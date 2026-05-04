@@ -1,0 +1,122 @@
+---
+type: decision
+id: DR-001
+status: open
+priority: P0
+revisit_trigger: "When a build/run audit, license review, and a small actor-feel prototype are all complete."
+---
+
+← [[decisions/index|decision records]] · [[spec/index|spec section]] · [[dashboards/research-readiness|readiness]] · [[design/opportunities-for-our-fork|fork opportunities]]
+
+# DR-001: Engine Strategy
+
+> [!info] Status: OPEN
+> No option locked for the **settled spec**. Prototype across multiple options freely. Recommendation: do not lock the authoritative engine choice until a build/runtime audit, a usage-ledger skim, and a minimum prototype evaluation are complete.
+
+## Context
+
+We need to decide how the future Cortex Command-like game inherits, replaces, or sidesteps the existing engine families:
+
+- CCCP unified repo (current active community continuation, AGPL-3.0).
+- C4 alternative continuation engine (older dependency stack, networking emphasis).
+- Greenfield engine in our preferred stack.
+- Compatibility-oriented rewrite that keeps `.rte` data but replaces the engine.
+
+This choice cascades across licensing, modding, networking posture, prototype velocity, scope risk, and community trust. It is the single most expensive reversible decision in the project.
+
+## Options
+
+| Option | Summary | Best Case | Worst Case |
+|---|---|---|---|
+| A. Fork CCCP | Build from active CCCP. | Inherit working engine, mods, content, mature Lua API. | AGPL-3.0 inheritance, opaque legacy code, slow modernization. |
+| B. Fork C4 | Build from C4 fork. | Older dependencies easier to swap; multiplayer code visible. | Less active upstream; archived signals; still legacy code burden. |
+| C. Greenfield engine | Build our own engine in modern stack. | Free of legacy debt; design replays/networking from day one. | Years before parity; loses moddability; community alienation risk. |
+| D. Compatibility rewrite | New engine that loads `.rte` data and supports a Lua subset. | Preserves community content; modern tech. | Schema and AI parity is a long tail; never quite "works for old mod X". |
+| E. Hybrid: greenfield core with optional CCCP-compat layer behind a flag | Modern core, opt-in compat. | Best of both with cost discipline. | Engineering complexity of two boundaries. |
+
+## Pros And Cons
+
+| Option | Pros | Cons | Unknowns |
+|---|---|---|---|
+| A | Working engine, mods, content, fast first prototype. | AGPL-3.0 viral; legacy network/AI/path code; modernization debt. | License compatibility with our distribution model. |
+| B | Easier dependency replacement; visible multiplayer/NAT code. | Less momentum; archived; lower mod compatibility. | Whether C4 even builds locally today. |
+| C | Clean architecture; replay/event/networking from day one; no legacy. | Loses community, content, modding momentum. | Time to first playable: 6-18 months. |
+| D | Preserves community while shedding old code. | INI/Lua compatibility is a long tail; partial parity hurts trust. | Number of community mods that still work after launch. |
+| E | Hybrid keeps escape hatch. | Two surfaces to maintain; fragmentation risk. | Whether a feature flag keeps both honest or just rotting. |
+
+## Evaluation
+
+| Lens | A. Fork CCCP | B. Fork C4 | C. Greenfield | D. Compat rewrite | E. Hybrid |
+|---|---|---|---|---|---|
+| Player value | Works on day one | Works on day one | Best long-term | Good | Best long-term |
+| Readability | Inherits friction | Inherits friction | Designable | Designable | Designable |
+| AI burden | Inherits hybrid Lua AI | Same | Build from scratch | Re-implement | Build from scratch + compat shim |
+| UX burden | Inherits old UI | Same | Designable | Designable | Designable |
+| Performance risk | Engine modernization debt | Same | Lowest | Medium | Medium |
+| Modding impact | Best (existing mods) | Good | Low (new format) | Best (compat) | Best (compat layer) |
+| Networking/replay | Inherits legacy code | Visible legacy | Architect from scratch | Architect from scratch | Architect from scratch |
+| Content cost | Lowest | Low | Highest | High | High |
+| Retention upside | Familiar | Familiar | Depends on hooks | Familiar | Familiar |
+| Ethics/fairness | AGPL-3.0 protects open community | Same | Designable | Designable | Designable |
+
+## Evidence
+
+| Evidence | Source | Confidence |
+|---|---|---|
+| CCCP is actively maintained and has unified source/data. | [[repos/cccp-active-unified-repo]] | High |
+| CCCP is AGPL-3.0. | CCCP repo `LICENSE` | High |
+| C4 has visible RakNet/NAT and multiplayer code. | [[repos/c4-continuation-engine]], [[engine/network-terrain-replication-lifecycle]] | High |
+| C4 last local commit is 2023-04-07; online metadata indicates archived. | [[repos/c4-continuation-engine]] | Medium |
+| CCCP networking code exists but is RakNet-era and bitmap-delta-based. | [[engine/network-terrain-replication-lifecycle]] | High |
+| Modding and migration are real product surfaces. | [[repos/legacy-mod-converter]], [[repos/cccp-vscode-extension]] | High |
+| CCCP modding ecosystem: mod.io CCCP, GitHub releases. | [[references/sources]] | High |
+
+## Current Recommendation
+
+Recommendation: **Do not lock**. Recommended sequencing before lock:
+
+1. Verify a clean local build of CCCP active and run the game (Linux/macOS via Meson).
+2. Perform a license review focused on AGPL-3.0 distribution constraints and any non-FOSS dependencies (RakNet license; FMOD if present; LuaJIT terms).
+3. Build a 2-week prototype of "actor feel + small terrain destruction" in our preferred greenfield stack.
+4. Only then choose between A, C, and D. Avoid B unless C4-only mods become a core promise.
+
+Why: each option has fundamentally different cost curves; the cheapest information per dollar is "can we even build CCCP?" and "how fast can we land a clean controller in a greenfield prototype?"
+
+## Prototype Or Validation Plan
+
+| Test | What It Proves | Pass/Fail |
+|---|---|---|
+| CCCP Linux build, run a vanilla mission. | Inheriting works at all. | Pass = playable; Fail = build broken. |
+| License review report (AGPL + deps). | Distribution feasibility. | Clean = continue; Conflicts = re-scope. |
+| Greenfield actor-feel prototype (controller + 200x200 terrain destruction). | Time-to-fun in our stack. | Pass = under 2 weeks to "fun"; Fail = > 4 weeks. |
+| `.rte` data parser proof-of-concept. | Compatibility option (D) is viable. | Pass = parses Base.rte without crashes; Fail = unblocked schema work needed. |
+
+## Risks
+
+| Risk | Mitigation |
+|---|---|
+| AGPL-3.0 viral concerns block our distribution model. | License review before any code reuse decision. |
+| Greenfield blows out schedule. | Strict time-box on prototype; explicit kill criteria. |
+| Compatibility rewrite never reaches parity. | Define a "supported subset"; document gracefully unsupported features. |
+| Choosing Option A locks us into legacy AI/network code that we then have to rewrite anyway. | Audit AI + networking before locking; budget rewrite as Phase 2. |
+| Community read of "fork vs new game" affects momentum. | Communicate honestly; preserve credit. |
+
+## Revisit Trigger
+
+Reopen this decision when:
+
+- Build/runtime audit completes (or fails).
+- License/reuse matrix decision (DR-010) is recorded.
+- Greenfield actor-feel prototype is benchmarked.
+- A new player-promise emerges (e.g. competitive PvP, paid mods) that materially changes the calculus.
+
+## Source Trail
+
+- [[repos/cccp-active-unified-repo]]
+- [[repos/c4-continuation-engine]]
+- [[comparisons/cccp-vs-c4]]
+- [[design/opportunities-for-our-fork]]
+- [[engine/architecture]]
+- [[engine/network-terrain-replication-lifecycle]]
+- [[systems/networking-backend-frontend]]
+- [[systems/modding-package-and-workbench]]
