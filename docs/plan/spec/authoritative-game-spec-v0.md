@@ -38,6 +38,7 @@ feeds:
   - DR-030
   - DR-031
   - DR-032
+  - DR-033
 ---
 
 ← [[spec/index|spec section]] · [[spec/prototype-roadmap|prototype roadmap]] · [[spec/prototype-implementation-backlog-slice-a|implementation backlog]] · [[dashboards/research-readiness|readiness]] · [[dashboards/system-heatmap|system heatmap]] · [[decisions/index|decisions]] · [[prototypes/index|prototype evidence]] · [root plan](../../VAULT_PLAN.md)
@@ -119,6 +120,7 @@ These are v0 product-direction commitments. They still need prototype evidence b
 | First playable | A single-actor lab grows into a repeatable Breach Contract proof mission before campaign breadth. | [[spec/prototype-implementation-backlog-slice-a]], [[spec/mission-director-slice-a]]. |
 | Direct control | Player movement, aim, weapon, tool, damage/status, and recovery loops are first-class, but bodies must remain AI-usable when not possessed. | A1 actor-feel runs, A-FEEL tests, DR-015 commander-only and handoff tests. |
 | Destructible terrain | Terrain and material affordances are core to navigation, combat, tools, AI, missions, replay, and UX. | MAT-T terrain/material sandbox tests. |
+| Full physical collision | **Everything physical collides by default** unless an explicit tested filter says otherwise (DR-033). Weapons, limbs, bodies, armor, mechs, terrain, objects, shields, debris, base parts, and projectiles are physical systems. Projectile-projectile contact is in scope; kinetic bullet-bullet contact deflects/fragments/loses energy unless authored explosive/fuze behavior says otherwise. Physics impulse can damage limbs, armor, equipment, chassis modules, terrain, and base objects. | [[decisions/dr-033-full-collision-physics-direction]], [[spec/full-collision-physics-plan]], M5.5 COLL-001..COLL-012. |
 | Replay/debug | Every meaningful prototype must produce inspectable run evidence. | [[references/prototype-run-bundle-schema]], [[spec/replay-recorder-slice-a]]. |
 | AI trust | Friendly AI is a launch-quality bar, not decoration, but only proven harness behavior can be promised. | AI-H and AI-EQ tests. |
 | Loadout/workbench | Equipment roles, source provenance, bot suitability, package warnings, and mission capabilities must be visible. | LOAD-A, LOAD-R, LOAD-W, LOAD-FIELD, and PACK tests. |

@@ -35,9 +35,11 @@ feeds:
   - DR-029
   - DR-030
   - DR-031
+  - DR-032
+  - DR-033
 ---
 
-<- [[spec/index|spec section]] · [[spec/prototype-roadmap|native roadmap]] · [[spec/authoritative-game-spec-v0|game spec v0]] · [[spec/ai-control-observability-layer|AI control/observability]] · [[references/prototype-run-bundle-schema|run-bundle schema]] · [VAULT_PLAN.md](../../VAULT_PLAN.md)
+<- [[spec/index|spec section]] · [[spec/prototype-roadmap|native roadmap]] · [[spec/authoritative-game-spec-v0|game spec v0]] · [[spec/full-collision-physics-plan|full collision plan]] · [[spec/ai-control-observability-layer|AI control/observability]] · [[references/prototype-run-bundle-schema|run-bundle schema]] · [VAULT_PLAN.md](../../VAULT_PLAN.md)
 
 # Native Implementation Backlog
 
@@ -237,6 +239,42 @@ cargo run -p cx-e2e -- --scenario m5_chassis_wreck_eject --expect pilot_extracte
 
 ---
 
+## M5.5 — Full Collision Gauntlet
+
+> [!important] Kickoff prerequisites
+> M2, M3, and M5 must be complete enough to provide terrain chunk proxies, replay/run-bundle events, and body/chassis/equipment proxy identities. Read [[spec/full-collision-physics-plan]] and [[decisions/dr-033-full-collision-physics-direction]] in full BEFORE feature work. Run [M5.5 Kickoff Smoke](../spec/prototype-roadmap.md#per-milestone-kickoff-smoke). M5.5 is not done until COLL-001..COLL-012 pass and the run replays headlessly with collision checksums.
+
+> [!warning] Hard rules
+> Everything physical collides by default unless a tested `collision_filter_reason` says otherwise. Do not brute-force all-pairs. Use broadphase, collision classes, proxies, CCD tiers, and deterministic pair ordering. Projectile-projectile collision is required for physical projectile classes; cosmetic tracers can be non-physical only if the actual projectile record still carries gameplay collision.
+
+| ID | Owns | Build | Tests | Evidence | Anti-scope |
+|---|---|---|---|---|---|
+| M5.5-001 collision class registry | `cx-physics`, `cx-mod`, `content/collision/` | Define physical classes from [[spec/full-collision-physics-plan]]: actor core, limb, armor zone, held weapon, loose item, kinetic projectile, explosive projectile, terrain proxy, debris chunk, mech part, base object, force field, sensor trigger, cosmetic particle. | Registry roundtrip; missing-class validation; class-id stability test. | `collision_class_registered` or schema audit in run note. | No gameplay behavior yet. |
+| M5.5-002 collision matrix + filters | `cx-physics`, `cx-mod` | Data-driven matrix with collide/sensor/filter/damage response; every filter requires `collision_filter_reason`. | COLL-001; bad matrix fixtures fail with useful diagnostics. | Matrix file and validator report. | No silent ignore pairs. |
+| M5.5-003 broadphase and pair cache | `cx-physics`, `cx-bench` | Dynamic tree/spatial hash hybrid; stable pair ids; deterministic pair ordering; projectile lane cache. | Pair-count tests; deterministic ordering; stress bench. | Perf counters: candidate pairs, narrowphase pairs, culled low-value pairs. | No O(n^2) production path. |
+| M5.5-004 narrowphase/contact manifolds | `cx-physics` | Contact manifolds for circle/capsule/convex/AABB/segment/terrain-proxy pairs; material pair lookup. | Shape-pair unit tests; edge/tiny-hole fixtures. | `collision_contact_started/persisted/ended`. | No exact per-pixel rigid body solver. |
+| M5.5-005 CCD tiers | `cx-physics`, `cx-bench` | Discrete, speculative, sweep ray, sweep capsule, sweep shape, TOI substep; per-class `ccd_class`. | COLL-007; tunneling fixtures for thin terrain, limb, shield, bullet, mech foot. | `toi_fraction` and CCD-tier fields in events. | No universal TOI for all debris. |
+| M5.5-006 projectile-projectile contacts | `cx-physics`, `cx-equipment`, `content/projectiles/` | Swept projectile lane test; kinetic deflect/fragment/tumble/energy loss; explosive detonate/fuze-fail/deflect by profile. | COLL-006; deterministic bullet-cross fixtures. | `projectile_projectile_contact`, `projectile_deflected`, optional `projectile_fragmented`. | No fake random explosions for kinetic rounds. |
+| M5.5-007 limb/equipment/body contacts | `cx-actor`, `cx-chassis`, `cx-equipment`, `cx-physics` | Limb-to-limb/body/weapon/terrain/door contacts; held weapon physical contacts; scoped owner self-filter; dropped item contacts. | COLL-002..COLL-004; crowd corridor fixture. | Contact events plus body/equipment/chassis follow-up events. | No animation-only collision. |
+| M5.5-008 impulse-to-damage routing | `cx-physics`, `cx-actor`, `cx-chassis`, `cx-equipment`, `cx-terrain` | Convert contact impulse/material/area/sharpness into limb wounds, armor crack/spall, equipment jam/damage, chassis module failure, terrain/base damage. | COLL-005, COLL-008; threshold tests by material/origin. | `contact_impulse_applied`, `collision_damage_applied`, parent-linked body/equipment/terrain events. | No hidden HP-only damage. |
+| M5.5-009 terrain/base/shield proxies | `cx-terrain`, `cx-mission`, `cx-physics` | Dirty chunk collision proxy rebuilds; doors/turrets/sensors/shields/repair pads register physical or sensor proxies. | Chunk seam tests; shield/body/projectile/base fixtures. | Terrain dirty-to-proxy events; base object contact events. | No full base builder here. |
+| M5.5-010 `cxctl` collision observation | `cx-control`, `cxctl`, `cx-physics` | `cxctl observe --collisions` and `cxctl inspect collision <event-id>` show live pairs, filters, last contacts, TOI, impulses, and budget status. | CLI snapshot tests; stream freshness tests. | Observation samples in run notes. | No screenshot-only physics debugging. |
+| M5.5-011 full gauntlet scenario | `content/scenarios/m5_5_full_collision_gauntlet.ron`, `cx-e2e` | Scenario scripts for COLL-001..COLL-012: crowd corridor, bullet cross, limb/weapon/door, debris crush, mech foot, shield, terrain seams. | Full E2E suite. | Checked run bundle with event counts by collision type. | No hand-tested-only acceptance. |
+| M5.5-012 replay/perf/bug hunt | `cx-headless`, `cx-bench`, `tools/`, vault | Headless replay checksum; perf report; first-divergence event; bug-hunt log. | Replay verify; 1080p/60 pass; 4K/120 + Deck status recorded. | Prototype note under `prototypes/` with final audit and known issues. | No "works once" completion. |
+
+M5.5 E2E:
+
+```bash
+cargo run -p cx-e2e -- --scenario m5_5_full_collision_gauntlet --suite COLL-001..COLL-012 --write-run-bundle
+cargo run -p cxctl -- observe --collisions --stream --hz 30 --scenario m5_5_full_collision_gauntlet
+cargo run -p cx-headless -- replay prototype_runs/native/<m5_5_run> --verify-checksums
+cargo run -p cx-bench -- --scenario m5_5_full_collision_gauntlet --profile collision
+```
+
+Human gate: project-owner may play the gauntlet for feel, but all COLL-* tests are agent-completable.
+
+---
+
 ## M6 — AI Core And Trust Harness
 
 | ID | Owns | Build | Tests | Evidence | Anti-scope |
@@ -377,6 +415,7 @@ These side tracks are not separate "later" workstreams. Every milestone final au
 |---|---|---|---|
 | T-PLATFORM | M0 | Keep current-platform commands passing; preserve Win/Linux/macOS portability in paths, file watching, case sensitivity, GPU backend assumptions, and input/audio setup. | Validation log; CI log when available. |
 | T-CONTROL | M0 | Add semantic control/observation coverage for every new gameplay/UI action; prefer `cxctl` for E2E; record debug capabilities in the manifest. | `cxctl` command log, observation sample, and run-bundle events. |
+| T-PHYS | M0 | Any new gameplay object that is physical gets a collision class/proxy/matrix entry/event policy or a tested cosmetic/sensor/filter reason. | Collision matrix diff, `collision.*` event sample, or explicit `collision_filter_reason`. |
 | T-MOD | M5 | Any new gameplay data should be data-driven unless hardcoded as a deliberate prototype shortcut; shortcuts must be named. | Schema/fixture test or explicit shortcut note. |
 | T-AUDIO | M4 | Any player-facing combat, mech, command-core, alarm, or UI feedback that needs sound later should emit an event/caption hook now. | Event/caption hook in run bundle. |
 | T-SAVE | M5 | New persistent identity/state must define save ownership even if no final save UI exists. | Save/load roundtrip or "not persistent yet" note. |

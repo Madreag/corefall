@@ -11,9 +11,10 @@ feeds:
   - DR-012
   - DR-013
   - DR-024
+  - DR-033
 ---
 
-← [[references/sources|sources]] · [[spec/prototype-roadmap|native roadmap]] · [[spec/native-implementation-backlog|native backlog]] · [[spec/prototype-implementation-backlog-slice-a|historical Slice-A backlog]] · [[spec/replay-recorder-slice-a|recorder Slice A]] · [[spec/accessibility-comfort-slice-a|accessibility/comfort Slice A]] · [[decisions/dr-013-backend-service-scope|DR-013 backend scope]] · [[systems/replay-determinism-and-run-evidence|determinism/run evidence]] · [[spec/actor-feel-sandbox-slice-a|actor-feel Slice A]] · [[spec/terrain-material-sandbox-slice-a|terrain/material Slice A]]
+← [[references/sources|sources]] · [[spec/prototype-roadmap|native roadmap]] · [[spec/native-implementation-backlog|native backlog]] · [[spec/full-collision-physics-plan|full collision plan]] · [[spec/prototype-implementation-backlog-slice-a|historical Slice-A backlog]] · [[spec/replay-recorder-slice-a|recorder Slice A]] · [[spec/accessibility-comfort-slice-a|accessibility/comfort Slice A]] · [[decisions/dr-013-backend-service-scope|DR-013 backend scope]] · [[systems/replay-determinism-and-run-evidence|determinism/run evidence]] · [[spec/actor-feel-sandbox-slice-a|actor-feel Slice A]] · [[spec/terrain-material-sandbox-slice-a|terrain/material Slice A]]
 
 # Prototype Run Bundle Schema
 
@@ -75,6 +76,7 @@ Good/Bad/Meh should be about observed play and debug evidence, not only personal
 | `input` | `input_intent`, `tool_selected_for_material` | Actor feel, replay, future net prediction, AI harness. |
 | `control` | `control_command_received`, `control_command_accepted`, `control_command_rejected`, `control_observation_sent`, `control_assertion_result` | AI/Codex automation, E2E tests, future bot SDK, replay/debug evidence. |
 | `mind` | `mind.task_created`, `mind.prompt_recorded` (hashes by default; raw text only when `manifest.capabilities.debug` is true), `mind.response_received`, `mind.proposal_validated`, `mind.patch_applied`, `mind.patch_rejected`, `mind.memory_written` | Async LLM mind layer (DR-032 / [[spec/hybrid-llm-ai-plan]]); audit prompt/response provenance, validator decisions, applied patches, structured memory writes; secrets redacted by default. |
+| `collision` | `collision_pair_created`, `collision_contact_started`, `collision_contact_persisted`, `collision_contact_ended`, `contact_impulse_applied`, `projectile_deflected`, `projectile_projectile_contact`, `collision_filter_applied`, `collision_damage_applied`, `collision_budget_degraded`, `collision_first_divergence` | T-PHYS / DR-033 full collision evidence; inspect contact pairs, filter reasons, projectile-projectile results, impulse-to-damage routing, and replay divergence. |
 | `combat` | `weapon_fired`, `projectile_spawned`, `projectile_hit_mo`, `weapon_reloaded` | Damage readability, replay, equipment balance. |
 | `body` | `wound_added`, `actor_status_changed`, `body_gibbed`, `inventory_dropped` | HUD, death recap, UX trust. |
 | `terrain` | `terrain_material_probe`, `terrain_penetration_threshold`, `terrain_carve_mask`, `terrain_fill_or_repair`, `path_material_refresh` | Terrain model, AI path trust, networking bandwidth. |
@@ -99,6 +101,7 @@ Good/Bad/Meh should be about observed play and debug evidence, not only personal
 | M3 replay/event recorder | Event cause chains, snapshots, dropped-event counters, deterministic replay checks, and viewer artifacts are present enough to debug a run without watching it live. |
 | M4 HUD/comic-noir UI | HUD, overlays, death/material explanations, accessibility settings, caption evidence, and screenshots/captures show the player-facing state clearly. |
 | M5 equipment/chassis | Item role labels, damage-stage state, armor/chassis effects, bot-usable fields, loadout validation, repair/salvage, and ejection/disable evidence are captured. |
+| M5.5 full collision gauntlet | `collision.*` events captured for collision matrix coverage, limb/body/equipment/mech/base/projectile contacts, projectile-projectile deflection/fuze/detonation cases, CCD/tunneling fixtures, impulse-to-damage routing, collision-filter reasons, `cxctl observe --collisions`, perf counters, and headless replay checksums. |
 | M6 AI trust harness | Bot intent, perception facts, doctrine/personality labels, mistakes, recovery actions, blocked-path reasons, and explanation overlays are captured by AI-H scenarios. |
 | M6.5 LLM mind lab | `mind.*` events captured for every task: prompt hash (raw text only when `debug` capability is on), response hash, validator result with reasons, applied patch ids, rejected proposals, memory writes; mock-provider runs are deterministic; live provider runs are flagged but never required for CI. |
 | M7 mission director | Manifest-driven objectives, director events, command-core/base-power state, debrief/retry state, and scenario completion/failure evidence are captured. |

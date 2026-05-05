@@ -11,9 +11,10 @@ feeds:
   - DR-013
   - DR-022
   - DR-024
+  - DR-033
 ---
 
-<- [[spec/index|spec section]] · [[spec/prototype-roadmap|native roadmap]] · [[spec/native-implementation-backlog|native backlog]] · [[references/prototype-run-bundle-schema|run-bundle schema]]
+<- [[spec/index|spec section]] · [[spec/prototype-roadmap|native roadmap]] · [[spec/native-implementation-backlog|native backlog]] · [[spec/full-collision-physics-plan|full collision plan]] · [[references/prototype-run-bundle-schema|run-bundle schema]]
 
 # AI Control And Observability Layer
 
@@ -111,6 +112,7 @@ Every observation packet should include enough data for an AI agent to decide an
 | UI tree | windows, panels, buttons, sliders, lists, focus target, stable ids, text, enabled/disabled state, bounds. |
 | Audio/caption feed | caption id, source, priority, spatial hint, transcript, alert class. |
 | Recent events | input, combat, body, terrain, AI, mission, UI, performance, warnings, errors, parent-event chain. |
+| Collision state | Current contact pairs, collision filters, contact normals, TOI, impulse summaries, projectile deflections, recent collision damage, and collision budget status. |
 | Performance | frame time, sim tick cost, event volume, control API latency, dropped observation frames. |
 
 ## Action Model
@@ -136,6 +138,7 @@ During development, invoke the CLI as `cargo run -p cxctl -- ...` until a local 
 cxctl scenario load micro_breach --seed 42
 cxctl observe --once --format json
 cxctl observe --stream --hz 30
+cxctl observe --collisions --stream --hz 30
 cxctl act move --x 1.0
 cxctl act aim --world 320,140
 cxctl act fire --pressed true
@@ -177,6 +180,7 @@ cxctl replay verify prototype_runs/native/<run_id>
 | M3 | Replay control commands and verify action/event timing. |
 | M4 | Expose semantic UI tree and UI actions; screenshots become audit evidence, not control dependency. |
 | M5 | Expose equipment, chassis, armor, damage-stage, eject, repair, and salvage observations/actions. |
+| M5.5 | Expose `cxctl observe --collisions` and `cxctl inspect collision <event-id>` for collision matrix, live contacts, filters, projectile-projectile outcomes, impulse damage, CCD/TOI, and collision budget state (see [[spec/full-collision-physics-plan]] and [[decisions/dr-033-full-collision-physics-direction]]). |
 | M6 | Reuse the same layer for AI-H harness bots; bot decisions cite observation fields and event ids. |
 | M6.5 | Derive `MindObservationFrame` from this layer with fog-of-war filtering; expose `cxctl observe --mind-frame <scope>` for LLM mind workers (see [[spec/hybrid-llm-ai-plan]] and [[decisions/dr-032-hybrid-llm-ai-direction]]). |
 | M7 | Scenario director, command-core/base-power, debrief, and retry are controllable/queryable. |
@@ -188,6 +192,19 @@ cxctl replay verify prototype_runs/native/<run_id>
 The full observation stream is the source of truth. Mind workers (LLM advisors, DR-032 / [[spec/hybrid-llm-ai-plan]]) consume a **derived, compact, fog-of-war-filtered subset** called `MindObservationFrame`. The compressor lives in `cx-ai::mind::compressor` and reads from this layer. Fog-of-war is enforced **before** any provider sees a prompt.
 
 `cxctl observe --mind-frame <scope>` returns a single frame for `actor`, `squad`, `faction`, `mission_director`, or `post_mission` scope (with optional `--ref <id>` to pin the subject). This is the same semantic surface that mind workers consume; CI uses it for fairness audits.
+
+### Derived: Collision Observation Frames
+
+The full observation stream also exposes a collision-focused view for T-PHYS and M5.5. `cxctl observe --collisions` returns:
+
+- active pair ids, entity ids, collision classes, and filter reasons;
+- contact point, normal, TOI fraction, relative velocity, and impulse summary;
+- recent `collision.*` events with parent cause chains;
+- projectile-projectile outcomes such as deflect, fragment, fuze-fail, or detonate;
+- low-value contact budget/degradation counters;
+- first-divergence data during replay verification.
+
+This view is mandatory for implementation agents. They should be able to debug collision without repeatedly screenshotting the app.
 
 ## Definition Of Done
 
@@ -201,6 +218,7 @@ The full observation stream is the source of truth. Mind workers (LLM advisors, 
 
 - [[spec/prototype-roadmap]] — pinned transport, CLI reference, repository layout, kickoff smoke.
 - [[spec/native-implementation-backlog]] — M0-006 control bootstrap task card, milestone integration tasks.
+- [[spec/full-collision-physics-plan]] — collision observation and M5.5 T-PHYS contract.
 - [[references/prototype-run-bundle-schema]] — `control` event category and run-bundle gates.
 - [[systems/replay-determinism-and-run-evidence]] — deterministic-island contract.
 - [[spec/ai-trust-harness-slice-a]] — AI-H scenario runner reuses this layer.

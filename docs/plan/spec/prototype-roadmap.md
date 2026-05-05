@@ -2,7 +2,7 @@
 type: spec
 status: planning-anchor-v0
 authority: "Native build roadmap (Rust + Bevy/wgpu hybrid + custom core crates). Replaces the prior browser-lab-flavored roadmap. Specific tickets/timelines remain open."
-last_updated: 2026-05-04
+last_updated: 2026-05-05
 ready_when: "M0..M3 land in the native repo and produce a playable, AI-controllable, replay-recordable, terrain-mutable single-actor scene that supersedes the HTML lab as the iteration harness."
 feeds:
   - DR-001
@@ -36,9 +36,11 @@ feeds:
   - DR-029
   - DR-030
   - DR-031
+  - DR-032
+  - DR-033
 ---
 
-← [[spec/index|spec section]] · [[spec/authoritative-game-spec-v0|game spec v0]] · [[spec/native-implementation-backlog|native backlog]] · [[spec/ai-control-observability-layer|AI control/observability]] · [[spec/prototype-implementation-backlog-slice-a|historical HTML backlog]] · [[dashboards/research-readiness|readiness]] · [[decisions/index|decisions]] · [VAULT_PLAN.md](../../VAULT_PLAN.md) · [HTML-era snapshot](../research-log/2026-05-04-prototype-roadmap-html-snapshot.md)
+← [[spec/index|spec section]] · [[spec/authoritative-game-spec-v0|game spec v0]] · [[spec/native-implementation-backlog|native backlog]] · [[spec/full-collision-physics-plan|full collision plan]] · [[spec/ai-control-observability-layer|AI control/observability]] · [[spec/prototype-implementation-backlog-slice-a|historical HTML backlog]] · [[dashboards/research-readiness|readiness]] · [[decisions/index|decisions]] · [VAULT_PLAN.md](../../VAULT_PLAN.md) · [HTML-era snapshot](../research-log/2026-05-04-prototype-roadmap-html-snapshot.md)
 
 # Native Build Roadmap
 
@@ -83,6 +85,7 @@ feeds:
   - [M3 — Replay And Event Recorder](#m3--replay-and-event-recorder)
   - [M4 — HUD And Comic-Noir UI](#m4--hud-and-comic-noir-ui)
   - [M5 — Equipment, Chassis, And Damage Grammar](#m5--equipment-chassis-and-damage-grammar)
+  - [M5.5 — Full Collision Gauntlet](#m55--full-collision-gauntlet)
   - [M6 — AI Core And Trust Harness](#m6--ai-core-and-trust-harness)
   - [M6.5 — LLM Mind Lab](#m65--llm-mind-lab)
   - [M7 — Mission Director And Breach Contract Proof Mission](#m7--mission-director-and-breach-contract-proof-mission)
@@ -94,6 +97,7 @@ feeds:
 - [Side Track Details](#side-track-details)
   - [T-CONTROL — AI Control And Observability](#t-control--ai-control-and-observability)
   - [T-LLM — Async LLM Mind Layer](#t-llm--async-llm-mind-layer)
+  - [T-PHYS — Full Collision And Physical Consequence](#t-phys--full-collision-and-physical-consequence)
   - [T-PLATFORM — Cross-Platform CI And Steam Deck](#t-platform--cross-platform-ci-and-steam-deck)
   - [T-MOD — Modding And Scripting](#t-mod--modding-and-scripting)
   - [T-AUDIO — Diegetic SFX And Captions](#t-audio--diegetic-sfx-and-captions)
@@ -134,10 +138,17 @@ A junior agent must never have to guess what these words mean. If a term is used
 | **Action** | A semantic player-or-AI request to do something (move, fire, click UI). Routed through `cx-control` and consumed by sim systems on the next fixed tick. |
 | **Anti-scope** | What a task card must NOT grow into. If you start drifting toward an anti-scope item, stop and write a follow-up task card instead. |
 | **Bevy version** | Pinned in `Cargo.toml`; do not bump without a milestone's explicit upgrade task. |
+| **Broadphase** | The cheap first collision pass that finds possible pairs using spatial structures. Required before narrowphase; brute-force all-pairs is not acceptable for gameplay scale. |
 | **Capability gate** | A flag in the run manifest that explicitly enables a debug-only or remote-access feature. Default off. |
 | **Chassis** | An armor/mech/origin grouping with layered armor zones, modules, and pilot binding. See [[spec/chassis-armor-mechs-and-origins]]. |
 | **Checksum** | A bit-deterministic hash of actor/terrain/inventory state at a given tick used to detect replay drift. Algorithm: blake3. |
+| **CCD** | Continuous collision detection. Used for fast or important bodies so projectiles, limbs, and mech parts do not tunnel through terrain, actors, shields, or each other. |
+| **Collision class** | A named physical class (`actor_limb`, `held_weapon`, `projectile_kinetic`, `terrain_proxy`, etc.) that drives matrix rules, filters, CCD tier, and events. |
+| **Collision filter reason** | Required reason string whenever two physical classes do NOT collide. Silent missing pairs are bugs. |
+| **Collision matrix** | Data table that says which collision classes collide, sense, filter, damage, or ignore. M5.5 fails if a physical pair has no rule. |
+| **Collision proxy** | Simplified shape used for physics/contact instead of raw art pixels. Examples: capsule limb, convex weapon, chunk terrain outline. |
 | **Command core** | The rooted/uprooted/embedded strategic object that powers the base or boosts a chassis avatar. See [[spec/command-core-base-power]]. |
+| **Contact manifold** | Narrowphase contact result: contact points, normal, depth, time-of-impact fraction, and impulse data. |
 | **`cx-app`** | The Bevy app shell binary; the launcher that wires plugins. |
 | **`cx-control`** | The crate that owns command/observation/UI-tree schemas and the local control server. |
 | **`cxctl`** | The CLI binary for AI/dev control. During M0..M1 use `cargo run -p cxctl -- <subcommand>`; once installed/PATH-ed, `cxctl <subcommand>` is shorthand. |
@@ -149,6 +160,7 @@ A junior agent must never have to guess what these words mean. If a term is used
 | **Event** | A typed record emitted by sim systems (combat/body/terrain/AI/mission/control/system/etc.). All player-visible behavior emits events. |
 | **Event id** | Stable id of the form `<run_id>:<tick>:<seq>`. Globally unique per run. Used for parent-cause chains. |
 | **Fixed tick** | The 60 Hz (or 120 Hz) sim cadence; render is decoupled and interpolates between ticks. |
+| **Full collision** | Product promise that everything physical has collision identity and consequence unless explicitly filtered with tests and replay visibility. It does not mean naive all-pairs simulation. |
 | **Junior agent** | The default reader/implementer of this roadmap. Treat them as competent in Rust and game programming basics, but assume they have NOT read CCCP source, the prior HTML lab, or the rest of this vault. |
 | **`AiMindProposal`** | The strict-schema output an LLM mind worker may produce. Doctrine patches, squad orders, dialogue, memory writes; never raw actions. See [[spec/hybrid-llm-ai-plan]]. |
 | **Manifest (run)** | `run_manifest.json` inside a run bundle. Identifies build, scenario, seed, schema versions, capabilities, expected tests. |
@@ -159,7 +171,9 @@ A junior agent must never have to guess what these words mean. If a term is used
 | **Manifest (scenario)** | RON file in `content/scenarios/` describing teams, objectives, materials, command core, base systems, capability requirements, director config, save fields. |
 | **Mission director** | The system that paces a scenario: reinforcement, LZ risk, objective escalation. Emits commander-decision events with reason labels. |
 | **Module** | A chassis subcomponent with damage states (jet, shield, sensor, repair-drone, weapon-mount). Failures emit reason-labeled events. |
+| **Narrowphase** | The exact collision pass for candidate pairs found by broadphase. Produces contact manifolds, TOI, impulses, and damage inputs. |
 | **Observation** | A structured snapshot of game state delivered to `cxctl`/control clients. Includes clock, player context, actors, equipment, terrain patch, objectives, UI tree, captions, recent events, perf counters. |
+| **Projectile-projectile collision** | Physical projectile contact such as bullet-bullet, bullet-rocket, or shell-shell. Kinetic rounds deflect/fragment/lose energy; explosive rounds may detonate or fuze-fail by profile. |
 | **Reason label** | A short string explaining WHY the AI/mission/refusal/warning fired. Required on every AI choice and refusal. |
 | **Recoil impulse** | The instantaneous velocity change applied to the firing actor; configurable per weapon preset. |
 | **Role record** | The shared item meaning consumed by AI, UI, modding, balance, replay, backend, mission. See [[spec/equipment-loadout]]. |
@@ -169,10 +183,12 @@ A junior agent must never have to guess what these words mean. If a term is used
 | **Scenario** | A single playable unit identified by an id (`m0_blank`, `m1_actor_range`, `micro_breach`, `breach_contract`, ...). Loaded from a scenario manifest. |
 | **Scenario id** | The string used by `--scenario <id>` flags. Maps 1:1 to a manifest file in `content/scenarios/<id>.ron`. |
 | **Seed** | A `u64` deterministic seed for the run's RNG. Default: read from manifest; overridable via `--seed <u64>`. |
-| **Side track** | A cross-cutting concern (T-CONTROL, T-PLATFORM, T-MOD, T-AUDIO, T-SAVE, T-ACCESSIBILITY, T-PERF) with its own done-criteria that intersect every milestone. |
+| **Side track** | A cross-cutting concern (T-CONTROL, T-LLM, T-PHYS, T-PLATFORM, T-MOD, T-AUDIO, T-SAVE, T-ACCESSIBILITY, T-PERF) with its own done-criteria that intersect every milestone. |
 | **Snapshot** | A periodic full state dump (actor/inventory/terrain) used for replay anchoring and drift detection. |
 | **Soft breach** | M1.5's stub destructible surface; replaced by M2's full chunked terrain without breaking replay consumers. |
+| **Swept shape** | A moving ray/capsule/convex proxy tested across a tick to find impact before tunneling can occur. |
 | **Tick** | A discrete sim step. Tick 0 is scenario start. Ticks are u64 monotonic. |
+| **TOI** | Time of impact. Fraction of a tick at which a swept contact occurs. Used for high-speed projectile and critical body contacts. |
 | **UI tree** | The structured representation of every UI element by stable id, role, label, state, bounds. Queryable/clickable through `cxctl ui ...`. |
 | **World units** | Pixel-space coordinates. 1 unit = 1 logical pixel. Y is up. Origin at scene's defined anchor. |
 
@@ -323,6 +339,7 @@ The milestone is fully done when:
 | Content economy | Premium game + free modding. Expansions/DLC/cosmetics later. No core-mechanic monetization (DR-031). |
 | Modding | Schema-first + scripting (Lua/Rhai TBD); package builder + validator; first-class at launch (DR-006). |
 | Async LLM mind layer | Optional async "mind" workers (cloud or local) propose doctrine, memory, personality, debriefs, commander adaptation through strict `AiMindProposal` schemas. **Local AI never blocks on an LLM. No API key required for the core game, CI, or AI-H** (DR-032). See T-LLM + M6.5. |
+| Physical collision | Full collision is a core game-feel promise: weapons, limbs, bodies, armor, mechs, objects, terrain, shields, base parts, debris, and projectiles collide by default unless an explicit tested filter says otherwise. Implemented through T-PHYS + M5.5 (DR-033), not brute-force all-pairs. |
 
 ---
 
@@ -336,6 +353,7 @@ The milestone is fully done when:
 | ECS | Bevy ECS | Schedule, parallelism, world model are excellent. Custom systems plug in cleanly. |
 | Sim core | **Custom crate** with fixed-tick scheduler | Bevy's frame loop is for rendering; sim must run on a fixed-tick deterministic island. |
 | Pixel terrain | **Custom crate** | Chunked, GPU-assisted, mutable per-pixel material. Off-the-shelf has no answer. |
+| Physics/collision | **Custom crate** with staged broadphase/narrowphase/CCD | Need full collision matrix, projectile-projectile contacts, terrain chunk proxies, limb/equipment/mech contacts, impulse-to-damage, replay-visible contact events, and 4K/120 budgets (DR-033). |
 | Body/chassis/mech model | **Custom crate** | DR-014/021 chassis grammar is unique to this project. |
 | AI | **Custom crate** | DR-022 humanlike-bar means perception/memory/doctrine/adaptation; not off-the-shelf. |
 | Replay/event | **Custom crate** | DR-002/DR-018 event taxonomy + scenario manifest + run-bundle schema. |
@@ -1198,6 +1216,8 @@ Some milestones produce stubs that later milestones must replace without breakin
 | Mini HUD → comic-noir HUD | M1.5/M4 | M4/M7 | Mini HUD writes status to the same `cx-ui::HudState` resource M4 reads. Adding fields is allowed; renames require a migration entry. |
 | Scenario manifest skeleton → full schema | M0/M1.5 | M7 | Scenario RON files bump `schema_version` only with a registered migration handler. Older scenarios continue to load via migration. |
 | Save stub → real save | M5 | T-SAVE | M5 writes a save with the v0.1 format. Each subsequent milestone that adds save fields bumps `schema_version` and registers a migration. |
+| Body/chassis proxies → full collision matrix | M5 | M5.5 | M5 owns limb, armor, equipment, and chassis proxy identity. M5.5 fills the collision matrix, broadphase/narrowphase pipeline, CCD tiers, contact events, and impulse-to-damage routing without changing M5 public component ids. |
+| Full collision affordances → AI trust harness | M5.5 | M6 | M6 AI reads collision affordances and events from M5.5: body blocking, debris obstruction, projectile danger, doors/shields, and collision damage reasons. AI must not ignore physical contacts. |
 | Replay event taxonomy → headless replay | M3 | M9 | All M3 events MUST be deterministically reproducible from manifest+seed+inputs. Cosmetic-only events are flagged with `cosmetic: true` and excluded from replay verification. |
 | Per-client bundles → align tick-for-tick | M10 | M11/M12 | Bundles share `run_id`; per-client bundles use `<run_id>__client_<role>` directory suffix. |
 | Local AI doctrine/blackboard hooks → LLM mind layer | M6 | M6.5 | M6 exposes hook points: utility-weight patch API, commander-blackboard goal API, doctrine-tag set API, dialogue-queue API, memory-write API. M6.5 wires `cx-ai::mind::policy` to those hooks. M6 must NEVER call the LLM layer directly; it only exposes the hooks. |
@@ -1224,6 +1244,7 @@ Before doing any feature work, the agent runs the milestone's kickoff smoke. If 
 | M3 | `cargo run -p cx-headless -- replay prototype_runs/native/<m2_run> --verify-checksums` | Headless replay matches checksums. |
 | M4 | `cargo run -p cx-e2e -- --scenario micro_breach --ui-scale 2.0 --high-contrast --verify-focus --write-run-bundle` | UI passes ACC-A floor. |
 | M5 | `cargo run -p cx-e2e -- --scenario m5_chassis_wreck_eject --expect pilot_extracted --write-run-bundle` | Chassis grammar end-to-end. |
+| M5.5 | `cargo run -p cx-e2e -- --scenario m5_5_full_collision_gauntlet --suite COLL-001..COLL-012 --write-run-bundle` | Full collision matrix, CCD, projectile-projectile, impulse damage, replay, and perf evidence exist. |
 | M6 | `cargo run -p cx-ai --bin ai_harness -- --suite AI-H-01..AI-H-06 --write-run-bundle` | Harness suite passes. |
 | M6.5 | `cargo run -p cx-ai --bin mind_lab -- --suite MIND-001..MIND-010 --provider mock --write-run-bundle` | Mind lab suite passes against mock; local AI keeps acting through provider sleep/fail/stale; replay shows mind events. |
 | M7 | `cargo run -p cx-e2e -- --scenario breach_contract --script win_path --expect win --write-run-bundle` | Breach Contract win path is real. |
@@ -1246,9 +1267,10 @@ Before doing any feature work, the agent runs the milestone's kickoff smoke. If 
 | M3 | Replay + Event Recorder | Event taxonomy + run bundle + snapshot/checksum + headless replay | M0..M2 | Yes |
 | M4 | HUD + Comic-Noir UI | HUD reads sim state; comic-noir cards; accessibility floor | M1, M3 | Yes |
 | M5 | Equipment + Chassis + Damage Grammar | Role records; modules; armor layers; jam/eject/repair/salvage events | M1, M3 | Yes |
-| M6 | AI Core + Trust Harness | Perception/memory/utility/doctrine; reason-label events; AI-H scenario runner | M1, M3, M5 | Yes |
+| M5.5 | Full Collision Gauntlet | Collision matrix; limb/equipment/body/mech/base/projectile contacts; projectile-projectile; CCD; impulse damage; collision events; replay/perf proof | M2, M3, M5 | Yes |
+| M6 | AI Core + Trust Harness | Perception/memory/utility/doctrine; reason-label events; AI-H scenario runner | M1, M3, M5.5 | Yes |
 | M6.5 | LLM Mind Lab | Async LLM mind layer with strict schemas, mock provider, validator, policy compiler, replay logging, deterministic fallback; one visible doctrine patch in a controlled breach scenario | M3, M6 | Optional v1; required for DR-032 closure evidence |
-| M7 | Mission Director + Breach Contract | Typed manifest; director; command-core minimum; base-system slice; first proof mission playable | M1..M6 | Yes |
+| M7 | Mission Director + Breach Contract | Typed manifest; director; command-core minimum; base-system slice; first proof mission playable | M1..M6 plus M5.5 | Yes |
 | M8 | Scenario Editor + Mod Tools | In-engine workbench; same manifest format; mod loader; package builder | M3, M5, M7 | Yes |
 | M9 | Headless Server + Determinism Islands | Headless sim binary; deterministic island contracts; replay-from-events | M3, M7 | Yes |
 | M10 | LAN Co-op | 2 clients on local network; replicated state; survival of one Breach Contract | M9 | Optional v1 |
@@ -1265,6 +1287,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 |---|---|---|
 | T-CONTROL | AI control and observability | M0..M12 |
 | T-LLM | Async LLM mind layer | M3, M6, M6.5..M12 |
+| T-PHYS | Full collision and physical consequence | M0..M12; M5.5 primary |
 | T-PLATFORM | Cross-platform CI and Steam Deck | M0..M12 |
 | T-MOD | Modding and scripting | M5..M8 primary; lifelong |
 | T-AUDIO | Diegetic SFX and captions | M4..M7 primary; lifelong |
@@ -1452,6 +1475,40 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 - [ ] BODY-A and CHASSIS-A acceptance tests pass.
 
 **Cross-DR:** DR-003, DR-014, DR-018, DR-021, DR-024.
+
+---
+
+### M5.5 — Full Collision Gauntlet
+
+**What it proves:** The game has the physical consequence contract required by DR-033. Bodies, limbs, weapons, armor, mechs, projectiles, objects, terrain, shields, and base parts collide through explicit data and replay-visible events, without brute-force all-pairs.
+
+**Scope (per [[spec/full-collision-physics-plan]]):**
+- `cx-physics` collision pipeline: broadphase, narrowphase, contact manifold, stable pair ids, collision matrix loader, deterministic pair ordering, and contact-event emission.
+- Collision classes and proxies for actor core, limbs, armor zones, held weapons, loose items, kinetic projectiles, explosive projectiles, terrain proxies, debris chunks, mech parts, base objects, force fields, and sensor triggers.
+- Explicit collision matrix: player/player, unit/unit, AI/AI, enemy/enemy, ally/ally, limb/limb, limb/body, limb/weapon, weapon/weapon, projectile/body, projectile/terrain, projectile/equipment, projectile/shield, projectile/projectile, debris/body, mech/infantry, base/object interactions.
+- CCD tiers: discrete, speculative, sweep ray, sweep capsule, sweep shape, and TOI substep. Fast projectiles, important limbs, command-core bodies, and mech crush contacts cannot tunnel through thin terrain or units.
+- Projectile-projectile contact: kinetic bullet-bullet deflects/fragments/tumbles/loses energy; explosive projectile contacts can detonate, fuze-fail, or deflect by authored profile.
+- Impulse-to-damage routing: collision impulse, contact area, sharpness, material pair, armor layer, and origin/chassis rules produce body, armor, equipment, terrain, module, and base-object damage.
+- Terrain chunk collision proxies update from M2 dirty regions; chunk seams/tiny holes/edge cases are test fixtures.
+- `cx-replay`: `collision` event category with contact start/persist/end, impulse, projectile deflection, projectile-projectile contact, filter reason, collision damage, budget degradation, and first divergence events.
+- `cxctl observe --collisions` and `cxctl inspect collision <event-id>` for implementation agents and future bot authors.
+- Perf budget governor for low-value debris; never silently drops actor, limb, armor, weapon, key projectile, terrain, shield, command-core, or mission-critical contacts.
+
+**Done-criteria:**
+- [ ] COLL-001 collision matrix generator fails on any physical pair with no rule.
+- [ ] COLL-002 player/ally/enemy/AI unit-unit body collisions block, shove, knock down, and recover with events.
+- [ ] COLL-003 limb-to-limb, limb-to-body, limb-to-terrain, and limb-to-door contacts work; detached limbs collide normally.
+- [ ] COLL-004 held weapons collide with limbs, terrain, doors, and other held weapons; owner self-filter is reason-labeled.
+- [ ] COLL-005 bullets hit bodies, armor, weapons, dropped items, terrain, shields, and mech modules with distinct events.
+- [ ] COLL-006 bullet-bullet/projectile-projectile contacts produce deflection/fragment/fuze/detonation outcomes per projectile profile.
+- [ ] COLL-007 high-speed projectiles and falling bodies do not tunnel through tiny holes, chunk boundaries, shields, or thin limbs.
+- [ ] COLL-008 physics impacts damage limbs, armor, equipment, chassis modules, debris, terrain, base objects, and mechs where thresholds are met.
+- [ ] COLL-009 Full Collision Gauntlet replays headlessly with identical contact ids/checksums.
+- [ ] COLL-010 `cxctl observe --collisions` exposes live contacts, filters, and last 30 collision events without screenshots.
+- [ ] COLL-011 perf report records 1080p/60 pass plus 4K/120 and Steam Deck status.
+- [ ] COLL-012 AI pathing/behavior reacts to body blocking, debris, doors, shields, and contact damage with reason labels.
+
+**Cross-DR:** DR-002, DR-003, DR-005, DR-007, DR-008, DR-014, DR-018, DR-021, DR-024, DR-028, DR-033.
 
 ---
 
@@ -1679,6 +1736,27 @@ This is the built-in "eyes, ears, hands, and voice" layer for AI implementation 
 
 ---
 
+### T-PHYS — Full Collision And Physical Consequence
+
+Spans M0..M12; M5.5 is the primary proof milestone. See [[spec/full-collision-physics-plan]] and [[decisions/dr-033-full-collision-physics-direction]].
+
+This track ensures the game never slips into "sprites pass through each other except for damage boxes." Everything physical must have a collision class, collision proxy, material/impulse response, and event policy. Exceptions are allowed only when explicit, tested, and replay-visible.
+
+| Aspect | Pin |
+|---|---|
+| Default rule | Physical objects collide by default. Missing matrix entries are build/test failures. |
+| Performance rule | No naive all-pairs. Use broadphase, spatial hash/dynamic tree, chunk proxies, CCD tiers, stable pair ordering, and low-value debris budgets. |
+| Projectile rule | Projectiles collide with units, limbs, armor, equipment, terrain, shields, base objects, and selected projectile classes. Kinetic bullet-bullet contacts deflect/fragment/lose energy unless authored otherwise. |
+| Damage rule | Contact impulse can damage limbs, armor, weapons, equipment, mech modules, terrain, shields, and base objects. |
+| Terrain rule | Pixels/materials stay authoritative; collision uses chunk proxies rebuilt from dirty regions plus exact material samples at contact. |
+| Event rule | Meaningful contacts emit `collision.*` events and parent-link to combat/body/terrain/equipment damage. |
+| Control rule | `cxctl observe --collisions` exposes live pair state, filters, recent contacts, and collision budget status. |
+| AI rule | From M6 onward, AI perceives collision-affordance changes and emits reason labels when blocked, shoved, pinned, avoiding debris, or reacting to projectile danger. |
+
+**Done-criteria per milestone:** each milestone final audit says which new physical classes, pairs, filters, events, and perf counters were added. A gameplay object cannot become physical in art/combat without being registered in the T-PHYS matrix or explicitly declared cosmetic/sensor-only.
+
+---
+
 ### T-PLATFORM — Cross-Platform CI And Steam Deck
 
 Spans M0..M12. From M0:
@@ -1778,12 +1856,16 @@ flowchart TB
   M3 --> M4
   M1 --> M5[M5 Equipment + Chassis]
   M3 --> M5
-  M5 --> M6[M6 AI + Trust Harness]
+  M2 --> M55[M5.5 Full Collision Gauntlet]
+  M5 --> M55
+  M3 --> M55
+  M55 --> M6[M6 AI + Trust Harness]
   M3 --> M6
   M6 --> M65[M6.5 LLM Mind Lab]
   M3 --> M65
   M4 --> M7[M7 Mission Director + Breach Contract]
   M5 --> M7
+  M55 --> M7
   M6 --> M7
   M65 -.optional augmentation.-> M7
   M3 --> M8[M8 Scenario Editor + Mods]
@@ -1802,6 +1884,9 @@ flowchart TB
   TL -.-> M6
   TL -.-> M65
   TL -.-> M12
+  TP[T-PHYS] -.-> M0
+  TP -.-> M55
+  TP -.-> M12
   T1[T-PLATFORM] -.-> M0
   T1 -.-> M12
   T2[T-MOD] -.-> M5
@@ -1834,7 +1919,8 @@ Quick lookup: which milestone owns which feature.
 | Semantic UI tree and UI action control | T-CONTROL, M4, M8 |
 | Future bot authoring API | T-CONTROL, M6, M8 |
 | Actor controller + control intent | M1 |
-| 2D physics | M1 |
+| 2D physics baseline | M1 |
+| T-PHYS full collision contract | T-PHYS, M1..M12 |
 | Micro Breach fun loop | M1.5 |
 | Reactive enemy dummy | M1.5 |
 | Temporary soft breach surface | M1.5, replaced by M2 terrain |
@@ -1855,6 +1941,15 @@ Quick lookup: which milestone owns which feature.
 | Chassis layers + modules | M5 |
 | Damage stages | M5 |
 | Pilot eject / repair / salvage | M5 |
+| Collision class/proxy registry | M5, M5.5 |
+| Full collision matrix | M5.5 |
+| Limb/body/equipment/mech/base collision | M5.5 |
+| Projectile-projectile collision | M5.5 |
+| CCD tiers / TOI contact proof | M5.5 |
+| Collision impulse-to-damage routing | M5.5 |
+| `collision` event category in run bundles | M3, M5.5 |
+| `cxctl observe --collisions` | M5.5 |
+| COLL-001..COLL-012 acceptance suite | M5.5 |
 | Tutorial-safety policy | M5, M7 |
 | AI perception + memory | M6 |
 | AI utility + doctrine | M6 |
@@ -1917,6 +2012,8 @@ These commands are the default validation surface for implementation agents. If 
 | Perf sample | `cargo run -p cx-bench -- --scenario <scenario-id> --profile milestone` | M2 |
 | Accessibility smoke | `cargo run -p cx-e2e -- --scenario <scenario-id> --ui-scale 2.0 --high-contrast --verify-focus` | M4 |
 | Save/load roundtrip | `cargo run -p cx-e2e -- --scenario <scenario-id> --save-load-roundtrip --verify-checksums` | M5/T-SAVE |
+| Full collision gauntlet | `cargo run -p cx-e2e -- --scenario m5_5_full_collision_gauntlet --suite COLL-001..COLL-012 --write-run-bundle` then `cargo run -p cx-headless -- replay prototype_runs/native/<m5_5_run> --verify-checksums` | M5.5/T-PHYS |
+| Collision observation stream | `cargo run -p cxctl -- observe --collisions --stream --hz 30 --scenario m5_5_full_collision_gauntlet` | M5.5/T-PHYS |
 | AI harness | `cargo run -p cx-ai --bin ai_harness -- --suite AI-H-01..AI-H-06 --write-run-bundle` | M6 |
 | Mind frame observation | `cargo run -p cxctl -- observe --mind-frame squad_alpha --once` | M6.5 |
 | Mind lab suite (mock) | `cargo run -p cx-ai --bin mind_lab -- --suite MIND-001..MIND-010 --provider mock --write-run-bundle` | M6.5 |
@@ -1941,7 +2038,7 @@ Every milestone final audit must answer these prompts.
 | Replay/events | Are required events present, ordered, parent-linked, counted, and linked to visible behavior? |
 | Determinism | If a deterministic claim is made, where is the checksum proof and first-divergence report? |
 | UI/readability | Does UI fit at 100%, 150%, and 200%; are critical states not color-only; are labels non-overlapping? |
-| Terrain/physics | Do high-speed impacts, edge collisions, tiny holes, chunk borders, and repeated edits behave predictably? |
+| Terrain/physics/collision | Do high-speed impacts, edge collisions, tiny holes, chunk borders, repeated edits, limb contacts, projectile-projectile contacts, weapon collisions, friendly body blocking, debris impacts, and mech crush contacts behave predictably? Are all collision filters reason-labeled? |
 | AI | Can the AI explain perception, chosen tactic, refused action, stuck state, and recovery? |
 | Save/load | Does save/load preserve identities, events, objective state, terrain, equipment, and checksums where promised? |
 | Performance | Are frame spikes, sim tick cost, event volume, dirty-region cost, and memory growth reported? |
@@ -1962,6 +2059,7 @@ For M0..M12, a milestone is done only when all agent-completable items below are
 | E2E | Milestone reference scenario runs from command line and produces expected outcome. |
 | Run bundle | Bundle exists under `prototype_runs/native/` and passes the checker. |
 | Replay | Required replay/checksum claims are backed by headless verification or explicitly not claimed. |
+| Collision/physics | Any new physical object has a collision class/proxy/matrix entry/event policy or a tested cosmetic/sensor/filter reason. |
 | Perf | Perf counters exist; T-PERF target status is recorded as pass/fail/blocked. |
 | UI/accessibility | Any user-facing surface has screenshot evidence and ACC-A status when applicable. |
 | Bug hunt | Bug checklist is completed; found bugs are fixed or logged as accepted known issues. |
@@ -1981,6 +2079,7 @@ For M0..M12, a milestone is done only when all agent-completable items below are
 | M3 | Headless replay produces identical checksums to live run. |
 | M4 | HUD-01..HUD-03 + ACC-A floor pass with 5 playtesters. |
 | M5 | Powered armor + light mech work end-to-end with chassis grammar; pilot eject works. |
+| M5.5 | COLL-001..COLL-012 pass; collision matrix/proxies/CCD/projectile-projectile/impulse damage replay headlessly with perf evidence. |
 | M6 | 6 of 8 DR-022 AI criteria demonstrably met; AI-H-01..06 pass. |
 | M6.5 | MIND-001..MIND-010 pass against mock provider; local AI keeps acting through provider sleep/fail/stale; replay shows `mind` events with redacted prompts. |
 | M7 | Project owner plays Breach Contract 5 times; A-FEEL gate met. |
@@ -2006,6 +2105,10 @@ For M0..M12, a milestone is done only when all agent-completable items below are
 | Steam Deck perf doesn't hit 800p/60 | Compatibility floor missed. | Test at every milestone; degrade gracefully; reduce particle/lighting on lower spec. |
 | Modding breaks determinism | Mods could desync replays. | Mod scripts run in a sandboxed deterministic island; non-deterministic ops are forbidden in sim-tick scope. |
 | Cross-DR conflicts emerge | A new DR contradicts an existing one. | Decision-tracker is the single source of truth; conflicts trigger a DR review. |
+| Full collision blows the frame budget (T-PHYS) | Limb/equipment/projectile/debris/mech contacts can explode pair counts. | Broadphase + class filters + CCD tiers + low-value debris budgets; M5.5 COLL-011 perf gate; never brute-force all-pairs. |
+| Collision feels unfair or sticky | Friendly body blocking, limb snagging, and weapon-wall contact can frustrate players. | Reason-labeled filters, shove/recovery states, debug overlays, AI spacing doctrine, scenario softening where deliberate. |
+| Projectile-projectile collision is noisy | Bullet-bullet contacts could be expensive and unreadable. | Projectile lane cache, class masks, event summaries, and readable deflect/fragment/fuze rules; keep cosmetic tracers non-physical. |
+| Collision order breaks replay determinism | Floating-point/contact ordering can diverge across platforms. | Stable pair ids, deterministic pair sorting, fixed tick, contact checksums, first-divergence events, and M5.5 headless replay gate. |
 | LLM cost overruns (T-LLM) | Live cloud calls can be expensive at iteration scale. | `MindProviderConfig.max_run_cost_usd` hard cap; per-task budget; mock-by-default for CI/dev; M6.5 lab caps at $0.25/run. |
 | LLM latency spikes (T-LLM) | A slow response could starve the policy compiler. | Async only with deadlines; staleness check; local AI never waits; MIND-002 acceptance test. |
 | LLM hallucination / invalid actions (T-LLM) | A model could output plans the validator can't recognize. | Strict `AiMindProposal` schema + validator; bounded caption length; no live arbitrary code; MIND-003/004 acceptance tests. |
@@ -2029,6 +2132,8 @@ This roadmap explicitly does NOT include for v1:
 - Noita-grade material chemistry (moonshot).
 - VR/AR.
 - Per-pixel deformable rigid bodies (chassis are sprite-based with module damage; no Teardown-style voxel sim).
+- Naive all-pairs collision. Full collision uses broadphase, filters, proxies, CCD tiers, and budgets; missing physical pair rules are bugs.
+- Silent ghosting of physical gameplay objects. If something physical does not collide, it needs a tested `collision_filter_reason` and replay/debug visibility.
 - Multi-region simultaneous combat in MMO mode (M12 is small-shard exploration).
 - Voice chat (use external; we provide text + captions).
 - Full localization at v1 (English-first; localization plan TBD).
@@ -2046,6 +2151,8 @@ This roadmap explicitly does NOT include for v1:
 - [[spec/ai-control-observability-layer]]
 - [[spec/hybrid-llm-ai-plan]]
 - [[decisions/dr-032-hybrid-llm-ai-direction]]
+- [[spec/full-collision-physics-plan]]
+- [[decisions/dr-033-full-collision-physics-direction]]
 - [[spec/prototype-implementation-backlog-slice-a]]
 - [[spec/setting-and-world-frame]]
 - [[spec/chassis-armor-mechs-and-origins]]
