@@ -1,22 +1,24 @@
 ---
 type: reference
-status: slice-a-contract
+status: prototype-evidence-contract
 feeds:
   - DR-002
   - DR-004
   - DR-005
   - DR-007
   - DR-008
+  - DR-009
   - DR-012
   - DR-013
+  - DR-024
 ---
 
-← [[references/sources|sources]] · [[spec/prototype-roadmap|prototype roadmap]] · [[spec/prototype-implementation-backlog-slice-a|implementation backlog]] · [[spec/replay-recorder-slice-a|recorder Slice A]] · [[spec/accessibility-comfort-slice-a|accessibility/comfort Slice A]] · [[decisions/dr-013-backend-service-scope|DR-013 backend scope]] · [[systems/replay-determinism-and-run-evidence|determinism/run evidence]] · [[spec/actor-feel-sandbox-slice-a|actor-feel Slice A]] · [[spec/terrain-material-sandbox-slice-a|terrain/material Slice A]]
+← [[references/sources|sources]] · [[spec/prototype-roadmap|native roadmap]] · [[spec/native-implementation-backlog|native backlog]] · [[spec/prototype-implementation-backlog-slice-a|historical Slice-A backlog]] · [[spec/replay-recorder-slice-a|recorder Slice A]] · [[spec/accessibility-comfort-slice-a|accessibility/comfort Slice A]] · [[decisions/dr-013-backend-service-scope|DR-013 backend scope]] · [[systems/replay-determinism-and-run-evidence|determinism/run evidence]] · [[spec/actor-feel-sandbox-slice-a|actor-feel Slice A]] · [[spec/terrain-material-sandbox-slice-a|terrain/material Slice A]]
 
 # Prototype Run Bundle Schema
 
 > [!summary] Why this exists
-> The prototype roadmap requires every serious Slice A run to emit a reproducible bundle. This page turns that prose into a concrete contract so implementation agents, planning agents, vault maintainers, replay tooling, AI harnesses, and decision records all read the same evidence.
+> The prototype roadmap requires every serious prototype/native milestone run to emit a reproducible bundle. This page turns that prose into a concrete contract so implementation agents, planning agents, vault maintainers, replay tooling, AI harnesses, and decision records all read the same evidence.
 
 ## Contract Files
 
@@ -71,6 +73,7 @@ Good/Bad/Meh should be about observed play and debug evidence, not only personal
 | Category | Typical Event Types | Primary Consumers |
 |---|---|---|
 | `input` | `input_intent`, `tool_selected_for_material` | Actor feel, replay, future net prediction, AI harness. |
+| `control` | `control_command_received`, `control_command_accepted`, `control_command_rejected`, `control_observation_sent`, `control_assertion_result` | AI/Codex automation, E2E tests, future bot SDK, replay/debug evidence. |
 | `combat` | `weapon_fired`, `projectile_spawned`, `projectile_hit_mo`, `weapon_reloaded` | Damage readability, replay, equipment balance. |
 | `body` | `wound_added`, `actor_status_changed`, `body_gibbed`, `inventory_dropped` | HUD, death recap, UX trust. |
 | `terrain` | `terrain_material_probe`, `terrain_penetration_threshold`, `terrain_carve_mask`, `terrain_fill_or_repair`, `path_material_refresh` | Terrain model, AI path trust, networking bandwidth. |
@@ -84,7 +87,23 @@ Good/Bad/Meh should be about observed play and debug evidence, not only personal
 | `accessibility` | `ux_accessibility_setting_changed`, text scale applied, contrast mode, focus path tested, caption shown, flash suppressed, screen shake scaled. | ACC-A evidence, comfort/readability regression, workbench accessibility, run-bundle audits. |
 | `performance` | frame cost, dirty rect cost, event volume, path refresh cost. | DR-002/DR-005/DR-007 risk budgets. |
 
-## Slice Acceptance Gates
+## Native Milestone Acceptance Gates
+
+| Milestone | Run Bundle Must Prove |
+|---|---|
+| M0 engine bootstrap | Native app starts/ends cleanly, seed/config/build metadata are captured, fixed-tick smoke evidence exists, `cxctl observe/run` evidence exists, and the bundle validates with `prototype_run_check.py`. |
+| M1 actor controller | Input, movement, aim, weapon, reload, status, HUD, semantic control actions, actor/equipment observations, and recorder events are captured from the native controller scene. |
+| M1.5 micro breach fun slice | Win/loss state, objective timer, reactive enemy behavior, temporary soft-breach surface edits, control-driven win/loss scripts, observation stream freshness, and HUD objective readability are captured. |
+| M2 terrain/materials | Material probe, penetration, carve/fill, dirty-region refresh, path refresh hooks, and performance counters are captured from mutable terrain actions. |
+| M3 replay/event recorder | Event cause chains, snapshots, dropped-event counters, deterministic replay checks, and viewer artifacts are present enough to debug a run without watching it live. |
+| M4 HUD/comic-noir UI | HUD, overlays, death/material explanations, accessibility settings, caption evidence, and screenshots/captures show the player-facing state clearly. |
+| M5 equipment/chassis | Item role labels, damage-stage state, armor/chassis effects, bot-usable fields, loadout validation, repair/salvage, and ejection/disable evidence are captured. |
+| M6 AI trust harness | Bot intent, perception facts, doctrine/personality labels, mistakes, recovery actions, blocked-path reasons, and explanation overlays are captured by AI-H scenarios. |
+| M7 mission director | Manifest-driven objectives, director events, command-core/base-power state, debrief/retry state, and scenario completion/failure evidence are captured. |
+| M8 editor/mod tools | Edited scenario/package data, validation diagnostics, content hashes, sample mod load evidence, and workbench screenshots are captured. |
+| M9+ networking/headless tracks | Headless replay, authority/replication events, config hashes, divergence reports, and bandwidth/performance counters are captured before any network posture can close. |
+
+## Historical Slice-A Acceptance Gates
 
 | Slice | Run Bundle Must Prove |
 |---|---|
@@ -113,6 +132,8 @@ The checker is a gate for evidence hygiene, not a declaration that a prototype i
 ## Source Trail
 
 - [[spec/prototype-roadmap]]
+- [[spec/native-implementation-backlog]]
+- [[spec/ai-control-observability-layer]]
 - [[spec/prototype-implementation-backlog-slice-a]]
 - [[spec/replay-recorder-slice-a]]
 - [[spec/accessibility-comfort-slice-a]]

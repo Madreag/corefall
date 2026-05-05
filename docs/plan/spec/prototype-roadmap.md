@@ -3,7 +3,7 @@ type: spec
 status: planning-anchor-v0
 authority: "Native build roadmap (Rust + Bevy/wgpu hybrid + custom core crates). Replaces the prior browser-lab-flavored roadmap. Specific tickets/timelines remain open."
 last_updated: 2026-05-04
-ready_when: "M0..M3 land in the native repo and produce a playable, replay-recordable, terrain-mutable single-actor scene that supersedes the HTML lab as the iteration harness."
+ready_when: "M0..M3 land in the native repo and produce a playable, AI-controllable, replay-recordable, terrain-mutable single-actor scene that supersedes the HTML lab as the iteration harness."
 feeds:
   - DR-001
   - DR-002
@@ -14,6 +14,10 @@ feeds:
   - DR-007
   - DR-008
   - DR-009
+  - DR-010
+  - DR-011
+  - DR-012
+  - DR-013
   - DR-014
   - DR-015
   - DR-016
@@ -34,7 +38,7 @@ feeds:
   - DR-031
 ---
 
-← [[spec/index|spec section]] · [[spec/authoritative-game-spec-v0|game spec v0]] · [[spec/prototype-implementation-backlog-slice-a|implementation backlog]] · [[dashboards/research-readiness|readiness]] · [[decisions/index|decisions]] · [VAULT_PLAN.md](../../VAULT_PLAN.md) · [HTML-era snapshot](../research-log/2026-05-04-prototype-roadmap-html-snapshot.md)
+← [[spec/index|spec section]] · [[spec/authoritative-game-spec-v0|game spec v0]] · [[spec/native-implementation-backlog|native backlog]] · [[spec/ai-control-observability-layer|AI control/observability]] · [[spec/prototype-implementation-backlog-slice-a|historical HTML backlog]] · [[dashboards/research-readiness|readiness]] · [[decisions/index|decisions]] · [VAULT_PLAN.md](../../VAULT_PLAN.md) · [HTML-era snapshot](../research-log/2026-05-04-prototype-roadmap-html-snapshot.md)
 
 # Native Build Roadmap
 
@@ -49,14 +53,32 @@ feeds:
 ## Table Of Contents
 
 - [Read Order](#read-order)
+- [Glossary](#glossary)
+- [Agent Implementation Contract](#agent-implementation-contract)
+- [Milestone Handoff Template](#milestone-handoff-template)
+- [Human Playtest Checklist Template](#human-playtest-checklist-template)
 - [Strategic Frame](#strategic-frame)
 - [Stack At A Glance](#stack-at-a-glance)
+- [Coordinate System And Units](#coordinate-system-and-units)
 - [Repository Layout](#repository-layout)
+- [Toolchain And Workspace Bootstrap](#toolchain-and-workspace-bootstrap)
+- [Per-Crate AGENTS.md Template](#per-crate-agentsmd-template)
+- [Logging, Tracing, And Error Policy](#logging-tracing-and-error-policy)
+- [Asset And Placeholder Strategy](#asset-and-placeholder-strategy)
+- [Testing Layers](#testing-layers)
+- [CLI Reference](#cli-reference)
+- [Control Transport And Envelope](#control-transport-and-envelope)
+- [Scenario Manifest Schema](#scenario-manifest-schema)
+- [Run-Bundle Naming Convention](#run-bundle-naming-convention)
+- [Bug Log Format](#bug-log-format)
+- [Inter-Milestone Bridges](#inter-milestone-bridges)
+- [Per-Milestone Kickoff Smoke](#per-milestone-kickoff-smoke)
 - [Milestone Map](#milestone-map)
 - [Side Tracks](#side-tracks)
 - [Milestone Details](#milestone-details)
   - [M0 — Engine Bootstrap](#m0--engine-bootstrap)
   - [M1 — Actor Controller And Sim Core](#m1--actor-controller-and-sim-core)
+  - [M1.5 — Micro Breach Fun Slice](#m15--micro-breach-fun-slice)
   - [M2 — Pixel Terrain And Materials](#m2--pixel-terrain-and-materials)
   - [M3 — Replay And Event Recorder](#m3--replay-and-event-recorder)
   - [M4 — HUD And Comic-Noir UI](#m4--hud-and-comic-noir-ui)
@@ -69,6 +91,7 @@ feeds:
   - [M11 — Online Co-op (Private)](#m11--online-co-op-private)
   - [M12 — PvP And MMO Experiments](#m12--pvp-and-mmo-experiments)
 - [Side Track Details](#side-track-details)
+  - [T-CONTROL — AI Control And Observability](#t-control--ai-control-and-observability)
   - [T-PLATFORM — Cross-Platform CI And Steam Deck](#t-platform--cross-platform-ci-and-steam-deck)
   - [T-MOD — Modding And Scripting](#t-mod--modding-and-scripting)
   - [T-AUDIO — Diegetic SFX And Captions](#t-audio--diegetic-sfx-and-captions)
@@ -77,6 +100,9 @@ feeds:
   - [T-PERF — Performance Targets And Budgets](#t-perf--performance-targets-and-budgets)
 - [Dependency Graph](#dependency-graph)
 - [Feature Index](#feature-index)
+- [Validation Command Matrix](#validation-command-matrix)
+- [Bug Hunt Checklist](#bug-hunt-checklist)
+- [Definition Of Done](#definition-of-done)
 - [Milestone Done-Criteria Summary](#milestone-done-criteria-summary)
 - [Risk Register](#risk-register)
 - [Anti-Goals](#anti-goals)
@@ -90,9 +116,184 @@ If you only have time to read three things before starting work:
 
 1. [[spec/authoritative-game-spec-v0]] — what the game is.
 2. This roadmap — what gets built and in what order.
-3. [[spec/prototype-implementation-backlog-slice-a]] — concrete task cards for the current milestone.
+3. [[spec/native-implementation-backlog]] — concrete native task cards for the current milestone.
 
-If you have more time, also read: [[decisions/index]], [[dashboards/decision-tracker]], [[references/usage-ledger]], [[research-log/moonshot-register]], [[prototypes/actor-feel-lab-a1-human-playtest-2026-05-04]] (the "ok I guess" signal that informs M1 acceptance).
+If you have more time, also read: [[decisions/index]], [[dashboards/decision-tracker]], [[references/prototype-run-bundle-schema]], [[spec/ai-control-observability-layer]], [[references/usage-ledger]], [[research-log/moonshot-register]], [[prototypes/actor-feel-lab-a1-human-playtest-2026-05-04]] (the "ok I guess" signal that informs M1.5 acceptance), and [[spec/prototype-implementation-backlog-slice-a]] only as a historical/browser-lab backlog.
+
+---
+
+## Glossary
+
+A junior agent must never have to guess what these words mean. If a term is used in this roadmap, the backlog, the AI control spec, or any task card, it lives here.
+
+| Term | Meaning |
+|---|---|
+| **Actor** | A simulated entity with `Position`, `Velocity`, `Aim`, `Status`, and `Inventory`. Includes infantry, powered armor, and mech-pilot pairs. |
+| **Action** | A semantic player-or-AI request to do something (move, fire, click UI). Routed through `cx-control` and consumed by sim systems on the next fixed tick. |
+| **Anti-scope** | What a task card must NOT grow into. If you start drifting toward an anti-scope item, stop and write a follow-up task card instead. |
+| **Bevy version** | Pinned in `Cargo.toml`; do not bump without a milestone's explicit upgrade task. |
+| **Capability gate** | A flag in the run manifest that explicitly enables a debug-only or remote-access feature. Default off. |
+| **Chassis** | An armor/mech/origin grouping with layered armor zones, modules, and pilot binding. See [[spec/chassis-armor-mechs-and-origins]]. |
+| **Checksum** | A bit-deterministic hash of actor/terrain/inventory state at a given tick used to detect replay drift. Algorithm: blake3. |
+| **Command core** | The rooted/uprooted/embedded strategic object that powers the base or boosts a chassis avatar. See [[spec/command-core-base-power]]. |
+| **`cx-app`** | The Bevy app shell binary; the launcher that wires plugins. |
+| **`cx-control`** | The crate that owns command/observation/UI-tree schemas and the local control server. |
+| **`cxctl`** | The CLI binary for AI/dev control. During M0..M1 use `cargo run -p cxctl -- <subcommand>`; once installed/PATH-ed, `cxctl <subcommand>` is shorthand. |
+| **`cx-e2e`** | A scripted end-to-end runner built on `cx-control`/`cxctl`. Used for milestone E2E proof. |
+| **`cx-headless`** | The headless server binary; same sim, no renderer/audio, network-driven inputs. |
+| **Determinism island** | A subsystem whose state is bit-deterministic given the same inputs and seed. Cosmetic systems are NOT in determinism islands. |
+| **Doctrine** | A named AI policy bundle (cautious, aggressive, support, scout, sniper, etc.). Influences utility scoring weights. |
+| **E2E** | End-to-end test: runs a scenario from CLI, drives it with `cxctl`/`cx-e2e`, asserts outcomes from observations/events, writes a run bundle. |
+| **Event** | A typed record emitted by sim systems (combat/body/terrain/AI/mission/control/system/etc.). All player-visible behavior emits events. |
+| **Event id** | Stable id of the form `<run_id>:<tick>:<seq>`. Globally unique per run. Used for parent-cause chains. |
+| **Fixed tick** | The 60 Hz (or 120 Hz) sim cadence; render is decoupled and interpolates between ticks. |
+| **Junior agent** | The default reader/implementer of this roadmap. Treat them as competent in Rust and game programming basics, but assume they have NOT read CCCP source, the prior HTML lab, or the rest of this vault. |
+| **Manifest (run)** | `run_manifest.json` inside a run bundle. Identifies build, scenario, seed, schema versions, capabilities, expected tests. |
+| **Manifest (scenario)** | RON file in `content/scenarios/` describing teams, objectives, materials, command core, base systems, capability requirements, director config, save fields. |
+| **Mission director** | The system that paces a scenario: reinforcement, LZ risk, objective escalation. Emits commander-decision events with reason labels. |
+| **Module** | A chassis subcomponent with damage states (jet, shield, sensor, repair-drone, weapon-mount). Failures emit reason-labeled events. |
+| **Observation** | A structured snapshot of game state delivered to `cxctl`/control clients. Includes clock, player context, actors, equipment, terrain patch, objectives, UI tree, captions, recent events, perf counters. |
+| **Reason label** | A short string explaining WHY the AI/mission/refusal/warning fired. Required on every AI choice and refusal. |
+| **Recoil impulse** | The instantaneous velocity change applied to the firing actor; configurable per weapon preset. |
+| **Role record** | The shared item meaning consumed by AI, UI, modding, balance, replay, backend, mission. See [[spec/equipment-loadout]]. |
+| **Run** | One execution of a scenario from start to end (or abort). Identified by a unique `run_id`. |
+| **Run bundle** | The directory `prototype_runs/native/<run_id>/` containing `run_manifest.json`, `events.jsonl`, `summary.json`, `notes.md`, `screenshots/`, `captures/`. |
+| **`run_id`** | Unique per run. Format: `<milestone>_<UTC ISO-8601 with hyphens>_<short_hash>`, e.g. `m0_2026-05-04T22-30-00Z_a1b2c3d4`. |
+| **Scenario** | A single playable unit identified by an id (`m0_blank`, `m1_actor_range`, `micro_breach`, `breach_contract`, ...). Loaded from a scenario manifest. |
+| **Scenario id** | The string used by `--scenario <id>` flags. Maps 1:1 to a manifest file in `content/scenarios/<id>.ron`. |
+| **Seed** | A `u64` deterministic seed for the run's RNG. Default: read from manifest; overridable via `--seed <u64>`. |
+| **Side track** | A cross-cutting concern (T-CONTROL, T-PLATFORM, T-MOD, T-AUDIO, T-SAVE, T-ACCESSIBILITY, T-PERF) with its own done-criteria that intersect every milestone. |
+| **Snapshot** | A periodic full state dump (actor/inventory/terrain) used for replay anchoring and drift detection. |
+| **Soft breach** | M1.5's stub destructible surface; replaced by M2's full chunked terrain without breaking replay consumers. |
+| **Tick** | A discrete sim step. Tick 0 is scenario start. Ticks are u64 monotonic. |
+| **UI tree** | The structured representation of every UI element by stable id, role, label, state, bounds. Queryable/clickable through `cxctl ui ...`. |
+| **World units** | Pixel-space coordinates. 1 unit = 1 logical pixel. Y is up. Origin at scene's defined anchor. |
+
+---
+
+## Agent Implementation Contract
+
+This roadmap is intended to be assignable to an AI implementation agent one milestone at a time. A milestone is not complete because code compiles or a feature appears once. The agent must build, test, bug hunt, repair, document evidence, and update the vault.
+
+### Required Agent Loop
+
+| Phase | Required Action | Output |
+|---|---|---|
+| 1. Preflight | Read `AGENTS.md`, this roadmap, [[spec/native-implementation-backlog]], the milestone's linked DRs/specs, and current repo state. | Short implementation plan with write scope and anti-scope. |
+| 2. Ownership | Name crates/files owned by the milestone and avoid unrelated edits. | Work happens in the milestone's owned crates plus explicit boundary crates. |
+| 3. Build | Implement the smallest complete vertical slice that satisfies the task cards. | Code, assets, schema, and fixture changes. |
+| 4. Unit/integration tests | Add or update tests for every new behavior, event, schema, and failure label. | `cargo test --workspace` passes. |
+| 5. E2E run | Run the milestone reference scenario from the command line and produce a run bundle. | `prototype_runs/native/<milestone>_<timestamp>/`. |
+| 6. Bug hunt | Actively search for crashes, replay drift, missing events, UI overlap, perf spikes, stale docs, and edge cases. | Bug log in the run notes plus fixes. |
+| 7. Rerun | Rerun all validation after fixes. | Clean command matrix. |
+| 8. Evidence | Update vault prototype/research notes with links to run bundle, screenshots, test output, and known gaps. | New or updated note under `cortext_command_vault/prototypes/` or `research-log/`. |
+| 9. Final audit | Compare all milestone done-criteria and backlog task cards against actual evidence. | Final audit section in the vault note and concise handoff summary. |
+
+### Agent-Completable Vs Human-Gated
+
+| Gate Type | Meaning | Handling |
+|---|---|---|
+| Agent-completable | Can be proven by code, tests, scripted E2E, screenshots, replay checks, perf counters, or static analysis. | Agent must finish before stopping. |
+| Human-gated | Requires project-owner playtest, multi-person playtest, accessibility tester feedback, platform hardware the agent cannot access, or subjective fun assessment. | Agent must prepare the build, scripted evidence, and playtest checklist; mark the gate `READY_FOR_HUMAN` instead of pretending it passed. |
+
+No milestone should use a human-gated item to hide incomplete agent-completable work.
+
+### Required Milestone Artifacts
+
+| Artifact | Required For | Notes |
+|---|---|---|
+| Run bundle | Every milestone M0 onward. | `run_manifest.json`, `events.jsonl`, `summary.json`, `notes.md`, captures/screenshots when visual. |
+| Test log | Every milestone. | Include exact commands run and pass/fail summary. |
+| E2E scenario | Every milestone with gameplay/tool UI. | Scripted where possible; manual checklist when unavoidable. |
+| Screenshot or capture | Visual/UI milestones and bug fixes. | Must be linked from `summary.json.artifacts`. |
+| Perf counters | M0 onward, richer from M2 onward. | Frame time, sim tick cost, event volume, terrain dirty cost as applicable. |
+| Replay/checksum report | M3 onward; earlier if events exist. | Drift reports must name first divergence. |
+| Vault note | Every milestone. | New note under `prototypes/` or `research-log/` with final audit. |
+| Known issues | Every milestone. | Must distinguish blockers from accepted follow-ups. |
+
+---
+
+## Milestone Handoff Template
+
+Use this template when assigning a milestone to an AI agent.
+
+```markdown
+Goal: Implement milestone <M#> from cortext_command_vault/spec/native-implementation-backlog.md.
+
+Context:
+- Read AGENTS.md.
+- Read cortext_command_vault/spec/authoritative-game-spec-v0.md.
+- Read cortext_command_vault/spec/prototype-roadmap.md.
+- Read cortext_command_vault/spec/native-implementation-backlog.md.
+- Read the milestone's linked DRs/spec pages.
+
+Write scope:
+- Own only the crates/files named in the milestone task cards.
+- Do not edit canonical reference repos.
+- Keep unrelated refactors out.
+
+Required loop:
+1. Inspect current code and write a short plan.
+2. Implement all task cards for the milestone.
+3. Add unit/integration/E2E tests.
+4. Run the validation command matrix.
+5. Bug hunt and fix issues until green.
+6. Produce a run bundle under prototype_runs/native/.
+7. Update the vault with a prototype/research note and final audit.
+
+Done when:
+- Every agent-completable task card is complete.
+- Validation commands pass.
+- E2E scenario passes.
+- Run-bundle checker passes.
+- Known issues are documented.
+- Human-gated items, if any, are marked READY_FOR_HUMAN with a playtest checklist.
+```
+
+---
+
+## Human Playtest Checklist Template
+
+When a milestone has a `READY_FOR_HUMAN_PLAYTEST` gate, the agent must produce this checklist as a markdown file co-located with the milestone vault note.
+
+```markdown
+# <Milestone> Human Playtest Checklist
+
+Build hash: <git-sha>
+Build platform(s) tested: <macOS/Linux/Windows>
+Scenario(s) ready: <scenario_id list>
+Estimated playtime: <X minutes per run; Y suggested runs>
+Save needed before play: <yes/no>; if yes, path: <path>
+
+## Pre-Flight (agent confirms)
+- [ ] Build runs from a clean checkout: `cargo run -p cx-app -- --scenario <id>`.
+- [ ] No panics in scripted smoke run.
+- [ ] Run bundle from scripted run validates.
+- [ ] Screenshot/capture of the starting scene attached.
+- [ ] Reset path tested (ESC, restart scenario).
+
+## Tester Tasks
+1. Launch `cargo run -p cx-app -- --scenario <id>`.
+2. Play <scenario> for <N> minutes.
+3. Try each of: <list specific player actions to attempt>.
+4. Note one Good, one Bad, one Meh (mandatory; verbatim).
+5. If something crashes or feels broken, save the run bundle path and screenshot.
+
+## Tester Capture Form
+- Verbatim reaction (one paragraph): _________________________
+- Did the scenario feel readable / boring / confusing / fun? _________________________
+- One thing I would change first: _________________________
+- Did anything crash? <y/n>; if yes, what: _________________________
+- Did the HUD ever lie or hide information you needed? _________________________
+- Run bundle path (if any): prototype_runs/native/<run_id>/
+
+## Acceptance For Milestone
+The milestone is fully done when:
+- Tester has played at least <N> runs.
+- Verbatim reaction is recorded in a vault note.
+- Any crashes are filed as bugs and triaged.
+- Acceptance criteria from the milestone done-criteria are confirmed by tester observation, not just by agent claim.
+```
 
 ---
 
@@ -130,6 +331,7 @@ If you have more time, also read: [[decisions/index]], [[dashboards/decision-tra
 | Body/chassis/mech model | **Custom crate** | DR-014/021 chassis grammar is unique to this project. |
 | AI | **Custom crate** | DR-022 humanlike-bar means perception/memory/doctrine/adaptation; not off-the-shelf. |
 | Replay/event | **Custom crate** | DR-002/DR-018 event taxonomy + scenario manifest + run-bundle schema. |
+| AI/dev control | **Custom crate + CLI** | `cx-control` schemas plus `cxctl` so agents/tests can observe and act without screenshots. |
 | Networking | **Custom crate** built on a transport (lightyear / renet / quinn TBD) | DR-005 MMO-ready architecture. Authority boundaries, snapshot/event hybrid, deterministic islands. |
 | Save | **Custom crate** | DR-029 versioned + migration-safe + replay-linked. |
 | UI | egui (Bevy plugin) for tools/workbench; **custom Bevy UI or egui-skinned** for game HUD | Comic-noir UI requires control egui can't fully give; tools can use egui. |
@@ -160,6 +362,26 @@ Allowed use of raylib/stb: throwaway prototypes, asset converters, image utiliti
 
 ---
 
+## Coordinate System And Units
+
+| Concept | Choice | Why |
+|---|---|---|
+| Coordinate space | World units = pixels at 1× zoom. | Pixel-sim battlefield maps cleanly to world units; render scale handles zoom. |
+| Y axis | Y is up. | Right-handed, matches `glam` defaults; gravity pulls toward `-Y`. |
+| Origin | Scenario manifest's declared anchor (default `(0, 0)` at the bottom-left of the playable region). | Predictable for content authors. |
+| Scale | One actor head ≈ 8 px tall. Mech (light) ≈ 24 px. Heavy mech ≈ 48 px. | Keeps Cortex/Liero/Soldat readability. |
+| Time | `f32` seconds for render; `u64` ticks for sim. 1 tick = 1/60 s by default; 1/120 s in 120 Hz mode. | Sim is integer-tick, render is fractional-second. |
+| Gravity | Default `-980.0` world units per second² (≈ 9.8 m/s² in pixel space if 1 px ≈ 1 cm). | Tunable per scenario manifest. |
+| Velocity | `Vec2<f32>` world units per second. | Render decoupling expects float velocities. |
+| Mass | `f32` kilograms. | Used by recoil, momentum, projectile impulse. |
+| Angles | Radians, `f32`. Aim is a unit `Vec2`. | Match `glam` and avoid degree/radian confusion. |
+| Linear maths | `glam::Vec2`, `glam::Vec3` (rare), `glam::IVec2` for grid coords. | Match Bevy. |
+| Random | Deterministic per-run via `rand_xoshiro::Xoshiro256StarStar` seeded from manifest. Wrapped by `cx-sim-core::Rng`. NEVER call `rand::thread_rng` or system time inside sim islands. | Fixed seed → reproducible; wrap forces audit. |
+| Floating point | All sim-tick math uses `f32`. No `f64` inside sim islands. Fixed-point used for terrain checksum input only. | f32 is consistent across platforms when the same instructions are emitted. |
+| Bit-determinism note | Cross-platform bit-deterministic `f32` is NOT guaranteed by IEEE on all CPUs/compilers. The determinism contract uses checksums of *quantized* state at snapshot boundaries, not raw float comparisons. See [[systems/replay-determinism-and-run-evidence]]. |
+
+---
+
 ## Repository Layout
 
 Modular crate workspace so AI agents can own separate crates per DR-026:
@@ -178,13 +400,16 @@ cortex-game/                          # cargo workspace root
 │   ├── cx-ai/                        # perception, memory, utility, doctrine, reason labels (DR-022)
 │   ├── cx-mission/                   # scenario manifest, director, objectives, command-core (DR-017)
 │   ├── cx-replay/                    # event taxonomy, run bundle, snapshots, checksums (DR-002)
+│   ├── cx-control/                   # command/observation schemas, action routing, UI tree contracts
+│   ├── cxctl/                        # CLI binary for AI/dev control: observe, act, step, assert, bundle
+│   ├── cx-e2e/                       # scripted end-to-end runner built on cx-control/cxctl
 │   ├── cx-save/                      # versioned save, migration, ironman policies (DR-029)
 │   ├── cx-net/                       # authority, snapshots, transport adapter (DR-005)
 │   ├── cx-render-2d/                 # custom wgpu pipelines: chunked terrain, sprite batching, particles
 │   ├── cx-ui/                        # comic-noir HUD, mission cards, accessibility
 │   ├── cx-audio/                     # diegetic mix, caption events
 │   ├── cx-mod/                       # mod loader, schema validator, script host
-│   ├── cx-tools-editor/              # in-engine scenario/package workbench (DR-020b)
+│   ├── cx-tools-editor/              # in-engine scenario/package workbench (DR-030)
 │   ├── cx-headless/                  # headless server binary
 │   └── cx-bench/                     # perf harness
 ├── assets/                           # sprites, audio, manifests, scenes
@@ -198,12 +423,812 @@ Each crate is owned by an explicit feature/agent boundary. Inter-crate boundarie
 
 ---
 
+## Toolchain And Workspace Bootstrap
+
+This is the M0 day-zero recipe. A junior agent assigned M0 must produce these files first, BEFORE any feature code, and verify them with the kickoff smoke (see [Per-Milestone Kickoff Smoke](#per-milestone-kickoff-smoke)).
+
+### `rust-toolchain.toml` (in `cortex-game/`)
+
+```toml
+[toolchain]
+channel = "1.84.0"
+components = ["rustfmt", "clippy"]
+profile = "default"
+```
+
+Pin Rust at a specific stable. Update only on a deliberate task (own row in the milestone audit), never as a side effect.
+
+### Workspace `Cargo.toml`
+
+```toml
+[workspace]
+resolver = "2"
+members = [
+  "crates/cx-app",
+  "crates/cx-sim-core",
+  "crates/cx-terrain",
+  "crates/cx-physics",
+  "crates/cx-actor",
+  "crates/cx-chassis",
+  "crates/cx-equipment",
+  "crates/cx-ai",
+  "crates/cx-mission",
+  "crates/cx-replay",
+  "crates/cx-control",
+  "crates/cxctl",
+  "crates/cx-e2e",
+  "crates/cx-save",
+  "crates/cx-net",
+  "crates/cx-render-2d",
+  "crates/cx-ui",
+  "crates/cx-audio",
+  "crates/cx-mod",
+  "crates/cx-tools-editor",
+  "crates/cx-headless",
+  "crates/cx-bench",
+]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2021"
+rust-version = "1.84"
+license = "Apache-2.0 OR MIT"
+publish = false
+
+[workspace.dependencies]
+bevy = { version = "0.14", default-features = false, features = ["bevy_winit", "bevy_render", "bevy_core_pipeline", "bevy_sprite", "bevy_text", "bevy_ui", "x11"] }
+glam = "0.27"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+ron = "0.8"
+thiserror = "1"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+rand_xoshiro = "0.6"
+blake3 = "1"
+clap = { version = "4", features = ["derive", "env"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "io-util", "sync", "time"] }
+tokio-tungstenite = "0.23"
+jsonrpsee = { version = "0.24", features = ["server", "client", "ws-client", "macros"] }
+schemars = "0.8"
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+debug = true   # keep debug info in release for crash triage
+```
+
+Rationale for the dep set:
+
+| Dep | Used By |
+|---|---|
+| `bevy` | `cx-app`, `cx-render-2d`, `cx-ui`, `cx-tools-editor`, `cx-audio`. |
+| `glam` | All sim/physics/render crates. |
+| `serde` + `serde_json` + `ron` | Replay, save, scenario manifests, control envelope. |
+| `thiserror` + `anyhow` | Error policy below. |
+| `tracing` + `tracing-subscriber` | Logging policy below. |
+| `rand_xoshiro` | Deterministic RNG. |
+| `blake3` | Checksums + content hashing. |
+| `clap` | CLI flags for `cx-app`, `cxctl`, `cx-e2e`, `cx-headless`, `cx-bench`, `cx-mod`. |
+| `tokio` + `tokio-tungstenite` + `jsonrpsee` | Local control server + `cxctl` client. |
+| `schemars` | JSON-Schema generation for control envelope versioning. |
+
+### `rustfmt.toml`
+
+```toml
+edition = "2021"
+max_width = 120
+use_small_heuristics = "Max"
+imports_granularity = "Crate"
+group_imports = "StdExternalCrate"
+reorder_imports = true
+reorder_modules = true
+newline_style = "Unix"
+```
+
+### `clippy.toml`
+
+```toml
+avoid-breaking-exported-api = false
+too-many-arguments-threshold = 8
+type-complexity-threshold = 250
+disallowed-methods = [
+  { path = "rand::thread_rng", reason = "Use cx-sim-core::Rng inside sim islands; wrap in cx-control for non-sim helpers." },
+  { path = "std::time::SystemTime::now", reason = "Use sim tick or cx-sim-core::WallClock to keep determinism intact." },
+]
+```
+
+### `.cargo/config.toml`
+
+```toml
+[build]
+rustflags = ["-D", "warnings"]
+
+[alias]
+ci-fmt = "fmt --all -- --check"
+ci-check = "check --workspace --all-targets"
+ci-clippy = "clippy --workspace --all-targets -- -D warnings"
+ci-test = "test --workspace"
+xtask = "run -p xtask --"
+
+[target.x86_64-pc-windows-msvc]
+linker = "rust-lld.exe"
+
+[target.aarch64-apple-darwin]
+rustflags = ["-C", "link-arg=-Wl,-rpath,@loader_path"]
+```
+
+### `.gitignore` (in `cortex-game/`)
+
+```
+/target
+**/*.rs.bk
+Cargo.lock.bak
+
+# IDE
+/.idea
+/.vscode
+*.iml
+
+# Run bundles produced by local runs in-tree
+/prototype_runs/native/local_*
+
+# OS
+.DS_Store
+Thumbs.db
+```
+
+### `.github/workflows/ci.yml`
+
+```yaml
+name: ci
+on:
+  pull_request: {}
+  push:
+    branches: [main]
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: cortex-game
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux deps
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libudev-dev libxkbcommon-dev libwayland-dev
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.84.0
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: cargo fmt
+        run: cargo fmt --all -- --check
+      - name: cargo check
+        run: cargo check --workspace --all-targets
+      - name: cargo clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: cargo test
+        run: cargo test --workspace
+      - name: cxctl observe smoke
+        run: cargo run -p cxctl -- observe --once --scenario m0_blank
+      - name: run-bundle smoke
+        run: |
+          cargo run -p cxctl -- run --scenario m0_blank --ticks 300 --write-run-bundle
+          python3 ../research_tools/prototype_run_check.py prototype_runs/native/m0_*
+```
+
+### Bootstrap Command Sequence (for M0)
+
+```bash
+mkdir -p cortex-game/crates
+cd cortex-game
+# create rust-toolchain.toml, Cargo.toml, rustfmt.toml, clippy.toml, .cargo/config.toml, .gitignore as above
+for crate in cx-app cx-sim-core cx-terrain cx-physics cx-actor cx-chassis cx-equipment \
+             cx-ai cx-mission cx-replay cx-control cxctl cx-e2e cx-save cx-net cx-render-2d \
+             cx-ui cx-audio cx-mod cx-tools-editor cx-headless cx-bench; do
+  case "$crate" in
+    cx-app|cxctl|cx-e2e|cx-headless|cx-bench) crate_kind="--bin" ;;
+    *) crate_kind="--lib" ;;
+  esac
+  cargo new $crate_kind crates/$crate --name $crate
+done
+# Add per-crate deps from workspace.dependencies, write minimal lib.rs/main.rs stubs.
+cargo check --workspace --all-targets
+```
+
+The per-crate `Cargo.toml` for a library follows the template below. For a binary crate, add a `bin` array-of-tables entry with `name` and `path` (omit for crates whose binary entry is the default `src/main.rs`).
+
+```toml
+[package]
+name = "cx-sim-core"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+glam = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+rand_xoshiro = { workspace = true }
+blake3 = { workspace = true }
+```
+
+---
+
+## Per-Crate AGENTS.md Template
+
+Every crate gets a top-level `AGENTS.md` with this exact skeleton. Junior agents read it before touching the crate.
+
+```markdown
+# <crate-name> — AGENTS.md
+
+## Owns
+- <bullet list of responsibilities>
+
+## Public API Boundary
+- <traits, types, events this crate exposes; everything else is private>
+
+## Does NOT Own
+- <bullet list of anti-scope; redirect to other crates>
+
+## Test Surface
+- Unit tests: `cargo test -p <crate-name>`
+- Integration tests: `tests/<scenario>.rs`
+- Required event categories in run bundles: <list>
+
+## Cross-Crate Contracts
+- Depends on: <crates>
+- Depended on by: <crates>
+- Event names this crate emits: <list>
+- Event names this crate consumes: <list>
+
+## Common Pitfalls
+- <known traps; e.g. "do not call rand::thread_rng inside sim systems">
+
+## Source Trail
+- Vault links to relevant DRs, specs, and design notes.
+```
+
+---
+
+## Logging, Tracing, And Error Policy
+
+### Logging
+
+- Use `tracing`. Never use `println!`, `eprintln!`, or `log::`.
+- Top-level binaries (`cx-app`, `cxctl`, `cx-e2e`, `cx-headless`, `cx-bench`, `cx-mod`) initialize `tracing-subscriber` in `main()` with `EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info,cx_=debug"))`.
+- Spans: every fixed sim tick wraps in `tracing::trace_span!("sim_tick", tick = %tick)`. Every scenario load wraps in `tracing::info_span!("scenario", id = %scenario_id, run = %run_id)`.
+- Log levels:
+  - `error!`: actual bugs, panics-narrowly-avoided, replay drift, scenario load failures.
+  - `warn!`: non-fatal degradation (recorder dropped events, perf budget missed, package validation warning).
+  - `info!`: lifecycle (run started/finished, scenario loaded, control client connected).
+  - `debug!`: per-frame perf samples, AI decisions, terrain dirty regions.
+  - `trace!`: per-tick sim/system traces.
+- Targets: every crate sets `TARGET = "cx::<short>"`, e.g. `cx::sim`, `cx::ai`, `cx::ctl`, `cx::ui`, `cx::net`. Filters use these.
+
+### Error Policy
+
+| Layer | Pattern | Why |
+|---|---|---|
+| Inside sim systems | `Result<T, cx_sim_core::SimError>` with `thiserror`-derived enums; never panic on bad data. | Panicking inside the sim breaks replay parity. |
+| Library boundaries | Crate-specific error enums via `thiserror`; no `anyhow` in lib crates. | Callers can match on variants. |
+| Binaries (`cx-app`, `cxctl`, etc.) | `anyhow::Result<()>` at `main()`; convert library errors with `?`. | Concise top-level error surface. |
+| Scenario/manifest loading | Errors include the file path, line/col when possible, and a fix-hint. | Junior agents need to know where to look. |
+| Control envelope | Every command response is `accepted`, `rejected`, or `queued`, with reason label and effective tick. | Spec'd in [Control Transport](#control-transport-and-envelope). |
+| Panic policy | Panic ONLY for invariant violations the agent can never recover from (poisoned mutex, malformed compile-time fixture). All recoverable failures return `Result`. | Panics destroy replay determinism. |
+
+### Reporting
+
+- Every `error!`/`warn!` increments a counter visible in `summary.json.event_counts.by_severity`.
+- Every panic (caught by `std::panic::set_hook`) writes a final `system.panic` event with backtrace before the process exits. The hook is installed by every binary in `main()`.
+
+---
+
+## Asset And Placeholder Strategy
+
+Until M5 chassis art arrives, milestones use procedurally generated or simple-PNG placeholders. The agent commits placeholders under `cortex-game/assets/placeholders/` with a stable file naming scheme. Real art replaces placeholders by file-name swap.
+
+| Asset | Location | M0..M4 Source | M5+ Source |
+|---|---|---|---|
+| Actor sprite (infantry) | `assets/placeholders/actors/infantry_idle.png` | 16×16 procedurally drawn at build time, OR a checked-in 16×16 PNG with bright distinct colors for parts. | Hand-authored pixel art per chassis archetype. |
+| Materials | `assets/placeholders/materials/<name>.png` | Solid 1×1 colored swatch per material id. | Hand-authored per material. |
+| Audio cues | `assets/placeholders/audio/<event>.ogg` | 200ms sine/square synth blips at distinct frequencies. | Diegetic synth-dread per [[spec/audio-identity]]. |
+| Fonts | `assets/placeholders/fonts/<name>.ttf` | Use a permissively licensed monospace + display pair (e.g. JetBrains Mono + Press Start 2P; check usage-ledger). | Final SDF/vector text per [[decisions/dr-019-visual-direction]]. |
+| Sprites for HUD | `assets/placeholders/ui/<element>.png` | 9-slice or solid-color rectangles. | Comic-noir UI per DR-019. |
+
+Every placeholder logged in [[references/usage-ledger]] with license. Generated placeholders: include the generator script under `tools/asset_gen/`. Do not let placeholders linger after final art ships.
+
+---
+
+## Testing Layers
+
+| Layer | Where | What It Tests | Required Starting |
+|---|---|---|---|
+| Unit | `crates/<crate>/src/...` `#[cfg(test)] mod tests {}` | Pure functions, type roundtrips, schema serialization, math helpers, error variants. | M0 |
+| Integration | `crates/<crate>/tests/*.rs` | Cross-module behavior within a crate; deterministic scenarios that build small fixtures. | M0 |
+| Workspace integration | `cortex-game/tests/*.rs` | Cross-crate behavior (e.g. sim + replay + control all in one process). | M1 |
+| E2E | `cargo run -p cx-e2e -- --scenario <id> --script <name>` | Full scenario run from CLI, asserts via observations + events; writes run bundle. | M1.5 |
+| Replay | `cargo run -p cx-headless -- replay <run-bundle> --verify-checksums` | A previously captured run replays headlessly to identical checksums. | M3 |
+| Determinism | `cargo run -p cx-bench --bin determinism -- --seed-set seeds.json --runs 100` | Same seed produces same checksum 100/100 runs across the test matrix. | M9 |
+| Perf | `cargo run -p cx-bench -- --scenario <id> --profile milestone` | Frame budget, sim cost, event volume, dirty cost; outputs `bench_report.json` artifact. | M2 |
+| Accessibility smoke | `cargo run -p cx-e2e -- --scenario <id> --ui-scale 2.0 --high-contrast --verify-focus` | Layout doesn't break at 200%; focus traversal reaches every interactable; captions fire. | M4 |
+| Save roundtrip | `cargo run -p cx-e2e -- --scenario <id> --save-load-roundtrip --verify-checksums` | Save → load reproduces identical state. | M5/T-SAVE |
+| Network alignment | `cargo run -p cx-headless -- replay-compare <client-a-bundle> <client-b-bundle>` | Two clients' bundles align tick-for-tick. | M10 |
+
+Naming convention: integration test files use the format `<feature>_<scenario>.rs` (e.g. `terrain_carve_lane.rs`). Test names use snake_case and include the assertion (`fn carve_through_dirt_emits_terrain_carved_event()`).
+
+---
+
+## CLI Reference
+
+Single source of truth for every CLI flag. If a flag exists in the codebase but not in this table, it is undocumented and must be added or removed.
+
+### `cx-app`
+
+| Flag | Type | Default | Meaning |
+|---|---|---|---|
+| `--scenario <id>` | string | required | Scenario id; loads `content/scenarios/<id>.ron`. |
+| `--seed <u64>` | u64 | from manifest | Override the manifest's seed. |
+| `--run-seconds <f32>` | f32 | unlimited | Auto-exit after N wall-seconds. Useful for smoke tests. |
+| `--ticks <u64>` | u64 | unlimited | Auto-exit after N sim ticks. |
+| `--write-run-bundle` | flag | false | Emit run bundle on exit. |
+| `--run-bundle-dir <path>` | path | `prototype_runs/native/` | Override run-bundle root. |
+| `--control-api` | flag | false | Open the local control server (see [Control Transport](#control-transport-and-envelope)). |
+| `--control-port <u16>` | u16 | 17890 | Bind port for control server (loopback only). |
+| `--control-uds <path>` | path | none | Optional Unix domain socket path for the control server (POSIX only). |
+| `--headless-smoke` | flag | false | Skip window creation, run sim only, exit cleanly. |
+| `--debug-capabilities <list>` | comma list | empty | Enables capability-gated debug actions; recorded in manifest. |
+| `--ui-scale <f32>` | f32 | 1.0 | Initial UI scale factor. |
+| `--high-contrast` | flag | false | Enables high-contrast palette. |
+
+### `cxctl`
+
+`cxctl` is the CLI client. During M0..M1, run as `cargo run -p cxctl -- <subcommand>`. After install, `cxctl <subcommand>` is shorthand.
+
+| Subcommand | Purpose | Key Flags |
+|---|---|---|
+| `observe --once` | Print one observation snapshot to stdout. | `--format json|ron`, `--scenario <id>` (auto-launches if no app is running and `--auto-launch`). |
+| `observe --stream --hz <N>` | Stream observations at N Hz to stdout. | `--format json`, `--filter <category>`. |
+| `act <action> ...` | Send a single semantic action; returns accepted/rejected. | `<action>` from the action grammar; see [Action Model](#control-transport-and-envelope). |
+| `ui tree` | Print the current UI tree. | `--scope <window\|focused\|all>`. |
+| `ui click <id>` | Click a UI element by stable id. | `--scope <window\|focused>`. |
+| `ui set <id> <value>` | Set a slider/select value. | `--unit <px\|pct\|raw>`. |
+| `scenario load <id>` | Load and ready a scenario. | `--seed <u64>`. |
+| `pause` / `step --ticks <N>` / `resume` | Sim control. | — |
+| `run --ticks <N> --write-run-bundle` | Run for N ticks unattended; emit bundle. | `--scenario <id>`, `--seed <u64>`. |
+| `script run <name>` | Execute a control script. Scripts live in `cortex-game/scripts/cxctl/<name>.cxctl.json`. | `--write-run-bundle`, `--expect <kv>`, `--timeout-ticks <N>`. |
+| `assert <key> <op> <value>` | Assert a key from the latest observation; non-zero exit on fail. | Ops: `==`, `!=`, `<`, `>`, `>=`, `<=`. |
+| `replay verify <run-dir>` | Replay a run bundle and verify checksums. | `--first-divergence`. |
+
+### `cx-e2e`
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--scenario <id>` | required | Scenario id. |
+| `--script <name>` | required if not `--manual` | Named cxctl script. |
+| `--expect <kv>` | optional, repeatable | `key=value` assertion against final observation. |
+| `--write-run-bundle` | false | Emit a run bundle on completion. |
+| `--ui-scale <f32>` | 1.0 | UI scale for accessibility runs. |
+| `--high-contrast` | false | High-contrast mode. |
+| `--verify-focus` | false | Walk all focusable UI elements and assert focus reaches each. |
+| `--save-load-roundtrip` | false | Save mid-run, load, continue, verify state checksums. |
+| `--verify-checksums` | false | Verify deterministic checksums match between live and replay paths. |
+
+### `cx-headless`
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--scenario <id>` | required | Scenario id. |
+| `--seed <u64>` | from manifest | Seed override. |
+| `--ticks <u64>` | required | Run length in ticks. |
+| `replay <run-dir>` | subcommand | Replay a captured run. |
+| `replay-compare <a> <b>` | subcommand | Tick-by-tick compare two run bundles. |
+| `--verify-checksums` | false | Verify deterministic checksums. |
+| `--first-divergence` | false | On replay diverge, dump the first divergence. |
+| `--bind <addr>` | `127.0.0.1:0` | Network bind for net-driven mode. |
+
+### `cx-bench`
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--scenario <id>` | required | Scenario id. |
+| `--profile <milestone>` | required | Pulls perf budget targets per milestone (e.g. `m2`, `m7`). |
+| `--runs <N>` | 5 | Repeat count for averaging. |
+| `--write-bench-report` | false | Emit `bench_report.json`. |
+
+### `cx-mod`
+
+| Subcommand | Purpose |
+|---|---|
+| `validate <paths...>` | Validate scenario/package manifests; exit non-zero on errors. |
+| `build <pkg-dir>` | Build a deterministic `.cxpkg`. |
+| `inspect <.cxpkg>` | Print loader graph + provenance. |
+| `--strict` | Treat warnings as errors. |
+
+---
+
+## Control Transport And Envelope
+
+`cx-control` is the contract layer. Pinning these choices removes ambiguity for every E2E and observation task.
+
+### Transport (Pinned)
+
+| Property | Choice |
+|---|---|
+| Default bind | `127.0.0.1:17890` (loopback only). |
+| Optional UDS | `--control-uds <path>` for POSIX. Disabled by default. |
+| Protocol | JSON-RPC 2.0 over WebSocket. |
+| Framing | One JSON-RPC envelope per WebSocket text frame. Binary frames reserved for future snapshot blobs. |
+| Auth | None for loopback. Remote bind requires `--control-token <token>` (off by default; see DR-005 / DR-013). |
+| Heartbeat | Server pings every 5 s; client must respond within 5 s or be disconnected. |
+| Schema versioning | Every request carries `schema_version: u32`. Server rejects mismatches with `code -32602` (`InvalidParams`) and a fix-hint. |
+
+### Envelope Shape
+
+All requests / responses use JSON-RPC 2.0:
+
+```json
+{ "jsonrpc": "2.0", "id": 7, "method": "act.move", "params": { "schema_version": 1, "x": 1.0 } }
+```
+
+```json
+{ "jsonrpc": "2.0", "id": 7, "result": { "schema_version": 1, "status": "accepted", "effective_tick": 1234, "reason": null } }
+```
+
+```json
+{ "jsonrpc": "2.0", "id": 7, "error": { "code": -32099, "message": "command_rejected", "data": { "reason": "actor_downed", "tick": 1234 } } }
+```
+
+Streaming (observations) uses JSON-RPC notifications:
+
+```json
+{ "jsonrpc": "2.0", "method": "observe.frame", "params": { "schema_version": 1, "tick": 1234, "actors": [...], "ui_tree": {...}, "events_since": 1212, "events": [...] } }
+```
+
+### Method Catalog (Initial)
+
+| Method | Direction | Purpose |
+|---|---|---|
+| `scenario.load` | client → server | Load scenario id with optional seed. |
+| `scenario.reset` | client → server | Reset to scenario start. |
+| `sim.pause` / `sim.resume` / `sim.step` | client → server | Sim control. |
+| `sim.run_for_ticks` | client → server | Auto-step N ticks then pause. |
+| `observe.once` | client → server | One-shot observation. |
+| `observe.subscribe` / `observe.unsubscribe` | client → server | Streaming observations. |
+| `observe.frame` | server → client (notification) | Streaming observation. |
+| `act.<family>.<verb>` | client → server | Semantic actions: `act.player.move`, `act.player.aim`, `act.player.fire`, `act.tactical.select_unit`, `act.ui.click`, `act.scenario.set_speed`, etc. |
+| `ui.tree` | client → server | Query UI tree. |
+| `query.entity` | client → server | Query an actor/equipment/objective by id. |
+| `assert.expression` | client → server | Server-side assert (used by scripts). |
+| `runbundle.write` | client → server | Trigger run-bundle write. |
+| `system.shutdown` | client → server | Graceful exit. |
+
+### Schema Files
+
+Schemas are emitted by `schemars` and committed under `cortex-game/crates/cx-control/schemas/`. Each release tags `cx-control` with a schema version; breaking changes bump the major version.
+
+```
+cortex-game/crates/cx-control/schemas/
+├── v1/
+│   ├── command.schema.json
+│   ├── observation.schema.json
+│   ├── ui_tree.schema.json
+│   └── action_grammar.schema.json
+```
+
+A control event in the run bundle uses the `control` category (see [[references/prototype-run-bundle-schema]]).
+
+---
+
+## Scenario Manifest Schema
+
+Scenarios are RON files in `content/scenarios/<id>.ron`. The schema is shared by manifest-first hybrid generation (per DR-017) and by the editor (per DR-030).
+
+### Minimal Skeleton
+
+```ron
+(
+  schema_version: 1,
+  id: "m0_blank",
+  display_name: "M0 Blank Scene",
+  description: "Empty scene used for engine bootstrap and run-bundle smoke.",
+  seed: 42,
+  duration_ticks: Some(300),
+  region: (anchor: (0.0, 0.0), width: 1280.0, height: 720.0),
+  gravity: -980.0,
+  teams: [],
+  actors: [],
+  terrain: None,
+  objectives: [],
+  director: None,
+  capabilities: (
+    debug: false,
+    control_api: true,
+    save_load: false,
+  ),
+  save_fields: [],
+  expected_tests: [],
+  notes: "",
+)
+```
+
+### Full-Form Skeleton (M7 Breach Contract Excerpt)
+
+```ron
+(
+  schema_version: 1,
+  id: "breach_contract",
+  display_name: "Breach Contract",
+  description: "Compact breach + extract proof mission.",
+  seed: 31415,
+  duration_ticks: Some(18000),
+  region: (anchor: (0.0, 0.0), width: 2560.0, height: 1440.0),
+  gravity: -980.0,
+  teams: [
+    (id: "alpha", display: "Alpha", role: Player, allegiance: Friendly),
+    (id: "compound", display: "Compound", role: Enemy, allegiance: Hostile),
+  ],
+  actors: [
+    (
+      kind: Infantry,
+      team: "alpha",
+      position: (120.0, 64.0),
+      chassis: Some("powered_armor.spartan"),
+      loadout: "engineer_breach",
+    ),
+  ],
+  terrain: Some((
+    materials_set: "v1.launch",
+    map_source: "content/maps/compound_a.png",
+    breachable_zones: [
+      (id: "outer_wall", bbox: ((640, 96), (768, 192)), material: "concrete"),
+    ],
+  )),
+  command_core: Some((
+    team: "compound",
+    rooted: true,
+    powers: ["shield.alpha", "turret.alpha"],
+    endgame: true,
+  )),
+  base_systems: [
+    (id: "shield.alpha", kind: Shield, position: (1280, 256)),
+    (id: "turret.alpha", kind: Turret, position: (1380, 256)),
+    (id: "door.south", kind: Door, position: (1024, 96), hp: 240),
+    (id: "repair.alpha", kind: RepairPad, position: (1340, 96)),
+  ],
+  objectives: [
+    (id: "breach", kind: Breach, target: "outer_wall", optional: false),
+    (id: "neutralize", kind: NeutralizeCount, target: "compound.guards", count: 3, optional: false),
+    (id: "extract", kind: ReachZone, zone: "lz_north", optional: false),
+  ],
+  director: Some((
+    pacing: Steady,
+    reinforcements: [(at_tick: 6000, team: "compound", count: 2)],
+    lz_risk: Medium,
+  )),
+  capabilities: (
+    debug: false,
+    control_api: true,
+    save_load: true,
+  ),
+  save_fields: ["actors", "objectives", "command_core", "base_systems"],
+  expected_tests: ["MISSION-A-01", "MISSION-A-02", "CORE-A-01"],
+  notes: "First proof mission. Win via breach + neutralize + extract under timer.",
+)
+```
+
+### Validation Rules (enforced by `cx-mod validate`)
+
+- `schema_version` must equal the engine's current version or have a registered migration.
+- All `team` references in actors/objectives must exist in `teams`.
+- Every `actors[*].chassis` must resolve in `content/chassis/`.
+- Every `actors[*].loadout` must resolve in `content/loadouts/`.
+- Every `objectives[*].target` must resolve to an actor/zone/structure id.
+- Every `expected_tests[*]` must be a known acceptance test id.
+- `save_fields` must reference real save-domain keys.
+- Objectives must form a reachable graph (no objective unreachable from start state).
+
+---
+
+## Run-Bundle Naming Convention
+
+Run bundles live under `prototype_runs/native/`. Naming is strict so that sorting by name = sorting by time, and so that humans can copy-paste paths without thinking.
+
+| Component | Format | Example |
+|---|---|---|
+| Milestone prefix | `m<id>` (lowercase, no separator) | `m0`, `m1_5`, `m7` |
+| Separator | `_` | |
+| UTC timestamp | `YYYY-MM-DDTHH-MM-SSZ` (ISO-8601, hyphens for time to keep filename safe) | `2026-05-04T22-30-00Z` |
+| Separator | `_` | |
+| Short hash | First 8 chars of `blake3(run_id_bytes)` | `a1b2c3d4` |
+
+Full example: `prototype_runs/native/m0_2026-05-04T22-30-00Z_a1b2c3d4/`
+
+The `run_id` itself is `<milestone-prefix>_<UTC ISO with hyphens>_<short-hash>`. The `summary.json.run_id` and `run_manifest.json.run_id` MUST match the directory basename.
+
+The current platform validation must exit cleanly even when `prototype_runs/` does not exist; the run-bundle writer creates the directory.
+
+### Minimal `run_manifest.json` (M0)
+
+```json
+{
+  "schema_version": 1,
+  "run_id": "m0_2026-05-04T22-30-00Z_a1b2c3d4",
+  "milestone": "m0",
+  "scenario": "m0_blank",
+  "seed": 42,
+  "build": {
+    "commit_sha": "<git-sha>",
+    "rust_version": "1.84.0",
+    "bevy_version": "0.14.x",
+    "platform": "macOS-aarch64"
+  },
+  "config_hash": "<blake3-of-effective-config>",
+  "schemas": {
+    "control": 1,
+    "scenario": 1,
+    "events": 1
+  },
+  "capabilities": {
+    "debug": false,
+    "control_api": true,
+    "save_load": false
+  },
+  "expected_tests": [],
+  "started_at": "2026-05-04T22:30:00Z",
+  "tick_rate_hz": 60
+}
+```
+
+### Minimal `summary.json` (M0)
+
+```json
+{
+  "schema_version": 1,
+  "manifest_run_id": "m0_2026-05-04T22-30-00Z_a1b2c3d4",
+  "run_id": "m0_2026-05-04T22-30-00Z_a1b2c3d4",
+  "ended_at": "2026-05-04T22:30:05Z",
+  "exit_code": 0,
+  "ticks_run": 300,
+  "wall_seconds": 5.0,
+  "event_counts": {
+    "total": 312,
+    "by_category": { "system": 8, "control": 4, "snapshot": 300 },
+    "by_severity": { "error": 0, "warn": 0 },
+    "dropped_total": 0
+  },
+  "perf": {
+    "avg_frame_ms": 4.2,
+    "p99_frame_ms": 6.1,
+    "avg_tick_ms": 0.4
+  },
+  "artifacts": [
+    { "kind": "screenshot", "path": "screenshots/m0_blank_start.png" }
+  ],
+  "tests": [
+    { "id": "M0-SMOKE-01", "result": "pass", "evidence_event_ids": ["m0_...:0:0", "m0_...:300:0"] }
+  ],
+  "blockers": [],
+  "next_actions": []
+}
+```
+
+### Minimal `notes.md` (M0)
+
+```markdown
+# M0 Run Notes — m0_2026-05-04T22-30-00Z_a1b2c3d4
+
+## Assumptions Tested
+- Bevy app launches and ticks fixed 60 Hz for 5 s without crash.
+- `cxctl observe --once` returns one observation against the live app.
+
+## Good
+- Fixed-tick scheduler stable; no drift across 300 ticks.
+
+## Bad
+- (none)
+
+## Meh
+- (none)
+
+## Evidence Links
+- screenshots/m0_blank_start.png
+- events.jsonl tick 0..300
+
+## Next Actions
+- Proceed to M1 task cards.
+```
+
+---
+
+## Bug Log Format
+
+Bugs found during a milestone are recorded in the milestone's vault note under the `## Bugs Found And Fixed` section using this table:
+
+```markdown
+| Bug ID | Severity | Found In | Symptom | Root Cause | Fix | Test Added |
+|---|---|---|---|---|---|---|
+| M2-BUG-001 | High | M2-003 carve | Carving across chunk border crashes | Off-by-one in dirty-region merge | Clamp bbox to chunk bounds in `terrain::dirty::merge_bbox` | `tests/terrain_carve_chunk_border.rs::carve_at_border_does_not_panic` |
+```
+
+Severity:
+- **Critical**: panic, data loss, replay drift, crash on startup, security.
+- **High**: feature visibly broken; reproduces in scripted E2E.
+- **Medium**: incorrect behavior with workaround; degraded perf.
+- **Low**: cosmetic, log spam, minor UX wart.
+
+Every Critical/High bug must add at least one test before it is marked fixed.
+
+---
+
+## Inter-Milestone Bridges
+
+Some milestones produce stubs that later milestones must replace without breaking dependents. These bridges are explicit so a junior agent can replace stubs cleanly.
+
+| Bridge | Producer | Consumer | Contract |
+|---|---|---|---|
+| Soft-breach surface → real terrain | M1.5 | M2 | M1.5 emits `terrain_carved` events with the same field shape (`{ tick, bbox, material_before, material_after, count }`) M2 will produce. M1.5 may emit `terrain_breach_stub` events alongside, but `terrain_carved` is the canonical event and must validate against `prototype-recorder-event.schema.json`. |
+| Reactive enemy → AI core | M1.5 | M6 | M1.5 enemy emits `ai_perception`, `tactic_chosen`, `weapon_fired`, `actor_status_changed` with reason labels. The same event names and reason-label vocabulary are reused by M6. |
+| Mini HUD → comic-noir HUD | M1.5/M4 | M4/M7 | Mini HUD writes status to the same `cx-ui::HudState` resource M4 reads. Adding fields is allowed; renames require a migration entry. |
+| Scenario manifest skeleton → full schema | M0/M1.5 | M7 | Scenario RON files bump `schema_version` only with a registered migration handler. Older scenarios continue to load via migration. |
+| Save stub → real save | M5 | T-SAVE | M5 writes a save with the v0.1 format. Each subsequent milestone that adds save fields bumps `schema_version` and registers a migration. |
+| Replay event taxonomy → headless replay | M3 | M9 | All M3 events MUST be deterministically reproducible from manifest+seed+inputs. Cosmetic-only events are flagged with `cosmetic: true` and excluded from replay verification. |
+| Per-client bundles → align tick-for-tick | M10 | M11/M12 | Bundles share `run_id`; per-client bundles use `<run_id>__client_<role>` directory suffix. |
+
+---
+
+## Per-Milestone Kickoff Smoke
+
+Before doing any feature work, the agent runs the milestone's kickoff smoke. If smoke fails, fix smoke first. If smoke succeeds, proceed to task cards.
+
+| Milestone | Kickoff Smoke (run from `cortex-game/`) | Pass Means |
+|---|---|---|
+| M0 | `cargo fmt --all -- --check && cargo check --workspace --all-targets && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace` | Workspace is well-formed; lints clean. |
+| M0 | `cargo run -p cx-app -- --scenario m0_blank --headless-smoke --ticks 60` | App launches, ticks 60 sim ticks, exits 0. |
+| M0 | `cargo run -p cxctl -- observe --once --scenario m0_blank` | Control envelope serializes one observation. |
+| M0 | `cargo run -p cxctl -- run --scenario m0_blank --ticks 300 --write-run-bundle && python3 ../research_tools/prototype_run_check.py prototype_runs/native/m0_*` | Run bundle validates. |
+| M1 | `cargo run -p cx-app -- --scenario m1_actor_range --run-seconds 5` | One actor visible; status strip shows. |
+| M1 | `cargo run -p cxctl -- script run m1_move_jump_fire_reload --write-run-bundle` | Scripted control drives actor end-to-end. |
+| M1.5 | `cargo run -p cxctl -- script run micro_breach_win --write-run-bundle` | Win path completes; bundle validates. |
+| M1.5 | `cargo run -p cxctl -- script run micro_breach_loss --write-run-bundle` | Loss path completes; bundle validates. |
+| M2 | `cargo run -p cx-e2e -- --scenario m2_material_lane --script dig_concrete_refuse_metal --expect win --write-run-bundle` | All 8 materials behave per affordance. |
+| M3 | `cargo run -p cx-headless -- replay prototype_runs/native/<m2_run> --verify-checksums` | Headless replay matches checksums. |
+| M4 | `cargo run -p cx-e2e -- --scenario micro_breach --ui-scale 2.0 --high-contrast --verify-focus --write-run-bundle` | UI passes ACC-A floor. |
+| M5 | `cargo run -p cx-e2e -- --scenario m5_chassis_wreck_eject --expect pilot_extracted --write-run-bundle` | Chassis grammar end-to-end. |
+| M6 | `cargo run -p cx-ai --bin ai_harness -- --suite AI-H-01..AI-H-06 --write-run-bundle` | Harness suite passes. |
+| M7 | `cargo run -p cx-e2e -- --scenario breach_contract --script win_path --expect win --write-run-bundle` | Breach Contract win path is real. |
+| M8 | `cargo run -p cx-mod -- validate content/ mods/ --strict && cargo run -p cx-e2e -- --scenario sample_mod_breach --expect win --write-run-bundle` | Mod loads + plays. |
+| M9 | `cargo run -p cx-headless -- --scenario breach_contract --ticks 36000 --verify-checksums` | 10-min headless replay verified. |
+| M10 | `cargo run -p cx-headless -- replay-compare <client_a_bundle> <client_b_bundle>` | Per-client bundles align. |
+| M11 | M10 smoke + cross-host smoke through transport adapter. | Transport adapter holds. |
+| M12 | M10/M11 smokes + N=20 stress harness. | Architecture is plausible at scale. |
+
+---
+
 ## Milestone Map
 
 | ID | Title | What It Proves | Depends On | Critical |
 |---|---|---|---|---|
 | M0 | Engine Bootstrap | Workspace builds, app runs, fixed-tick sim ticks, hello-world render | — | Yes |
 | M1 | Actor Controller + Sim Core | One actor playable; control intent + physics + simple weapon | M0 | Yes |
+| M1.5 | Micro Breach Fun Slice | Sterile actor lab becomes a 60-90s playable loop with enemy, soft breach, objective, and replay evidence | M1 | Yes |
 | M2 | Pixel Terrain + Materials | Mutable chunked terrain; GPU-assisted carving; material affordances | M0, M1 | Yes |
 | M3 | Replay + Event Recorder | Event taxonomy + run bundle + snapshot/checksum + headless replay | M0..M2 | Yes |
 | M4 | HUD + Comic-Noir UI | HUD reads sim state; comic-noir cards; accessibility floor | M1, M3 | Yes |
@@ -224,6 +1249,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 | ID | Title | Spans Milestones |
 |---|---|---|
+| T-CONTROL | AI control and observability | M0..M12 |
 | T-PLATFORM | Cross-platform CI and Steam Deck | M0..M12 |
 | T-MOD | Modding and scripting | M5..M8 primary; lifelong |
 | T-AUDIO | Diegetic SFX and captions | M4..M7 primary; lifelong |
@@ -245,17 +1271,20 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 - `cx-sim-core` fixed-tick scheduler (60 Hz default; 120 Hz option).
 - `cx-replay` minimal event envelope + run-bundle writer (no events yet beyond `system_*`).
 - `cx-render-2d` minimal wgpu pipeline that clears the screen.
+- `cx-control` minimal command/observation schema plus `cargo run -p cxctl -- observe --once`, `cargo run -p cxctl -- run --ticks`, `pause`, and `step`.
 - GitHub Actions CI: build matrix Win/Linux/macOS; cargo check + cargo test + cargo clippy.
-- `tools/run_bundle_check.py` ported from the existing Python tool to validate native run bundles.
+- Native run bundles compatible with `research_tools/prototype_run_check.py`; add a thin native helper or wrapper only if the milestone needs one.
 - Hello-world scene: blank window, press ESC to exit, run-bundle written to `prototype_runs/native/`.
 
 **Done-criteria:**
 - [ ] `cargo build --release` succeeds on Win/Linux/macOS.
-- [ ] CI is green for all three platforms.
+- [ ] CI is green for all three platforms when runners are available; local current-platform validation passes before handoff.
 - [ ] `cargo run` opens a window, ticks the sim at 60 Hz for 5 seconds, exits cleanly.
 - [ ] A run bundle is written under `prototype_runs/native/m0_*/` with manifest+events+summary+notes.
-- [ ] `tools/run_bundle_check.py` passes on the bundle.
-- [ ] Repository is committed; commit history is semantic.
+- [ ] `python3 research_tools/prototype_run_check.py prototype_runs/native/<m0_run>` passes on the bundle.
+- [ ] `cargo run -p cxctl -- observe --once` reads current run/tick/scenario state without screenshot capture.
+- [ ] `cargo run -p cxctl -- run --ticks 300 --write-run-bundle` drives the no-op scene without OS input.
+- [ ] Repository is commit-ready, with a semantic commit only if the user explicitly asked the agent to commit.
 
 **Cross-DR:** DR-001, DR-024, DR-025, DR-026, DR-002 (run-bundle).
 
@@ -272,18 +1301,47 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 - `cx-equipment` minimal: one rifle preset; magazine/ammo state; fire/reload events.
 - `cx-render-2d`: pixel-art sprite rendering (sub-pixel-clean); chunky pixel actor sprite.
 - `cx-replay`: event taxonomy expanded to `input_intent`, `actor_status_changed`, `weapon_fired`, `weapon_reloaded`, `actor_snapshot`.
+- `cx-control`: movement, aim, fire, reload, selected-item, actor snapshot, and equipment observations/actions.
 - HUD stub via egui: ammo + status text overlay.
 - Manual playtest: WASD movement, mouse aim, click-to-fire, R to reload.
 
 **Done-criteria:**
 - [ ] One actor is playable for 5 minutes without crash.
 - [ ] All control inputs produce `input_intent` events.
+- [ ] The actor can be moved, aimed, fired, and reloaded through `cxctl` or the control API with the same sim path as human input.
 - [ ] Status transitions emit `actor_status_changed` with cause.
 - [ ] A 5-minute run bundle validates with the run-bundle checker.
 - [ ] Project owner does a manual playtest and writes a verbatim reaction in a vault note.
 - [ ] HTML lab is marked superseded; new prototype work goes into native.
 
 **Cross-DR:** DR-001, DR-003, DR-004, DR-024, DR-026, DR-002.
+
+---
+
+### M1.5 — Micro Breach Fun Slice
+
+**What it proves:** The native actor lab has something to do. This milestone directly answers the HTML playtest signal: "ok I guess... hard to tell." It adds the cheapest possible pressure, goal, enemy, and terrain consequence before the full terrain/material milestone.
+
+**Scope:**
+- One 60-90 second playable micro scenario: start → breach a soft barrier → fight or bypass one reactive enemy → reach extraction.
+- One reactive enemy dummy: limited sight cone, slow aim, imperfect fire, health/status, death event, and no omniscience.
+- One soft breach surface: a tiny temporary destructible strip or tile field. It may be replaced by M2's real chunked terrain; it must still emit terrain-like events.
+- One digger/tool action with visible refusal/success labels.
+- One objective state machine: `objective_started`, `objective_updated`, `objective_completed`, `objective_failed`.
+- HUD additions: objective text, timer, player status, enemy status, selected item, last important event.
+- Run bundle captures input, enemy perception, enemy fire, hit/miss, player damage/death, tool use, terrain breach, objective result, and screenshot.
+- `cargo run -p cxctl -- script ...` scripts drive both win and loss paths without requiring manual input.
+
+**Done-criteria:**
+- [ ] The micro scenario can be won and lost in 60-90 seconds.
+- [ ] Enemy behavior is reactive but simple; it emits perception/fire/reload/death events with reason labels.
+- [ ] The soft breach emits terrain-compatible events that M2 can replace without changing replay consumers.
+- [ ] A scripted E2E run wins the scenario; another scripted or deterministic run loses it.
+- [ ] Both E2E runs use the semantic control layer and assert objective outcome from structured observations/events.
+- [ ] Run bundle validates and includes screenshot/capture plus objective outcome.
+- [ ] Project owner can play the scenario and record a verbatim reaction. If unavailable, mark `READY_FOR_HUMAN_PLAYTEST`.
+
+**Cross-DR:** DR-002, DR-004, DR-007, DR-008, DR-009, DR-024.
 
 ---
 
@@ -531,6 +1589,23 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 ## Side Track Details
 
+### T-CONTROL — AI Control And Observability
+
+Spans M0..M12. See [[spec/ai-control-observability-layer]].
+
+This is the built-in "eyes, ears, hands, and voice" layer for AI implementation agents (Codex, Factory droids, Claude Code, Cursor, etc.), automated tests, accessibility tooling, and player/community bots. It must expose structured game state and semantic actions directly, so agents do not need to drive the app through screenshot polling.
+
+- `cx-control` owns versioned command, observation, UI-tree, and assertion schemas.
+- `cxctl` is the CLI interface for scripts: load scenario, pause, step, observe, act, click UI by id, assert objective state, and write run bundles. During development, run it as `cargo run -p cxctl -- ...`; `cxctl ...` is shorthand after the binary is installed or added to PATH.
+- A local-only control server, launched with `--control-api`, streams observations and accepts semantic action commands. Initial target is JSON-RPC/WebSocket or an equally scriptable transport.
+- Observation packets include tick, scenario, actors, equipment, terrain/material affordances, objectives, UI semantic tree, captions/audio cues, recent events, and performance counters.
+- Action packets map to real human/gameplay/UI affordances: move, aim, fire, reload, use, select unit, issue order, query/click/type UI, run/step/reset scenario, inspect entity/event chain.
+- Debug-only actions are capability-gated, disabled by default, and recorded in the run manifest.
+
+**Done-criteria per milestone:** every new player-facing control or UI action is either controllable through `cxctl`/the control API or explicitly marked human-only with a reason; every new critical screen state has a structured observation/event/caption equivalent.
+
+---
+
 ### T-PLATFORM — Cross-Platform CI And Steam Deck
 
 Spans M0..M12. From M0:
@@ -621,8 +1696,10 @@ Per-frame budget at 4K/120: 8.33ms. Sim tick at 60Hz: 16.67ms. AI/terrain async 
 ```mermaid
 flowchart TB
   M0[M0 Engine Bootstrap] --> M1[M1 Actor + Sim Core]
+  M1 --> M15[M1.5 Micro Breach Fun Slice]
   M0 --> M2[M2 Terrain + Materials]
   M1 --> M3[M3 Replay + Recorder]
+  M15 --> M3
   M2 --> M3
   M1 --> M4[M4 HUD + UI]
   M3 --> M4
@@ -642,6 +1719,8 @@ flowchart TB
   M10 --> M11[M11 Online Co-op]
   M11 --> M12[M12 PvP/MMO Experiments]
 
+  T0[T-CONTROL] -.-> M0
+  T0 -.-> M12
   T1[T-PLATFORM] -.-> M0
   T1 -.-> M12
   T2[T-MOD] -.-> M5
@@ -669,8 +1748,16 @@ Quick lookup: which milestone owns which feature.
 | Custom wgpu render pipelines | M0 (clear), M1 (sprite), M2 (terrain), M5 (chassis), M7 (full) |
 | Fixed-tick sim scheduler | M0 |
 | Run-bundle writer / checker | M0, M3 |
+| AI/dev control API schemas | T-CONTROL, M0 |
+| `cxctl` CLI observe/run/step/act/assert | T-CONTROL, M0..M1.5 |
+| Semantic UI tree and UI action control | T-CONTROL, M4, M8 |
+| Future bot authoring API | T-CONTROL, M6, M8 |
 | Actor controller + control intent | M1 |
 | 2D physics | M1 |
+| Micro Breach fun loop | M1.5 |
+| Reactive enemy dummy | M1.5 |
+| Temporary soft breach surface | M1.5, replaced by M2 terrain |
+| Objective timer/win/loss state | M1.5, M7 |
 | Pixel terrain (chunked) | M2 |
 | Material system + affordances | M2 |
 | GPU-assisted terrain carving | M2 |
@@ -717,12 +1804,82 @@ Quick lookup: which milestone owns which feature.
 
 ---
 
+## Validation Command Matrix
+
+These commands are the default validation surface for implementation agents. If the native repo path changes, update this table before assigning more milestones.
+
+| Scope | Command / Check | Required Starting |
+|---|---|---|
+| Formatting | `cargo fmt --all --check` | M0 |
+| Compile | `cargo check --workspace --all-targets` | M0 |
+| Lints | `cargo clippy --workspace --all-targets -- -D warnings` | M0 |
+| Unit/integration tests | `cargo test --workspace` | M0 |
+| Native app smoke | `cargo run -p cx-app -- --scenario <milestone-smoke> --run-seconds 5 --write-run-bundle` | M0 |
+| Control API smoke | `cargo run -p cxctl -- observe --once` and `cargo run -p cxctl -- run --ticks 300 --write-run-bundle` against the current milestone scene. | M0 |
+| Run-bundle validation | `python3 research_tools/prototype_run_check.py prototype_runs/native/<run_id>` | M0 |
+| Scripted E2E | `cargo run -p cx-e2e -- --scenario <scenario-id> --expect <result> --write-run-bundle`; prefer `cxctl`/control API actions over OS-level input. | M1.5 |
+| Observation stream check | Stream `cargo run -p cxctl -- observe --stream --hz 30` during a scripted run and verify tick/order/event freshness. | M1.5 |
+| Replay check | `cargo run -p cx-headless -- replay prototype_runs/native/<run_id> --verify-checksums` | M3 |
+| Screenshot/capture check | Capture listed in `summary.json.artifacts`; verify no blank/overlap failure. | M1.5 visual runs; M4 required |
+| Perf sample | `cargo run -p cx-bench -- --scenario <scenario-id> --profile milestone` | M2 |
+| Accessibility smoke | `cargo run -p cx-e2e -- --scenario <scenario-id> --ui-scale 2.0 --high-contrast --verify-focus` | M4 |
+| Save/load roundtrip | `cargo run -p cx-e2e -- --scenario <scenario-id> --save-load-roundtrip --verify-checksums` | M5/T-SAVE |
+| AI harness | `cargo run -p cx-ai --bin ai_harness -- --suite AI-H-01..AI-H-06 --write-run-bundle` | M6 |
+| Package/mod validation | `cargo run -p cx-mod -- validate content/ mods/ --strict` | M8 |
+| Headless server smoke | `cargo run -p cx-headless -- --scenario breach_contract --ticks 3600 --verify-checksums` | M9 |
+| LAN/online replay alignment | Compare per-client run bundles with `cx-headless replay-compare`. | M10+ |
+
+If a command does not exist yet, the milestone that first lists it must either implement it or explicitly record a blocker and replacement check.
+
+---
+
+## Bug Hunt Checklist
+
+Every milestone final audit must answer these prompts.
+
+| Category | Questions |
+|---|---|
+| Crashes/hangs | Can reset, exit, alt-tab, reload scenario, and replay complete without panic/deadlock? |
+| Input | Are repeated inputs, held inputs, lost focus, mouse capture, controller fallback, and remap paths sane? |
+| Replay/events | Are required events present, ordered, parent-linked, counted, and linked to visible behavior? |
+| Determinism | If a deterministic claim is made, where is the checksum proof and first-divergence report? |
+| UI/readability | Does UI fit at 100%, 150%, and 200%; are critical states not color-only; are labels non-overlapping? |
+| Terrain/physics | Do high-speed impacts, edge collisions, tiny holes, chunk borders, and repeated edits behave predictably? |
+| AI | Can the AI explain perception, chosen tactic, refused action, stuck state, and recovery? |
+| Save/load | Does save/load preserve identities, events, objective state, terrain, equipment, and checksums where promised? |
+| Performance | Are frame spikes, sim tick cost, event volume, dirty-region cost, and memory growth reported? |
+| Platform | Are path separators, case sensitivity, file watching, audio, input, and GPU backend assumptions portable? |
+| Mod/package | Do bad packages fail with actionable diagnostics instead of panic/crash? |
+| Documentation | Are roadmap/backlog/source links current; are ghost DRs or stale Slice-A references avoided? |
+
+---
+
+## Definition Of Done
+
+For M0..M12, a milestone is done only when all agent-completable items below are complete.
+
+| Area | Required Evidence |
+|---|---|
+| Code | Implemented in the owned crates/files named by [[spec/native-implementation-backlog]]. |
+| Tests | Unit/integration tests added for new core behavior and failure paths. |
+| E2E | Milestone reference scenario runs from command line and produces expected outcome. |
+| Run bundle | Bundle exists under `prototype_runs/native/` and passes the checker. |
+| Replay | Required replay/checksum claims are backed by headless verification or explicitly not claimed. |
+| Perf | Perf counters exist; T-PERF target status is recorded as pass/fail/blocked. |
+| UI/accessibility | Any user-facing surface has screenshot evidence and ACC-A status when applicable. |
+| Bug hunt | Bug checklist is completed; found bugs are fixed or logged as accepted known issues. |
+| Vault | Prototype/research note is updated with run links, test commands, screenshots, final audit, and next actions. |
+| Human gates | Human-only checks are marked `READY_FOR_HUMAN`, with a short playtest checklist. |
+
+---
+
 ## Milestone Done-Criteria Summary
 
 | Milestone | Headline Done-Criterion |
 |---|---|
 | M0 | Workspace builds on 3 platforms; Bevy app ticks; M0 run bundle validates. |
 | M1 | One actor playable for 5 minutes; HTML lab is officially superseded. |
+| M1.5 | Micro Breach can be won/lost in 60-90s, with reactive enemy, soft breach, objective state, and checked run bundle. |
 | M2 | Player digs through 8-material grid; carving replay-recorded; perf budget met. |
 | M3 | Headless replay produces identical checksums to live run. |
 | M4 | HUD-01..HUD-03 + ACC-A floor pass with 5 playtesters. |
@@ -777,6 +1934,8 @@ This roadmap explicitly does NOT include for v1:
 ## Source Trail
 
 - [[spec/authoritative-game-spec-v0]]
+- [[spec/native-implementation-backlog]]
+- [[spec/ai-control-observability-layer]]
 - [[spec/prototype-implementation-backlog-slice-a]]
 - [[spec/setting-and-world-frame]]
 - [[spec/chassis-armor-mechs-and-origins]]
