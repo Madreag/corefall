@@ -983,6 +983,10 @@ Single source of truth for every CLI flag. If a flag exists in the codebase but 
 | `--debug-capabilities <list>` | comma list | empty | Enables capability-gated debug actions; recorded in manifest. |
 | `--ui-scale <f32>` | f32 | 1.0 | Initial UI scale factor. |
 | `--high-contrast` | flag | false | Enables high-contrast palette. |
+| `--captions <on\|off>` | enum | on | Initial caption setting. Semantic placeholder in M0; captions become content-bearing from audio/UI milestones. |
+| `--reduced-motion` | flag | false | Enables reduced-motion posture. Semantic placeholder in M0; later VFX/camera systems must read it. |
+| `--reduced-shake` | flag | false | Disables or reduces camera shake once camera/VFX systems exist. Recorded in M0 settings state. |
+| `--reduced-flash` | flag | false | Disables or reduces flashing effects once VFX systems exist. Recorded in M0 settings state. |
 
 ### `cfctl`
 
@@ -1573,6 +1577,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 - `cf-render-2d` minimal wgpu pipeline that clears the screen.
 - `cf-control` minimal command/observation schema plus `cargo run -p cfctl -- observe --once`, `cargo run -p cfctl -- run --ticks`, `pause`, and `step`.
 - GitHub Actions CI: build matrix Win/Linux/macOS; cargo check + cargo test + cargo clippy.
+- M0-level accessibility/settings flags: `--ui-scale`, `--high-contrast`, and placeholder settings fields for captions/reduced motion/reduced shake/reduced flash so DR-012 has a stable early config surface.
 - Native run bundles compatible with `research_tools/prototype_run_check.py`; add a thin native helper or wrapper only if the milestone needs one.
 - Hello-world scene: blank window, press ESC to exit, run-bundle written to `prototype_runs/native/`.
 
@@ -1586,9 +1591,9 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 - [ ] `cargo run -p cfctl -- run --ticks 300 --write-run-bundle` drives the no-op scene without OS input.
 - [ ] Repository is commit-ready, with a semantic commit only if the user explicitly asked the agent to commit.
 
-**Cross-DR:** DR-001, DR-024, DR-025, DR-026, DR-002 (run-bundle).
+**Cross-DR:** DR-001, DR-002 (run-bundle), DR-012 (early accessibility/settings surface), DR-024, DR-025, DR-026.
 
-**Open DR gates:** DR-002 (replay/event architecture is OPEN with hybrid event-log + snapshots lean) — M0 ships the run-bundle writer; confirm the event envelope shape + manifest fields with the user before locking the schema. Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
+**Open DR gates:** DR-002 (replay/event architecture is OPEN with hybrid event-log + snapshots lean) — M0 ships the run-bundle writer; confirm the event envelope shape + manifest fields with the user before locking the schema. DR-012 (accessibility/comfort floor is OPEN) — M0 does not close ACC-A, but it must establish the app/settings flags for UI scale, high contrast, captions, reduced motion, reduced shake, and reduced flash so later UI/audio/VFX work does not bolt accessibility on late. Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
 
 ---
 
