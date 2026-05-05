@@ -22,7 +22,7 @@ revisit_trigger: "Modular crate boundaries fail under integration; or AI-augment
 
 | Aspect | Commitment |
 |---|---|
-| Repo layout | Cargo workspace at `cortex-game/` with one crate per feature subsystem. See [[spec/prototype-roadmap]] Repository Layout. |
+| Repo layout | Cargo workspace at `corefall-game/` with one crate per feature subsystem. See [[spec/prototype-roadmap]] Repository Layout. |
 | Inter-crate boundaries | Public APIs are traits + types + event structs. Internal data structures stay private. |
 | Agent ownership | Each AI agent task names the crate(s) it owns. Cross-crate work requires an explicit handoff or merge. |
 | Build hygiene | `cargo check` + `cargo test` + `cargo clippy -- -D warnings` are CI-enforced on every PR. |

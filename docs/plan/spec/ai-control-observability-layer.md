@@ -44,7 +44,7 @@ Screenshots and video captures remain useful evidence, but they are not the prim
 Recommended initial transport: localhost-only WebSocket JSON-RPC because it is easy for any AI agent (Codex, Factory droids, Claude Code, Cursor), Python, Node, browser tools, and future community bot authors. Keep the schema transport-neutral so it can later run over UDS, pipes, replay files, or server-authoritative net channels.
 
 > [!info] Transport pin
-> The concrete transport (JSON-RPC 2.0 over WebSocket on `127.0.0.1:17890`, optional UDS, mandatory `schema_version`, heartbeat) is pinned in [[spec/prototype-roadmap#control-transport-and-envelope]]. Schemas live under `cortex-game/crates/cx-control/schemas/v<N>/`.
+> The concrete transport (JSON-RPC 2.0 over WebSocket on `127.0.0.1:17890`, optional UDS, mandatory `schema_version`, heartbeat) is pinned in [[spec/prototype-roadmap#Control Transport And Envelope]]. Schemas live under `corefall-game/crates/cx-control/schemas/v<N>/`.
 
 ### Concrete Envelope Examples
 

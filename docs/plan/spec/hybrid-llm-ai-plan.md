@@ -131,7 +131,7 @@ Local AI Executor
 
 ## Data Contracts
 
-The LLM layer is data-driven from the start. Schemas live inside the existing `cx-ai` crate under a `mind` submodule (`cx-ai::mind::schema`) plus generated JSON Schemas under `cortex-game/crates/cx-ai/schemas/mind/v<N>/` until the project stabilizes; they are NOT in a separate `cx-ai-mind-schema` crate. Provider adapters live inside `cx-ai::mind::provider`, behind cargo features (`mind-openai`, `mind-anthropic`, `mind-ollama`, `mind-openai-compatible`). The deterministic mock provider is always built. Test scenarios live in `tests/` and content packs live in `content/`, consistent with the workspace layout pinned in [[spec/prototype-roadmap]].
+The LLM layer is data-driven from the start. Schemas live inside the existing `cx-ai` crate under a `mind` submodule (`cx-ai::mind::schema`) plus generated JSON Schemas under `corefall-game/crates/cx-ai/schemas/mind/v<N>/` until the project stabilizes; they are NOT in a separate `cx-ai-mind-schema` crate. Provider adapters live inside `cx-ai::mind::provider`, behind cargo features (`mind-openai`, `mind-anthropic`, `mind-ollama`, `mind-openai-compatible`). The deterministic mock provider is always built. Test scenarios live in `tests/` and content packs live in `content/`, consistent with the workspace layout pinned in [[spec/prototype-roadmap]].
 
 ### `MindObservationFrame`
 
@@ -316,7 +316,7 @@ Do not make this part of M0-M6 baseline AI. Add it as a side track and a bridge 
 
 | ID | Task | Owner crates/modules | Done when |
 |---|---|---|---|
-| T-LLM-001 | Define schemas for `MindObservationFrame`, `MindTask`, `AiMindProposal`, `MindValidationResult`, `MindMemoryRecord`, and `MindProviderConfig`. | `cx-ai::mind::schema` (with generated JSON Schemas under `cortex-game/crates/cx-ai/schemas/mind/v1/`) | JSON/RON schemas exist, examples validate, bad examples fail. |
+| T-LLM-001 | Define schemas for `MindObservationFrame`, `MindTask`, `AiMindProposal`, `MindValidationResult`, `MindMemoryRecord`, and `MindProviderConfig`. | `cx-ai::mind::schema` (with generated JSON Schemas under `corefall-game/crates/cx-ai/schemas/mind/v1/`) | JSON/RON schemas exist, examples validate, bad examples fail. |
 | T-LLM-002 | Add deterministic mock provider. | `cx-ai::mind::provider::mock` | Tests can inject canned responses, malformed responses, timeout, cost overflow, and stale response. |
 | T-LLM-003 | Add provider adapter trait and routing config. | `cx-ai::mind::provider` (cargo features `mind-openai`, `mind-anthropic`, `mind-ollama`, `mind-openai-compatible`) | OpenAI-compatible, Anthropic, Ollama, and mock adapters share one interface. Live cloud adapters are feature-gated. |
 | T-LLM-004 | Build observation compressor. | `cx-ai::mind::compressor`, `cx-control`, `cx-replay` | Produces compact, fog-of-war-filtered mind frames from event stream and blackboard. |

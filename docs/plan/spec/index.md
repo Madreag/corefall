@@ -9,7 +9,7 @@
 > The v0 spec is authoritative for the current plan, not a final shipping lock. Stub or prototype pages still need the gates in [[dashboards/research-readiness]], open decisions in [[dashboards/decision-tracker]], and run evidence before they become final release commitments.
 
 > [!important] Worker onboarding
-> When assigning a milestone or feature task to an AI implementation agent, hand them the relevant rows from [[spec/ai-coder-reading-list]]. The [[spec/prototype-roadmap#open-decision-gates-protocol|Open Decision Gates Protocol]] applies to every task.
+> When assigning a milestone or feature task to an AI implementation agent, hand them the relevant rows from [[spec/ai-coder-reading-list]]. The [[spec/prototype-roadmap#Open Decision Gates Protocol|Open Decision Gates Protocol]] applies to every task.
 
 ## Purpose
 

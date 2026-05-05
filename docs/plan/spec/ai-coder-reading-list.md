@@ -18,7 +18,7 @@ feeds:
 > The exact docs an AI implementation agent must read before starting any milestone or feature task. Use this when handing off work. Order matters; the first 8 are non-negotiable for every task.
 
 > [!important] Hand this list (or a subset) to the worker
-> When assigning a milestone or single roadmap feature, paste the relevant rows below into the agent prompt. The agent must confirm each read in the milestone vault note. The [[spec/prototype-roadmap#open-decision-gates-protocol|Open Decision Gates Protocol]] applies to every task.
+> When assigning a milestone or single roadmap feature, paste the relevant rows below into the agent prompt. The agent must confirm each read in the milestone vault note. The [[spec/prototype-roadmap#Open Decision Gates Protocol|Open Decision Gates Protocol]] applies to every task.
 
 ## Mandatory For Every Task (Read In Order)
 
@@ -26,7 +26,7 @@ feeds:
 |---|---|---|
 | 1 | `AGENTS.md` (root) | Project rules, license/reuse posture, vault structure, agent role definitions. |
 | 2 | [[spec/authoritative-game-spec-v0]] | Canonical game spec: product promise, player fantasy, core loop, launch commitments, non-commitments, moonshots. |
-| 3 | [[spec/prototype-roadmap]] | Native build roadmap. **Required subsections:** Read Order, Glossary, Agent Implementation Contract, [[spec/prototype-roadmap#open-decision-gates-protocol\|Open Decision Gates Protocol]], Milestone Handoff Template, Strategic Frame, Stack At A Glance, Repository Layout, Toolchain And Workspace Bootstrap, Per-Crate AGENTS.md Template, Logging/Tracing/Error Policy, Asset/Placeholder Strategy, Testing Layers, [[spec/prototype-roadmap#cli-reference\|CLI Reference]], Control Transport And Envelope, Scenario Manifest Schema, Run-Bundle Naming Convention, Bug Log Format, Per-Milestone Kickoff Smoke, the assigned milestone's Detail section (with its **Open DR gates** row), Validation Command Matrix, Bug Hunt Checklist, Definition Of Done, Anti-Goals. |
+| 3 | [[spec/prototype-roadmap]] | Native build roadmap. **Required subsections:** Read Order, Glossary, Agent Implementation Contract, [[spec/prototype-roadmap#Open Decision Gates Protocol\|Open Decision Gates Protocol]], Milestone Handoff Template, Strategic Frame, Stack At A Glance, Repository Layout, Toolchain And Workspace Bootstrap, Per-Crate AGENTS.md Template, Logging/Tracing/Error Policy, Asset/Placeholder Strategy, Testing Layers, [[spec/prototype-roadmap#CLI Reference\|CLI Reference]], Control Transport And Envelope, Scenario Manifest Schema, Run-Bundle Naming Convention, Bug Log Format, Per-Milestone Kickoff Smoke, the assigned milestone's Detail section (with its **Open DR gates** row), Validation Command Matrix, Bug Hunt Checklist, Definition Of Done, Anti-Goals. |
 | 4 | [[spec/native-implementation-backlog]] | Global Rules + Standard Validation + the assigned milestone's task cards. |
 | 5 | [[spec/feature-completion-checklist]] | Update Rules For Agents + [[spec/feature-completion-checklist#open-decision-gates-checklist\|Open Decision Gates Checklist]] + Server/MMO + Material/T-MAT addenda + the assigned milestone's scope/done/task rows. |
 | 6 | [[spec/ai-control-observability-layer]] | Eyes/ears/hands rule. Every player-facing surface MUST be reachable from `cxctl`. |
@@ -77,7 +77,7 @@ feeds:
 
 ## Hard Rules The Worker Must Always Follow
 
-1. **[[spec/prototype-roadmap#open-decision-gates-protocol|Open Decision Gates Protocol]]**: do not silently assume an OPEN DR's lean is locked. Confirm the lean from current evidence or ask the user through the active agent's available user-input/chat mechanism.
+1. **[[spec/prototype-roadmap#Open Decision Gates Protocol|Open Decision Gates Protocol]]**: do not silently assume an OPEN DR's lean is locked. Confirm the lean from current evidence or ask the user through the active agent's available user-input/chat mechanism.
 2. **Eyes/ears/hands rule**: every player-facing surface MUST be reachable from `cxctl`. If a UI lacks a `cx-control` path, the milestone is incomplete. See [[spec/ai-control-observability-layer]].
 3. **Events first**: every behavior that affects player understanding/replay/AI/networking/save/debugging emits an event. See [[references/prototype-run-bundle-schema]].
 4. **Reference repos are read-only**: never edit CCCP/C4/comparable repos.

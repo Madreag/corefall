@@ -527,7 +527,7 @@ Allowed use of raylib/stb: throwaway prototypes, asset converters, image utiliti
 Modular crate workspace so AI agents can own separate crates per DR-026:
 
 ```
-cortex-game/                          # cargo workspace root
+corefall-game/                        # cargo workspace root
 ├── Cargo.toml                        # workspace + shared deps
 ├── crates/
 │   ├── cx-app/                       # binary; thin Bevy app shell + plugin wiring
@@ -574,7 +574,7 @@ Each crate is owned by an explicit feature/agent boundary. Inter-crate boundarie
 
 This is the M0 day-zero recipe. A junior agent assigned M0 must produce these files first, BEFORE any feature code, and verify them with the kickoff smoke (see [[#Per-Milestone Kickoff Smoke|Per-Milestone Kickoff Smoke]]).
 
-### `rust-toolchain.toml` (in `cortex-game/`)
+### `rust-toolchain.toml` (in `corefall-game/`)
 
 ```toml
 [toolchain]
@@ -719,7 +719,7 @@ linker = "rust-lld.exe"
 rustflags = ["-C", "link-arg=-Wl,-rpath,@loader_path"]
 ```
 
-### `.gitignore` (in `cortex-game/`)
+### `.gitignore` (in `corefall-game/`)
 
 ```
 /target
@@ -756,7 +756,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     defaults:
       run:
-        working-directory: cortex-game
+        working-directory: corefall-game
     steps:
       - uses: actions/checkout@v4
       - name: Install Linux deps
@@ -788,8 +788,8 @@ jobs:
 ### Bootstrap Command Sequence (for M0)
 
 ```bash
-mkdir -p cortex-game/crates
-cd cortex-game
+mkdir -p corefall-game/crates
+cd corefall-game
 # create rust-toolchain.toml, Cargo.toml, rustfmt.toml, clippy.toml, .cargo/config.toml, .gitignore as above
 for crate in cx-app cx-sim-core cx-terrain cx-physics cx-material cx-atmos cx-actor cx-chassis \
              cx-equipment cx-ai cx-mission cx-replay cx-control cxctl cx-e2e cx-save cx-net \
@@ -898,7 +898,7 @@ Every crate gets a top-level `AGENTS.md` with this exact skeleton. Junior agents
 
 ## Asset And Placeholder Strategy
 
-Until M5 chassis art arrives, milestones use procedurally generated or simple-PNG placeholders. The agent commits placeholders under `cortex-game/assets/placeholders/` with a stable file naming scheme. Real art replaces placeholders by file-name swap.
+Until M5 chassis art arrives, milestones use procedurally generated or simple-PNG placeholders. The agent commits placeholders under `corefall-game/assets/placeholders/` with a stable file naming scheme. Real art replaces placeholders by file-name swap.
 
 | Asset | Location | M0..M4 Source | M5+ Source |
 |---|---|---|---|
@@ -918,7 +918,7 @@ Every placeholder logged in [[references/usage-ledger]] with license. Generated 
 |---|---|---|---|
 | Unit | `crates/<crate>/src/...` `#[cfg(test)] mod tests {}` | Pure functions, type roundtrips, schema serialization, math helpers, error variants. | M0 |
 | Integration | `crates/<crate>/tests/*.rs` | Cross-module behavior within a crate; deterministic scenarios that build small fixtures. | M0 |
-| Workspace integration | `cortex-game/tests/*.rs` | Cross-crate behavior (e.g. sim + replay + control all in one process). | M1 |
+| Workspace integration | `corefall-game/tests/*.rs` | Cross-crate behavior (e.g. sim + replay + control all in one process). | M1 |
 | E2E | `cargo run -p cx-e2e -- --scenario <id> --script <name>` | Full scenario run from CLI, asserts via observations + events; writes run bundle. | M1.5 |
 | Replay | `cargo run -p cx-headless -- replay <run-bundle> --verify-checksums` | A previously captured run replays headlessly to identical checksums. | M3 |
 | Determinism | `cargo run -p cx-bench --bin determinism -- --seed-set seeds.json --runs 100` | Same seed produces same checksum 100/100 runs across the test matrix. | M9 |
@@ -1013,7 +1013,7 @@ Single source of truth for every CLI flag. If a flag exists in the codebase but 
 | `scenario reset` | Reset to scenario start. | `--keep-seed`. |
 | `pause` / `step --ticks <N>` / `resume` | Sim control. | — |
 | `run --ticks <N> --write-run-bundle` | Run for N ticks unattended; emit bundle. | `--scenario <id>`, `--seed <u64>`. |
-| `script run <name>` | Execute a control script. Scripts live in `cortex-game/scripts/cxctl/<name>.cxctl.json`. | `--write-run-bundle`, `--expect <kv>`, `--timeout-ticks <N>`. |
+| `script run <name>` | Execute a control script. Scripts live in `corefall-game/scripts/cxctl/<name>.cxctl.json`. | `--write-run-bundle`, `--expect <kv>`, `--timeout-ticks <N>`. |
 | `assert <key> <op> <value>` | Assert a key from the latest observation; non-zero exit on fail. | Ops: `==`, `!=`, `<`, `>`, `>=`, `<=`, `contains`, `starts-with`. |
 | `replay verify <run-dir>` | Replay a run bundle and verify checksums. | `--first-divergence`. |
 | `replay scrub <run-dir> --tick <N>` | Scrub the replay viewer to a tick (used by tools and scripts). | `--filter <category>`. |
@@ -1162,10 +1162,10 @@ Streaming (observations) uses JSON-RPC notifications:
 
 ### Schema Files
 
-Schemas are emitted by `schemars` and committed under `cortex-game/crates/cx-control/schemas/`. Each release tags `cx-control` with a schema version; breaking changes bump the major version.
+Schemas are emitted by `schemars` and committed under `corefall-game/crates/cx-control/schemas/`. Each release tags `cx-control` with a schema version; breaking changes bump the major version.
 
 ```
-cortex-game/crates/cx-control/schemas/
+corefall-game/crates/cx-control/schemas/
 ├── v1/
 │   ├── command.schema.json
 │   ├── observation.schema.json
@@ -1448,7 +1448,7 @@ Some milestones produce stubs that later milestones must replace without breakin
 
 Before doing any feature work, the agent runs the milestone's kickoff smoke. If smoke fails, fix smoke first. If smoke succeeds, proceed to task cards.
 
-| Milestone | Kickoff Smoke (run from `cortex-game/`) | Pass Means |
+| Milestone | Kickoff Smoke (run from `corefall-game/`) | Pass Means |
 |---|---|---|
 | M0 | `cargo fmt --all -- --check && cargo check --workspace --all-targets && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace` | Workspace is well-formed; lints clean. |
 | M0 | `cargo run -p cx-app -- --scenario m0_blank --headless-smoke --ticks 60` | App launches, ticks 60 sim ticks, exits 0. |
@@ -1848,7 +1848,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 **What it proves:** An async LLM "mind" layer can run alongside local AI without blocking it. Strict-schema proposals (doctrine patches, squad orders, dialogue, memory writes) flow through a validator and policy compiler. A deterministic mock provider drives CI; cloud/local providers (OpenAI, Anthropic, Ollama, OpenAI-compatible) sit behind feature gates. Local AI keeps acting through provider sleep, failure, malformed/stale responses, and cost-cap exhaustion. **No API key is required to ship, test, or play.**
 
 **Scope (per [[spec/hybrid-llm-ai-plan]]):**
-- `cx-ai::mind::schema`: `MindObservationFrame`, `MindTask`, `AiMindProposal`, `MindValidationResult`, `MindMemoryRecord`, `MindProviderConfig`. JSON Schemas under `cortex-game/crates/cx-ai/schemas/mind/v1/`.
+- `cx-ai::mind::schema`: `MindObservationFrame`, `MindTask`, `AiMindProposal`, `MindValidationResult`, `MindMemoryRecord`, `MindProviderConfig`. JSON Schemas under `corefall-game/crates/cx-ai/schemas/mind/v1/`.
 - `cx-ai::mind::provider`: shared trait + adapters (`mock` always built; `openai`/`anthropic`/`ollama`/`openai-compatible` behind cargo features `mind-openai`, `mind-anthropic`, `mind-ollama`, `mind-openai-compatible`).
 - `cx-ai::mind::compressor`: derives `MindObservationFrame` from the `cx-control` observation stream + replay events with fog-of-war filtering.
 - `cx-ai::mind::validator`: rejects stale, invalid, impossible, unfair, over-budget, hidden-info, capability-violating proposals.
