@@ -6,7 +6,7 @@ priority: P0
 revisit_trigger: "When a build/run audit, license review, and a small actor-feel prototype are all complete."
 ---
 
-← [[decisions/index|decision records]] · [[spec/index|spec section]] · [[dashboards/research-readiness|readiness]] · [[design/opportunities-for-our-fork|fork opportunities]]
+← [[decisions/index|decision records]] · [[spec/index|spec section]] · [[dashboards/research-readiness|readiness]] · [[engine/cccp-build-run-audit|CCCP build/run audit]] · [[design/opportunities-for-our-fork|fork opportunities]]
 
 # DR-001: Engine Strategy
 
@@ -70,12 +70,15 @@ This choice cascades across licensing, modding, networking posture, prototype ve
 | CCCP networking code exists but is RakNet-era and bitmap-delta-based. | [[engine/network-terrain-replication-lifecycle]] | High |
 | Modding and migration are real product surfaces. | [[repos/legacy-mod-converter]], [[repos/cccp-vscode-extension]] | High |
 | CCCP modding ecosystem: mod.io CCCP, GitHub releases. | [[references/sources]] | High |
+| Local CCCP native macOS configure/compile now succeeds on this host after installing the README Homebrew stack; bounded menu/tutorial startup launches stay alive until wrapper timeout. | [[engine/cccp-build-run-audit]] | High |
+| Full runtime proof remains open: WindowServer sees an on-screen `Cortex Command` window, but screenshots did not capture game pixels and no interactive vanilla mission screenshot/video, input smoke test, or played-session log bundle has been captured yet. | [[engine/cccp-build-run-audit]], [[engine/cccp-runtime-window-capture-troubleshooting]] | High |
+| Current README and Meson workflow still point to Meson/Ninja builds; native macOS requires GCC 13, and CI macOS uses an osxcross path rather than proving native Apple Silicon Homebrew builds. | [[engine/cccp-build-run-audit]], [[references/sources]] | High |
 
 ## Current Recommendation
 
 Recommendation: **Do not lock**. Recommended sequencing before lock:
 
-1. Verify a clean local build of CCCP active and run the game (Linux/macOS via Meson).
+1. Verify a clean local build of CCCP active and run the game (Linux/macOS via Meson). Current status: [[engine/cccp-build-run-audit]] has cleared native macOS configure/compile and bounded startup, but still needs an interactive vanilla mission proof.
 2. Perform a license review focused on AGPL-3.0 distribution constraints and any non-FOSS dependencies (RakNet license; FMOD if present; LuaJIT terms).
 3. Build a 2-week prototype of "actor feel + small terrain destruction" in our preferred greenfield stack.
 4. Only then choose between A, C, and D. Avoid B unless C4-only mods become a core promise.
@@ -86,7 +89,9 @@ Why: each option has fundamentally different cost curves; the cheapest informati
 
 | Test | What It Proves | Pass/Fail |
 |---|---|---|
-| CCCP Linux build, run a vanilla mission. | Inheriting works at all. | Pass = playable; Fail = build broken. |
+| CCCP Linux build, run a vanilla mission. | Inheriting works on a reproducible CI-like target. | Pass = playable; Fail = build/runtime broken. |
+| CCCP native macOS configure/compile/startup. | Whether this machine can build and launch the active repo. | Current = configure/compile pass; bounded menu/tutorial startup pass/partial; see [[engine/cccp-build-run-audit]]. |
+| CCCP native macOS interactive mission proof. | Whether the local build is actually playable. | Open = capture menu screenshot/video, start one vanilla mission, test input/audio/rendering, and archive logs. |
 | License review report (AGPL + deps). | Distribution feasibility. | Clean = continue; Conflicts = re-scope. |
 | Greenfield actor-feel prototype (controller + 200x200 terrain destruction). | Time-to-fun in our stack. | Pass = under 2 weeks to "fun"; Fail = > 4 weeks. |
 | `.rte` data parser proof-of-concept. | Compatibility option (D) is viable. | Pass = parses Base.rte without crashes; Fail = unblocked schema work needed. |
@@ -106,6 +111,7 @@ Why: each option has fundamentally different cost curves; the cheapest informati
 Reopen this decision when:
 
 - Build/runtime audit completes (or fails).
+- Build/runtime compile proof is paired with a real interactive mission run result.
 - License/reuse matrix decision (DR-010) is recorded.
 - Greenfield actor-feel prototype is benchmarked.
 - A new player-promise emerges (e.g. competitive PvP, paid mods) that materially changes the calculus.
@@ -117,6 +123,7 @@ Reopen this decision when:
 - [[comparisons/cccp-vs-c4]]
 - [[design/opportunities-for-our-fork]]
 - [[engine/architecture]]
+- [[engine/cccp-build-run-audit]]
 - [[engine/network-terrain-replication-lifecycle]]
 - [[systems/networking-backend-frontend]]
 - [[systems/modding-package-and-workbench]]

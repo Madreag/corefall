@@ -9,7 +9,7 @@
 
 | ID | Title | Priority | Status | Lean | Closes When |
 |---|---|---|---|---|---|
-| [[decisions/dr-001-engine-strategy|DR-001]] | Engine strategy | <span class="cc-flag cc-red">P0</span> | OPEN | Build/run audit → 2-week prototype → choose | Audit + prototype + reuse-ledger skim done. |
+| [[decisions/dr-001-engine-strategy|DR-001]] | Engine strategy | <span class="cc-flag cc-red">P0</span> | OPEN | CCCP native build passes + bounded startup partial → interactive mission proof → 2-week greenfield prototype → choose | [[engine/cccp-build-run-audit]] plus interactive run audit + prototype + reuse-ledger skim done. |
 | [[decisions/dr-002-replay-event-architecture|DR-002]] | Replay/event architecture | <span class="cc-flag cc-red">P0</span> | OPEN | Hybrid event log + snapshots | Recorder + viewer reproduce 5-min battle. |
 | [[decisions/dr-003-body-damage-readability|DR-003]] | Body damage readability | <span class="cc-flag cc-red">P0</span> | OPEN | Silhouette default + advanced HUD opt-in | HUD-01..HUD-03 acceptance pass. |
 | [[decisions/dr-004-first-playable-slice|DR-004]] | First playable slice | <span class="cc-flag cc-red">P0</span> | OPEN | Sequenced single actor → squad → bunker breach | Slice A (single actor) playable for 5 minutes. |
@@ -19,28 +19,74 @@
 | [[decisions/dr-008-ai-architecture|DR-008]] | AI architecture | <span class="cc-flag cc-red">P0</span> | OPEN | Hybrid jobs + utility scoring + scripted hooks | AI-01..AI-12 pass with replays. |
 | [[decisions/dr-009-command-ux-style|DR-009]] | Command UX style | <span class="cc-flag cc-orange">P1</span> | OPEN | Direct + slowdown overlay + optional tactical map | ORDER-01 acceptance pass. |
 | [[decisions/dr-010-license-reuse-matrix|DR-010]] | License/reuse posture | <span class="cc-flag cc-orange">P1</span> | OPEN | Documentation only; ledger tracks usage | Public-release decision is made. |
+| [[decisions/dr-011-progression-retention-loop|DR-011]] | Progression/retention loop | <span class="cc-flag cc-orange">P1</span> | OPEN | Intrinsic-first hybrid: mastery + autonomy + veterans + salvage + replays + creator challenges | RET-A-01..RET-A-06 prototype results show players return for mastery/stories, not obligation. |
+| [[decisions/dr-012-accessibility-comfort-readability|DR-012]] | Accessibility, comfort, and readability floor | <span class="cc-flag cc-orange">P1</span> | OPEN | Slice A accessibility/comfort floor, not late compliance | ACC-A-01..16 pass across HUD, command, equipment workbench, replay, hub, package-builder, settings, and run-bundle evidence. |
+| [[decisions/dr-013-backend-service-scope|DR-013]] | Backend service scope | <span class="cc-flag cc-orange">P1</span> | OPEN | Local-first service spine + optional adapters | BACK-SCOPE/BACK-A pass with local health/schema, package registry, join resolver, server fixtures, local supervisor, replay/report index, diagnostics redaction, and clean platform-adapter boundaries. |
 
 ## Evidence Backlog
 
 | Evidence Item | Unblocks |
 |---|---|
 | [[comparables/opensoldat-local-audit]] first pass: control state, weapon feel, bot waypoints, snapshots/deltas, demo hooks, HUD. | DR-005, DR-008, DR-009 |
-| [[comparables/opensoldat-satellites-local-audit]] first pass: deterministic base content archive, launcher UX, lobby API, server browser/deep links, mods/interfaces, package hash/purity lessons. | DR-005, DR-006, DR-010, backend service scope DR candidate |
-| [[comparables/the-powder-toy-local-audit]] first pass: material schema, particle state, air/heat/gravity fields, Lua API, save/stamp/community loop, snapshot-delta undo. | DR-002, DR-006, DR-007, retention loop DR candidate |
+| [[comparables/opensoldat-satellites-local-audit]] first pass: deterministic base content archive, launcher UX, lobby API, server browser/deep links, mods/interfaces, package hash/purity lessons. | DR-005, DR-006, DR-010, DR-013 |
+| [[comparables/the-powder-toy-local-audit]] first pass: material schema, particle state, air/heat/gravity fields, Lua API, save/stamp/community loop, snapshot-delta undo. | DR-002, DR-006, DR-007, DR-011 |
 | [[comparables/openlierox-local-audit]] first pass: rope movement, material hook/pass/damage flags, terrain carving, projectile action graphs, bot heuristics, Gusanos/Lua modding, legacy/NewNet caution. | DR-004, DR-005, DR-006, DR-007, DR-008 |
+| [[spec/prototype-implementation-backlog-slice-a]] implementation backlog: A0..A7 task cards, gates, First 48 Hours checklist, run-bundle evidence by milestone, and explicit A5 equipment/loadout workbench handoff. | DR-001, DR-002, DR-003, DR-004, DR-005, DR-006, DR-007, DR-008, DR-009 |
 | [[spec/actor-feel-sandbox-slice-a]] prototype requirements: scope, material set, event hooks, acceptance tests, first tickets, kill criteria. | DR-001, DR-002, DR-003, DR-004, DR-005, DR-007, DR-008, DR-009 |
-| [[spec/replay-recorder-slice-a]] prototype requirements: event envelope, hook map, stable-id caveat, causality model, snapshot cadence, viewer requirements, REC-A tests, first tickets. | DR-002, DR-003, DR-004, DR-005, DR-008 |
+| [[spec/replay-recorder-slice-a]] prototype requirements: event envelope, hook map, stable-id caveat, causality model, snapshot cadence, viewer requirements, REC-A/DET-A tests, first tickets. | DR-002, DR-003, DR-004, DR-005, DR-008 |
+| [[spec/body-damage-model]] prototype requirements: body parts, wound fields, status vocabulary, damage channels, equipment fallout, treatment hooks, AI reason labels, replay/death recap events, HUD rules, and BODY-A tests. | DR-002, DR-003, DR-004, DR-008, DR-009, DR-011 |
+| [[systems/replay-determinism-and-run-evidence]] research bridge: Unreal, Photon Quantum, Gaffer, YellowAfterlife, GameDeveloper, OpenSoldat demos, Powder Toy snapshots, OpenLieroX NewNet, and CCCP update/save hooks translated into hybrid events/snapshots/checksums and deterministic-island gates. | DR-002, DR-004, DR-005, DR-007, DR-008 |
 | [[spec/ai-trust-harness-slice-a]] prototype requirements: scenario manifest, AI event contract, local AI hook map, AI-H bootstrap scenarios, report/export shape, overlay fields, first tickets. | DR-002, DR-004, DR-008, DR-009 |
 | [[spec/terrain-material-sandbox-slice-a]] prototype requirements: material fixture, overlay tests, terrain events, dirty-region/path refresh metrics, AI material labels, recorder export, MAT-T tests. | DR-002, DR-004, DR-005, DR-006, DR-007, DR-008, DR-009 |
-| CCCP local build + run on Linux/macOS. | DR-001 |
+| [[spec/mission-director-slice-a]] prototype requirements: typed breach-contract manifest, director pacing, commander AI reason strings, destruction-aware objective grammar, equipment capability contract, save/replay events, UI/workbench obligations, and MISSION-A tests. | DR-002, DR-003, DR-004, DR-007, DR-008, DR-009 |
+| [[spec/backend-service-hub-slice-a]] prototype requirements: server discovery schema, join eligibility, package compatibility, deep links, local server supervisor, hub UX, backend events, BACK-A tests. | DR-005, DR-006, DR-010, DR-013 |
+| [[engine/content-module-loading-lifecycle]] code archaeology: zip import, official/module/userdata order, `Index.ini`/`MergedIndex.ini`, include stack, `CopyOf`, preset registration/source paths, scan-folder caveats, script reload, and CONTENT-A tests. | DR-006, DR-010, DR-003, DR-008, DR-009 |
+| [[spec/modding-model]] exploratory requirements: package modes, loader parity, provenance, script capabilities, equipment metadata, migration, MOD-A tests. | DR-006, DR-010 |
+| [[spec/package-builder-workbench-slice-a]] prototype requirements: deterministic package builder, manifest/provenance validation, diagnostics, dev mount, loader graph, preset/effect graphs, migration preview, test launch, PACK-A tests. | DR-006, DR-010, DR-013 |
+| [[spec/ux-wireframes-slice-a]] prototype requirements: HUD, squad, command, buy/loadout, material overlay, death recap/replay, hub, workbench, accessibility floors, UX events, UX-W tests. | DR-003, DR-004, DR-008, DR-009, DR-013 |
+| [[spec/accessibility-comfort-slice-a]] prototype requirements: text scale/reflow, contrast, no-color-only state, same-input navigation, remapping/holds, captions, reduced motion/shake/flash, equipment workbench ACC-A tests, and run-bundle evidence additions. | DR-003, DR-004, DR-006, DR-008, DR-009, DR-012 |
+| [[spec/equipment-loadout]] prototype requirements: actor roles, item archetypes, explicit slots, AI item metadata, buy/loadout UX, delivery risk, mod validation, replay hooks, LOAD-A tests. | DR-003, DR-004, DR-006, DR-008, DR-009 |
+| [[references/equipment-cccp-field-map]] field-level translation: CCCP C++/Lua/INI equipment/loadout fields mapped to future AI, UI, modding, balance, replay, backend, and package-builder consumers. | DR-003, DR-004, DR-006, DR-008, DR-009 |
+| [[references/equipment-device-loadout-field-atlas]] device/loadout atlas: exact held-device, firearm, magazine, round, loadout, delivery-role, and durable external schema references mapped into AI/UI/modding/balance/replay/backend consumers and LOAD-FIELD tests. | DR-003, DR-004, DR-006, DR-008, DR-009 |
+| [[references/equipment-role-design-deep-dive]] concrete role-card translation: CCCP digger/concrete/grapple/medikit/launcher examples plus durable weapon/loadout/tag/data references mapped into AI, UI, modding, balance, replay, and overlap-audit requirements. | DR-003, DR-004, DR-006, DR-008, DR-009 |
+| [[references/equipment-capability-authoring-matrix]] capability/authoring matrix: CCCP fields plus Soldat/OpenSoldat, Arma Reforger, Ravenfield, and Core references mapped into AI/UI/modding/balance contracts, authoring tiers, schema deltas, and fixture implications. | DR-003, DR-004, DR-006, DR-008, DR-009 |
+| [[references/equipment-ai-behavior-contract]] behavior contract: actual CCCP item group switching, projectile summaries, breaching/material checks, pickup scoring, support timing, and explosive safety mapped into bot choice/refusal reason labels and AI-EQ tickets. | DR-003, DR-004, DR-006, DR-008, DR-009 |
+| [[references/equipment-consumer-traceability-matrix]] consumer traceability: source fields mapped to AI, UI, workbench/package, balance, replay/debug, backend, and prototype-test obligations. | DR-003, DR-004, DR-006, DR-008, DR-009 |
+| [[references/equipment-consumer-traceability-slice-a]] generated LOAD-011 traceability report: 106 role-card rows mapped into UI, AI, workbench/package, balance, replay/backend, fixture, diagnostic, and gap-queue consumers. | DR-003, DR-004, DR-006, DR-008, DR-009 |
+| [[references/equipment-trace-tab-view-slice-a]] generated LOAD-W-010 trace-tab view: 106 item trace rows, 9 fixture tabs, 39 diagnostic trace rows, 80 gap badges, open targets, and checker coverage for the future workbench UI. | DR-003, DR-004, DR-006, DR-008, DR-009 |
+| [[references/equipment-source-trace-slice-a]] generated LOAD-FIELD-SOURCE source trace: 106 role-card rows joined to loader graph context, source confidence, field provenance counts, duplicate source hits, trace-tab refs, and source-inspector open targets. | DR-003, DR-004, DR-006, DR-008, DR-009, DR-010 |
+| [[references/equipment-role-cards-slice-a]] generated role cards: 106 system-readable item cards with player verbs, map consequences, bot policy, UI fields, balance inputs, workbench warnings, and replay contracts. | DR-003, DR-004, DR-006, DR-008, DR-009 |
+| [[references/equipment-overlap-audit-slice-a]] generated overlap audit: 10 role-signature groups covering 42 catalog items, including 3 high-risk duplicate-role groups. | DR-003, DR-004, DR-006, DR-008, DR-009 |
+| [[spec/equipment-role-card-renderer-slice-a]] prototype requirements: LOAD-009/LOAD-010 renderer contract, visibility policy, detail drawers, workbench drill-downs, AI/replay labels, overlap-resolution rules, and LOAD-R tests. | DR-003, DR-004, DR-006, DR-008, DR-009 |
+| [[references/equipment-role-card-renderer-view-slice-a]] generated LOAD-R view: 63 catalog rows, 106 workbench rows, 5 detail drawer examples, 10 overlap rows, 9 fixture summaries, and acceptance coverage. | DR-003, DR-004, DR-006, DR-008, DR-009 |
+| [[references/equipment-overlap-resolution-worksheet-slice-a]] LOAD-010 worksheet: candidate role splits, skin/legacy statuses, mission fixture needs, and consumer implications for high/medium overlap groups. | DR-003, DR-004, DR-006, DR-008, DR-009 |
+| [[spec/equipment-loadout-workbench-slice-a]] interactive prototype requirements: fixture routes, screen regions, state machine, data projections, LOAD-W acceptance tests, and implementation tickets for the equipment/loadout/workbench UI. | DR-003, DR-004, DR-006, DR-008, DR-009 |
+| [[prototypes/actor-feel-lab-a1-load-w-fixture-switch-smoke]] checked prototype evidence: all nine LOAD-A fixture imports, `engineer_breach` to `medic_rescue` runtime switch, focused Medikit trace/source/AI join, and screenshot proof. | DR-003, DR-004, DR-006, DR-008, DR-009 |
+| [[prototypes/actor-feel-lab-a1-load-w-fixture-tab-input-smoke]] checked prototype evidence: fixture-tab mouse click and focused-button keyboard activation switch runtime LOAD-A fixtures and keep trace/source/AI joins intact. | DR-003, DR-004, DR-006, DR-008, DR-009 |
+| [[prototypes/actor-feel-lab-a1-load-w-fixture-traversal-smoke]] checked prototype evidence: Tab-to-fixture focus, ArrowRight fixture movement, Enter/Space fixture activation, render focus restore, and trace/source/AI joins survive live browser traversal. | DR-003, DR-004, DR-006, DR-008, DR-009 |
+| [[references/equipment-corpus-cccp]] first generated corpus: 184 device blocks, 90 loadout blocks, group/archetype counts, metadata coverage, gap sample, and extractor caveats. | DR-003, DR-006, DR-008, DR-009 |
+| [[references/equipment-schema-and-overlays]] first schema/overlay pass: JSON Schema, corpus JSON, and 72-item Base/Coalition/Ronin overlay seed. | DR-003, DR-006, DR-008, DR-009 |
+| [[references/equipment-overlay-review-matrix]] first review pass: warning severity, critical item triage, bot competence gates, LOAD-A fixture plan, and package diagnostic codes. | DR-003, DR-004, DR-006, DR-008, DR-009 |
+| [[references/equipment-manual-overlay-patches]] first patch pass: replacement/catalog policy, internal component/payload classification, scripted tool contexts, and launcher bot-label gating. | DR-003, DR-004, DR-006, DR-008, DR-009 |
+| [[references/equipment-overlay-merged-preview]] first merged preview: patch-applied item records plus fixture reports for package-builder, AI harness, buy/loadout UX, and prototype loaders. | DR-003, DR-004, DR-006, DR-008, DR-009 |
+| [[references/equipment-loadout-fixtures-slice-a]] first fixture seed: nine LOAD-A loadouts with item IDs, expected warnings, manual badges, and test coverage. | DR-003, DR-004, DR-006, DR-008, DR-009 |
+| [[references/equipment-ai-scenarios-slice-a]] first AI-H-LOAD seed: nine equipment scenarios for weapon choice, breach tools, support use, explosive refusal, target classes, pickup value, and negative loadout preflight. | DR-003, DR-004, DR-006, DR-008, DR-009 |
+| [[references/equipment-package-diagnostics-slice-a]] first PACK-014 expected-output seed: per-fixture package-mode verdicts, bot assignment verdicts, diagnostic policy, and PACK-014C consumer-impact labels. | DR-003, DR-004, DR-006, DR-008, DR-009 |
+| [[references/content-loader-graph-cccp]] generated loader graph: active module order, 508 INI files, 498 include edges, 3064 top-level preset blocks, 48085 `CopyOf` refs, 458 script paths, duplicate preset pressure, diagnostics, and JSON fixture. | DR-003, DR-006, DR-008, DR-009, DR-010 |
+| [[decisions/dr-011-progression-retention-loop]] and [[spec/progression-retention]]: intrinsic-first retention stack, progression objects, RET-A tests, UI/telemetry requirements, and dark-pattern guardrails. | DR-002, DR-004, DR-006, DR-008, DR-009, future monetization/economy DR |
+| [[engine/cccp-build-run-audit]] native macOS build pass: dependency stack installed, Meson configured with GCC 13, 537-step compile linked `build/CortexCommand`, bounded menu/tutorial startup stayed alive, and repo stayed clean. | DR-001 |
+| [[engine/cccp-runtime-window-capture-troubleshooting]] runtime proof follow-up: process and Quartz WindowServer enumeration show an on-screen `Cortex Command` window, but screenshots do not capture game pixels yet. | DR-001 |
+| CCCP interactive mission proof: menu screenshot/video, one vanilla mission entered, input/audio/rendering/content verified, and logs archived. | DR-001 |
 | Greenfield actor-feel prototype (2 weeks, controller + small destruction). | DR-001, DR-004 |
-| Replay/event recorder + viewer prototype from [[spec/replay-recorder-slice-a]]. | DR-002, DR-008 |
+| Replay/event recorder + viewer prototype from [[spec/replay-recorder-slice-a]] and [[systems/replay-determinism-and-run-evidence]]. | DR-002, DR-005, DR-008 |
 | HUD silhouette mockup + 5-user playtest. | DR-003 |
 | Bandwidth measurement at peak combat density. | DR-005, DR-007 |
 | Workbench V1 (module browser + INI editor + sandbox). | DR-006 |
+| Package-builder/workbench Slice A from [[spec/package-builder-workbench-slice-a]]. | DR-006, DR-010 |
+| Run tests from [[spec/equipment-loadout]], [[spec/equipment-role-card-renderer-slice-a]], [[spec/equipment-loadout-workbench-slice-a]], [[references/content-loader-graph-cccp]], [[references/equipment-source-trace-slice-a]], [[references/equipment-role-card-renderer-view-slice-a]], [[references/equipment-cccp-field-map]], [[references/equipment-device-loadout-field-atlas]], [[references/equipment-role-design-deep-dive]], [[references/equipment-capability-authoring-matrix]], [[references/equipment-consumer-traceability-matrix]], [[references/equipment-consumer-traceability-slice-a]], [[references/equipment-role-cards-slice-a]], [[references/equipment-overlap-audit-slice-a]], [[references/equipment-overlap-resolution-worksheet-slice-a]], [[references/equipment-corpus-cccp]], [[references/equipment-schema-and-overlays]], [[references/equipment-overlay-review-matrix]], [[references/equipment-manual-overlay-patches]], [[references/equipment-overlay-merged-preview]], [[references/equipment-provenance-workbench-view]], [[references/equipment-loadout-fixtures-slice-a]], [[references/equipment-ai-scenarios-slice-a]], and [[references/equipment-package-diagnostics-slice-a]]. | DR-003, DR-004, DR-006, DR-008, DR-009 |
 | Material lab + MAT-T-01..MAT-T-10 terrain/material sandbox tests. | DR-007 |
 | AI-H bootstrap harness from [[spec/ai-trust-harness-slice-a]], then AI-01..AI-12. | DR-008 |
-| Command overlay prototype + slowdown ratio test. | DR-009 |
+| Command overlay prototype + slowdown ratio test from [[spec/ux-wireframes-slice-a]]. | DR-009 |
 
 ## Topics Still Without A Decision Record
 
@@ -48,12 +94,10 @@ These can become DRs when evidence accumulates:
 
 | Topic | Why It's Not A DR Yet |
 |---|---|
-| Progression / retention loop | Research/prototype freely; promote to DR once core combat loop is proven. |
 | Monetization ethics | Research/prototype retention or collection mechanics freely; promote to DR before any launch commitment, after modding/fairness boundaries are visible. |
-| Backend service scope | Depends on DR-005 (multiplayer) outcome; sketch services freely. |
-| Audio/music identity | Cosmetic-priority; no risk to core. |
+| Mission/director architecture | [[spec/mission-director-slice-a]] now sketches Slice A; promote to DR only if director/commander architecture starts competing with DR-004 or DR-008 scope. |
 | Localization plan | Pre-launch concern; research patterns now if convenient. |
-| Accessibility plan | Not blocking solo-first; should still be tracked. |
+| Audio/music identity | Cosmetic-priority; critical-caption/audio-alternative floors are covered by [[decisions/dr-012-accessibility-comfort-readability]] and [[spec/accessibility-comfort-slice-a]]. |
 | Moonshot register | Centralize wild ideas (Noita-grade materials, PvP variants, AI personality engines) in [[research-log/moonshot-register]] when one needs more than a paragraph. |
 
 ## Process

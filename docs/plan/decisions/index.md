@@ -25,6 +25,8 @@
 6. Link the decision from `spec/` as exploratory whenever useful; mark it settled only when evidence is strong enough.
 7. Add a revisit trigger so the team knows when to reopen it.
 
+[[spec/authoritative-game-spec-v0]] is the current canonical synthesis of these decisions. Treat it as the implementation-facing plan, while keeping every DR open until its listed evidence closes.
+
 ## Feature Evaluation Matrix
 
 Use these lenses for every major feature.
@@ -57,17 +59,17 @@ Use these lenses for every major feature.
 | [[decisions/dr-008-ai-architecture|DR-008]] | AI architecture | <span class="cc-flag cc-red">P0</span> | OPEN | Hybrid jobs + utility scoring + scripted hooks | Solo-first promise depends on commandable, recoverable, explainable bots. |
 | [[decisions/dr-009-command-ux-style|DR-009]] | Command UX style | <span class="cc-flag cc-orange">P1</span> | OPEN | Direct control + slowdown overlay + optional tactical map | Direct + command must coexist without slowing the game. |
 | [[decisions/dr-010-license-reuse-matrix|DR-010]] | License/reuse matrix | <span class="cc-flag cc-orange">P1</span> | OPEN | Personal/private reuse allowed; ledger tracks future release cleanup | Keeps public-release options open without blocking game creation. |
+| [[decisions/dr-011-progression-retention-loop|DR-011]] | Progression/retention loop | <span class="cc-flag cc-orange">P1</span> | OPEN | Intrinsic-first hybrid: mastery + autonomy + veterans + salvage + replays + creator challenges | Defines why players return without letting gacha/live-service pressure lead the design. |
+| [[decisions/dr-012-accessibility-comfort-readability|DR-012]] | Accessibility, comfort, and readability floor | <span class="cc-flag cc-orange">P1</span> | OPEN | Slice A accessibility/comfort floor, not late compliance | Keeps dense combat, loadout, replay, hub, and workbench UI readable, navigable, captioned, and comfortable while prototypes are cheap to change. |
+| [[decisions/dr-013-backend-service-scope|DR-013]] | Backend service scope | <span class="cc-flag cc-orange">P1</span> | OPEN | Local-first service spine + optional adapters | Keeps backend work focused on play, packages, replay/debug, diagnostics, hub UX, and future co-op without prematurely committing accounts, matchmaking, economy, or public PvP. |
 
 ## Still-Open Topics (Not Yet A Record)
 
 | Decision | Why It Matters | Source Notes |
 |---|---|---|
-| Progression / retention loop | Replayability without grind; gacha implications. | [[systems/ux-ui-and-retention]], [[strategy/best-cortex-like-game-principles]] |
-| Monetization ethics | Long-term fairness with modding ecosystem. | [[strategy/best-cortex-like-game-principles]] |
-| Backend service scope | Mods registry, replay upload, telemetry, leaderboards. | [[systems/networking-backend-frontend]] |
-| Audio/music identity | Diegetic feedback + procedural soundtrack budget. | [[engine/rendering-audio-input-ui]] |
+| Monetization ethics | Long-term fairness with modding ecosystem; DR-011 captures launch-boundary posture but a release-facing economy DR is still needed before any commitment. | [[decisions/dr-011-progression-retention-loop]], [[strategy/best-cortex-like-game-principles]] |
 | Localization plan | Strings, fonts, language packs, mod localization. | None yet. |
-| Accessibility plan | Color, contrast, input remapping, captions. | None yet. |
+| Audio/music identity | Diegetic feedback + procedural soundtrack budget. | [[spec/accessibility-comfort-slice-a]] covers critical-caption/audio-alternative floors, but not creative audio identity. |
 
 ## Decision Record Format
 
