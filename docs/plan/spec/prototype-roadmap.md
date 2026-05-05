@@ -60,6 +60,7 @@ feeds:
 - [Read Order](#read-order)
 - [Glossary](#glossary)
 - [Agent Implementation Contract](#agent-implementation-contract)
+  - [Open Decision Gates Protocol](#open-decision-gates-protocol)
 - [Milestone Handoff Template](#milestone-handoff-template)
 - [Human Playtest Checklist Template](#human-playtest-checklist-template)
 - [Strategic Frame](#strategic-frame)
@@ -131,9 +132,9 @@ feeds:
 If you only have time to read four things before starting work:
 
 1. [[spec/authoritative-game-spec-v0]] — what the game is.
-2. This roadmap — what gets built and in what order.
+2. This roadmap — what gets built and in what order. **Pay special attention to [Open Decision Gates Protocol](#open-decision-gates-protocol) — do not silently assume an OPEN DR's lean is locked.**
 3. [[spec/native-implementation-backlog]] — concrete native task cards for the current milestone.
-4. [[spec/feature-completion-checklist]] — completion/rating rows that must be updated when work lands.
+4. [[spec/feature-completion-checklist]] — completion/rating rows that must be updated when work lands. The Open Decision Gates Checklist is mandatory.
 
 If you have more time, also read in roughly this order:
 
@@ -276,6 +277,42 @@ This roadmap is intended to be assignable to an AI implementation agent one mile
 
 No milestone should use a human-gated item to hide incomplete agent-completable work.
 
+### Open Decision Gates Protocol
+
+> [!warning] Mandatory: do not assume an open DR's lean
+> Several DRs are **OPEN** (lean only) or have **topic-level decisions** that have not been made. If a milestone's Cross-DR row references a still-open decision, the AI worker MUST stop at the relevant phase and either (a) confirm the lean still holds against current evidence and write a one-paragraph evidence trail in the milestone vault note, or (b) ask the user via `AskUser` for a directive when evidence is missing or the lean is contested. Silent assumption that a lean is locked is forbidden.
+
+| Open DR / Topic | Status | Lean | Milestones It Gates | What The Worker Must Do Before Proceeding |
+|---|---|---|---|---|
+| [[decisions/dr-002-replay-event-architecture|DR-002]] | OPEN | Hybrid event log + snapshots | M0, M1, M1.5, M2, M3, M5.6, M6.5, M7, M8.5, M9, M10, M11, M12 (any milestone that emits replay events) | Confirm event taxonomy + snapshot cadence + checksum algorithm with the user before adding new event categories or changing snapshot policy. M3 is the closure milestone. |
+| [[decisions/dr-003-body-damage-readability|DR-003]] | OPEN | Silhouette default + advanced HUD opt-in | M3, M4, M5, M5.7, M7, M8 | Confirm silhouette vs full-body display posture before locking HUD layout (M4). HUD-01..HUD-03 acceptance closes the DR. |
+| [[decisions/dr-004-first-playable-slice|DR-004]] | OPEN | Sequenced single actor → squad → bunker breach | M1, M1.5, M7 | Confirm scope of "first playable" before assigning M7's Breach Contract proof. M7's done-criteria close the DR. |
+| [[decisions/dr-006-modding-data-model|DR-006]] | OPEN | Schema-first + Lua escape hatches + workbench | M2, M5, M5.6, M5.7, M6.6, M7.5, M8, M8.5 | Confirm modding schema versioning + capability gates + script-host posture before locking content schemas (M2 onward). M8 closes the DR. |
+| [[decisions/dr-007-terrain-material-model|DR-007]] | OPEN (defers implementation specifics to DR-036) | Curated solids + hazards first; systemic direction active per DR-036 | M2, M5.6, M5.7, M7.5 | Confirm M2's launch material set still matches DR-007 lean before adding new material categories. M5.6/M5.7/M7.5 close DR-007 implementation specifics under DR-036. |
+| [[decisions/dr-008-ai-architecture|DR-008]] | OPEN | Hybrid jobs + utility scoring + scripted hooks | M6, M6.5, M6.6, M7, M11, M12 | Confirm utility/job/scripted-hook split before adding new AI subsystems (M6). AI-01..AI-12 + AI-H suite close the DR. |
+| [[decisions/dr-009-command-ux-style|DR-009]] | OPEN | Direct + slowdown overlay + optional tactical map | M4, M5, M6, M7, M8 | Confirm command UX posture (slowdown ratio, tactical map opt-in, order grammar) before adding command surfaces. ORDER-01 closes the DR. |
+| [[decisions/dr-010-license-reuse-matrix|DR-010]] | OPEN | Documentation only; ledger tracks usage | All | When external code/asset/data enters the project, log it in `[[references/usage-ledger]]`. No release-readiness gating during private prototyping. Public-release decision closes the DR. |
+| [[decisions/dr-011-progression-retention-loop|DR-011]] | OPEN | Intrinsic-first hybrid: mastery + autonomy + veterans + salvage + replays + creator challenges | M7, M11, M12 | Confirm retention model (no gacha/grind) before designing campaign loops in M7+. RET-A-01..RET-A-06 close the DR. |
+| [[decisions/dr-012-accessibility-comfort-readability|DR-012]] | OPEN | Slice-A accessibility/comfort floor, not late compliance | M0, M4, M5.7, M6.6, M7, M7.5, M8, M8.5 | Confirm UI scale, contrast, captions, remap, reduced motion are wired into the milestone's player surfaces. ACC-A-01..16 close the DR. |
+| Networking transport library (topic) | OPEN | lightyear vs renet vs quinn | M9, M10, M11, M12 | Decision deferred to M9/M10 prototyping. Worker MUST present transport options + perf evidence to user before committing to one library in `cx-net`. |
+| Modding script host (topic) | OPEN | mlua vs Rhai | M5, M8 | Decision deferred to M5 implementation. Worker MUST run `cx-mod` script-host benchmark + capability-gate audit and ASK before locking the host. |
+| Localization plan (topic) | OPEN | None yet | M4, M7, M8 | Strings/fonts/lang packs/mod-localization. Worker MUST flag any string-source code path that bakes English-only strings; avoid hardcoded UI strings. Open a follow-up task if the milestone needs locale support. |
+| Cloud-save backend (topic) | OPEN | Post-launch | T-SAVE | Local-first today (DR-029); no cloud at launch. Worker MUST NOT add cloud dependencies during T-SAVE work. |
+
+When a milestone closes one of these decisions, the worker MUST:
+
+1. Update the relevant DR file (`status` + `closed_at` + revisit_trigger refresh).
+2. Update [[decisions/index]] + [[dashboards/decision-tracker]].
+3. Update this section's `Status` column.
+4. Update [[dashboards/research-readiness]].
+5. Note the closure in the milestone's vault note + research-log.
+
+When a milestone gathers evidence that **invalidates** a still-open lean, the worker MUST:
+
+1. Write a `revisit_trigger` entry in the relevant DR.
+2. ASK the user via `AskUser` whether to revise the lean before proceeding.
+3. Capture the discussion in the milestone vault note.
+
 ### Required Milestone Artifacts
 
 | Artifact | Required For | Notes |
@@ -299,13 +336,20 @@ Use this template when assigning a milestone to an AI agent.
 ```markdown
 Goal: Implement milestone <M#> from cortext_command_vault/spec/native-implementation-backlog.md.
 
-Context:
-- Read AGENTS.md.
-- Read cortext_command_vault/spec/authoritative-game-spec-v0.md.
-- Read cortext_command_vault/spec/prototype-roadmap.md.
-- Read cortext_command_vault/spec/native-implementation-backlog.md.
-- Read cortext_command_vault/spec/feature-completion-checklist.md.
-- Read the milestone's linked DRs/spec pages.
+Context (read in this order):
+1. AGENTS.md (root).
+2. cortext_command_vault/spec/authoritative-game-spec-v0.md.
+3. cortext_command_vault/spec/prototype-roadmap.md (especially the Open Decision Gates Protocol + the milestone's section + Open DR gates row).
+4. cortext_command_vault/spec/native-implementation-backlog.md (milestone task cards).
+5. cortext_command_vault/spec/feature-completion-checklist.md (Open Decision Gates Checklist + the milestone scope/done-criteria/task rows).
+6. cortext_command_vault/spec/ai-control-observability-layer.md (every player surface MUST be reachable from cxctl).
+7. The milestone's linked DRs/spec pages, including any cross-cutting plan (full-collision-physics-plan, hybrid-llm-ai-plan, server-app-architecture, persistent-mmo-architecture, dr-036-systemic-material-simulation-direction).
+8. cortext_command_vault/references/prototype-run-bundle-schema.md (run-bundle event categories + acceptance gates).
+
+Open Decision Gates pre-check:
+- Identify every still-open DR or topic-level decision listed in the milestone's "Open DR gates" row.
+- For each: confirm the current lean still matches design intent OR call AskUser.
+- Capture the result in the milestone vault note before code work begins.
 
 Write scope:
 - Own only the crates/files named in the milestone task cards.
@@ -313,21 +357,24 @@ Write scope:
 - Keep unrelated refactors out.
 
 Required loop:
-1. Inspect current code and write a short plan.
+1. Inspect current code, run the Open Decision Gates pre-check, and write a short plan.
 2. Implement all task cards for the milestone.
 3. Add unit/integration/E2E tests.
-4. Run the validation command matrix.
-5. Bug hunt and fix issues until green.
-6. Produce a run bundle under prototype_runs/native/.
-7. Update the vault with a prototype/research note and final audit.
-8. Update feature-completion-checklist rows for every affected feature/task/done-criterion, including AI self-ratings and evidence links.
+4. Wire every new player-facing surface (UI, action, observation, event) into cxctl per ai-control-observability-layer.md.
+5. Run the validation command matrix.
+6. Bug hunt and fix issues until green.
+7. Produce a run bundle under prototype_runs/native/.
+8. Update the vault with a prototype/research note and final audit.
+9. Update feature-completion-checklist rows for every affected feature/task/done-criterion, including the Open Decision Gates Checklist rows, AI self-ratings and evidence links.
+10. If the milestone closes a DR, update the DR file + decisions/index + dashboards/decision-tracker + dashboards/research-readiness in the same pass.
 
 Done when:
 - Every agent-completable task card is complete.
 - Validation commands pass.
 - E2E scenario passes.
 - Run-bundle checker passes.
-- Feature-completion-checklist rows are updated and the handoff lists row IDs changed.
+- Feature-completion-checklist rows are updated, including Open Decision Gates rows. Handoff lists row IDs changed.
+- Every new player-facing surface is reachable from cxctl with assert/inspect coverage.
 - Known issues are documented.
 - Human-gated items, if any, are marked READY_FOR_HUMAN with a playtest checklist.
 ```
@@ -922,16 +969,56 @@ Single source of truth for every CLI flag. If a flag exists in the codebase but 
 | `observe --reactions` | Stream or snapshot recent `reaction.*` events: reagents, byproducts, temperature, parent cause chain (T-MAT, M5.6+). | Optional `--once`/`--stream --hz <N>`, `--filter <reaction-tag>`, `--last <N>`. |
 | `inspect material <event-id>` | Print the full `material.*` event payload by id: material id, contact point, temperature, state, parent cause, follow-up reaction/damage links. | Optional `--format json\|ron`, `--with-parents`, `--with-children`. |
 | `inspect reaction <event-id>` | Print the full `reaction.*` event payload by id: reagents, byproducts, priority, temperature, catalysts, parent cause chain. | Optional `--format json\|ron`, `--with-parents`, `--with-children`. |
+| `observe --hud` | Stream or snapshot HUD state: silhouette, ammo, status, modules, objective banner, last critical event, captions, accessibility flags. Required for any UI/HUD milestone (M4+). | Optional `--once`/`--stream --hz <N>`, `--scope <player\|squad\|faction>`, `--include-cosmetic`. |
+| `observe --captions` | Stream caption queue: id, source, priority, transcript, alert class, spatial hint, lifetime. | Optional `--once`/`--stream --hz <N>`, `--filter <category>`, `--last <N>`. |
+| `observe --mission` | Stream mission/director state: objectives, timers, director phase, commander reasons, fail/win conditions, debrief readiness. | Optional `--once`/`--stream --hz <N>`, `--include-completed`, `--scope <objective-id\|all>`. |
+| `observe --debrief` | Snapshot debrief state after mission end: outcome, cause chains, AI explanations, salvage, rescue summary, retry seed. | Optional `--once`, `--scope <player\|squad>`. |
+| `observe --ai` | Stream AI intent labels for visible bots: actor id, doctrine, current tactic + reason, perception facts, blocked-path reasons, recovery actions. Respects fog-of-war by default. | Optional `--once`/`--stream --hz <N>`, `--scope <actor\|squad\|faction\|all>`, `--include-hidden` (requires debug capability). |
+| `observe --base` | Snapshot or stream command-core/base-power state: rooted/uprooted/embedded core, shields, turrets, sensors, doors, repair pads, hangar/storage, traps, breachable structure (DR-027). | Optional `--once`/`--stream --hz <N>`, `--scope <base-id\|all>`. |
+| `observe --camera` | Snapshot camera state: mode (`side`, `tactical-map`, `replay-scrub`), position, zoom, follow target, slowdown ratio (DR-009). | Optional `--once`/`--stream --hz <N>`. |
+| `observe --audio` | Snapshot audio routing relevant to gameplay: caption-driving sources, alert classes, mix bus state. Audio waveforms are not exposed by default; only the semantic state. | Optional `--once`/`--stream --hz <N>`. |
+| `observe --save` | Snapshot save-system state: slot list, autosave/ironman flags, scenario policy, last-load source, migration warnings (T-SAVE / DR-029). | Optional `--once`. |
+| `observe --settings` | Snapshot current settings: UI scale, contrast mode, captions on/off, reduced motion/shake/flash, keybinds, language pack (DR-012). | Optional `--once`, `--diff <baseline>` to print only deltas. |
+| `observe --replay` | Snapshot replay state: tick, paused/playing, scrub position, divergence flag, viewer filters, parent-chain pin. | Optional `--once`/`--stream --hz <N>`. |
+| `observe --perf` | Snapshot performance counters: frame ms, sim tick ms, event volume, dropped events, control API latency, terrain dirty cost, material chunk budget, atmosphere cost, replay recorder backpressure. | Optional `--once`/`--stream --hz <N>`. |
+| `inspect actor <id>` | Print full actor detail: position/velocity/aim, status, body zones, armor stages, modules, inventory, afflictions, last events, parent cause chain. | Optional `--format json\|ron`, `--with-events`, `--with-parents`, `--with-children`. |
+| `inspect equipment <id>` | Print full equipment detail: role record, ammo/heat/energy, jam/damage stage, valid actions, refusal reasons, source provenance. | Optional `--format json\|ron`, `--with-events`. |
+| `inspect chassis <id>` | Print full chassis detail: armor zones, modules, pilot binding, damage stages, active afflictions, last events. | Optional `--format json\|ron`, `--with-events`. |
+| `inspect mission` | Print mission director detail: manifest, active objectives, director phase, commander reason chain, capability requirements, save fields. | Optional `--format json\|ron`, `--with-events`. |
+| `inspect base <id>` | Print full base/command-core detail: power state, shields, turrets, sensors, doors, repair pads, atmospherics state (M7.5+). | Optional `--format json\|ron`, `--with-events`. |
+| `inspect objective <id>` | Print one objective's full state: kind, progress, hull/material/actor refs, dependency chain, fail/win triggers. | Optional `--format json\|ron`, `--with-events`. |
+| `inspect order <id>` | Print one tactical order's full state: issuer, target, kind, reason label, current step, refusal chain. | Optional `--format json\|ron`, `--with-parents`. |
+| `inspect affliction <id>` | Print one affliction's full state: source material/event, stack, duration, decay, current actor effect. | Optional `--format json\|ron`, `--with-parents`. |
+| `inspect event <event-id>` | Generic event inspector: print the full payload and parent/child chain for any event id. | Optional `--format json\|ron`, `--with-parents`, `--with-children`, `--depth <N>`. |
 | `act <action> ...` | Send a single semantic action; returns accepted/rejected. | `<action>` from the action grammar; see [Action Model](#control-transport-and-envelope). |
-| `ui tree` | Print the current UI tree. | `--scope <window\|focused\|all>`. |
-| `ui click <id>` | Click a UI element by stable id. | `--scope <window\|focused>`. |
-| `ui set <id> <value>` | Set a slider/select value. | `--unit <px\|pct\|raw>`. |
+| `act tactical select <unit\|squad\|faction>` | Select a unit/squad for command. | `--ref <id>`, `--multi` (multi-select), `--toggle`. |
+| `act tactical order <verb> ...` | Issue a tactical order. Verbs: `move-to`, `attack`, `defend`, `retreat`, `breach`, `repair`, `support`, `follow`, `hold`, `extract`, `rescue`, `salvage`. | `--target <id\|world-coord>`, `--reason <label>`, `--queue` (append to order list), `--rally <coord>`. |
+| `act tactical doctrine <name>` | Set current doctrine for a selected unit/squad. | `--unit <id>`, `--squad <id>`. |
+| `act camera <verb> ...` | Camera control. Verbs: `pan`, `zoom`, `follow`, `mode <side\|tactical-map\|replay-scrub>`, `slowdown <ratio>`. | `--target <id\|world-coord>`. |
+| `act save save <slot>` / `act save load <slot>` / `act save autosave` | Save/load actions through `cx-save` (T-SAVE / DR-029). | `--ironman`, `--description <text>`. |
+| `act settings set <key> <value>` | Change a setting (UI scale, contrast, captions, motion/shake/flash, keybind, language). | `--persist` (write to settings file). |
+| `act keybind <action> <key>` | Remap a keybind. Triggers the same code path as the settings UI. | `--scope <kbm\|controller>`, `--clear` (unbind). |
+| `act mod <verb> ...` | Mod tooling actions: `enable`, `disable`, `validate`, `reload`. | `--pack <id>`, `--strict`. |
+| `act director <verb> ...` | Mission director control: `phase <name>`, `reinforce`, `escalate`, `force-objective <id> <state>`. Debug-capability gated. | `--reason <label>`. |
+| `act debug <verb> ...` | Debug-only actions: `spawn-fixture`, `teleport`, `force-damage`, `reveal-map`, `grant-item`. Requires `--debug-capabilities` flag in run manifest. | All actions emit `system.debug_action_used` event. |
+| `ui tree` | Print the current UI tree. | `--scope <window\|focused\|all>`, `--with-bounds`. |
+| `ui click <id>` | Click a UI element by stable id. | `--scope <window\|focused>`, `--double` (double-click). |
+| `ui hover <id>` | Hover over a UI element (triggers tooltips/preview UI). | — |
+| `ui set <id> <value>` | Set a slider/select/checkbox/radio/textbox value. | `--unit <px\|pct\|raw>`. |
+| `ui type <id> <text>` | Type text into a focused text field. | `--press <keys>` for special keys (Tab, Enter, Esc, F1..F12, Arrow). |
+| `ui focus <id>` | Set focus to a UI element (keyboard focus). | — |
+| `ui press <key>` | Press a single key as if from keyboard (Tab, Enter, Escape, Arrow keys, F-keys, Ctrl+S, Ctrl+Z, etc.). | `--repeat <N>`. |
+| `ui assert <id> <prop> <op> <value>` | Assert a UI element property (text, enabled, focused, value, visible). Non-zero exit on fail. | Ops: `==`, `!=`, `contains`, `starts-with`. |
 | `scenario load <id>` | Load and ready a scenario. | `--seed <u64>`. |
+| `scenario reset` | Reset to scenario start. | `--keep-seed`. |
 | `pause` / `step --ticks <N>` / `resume` | Sim control. | — |
 | `run --ticks <N> --write-run-bundle` | Run for N ticks unattended; emit bundle. | `--scenario <id>`, `--seed <u64>`. |
 | `script run <name>` | Execute a control script. Scripts live in `cortex-game/scripts/cxctl/<name>.cxctl.json`. | `--write-run-bundle`, `--expect <kv>`, `--timeout-ticks <N>`. |
-| `assert <key> <op> <value>` | Assert a key from the latest observation; non-zero exit on fail. | Ops: `==`, `!=`, `<`, `>`, `>=`, `<=`. |
+| `assert <key> <op> <value>` | Assert a key from the latest observation; non-zero exit on fail. | Ops: `==`, `!=`, `<`, `>`, `>=`, `<=`, `contains`, `starts-with`. |
 | `replay verify <run-dir>` | Replay a run bundle and verify checksums. | `--first-divergence`. |
+| `replay scrub <run-dir> --tick <N>` | Scrub the replay viewer to a tick (used by tools and scripts). | `--filter <category>`. |
+| `runbundle write` | Force a run-bundle write of the current run. | `--id <override>`. |
+| `health` | Print app/server health status (DR-034 readiness probes). | `--format json\|pretty`. |
 
 ### `cx-e2e`
 
@@ -1470,6 +1557,8 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 **Cross-DR:** DR-001, DR-024, DR-025, DR-026, DR-002 (run-bundle).
 
+**Open DR gates:** DR-002 (replay/event architecture is OPEN with hybrid event-log + snapshots lean) — M0 ships the run-bundle writer; confirm the event envelope shape + manifest fields with the user before locking the schema. Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
+
 ---
 
 ### M1 — Actor Controller And Sim Core
@@ -1498,6 +1587,8 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 **Cross-DR:** DR-001, DR-003, DR-004, DR-024, DR-026, DR-002.
 
+**Open DR gates:** DR-002, DR-003 (silhouette default + advanced HUD opt-in lean), DR-004 (sequenced single-actor → squad → bunker breach lean). M1 produces the first playable actor: confirm the body-status state machine vocabulary (STABLE/UNSTABLE/DOWNED/DEAD) + HUD silhouette posture before locking the M1 actor representation. Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
+
 ---
 
 ### M1.5 — Micro Breach Fun Slice
@@ -1525,6 +1616,8 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 **Cross-DR:** DR-002, DR-004, DR-007, DR-008, DR-009, DR-024.
 
+**Open DR gates:** DR-002, DR-004, DR-007 (terrain/material model — defers implementation to DR-036; confirm M1.5 soft-breach material set still matches DR-007 launch lean), DR-008 (AI architecture — confirm hybrid-jobs + utility scoring + scripted-hooks shape before adding the reactive enemy), DR-009 (command UX style — M1.5 introduces objective state, confirm direct + slowdown overlay posture). Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
+
 ---
 
 ### M2 — Pixel Terrain And Materials
@@ -1551,6 +1644,8 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 **Cross-DR:** DR-007, DR-019, DR-024, DR-002.
 
+**Open DR gates:** DR-002, DR-007 (terrain/material model — implementation specifics defer to DR-036; M2 ships the curated launch material set, M5.6 ships the active material kernel; confirm material-id stability + chunk shape before locking schema). Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
+
 ---
 
 ### M3 — Replay And Event Recorder
@@ -1574,6 +1669,8 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 **Cross-DR:** DR-002, DR-005, DR-018, DR-024.
 
+**Open DR gates:** DR-002 (M3 IS the closure milestone for DR-002) — when M3 done-criteria pass, the worker MUST update DR-002 status to CLOSED-DIRECTION, refresh the revisit_trigger, and update [[decisions/index]] + [[dashboards/decision-tracker]] in the same pass. Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
+
 ---
 
 ### M4 — HUD And Comic-Noir UI
@@ -1595,6 +1692,8 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 - [ ] 200% text scale doesn't break HUD layout.
 
 **Cross-DR:** DR-003, DR-009, DR-012, DR-019, DR-024.
+
+**Open DR gates:** DR-003 (silhouette + advanced HUD opt-in lean — M4 IS the HUD-01..HUD-03 closure milestone), DR-009 (command UX — M4 introduces command overlay surfaces; confirm slowdown ratio + tactical-map opt-in posture), DR-012 (accessibility floor — M4 IS the ACC-A floor closure milestone; confirm 200% scale, contrast, captions, reduced motion, remap holds with user). When M4 closes any of these DRs, update status + decision-tracker + research-readiness. Per [Open Decision Gates Protocol](#open-decision-gates-protocol). Topic-level: localization plan is OPEN — flag any string-source code path that bakes English-only strings.
 
 ---
 
@@ -1619,6 +1718,8 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 - [ ] BODY-A and CHASSIS-A acceptance tests pass.
 
 **Cross-DR:** DR-003, DR-014, DR-018, DR-021, DR-024.
+
+**Open DR gates:** DR-003 (body damage readability still open — M5 introduces the chassis grammar that depends on it; confirm silhouette/HUD posture before locking chassis stages). Topic-level: modding script host (mlua vs Rhai) is OPEN — DR-006 is OPEN — `cx-equipment` role records may need scripted hooks; confirm script-host posture before adding scripted equipment behavior. Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
 
 ---
 
@@ -1654,6 +1755,8 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 **Cross-DR:** DR-002, DR-003, DR-005, DR-007, DR-008, DR-014, DR-018, DR-021, DR-024, DR-028, DR-033.
 
+**Open DR gates:** DR-002, DR-003, DR-007 (terrain/material — M5.5 collision proxies must match M2 material schema), DR-008 (AI architecture — M5.5 collision events feed AI utility scoring). Confirm collision-class registry + matrix + filter-reason vocabulary with user before locking the collision data files; the matrix becomes a contract for M6/M6.6 AI material competence. Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
+
 ---
 
 ### M5.6 — Material Kernel
@@ -1683,6 +1786,8 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 **Cross-DR:** DR-002, DR-006, DR-007, DR-024, DR-028, DR-033, DR-036.
 
+**Open DR gates:** DR-002 (new material/reaction event categories must close DR-002 contract), DR-006 (modding data model — material schema is moddable; confirm schema versioning + capability gates), DR-007 (terrain/material — M5.6 closes implementation specifics under DR-036; confirm reaction priority resolution + chunk shape + perf budget with user before locking). Topic-level: modding script host is OPEN — `cx-mod validate` for materials may need scripted reaction hooks; confirm host before scripted reactions ship. Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
+
 ---
 
 ### M5.7 — Hazard Package
@@ -1710,6 +1815,8 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 **Cross-DR:** DR-002, DR-003, DR-006, DR-007, DR-012, DR-018, DR-020, DR-024, DR-028, DR-033, DR-036.
 
+**Open DR gates:** DR-002, DR-003 (M5.7 wires hazards into the body damage HUD — confirm affliction icon + caption posture matches DR-003 silhouette lean), DR-006 (hazard material schema may be moddable — confirm), DR-007 (M5.7 hazard set extends DR-007 launch lean), DR-012 (hazard overlays must be color-blind safe + caption-backed — confirm with user before shipping). Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
+
 ---
 
 ### M6 — AI Core And Trust Harness
@@ -1731,6 +1838,8 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 - [ ] A friendly bot in a 60-90s scene actively communicates intent through reason labels.
 
 **Cross-DR:** DR-008, DR-014, DR-022, DR-024.
+
+**Open DR gates:** DR-008 (AI architecture — M6 IS the AI-01..AI-12 + AI-H closure milestone; when DR-008 done-criteria pass, update DR-008 status to CLOSED-DIRECTION + revisit_trigger refresh + decision-tracker + research-readiness in the same pass). Confirm doctrine slot list + utility weights schema before adding AI subsystems. Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
 
 ---
 
@@ -1764,6 +1873,8 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 **Cross-DR:** DR-002, DR-006, DR-008, DR-009, DR-012, DR-013, DR-022, DR-024, DR-032.
 
+**Open DR gates:** DR-002 (mind events feed DR-002 closure), DR-006 (mind worker schemas may be moddable — confirm capability gates), DR-008 (mind worker hooks attach to M6 utility scorer — confirm hook surface), DR-009 (mind dialogue queue surfaces in command UX — confirm), DR-012 (mind captions/dialogue must be caption-backed — confirm). Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
+
 ---
 
 ### M6.6 — AI Material Competence
@@ -1790,6 +1901,8 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 **Cross-DR:** DR-002, DR-008, DR-009, DR-012, DR-022, DR-024, DR-032, DR-036.
 
+**Open DR gates:** DR-002, DR-008 (M6.6 extends DR-008 utility scorer with material affordances — confirm reason-label enum), DR-009 (AI material decisions surface in command UX — confirm), DR-012 (hazard overlays + AI captions must be color-blind safe — confirm). Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
+
 ---
 
 ### M7 — Mission Director And Breach Contract Proof Mission
@@ -1814,6 +1927,8 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 - [ ] At this point, the **A-FEEL gate from the prior HTML playtest is met** — the lab has something to do, not just operate.
 
 **Cross-DR:** DR-014, DR-015, DR-016, DR-017, DR-018, DR-021, DR-022, DR-027.
+
+**Open DR gates:** DR-004 (first playable scope — M7 IS the Breach Contract closure milestone; when M7 done-criteria pass, update DR-004 status to CLOSED-DIRECTION + revisit_trigger). DR-009 (command UX — M7 ships director + commander surfaces; confirm reason-label posture). DR-011 (progression/retention — M7 retry/debrief/replay loop is the seed for RET-A; confirm debrief shape with user before RET-A scope locks). Topic-level: localization plan is OPEN — flag any baked English strings in mission/director text. Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
 
 ---
 
@@ -1842,6 +1957,8 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 **Cross-DR:** DR-002, DR-005, DR-007, DR-013, DR-015, DR-017, DR-018, DR-022, DR-024, DR-027, DR-033, DR-034, DR-035, DR-036.
 
+**Open DR gates:** DR-002 (atmosphere event category extends DR-002 contract), DR-007 (M7.5 closes DR-007 atmospheric implementation specifics under DR-036), DR-012 (hull-state UI overlays must satisfy ACC-A floor — confirm with user). Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
+
 ---
 
 ### M8 — Scenario Editor And Mod Tools
@@ -1863,6 +1980,8 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 - [ ] PACK-A and MOD-A acceptance tests pass.
 
 **Cross-DR:** DR-006, DR-010, DR-017, DR-024, DR-030.
+
+**Open DR gates:** DR-006 (modding data model — M8 IS the closure milestone for the workbench V1 + 3 mods migrated criterion; confirm package format + provenance + script-host posture before locking; modding script host topic-level decision MUST close in M8). DR-010 (license/reuse — every mod load path must respect usage-ledger discipline). Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
 
 ---
 
@@ -1890,6 +2009,8 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 - [ ] Accessibility floor: lab UI passes ACC-A floor.
 
 **Cross-DR:** DR-002, DR-006, DR-008, DR-009, DR-010, DR-012, DR-022, DR-024, DR-030, DR-032, DR-033, DR-036.
+
+**Open DR gates:** DR-002, DR-006 (material lab + expansion-material gate is the modding stress test — confirm schema versioning), DR-008 (M8.5 AI puppet uses utility scorer — confirm hook surface), DR-009, DR-010 (any external material assets enter usage-ledger), DR-012 (material lab UI must satisfy ACC-A — confirm). Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
 
 ---
 
@@ -1923,6 +2044,8 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 **Cross-DR:** DR-002, DR-005, DR-013, DR-024, DR-025, DR-026, DR-029, DR-034.
 
+**Open DR gates:** DR-002 (server.* event category extends DR-002 contract). Topic-level: **networking transport library is OPEN** — lightyear vs renet vs quinn for `cx-net`. M9 is the milestone where this MUST close. Worker MUST present transport options + perf evidence + adapter-trait shape to the user via `AskUser` before committing to a library. Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
+
 ---
 
 ### M10 — LAN Co-op
@@ -1946,6 +2069,8 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 - [ ] Mod hash mismatch produces a clean diff UI, not a crash.
 
 **Cross-DR:** DR-002, DR-005, DR-006, DR-013, DR-024, DR-025, DR-034.
+
+**Open DR gates:** DR-002, DR-006 (mod hash sync — confirm posture). Topic-level: networking transport library MUST be locked by M10 if not closed in M9. Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
 
 ---
 
@@ -1972,6 +2097,8 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 - [ ] Anti-cheat `competitive` profile rejects an input-rate-spike client and writes `system.anti_cheat_kicked` to the run bundle.
 
 **Cross-DR:** DR-002, DR-005, DR-006, DR-013, DR-024, DR-026, DR-034.
+
+**Open DR gates:** DR-002, DR-006 (community mod packs land here; confirm sync + trust-tier schema). Topic-level: networking transport library MUST be locked before M11. Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
 
 ---
 
@@ -2021,6 +2148,8 @@ Cross-shard:
 - [ ] No proprietary cloud database dependency.
 
 **Cross-DR:** DR-002, DR-005, DR-013, DR-018, DR-022, DR-024, DR-027, DR-029, DR-031, DR-032, DR-033, DR-034, DR-035.
+
+**Open DR gates:** DR-002, DR-011 (progression/retention — M12 MMO shard exposes the longest-tail retention surface; RET-A criteria from DR-011 must be evaluated against shard data; confirm anti-grind/anti-gacha posture is preserved before adding shard progression). Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
 
 ---
 

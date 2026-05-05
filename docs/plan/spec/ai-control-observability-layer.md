@@ -121,38 +121,114 @@ Every observation packet should include enough data for an AI agent to decide an
 
 ## Action Model
 
-The automation layer should only expose actions that map to real gameplay or UI affordances unless an explicit debug capability is enabled.
+The automation layer should only expose actions that map to real gameplay or UI affordances unless an explicit debug capability is enabled. **The rule is: any pixel a human can interact with on screen, the AI must be able to drive through `cxctl`.**
 
 | Action Family | Examples |
 |---|---|
-| Player controls | move axis, jump, crouch, aim vector, fire, reload, use tool, switch item, interact, stop. |
-| Tactical controls | select unit, issue order, queue order, set rally point, follow/protect/breach/retreat, assume direct control, release to AI. |
-| UI controls | focus by id, click by id, set slider, choose option, type text, submit/cancel, navigate tabs. |
-| Scenario controls | load scenario, reset, set seed, pause, step ticks, run for N ticks, set speed, capture bundle. |
-| Inspection | query entity, query UI tree, query terrain patch, query material patch, query atmosphere cell, query reaction chain, query event chain, query last failure reason, query collision pair, query collision filter reason, query collision damage chain. |
-| Debug-only | spawn fixture, teleport, force damage, reveal map, grant item. Disabled unless the run manifest declares debug capability. |
+| Player controls | move axis, jump, crouch, aim vector, fire, reload, use tool, switch item, interact, drop, throw, stop. |
+| Tactical controls | select unit/squad/faction, issue order (`move-to`, `attack`, `defend`, `retreat`, `breach`, `repair`, `support`, `follow`, `hold`, `extract`, `rescue`, `salvage`), queue order, set rally point, set doctrine, assume direct control, release to AI. |
+| Camera controls | pan, zoom, follow target, switch mode (side / tactical-map / replay-scrub), set slowdown ratio. |
+| UI controls | focus by id, click/double-click by id, hover (triggers tooltips/preview), set slider/select/checkbox/radio/text, type text, submit/cancel, navigate tabs, press individual keys (Tab/Enter/Esc/Arrow/F-keys/Ctrl+key combos), assert UI properties. |
+| Scenario controls | load scenario, reset, set seed, pause, step ticks, run for N ticks, set speed, capture bundle, force `runbundle.write`. |
+| Save controls | save slot, load slot, autosave, ironman flag, scenario policy override. |
+| Settings controls | set UI scale, contrast mode, captions on/off, reduced motion/shake/flash, keybinds, language pack. Persist or transient. |
+| Mod controls | enable/disable/validate/reload mod packs; check trust tier; check capability declarations. |
+| Director controls (debug-gated) | force director phase, force reinforcement, force objective state, escalate, hint scenario hooks. Logged in manifest. |
+| Inspection | query entity (actor/equipment/chassis/mission/base/objective/order/affliction/event), query UI tree with bounds, query terrain patch, query material patch, query atmosphere cell, query reaction chain, query event chain (parent/children), query last failure reason, query collision pair + filter reason + damage chain, query AI intent + reason chain, query mission director phase + commander reasons, query save slot list. |
+| Debug-only | spawn fixture, teleport, force damage, reveal map, grant item. Disabled unless the run manifest declares `debug_capabilities`. Every debug action emits a `system.debug_action_used` event. |
 
 All action requests should return `accepted`, `rejected`, or `queued`, with a reason label and the tick where the command took effect.
+
+> [!important] Coverage rule
+> If a human can do it on screen — click a button, drag a slider, type into a textbox, press a key, hover for a tooltip, switch tabs, scrub a replay, save/load, change a setting, queue an order, switch doctrine, change camera — the AI worker MUST be able to do the same thing through `cxctl` or the JSON-RPC envelope. Screenshot-only debugging is not a substitute. If a UI surface lacks a `cx-control` path, the milestone is incomplete.
 
 ## Minimum Commands
 
 During development, invoke the CLI as `cargo run -p cxctl -- ...` until a local `cxctl` binary is installed or added to PATH. The examples below use the shorter installed-binary form.
 
 ```text
+# Scenario / sim flow
 cxctl scenario load micro_breach --seed 42
+cxctl pause
+cxctl step --ticks 60
+cxctl resume
+cxctl run --ticks 600 --write-run-bundle
+
+# Observation (eyes/ears)
 cxctl observe --once --format json
 cxctl observe --stream --hz 30
+cxctl observe --hud --stream --hz 10
+cxctl observe --captions --stream --hz 10
+cxctl observe --mission --once
+cxctl observe --debrief --once
+cxctl observe --ai --stream --hz 5
+cxctl observe --base --once
+cxctl observe --camera --once
 cxctl observe --collisions --stream --hz 30
-cxctl observe --materials --stream --hz 30
+cxctl observe --materials --stream --hz 30 --scope chunk:0,0
 cxctl observe --atmosphere --stream --hz 10
+cxctl observe --reactions --stream --hz 30
+cxctl observe --replay --once
+cxctl observe --perf --stream --hz 1
+cxctl observe --settings --once
+
+# Inspection (deep dives)
+cxctl inspect actor alpha:0
+cxctl inspect equipment alpha:0:weapon
+cxctl inspect chassis alpha:0
+cxctl inspect mission --with-events
+cxctl inspect base core:0 --with-events
+cxctl inspect objective breach.win
+cxctl inspect order alpha:1:move-to-7
+cxctl inspect affliction alpha:0:burning
+cxctl inspect collision <event-id> --with-parents --with-children
+cxctl inspect material <event-id>
+cxctl inspect reaction <event-id>
+cxctl inspect event <event-id> --depth 5
+
+# Player actions (hands)
 cxctl act move --x 1.0
 cxctl act aim --world 320,140
 cxctl act fire --pressed true
-cxctl ui tree
+cxctl act reload
+cxctl act use-tool digger
+cxctl act switch-item --slot primary
+
+# Tactical actions
+cxctl act tactical select alpha:1
+cxctl act tactical order move-to --target 320,140 --reason "flank_left"
+cxctl act tactical order breach --target door:0 --reason "objective_ingress"
+cxctl act tactical doctrine cautious --unit alpha:1
+
+# Camera + UI
+cxctl act camera mode tactical-map
+cxctl act camera follow alpha:0
+cxctl ui tree --with-bounds
 cxctl ui click loadout.confirm
-cxctl run --ticks 600 --write-run-bundle
+cxctl ui hover hud.module.jet
+cxctl ui set settings.ui_scale 200
+cxctl ui type chat.input "covering fire on left"
+cxctl ui press Tab
+cxctl ui press Ctrl+S
+cxctl ui assert hud.objective contains "Breach"
+cxctl ui focus settings.captions
+
+# Save / settings / mods
+cxctl act save save 1 --description "before final breach"
+cxctl act save load 1
+cxctl act settings set captions on --persist
+cxctl act keybind primary_fire MouseLeft
+cxctl act mod validate --pack sample_breach --strict
+
+# Director (debug-gated)
+cxctl act director phase escalation --reason "scripted_test"
+
+# Assertion + replay
 cxctl assert objective.result == win
 cxctl replay verify prototype_runs/native/<run_id>
+cxctl replay scrub prototype_runs/native/<run_id> --tick 1850
+cxctl runbundle write
+cxctl health --format json
 ```
 
 ## Latency And Throughput Targets

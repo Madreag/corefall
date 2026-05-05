@@ -61,6 +61,9 @@ feeds:
 > [!important] Material/T-MAT addendum active
 > The 2026-05-05 systemic material direction added DR-036, T-MAT, M5.6/M5.7/M6.6/M7.5/M8.5 milestones, `cx-material`/`cx-atmos` crates, and four new run-bundle event categories (`material`/`reaction`/`atmosphere`/`affliction`). This file now includes a focused Material/T-MAT addendum so implementing agents have checklist rows immediately. The next full regeneration should merge these rows into the normal milestone/side-track sections and remove this temporary addendum callout.
 
+> [!important] Open Decision Gates addendum active
+> The 2026-05-05 readiness pass added an [Open Decision Gates Protocol](../spec/prototype-roadmap.md#open-decision-gates-protocol) and per-milestone gate callouts to [[spec/prototype-roadmap]]. This file now includes a focused Open Decision Gates checklist so implementing agents do not silently assume a DR lean is locked, and so milestone owners are responsible for closing the listed DRs through evidence. The next full regeneration should fold these rows into the per-milestone sections.
+
 ## Rating System
 
 | Column | Who Fills It | Scale | Meaning |
@@ -95,6 +98,7 @@ feeds:
 - [Side Track Checklist](#side-track-checklist)
 - [Server/MMO Addendum Checklist](#servermmo-addendum-checklist)
 - [Material/T-MAT Addendum Checklist](#materialt-mat-addendum-checklist)
+- [Open Decision Gates Checklist](#open-decision-gates-checklist)
 - [Native Task Card Checklist](#native-task-card-checklist)
 - [Global Validation And Bug Hunt Checklist](#global-validation-and-bug-hunt-checklist)
 
@@ -143,6 +147,31 @@ Use these rows for all M5.6/M5.7/M6.6/M7.5/M8.5/T-MAT work until the checklist i
 | [ ] | `M8.5-EXPANSION-GATE` | `cx-mod validate --strict` rejects expansion materials missing inspect overlay, AI affordance tag, replay event payload, recipe journal entry, or accessibility caption. | [[spec/native-implementation-backlog#M8.5 — Material Lab]] | - | - | - | - | - | - | - | Schema-enforced; no half-spec'd packs. |
 | [ ] | `M8.5-RECIPE-JOURNAL` | In-engine recipe journal logs designer-triggered reactions and persists across editor sessions; exportable as scenario hint content fragment. | [[spec/native-implementation-backlog#M8.5 — Material Lab]] | - | - | - | - | - | - | - | Player-readable; respects fog-of-war for player runs. |
 | [ ] | `TMAT-DR-REVIEW` | DR-007/036 reviewed with M5.6-M8.5 evidence; scope promoted, adjusted, or reopened explicitly. | [[decisions/dr-036-systemic-material-simulation-direction]] | - | - | - | - | - | - | - | No silent demotion or silent scope expansion. |
+
+---
+
+## Open Decision Gates Checklist
+
+> [!warning] Reading rule
+> Before starting any milestone, verify the Open DR gates listed in the milestone's roadmap section. Use [[dashboards/decision-tracker]] for current status. When a milestone closes a still-open DR, update the relevant row here, the DR file, [[decisions/index]], [[dashboards/decision-tracker]], and [[dashboards/research-readiness]] in the same pass.
+
+| Done | ID | DR / Topic | Status | Closes In | Worker Action Required Before Closure | H-Full | H-Quality | H-Review | AI-Full | AI-Quality | AI-Review | Notes |
+|---|---|---|---|---|---|---:|---:|---:|---:|---:|---:|---|
+| [ ] | `GATE-DR-002` | [[decisions/dr-002-replay-event-architecture|DR-002]] | OPEN | M3 | M3 done-criteria pass + 5-minute M2 run replays headlessly with matching checksums. Update DR status to CLOSED-DIRECTION + revisit_trigger refresh + decision-tracker + research-readiness. | - | - | - | - | - | - | - | All milestones with replay/event work touch DR-002. |
+| [ ] | `GATE-DR-003` | [[decisions/dr-003-body-damage-readability|DR-003]] | OPEN | M4 | HUD-01..HUD-03 acceptance pass with 5 playtesters; silhouette + advanced HUD opt-in lean validated. | - | - | - | - | - | - | - | Touched by M3, M4, M5, M5.7, M7. |
+| [ ] | `GATE-DR-004` | [[decisions/dr-004-first-playable-slice|DR-004]] | OPEN | M7 | Breach Contract proof mission shippable; project owner plays 5 runs and writes verbatim reaction. | - | - | - | - | - | - | - | Sequenced single actor → squad → bunker breach lean. |
+| [ ] | `GATE-DR-006` | [[decisions/dr-006-modding-data-model|DR-006]] | OPEN | M8 | Workbench V1 exists; 3 mods migrated; package format + provenance + script-host posture locked. | - | - | - | - | - | - | - | Touched by M2, M5, M5.6, M5.7, M6.6, M7.5, M8, M8.5, M10, M11. |
+| [ ] | `GATE-DR-007` | [[decisions/dr-007-terrain-material-model|DR-007]] | OPEN (defers to DR-036) | M5.6 / M5.7 / M7.5 | DR-036 milestones close DR-007 implementation specifics. Update DR-007 status when M7.5 done-criteria pass. | - | - | - | - | - | - | - | M2 launch material set must remain compatible with DR-036 expansion. |
+| [ ] | `GATE-DR-008` | [[decisions/dr-008-ai-architecture|DR-008]] | OPEN | M6 | AI-01..AI-12 + AI-H-01..AI-H-06 pass with replay evidence; hybrid jobs + utility scoring + scripted hooks lean validated. | - | - | - | - | - | - | - | Touched by M6, M6.5, M6.6, M7, M11, M12. |
+| [ ] | `GATE-DR-009` | [[decisions/dr-009-command-ux-style|DR-009]] | OPEN | M4 / M7 | ORDER-01 acceptance pass; direct + slowdown overlay + optional tactical map lean validated. | - | - | - | - | - | - | - | Touched by M4, M5, M6, M6.5, M6.6, M7, M8.5. |
+| [ ] | `GATE-DR-010` | [[decisions/dr-010-license-reuse-matrix|DR-010]] | OPEN | Public-release decision | Documentation only; ledger tracks usage. Remains open until project owner decides on public release. | - | - | - | - | - | - | - | Not a build blocker during private prototyping. |
+| [ ] | `GATE-DR-011` | [[decisions/dr-011-progression-retention-loop|DR-011]] | OPEN | M7 / M11 / M12 | RET-A-01..RET-A-06 prototype results show players return for mastery/stories, not obligation. | - | - | - | - | - | - | - | Anti-grind/anti-gacha posture must be preserved through M12. |
+| [ ] | `GATE-DR-012` | [[decisions/dr-012-accessibility-comfort-readability|DR-012]] | OPEN | M4 | ACC-A-01..16 pass across HUD, command, equipment workbench, replay, hub, package-builder, settings, and run-bundle evidence. | - | - | - | - | - | - | - | Touched by M0, M4, M5.7, M6.6, M7, M7.5, M8, M8.5. |
+| [ ] | `GATE-TOPIC-NET-TRANSPORT` | Networking transport library | OPEN | M9 / M10 | lightyear vs renet vs quinn for `cx-net`. Worker MUST present transport options + perf evidence + adapter-trait shape via `AskUser` before committing. | - | - | - | - | - | - | - | Decision lives outside DR system until then. |
+| [ ] | `GATE-TOPIC-MOD-SCRIPT-HOST` | Modding script host | OPEN | M5 / M8 | mlua vs Rhai. Worker MUST run benchmark + capability-gate audit and ASK before locking. | - | - | - | - | - | - | - | Affects DR-006 closure. |
+| [ ] | `GATE-TOPIC-LOCALIZATION` | Localization plan | OPEN | TBD | Strings/fonts/lang packs/mod-localization. Worker MUST flag any code path that bakes English-only strings; avoid hardcoded UI strings. | - | - | - | - | - | - | - | Touched by M4, M7, M8. |
+| [ ] | `GATE-TOPIC-CLOUD-SAVE` | Cloud-save backend | OPEN | Post-launch | Local-first today (DR-029); no cloud at launch. Worker MUST NOT add cloud dependencies during T-SAVE work. | - | - | - | - | - | - | - | Out of scope for v1. |
+| [ ] | `GATE-PROTOCOL-COMPLIANCE` | Worker confirms `Open Decision Gates Protocol` was followed | N/A | Each milestone | Per-milestone vault note records: which open DRs were touched, whether the lean held, what evidence was added, whether `AskUser` was invoked. | - | - | - | - | - | - | - | Hard handoff requirement. No "I assumed" silently. |
 
 ---
 
