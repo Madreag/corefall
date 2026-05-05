@@ -280,7 +280,7 @@ No milestone should use a human-gated item to hide incomplete agent-completable 
 ### Open Decision Gates Protocol
 
 > [!warning] Mandatory: do not assume an open DR's lean
-> Several DRs are **OPEN** (lean only) or have **topic-level decisions** that have not been made. If a milestone's Cross-DR row references a still-open decision, the AI worker MUST stop at the relevant phase and either (a) confirm the lean still holds against current evidence and write a one-paragraph evidence trail in the milestone vault note, or (b) ask the user via `AskUser` for a directive when evidence is missing or the lean is contested. Silent assumption that a lean is locked is forbidden.
+> Several DRs are **OPEN** (lean only) or have **topic-level decisions** that have not been made. If a milestone's Cross-DR row references a still-open decision, the AI worker MUST stop at the relevant phase and either (a) confirm the lean still holds against current evidence and write a one-paragraph evidence trail in the milestone vault note, or (b) ask the user through the active agent's available user-input/chat mechanism when evidence is missing or the lean is contested. Silent assumption that a lean is locked is forbidden.
 
 | Open DR / Topic | Status | Lean | Milestones It Gates | What The Worker Must Do Before Proceeding |
 |---|---|---|---|---|
@@ -295,7 +295,7 @@ No milestone should use a human-gated item to hide incomplete agent-completable 
 | [[decisions/dr-011-progression-retention-loop|DR-011]] | OPEN | Intrinsic-first hybrid: mastery + autonomy + veterans + salvage + replays + creator challenges | M7, M11, M12 | Confirm retention model (no gacha/grind) before designing campaign loops in M7+. RET-A-01..RET-A-06 close the DR. |
 | [[decisions/dr-012-accessibility-comfort-readability|DR-012]] | OPEN | Slice-A accessibility/comfort floor, not late compliance | M0, M4, M5.7, M6.6, M7, M7.5, M8, M8.5 | Confirm UI scale, contrast, captions, remap, reduced motion are wired into the milestone's player surfaces. ACC-A-01..16 close the DR. |
 | Networking transport library (topic) | OPEN | lightyear vs renet vs quinn | M9, M10, M11, M12 | Decision deferred to M9/M10 prototyping. Worker MUST present transport options + perf evidence to user before committing to one library in `cx-net`. |
-| Modding script host (topic) | OPEN | mlua vs Rhai | M5, M8 | Decision deferred to M5 implementation. Worker MUST run `cx-mod` script-host benchmark + capability-gate audit and ASK before locking the host. |
+| Modding script host (topic) | OPEN | mlua vs Rhai | M5, M8 | Decision deferred to M5 implementation. Worker MUST run `cx-mod` script-host benchmark + capability-gate audit and ask the user before locking the host. |
 | Localization plan (topic) | OPEN | None yet | M4, M7, M8 | Strings/fonts/lang packs/mod-localization. Worker MUST flag any string-source code path that bakes English-only strings; avoid hardcoded UI strings. Open a follow-up task if the milestone needs locale support. |
 | Cloud-save backend (topic) | OPEN | Post-launch | T-SAVE | Local-first today (DR-029); no cloud at launch. Worker MUST NOT add cloud dependencies during T-SAVE work. |
 
@@ -310,7 +310,7 @@ When a milestone closes one of these decisions, the worker MUST:
 When a milestone gathers evidence that **invalidates** a still-open lean, the worker MUST:
 
 1. Write a `revisit_trigger` entry in the relevant DR.
-2. ASK the user via `AskUser` whether to revise the lean before proceeding.
+2. Ask the user through the active agent's available user-input/chat mechanism whether to revise the lean before proceeding.
 3. Capture the discussion in the milestone vault note.
 
 ### Required Milestone Artifacts
@@ -348,7 +348,7 @@ Context (read in this order):
 
 Open Decision Gates pre-check:
 - Identify every still-open DR or topic-level decision listed in the milestone's "Open DR gates" row.
-- For each: confirm the current lean still matches design intent OR call AskUser.
+- For each: confirm the current lean still matches design intent OR ask the user through the active agent's available user-input/chat mechanism.
 - Capture the result in the milestone vault note before code work begins.
 
 Write scope:
@@ -366,7 +366,7 @@ Required loop:
 7. Produce a run bundle under prototype_runs/native/.
 8. Update the vault with a prototype/research note and final audit.
 9. Update feature-completion-checklist rows for every affected feature/task/done-criterion, including the Open Decision Gates Checklist rows, AI self-ratings and evidence links.
-10. If the milestone closes a DR, update the DR file + decisions/index + dashboards/decision-tracker + dashboards/research-readiness in the same pass.
+10. If the milestone closes a DR, update the DR file + decisions/index + dashboards/decision-tracker + dashboards/research-readiness + a dated research-log note in the same pass.
 
 Done when:
 - Every agent-completable task card is complete.
@@ -2044,7 +2044,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 **Cross-DR:** DR-002, DR-005, DR-013, DR-024, DR-025, DR-026, DR-029, DR-034.
 
-**Open DR gates:** DR-002 (server.* event category extends DR-002 contract). Topic-level: **networking transport library is OPEN** — lightyear vs renet vs quinn for `cx-net`. M9 is the milestone where this MUST close. Worker MUST present transport options + perf evidence + adapter-trait shape to the user via `AskUser` before committing to a library. Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
+**Open DR gates:** DR-002 (server.* event category extends DR-002 contract). Topic-level: **networking transport library is OPEN** — lightyear vs renet vs quinn for `cx-net`. M9 is the milestone where this MUST close. Worker MUST present transport options + perf evidence + adapter-trait shape to the user through the active agent's available user-input/chat mechanism before committing to a library. Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
 
 ---
 

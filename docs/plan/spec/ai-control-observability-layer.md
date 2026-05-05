@@ -166,7 +166,7 @@ cxctl observe --base --once
 cxctl observe --camera --once
 cxctl observe --collisions --stream --hz 30
 cxctl observe --materials --stream --hz 30 --scope chunk:0,0
-cxctl observe --atmosphere --stream --hz 10
+cxctl observe --atmospheres --stream --hz 10
 cxctl observe --reactions --stream --hz 30
 cxctl observe --replay --once
 cxctl observe --perf --stream --hz 1
@@ -268,7 +268,7 @@ cxctl health --format json
 | M6.5 | Derive `MindObservationFrame` from this layer with fog-of-war filtering; expose `cxctl observe --mind-frame <scope>` for LLM mind workers (see [[spec/hybrid-llm-ai-plan]] and [[decisions/dr-032-hybrid-llm-ai-direction]]). |
 | M6.6 | Add AI-facing material competence observations: hazard labels, safe/unsafe material affordances, containment opportunities, and explainable avoidance/rescue decisions. |
 | M7 | Scenario director, command-core/base-power, debrief, and retry are controllable/queryable. |
-| M7.5 | Expose `cxctl observe --atmosphere`, room pressure/oxygen/toxin state, leak paths, powered doors/vents/shields, and base-life-support events for command-core/base atmospherics. |
+| M7.5 | Expose `cxctl observe --atmospheres`, room pressure/oxygen/toxin state, leak paths, powered doors/vents/shields, and base-life-support events for command-core/base atmospherics. |
 | M8 | Editor and mod tooling expose semantic UI and package validation commands. |
 | M8.5 | Material lab scenarios expose fixture setup, reaction assertions, material sample export/import, and player-authored material test bundles through the same control contract. |
 | M9 | `cx-server` exposes the same `cx-control` envelope for admin (capability-gated) + observation. `cxctl --target server://host:port` connects to a running server for ops/audit (see [[spec/server-app-architecture]] and [[decisions/dr-034-dedicated-server-application]]). |
@@ -296,7 +296,7 @@ This view is mandatory for implementation agents. They should be able to debug c
 
 ### Derived: Material Observation Frames
 
-The material-focused view is the mandatory debug surface for T-MAT and DR-036. `cxctl observe --materials` and `cxctl observe --atmosphere` return:
+The material-focused view is the mandatory debug surface for T-MAT and DR-036. `cxctl observe --materials` and `cxctl observe --atmospheres` return:
 
 - active-region bounds, dirty cells, material ids, temperature/electric/toxic/flammable state, and material budget counters;
 - liquid/gas/solid layering, containment, leak paths, pressure, oxygen, and toxin summaries;

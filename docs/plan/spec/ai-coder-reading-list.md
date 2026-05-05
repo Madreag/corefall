@@ -77,13 +77,13 @@ feeds:
 
 ## Hard Rules The Worker Must Always Follow
 
-1. **[[spec/prototype-roadmap#open-decision-gates-protocol|Open Decision Gates Protocol]]**: do not silently assume an OPEN DR's lean is locked. Confirm or call `AskUser`.
+1. **[[spec/prototype-roadmap#open-decision-gates-protocol|Open Decision Gates Protocol]]**: do not silently assume an OPEN DR's lean is locked. Confirm the lean from current evidence or ask the user through the active agent's available user-input/chat mechanism.
 2. **Eyes/ears/hands rule**: every player-facing surface MUST be reachable from `cxctl`. If a UI lacks a `cx-control` path, the milestone is incomplete. See [[spec/ai-control-observability-layer]].
 3. **Events first**: every behavior that affects player understanding/replay/AI/networking/save/debugging emits an event. See [[references/prototype-run-bundle-schema]].
 4. **Reference repos are read-only**: never edit CCCP/C4/comparable repos.
 5. **Run-bundle evidence required**: every meaningful run emits a checked run bundle under `prototype_runs/native/`.
 6. **Checklist update required**: every completed task updates [[spec/feature-completion-checklist]] rows with evidence + AI self-ratings.
-7. **DR closure protocol**: when a milestone closes a DR, update the DR file + [[decisions/index]] + [[dashboards/decision-tracker]] + [[dashboards/research-readiness]] in the same pass.
+7. **DR closure protocol**: when a milestone closes a DR, update the DR file + [[decisions/index]] + [[dashboards/decision-tracker]] + [[dashboards/research-readiness]] + a dated [[research-log/index|research-log]] note in the same pass.
 
 ## Source Trail
 
