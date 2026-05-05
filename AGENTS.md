@@ -50,7 +50,7 @@ If the canonical `spec/ai-coder-reading-list.md` disagrees with the list above, 
 
 ## Repository Layout
 
-The native game workspace lives at the corefall repo's `game/` directory. This matches the canonical roadmap's [Repository Layout](https://.../prototype-roadmap.md#repository-layout) name; no path mapping is needed.
+The native game workspace lives at the corefall repo's `game/` directory. This matches the canonical roadmap's `Repository Layout` section in `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md`; no path mapping is needed.
 
 | Canonical (in roadmap) | This repo |
 |---|---|
@@ -73,7 +73,7 @@ Do not put source code in the planning vault. Do not copy the whole vault into t
 
 ## Per-Crate AGENTS.md
 
-Once `game/` is bootstrapped as a workspace with crates, every crate ships its own `AGENTS.md` per the [Per-Crate AGENTS.md Template](https://.../prototype-roadmap.md#per-crate-agentsmd-template) in the canonical roadmap. The crate's `AGENTS.md` is the boundary contract:
+Once `game/` is bootstrapped as a workspace with crates, every crate ships its own `AGENTS.md` per the `Per-Crate AGENTS.md Template` section in `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md`. The crate's `AGENTS.md` is the boundary contract:
 
 - Owns
 - Public API Boundary
@@ -100,11 +100,11 @@ python3 /Users/erol/projects/cortex-command-repos-all/research_tools/prototype_r
 
 Milestones with gameplay/tool UI also require a scripted E2E command and a screenshot/capture artifact listed in `summary.json.artifacts`.
 
-`cfctl` lives at `game/crates/cfctl/`. Invoke as `cargo run -p cfctl -- <subcommand>` during M0..M1; once installed or added to PATH, `cfctl <subcommand>` is shorthand. The full CLI surface is pinned in the canonical [CLI Reference](https://.../prototype-roadmap.md#cli-reference).
+`cfctl` lives at `game/crates/cfctl/`. Invoke as `cargo run -p cfctl -- <subcommand>` during M0..M1; once installed or added to PATH, `cfctl <subcommand>` is shorthand. The full CLI surface is pinned in the canonical `CLI Reference` section of `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md`.
 
 ## Run-Bundle Naming
 
-Run bundles live under `prototype_runs/native/` at the corefall repo root. Naming follows the canonical [Run-Bundle Naming Convention](https://.../prototype-roadmap.md#run-bundle-naming-convention):
+Run bundles live under `prototype_runs/native/` at the corefall repo root. Naming follows the canonical `Run-Bundle Naming Convention` section of `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md`:
 
 ```text
 prototype_runs/native/<milestone>_<UTC ISO-8601 with hyphens>_<short_hash>/
@@ -120,7 +120,7 @@ Do not silently assume an open decision is settled.
 
 If a milestone touches an OPEN decision record or topic-level open decision:
 
-- Confirm the current lean from the canonical vault per the [Open Decision Gates Protocol](https://.../prototype-roadmap.md#open-decision-gates-protocol).
+- Confirm the current lean from the canonical vault per the `Open Decision Gates Protocol` section of `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md`.
 - Implement only what the milestone allows.
 - If the lean is contested or would materially change architecture, stop and ask the user through the active agent's available user-input/chat mechanism.
 - When prototype evidence closes a DR, update the canonical vault in the same pass (DR file + decisions/index + decision-tracker + research-readiness + a dated research-log note) or explicitly report that the vault update is still pending.
@@ -131,7 +131,7 @@ Every player-facing surface must be controllable and observable through the plan
 
 The rule: any pixel a human can interact with on screen, the AI worker must be able to drive through `cfctl`. Screenshot-only testing is not enough. A milestone is incomplete if AI agents cannot inspect and drive the new gameplay/UI surface through structured commands.
 
-See the canonical [[spec/ai-control-observability-layer]] for the full observe/inspect/act surface; every new player-facing surface must extend it.
+See `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/ai-control-observability-layer.md` for the full observe/inspect/act surface; every new player-facing surface must extend it.
 
 ## Evidence Requirements
 
@@ -231,7 +231,7 @@ Current direction:
 ## Secrets Posture
 
 - Never commit API keys, `.env` files, signing keys, or LLM provider tokens.
-- Use environment variables for any secret per [[spec/hybrid-llm-ai-plan]] `MindProviderConfig.api_key_env`.
+- Use environment variables for any secret per `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/hybrid-llm-ai-plan.md` `MindProviderConfig.api_key_env`.
 - The `.gitignore` already excludes `.env`, `.env.*` (with `!.env.example` exception). Do not weaken this without an explicit user request.
 - LLM live providers are cargo-feature-gated and never required for any test. CI uses the deterministic mock provider only.
 
@@ -240,7 +240,7 @@ Current direction:
 - Don't write source code under `cortext_command_vault/`. The vault is planning, not implementation.
 - Don't edit canonical reference repos under `/Users/erol/projects/cortex-command-repos-all/{Cortex-Command-*,comparables_repos/*}` unless the user explicitly says so.
 - Don't use `rand::thread_rng()` inside sim crates (`cf-sim-core`, `cf-physics`, `cf-material`, `cf-ai`, ...). Sim RNG must be seeded and recorded per the manifest.
-- Don't use `println!` in production code. Use `tracing` per the canonical [Logging, Tracing, And Error Policy](https://.../prototype-roadmap.md#logging-tracing-and-error-policy).
+- Don't use `println!` in production code. Use `tracing` per the canonical `Logging, Tracing, And Error Policy` section of `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md`.
 - Don't `unwrap()` on user-controllable inputs.
 - Don't skip the Open Decision Gates pre-check before assigning a milestone.
 - Don't commit API keys, `.env` files, signing keys, or LLM provider tokens.

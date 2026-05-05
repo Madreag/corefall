@@ -1,8 +1,8 @@
-.DS_Store
 *.log
 *.tmp
 *.swp
 *.swo
+.DS_Store
 .env
 .env.*
 !.env.example
@@ -11,7 +11,10 @@
 target/
 
 # Generated prototype evidence
-prototype_runs/
+prototype_runs/*
+!prototype_runs/native/
+prototype_runs/native/*
+!prototype_runs/native/README.md
 run_bundles/
 captures/
 screenshots/

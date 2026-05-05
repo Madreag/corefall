@@ -1,6 +1,6 @@
 # Corefall Native Workspace
 
-The native Rust workspace will live here. Directory name `game/` matches the canonical roadmap's [Repository Layout](https://.../prototype-roadmap.md#repository-layout) — no path mapping needed.
+The native Rust workspace will live here. Directory name `game/` matches the canonical roadmap's `Repository Layout` section in `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md` — no path mapping needed.
 
 Do not scaffold this by guessing. Start M0 from the canonical roadmap and backlog:
 
