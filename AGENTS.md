@@ -133,7 +133,7 @@ Milestones with gameplay/tool UI also require a scripted E2E command and a scree
 
 ## Run-Bundle Naming
 
-Run bundles live under `prototype_runs/native/` at the corefall repo root. Naming follows the canonical `Run-Bundle Naming Convention` section of `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md`:
+Run bundles live under `prototype_runs/native/` at the corefall repo root. Naming follows the canonical `Run-Bundle Naming Convention` section of `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md`.
 
 ```text
 prototype_runs/native/<milestone>_<UTC ISO-8601 with hyphens>_<short_hash>/
@@ -141,7 +141,7 @@ prototype_runs/native/<milestone>_<UTC ISO-8601 with hyphens>_<short_hash>/
 
 Example: `prototype_runs/native/m0_2026-05-04T22-30-00Z_a1b2c3d4/`.
 
-Each bundle contains `run_manifest.json`, `events.jsonl`, `summary.json`, `notes.md`, and optional `screenshots/` / `captures/`. Validate with the run-bundle checker named in Standard Validation.
+Each bundle contains `run_manifest.json`, `events.jsonl`, `summary.json`, `notes.md`, and optional `screenshots/` / `captures/`. Validate it with the run-bundle checker named in Standard Validation.
 
 ## Open Decision Gates
 
@@ -162,46 +162,6 @@ The rule: any pixel a human can interact with on screen, the AI worker must be a
 
 See `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/ai-control-observability-layer.md` for the full observe/inspect/act surface; every new player-facing surface must extend it.
 
-## Evidence Requirements
-
-Every meaningful prototype run must emit a run bundle under:
-
-```text
-prototype_runs/native/
-```
-
-Every completed task must update or produce:
-
-- The relevant checklist rows in the canonical `feature-completion-checklist.md`; check off completed rows and fill evidence, commands, run-bundle paths, and AI self-ratings.
-- The canonical `prototype-roadmap.md`; update milestone/feature status, evidence links, changed scope, open follow-ups, and any newly discovered dependency or sequencing issue. If no roadmap edit is needed, say why in the implementation log.
-- A milestone note under `docs/implementation-log/`.
-- A repo-local entry in `CHANGELOG.md`.
-- Run-bundle paths.
-- Commands run.
-- Bugs found and fixed.
-- Known limitations.
-- AI self-ratings for implementation completeness and quality.
-
-Use human rating fields only for user/human review. AI agents fill only AI self-rating fields and evidence notes.
-
-Canonical checklist:
-
-```text
-/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/feature-completion-checklist.md
-```
-
-Canonical roadmap:
-
-```text
-/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md
-```
-
-Repo-only changelog:
-
-```text
-CHANGELOG.md
-```
-
 ## Completion Contract
 
 After implementing any feature, task card, side-track item, or milestone, an agent must leave the project in a state where another agent can see exactly what changed and what remains.
@@ -211,8 +171,8 @@ Required completion actions:
 1. Update code and tests in `game/`.
 2. Run the Standard Validation commands (above) plus any milestone-specific validation from the assigned roadmap/backlog section.
 3. Emit or update run-bundle evidence when the task includes runnable behavior.
-4. Update the canonical vault checklist rows that correspond to the completed work.
-5. Update the canonical roadmap if status, scope, dependencies, evidence, commands, risks, or follow-up work changed.
+4. Update `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/feature-completion-checklist.md` rows that correspond to the completed work. Fill evidence, commands, run-bundle paths, and AI self-ratings; leave human rating fields blank unless the user provides them.
+5. Update `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md` if status, scope, dependencies, evidence, commands, risks, or follow-up work changed.
 6. Add or update the milestone implementation note under `docs/implementation-log/`.
 7. Add a concise repo-local entry to `CHANGELOG.md`.
 8. If the milestone closes a DR, update the DR file + `decisions/index.md` + `dashboards/decision-tracker.md` + `dashboards/research-readiness.md` + a dated `research-log/` note in the same pass.
