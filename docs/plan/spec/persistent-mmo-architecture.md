@@ -2,7 +2,7 @@
 type: spec
 status: closed-direction
 created: 2026-05-05
-authority: "Closed-direction architecture for persistent MMO shard mode. The MMO shard is one of the supported modes of cx-server; community-hostable; not subscription-funded."
+authority: "Closed-direction architecture for persistent MMO shard mode. The MMO shard is one full-product target mode of cx-server; community-hostable; not subscription-funded."
 ready_when: "M12 ships an MMO shard mode capable of 50-200 concurrent players for 1+ hour with persistence snapshots and clean restart."
 feeds:
   - DR-002
@@ -24,7 +24,7 @@ feeds:
 # Persistent MMO Architecture
 
 > [!summary] Direction
-> A "persistent MMO shard" is one mode of `cx-server` (DR-034). A shard is a long-running world hosting 50-200 concurrent players in a contract-based frontier sandbox. Multiple shards can run independently; cross-shard travel is via lobby/portal at v1, not seamless world. Anyone can host a shard; first-party hosting is optional, not required for launch.
+> A "persistent MMO shard" is one full-product target mode of `cx-server` (DR-034). A shard is a long-running world hosting 50-200 concurrent players in a contract-based frontier sandbox. Multiple shards can run independently; cross-shard travel is via lobby/portal at v1, not seamless world. Anyone can host a shard; first-party hosting is optional. M12 proves readiness and reopens DR-035 if the target fails.
 
 > [!important] Bounds
 > This is **not** EVE Online, **not** WoW, **not** Star Citizen. It is **Cortex Command's contract-and-base sandbox at MMO scale** with persistent factions, named actors, salvage economies, and player-built bases. The MMO mode borrows from Project Zomboid dedicated servers, Space Station 13/14 round-based persistence, and EVE-class server architecture, **without** committing to seamless single-shard world or full simulation of every shard tick.

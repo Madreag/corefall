@@ -372,7 +372,7 @@ cargo run -p cx-e2e -- --scenario sample_mod_breach --expect win --write-run-bun
 ## M9 — Dedicated Server App + Determinism Islands
 
 > [!important] Kickoff prerequisites
-> M3 (replay/event recorder) and M7 (mission director + Breach Contract) must be complete. Read [[spec/server-app-architecture]], [[decisions/dr-005-multiplayer-posture]], [[decisions/dr-013-backend-service-scope]], [[decisions/dr-034-dedicated-server-application]] in full BEFORE feature work. Run [M9 Kickoff Smoke](../spec/prototype-roadmap.md#per-milestone-kickoff-smoke). M9 is not done until SERVER-001..SERVER-016 pass and the reference Docker image runs unchanged.
+> M3 (replay/event recorder) and M7 (mission director + Breach Contract) must be complete. Read [[spec/server-app-architecture]], [[decisions/dr-005-multiplayer-posture]], [[decisions/dr-013-backend-service-scope]], [[decisions/dr-034-dedicated-server-application]] in full BEFORE feature work. Run [M9 Kickoff Smoke](../spec/prototype-roadmap.md#per-milestone-kickoff-smoke). M9 is not done until the M9 server-core subset passes and the reference Docker image runs unchanged. PvP/MMO scale gates stay in M12.
 
 > [!warning] Hard rules
 > Same sim path as the client. No "server-only" branch of game logic. Server-authoritative for sim, terrain mutation, AI decisions, mission director, persistence. No proprietary cloud database dependency. Networking transport library decision committed at M9 close.
@@ -396,7 +396,7 @@ cargo run -p cx-e2e -- --scenario sample_mod_breach --expect win --write-run-bun
 | M9-015 lobby_directory mode skeleton | `cx-server` | Mode lists registered shards via REST + WebSocket schema; multi-instance protocol. | SERVER-005 boot test. | Lobby directory boot capture. | No moderation. |
 | M9-016 server mod loading | `cx-server`, `cx-mod` | Server loads same `cx-mod` package format as client; mod hash recorded; `server_only: true` packages allowed. | Server-side mod load test. | Mod load report. | No auto-download. |
 | M9-017 reference Docker image | `tools/`, `docs/server-hosting.md` | Minimal Docker image runs `cx-server` unchanged; documented hosting guide for Linux + Windows. | Docker image smoke. | Image manifest + hosting guide. | No production registry. |
-| M9-018 SERVER-001..SERVER-016 suite | `cx-e2e`, `tests/`, `cx-server` | Implement and pass all 16 SERVER-* acceptance tests from [[spec/server-app-architecture]]. | All SERVER-* pass. | M9 run bundle. | No premature MMO acceptance. |
+| M9-018 server-core acceptance suite | `cx-e2e`, `tests/`, `cx-server` | Implement and pass the M9 server-core subset from [[spec/server-app-architecture]]: SERVER-001, SERVER-006, SERVER-009, SERVER-010, SERVER-011, SERVER-014, SERVER-015, SERVER-016. Track SERVER-002/004/012 as M12 gates. | M9 server-core subset passes. | M9 run bundle. | No premature PvP/MMO scale acceptance. |
 
 M9 E2E:
 
@@ -486,7 +486,7 @@ Human gate: project-owner self-hosts a `coop_room` and runs an online co-op sess
 > M9 + M10 + M11 complete. Read [[spec/persistent-mmo-architecture]] + [[decisions/dr-005-multiplayer-posture]] + [[decisions/dr-013-backend-service-scope]] + [[decisions/dr-034-dedicated-server-application]] + [[decisions/dr-035-persistent-mmo-architecture]] in full. Run M12 kickoff smoke.
 
 > [!warning] Hard rules
-> Public PvP and persistent MMO shards are LAUNCH commitments (not post-launch experiments). MMO shards are community-hostable. No proprietary cloud database. Subscription forbidden. Cross-shard live combat forbidden at v1. Auto-population (server bots dressed as players) forbidden.
+> Public PvP and persistent MMO shards are full-product target modes, not post-launch-only architecture. M12 proves readiness. MMO shards are community-hostable. No proprietary cloud database. Subscription forbidden. Cross-shard live combat forbidden at v1. Auto-population (server bots dressed as players) forbidden.
 
 PvP arena task cards:
 

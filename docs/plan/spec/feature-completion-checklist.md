@@ -37,6 +37,8 @@ feeds:
   - DR-031
   - DR-032
   - DR-033
+  - DR-034
+  - DR-035
 ---
 
 <- [[spec/index|spec section]] · [[spec/prototype-roadmap|native roadmap]] · [[spec/native-implementation-backlog|native backlog]] · [[spec/authoritative-game-spec-v0|game spec v0]] · [[dashboards/research-readiness|readiness]] · [VAULT_PLAN.md](../../VAULT_PLAN.md)
@@ -50,10 +52,10 @@ feeds:
 > Build scope still comes from [[spec/prototype-roadmap]] and [[spec/native-implementation-backlog]]. This checklist tracks completion, evidence, human ratings, and AI self-ratings. If the roadmap/backlog changes, update this checklist in the same pass.
 
 > [!info] Current coverage
-> 497 checklist rows: 16 milestone proof rows, 106 milestone scope rows, 90 milestone done-criteria rows, 80 roadmap feature-index rows, 68 side-track rows, 89 native task-card rows, 24 validation rows, 12 bug-hunt rows, and 12 definition-of-done rows.
+> 497 baseline checklist rows plus the server/MMO addendum below. The old M9-M12 rows remain for continuity, but agents implementing M9-M12 must use the addendum plus [[spec/prototype-roadmap]], [[spec/native-implementation-backlog]], [[spec/server-app-architecture]], and [[spec/persistent-mmo-architecture]] as the authoritative scope until the next full regeneration.
 
-> [!warning] Stale: M9-M12 scope expanded 2026-05-05 (post-direction-shift)
-> The closed-direction shift on 2026-05-05 (DR-005 + DR-013 re-closed; new DR-034 dedicated server app; new DR-035 persistent MMO architecture; new T-SERVER side track) substantially expanded M9 task cards (4 → 18), M11 (3 → 9), M12 (3 → 17 = 3 PvP + 14 MMO), added the T-SERVER side track, and added new event categories (`server`, `anti_cheat`, `mmo`) to the run-bundle schema. **This checklist's M9/M10/M11/M12 + T-SERVER + side-track + feature-index + validation rows are out of date until the next regeneration.** Authoritative scope until then: [[spec/prototype-roadmap]], [[spec/native-implementation-backlog]], [[spec/server-app-architecture]], [[spec/persistent-mmo-architecture]]. New acceptance suites to track on regeneration: SERVER-001..SERVER-016, MMO-001..MMO-012.
+> [!important] Server/MMO addendum active
+> The 2026-05-05 server direction added DR-034, DR-035, T-SERVER, server/anti-cheat/MMO run-bundle categories, and expanded M9-M12. This file now includes a focused addendum so implementing agents have checklist rows immediately. The next full regeneration should merge these rows into the normal sections and remove the historical M9-M12 labels.
 
 ## Rating System
 
@@ -87,8 +89,31 @@ feeds:
 - [Milestone Done-Criteria Checklist](#milestone-done-criteria-checklist)
 - [Roadmap Feature Index Checklist](#roadmap-feature-index-checklist)
 - [Side Track Checklist](#side-track-checklist)
+- [Server/MMO Addendum Checklist](#servermmo-addendum-checklist)
 - [Native Task Card Checklist](#native-task-card-checklist)
 - [Global Validation And Bug Hunt Checklist](#global-validation-and-bug-hunt-checklist)
+
+---
+
+## Server/MMO Addendum Checklist
+
+Use these rows for all M9-M12/T-SERVER work until the checklist is fully regenerated. Human ratings stay blank until the owner gives them.
+
+| Done | ID | Feature / Requirement | Source | Evidence | H-Full | H-Quality | H-Review | AI-Full | AI-Quality | AI-Review | Notes |
+|---|---|---|---|---|---:|---:|---:|---:|---:|---:|---|
+| [ ] | `TSERVER-P00` | T-SERVER side track: `cx-server` is the shared dedicated server artifact for LAN, co-op, PvP arena, MMO shard, and lobby directory modes. | [[spec/prototype-roadmap#T-SERVER — Dedicated Server App Lifecycle And Community Hosting]] | - | - | - | - | - | - | - | Use same sim path as client; no server-only game logic. |
+| [ ] | `M9-SERVER-CORE` | M9 server-core subset passes: SERVER-001, SERVER-006, SERVER-009, SERVER-010, SERVER-011, SERVER-014, SERVER-015, SERVER-016. | [[spec/server-app-architecture#Acceptance Suite]] | - | - | - | - | - | - | - | M9 does not require SERVER-002/004/012 PvP/MMO scale tests. |
+| [ ] | `M9-CXSERVER` | `cx-server` binary scaffold: RON config, `--mode`, `--validate-config-only`, no render/UI/audio crates. | [[spec/native-implementation-backlog#M9 — Dedicated Server App + Determinism Islands]] | - | - | - | - | - | - | - | Owns `cx-server`, `cx-server-ops`. |
+| [ ] | `M9-OPS` | Health, readiness, metrics, JSON logs, drain shutdown, restart hooks. | [[spec/server-app-architecture]] | - | - | - | - | - | - | - | Emits `server.*` events. |
+| [ ] | `M9-ANTI-CHEAT-FOUNDATION` | Anti-cheat profile registry, rate-limit hooks, replay drift skeleton, persisted ban list, audit log. | [[spec/native-implementation-backlog#M9 — Dedicated Server App + Determinism Islands]] | - | - | - | - | - | - | - | Foundation only; tournament-grade remains later. |
+| [ ] | `M9-PERSISTENCE-FOUNDATION` | Snapshot writer, append-only event journal, restore loop, backups, schema migration hooks. | [[spec/native-implementation-backlog#M9 — Dedicated Server App + Determinism Islands]] | - | - | - | - | - | - | - | Full MMO persistence remains M12. |
+| [ ] | `M9-DOCKER` | Reference Docker image runs `cx-server` unchanged and is documented. | [[spec/server-app-architecture#Acceptance Suite]] | - | - | - | - | - | - | - | Linux required; Windows hosting guide required separately. |
+| [ ] | `M10-LAN-CXSERVER` | LAN co-op runs through `cx-server --mode lan_room`; ready-up, replicated state, per-client replay alignment. | [[spec/prototype-roadmap#M10 — LAN Co-op]] | - | - | - | - | - | - | - | Includes `anti_cheat.profile_applied` with `casual`. |
+| [ ] | `M11-ONLINE-SELF-HOSTED` | A community member can host `cx-server --mode coop_room`; remote friends join through NAT/relay and complete a Breach Contract. | [[spec/prototype-roadmap#M11 — Online Co-op (Self-Hosted Dedicated Servers)]] | - | - | - | - | - | - | - | Package hash mismatch must fail cleanly. |
+| [ ] | `M11-LOBBY-DIRECTORY` | `lobby_directory` registration, heartbeat, browse/filter, deregister, and expiry work end-to-end. | [[decisions/dr-013-backend-service-scope]] | - | - | - | - | - | - | - | Required for public discovery; optional for private deployments. |
+| [ ] | `M12-PVP-ARENA` | `cx-server --mode pvp_arena` runs a 4-8 player public arena with server-authoritative state and replay-aligned clients. | [[spec/prototype-roadmap#M12 — Public PvP Arenas + Persistent MMO Shards]] | - | - | - | - | - | - | - | Uses `competitive` default; `tournament_strict` opt-in only. |
+| [ ] | `M12-MMO-SUITE` | MMO-001..MMO-012 all pass, including 50-client 1-hour soak, persistence restart, interest management, no-cloud reference. | [[spec/persistent-mmo-architecture#Acceptance Suite]] | - | - | - | - | - | - | - | M12 evidence gate; failure reopens DR-035. |
+| [ ] | `M12-PVP-MMO-DR-REVIEW` | DR-005/013/034/035 reviewed with M9-M12 evidence; scope promoted, adjusted, or reopened explicitly. | [[spec/native-implementation-backlog#M12 — Public PvP Arenas + Persistent MMO Shards]] | - | - | - | - | - | - | - | No silent demotion or silent scope expansion. |
 
 ---
 

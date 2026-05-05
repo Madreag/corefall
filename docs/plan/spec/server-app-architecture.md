@@ -3,7 +3,7 @@ type: spec
 status: closed-direction
 created: 2026-05-05
 authority: "Closed-direction architecture for the dedicated server application. Anyone can host. Same binary serves co-op, PvP, and persistent MMO shards."
-ready_when: "M9 ships cx-server with a working dedicated build, M11 proves a community member can host an internet-reachable co-op session, and M12 proves PvP + MMO shard modes with the same binary."
+ready_when: "M9 ships cx-server with a working dedicated build and core server suite, M11 proves a community member can host an internet-reachable co-op session, and M12 proves PvP + MMO shard modes with the same binary."
 feeds:
   - DR-002
   - DR-005
@@ -27,7 +27,7 @@ feeds:
 # Server App Architecture (`cx-server`)
 
 > [!summary] Direction
-> A single dedicated server binary (`cx-server`) is part of the launch SKU. Anyone can host any supported game mode (co-op, PvP arena, persistent MMO shard) with no proprietary dependency. The server is a first-class native artifact alongside the client app, modding tools, and scenario editor.
+> A single dedicated server binary (`cx-server`) is a full-product artifact. Anyone can host any supported game mode (co-op, PvP arena, persistent MMO shard) with no proprietary dependency. The server is a first-class native artifact alongside the client app, modding tools, and scenario editor.
 
 > [!important] Hard rules
 > Every gameplay mode is server-authoritative. The client app and `cx-server` share the **same** sim core, terrain, physics, equipment, chassis, AI, replay, mod loader, and `cx-control` schemas. There is no "server-only" branch of game logic. Public dedicated servers do not require an Anthropic/OpenAI/Steam/Epic account; cloud features are optional adapters.
@@ -53,7 +53,7 @@ The dedicated server app exists so that:
 | `lan_room` | LAN co-op (auto-discovered). | 2-4. | Same as `coop_room`. |
 | `mmo_shard` | Persistent MMO shard with a long-running world (DR-035). | 50-200 concurrent (target); soft cap configurable. | Continuous; periodic snapshot to durable storage. |
 | `ranked_arena` | Future: ranked PvP arena with leaderboard adapter. | 2-8. | Optional; opt-in account adapter. |
-| `lobby_directory` | Future: public server browser/relay. | N/A. | Adapter-shaped; can be disabled in private deployments. |
+| `lobby_directory` | Public server/shard browser and presence directory. | N/A. | Required for public discovery; can be disabled in private deployments. |
 
 Mode selection is a single `--mode` flag; per-mode config files live in `content/server/<mode>/`. Adding a new mode is a data + config addition, not a fork.
 
@@ -99,7 +99,7 @@ ServerConfig(
   ),
   anti_cheat: (
     enabled: true,
-    profile: "tournament_strict",
+    profile: "competitive",
     log_dir: "./anti-cheat/",
   ),
   ai_mind: (
@@ -226,26 +226,26 @@ The default ship state is: **a player downloads `cx-server`, fills in 5 config f
 
 ## Acceptance Suite
 
-`SERVER-001..SERVER-016` (assignable in M9..M12 task cards):
+`SERVER-001..SERVER-016` are split across milestones. M9 requires the core server lifecycle subset only; PvP/MMO scale tests belong to M12.
 
-| ID | What It Proves |
-|---|---|
-| SERVER-001 | `cx-server --mode coop_room --scenario breach_contract` boots, accepts 2 clients, runs the mission to completion, archives a run bundle. |
-| SERVER-002 | `cx-server --mode pvp_arena` runs a 4-player match server-authoritatively; client-side prediction + reconciliation visible in events. |
-| SERVER-003 | `cx-server --mode lan_room` is auto-discovered by client on the same LAN; ready-up + start works. |
-| SERVER-004 | `cx-server --mode mmo_shard` runs for 1 hour with simulated 50 clients (headless); persistence snapshot every 10 minutes; restart resumes from snapshot. |
-| SERVER-005 | Mod hash mismatch on join produces actionable error: client sees package diff and a download/repair route. |
-| SERVER-006 | Server replay verifies headlessly with `cx-headless replay --verify-checksums`. |
-| SERVER-007 | Per-client run bundles align tick-for-tick (`cx-headless replay-compare`). |
-| SERVER-008 | Anti-cheat profile `tournament_strict` rejects an input-rate-spike client and logs `system.anti_cheat_kicked` event with reason. |
-| SERVER-009 | Admin command via `cxctl --capability admin` kicks a client, saves the shard, hot-loads a scenario. |
-| SERVER-010 | Health + readiness endpoints work in container mode; metrics endpoint exposes per-tick budget, client count, replay queue depth. |
-| SERVER-011 | `cx-server` binary launches and exits cleanly on Linux + Windows. macOS support is nice-to-have. |
-| SERVER-012 | LLM mind layer runs server-side per DR-032; clients never see prompts; replay records hashed prompts only. |
-| SERVER-013 | Server-side mod (admin tool / tournament ruleset) loads with `server_only: true` and is invisible to clients. |
-| SERVER-014 | Capability `god`/`debug` is off by default; requires explicit config opt-in; opt-in is recorded in run-bundle manifest. |
-| SERVER-015 | Drain shutdown: SIGTERM produces graceful client disconnect with reason, replay flush, persistence save, exit code 0 within 10 seconds. |
-| SERVER-016 | Reference Docker image runs the dedicated server unmodified; documented in `docs/server-hosting.md`. |
+| ID | Milestone Gate | What It Proves |
+|---|---|---|
+| SERVER-001 | M9 core | `cx-server --mode coop_room --scenario breach_contract` boots, accepts 2 clients, runs the mission to completion, archives a run bundle. |
+| SERVER-002 | M12 PvP | `cx-server --mode pvp_arena` runs a 4-player match server-authoritatively; client-side prediction + reconciliation visible in events. |
+| SERVER-003 | M10 LAN | `cx-server --mode lan_room` is auto-discovered by client on the same LAN; ready-up + start works. |
+| SERVER-004 | M12 MMO | `cx-server --mode mmo_shard` runs for 1 hour with simulated 50 clients (headless); persistence snapshot every 10 minutes; restart resumes from snapshot. |
+| SERVER-005 | M10/M11 | Mod hash mismatch on join produces actionable error: client sees package diff and a download/repair route. |
+| SERVER-006 | M9 core | Server replay verifies headlessly with `cx-headless replay --verify-checksums`. |
+| SERVER-007 | M10/M11 | Per-client run bundles align tick-for-tick (`cx-headless replay-compare`). |
+| SERVER-008 | M11/M12 | Anti-cheat profile `competitive` rejects an input-rate-spike client and logs `system.anti_cheat_kicked` event with reason; `tournament_strict` is opt-in for ranked/tournament later. |
+| SERVER-009 | M9 core | Admin command via `cxctl --capability admin` kicks a client, saves the shard/session, hot-loads a scenario. |
+| SERVER-010 | M9 core | Health + readiness endpoints work in container mode; metrics endpoint exposes per-tick budget, client count, replay queue depth. |
+| SERVER-011 | M9 core | `cx-server` binary launches and exits cleanly on Linux + Windows. macOS support is nice-to-have. |
+| SERVER-012 | M12 integration | LLM mind layer runs server-side per DR-032; clients never see prompts; replay records hashed prompts only. |
+| SERVER-013 | M9/M11 | Server-side mod (admin tool / tournament ruleset) loads with `server_only: true` and is invisible to clients. |
+| SERVER-014 | M9 core | Capability `god`/`debug` is off by default; requires explicit config opt-in; opt-in is recorded in run-bundle manifest. |
+| SERVER-015 | M9 core | Drain shutdown: SIGTERM produces graceful client disconnect with reason, replay flush, persistence save, exit code 0 within 10 seconds. |
+| SERVER-016 | M9 core | Reference Docker image runs the dedicated server unmodified; documented in `docs/server-hosting.md`. |
 
 ## Anti-Goals
 

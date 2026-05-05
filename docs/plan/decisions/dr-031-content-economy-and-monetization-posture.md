@@ -57,7 +57,7 @@ revisit_trigger: "Premium price ceiling fails to support development; or communi
 |---|---|
 | Free-to-play with battle pass / gacha | Wrong genre fit; conflicts with retention principles. |
 | Free-to-play with cosmetic shop only | Reduces development runway; pressure to monetize creeps into mechanics. |
-| Subscription | Wrong category; sandbox/sim genre doesn't sustain subscription unless it's a live-service MMO, which is post-launch only. |
+| Subscription | Wrong category for the base game. MMO shards are community-hostable and not subscription-funded by the base SKU; any operator hosting fee is outside the core economy posture. |
 | Marketplace with cut on user mods | Damages community trust; DR-010 license matrix already commits to community-friendly posture. |
 | Crypto / NFT integration | Hard no. Conflicts with sandbox trust + modding ethics. |
 | Console paid-only with PC piracy excuse | Wrong incentive; PC + Linux are first-class per DR-025. |

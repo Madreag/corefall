@@ -12,7 +12,7 @@ revisit_trigger: "Single-binary multi-mode server proves infeasible; community h
 # DR-034: Dedicated Server Application And Community Hosting
 
 > [!success] Status: CLOSED-DIRECTION (project owner committed 2026-05-05)
-> Ship a dedicated server binary `cx-server` as part of the launch SKU. Anyone can host any supported mode (LAN co-op, online co-op, PvP arena, persistent MMO shard, lobby directory). Same sim core, terrain, physics, equipment, chassis, AI, replay, and modding crates as the client. Community-hostable by default; platform adapters (Steam/EOS/PlayFab/Unity) are optional. See [[spec/server-app-architecture]] for the full architecture.
+> Ship a dedicated server binary `cx-server` as a full-product artifact, designed from day one to host LAN co-op, online co-op, PvP arena, persistent MMO shard, and lobby-directory modes. Same sim core, terrain, physics, equipment, chassis, AI, replay, and modding crates as the client. Community-hostable by default; platform adapters (Steam/EOS/PlayFab/Unity) are optional. See [[spec/server-app-architecture]] for the full architecture.
 
 ## Decision
 
@@ -22,7 +22,7 @@ revisit_trigger: "Single-binary multi-mode server proves infeasible; community h
 
 | Aspect | Commitment |
 |---|---|
-| Binary | `cx-server` is part of the launch SKU and ships on Linux + Windows. macOS server is nice-to-have, not required. |
+| Binary | `cx-server` is a full-product artifact and ships on Linux + Windows. macOS server is nice-to-have, not required. |
 | Modes | `coop_room`, `pvp_arena`, `lan_room`, `mmo_shard`, `ranked_arena` (post-launch), `lobby_directory`. Mode is a CLI flag + config file. |
 | Authority | 100% server-authoritative simulation (per DR-005). |
 | Sim parity | Same `cx-sim-core`, `cx-terrain`, `cx-physics`, `cx-actor`, `cx-chassis`, `cx-equipment`, `cx-ai`, `cx-mission`, `cx-replay`, `cx-control`, `cx-net`, `cx-save`, `cx-mod` crates. No fork. |
@@ -35,7 +35,7 @@ revisit_trigger: "Single-binary multi-mode server proves infeasible; community h
 | Observability | Structured JSON logs, Prometheus-compatible metrics endpoint, `/health` and `/ready` endpoints, replay archive directory. |
 | Admin API | `cxctl --capability admin` over the same JSON-RPC envelope as the client; capability-gated; opt-in. |
 | LLM mind | Mind workers may run server-side per DR-032; clients never see prompts. |
-| Documentation | Hosting guide, ops runbook, anti-cheat profile reference, mod compatibility playbook all ship with the launch SKU. |
+| Documentation | Hosting guide, ops runbook, anti-cheat profile reference, mod compatibility playbook all ship with the server artifact. |
 
 ## What This Does NOT Lock
 
@@ -94,7 +94,7 @@ revisit_trigger: "Single-binary multi-mode server proves infeasible; community h
 
 | Test | What It Proves |
 |---|---|
-| M9 SERVER-001..SERVER-016 | All modes boot, accept clients, run sims, archive replays, drain cleanly. |
+| M9 server-core subset | Core server lifecycle, config, replay, health/readiness, admin capability gates, drain shutdown, Docker smoke, and mode boot/config paths. |
 | M10 LAN co-op via `cx-server --mode lan_room` | LAN auto-discovery; ready-up; mission completion; per-client bundles align. |
 | M11 online co-op via `cx-server --mode coop_room` over NAT/relay | Mod hash sync; latency masking; clean mismatch error. |
 | M12 PvP via `cx-server --mode pvp_arena` | 4-8 players; server-authoritative; bandwidth + cheat profile tested. |

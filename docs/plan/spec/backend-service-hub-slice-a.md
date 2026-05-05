@@ -9,7 +9,7 @@ ready_when: "A static/heartbeat backend, hub browser, join-eligibility resolver,
 # Backend Service And Hub Slice A
 
 > [!summary] Purpose
-> Convert the OpenSoldat base/launcher/lobby audit plus current platform research into a concrete first backend/frontend slice. [[decisions/dr-013-backend-service-scope]] sets the boundary: local-first service spine now, optional adapters later. This is **not** a launch commitment to public PvP, matchmaking, accounts, gacha, or a live service. It is the minimum infrastructure needed for server discovery, local hosting, content compatibility, replay browsing, diagnostics, and future co-op-ready architecture.
+> Convert the OpenSoldat base/launcher/lobby audit plus current platform research into a concrete first backend/frontend slice. [[decisions/dr-013-backend-service-scope]] sets the boundary: local-first service spine first, with the same contracts extending into `cx-server`, `lobby_directory`, public-server discovery, public-shard account adapters, anti-cheat foundation, and MMO persistence as M9-M12 mature. This slice is **not** a commitment to ranked matchmaking, gacha, cloud-only hosting, or a live-service economy.
 
 > [!tip] UX companion
 > Hub layout, server-row readability, join blockers, replay browsing, diagnostics, and settings/accessibility flows are translated into screen requirements in [[spec/ux-wireframes-slice-a]].
@@ -65,7 +65,7 @@ OpenSoldat shows that a 2D action game is not just an executable. Its ecosystem 
 |---|---|
 | Real money economy, gacha, or account inventory | Research freely elsewhere; do not entangle early backend with monetization before the core game is fun. |
 | Public matchmaking | Server browser + join eligibility is enough to validate schema and UX. |
-| Competitive anti-cheat | Track trust tiers and content hashes now; full anti-cheat waits until DR-005 proves an online mode. |
+| Tournament-grade anti-cheat | Track trust tiers, content hashes, and server-side validation now; full commercial anti-cheat remains later. |
 | Production-scale backend | Slice A can be static JSON plus heartbeat TTL. Production hardening is a later milestone. |
 | Transport choice | This note defines discovery and hub requirements, not whether we use Steam, GameNetworkingSockets, raw UDP, Relay, or something else. |
 

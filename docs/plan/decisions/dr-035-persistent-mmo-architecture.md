@@ -12,13 +12,13 @@ revisit_trigger: "MMO mode cannot meet 50-100 concurrent floor on community hard
 # DR-035: Persistent MMO Architecture
 
 > [!success] Status: CLOSED-DIRECTION (project owner committed 2026-05-05)
-> Persistent MMO shards are a launch-supported mode of `cx-server` (DR-034). A shard is a long-running world hosting 50-200 concurrent players in a contract-and-base sandbox with persistent terrain, bases, faction state, named actors, salvage, and AI commander memory. Multiple shards run independently; cross-shard travel is via lobby/portal at v1, NOT seamless world. Anyone can host a shard. **Not subscription-funded.** See [[spec/persistent-mmo-architecture]] for the full architecture.
+> Persistent MMO shards are a full-product target mode of `cx-server` (DR-034), not a bolted-on afterthought. A shard is a long-running world hosting 50-200 concurrent players in a contract-and-base sandbox with persistent terrain, bases, faction state, named actors, salvage, and AI commander memory. Multiple shards run independently; cross-shard travel is via lobby/portal at v1, NOT seamless world. Anyone can host a shard. **Not subscription-funded.** M12 proves readiness; if the evidence fails, this DR reopens.
 
 ## Decision
 
 **MMO is a `cx-server --mode mmo_shard` deployment with community-hostable persistent shards. Bounded scope: shard-with-portal, not seamless single-world.**
 
-This DR replaces the prior "MMO experiment R&D only, post-launch" posture. The user's commitment on 2026-05-05 promotes MMO mode to a launch-supported product surface.
+This DR replaces the prior "MMO experiment R&D only, post-launch" posture. The user's commitment on 2026-05-05 promotes MMO capability to a first-class architecture and roadmap target. M12 acceptance decides whether it is ready for public release; earlier milestones are not blocked on 50-100 client MMO proof.
 
 ## What This Locks In
 
@@ -73,7 +73,7 @@ This DR replaces the prior "MMO experiment R&D only, post-launch" posture. The u
 | WoW-style sharded continents with cross-realm | Operator cost; needs first-party hosting at scale. |
 | Realms-style instance-only (no persistence) | Loses the contract/base/persistence promise. |
 | Subscription MMO | DR-031 forbids. |
-| MMO as moonshot only / post-launch only | Prior posture; user's 2026-05-05 commitment elevates to launch. |
+| MMO as moonshot-only / post-launch-only architecture | Prior posture; user's 2026-05-05 commitment elevates MMO to a first-class `cx-server` mode with M12 evidence gates. |
 
 ## Evidence Trail
 

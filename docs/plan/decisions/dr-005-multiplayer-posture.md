@@ -12,13 +12,13 @@ revisit_trigger: "Networking transport library proves infeasible after M9/M10 pr
 # DR-005: Multiplayer Architecture And Launch Scope
 
 > [!success] Status: CLOSED-DIRECTION (project owner committed 2026-05-05)
-> The full multiplayer ladder is part of the launch SKU: **solo + split-screen + LAN co-op + online co-op + community-hostable dedicated PvP arenas + persistent MMO shards**. All modes use one server-authoritative simulation hosted by the same `cx-server` binary (DR-034). Anyone can host any mode without proprietary cloud dependencies. Persistent MMO shards are first-class (DR-035), not a post-launch experiment.
+> Multiplayer/PvP/MMO capability is an architecture commitment from day one, not an afterthought: **solo + split-screen-ready local play + LAN co-op + online co-op + community-hostable PvP arenas + persistent MMO shards** all route through one server-authoritative `cx-server` design (DR-034). PvP arenas and MMO shards are full-product targets proven at M12; if their evidence gates fail, DR-005/DR-035 reopen instead of silently blocking earlier first-playable milestones.
 
 ## Decision
 
-**Server-authoritative simulation; one dedicated server binary; full multiplayer ladder at launch.**
+**Server-authoritative simulation; one dedicated server binary; full multiplayer ladder architected from day one and evidence-gated through M12.**
 
-This DR replaces the prior "solo-first + co-op-ready architecture; no launch PvP promise yet" posture. The user's commitment on 2026-05-05 is to ship multiplayer as a first-class product surface, not a post-launch milestone.
+This DR replaces the prior "solo-first + co-op-ready architecture; no launch PvP promise yet" posture. The user's commitment on 2026-05-05 is to plan multiplayer, PvP, MMO capability, and a hostable server app as first-class product architecture. It does **not** mean M9 must pass M12-scale MMO/PvP soak tests; those remain M12 evidence gates.
 
 ## What This Locks In
 
@@ -26,11 +26,11 @@ This DR replaces the prior "solo-first + co-op-ready architecture; no launch PvP
 |---|---|---|
 | Solo (offline) | Required at launch. No account needed. | M0..M7 progression. |
 | Split-screen local | Optional at launch (input remap UX cost). | Post-M7 evaluation. |
-| LAN co-op | **Required at launch.** | M10 LAN Co-op milestone. |
-| Online co-op (private) | **Required at launch.** | M11 Online Co-op milestone. |
-| Public online co-op (community-hosted) | **Required at launch.** | M11 + M12. |
-| PvP arena (community-hosted) | **Required at launch.** | M12 PvP milestone. |
-| Persistent MMO shards (community-hostable) | **Required at launch** as a supported mode. | M12 MMO milestone. |
+| LAN co-op | Full-product target; evidence-gated. | M10 LAN Co-op milestone. |
+| Online co-op (private) | Full-product target; evidence-gated. | M11 Online Co-op milestone. |
+| Public online co-op (community-hosted) | Full-product target; evidence-gated. | M11 + M12. |
+| PvP arena (community-hosted) | Full-product target; not a M9 gate. | M12 PvP milestone. |
+| Persistent MMO shards (community-hostable) | Full-product target; not a M9 gate. | M12 MMO milestone. |
 | Ranked PvP / first-party MMO hosting | Optional, post-launch. | Post-launch evaluation. |
 
 | Architectural Pin | Commitment |
@@ -50,8 +50,8 @@ This DR replaces the prior "solo-first + co-op-ready architecture; no launch PvP
 
 | Rejected Pattern | Why |
 |---|---|
-| "No launch PvP promise" | The user's 2026-05-05 commitment elevates PvP to launch. Community hosting + anti-cheat foundation make this feasible without a publisher-scale ops team. |
-| "MMO mode is post-launch experiment only" | DR-035 promotes MMO shard mode to a launch-supported mode. Community-hosted shards remove the operator-cost objection. |
+| "No PvP/MMO architecture until later" | The user's 2026-05-05 direction requires multiplayer, PvP, MMO capability, and hostable server architecture to be designed now. |
+| "MMO mode is post-launch-only research" | DR-035 promotes MMO shard mode to a full-product target with M12 acceptance gates. Community-hosted shards remove the operator-cost objection, but M12 evidence still decides readiness. |
 | Client-authoritative sim state | Cheating risk; replay/determinism risk; networking instability. Server is authoritative for everything that matters. |
 | Forced first-party hosting | Architecture supports community hosting first; first-party is optional adapter. |
 | Forced account systems for private play | Solo and LAN/private co-op work without any account. |
@@ -73,6 +73,7 @@ This DR replaces the prior "solo-first + co-op-ready architecture; no launch PvP
 ## Evidence Trail
 
 - Project owner verbatim (2026-05-05): "I think it makes sence to plan out Multiplayer and PVP and MMO capability. I want to have an entire server app designed to run our app. anyone can host multiplayer games, as well as the persistent MMO mode."
+- Interpretation: this closes the architecture direction and roadmap capability target. It does not collapse M9/M10/M11/M12 into one release gate; PvP/MMO readiness is proven by the M12 suites.
 - Source patterns: Source dedicated server, Quake/Quake-Live community model, Project Zomboid dedicated server, Space Station 13/14 round-based persistence, Minecraft Realms-vs-Bukkit split, EVE Online single-shard architecture (anti-pattern; we're not doing that), Steam Game Servers + Steam Datagram Relay, EOS sessions, Unity Lobby + Multiplay readiness, PlayFab modular multiplayer.
 - Cross-DR coherence: DR-024 already commits to "MMO-ready architecture from day one"; this DR closes the open posture so DR-024 isn't aspirational.
 - DR-026 team model + DR-031 economy + DR-013 backend scope all support community-hosted servers as the default; DR-005 ratifies this.
@@ -95,7 +96,7 @@ This DR replaces the prior "solo-first + co-op-ready architecture; no launch PvP
 
 | Test | What It Proves |
 |---|---|
-| M9 SERVER-001..SERVER-016 | Dedicated server binary works in `coop_room`, `pvp_arena`, `lan_room`, `mmo_shard` modes. |
+| M9 server-core subset | Dedicated server binary works for core lifecycle, replay, health/readiness, admin capability gates, drain shutdown, Docker smoke, and mode boot/config paths. |
 | M10 LAN co-op | Two LAN clients survive a 5-min Breach Contract; per-client bundles align. |
 | M11 online co-op | Two friends in different cities co-op a Breach Contract through NAT/relay; mod hash sync works. |
 | M12 PvP arena | 4-8 players in a small destructible map; server-authoritative; bandwidth + cheat models tested. |

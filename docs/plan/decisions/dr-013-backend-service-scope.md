@@ -12,13 +12,13 @@ revisit_trigger: "Backend cost or operator complexity exceeds the AI-augmented-s
 # DR-013: Backend Services Architecture
 
 > [!success] Status: CLOSED-DIRECTION (project owner committed 2026-05-05)
-> Backend services are first-class. They support a self-hostable dedicated server app (DR-034), persistent MMO shards (DR-035), package/replay sharing, server discovery, and the optional account/identity surface for public modes. **Local-first remains the default for solo/private LAN play; backend services unlock as online modes are used.** Any operator can run any service tier with no proprietary cloud dependency.
+> Backend services are first-class. They support a self-hostable dedicated server app (DR-034), persistent MMO shards (DR-035), package/replay sharing, server discovery, and the optional account/identity surface for public modes. **Local-first remains the default for solo/private LAN play; public-server services unlock as online modes are used and are proven by M9-M12 gates.** Any operator can run any service tier with no proprietary cloud dependency.
 
 ## Decision
 
 **Full backend service spine + dedicated server app + community hosting + optional first-party services.**
 
-This DR replaces the prior "local-first service spine + optional adapters" lean. The user's commitment on 2026-05-05 promotes backend services from optional-research-only to a launch-supported product surface, while preserving the local-first default for solo and private play.
+This DR replaces the prior "local-first service spine + optional adapters" lean. The user's commitment on 2026-05-05 promotes backend services from optional-research-only to a full-product architecture surface, while preserving the local-first default for solo and private play.
 
 ## What This Locks In
 
@@ -26,13 +26,13 @@ This DR replaces the prior "local-first service spine + optional adapters" lean.
 |---|---|---|
 | Local game services (health, schema, package registry, join eligibility, deep-link parser, local replay/report index, diagnostics export, redaction) | **Required at launch.** Same shape as the prior Slice A. | Files-on-disk + in-process services for solo/private play. |
 | Local server supervisor | **Required at launch.** | Drives `cx-server` lifecycle from the client when the player hosts. |
-| `lobby_directory` service | **Required at launch.** | Aggregates community-hosted shards; multiple instances can exist; default community list ships in the launch SKU. Also one of the `cx-server --mode` options (DR-034). |
-| Account/identity adapter | **Required at launch** for public shards. **Optional** for private play. | Plug-in: local account file (private), `lobby_directory` token (community), Steam/EOS/PlayFab adapters (post-launch ready). |
-| Server discovery / browser | **Required at launch.** | Filter by mode, region, ping, player count, package set, ruleset, trust tier. |
+| `lobby_directory` service | Required for public server/shard discovery; optional for private deployments. | Aggregates community-hosted shards; multiple instances can exist. Also one of the `cx-server --mode` options (DR-034). |
+| Account/identity adapter | Required for public shards. Optional for private play. | Plug-in: local account file (private), `lobby_directory` token (community), Steam/EOS/PlayFab adapters (post-launch ready). |
+| Server discovery / browser | Required for public online modes. | Filter by mode, region, ping, player count, package set, ruleset, trust tier. |
 | Package / mod registry | **Required at launch.** | Package hashes + manifest summaries + dependency graph; reused by client, server, and editor. |
 | Replay / report index | **Required at launch.** | Per-run bundle metadata; queryable; redacted by default. |
 | Diagnostics + telemetry | **Required at launch.** | Local diagnostics with consented exports; redaction tests required. |
-| Persistent MMO shard services (snapshot store, event journal, durable storage adapter) | **Required at launch** as one shape of `cx-server-persistence`. | DR-035; community-hostable; no proprietary cloud lock-in. |
+| Persistent MMO shard services (snapshot store, event journal, durable storage adapter) | Required for M12 MMO shard evidence. | DR-035; community-hostable; no proprietary cloud lock-in. |
 | Anti-cheat foundation (server-side validation hooks, ban list, audit log) | **Required at launch.** | Foundation only; tournament-grade is post-launch. |
 | Optional first-party hosted services (cloud save sync, server browser cluster, ranked leaderboards, event aggregation) | **Optional, post-launch.** | Adapters; no v1 commitment to operate them. |
 | Live-service economy / cosmetic shop / marketplace | **NOT a launch commitment.** | DR-031 anti-goal; remains rejected. |
@@ -47,7 +47,7 @@ This DR replaces the prior "local-first service spine + optional adapters" lean.
 | Privacy / redaction | Default-on for all run-bundle exports; tested per BACK-SCOPE-07; opt-in for diagnostics sharing. |
 | Adapter posture | Steam, EOS, PlayFab, Unity Multiplay, Sony/MS/Nintendo are **adapter** layers behind shared contracts; the core never depends on any one platform. |
 | Observability | Prometheus-compatible metrics endpoint per server; structured JSON logs; health/readiness endpoints. |
-| Open-source posture for backend code | Friendly to community-hosted operators; documentation and reference deployments ship with the launch SKU. |
+| Open-source posture for backend code | Friendly to community-hosted operators; documentation and reference deployments ship with the server artifact. |
 
 ## What This Explicitly REJECTS
 
@@ -78,7 +78,7 @@ This DR replaces the prior "local-first service spine + optional adapters" lean.
 - DR-034 dedicated server app commits to `cx-server` as a launch artifact.
 - DR-035 persistent MMO architecture commits to community-hostable shards.
 - Source patterns: Steamworks Game Servers + Steam Datagram Relay (community-hostable + relay-optional), EOS sessions/lobbies/relay (modular), PlayFab multiplayer (modular), Unity Multiplay readiness (process+ready separation), OpenSoldat satellites (launcher/lobby/base content separation), Project Zomboid dedicated server (community ops), Space Station 14 (round-based persistence + community).
-- Cross-DR coherence: DR-013's prior "local-first + optional adapters" lean is preserved as the default solo/private posture; the closed-direction now explicitly extends scope to public services as launch-supported.
+- Cross-DR coherence: DR-013's prior "local-first + optional adapters" lean is preserved as the default solo/private posture; the closed-direction now explicitly extends scope to public services as full-product architecture proven in M9-M12.
 
 ## Service Tier Matrix (Updated)
 
