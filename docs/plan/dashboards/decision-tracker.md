@@ -32,6 +32,14 @@
 | [[decisions/dr-021-mech-scale-and-archetypes|DR-021]] | Mech scale & archetypes | <span class="cc-flag cc-red">P0</span> | <span class="cc-flag cc-green">DIRECTION CLOSED</span> | Full ladder (powered armor → light → medium → heavy) + 8 archetypes + module system; ~6-9 mechs at v1. | Revisit if v1 chassis content overruns or heavy mechs crowd out infantry play. |
 | [[decisions/dr-022-ai-humanlike-bar|DR-022]] | AI humanlike-ness bar | <span class="cc-flag cc-red">P0</span> | <span class="cc-flag cc-green">DIRECTION CLOSED</span> | Persistent teammate-and-rival AI; 8 criteria all-must-hold. | Revisit if commander adaptation across missions proves architecturally infeasible. |
 | [[decisions/dr-023-tutorial-and-onboarding-strategy|DR-023]] | Tutorial & onboarding | <span class="cc-flag cc-red">P0</span> | <span class="cc-flag cc-green">DIRECTION CLOSED</span> | Hybrid+: cinematic onboarding mission + 8 permanent labs + fading tooltips + "show me why" handoff. | Revisit if onboarding is too rigid, labs go unused, or tooltip-fade fails. |
+| [[decisions/dr-024-native-engine-stack|DR-024]] | Native engine stack | <span class="cc-flag cc-red">P0</span> | <span class="cc-flag cc-green">DIRECTION CLOSED</span> | Rust + Bevy/wgpu hybrid + custom core crates (cargo workspace). | Revisit if Bevy/wgpu blocks a critical capability or solo+AI throughput is materially worse than an alternative stack. |
+| [[decisions/dr-025-target-platforms|DR-025]] | Target platforms | <span class="cc-flag cc-red">P0</span> | <span class="cc-flag cc-green">DIRECTION CLOSED</span> | Win + Linux + macOS desktop-first; Steam Deck floor; headless Linux server; web for labs only; no mobile. | Revisit if Deck floor cannot be hit or mobile becomes a strategic priority. |
+| [[decisions/dr-026-team-and-repo-model|DR-026]] | Team & repo model | <span class="cc-flag cc-red">P0</span> | <span class="cc-flag cc-green">DIRECTION CLOSED</span> | AI-augmented solo + modular crate ownership. | Revisit if crate boundaries fail under integration or external collaborators change ownership shape. |
+| [[decisions/dr-027-combat-base-scope|DR-027]] | Combat-base scope | <span class="cc-flag cc-red">P0</span> | <span class="cc-flag cc-green">DIRECTION CLOSED</span> | Deep combat-base (core + power + shields + turrets + sensors + doors + repair + hangar + storage + traps + breachable structure). NOT colony sim. | Revisit if base loop fails to deliver tactical depth or colony-sim depth becomes critical. |
+| [[decisions/dr-028-visual-fidelity-targets|DR-028]] | Visual fidelity targets | <span class="cc-flag cc-red">P0</span> | <span class="cc-flag cc-green">DIRECTION CLOSED</span> | Ceiling 4K/120 strong desktop; default 1080p/60; floor Deck 800p/60. 60 Hz fixed sim island. | Revisit if Deck floor cannot be hit or strong-desktop ceiling becomes structurally unreachable. |
+| [[decisions/dr-029-save-game-model|DR-029]] | Save game model | <span class="cc-flag cc-red">P0</span> | <span class="cc-flag cc-green">DIRECTION CLOSED</span> | Versioned local-first `.cxsave` + replay archive linkage; multi-slot, autosave, ironman, scenario policies, migration handlers. Cloud post-launch. | Revisit if migration breaks under a real upgrade or replay-linked saves balloon disk usage. |
+| [[decisions/dr-030-scenario-editor-commitment|DR-030]] | Scenario editor commitment | <span class="cc-flag cc-red">P0</span> | <span class="cc-flag cc-green">DIRECTION CLOSED</span> | First-class in-engine editor at launch; same typed manifest as engine + director + procedural + player-authored. | Revisit if editor authoring proves too steep or same-manifest contract collides with engine evolution. |
+| [[decisions/dr-031-content-economy-and-monetization-posture|DR-031]] | Content economy & monetization | <span class="cc-flag cc-red">P0</span> | <span class="cc-flag cc-green">DIRECTION CLOSED</span> | Premium + free modding. Expansions/DLC/cosmetics post-launch. No pay-to-win, gacha, gameplay-gating BP, or mod-marketplace cut. | Revisit if premium ceiling underfunds development or community pressure forces a marketplace decision. |
 
 ## Evidence Backlog
 
@@ -106,10 +114,11 @@ These can become DRs when evidence accumulates:
 
 | Topic | Why It's Not A DR Yet |
 |---|---|
-| Monetization ethics | Research/prototype retention or collection mechanics freely; promote to DR before any launch commitment, after modding/fairness boundaries are visible. |
 | Mission/director architecture | [[spec/mission-director-slice-a]] now sketches Slice A; promote to DR only if director/commander architecture starts competing with DR-004 or DR-008 scope. |
 | Localization plan | Pre-launch concern; research patterns now if convenient. |
-| Audio/music identity | Cosmetic-priority; critical-caption/audio-alternative floors are covered by [[decisions/dr-012-accessibility-comfort-readability]] and [[spec/accessibility-comfort-slice-a]]. |
+| Networking transport choice | Lightyear vs renet vs quinn for the `cx-net` crate. Decision deferred to M9/M10 prototyping. |
+| Modding script host | mlua (Lua) vs Rhai. Decision deferred to M5 implementation work. |
+| Cloud-save backend | Provider + privacy + sync semantics. Post-launch follow-up to [[decisions/dr-029-save-game-model]]. |
 | Moonshot register | Centralize wild ideas (Noita-grade materials, PvP variants, AI personality engines) in [[research-log/moonshot-register]] when one needs more than a paragraph. |
 
 ## Process
@@ -135,3 +144,11 @@ These can become DRs when evidence accumulates:
 | [[decisions/dr-021-mech-scale-and-archetypes|DR-021]] | Mech scale & archetypes | 2026-05-04 | Full ladder + 8 archetypes + module system; constrained v1 roster. |
 | [[decisions/dr-022-ai-humanlike-bar|DR-022]] | AI humanlike-ness bar | 2026-05-04 | Persistent teammate-and-rival AI; 8 criteria all-must-hold. |
 | [[decisions/dr-023-tutorial-and-onboarding-strategy|DR-023]] | Tutorial & onboarding | 2026-05-04 | Hybrid+: cinematic onboarding + permanent labs + fading tooltips + "show me why" handoff. |
+| [[decisions/dr-024-native-engine-stack|DR-024]] | Native engine stack | 2026-05-04 | Rust + Bevy/wgpu hybrid + custom core crates (modular cargo workspace). |
+| [[decisions/dr-025-target-platforms|DR-025]] | Target platforms | 2026-05-04 | Win + Linux + macOS desktop-first; Steam Deck floor; headless Linux server; web for labs only; no mobile. |
+| [[decisions/dr-026-team-and-repo-model|DR-026]] | Team & repo model | 2026-05-04 | AI-augmented solo with crate-boundary ownership. |
+| [[decisions/dr-027-combat-base-scope|DR-027]] | Combat-base scope | 2026-05-04 | Deep combat-base (command core + power + shields + turrets + sensors + doors + repair + hangar + storage + traps + breachable structure). NOT colony sim. |
+| [[decisions/dr-028-visual-fidelity-targets|DR-028]] | Visual fidelity targets | 2026-05-04 | Ceiling 4K/120; default 1080p/60; floor Deck 800p/60. 60 Hz fixed sim island. |
+| [[decisions/dr-029-save-game-model|DR-029]] | Save game model | 2026-05-04 | Versioned local-first `.cxsave`; multi-slot; autosave; ironman; scenario policies; migration handlers; replay archive linkage. |
+| [[decisions/dr-030-scenario-editor-commitment|DR-030]] | Scenario editor commitment | 2026-05-04 | First-class in-engine editor at launch; same typed manifest as engine + director + procedural + player-authored content. |
+| [[decisions/dr-031-content-economy-and-monetization-posture|DR-031]] | Content economy & monetization | 2026-05-04 | Premium + free modding; expansions/DLC/cosmetics post-launch; no pay-to-win/gacha/gameplay-gating BP/mod-marketplace cut. |

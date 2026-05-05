@@ -21,6 +21,22 @@ feeds:
   - DR-013
   - DR-014
   - DR-015
+  - DR-016
+  - DR-017
+  - DR-018
+  - DR-019
+  - DR-020
+  - DR-021
+  - DR-022
+  - DR-023
+  - DR-024
+  - DR-025
+  - DR-026
+  - DR-027
+  - DR-028
+  - DR-029
+  - DR-030
+  - DR-031
 ---
 
 ← [[spec/index|spec section]] · [[spec/prototype-roadmap|prototype roadmap]] · [[spec/prototype-implementation-backlog-slice-a|implementation backlog]] · [[dashboards/research-readiness|readiness]] · [[dashboards/system-heatmap|system heatmap]] · [[decisions/index|decisions]] · [[prototypes/index|prototype evidence]] · [root plan](../../VAULT_PLAN.md)
@@ -86,7 +102,13 @@ These are v0 product-direction commitments. They still need prototype evidence b
 |---|---|---|
 | Camera & framing | **Strict 2D side-view.** Cortex/Liero classic: small actors, huge destructible terrain, no camera rotation. Tactical map view (per DR-009) is a UI mode that overlays/replaces the side-view temporarily, not a different sim. | A1 actor-feel runs; UX-W camera-mode tests. |
 | Tone | **Tactical pulp sci-fi disaster sandbox** (DR-014). Gritty tactical stakes, pulpy systemic consequences, surreal sci-fi accents, sandbox/workbench support. Excludes pure comedy, pure X-COM grimness, pure Noita opacity, pure Powder Toy sandbox. | [[decisions/dr-014-tone-player-promise]]. |
-| Engine direction | **Greenfield native core + CCCP as reference lab** (DR-001 direction closed). Greenfield engine; CCCP is read-only reference for mechanics/feel/taxonomy/AI lessons. | [[decisions/dr-001-engine-strategy]]. Implementation specifics (lang/runtime/renderer/data schema) still open. |
+| Engine direction | **Greenfield native core + CCCP as reference lab** (DR-001) on a **Rust + Bevy/wgpu hybrid + custom core crates** stack (DR-024). Modular cargo workspace with crate-boundary ownership (DR-026). | [[decisions/dr-001-engine-strategy]], [[decisions/dr-024-native-engine-stack]], [[decisions/dr-026-team-and-repo-model]], [[spec/prototype-roadmap]]. |
+| Target platforms | **Win + Linux + macOS desktop-first**; Steam Deck floor; headless Linux server later; web only for labs/tools/demos; **no mobile** at launch (DR-025). | [[decisions/dr-025-target-platforms]]. |
+| Visual fidelity | Ceiling **4K @ 120 Hz** strong desktop; default **1080p @ 60 Hz** mid-range; floor **Steam Deck 800p @ 60 Hz**. 60 Hz fixed sim island, render decoupled (DR-028). | [[decisions/dr-028-visual-fidelity-targets]]. |
+| Save model | **Versioned local-first `.cxsave`** with replay archive linkage; multi-slot, autosave, ironman, scenario policies, migration handlers; cloud post-launch (DR-029). | [[decisions/dr-029-save-game-model]]. |
+| Scenario editor | **First-class in-engine editor at launch** using the same typed manifest as engine + director + procedural + player-authored content (DR-030). | [[decisions/dr-017-mission-generation-strategy]], [[decisions/dr-030-scenario-editor-commitment]]. |
+| Content economy | **Premium one-time purchase + free modding**; expansions/DLC/cosmetics post-launch; **no pay-to-win, gacha, gameplay-gating battle pass, or marketplace cut on user mods** (DR-031). | [[decisions/dr-031-content-economy-and-monetization-posture]]. |
+| Combat-base scope | **Deep combat-base** (command core + power + shields + turrets + sensors + doors + repair + hangar + storage + traps + breachable structure). NOT colony sim (DR-027). | [[decisions/dr-027-combat-base-scope]], [[spec/command-core-base-power]]. |
 | AI bar | **Most humanlike AI in the genre** (DR-014 / DR-008 raised bar). Friendly and enemy bots must communicate intent, model perception/memory, exhibit personality/doctrine, make readable mistakes, and learn-from-defeat. Beyond utility scoring once basics work. | AI-H + AI-EQ + future humanlike-AI tests. |
 | Player identity / control posture | **Command-core operator** (DR-015). The player can play strategy-first through orders and AI autonomy, direct-pilot bodies/mechs when desired, or fluidly switch between both. Direct control is optional intervention, not a mandatory always-on mode. | Commander-only breach test, pilot-intervention handoff test, AI handoff replay labels. |
 | Command core / base power | The command core is a rooted/mobile/embedded strategic object. Rooted: powers base shields, turrets, sensors, doors, repair platforms, energy pads, command relays, logistics. Embedded: creates a stronger core-bearing avatar while base systems weaken/offline. | CORE-A tests in [[spec/command-core-base-power]]. |
@@ -111,7 +133,7 @@ These are v0 product-direction commitments. They still need prototype evidence b
 | Account economy / gacha / paid collection | Research and private prototype only. | Fairness, modding trust, ethics, and economy require a future release-facing DR beyond [[decisions/dr-011-progression-retention-loop]]. |
 | Noita-grade material chemistry at launch | Moonshot, not v0 promise. | The launch path is curated material affordances until [[decisions/dr-007-terrain-material-model]] has run evidence. |
 | Full deterministic replay | Open research. | The current posture is hybrid semantic events, snapshots, checksums, and deterministic islands only when proven. |
-| Final engine implementation | Open within direction. | DR-001 direction closed (greenfield + CCCP reference); language/runtime/renderer/ECS-or-OOP/data-schema/build-CI still open. |
+| Final engine implementation | Direction + stack closed; specifics open within stack. | DR-001 direction closed (greenfield + CCCP reference); DR-024 stack closed (Rust + Bevy/wgpu hybrid + custom crates); transport library, scripting host, and per-crate API specifics decided per-milestone. |
 | Final arsenal balance | Open. | Generated role cards and overlap audits are seed data; runtime item behavior and AI-H evidence must decide. |
 | Final origin/race roster | Open. | Grammar is fixed in [[spec/chassis-armor-mechs-and-origins]]; ship roster (suggested 2-3 origins) decided by content cost vs prototype-mission needs. |
 | MMO live service at launch | Not a v0 commitment. | Architecture must not foreclose it (per Scope flexibility framework), but no v1 MMO promise. Future DR after persistent-squad campaign + co-op evidence. |
@@ -323,7 +345,7 @@ Moonshots stay alive in [[research-log/moonshot-register]] and must not block th
 
 | Question | Current Status | Must Resolve With |
 |---|---|---|
-| Should the final game build on CCCP, a fork, or a greenfield engine? | Open. CCCP build passes; runtime visual proof partial. | [[decisions/dr-001-engine-strategy]], [[engine/cccp-build-run-audit]], greenfield comparison. |
+| Should the final game build on CCCP, a fork, or a greenfield engine? | **Closed** — greenfield native (DR-001) on Rust + Bevy/wgpu hybrid + custom core crates (DR-024). CCCP is read-only reference. | [[decisions/dr-001-engine-strategy]], [[decisions/dr-024-native-engine-stack]], [[engine/cccp-build-run-audit]]. |
 | What terrain backend best balances feel, readability, AI, replay, and networking? | Open. Curated material Slice A chosen for test. | MAT-T runs and [[decisions/dr-007-terrain-material-model]]. |
 | How deterministic can replay be? | Open. Hybrid event/snapshot/checksum posture. | REC-A/DET-A run bundles. |
 | How much AI complexity is enough for solo trust? | Open. Harness requirements ready. | AI-H and AI-EQ runs, [[decisions/dr-008-ai-architecture]]. |
