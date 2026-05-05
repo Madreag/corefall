@@ -4,76 +4,72 @@ This file is for AI implementation agents working in `~/projects/corefall`.
 
 ## Source Of Truth
 
-This is the implementation repo. The canonical research vault is still:
+This is the implementation repo. Do not duplicate the planning vault here.
+
+The canonical research and planning vault is:
 
 ```text
 /Users/erol/projects/cortex-command-repos-all/cortext_command_vault
 ```
 
-The copied planning snapshot is in:
+Root planning files live here:
 
 ```text
-docs/planning/
+/Users/erol/projects/cortex-command-repos-all/VAULT_PLAN.md
+/Users/erol/projects/cortex-command-repos-all/DIRECTORY.md
+/Users/erol/projects/cortex-command-repos-all/AGENTS.md
+/Users/erol/projects/cortex-command-repos-all/GAME_DESCRIPTION_FOR_FRIEND.md
 ```
 
-Use the local snapshot for fast implementation context, but check the canonical vault if a detail seems stale, contradictory, missing, or important to a decision.
+Before implementing a milestone, read the canonical vault directly. If any path below is missing, search the canonical vault with `rg --files` and ask the user before making architecture-changing assumptions.
 
 ## Mandatory Read Order Before Any Milestone
 
 Read these in order before implementing a roadmap milestone:
 
-1. [AGENTS.md](AGENTS.md)
-2. [docs/planning/spec/ai-coder-reading-list.md](docs/planning/spec/ai-coder-reading-list.md)
-3. [docs/planning/spec/authoritative-game-spec-v0.md](docs/planning/spec/authoritative-game-spec-v0.md)
-4. [docs/planning/spec/prototype-roadmap.md](docs/planning/spec/prototype-roadmap.md)
-5. [docs/planning/spec/native-implementation-backlog.md](docs/planning/spec/native-implementation-backlog.md)
-6. [docs/planning/spec/feature-completion-checklist.md](docs/planning/spec/feature-completion-checklist.md)
-7. [docs/planning/spec/ai-control-observability-layer.md](docs/planning/spec/ai-control-observability-layer.md)
-8. [docs/planning/references/prototype-run-bundle-schema.md](docs/planning/references/prototype-run-bundle-schema.md)
-9. [docs/planning/decisions/index.md](docs/planning/decisions/index.md)
-10. [docs/planning/dashboards/decision-tracker.md](docs/planning/dashboards/decision-tracker.md)
+1. `/Users/erol/projects/cortex-command-repos-all/AGENTS.md`
+2. `/Users/erol/projects/cortex-command-repos-all/VAULT_PLAN.md`
+3. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/ai-coder-reading-list.md`
+4. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/authoritative-game-spec-v0.md`
+5. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md`
+6. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/native-implementation-backlog.md`
+7. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/feature-completion-checklist.md`
+8. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/ai-control-observability-layer.md`
+9. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/references/prototype-run-bundle-schema.md`
+10. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/decisions/index.md`
+11. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/dashboards/decision-tracker.md`
 
-For conditional milestone-specific docs, use the tables in [docs/planning/spec/ai-coder-reading-list.md](docs/planning/spec/ai-coder-reading-list.md).
+For milestone-specific docs, use the tables in:
 
-## Required Roadmap Sections
+```text
+/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/ai-coder-reading-list.md
+```
 
-Every implementation agent must read these roadmap sections before coding:
+## Implementation Workspace
 
-- Read Order
-- Glossary
-- Agent Implementation Contract
-- Open Decision Gates Protocol
-- Milestone Handoff Template
-- Strategic Frame
-- Stack At A Glance
-- Repository Layout
-- Toolchain And Workspace Bootstrap
-- Per-Crate AGENTS.md Template
-- Logging, Tracing, And Error Policy
-- Asset And Placeholder Strategy
-- Testing Layers
-- CLI Reference
-- Control Transport And Envelope
-- Scenario Manifest Schema
-- Run-Bundle Naming Convention
-- Bug Log Format
-- Per-Milestone Kickoff Smoke
-- The assigned milestone section
-- Validation Command Matrix
-- Bug Hunt Checklist
-- Definition Of Done
-- Anti-Goals
+The actual native game code belongs under:
+
+```text
+game/
+```
+
+Do not put source code in the planning vault. Do not copy the whole vault into this repo. Implementation notes and milestone evidence belong in this repo under:
+
+```text
+docs/implementation-log/
+prototype_runs/native/
+```
 
 ## Open Decision Gates
 
 Do not silently assume an open decision is settled.
 
-If the assigned milestone touches an OPEN DR or topic-level open decision:
+If a milestone touches an OPEN decision record or topic-level open decision:
 
-- Confirm the current lean from `docs/planning/decisions/` and the canonical vault.
+- Confirm the current lean from the canonical vault.
 - Implement only what the milestone allows.
 - If the lean is contested or would materially change architecture, stop and ask the user.
-- When prototype evidence closes a DR, update the DR file, decision index, tracker, readiness page, and implementation log in the same pass.
+- When prototype evidence closes a DR, update the canonical vault in the same pass or explicitly report that the vault update is still pending.
 
 ## Eyes, Ears, Hands Rule
 
@@ -89,30 +85,33 @@ Every meaningful prototype run must emit a run bundle under:
 prototype_runs/native/
 ```
 
-Each completed task must update:
+Every completed task must update or produce:
 
-- The relevant rows in [docs/planning/spec/feature-completion-checklist.md](docs/planning/spec/feature-completion-checklist.md)
-- The milestone note under [docs/implementation-log/](docs/implementation-log/)
-- Any run-bundle evidence links
-- Any open bugs or known limitations
+- The relevant checklist evidence in the canonical `feature-completion-checklist.md`
+- A milestone note under `docs/implementation-log/`
+- Run-bundle paths
+- Commands run
+- Bugs found and fixed
+- Known limitations
+- AI self-ratings for implementation completeness and quality
 
 Use human rating fields only for user/human review. AI agents fill only AI self-rating fields and evidence notes.
 
-## Reference Repos And Research Vault
+## Reference Repos And Reuse
 
 Reference repos under `/Users/erol/projects/cortex-command-repos-all` are read-only unless the user explicitly says otherwise.
 
-Do not copy code/assets from external projects into Corefall without logging the source and license posture in:
+Do not copy code/assets from external projects into Corefall without logging the source and license posture in the canonical usage ledger:
 
 ```text
-docs/planning/references/usage-ledger.md
+/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/references/usage-ledger.md
 ```
 
 For now, reuse/licensing guidance is not a blocker for private research or prototypes, but provenance must be tracked so release decisions are clean later.
 
 ## Implementation Posture
 
-Build the best game and best UX first. The planning docs contain safety, reuse, scope, and launch-boundary guidance, but they should not be misread as bans on research, prototyping, or learning from other games.
+Build the best game and best UX first. Planning docs contain safety, reuse, scope, and launch-boundary guidance, but they should not be misread as bans on research, prototyping, or learning from other games.
 
 Current direction:
 
@@ -130,8 +129,8 @@ Current direction:
 
 Unless the user assigns a different target, start with:
 
-1. M0 — Engine Bootstrap
-2. M1 — Actor Controller And Sim Core
-3. M1.5 — Micro Breach Fun Slice
+1. M0 - Engine Bootstrap
+2. M1 - Actor Controller And Sim Core
+3. M1.5 - Micro Breach Fun Slice
 
 Do not skip M1.5. It exists because the actor-feel lab alone was too sterile; the project needs early fun evidence before deeper systems attach.
