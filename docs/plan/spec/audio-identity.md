@@ -94,5 +94,5 @@ Per [[decisions/dr-012-accessibility-comfort-readability]] and [[spec/accessibil
 - [[decisions/dr-012-accessibility-comfort-readability]]
 - [[spec/chassis-armor-mechs-and-origins]]
 - [[spec/accessibility-comfort-slice-a]]
-- [[spec/ux-overlay-screen-brief]]
+- [[systems/ux-overlay-screen-brief]]
 - [[systems/replay-event-architecture]]

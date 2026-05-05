@@ -40,7 +40,7 @@ All eight must hold. Failing any one resets the AI claim.
 | Cross-mission state | Commander AI memory persists across missions in campaign mode. New campaign-state schema. |
 | AI trust harness | AI-H tests cover intent, perception, doctrine, mistakes, recovery, strategic adaptation, replay, fairness — eight test families, not the original six. See [[spec/ai-trust-harness-slice-a]]. |
 | Modding | Mod-authored doctrines/personalities must satisfy the same criteria; validator catches missing reason labels. See [[decisions/dr-006-modding-data-model]]. |
-| UX | Player-facing intent labels are mandatory: HUD, squad panel, command overlay all show what the bot is trying. See [[spec/ux-overlay-screen-brief]]. |
+| UX | Player-facing intent labels are mandatory: HUD, squad panel, command overlay all show what the bot is trying. See [[systems/ux-overlay-screen-brief]]. |
 
 ## What This Does NOT Lock
 

@@ -27,7 +27,7 @@ This is **not** a raw Cortex clone, **not** modern hand-painted 2D, and **not** 
 | Spec Area | Implication |
 |---|---|
 | Engine | Renderer must support sub-pixel-clean pixel-art rendering AND clean vector-ish UI overlays. See [[decisions/dr-001-engine-strategy]]. |
-| HUD / UX | Comic-noir briefings, mission cards, replay panels, chassis silhouettes. See [[spec/ux-overlay-screen-brief]] and [[systems/ux-overlay-screen-brief]]. |
+| HUD / UX | Comic-noir briefings, mission cards, replay panels, chassis silhouettes. See [[systems/ux-overlay-screen-brief]]. |
 | Modding | Sprite-friendly: pixel art is straightforward to author and mod. UI is still themable. See [[spec/modding-model]]. |
 | Chassis | Pixel battlefield must read clearly at infantry, powered armor, light/medium/heavy mech scales. See [[spec/chassis-armor-mechs-and-origins]]. |
 | Materials/destruction | Pixel-sim terrain naturally supports per-pixel mutation and material overlays. See [[decisions/dr-007-terrain-material-model]]. |

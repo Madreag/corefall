@@ -88,7 +88,6 @@ Why comic-noir: matches the tactical pulp sci-fi tone (DR-014); supports strong 
 - [[decisions/dr-007-terrain-material-model]]
 - [[spec/chassis-armor-mechs-and-origins]]
 - [[spec/setting-and-world-frame]]
-- [[spec/ux-overlay-screen-brief]]
 - [[systems/ux-overlay-screen-brief]]
 - [[spec/ux-wireframes-slice-a]]
 - [[comparables/comparison-matrix]]
