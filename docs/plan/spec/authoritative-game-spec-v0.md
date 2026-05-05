@@ -1,6 +1,7 @@
 ---
 type: spec
-status: authoritative-v0
+status: planning-anchor-v0
+authority: "Direction and scope for the first-playable prototype only. Not a release commitment."
 scope: first-playable-prototype-and-launch-direction
 last_updated: 2026-05-04
 ready_when: "This v0 is replaced by a run-evidence-backed Slice B/C spec after A1..A7 prototype results close or revise the open decisions."
@@ -22,10 +23,10 @@ feeds:
 
 ← [[spec/index|spec section]] · [[spec/prototype-roadmap|prototype roadmap]] · [[spec/prototype-implementation-backlog-slice-a|implementation backlog]] · [[dashboards/research-readiness|readiness]] · [[dashboards/system-heatmap|system heatmap]] · [[decisions/index|decisions]] · [[prototypes/index|prototype evidence]] · [root plan](../../VAULT_PLAN.md)
 
-# Authoritative Game Spec v0
+# Game Spec v0 (Planning Anchor)
 
-> [!summary] Current canonical spec
-> This is the first implementation-facing game spec for the future Cortex-like game. It is authoritative for **product direction, first playable scope, system boundaries, and prototype order**. It is not a final ship spec, final balance sheet, engine lock, live-service commitment, or proof that unbuilt systems already work.
+> [!summary] What this page is
+> The first implementation-facing game spec for the future Cortex-like game. It is the **planning anchor** for product direction, first playable scope, system boundaries, and prototype order. It is **not** a final ship spec, balance sheet, engine lock, live-service commitment, or proof that unbuilt systems already work. Treat the body of this page as direction-grade truth and treat any specific feature as still mutable until its DR closes and prototype evidence backs it.
 
 > [!warning] Evidence boundary
 > A feature below is a v0 commitment only when this page says it is a commitment. Anything listed under prototype tracks, moonshots, or open research remains explicitly unproven until backed by local code evidence, comparable repo evidence, public source evidence, decision-record closure, or prototype run evidence.
