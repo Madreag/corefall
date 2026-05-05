@@ -9,9 +9,10 @@ feeds:
   - DR-008
   - DR-009
   - DR-011
+  - DR-014
 ---
 
-← [[spec/index|spec section]] · [[engine/body-damage-wound-gib-lifecycle|body damage lifecycle]] · [[engine/projectile-to-impact-lifecycle|projectile impact]] · [[systems/damage-equipment-and-items|damage/equipment primer]] · [[spec/equipment-loadout|equipment model]] · [[spec/replay-recorder-slice-a|replay recorder]] · [[spec/ux-wireframes-slice-a|UX wireframes]] · [[spec/ai-trust-harness-slice-a|AI harness]] · [[references/prototype-run-bundle-schema|run-bundle schema]] · [[decisions/dr-003-body-damage-readability|DR-003]]
+← [[spec/index|spec section]] · [[engine/body-damage-wound-gib-lifecycle|body damage lifecycle]] · [[engine/projectile-to-impact-lifecycle|projectile impact]] · [[systems/damage-equipment-and-items|damage/equipment primer]] · [[spec/equipment-loadout|equipment model]] · [[spec/chassis-armor-mechs-and-origins|chassis/armor/mechs/origins]] · [[spec/replay-recorder-slice-a|replay recorder]] · [[spec/ux-wireframes-slice-a|UX wireframes]] · [[spec/ai-trust-harness-slice-a|AI harness]] · [[references/prototype-run-bundle-schema|run-bundle schema]] · [[decisions/dr-003-body-damage-readability|DR-003]]
 
 # Body / Damage Model
 
@@ -20,6 +21,8 @@ feeds:
 
 > [!important] Product stance
 > Body damage should be brutal, physical, and story-rich without becoming a hidden medical spreadsheet. Players should understand "my arm is gone, my rifle dropped, my bot is unstable, my medic can still save this" in one glance. The model exists to create tactical consequences, readable rescues, death recaps, veteran memories, AI decisions, modding hooks, and replay/debug evidence.
+>
+> This also applies to armor, android/robot bodies, mechs, and equipment. A smoking weapon, cracked helmet, jammed servo arm, disabled mech knee, EMP-shocked android, or breached cockpit should be part of the same readable damage language rather than a separate hidden durability system.
 
 ## Slice A Question
 
@@ -64,8 +67,11 @@ Can a player, bot, replay viewer, and loadout/workbench UI all explain one actor
 | `actor_health` | Core survival value, max health, prior health, death timer. | Simulation, HUD silhouette, death recap, AI triage. |
 | `actor_status` | STABLE, UNSTABLE, DYING, DEAD, INACTIVE, plus optional prototype-only KNOCKED_OUT if tested. | Control feel, AI, replay, squad panel, accessibility text. |
 | `body_parts` | Head, torso, arms, legs, hands, feet, backpack/jetpack, held-device attach points, optional faction/special parts. | Hit routing, UI silhouette, equipment fallback, modding schema. |
+| `actor_origin` | Human/organic, android/synthetic, robot frame, augmented, alien/biological, plus treatment and vulnerability tags. | Body damage, treatment/repair, AI, progression, loadout compatibility. |
+| `chassis_modules` | Armor plates, mech arms/legs/sensors/reactor/cockpit, powered-armor sockets, robot hardpoints. | Damage routing, module failure, mech HUD, AI repair/rescue, replay. |
 | `attachments` | Joint strength, gib impulse limit, gib wound limit, damage multiplier, mission-critical flag, part ownership. | Physics, limb detachment, equipment drop, workbench diagnostics. |
 | `wounds` | Entry/exit emitter, source event, damage channel, part, severity, bleed/pain/stability modifiers, treatment tags. | Simulation, particles/SFX, med/support items, replay/death recap. |
+| `equipment_condition` | Intact, impaired, critical, disabled, destroyed stage for weapons/tools/armor/modules, plus behavior penalty and repairability. | HUD warnings, AI switching/refusal, salvage, repair, replay/debrief. |
 | `stability` | Stable velocity thresholds, recovery timer, travel impulse damage, posture state. | Actor controller, AI rescue/retreat, HUD posture icon. |
 | `inventory_fallout` | Dropped weapon/tool/gold/passenger objects, positions, velocities, owner, salvage state. | Replay, AI pickup, economy, loadout workbench, campaign recap. |
 | `treatment_state` | Removed wounds, stabilized parts, revives, scars, prosthetics, repair/replace operations. | Medic tools, veteran persistence, progression/retention, replay. |
@@ -82,6 +88,7 @@ Design rule: HP remains useful, but it cannot be the only public truth. The read
 | `DEAD` | Actor is terminal debris/body. | Death marker and death recap entry. | No orders; may be salvage/revive target only if tool supports it. | `actor_status_changed`, `actor_death_finalized`. |
 | `INACTIVE` | Actor is deliberately disabled by activity/script. | Muted squad card, scenario text if player-visible. | Excluded from combat decisions unless script says otherwise. | `actor_status_changed`. |
 | `KNOCKED_OUT` | Prototype-only candidate for non-lethal rescue/arrest/medical play. | Blue/white prone marker and timer. | Medic/rescue behavior can test non-lethal stakes. | `actor_status_changed`; only promote after tests. |
+| `PILOT_TRAPPED` | Actor is alive but trapped inside damaged armor/mech/cockpit. | Cockpit warning, eject/rescue affordance, squad alert. | Rescue, repair, tow, abandon, or extraction decision. | `pilot_state_changed`, `chassis_module_damaged`. |
 
 ## Damage Channels
 
@@ -93,6 +100,7 @@ Design rule: HP remains useful, but it cannot be the only public truth. The read
 | `explosive` | Blast impulse, gib limits, explosive rounds/devices. | Include danger radius, terrain carve, part detach/gib, dropped equipment, friendly-fire labels. |
 | `thermal` | Fire/burn content is less central in CCCP, but needed for future hazards. | Add burn wounds/effects only when HUD can show persistent hazard and treatment state. |
 | `electric_emp` | Useful for robotics/devices and future faction roles. | Start as device/bodypart disable channel; do not promise without equipment/AI tests. |
+| `equipment_fault` | Damaged weapon/tool/armor/mech module changes behavior without necessarily injuring the actor. | Emit condition-stage changes, jam/fault labels, smoke/spark state, repair/swap options. |
 | `chemical_bio` | Future poison/acid/stim/bleed modifiers. | Treat as effect stack with bodypart or actor target; keep visible in advanced panel. |
 | `terrain_crush` | Dropship/body collision, fall, unstable impact, terrain/object physics. | Emit causality from terrain/object/contact so death recap can say what killed the actor. |
 
@@ -142,6 +150,10 @@ Every controllable actor body part should have enough data for simulation, HUD, 
 | Torso critical | High bleed/stability/death risk. | Central warning, not full medical chart. | Medic priority increases; retreat order likely. | Heavy equipment may worsen stability. |
 | Jetpack/backpack damaged | Mobility/flight/support loss. | Mobility icon and "jetpack disabled" text. | Bot refuses vertical route. | Loadout/workbench sees mobility capability lost. |
 | Held device damaged/dropped | Weapon/tool unavailable. | Dropped item marker and slot warning. | AI switches, retrieves, or asks for pickup. | Replay/export records item id and source. |
+| Weapon/tool impaired | Jams, overheats, misfires, loses accuracy, digs poorly, scans unreliably, or smokes. | Condition badge, smoke/spark cue, repair/swap action. | AI may switch/refuse/use cautiously with reason. | `equipment_condition_changed`, behavior penalty. |
+| Armor layer cracked | Protection reduced for a local part. | Local armor-stage icon and exposed-part warning. | AI changes stance/retreat/rescue priority. | Armor slot stage update and repair/salvage flag. |
+| Mech limb/module disabled | Mech loses weapon/tool/grip/mobility/sensor/power function. | Module warning, cockpit/pilot risk, route-fit warning. | AI may repair, eject pilot, abandon, or tow. | `chassis_module_damaged`, `pilot_state_changed`. |
+| Android/robot EMP shock | Synthetic actor/module loses power/sensors/control temporarily or permanently. | EMP/shutdown/reboot label, no bleed marker. | AI seeks reboot/repair instead of medikit. | Origin-specific status and repair event. |
 | Mission-critical gib blocked | Object stays intact despite threshold. | Debug/workbench warning; optional in-game spark/brace feedback. | AI should not assume invulnerability unless role says so. | Package diagnostics warn if overused. |
 
 ## UI / UX Rules
@@ -191,6 +203,11 @@ Every BODY-A prototype run should export these event families through [[spec/rep
 | `body_stability_impulse` | actor id, impulse, threshold, damage, previous/new status. |
 | `actor_status_changed` | actor id, old/new status, cause event id, rescue window if any. |
 | `inventory_dropped` | actor id, item id, slot, position, velocity, cause event id. |
+| `equipment_condition_changed` | item/module id, owner, old/new stage, behavior penalty, visible feedback, repairability, cause event id. |
+| `armor_stage_changed` | actor/chassis id, armor slot, covered part, old/new stage, protection delta, cause event id. |
+| `chassis_module_damaged` | chassis id, module slot, old/new stage, behavior consequence, pilot risk, cause event id. |
+| `pilot_state_changed` | pilot actor id, mech/chassis id, old/new state, entry/exit/eject/rescue cause. |
+| `origin_status_changed` | actor id, origin id, origin-specific status, repair/treatment requirement, cause event id. |
 | `gold_dropped` | actor id, amount/pixel count, position, cause event id. |
 | `treatment_applied` | support item id, target actor/part, wound ids removed/changed, result, failure reason. |
 | `death_recap_ready` | actor id, final cause chain, item drops, salvage/veteran consequence, replay marker. |

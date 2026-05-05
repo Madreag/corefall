@@ -9,7 +9,7 @@
 
 | ID | Title | Priority | Status | Lean | Closes When |
 |---|---|---|---|---|---|
-| [[decisions/dr-001-engine-strategy|DR-001]] | Engine strategy | <span class="cc-flag cc-red">P0</span> | OPEN | CCCP native build passes + bounded startup partial → interactive mission proof → 2-week greenfield prototype → choose | [[engine/cccp-build-run-audit]] plus interactive run audit + prototype + reuse-ledger skim done. |
+| [[decisions/dr-001-engine-strategy|DR-001]] | Engine strategy | <span class="cc-flag cc-red">P0</span> | <span class="cc-flag cc-green">DIRECTION CLOSED</span> | Greenfield native core + CCCP as reference lab (project owner committed 2026-05-04). Implementation specifics (lang/runtime/renderer/data schema) still open. | Greenfield language/runtime/renderer chosen + first greenfield slice benchmarked vs CCCP reference. |
 | [[decisions/dr-002-replay-event-architecture|DR-002]] | Replay/event architecture | <span class="cc-flag cc-red">P0</span> | OPEN | Hybrid event log + snapshots | Recorder + viewer reproduce 5-min battle. |
 | [[decisions/dr-003-body-damage-readability|DR-003]] | Body damage readability | <span class="cc-flag cc-red">P0</span> | OPEN | Silhouette default + advanced HUD opt-in | HUD-01..HUD-03 acceptance pass. |
 | [[decisions/dr-004-first-playable-slice|DR-004]] | First playable slice | <span class="cc-flag cc-red">P0</span> | OPEN | Sequenced single actor → squad → bunker breach | Slice A (single actor) playable for 5 minutes. |
@@ -22,6 +22,7 @@
 | [[decisions/dr-011-progression-retention-loop|DR-011]] | Progression/retention loop | <span class="cc-flag cc-orange">P1</span> | OPEN | Intrinsic-first hybrid: mastery + autonomy + veterans + salvage + replays + creator challenges | RET-A-01..RET-A-06 prototype results show players return for mastery/stories, not obligation. |
 | [[decisions/dr-012-accessibility-comfort-readability|DR-012]] | Accessibility, comfort, and readability floor | <span class="cc-flag cc-orange">P1</span> | OPEN | Slice A accessibility/comfort floor, not late compliance | ACC-A-01..16 pass across HUD, command, equipment workbench, replay, hub, package-builder, settings, and run-bundle evidence. |
 | [[decisions/dr-013-backend-service-scope|DR-013]] | Backend service scope | <span class="cc-flag cc-orange">P1</span> | OPEN | Local-first service spine + optional adapters | BACK-SCOPE/BACK-A pass with local health/schema, package registry, join resolver, server fixtures, local supervisor, replay/report index, diagnostics redaction, and clean platform-adapter boundaries. |
+| [[decisions/dr-014-tone-player-promise|DR-014]] | Tone and player promise | <span class="cc-flag cc-red">P0</span> | <span class="cc-flag cc-green">DIRECTION CLOSED</span> | Tactical pulp sci-fi disaster sandbox + first-class chassis/armor/mechs/origins (project owner committed 2026-05-04). | Revisit only if a playtest shows the chosen tone alienates the target player or chassis depth proves content-cost prohibitive. |
 
 ## Evidence Backlog
 
@@ -34,7 +35,8 @@
 | [[spec/prototype-implementation-backlog-slice-a]] implementation backlog: A0..A7 task cards, gates, First 48 Hours checklist, run-bundle evidence by milestone, and explicit A5 equipment/loadout workbench handoff. | DR-001, DR-002, DR-003, DR-004, DR-005, DR-006, DR-007, DR-008, DR-009 |
 | [[spec/actor-feel-sandbox-slice-a]] prototype requirements: scope, material set, event hooks, acceptance tests, first tickets, kill criteria. | DR-001, DR-002, DR-003, DR-004, DR-005, DR-007, DR-008, DR-009 |
 | [[spec/replay-recorder-slice-a]] prototype requirements: event envelope, hook map, stable-id caveat, causality model, snapshot cadence, viewer requirements, REC-A/DET-A tests, first tickets. | DR-002, DR-003, DR-004, DR-005, DR-008 |
-| [[spec/body-damage-model]] prototype requirements: body parts, wound fields, status vocabulary, damage channels, equipment fallout, treatment hooks, AI reason labels, replay/death recap events, HUD rules, and BODY-A tests. | DR-002, DR-003, DR-004, DR-008, DR-009, DR-011 |
+| [[spec/body-damage-model]] prototype requirements: body parts, wound fields, status vocabulary, damage channels, equipment fallout, treatment hooks, AI reason labels, replay/death recap events, HUD rules, and BODY-A tests. | DR-002, DR-003, DR-004, DR-008, DR-009, DR-011, DR-014 |
+| [[spec/chassis-armor-mechs-and-origins]] exploratory requirements: armor layers, powered armor, enterable mechs, android/robot/origin choices, staged equipment/module damage, AI reason labels, replay events, and CHASSIS-A tests. | DR-003, DR-004, DR-008, DR-009, DR-011, DR-014 |
 | [[systems/replay-determinism-and-run-evidence]] research bridge: Unreal, Photon Quantum, Gaffer, YellowAfterlife, GameDeveloper, OpenSoldat demos, Powder Toy snapshots, OpenLieroX NewNet, and CCCP update/save hooks translated into hybrid events/snapshots/checksums and deterministic-island gates. | DR-002, DR-004, DR-005, DR-007, DR-008 |
 | [[spec/ai-trust-harness-slice-a]] prototype requirements: scenario manifest, AI event contract, local AI hook map, AI-H bootstrap scenarios, report/export shape, overlay fields, first tickets. | DR-002, DR-004, DR-008, DR-009 |
 | [[spec/terrain-material-sandbox-slice-a]] prototype requirements: material fixture, overlay tests, terrain events, dirty-region/path refresh metrics, AI material labels, recorder export, MAT-T tests. | DR-002, DR-004, DR-005, DR-006, DR-007, DR-008, DR-009 |
@@ -45,7 +47,7 @@
 | [[spec/package-builder-workbench-slice-a]] prototype requirements: deterministic package builder, manifest/provenance validation, diagnostics, dev mount, loader graph, preset/effect graphs, migration preview, test launch, PACK-A tests. | DR-006, DR-010, DR-013 |
 | [[spec/ux-wireframes-slice-a]] prototype requirements: HUD, squad, command, buy/loadout, material overlay, death recap/replay, hub, workbench, accessibility floors, UX events, UX-W tests. | DR-003, DR-004, DR-008, DR-009, DR-013 |
 | [[spec/accessibility-comfort-slice-a]] prototype requirements: text scale/reflow, contrast, no-color-only state, same-input navigation, remapping/holds, captions, reduced motion/shake/flash, equipment workbench ACC-A tests, and run-bundle evidence additions. | DR-003, DR-004, DR-006, DR-008, DR-009, DR-012 |
-| [[spec/equipment-loadout]] prototype requirements: actor roles, item archetypes, explicit slots, AI item metadata, buy/loadout UX, delivery risk, mod validation, replay hooks, LOAD-A tests. | DR-003, DR-004, DR-006, DR-008, DR-009 |
+| [[spec/equipment-loadout]] prototype requirements: actor roles, item archetypes, explicit slots, AI item metadata, buy/loadout UX, delivery risk, mod validation, replay hooks, LOAD-A tests. | DR-003, DR-004, DR-006, DR-008, DR-009, DR-014 |
 | [[references/equipment-cccp-field-map]] field-level translation: CCCP C++/Lua/INI equipment/loadout fields mapped to future AI, UI, modding, balance, replay, backend, and package-builder consumers. | DR-003, DR-004, DR-006, DR-008, DR-009 |
 | [[references/equipment-device-loadout-field-atlas]] device/loadout atlas: exact held-device, firearm, magazine, round, loadout, delivery-role, and durable external schema references mapped into AI/UI/modding/balance/replay/backend consumers and LOAD-FIELD tests. | DR-003, DR-004, DR-006, DR-008, DR-009 |
 | [[references/equipment-role-design-deep-dive]] concrete role-card translation: CCCP digger/concrete/grapple/medikit/launcher examples plus durable weapon/loadout/tag/data references mapped into AI, UI, modding, balance, replay, and overlap-audit requirements. | DR-003, DR-004, DR-006, DR-008, DR-009 |
@@ -110,4 +112,7 @@ These can become DRs when evidence accumulates:
 
 ## Closed Decisions
 
-_None yet._
+| ID | Title | Closed | Direction |
+|---|---|---|---|
+| [[decisions/dr-001-engine-strategy|DR-001]] | Engine strategy (direction) | 2026-05-04 | Greenfield native core + CCCP as reference lab. Implementation specifics still open. |
+| [[decisions/dr-014-tone-player-promise|DR-014]] | Tone and player promise | 2026-05-04 | Tactical pulp sci-fi disaster sandbox + first-class chassis/armor/mechs/origins. |

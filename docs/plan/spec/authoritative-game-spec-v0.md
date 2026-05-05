@@ -19,6 +19,7 @@ feeds:
   - DR-011
   - DR-012
   - DR-013
+  - DR-014
 ---
 
 ← [[spec/index|spec section]] · [[spec/prototype-roadmap|prototype roadmap]] · [[spec/prototype-implementation-backlog-slice-a|implementation backlog]] · [[dashboards/research-readiness|readiness]] · [[dashboards/system-heatmap|system heatmap]] · [[decisions/index|decisions]] · [[prototypes/index|prototype evidence]] · [root plan](../../VAULT_PLAN.md)
@@ -46,9 +47,9 @@ Use this spec as the implementation starting point, then follow evidence in this
 
 ## Product Promise
 
-Build a solo-first tactical physics sandbox where the player directly pilots fragile soldiers, commands AI squadmates, tears through destructible terrain, survives chaotic mission failures, and uses replay/debug tools to understand and improve every run.
+Build a solo-first tactical physics sandbox where the player directly pilots fragile soldiers, androids, robots, armored bodies, and enterable mechs; commands AI squadmates; tears through destructible terrain; survives chaotic mission failures; and uses replay/debug tools to understand and improve every run.
 
-The game must feel like a modern successor to the Cortex Command fantasy without copying Cortex Command as a product plan. The target is a clearer, more moddable, more replayable version of the core fantasy: tiny actors, brutal materials, improvised tunnels, emergency rescues, dangerous delivery craft, clever tools, and AI helpers that explain what they are doing.
+The game must feel like a modern successor to the Cortex Command fantasy without copying Cortex Command as a product plan. The target is a clearer, more moddable, more replayable version of the core fantasy: tiny actors, brutal materials, improvised tunnels, emergency rescues, dangerous delivery craft, clever tools, damageable armor/mechs/equipment, and AI helpers that explain what they are doing.
 
 ## Player Fantasy
 
@@ -56,6 +57,7 @@ The game must feel like a modern successor to the Cortex Command fantasy without
 |---|---|---|
 | Field commander under pressure | Switches between direct control and squad orders while terrain, bodies, and craft are changing the battlefield. | Direct control and command UX must coexist; see [[decisions/dr-004-first-playable-slice]] and [[decisions/dr-009-command-ux-style]]. |
 | Physical problem solver | Uses rifles, diggers, charges, medkits, repair tools, and delivery plans to solve a destructible objective. | Items need shared AI/UI/modding/replay role records; see [[spec/equipment-loadout]] and [[references/equipment-role-records-slice-a]]. |
+| Chassis tactician | Chooses humans, androids, robots, armor layers, powered armor, and mechs for different mission constraints. | Chassis/origin choices need mass, protection, damage-stage, repair/treatment, AI, loadout, replay, and UX contracts; see [[spec/chassis-armor-mechs-and-origins]]. |
 | Rescue storyteller | Saves or loses named actors, recovers gear, and understands why the run collapsed. | Body damage, replay/debrief, and progression must surface causes, not only outcomes. |
 | Creator and tester | Builds packages, validates fields, test-launches missions, and inspects source/provenance. | Modding/workbench is core product scope, not an external afterthought. |
 | Mastery loop player | Replays a same seed with different loadouts and tactics. | Contracts, run bundles, debriefs, templates, and replay cards must make iteration fast. |
@@ -68,6 +70,7 @@ The game must feel like a modern successor to the Cortex Command fantasy without
 | Direct actor feel comes first. | One actor that feels good beats a broad but mushy battlefield. | [[spec/actor-feel-sandbox-slice-a]], [[spec/prototype-roadmap]], [[prototypes/actor-feel-lab-a1-runtime-smoke]]. |
 | AI is a tested product feature. | No "great solo AI" claim ships without scenario harness results, reason labels, and replay evidence. | [[spec/ai-trust-harness-slice-a]], [[systems/ai-trust-test-suite]], [[decisions/dr-008-ai-architecture]]. |
 | Equipment has one shared meaning. | AI, UI, modding, balance, replay, backend/session, and missions consume the same item role record. | [[spec/equipment-loadout]], [[spec/equipment-loadout-workbench-slice-a]], [[references/equipment-role-records-slice-a]]. |
+| Bodies and machines fail locally. | Armor plates, limbs, weapons, tools, mech modules, sensors, reactors, and origins degrade in readable stages when they matter. | [[spec/chassis-armor-mechs-and-origins]], [[spec/body-damage-model]], [[decisions/dr-014-tone-player-promise]]. |
 | Modding and diagnostics are part of the game. | Package validation, provenance, loader graph, diagnostics, and test launch are first-class workflows. | [[spec/modding-model]], [[spec/package-builder-workbench-slice-a]], [[engine/content-module-loading-lifecycle]]. |
 | Progression widens tactics. | Retention comes from mastery, horizontal tools, veterans, salvage, templates, replays, and challenges before grind. | [[decisions/dr-011-progression-retention-loop]], [[spec/progression-retention]]. |
 
@@ -77,16 +80,22 @@ These are v0 product-direction commitments. They still need prototype evidence b
 
 | Area | v0 Commitment | First Proof |
 |---|---|---|
-| Primary mode | Solo-first. Local/offline play must work without account or live-service dependency. | [[spec/prototype-roadmap]], [[decisions/dr-005-multiplayer-posture]], [[decisions/dr-013-backend-service-scope]]. |
+| Camera & framing | **Strict 2D side-view.** Cortex/Liero classic: small actors, huge destructible terrain, no camera rotation. Tactical map view (per DR-009) is a UI mode that overlays/replaces the side-view temporarily, not a different sim. | A1 actor-feel runs; UX-W camera-mode tests. |
+| Tone | **Tactical pulp sci-fi disaster sandbox** (DR-014). Gritty tactical stakes, pulpy systemic consequences, surreal sci-fi accents, sandbox/workbench support. Excludes pure comedy, pure X-COM grimness, pure Noita opacity, pure Powder Toy sandbox. | [[decisions/dr-014-tone-player-promise]]. |
+| Engine direction | **Greenfield native core + CCCP as reference lab** (DR-001 direction closed). Greenfield engine; CCCP is read-only reference for mechanics/feel/taxonomy/AI lessons. | [[decisions/dr-001-engine-strategy]]. Implementation specifics (lang/runtime/renderer/data schema) still open. |
+| AI bar | **Most humanlike AI in the genre** (DR-014 / DR-008 raised bar). Friendly and enemy bots must communicate intent, model perception/memory, exhibit personality/doctrine, make readable mistakes, and learn-from-defeat. Beyond utility scoring once basics work. | AI-H + AI-EQ + future humanlike-AI tests. |
+| Primary launch mode | **Solo-first**. Local/offline play must work without account or live-service dependency. | [[spec/prototype-roadmap]], [[decisions/dr-005-multiplayer-posture]], [[decisions/dr-013-backend-service-scope]]. |
+| Scope flexibility framework | **Framework must accommodate** solo-hero, small-squad (3-5), RTS-scale (10+), persistent squad campaign (3-10 named with veterans/legacy), and **MMO-ready architecture** for eventual growth. Players author their own scenarios. Default delivered campaign mode is persistent squad. Architectural choices (ECS, networking authority, scenario data model, content pipeline) must not foreclose any of these scales. | Slice-A scenario manifest + scale stress test (single actor, 5 actors, 50 actors); networking authority memo (DR-005). |
 | First playable | A single-actor lab grows into a repeatable Breach Contract proof mission before campaign breadth. | [[spec/prototype-implementation-backlog-slice-a]], [[spec/mission-director-slice-a]]. |
 | Direct control | Player movement, aim, weapon, tool, damage/status, and recovery loops are first-class. | A1 actor-feel runs and A-FEEL tests. |
 | Destructible terrain | Terrain and material affordances are core to navigation, combat, tools, AI, missions, replay, and UX. | MAT-T terrain/material sandbox tests. |
 | Replay/debug | Every meaningful prototype must produce inspectable run evidence. | [[references/prototype-run-bundle-schema]], [[spec/replay-recorder-slice-a]]. |
 | AI trust | Friendly AI is a launch-quality bar, not decoration, but only proven harness behavior can be promised. | AI-H and AI-EQ tests. |
 | Loadout/workbench | Equipment roles, source provenance, bot suitability, package warnings, and mission capabilities must be visible. | LOAD-A, LOAD-R, LOAD-W, LOAD-FIELD, and PACK tests. |
+| Chassis/armor/mechs | **First-class** (DR-014). Armor layers, damageable equipment, mechs, powered armor, robots/androids, multiple origins/races, staged machine/body damage, pilot rescue/eject, repair/salvage. Not stat-boost suits; chassis grammar from [[spec/chassis-armor-mechs-and-origins]]. | CHASSIS-A tests; one chassis-bearing actor in Slice A. |
 | Accessibility floor | Text scale, contrast, no-color-only states, same-input navigation, remap/holds, captions, reduced motion/shake/flash are early requirements. | ACC-A and UX-W tests. |
-| Modding | Schema-first data, Lua escape hatches, package builder, loader parity, diagnostics, and provenance are product scope. | MOD-A, PACK-A, CONTENT-A tests. |
-| Backend posture | Local-first service spine for health/schema/package/replay/diagnostics/hub fixtures; online adapters stay optional. | BACK-SCOPE and BACK-A tests. |
+| Modding | Schema-first data, Lua escape hatches, package builder, loader parity, diagnostics, and provenance are product scope. Player-authored scenarios are core (per scope flexibility). | MOD-A, PACK-A, CONTENT-A tests. |
+| Backend posture | Local-first service spine for health/schema/package/replay/diagnostics/hub fixtures; online adapters stay optional but architecture must not foreclose MMO-scale services. | BACK-SCOPE and BACK-A tests. |
 
 ## Explicit Non-Commitments v0
 
@@ -96,8 +105,11 @@ These are v0 product-direction commitments. They still need prototype evidence b
 | Account economy / gacha / paid collection | Research and private prototype only. | Fairness, modding trust, ethics, and economy require a future release-facing DR beyond [[decisions/dr-011-progression-retention-loop]]. |
 | Noita-grade material chemistry at launch | Moonshot, not v0 promise. | The launch path is curated material affordances until [[decisions/dr-007-terrain-material-model]] has run evidence. |
 | Full deterministic replay | Open research. | The current posture is hybrid semantic events, snapshots, checksums, and deterministic islands only when proven. |
-| Final engine choice | Open. | [[decisions/dr-001-engine-strategy]] still needs interactive CCCP mission proof and greenfield comparison. |
+| Final engine implementation | Open within direction. | DR-001 direction closed (greenfield + CCCP reference); language/runtime/renderer/ECS-or-OOP/data-schema/build-CI still open. |
 | Final arsenal balance | Open. | Generated role cards and overlap audits are seed data; runtime item behavior and AI-H evidence must decide. |
+| Final origin/race roster | Open. | Grammar is fixed in [[spec/chassis-armor-mechs-and-origins]]; ship roster (suggested 2-3 origins) decided by content cost vs prototype-mission needs. |
+| MMO live service at launch | Not a v0 commitment. | Architecture must not foreclose it (per Scope flexibility framework), but no v1 MMO promise. Future DR after persistent-squad campaign + co-op evidence. |
+| Default game mode beyond solo | Persistent squad campaign is the planned default delivered mode, but launch order (solo arena → squad campaign → RTS → MMO-able) decided by playtest evidence. | RET-A and Slice-B/C scope. |
 
 ## Core Loop
 
@@ -149,6 +161,7 @@ The first playable exits only when [[spec/prototype-implementation-backlog-slice
 | Aim and weapon feel | Reticle and firing outcomes must show motion, recoil, reload, stance/range/spread, and failure causes. | A-FEEL-02, HUD-01..03, [[engine/projectile-to-impact-lifecycle]]. |
 | Recovery | Actor should recover from recoil, impact, terrain snag, or command swap with readable status. | A-FEEL-01/03, BODY-A status events. |
 | Tool feel | Digger, repair/fill, explosive, and support actions show validity before or immediately after action. | MAT-T, LOAD-A, LOAD-W, UX-W material overlays. |
+| Chassis feel | Armor, powered armor, robots, and mechs must feel different through mass, acceleration, recoil, route fit, noise, and recovery, not only stat bars. | CHASSIS-A, A-FEEL, MAT-T route-fit tests. |
 | Input coverage | Keyboard/mouse first; controller/gamepad path must be tested early for HUD/workbench traversal. | ACC-A same-input navigation, LOAD-W fixture traversal follow-ups. |
 
 ## Physics, Destruction, And Terrain
@@ -168,6 +181,8 @@ The first playable exits only when [[spec/prototype-implementation-backlog-slice
 | Body state | Use readable coarse states first: stable, impaired, downed/dying, dead/gibbed, with expandable limb/wound detail. | [[spec/body-damage-model]], [[decisions/dr-003-body-damage-readability]]. |
 | Damage channels | Projectile, blast, crush/fall, hazard/material, fire/heat, tool/self, and scripted mission causes must map to event families. | BODY-A and REC-A cause-chain tests. |
 | Wounds and fallout | Wounds, bleeding/status changes, limb loss/gibs, inventory/equipment fallout, and treatment/support actions must be evented. | [[engine/body-damage-wound-gib-lifecycle]], [[systems/damage-equipment-and-items]]. |
+| Armor/chassis/equipment damage | Armor plates, weapons, tools, sensors, mech limbs, reactors, and origin-specific body systems should degrade in coarse readable stages when tactically meaningful. | [[spec/chassis-armor-mechs-and-origins]], CHASSIS-A tests. |
+| Origins | Human, android, robot, augmented, and later surreal/biological origins are tactical body promises, not cosmetic skins. | [[spec/chassis-armor-mechs-and-origins]], BODY-A/RET-A evidence. |
 | Player comprehension | Death/loss recap shows last causes, relevant input, source actor/item/material, status progression, and next action. | REC-A-04, BODY-A, UX death recap tests. |
 | AI use | Bots need reason labels for rescue, retreat, treatment, refusal, and unsafe orders. | AI-H and AI-EQ scenarios. |
 
@@ -178,6 +193,7 @@ Equipment is a shared system contract, not a catalog page.
 | Surface | v0 Requirement | Source |
 |---|---|---|
 | Role record | Each item must resolve to one shared `role_record` with identity/provenance, slots, action/effect, terrain/material consequence, AI policy, UI projection, balance/overlap, replay/backend, and mission tags. | [[spec/equipment-loadout]], [[references/equipment-role-records-slice-a]]. |
+| Chassis and armor slots | Actor origins, armor layers, powered armor, mech modules, and damageable equipment extend the same slot/role-record model instead of becoming a separate RPG inventory. | [[spec/chassis-armor-mechs-and-origins]], [[spec/equipment-loadout]]. |
 | Loadout fixtures | Slice A uses nine fixture loadouts from generated data to test assault, breach, medic, scout, sniper, heavy, grenadier, and bad-loadout cases. | [[references/equipment-loadout-fixtures-slice-a]]. |
 | Workbench | Mission strip, catalog, actor columns, detail drawer, trace tab, source inspector, bot trust, overlap compare, diagnostics, and export preview are required prototype surfaces. | [[spec/equipment-loadout-workbench-slice-a]]. |
 | Bot suitability | Items expose bot claim states, reason labels, refused/selected/result events, source confidence, and first fix actions. | [[references/equipment-ai-behavior-contract]], [[references/equipment-ai-summary-seed-slice-a]]. |
@@ -191,6 +207,7 @@ Equipment is a shared system contract, not a catalog page.
 | Intent layer | Bots write through the same serializable intent/control layer as players where practical. | AI-H control-driver tests and replay traces. |
 | Tactical AI | Start with utility/scored jobs plus scripted hooks, not opaque cleverness. | [[decisions/dr-008-ai-architecture]], AI-H-01..06. |
 | Item decisions | Item choice/refusal/result events must include reason labels, rejected alternatives, source confidence, and result. | AI-EQ and AI-EQ-SUMMARY tests. |
+| Chassis decisions | Bots must understand armor mass, route fit, mech entry/exit, pilot rescue, equipment damage, origin-specific repair/treatment, and module failures before default use claims. | CHASSIS-A + AI-H reason-label tests. |
 | Terrain reasoning | Bots must understand path blockers, wrong tool, stale path, unsafe hazard, and breach/rescue opportunities. | MAT-T + AI-H path/material tests. |
 | Trust UI | Player-facing command and replay surfaces must show what the bot is trying, why it changed, and how it failed. | [[spec/ux-wireframes-slice-a]], [[systems/ai-trust-test-suite]]. |
 | Commander AI | Enemy director/commander decisions must expose reason strings and objective state changes. | [[spec/mission-director-slice-a]], MISSION-A. |
@@ -209,10 +226,10 @@ Equipment is a shared system contract, not a catalog page.
 
 | Surface | v0 Requirement | Validation |
 |---|---|---|
-| HUD | Actor, item/ammo/cooldown, health/status, reticle state, order state, material/tool label, and last critical event. | HUD-01..03 and UX-W tests. |
-| Squad panel | Actor status, current job/order, path/material blocker, inventory role, rescue/extract state. | SQUAD/ORDER tests. |
+| HUD | Actor, chassis/origin, armor/equipment condition, item/ammo/cooldown, health/status, reticle state, order state, material/tool label, and last critical event. | HUD-01..03, CHASSIS-A, and UX-W tests. |
+| Squad panel | Actor status, current job/order, path/material blocker, inventory role, armor/mech/pilot state, rescue/extract state. | SQUAD/ORDER/CHASSIS tests. |
 | Command overlay | Direct + slowdown overlay first; optional tactical map remains a prototype/DR-009 validation route. | ORDER-01, AI-H reason label display. |
-| Buy/loadout/workbench | Mission capability strip, role cards, source/provenance, bot trust, package diagnostics, and export preview. | LOAD-W and ACC-A workbench tests. |
+| Buy/loadout/workbench | Mission capability strip, role cards, chassis/origin compatibility, armor/mech slots, source/provenance, bot trust, package diagnostics, and export preview. | LOAD-W, CHASSIS-A, and ACC-A workbench tests. |
 | Replay/debrief | Timeline, cause chains, screenshots/snapshots, actor fate, equipment used/refused, retry/edit actions. | REC-A, MISSION-A, RET-A. |
 | Hub | Local game, package/workbench, replay/reports, diagnostics, server fixtures, settings. | BACK-A and UX-W hub tests. |
 | Accessibility | 200 percent text scale, color-independent state labels, keyboard/controller route, remap/holds, captions, reduced motion/shake/flash. | [[spec/accessibility-comfort-slice-a]]. |
@@ -255,6 +272,7 @@ Equipment is a shared system contract, not a catalog page.
 | Return loop | Same-seed retries, saved templates, veteran actors, salvage, replay/debrief, contract variants, creator challenges. | RET-A tests after actor-feel, recorder, loadout, and one contract exist. |
 | Progression shape | Horizontal unlocks and tactical options over raw power escalation. | Avoid turning sandbox mastery into grind. |
 | Veterans | Named actors, scars, specialties, and recovery stories are retention candidates. | Prototype before campaign commitment. |
+| Chassis identity | Armor sets, mech hulls, repaired modules, android shells, robot frames, and origin histories can become memorable return-loop objects if they stay tactical and readable. | Prototype through CHASSIS-A and RET-A before campaign commitment. |
 | Salvage | Salvage creates tactical recovery and material consequences. | Must not punish experimentation into restart-only behavior. |
 | Collection/economy | Cosmetics/collection/gacha can be researched privately but must not corrupt modding or fairness commitments. | Future monetization ethics DR before release commitment. |
 
@@ -269,6 +287,7 @@ These tracks are required or allowed, but not final launch promises.
 | Replay recorder/viewer | Required. | REC-A/DET-A implementation from [[spec/replay-recorder-slice-a]]. |
 | Terrain/material lab | Required. | MAT-T-01..10 implementation from [[spec/terrain-material-sandbox-slice-a]]. |
 | Full equipment workbench traversal | Required. | LOAD-W full traversal, source drill-down, gamepad, 200 percent text, replay/export. |
+| Chassis/armor/mech/origin prototype | Required before promising the mech/armor fantasy as more than direction. | CHASSIS-A local armor, staged equipment damage, enterable mech, and android/robot origin run evidence. |
 | AI trust harness | Required before AI promise. | AI-H-01..06 and AI-H-LOAD scenario runner. |
 | Breach Contract mission | Required before Slice B. | MISSION-A proof mission. |
 | Backend/hub fixtures | Required for local-first service spine. | BACK-A and BACK-SCOPE runs. |
@@ -292,6 +311,7 @@ Moonshots stay alive in [[research-log/moonshot-register]] and must not block th
 | Async strategic layer | Revisit after backend fixture contracts. |
 | Voxel/2.5D experiment | Separate experiment only. |
 | Cosmetic collection economy | Research only until fairness/modding DR. |
+| Exotic origins and biotech bodies | Prototype after human/android/robot readability works; keep as surreal-world expansion, not Slice A dependency. |
 
 ## Open Research Questions
 
@@ -305,6 +325,7 @@ Moonshots stay alive in [[research-log/moonshot-register]] and must not block th
 | What multiplayer posture is viable? | Open lean: solo-first/co-op-ready, no PvP promise. | Event volume, terrain snapshot, authority prototype, [[decisions/dr-005-multiplayer-posture]]. |
 | What backend scope is worth building now? | Local-first spine chosen for Slice A. | BACK-SCOPE/BACK-A evidence and [[decisions/dr-013-backend-service-scope]]. |
 | Which item roles are truly distinct? | Generated role records and overlap worksheets exist; runtime proof open. | LOAD-W, AI-H-LOAD, overlap comparisons. |
+| How far should armor, mechs, robots, androids, and species/origins go? | Open. Direction accepted; prototype evidence missing. | [[decisions/dr-014-tone-player-promise]], [[spec/chassis-armor-mechs-and-origins]], CHASSIS-A tests. |
 | How should body damage stay readable instead of noisy? | Coarse silhouette + advanced opt-in lean. | BODY-A, HUD, REC-A recap tests and [[decisions/dr-003-body-damage-readability]]. |
 | What retention loop is fair and durable? | Intrinsic-first hybrid lean. | RET-A tests and future economy/fairness DR if monetization becomes real. |
 | What audio identity and localization plan should exist? | Not yet specified. | New DRs or spec pages after first playable UX vocabulary stabilizes. |
@@ -329,6 +350,7 @@ Moonshots stay alive in [[research-log/moonshot-register]] and must not block th
 - [[spec/actor-feel-sandbox-slice-a]]
 - [[spec/terrain-material-sandbox-slice-a]]
 - [[spec/body-damage-model]]
+- [[spec/chassis-armor-mechs-and-origins]]
 - [[spec/equipment-loadout]]
 - [[spec/equipment-role-card-renderer-slice-a]]
 - [[spec/equipment-loadout-workbench-slice-a]]

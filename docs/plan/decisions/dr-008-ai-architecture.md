@@ -11,6 +11,8 @@ revisit_trigger: "When AI trust suite scenarios AI-01..AI-12 run end-to-end with
 # DR-008: AI Architecture
 
 > [!info] Status: OPEN; LEAN: hybrid jobs + utility scoring + scriptable hooks; debug overlays mandatory
+>
+> **Bar raised by project owner (DR-014, 2026-05-04):** "MOST HUMANLIKE AI IN THE GAME." Not just functional, not just trustworthy — the genre's high-water mark for human-feeling friendly and enemy AI. Implication: invest beyond utility scoring once basics work — perception/memory modeling, personality/doctrine layering, communicated intent, mistake patterns, learning-from-defeat. See [[decisions/dr-014-tone-player-promise]] and [[spec/chassis-armor-mechs-and-origins]] AI Contract.
 
 ## Context
 

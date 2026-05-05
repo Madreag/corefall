@@ -10,8 +10,12 @@ revisit_trigger: "When a build/run audit, license review, and a small actor-feel
 
 # DR-001: Engine Strategy
 
-> [!info] Status: OPEN
-> No option locked for the **settled spec**. Prototype across multiple options freely. Recommendation: do not lock the authoritative engine choice until a build/runtime audit, a usage-ledger skim, and a minimum prototype evaluation are complete.
+> [!success] Status: DIRECTION CLOSED (project owner committed 2026-05-04). Implementation specifics still open.
+> **Direction:** Greenfield native core + CCCP as reference lab. Build a new engine. Use CCCP for mechanics archaeology, feel comparison, content taxonomy, equipment roles, AI/pathfinding lessons, terrain/destruction behavior, mistakes-to-avoid, and possibly a one-way import/converter tool later. Do **not** let CCCP define the final data format, physics model, UI, AI architecture, mod API, or backend/replay/event model.
+>
+> **Constraint inherited from project owner:** "Best engine, best physics, best performance, best network latency, best UX, best UI, MOST HUMANLIKE AI IN THE GAME, all enjoyable." These are not soft hopes; they are the bar. The greenfield path is justified because no fork inherits all of them at the level required.
+>
+> Still open: language/runtime, ECS or OOP, renderer (WebGPU/wgpu/Vulkan/native), determinism boundary, exact data schema, repo structure, build/CI plan. These are implementation specifics that the actor-feel + recorder + chassis Slice-A prototypes inform.
 
 ## Context
 
@@ -76,14 +80,16 @@ This choice cascades across licensing, modding, networking posture, prototype ve
 
 ## Current Recommendation
 
-Recommendation: **Do not lock**. Recommended sequencing before lock:
+**Closed direction (2026-05-04): Option C — Greenfield native core + CCCP as reference lab.**
 
-1. Verify a clean local build of CCCP active and run the game (Linux/macOS via Meson). Current status: [[engine/cccp-build-run-audit]] has cleared native macOS configure/compile and bounded startup, but still needs an interactive vanilla mission proof.
-2. Perform a license review focused on AGPL-3.0 distribution constraints and any non-FOSS dependencies (RakNet license; FMOD if present; LuaJIT terms).
-3. Build a 2-week prototype of "actor feel + small terrain destruction" in our preferred greenfield stack.
-4. Only then choose between A, C, and D. Avoid B unless C4-only mods become a core promise.
+Implementation sequencing now in effect:
 
-Why: each option has fundamentally different cost curves; the cheapest information per dollar is "can we even build CCCP?" and "how fast can we land a clean controller in a greenfield prototype?"
+1. CCCP local build verified (see [[engine/cccp-build-run-audit]]). Use it for mechanics archaeology, feel comparison, equipment-role taxonomy, AI lessons. **Do not edit it.** Interactive mission proof still useful as a feel-comparison reference, not as an engine commitment.
+2. Continue browser/canvas A1+ prototyping for fast feel iteration; treat the browser lab as a **harness**, not the engine answer.
+3. Stand up a small greenfield experiment in the candidate native stack (TBD per Slice-A evidence) the moment browser-only stops being honest about feel/perf. Compare side by side.
+4. License/usage ledger applies: anything copied from CCCP into the greenfield core gets logged in [[references/usage-ledger]] with a replacement plan.
+
+Options A, B, D, E remain in the record below for audit, but are no longer the leading direction.
 
 ## Prototype Or Validation Plan
 

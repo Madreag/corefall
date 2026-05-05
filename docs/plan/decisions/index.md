@@ -62,6 +62,7 @@ Use these lenses for every major feature.
 | [[decisions/dr-011-progression-retention-loop|DR-011]] | Progression/retention loop | <span class="cc-flag cc-orange">P1</span> | OPEN | Intrinsic-first hybrid: mastery + autonomy + veterans + salvage + replays + creator challenges | Defines why players return without letting gacha/live-service pressure lead the design. |
 | [[decisions/dr-012-accessibility-comfort-readability|DR-012]] | Accessibility, comfort, and readability floor | <span class="cc-flag cc-orange">P1</span> | OPEN | Slice A accessibility/comfort floor, not late compliance | Keeps dense combat, loadout, replay, hub, and workbench UI readable, navigable, captioned, and comfortable while prototypes are cheap to change. |
 | [[decisions/dr-013-backend-service-scope|DR-013]] | Backend service scope | <span class="cc-flag cc-orange">P1</span> | OPEN | Local-first service spine + optional adapters | Keeps backend work focused on play, packages, replay/debug, diagnostics, hub UX, and future co-op without prematurely committing accounts, matchmaking, economy, or public PvP. |
+| [[decisions/dr-014-tone-player-promise|DR-014]] | Tone and player promise | <span class="cc-flag cc-orange">P1</span> | OPEN | Tactical pulp sci-fi disaster sandbox | Guides art, audio, writing, mechanics, UX, mechs, armor, origins, and staged equipment/body damage. |
 
 ## Still-Open Topics (Not Yet A Record)
 
@@ -69,7 +70,7 @@ Use these lenses for every major feature.
 |---|---|---|
 | Monetization ethics | Long-term fairness with modding ecosystem; DR-011 captures launch-boundary posture but a release-facing economy DR is still needed before any commitment. | [[decisions/dr-011-progression-retention-loop]], [[strategy/best-cortex-like-game-principles]] |
 | Localization plan | Strings, fonts, language packs, mod localization. | None yet. |
-| Audio/music identity | Diegetic feedback + procedural soundtrack budget. | [[spec/accessibility-comfort-slice-a]] covers critical-caption/audio-alternative floors, but not creative audio identity. |
+| Audio/music identity | Diegetic feedback + procedural soundtrack budget. DR-014 now sets tone, but the actual music/SFX identity still needs a dedicated pass. | [[decisions/dr-014-tone-player-promise]], [[spec/accessibility-comfort-slice-a]] |
 
 ## Decision Record Format
 

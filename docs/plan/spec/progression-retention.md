@@ -4,7 +4,7 @@ status: exploratory-reqs
 ready_when: "RET-A tests have results from actor-feel, replay, loadout, and one repeatable mission prototype."
 ---
 
-← [[spec/index|spec section]] · [[decisions/dr-011-progression-retention-loop|DR-011]] · [[systems/ux-ui-and-retention|UX/retention]] · [[spec/core-loop|core loop]] · [[research-log/moonshot-register|moonshots]]
+← [[spec/index|spec section]] · [[decisions/dr-011-progression-retention-loop|DR-011]] · [[decisions/dr-014-tone-player-promise|DR-014]] · [[systems/ux-ui-and-retention|UX/retention]] · [[spec/core-loop|core loop]] · [[spec/chassis-armor-mechs-and-origins|chassis/armor/mechs/origins]] · [[research-log/moonshot-register|moonshots]]
 
 # Progression And Retention
 
@@ -21,6 +21,7 @@ Retention is a game-quality requirement here, not just a metric target. A good s
 |---|---|
 | "I can beat that seed cleaner." | Same-seed retry, replay timeline, personal best, failure cause. |
 | "This squad deserves another mission." | Named actors, scars, traits, rescue history, veteran UI. |
+| "This machine deserves repair." | Damaged armor, recovered mech hulls, repaired modules, android shells, robot frames, and battle scars. |
 | "This new tool changes the plan." | Horizontal equipment unlocks, lab tests, loadout templates. |
 | "The enemy commander surprised me." | Visible enemy doctrine, adaptation, scouting clues. |
 | "I want to show this moment." | Replay card, seed hash, mod/package list, short export. |
@@ -57,6 +58,8 @@ Retention is a game-quality requirement here, not just a metric target. A good s
 |---|---|---|
 | `campaign_profile` | profile id, campaign seed, difficulty posture, unlocked labs, contract history, replay archive ids. | Save system, hub, replay browser. |
 | `actor_veteran` | stable actor id, name, role, scars, injuries, traits, rescue count, mission count, favorite loadout. | Squad UI, AI doctrine, replay recap. |
+| `chassis_record` | chassis id, owner/pilot history, armor/module condition, repairs, scars/paint, salvage state, mission count. | Loadout UI, mech bay, replay recap, progression, AI compatibility. |
+| `origin_profile` | origin id, treatment/repair needs, vulnerabilities, personality/story tags, compatible armor/mechs. | Squad creation, AI, body damage, retention, mission constraints. |
 | `loadout_template` | actor roles, item ids, role tags, mass, cost, delivery craft, AI warnings, package hashes. | Buy/loadout UI, package diagnostics, balancing. |
 | `contract_seed` | seed id, objective, map/material profile, constraints, reward class, required capabilities, validation status. | Mission generator, replay, challenge browser. |
 | `salvage_manifest` | recovered items, scrap/material types, enemy tech, damaged gear, base repair deltas. | Economy, loadout, workbench. |
@@ -72,6 +75,7 @@ Retention is a game-quality requirement here, not just a metric target. A good s
 | RET-A-02 | Contract generator | Three deterministic contracts with distinct material/equipment constraints. | Each has a valid route, clear role requirement, and no impossible AI state. |
 | RET-A-03 | Veteran value | One actor survives two missions with a visible scar/trait. | Player can explain what changed and why they care. |
 | RET-A-04 | Salvage to loadout | Recovered item/tool changes next mission template. | Player sees a new tactical option without raw power creep. |
+| RET-A-04B | Salvaged chassis repair | Damaged armor/mech module survives a mission and can be repaired or refit. | Player can explain whether repair, strip-for-parts, or fielding the damaged chassis is the better next move. |
 | RET-A-05 | Enemy commander adaptation | Enemy changes one visible tactic after a player win. | Player can name the adaptation from briefing or battlefield evidence. |
 | RET-A-06 | Loss recap | Player loses actor/objective to terrain, blast, or AI failure. | Recap names cause, timeline event, and retry option within 10 seconds. |
 | RET-A-07 | Challenge sharing | Export a seed/replay card and re-open it locally. | Contract, loadout, package list, and replay hash round-trip. |
@@ -87,6 +91,7 @@ Retention is a game-quality requirement here, not just a metric target. A good s
 | Campaign map | Current pressure, available contracts, base damage, enemy commander clues, saved challenge seeds. |
 | Squad/veteran panel | Name, role, health, scars, traits, current doctrine, rescue risk, recent event. |
 | Loadout builder | Role filters, item tags, AI competence, provenance/warnings, delivery risk, missing capability summary. |
+| Mech/chassis bay | Origin compatibility, armor slots, module condition, repair cost, route/delivery warnings, pilot/rescue state. |
 | Mission HUD | Current contract goal, high-risk actor warnings, salvage/recovery prompts only when relevant. |
 | Recap screen | Win/loss cause, key events, actor fates, salvage, retry same seed, save replay, edit loadout. |
 | Replay card | Mission title, seed, duration, result, mods/packages, notable events, share/export actions. |
@@ -100,6 +105,7 @@ Retention is a game-quality requirement here, not just a metric target. A good s
 | Time to first meaningful event | Confirms the loop gets to fun quickly. |
 | Loadout edits after recap | Shows whether replay teaches useful changes. |
 | Veteran preservation behavior | Tests emotional stakes without hard punishment. |
+| Chassis repair/reuse rate | Tests whether armor/mechs create attachment and tactics rather than maintenance chores. |
 | Salvage usage in next mission | Checks whether economy creates decisions. |
 | Contract abandonment cause | Finds impossible/boring/generated bad seeds. |
 | Replay saved/shared/opened | Measures spectacle and learning loop. |
@@ -125,6 +131,7 @@ Retention is a game-quality requirement here, not just a metric target. A good s
 | How much persistence is enough before the game feels like a campaign? | RET-A-03 and RET-A-04 prototype feedback. |
 | Should contracts be roguelite runs, campaign ops, or both? | RET-A-02 and first proof mission. |
 | How expressive should veteran traits be? | AI harness and HUD readability tests. |
+| Should chassis/mechs have veteran-like history? | CHASSIS-A plus RET-A-04B. |
 | Can enemy commanders adapt without feeling unfair? | RET-A-05 plus AI-H scenario failures. |
 | Does salvage improve tactics or just create chores? | Loadout edits and salvage usage metrics. |
 | Which sharing layer comes first: local replay cards, backend upload, or mod browser? | Backend/hub Slice A tests. |
@@ -136,6 +143,7 @@ Retention is a game-quality requirement here, not just a metric target. A good s
 - [[systems/ux-ui-and-retention]]
 - [[spec/core-loop]]
 - [[spec/product-promise]]
+- [[spec/chassis-armor-mechs-and-origins]]
 - [[spec/equipment-loadout]]
 - [[references/equipment-provenance-workbench-view]]
 - [[comparables/the-powder-toy-local-audit]]
