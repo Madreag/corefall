@@ -12,11 +12,11 @@ revisit_trigger: "Editor authoring proves too steep for typical players; or the 
 # DR-030: Scenario Editor First-Class Commitment
 
 > [!success] Status: CLOSED-DIRECTION (project owner committed 2026-05-04)
-> **First-class scenario editor at launch.** Same typed manifest format for official campaign missions, procedural contracts, and player-authored scenarios. The editor is part of the base game (not a paid DLC tool), runs in-engine, and exports `.cxpkg` packages that load like any other content.
+> **First-class scenario editor at launch.** Same typed manifest format for official campaign missions, procedural contracts, and player-authored scenarios. The editor is part of the base game (not a paid DLC tool), runs in-engine, and exports `.cfpkg` packages that load like any other content.
 
 ## Decision
 
-**Build the scenario editor as a first-class shipping feature, not a community-tool add-on.** It uses the exact same manifest format (per [[decisions/dr-017-mission-generation-strategy]]) the engine and director consume internally. Authoring is in-engine (workbench mode in `cx-tools-editor`) with hot-reload, test-run, and export.
+**Build the scenario editor as a first-class shipping feature, not a community-tool add-on.** It uses the exact same manifest format (per [[decisions/dr-017-mission-generation-strategy]]) the engine and director consume internally. Authoring is in-engine (workbench mode in `cf-tools-editor`) with hot-reload, test-run, and export.
 
 ## What This Locks In
 
@@ -25,11 +25,11 @@ revisit_trigger: "Editor authoring proves too steep for typical players; or the 
 | Launch surface | Editor ships in the base game (not paid DLC). |
 | Manifest format | Single typed manifest for engine, director, editor, procedural generator, and player scenarios. |
 | Authoring mode | In-engine workbench with hot-reload and test-run. |
-| Export | Deterministic `.cxpkg` archives; loadable by any other player without recompilation. |
-| Validation | Editor runs the same validators as `cx-mod` package validator: missing fields, broken refs, AI policy violations, accessibility floor checks per DR-012. |
+| Export | Deterministic `.cfpkg` archives; loadable by any other player without recompilation. |
+| Validation | Editor runs the same validators as `cf-mod` package validator: missing fields, broken refs, AI policy violations, accessibility floor checks per DR-012. |
 | Procedural generation | Procedural contracts use the same manifest schema; the generator is one of multiple author paths. |
 | Sharing | Local export at launch; backend-mediated sharing post-launch per [[decisions/dr-013-backend-service-scope]]. |
-| Mod relationship | The editor IS the mod authoring tool for scenarios. Other content classes (chassis, equipment, AI doctrines) use sibling `cx-mod` workflows per DR-006. |
+| Mod relationship | The editor IS the mod authoring tool for scenarios. Other content classes (chassis, equipment, AI doctrines) use sibling `cf-mod` workflows per DR-006. |
 
 ## What This Does NOT Lock
 
@@ -64,7 +64,7 @@ revisit_trigger: "Editor authoring proves too steep for typical players; or the 
 | Manifest schema collides with engine evolution | Migration handlers per DR-029; editor refuses to load incompatible schemas with a clear message. |
 | AI-validation false positives block authors | Validators emit reasoned warnings, not silent fails. Workbench shows "fixable" vs "blocking" issues. |
 | Sharing latency / quality control post-launch | Sharing posture is local-export at launch; backend-mediated sharing is a post-launch DR. |
-| Editor competes with engine UI for `cx-render-2d` cycles | Editor mode is a workbench layer that can disable game rendering during heavy authoring. |
+| Editor competes with engine UI for `cf-render-2d` cycles | Editor mode is a workbench layer that can disable game rendering during heavy authoring. |
 
 ## Prototype / Validation Plan
 

@@ -29,7 +29,7 @@ feeds:
 | 3 | [[spec/prototype-roadmap]] | Native build roadmap. **Required subsections:** Read Order, Glossary, Agent Implementation Contract, [[spec/prototype-roadmap#Open Decision Gates Protocol\|Open Decision Gates Protocol]], Milestone Handoff Template, Strategic Frame, Stack At A Glance, Repository Layout, Toolchain And Workspace Bootstrap, Per-Crate AGENTS.md Template, Logging/Tracing/Error Policy, Asset/Placeholder Strategy, Testing Layers, [[spec/prototype-roadmap#CLI Reference\|CLI Reference]], Control Transport And Envelope, Scenario Manifest Schema, Run-Bundle Naming Convention, Bug Log Format, Per-Milestone Kickoff Smoke, the assigned milestone's Detail section (with its **Open DR gates** row), Validation Command Matrix, Bug Hunt Checklist, Definition Of Done, Anti-Goals. |
 | 4 | [[spec/native-implementation-backlog]] | Global Rules + Standard Validation + the assigned milestone's task cards. |
 | 5 | [[spec/feature-completion-checklist]] | Update Rules For Agents + [[spec/feature-completion-checklist#open-decision-gates-checklist\|Open Decision Gates Checklist]] + Server/MMO + Material/T-MAT addenda + the assigned milestone's scope/done/task rows. |
-| 6 | [[spec/ai-control-observability-layer]] | Eyes/ears/hands rule. Every player-facing surface MUST be reachable from `cxctl`. |
+| 6 | [[spec/ai-control-observability-layer]] | Eyes/ears/hands rule. Every player-facing surface MUST be reachable from `cfctl`. |
 | 7 | [[references/prototype-run-bundle-schema]] | Run-bundle schema, event category baseline, native milestone acceptance gates. |
 | 8 | [[decisions/index]] + [[dashboards/decision-tracker]] | Current DR status + still-open topics. |
 
@@ -63,7 +63,7 @@ feeds:
 
 | Feature Topic | Read |
 |---|---|
-| Any UI surface | [[spec/ai-control-observability-layer]] (must be reachable from `cxctl`), [[spec/ux-wireframes-slice-a]], [[spec/accessibility-comfort-slice-a]]. |
+| Any UI surface | [[spec/ai-control-observability-layer]] (must be reachable from `cfctl`), [[spec/ux-wireframes-slice-a]], [[spec/accessibility-comfort-slice-a]]. |
 | Any AI behavior | [[decisions/dr-008-ai-architecture]], [[decisions/dr-022-ai-humanlike-bar]], [[decisions/dr-032-hybrid-llm-ai-direction]], [[spec/ai-trust-harness-slice-a]], [[spec/hybrid-llm-ai-plan]]. |
 | Any equipment / loadout work | [[spec/equipment-loadout]], [[references/equipment-cccp-field-map]], [[references/equipment-device-loadout-field-atlas]], [[references/equipment-role-cards-slice-a]]. |
 | Any networking work | [[spec/server-app-architecture]], [[spec/persistent-mmo-architecture]], [[decisions/dr-005-multiplayer-posture]], [[decisions/dr-013-backend-service-scope]], [[decisions/dr-034-dedicated-server-application]], [[decisions/dr-035-persistent-mmo-architecture]]. **Networking transport library is OPEN — confirm with user.** |
@@ -78,7 +78,7 @@ feeds:
 ## Hard Rules The Worker Must Always Follow
 
 1. **[[spec/prototype-roadmap#Open Decision Gates Protocol|Open Decision Gates Protocol]]**: do not silently assume an OPEN DR's lean is locked. Confirm the lean from current evidence or ask the user through the active agent's available user-input/chat mechanism.
-2. **Eyes/ears/hands rule**: every player-facing surface MUST be reachable from `cxctl`. If a UI lacks a `cx-control` path, the milestone is incomplete. See [[spec/ai-control-observability-layer]].
+2. **Eyes/ears/hands rule**: every player-facing surface MUST be reachable from `cfctl`. If a UI lacks a `cf-control` path, the milestone is incomplete. See [[spec/ai-control-observability-layer]].
 3. **Events first**: every behavior that affects player understanding/replay/AI/networking/save/debugging emits an event. See [[references/prototype-run-bundle-schema]].
 4. **Reference repos are read-only**: never edit CCCP/C4/comparable repos.
 5. **Run-bundle evidence required**: every meaningful run emits a checked run bundle under `prototype_runs/native/`.

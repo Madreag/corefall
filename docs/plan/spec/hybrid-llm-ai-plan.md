@@ -68,7 +68,7 @@ Do not:
 |---|---|---|
 | [[decisions/dr-008-ai-architecture]] | Hybrid jobs + utility + scripted hooks; local AI remains open until harness proof. | Keep the DR-008 local stack as the base. Add the LLM as an optional commander/personality layer above it. |
 | [[decisions/dr-022-ai-humanlike-bar]] | AI must satisfy intent, perception, doctrine, mistakes, recovery, strategic adaptation, replay proof, and fairness. | LLMs directly help doctrine, intent, personality, adaptation, and debriefs. They are risky for replay proof and fairness unless sandboxed. |
-| [[spec/ai-control-observability-layer]] | `cx-control`, `cxctl`, structured observations, semantic actions, UI tree, local bot API. | Reuse this as the observation/action boundary for LLM agents, headless eval, and future bot authors. |
+| [[spec/ai-control-observability-layer]] | `cf-control`, `cfctl`, structured observations, semantic actions, UI tree, local bot API. | Reuse this as the observation/action boundary for LLM agents, headless eval, and future bot authors. |
 | [[spec/replay-recorder-slice-a]] | Replay events and snapshots are required early. | Every prompt, compressed observation, proposal, validation result, accepted patch, rejection, and memory write needs replay/run-bundle evidence. |
 | [[spec/native-implementation-backlog]] | M6 local AI currently has no LLM runtime dependency. | Preserve that anti-scope. Add M6.5 after M6 instead of polluting M6. |
 | [[spec/modding-model]] | Modding data and script capability need validation/provenance. | LLM-generated profiles are mod data, not privileged code. They must pass the same schema/workbench validation. |
@@ -131,7 +131,7 @@ Local AI Executor
 
 ## Data Contracts
 
-The LLM layer is data-driven from the start. Schemas live inside the existing `cx-ai` crate under a `mind` submodule (`cx-ai::mind::schema`) plus generated JSON Schemas under `corefall-game/crates/cx-ai/schemas/mind/v<N>/` until the project stabilizes; they are NOT in a separate `cx-ai-mind-schema` crate. Provider adapters live inside `cx-ai::mind::provider`, behind cargo features (`mind-openai`, `mind-anthropic`, `mind-ollama`, `mind-openai-compatible`). The deterministic mock provider is always built. Test scenarios live in `tests/` and content packs live in `content/`, consistent with the workspace layout pinned in [[spec/prototype-roadmap]].
+The LLM layer is data-driven from the start. Schemas live inside the existing `cf-ai` crate under a `mind` submodule (`cf-ai::mind::schema`) plus generated JSON Schemas under `game/crates/cf-ai/schemas/mind/v<N>/` until the project stabilizes; they are NOT in a separate `cf-ai-mind-schema` crate. Provider adapters live inside `cf-ai::mind::provider`, behind cargo features (`mind-openai`, `mind-anthropic`, `mind-ollama`, `mind-openai-compatible`). The deterministic mock provider is always built. Test scenarios live in `tests/` and content packs live in `content/`, consistent with the workspace layout pinned in [[spec/prototype-roadmap]].
 
 ### `MindObservationFrame`
 
@@ -302,7 +302,7 @@ Do not make this part of M0-M6 baseline AI. Add it as a side track and a bridge 
 | Roadmap point | Add / change | Acceptance bar |
 |---|---|---|
 | M0 - Native bootstrap | Add only config stubs and feature flags: `ai_mind.enabled=false`, provider config format, secret redaction policy. | Game starts with no API keys. Config validation rejects secrets in checked fixtures. |
-| T-CONTROL | Ensure the control/observation stream can also feed LLM observation frames. | `cxctl observe --mind-frame squad_alpha` returns compact JSON without screenshots. |
+| T-CONTROL | Ensure the control/observation stream can also feed LLM observation frames. | `cfctl observe --mind-frame squad_alpha` returns compact JSON without screenshots. |
 | M3 - Replay/Event | Add mind event families: `mind.task_created`, `mind.prompt_recorded`, `mind.response_received`, `mind.proposal_validated`, `mind.patch_applied`, `mind.patch_rejected`, `mind.memory_written`. | Replay viewer can show why a mind proposal affected behavior. |
 | M6 - Local AI | Keep local-only. Add hook points for doctrine patches and blackboard goals, but no live LLM dependency. | AI-H tests pass with mock/no provider. |
 | M6.5 - LLM Mind Lab | New milestone. Build provider abstraction, schemas, mock provider, observation compressor, validator, policy compiler, cost/latency telemetry, and one visible doctrine patch in a controlled breach lab. | Local AI continues acting if provider sleeps, fails, times out, or returns invalid output. |
@@ -316,16 +316,16 @@ Do not make this part of M0-M6 baseline AI. Add it as a side track and a bridge 
 
 | ID | Task | Owner crates/modules | Done when |
 |---|---|---|---|
-| T-LLM-001 | Define schemas for `MindObservationFrame`, `MindTask`, `AiMindProposal`, `MindValidationResult`, `MindMemoryRecord`, and `MindProviderConfig`. | `cx-ai::mind::schema` (with generated JSON Schemas under `corefall-game/crates/cx-ai/schemas/mind/v1/`) | JSON/RON schemas exist, examples validate, bad examples fail. |
-| T-LLM-002 | Add deterministic mock provider. | `cx-ai::mind::provider::mock` | Tests can inject canned responses, malformed responses, timeout, cost overflow, and stale response. |
-| T-LLM-003 | Add provider adapter trait and routing config. | `cx-ai::mind::provider` (cargo features `mind-openai`, `mind-anthropic`, `mind-ollama`, `mind-openai-compatible`) | OpenAI-compatible, Anthropic, Ollama, and mock adapters share one interface. Live cloud adapters are feature-gated. |
-| T-LLM-004 | Build observation compressor. | `cx-ai::mind::compressor`, `cx-control`, `cx-replay` | Produces compact, fog-of-war-filtered mind frames from event stream and blackboard. |
-| T-LLM-005 | Build proposal validator. | `cx-ai::mind::validator` | Rejects stale, invalid, impossible, unfair, over-budget, hidden-info, and capability-violating proposals. |
-| T-LLM-006 | Build policy compiler. | `cx-ai::mind::policy` | Accepted proposal can update utility weights, commander blackboard, actor doctrine tags, dialogue queue, and memory. |
-| T-LLM-007 | Add replay/run-bundle events. | `cx-replay`, `cx-ai::mind::events`, `tools/run_bundle_check.py` (event-category extension) | Every mind task and outcome can be audited without exposing secrets. |
-| T-LLM-008 | Add latency/cost/rate budget dashboard. | `cx-ui`, `cx-tools-editor` (workbench panel) | Dev can see task count, stale rate, provider failures, estimated cost, model routing, and accept/reject reasons. |
-| T-LLM-009 | Add profile/workbench authoring. | `cx-tools-editor`, `content/mind/profiles/` | Designer can create a cautious medic, aggressive breacher, shield commander, rival raider, or base defense mind pack. |
-| T-LLM-010 | Add AI-H/MIND eval scenarios. | `tests/`, `cx-headless`, `cx-bench` | Headless test suite proves local AI independence, proposal usefulness, fairness, and visible "why" labels. |
+| T-LLM-001 | Define schemas for `MindObservationFrame`, `MindTask`, `AiMindProposal`, `MindValidationResult`, `MindMemoryRecord`, and `MindProviderConfig`. | `cf-ai::mind::schema` (with generated JSON Schemas under `game/crates/cf-ai/schemas/mind/v1/`) | JSON/RON schemas exist, examples validate, bad examples fail. |
+| T-LLM-002 | Add deterministic mock provider. | `cf-ai::mind::provider::mock` | Tests can inject canned responses, malformed responses, timeout, cost overflow, and stale response. |
+| T-LLM-003 | Add provider adapter trait and routing config. | `cf-ai::mind::provider` (cargo features `mind-openai`, `mind-anthropic`, `mind-ollama`, `mind-openai-compatible`) | OpenAI-compatible, Anthropic, Ollama, and mock adapters share one interface. Live cloud adapters are feature-gated. |
+| T-LLM-004 | Build observation compressor. | `cf-ai::mind::compressor`, `cf-control`, `cf-replay` | Produces compact, fog-of-war-filtered mind frames from event stream and blackboard. |
+| T-LLM-005 | Build proposal validator. | `cf-ai::mind::validator` | Rejects stale, invalid, impossible, unfair, over-budget, hidden-info, and capability-violating proposals. |
+| T-LLM-006 | Build policy compiler. | `cf-ai::mind::policy` | Accepted proposal can update utility weights, commander blackboard, actor doctrine tags, dialogue queue, and memory. |
+| T-LLM-007 | Add replay/run-bundle events. | `cf-replay`, `cf-ai::mind::events`, `tools/run_bundle_check.py` (event-category extension) | Every mind task and outcome can be audited without exposing secrets. |
+| T-LLM-008 | Add latency/cost/rate budget dashboard. | `cf-ui`, `cf-tools-editor` (workbench panel) | Dev can see task count, stale rate, provider failures, estimated cost, model routing, and accept/reject reasons. |
+| T-LLM-009 | Add profile/workbench authoring. | `cf-tools-editor`, `content/mind/profiles/` | Designer can create a cautious medic, aggressive breacher, shield commander, rival raider, or base defense mind pack. |
+| T-LLM-010 | Add AI-H/MIND eval scenarios. | `tests/`, `cf-headless`, `cf-bench` | Headless test suite proves local AI independence, proposal usefulness, fairness, and visible "why" labels. |
 
 ## New Milestone: M6.5 - LLM Mind Lab
 

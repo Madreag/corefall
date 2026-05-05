@@ -33,7 +33,7 @@ This DR ratifies what [[comparables/noita-grade-material-simulation-research]] r
 | Pipe/power/signal networks | Stationeers-style atmosphere/pipe/power networks for base equipment (oxygen generators, pumps, vents, filters, sensors, doors, alarms). Sensor-readable + AI-controllable. |
 | AI hazard perception | AI reads material/hazard/pressure/electricity fields with the same data players see. AI affordance tags (avoid, seek, use-as-weapon, extinguish-with, neutralize-with, vent, pump). |
 | Replay determinism | Material kernel is deterministic; same seed/inputs produce identical material checksums. Same authoritative server-replay model as DR-005 / DR-034. |
-| Observation API | `cxctl observe --materials`, `cxctl observe --atmospheres`, `cxctl observe --reactions` for AI agents and tests. New `material`, `reaction`, `atmosphere`, and `affliction` event categories. |
+| Observation API | `cfctl observe --materials`, `cfctl observe --atmospheres`, `cfctl observe --reactions` for AI agents and tests. New `material`, `reaction`, `atmosphere`, and `affliction` event categories. |
 | Performance posture | Active-region budgets per chunk; sleeping chunks; LOD; dirty rects; material kernel chunked at 64×64 minimum (Noita pattern). |
 | Modding | Material schema is moddable per DR-006; mods declare reactions, materials, ingestion effects, pipe devices, AI affordances. Server-side mod compatibility enforced per DR-034. |
 | Anti-cheat / fairness | Server-authoritative material state in multiplayer per DR-005. Bounded active regions; material events from outside interest range are not delivered. |

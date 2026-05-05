@@ -16,13 +16,13 @@ revisit_trigger: "Save migration breaks under a real upgrade; or replay-linked s
 
 ## Decision
 
-**`.cxsave` is a versioned local file format with explicit migration handlers.** Every save carries a schema version and pointers to its replay archive. Saves capture the full campaign state needed to continue: command core state, base modules, actors/veterans, mechs, salvage, faction state, enemy commander memory, mission manifests, scenario policy, and replay archive references.
+**`.cfsave` is a versioned local file format with explicit migration handlers.** Every save carries a schema version and pointers to its replay archive. Saves capture the full campaign state needed to continue: command core state, base modules, actors/veterans, mechs, salvage, faction state, enemy commander memory, mission manifests, scenario policy, and replay archive references.
 
 ## What This Locks In
 
 | Aspect | Commitment |
 |---|---|
-| Format | `.cxsave` versioned local file (binary or compressed JSON; TBD during M5). |
+| Format | `.cfsave` versioned local file (binary or compressed JSON; TBD during M5). |
 | Storage | Local disk by default. Cloud sync optional post-launch. |
 | Slots | Multiple per profile; ironman locks one slot to in-place autosave. |
 | Autosave | Before/after every contract; before risky branch points. |

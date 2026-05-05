@@ -27,13 +27,13 @@ This closes the engine-stack subdecision that DR-001 intentionally left for the 
 | Language | Rust (edition 2021+). |
 | App shell, ECS, windowing, input, asset pipeline, hot reload | Bevy. |
 | Renderer foundation | wgpu via Bevy where it fits; **custom wgpu-first** for terrain/sprite/particle hot paths that need to hit 4K/120. |
-| Sim core | Custom `cx-sim-core` crate with fixed-tick scheduler. |
-| Pixel terrain | Custom `cx-terrain` crate (chunked, GPU-assisted carving). |
-| Body/chassis/mech model | Custom `cx-chassis` crate. |
-| AI | Custom `cx-ai` crate (perception, memory, doctrine, reason labels per [[decisions/dr-022-ai-humanlike-bar]]). |
-| Replay/event | Custom `cx-replay` crate per [[decisions/dr-002-replay-event-architecture]]. |
-| Networking | Custom `cx-net` crate built on a transport (lightyear / renet / quinn TBD). |
-| Save | Custom `cx-save` crate per [[decisions/dr-029-save-game-model]]. |
+| Sim core | Custom `cf-sim-core` crate with fixed-tick scheduler. |
+| Pixel terrain | Custom `cf-terrain` crate (chunked, GPU-assisted carving). |
+| Body/chassis/mech model | Custom `cf-chassis` crate. |
+| AI | Custom `cf-ai` crate (perception, memory, doctrine, reason labels per [[decisions/dr-022-ai-humanlike-bar]]). |
+| Replay/event | Custom `cf-replay` crate per [[decisions/dr-002-replay-event-architecture]]. |
+| Networking | Custom `cf-net` crate built on a transport (lightyear / renet / quinn TBD). |
+| Save | Custom `cf-save` crate per [[decisions/dr-029-save-game-model]]. |
 | UI | egui (Bevy plugin) for tools/workbench; custom Bevy UI or egui-skinned for game HUD. |
 | Audio | Bevy audio backend or kira. |
 | Modding scripts | mlua (Lua) or Rhai — pick during M5 implementation. |
@@ -69,11 +69,11 @@ This closes the engine-stack subdecision that DR-001 intentionally left for the 
 
 | Risk | Mitigation |
 |---|---|
-| Bevy breaking changes | Pin version; treat upgrades as scheduled work; isolate Bevy-facing surface in `cx-app` plus a few thin plugins. |
+| Bevy breaking changes | Pin version; treat upgrades as scheduled work; isolate Bevy-facing surface in `cf-app` plus a few thin plugins. |
 | Custom wgpu hot-path is more work than expected | Start with off-the-shelf Bevy renderer; introduce custom wgpu only where perf demands. CPU fallback for terrain carving always present. |
 | GPU-assisted terrain carving differs Metal/Vulkan/DX12 | wgpu abstracts; CPU fallback always present; CI tests all three platforms per DR-025. |
 | Lua vs Rhai decision drift | Forced decision at M5; pick based on real script needs from chassis/AI work. |
-| Determinism leaks through Bevy's frame loop | `cx-sim-core` runs fixed-tick on its own schedule; rendering decoupled. Audited at every milestone end via [[decisions/dr-002-replay-event-architecture]]. |
+| Determinism leaks through Bevy's frame loop | `cf-sim-core` runs fixed-tick on its own schedule; rendering decoupled. Audited at every milestone end via [[decisions/dr-002-replay-event-architecture]]. |
 
 ## Prototype / Validation Plan
 

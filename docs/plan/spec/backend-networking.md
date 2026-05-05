@@ -9,7 +9,7 @@ ready_when: "DR-005/DR-013/DR-034/DR-035 stay coherent; M9-M12 bandwidth/server 
 # Backend / Networking Posture
 
 > [!info] Current posture
-> [[decisions/dr-013-backend-service-scope]] sets the backend service boundary: build a local-first service spine for solo/private play, then extend the same contracts into `cx-server`, `lobby_directory`, public-server discovery, account adapters for public shards, anti-cheat foundation, and MMO persistence as M9-M12 evidence matures. Economy/gacha layers remain separate research tracks.
+> [[decisions/dr-013-backend-service-scope]] sets the backend service boundary: build a local-first service spine for solo/private play, then extend the same contracts into `cf-server`, `lobby_directory`, public-server discovery, account adapters for public shards, anti-cheat foundation, and MMO persistence as M9-M12 evidence matures. Economy/gacha layers remain separate research tracks.
 
 ## Service Scope Summary
 

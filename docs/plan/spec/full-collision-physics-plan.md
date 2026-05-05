@@ -233,7 +233,7 @@ These tests become M5.5 and T-PHYS requirements.
 | COLL-007 | High-speed projectile and falling body cross terrain chunk boundaries, tiny holes, and edge contacts without tunneling. | CCD plus terrain proxy seams. |
 | COLL-008 | Debris/mech/base-object impact can damage armor, limbs, equipment, and modules by impulse. | Physics-caused damage. |
 | COLL-009 | Full Collision Gauntlet replays headlessly with identical contact ids/checksums. | Replay/determinism readiness. |
-| COLL-010 | `cxctl observe --collisions` streams current contact pairs, collision filters, and last 30 collision events. | AI/dev eyes-and-ears can inspect physics directly. |
+| COLL-010 | `cfctl observe --collisions` streams current contact pairs, collision filters, and last 30 collision events. | AI/dev eyes-and-ears can inspect physics directly. |
 | COLL-011 | Perf run hits target budgets at 1080p/60 and records 4K/120/Deck status. | Performance guardrail. |
 | COLL-012 | AI pathing and behavior reacts to body blocking, debris, locked doors, and new terrain contacts with reason labels. | AI does not ignore the physical world. |
 
@@ -249,7 +249,7 @@ These tests become M5.5 and T-PHYS requirements.
 | M5.5 | Full Collision Gauntlet: matrix, projectile-projectile, limb/equipment/body/debris/mech/base contacts, CCD, impulse damage, replay/perf proof. |
 | M6 | AI harness consumes collision affordances and reason-labels collision-aware choices. |
 | M7 | Mission director and base systems rely on doors/shields/turrets/repair pads being real collision objects. |
-| M9+ | `cx-headless` and `cx-server` deterministic islands decide which collision pairs are authoritative for LAN, online co-op, public PvP, and persistent MMO shards. |
+| M9+ | `cf-headless` and `cf-server` deterministic islands decide which collision pairs are authoritative for LAN, online co-op, public PvP, and persistent MMO shards. |
 
 ## Research Synthesis
 
@@ -306,12 +306,12 @@ Hard rules:
 - Projectiles must collide with bodies, armor, equipment, terrain, shields, and selected projectile classes.
 - Kinetic bullet-bullet contacts deflect/fragment/lose energy unless the projectile profile says explosive/fuze behavior.
 - Physics impulse can damage limbs, armor, equipment, chassis modules, terrain, and base objects.
-- Every meaningful contact must be observable through `cxctl`, replay events, and run bundles.
+- Every meaningful contact must be observable through `cfctl`, replay events, and run bundles.
 
 Done when:
 - COLL-001..COLL-012 pass.
-- `cargo run -p cx-e2e -- --scenario m5_5_full_collision_gauntlet --suite COLL-001..COLL-012 --write-run-bundle` passes.
-- `cargo run -p cx-headless -- replay <m5_5_run_bundle> --verify-checksums` passes.
+- `cargo run -p cf-e2e -- --scenario m5_5_full_collision_gauntlet --suite COLL-001..COLL-012 --write-run-bundle` passes.
+- `cargo run -p cf-headless -- replay <m5_5_run_bundle> --verify-checksums` passes.
 - Perf report records 1080p/60 pass and 4K/120 + Deck status.
 - Vault prototype note contains final audit, bug log, known issues, and links to run bundle.
 ```

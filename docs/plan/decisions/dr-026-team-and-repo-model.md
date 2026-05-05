@@ -22,7 +22,7 @@ revisit_trigger: "Modular crate boundaries fail under integration; or AI-augment
 
 | Aspect | Commitment |
 |---|---|
-| Repo layout | Cargo workspace at `corefall-game/` with one crate per feature subsystem. See [[spec/prototype-roadmap]] Repository Layout. |
+| Repo layout | Cargo workspace at `game/` with one crate per feature subsystem. See [[spec/prototype-roadmap]] Repository Layout. |
 | Inter-crate boundaries | Public APIs are traits + types + event structs. Internal data structures stay private. |
 | Agent ownership | Each AI agent task names the crate(s) it owns. Cross-crate work requires an explicit handoff or merge. |
 | Build hygiene | `cargo check` + `cargo test` + `cargo clippy -- -D warnings` are CI-enforced on every PR. |
@@ -67,7 +67,7 @@ revisit_trigger: "Modular crate boundaries fail under integration; or AI-augment
 |---|---|
 | M0 — Workspace builds with the crate split. | Cargo workspace pattern works. |
 | M1..M3 — Each milestone is delivered as PRs that touch a small set of crates with clean boundaries. | Boundary discipline holds under real work. |
-| M5 — One AI-agent-driven PR adds a new chassis archetype using only `cx-chassis` + a content directory. | Agent-owned-feature model works in practice. |
+| M5 — One AI-agent-driven PR adds a new chassis archetype using only `cf-chassis` + a content directory. | Agent-owned-feature model works in practice. |
 | M8 — Mod loader proves the boundary contract: a third-party mod adds a chassis without modifying core crates. | The same boundaries that serve agents serve modders. |
 
 ## Revisit Trigger

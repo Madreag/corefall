@@ -12,7 +12,7 @@ revisit_trigger: "Networking transport library proves infeasible after M9/M10 pr
 # DR-005: Multiplayer Architecture And Launch Scope
 
 > [!success] Status: CLOSED-DIRECTION (project owner committed 2026-05-05)
-> Multiplayer/PvP/MMO capability is an architecture commitment from day one, not an afterthought: **solo + split-screen-ready local play + LAN co-op + online co-op + community-hostable PvP arenas + persistent MMO shards** all route through one server-authoritative `cx-server` design (DR-034). PvP arenas and MMO shards are full-product targets proven at M12; if their evidence gates fail, DR-005/DR-035 reopen instead of silently blocking earlier first-playable milestones.
+> Multiplayer/PvP/MMO capability is an architecture commitment from day one, not an afterthought: **solo + split-screen-ready local play + LAN co-op + online co-op + community-hostable PvP arenas + persistent MMO shards** all route through one server-authoritative `cf-server` design (DR-034). PvP arenas and MMO shards are full-product targets proven at M12; if their evidence gates fail, DR-005/DR-035 reopen instead of silently blocking earlier first-playable milestones.
 
 ## Decision
 
@@ -36,11 +36,11 @@ This DR replaces the prior "solo-first + co-op-ready architecture; no launch PvP
 | Architectural Pin | Commitment |
 |---|---|
 | Authority | 100% server-authoritative for sim state, terrain mutation, AI decisions, mission director, save persistence. Clients use prediction + reconciliation only for player-driven actor. |
-| Server binary | One `cx-server` binary with `--mode <coop_room\|pvp_arena\|lan_room\|mmo_shard\|lobby_directory\|ranked_arena>`. Same sim, terrain, physics, equipment, chassis, AI, replay, mod, control as the client. See [[spec/server-app-architecture]]. |
+| Server binary | One `cf-server` binary with `--mode <coop_room\|pvp_arena\|lan_room\|mmo_shard\|lobby_directory\|ranked_arena>`. Same sim, terrain, physics, equipment, chassis, AI, replay, mod, control as the client. See [[spec/server-app-architecture]]. |
 | Hosting | Community-hostable by default. Steam Datagram Relay / EOS / PlayFab / Unity Multiplay are **adapters**, not requirements. |
 | Account | **Not required** for solo or private LAN/co-op rooms. Required for public shards (per DR-035). |
 | Anti-cheat | Server-authoritative validation as a foundation; tournament-grade is post-launch. Anti-cheat profiles: `casual`, `competitive`, `tournament_strict`. |
-| Modding | Server runs the same `cx-mod` package format as the client; mod hash sync is mandatory; trust tiers gate per-server admission (DR-006). |
+| Modding | Server runs the same `cf-mod` package format as the client; mod hash sync is mandatory; trust tiers gate per-server admission (DR-006). |
 | Replay determinism | Server-authoritative replay; per-client run bundles align tick-for-tick (DR-002). |
 | LLM mind | Mind workers may run server-side (DR-032); clients see reason labels only, never prompts. |
 | Networking transport | Decided in M9/M10: candidate trait-bound implementations of `lightyear`, `renet`, `quinn`. Selection committed before M11 begins. |
@@ -55,7 +55,7 @@ This DR replaces the prior "solo-first + co-op-ready architecture; no launch PvP
 | Client-authoritative sim state | Cheating risk; replay/determinism risk; networking instability. Server is authoritative for everything that matters. |
 | Forced first-party hosting | Architecture supports community hosting first; first-party is optional adapter. |
 | Forced account systems for private play | Solo and LAN/private co-op work without any account. |
-| Different sim logic for server vs client | One `cx-sim-core`; server omits render/audio crates only. |
+| Different sim logic for server vs client | One `cf-sim-core`; server omits render/audio crates only. |
 | Brute-force replication | Use snapshot/event hybrid + interest management per DR-002 + persistent MMO architecture. |
 | Subscription-funded MMO | Conflicts with DR-031 content economy. |
 
@@ -87,7 +87,7 @@ This DR replaces the prior "solo-first + co-op-ready architecture; no launch PvP
 | Mod compatibility across servers | Hash sync; trust tiers; clear mismatch UI; auto-download off by default for production. |
 | MMO persistence corruption | Atomic snapshot writes; journal replay validation; rolling backups (DR-035). |
 | Community hosting cost / availability | First-party Docker images + reference deployments; `lobby_directory` aggregates community shards; we don't take responsibility for uptime of community shards. |
-| Networking transport churn | Trait-bound `cx-net` adapter; selection committed before M11; library swap is local to one crate. |
+| Networking transport churn | Trait-bound `cf-net` adapter; selection committed before M11; library swap is local to one crate. |
 | Platform certification (Steam/EOS) | Adapters; can launch on Steam without locking to Steam-only. |
 | Replay drift across clients | Stable pair ordering, deterministic islands, per-client checksums in M10/M11 acceptance tests. |
 | Operator burnout | Minimal-config dedicated server; reference Docker; community templates; T-SERVER side track tracks ops UX. |
@@ -101,7 +101,7 @@ This DR replaces the prior "solo-first + co-op-ready architecture; no launch PvP
 | M11 online co-op | Two friends in different cities co-op a Breach Contract through NAT/relay; mod hash sync works. |
 | M12 PvP arena | 4-8 players in a small destructible map; server-authoritative; bandwidth + cheat models tested. |
 | M12 MMO-001..MMO-012 | MMO shard mode boots, persists, restarts cleanly; 50 simulated clients for 1 hour; 100 for 30 min. |
-| Headless replay verification | `cx-headless replay --verify-checksums` per-client and per-server bundles align tick-for-tick. |
+| Headless replay verification | `cf-headless replay --verify-checksums` per-client and per-server bundles align tick-for-tick. |
 | Anti-cheat profile validation | Input-rate-spike client kicked; ban list persists across restart. |
 
 ## Revisit Trigger

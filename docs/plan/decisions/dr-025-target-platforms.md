@@ -28,7 +28,7 @@ This DR closes the platform reach question and defines the perf floors and ceili
 | Linux (Ubuntu LTS + Steam Runtime baseline) | First-class launch target. |
 | macOS (Apple Silicon + Intel) | First-class launch target. |
 | Steam Deck (Linux + Proton) | First-class compatibility target. 800p/60 floor per DR-028. |
-| Headless Linux server | Milestone 9 deliverable; runs `cx-headless` binary without graphics drivers per [[decisions/dr-005-multiplayer-posture]]. |
+| Headless Linux server | Milestone 9 deliverable; runs `cf-headless` binary without graphics drivers per [[decisions/dr-005-multiplayer-posture]]. |
 | Web (lab, tools, demos) | Optional; build via wasm if needed; not a launch surface. |
 | Mobile (iOS/Android) | NOT a launch target. Possible after launch as a separate spinoff if the design proves it can shrink. |
 | Console (Switch/PS/Xbox) | Not committed. Possible after launch via Steam Deck-tested portable build. |
@@ -55,7 +55,7 @@ This DR closes the platform reach question and defines the perf floors and ceili
 - Project owner verbatim (2026-05-04 stack round): "Windows + Linux + macOS desktop-first; Steam Deck floor; headless Linux server later; web only for labs/tools/demos; no mobile."
 - Cross-platform CI is enforceable on all three desktop targets via GitHub Actions per DR-024.
 - Steam Deck inherits Linux build path; perf budget per DR-028.
-- Headless Linux server is a natural outcome of the deterministic-island sim core per DR-002 and the cx-net crate per DR-024.
+- Headless Linux server is a natural outcome of the deterministic-island sim core per DR-002 and the cf-net crate per DR-024.
 
 ## Risks
 
@@ -74,7 +74,7 @@ This DR closes the platform reach question and defines the perf floors and ceili
 | M0 — CI matrix green on Win/Linux/macOS. | All three desktop targets build and test. |
 | M0 — Project owner runs the build on macOS personally. | macOS is not just a CI green — it works locally. |
 | M2/M5 — Steam Deck reference scene runs at 800p/60. | Floor target is hit with carving + chassis. |
-| M9 — Headless `cx-headless` binary on a Linux VPS. | Server target works without graphics. |
+| M9 — Headless `cf-headless` binary on a Linux VPS. | Server target works without graphics. |
 
 ## Revisit Trigger
 

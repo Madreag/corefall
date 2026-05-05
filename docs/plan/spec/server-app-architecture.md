@@ -3,7 +3,7 @@ type: spec
 status: closed-direction
 created: 2026-05-05
 authority: "Closed-direction architecture for the dedicated server application. Anyone can host. Same binary serves co-op, PvP, and persistent MMO shards."
-ready_when: "M9 ships cx-server with a working dedicated build and core server suite, M11 proves a community member can host an internet-reachable co-op session, and M12 proves PvP + MMO shard modes with the same binary."
+ready_when: "M9 ships cf-server with a working dedicated build and core server suite, M11 proves a community member can host an internet-reachable co-op session, and M12 proves PvP + MMO shard modes with the same binary."
 feeds:
   - DR-002
   - DR-005
@@ -24,13 +24,13 @@ feeds:
 
 ← [[spec/index|spec section]] · [[spec/prototype-roadmap|native roadmap]] · [[spec/native-implementation-backlog|native backlog]] · [[spec/persistent-mmo-architecture|persistent MMO architecture]] · [[spec/backend-networking|backend networking]] · [[decisions/dr-005-multiplayer-posture|DR-005]] · [[decisions/dr-013-backend-service-scope|DR-013]] · [[decisions/dr-034-dedicated-server-application|DR-034]]
 
-# Server App Architecture (`cx-server`)
+# Server App Architecture (`cf-server`)
 
 > [!summary] Direction
-> A single dedicated server binary (`cx-server`) is a full-product artifact. Anyone can host any supported game mode (co-op, PvP arena, persistent MMO shard) with no proprietary dependency. The server is a first-class native artifact alongside the client app, modding tools, and scenario editor.
+> A single dedicated server binary (`cf-server`) is a full-product artifact. Anyone can host any supported game mode (co-op, PvP arena, persistent MMO shard) with no proprietary dependency. The server is a first-class native artifact alongside the client app, modding tools, and scenario editor.
 
 > [!important] Hard rules
-> Every gameplay mode is server-authoritative. The client app and `cx-server` share the **same** sim core, terrain, physics, equipment, chassis, AI, replay, mod loader, and `cx-control` schemas. There is no "server-only" branch of game logic. Public dedicated servers do not require an Anthropic/OpenAI/Steam/Epic account; cloud features are optional adapters.
+> Every gameplay mode is server-authoritative. The client app and `cf-server` share the **same** sim core, terrain, physics, equipment, chassis, AI, replay, mod loader, and `cf-control` schemas. There is no "server-only" branch of game logic. Public dedicated servers do not require an Anthropic/OpenAI/Steam/Epic account; cloud features are optional adapters.
 
 ## Purpose
 
@@ -44,7 +44,7 @@ The dedicated server app exists so that:
 
 ## Single Binary, Multiple Modes
 
-`cx-server` runs in one of these modes selected at launch:
+`cf-server` runs in one of these modes selected at launch:
 
 | Mode | Purpose | Player Count Target | Persistence |
 |---|---|---|---|
@@ -61,18 +61,18 @@ Mode selection is a single `--mode` flag; per-mode config files live in `content
 
 | Crate / Binary | Role |
 |---|---|
-| `cx-server` (binary) | Dedicated server entry point; pulls `cx-sim-core`, `cx-terrain`, `cx-physics`, `cx-actor`, `cx-chassis`, `cx-equipment`, `cx-ai`, `cx-mission`, `cx-replay`, `cx-net`, `cx-control`, `cx-save`, `cx-mod`. No `cx-render-2d`, `cx-ui`, `cx-audio`. |
-| `cx-server-ops` (library) | Lifecycle: config loader, mode selector, health/readiness, metrics, log shipping, shutdown drain, restart hooks. |
-| `cx-server-persistence` (library) | MMO shard persistence: snapshot/restore, durable event store, cross-tick journaling, migration handlers. (M12 / DR-035) |
-| `cx-server-anti-cheat` (library) | Server-side validation of client inputs, replay-driven anomaly detection, rate limits, capability gates. Extension trait + cargo features. |
-| `cx-server-admin` (library) | Admin/console API: kick, ban, save, restart, mode switch, scenario load. JSON-RPC over the same `cx-control` envelope, behind capability gate `admin`. |
-| `cx-headless` (existing) | Stays as the headless sim runner used by replay verification and CI; `cx-server` consumes it for the deterministic island. |
+| `cf-server` (binary) | Dedicated server entry point; pulls `cf-sim-core`, `cf-terrain`, `cf-physics`, `cf-actor`, `cf-chassis`, `cf-equipment`, `cf-ai`, `cf-mission`, `cf-replay`, `cf-net`, `cf-control`, `cf-save`, `cf-mod`. No `cf-render-2d`, `cf-ui`, `cf-audio`. |
+| `cf-server-ops` (library) | Lifecycle: config loader, mode selector, health/readiness, metrics, log shipping, shutdown drain, restart hooks. |
+| `cf-server-persistence` (library) | MMO shard persistence: snapshot/restore, durable event store, cross-tick journaling, migration handlers. (M12 / DR-035) |
+| `cf-server-anti-cheat` (library) | Server-side validation of client inputs, replay-driven anomaly detection, rate limits, capability gates. Extension trait + cargo features. |
+| `cf-server-admin` (library) | Admin/console API: kick, ban, save, restart, mode switch, scenario load. JSON-RPC over the same `cf-control` envelope, behind capability gate `admin`. |
+| `cf-headless` (existing) | Stays as the headless sim runner used by replay verification and CI; `cf-server` consumes it for the deterministic island. |
 
-> The dedicated server keeps the **exact same** `cx-control` envelope as the client. `cxctl` can drive a `cx-server` instance for testing, automation, MMO ops, and anti-cheat audits.
+> The dedicated server keeps the **exact same** `cf-control` envelope as the client. `cfctl` can drive a `cf-server` instance for testing, automation, MMO ops, and anti-cheat audits.
 
 ## Configuration Model
 
-Server config is RON, validated by `cx-mod validate`:
+Server config is RON, validated by `cf-mod validate`:
 
 ```ron
 ServerConfig(
@@ -126,10 +126,10 @@ Adding a new field bumps `schema_version`; older configs migrate via registered 
 ## Core Loop
 
 1. Parse CLI/config; validate against schema.
-2. Load `package_set` + `mod_packs` via `cx-mod`; refuse on hash mismatch unless `--allow-package-mismatch` (debug only).
-3. Initialize `cx-sim-core` fixed-tick loop and the chosen mode's scenario manifest.
-4. Open `cx-net` listener (transport per DR-005); admit clients per capability gates and rate limits.
-5. Per tick: drain `cx-control` actions from clients, validate via anti-cheat, run sim, emit events, broadcast snapshots/event deltas, write replay events.
+2. Load `package_set` + `mod_packs` via `cf-mod`; refuse on hash mismatch unless `--allow-package-mismatch` (debug only).
+3. Initialize `cf-sim-core` fixed-tick loop and the chosen mode's scenario manifest.
+4. Open `cf-net` listener (transport per DR-005); admit clients per capability gates and rate limits.
+5. Per tick: drain `cf-control` actions from clients, validate via anti-cheat, run sim, emit events, broadcast snapshots/event deltas, write replay events.
 6. Periodically: persist (MMO mode), rotate logs, expose metrics, run health/readiness probes.
 7. On shutdown: drain clients with reason, finalize replay archive, flush persistence, signal exit code.
 
@@ -139,7 +139,7 @@ The sim tick rate matches the client (60 Hz default; 120 Hz option). Render is a
 
 | Domain | Authority |
 |---|---|
-| Player input | Client sends `cx-control` actions; server validates against capability + rate limit + anti-cheat profile; only accepted actions enter the sim. |
+| Player input | Client sends `cf-control` actions; server validates against capability + rate limit + anti-cheat profile; only accepted actions enter the sim. |
 | Sim state | 100% server-authoritative. Clients receive snapshots + event deltas; clients use prediction + reconciliation only for player-driven actor (per DR-005). |
 | Terrain mutation | Server-authoritative. Clients render dirty regions delivered by snapshot/event deltas. |
 | AI decisions | Server-authoritative. Clients see reason labels via event stream. |
@@ -159,18 +159,18 @@ Transport is decided per-mode (per DR-005):
 | `mmo_shard` | QUIC-based (`quinn`); long-lived connections; per-region UDP relay if needed. | Steam Datagram Relay / EOS / PlayFab as optional adapters. |
 | `lobby_directory` | HTTPS REST + WebSocket for live presence. | Steam server browser / EOS lobby adapters. |
 
-Final transport library selection is the open follow-up tracked under [[decisions/index]] still-open topics; `cx-net` exposes adapters behind a single trait so swapping transports is local to one crate (per DR-024).
+Final transport library selection is the open follow-up tracked under [[decisions/index]] still-open topics; `cf-net` exposes adapters behind a single trait so swapping transports is local to one crate (per DR-024).
 
 ## Modding And Package Compatibility
 
 | Aspect | Pin |
 |---|---|
-| Server-side mods | Yes. The same `cx-mod` package format runs on both client and server. |
+| Server-side mods | Yes. The same `cf-mod` package format runs on both client and server. |
 | Hash sync | Mandatory. On client join, the server requires a matching package set hash (chassis, equipment, materials, scenarios, AI doctrines, mind packs). Mismatch produces a clean error with downloadable manifest of differences. |
 | Auto-download | Optional per server config; off by default for production servers. Dev workflows can enable it. |
 | Server-only mods | Allowed (admin tools, tournament rules). Marked with `server_only: true` in the package manifest; clients see a per-server policy summary, never raw mod code. |
 | Trust tiers | Mods declare trust tier (`vanilla`, `verified`, `community`, `experimental`); servers can pin a maximum trust tier accepted from clients. |
-| Sandbox | Mod scripts run in `cx-mod`'s sandboxed deterministic island per DR-006; non-deterministic ops are forbidden in sim-tick scope on both client and server. |
+| Sandbox | Mod scripts run in `cf-mod`'s sandboxed deterministic island per DR-006; non-deterministic ops are forbidden in sim-tick scope on both client and server. |
 
 ## Anti-Cheat Foundation
 
@@ -181,7 +181,7 @@ Final transport library selection is the open follow-up tracked under [[decision
 | Capability gates | `admin`, `debug`, `god`, `teleport`, `force_damage`, `reveal_map` all off by default; require server config opt-in. |
 | Anomaly profiles | `casual`, `competitive`, `tournament_strict`. Thresholds for input rate, snapshot drift, modding, and reason-label coverage. |
 | Audit log | Every rejection writes a `system.anti_cheat_*` event in the replay/run-bundle for offline review. |
-| Bans | Server-side ban list (steam id / account id / IP / hash); persisted via `cx-server-persistence`. |
+| Bans | Server-side ban list (steam id / account id / IP / hash); persisted via `cf-server-persistence`. |
 
 This is **a foundation**, not a full anti-cheat product. Tournament-grade anti-cheat is post-launch; the foundation is sufficient for community servers and the MMO mode default profile.
 
@@ -193,7 +193,7 @@ Every server build ships with:
 - Prometheus-compatible metrics endpoint (`/metrics`); per-mode default scrape interval.
 - Health endpoint (`/health`) and readiness endpoint (`/ready`) per DR-013.
 - Replay archive directory; per-session run bundles, retention configurable.
-- `cxctl` admin commands (capability-gated) for live introspection: tick rate, client list, anti-cheat events, mod hash status, persistence status, AI mind queue depth.
+- `cfctl` admin commands (capability-gated) for live introspection: tick rate, client list, anti-cheat events, mod hash status, persistence status, AI mind queue depth.
 
 ## Hosting Posture
 
@@ -207,7 +207,7 @@ Every server build ships with:
 | Cloud one-click deploy | Future. We provide Docker images and reference Terraform/systemd/launchd configs; partners or community build the rest. |
 | MMO publisher hosting | Optional. We architect for community hosting; first-party MMO hosting is a business decision, not a technical lock-in. |
 
-The default ship state is: **a player downloads `cx-server`, fills in 5 config fields, runs it, opens a port, and friends join.** No account required for private servers.
+The default ship state is: **a player downloads `cf-server`, fills in 5 config fields, runs it, opens a port, and friends join.** No account required for private servers.
 
 ## Cross-DR Anchors
 
@@ -215,7 +215,7 @@ The default ship state is: **a player downloads `cx-server`, fills in 5 config f
 |---|---|
 | DR-005 multiplayer architecture | Defines the modes ladder; this spec implements it. |
 | DR-013 backend services | Defines services architecture; this spec is the gameplay-server portion. |
-| DR-024 native engine stack | `cx-server` is a Rust binary in the same workspace. |
+| DR-024 native engine stack | `cf-server` is a Rust binary in the same workspace. |
 | DR-026 team/repo model | Crates per concern; modular for AI agents. |
 | DR-029 save game model | Server-side persistence reuses save schema + migration handlers. |
 | DR-031 content economy | Community hosting fits the premium + free modding posture; no marketplace cut. |
@@ -230,17 +230,17 @@ The default ship state is: **a player downloads `cx-server`, fills in 5 config f
 
 | ID | Milestone Gate | What It Proves |
 |---|---|---|
-| SERVER-001 | M9 core | `cx-server --mode coop_room --scenario breach_contract` boots, accepts 2 clients, runs the mission to completion, archives a run bundle. |
-| SERVER-002 | M12 PvP | `cx-server --mode pvp_arena` runs a 4-player match server-authoritatively; client-side prediction + reconciliation visible in events. |
-| SERVER-003 | M10 LAN | `cx-server --mode lan_room` is auto-discovered by client on the same LAN; ready-up + start works. |
-| SERVER-004 | M12 MMO | `cx-server --mode mmo_shard` runs for 1 hour with simulated 50 clients (headless); persistence snapshot every 10 minutes; restart resumes from snapshot. |
+| SERVER-001 | M9 core | `cf-server --mode coop_room --scenario breach_contract` boots, accepts 2 clients, runs the mission to completion, archives a run bundle. |
+| SERVER-002 | M12 PvP | `cf-server --mode pvp_arena` runs a 4-player match server-authoritatively; client-side prediction + reconciliation visible in events. |
+| SERVER-003 | M10 LAN | `cf-server --mode lan_room` is auto-discovered by client on the same LAN; ready-up + start works. |
+| SERVER-004 | M12 MMO | `cf-server --mode mmo_shard` runs for 1 hour with simulated 50 clients (headless); persistence snapshot every 10 minutes; restart resumes from snapshot. |
 | SERVER-005 | M10/M11 | Mod hash mismatch on join produces actionable error: client sees package diff and a download/repair route. |
-| SERVER-006 | M9 core | Server replay verifies headlessly with `cx-headless replay --verify-checksums`. |
-| SERVER-007 | M10/M11 | Per-client run bundles align tick-for-tick (`cx-headless replay-compare`). |
+| SERVER-006 | M9 core | Server replay verifies headlessly with `cf-headless replay --verify-checksums`. |
+| SERVER-007 | M10/M11 | Per-client run bundles align tick-for-tick (`cf-headless replay-compare`). |
 | SERVER-008 | M11/M12 | Anti-cheat profile `competitive` rejects an input-rate-spike client and logs `system.anti_cheat_kicked` event with reason; `tournament_strict` is opt-in for ranked/tournament later. |
-| SERVER-009 | M9 core | Admin command via `cxctl --capability admin` kicks a client, saves the shard/session, hot-loads a scenario. |
+| SERVER-009 | M9 core | Admin command via `cfctl --capability admin` kicks a client, saves the shard/session, hot-loads a scenario. |
 | SERVER-010 | M9 core | Health + readiness endpoints work in container mode; metrics endpoint exposes per-tick budget, client count, replay queue depth. |
-| SERVER-011 | M9 core | `cx-server` binary launches and exits cleanly on Linux + Windows. macOS support is nice-to-have. |
+| SERVER-011 | M9 core | `cf-server` binary launches and exits cleanly on Linux + Windows. macOS support is nice-to-have. |
 | SERVER-012 | M12 integration | LLM mind layer runs server-side per DR-032; clients never see prompts; replay records hashed prompts only. |
 | SERVER-013 | M9/M11 | Server-side mod (admin tool / tournament ruleset) loads with `server_only: true` and is invisible to clients. |
 | SERVER-014 | M9 core | Capability `god`/`debug` is off by default; requires explicit config opt-in; opt-in is recorded in run-bundle manifest. |

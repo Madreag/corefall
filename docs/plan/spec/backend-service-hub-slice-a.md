@@ -9,7 +9,7 @@ ready_when: "A static/heartbeat backend, hub browser, join-eligibility resolver,
 # Backend Service And Hub Slice A
 
 > [!summary] Purpose
-> Convert the OpenSoldat base/launcher/lobby audit plus current platform research into a concrete first backend/frontend slice. [[decisions/dr-013-backend-service-scope]] sets the boundary: local-first service spine first, with the same contracts extending into `cx-server`, `lobby_directory`, public-server discovery, public-shard account adapters, anti-cheat foundation, and MMO persistence as M9-M12 mature. This slice is **not** a commitment to ranked matchmaking, gacha, cloud-only hosting, or a live-service economy.
+> Convert the OpenSoldat base/launcher/lobby audit plus current platform research into a concrete first backend/frontend slice. [[decisions/dr-013-backend-service-scope]] sets the boundary: local-first service spine first, with the same contracts extending into `cf-server`, `lobby_directory`, public-server discovery, public-shard account adapters, anti-cheat foundation, and MMO persistence as M9-M12 mature. This slice is **not** a commitment to ranked matchmaking, gacha, cloud-only hosting, or a live-service economy.
 
 > [!tip] UX companion
 > Hub layout, server-row readability, join blockers, replay browsing, diagnostics, and settings/accessibility flows are translated into screen requirements in [[spec/ux-wireframes-slice-a]].

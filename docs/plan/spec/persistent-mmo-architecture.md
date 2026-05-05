@@ -2,7 +2,7 @@
 type: spec
 status: closed-direction
 created: 2026-05-05
-authority: "Closed-direction architecture for persistent MMO shard mode. The MMO shard is one full-product target mode of cx-server; community-hostable; not subscription-funded."
+authority: "Closed-direction architecture for persistent MMO shard mode. The MMO shard is one full-product target mode of cf-server; community-hostable; not subscription-funded."
 ready_when: "M12 ships an MMO shard mode capable of 50-200 concurrent players for 1+ hour with persistence snapshots and clean restart."
 feeds:
   - DR-002
@@ -24,7 +24,7 @@ feeds:
 # Persistent MMO Architecture
 
 > [!summary] Direction
-> A "persistent MMO shard" is one full-product target mode of `cx-server` (DR-034). A shard is a long-running world hosting 50-200 concurrent players in a contract-based frontier sandbox. Multiple shards can run independently; cross-shard travel is via lobby/portal at v1, not seamless world. Anyone can host a shard; first-party hosting is optional. M12 proves readiness and reopens DR-035 if the target fails.
+> A "persistent MMO shard" is one full-product target mode of `cf-server` (DR-034). A shard is a long-running world hosting 50-200 concurrent players in a contract-based frontier sandbox. Multiple shards can run independently; cross-shard travel is via lobby/portal at v1, not seamless world. Anyone can host a shard; first-party hosting is optional. M12 proves readiness and reopens DR-035 if the target fails.
 
 > [!important] Bounds
 > This is **not** EVE Online, **not** WoW, **not** Star Citizen. It is **Cortex Command's contract-and-base sandbox at MMO scale** with persistent factions, named actors, salvage economies, and player-built bases. The MMO mode borrows from Project Zomboid dedicated servers, Space Station 13/14 round-based persistence, and EVE-class server architecture, **without** committing to seamless single-shard world or full simulation of every shard tick.
@@ -45,7 +45,7 @@ feeds:
 
 ## Shard Topology
 
-Each shard is one process running `cx-server --mode mmo_shard`. A shard owns:
+Each shard is one process running `cf-server --mode mmo_shard`. A shard owns:
 
 - One persistent world manifest (region map, materials, hazards, faction territories).
 - One persistent state store (snapshot files + durable event journal).
@@ -95,7 +95,7 @@ Storage: defaults to local filesystem (`./shard-state/<shard-id>/`). Operators c
 
 Per fixed tick (60 Hz default; 30 Hz acceptable for MMO mode if perf demands):
 
-1. Drain client `cx-control` actions; rate-limit per anti-cheat profile.
+1. Drain client `cf-control` actions; rate-limit per anti-cheat profile.
 2. Tick sim systems for all actors in active region(s).
 3. Run mission director and faction commander logic.
 4. Process LLM mind proposals (background; never blocking).
@@ -148,13 +148,13 @@ Audit logs are append-only and operator-readable. Player appeals are out-of-game
 | Server-only mods | Allowed for admin tools, tournament rules, shard-specific quests, special events. Clients never see source. |
 | Persistence migration | Mod schema bumps require server-side migration handlers; shards refuse to load incompatible mod versions without registered migrations. |
 | Trust | Operators pin a max trust tier accepted from clients (`vanilla`, `verified`, `community`, `experimental`). |
-| Sandbox | Mod scripts run in `cx-mod` deterministic island per DR-006; non-deterministic ops forbidden. |
+| Sandbox | Mod scripts run in `cf-mod` deterministic island per DR-006; non-deterministic ops forbidden. |
 
 ## Cross-Shard, Lobby, And Discovery
 
 | Surface | Pin |
 |---|---|
-| Lobby/portal | Players discover shards via a `lobby_directory` instance (also a `cx-server` mode). Multiple lobby instances can exist. |
+| Lobby/portal | Players discover shards via a `lobby_directory` instance (also a `cf-server` mode). Multiple lobby instances can exist. |
 | Shard browse | Filter by mode, region, ping, player count, package set, ruleset, trust tier. |
 | Cross-shard travel | Player logs out on Shard A, logs in on Shard B; no live cross-shard combat or trade in v1. |
 | Identity persistence | Account id + per-shard veteran roster persist; cross-shard veteran transfer is **not** v1. |
@@ -179,10 +179,10 @@ Audit logs are append-only and operator-readable. Player appeals are out-of-game
 
 | ID | What It Proves |
 |---|---|
-| MMO-001 | `cx-server --mode mmo_shard` boots with default config; 1 player connects and roams the world. |
+| MMO-001 | `cf-server --mode mmo_shard` boots with default config; 1 player connects and roams the world. |
 | MMO-002 | Snapshot persists every 10 minutes; shard restart resumes from snapshot in <30 s with no state loss. |
 | MMO-003 | Event journal supports point-in-time recovery; crash/kill -9 + restart resumes within 1 minute with at most 1 minute of journal replay. |
-| MMO-004 | 50 simulated clients (headless `cxctl` puppets) connect and play for 1 hour without desync; sim stays at 30 Hz target. |
+| MMO-004 | 50 simulated clients (headless `cfctl` puppets) connect and play for 1 hour without desync; sim stays at 30 Hz target. |
 | MMO-005 | 100 simulated clients sustained for 30 minutes; perf report records frame budgets and degraded modes. |
 | MMO-006 | Two shards run concurrently on different ports; lobby/portal lists both; player log-out from Shard A and log-in on Shard B works. |
 | MMO-007 | Mod hash mismatch on join produces actionable diff; auto-download disabled by default. |
@@ -218,7 +218,7 @@ Audit logs are append-only and operator-readable. Player appeals are out-of-game
 | DR-031 content economy | MMO is community-runnable; no subscription; operators may monetize hosting independently. |
 | DR-032 hybrid LLM AI | Mind workers run server-side; per-shard cost cap. |
 | DR-033 full collision physics | Server-authoritative collision; clients consume `collision.*` events. |
-| DR-034 dedicated server app | The `cx-server` binary's `mmo_shard` mode is the implementation surface for this spec. |
+| DR-034 dedicated server app | The `cf-server` binary's `mmo_shard` mode is the implementation surface for this spec. |
 | DR-035 persistent MMO architecture | The closed-direction commitment captured by this spec. |
 
 ## Source Trail

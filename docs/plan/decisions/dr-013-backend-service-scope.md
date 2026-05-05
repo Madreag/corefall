@@ -25,8 +25,8 @@ This DR replaces the prior "local-first service spine + optional adapters" lean.
 | Service Tier | Status | Notes |
 |---|---|---|
 | Local game services (health, schema, package registry, join eligibility, deep-link parser, local replay/report index, diagnostics export, redaction) | **Required at launch.** Same shape as the prior Slice A. | Files-on-disk + in-process services for solo/private play. |
-| Local server supervisor | **Required at launch.** | Drives `cx-server` lifecycle from the client when the player hosts. |
-| `lobby_directory` service | Required for public server/shard discovery; optional for private deployments. | Aggregates community-hosted shards; multiple instances can exist. Also one of the `cx-server --mode` options (DR-034). |
+| Local server supervisor | **Required at launch.** | Drives `cf-server` lifecycle from the client when the player hosts. |
+| `lobby_directory` service | Required for public server/shard discovery; optional for private deployments. | Aggregates community-hosted shards; multiple instances can exist. Also one of the `cf-server --mode` options (DR-034). |
 | Account/identity adapter | Required for public shards. Optional for private play. | Plug-in: local account file (private), `lobby_directory` token (community), Steam/EOS/PlayFab adapters (post-launch ready). |
 | Server discovery / browser | Required for public online modes. | Filter by mode, region, ping, player count, package set, ruleset, trust tier. |
 | Package / mod registry | **Required at launch.** | Package hashes + manifest summaries + dependency graph; reused by client, server, and editor. |
@@ -75,7 +75,7 @@ This DR replaces the prior "local-first service spine + optional adapters" lean.
 
 - Project owner verbatim (2026-05-05): "I want to have an entire server app designed to run our app. anyone can host multiplayer games, as well as the persistent MMO mode."
 - DR-005 multiplayer architecture closes with full ladder including community-hosted PvP and MMO shards.
-- DR-034 dedicated server app commits to `cx-server` as a launch artifact.
+- DR-034 dedicated server app commits to `cf-server` as a launch artifact.
 - DR-035 persistent MMO architecture commits to community-hostable shards.
 - Source patterns: Steamworks Game Servers + Steam Datagram Relay (community-hostable + relay-optional), EOS sessions/lobbies/relay (modular), PlayFab multiplayer (modular), Unity Multiplay readiness (process+ready separation), OpenSoldat satellites (launcher/lobby/base content separation), Project Zomboid dedicated server (community ops), Space Station 14 (round-based persistence + community).
 - Cross-DR coherence: DR-013's prior "local-first + optional adapters" lean is preserved as the default solo/private posture; the closed-direction now explicitly extends scope to public services as full-product architecture proven in M9-M12.
@@ -85,10 +85,10 @@ This DR replaces the prior "local-first service spine + optional adapters" lean.
 | Tier | Services | Status | Why |
 |---|---|---|---|
 | Local game core (Slice A) | health, schema/version report, local package registry, join eligibility, deep-link parser, local server supervisor, local replay/report index, diagnostics export, privacy redaction. | Required at launch. | Solo/local play, package compatibility, workbench UX, recorder evidence; same as prior Slice A. |
-| Server lifecycle (Slice B) | `cx-server-ops` health/readiness/metrics, log shipping, drain shutdown, restart hooks. | **Required at launch.** | DR-034 dedicated server app. |
+| Server lifecycle (Slice B) | `cf-server-ops` health/readiness/metrics, log shipping, drain shutdown, restart hooks. | **Required at launch.** | DR-034 dedicated server app. |
 | Server discovery (Slice B) | `lobby_directory` service: shard list, presence, package set summary, trust tier, ping. | **Required at launch.** | DR-005 community hosting + DR-035 MMO discovery. |
 | Account/identity adapter (Slice B) | Local account, lobby token, Steam/EOS/PlayFab adapter shapes. | **Required at launch** for public shards. | DR-035 account model. |
-| Persistence (Slice B) | `cx-server-persistence` snapshot store + event journal + durable storage adapter. | **Required at launch.** | DR-035 MMO mode. |
+| Persistence (Slice B) | `cf-server-persistence` snapshot store + event journal + durable storage adapter. | **Required at launch.** | DR-035 MMO mode. |
 | Anti-cheat foundation (Slice B) | Server-side validation hooks, profiles, ban list, audit log. | **Required at launch.** | DR-005 anti-cheat foundation. |
 | Replay / report sharing (Slice C) | Optional opt-in upload of run-bundle metadata; replay browser. | Optional, post-launch. | Retention/community surface. |
 | First-party server browser cluster | Cloud-hosted aggregation across community lobby_directory instances. | Optional, post-launch. | Convenience; community can run without it. |
@@ -107,7 +107,7 @@ This DR replaces the prior "local-first service spine + optional adapters" lean.
 | BACK-ACCOUNT-01 | Local account file works for private LAN; Steam adapter resolves identity for public shard; tokens never appear in run bundles. |
 | BACK-PERSIST-01 | Snapshot store + journal restore reproduces shard state within 1 minute of crash. |
 | BACK-ANTI-CHEAT-01 | Server-side rate limit + replay drift detection + ban list persists. |
-| BACK-OPS-01 | Reference Docker image runs `cx-server` unchanged; `/health` + `/ready` + `/metrics` work. |
+| BACK-OPS-01 | Reference Docker image runs `cf-server` unchanged; `/health` + `/ready` + `/metrics` work. |
 
 ## Risks And Mitigations
 

@@ -34,17 +34,17 @@ Screenshots and video captures remain useful evidence, but they are not the prim
 
 | Layer | Purpose | First Milestone |
 |---|---|---|
-| `cx-control` crate | Shared command/observation/event schemas. | M0 |
+| `cf-control` crate | Shared command/observation/event schemas. | M0 |
 | Local control server | JSON-RPC or compact JSON messages over localhost WebSocket plus optional Unix domain socket / named pipe. | M0/M1 |
-| CLI client | `cxctl` for scripts: load scenario, step, observe, act, replay, assert, dump bundle. | M0/M1 |
-| Headless/server bridge | Same commands work in `cx-headless` and capability-gated `cx-server`; rendering is optional. | M3/M9 |
+| CLI client | `cfctl` for scripts: load scenario, step, observe, act, replay, assert, dump bundle. | M0/M1 |
+| Headless/server bridge | Same commands work in `cf-headless` and capability-gated `cf-server`; rendering is optional. | M3/M9 |
 | UI semantic tree | Query/click/type/focus every UI action by stable id, role, label, state, and bounds. | M4 |
 | Bot SDK surface | Versioned API for player bots and modded agents, backed by the same command/observation schemas. | M6/M8 |
 
 Recommended initial transport: localhost-only WebSocket JSON-RPC because it is easy for any AI agent (Codex, Factory droids, Claude Code, Cursor), Python, Node, browser tools, and future community bot authors. Keep the schema transport-neutral so it can later run over UDS, pipes, replay files, or server-authoritative net channels.
 
 > [!info] Transport pin
-> The concrete transport (JSON-RPC 2.0 over WebSocket on `127.0.0.1:17890`, optional UDS, mandatory `schema_version`, heartbeat) is pinned in [[spec/prototype-roadmap#Control Transport And Envelope]]. Schemas live under `corefall-game/crates/cx-control/schemas/v<N>/`.
+> The concrete transport (JSON-RPC 2.0 over WebSocket on `127.0.0.1:17890`, optional UDS, mandatory `schema_version`, heartbeat) is pinned in [[spec/prototype-roadmap#Control Transport And Envelope]]. Schemas live under `game/crates/cf-control/schemas/v<N>/`.
 
 ### Concrete Envelope Examples
 
@@ -88,7 +88,7 @@ Streaming observation notification:
 Schema-version mismatch:
 
 ```json
-{ "jsonrpc": "2.0", "id": 7, "error": { "code": -32602, "message": "InvalidParams", "data": { "reason": "schema_version_mismatch", "server_version": 1, "client_version": 2, "fix_hint": "Upgrade cxctl to v0.2 or pin client schema_version: 1" } } }
+{ "jsonrpc": "2.0", "id": 7, "error": { "code": -32602, "message": "InvalidParams", "data": { "reason": "schema_version_mismatch", "server_version": 1, "client_version": 2, "fix_hint": "Upgrade cfctl to v0.2 or pin client schema_version: 1" } } }
 ```
 
 ### Versioning
@@ -121,7 +121,7 @@ Every observation packet should include enough data for an AI agent to decide an
 
 ## Action Model
 
-The automation layer should only expose actions that map to real gameplay or UI affordances unless an explicit debug capability is enabled. **The rule is: any pixel a human can interact with on screen, the AI must be able to drive through `cxctl`.**
+The automation layer should only expose actions that map to real gameplay or UI affordances unless an explicit debug capability is enabled. **The rule is: any pixel a human can interact with on screen, the AI must be able to drive through `cfctl`.**
 
 | Action Family | Examples |
 |---|---|
@@ -140,95 +140,95 @@ The automation layer should only expose actions that map to real gameplay or UI 
 All action requests should return `accepted`, `rejected`, or `queued`, with a reason label and the tick where the command took effect.
 
 > [!important] Coverage rule
-> If a human can do it on screen — click a button, drag a slider, type into a textbox, press a key, hover for a tooltip, switch tabs, scrub a replay, save/load, change a setting, queue an order, switch doctrine, change camera — the AI worker MUST be able to do the same thing through `cxctl` or the JSON-RPC envelope. Screenshot-only debugging is not a substitute. If a UI surface lacks a `cx-control` path, the milestone is incomplete.
+> If a human can do it on screen — click a button, drag a slider, type into a textbox, press a key, hover for a tooltip, switch tabs, scrub a replay, save/load, change a setting, queue an order, switch doctrine, change camera — the AI worker MUST be able to do the same thing through `cfctl` or the JSON-RPC envelope. Screenshot-only debugging is not a substitute. If a UI surface lacks a `cf-control` path, the milestone is incomplete.
 
 ## Minimum Commands
 
-During development, invoke the CLI as `cargo run -p cxctl -- ...` until a local `cxctl` binary is installed or added to PATH. The examples below use the shorter installed-binary form.
+During development, invoke the CLI as `cargo run -p cfctl -- ...` until a local `cfctl` binary is installed or added to PATH. The examples below use the shorter installed-binary form.
 
 ```text
 # Scenario / sim flow
-cxctl scenario load micro_breach --seed 42
-cxctl pause
-cxctl step --ticks 60
-cxctl resume
-cxctl run --ticks 600 --write-run-bundle
+cfctl scenario load micro_breach --seed 42
+cfctl pause
+cfctl step --ticks 60
+cfctl resume
+cfctl run --ticks 600 --write-run-bundle
 
 # Observation (eyes/ears)
-cxctl observe --once --format json
-cxctl observe --stream --hz 30
-cxctl observe --hud --stream --hz 10
-cxctl observe --captions --stream --hz 10
-cxctl observe --mission --once
-cxctl observe --debrief --once
-cxctl observe --ai --stream --hz 5
-cxctl observe --base --once
-cxctl observe --camera --once
-cxctl observe --collisions --stream --hz 30
-cxctl observe --materials --stream --hz 30 --scope chunk:0,0
-cxctl observe --atmospheres --stream --hz 10
-cxctl observe --reactions --stream --hz 30
-cxctl observe --replay --once
-cxctl observe --perf --stream --hz 1
-cxctl observe --settings --once
+cfctl observe --once --format json
+cfctl observe --stream --hz 30
+cfctl observe --hud --stream --hz 10
+cfctl observe --captions --stream --hz 10
+cfctl observe --mission --once
+cfctl observe --debrief --once
+cfctl observe --ai --stream --hz 5
+cfctl observe --base --once
+cfctl observe --camera --once
+cfctl observe --collisions --stream --hz 30
+cfctl observe --materials --stream --hz 30 --scope chunk:0,0
+cfctl observe --atmospheres --stream --hz 10
+cfctl observe --reactions --stream --hz 30
+cfctl observe --replay --once
+cfctl observe --perf --stream --hz 1
+cfctl observe --settings --once
 
 # Inspection (deep dives)
-cxctl inspect actor alpha:0
-cxctl inspect equipment alpha:0:weapon
-cxctl inspect chassis alpha:0
-cxctl inspect mission --with-events
-cxctl inspect base core:0 --with-events
-cxctl inspect objective breach.win
-cxctl inspect order alpha:1:move-to-7
-cxctl inspect affliction alpha:0:burning
-cxctl inspect collision <event-id> --with-parents --with-children
-cxctl inspect material <event-id>
-cxctl inspect reaction <event-id>
-cxctl inspect event <event-id> --depth 5
+cfctl inspect actor alpha:0
+cfctl inspect equipment alpha:0:weapon
+cfctl inspect chassis alpha:0
+cfctl inspect mission --with-events
+cfctl inspect base core:0 --with-events
+cfctl inspect objective breach.win
+cfctl inspect order alpha:1:move-to-7
+cfctl inspect affliction alpha:0:burning
+cfctl inspect collision <event-id> --with-parents --with-children
+cfctl inspect material <event-id>
+cfctl inspect reaction <event-id>
+cfctl inspect event <event-id> --depth 5
 
 # Player actions (hands)
-cxctl act move --x 1.0
-cxctl act aim --world 320,140
-cxctl act fire --pressed true
-cxctl act reload
-cxctl act use-tool digger
-cxctl act switch-item --slot primary
+cfctl act move --x 1.0
+cfctl act aim --world 320,140
+cfctl act fire --pressed true
+cfctl act reload
+cfctl act use-tool digger
+cfctl act switch-item --slot primary
 
 # Tactical actions
-cxctl act tactical select alpha:1
-cxctl act tactical order move-to --target 320,140 --reason "flank_left"
-cxctl act tactical order breach --target door:0 --reason "objective_ingress"
-cxctl act tactical doctrine cautious --unit alpha:1
+cfctl act tactical select alpha:1
+cfctl act tactical order move-to --target 320,140 --reason "flank_left"
+cfctl act tactical order breach --target door:0 --reason "objective_ingress"
+cfctl act tactical doctrine cautious --unit alpha:1
 
 # Camera + UI
-cxctl act camera mode tactical-map
-cxctl act camera follow alpha:0
-cxctl ui tree --with-bounds
-cxctl ui click loadout.confirm
-cxctl ui hover hud.module.jet
-cxctl ui set settings.ui_scale 200
-cxctl ui type chat.input "covering fire on left"
-cxctl ui press Tab
-cxctl ui press Ctrl+S
-cxctl ui assert hud.objective contains "Breach"
-cxctl ui focus settings.captions
+cfctl act camera mode tactical-map
+cfctl act camera follow alpha:0
+cfctl ui tree --with-bounds
+cfctl ui click loadout.confirm
+cfctl ui hover hud.module.jet
+cfctl ui set settings.ui_scale 200
+cfctl ui type chat.input "covering fire on left"
+cfctl ui press Tab
+cfctl ui press Ctrl+S
+cfctl ui assert hud.objective contains "Breach"
+cfctl ui focus settings.captions
 
 # Save / settings / mods
-cxctl act save save 1 --description "before final breach"
-cxctl act save load 1
-cxctl act settings set captions on --persist
-cxctl act keybind primary_fire MouseLeft
-cxctl act mod validate --pack sample_breach --strict
+cfctl act save save 1 --description "before final breach"
+cfctl act save load 1
+cfctl act settings set captions on --persist
+cfctl act keybind primary_fire MouseLeft
+cfctl act mod validate --pack sample_breach --strict
 
 # Director (debug-gated)
-cxctl act director phase escalation --reason "scripted_test"
+cfctl act director phase escalation --reason "scripted_test"
 
 # Assertion + replay
-cxctl assert objective.result == win
-cxctl replay verify prototype_runs/native/<run_id>
-cxctl replay scrub prototype_runs/native/<run_id> --tick 1850
-cxctl runbundle write
-cxctl health --format json
+cfctl assert objective.result == win
+cfctl replay verify prototype_runs/native/<run_id>
+cfctl replay scrub prototype_runs/native/<run_id> --tick 1850
+cfctl runbundle write
+cfctl health --format json
 ```
 
 ## Latency And Throughput Targets
@@ -255,35 +255,35 @@ cxctl health --format json
 
 | Milestone | Required Integration |
 |---|---|
-| M0 | Define `cx-control` schemas; expose `observe --once`, `run --ticks`, `pause`, `step`, run-bundle hooks. |
+| M0 | Define `cf-control` schemas; expose `observe --once`, `run --ticks`, `pause`, `step`, run-bundle hooks. |
 | M1 | Control movement/aim/fire/reload through the command API; stream actor/equipment observations. |
-| M1.5 | Script both win and loss Micro Breach runs entirely through `cxctl`; no manual input required for E2E. |
+| M1.5 | Script both win and loss Micro Breach runs entirely through `cfctl`; no manual input required for E2E. |
 | M2 | Add terrain patch/material/affordance observations and dig/refusal actions. |
 | M3 | Replay control commands and verify action/event timing. |
 | M4 | Expose semantic UI tree and UI actions; screenshots become audit evidence, not control dependency. |
 | M5 | Expose equipment, chassis, armor, damage-stage, eject, repair, and salvage observations/actions. |
-| M5.5 | Expose `cxctl observe --collisions` and `cxctl inspect collision <event-id>` for collision matrix, live contacts, filters, projectile-projectile outcomes, impulse damage, CCD/TOI, and collision budget state (see [[spec/full-collision-physics-plan]] and [[decisions/dr-033-full-collision-physics-direction]]). |
-| M5.6 | Expose `cxctl observe --materials`, `cxctl inspect material <cell-or-region>`, and deterministic material/reaction event chains for active-region CA, material transitions, containment, fire/liquid/gas/electric interactions, and material budget state (see [[comparables/noita-grade-material-simulation-research]] and [[decisions/dr-036-systemic-material-simulation-direction]]). |
+| M5.5 | Expose `cfctl observe --collisions` and `cfctl inspect collision <event-id>` for collision matrix, live contacts, filters, projectile-projectile outcomes, impulse damage, CCD/TOI, and collision budget state (see [[spec/full-collision-physics-plan]] and [[decisions/dr-033-full-collision-physics-direction]]). |
+| M5.6 | Expose `cfctl observe --materials`, `cfctl inspect material <cell-or-region>`, and deterministic material/reaction event chains for active-region CA, material transitions, containment, fire/liquid/gas/electric interactions, and material budget state (see [[comparables/noita-grade-material-simulation-research]] and [[decisions/dr-036-systemic-material-simulation-direction]]). |
 | M6 | Reuse the same layer for AI-H harness bots; bot decisions cite observation fields and event ids. |
-| M6.5 | Derive `MindObservationFrame` from this layer with fog-of-war filtering; expose `cxctl observe --mind-frame <scope>` for LLM mind workers (see [[spec/hybrid-llm-ai-plan]] and [[decisions/dr-032-hybrid-llm-ai-direction]]). |
+| M6.5 | Derive `MindObservationFrame` from this layer with fog-of-war filtering; expose `cfctl observe --mind-frame <scope>` for LLM mind workers (see [[spec/hybrid-llm-ai-plan]] and [[decisions/dr-032-hybrid-llm-ai-direction]]). |
 | M6.6 | Add AI-facing material competence observations: hazard labels, safe/unsafe material affordances, containment opportunities, and explainable avoidance/rescue decisions. |
 | M7 | Scenario director, command-core/base-power, debrief, and retry are controllable/queryable. |
-| M7.5 | Expose `cxctl observe --atmospheres`, room pressure/oxygen/toxin state, leak paths, powered doors/vents/shields, and base-life-support events for command-core/base atmospherics. |
+| M7.5 | Expose `cfctl observe --atmospheres`, room pressure/oxygen/toxin state, leak paths, powered doors/vents/shields, and base-life-support events for command-core/base atmospherics. |
 | M8 | Editor and mod tooling expose semantic UI and package validation commands. |
 | M8.5 | Material lab scenarios expose fixture setup, reaction assertions, material sample export/import, and player-authored material test bundles through the same control contract. |
-| M9 | `cx-server` exposes the same `cx-control` envelope for admin (capability-gated) + observation. `cxctl --target server://host:port` connects to a running server for ops/audit (see [[spec/server-app-architecture]] and [[decisions/dr-034-dedicated-server-application]]). |
+| M9 | `cf-server` exposes the same `cf-control` envelope for admin (capability-gated) + observation. `cfctl --target server://host:port` connects to a running server for ops/audit (see [[spec/server-app-architecture]] and [[decisions/dr-034-dedicated-server-application]]). |
 | M10..M12 | Per-client and per-server run bundles use the same envelope; replay/replay-compare verifies multi-client and shard observation streams. |
 | M9+ | Headless/server modes use the same command/observation contract for replay, LAN, online, public PvP, and persistent MMO shards. |
 
 ### Derived: Mind Observation Frames
 
-The full observation stream is the source of truth. Mind workers (LLM advisors, DR-032 / [[spec/hybrid-llm-ai-plan]]) consume a **derived, compact, fog-of-war-filtered subset** called `MindObservationFrame`. The compressor lives in `cx-ai::mind::compressor` and reads from this layer. Fog-of-war is enforced **before** any provider sees a prompt.
+The full observation stream is the source of truth. Mind workers (LLM advisors, DR-032 / [[spec/hybrid-llm-ai-plan]]) consume a **derived, compact, fog-of-war-filtered subset** called `MindObservationFrame`. The compressor lives in `cf-ai::mind::compressor` and reads from this layer. Fog-of-war is enforced **before** any provider sees a prompt.
 
-`cxctl observe --mind-frame <scope>` returns a single frame for `actor`, `squad`, `faction`, `mission_director`, or `post_mission` scope (with optional `--ref <id>` to pin the subject). This is the same semantic surface that mind workers consume; CI uses it for fairness audits.
+`cfctl observe --mind-frame <scope>` returns a single frame for `actor`, `squad`, `faction`, `mission_director`, or `post_mission` scope (with optional `--ref <id>` to pin the subject). This is the same semantic surface that mind workers consume; CI uses it for fairness audits.
 
 ### Derived: Collision Observation Frames
 
-The full observation stream also exposes a collision-focused view for T-PHYS and M5.5. `cxctl observe --collisions` returns:
+The full observation stream also exposes a collision-focused view for T-PHYS and M5.5. `cfctl observe --collisions` returns:
 
 - active pair ids, entity ids, collision classes, and filter reasons;
 - contact point, normal, TOI fraction, relative velocity, and impulse summary;
@@ -296,7 +296,7 @@ This view is mandatory for implementation agents. They should be able to debug c
 
 ### Derived: Material Observation Frames
 
-The material-focused view is the mandatory debug surface for T-MAT and DR-036. `cxctl observe --materials` and `cxctl observe --atmospheres` return:
+The material-focused view is the mandatory debug surface for T-MAT and DR-036. `cfctl observe --materials` and `cfctl observe --atmospheres` return:
 
 - active-region bounds, dirty cells, material ids, temperature/electric/toxic/flammable state, and material budget counters;
 - liquid/gas/solid layering, containment, leak paths, pressure, oxygen, and toxin summaries;
@@ -313,7 +313,7 @@ This view is required before any material hazard can graduate from lab fixture t
 - Every player-visible control has a matching semantic action or UI command.
 - Every critical state a human can understand from the screen has a structured observation, caption, or event equivalent.
 - Every critical material, atmosphere, collision, and server/shard state has a structured observation or event equivalent before it is treated as milestone-complete.
-- E2E tests for gameplay and UI prefer `cxctl`/control API over OS-level input where possible.
+- E2E tests for gameplay and UI prefer `cfctl`/control API over OS-level input where possible.
 - The interface is documented enough for future bot authors to build against versioned schemas.
 
 ## Source Trail

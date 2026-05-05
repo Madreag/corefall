@@ -48,7 +48,7 @@ feeds:
 # Native Build Roadmap
 
 > [!summary] What this is
-> The native development roadmap. Replaces the prior browser-lab-flavored roadmap in full. The project is a **greenfield Rust native game** built on Bevy + wgpu as foundation, with custom core crates for the systems that make this game special. Targets desktop-first (Win/Linux/macOS) at 4K/120 ceiling with 1080p/60 floor and Steam Deck 800p/60 compatibility. The full-product architecture includes a **dedicated server binary (`cx-server`) anyone can host** for LAN co-op, online co-op, public PvP arenas, and **persistent MMO shards** (DR-005 + DR-013 + DR-034 + DR-035), and **Noita-grade systemic material simulation** (DR-036) where every material is a verb, every reaction has a cause chain, every hazard has an overlay/caption/replay event. M12 proves PvP/MMO readiness; earlier milestones are not blocked on M12-scale soak tests. First-class scenario editor and modding at launch (DR-030 + DR-006).
+> The native development roadmap. Replaces the prior browser-lab-flavored roadmap in full. The project is a **greenfield Rust native game** built on Bevy + wgpu as foundation, with custom core crates for the systems that make this game special. Targets desktop-first (Win/Linux/macOS) at 4K/120 ceiling with 1080p/60 floor and Steam Deck 800p/60 compatibility. The full-product architecture includes a **dedicated server binary (`cf-server`) anyone can host** for LAN co-op, online co-op, public PvP arenas, and **persistent MMO shards** (DR-005 + DR-013 + DR-034 + DR-035), and **Noita-grade systemic material simulation** (DR-036) where every material is a verb, every reaction has a cause chain, every hazard has an overlay/caption/replay event. M12 proves PvP/MMO readiness; earlier milestones are not blocked on M12-scale soak tests. First-class scenario editor and modding at launch (DR-030 + DR-006).
 
 > [!warning] Authority boundary
 > This is a planning anchor. Milestones, ticket counts, and per-feature detail will move as evidence comes in. The structure (M0..M12 + side tracks) is committed. Specific timelines and ticket boundaries will be tuned per milestone.
@@ -138,8 +138,8 @@ If you only have time to read four things before starting work:
 
 If you have more time, also read in roughly this order:
 
-- [[spec/ai-control-observability-layer]] — `cx-control` / `cxctl` / observation stream / UI tree (cross-cutting from M0).
-- [[spec/server-app-architecture]] — `cx-server` dedicated server binary; modes (`coop_room`, `pvp_arena`, `lan_room`, `mmo_shard`, `lobby_directory`); community-hosting posture (T-SERVER / M9..M12).
+- [[spec/ai-control-observability-layer]] — `cf-control` / `cfctl` / observation stream / UI tree (cross-cutting from M0).
+- [[spec/server-app-architecture]] — `cf-server` dedicated server binary; modes (`coop_room`, `pvp_arena`, `lan_room`, `mmo_shard`, `lobby_directory`); community-hosting posture (T-SERVER / M9..M12).
 - [[spec/persistent-mmo-architecture]] — MMO shard mode, persistence, interest management, account model, MMO-001..MMO-012 (M12 / DR-035).
 - [[spec/full-collision-physics-plan]] — collision classes, matrix, projectile-projectile rules, CCD tiers, impulse-to-damage, COLL-001..COLL-012 (T-PHYS / M5.5).
 - [[decisions/dr-036-systemic-material-simulation-direction]] — systemic material direction: bounded active-region CA kernel, reaction table, affliction layer, atmospheres, material lab, AI material competence (T-MAT / M5.6..M8.5).
@@ -161,7 +161,7 @@ A junior agent must never have to guess what these words mean. If a term is used
 | Term | Meaning |
 |---|---|
 | **Actor** | A simulated entity with `Position`, `Velocity`, `Aim`, `Status`, and `Inventory`. Includes infantry, powered armor, and mech-pilot pairs. |
-| **Action** | A semantic player-or-AI request to do something (move, fire, click UI). Routed through `cx-control` and consumed by sim systems on the next fixed tick. |
+| **Action** | A semantic player-or-AI request to do something (move, fire, click UI). Routed through `cf-control` and consumed by sim systems on the next fixed tick. |
 | **Anti-scope** | What a task card must NOT grow into. If you start drifting toward an anti-scope item, stop and write a follow-up task card instead. |
 | **Bevy version** | Pinned in `Cargo.toml`; do not bump without a milestone's explicit upgrade task. |
 | **Broadphase** | The cheap first collision pass that finds possible pairs using spatial structures. Required before narrowphase; brute-force all-pairs is not acceptable for gameplay scale. |
@@ -175,14 +175,14 @@ A junior agent must never have to guess what these words mean. If a term is used
 | **Collision proxy** | Simplified shape used for physics/contact instead of raw art pixels. Examples: capsule limb, convex weapon, chunk terrain outline. |
 | **Command core** | The rooted/uprooted/embedded strategic object that powers the base or boosts a chassis avatar. See [[spec/command-core-base-power]]. |
 | **Contact manifold** | Narrowphase contact result: contact points, normal, depth, time-of-impact fraction, and impulse data. |
-| **`cx-app`** | The Bevy app shell binary; the launcher that wires plugins. |
-| **`cx-control`** | The crate that owns command/observation/UI-tree schemas and the local control server. |
-| **`cxctl`** | The CLI binary for AI/dev control. During M0..M1 use `cargo run -p cxctl -- <subcommand>`; once installed/PATH-ed, `cxctl <subcommand>` is shorthand. |
-| **`cx-e2e`** | A scripted end-to-end runner built on `cx-control`/`cxctl`. Used for milestone E2E proof. |
-| **`cx-headless`** | The headless server binary; same sim, no renderer/audio, network-driven inputs. |
+| **`cf-app`** | The Bevy app shell binary; the launcher that wires plugins. |
+| **`cf-control`** | The crate that owns command/observation/UI-tree schemas and the local control server. |
+| **`cfctl`** | The CLI binary for AI/dev control. During M0..M1 use `cargo run -p cfctl -- <subcommand>`; once installed/PATH-ed, `cfctl <subcommand>` is shorthand. |
+| **`cf-e2e`** | A scripted end-to-end runner built on `cf-control`/`cfctl`. Used for milestone E2E proof. |
+| **`cf-headless`** | The headless server binary; same sim, no renderer/audio, network-driven inputs. |
 | **Determinism island** | A subsystem whose state is bit-deterministic given the same inputs and seed. Cosmetic systems are NOT in determinism islands. |
 | **Doctrine** | A named AI policy bundle (cautious, aggressive, support, scout, sniper, etc.). Influences utility scoring weights. |
-| **E2E** | End-to-end test: runs a scenario from CLI, drives it with `cxctl`/`cx-e2e`, asserts outcomes from observations/events, writes a run bundle. |
+| **E2E** | End-to-end test: runs a scenario from CLI, drives it with `cfctl`/`cf-e2e`, asserts outcomes from observations/events, writes a run bundle. |
 | **Event** | A typed record emitted by sim systems (combat/body/terrain/AI/mission/control/system/etc.). All player-visible behavior emits events. |
 | **Event id** | Stable id of the form `<run_id>:<tick>:<seq>`. Globally unique per run. Used for parent-cause chains. |
 | **Fixed tick** | The 60 Hz (or 120 Hz) sim cadence; render is decoupled and interpolates between ticks. |
@@ -190,44 +190,44 @@ A junior agent must never have to guess what these words mean. If a term is used
 | **Junior agent** | The default reader/implementer of this roadmap. Treat them as competent in Rust and game programming basics, but assume they have NOT read CCCP source, the prior HTML lab, or the rest of this vault. |
 | **`AiMindProposal`** | The strict-schema output an LLM mind worker may produce. Doctrine patches, squad orders, dialogue, memory writes; never raw actions. See [[spec/hybrid-llm-ai-plan]]. |
 | **Manifest (run)** | `run_manifest.json` inside a run bundle. Identifies build, scenario, seed, schema versions, capabilities, expected tests. |
-| **Mind frame** | A compact, fog-of-war-filtered observation packet sent to an LLM mind worker. Derived from the `cx-control` observation stream. |
+| **Mind frame** | A compact, fog-of-war-filtered observation packet sent to an LLM mind worker. Derived from the `cf-control` observation stream. |
 | **Mind task** | A queued LLM request with kind, deadline, cost cap, observation, output schema. Async; never blocks sim. |
 | **Mind worker** | An async background worker that consumes mind tasks and submits validated `AiMindProposal` results. Local AI never waits on it. |
 | **Mock provider** | The deterministic LLM provider used by CI, AI-H, replay, and mind-lab tests. Always built. No API keys. |
-| **`cx-server`** | The dedicated server binary (DR-034). Same Rust workspace; same sim path as the client. Modes: `coop_room`, `pvp_arena`, `lan_room`, `mmo_shard`, `lobby_directory`. Linux + Windows. Reference Docker image ships at launch. |
-| **Dedicated server / server app** | Synonyms for `cx-server`. Anyone can host. |
-| **Server mode** | A run-mode of `cx-server` selected via `--mode`. One binary, multiple modes. |
-| **Coop room** | `cx-server --mode coop_room`: private/public co-op session for 2-4 (configurable up to 8). |
-| **PvP arena** | `cx-server --mode pvp_arena`: server-authoritative PvP for 2-8 with anti-cheat foundation. |
-| **LAN room** | `cx-server --mode lan_room`: LAN-discovered co-op session. |
-| **MMO shard** | `cx-server --mode mmo_shard`: persistent long-running world; 50-200 concurrent target; community-hostable per DR-035. |
-| **Lobby directory** | `cx-server --mode lobby_directory`: public registry that aggregates community-hosted shards. |
+| **`cf-server`** | The dedicated server binary (DR-034). Same Rust workspace; same sim path as the client. Modes: `coop_room`, `pvp_arena`, `lan_room`, `mmo_shard`, `lobby_directory`. Linux + Windows. Reference Docker image ships at launch. |
+| **Dedicated server / server app** | Synonyms for `cf-server`. Anyone can host. |
+| **Server mode** | A run-mode of `cf-server` selected via `--mode`. One binary, multiple modes. |
+| **Coop room** | `cf-server --mode coop_room`: private/public co-op session for 2-4 (configurable up to 8). |
+| **PvP arena** | `cf-server --mode pvp_arena`: server-authoritative PvP for 2-8 with anti-cheat foundation. |
+| **LAN room** | `cf-server --mode lan_room`: LAN-discovered co-op session. |
+| **MMO shard** | `cf-server --mode mmo_shard`: persistent long-running world; 50-200 concurrent target; community-hostable per DR-035. |
+| **Lobby directory** | `cf-server --mode lobby_directory`: public registry that aggregates community-hosted shards. |
 | **Anti-cheat profile** | Named tuning bundle for server-side input/state validation: `casual`, `competitive`, `tournament_strict`. |
 | **Snapshot store** | MMO shard's compressed binary snapshot directory; default cadence 10 min. |
 | **Event journal** | Append-only per-tick event log for MMO shards; supports point-in-time recovery. |
 | **Interest management** | Server-side filter that delivers events/snapshots only for in-range entities to each client. Required for MMO scale. |
 | **Lobby/portal** | UI flow for cross-shard travel. Player logs out on Shard A, logs in on Shard B; no live cross-shard combat at v1. |
 | **Trust tier** | Per-mod label (`vanilla`, `verified`, `community`, `experimental`); operators pin a max trust accepted from clients. |
-| **Active material kernel** | The CPU-deterministic chunked CA in `cx-material` that simulates per-pixel materials in active regions. 64×64 chunks; dirty rects; sleeping chunks. Per DR-036. |
+| **Active material kernel** | The CPU-deterministic chunked CA in `cf-material` that simulates per-pixel materials in active regions. 64×64 chunks; dirty rects; sleeping chunks. Per DR-036. |
 | **Reaction table** | Data-driven pair/triple material reactions with priority, temperature thresholds, catalysts, byproducts. Every reaction emits a replay-recorded `reaction.*` event with cause chain. |
 | **Density layering** | Stable layering of immiscible liquids by density (oil floats on water, sludge sinks, gas rises). Implemented via density-compare swap rule in the active kernel. |
 | **Phase change** | Temperature-driven material transition (water ↔ steam, lava ↔ rock). Recorded as a `material.*` event with parent cause. |
 | **Hazard perception map** | Per-actor view of nearby material/temperature/electricity/gas fields used by AI for pathing and tactical decisions (M6.6 / DR-036). Respects fog-of-war (DR-022 + DR-032 fairness). |
 | **AI affordance tag** | Per-material label (`avoid`, `seek`, `use-as-weapon`, `extinguish-with`, `neutralize-with`, `vent`, `pump`) consumed by AI utility scoring. |
-| **Hull / room / atmosphere** | Barotrauma-style room volume in `cx-atmos` with water level, oxygen level, pressure, fire state, toxic gas. Connected via gaps. |
+| **Hull / room / atmosphere** | Barotrauma-style room volume in `cf-atmos` with water level, oxygen level, pressure, fire state, toxic gas. Connected via gaps. |
 | **Gap** | Connection between two hulls (or a hull and outside). Open/closed state. Carries water/oxygen/gas flow + flow force. |
 | **Reaction event** | Replay-recorded `reaction.*` event capturing reagents, byproducts, priority, temperature, catalysts, and parent cause. |
 | **Material event** | Replay-recorded `material.*` event capturing material id, contact point, temperature, state change, and parent cause. |
 | **Atmosphere event** | Replay-recorded `atmosphere.*` event capturing hull/gap/pump/vent state changes. |
 | **Affliction** | Per-actor systemic state (`wetness`, `burning`, `corroded`, `electrified`, `poisoned`, `asphyxiating`, `suffocating`, `drowning`, `depressurizing`). Visible on HUD. |
-| **Material lab** | The `cx-tools-editor --mode material_lab` workbench. Brushes, inspect, recipe journal, stamps, AI puppet test. Designer authors a tiny reaction puzzle in <10 minutes (M8.5). |
+| **Material lab** | The `cf-tools-editor --mode material_lab` workbench. Brushes, inspect, recipe journal, stamps, AI puppet test. Designer authors a tiny reaction puzzle in <10 minutes (M8.5). |
 | **Launch material set** | 17 materials shipped at launch (air, dirt/sand, rock/concrete, metal, wood/organic, water, steam/mist, smoke, fire/heat, oil/fuel, acid, toxic sludge/liquid, toxic gas, lava, blood/vomit, electricity charge, pebble/debris). Per DR-036. |
 | **Expansion materials** | Materials gated behind material lab + balance review (slime, brine, coolant, cryo, fuel vapor, foam, nanogel, alchemic precursor, Midas, biological variants). |
 | **Manifest (scenario)** | RON file in `content/scenarios/` describing teams, objectives, materials, command core, base systems, capability requirements, director config, save fields. |
 | **Mission director** | The system that paces a scenario: reinforcement, LZ risk, objective escalation. Emits commander-decision events with reason labels. |
 | **Module** | A chassis subcomponent with damage states (jet, shield, sensor, repair-drone, weapon-mount). Failures emit reason-labeled events. |
 | **Narrowphase** | The exact collision pass for candidate pairs found by broadphase. Produces contact manifolds, TOI, impulses, and damage inputs. |
-| **Observation** | A structured snapshot of game state delivered to `cxctl`/control clients. Includes clock, player context, actors, equipment, terrain patch, objectives, UI tree, captions, recent events, perf counters. |
+| **Observation** | A structured snapshot of game state delivered to `cfctl`/control clients. Includes clock, player context, actors, equipment, terrain patch, objectives, UI tree, captions, recent events, perf counters. |
 | **Projectile-projectile collision** | Physical projectile contact such as bullet-bullet, bullet-rocket, or shell-shell. Kinetic rounds deflect/fragment/lose energy; explosive rounds may detonate or fuze-fail by profile. |
 | **Reason label** | A short string explaining WHY the AI/mission/refusal/warning fired. Required on every AI choice and refusal. |
 | **Recoil impulse** | The instantaneous velocity change applied to the firing actor; configurable per weapon preset. |
@@ -244,7 +244,7 @@ A junior agent must never have to guess what these words mean. If a term is used
 | **Swept shape** | A moving ray/capsule/convex proxy tested across a tick to find impact before tunneling can occur. |
 | **Tick** | A discrete sim step. Tick 0 is scenario start. Ticks are u64 monotonic. |
 | **TOI** | Time of impact. Fraction of a tick at which a swept contact occurs. Used for high-speed projectile and critical body contacts. |
-| **UI tree** | The structured representation of every UI element by stable id, role, label, state, bounds. Queryable/clickable through `cxctl ui ...`. |
+| **UI tree** | The structured representation of every UI element by stable id, role, label, state, bounds. Queryable/clickable through `cfctl ui ...`. |
 | **World units** | Pixel-space coordinates. 1 unit = 1 logical pixel. Y is up. Origin at scene's defined anchor. |
 
 ---
@@ -294,8 +294,8 @@ No milestone should use a human-gated item to hide incomplete agent-completable 
 | [[decisions/dr-010-license-reuse-matrix|DR-010]] | OPEN | Documentation only; ledger tracks usage | All | When external code/asset/data enters the project, log it in `[[references/usage-ledger]]`. No release-readiness gating during private prototyping. Public-release decision closes the DR. |
 | [[decisions/dr-011-progression-retention-loop|DR-011]] | OPEN | Intrinsic-first hybrid: mastery + autonomy + veterans + salvage + replays + creator challenges | M7, M11, M12 | Confirm retention model (no gacha/grind) before designing campaign loops in M7+. RET-A-01..RET-A-06 close the DR. |
 | [[decisions/dr-012-accessibility-comfort-readability|DR-012]] | OPEN | Slice-A accessibility/comfort floor, not late compliance | M0, M4, M5.7, M6.6, M7, M7.5, M8, M8.5 | Confirm UI scale, contrast, captions, remap, reduced motion are wired into the milestone's player surfaces. ACC-A-01..16 close the DR. |
-| Networking transport library (topic) | OPEN | lightyear vs renet vs quinn | M9, M10, M11, M12 | Decision deferred to M9/M10 prototyping. Worker MUST present transport options + perf evidence to user before committing to one library in `cx-net`. |
-| Modding script host (topic) | OPEN | mlua vs Rhai | M5, M8 | Decision deferred to M5 implementation. Worker MUST run `cx-mod` script-host benchmark + capability-gate audit and ask the user before locking the host. |
+| Networking transport library (topic) | OPEN | lightyear vs renet vs quinn | M9, M10, M11, M12 | Decision deferred to M9/M10 prototyping. Worker MUST present transport options + perf evidence to user before committing to one library in `cf-net`. |
+| Modding script host (topic) | OPEN | mlua vs Rhai | M5, M8 | Decision deferred to M5 implementation. Worker MUST run `cf-mod` script-host benchmark + capability-gate audit and ask the user before locking the host. |
 | Localization plan (topic) | OPEN | None yet | M4, M7, M8 | Strings/fonts/lang packs/mod-localization. Worker MUST flag any string-source code path that bakes English-only strings; avoid hardcoded UI strings. Open a follow-up task if the milestone needs locale support. |
 | Cloud-save backend (topic) | OPEN | Post-launch | T-SAVE | Local-first today (DR-029); no cloud at launch. Worker MUST NOT add cloud dependencies during T-SAVE work. |
 
@@ -342,7 +342,7 @@ Context (read in this order):
 3. cortext_command_vault/spec/prototype-roadmap.md (especially the Open Decision Gates Protocol + the milestone's section + Open DR gates row).
 4. cortext_command_vault/spec/native-implementation-backlog.md (milestone task cards).
 5. cortext_command_vault/spec/feature-completion-checklist.md (Open Decision Gates Checklist + the milestone scope/done-criteria/task rows).
-6. cortext_command_vault/spec/ai-control-observability-layer.md (every player surface MUST be reachable from cxctl).
+6. cortext_command_vault/spec/ai-control-observability-layer.md (every player surface MUST be reachable from cfctl).
 7. The milestone's linked DRs/spec pages, including any cross-cutting plan (full-collision-physics-plan, hybrid-llm-ai-plan, server-app-architecture, persistent-mmo-architecture, dr-036-systemic-material-simulation-direction).
 8. cortext_command_vault/references/prototype-run-bundle-schema.md (run-bundle event categories + acceptance gates).
 
@@ -360,7 +360,7 @@ Required loop:
 1. Inspect current code, run the Open Decision Gates pre-check, and write a short plan.
 2. Implement all task cards for the milestone.
 3. Add unit/integration/E2E tests.
-4. Wire every new player-facing surface (UI, action, observation, event) into cxctl per ai-control-observability-layer.md.
+4. Wire every new player-facing surface (UI, action, observation, event) into cfctl per ai-control-observability-layer.md.
 5. Run the validation command matrix.
 6. Bug hunt and fix issues until green.
 7. Produce a run bundle under prototype_runs/native/.
@@ -374,7 +374,7 @@ Done when:
 - E2E scenario passes.
 - Run-bundle checker passes.
 - Feature-completion-checklist rows are updated, including Open Decision Gates rows. Handoff lists row IDs changed.
-- Every new player-facing surface is reachable from cxctl with assert/inspect coverage.
+- Every new player-facing surface is reachable from cfctl with assert/inspect coverage.
 - Known issues are documented.
 - Human-gated items, if any, are marked READY_FOR_HUMAN with a playtest checklist.
 ```
@@ -395,14 +395,14 @@ Estimated playtime: <X minutes per run; Y suggested runs>
 Save needed before play: <yes/no>; if yes, path: <path>
 
 ## Pre-Flight (agent confirms)
-- [ ] Build runs from a clean checkout: `cargo run -p cx-app -- --scenario <id>`.
+- [ ] Build runs from a clean checkout: `cargo run -p cf-app -- --scenario <id>`.
 - [ ] No panics in scripted smoke run.
 - [ ] Run bundle from scripted run validates.
 - [ ] Screenshot/capture of the starting scene attached.
 - [ ] Reset path tested (ESC, restart scenario).
 
 ## Tester Tasks
-1. Launch `cargo run -p cx-app -- --scenario <id>`.
+1. Launch `cargo run -p cf-app -- --scenario <id>`.
 2. Play <scenario> for <N> minutes.
 3. Try each of: <list specific player actions to attempt>.
 4. Note one Good, one Bad, one Meh (mandatory; verbatim).
@@ -435,8 +435,8 @@ The milestone is fully done when:
 | Target platforms | Desktop-first: Windows, Linux, macOS. Steam Deck 800p/60 floor. Headless Linux server later. Web only for labs/tools/demos. No mobile (DR-025). |
 | Team model | AI-augmented solo/small-core. Modular repo so AI agents can own crates without breakage (DR-026). |
 | Pacing & control | Hybrid real-time tactical. Direct possession optional. Strategy-first valid (DR-015 + DR-026). |
-| Multiplayer phasing | **Full ladder architected from day one** (DR-005 closed): solo + LAN co-op + online co-op + community-hostable public PvP arenas + persistent MMO shards. Server-authoritative simulation; one `cx-server` binary; community-hostable by default; no proprietary cloud lock-in. PvP/MMO readiness is proven by M12 evidence gates; ranked PvP and first-party hosting are post-launch. |
-| Dedicated server app | **`cx-server` is a full-product artifact** (DR-034). Same Rust workspace; same sim/terrain/physics/equipment/chassis/AI/replay/mod crates; modes selected via `--mode <coop_room\|pvp_arena\|lan_room\|mmo_shard\|lobby_directory>`. Linux + Windows; reference Docker image; documented hosting guide. See [[spec/server-app-architecture]]. |
+| Multiplayer phasing | **Full ladder architected from day one** (DR-005 closed): solo + LAN co-op + online co-op + community-hostable public PvP arenas + persistent MMO shards. Server-authoritative simulation; one `cf-server` binary; community-hostable by default; no proprietary cloud lock-in. PvP/MMO readiness is proven by M12 evidence gates; ranked PvP and first-party hosting are post-launch. |
+| Dedicated server app | **`cf-server` is a full-product artifact** (DR-034). Same Rust workspace; same sim/terrain/physics/equipment/chassis/AI/replay/mod crates; modes selected via `--mode <coop_room\|pvp_arena\|lan_room\|mmo_shard\|lobby_directory>`. Linux + Windows; reference Docker image; documented hosting guide. See [[spec/server-app-architecture]]. |
 | Persistent MMO mode | **MMO shard is a full-product target mode** (DR-035). Bounded shard-with-portal model (NOT seamless world); 50-200 concurrent target; community-hostable; persistent terrain/bases/veterans/factions/commander memory; account required for public shards, NOT for private LAN/co-op. **No subscription**. M12 proves readiness. See [[spec/persistent-mmo-architecture]]. |
 | Backend services | Local-first default for solo/private play; public-server service spine (lobby_directory, account adapter, persistence, anti-cheat foundation, observability) is built as online modes mature (DR-013). Steam/EOS/PlayFab/Unity Multiplay are optional adapters, never required. |
 | Systemic material simulation | **Noita-grade systemic causality** is a launch product surface (DR-036), not a moonshot. Hybrid: active-region per-pixel material sim + rigid-body collision (DR-033) + Barotrauma-style room/atmosphere networks + reaction engine + AI hazard perception + replay/event audit. Curated launch material set (17 materials); expansion via material lab. Every material is a verb; every reaction has a cause chain; every hazard has an overlay/caption/replay event. T-MAT side track + M5.6/M5.7/M6.6/M7.5/M8.5 milestones. See [[comparables/noita-grade-material-simulation-research]]. |
@@ -464,15 +464,15 @@ The milestone is fully done when:
 | Sim core | **Custom crate** with fixed-tick scheduler | Bevy's frame loop is for rendering; sim must run on a fixed-tick deterministic island. |
 | Pixel terrain | **Custom crate** | Chunked, GPU-assisted, mutable per-pixel material. Off-the-shelf has no answer. |
 | Physics/collision | **Custom crate** with staged broadphase/narrowphase/CCD | Need full collision matrix, projectile-projectile contacts, terrain chunk proxies, limb/equipment/mech contacts, impulse-to-damage, replay-visible contact events, and 4K/120 budgets (DR-033). |
-| Active material kernel | **Custom crate** `cx-material` (CPU-deterministic; chunked 64×64; dirty rects; sleeping chunks) | Noita-grade systemic causality at the active-region scale; reaction table + density layering + phase change + electricity/conductivity/wetness; per DR-036. |
-| Room / atmosphere networks | **Custom crate** `cx-atmos` | Barotrauma-style hulls/gaps/pumps/vents/oxygen/pressure/fire networks; powers DR-027 deep combat-base; per DR-036. |
-| Pipe / power / signal networks | **Custom crate** `cx-utility-net` (or fold into `cx-mission`) | Stationeers-style atmospherics + power graph for base equipment; sensor-readable + AI-controllable; per DR-036. |
+| Active material kernel | **Custom crate** `cf-material` (CPU-deterministic; chunked 64×64; dirty rects; sleeping chunks) | Noita-grade systemic causality at the active-region scale; reaction table + density layering + phase change + electricity/conductivity/wetness; per DR-036. |
+| Room / atmosphere networks | **Custom crate** `cf-atmos` | Barotrauma-style hulls/gaps/pumps/vents/oxygen/pressure/fire networks; powers DR-027 deep combat-base; per DR-036. |
+| Pipe / power / signal networks | **Custom crate** `cf-utility-net` (or fold into `cf-mission`) | Stationeers-style atmospherics + power graph for base equipment; sensor-readable + AI-controllable; per DR-036. |
 | Body/chassis/mech model | **Custom crate** | DR-014/021 chassis grammar is unique to this project. |
 | AI | **Custom crate** | DR-022 humanlike-bar means perception/memory/doctrine/adaptation; not off-the-shelf. |
 | Replay/event | **Custom crate** | DR-002/DR-018 event taxonomy + scenario manifest + run-bundle schema. |
-| AI/dev control | **Custom crate + CLI** | `cx-control` schemas plus `cxctl` so agents/tests can observe and act without screenshots. |
+| AI/dev control | **Custom crate + CLI** | `cf-control` schemas plus `cfctl` so agents/tests can observe and act without screenshots. |
 | Networking | **Custom crate** built on a transport (lightyear / renet / quinn TBD) | DR-005 server-authoritative architecture. Authority boundaries, snapshot/event hybrid, deterministic islands. Transport selection committed before M11. |
-| Dedicated server | **Custom binary `cx-server` + ops/persistence/anti-cheat/admin crates** | DR-034 single-binary multi-mode server. Linux + Windows. Reuses every sim crate. See [[spec/server-app-architecture]]. |
+| Dedicated server | **Custom binary `cf-server` + ops/persistence/anti-cheat/admin crates** | DR-034 single-binary multi-mode server. Linux + Windows. Reuses every sim crate. See [[spec/server-app-architecture]]. |
 | Save / persistence | **Custom crate** (client + shared with server-side persistence) | DR-029 versioned + migration-safe + replay-linked; MMO shard persistence per DR-035. |
 | UI | egui (Bevy plugin) for tools/workbench; **custom Bevy UI or egui-skinned** for game HUD | Comic-noir UI requires control egui can't fully give; tools can use egui. |
 | Audio | Bevy audio backend or kira | Diegetic-first mix; caption events drive subtitle UI. |
@@ -516,7 +516,7 @@ Allowed use of raylib/stb: throwaway prototypes, asset converters, image utiliti
 | Mass | `f32` kilograms. | Used by recoil, momentum, projectile impulse. |
 | Angles | Radians, `f32`. Aim is a unit `Vec2`. | Match `glam` and avoid degree/radian confusion. |
 | Linear maths | `glam::Vec2`, `glam::Vec3` (rare), `glam::IVec2` for grid coords. | Match Bevy. |
-| Random | Deterministic per-run via `rand_xoshiro::Xoshiro256StarStar` seeded from manifest. Wrapped by `cx-sim-core::Rng`. NEVER call `rand::thread_rng` or system time inside sim islands. | Fixed seed → reproducible; wrap forces audit. |
+| Random | Deterministic per-run via `rand_xoshiro::Xoshiro256StarStar` seeded from manifest. Wrapped by `cf-sim-core::Rng`. NEVER call `rand::thread_rng` or system time inside sim islands. | Fixed seed → reproducible; wrap forces audit. |
 | Floating point | All sim-tick math uses `f32`. No `f64` inside sim islands. Fixed-point used for terrain checksum input only. | f32 is consistent across platforms when the same instructions are emitted. |
 | Bit-determinism note | Cross-platform bit-deterministic `f32` is NOT guaranteed by IEEE on all CPUs/compilers. The determinism contract uses checksums of *quantized* state at snapshot boundaries, not raw float comparisons. See [[systems/replay-determinism-and-run-evidence]]. |
 
@@ -527,38 +527,38 @@ Allowed use of raylib/stb: throwaway prototypes, asset converters, image utiliti
 Modular crate workspace so AI agents can own separate crates per DR-026:
 
 ```
-corefall-game/                        # cargo workspace root
+game/                        # cargo workspace root
 ├── Cargo.toml                        # workspace + shared deps
 ├── crates/
-│   ├── cx-app/                       # binary; thin Bevy app shell + plugin wiring
-│   ├── cx-sim-core/                  # fixed-tick scheduler, time, RNG, deterministic islands
-│   ├── cx-terrain/                   # chunked pixel terrain + materials + GPU carving
-│   ├── cx-physics/                   # custom 2D physics (collision, atom-style probes)
-│   ├── cx-material/                  # active material kernel: per-pixel CA, reaction table, density layering, phase change, electricity, replay-deterministic (DR-036)
-│   ├── cx-atmos/                     # room/volume/atmosphere networks: hulls/gaps/pumps/vents/oxygen/pressure/fire (DR-036)
-│   ├── cx-actor/                     # actor components, controller intent layer
-│   ├── cx-chassis/                   # armor/mech/origin grammar (DR-014/021)
-│   ├── cx-equipment/                 # role records, modules, jam/eject/repair
-│   ├── cx-ai/                        # perception, memory, utility, doctrine, reason labels (DR-022)
-│   ├── cx-mission/                   # scenario manifest, director, objectives, command-core (DR-017)
-│   ├── cx-replay/                    # event taxonomy, run bundle, snapshots, checksums (DR-002)
-│   ├── cx-control/                   # command/observation schemas, action routing, UI tree contracts
-│   ├── cxctl/                        # CLI binary for AI/dev control: observe, act, step, assert, bundle
-│   ├── cx-e2e/                       # scripted end-to-end runner built on cx-control/cxctl
-│   ├── cx-save/                      # versioned save, migration, ironman policies (DR-029)
-│   ├── cx-net/                       # authority, snapshots, transport adapter (DR-005)
-│   ├── cx-render-2d/                 # custom wgpu pipelines: chunked terrain, sprite batching, particles
-│   ├── cx-ui/                        # comic-noir HUD, mission cards, accessibility
-│   ├── cx-audio/                     # diegetic mix, caption events
-│   ├── cx-mod/                       # mod loader, schema validator, script host
-│   ├── cx-tools-editor/              # in-engine scenario/package workbench (DR-030)
-│   ├── cx-headless/                  # headless sim runner used by replay verification + CI
-│   ├── cx-server/                    # dedicated server binary (DR-034); modes: coop_room, pvp_arena, lan_room, mmo_shard, lobby_directory
-│   ├── cx-server-ops/                # server lifecycle: config, health/readiness, metrics, drain shutdown, restart hooks
-│   ├── cx-server-persistence/        # MMO shard snapshot/journal/restore (DR-035); also reused for save migration tests
-│   ├── cx-server-anti-cheat/         # server-side input validation, replay drift detection, profiles, ban list, audit log
-│   ├── cx-server-admin/              # admin/console API (capability-gated) over the cx-control envelope
-│   └── cx-bench/                     # perf harness
+│   ├── cf-app/                       # binary; thin Bevy app shell + plugin wiring
+│   ├── cf-sim-core/                  # fixed-tick scheduler, time, RNG, deterministic islands
+│   ├── cf-terrain/                   # chunked pixel terrain + materials + GPU carving
+│   ├── cf-physics/                   # custom 2D physics (collision, atom-style probes)
+│   ├── cf-material/                  # active material kernel: per-pixel CA, reaction table, density layering, phase change, electricity, replay-deterministic (DR-036)
+│   ├── cf-atmos/                     # room/volume/atmosphere networks: hulls/gaps/pumps/vents/oxygen/pressure/fire (DR-036)
+│   ├── cf-actor/                     # actor components, controller intent layer
+│   ├── cf-chassis/                   # armor/mech/origin grammar (DR-014/021)
+│   ├── cf-equipment/                 # role records, modules, jam/eject/repair
+│   ├── cf-ai/                        # perception, memory, utility, doctrine, reason labels (DR-022)
+│   ├── cf-mission/                   # scenario manifest, director, objectives, command-core (DR-017)
+│   ├── cf-replay/                    # event taxonomy, run bundle, snapshots, checksums (DR-002)
+│   ├── cf-control/                   # command/observation schemas, action routing, UI tree contracts
+│   ├── cfctl/                        # CLI binary for AI/dev control: observe, act, step, assert, bundle
+│   ├── cf-e2e/                       # scripted end-to-end runner built on cf-control/cfctl
+│   ├── cf-save/                      # versioned save, migration, ironman policies (DR-029)
+│   ├── cf-net/                       # authority, snapshots, transport adapter (DR-005)
+│   ├── cf-render-2d/                 # custom wgpu pipelines: chunked terrain, sprite batching, particles
+│   ├── cf-ui/                        # comic-noir HUD, mission cards, accessibility
+│   ├── cf-audio/                     # diegetic mix, caption events
+│   ├── cf-mod/                       # mod loader, schema validator, script host
+│   ├── cf-tools-editor/              # in-engine scenario/package workbench (DR-030)
+│   ├── cf-headless/                  # headless sim runner used by replay verification + CI
+│   ├── cf-server/                    # dedicated server binary (DR-034); modes: coop_room, pvp_arena, lan_room, mmo_shard, lobby_directory
+│   ├── cf-server-ops/                # server lifecycle: config, health/readiness, metrics, drain shutdown, restart hooks
+│   ├── cf-server-persistence/        # MMO shard snapshot/journal/restore (DR-035); also reused for save migration tests
+│   ├── cf-server-anti-cheat/         # server-side input validation, replay drift detection, profiles, ban list, audit log
+│   ├── cf-server-admin/              # admin/console API (capability-gated) over the cf-control envelope
+│   └── cf-bench/                     # perf harness
 ├── assets/                           # sprites, audio, manifests, scenes
 ├── content/                          # base game packages (data + manifests + scripts)
 ├── tools/                            # scripts, generators, run-bundle checker
@@ -574,7 +574,7 @@ Each crate is owned by an explicit feature/agent boundary. Inter-crate boundarie
 
 This is the M0 day-zero recipe. A junior agent assigned M0 must produce these files first, BEFORE any feature code, and verify them with the kickoff smoke (see [[#Per-Milestone Kickoff Smoke|Per-Milestone Kickoff Smoke]]).
 
-### `rust-toolchain.toml` (in `corefall-game/`)
+### `rust-toolchain.toml` (in `game/`)
 
 ```toml
 [toolchain]
@@ -591,35 +591,35 @@ Pin Rust at a specific stable. Update only on a deliberate task (own row in the 
 [workspace]
 resolver = "2"
 members = [
-  "crates/cx-app",
-  "crates/cx-sim-core",
-  "crates/cx-terrain",
-  "crates/cx-physics",
-  "crates/cx-material",
-  "crates/cx-atmos",
-  "crates/cx-actor",
-  "crates/cx-chassis",
-  "crates/cx-equipment",
-  "crates/cx-ai",
-  "crates/cx-mission",
-  "crates/cx-replay",
-  "crates/cx-control",
-  "crates/cxctl",
-  "crates/cx-e2e",
-  "crates/cx-save",
-  "crates/cx-net",
-  "crates/cx-render-2d",
-  "crates/cx-ui",
-  "crates/cx-audio",
-  "crates/cx-mod",
-  "crates/cx-tools-editor",
-  "crates/cx-headless",
-  "crates/cx-server",
-  "crates/cx-server-ops",
-  "crates/cx-server-persistence",
-  "crates/cx-server-anti-cheat",
-  "crates/cx-server-admin",
-  "crates/cx-bench",
+  "crates/cf-app",
+  "crates/cf-sim-core",
+  "crates/cf-terrain",
+  "crates/cf-physics",
+  "crates/cf-material",
+  "crates/cf-atmos",
+  "crates/cf-actor",
+  "crates/cf-chassis",
+  "crates/cf-equipment",
+  "crates/cf-ai",
+  "crates/cf-mission",
+  "crates/cf-replay",
+  "crates/cf-control",
+  "crates/cfctl",
+  "crates/cf-e2e",
+  "crates/cf-save",
+  "crates/cf-net",
+  "crates/cf-render-2d",
+  "crates/cf-ui",
+  "crates/cf-audio",
+  "crates/cf-mod",
+  "crates/cf-tools-editor",
+  "crates/cf-headless",
+  "crates/cf-server",
+  "crates/cf-server-ops",
+  "crates/cf-server-persistence",
+  "crates/cf-server-anti-cheat",
+  "crates/cf-server-admin",
+  "crates/cf-bench",
 ]
 
 [workspace.package]
@@ -663,15 +663,15 @@ Rationale for the dep set:
 
 | Dep | Used By |
 |---|---|
-| `bevy` | `cx-app`, `cx-render-2d`, `cx-ui`, `cx-tools-editor`, `cx-audio`. |
+| `bevy` | `cf-app`, `cf-render-2d`, `cf-ui`, `cf-tools-editor`, `cf-audio`. |
 | `glam` | All sim/physics/render crates. |
 | `serde` + `serde_json` + `ron` | Replay, save, scenario manifests, control envelope. |
 | `thiserror` + `anyhow` | Error policy below. |
 | `tracing` + `tracing-subscriber` | Logging policy below. |
 | `rand_xoshiro` | Deterministic RNG. |
 | `blake3` | Checksums + content hashing. |
-| `clap` | CLI flags for `cx-app`, `cxctl`, `cx-e2e`, `cx-headless`, `cx-bench`, `cx-mod`. |
-| `tokio` + `tokio-tungstenite` + `jsonrpsee` | Local control server + `cxctl` client. |
+| `clap` | CLI flags for `cf-app`, `cfctl`, `cf-e2e`, `cf-headless`, `cf-bench`, `cf-mod`. |
+| `tokio` + `tokio-tungstenite` + `jsonrpsee` | Local control server + `cfctl` client. |
 | `schemars` | JSON-Schema generation for control envelope versioning. |
 
 ### `rustfmt.toml`
@@ -694,8 +694,8 @@ avoid-breaking-exported-api = false
 too-many-arguments-threshold = 8
 type-complexity-threshold = 250
 disallowed-methods = [
-  { path = "rand::thread_rng", reason = "Use cx-sim-core::Rng inside sim islands; wrap in cx-control for non-sim helpers." },
-  { path = "std::time::SystemTime::now", reason = "Use sim tick or cx-sim-core::WallClock to keep determinism intact." },
+  { path = "rand::thread_rng", reason = "Use cf-sim-core::Rng inside sim islands; wrap in cf-control for non-sim helpers." },
+  { path = "std::time::SystemTime::now", reason = "Use sim tick or cf-sim-core::WallClock to keep determinism intact." },
 ]
 ```
 
@@ -719,7 +719,7 @@ linker = "rust-lld.exe"
 rustflags = ["-C", "link-arg=-Wl,-rpath,@loader_path"]
 ```
 
-### `.gitignore` (in `corefall-game/`)
+### `.gitignore` (in `game/`)
 
 ```
 /target
@@ -756,7 +756,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     defaults:
       run:
-        working-directory: corefall-game
+        working-directory: game
     steps:
       - uses: actions/checkout@v4
       - name: Install Linux deps
@@ -777,26 +777,26 @@ jobs:
         run: cargo clippy --workspace --all-targets -- -D warnings
       - name: cargo test
         run: cargo test --workspace
-      - name: cxctl observe smoke
-        run: cargo run -p cxctl -- observe --once --scenario m0_blank
+      - name: cfctl observe smoke
+        run: cargo run -p cfctl -- observe --once --scenario m0_blank
       - name: run-bundle smoke
         run: |
-          cargo run -p cxctl -- run --scenario m0_blank --ticks 300 --write-run-bundle
+          cargo run -p cfctl -- run --scenario m0_blank --ticks 300 --write-run-bundle
           python3 ../research_tools/prototype_run_check.py prototype_runs/native/m0_*
 ```
 
 ### Bootstrap Command Sequence (for M0)
 
 ```bash
-mkdir -p corefall-game/crates
-cd corefall-game
+mkdir -p game/crates
+cd game
 # create rust-toolchain.toml, Cargo.toml, rustfmt.toml, clippy.toml, .cargo/config.toml, .gitignore as above
-for crate in cx-app cx-sim-core cx-terrain cx-physics cx-material cx-atmos cx-actor cx-chassis \
-             cx-equipment cx-ai cx-mission cx-replay cx-control cxctl cx-e2e cx-save cx-net \
-             cx-render-2d cx-ui cx-audio cx-mod cx-tools-editor cx-headless cx-server \
-             cx-server-ops cx-server-persistence cx-server-anti-cheat cx-server-admin cx-bench; do
+for crate in cf-app cf-sim-core cf-terrain cf-physics cf-material cf-atmos cf-actor cf-chassis \
+             cf-equipment cf-ai cf-mission cf-replay cf-control cfctl cf-e2e cf-save cf-net \
+             cf-render-2d cf-ui cf-audio cf-mod cf-tools-editor cf-headless cf-server \
+             cf-server-ops cf-server-persistence cf-server-anti-cheat cf-server-admin cf-bench; do
   case "$crate" in
-    cx-app|cxctl|cx-e2e|cx-headless|cx-server|cx-bench) crate_kind="--bin" ;;
+    cf-app|cfctl|cf-e2e|cf-headless|cf-server|cf-bench) crate_kind="--bin" ;;
     *) crate_kind="--lib" ;;
   esac
   cargo new $crate_kind crates/$crate --name $crate
@@ -809,7 +809,7 @@ The per-crate `Cargo.toml` for a library follows the template below. For a binar
 
 ```toml
 [package]
-name = "cx-sim-core"
+name = "cf-sim-core"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -868,7 +868,7 @@ Every crate gets a top-level `AGENTS.md` with this exact skeleton. Junior agents
 ### Logging
 
 - Use `tracing`. Never use `println!`, `eprintln!`, or `log::`.
-- Top-level binaries (`cx-app`, `cxctl`, `cx-e2e`, `cx-headless`, `cx-bench`, `cx-mod`) initialize `tracing-subscriber` in `main()` with `EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info,cx_=debug"))`.
+- Top-level binaries (`cf-app`, `cfctl`, `cf-e2e`, `cf-headless`, `cf-bench`, `cf-mod`) initialize `tracing-subscriber` in `main()` with `EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info,cf_=debug"))`.
 - Spans: every fixed sim tick wraps in `tracing::trace_span!("sim_tick", tick = %tick)`. Every scenario load wraps in `tracing::info_span!("scenario", id = %scenario_id, run = %run_id)`.
 - Log levels:
   - `error!`: actual bugs, panics-narrowly-avoided, replay drift, scenario load failures.
@@ -876,15 +876,15 @@ Every crate gets a top-level `AGENTS.md` with this exact skeleton. Junior agents
   - `info!`: lifecycle (run started/finished, scenario loaded, control client connected).
   - `debug!`: per-frame perf samples, AI decisions, terrain dirty regions.
   - `trace!`: per-tick sim/system traces.
-- Targets: every crate sets `TARGET = "cx::<short>"`, e.g. `cx::sim`, `cx::ai`, `cx::ctl`, `cx::ui`, `cx::net`. Filters use these.
+- Targets: every crate sets `TARGET = "cf::<short>"`, e.g. `cf::sim`, `cf::ai`, `cf::ctl`, `cf::ui`, `cf::net`. Filters use these.
 
 ### Error Policy
 
 | Layer | Pattern | Why |
 |---|---|---|
-| Inside sim systems | `Result<T, cx_sim_core::SimError>` with `thiserror`-derived enums; never panic on bad data. | Panicking inside the sim breaks replay parity. |
+| Inside sim systems | `Result<T, cf_sim_core::SimError>` with `thiserror`-derived enums; never panic on bad data. | Panicking inside the sim breaks replay parity. |
 | Library boundaries | Crate-specific error enums via `thiserror`; no `anyhow` in lib crates. | Callers can match on variants. |
-| Binaries (`cx-app`, `cxctl`, etc.) | `anyhow::Result<()>` at `main()`; convert library errors with `?`. | Concise top-level error surface. |
+| Binaries (`cf-app`, `cfctl`, etc.) | `anyhow::Result<()>` at `main()`; convert library errors with `?`. | Concise top-level error surface. |
 | Scenario/manifest loading | Errors include the file path, line/col when possible, and a fix-hint. | Junior agents need to know where to look. |
 | Control envelope | Every command response is `accepted`, `rejected`, or `queued`, with reason label and effective tick. | Spec'd in [[#Control Transport And Envelope|Control Transport]]. |
 | Panic policy | Panic ONLY for invariant violations the agent can never recover from (poisoned mutex, malformed compile-time fixture). All recoverable failures return `Result`. | Panics destroy replay determinism. |
@@ -898,7 +898,7 @@ Every crate gets a top-level `AGENTS.md` with this exact skeleton. Junior agents
 
 ## Asset And Placeholder Strategy
 
-Until M5 chassis art arrives, milestones use procedurally generated or simple-PNG placeholders. The agent commits placeholders under `corefall-game/assets/placeholders/` with a stable file naming scheme. Real art replaces placeholders by file-name swap.
+Until M5 chassis art arrives, milestones use procedurally generated or simple-PNG placeholders. The agent commits placeholders under `game/assets/placeholders/` with a stable file naming scheme. Real art replaces placeholders by file-name swap.
 
 | Asset | Location | M0..M4 Source | M5+ Source |
 |---|---|---|---|
@@ -918,14 +918,14 @@ Every placeholder logged in [[references/usage-ledger]] with license. Generated 
 |---|---|---|---|
 | Unit | `crates/<crate>/src/...` `#[cfg(test)] mod tests {}` | Pure functions, type roundtrips, schema serialization, math helpers, error variants. | M0 |
 | Integration | `crates/<crate>/tests/*.rs` | Cross-module behavior within a crate; deterministic scenarios that build small fixtures. | M0 |
-| Workspace integration | `corefall-game/tests/*.rs` | Cross-crate behavior (e.g. sim + replay + control all in one process). | M1 |
-| E2E | `cargo run -p cx-e2e -- --scenario <id> --script <name>` | Full scenario run from CLI, asserts via observations + events; writes run bundle. | M1.5 |
-| Replay | `cargo run -p cx-headless -- replay <run-bundle> --verify-checksums` | A previously captured run replays headlessly to identical checksums. | M3 |
-| Determinism | `cargo run -p cx-bench --bin determinism -- --seed-set seeds.json --runs 100` | Same seed produces same checksum 100/100 runs across the test matrix. | M9 |
-| Perf | `cargo run -p cx-bench -- --scenario <id> --profile milestone` | Frame budget, sim cost, event volume, dirty cost; outputs `bench_report.json` artifact. | M2 |
-| Accessibility smoke | `cargo run -p cx-e2e -- --scenario <id> --ui-scale 2.0 --high-contrast --verify-focus` | Layout doesn't break at 200%; focus traversal reaches every interactable; captions fire. | M4 |
-| Save roundtrip | `cargo run -p cx-e2e -- --scenario <id> --save-load-roundtrip --verify-checksums` | Save → load reproduces identical state. | M5/T-SAVE |
-| Network alignment | `cargo run -p cx-headless -- replay-compare <client-a-bundle> <client-b-bundle>` | Two clients' bundles align tick-for-tick. | M10 |
+| Workspace integration | `game/tests/*.rs` | Cross-crate behavior (e.g. sim + replay + control all in one process). | M1 |
+| E2E | `cargo run -p cf-e2e -- --scenario <id> --script <name>` | Full scenario run from CLI, asserts via observations + events; writes run bundle. | M1.5 |
+| Replay | `cargo run -p cf-headless -- replay <run-bundle> --verify-checksums` | A previously captured run replays headlessly to identical checksums. | M3 |
+| Determinism | `cargo run -p cf-bench --bin determinism -- --seed-set seeds.json --runs 100` | Same seed produces same checksum 100/100 runs across the test matrix. | M9 |
+| Perf | `cargo run -p cf-bench -- --scenario <id> --profile milestone` | Frame budget, sim cost, event volume, dirty cost; outputs `bench_report.json` artifact. | M2 |
+| Accessibility smoke | `cargo run -p cf-e2e -- --scenario <id> --ui-scale 2.0 --high-contrast --verify-focus` | Layout doesn't break at 200%; focus traversal reaches every interactable; captions fire. | M4 |
+| Save roundtrip | `cargo run -p cf-e2e -- --scenario <id> --save-load-roundtrip --verify-checksums` | Save → load reproduces identical state. | M5/T-SAVE |
+| Network alignment | `cargo run -p cf-headless -- replay-compare <client-a-bundle> <client-b-bundle>` | Two clients' bundles align tick-for-tick. | M10 |
 
 Naming convention: integration test files use the format `<feature>_<scenario>.rs` (e.g. `terrain_carve_lane.rs`). Test names use snake_case and include the assertion (`fn carve_through_dirt_emits_terrain_carved_event()`).
 
@@ -935,7 +935,7 @@ Naming convention: integration test files use the format `<feature>_<scenario>.r
 
 Single source of truth for every CLI flag. If a flag exists in the codebase but not in this table, it is undocumented and must be added or removed.
 
-### `cx-app`
+### `cf-app`
 
 | Flag | Type | Default | Meaning |
 |---|---|---|---|
@@ -953,9 +953,9 @@ Single source of truth for every CLI flag. If a flag exists in the codebase but 
 | `--ui-scale <f32>` | f32 | 1.0 | Initial UI scale factor. |
 | `--high-contrast` | flag | false | Enables high-contrast palette. |
 
-### `cxctl`
+### `cfctl`
 
-`cxctl` is the CLI client. During M0..M1, run as `cargo run -p cxctl -- <subcommand>`. After install, `cxctl <subcommand>` is shorthand.
+`cfctl` is the CLI client. During M0..M1, run as `cargo run -p cfctl -- <subcommand>`. After install, `cfctl <subcommand>` is shorthand.
 
 | Subcommand | Purpose | Key Flags |
 |---|---|---|
@@ -995,7 +995,7 @@ Single source of truth for every CLI flag. If a flag exists in the codebase but 
 | `act tactical order <verb> ...` | Issue a tactical order. Verbs: `move-to`, `attack`, `defend`, `retreat`, `breach`, `repair`, `support`, `follow`, `hold`, `extract`, `rescue`, `salvage`. | `--target <id\|world-coord>`, `--reason <label>`, `--queue` (append to order list), `--rally <coord>`. |
 | `act tactical doctrine <name>` | Set current doctrine for a selected unit/squad. | `--unit <id>`, `--squad <id>`. |
 | `act camera <verb> ...` | Camera control. Verbs: `pan`, `zoom`, `follow`, `mode <side\|tactical-map\|replay-scrub>`, `slowdown <ratio>`. | `--target <id\|world-coord>`. |
-| `act save save <slot>` / `act save load <slot>` / `act save autosave` | Save/load actions through `cx-save` (T-SAVE / DR-029). | `--ironman`, `--description <text>`. |
+| `act save save <slot>` / `act save load <slot>` / `act save autosave` | Save/load actions through `cf-save` (T-SAVE / DR-029). | `--ironman`, `--description <text>`. |
 | `act settings set <key> <value>` | Change a setting (UI scale, contrast, captions, motion/shake/flash, keybind, language). | `--persist` (write to settings file). |
 | `act keybind <action> <key>` | Remap a keybind. Triggers the same code path as the settings UI. | `--scope <kbm\|controller>`, `--clear` (unbind). |
 | `act mod <verb> ...` | Mod tooling actions: `enable`, `disable`, `validate`, `reload`. | `--pack <id>`, `--strict`. |
@@ -1013,19 +1013,19 @@ Single source of truth for every CLI flag. If a flag exists in the codebase but 
 | `scenario reset` | Reset to scenario start. | `--keep-seed`. |
 | `pause` / `step --ticks <N>` / `resume` | Sim control. | — |
 | `run --ticks <N> --write-run-bundle` | Run for N ticks unattended; emit bundle. | `--scenario <id>`, `--seed <u64>`. |
-| `script run <name>` | Execute a control script. Scripts live in `corefall-game/scripts/cxctl/<name>.cxctl.json`. | `--write-run-bundle`, `--expect <kv>`, `--timeout-ticks <N>`. |
+| `script run <name>` | Execute a control script. Scripts live in `game/scripts/cfctl/<name>.cfctl.json`. | `--write-run-bundle`, `--expect <kv>`, `--timeout-ticks <N>`. |
 | `assert <key> <op> <value>` | Assert a key from the latest observation; non-zero exit on fail. | Ops: `==`, `!=`, `<`, `>`, `>=`, `<=`, `contains`, `starts-with`. |
 | `replay verify <run-dir>` | Replay a run bundle and verify checksums. | `--first-divergence`. |
 | `replay scrub <run-dir> --tick <N>` | Scrub the replay viewer to a tick (used by tools and scripts). | `--filter <category>`. |
 | `runbundle write` | Force a run-bundle write of the current run. | `--id <override>`. |
 | `health` | Print app/server health status (DR-034 readiness probes). | `--format json\|pretty`. |
 
-### `cx-e2e`
+### `cf-e2e`
 
 | Flag | Default | Meaning |
 |---|---|---|
 | `--scenario <id>` | required | Scenario id. |
-| `--script <name>` | required if not `--manual` | Named cxctl script. |
+| `--script <name>` | required if not `--manual` | Named cfctl script. |
 | `--expect <kv>` | optional, repeatable | `key=value` assertion against final observation. |
 | `--write-run-bundle` | false | Emit a run bundle on completion. |
 | `--ui-scale <f32>` | 1.0 | UI scale for accessibility runs. |
@@ -1034,7 +1034,7 @@ Single source of truth for every CLI flag. If a flag exists in the codebase but 
 | `--save-load-roundtrip` | false | Save mid-run, load, continue, verify state checksums. |
 | `--verify-checksums` | false | Verify deterministic checksums match between live and replay paths. |
 
-### `cx-headless`
+### `cf-headless`
 
 | Flag | Default | Meaning |
 |---|---|---|
@@ -1047,7 +1047,7 @@ Single source of truth for every CLI flag. If a flag exists in the codebase but 
 | `--first-divergence` | false | On replay diverge, dump the first divergence. |
 | `--bind <addr>` | `127.0.0.1:0` | Network bind for net-driven mode. |
 
-### `cx-server`
+### `cf-server`
 
 The dedicated server binary (DR-034). Same Rust workspace; same sim path as the client. See [[spec/server-app-architecture]].
 
@@ -1076,7 +1076,7 @@ The dedicated server binary (DR-034). Same Rust workspace; same sim path as the 
 | `--admin-capabilities <list>` | empty | Comma list of admin capabilities to enable (e.g. `kick,save,hot_load_scenario`). |
 | `--debug-capabilities <list>` | empty | Comma list of debug capabilities (forces a flag in run-bundle manifest). |
 | `--ticks <u64>` | unlimited | Auto-exit after N sim ticks (smoke). |
-| `--simulate-clients <N>` | 0 | Spawn N internal `cxctl` puppet clients (M12 stress harness). |
+| `--simulate-clients <N>` | 0 | Spawn N internal `cfctl` puppet clients (M12 stress harness). |
 | `--duration-min <N>` | unlimited | Auto-exit after N wall-minutes. |
 | `--write-run-bundle` | false | Emit per-session run bundle on close. |
 | `--validate-config-only` | false | Validate the config + exit 0; no listen. |
@@ -1084,7 +1084,7 @@ The dedicated server binary (DR-034). Same Rust workspace; same sim path as the 
 | `--auto-discover` | false | (`lan_room` only) Broadcast LAN presence. |
 | `--allow-package-mismatch` | false | Debug only; permits clients with mismatched mod hashes (records in run-bundle manifest). |
 
-### `cx-bench`
+### `cf-bench`
 
 | Flag | Default | Meaning |
 |---|---|---|
@@ -1093,20 +1093,20 @@ The dedicated server binary (DR-034). Same Rust workspace; same sim path as the 
 | `--runs <N>` | 5 | Repeat count for averaging. |
 | `--write-bench-report` | false | Emit `bench_report.json`. |
 
-### `cx-mod`
+### `cf-mod`
 
 | Subcommand | Purpose |
 |---|---|
 | `validate <paths...>` | Validate scenario/package manifests; exit non-zero on errors. |
-| `build <pkg-dir>` | Build a deterministic `.cxpkg`. |
-| `inspect <.cxpkg>` | Print loader graph + provenance. |
+| `build <pkg-dir>` | Build a deterministic `.cfpkg`. |
+| `inspect <.cfpkg>` | Print loader graph + provenance. |
 | `--strict` | Treat warnings as errors. |
 
 ---
 
 ## Control Transport And Envelope
 
-`cx-control` is the contract layer. Pinning these choices removes ambiguity for every E2E and observation task.
+`cf-control` is the contract layer. Pinning these choices removes ambiguity for every E2E and observation task.
 
 ### Transport (Pinned)
 
@@ -1162,10 +1162,10 @@ Streaming (observations) uses JSON-RPC notifications:
 
 ### Schema Files
 
-Schemas are emitted by `schemars` and committed under `corefall-game/crates/cx-control/schemas/`. Each release tags `cx-control` with a schema version; breaking changes bump the major version.
+Schemas are emitted by `schemars` and committed under `game/crates/cf-control/schemas/`. Each release tags `cf-control` with a schema version; breaking changes bump the major version.
 
 ```
-corefall-game/crates/cx-control/schemas/
+game/crates/cf-control/schemas/
 ├── v1/
 │   ├── command.schema.json
 │   ├── observation.schema.json
@@ -1274,7 +1274,7 @@ Scenarios are RON files in `content/scenarios/<id>.ron`. The schema is shared by
 )
 ```
 
-### Validation Rules (enforced by `cx-mod validate`)
+### Validation Rules (enforced by `cf-mod validate`)
 
 - `schema_version` must equal the engine's current version or have a registered migration.
 - All `team` references in actors/objectives must exist in `teams`.
@@ -1377,7 +1377,7 @@ The current platform validation must exit cleanly even when `prototype_runs/` do
 
 ## Assumptions Tested
 - Bevy app launches and ticks fixed 60 Hz for 5 s without crash.
-- `cxctl observe --once` returns one observation against the live app.
+- `cfctl observe --once` returns one observation against the live app.
 
 ## Good
 - Fixed-tick scheduler stable; no drift across 300 ticks.
@@ -1426,20 +1426,20 @@ Some milestones produce stubs that later milestones must replace without breakin
 |---|---|---|---|
 | Soft-breach surface → real terrain | M1.5 | M2 | M1.5 emits `terrain_carved` events with the same field shape (`{ tick, bbox, material_before, material_after, count }`) M2 will produce. M1.5 may emit `terrain_breach_stub` events alongside, but `terrain_carved` is the canonical event and must validate against `prototype-recorder-event.schema.json`. |
 | Reactive enemy → AI core | M1.5 | M6 | M1.5 enemy emits `ai_perception`, `tactic_chosen`, `weapon_fired`, `actor_status_changed` with reason labels. The same event names and reason-label vocabulary are reused by M6. |
-| Mini HUD → comic-noir HUD | M1.5/M4 | M4/M7 | Mini HUD writes status to the same `cx-ui::HudState` resource M4 reads. Adding fields is allowed; renames require a migration entry. |
+| Mini HUD → comic-noir HUD | M1.5/M4 | M4/M7 | Mini HUD writes status to the same `cf-ui::HudState` resource M4 reads. Adding fields is allowed; renames require a migration entry. |
 | Scenario manifest skeleton → full schema | M0/M1.5 | M7 | Scenario RON files bump `schema_version` only with a registered migration handler. Older scenarios continue to load via migration. |
 | Save stub → real save | M5 | T-SAVE | M5 writes a save with the v0.1 format. Each subsequent milestone that adds save fields bumps `schema_version` and registers a migration. |
 | Body/chassis proxies → full collision matrix | M5 | M5.5 | M5 owns limb, armor, equipment, and chassis proxy identity. M5.5 fills the collision matrix, broadphase/narrowphase pipeline, CCD tiers, contact events, and impulse-to-damage routing without changing M5 public component ids. |
 | Full collision affordances → AI trust harness | M5.5 | M6 | M6 AI reads collision affordances and events from M5.5: body blocking, debris obstruction, projectile danger, doors/shields, and collision damage reasons. AI must not ignore physical contacts. |
 | Replay event taxonomy → headless replay | M3 | M9 | All M3 events MUST be deterministically reproducible from manifest+seed+inputs. Cosmetic-only events are flagged with `cosmetic: true` and excluded from replay verification. |
 | Per-client bundles → align tick-for-tick | M10 | M11/M12 | Bundles share `run_id`; per-client bundles use `<run_id>__client_<role>` directory suffix. |
-| `cx-headless` sim runner → `cx-server` dedicated server | M3/M9 | M9..M12 | M3 ships `cx-headless` for replay verification; M9 wraps it with `cx-server-ops` (lifecycle, health, metrics, persistence, anti-cheat) without changing the sim path. `cx-headless` continues to be used by CI/replay even after `cx-server` ships. |
-| Server lifecycle stubs → full `cx-server` modes | M0 | M9 | M0 reserves config schema fields + capability gates for `--control-api`, `--debug-capabilities`, secret-redaction. M9 implements `--mode <coop_room\|pvp_arena\|lan_room\|mmo_shard\|lobby_directory>` against those stubs. |
+| `cf-headless` sim runner → `cf-server` dedicated server | M3/M9 | M9..M12 | M3 ships `cf-headless` for replay verification; M9 wraps it with `cf-server-ops` (lifecycle, health, metrics, persistence, anti-cheat) without changing the sim path. `cf-headless` continues to be used by CI/replay even after `cf-server` ships. |
+| Server lifecycle stubs → full `cf-server` modes | M0 | M9 | M0 reserves config schema fields + capability gates for `--control-api`, `--debug-capabilities`, secret-redaction. M9 implements `--mode <coop_room\|pvp_arena\|lan_room\|mmo_shard\|lobby_directory>` against those stubs. |
 | Save game state → MMO shard persistence | M5/T-SAVE | M12/DR-035 | M5 writes the v0.1 save format. M9 reuses the format for per-session co-op archive. M12 extends it for MMO shard snapshot/journal persistence. Schema bumps go through registered migration handlers (DR-029). |
 | Anti-cheat foundation hooks → public profiles | M9 | M11/M12 | M9 ships profile registry (`casual`/`competitive`/`tournament_strict`) + audit log skeleton. M11 enables `competitive` for online co-op. M12 uses `competitive` for public PvP/MMO by default; `tournament_strict` remains opt-in for ranked/tournament later. |
 | Mod package hashes → server-side mod compatibility | M5/M8/T-MOD | M9..M12 | M5 ships package format + hash. M8 ships package builder + registry. M9 enables server-side mod loading + hash-mismatch UI on join. Server-only mods (`server_only: true`) ship with M11/M12. |
-| Local AI doctrine/blackboard hooks → LLM mind layer | M6 | M6.5 | M6 exposes hook points: utility-weight patch API, commander-blackboard goal API, doctrine-tag set API, dialogue-queue API, memory-write API. M6.5 wires `cx-ai::mind::policy` to those hooks. M6 must NEVER call the LLM layer directly; it only exposes the hooks. |
-| Observation stream → `MindObservationFrame` | T-CONTROL (M0+) | T-LLM (M6.5) | M6.5 adds the compressor that derives `MindObservationFrame` from the `cx-control` observation stream + replay events. The compressor enforces fog-of-war BEFORE any provider sees a prompt. |
+| Local AI doctrine/blackboard hooks → LLM mind layer | M6 | M6.5 | M6 exposes hook points: utility-weight patch API, commander-blackboard goal API, doctrine-tag set API, dialogue-queue API, memory-write API. M6.5 wires `cf-ai::mind::policy` to those hooks. M6 must NEVER call the LLM layer directly; it only exposes the hooks. |
+| Observation stream → `MindObservationFrame` | T-CONTROL (M0+) | T-LLM (M6.5) | M6.5 adds the compressor that derives `MindObservationFrame` from the `cf-control` observation stream + replay events. The compressor enforces fog-of-war BEFORE any provider sees a prompt. |
 | Run-bundle event taxonomy → `mind` events | M3 | M6.5 | M3 reserves the `mind` event category in the schema. M6.5 fills it with `mind.task_created`, `mind.prompt_recorded` (hashes only by default; raw text behind `debug_capabilities`), `mind.response_received`, `mind.proposal_validated`, `mind.patch_applied`, `mind.patch_rejected`, `mind.memory_written`. |
 
 ---
@@ -1448,35 +1448,35 @@ Some milestones produce stubs that later milestones must replace without breakin
 
 Before doing any feature work, the agent runs the milestone's kickoff smoke. If smoke fails, fix smoke first. If smoke succeeds, proceed to task cards.
 
-| Milestone | Kickoff Smoke (run from `corefall-game/`) | Pass Means |
+| Milestone | Kickoff Smoke (run from `game/`) | Pass Means |
 |---|---|---|
 | M0 | `cargo fmt --all -- --check && cargo check --workspace --all-targets && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace` | Workspace is well-formed; lints clean. |
-| M0 | `cargo run -p cx-app -- --scenario m0_blank --headless-smoke --ticks 60` | App launches, ticks 60 sim ticks, exits 0. |
-| M0 | `cargo run -p cxctl -- observe --once --scenario m0_blank` | Control envelope serializes one observation. |
-| M0 | `cargo run -p cxctl -- run --scenario m0_blank --ticks 300 --write-run-bundle && python3 ../research_tools/prototype_run_check.py prototype_runs/native/m0_*` | Run bundle validates. |
-| M1 | `cargo run -p cx-app -- --scenario m1_actor_range --run-seconds 5` | One actor visible; status strip shows. |
-| M1 | `cargo run -p cxctl -- script run m1_move_jump_fire_reload --write-run-bundle` | Scripted control drives actor end-to-end. |
-| M1.5 | `cargo run -p cxctl -- script run micro_breach_win --write-run-bundle` | Win path completes; bundle validates. |
-| M1.5 | `cargo run -p cxctl -- script run micro_breach_loss --write-run-bundle` | Loss path completes; bundle validates. |
-| M2 | `cargo run -p cx-e2e -- --scenario m2_material_lane --script dig_concrete_refuse_metal --expect win --write-run-bundle` | All 8 materials behave per affordance. |
-| M3 | `cargo run -p cx-headless -- replay prototype_runs/native/<m2_run> --verify-checksums` | Headless replay matches checksums. |
-| M4 | `cargo run -p cx-e2e -- --scenario micro_breach --ui-scale 2.0 --high-contrast --verify-focus --write-run-bundle` | UI passes ACC-A floor. |
-| M5 | `cargo run -p cx-e2e -- --scenario m5_chassis_wreck_eject --expect pilot_extracted --write-run-bundle` | Chassis grammar end-to-end. |
-| M5.5 | `cargo run -p cx-e2e -- --scenario m5_5_full_collision_gauntlet --suite COLL-001..COLL-012 --write-run-bundle` | Full collision matrix, CCD, projectile-projectile, impulse damage, replay, and perf evidence exist. |
-| M5.6 | `cargo run -p cx-e2e -- --scenario m5_6_material_kernel --suite MAT-01,MAT-02,MAT-03,MAT-06,MAT-13 --write-run-bundle` | Material kernel + reaction table + density layering + replay determinism. |
-| M5.7 | `cargo run -p cx-e2e -- --scenario m5_7_hazard_package --suite MAT-04,MAT-05,MAT-07,MAT-08-stub --write-run-bundle` | Acid/electricity/debris/ingestion damage routes through armor/limbs. |
-| M6 | `cargo run -p cx-ai --bin ai_harness -- --suite AI-H-01..AI-H-06 --write-run-bundle` | Harness suite passes. |
-| M6.5 | `cargo run -p cx-ai --bin mind_lab -- --suite MIND-001..MIND-010 --provider mock --write-run-bundle` | Mind lab suite passes against mock; local AI keeps acting through provider sleep/fail/stale; replay shows mind events. |
-| M6.6 | `cargo run -p cx-ai --bin ai_harness -- --suite AI-MAT-01..AI-MAT-08 --write-run-bundle` | AI material competence suite passes; AI avoids/uses materials with reason labels. |
-| M7 | `cargo run -p cx-e2e -- --scenario breach_contract --script win_path --expect win --write-run-bundle` | Breach Contract win path is real. |
-| M7.5 | `cargo run -p cx-e2e -- --scenario m7_5_base_atmospherics --suite MAT-09,MAT-10 --write-run-bundle` | Hull/gap/pump/vent/oxygen/pressure/fire networks; flooding + breach + repair scenarios pass. |
-| M8 | `cargo run -p cx-mod -- validate content/ mods/ --strict && cargo run -p cx-e2e -- --scenario sample_mod_breach --expect win --write-run-bundle` | Mod loads + plays. |
-| M8.5 | `cargo run -p cx-tools-editor -- --mode material_lab --scenario m8_5_acid_trap_puzzle --suite MAT-11,MAT-14 --write-run-bundle && cargo run -p cx-mod -- validate mods/sample_material_pack/ --strict` | Designer authors + exports + reloads a material puzzle; mod pack with new material loads cleanly. |
-| M9 | `cargo run -p cx-server -- --mode coop_room --scenario breach_contract --ticks 36000 --write-run-bundle` then `cargo run -p cx-headless -- replay <m9_run> --verify-checksums` | Dedicated server boots and runs a co-op room; 10-min replay verified. |
-| M9 | `cargo run -p cx-server -- --mode lan_room --auto-discover` (smoke) and `cargo run -p cx-server -- --mode mmo_shard --bootstrap-empty-shard` (smoke). | Each `cx-server` mode boots. |
-| M10 | `cargo run -p cx-server -- --mode lan_room` (host) + 2 `cx-app` clients on LAN, then `cargo run -p cx-headless -- replay-compare <client_a_bundle> <client_b_bundle>` | Per-client bundles align tick-for-tick. |
-| M11 | M10 smoke + `cargo run -p cx-server -- --mode coop_room --public-bind 0.0.0.0:0` reachable through the chosen transport with `lobby_directory` integration. | Self-hosted online co-op with mod hash sync works. |
-| M12 | `cargo run -p cx-server -- --mode pvp_arena` 4-player stress + `cargo run -p cx-server -- --mode mmo_shard --simulate-clients 50 --duration-min 60` + MMO-001..MMO-012 suite. | PvP + MMO architecture is real at launch scale. |
+| M0 | `cargo run -p cf-app -- --scenario m0_blank --headless-smoke --ticks 60` | App launches, ticks 60 sim ticks, exits 0. |
+| M0 | `cargo run -p cfctl -- observe --once --scenario m0_blank` | Control envelope serializes one observation. |
+| M0 | `cargo run -p cfctl -- run --scenario m0_blank --ticks 300 --write-run-bundle && python3 ../research_tools/prototype_run_check.py prototype_runs/native/m0_*` | Run bundle validates. |
+| M1 | `cargo run -p cf-app -- --scenario m1_actor_range --run-seconds 5` | One actor visible; status strip shows. |
+| M1 | `cargo run -p cfctl -- script run m1_move_jump_fire_reload --write-run-bundle` | Scripted control drives actor end-to-end. |
+| M1.5 | `cargo run -p cfctl -- script run micro_breach_win --write-run-bundle` | Win path completes; bundle validates. |
+| M1.5 | `cargo run -p cfctl -- script run micro_breach_loss --write-run-bundle` | Loss path completes; bundle validates. |
+| M2 | `cargo run -p cf-e2e -- --scenario m2_material_lane --script dig_concrete_refuse_metal --expect win --write-run-bundle` | All 8 materials behave per affordance. |
+| M3 | `cargo run -p cf-headless -- replay prototype_runs/native/<m2_run> --verify-checksums` | Headless replay matches checksums. |
+| M4 | `cargo run -p cf-e2e -- --scenario micro_breach --ui-scale 2.0 --high-contrast --verify-focus --write-run-bundle` | UI passes ACC-A floor. |
+| M5 | `cargo run -p cf-e2e -- --scenario m5_chassis_wreck_eject --expect pilot_extracted --write-run-bundle` | Chassis grammar end-to-end. |
+| M5.5 | `cargo run -p cf-e2e -- --scenario m5_5_full_collision_gauntlet --suite COLL-001..COLL-012 --write-run-bundle` | Full collision matrix, CCD, projectile-projectile, impulse damage, replay, and perf evidence exist. |
+| M5.6 | `cargo run -p cf-e2e -- --scenario m5_6_material_kernel --suite MAT-01,MAT-02,MAT-03,MAT-06,MAT-13 --write-run-bundle` | Material kernel + reaction table + density layering + replay determinism. |
+| M5.7 | `cargo run -p cf-e2e -- --scenario m5_7_hazard_package --suite MAT-04,MAT-05,MAT-07,MAT-08-stub --write-run-bundle` | Acid/electricity/debris/ingestion damage routes through armor/limbs. |
+| M6 | `cargo run -p cf-ai --bin ai_harness -- --suite AI-H-01..AI-H-06 --write-run-bundle` | Harness suite passes. |
+| M6.5 | `cargo run -p cf-ai --bin mind_lab -- --suite MIND-001..MIND-010 --provider mock --write-run-bundle` | Mind lab suite passes against mock; local AI keeps acting through provider sleep/fail/stale; replay shows mind events. |
+| M6.6 | `cargo run -p cf-ai --bin ai_harness -- --suite AI-MAT-01..AI-MAT-08 --write-run-bundle` | AI material competence suite passes; AI avoids/uses materials with reason labels. |
+| M7 | `cargo run -p cf-e2e -- --scenario breach_contract --script win_path --expect win --write-run-bundle` | Breach Contract win path is real. |
+| M7.5 | `cargo run -p cf-e2e -- --scenario m7_5_base_atmospherics --suite MAT-09,MAT-10 --write-run-bundle` | Hull/gap/pump/vent/oxygen/pressure/fire networks; flooding + breach + repair scenarios pass. |
+| M8 | `cargo run -p cf-mod -- validate content/ mods/ --strict && cargo run -p cf-e2e -- --scenario sample_mod_breach --expect win --write-run-bundle` | Mod loads + plays. |
+| M8.5 | `cargo run -p cf-tools-editor -- --mode material_lab --scenario m8_5_acid_trap_puzzle --suite MAT-11,MAT-14 --write-run-bundle && cargo run -p cf-mod -- validate mods/sample_material_pack/ --strict` | Designer authors + exports + reloads a material puzzle; mod pack with new material loads cleanly. |
+| M9 | `cargo run -p cf-server -- --mode coop_room --scenario breach_contract --ticks 36000 --write-run-bundle` then `cargo run -p cf-headless -- replay <m9_run> --verify-checksums` | Dedicated server boots and runs a co-op room; 10-min replay verified. |
+| M9 | `cargo run -p cf-server -- --mode lan_room --auto-discover` (smoke) and `cargo run -p cf-server -- --mode mmo_shard --bootstrap-empty-shard` (smoke). | Each `cf-server` mode boots. |
+| M10 | `cargo run -p cf-server -- --mode lan_room` (host) + 2 `cf-app` clients on LAN, then `cargo run -p cf-headless -- replay-compare <client_a_bundle> <client_b_bundle>` | Per-client bundles align tick-for-tick. |
+| M11 | M10 smoke + `cargo run -p cf-server -- --mode coop_room --public-bind 0.0.0.0:0` reachable through the chosen transport with `lobby_directory` integration. | Self-hosted online co-op with mod hash sync works. |
+| M12 | `cargo run -p cf-server -- --mode pvp_arena` 4-player stress + `cargo run -p cf-server -- --mode mmo_shard --simulate-clients 50 --duration-min 60` + MMO-001..MMO-012 suite. | PvP + MMO architecture is real at launch scale. |
 
 ---
 
@@ -1501,10 +1501,10 @@ Before doing any feature work, the agent runs the milestone's kickoff smoke. If 
 | M7.5 | Base Atmospherics | Hull/gap/pump/vent/oxygen/pressure network for bases/mechs/sealed chambers (MAT-09, MAT-10); damageable life support; flooding/fire/smoke through rooms | M5.6, M5.7, M7 | Yes (DR-036) |
 | M8 | Scenario Editor + Mod Tools | In-engine workbench; same manifest format; mod loader; package builder | M3, M5, M7 | Yes |
 | M8.5 | Material Lab | Material brush/inspect/recipe/stamp/test editor (MAT-11, MAT-14); designer authors a tiny reaction puzzle in minutes; community-shareable material packs | M5.6, M5.7, M8 | Yes (DR-036) |
-| M9 | Dedicated Server App + Determinism Islands | `cx-server` binary boots in all modes, passes M9 core server lifecycle subset, deterministic islands, replay verification, and reference Docker smoke; PvP/MMO scale tests remain M12 | M3, M7 | **Yes** (server architecture commitment per DR-005 + DR-034) |
-| M10 | LAN Co-op | 2-4 clients on local network via `cx-server --mode lan_room`; replicated state; survival of one Breach Contract; per-client bundles align tick-for-tick | M9 | **Yes** (evidence-gated full-product target) |
-| M11 | Online Co-op (Self-Hosted Dedicated Servers) | NAT/relay via `cx-server --mode coop_room`; lobby + package hash sync; community member can host a public co-op session friends in different cities can join | M10 | **Yes** (evidence-gated full-product target) |
-| M12 | Public PvP Arenas + Persistent MMO Shards | `cx-server --mode pvp_arena` with anti-cheat foundation; `cx-server --mode mmo_shard` with persistence + interest management + 50-100 concurrent player target; MMO-001..MMO-012 + PvP stress tests | M10, M11 | **Yes** (full-product readiness gate per DR-005 + DR-035) |
+| M9 | Dedicated Server App + Determinism Islands | `cf-server` binary boots in all modes, passes M9 core server lifecycle subset, deterministic islands, replay verification, and reference Docker smoke; PvP/MMO scale tests remain M12 | M3, M7 | **Yes** (server architecture commitment per DR-005 + DR-034) |
+| M10 | LAN Co-op | 2-4 clients on local network via `cf-server --mode lan_room`; replicated state; survival of one Breach Contract; per-client bundles align tick-for-tick | M9 | **Yes** (evidence-gated full-product target) |
+| M11 | Online Co-op (Self-Hosted Dedicated Servers) | NAT/relay via `cf-server --mode coop_room`; lobby + package hash sync; community member can host a public co-op session friends in different cities can join | M10 | **Yes** (evidence-gated full-product target) |
+| M12 | Public PvP Arenas + Persistent MMO Shards | `cf-server --mode pvp_arena` with anti-cheat foundation; `cf-server --mode mmo_shard` with persistence + interest management + 50-100 concurrent player target; MMO-001..MMO-012 + PvP stress tests | M10, M11 | **Yes** (full-product readiness gate per DR-005 + DR-035) |
 
 ---
 
@@ -1536,11 +1536,11 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 **Scope:**
 - Cargo workspace with the crate layout above.
-- `cx-app` binary that launches a Bevy app with empty schedule.
-- `cx-sim-core` fixed-tick scheduler (60 Hz default; 120 Hz option).
-- `cx-replay` minimal event envelope + run-bundle writer (no events yet beyond `system_*`).
-- `cx-render-2d` minimal wgpu pipeline that clears the screen.
-- `cx-control` minimal command/observation schema plus `cargo run -p cxctl -- observe --once`, `cargo run -p cxctl -- run --ticks`, `pause`, and `step`.
+- `cf-app` binary that launches a Bevy app with empty schedule.
+- `cf-sim-core` fixed-tick scheduler (60 Hz default; 120 Hz option).
+- `cf-replay` minimal event envelope + run-bundle writer (no events yet beyond `system_*`).
+- `cf-render-2d` minimal wgpu pipeline that clears the screen.
+- `cf-control` minimal command/observation schema plus `cargo run -p cfctl -- observe --once`, `cargo run -p cfctl -- run --ticks`, `pause`, and `step`.
 - GitHub Actions CI: build matrix Win/Linux/macOS; cargo check + cargo test + cargo clippy.
 - Native run bundles compatible with `research_tools/prototype_run_check.py`; add a thin native helper or wrapper only if the milestone needs one.
 - Hello-world scene: blank window, press ESC to exit, run-bundle written to `prototype_runs/native/`.
@@ -1551,8 +1551,8 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 - [ ] `cargo run` opens a window, ticks the sim at 60 Hz for 5 seconds, exits cleanly.
 - [ ] A run bundle is written under `prototype_runs/native/m0_*/` with manifest+events+summary+notes.
 - [ ] `python3 research_tools/prototype_run_check.py prototype_runs/native/<m0_run>` passes on the bundle.
-- [ ] `cargo run -p cxctl -- observe --once` reads current run/tick/scenario state without screenshot capture.
-- [ ] `cargo run -p cxctl -- run --ticks 300 --write-run-bundle` drives the no-op scene without OS input.
+- [ ] `cargo run -p cfctl -- observe --once` reads current run/tick/scenario state without screenshot capture.
+- [ ] `cargo run -p cfctl -- run --ticks 300 --write-run-bundle` drives the no-op scene without OS input.
 - [ ] Repository is commit-ready, with a semantic commit only if the user explicitly asked the agent to commit.
 
 **Cross-DR:** DR-001, DR-024, DR-025, DR-026, DR-002 (run-bundle).
@@ -1566,20 +1566,20 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 **What it proves:** One actor is playable on the native engine. Movement, aim, simple weapon, and the body-status state machine all run through the fixed-tick sim and emit replay events. This is the moment the **HTML lab is officially superseded as the iteration harness**.
 
 **Scope:**
-- `cx-actor` actor components: `Position`, `Velocity`, `Aim`, `Status` (STABLE/UNSTABLE/DOWNED/DEAD), `Inventory`.
-- `cx-sim-core` control intent layer: input → `ControlIntent` resource → consumed by sim systems.
-- `cx-physics` minimal 2D physics: gravity, ground collision, recoil impulse.
-- `cx-equipment` minimal: one rifle preset; magazine/ammo state; fire/reload events.
-- `cx-render-2d`: pixel-art sprite rendering (sub-pixel-clean); chunky pixel actor sprite.
-- `cx-replay`: event taxonomy expanded to `input_intent`, `actor_status_changed`, `weapon_fired`, `weapon_reloaded`, `actor_snapshot`.
-- `cx-control`: movement, aim, fire, reload, selected-item, actor snapshot, and equipment observations/actions.
+- `cf-actor` actor components: `Position`, `Velocity`, `Aim`, `Status` (STABLE/UNSTABLE/DOWNED/DEAD), `Inventory`.
+- `cf-sim-core` control intent layer: input → `ControlIntent` resource → consumed by sim systems.
+- `cf-physics` minimal 2D physics: gravity, ground collision, recoil impulse.
+- `cf-equipment` minimal: one rifle preset; magazine/ammo state; fire/reload events.
+- `cf-render-2d`: pixel-art sprite rendering (sub-pixel-clean); chunky pixel actor sprite.
+- `cf-replay`: event taxonomy expanded to `input_intent`, `actor_status_changed`, `weapon_fired`, `weapon_reloaded`, `actor_snapshot`.
+- `cf-control`: movement, aim, fire, reload, selected-item, actor snapshot, and equipment observations/actions.
 - HUD stub via egui: ammo + status text overlay.
 - Manual playtest: WASD movement, mouse aim, click-to-fire, R to reload.
 
 **Done-criteria:**
 - [ ] One actor is playable for 5 minutes without crash.
 - [ ] All control inputs produce `input_intent` events.
-- [ ] The actor can be moved, aimed, fired, and reloaded through `cxctl` or the control API with the same sim path as human input.
+- [ ] The actor can be moved, aimed, fired, and reloaded through `cfctl` or the control API with the same sim path as human input.
 - [ ] Status transitions emit `actor_status_changed` with cause.
 - [ ] A 5-minute run bundle validates with the run-bundle checker.
 - [ ] Project owner does a manual playtest and writes a verbatim reaction in a vault note.
@@ -1603,7 +1603,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 - One objective state machine: `objective_started`, `objective_updated`, `objective_completed`, `objective_failed`.
 - HUD additions: objective text, timer, player status, enemy status, selected item, last important event.
 - Run bundle captures input, enemy perception, enemy fire, hit/miss, player damage/death, tool use, terrain breach, objective result, and screenshot.
-- `cargo run -p cxctl -- script ...` scripts drive both win and loss paths without requiring manual input.
+- `cargo run -p cfctl -- script ...` scripts drive both win and loss paths without requiring manual input.
 
 **Done-criteria:**
 - [ ] The micro scenario can be won and lost in 60-90 seconds.
@@ -1625,12 +1625,12 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 **What it proves:** Mutable chunked pixel terrain. The player can dig a soft-material wall and the change is visible, replay-recorded, and respected by the simple physics.
 
 **Scope:**
-- `cx-terrain` chunked pixel terrain: 256×256 chunks; per-pixel material id; sparse storage.
+- `cf-terrain` chunked pixel terrain: 256×256 chunks; per-pixel material id; sparse storage.
 - GPU-assisted carving compute shader (wgpu): blast/dig writes apply on the GPU when bounds are large; CPU fallback for small writes.
 - Material registry with launch material set: air, dirt, concrete, metal-nohook, hazard, loose fill, repair-fill, anchor.
 - Material affordances: hardness, anchorability, hazard flags, path-cost contribution.
 - Dirty-region tracker for downstream consumers (path, replay, render).
-- Digger tool wired into `cx-equipment`; `tool_action_started` / `terrain_carved` / `tool_refused` events.
+- Digger tool wired into `cf-equipment`; `tool_action_started` / `terrain_carved` / `tool_refused` events.
 - Material overlay (toggle key): renders material id as colored overlay.
 - Visual feedback: pixel debris particles when carving.
 
@@ -1653,7 +1653,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 **What it proves:** Event taxonomy is complete enough that any prior milestone's run can be replayed headlessly and produce identical state checksums. Determinism islands are real.
 
 **Scope:**
-- `cx-replay` event taxonomy expanded to cover every baseline category in [[references/prototype-run-bundle-schema#Event Category Baseline]]: `input`, `control`, `mind`, `collision`, `server`, `anti_cheat`, `mmo`, `material`, `reaction`, `atmosphere`, `affliction`, `combat`, `body`, `terrain`, `ai`, `logistics`, `mission`, `system`, `snapshot`, `determinism`, `ux`, `accessibility`, and `performance`. New event categories must be added to the schema first, then wired into recorder filters, viewer filters, summary counters, and checklist rows.
+- `cf-replay` event taxonomy expanded to cover every baseline category in [[references/prototype-run-bundle-schema#Event Category Baseline]]: `input`, `control`, `mind`, `collision`, `server`, `anti_cheat`, `mmo`, `material`, `reaction`, `atmosphere`, `affliction`, `combat`, `body`, `terrain`, `ai`, `logistics`, `mission`, `system`, `snapshot`, `determinism`, `ux`, `accessibility`, and `performance`. New event categories must be added to the schema first, then wired into recorder filters, viewer filters, summary counters, and checklist rows.
 - Snapshot writer: full actor/inventory/terrain snapshot at scene start + every objective change.
 - Checksum producer: per-tick or per-snapshot.
 - Headless replay binary: replays a run bundle without rendering and produces matching checksums.
@@ -1678,7 +1678,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 **What it proves:** Game state is readable from the HUD without text walls. Comic-noir mission card style is established. Accessibility floor (DR-012) is hit.
 
 **Scope:**
-- `cx-ui` HUD: body silhouette (DR-003 style); module strip stub; ammo + reload; objective banner; timer; last-important-event ticker.
+- `cf-ui` HUD: body silhouette (DR-003 style); module strip stub; ammo + reload; objective banner; timer; last-important-event ticker.
 - Comic-noir mission card: pre-mission briefing card; post-mission debrief card; both static.
 - Status banners ("ARMOR CRACKED LEFT", "JET FAILED", "EJECT NOW") triggered by chassis events.
 - Material overlay UI integrated; tool-validity color cues.
@@ -1702,10 +1702,10 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 **What it proves:** The chassis grammar from DR-014/021 works on the native engine. One powered-armor actor and one light mech actor exercise the full ladder of layers + modules + damage stages + jam + eject + repair + salvage.
 
 **Scope:**
-- `cx-chassis` chassis components: layered armor zones, modules with state, pilot/operator binding.
+- `cf-chassis` chassis components: layered armor zones, modules with state, pilot/operator binding.
 - Damage stages: `nominal` → `degraded` → `module-warning` → `module-failed` → `weapon-jammed` → `armor-cracked` → `disabled` → `pilot-injured` → `eject` → `bail-too-late` → `wreck` → `gibbed/exploded`.
 - Module system: jet, shield, sensor, repair-drone, weapon-mount; each with damage states.
-- `cx-equipment` role records implementation; LOAD-A fixture support; AI policy hints.
+- `cf-equipment` role records implementation; LOAD-A fixture support; AI policy hints.
 - Events: `chassis_stage_changed`, `module_state_changed`, `armor_layer_damaged`, `weapon_jammed`, `weapon_cleared`, `pilot_state_changed`, `pilot_ejected`, `pilot_extracted`, `pilot_lost`, `chassis_repaired`, `chassis_salvaged`.
 - Two reference chassis: powered armor (Spartan-ish proportions); light mech (~3× human).
 - Tutorial-safety scenario policy honored: lethal demoted to KO during onboarding-shaped scenarios.
@@ -1719,7 +1719,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 **Cross-DR:** DR-003, DR-014, DR-018, DR-021, DR-024.
 
-**Open DR gates:** DR-003 (body damage readability still open — M5 introduces the chassis grammar that depends on it; confirm silhouette/HUD posture before locking chassis stages). Topic-level: modding script host (mlua vs Rhai) is OPEN — DR-006 is OPEN — `cx-equipment` role records may need scripted hooks; confirm script-host posture before adding scripted equipment behavior. Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
+**Open DR gates:** DR-003 (body damage readability still open — M5 introduces the chassis grammar that depends on it; confirm silhouette/HUD posture before locking chassis stages). Topic-level: modding script host (mlua vs Rhai) is OPEN — DR-006 is OPEN — `cf-equipment` role records may need scripted hooks; confirm script-host posture before adding scripted equipment behavior. Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
 
 ---
 
@@ -1728,15 +1728,15 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 **What it proves:** The game has the physical consequence contract required by DR-033. Bodies, limbs, weapons, armor, mechs, projectiles, objects, terrain, shields, and base parts collide through explicit data and replay-visible events, without brute-force all-pairs.
 
 **Scope (per [[spec/full-collision-physics-plan]]):**
-- `cx-physics` collision pipeline: broadphase, narrowphase, contact manifold, stable pair ids, collision matrix loader, deterministic pair ordering, and contact-event emission.
+- `cf-physics` collision pipeline: broadphase, narrowphase, contact manifold, stable pair ids, collision matrix loader, deterministic pair ordering, and contact-event emission.
 - Collision classes and proxies for actor core, limbs, armor zones, held weapons, loose items, kinetic projectiles, explosive projectiles, terrain proxies, debris chunks, mech parts, base objects, force fields, and sensor triggers.
 - Explicit collision matrix: player/player, unit/unit, AI/AI, enemy/enemy, ally/ally, limb/limb, limb/body, limb/weapon, weapon/weapon, projectile/body, projectile/terrain, projectile/equipment, projectile/shield, projectile/projectile, debris/body, mech/infantry, base/object interactions.
 - CCD tiers: discrete, speculative, sweep ray, sweep capsule, sweep shape, and TOI substep. Fast projectiles, important limbs, command-core bodies, and mech crush contacts cannot tunnel through thin terrain or units.
 - Projectile-projectile contact: kinetic bullet-bullet deflects/fragments/tumbles/loses energy; explosive projectile contacts can detonate, fuze-fail, or deflect by authored profile.
 - Impulse-to-damage routing: collision impulse, contact area, sharpness, material pair, armor layer, and origin/chassis rules produce body, armor, equipment, terrain, module, and base-object damage.
 - Terrain chunk collision proxies update from M2 dirty regions; chunk seams/tiny holes/edge cases are test fixtures.
-- `cx-replay`: `collision` event category with contact start/persist/end, impulse, projectile deflection, projectile-projectile contact, filter reason, collision damage, budget degradation, and first divergence events.
-- `cxctl observe --collisions` and `cxctl inspect collision <event-id>` for implementation agents and future bot authors.
+- `cf-replay`: `collision` event category with contact start/persist/end, impulse, projectile deflection, projectile-projectile contact, filter reason, collision damage, budget degradation, and first divergence events.
+- `cfctl observe --collisions` and `cfctl inspect collision <event-id>` for implementation agents and future bot authors.
 - Perf budget governor for low-value debris; never silently drops actor, limb, armor, weapon, key projectile, terrain, shield, command-core, or mission-critical contacts.
 
 **Done-criteria:**
@@ -1749,7 +1749,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 - [ ] COLL-007 high-speed projectiles and falling bodies do not tunnel through tiny holes, chunk boundaries, shields, or thin limbs.
 - [ ] COLL-008 physics impacts damage limbs, armor, equipment, chassis modules, debris, terrain, base objects, and mechs where thresholds are met.
 - [ ] COLL-009 Full Collision Gauntlet replays headlessly with identical contact ids/checksums.
-- [ ] COLL-010 `cxctl observe --collisions` exposes live contacts, filters, and last 30 collision events without screenshots.
+- [ ] COLL-010 `cfctl observe --collisions` exposes live contacts, filters, and last 30 collision events without screenshots.
 - [ ] COLL-011 perf report records 1080p/60 pass plus 4K/120 and Steam Deck status.
 - [ ] COLL-012 AI pathing/behavior reacts to body blocking, debris, doors, shields, and contact damage with reason labels.
 
@@ -1764,15 +1764,15 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 **What it proves:** The active-region material kernel from DR-036 / [[comparables/noita-grade-material-simulation-research]] is real. Active material grid + reaction table + density layering + phase change + chunked dirty rects + sleeping chunks + replay determinism. Sand falls, water pools, steam rises, oil floats on water, fire ignites oil/wood, water extinguishes fire. Every reaction emits a replay-recorded `material.*` / `reaction.*` event with cause chain.
 
 **Scope (MAT-01, MAT-02, MAT-03, MAT-06, MAT-13 minimal):**
-- `cx-material` crate: chunked CA grid (64×64 per chunk default; Noita pattern); deterministic update order; dirty-rect tracker; sleeping chunk policy; per-pixel material id + temperature + state; CPU-deterministic kernel (GPU experiments deferred).
-- Material schema (data-first per DR-036): `id`, `display_name`, `category`, `movement_class`, `density`, `viscosity`, `mass_per_pixel`, `hardness`, `heat_capacity`, `thermal_conductivity`, `temperature`, `ignition_temperature`, `burn_rate`, `oxygen_requirement`, `burn_products`, `phase_changes`, `conductivity`, `wetting`, `reaction_tags`, `ai_affordances`, `ui_overlay_color`, `caption_priority`, `performance_tier`, `network_replay_mode`. Validates through `cx-mod validate`.
+- `cf-material` crate: chunked CA grid (64×64 per chunk default; Noita pattern); deterministic update order; dirty-rect tracker; sleeping chunk policy; per-pixel material id + temperature + state; CPU-deterministic kernel (GPU experiments deferred).
+- Material schema (data-first per DR-036): `id`, `display_name`, `category`, `movement_class`, `density`, `viscosity`, `mass_per_pixel`, `hardness`, `heat_capacity`, `thermal_conductivity`, `temperature`, `ignition_temperature`, `burn_rate`, `oxygen_requirement`, `burn_products`, `phase_changes`, `conductivity`, `wetting`, `reaction_tags`, `ai_affordances`, `ui_overlay_color`, `caption_priority`, `performance_tier`, `network_replay_mode`. Validates through `cf-mod validate`.
 - Launch material set v0 (subset for M5.6): air, dirt/sand, rock, water, steam/mist, oil/fuel, fire/heat, smoke. Wood/organic stubs.
 - Reaction table: data-driven pair/triple reactions with priority/temperature/catalysts/byproducts. Examples: `water + fire → steam` (consumes both, spawns steam); `oil + ignition → fire on oil surface`; `lava + water → rock + steam` (with heat dump).
 - Density layering: `oil` floats on `water`; `lava` sinks below lighter fluids; gas rises.
 - Phase change kernel: water ↔ steam at temperature thresholds.
-- Replay determinism: `cx-replay` `material` + `reaction` event categories; per-chunk material checksum; first-divergence reports.
+- Replay determinism: `cf-replay` `material` + `reaction` event categories; per-chunk material checksum; first-divergence reports.
 - Performance gates: dirty-rect updates only; sleeping chunks; chunk-budget governor; perf counters in `summary.json`.
-- Observation hook: `cxctl observe --materials` snapshots material/temperature/state for in-range chunks (DR-036).
+- Observation hook: `cfctl observe --materials` snapshots material/temperature/state for in-range chunks (DR-036).
 
 **Done-criteria:**
 - [ ] MAT-01 active material kernel: 256×256 sandbox runs sand/water/oil/steam/fire for 5 minutes at ≥60 FPS on baseline hardware.
@@ -1781,12 +1781,12 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 - [ ] MAT-06 density/layering: stable oil-on-water, sludge-below-water, gas-above-air without jitter for 60 seconds.
 - [ ] MAT-13 minimal replay determinism: same seed/inputs produce identical material checksum after 10,000 ticks.
 - [ ] Chunk budget: 32 active 64×64 chunks at 60 Hz on baseline hardware without dropping below sim tick budget (per T-PERF).
-- [ ] `cxctl observe --materials --once --scope chunk:0,0` returns a JSON material/temperature/state snapshot for the chunk.
+- [ ] `cfctl observe --materials --once --scope chunk:0,0` returns a JSON material/temperature/state snapshot for the chunk.
 - [ ] Run bundle includes `material.*` and `reaction.*` events; replay-from-events reproduces the run with matching checksum.
 
 **Cross-DR:** DR-002, DR-006, DR-007, DR-024, DR-028, DR-033, DR-036.
 
-**Open DR gates:** DR-002 (new material/reaction event categories must close DR-002 contract), DR-006 (modding data model — material schema is moddable; confirm schema versioning + capability gates), DR-007 (terrain/material — M5.6 closes implementation specifics under DR-036; confirm reaction priority resolution + chunk shape + perf budget with user before locking). Topic-level: modding script host is OPEN — `cx-mod validate` for materials may need scripted reaction hooks; confirm host before scripted reactions ship. Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
+**Open DR gates:** DR-002 (new material/reaction event categories must close DR-002 contract), DR-006 (modding data model — material schema is moddable; confirm schema versioning + capability gates), DR-007 (terrain/material — M5.6 closes implementation specifics under DR-036; confirm reaction priority resolution + chunk shape + perf budget with user before locking). Topic-level: modding script host is OPEN — `cf-mod validate` for materials may need scripted reaction hooks; confirm host before scripted reactions ship. Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
 
 ---
 
@@ -1824,7 +1824,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 **What it proves:** The 8-criteria humanlike AI bar from DR-022 has a runnable harness. Perception, memory, doctrine, reason labels, recovery, and replay are all in place. Strategic adaptation across missions is staged but not yet required to fire.
 
 **Scope:**
-- `cx-ai` perception model: sight cone + hearing range + memory grid for last-known positions.
+- `cf-ai` perception model: sight cone + hearing range + memory grid for last-known positions.
 - Utility scoring + doctrine slots: cautious, aggressive, support, scout, sniper, etc. (start with 4-6).
 - Reason-label events: `tactic_chosen` with reason string for every decision.
 - Mistake/recovery model: bots can panic, miss, get stuck; recovery actions emit events.
@@ -1848,15 +1848,15 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 **What it proves:** An async LLM "mind" layer can run alongside local AI without blocking it. Strict-schema proposals (doctrine patches, squad orders, dialogue, memory writes) flow through a validator and policy compiler. A deterministic mock provider drives CI; cloud/local providers (OpenAI, Anthropic, Ollama, OpenAI-compatible) sit behind feature gates. Local AI keeps acting through provider sleep, failure, malformed/stale responses, and cost-cap exhaustion. **No API key is required to ship, test, or play.**
 
 **Scope (per [[spec/hybrid-llm-ai-plan]]):**
-- `cx-ai::mind::schema`: `MindObservationFrame`, `MindTask`, `AiMindProposal`, `MindValidationResult`, `MindMemoryRecord`, `MindProviderConfig`. JSON Schemas under `corefall-game/crates/cx-ai/schemas/mind/v1/`.
-- `cx-ai::mind::provider`: shared trait + adapters (`mock` always built; `openai`/`anthropic`/`ollama`/`openai-compatible` behind cargo features `mind-openai`, `mind-anthropic`, `mind-ollama`, `mind-openai-compatible`).
-- `cx-ai::mind::compressor`: derives `MindObservationFrame` from the `cx-control` observation stream + replay events with fog-of-war filtering.
-- `cx-ai::mind::validator`: rejects stale, invalid, impossible, unfair, over-budget, hidden-info, capability-violating proposals.
-- `cx-ai::mind::policy`: applies accepted proposals as utility-weight patches, commander-blackboard goals, doctrine tags, dialogue queue entries, and `MindMemoryRecord` writes.
-- `cx-replay`: new `mind` event category (see [[references/prototype-run-bundle-schema]]) with `mind.task_created`, `mind.prompt_recorded`, `mind.response_received`, `mind.proposal_validated`, `mind.patch_applied`, `mind.patch_rejected`, `mind.memory_written`.
-- `cxctl observe --mind-frame <scope>`: emit a compact mind frame for `actor`/`squad`/`faction`/`mission_director`/`post_mission` scopes (no screenshots).
+- `cf-ai::mind::schema`: `MindObservationFrame`, `MindTask`, `AiMindProposal`, `MindValidationResult`, `MindMemoryRecord`, `MindProviderConfig`. JSON Schemas under `game/crates/cf-ai/schemas/mind/v1/`.
+- `cf-ai::mind::provider`: shared trait + adapters (`mock` always built; `openai`/`anthropic`/`ollama`/`openai-compatible` behind cargo features `mind-openai`, `mind-anthropic`, `mind-ollama`, `mind-openai-compatible`).
+- `cf-ai::mind::compressor`: derives `MindObservationFrame` from the `cf-control` observation stream + replay events with fog-of-war filtering.
+- `cf-ai::mind::validator`: rejects stale, invalid, impossible, unfair, over-budget, hidden-info, capability-violating proposals.
+- `cf-ai::mind::policy`: applies accepted proposals as utility-weight patches, commander-blackboard goals, doctrine tags, dialogue queue entries, and `MindMemoryRecord` writes.
+- `cf-replay`: new `mind` event category (see [[references/prototype-run-bundle-schema]]) with `mind.task_created`, `mind.prompt_recorded`, `mind.response_received`, `mind.proposal_validated`, `mind.patch_applied`, `mind.patch_rejected`, `mind.memory_written`.
+- `cfctl observe --mind-frame <scope>`: emit a compact mind frame for `actor`/`squad`/`faction`/`mission_director`/`post_mission` scopes (no screenshots).
 - `content/scenarios/micro_breach_mind_lab.ron`: the M6.5 scenario in three modes (`mind_off`, `mind_mock`, `mind_live_optional`).
-- `cx-tools-editor`: dev-only mind dashboard (task count, stale rate, provider failures, estimated cost, model routing, accept/reject reasons).
+- `cf-tools-editor`: dev-only mind dashboard (task count, stale rate, provider failures, estimated cost, model routing, accept/reject reasons).
 
 **Done-criteria:**
 - [ ] MIND-001 — `ai_mind.enabled=false` baseline plays the scenario; AI-H tests pass.
@@ -1886,7 +1886,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 - AI affordance tags consumed: `avoid` (electrified water, lava, toxic gas), `seek` (cover, water for healing/extinguish), `use-as-weapon` (kicked debris, oil pour + ignition), `extinguish-with` (water, foam), `neutralize-with` (water against acid), `vent` (open door / use pump for gas/smoke), `pump` (mech/base interaction).
 - Utility scorer extension: hazard cost added to path cost; tactical material use as discrete action choices.
 - Reason labels: `tactic_chosen` events include `material_*` reasons (e.g. `material_acid_neutralize_with_water`, `material_electrified_water_avoid`, `material_oil_trail_ignite_for_kill`).
-- AI-MAT-01..AI-MAT-08 acceptance suite (a `cx-ai --bin ai_harness --suite AI-MAT-01..AI-MAT-08` smoke).
+- AI-MAT-01..AI-MAT-08 acceptance suite (a `cf-ai --bin ai_harness --suite AI-MAT-01..AI-MAT-08` smoke).
 - LLM mind layer (DR-032): material observations enter `MindObservationFrame` so high-level commander/squad doctrine can recommend material strategies in async.
 
 **Done-criteria:**
@@ -1910,7 +1910,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 **What it proves:** Everything above composes into one playable Breach Contract mission. Manifest format works. Command core works minimally. Base systems work minimally. Mission director paces the encounter. The first proof mission can be played, won, lost, replayed, debriefed.
 
 **Scope:**
-- `cx-mission` typed scenario manifest schema (data-only): objectives, teams, terrain rules, command-core/base state, capability requirements, director phases, save fields, replay events, validation.
+- `cf-mission` typed scenario manifest schema (data-only): objectives, teams, terrain rules, command-core/base state, capability requirements, director phases, save fields, replay events, validation.
 - Mission director: manages pacing, reinforcement, LZ risk, objective escalation, with reason labels.
 - Command-core mechanic minimum: rooted core powers ≥ 2 base systems (shield + 1 turret). Uprooted core embeds into player avatar with stat boost. Losing core = mission failure if `command_core_endgame` policy.
 - Base system slice: command core + power grid + 1 shield + 1 turret + 1 door + 1 repair pad.
@@ -1937,7 +1937,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 **What it proves:** Barotrauma-style hull/gap/pump/vent/oxygen/pressure/fire networks layer on top of M5.6 material kernel + M7 mission director (DR-027 deep combat-base + DR-036). Bases, mechs, ships, sealed chambers can be **rooms with state**. Breaches flood; pumps recover; oxygen runs out; fire grows with oxygen and is extinguished by water; pressure differentials move actors and items.
 
 **Scope (MAT-09, MAT-10):**
-- `cx-atmos` crate: hulls (rooms with volume + water level + oxygen level + pressure + fire state); gaps (room-to-room/outside connections with open/closed state and flow force); per-tick equalize step; connected-hull search.
+- `cf-atmos` crate: hulls (rooms with volume + water level + oxygen level + pressure + fire state); gaps (room-to-room/outside connections with open/closed state and flow force); per-tick equalize step; connected-hull search.
 - Equipment: oxygen generator, pump, vent, filter, sensor, powered door, alarm. Each is a base/mech module per DR-027 + DR-034 + DR-035.
 - Power/condition coupling: equipment runs on command-core power (DR-015) + has condition (degraded → failed); damage chain integrates with M5/M5.5 chassis grammar.
 - Material ↔ atmosphere bridge: M5.6 active-material chunks update room state at chunk boundaries (water mass aggregates into hull water level; fire propagates into hull fire state; toxic gas raises room toxicity).
@@ -1966,16 +1966,16 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 **What it proves:** Players can author scenarios using the same manifest format the engine ships with. Mod loader works. Package builder produces deterministic packages.
 
 **Scope:**
-- `cx-tools-editor` in-engine workbench mode: scenario editor (place spawns, materials, objectives, command-core, base systems, capability requirements, director config); test-run; export.
-- `cx-mod` mod loader: discovers packages in `mods/`; validates schemas; loads at engine startup.
-- Package builder: produces deterministic `.cxpkg` archives; provenance tracking; loader graph; preset/effect graphs; migration preview.
+- `cf-tools-editor` in-engine workbench mode: scenario editor (place spawns, materials, objectives, command-core, base systems, capability requirements, director config); test-run; export.
+- `cf-mod` mod loader: discovers packages in `mods/`; validates schemas; loads at engine startup.
+- Package builder: produces deterministic `.cfpkg` archives; provenance tracking; loader graph; preset/effect graphs; migration preview.
 - Lua or Rhai scripting host for mod scripts (decision in M5; implement in M8).
 - Scenario validator: catches missing fields, broken refs, AI policy violations, accessibility issues.
 - One sample mod: adds a new chassis archetype using the same grammar.
 
 **Done-criteria:**
 - [ ] A player can author a Breach Contract variant in the in-engine editor.
-- [ ] The variant exports as a `.cxpkg`, loads back into the engine, runs.
+- [ ] The variant exports as a `.cfpkg`, loads back into the engine, runs.
 - [ ] Sample mod's new chassis works in M7 mission.
 - [ ] PACK-A and MOD-A acceptance tests pass.
 
@@ -1987,24 +1987,24 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 ### M8.5 — Material Lab
 
-**What it proves:** Designers + modders can build, share, and debug systemic material content using the same `cx-mod` package format the engine ships. A designer authors a tiny reaction puzzle (acid trap with water counter, oil-fire chain reaction, electrified-water shock zone) in minutes and shares it through the standard package builder.
+**What it proves:** Designers + modders can build, share, and debug systemic material content using the same `cf-mod` package format the engine ships. A designer authors a tiny reaction puzzle (acid trap with water counter, oil-fire chain reaction, electrified-water shock zone) in minutes and shares it through the standard package builder.
 
 **Scope (MAT-11, MAT-14):**
-- `cx-tools-editor` material lab mode: brush tools, material palette, recipe inspector, stamp save/load, snapshot/delta undo (Powder Toy pattern), test-run with replay capture, AI puppet test (`cxctl` puppet validates a hazard).
+- `cf-tools-editor` material lab mode: brush tools, material palette, recipe inspector, stamp save/load, snapshot/delta undo (Powder Toy pattern), test-run with replay capture, AI puppet test (`cfctl` puppet validates a hazard).
 - Material inspect tool: click any pixel; shows material id, temperature, state, density, last reaction, parent cause.
 - Recipe journal: reactions discovered by the designer/player are recorded; UI shows reagents → byproducts; debrief cause chains link back.
-- Stamps: regions of material+terrain can be saved as `.cxstamp` files; placed into other scenarios; community-shareable.
-- Material packs: `.cxpkg` mod packages can declare new materials, reactions, ingestion effects, pipe devices, AI affordances; validated by `cx-mod validate`.
+- Stamps: regions of material+terrain can be saved as `.cfstamp` files; placed into other scenarios; community-shareable.
+- Material packs: `.cfpkg` mod packages can declare new materials, reactions, ingestion effects, pipe devices, AI affordances; validated by `cf-mod validate`.
 - Accessibility floor: 200% scale; high-contrast overlays; color-independent state labels for material categories.
-- AI test puppet: `cxctl` puppet plays the puzzle; designer sees AI affordance reasoning in real-time.
+- AI test puppet: `cfctl` puppet plays the puzzle; designer sees AI affordance reasoning in real-time.
 - Run-bundle integration: lab session emits `material.*` + `reaction.*` + `atmosphere.*` events for designer review.
 
 **Done-criteria:**
 - [ ] MAT-11 inspect tool works on every launch material; tooltip shows id/temperature/state/density/last reaction.
-- [ ] MAT-14 designer authors an acid-trap puzzle in <10 minutes; exports `.cxpkg`; another machine loads + plays it.
+- [ ] MAT-14 designer authors an acid-trap puzzle in <10 minutes; exports `.cfpkg`; another machine loads + plays it.
 - [ ] Recipe journal records discovered reactions in run bundle; debrief links each to a reaction event.
 - [ ] Stamp tool saves a region; loads in another scenario; preserves material state.
-- [ ] AI puppet test: `cxctl --bot puppet --scenario <author-pkg>` plays the lab scenario; reasoning trace visible.
+- [ ] AI puppet test: `cfctl --bot puppet --scenario <author-pkg>` plays the lab scenario; reasoning trace visible.
 - [ ] Mod pack with one new material loads in a scenario without engine crash; mismatched packages show clean diff UI.
 - [ ] Accessibility floor: lab UI passes ACC-A floor.
 
@@ -2016,27 +2016,27 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 ### M9 — Dedicated Server App + Determinism Islands
 
-**What it proves:** `cx-server` is a working dedicated server binary anyone can host. It runs core lifecycle and mode-selection paths against the same sim path the client uses. Determinism islands are real and testable. Replays from events alone reconstruct identical state. The M9 server-core subset from [[spec/server-app-architecture]] passes; M12 owns PvP/MMO scale acceptance.
+**What it proves:** `cf-server` is a working dedicated server binary anyone can host. It runs core lifecycle and mode-selection paths against the same sim path the client uses. Determinism islands are real and testable. Replays from events alone reconstruct identical state. The M9 server-core subset from [[spec/server-app-architecture]] passes; M12 owns PvP/MMO scale acceptance.
 
 **Scope (per [[spec/server-app-architecture]] + [[decisions/dr-034-dedicated-server-application|DR-034]]):**
-- `cx-server` binary: thin entry point pulling `cx-sim-core`, `cx-terrain`, `cx-physics`, `cx-actor`, `cx-chassis`, `cx-equipment`, `cx-ai`, `cx-mission`, `cx-replay`, `cx-net`, `cx-control`, `cx-save`, `cx-mod`. No render/UI/audio crates.
-- `cx-server-ops`: config loader (RON), mode selector, health (`/health`), readiness (`/ready`), Prometheus metrics endpoint, structured JSON logs, drain shutdown, restart hooks.
-- `cx-server-persistence` minimum: snapshot writer + event journal + restore loop (full MMO scope lands in M12 but the API ships in M9).
-- `cx-server-anti-cheat` foundation: server-authoritative input validation, rate-limit hooks, capability gates, audit log skeleton, profile registry (`casual`, `competitive`, `tournament_strict`).
-- `cx-server-admin`: capability-gated `cxctl`-shape admin endpoints (kick, save, restart, hot-load scenario).
-- `cx-headless` stays as the headless sim runner used by replay verification + CI; `cx-server` consumes it for the deterministic island.
+- `cf-server` binary: thin entry point pulling `cf-sim-core`, `cf-terrain`, `cf-physics`, `cf-actor`, `cf-chassis`, `cf-equipment`, `cf-ai`, `cf-mission`, `cf-replay`, `cf-net`, `cf-control`, `cf-save`, `cf-mod`. No render/UI/audio crates.
+- `cf-server-ops`: config loader (RON), mode selector, health (`/health`), readiness (`/ready`), Prometheus metrics endpoint, structured JSON logs, drain shutdown, restart hooks.
+- `cf-server-persistence` minimum: snapshot writer + event journal + restore loop (full MMO scope lands in M12 but the API ships in M9).
+- `cf-server-anti-cheat` foundation: server-authoritative input validation, rate-limit hooks, capability gates, audit log skeleton, profile registry (`casual`, `competitive`, `tournament_strict`).
+- `cf-server-admin`: capability-gated `cfctl`-shape admin endpoints (kick, save, restart, hot-load scenario).
+- `cf-headless` stays as the headless sim runner used by replay verification + CI; `cf-server` consumes it for the deterministic island.
 - Determinism island contracts documented and validated: which subsystems are bit-deterministic; which are stochastic-but-replayable; which are cosmetic only.
-- Reference Docker image: minimal `cx-server` image suitable for community deployments.
-- CLI Reference entries for `cx-server`, `cx-server-ops`, `cx-server-admin` per [[#CLI Reference|CLI Reference]].
+- Reference Docker image: minimal `cf-server` image suitable for community deployments.
+- CLI Reference entries for `cf-server`, `cf-server-ops`, `cf-server-admin` per [[#CLI Reference|CLI Reference]].
 - Networking transport library committed (decision between lightyear / renet / quinn locked at M9 close).
 
 **Done-criteria:**
 - [ ] M9 server-core subset passes against checked run bundles: SERVER-001, SERVER-006, SERVER-009, SERVER-010, SERVER-011, SERVER-014, SERVER-015, SERVER-016.
-- [ ] `cx-server --mode coop_room` boots, accepts 2-4 clients, runs a Breach Contract to completion, archives a per-session run bundle.
-- [ ] `cx-server --mode pvp_arena` boots and accepts a 4-player session.
-- [ ] `cx-server --mode lan_room` is auto-discovered by client on the same LAN.
-- [ ] `cx-server --mode mmo_shard` boots with default config; persistence snapshot every 10 min; restart restore <30 s (full MMO acceptance is M12).
-- [ ] `cx-server --mode lobby_directory` returns a list of registered shards.
+- [ ] `cf-server --mode coop_room` boots, accepts 2-4 clients, runs a Breach Contract to completion, archives a per-session run bundle.
+- [ ] `cf-server --mode pvp_arena` boots and accepts a 4-player session.
+- [ ] `cf-server --mode lan_room` is auto-discovered by client on the same LAN.
+- [ ] `cf-server --mode mmo_shard` boots with default config; persistence snapshot every 10 min; restart restore <30 s (full MMO acceptance is M12).
+- [ ] `cf-server --mode lobby_directory` returns a list of registered shards.
 - [ ] A 10-minute M7 mission run replays headlessly with bit-identical actor/terrain/inventory checksums.
 - [ ] Reference Docker image runs the server unchanged on Linux; documented in `docs/server-hosting.md`.
 - [ ] DET-A acceptance tests pass.
@@ -2044,27 +2044,27 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 **Cross-DR:** DR-002, DR-005, DR-013, DR-024, DR-025, DR-026, DR-029, DR-034.
 
-**Open DR gates:** DR-002 (server.* event category extends DR-002 contract). Topic-level: **networking transport library is OPEN** — lightyear vs renet vs quinn for `cx-net`. M9 is the milestone where this MUST close. Worker MUST present transport options + perf evidence + adapter-trait shape to the user through the active agent's available user-input/chat mechanism before committing to a library. Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
+**Open DR gates:** DR-002 (server.* event category extends DR-002 contract). Topic-level: **networking transport library is OPEN** — lightyear vs renet vs quinn for `cf-net`. M9 is the milestone where this MUST close. Worker MUST present transport options + perf evidence + adapter-trait shape to the user through the active agent's available user-input/chat mechanism before committing to a library. Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
 
 ---
 
 ### M10 — LAN Co-op
 
-**What it proves:** Two-to-four clients on a local network can play one Breach Contract together via `cx-server --mode lan_room` with replicated state, authority resolution, anti-cheat foundation enabled, and replay parity.
+**What it proves:** Two-to-four clients on a local network can play one Breach Contract together via `cf-server --mode lan_room` with replicated state, authority resolution, anti-cheat foundation enabled, and replay parity.
 
 **Scope:**
-- `cx-net` authority model: server-authoritative for sim; clients send inputs (via `cx-control` envelope), receive snapshots + events.
-- LAN discovery (mDNS / UDP broadcast) to find local `cx-server` instances; no NAT punch-through yet.
+- `cf-net` authority model: server-authoritative for sim; clients send inputs (via `cf-control` envelope), receive snapshots + events.
+- LAN discovery (mDNS / UDP broadcast) to find local `cf-server` instances; no NAT punch-through yet.
 - Lobby + ready-up flow inside the client (driven by the same `lobby_directory` schema).
 - Replicated state: actors, terrain, inventory, objective state, base modules.
 - Co-op friendly fire policy (configurable per scenario; defaults per DR-018 consequence ladder).
-- Per-client replay bundles that align tick-for-tick (`cx-headless replay-compare`).
+- Per-client replay bundles that align tick-for-tick (`cf-headless replay-compare`).
 - Anti-cheat profile `casual` enabled by default for LAN; logs but does not kick.
 - Mod hash sync between server and clients on join.
 
 **Done-criteria:**
 - [ ] Two clients survive one 5-minute Breach Contract together with no desync.
-- [ ] Both clients' replay bundles align tick-for-tick under `cx-headless replay-compare`.
+- [ ] Both clients' replay bundles align tick-for-tick under `cf-headless replay-compare`.
 - [ ] Bandwidth budget within target (per T-PERF).
 - [ ] Mod hash mismatch produces a clean diff UI, not a crash.
 
@@ -2076,7 +2076,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 ### M11 — Online Co-op (Self-Hosted Dedicated Servers)
 
-**What it proves:** A community member can host an internet-reachable `cx-server --mode coop_room` instance, register it with a `lobby_directory` (community or first-party), and friends in different cities can find it, join via NAT-traversal/relay, and complete a Breach Contract together. Mod hash sync prevents version mismatch crashes.
+**What it proves:** A community member can host an internet-reachable `cf-server --mode coop_room` instance, register it with a `lobby_directory` (community or first-party), and friends in different cities can find it, join via NAT-traversal/relay, and complete a Breach Contract together. Mod hash sync prevents version mismatch crashes.
 
 **Scope:**
 - NAT punch-through or relay using the chosen transport (decided in M9).
@@ -2090,7 +2090,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 - Account adapter: local file works for private; lobby_directory token works for public; Steam/EOS/PlayFab adapters stubbed behind cargo features.
 
 **Done-criteria:**
-- [ ] Two friends in different cities co-op a Breach Contract via a self-hosted `cx-server`.
+- [ ] Two friends in different cities co-op a Breach Contract via a self-hosted `cf-server`.
 - [ ] Latency masking works at 50-150 ms RTT without obvious jitter.
 - [ ] Package mismatch produces a clean error with downloadable diff, not a crash.
 - [ ] `lobby_directory` registers + heartbeats + deregisters cleanly.
@@ -2104,11 +2104,11 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 ### M12 — Public PvP Arenas + Persistent MMO Shards
 
-**What it proves:** The architecture supports public PvP arenas and persistent MMO shards under `cx-server`, with community-hostable defaults, anti-cheat foundation enabled, persistence proven across restart, interest management proven at scale, and per-client run bundles aligning tick-for-tick.
+**What it proves:** The architecture supports public PvP arenas and persistent MMO shards under `cf-server`, with community-hostable defaults, anti-cheat foundation enabled, persistence proven across restart, interest management proven at scale, and per-client run bundles aligning tick-for-tick.
 
 **Scope (full-product readiness gate; was previously post-launch-only research):**
 
-PvP arena half (`cx-server --mode pvp_arena`):
+PvP arena half (`cf-server --mode pvp_arena`):
 - 2-8 player server-authoritative match server.
 - Anti-cheat profile `competitive` default; tournament profile available.
 - Replay archive per match.
@@ -2116,7 +2116,7 @@ PvP arena half (`cx-server --mode pvp_arena`):
 - PvP-specific scenarios under `content/scenarios/pvp/`.
 - Bandwidth/authority/cheat models tested at 4-8 player density.
 
-MMO shard half (`cx-server --mode mmo_shard`, per [[spec/persistent-mmo-architecture]]):
+MMO shard half (`cf-server --mode mmo_shard`, per [[spec/persistent-mmo-architecture]]):
 - Persistent world manifest (region map, materials, hazards, faction territories).
 - Persistent state store: snapshot every 10 min + append-only event journal.
 - Persistent terrain (carved/repaired regions survive reboot).
@@ -2135,11 +2135,11 @@ Cross-shard:
 - Multiple shards on same machine or across operators; lobby_directory aggregates listings.
 
 **Done-criteria:**
-- [ ] `cx-server --mode pvp_arena` runs a 4-player match for 10 minutes; per-client bundles align; anti-cheat events logged.
+- [ ] `cf-server --mode pvp_arena` runs a 4-player match for 10 minutes; per-client bundles align; anti-cheat events logged.
 - [ ] PvP server-authoritative simulation rejects all client-claimed actor states that diverge from server snapshots.
 - [ ] PvP bandwidth budget within target.
 - [ ] MMO-001..MMO-012 all pass.
-- [ ] 50 simulated clients (`cxctl` puppets) connect to one shard for 1 hour at ≥30 Hz sim with no desync.
+- [ ] 50 simulated clients (`cfctl` puppets) connect to one shard for 1 hour at ≥30 Hz sim with no desync.
 - [ ] 100 simulated clients sustained for 30 minutes; perf report records degraded modes.
 - [ ] Snapshot persists every 10 min; shard restart resumes from snapshot in <30 s with no state loss.
 - [ ] Crash + restart resumes within 1 minute via journal replay.
@@ -2187,14 +2187,14 @@ Spans M0..M12. See [[spec/ai-control-observability-layer]].
 
 This is the built-in "eyes, ears, hands, and voice" layer for AI implementation agents (Codex, Factory droids, Claude Code, Cursor, etc.), automated tests, accessibility tooling, and player/community bots. It must expose structured game state and semantic actions directly, so agents do not need to drive the app through screenshot polling.
 
-- `cx-control` owns versioned command, observation, UI-tree, and assertion schemas.
-- `cxctl` is the CLI interface for scripts: load scenario, pause, step, observe, act, click UI by id, assert objective state, and write run bundles. During development, run it as `cargo run -p cxctl -- ...`; `cxctl ...` is shorthand after the binary is installed or added to PATH.
+- `cf-control` owns versioned command, observation, UI-tree, and assertion schemas.
+- `cfctl` is the CLI interface for scripts: load scenario, pause, step, observe, act, click UI by id, assert objective state, and write run bundles. During development, run it as `cargo run -p cfctl -- ...`; `cfctl ...` is shorthand after the binary is installed or added to PATH.
 - A local-only control server, launched with `--control-api`, streams observations and accepts semantic action commands. Initial target is JSON-RPC/WebSocket or an equally scriptable transport.
 - Observation packets include tick, scenario, actors, equipment, terrain/material affordances, objectives, UI semantic tree, captions/audio cues, recent events, and performance counters.
 - Action packets map to real human/gameplay/UI affordances: move, aim, fire, reload, use, select unit, issue order, query/click/type UI, run/step/reset scenario, inspect entity/event chain.
 - Debug-only actions are capability-gated, disabled by default, and recorded in the run manifest.
 
-**Done-criteria per milestone:** every new player-facing control or UI action is either controllable through `cxctl`/the control API or explicitly marked human-only with a reason; every new critical screen state has a structured observation/event/caption equivalent.
+**Done-criteria per milestone:** every new player-facing control or UI action is either controllable through `cfctl`/the control API or explicitly marked human-only with a reason; every new critical screen state has a structured observation/event/caption equivalent.
 
 ---
 
@@ -2202,26 +2202,26 @@ This is the built-in "eyes, ears, hands, and voice" layer for AI implementation 
 
 Spans M0 (config stubs) and M9..M12 primary; lifelong from M9. See [[spec/server-app-architecture]], [[spec/persistent-mmo-architecture]], [[decisions/dr-005-multiplayer-posture]], [[decisions/dr-013-backend-service-scope]], [[decisions/dr-034-dedicated-server-application]], [[decisions/dr-035-persistent-mmo-architecture]].
 
-This track ensures the dedicated server binary `cx-server` is a first-class launch artifact. Anyone can host any supported mode (LAN co-op, online co-op, public PvP arena, persistent MMO shard, lobby directory) using the same binary, the same sim path, the same mod packages, and no proprietary cloud lock-in.
+This track ensures the dedicated server binary `cf-server` is a first-class launch artifact. Anyone can host any supported mode (LAN co-op, online co-op, public PvP arena, persistent MMO shard, lobby directory) using the same binary, the same sim path, the same mod packages, and no proprietary cloud lock-in.
 
 | Aspect | Pin |
 |---|---|
-| Binary | `cx-server` is a full-product artifact. Linux + Windows; macOS server is nice-to-have. |
+| Binary | `cf-server` is a full-product artifact. Linux + Windows; macOS server is nice-to-have. |
 | Modes | One binary, multi-mode: `coop_room`, `pvp_arena`, `lan_room`, `mmo_shard`, `lobby_directory`, `ranked_arena` (post-launch). |
-| Sim parity | Same `cx-sim-core`, `cx-terrain`, `cx-physics`, `cx-actor`, `cx-chassis`, `cx-equipment`, `cx-ai`, `cx-mission`, `cx-replay`, `cx-control`, `cx-net`, `cx-save`, `cx-mod`. No fork. |
+| Sim parity | Same `cf-sim-core`, `cf-terrain`, `cf-physics`, `cf-actor`, `cf-chassis`, `cf-equipment`, `cf-ai`, `cf-mission`, `cf-replay`, `cf-control`, `cf-net`, `cf-save`, `cf-mod`. No fork. |
 | Authority | 100% server-authoritative simulation. Clients use prediction + reconciliation only for player-driven actor. |
-| Configuration | RON config file; validated by `cx-mod validate`; schema-versioned; migration handlers registered (DR-029). |
+| Configuration | RON config file; validated by `cf-mod validate`; schema-versioned; migration handlers registered (DR-029). |
 | Hosting posture | Community-hostable by default. Reference Docker image + Linux + Windows hosting guide ship at launch. Steam/EOS/PlayFab/Unity Multiplay are optional adapters behind cargo features. |
 | Account requirement | Optional for solo/private LAN/co-op rooms. Required for public shards (DR-035). |
 | Anti-cheat foundation | Server-authoritative input validation; profiles `casual`, `competitive`, `tournament_strict`; ban list persisted; audit log appended. Tournament-grade is post-launch. |
 | Mod compatibility | Mandatory mod hash sync; trust tiers gate per-server admission; auto-download off by default. Server-only mods allowed (`server_only: true` in package manifest). |
 | Persistence | MMO mode uses snapshot store + event journal; recovery = snapshot + journal replay; rolling backups. (DR-035) |
 | Observability | Structured JSON logs; Prometheus-compatible metrics; `/health` + `/ready` endpoints; per-session run bundles. |
-| Admin API | `cxctl --capability admin` over the same JSON-RPC envelope as the client. Capability-gated; opt-in. |
+| Admin API | `cfctl --capability admin` over the same JSON-RPC envelope as the client. Capability-gated; opt-in. |
 | LLM mind | Mind workers may run server-side per DR-032; clients see reason labels only. |
 | Replay determinism | Server-authoritative replay; per-client run bundles align tick-for-tick. |
 
-**Done-criteria per milestone:** every milestone that touches multiplayer/server/MMO/anti-cheat extends `cx-server` with the relevant mode/config/event/observability surface; per-milestone audit lists `cx-server` modes touched, anti-cheat profile changes, persistence schema bumps, and `lobby_directory` schema bumps.
+**Done-criteria per milestone:** every milestone that touches multiplayer/server/MMO/anti-cheat extends `cf-server` with the relevant mode/config/event/observability surface; per-milestone audit lists `cf-server` modes touched, anti-cheat profile changes, persistence schema bumps, and `lobby_directory` schema bumps.
 
 ---
 
@@ -2239,7 +2239,7 @@ This track ensures the game never slips into "sprites pass through each other ex
 | Damage rule | Contact impulse can damage limbs, armor, weapons, equipment, mech modules, terrain, shields, and base objects. |
 | Terrain rule | Pixels/materials stay authoritative; collision uses chunk proxies rebuilt from dirty regions plus exact material samples at contact. |
 | Event rule | Meaningful contacts emit `collision.*` events and parent-link to combat/body/terrain/equipment damage. |
-| Control rule | `cxctl observe --collisions` exposes live pair state, filters, recent contacts, and collision budget status. |
+| Control rule | `cfctl observe --collisions` exposes live pair state, filters, recent contacts, and collision budget status. |
 | AI rule | From M6 onward, AI perceives collision-affordance changes and emits reason labels when blocked, shoved, pinned, avoiding debris, or reacting to projectile danger. |
 
 **Done-criteria per milestone:** each milestone final audit says which new physical classes, pairs, filters, events, and perf counters were added. A gameplay object cannot become physical in art/combat without being registered in the T-PHYS matrix or explicitly declared cosmetic/sensor-only.
@@ -2254,10 +2254,10 @@ This track captures the systemic material simulation: every material is a verb, 
 
 | Aspect | Pin |
 |---|---|
-| Core kernel | `cx-material` CPU-deterministic chunked CA (64×64 per chunk default; Noita pattern); dirty rects; sleeping chunks. GPU experiments deferred until determinism + replay parity are proven. |
+| Core kernel | `cf-material` CPU-deterministic chunked CA (64×64 per chunk default; Noita pattern); dirty rects; sleeping chunks. GPU experiments deferred until determinism + replay parity are proven. |
 | Reaction engine | Data-driven pair/triple reactions with priority, temperature, catalysts, byproducts. Every reaction emits a replay-recorded `reaction.*` event with cause chain. |
-| Room/atmosphere | `cx-atmos` Barotrauma-style hulls/gaps/pumps/vents/oxygen/pressure/fire networks. Approximate (not real-unit) per Barotrauma's own scope lesson. |
-| Pipe/power/signal | Stationeers-style atmospherics + power graph; sensor-readable + AI-controllable. Ships in M7.5 / M5.7 stubs; lives in `cx-atmos` and/or `cx-mission`. |
+| Room/atmosphere | `cf-atmos` Barotrauma-style hulls/gaps/pumps/vents/oxygen/pressure/fire networks. Approximate (not real-unit) per Barotrauma's own scope lesson. |
+| Pipe/power/signal | Stationeers-style atmospherics + power graph; sensor-readable + AI-controllable. Ships in M7.5 / M5.7 stubs; lives in `cf-atmos` and/or `cf-mission`. |
 | Material schema | Data-first per DR-036; fields cover movement, density, mass, hardness, thermal, ignition, phase, conductivity, wetting, reaction_tags, ingestion, container, ai_affordances, ui_overlay, performance_tier, network_replay_mode. |
 | Launch material set (17) | Air, dirt/sand, rock/concrete, metal, wood/organic, water, steam/mist, smoke, fire/heat, oil/fuel, acid, toxic sludge/liquid, toxic gas, lava, blood/vomit, electricity charge, pebble/debris. |
 | Expansion materials | Slime, brine, coolant, cryo, fuel vapor, foam, nanogel, alchemic precursor, Midas/gold-maker, biological acid/blood variants — gated behind material lab + balance review. |
@@ -2267,7 +2267,7 @@ This track captures the systemic material simulation: every material is a verb, 
 | Performance | Active-region budgets; sleeping chunks; LOD; perf gates at every material milestone. T-PERF + T-MAT track. |
 | Modding | Material schema, reaction tables, atmosphere device packs are first-class moddable surfaces (DR-006). Mod hash sync (DR-034). |
 | Captioning + accessibility | Every hazard event has a caption per T-AUDIO + T-ACCESSIBILITY. Color-independent state labels for material categories. |
-| Observation API | `cxctl observe --materials`, `cxctl observe --atmospheres`, `cxctl observe --reactions` (T-CONTROL extension); see CLI Reference. |
+| Observation API | `cfctl observe --materials`, `cfctl observe --atmospheres`, `cfctl observe --reactions` (T-CONTROL extension); see CLI Reference. |
 
 **Done-criteria per milestone:** each milestone touching materials/atmospheres adds the relevant material rows, reaction-table entries, atmosphere-device entries, AI affordance tags, captions, replay events, and perf counters. New materials require an inspect overlay, AI affordance, replay event, and lab fixture before they ship in production scenarios.
 
@@ -2312,7 +2312,7 @@ Spans M4..M7 primary; lifelong from M4.
 
 Spans M5..M9 primary; lifelong from M5.
 
-- `cx-save` versioned save format (`.cxsave`).
+- `cf-save` versioned save format (`.cfsave`).
 - Saves include: command core state, base modules, actors/veterans, mechs, salvage, faction state, enemy commander memory, mission manifests, scenario policy.
 - Multiple save slots per profile.
 - Autosave before/after contracts.
@@ -2454,7 +2454,7 @@ Quick lookup: which milestone owns which feature.
 | Fixed-tick sim scheduler | M0 |
 | Run-bundle writer / checker | M0, M3 |
 | AI/dev control API schemas | T-CONTROL, M0 |
-| `cxctl` CLI observe/run/step/act/assert | T-CONTROL, M0..M1.5 |
+| `cfctl` CLI observe/run/step/act/assert | T-CONTROL, M0..M1.5 |
 | Semantic UI tree and UI action control | T-CONTROL, M4, M8 |
 | Future bot authoring API | T-CONTROL, M6, M8 |
 | Actor controller + control intent | M1 |
@@ -2476,7 +2476,7 @@ Quick lookup: which milestone owns which feature.
 | Affliction layer (wetness/burning/corroded/electrified/poisoned/asphyxiating) | M5.7, T-MAT |
 | AI hazard perception map + affordance tags | M6.6, T-MAT |
 | `material` + `reaction` event categories in run bundles | M3, M5.6 |
-| `cxctl observe --materials/--atmospheres/--reactions` | M5.6, M7.5, T-MAT |
+| `cfctl observe --materials/--atmospheres/--reactions` | M5.6, M7.5, T-MAT |
 | Hull / gap / pump / vent / oxygen / pressure networks | M7.5, T-MAT |
 | `atmosphere` event category in run bundles | M7.5 |
 | Material lab (brush/inspect/recipe/stamp) | M8.5, T-MAT |
@@ -2502,7 +2502,7 @@ Quick lookup: which milestone owns which feature.
 | CCD tiers / TOI contact proof | M5.5 |
 | Collision impulse-to-damage routing | M5.5 |
 | `collision` event category in run bundles | M3, M5.5 |
-| `cxctl observe --collisions` | M5.5 |
+| `cfctl observe --collisions` | M5.5 |
 | COLL-001..COLL-012 acceptance suite | M5.5 |
 | Tutorial-safety policy | M5, M7 |
 | AI perception + memory | M6 |
@@ -2517,7 +2517,7 @@ Quick lookup: which milestone owns which feature.
 | Observation compressor (fog-of-war filter) | M6.5 |
 | Proposal validator + policy compiler | M6.5 |
 | `mind` event category in run bundles | M3, M6.5 |
-| `cxctl observe --mind-frame` | M6.5 |
+| `cfctl observe --mind-frame` | M6.5 |
 | LLM mind dashboard (dev/debug) | M6.5, M8 |
 | MIND-001..MIND-010 acceptance suite | M6.5 |
 | LLM-driven debrief / commander adaptation | M7 (optional augmentation), M9 |
@@ -2531,21 +2531,21 @@ Quick lookup: which milestone owns which feature.
 | In-engine scenario editor | M8 |
 | Mod loader + package builder | M8 |
 | Lua/Rhai script host | M8 |
-| `cx-headless` sim runner (replay verification + CI) | M3, M9 |
-| `cx-server` dedicated server binary (T-SERVER) | M9, M10, M11, M12 |
-| `cx-server-ops` lifecycle (config, health, readiness, metrics, drain shutdown) | M9 |
-| `cx-server-persistence` (snapshot + journal + restore) | M9 (foundation), M12 (MMO scope) |
-| `cx-server-anti-cheat` (validation, profiles, ban list, audit log) | M9 (foundation), M11/M12 (profiles) |
-| `cx-server-admin` (capability-gated admin API) | M9 |
+| `cf-headless` sim runner (replay verification + CI) | M3, M9 |
+| `cf-server` dedicated server binary (T-SERVER) | M9, M10, M11, M12 |
+| `cf-server-ops` lifecycle (config, health, readiness, metrics, drain shutdown) | M9 |
+| `cf-server-persistence` (snapshot + journal + restore) | M9 (foundation), M12 (MMO scope) |
+| `cf-server-anti-cheat` (validation, profiles, ban list, audit log) | M9 (foundation), M11/M12 (profiles) |
+| `cf-server-admin` (capability-gated admin API) | M9 |
 | Reference Docker image + hosting guide | M9 |
-| `cx-server --mode coop_room` | M9 (boot), M10/M11 (production) |
-| `cx-server --mode pvp_arena` | M9 (boot), M12 (production) |
-| `cx-server --mode lan_room` | M9 (boot), M10 (production) |
-| `cx-server --mode mmo_shard` | M9 (boot), M12 (production) |
-| `cx-server --mode lobby_directory` | M9 (boot), M11/M12 (production) |
+| `cf-server --mode coop_room` | M9 (boot), M10/M11 (production) |
+| `cf-server --mode pvp_arena` | M9 (boot), M12 (production) |
+| `cf-server --mode lan_room` | M9 (boot), M10 (production) |
+| `cf-server --mode mmo_shard` | M9 (boot), M12 (production) |
+| `cf-server --mode lobby_directory` | M9 (boot), M11/M12 (production) |
 | Determinism island contracts | M9 |
-| LAN co-op via `cx-server` | M10 |
-| Online co-op via self-hosted `cx-server` | M11 |
+| LAN co-op via `cf-server` | M10 |
+| Online co-op via self-hosted `cf-server` | M11 |
 | Package hash sync (server-authoritative) | M11 |
 | Anti-cheat profiles (`casual`/`competitive`/`tournament_strict`) | M9 (registry), M11/M12 (live) |
 | Public PvP arena | M12 |
@@ -2573,44 +2573,44 @@ These commands are the default validation surface for implementation agents. If 
 | Compile | `cargo check --workspace --all-targets` | M0 |
 | Lints | `cargo clippy --workspace --all-targets -- -D warnings` | M0 |
 | Unit/integration tests | `cargo test --workspace` | M0 |
-| Native app smoke | `cargo run -p cx-app -- --scenario <milestone-smoke> --run-seconds 5 --write-run-bundle` | M0 |
-| Control API smoke | `cargo run -p cxctl -- observe --once` and `cargo run -p cxctl -- run --ticks 300 --write-run-bundle` against the current milestone scene. | M0 |
+| Native app smoke | `cargo run -p cf-app -- --scenario <milestone-smoke> --run-seconds 5 --write-run-bundle` | M0 |
+| Control API smoke | `cargo run -p cfctl -- observe --once` and `cargo run -p cfctl -- run --ticks 300 --write-run-bundle` against the current milestone scene. | M0 |
 | Run-bundle validation | `python3 research_tools/prototype_run_check.py prototype_runs/native/<run_id>` | M0 |
-| Scripted E2E | `cargo run -p cx-e2e -- --scenario <scenario-id> --expect <result> --write-run-bundle`; prefer `cxctl`/control API actions over OS-level input. | M1.5 |
-| Observation stream check | Stream `cargo run -p cxctl -- observe --stream --hz 30` during a scripted run and verify tick/order/event freshness. | M1.5 |
-| Replay check | `cargo run -p cx-headless -- replay prototype_runs/native/<run_id> --verify-checksums` | M3 |
+| Scripted E2E | `cargo run -p cf-e2e -- --scenario <scenario-id> --expect <result> --write-run-bundle`; prefer `cfctl`/control API actions over OS-level input. | M1.5 |
+| Observation stream check | Stream `cargo run -p cfctl -- observe --stream --hz 30` during a scripted run and verify tick/order/event freshness. | M1.5 |
+| Replay check | `cargo run -p cf-headless -- replay prototype_runs/native/<run_id> --verify-checksums` | M3 |
 | Screenshot/capture check | Capture listed in `summary.json.artifacts`; verify no blank/overlap failure. | M1.5 visual runs; M4 required |
-| Perf sample | `cargo run -p cx-bench -- --scenario <scenario-id> --profile milestone` | M2 |
-| Accessibility smoke | `cargo run -p cx-e2e -- --scenario <scenario-id> --ui-scale 2.0 --high-contrast --verify-focus` | M4 |
-| Save/load roundtrip | `cargo run -p cx-e2e -- --scenario <scenario-id> --save-load-roundtrip --verify-checksums` | M5/T-SAVE |
-| Full collision gauntlet | `cargo run -p cx-e2e -- --scenario m5_5_full_collision_gauntlet --suite COLL-001..COLL-012 --write-run-bundle` then `cargo run -p cx-headless -- replay prototype_runs/native/<m5_5_run> --verify-checksums` | M5.5/T-PHYS |
-| Collision observation stream | `cargo run -p cxctl -- observe --collisions --stream --hz 30 --scenario m5_5_full_collision_gauntlet` | M5.5/T-PHYS |
-| Material kernel suite | `cargo run -p cx-e2e -- --scenario m5_6_material_kernel --suite MAT-01,MAT-02,MAT-03,MAT-06,MAT-13 --write-run-bundle` then `cargo run -p cx-headless -- replay prototype_runs/native/<m5_6_run> --verify-checksums` | M5.6/T-MAT |
-| Hazard package suite | `cargo run -p cx-e2e -- --scenario m5_7_hazard_package --suite MAT-04,MAT-05,MAT-07,MAT-08-stub --write-run-bundle` | M5.7/T-MAT |
-| AI material competence | `cargo run -p cx-ai --bin ai_harness -- --suite AI-MAT-01..AI-MAT-08 --write-run-bundle` | M6.6/T-MAT |
-| Base atmospherics suite | `cargo run -p cx-e2e -- --scenario m7_5_base_atmospherics --suite MAT-09,MAT-10 --write-run-bundle` then `cargo run -p cx-headless -- replay prototype_runs/native/<m7_5_run> --verify-checksums` | M7.5/T-MAT |
-| Material lab suite | `cargo run -p cx-tools-editor -- --mode material_lab --suite MAT-11,MAT-14 --write-run-bundle` | M8.5/T-MAT |
-| Material observation stream | `cargo run -p cxctl -- observe --materials --stream --hz 30 --scope chunk:0,0` | M5.6/T-MAT |
-| Atmosphere observation stream | `cargo run -p cxctl -- observe --atmospheres --stream --hz 5 --scope all` | M7.5/T-MAT |
-| Reaction event tail | `cargo run -p cxctl -- observe --reactions --stream --hz 30` | M5.6/T-MAT |
-| Material schema validate | `cargo run -p cx-mod -- validate content/materials/ --strict` | M5.6/T-MAT |
-| Material determinism | `cargo run -p cx-bench -- --scenario m5_6_material_kernel --profile material --runs 100 --check-checksum-stability` | M5.6+/T-MAT |
-| AI harness | `cargo run -p cx-ai --bin ai_harness -- --suite AI-H-01..AI-H-06 --write-run-bundle` | M6 |
-| Mind frame observation | `cargo run -p cxctl -- observe --mind-frame squad_alpha --once` | M6.5 |
-| Mind lab suite (mock) | `cargo run -p cx-ai --bin mind_lab -- --suite MIND-001..MIND-010 --provider mock --write-run-bundle` | M6.5 |
-| Mind cost-cap smoke | `cargo run -p cx-ai --bin mind_lab -- --suite MIND-009 --provider mock --max-run-cost-usd 0.0 --write-run-bundle` | M6.5 |
-| Mind fairness audit | `cargo run -p cx-ai --bin mind_lab -- --suite MIND-006 --provider mock --write-run-bundle` | M6.5 |
-| Package/mod validation | `cargo run -p cx-mod -- validate content/ mods/ --strict` | M8 |
-| Headless replay verification | `cargo run -p cx-headless -- --scenario breach_contract --ticks 3600 --verify-checksums` | M9 |
-| Dedicated server smoke | `cargo run -p cx-server -- --mode coop_room --scenario breach_contract --ticks 36000 --write-run-bundle` then `cargo run -p cx-headless -- replay prototype_runs/native/<m9_run> --verify-checksums` | M9/T-SERVER |
-| Server modes smoke | `cargo run -p cx-server -- --mode <coop_room\|pvp_arena\|lan_room\|mmo_shard\|lobby_directory> --validate-config-only` | M9/T-SERVER |
-| Server health/readiness check | `curl http://127.0.0.1:9090/health` and `/ready` after `cx-server` boots; check `/metrics` Prometheus surface. | M9/T-SERVER |
-| LAN/online replay alignment | Compare per-client run bundles with `cargo run -p cx-headless -- replay-compare <client_a_bundle> <client_b_bundle>`. | M10+ |
-| Mod hash sync smoke | `cargo run -p cx-server -- --mode coop_room --package-set base,official_dlc_a` against a client with mismatched packages; verify clean diff UI. | M11/T-SERVER |
-| Anti-cheat foundation smoke | `cargo run -p cx-server -- --mode pvp_arena --anti-cheat-profile competitive` with a `cxctl` puppet emitting input-rate spikes; verify kick + audit log + ban-list persist. | M11/T-SERVER |
-| MMO shard suite | `cargo run -p cx-server -- --mode mmo_shard --simulate-clients 50 --duration-min 60 --suite MMO-001..MMO-012 --write-run-bundle` | M12/T-SERVER |
-| MMO persistence restart smoke | Boot `cx-server --mode mmo_shard`; let it run 10 min; SIGKILL; restart; verify journal replay + state restore <1 min. | M12/T-SERVER |
-| MMO interest management audit | `cxctl observe --stream` against a 50-client shard; assert event volume per client matches interest range, not full shard volume. | M12/T-SERVER |
+| Perf sample | `cargo run -p cf-bench -- --scenario <scenario-id> --profile milestone` | M2 |
+| Accessibility smoke | `cargo run -p cf-e2e -- --scenario <scenario-id> --ui-scale 2.0 --high-contrast --verify-focus` | M4 |
+| Save/load roundtrip | `cargo run -p cf-e2e -- --scenario <scenario-id> --save-load-roundtrip --verify-checksums` | M5/T-SAVE |
+| Full collision gauntlet | `cargo run -p cf-e2e -- --scenario m5_5_full_collision_gauntlet --suite COLL-001..COLL-012 --write-run-bundle` then `cargo run -p cf-headless -- replay prototype_runs/native/<m5_5_run> --verify-checksums` | M5.5/T-PHYS |
+| Collision observation stream | `cargo run -p cfctl -- observe --collisions --stream --hz 30 --scenario m5_5_full_collision_gauntlet` | M5.5/T-PHYS |
+| Material kernel suite | `cargo run -p cf-e2e -- --scenario m5_6_material_kernel --suite MAT-01,MAT-02,MAT-03,MAT-06,MAT-13 --write-run-bundle` then `cargo run -p cf-headless -- replay prototype_runs/native/<m5_6_run> --verify-checksums` | M5.6/T-MAT |
+| Hazard package suite | `cargo run -p cf-e2e -- --scenario m5_7_hazard_package --suite MAT-04,MAT-05,MAT-07,MAT-08-stub --write-run-bundle` | M5.7/T-MAT |
+| AI material competence | `cargo run -p cf-ai --bin ai_harness -- --suite AI-MAT-01..AI-MAT-08 --write-run-bundle` | M6.6/T-MAT |
+| Base atmospherics suite | `cargo run -p cf-e2e -- --scenario m7_5_base_atmospherics --suite MAT-09,MAT-10 --write-run-bundle` then `cargo run -p cf-headless -- replay prototype_runs/native/<m7_5_run> --verify-checksums` | M7.5/T-MAT |
+| Material lab suite | `cargo run -p cf-tools-editor -- --mode material_lab --suite MAT-11,MAT-14 --write-run-bundle` | M8.5/T-MAT |
+| Material observation stream | `cargo run -p cfctl -- observe --materials --stream --hz 30 --scope chunk:0,0` | M5.6/T-MAT |
+| Atmosphere observation stream | `cargo run -p cfctl -- observe --atmospheres --stream --hz 5 --scope all` | M7.5/T-MAT |
+| Reaction event tail | `cargo run -p cfctl -- observe --reactions --stream --hz 30` | M5.6/T-MAT |
+| Material schema validate | `cargo run -p cf-mod -- validate content/materials/ --strict` | M5.6/T-MAT |
+| Material determinism | `cargo run -p cf-bench -- --scenario m5_6_material_kernel --profile material --runs 100 --check-checksum-stability` | M5.6+/T-MAT |
+| AI harness | `cargo run -p cf-ai --bin ai_harness -- --suite AI-H-01..AI-H-06 --write-run-bundle` | M6 |
+| Mind frame observation | `cargo run -p cfctl -- observe --mind-frame squad_alpha --once` | M6.5 |
+| Mind lab suite (mock) | `cargo run -p cf-ai --bin mind_lab -- --suite MIND-001..MIND-010 --provider mock --write-run-bundle` | M6.5 |
+| Mind cost-cap smoke | `cargo run -p cf-ai --bin mind_lab -- --suite MIND-009 --provider mock --max-run-cost-usd 0.0 --write-run-bundle` | M6.5 |
+| Mind fairness audit | `cargo run -p cf-ai --bin mind_lab -- --suite MIND-006 --provider mock --write-run-bundle` | M6.5 |
+| Package/mod validation | `cargo run -p cf-mod -- validate content/ mods/ --strict` | M8 |
+| Headless replay verification | `cargo run -p cf-headless -- --scenario breach_contract --ticks 3600 --verify-checksums` | M9 |
+| Dedicated server smoke | `cargo run -p cf-server -- --mode coop_room --scenario breach_contract --ticks 36000 --write-run-bundle` then `cargo run -p cf-headless -- replay prototype_runs/native/<m9_run> --verify-checksums` | M9/T-SERVER |
+| Server modes smoke | `cargo run -p cf-server -- --mode <coop_room\|pvp_arena\|lan_room\|mmo_shard\|lobby_directory> --validate-config-only` | M9/T-SERVER |
+| Server health/readiness check | `curl http://127.0.0.1:9090/health` and `/ready` after `cf-server` boots; check `/metrics` Prometheus surface. | M9/T-SERVER |
+| LAN/online replay alignment | Compare per-client run bundles with `cargo run -p cf-headless -- replay-compare <client_a_bundle> <client_b_bundle>`. | M10+ |
+| Mod hash sync smoke | `cargo run -p cf-server -- --mode coop_room --package-set base,official_dlc_a` against a client with mismatched packages; verify clean diff UI. | M11/T-SERVER |
+| Anti-cheat foundation smoke | `cargo run -p cf-server -- --mode pvp_arena --anti-cheat-profile competitive` with a `cfctl` puppet emitting input-rate spikes; verify kick + audit log + ban-list persist. | M11/T-SERVER |
+| MMO shard suite | `cargo run -p cf-server -- --mode mmo_shard --simulate-clients 50 --duration-min 60 --suite MMO-001..MMO-012 --write-run-bundle` | M12/T-SERVER |
+| MMO persistence restart smoke | Boot `cf-server --mode mmo_shard`; let it run 10 min; SIGKILL; restart; verify journal replay + state restore <1 min. | M12/T-SERVER |
+| MMO interest management audit | `cfctl observe --stream` against a 50-client shard; assert event volume per client matches interest range, not full shard volume. | M12/T-SERVER |
 
 If a command does not exist yet, the milestone that first lists it must either implement it or explicitly record a blocker and replacement check.
 
@@ -2679,10 +2679,10 @@ For M0..M12, a milestone is done only when all agent-completable items below are
 | M7.5 | MAT-09, MAT-10 pass; Barotrauma-style hull/gap/pump/vent/oxygen/pressure/fire networks; mission director can author room-state objectives. |
 | M8 | Player authors a Breach Contract variant + sample mod loads. |
 | M8.5 | MAT-11, MAT-14 pass; designer authors + exports + reloads a material puzzle in <10 minutes; community mod pack with new material loads cleanly. |
-| M9 | `cx-server` boots in all 5 modes; M9 server-core subset passes; 10-minute mission replays headlessly bit-identical; reference Docker image runs unchanged. |
-| M10 | LAN co-op via `cx-server --mode lan_room` survives one Breach Contract; per-client bundles align tick-for-tick; mod hash sync works. |
-| M11 | A community member self-hosts `cx-server --mode coop_room`; friends in different cities join via NAT/relay; package hash mismatch handled cleanly; anti-cheat `competitive` profile rejects spike-rate clients. |
-| M12 | `cx-server --mode pvp_arena` runs 4-8 player matches with anti-cheat foundation; `cx-server --mode mmo_shard` MMO-001..MMO-012 all pass; 50 simulated clients for 1 hour at ≥30 Hz; persistence + restart proven; no proprietary cloud dependency. |
+| M9 | `cf-server` boots in all 5 modes; M9 server-core subset passes; 10-minute mission replays headlessly bit-identical; reference Docker image runs unchanged. |
+| M10 | LAN co-op via `cf-server --mode lan_room` survives one Breach Contract; per-client bundles align tick-for-tick; mod hash sync works. |
+| M11 | A community member self-hosts `cf-server --mode coop_room`; friends in different cities join via NAT/relay; package hash mismatch handled cleanly; anti-cheat `competitive` profile rejects spike-rate clients. |
+| M12 | `cf-server --mode pvp_arena` runs 4-8 player matches with anti-cheat foundation; `cf-server --mode mmo_shard` MMO-001..MMO-012 all pass; 50 simulated clients for 1 hour at ≥30 Hz; persistence + restart proven; no proprietary cloud dependency. |
 
 ---
 
@@ -2690,7 +2690,7 @@ For M0..M12, a milestone is done only when all agent-completable items below are
 
 | Risk | Why It Matters | Mitigation |
 |---|---|---|
-| Bevy breaking changes mid-development | Version churn could break the project. | Pin Bevy version; treat upgrades as scheduled work; isolate Bevy interface in `cx-app` and a few plugins. |
+| Bevy breaking changes mid-development | Version churn could break the project. | Pin Bevy version; treat upgrades as scheduled work; isolate Bevy interface in `cf-app` and a few plugins. |
 | Custom wgpu renderer is more work than expected | Could delay M2/M7. | Start with off-the-shelf Bevy renderer; introduce custom wgpu only where perf demands. |
 | GPU-assisted terrain carving is hard cross-platform | macOS Metal + Linux Vulkan + Windows DX12 differ. | Wgpu abstracts this; CPU fallback path always present; test on all platforms in CI. |
 | AI 8-criteria humanlike bar is too ambitious | Could become a tarpit. | Ship 6 of 8 by M6; defer strategic-adaptation + fairness instrumentation to M7+ if needed. |
@@ -2715,7 +2715,7 @@ For M0..M12, a milestone is done only when all agent-completable items below are
 | MMO sim cost at 100+ concurrent players (T-SERVER / DR-035) | Frame budget could overrun at scale. | Interest management; sub-region tick budgets; offload AI/LLM to background; degrade to 30 Hz; T-PERF gates at M12. |
 | Server/client mod-hash mismatch hell (T-SERVER) | Players blocked from joining due to opaque package errors. | Pinned package set per server; clear diff UI; trust tiers; auto-download off by default for production. |
 | Anti-cheat false positives on community servers (T-SERVER) | Player frustration; operator headaches. | Tiered profiles (LAN/private `casual`, public co-op/PvP/MMO `competitive`, ranked/tournament `tournament_strict` opt-in); operator-tunable; appeal-out-of-game per operator policy. |
-| Networking transport library churn (T-SERVER / DR-005) | lightyear/renet/quinn ecosystem could change after our pick. | Trait-bound `cx-net` adapter; selection committed before M11; library swap is local to one crate. |
+| Networking transport library churn (T-SERVER / DR-005) | lightyear/renet/quinn ecosystem could change after our pick. | Trait-bound `cf-net` adapter; selection committed before M11; library swap is local to one crate. |
 | Platform certification (Steam/Sony/MS/Nintendo) forces server-app fork (T-SERVER) | Some platforms require submission-only multiplayer / anti-cheat / sandboxing. | Adapter posture; can ship Steam without locking out Linux community hosting; revisit DR-005/DR-034 if a platform requires structural changes. |
 | First-party MMO hosting cost spirals (T-SERVER / DR-035) | If the project starts hosting publisher-grade shards, ops cost balloons. | First-party hosting is **optional**; community-hosted is the default; we don't take responsibility for community shard uptime. |
 | Material kernel cost explosion (T-MAT / DR-036) | Per-pixel CA + fire + electricity + reactions can blow the 4K/120 budget. | Active-region budgets, dirty rects, sleeping chunks, LOD, perf gates at every material milestone (M5.6, M5.7, M7.5, M8.5). |
@@ -2748,8 +2748,8 @@ This roadmap explicitly does NOT include for v1:
 - Cross-shard live combat or trade at v1 (DR-035). Reopens via DR-035 amendment if a future direction warrants it.
 - Cross-shard veteran transfer at v1 (DR-035 open follow-up).
 - Auto-population of MMO shards with bots dressed as players. NPCs/AI are visibly AI; player count metric is humans only (DR-035).
-- A "lite" dedicated server stripped of mod support (DR-034). The server runs the same `cx-mod` packages as the client.
-- Different sim logic for server vs client (DR-034). One `cx-sim-core`; server omits render/audio/UI crates only.
+- A "lite" dedicated server stripped of mod support (DR-034). The server runs the same `cf-mod` packages as the client.
+- Different sim logic for server vs client (DR-034). One `cf-sim-core`; server omits render/audio/UI crates only.
 - Forced first-party hosting for any multiplayer mode (DR-034). Community-hostable is the default; first-party is an optional adapter.
 - Forced account systems for solo or private LAN/co-op rooms (DR-035). Public shards do require an account (local or pluggable provider).
 - Voice chat (use external; we provide text + captions).
