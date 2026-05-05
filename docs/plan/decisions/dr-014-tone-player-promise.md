@@ -55,7 +55,7 @@ These are first-class product elements, not flavor decoration:
 | Equipment | Items and tools must have damage state, jam/overheat/destroyed transitions, and field repair affordance. See [[spec/equipment-loadout]]. |
 | Replay / event | Every chassis stage transition, equipment failure, AI bail decision, eject, and salvage event must be in the event taxonomy. See [[systems/replay-event-architecture]] and [[spec/replay-recorder-slice-a]]. |
 | AI | Bots understand their chassis state, know when to eject/retreat, and explain it. See [[decisions/dr-008-ai-architecture]] and [[spec/ai-trust-harness-slice-a]]. |
-| UX | Chassis HUD must show stage, modules, pilot state, repair affordance. See [[spec/ux-overlay-screen-brief]] and [[spec/ux-wireframes-slice-a]]. |
+| UX | Chassis HUD must show stage, modules, pilot state, repair affordance. See [[systems/ux-overlay-screen-brief]] and [[spec/ux-wireframes-slice-a]]. |
 | Mission design | Missions reward repair/salvage/extract behaviors, not just kill/destroy. See [[spec/missions-and-objectives]]. |
 | Modding | Origins/races and chassis classes are first-class mod surfaces. See [[spec/modding-model]]. |
 | Visual / audio | Smoke, sparks, alarms, hydraulic whine, servo failure are part of the diegetic feedback layer. New audio-identity DR (TBD). |

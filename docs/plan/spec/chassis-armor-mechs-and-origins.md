@@ -143,7 +143,7 @@ The HUD must surface chassis state without becoming noise.
 | Repair affordance icon | When a repairable module/layer is in range of a repair tool/drone. |
 | Salvage marker on wrecks | Once chassis enters `wreck` stage. |
 
-See [[spec/ux-overlay-screen-brief]] and [[spec/ux-wireframes-slice-a]].
+See [[systems/ux-overlay-screen-brief]] and [[spec/ux-wireframes-slice-a]].
 
 ## Modding Contract
 
@@ -188,7 +188,7 @@ Without this in Slice A, the body damage / replay / AI / equipment claims in [[s
 - [[decisions/dr-008-ai-architecture]]
 - [[spec/body-damage-model]]
 - [[spec/equipment-loadout]]
-- [[spec/ux-overlay-screen-brief]]
+- [[systems/ux-overlay-screen-brief]]
 - [[spec/ux-wireframes-slice-a]]
 - [[spec/replay-recorder-slice-a]]
 - [[spec/missions-and-objectives]]
