@@ -22,6 +22,7 @@ Retention is a game-quality requirement here, not just a metric target. A good s
 | "I can beat that seed cleaner." | Same-seed retry, replay timeline, personal best, failure cause. |
 | "This squad deserves another mission." | Named actors, scars, traits, rescue history, veteran UI. |
 | "This machine deserves repair." | Damaged armor, recovered mech hulls, repaired modules, android shells, robot frames, and battle scars. |
+| "This base deserves better power." | Command core upgrades, shields, turrets, sensors, doors, repair platforms, reserve power, and module scars. |
 | "This new tool changes the plan." | Horizontal equipment unlocks, lab tests, loadout templates. |
 | "The enemy commander surprised me." | Visible enemy doctrine, adaptation, scouting clues. |
 | "I want to show this moment." | Replay card, seed hash, mod/package list, short export. |
@@ -35,7 +36,7 @@ Retention is a game-quality requirement here, not just a metric target. A good s
 | Tactical command | Orders must show intent, path, blocked reason, and recovery behavior. | [[spec/ai-trust-harness-slice-a]], [[spec/ux-wireframes-slice-a]] |
 | Loadout craft | Templates, role filters, AI competence, mass/cost/delivery warnings. | [[spec/equipment-loadout]], [[references/equipment-provenance-workbench-view]] |
 | Destructible problems | Contracts must vary terrain/material/objective pressure. | [[spec/terrain-material-sandbox-slice-a]], [[systems/destruction-objective-mission-patterns]] |
-| Persistence | Actors, salvage, base state, enemy commander, contract history. | Save/campaign stub; not built yet. |
+| Persistence | Actors, salvage, command core state, base power grid, base modules, enemy commander, contract history. | Save/campaign stub; not built yet. |
 | Learning | Replay/event recap explains deaths, breaches, AI failures, and losses. | [[spec/replay-recorder-slice-a]] |
 | Sharing | Deterministic seed cards, replay exports, mod/package hashes. | [[spec/backend-service-hub-slice-a]], [[spec/package-builder-workbench-slice-a]] |
 | Optional collection | Cosmetic/story/trophy layer first; power collection only after fairness DR. | Future monetization/economy DR. |
@@ -57,6 +58,9 @@ Retention is a game-quality requirement here, not just a metric target. A good s
 | Object | Fields To Prototype | Consumer |
 |---|---|---|
 | `campaign_profile` | profile id, campaign seed, difficulty posture, unlocked labs, contract history, replay archive ids. | Save system, hub, replay browser. |
+| `command_core_record` | stable core id, origin/flavor, integrity, upgrades, rooted/portable/embedded history, near-loss events, avatar missions. | Save system, base UI, avatar HUD, replay recap, progression. |
+| `base_power_grid` | rooted core socket, reserve power, shield emitters, turret links, sensor relays, door controllers, repair/charging pads, logistics beacons. | Base UI, mission setup, AI defense, replay, campaign state. |
+| `base_module_record` | module id, type, power draw, condition, repair history, scars, mod provenance, tactical role. | Base builder, repair loop, salvage, package workbench. |
 | `actor_veteran` | stable actor id, name, role, scars, injuries, traits, rescue count, mission count, favorite loadout. | Squad UI, AI doctrine, replay recap. |
 | `chassis_record` | chassis id, owner/pilot history, armor/module condition, repairs, scars/paint, salvage state, mission count. | Loadout UI, mech bay, replay recap, progression, AI compatibility. |
 | `origin_profile` | origin id, treatment/repair needs, vulnerabilities, personality/story tags, compatible armor/mechs. | Squad creation, AI, body damage, retention, mission constraints. |
@@ -92,6 +96,8 @@ Retention is a game-quality requirement here, not just a metric target. A good s
 | Squad/veteran panel | Name, role, health, scars, traits, current doctrine, rescue risk, recent event. |
 | Loadout builder | Role filters, item tags, AI competence, provenance/warnings, delivery risk, missing capability summary. |
 | Mech/chassis bay | Origin compatibility, armor slots, module condition, repair cost, route/delivery warnings, pilot/rescue state. |
+| Base power panel | Command core rooted/portable/embedded state, available/reserve power, powered/offline modules, shields, turrets, sensors, doors, repair/charging pads. |
+| Avatar core panel | Core integrity, avatar boosts, base-offline warnings, energy/heat, ability cooldowns, extraction route, loss risk. |
 | Mission HUD | Current contract goal, high-risk actor warnings, salvage/recovery prompts only when relevant. |
 | Recap screen | Win/loss cause, key events, actor fates, salvage, retry same seed, save replay, edit loadout. |
 | Replay card | Mission title, seed, duration, result, mods/packages, notable events, share/export actions. |
@@ -106,6 +112,8 @@ Retention is a game-quality requirement here, not just a metric target. A good s
 | Loadout edits after recap | Shows whether replay teaches useful changes. |
 | Veteran preservation behavior | Tests emotional stakes without hard punishment. |
 | Chassis repair/reuse rate | Tests whether armor/mechs create attachment and tactics rather than maintenance chores. |
+| Core uproot/embed rate | Tests whether avatar-core play is an interesting strategic choice rather than a dominant or ignored option. |
+| Base module power-off causes | Finds whether base shutdowns are readable, fair, and traceable to player/enemy decisions. |
 | Salvage usage in next mission | Checks whether economy creates decisions. |
 | Contract abandonment cause | Finds impossible/boring/generated bad seeds. |
 | Replay saved/shared/opened | Measures spectacle and learning loop. |

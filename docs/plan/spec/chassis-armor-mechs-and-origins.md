@@ -39,7 +39,7 @@ A chassis is the layered physical thing an actor inhabits or wears.
 
 | Layer | Description | Example: Infantry | Example: Powered Armor | Example: Light Mech | Example: Android |
 |---|---|---|---|---|---|
-| Operator/pilot | The "brain" the player or AI commands. May be the same as the actor body or separate. | Soldier | Soldier in suit | Pilot in cockpit | Synthetic mind |
+| Operator/pilot | The "brain" the player or AI commands. May be the same as the actor body, separate, or an embedded command core/avatar state. | Soldier | Soldier in suit | Pilot in cockpit | Synthetic mind |
 | Frame | Skeleton/frame that defines mass, mobility, weapon hardpoints. | Bone/muscle | Light exo | Bipedal frame | Endoskeleton |
 | Armor layers | Independently damageable plates / shells / undersuits. | Helmet, vest, undersuit | Helmet, plate, undersuit, joints | Cockpit plate, leg plate, arm plate, joint shell | Outer hull, inner skin |
 | Modules | Bolted-on subsystems with their own state (sensors, jet, shield, repair drone, ammo box). | Backpack, NVGs | Jet pack, HUD optic, shield emitter | Targeting computer, jet pods, shield, ammo silo | Sensor pod, comm relay |
@@ -85,6 +85,20 @@ Examples:
 - Targeting computer → provides aim assist; can fail with EMP.
 - Repair drone → provides slow self-repair; can be destroyed independently.
 - Sensor pod → provides AI/UX vision; degraded by smoke.
+
+## Command Core Embedding
+
+The command core from [[spec/command-core-base-power]] can be embedded into an eligible chassis as an avatar state. This is not a normal module slot and not a passive stat bonus.
+
+| Requirement | Meaning |
+|---|---|
+| Explicit compatibility | A body/chassis declares whether it can accept the command core, whether it needs a cockpit/socket, and whether embedding is safe, risky, or impossible. |
+| Base tradeoff | Embedding the core must report what base systems lose power or drop to reserve mode. |
+| Avatar bonuses | Armor, health, mobility, energy, equipment power, abilities, and command/control aura are declared as readable boost records. |
+| Damage risk | Core integrity can be damaged separately from the host chassis; losing the avatar can lose the run/campaign. |
+| Extraction | Removing the core from the avatar is an explicit action with time, risk, and UI/replay events. |
+
+This keeps "planting the core into a unit" from becoming invisible RPG math. The player should understand exactly what got stronger, what the base lost, and what failure would cost.
 
 ## Origins / Races
 

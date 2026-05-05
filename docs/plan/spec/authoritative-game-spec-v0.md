@@ -20,6 +20,7 @@ feeds:
   - DR-012
   - DR-013
   - DR-014
+  - DR-015
 ---
 
 ← [[spec/index|spec section]] · [[spec/prototype-roadmap|prototype roadmap]] · [[spec/prototype-implementation-backlog-slice-a|implementation backlog]] · [[dashboards/research-readiness|readiness]] · [[dashboards/system-heatmap|system heatmap]] · [[decisions/index|decisions]] · [[prototypes/index|prototype evidence]] · [root plan](../../VAULT_PLAN.md)
@@ -47,7 +48,7 @@ Use this spec as the implementation starting point, then follow evidence in this
 
 ## Product Promise
 
-Build a solo-first tactical physics sandbox where the player directly pilots fragile soldiers, androids, robots, armored bodies, and enterable mechs; commands AI squadmates; tears through destructible terrain; survives chaotic mission failures; and uses replay/debug tools to understand and improve every run.
+Build a solo-first tactical physics sandbox where the player can command AI-controlled fragile soldiers, androids, robots, armored bodies, and enterable mechs as a strategy game; directly possess or pilot bodies when desired; power a base through a vulnerable command core; uproot that core for a risky boosted-avatar play; tear through destructible terrain; survive chaotic mission failures; and use replay/debug tools to understand and improve every run.
 
 The game must feel like a modern successor to the Cortex Command fantasy without copying Cortex Command as a product plan. The target is a clearer, more moddable, more replayable version of the core fantasy: tiny actors, brutal materials, improvised tunnels, emergency rescues, dangerous delivery craft, clever tools, damageable armor/mechs/equipment, and AI helpers that explain what they are doing.
 
@@ -56,6 +57,8 @@ The game must feel like a modern successor to the Cortex Command fantasy without
 | Fantasy | What The Player Does | Spec Obligation |
 |---|---|---|
 | Field commander under pressure | Switches between direct control and squad orders while terrain, bodies, and craft are changing the battlefield. | Direct control and command UX must coexist; see [[decisions/dr-004-first-playable-slice]] and [[decisions/dr-009-command-ux-style]]. |
+| Continuity commander | Can play commander-first, pilot-first, or hybrid; AI controls bodies by default and the player takes over only when they want. | Player identity/control posture follows [[decisions/dr-015-player-identity-control-posture]]; command UX and AI trust must support strategy-style play. |
+| Base-core tactician | Keeps the command core rooted to power base shields/turrets/sensors/doors/repair platforms, or uproots it into an avatar body/chassis for a high-risk power spike. | Command core and base-power mechanics follow [[spec/command-core-base-power]]; base modules, avatar boosts, and loss risks must be replay/UX visible. |
 | Physical problem solver | Uses rifles, diggers, charges, medkits, repair tools, and delivery plans to solve a destructible objective. | Items need shared AI/UI/modding/replay role records; see [[spec/equipment-loadout]] and [[references/equipment-role-records-slice-a]]. |
 | Chassis tactician | Chooses humans, androids, robots, armor layers, powered armor, and mechs for different mission constraints. | Chassis/origin choices need mass, protection, damage-stage, repair/treatment, AI, loadout, replay, and UX contracts; see [[spec/chassis-armor-mechs-and-origins]]. |
 | Rescue storyteller | Saves or loses named actors, recovers gear, and understands why the run collapsed. | Body damage, replay/debrief, and progression must surface causes, not only outcomes. |
@@ -71,6 +74,7 @@ The game must feel like a modern successor to the Cortex Command fantasy without
 | AI is a tested product feature. | No "great solo AI" claim ships without scenario harness results, reason labels, and replay evidence. | [[spec/ai-trust-harness-slice-a]], [[systems/ai-trust-test-suite]], [[decisions/dr-008-ai-architecture]]. |
 | Equipment has one shared meaning. | AI, UI, modding, balance, replay, backend/session, and missions consume the same item role record. | [[spec/equipment-loadout]], [[spec/equipment-loadout-workbench-slice-a]], [[references/equipment-role-records-slice-a]]. |
 | Bodies and machines fail locally. | Armor plates, limbs, weapons, tools, mech modules, sensors, reactors, and origins degrade in readable stages when they matter. | [[spec/chassis-armor-mechs-and-origins]], [[spec/body-damage-model]], [[decisions/dr-014-tone-player-promise]]. |
+| Command core creates strategic risk. | Rooted core powers the base; uprooted/embedded core creates a stronger avatar while weakening the base. | [[decisions/dr-015-player-identity-control-posture]], [[spec/command-core-base-power]]. |
 | Modding and diagnostics are part of the game. | Package validation, provenance, loader graph, diagnostics, and test launch are first-class workflows. | [[spec/modding-model]], [[spec/package-builder-workbench-slice-a]], [[engine/content-module-loading-lifecycle]]. |
 | Progression widens tactics. | Retention comes from mastery, horizontal tools, veterans, salvage, templates, replays, and challenges before grind. | [[decisions/dr-011-progression-retention-loop]], [[spec/progression-retention]]. |
 
@@ -84,10 +88,12 @@ These are v0 product-direction commitments. They still need prototype evidence b
 | Tone | **Tactical pulp sci-fi disaster sandbox** (DR-014). Gritty tactical stakes, pulpy systemic consequences, surreal sci-fi accents, sandbox/workbench support. Excludes pure comedy, pure X-COM grimness, pure Noita opacity, pure Powder Toy sandbox. | [[decisions/dr-014-tone-player-promise]]. |
 | Engine direction | **Greenfield native core + CCCP as reference lab** (DR-001 direction closed). Greenfield engine; CCCP is read-only reference for mechanics/feel/taxonomy/AI lessons. | [[decisions/dr-001-engine-strategy]]. Implementation specifics (lang/runtime/renderer/data schema) still open. |
 | AI bar | **Most humanlike AI in the genre** (DR-014 / DR-008 raised bar). Friendly and enemy bots must communicate intent, model perception/memory, exhibit personality/doctrine, make readable mistakes, and learn-from-defeat. Beyond utility scoring once basics work. | AI-H + AI-EQ + future humanlike-AI tests. |
+| Player identity / control posture | **Command-core operator** (DR-015). The player can play strategy-first through orders and AI autonomy, direct-pilot bodies/mechs when desired, or fluidly switch between both. Direct control is optional intervention, not a mandatory always-on mode. | Commander-only breach test, pilot-intervention handoff test, AI handoff replay labels. |
+| Command core / base power | The command core is a rooted/mobile/embedded strategic object. Rooted: powers base shields, turrets, sensors, doors, repair platforms, energy pads, command relays, logistics. Embedded: creates a stronger core-bearing avatar while base systems weaken/offline. | CORE-A tests in [[spec/command-core-base-power]]. |
 | Primary launch mode | **Solo-first**. Local/offline play must work without account or live-service dependency. | [[spec/prototype-roadmap]], [[decisions/dr-005-multiplayer-posture]], [[decisions/dr-013-backend-service-scope]]. |
 | Scope flexibility framework | **Framework must accommodate** solo-hero, small-squad (3-5), RTS-scale (10+), persistent squad campaign (3-10 named with veterans/legacy), and **MMO-ready architecture** for eventual growth. Players author their own scenarios. Default delivered campaign mode is persistent squad. Architectural choices (ECS, networking authority, scenario data model, content pipeline) must not foreclose any of these scales. | Slice-A scenario manifest + scale stress test (single actor, 5 actors, 50 actors); networking authority memo (DR-005). |
 | First playable | A single-actor lab grows into a repeatable Breach Contract proof mission before campaign breadth. | [[spec/prototype-implementation-backlog-slice-a]], [[spec/mission-director-slice-a]]. |
-| Direct control | Player movement, aim, weapon, tool, damage/status, and recovery loops are first-class. | A1 actor-feel runs and A-FEEL tests. |
+| Direct control | Player movement, aim, weapon, tool, damage/status, and recovery loops are first-class, but bodies must remain AI-usable when not possessed. | A1 actor-feel runs, A-FEEL tests, DR-015 commander-only and handoff tests. |
 | Destructible terrain | Terrain and material affordances are core to navigation, combat, tools, AI, missions, replay, and UX. | MAT-T terrain/material sandbox tests. |
 | Replay/debug | Every meaningful prototype must produce inspectable run evidence. | [[references/prototype-run-bundle-schema]], [[spec/replay-recorder-slice-a]]. |
 | AI trust | Friendly AI is a launch-quality bar, not decoration, but only proven harness behavior can be promised. | AI-H and AI-EQ tests. |
