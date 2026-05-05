@@ -39,7 +39,7 @@ feeds:
   - DR-033
 ---
 
-<- [[spec/index|spec section]] · [[spec/prototype-roadmap|native roadmap]] · [[spec/authoritative-game-spec-v0|game spec v0]] · [[spec/full-collision-physics-plan|full collision plan]] · [[spec/ai-control-observability-layer|AI control/observability]] · [[references/prototype-run-bundle-schema|run-bundle schema]] · [VAULT_PLAN.md](../../VAULT_PLAN.md)
+<- [[spec/index|spec section]] · [[spec/prototype-roadmap|native roadmap]] · [[spec/feature-completion-checklist|feature checklist]] · [[spec/authoritative-game-spec-v0|game spec v0]] · [[spec/full-collision-physics-plan|full collision plan]] · [[spec/ai-control-observability-layer|AI control/observability]] · [[references/prototype-run-bundle-schema|run-bundle schema]] · [VAULT_PLAN.md](../../VAULT_PLAN.md)
 
 # Native Implementation Backlog
 
@@ -53,7 +53,7 @@ feeds:
 
 | Rule | Requirement |
 |---|---|
-| Read first | `AGENTS.md`, [[spec/prototype-roadmap]] (especially the Glossary, Toolchain And Workspace Bootstrap, CLI Reference, Control Transport And Envelope, Scenario Manifest Schema, Run-Bundle Naming Convention, Per-Milestone Kickoff Smoke), this backlog, and linked DR/spec pages. |
+| Read first | `AGENTS.md`, [[spec/prototype-roadmap]] (especially the Glossary, Toolchain And Workspace Bootstrap, CLI Reference, Control Transport And Envelope, Scenario Manifest Schema, Run-Bundle Naming Convention, Per-Milestone Kickoff Smoke), this backlog, [[spec/feature-completion-checklist]], and linked DR/spec pages. |
 | Work location | Native production prototype lives in `cortex-game/` unless the implementation agent proposes and documents a different path. |
 | Reference repos | Never edit CCCP/C4/comparable repos. They are read-only reference material. |
 | Crate ownership | Touch only owned crates/files plus explicit boundary crates. Each crate ships an `AGENTS.md` per the [Per-Crate AGENTS.md Template](../spec/prototype-roadmap.md#per-crate-agentsmd-template). |
@@ -61,6 +61,7 @@ feeds:
 | Control first | Every new player-facing control or UI action gets a semantic `cx-control` / `cxctl` path unless explicitly marked human-only. The transport pin is in [Control Transport](../spec/prototype-roadmap.md#control-transport-and-envelope). |
 | Tests required | Every new behavior gets unit or integration coverage per [Testing Layers](../spec/prototype-roadmap.md#testing-layers); every player-facing milestone gets E2E proof. |
 | Evidence required | Every meaningful run emits a checked run bundle named per [Run-Bundle Naming Convention](../spec/prototype-roadmap.md#run-bundle-naming-convention) under `prototype_runs/native/`. |
+| Checklist required | Every completed or partially completed task updates [[spec/feature-completion-checklist]] with affected row ids, evidence links, and AI self-ratings. Human rating columns stay blank unless the user provides ratings. |
 | Human gates | If a criterion requires project-owner play, platform hardware, or human accessibility feedback, prepare the build, run the kickoff smoke, fill in the [Human Playtest Checklist Template](../spec/prototype-roadmap.md#human-playtest-checklist-template), and mark `READY_FOR_HUMAN`. |
 | Logging/errors | Use the policy in [Logging, Tracing, And Error Policy](../spec/prototype-roadmap.md#logging-tracing-and-error-policy). No `println!`, no `unwrap()` on user-controllable inputs, no `rand::thread_rng` inside sim. |
 | Bug log | Found bugs go in the milestone vault note under `## Bugs Found And Fixed` per the [Bug Log Format](../spec/prototype-roadmap.md#bug-log-format). |
@@ -443,8 +444,9 @@ Required headings:
 ## Screenshots / Captures
 ## Bugs Found And Fixed
 ## Known Issues
+## Checklist Updates
 ## Final Audit
 ## Next Actions
 ```
 
-The final audit must state every task card as `pass`, `blocked`, `human-gated`, or `deferred-with-reason`.
+The checklist update must list every changed row id from [[spec/feature-completion-checklist]], the evidence link used, and the AI self-ratings assigned. The final audit must state every task card as `pass`, `blocked`, `human-gated`, or `deferred-with-reason`.

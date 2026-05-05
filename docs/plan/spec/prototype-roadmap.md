@@ -40,7 +40,7 @@ feeds:
   - DR-033
 ---
 
-← [[spec/index|spec section]] · [[spec/authoritative-game-spec-v0|game spec v0]] · [[spec/native-implementation-backlog|native backlog]] · [[spec/full-collision-physics-plan|full collision plan]] · [[spec/ai-control-observability-layer|AI control/observability]] · [[spec/prototype-implementation-backlog-slice-a|historical HTML backlog]] · [[dashboards/research-readiness|readiness]] · [[decisions/index|decisions]] · [VAULT_PLAN.md](../../VAULT_PLAN.md) · [HTML-era snapshot](../research-log/2026-05-04-prototype-roadmap-html-snapshot.md)
+← [[spec/index|spec section]] · [[spec/authoritative-game-spec-v0|game spec v0]] · [[spec/native-implementation-backlog|native backlog]] · [[spec/feature-completion-checklist|feature checklist]] · [[spec/full-collision-physics-plan|full collision plan]] · [[spec/ai-control-observability-layer|AI control/observability]] · [[spec/prototype-implementation-backlog-slice-a|historical HTML backlog]] · [[dashboards/research-readiness|readiness]] · [[decisions/index|decisions]] · [VAULT_PLAN.md](../../VAULT_PLAN.md) · [HTML-era snapshot](../research-log/2026-05-04-prototype-roadmap-html-snapshot.md)
 
 # Native Build Roadmap
 
@@ -123,6 +123,7 @@ If you only have time to read three things before starting work:
 1. [[spec/authoritative-game-spec-v0]] — what the game is.
 2. This roadmap — what gets built and in what order.
 3. [[spec/native-implementation-backlog]] — concrete native task cards for the current milestone.
+4. [[spec/feature-completion-checklist]] — completion/rating rows that must be updated when work lands.
 
 If you have more time, also read: [[decisions/index]], [[dashboards/decision-tracker]], [[references/prototype-run-bundle-schema]], [[spec/ai-control-observability-layer]], [[references/usage-ledger]], [[research-log/moonshot-register]], [[prototypes/actor-feel-lab-a1-human-playtest-2026-05-04]] (the "ok I guess" signal that informs M1.5 acceptance), and [[spec/prototype-implementation-backlog-slice-a]] only as a historical/browser-lab backlog.
 
@@ -210,7 +211,8 @@ This roadmap is intended to be assignable to an AI implementation agent one mile
 | 6. Bug hunt | Actively search for crashes, replay drift, missing events, UI overlap, perf spikes, stale docs, and edge cases. | Bug log in the run notes plus fixes. |
 | 7. Rerun | Rerun all validation after fixes. | Clean command matrix. |
 | 8. Evidence | Update vault prototype/research notes with links to run bundle, screenshots, test output, and known gaps. | New or updated note under `cortext_command_vault/prototypes/` or `research-log/`. |
-| 9. Final audit | Compare all milestone done-criteria and backlog task cards against actual evidence. | Final audit section in the vault note and concise handoff summary. |
+| 9. Checklist update | Update [[spec/feature-completion-checklist]] rows for affected roadmap features, milestone scope, done-criteria, side tracks, and native task cards. | Checked rows only when evidence exists; AI self-ratings filled; human ratings left blank unless provided. |
+| 10. Final audit | Compare all milestone done-criteria and backlog task cards against actual evidence. | Final audit section in the vault note and concise handoff summary listing checklist IDs changed. |
 
 ### Agent-Completable Vs Human-Gated
 
@@ -232,6 +234,7 @@ No milestone should use a human-gated item to hide incomplete agent-completable 
 | Perf counters | M0 onward, richer from M2 onward. | Frame time, sim tick cost, event volume, terrain dirty cost as applicable. |
 | Replay/checksum report | M3 onward; earlier if events exist. | Drift reports must name first divergence. |
 | Vault note | Every milestone. | New note under `prototypes/` or `research-log/` with final audit. |
+| Feature checklist update | Every milestone and substantial feature pass. | Update [[spec/feature-completion-checklist]] with status, evidence, AI self-ratings, and human rating placeholders. |
 | Known issues | Every milestone. | Must distinguish blockers from accepted follow-ups. |
 
 ---
@@ -248,6 +251,7 @@ Context:
 - Read cortext_command_vault/spec/authoritative-game-spec-v0.md.
 - Read cortext_command_vault/spec/prototype-roadmap.md.
 - Read cortext_command_vault/spec/native-implementation-backlog.md.
+- Read cortext_command_vault/spec/feature-completion-checklist.md.
 - Read the milestone's linked DRs/spec pages.
 
 Write scope:
@@ -263,12 +267,14 @@ Required loop:
 5. Bug hunt and fix issues until green.
 6. Produce a run bundle under prototype_runs/native/.
 7. Update the vault with a prototype/research note and final audit.
+8. Update feature-completion-checklist rows for every affected feature/task/done-criterion, including AI self-ratings and evidence links.
 
 Done when:
 - Every agent-completable task card is complete.
 - Validation commands pass.
 - E2E scenario passes.
 - Run-bundle checker passes.
+- Feature-completion-checklist rows are updated and the handoff lists row IDs changed.
 - Known issues are documented.
 - Human-gated items, if any, are marked READY_FOR_HUMAN with a playtest checklist.
 ```
@@ -2066,6 +2072,7 @@ For M0..M12, a milestone is done only when all agent-completable items below are
 | UI/accessibility | Any user-facing surface has screenshot evidence and ACC-A status when applicable. |
 | Bug hunt | Bug checklist is completed; found bugs are fixed or logged as accepted known issues. |
 | Vault | Prototype/research note is updated with run links, test commands, screenshots, final audit, and next actions. |
+| Feature checklist | [[spec/feature-completion-checklist]] rows are updated for affected roadmap features, milestone scope, done-criteria, side tracks, and native task cards. |
 | Human gates | Human-only checks are marked `READY_FOR_HUMAN`, with a short playtest checklist. |
 
 ---
@@ -2150,6 +2157,7 @@ This roadmap explicitly does NOT include for v1:
 
 - [[spec/authoritative-game-spec-v0]]
 - [[spec/native-implementation-backlog]]
+- [[spec/feature-completion-checklist]]
 - [[spec/ai-control-observability-layer]]
 - [[spec/hybrid-llm-ai-plan]]
 - [[decisions/dr-032-hybrid-llm-ai-direction]]
