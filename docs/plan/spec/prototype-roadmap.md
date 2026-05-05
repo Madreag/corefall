@@ -57,73 +57,73 @@ feeds:
 
 ## Table Of Contents
 
-- [Read Order](#read-order)
-- [Glossary](#glossary)
-- [Agent Implementation Contract](#agent-implementation-contract)
-  - [Open Decision Gates Protocol](#open-decision-gates-protocol)
-- [Milestone Handoff Template](#milestone-handoff-template)
-- [Human Playtest Checklist Template](#human-playtest-checklist-template)
-- [Strategic Frame](#strategic-frame)
-- [Stack At A Glance](#stack-at-a-glance)
-- [Coordinate System And Units](#coordinate-system-and-units)
-- [Repository Layout](#repository-layout)
-- [Toolchain And Workspace Bootstrap](#toolchain-and-workspace-bootstrap)
-- [Per-Crate AGENTS.md Template](#per-crate-agentsmd-template)
-- [Logging, Tracing, And Error Policy](#logging-tracing-and-error-policy)
-- [Asset And Placeholder Strategy](#asset-and-placeholder-strategy)
-- [Testing Layers](#testing-layers)
-- [CLI Reference](#cli-reference)
-- [Control Transport And Envelope](#control-transport-and-envelope)
-- [Scenario Manifest Schema](#scenario-manifest-schema)
-- [Run-Bundle Naming Convention](#run-bundle-naming-convention)
-- [Bug Log Format](#bug-log-format)
-- [Inter-Milestone Bridges](#inter-milestone-bridges)
-- [Per-Milestone Kickoff Smoke](#per-milestone-kickoff-smoke)
-- [Milestone Map](#milestone-map)
-- [Side Tracks](#side-tracks)
-- [Milestone Details](#milestone-details)
-  - [M0 — Engine Bootstrap](#m0--engine-bootstrap)
-  - [M1 — Actor Controller And Sim Core](#m1--actor-controller-and-sim-core)
-  - [M1.5 — Micro Breach Fun Slice](#m15--micro-breach-fun-slice)
-  - [M2 — Pixel Terrain And Materials](#m2--pixel-terrain-and-materials)
-  - [M3 — Replay And Event Recorder](#m3--replay-and-event-recorder)
-  - [M4 — HUD And Comic-Noir UI](#m4--hud-and-comic-noir-ui)
-  - [M5 — Equipment, Chassis, And Damage Grammar](#m5--equipment-chassis-and-damage-grammar)
-  - [M5.5 — Full Collision Gauntlet](#m55--full-collision-gauntlet)
-  - [M5.6 — Material Kernel](#m56--material-kernel)
-  - [M5.7 — Hazard Package](#m57--hazard-package)
-  - [M6 — AI Core And Trust Harness](#m6--ai-core-and-trust-harness)
-  - [M6.5 — LLM Mind Lab](#m65--llm-mind-lab)
-  - [M6.6 — AI Material Competence](#m66--ai-material-competence)
-  - [M7 — Mission Director And Breach Contract Proof Mission](#m7--mission-director-and-breach-contract-proof-mission)
-  - [M7.5 — Base Atmospherics](#m75--base-atmospherics)
-  - [M8 — Scenario Editor And Mod Tools](#m8--scenario-editor-and-mod-tools)
-  - [M8.5 — Material Lab](#m85--material-lab)
-  - [M9 — Dedicated Server App + Determinism Islands](#m9--dedicated-server-app--determinism-islands)
-  - [M10 — LAN Co-op](#m10--lan-co-op)
-  - [M11 — Online Co-op (Self-Hosted Dedicated Servers)](#m11--online-co-op-self-hosted-dedicated-servers)
-  - [M12 — Public PvP Arenas + Persistent MMO Shards](#m12--public-pvp-arenas--persistent-mmo-shards)
-- [Side Track Details](#side-track-details)
-  - [T-CONTROL — AI Control And Observability](#t-control--ai-control-and-observability)
-  - [T-LLM — Async LLM Mind Layer](#t-llm--async-llm-mind-layer)
-  - [T-PHYS — Full Collision And Physical Consequence](#t-phys--full-collision-and-physical-consequence)
-  - [T-SERVER — Dedicated Server App Lifecycle And Community Hosting](#t-server--dedicated-server-app-lifecycle-and-community-hosting)
-  - [T-MAT — Systemic Materials, Chemistry, And Atmospheres](#t-mat--systemic-materials-chemistry-and-atmospheres)
-  - [T-PLATFORM — Cross-Platform CI And Steam Deck](#t-platform--cross-platform-ci-and-steam-deck)
-  - [T-MOD — Modding And Scripting](#t-mod--modding-and-scripting)
-  - [T-AUDIO — Diegetic SFX And Captions](#t-audio--diegetic-sfx-and-captions)
-  - [T-SAVE — Save Game System](#t-save--save-game-system)
-  - [T-ACCESSIBILITY — Accessibility Floor](#t-accessibility--accessibility-floor)
-  - [T-PERF — Performance Targets And Budgets](#t-perf--performance-targets-and-budgets)
-- [Dependency Graph](#dependency-graph)
-- [Feature Index](#feature-index)
-- [Validation Command Matrix](#validation-command-matrix)
-- [Bug Hunt Checklist](#bug-hunt-checklist)
-- [Definition Of Done](#definition-of-done)
-- [Milestone Done-Criteria Summary](#milestone-done-criteria-summary)
-- [Risk Register](#risk-register)
-- [Anti-Goals](#anti-goals)
-- [Source Trail](#source-trail)
+- [[#Read Order|Read Order]]
+- [[#Glossary|Glossary]]
+- [[#Agent Implementation Contract|Agent Implementation Contract]]
+  - [[#Open Decision Gates Protocol|Open Decision Gates Protocol]]
+- [[#Milestone Handoff Template|Milestone Handoff Template]]
+- [[#Human Playtest Checklist Template|Human Playtest Checklist Template]]
+- [[#Strategic Frame|Strategic Frame]]
+- [[#Stack At A Glance|Stack At A Glance]]
+- [[#Coordinate System And Units|Coordinate System And Units]]
+- [[#Repository Layout|Repository Layout]]
+- [[#Toolchain And Workspace Bootstrap|Toolchain And Workspace Bootstrap]]
+- [[#Per-Crate AGENTS.md Template|Per-Crate AGENTS.md Template]]
+- [[#Logging, Tracing, And Error Policy|Logging, Tracing, And Error Policy]]
+- [[#Asset And Placeholder Strategy|Asset And Placeholder Strategy]]
+- [[#Testing Layers|Testing Layers]]
+- [[#CLI Reference|CLI Reference]]
+- [[#Control Transport And Envelope|Control Transport And Envelope]]
+- [[#Scenario Manifest Schema|Scenario Manifest Schema]]
+- [[#Run-Bundle Naming Convention|Run-Bundle Naming Convention]]
+- [[#Bug Log Format|Bug Log Format]]
+- [[#Inter-Milestone Bridges|Inter-Milestone Bridges]]
+- [[#Per-Milestone Kickoff Smoke|Per-Milestone Kickoff Smoke]]
+- [[#Milestone Map|Milestone Map]]
+- [[#Side Tracks|Side Tracks]]
+- [[#Milestone Details|Milestone Details]]
+  - [[#M0 — Engine Bootstrap|M0 — Engine Bootstrap]]
+  - [[#M1 — Actor Controller And Sim Core|M1 — Actor Controller And Sim Core]]
+  - [[#M1.5 — Micro Breach Fun Slice|M1.5 — Micro Breach Fun Slice]]
+  - [[#M2 — Pixel Terrain And Materials|M2 — Pixel Terrain And Materials]]
+  - [[#M3 — Replay And Event Recorder|M3 — Replay And Event Recorder]]
+  - [[#M4 — HUD And Comic-Noir UI|M4 — HUD And Comic-Noir UI]]
+  - [[#M5 — Equipment, Chassis, And Damage Grammar|M5 — Equipment, Chassis, And Damage Grammar]]
+  - [[#M5.5 — Full Collision Gauntlet|M5.5 — Full Collision Gauntlet]]
+  - [[#M5.6 — Material Kernel|M5.6 — Material Kernel]]
+  - [[#M5.7 — Hazard Package|M5.7 — Hazard Package]]
+  - [[#M6 — AI Core And Trust Harness|M6 — AI Core And Trust Harness]]
+  - [[#M6.5 — LLM Mind Lab|M6.5 — LLM Mind Lab]]
+  - [[#M6.6 — AI Material Competence|M6.6 — AI Material Competence]]
+  - [[#M7 — Mission Director And Breach Contract Proof Mission|M7 — Mission Director And Breach Contract Proof Mission]]
+  - [[#M7.5 — Base Atmospherics|M7.5 — Base Atmospherics]]
+  - [[#M8 — Scenario Editor And Mod Tools|M8 — Scenario Editor And Mod Tools]]
+  - [[#M8.5 — Material Lab|M8.5 — Material Lab]]
+  - [[#M9 — Dedicated Server App + Determinism Islands|M9 — Dedicated Server App + Determinism Islands]]
+  - [[#M10 — LAN Co-op|M10 — LAN Co-op]]
+  - [[#M11 — Online Co-op (Self-Hosted Dedicated Servers)|M11 — Online Co-op (Self-Hosted Dedicated Servers)]]
+  - [[#M12 — Public PvP Arenas + Persistent MMO Shards|M12 — Public PvP Arenas + Persistent MMO Shards]]
+- [[#Side Track Details|Side Track Details]]
+  - [[#T-LLM — Async LLM Mind Layer|T-LLM — Async LLM Mind Layer]]
+  - [[#T-CONTROL — AI Control And Observability|T-CONTROL — AI Control And Observability]]
+  - [[#T-SERVER — Dedicated Server App Lifecycle And Community Hosting|T-SERVER — Dedicated Server App Lifecycle And Community Hosting]]
+  - [[#T-PHYS — Full Collision And Physical Consequence|T-PHYS — Full Collision And Physical Consequence]]
+  - [[#T-MAT — Systemic Materials, Chemistry, And Atmospheres|T-MAT — Systemic Materials, Chemistry, And Atmospheres]]
+  - [[#T-PLATFORM — Cross-Platform CI And Steam Deck|T-PLATFORM — Cross-Platform CI And Steam Deck]]
+  - [[#T-MOD — Modding And Scripting|T-MOD — Modding And Scripting]]
+  - [[#T-AUDIO — Diegetic SFX And Captions|T-AUDIO — Diegetic SFX And Captions]]
+  - [[#T-SAVE — Save Game System|T-SAVE — Save Game System]]
+  - [[#T-ACCESSIBILITY — Accessibility Floor|T-ACCESSIBILITY — Accessibility Floor]]
+  - [[#T-PERF — Performance Targets And Budgets|T-PERF — Performance Targets And Budgets]]
+- [[#Dependency Graph|Dependency Graph]]
+- [[#Feature Index|Feature Index]]
+- [[#Validation Command Matrix|Validation Command Matrix]]
+- [[#Bug Hunt Checklist|Bug Hunt Checklist]]
+- [[#Definition Of Done|Definition Of Done]]
+- [[#Milestone Done-Criteria Summary|Milestone Done-Criteria Summary]]
+- [[#Risk Register|Risk Register]]
+- [[#Anti-Goals|Anti-Goals]]
+- [[#Source Trail|Source Trail]]
 
 ---
 
@@ -132,7 +132,7 @@ feeds:
 If you only have time to read four things before starting work:
 
 1. [[spec/authoritative-game-spec-v0]] — what the game is.
-2. This roadmap — what gets built and in what order. **Pay special attention to [Open Decision Gates Protocol](#open-decision-gates-protocol) — do not silently assume an OPEN DR's lean is locked.**
+2. This roadmap — what gets built and in what order. **Pay special attention to [[#Open Decision Gates Protocol|Open Decision Gates Protocol]] — do not silently assume an OPEN DR's lean is locked.**
 3. [[spec/native-implementation-backlog]] — concrete native task cards for the current milestone.
 4. [[spec/feature-completion-checklist]] — completion/rating rows that must be updated when work lands. The Open Decision Gates Checklist is mandatory.
 
@@ -572,7 +572,7 @@ Each crate is owned by an explicit feature/agent boundary. Inter-crate boundarie
 
 ## Toolchain And Workspace Bootstrap
 
-This is the M0 day-zero recipe. A junior agent assigned M0 must produce these files first, BEFORE any feature code, and verify them with the kickoff smoke (see [Per-Milestone Kickoff Smoke](#per-milestone-kickoff-smoke)).
+This is the M0 day-zero recipe. A junior agent assigned M0 must produce these files first, BEFORE any feature code, and verify them with the kickoff smoke (see [[#Per-Milestone Kickoff Smoke|Per-Milestone Kickoff Smoke]]).
 
 ### `rust-toolchain.toml` (in `cortex-game/`)
 
@@ -886,7 +886,7 @@ Every crate gets a top-level `AGENTS.md` with this exact skeleton. Junior agents
 | Library boundaries | Crate-specific error enums via `thiserror`; no `anyhow` in lib crates. | Callers can match on variants. |
 | Binaries (`cx-app`, `cxctl`, etc.) | `anyhow::Result<()>` at `main()`; convert library errors with `?`. | Concise top-level error surface. |
 | Scenario/manifest loading | Errors include the file path, line/col when possible, and a fix-hint. | Junior agents need to know where to look. |
-| Control envelope | Every command response is `accepted`, `rejected`, or `queued`, with reason label and effective tick. | Spec'd in [Control Transport](#control-transport-and-envelope). |
+| Control envelope | Every command response is `accepted`, `rejected`, or `queued`, with reason label and effective tick. | Spec'd in [[#Control Transport And Envelope|Control Transport]]. |
 | Panic policy | Panic ONLY for invariant violations the agent can never recover from (poisoned mutex, malformed compile-time fixture). All recoverable failures return `Result`. | Panics destroy replay determinism. |
 
 ### Reporting
@@ -945,7 +945,7 @@ Single source of truth for every CLI flag. If a flag exists in the codebase but 
 | `--ticks <u64>` | u64 | unlimited | Auto-exit after N sim ticks. |
 | `--write-run-bundle` | flag | false | Emit run bundle on exit. |
 | `--run-bundle-dir <path>` | path | `prototype_runs/native/` | Override run-bundle root. |
-| `--control-api` | flag | false | Open the local control server (see [Control Transport](#control-transport-and-envelope)). |
+| `--control-api` | flag | false | Open the local control server (see [[#Control Transport And Envelope|Control Transport]]). |
 | `--control-port <u16>` | u16 | 17890 | Bind port for control server (loopback only). |
 | `--control-uds <path>` | path | none | Optional Unix domain socket path for the control server (POSIX only). |
 | `--headless-smoke` | flag | false | Skip window creation, run sim only, exit cleanly. |
@@ -990,7 +990,7 @@ Single source of truth for every CLI flag. If a flag exists in the codebase but 
 | `inspect order <id>` | Print one tactical order's full state: issuer, target, kind, reason label, current step, refusal chain. | Optional `--format json\|ron`, `--with-parents`. |
 | `inspect affliction <id>` | Print one affliction's full state: source material/event, stack, duration, decay, current actor effect. | Optional `--format json\|ron`, `--with-parents`. |
 | `inspect event <event-id>` | Generic event inspector: print the full payload and parent/child chain for any event id. | Optional `--format json\|ron`, `--with-parents`, `--with-children`, `--depth <N>`. |
-| `act <action> ...` | Send a single semantic action; returns accepted/rejected. | `<action>` from the action grammar; see [Action Model](#control-transport-and-envelope). |
+| `act <action> ...` | Send a single semantic action; returns accepted/rejected. | `<action>` from the action grammar; see [[#Control Transport And Envelope|Action Model]]. |
 | `act tactical select <unit\|squad\|faction>` | Select a unit/squad for command. | `--ref <id>`, `--multi` (multi-select), `--toggle`. |
 | `act tactical order <verb> ...` | Issue a tactical order. Verbs: `move-to`, `attack`, `defend`, `retreat`, `breach`, `repair`, `support`, `follow`, `hold`, `extract`, `rescue`, `salvage`. | `--target <id\|world-coord>`, `--reason <label>`, `--queue` (append to order list), `--rally <coord>`. |
 | `act tactical doctrine <name>` | Set current doctrine for a selected unit/squad. | `--unit <id>`, `--squad <id>`. |
@@ -1557,7 +1557,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 **Cross-DR:** DR-001, DR-024, DR-025, DR-026, DR-002 (run-bundle).
 
-**Open DR gates:** DR-002 (replay/event architecture is OPEN with hybrid event-log + snapshots lean) — M0 ships the run-bundle writer; confirm the event envelope shape + manifest fields with the user before locking the schema. Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
+**Open DR gates:** DR-002 (replay/event architecture is OPEN with hybrid event-log + snapshots lean) — M0 ships the run-bundle writer; confirm the event envelope shape + manifest fields with the user before locking the schema. Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
 
 ---
 
@@ -1587,7 +1587,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 **Cross-DR:** DR-001, DR-003, DR-004, DR-024, DR-026, DR-002.
 
-**Open DR gates:** DR-002, DR-003 (silhouette default + advanced HUD opt-in lean), DR-004 (sequenced single-actor → squad → bunker breach lean). M1 produces the first playable actor: confirm the body-status state machine vocabulary (STABLE/UNSTABLE/DOWNED/DEAD) + HUD silhouette posture before locking the M1 actor representation. Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
+**Open DR gates:** DR-002, DR-003 (silhouette default + advanced HUD opt-in lean), DR-004 (sequenced single-actor → squad → bunker breach lean). M1 produces the first playable actor: confirm the body-status state machine vocabulary (STABLE/UNSTABLE/DOWNED/DEAD) + HUD silhouette posture before locking the M1 actor representation. Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
 
 ---
 
@@ -1616,7 +1616,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 **Cross-DR:** DR-002, DR-004, DR-007, DR-008, DR-009, DR-024.
 
-**Open DR gates:** DR-002, DR-004, DR-007 (terrain/material model — defers implementation to DR-036; confirm M1.5 soft-breach material set still matches DR-007 launch lean), DR-008 (AI architecture — confirm hybrid-jobs + utility scoring + scripted-hooks shape before adding the reactive enemy), DR-009 (command UX style — M1.5 introduces objective state, confirm direct + slowdown overlay posture). Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
+**Open DR gates:** DR-002, DR-004, DR-007 (terrain/material model — defers implementation to DR-036; confirm M1.5 soft-breach material set still matches DR-007 launch lean), DR-008 (AI architecture — confirm hybrid-jobs + utility scoring + scripted-hooks shape before adding the reactive enemy), DR-009 (command UX style — M1.5 introduces objective state, confirm direct + slowdown overlay posture). Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
 
 ---
 
@@ -1644,7 +1644,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 **Cross-DR:** DR-007, DR-019, DR-024, DR-002.
 
-**Open DR gates:** DR-002, DR-007 (terrain/material model — implementation specifics defer to DR-036; M2 ships the curated launch material set, M5.6 ships the active material kernel; confirm material-id stability + chunk shape before locking schema). Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
+**Open DR gates:** DR-002, DR-007 (terrain/material model — implementation specifics defer to DR-036; M2 ships the curated launch material set, M5.6 ships the active material kernel; confirm material-id stability + chunk shape before locking schema). Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
 
 ---
 
@@ -1669,7 +1669,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 **Cross-DR:** DR-002, DR-005, DR-018, DR-024.
 
-**Open DR gates:** DR-002 (M3 IS the closure milestone for DR-002) — when M3 done-criteria pass, the worker MUST update DR-002 status to CLOSED-DIRECTION, refresh the revisit_trigger, and update [[decisions/index]] + [[dashboards/decision-tracker]] in the same pass. Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
+**Open DR gates:** DR-002 (M3 IS the closure milestone for DR-002) — when M3 done-criteria pass, the worker MUST update DR-002 status to CLOSED-DIRECTION, refresh the revisit_trigger, and update [[decisions/index]] + [[dashboards/decision-tracker]] in the same pass. Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
 
 ---
 
@@ -1693,7 +1693,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 **Cross-DR:** DR-003, DR-009, DR-012, DR-019, DR-024.
 
-**Open DR gates:** DR-003 (silhouette + advanced HUD opt-in lean — M4 IS the HUD-01..HUD-03 closure milestone), DR-009 (command UX — M4 introduces command overlay surfaces; confirm slowdown ratio + tactical-map opt-in posture), DR-012 (accessibility floor — M4 IS the ACC-A floor closure milestone; confirm 200% scale, contrast, captions, reduced motion, remap holds with user). When M4 closes any of these DRs, update status + decision-tracker + research-readiness. Per [Open Decision Gates Protocol](#open-decision-gates-protocol). Topic-level: localization plan is OPEN — flag any string-source code path that bakes English-only strings.
+**Open DR gates:** DR-003 (silhouette + advanced HUD opt-in lean — M4 IS the HUD-01..HUD-03 closure milestone), DR-009 (command UX — M4 introduces command overlay surfaces; confirm slowdown ratio + tactical-map opt-in posture), DR-012 (accessibility floor — M4 IS the ACC-A floor closure milestone; confirm 200% scale, contrast, captions, reduced motion, remap holds with user). When M4 closes any of these DRs, update status + decision-tracker + research-readiness. Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]]. Topic-level: localization plan is OPEN — flag any string-source code path that bakes English-only strings.
 
 ---
 
@@ -1719,7 +1719,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 **Cross-DR:** DR-003, DR-014, DR-018, DR-021, DR-024.
 
-**Open DR gates:** DR-003 (body damage readability still open — M5 introduces the chassis grammar that depends on it; confirm silhouette/HUD posture before locking chassis stages). Topic-level: modding script host (mlua vs Rhai) is OPEN — DR-006 is OPEN — `cx-equipment` role records may need scripted hooks; confirm script-host posture before adding scripted equipment behavior. Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
+**Open DR gates:** DR-003 (body damage readability still open — M5 introduces the chassis grammar that depends on it; confirm silhouette/HUD posture before locking chassis stages). Topic-level: modding script host (mlua vs Rhai) is OPEN — DR-006 is OPEN — `cx-equipment` role records may need scripted hooks; confirm script-host posture before adding scripted equipment behavior. Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
 
 ---
 
@@ -1755,7 +1755,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 **Cross-DR:** DR-002, DR-003, DR-005, DR-007, DR-008, DR-014, DR-018, DR-021, DR-024, DR-028, DR-033.
 
-**Open DR gates:** DR-002, DR-003, DR-007 (terrain/material — M5.5 collision proxies must match M2 material schema), DR-008 (AI architecture — M5.5 collision events feed AI utility scoring). Confirm collision-class registry + matrix + filter-reason vocabulary with user before locking the collision data files; the matrix becomes a contract for M6/M6.6 AI material competence. Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
+**Open DR gates:** DR-002, DR-003, DR-007 (terrain/material — M5.5 collision proxies must match M2 material schema), DR-008 (AI architecture — M5.5 collision events feed AI utility scoring). Confirm collision-class registry + matrix + filter-reason vocabulary with user before locking the collision data files; the matrix becomes a contract for M6/M6.6 AI material competence. Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
 
 ---
 
@@ -1786,7 +1786,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 **Cross-DR:** DR-002, DR-006, DR-007, DR-024, DR-028, DR-033, DR-036.
 
-**Open DR gates:** DR-002 (new material/reaction event categories must close DR-002 contract), DR-006 (modding data model — material schema is moddable; confirm schema versioning + capability gates), DR-007 (terrain/material — M5.6 closes implementation specifics under DR-036; confirm reaction priority resolution + chunk shape + perf budget with user before locking). Topic-level: modding script host is OPEN — `cx-mod validate` for materials may need scripted reaction hooks; confirm host before scripted reactions ship. Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
+**Open DR gates:** DR-002 (new material/reaction event categories must close DR-002 contract), DR-006 (modding data model — material schema is moddable; confirm schema versioning + capability gates), DR-007 (terrain/material — M5.6 closes implementation specifics under DR-036; confirm reaction priority resolution + chunk shape + perf budget with user before locking). Topic-level: modding script host is OPEN — `cx-mod validate` for materials may need scripted reaction hooks; confirm host before scripted reactions ship. Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
 
 ---
 
@@ -1815,7 +1815,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 **Cross-DR:** DR-002, DR-003, DR-006, DR-007, DR-012, DR-018, DR-020, DR-024, DR-028, DR-033, DR-036.
 
-**Open DR gates:** DR-002, DR-003 (M5.7 wires hazards into the body damage HUD — confirm affliction icon + caption posture matches DR-003 silhouette lean), DR-006 (hazard material schema may be moddable — confirm), DR-007 (M5.7 hazard set extends DR-007 launch lean), DR-012 (hazard overlays must be color-blind safe + caption-backed — confirm with user before shipping). Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
+**Open DR gates:** DR-002, DR-003 (M5.7 wires hazards into the body damage HUD — confirm affliction icon + caption posture matches DR-003 silhouette lean), DR-006 (hazard material schema may be moddable — confirm), DR-007 (M5.7 hazard set extends DR-007 launch lean), DR-012 (hazard overlays must be color-blind safe + caption-backed — confirm with user before shipping). Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
 
 ---
 
@@ -1839,7 +1839,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 **Cross-DR:** DR-008, DR-014, DR-022, DR-024.
 
-**Open DR gates:** DR-008 (AI architecture — M6 IS the AI-01..AI-12 + AI-H closure milestone; when DR-008 done-criteria pass, update DR-008 status to CLOSED-DIRECTION + revisit_trigger refresh + decision-tracker + research-readiness in the same pass). Confirm doctrine slot list + utility weights schema before adding AI subsystems. Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
+**Open DR gates:** DR-008 (AI architecture — M6 IS the AI-01..AI-12 + AI-H closure milestone; when DR-008 done-criteria pass, update DR-008 status to CLOSED-DIRECTION + revisit_trigger refresh + decision-tracker + research-readiness in the same pass). Confirm doctrine slot list + utility weights schema before adding AI subsystems. Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
 
 ---
 
@@ -1873,7 +1873,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 **Cross-DR:** DR-002, DR-006, DR-008, DR-009, DR-012, DR-013, DR-022, DR-024, DR-032.
 
-**Open DR gates:** DR-002 (mind events feed DR-002 closure), DR-006 (mind worker schemas may be moddable — confirm capability gates), DR-008 (mind worker hooks attach to M6 utility scorer — confirm hook surface), DR-009 (mind dialogue queue surfaces in command UX — confirm), DR-012 (mind captions/dialogue must be caption-backed — confirm). Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
+**Open DR gates:** DR-002 (mind events feed DR-002 closure), DR-006 (mind worker schemas may be moddable — confirm capability gates), DR-008 (mind worker hooks attach to M6 utility scorer — confirm hook surface), DR-009 (mind dialogue queue surfaces in command UX — confirm), DR-012 (mind captions/dialogue must be caption-backed — confirm). Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
 
 ---
 
@@ -1901,7 +1901,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 **Cross-DR:** DR-002, DR-008, DR-009, DR-012, DR-022, DR-024, DR-032, DR-036.
 
-**Open DR gates:** DR-002, DR-008 (M6.6 extends DR-008 utility scorer with material affordances — confirm reason-label enum), DR-009 (AI material decisions surface in command UX — confirm), DR-012 (hazard overlays + AI captions must be color-blind safe — confirm). Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
+**Open DR gates:** DR-002, DR-008 (M6.6 extends DR-008 utility scorer with material affordances — confirm reason-label enum), DR-009 (AI material decisions surface in command UX — confirm), DR-012 (hazard overlays + AI captions must be color-blind safe — confirm). Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
 
 ---
 
@@ -1928,7 +1928,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 **Cross-DR:** DR-014, DR-015, DR-016, DR-017, DR-018, DR-021, DR-022, DR-027.
 
-**Open DR gates:** DR-004 (first playable scope — M7 IS the Breach Contract closure milestone; when M7 done-criteria pass, update DR-004 status to CLOSED-DIRECTION + revisit_trigger). DR-009 (command UX — M7 ships director + commander surfaces; confirm reason-label posture). DR-011 (progression/retention — M7 retry/debrief/replay loop is the seed for RET-A; confirm debrief shape with user before RET-A scope locks). Topic-level: localization plan is OPEN — flag any baked English strings in mission/director text. Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
+**Open DR gates:** DR-004 (first playable scope — M7 IS the Breach Contract closure milestone; when M7 done-criteria pass, update DR-004 status to CLOSED-DIRECTION + revisit_trigger). DR-009 (command UX — M7 ships director + commander surfaces; confirm reason-label posture). DR-011 (progression/retention — M7 retry/debrief/replay loop is the seed for RET-A; confirm debrief shape with user before RET-A scope locks). Topic-level: localization plan is OPEN — flag any baked English strings in mission/director text. Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
 
 ---
 
@@ -1957,7 +1957,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 **Cross-DR:** DR-002, DR-005, DR-007, DR-013, DR-015, DR-017, DR-018, DR-022, DR-024, DR-027, DR-033, DR-034, DR-035, DR-036.
 
-**Open DR gates:** DR-002 (atmosphere event category extends DR-002 contract), DR-007 (M7.5 closes DR-007 atmospheric implementation specifics under DR-036), DR-012 (hull-state UI overlays must satisfy ACC-A floor — confirm with user). Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
+**Open DR gates:** DR-002 (atmosphere event category extends DR-002 contract), DR-007 (M7.5 closes DR-007 atmospheric implementation specifics under DR-036), DR-012 (hull-state UI overlays must satisfy ACC-A floor — confirm with user). Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
 
 ---
 
@@ -1981,7 +1981,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 **Cross-DR:** DR-006, DR-010, DR-017, DR-024, DR-030.
 
-**Open DR gates:** DR-006 (modding data model — M8 IS the closure milestone for the workbench V1 + 3 mods migrated criterion; confirm package format + provenance + script-host posture before locking; modding script host topic-level decision MUST close in M8). DR-010 (license/reuse — every mod load path must respect usage-ledger discipline). Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
+**Open DR gates:** DR-006 (modding data model — M8 IS the closure milestone for the workbench V1 + 3 mods migrated criterion; confirm package format + provenance + script-host posture before locking; modding script host topic-level decision MUST close in M8). DR-010 (license/reuse — every mod load path must respect usage-ledger discipline). Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
 
 ---
 
@@ -2010,7 +2010,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 **Cross-DR:** DR-002, DR-006, DR-008, DR-009, DR-010, DR-012, DR-022, DR-024, DR-030, DR-032, DR-033, DR-036.
 
-**Open DR gates:** DR-002, DR-006 (material lab + expansion-material gate is the modding stress test — confirm schema versioning), DR-008 (M8.5 AI puppet uses utility scorer — confirm hook surface), DR-009, DR-010 (any external material assets enter usage-ledger), DR-012 (material lab UI must satisfy ACC-A — confirm). Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
+**Open DR gates:** DR-002, DR-006 (material lab + expansion-material gate is the modding stress test — confirm schema versioning), DR-008 (M8.5 AI puppet uses utility scorer — confirm hook surface), DR-009, DR-010 (any external material assets enter usage-ledger), DR-012 (material lab UI must satisfy ACC-A — confirm). Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
 
 ---
 
@@ -2027,7 +2027,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 - `cx-headless` stays as the headless sim runner used by replay verification + CI; `cx-server` consumes it for the deterministic island.
 - Determinism island contracts documented and validated: which subsystems are bit-deterministic; which are stochastic-but-replayable; which are cosmetic only.
 - Reference Docker image: minimal `cx-server` image suitable for community deployments.
-- CLI Reference entries for `cx-server`, `cx-server-ops`, `cx-server-admin` per [CLI Reference](#cli-reference).
+- CLI Reference entries for `cx-server`, `cx-server-ops`, `cx-server-admin` per [[#CLI Reference|CLI Reference]].
 - Networking transport library committed (decision between lightyear / renet / quinn locked at M9 close).
 
 **Done-criteria:**
@@ -2044,7 +2044,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 **Cross-DR:** DR-002, DR-005, DR-013, DR-024, DR-025, DR-026, DR-029, DR-034.
 
-**Open DR gates:** DR-002 (server.* event category extends DR-002 contract). Topic-level: **networking transport library is OPEN** — lightyear vs renet vs quinn for `cx-net`. M9 is the milestone where this MUST close. Worker MUST present transport options + perf evidence + adapter-trait shape to the user through the active agent's available user-input/chat mechanism before committing to a library. Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
+**Open DR gates:** DR-002 (server.* event category extends DR-002 contract). Topic-level: **networking transport library is OPEN** — lightyear vs renet vs quinn for `cx-net`. M9 is the milestone where this MUST close. Worker MUST present transport options + perf evidence + adapter-trait shape to the user through the active agent's available user-input/chat mechanism before committing to a library. Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
 
 ---
 
@@ -2070,7 +2070,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 **Cross-DR:** DR-002, DR-005, DR-006, DR-013, DR-024, DR-025, DR-034.
 
-**Open DR gates:** DR-002, DR-006 (mod hash sync — confirm posture). Topic-level: networking transport library MUST be locked by M10 if not closed in M9. Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
+**Open DR gates:** DR-002, DR-006 (mod hash sync — confirm posture). Topic-level: networking transport library MUST be locked by M10 if not closed in M9. Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
 
 ---
 
@@ -2098,7 +2098,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 **Cross-DR:** DR-002, DR-005, DR-006, DR-013, DR-024, DR-026, DR-034.
 
-**Open DR gates:** DR-002, DR-006 (community mod packs land here; confirm sync + trust-tier schema). Topic-level: networking transport library MUST be locked before M11. Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
+**Open DR gates:** DR-002, DR-006 (community mod packs land here; confirm sync + trust-tier schema). Topic-level: networking transport library MUST be locked before M11. Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
 
 ---
 
@@ -2149,7 +2149,7 @@ Cross-shard:
 
 **Cross-DR:** DR-002, DR-005, DR-013, DR-018, DR-022, DR-024, DR-027, DR-029, DR-031, DR-032, DR-033, DR-034, DR-035.
 
-**Open DR gates:** DR-002, DR-011 (progression/retention — M12 MMO shard exposes the longest-tail retention surface; RET-A criteria from DR-011 must be evaluated against shard data; confirm anti-grind/anti-gacha posture is preserved before adding shard progression). Per [Open Decision Gates Protocol](#open-decision-gates-protocol).
+**Open DR gates:** DR-002, DR-011 (progression/retention — M12 MMO shard exposes the longest-tail retention surface; RET-A criteria from DR-011 must be evaluated against shard data; confirm anti-grind/anti-gacha posture is preserved before adding shard progression). Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
 
 ---
 
