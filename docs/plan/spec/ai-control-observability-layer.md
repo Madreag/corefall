@@ -125,7 +125,7 @@ The automation layer should only expose actions that map to real gameplay or UI 
 | Tactical controls | select unit, issue order, queue order, set rally point, follow/protect/breach/retreat, assume direct control, release to AI. |
 | UI controls | focus by id, click by id, set slider, choose option, type text, submit/cancel, navigate tabs. |
 | Scenario controls | load scenario, reset, set seed, pause, step ticks, run for N ticks, set speed, capture bundle. |
-| Inspection | query entity, query UI tree, query terrain patch, query event chain, query last failure reason. |
+| Inspection | query entity, query UI tree, query terrain patch, query event chain, query last failure reason, query collision pair, query collision filter reason, query collision damage chain. |
 | Debug-only | spawn fixture, teleport, force damage, reveal map, grant item. Disabled unless the run manifest declares debug capability. |
 
 All action requests should return `accepted`, `rejected`, or `queued`, with a reason label and the tick where the command took effect.

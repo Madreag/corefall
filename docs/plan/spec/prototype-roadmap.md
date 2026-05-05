@@ -143,7 +143,7 @@ A junior agent must never have to guess what these words mean. If a term is used
 | **Chassis** | An armor/mech/origin grouping with layered armor zones, modules, and pilot binding. See [[spec/chassis-armor-mechs-and-origins]]. |
 | **Checksum** | A bit-deterministic hash of actor/terrain/inventory state at a given tick used to detect replay drift. Algorithm: blake3. |
 | **CCD** | Continuous collision detection. Used for fast or important bodies so projectiles, limbs, and mech parts do not tunnel through terrain, actors, shields, or each other. |
-| **Collision class** | A named physical class (`actor_limb`, `held_weapon`, `projectile_kinetic`, `terrain_proxy`, etc.) that drives matrix rules, filters, CCD tier, and events. |
+| **Collision class** | A named physical class (`actor_limb`, `held_weapon`, `projectile_kinetic`, `terrain_proxy`, etc.) that drives matrix rules, filters, CCD tier, and events. The full launch catalog (16 classes) is in [[spec/full-collision-physics-plan]]: `actor_core`, `actor_limb`, `armor_zone`, `held_weapon`, `loose_item`, `projectile_kinetic`, `projectile_explosive`, `beam_or_trace`, `terrain_pixel`, `terrain_proxy`, `debris_chunk`, `mech_part`, `base_object`, `force_field`, `sensor_trigger`, `cosmetic_particle`. |
 | **Collision filter reason** | Required reason string whenever two physical classes do NOT collide. Silent missing pairs are bugs. |
 | **Collision matrix** | Data table that says which collision classes collide, sense, filter, damage, or ignore. M5.5 fails if a physical pair has no rule. |
 | **Collision proxy** | Simplified shape used for physics/contact instead of raw art pixels. Examples: capsule limb, convex weapon, chunk terrain outline. |
@@ -833,6 +833,8 @@ Single source of truth for every CLI flag. If a flag exists in the codebase but 
 | `observe --once` | Print one observation snapshot to stdout. | `--format json|ron`, `--scenario <id>` (auto-launches if no app is running and `--auto-launch`). |
 | `observe --stream --hz <N>` | Stream observations at N Hz to stdout. | `--format json`, `--filter <category>`. |
 | `observe --mind-frame <scope>` | Print one compact, fog-of-war-filtered `MindObservationFrame` for an LLM mind worker. | `<scope>` ∈ `actor`, `squad`, `faction`, `mission_director`, `post_mission`. Optional `--ref <id>` to pin the actor/squad/faction. Optional `--once`/`--stream`. Output is the JSON payload of the `MindObservationFrame`. |
+| `observe --collisions` | Stream or snapshot live collision pairs, filters, contact normals, TOI, impulses, projectile deflections, recent `collision.*` events, and budget/degradation status (T-PHYS, M5.5). | Optional `--once`/`--stream --hz <N>`, `--filter <class-pair>`, `--include-cosmetic`, `--scope <actor\|squad\|faction\|all>`, `--last <N>` for last-N collision events. |
+| `inspect collision <event-id>` | Print the full `collision.*` event payload by id: classes, materials, contact point/normal, TOI fraction, impulses, parent cause chain, and follow-up damage/projectile-deflection links (T-PHYS, M5.5). | Optional `--format json\|ron`, `--with-parents`, `--with-children`. |
 | `act <action> ...` | Send a single semantic action; returns accepted/rejected. | `<action>` from the action grammar; see [Action Model](#control-transport-and-envelope). |
 | `ui tree` | Print the current UI tree. | `--scope <window\|focused\|all>`. |
 | `ui click <id>` | Click a UI element by stable id. | `--scope <window\|focused>`. |
@@ -876,7 +878,7 @@ Single source of truth for every CLI flag. If a flag exists in the codebase but 
 | Flag | Default | Meaning |
 |---|---|---|
 | `--scenario <id>` | required | Scenario id. |
-| `--profile <milestone>` | required | Pulls perf budget targets per milestone (e.g. `m2`, `m7`). |
+| `--profile <milestone\|track>` | required | Pulls perf budget targets per milestone (e.g. `m2`, `m7`) OR per side track when finer-grained. Recognized track profiles: `collision` (T-PHYS / M5.5: pair counts, narrowphase ms, TOI substep ms, impulse routing ms, debris-budget cull rate). New track profiles are added when their side track first ships. |
 | `--runs <N>` | 5 | Repeat count for averaging. |
 | `--write-bench-report` | false | Emit `bench_report.json`. |
 

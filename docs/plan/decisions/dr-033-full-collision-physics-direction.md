@@ -1,24 +1,13 @@
 ---
-type: decision-record
+type: decision
+id: DR-033
 status: closed-direction
-date: 2026-05-05
 priority: P0
-decision: "Full physical collision is a core game promise, implemented through a staged T-PHYS side track and M5.5 Full Collision Gauntlet."
-feeds:
-  - DR-002
-  - DR-003
-  - DR-004
-  - DR-005
-  - DR-007
-  - DR-008
-  - DR-014
-  - DR-018
-  - DR-021
-  - DR-024
-  - DR-028
+closed_at: 2026-05-05
+revisit_trigger: "M5.5 cannot meet 1080p/60 after broadphase and pair budgets; bullet-bullet collision adds no readable fun after prototype proof; full friendly collision makes AI teammates feel unfair rather than tactical; or networking evidence in M9/M10 shows a subset of collision pairs must be server-only or event-authoritative."
 ---
 
-<- [[decisions/index|decisions]] · [[spec/full-collision-physics-plan|full collision plan]] · [[spec/prototype-roadmap|native roadmap]] · [[spec/native-implementation-backlog|native backlog]] · [[systems/physics-and-destruction-models|physics/destruction systems]]
+← [[decisions/index|decision records]] · [[dashboards/decision-tracker|decision tracker]] · [[spec/full-collision-physics-plan|full collision plan]] · [[spec/prototype-roadmap|native roadmap]] · [[spec/native-implementation-backlog|native backlog]] · [[systems/physics-and-destruction-models|physics/destruction systems]]
 
 # DR-033: Full Collision Physics Direction
 
