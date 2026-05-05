@@ -185,7 +185,9 @@ cxctl replay verify prototype_runs/native/<run_id>
 | M6.5 | Derive `MindObservationFrame` from this layer with fog-of-war filtering; expose `cxctl observe --mind-frame <scope>` for LLM mind workers (see [[spec/hybrid-llm-ai-plan]] and [[decisions/dr-032-hybrid-llm-ai-direction]]). |
 | M7 | Scenario director, command-core/base-power, debrief, and retry are controllable/queryable. |
 | M8 | Editor and mod tooling expose semantic UI and package validation commands. |
-| M9+ | Headless/server modes use the same command/observation contract for replay, LAN, online, and scale tests. |
+| M9 | `cx-server` exposes the same `cx-control` envelope for admin (capability-gated) + observation. `cxctl --target server://host:port` connects to a running server for ops/audit (see [[spec/server-app-architecture]] and [[decisions/dr-034-dedicated-server-application]]). |
+| M10..M12 | Per-client and per-server run bundles use the same envelope; replay/replay-compare verifies multi-client and shard observation streams. |
+| M9+ | Headless/server modes use the same command/observation contract for replay, LAN, online, public PvP, and persistent MMO shards. |
 
 ### Derived: Mind Observation Frames
 

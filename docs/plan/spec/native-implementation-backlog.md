@@ -37,9 +37,11 @@ feeds:
   - DR-031
   - DR-032
   - DR-033
+  - DR-034
+  - DR-035
 ---
 
-<- [[spec/index|spec section]] · [[spec/prototype-roadmap|native roadmap]] · [[spec/feature-completion-checklist|feature checklist]] · [[spec/authoritative-game-spec-v0|game spec v0]] · [[spec/full-collision-physics-plan|full collision plan]] · [[spec/ai-control-observability-layer|AI control/observability]] · [[references/prototype-run-bundle-schema|run-bundle schema]] · [VAULT_PLAN.md](../../VAULT_PLAN.md)
+<- [[spec/index|spec section]] · [[spec/prototype-roadmap|native roadmap]] · [[spec/feature-completion-checklist|feature checklist]] · [[spec/authoritative-game-spec-v0|game spec v0]] · [[spec/server-app-architecture|server app architecture]] · [[spec/persistent-mmo-architecture|persistent MMO architecture]] · [[spec/full-collision-physics-plan|full collision plan]] · [[spec/hybrid-llm-ai-plan|hybrid LLM AI plan]] · [[spec/ai-control-observability-layer|AI control/observability]] · [[references/prototype-run-bundle-schema|run-bundle schema]] · [VAULT_PLAN.md](../../VAULT_PLAN.md)
 
 # Native Implementation Backlog
 
@@ -367,44 +369,177 @@ cargo run -p cx-e2e -- --scenario sample_mod_breach --expect win --write-run-bun
 
 ---
 
-## M9 — Headless Server And Determinism Islands
+## M9 — Dedicated Server App + Determinism Islands
+
+> [!important] Kickoff prerequisites
+> M3 (replay/event recorder) and M7 (mission director + Breach Contract) must be complete. Read [[spec/server-app-architecture]], [[decisions/dr-005-multiplayer-posture]], [[decisions/dr-013-backend-service-scope]], [[decisions/dr-034-dedicated-server-application]] in full BEFORE feature work. Run [M9 Kickoff Smoke](../spec/prototype-roadmap.md#per-milestone-kickoff-smoke). M9 is not done until SERVER-001..SERVER-016 pass and the reference Docker image runs unchanged.
+
+> [!warning] Hard rules
+> Same sim path as the client. No "server-only" branch of game logic. Server-authoritative for sim, terrain mutation, AI decisions, mission director, persistence. No proprietary cloud database dependency. Networking transport library decision committed at M9 close.
 
 | ID | Owns | Build | Tests | Evidence | Anti-scope |
 |---|---|---|---|---|---|
-| M9-001 headless binary | `cx-headless`, `cx-app` | Run sim without renderer/audio; load scenario; accept scripted inputs. | Linux headless smoke. | Headless logs in bundle. | No public server browser. |
-| M9-002 determinism contracts | `cx-sim-core`, `cx-replay`, docs | Document deterministic/stochastic/cosmetic subsystems. | Contract tests. | Determinism report. | No whole-engine determinism claim. |
-| M9-003 replay-from-events | `cx-headless`, `cx-replay` | 10-minute M7 replay verifies actor/terrain/inventory checksums. | Replay compare. | First-divergence report if fail. | No network sync yet. |
+| M9-001 cx-headless sim runner | `cx-headless`, `cx-app` | Headless sim runner used by replay verification + CI; same sim, no renderer/audio; loads scenario; accepts scripted inputs. | Linux headless smoke; replay verification. | Headless logs in bundle; replay verification report. | No public server browser. |
+| M9-002 determinism contracts | `cx-sim-core`, `cx-replay`, docs | Document deterministic/stochastic/cosmetic subsystems; contract tests for each. | Contract tests. | Determinism report. | No whole-engine determinism claim. |
+| M9-003 replay-from-events | `cx-headless`, `cx-replay` | 10-minute M7 replay verifies actor/terrain/inventory checksums. | Replay compare. | First-divergence report on fail. | No network sync yet. |
 | M9-004 headless perf | `cx-bench`, `cx-headless` | 10x real-time replay validation target. | Bench test. | Perf report. | No optimization-only rabbit hole. |
+| M9-005 cx-server binary scaffold | `cx-server` (bin), `cx-server-ops` | New binary that pulls all sim crates (no render/audio/UI); RON config loader; `--mode <coop_room\|pvp_arena\|lan_room\|mmo_shard\|lobby_directory>` flag; `--validate-config-only` exit. | Config validator tests; mode-flag dispatch tests. | `cx-server --validate-config-only` smoke; CLI help output captured. | No production hosting yet. |
+| M9-006 server lifecycle (cx-server-ops) | `cx-server-ops` | Health (`/health`), readiness (`/ready`), Prometheus-compatible metrics endpoint, structured JSON logs, drain shutdown (SIGTERM = graceful client disconnect within 10s + replay flush + persistence save), restart hooks. | Lifecycle integration test; SIGTERM + clean-exit test; metrics endpoint smoke. | Logs + metrics capture in M9 run bundle. | No log-aggregation product. |
+| M9-007 cx-server-anti-cheat foundation | `cx-server-anti-cheat` | Profile registry (`casual`, `competitive`, `tournament_strict`), input rate limit hooks, replay drift detection skeleton, ban list persisted, audit log appended (`system.anti_cheat_*` events). | Profile-load tests; rate-limit unit tests; ban-list roundtrip. | Anti-cheat audit log sample in M9 run bundle. | No tournament-grade anti-cheat. |
+| M9-008 cx-server-persistence foundation | `cx-server-persistence` | Snapshot writer (atomic temp + rename) + append-only event journal + restore loop; rolling backup; schema-versioned with migration handler hooks. | Snapshot/restore roundtrip; corruption-on-mid-write recovery. | Persistence sample in M9 run bundle. | Full MMO persistence is M12. |
+| M9-009 cx-server-admin API | `cx-server-admin`, `cxctl` | Capability-gated admin endpoints over the same JSON-RPC envelope as `cxctl` (kick, save, restart, hot-load scenario). Default `admin` capability OFF. | Admin API auth/capability tests. | Admin command transcripts in M9 note. | No silent admin mutations. |
+| M9-010 cx-net authority + transport | `cx-net`, `cx-sim-core` | Server-authoritative input/snapshot/event model; trait-bound transport adapter with `lightyear`/`renet`/`quinn` candidates; networking transport library decision committed at M9 close. | Unit tests for input validation; transport-trait contract tests. | Networking decision document committed to vault; authority memo. | No platform lock-in. |
+| M9-011 coop_room mode | `cx-server`, `cx-net`, `cx-mission` | `cx-server --mode coop_room --scenario breach_contract` boots, accepts 2-4 clients, runs the mission, archives a per-session run bundle. | SERVER-001 acceptance test. | Co-op room run bundle. | No NAT/relay yet (M11). |
+| M9-012 lan_room mode | `cx-server`, `cx-net` | LAN auto-discovery (mDNS/UDP broadcast); ready-up. | SERVER-003 acceptance test. | LAN room run bundle. | No public list. |
+| M9-013 pvp_arena mode skeleton | `cx-server`, `cx-mission` | Mode boots with `pvp_arena` config; server-authoritative match scaffolding (full PvP gameplay lands in M12). | SERVER-002 boot test (gameplay tests in M12). | PvP arena boot run bundle. | No PvP scenario design. |
+| M9-014 mmo_shard mode skeleton | `cx-server`, `cx-server-persistence` | Mode boots with empty world manifest; persistence snapshot every 10 min; restart restore <30 s. (Full MMO acceptance is M12.) | MMO-001 + MMO-002 boot/restore tests. | MMO shard boot run bundle. | No 50-100 client load yet. |
+| M9-015 lobby_directory mode skeleton | `cx-server` | Mode lists registered shards via REST + WebSocket schema; multi-instance protocol. | SERVER-005 boot test. | Lobby directory boot capture. | No moderation. |
+| M9-016 server mod loading | `cx-server`, `cx-mod` | Server loads same `cx-mod` package format as client; mod hash recorded; `server_only: true` packages allowed. | Server-side mod load test. | Mod load report. | No auto-download. |
+| M9-017 reference Docker image | `tools/`, `docs/server-hosting.md` | Minimal Docker image runs `cx-server` unchanged; documented hosting guide for Linux + Windows. | Docker image smoke. | Image manifest + hosting guide. | No production registry. |
+| M9-018 SERVER-001..SERVER-016 suite | `cx-e2e`, `tests/`, `cx-server` | Implement and pass all 16 SERVER-* acceptance tests from [[spec/server-app-architecture]]. | All SERVER-* pass. | M9 run bundle. | No premature MMO acceptance. |
+
+M9 E2E:
+
+```bash
+cargo run -p cx-server -- --mode coop_room --scenario breach_contract --ticks 36000 --write-run-bundle
+cargo run -p cx-server -- --mode lan_room --auto-discover --validate-config-only
+cargo run -p cx-server -- --mode mmo_shard --bootstrap-empty-shard
+cargo run -p cx-server -- --mode lobby_directory --validate-config-only
+cargo run -p cx-headless -- replay prototype_runs/native/<m9_run> --verify-checksums
+docker run --rm cx-server:latest --validate-config-only
+```
+
+Human gate: optional. Project owner can manually host a `coop_room` and play a Breach Contract; SERVER-001..016 are agent-completable.
 
 ---
 
 ## M10 — LAN Co-op
 
+> [!important] Kickoff prerequisites
+> M9 dedicated server scaffold must be complete (M9-005 through M9-018). Read [[decisions/dr-005-multiplayer-posture]] + [[decisions/dr-034-dedicated-server-application]]. Run M10 kickoff smoke.
+
+> [!warning] Hard rules
+> All clients use `cx-control` envelope; no OS-level input automation in tests. Per-client run bundles MUST align tick-for-tick under `cx-headless replay-compare`. Mod hash sync mandatory.
+
 | ID | Owns | Build | Tests | Evidence | Anti-scope |
 |---|---|---|---|---|---|
-| M10-001 authority model | `cx-net`, `cx-sim-core` | Server-authoritative input/snapshot/event model. | Unit tests for input validation. | Authority memo. | No anti-cheat product. |
-| M10-002 LAN discovery/lobby | `cx-net`, `cx-ui` | Host/list/join on LAN; ready-up. | Local two-client smoke. | Lobby screenshot. | No NAT/relay. |
-| M10-003 replication | `cx-net`, `cx-replay` | Actors, terrain, inventory, objective state replicate; per-client bundles align. | Replay compare across clients. | Two-client run bundles. | No public matchmaking. |
+| M10-001 LAN host flow | `cx-server`, `cx-net`, `cx-ui` | Client UI launches `cx-server --mode lan_room` as a child process; ready-up; mission start. | Local two-client smoke (host + 1 join). | Lobby screenshot; ready-up event log. | No NAT/relay. |
+| M10-002 replication | `cx-net`, `cx-replay` | Actors, terrain, inventory, objective state, base modules replicate via snapshot/event hybrid; interest filter at LAN scope (everything visible). | Replay compare across clients. | Two-client run bundles aligned. | No public matchmaking. |
+| M10-003 anti-cheat profile `casual` | `cx-server-anti-cheat`, `cx-server` | LAN default profile logs anomalies but does not kick; verify foundation hooks fire. | Anti-cheat foundation tests. | Audit log sample. | No tournament-grade anti-cheat. |
+| M10-004 mod hash sync UI | `cx-mod`, `cx-ui` | Join preflight checks package set + manifest hashes; mismatch produces clean diff UI. | Mismatch fixture tests. | Join-failure screenshot. | No auto-download (M11). |
+| M10-005 friendly fire policy | `cx-mission`, `cx-server` | Configurable friendly-fire flag per scenario manifest; defaults per DR-018 consequence ladder. | Scenario policy tests. | Friendly-fire configuration capture. | No global PvP at LAN scope. |
+| M10-006 LAN co-op proof mission | `content/scenarios/`, `cx-app`, `cx-server` | Two clients survive one 5-minute Breach Contract via `cx-server --mode lan_room`; per-client bundles align tick-for-tick. | Full E2E. | Per-client run bundles + alignment report. | No public WAN. |
+
+M10 E2E:
+
+```bash
+cargo run -p cx-server -- --mode lan_room --scenario breach_contract --auto-discover &
+cargo run -p cx-app -- --connect-lan auto --client-id alpha --write-run-bundle
+cargo run -p cx-app -- --connect-lan auto --client-id bravo --write-run-bundle
+cargo run -p cx-headless -- replay-compare prototype_runs/native/<alpha> prototype_runs/native/<bravo>
+```
+
+Human gate: project-owner LAN co-op session of one Breach Contract.
 
 ---
 
-## M11 — Online Co-op Private
+## M11 — Online Co-op (Self-Hosted Dedicated Servers)
+
+> [!important] Kickoff prerequisites
+> M9 + M10 complete. Networking transport library committed (M9-010). Read [[spec/server-app-architecture]] hosting posture + DR-005 + DR-013 + DR-034.
+
+> [!warning] Hard rules
+> A community member must be able to host an internet-reachable server with documented hosting steps. Steam/EOS adapters are optional cargo features. `lobby_directory` registration must work end-to-end. Mod hash sync is mandatory.
 
 | ID | Owns | Build | Tests | Evidence | Anti-scope |
 |---|---|---|---|---|---|
-| M11-001 transport adapter | `cx-net` | NAT/relay candidate behind trait boundary. | Simulated latency tests. | Transport decision note. | No platform lock-in. |
-| M11-002 package hash sync | `cx-net`, `cx-mod`, `cx-ui` | Join preflight checks content hashes and produces clean mismatch actions. | Mismatch tests. | Join-failure screenshots. | No public mod CDN. |
-| M11-003 online session smoke | `cx-net`, `cx-app` | Two remote clients complete private co-op Breach Contract. | Remote run compare. | Per-client bundles. | No public launch promise. |
+| M11-001 NAT/relay transport | `cx-net` | NAT punch-through or relay using committed transport (lightyear/renet/quinn); fallback to TCP for restricted networks. | Simulated latency + packet-loss tests. | Transport decision document; latency tests. | No platform lock-in. |
+| M11-002 lobby_directory integration | `cx-server`, `cx-net`, `cx-ui` | Server registers + heartbeats + deregisters; client browses + filters + joins. Multi-instance protocol. | Registration roundtrip; heartbeat expiry; deregister cleanup. | Registry capture; browse UI screenshot. | No first-party hosted directory. |
+| M11-003 anti-cheat profile `competitive` | `cx-server-anti-cheat` | Default profile for online co-op; rejects input-rate-spike clients; ban list persisted across restart; audit log. | Anti-cheat acceptance fixture; ban-list roundtrip. | `system.anti_cheat_kicked` event in run bundle. | No tournament-grade. |
+| M11-004 latency compensation | `cx-net`, `cx-actor` | Client-side prediction + server reconciliation for player actor; pure replication for AI bots. Tunable interpolation factor. | Latency-masked input tests at 50-150 ms RTT. | Latency masking screenshots/captures. | No predictive AI. |
+| M11-005 package hash sync (production) | `cx-mod`, `cx-net` | Server checks client packages match; soft-fail with auto-download for dev workflow; hard-fail with mismatch report for shipping. | Mismatch fixture tests; auto-download dev path test. | Join-failure with downloadable diff screenshots. | No public mod CDN. |
+| M11-006 account adapter foundation | `cx-server`, `cx-net` | Local account file (private), `lobby_directory` token (community), Steam/EOS/PlayFab adapters stubbed behind cargo features (`net-steam`, `net-eos`, `net-playfab`). | Adapter contract tests; redaction tests for tokens. | Adapter shape doc; redaction-test report. | No first-party identity service. |
+| M11-007 Steam Datagram Relay adapter (optional) | `cx-net` (cargo feature `net-steam`) | Behind cargo feature; off by default; documented usage. | Adapter shape contract tests. | Adapter doc. | No Steam-only design. |
+| M11-008 reference systemd / launchd / Docker | `tools/`, `docs/server-hosting.md` | Reference deployment templates for self-hosted operators. | Smoke deployment of each. | Templates committed. | No production registry. |
+| M11-009 online co-op proof | `cx-server`, `content/scenarios/` | Two friends in different cities co-op a Breach Contract via self-hosted `cx-server`; per-client bundles align. | Cross-host smoke. | Per-client run bundles + alignment report. | No public PvP. |
+
+M11 E2E:
+
+```bash
+# operator side
+cargo run -p cx-server -- --mode coop_room --bind 0.0.0.0:0 --public-address <addr> --lobby-register <directory_url>
+
+# client side (different machine)
+cargo run -p cx-app -- --connect <host:port> --client-id alpha --write-run-bundle
+cargo run -p cx-app -- --connect <host:port> --client-id bravo --write-run-bundle
+
+cargo run -p cx-headless -- replay-compare <alpha-bundle> <bravo-bundle>
+```
+
+Human gate: project-owner self-hosts a `coop_room` and runs an online co-op session.
 
 ---
 
-## M12 — PvP And MMO Experiments
+## M12 — Public PvP Arenas + Persistent MMO Shards
+
+> [!important] Kickoff prerequisites
+> M9 + M10 + M11 complete. Read [[spec/persistent-mmo-architecture]] + [[decisions/dr-005-multiplayer-posture]] + [[decisions/dr-013-backend-service-scope]] + [[decisions/dr-034-dedicated-server-application]] + [[decisions/dr-035-persistent-mmo-architecture]] in full. Run M12 kickoff smoke.
+
+> [!warning] Hard rules
+> Public PvP and persistent MMO shards are LAUNCH commitments (not post-launch experiments). MMO shards are community-hostable. No proprietary cloud database. Subscription forbidden. Cross-shard live combat forbidden at v1. Auto-population (server bots dressed as players) forbidden.
+
+PvP arena task cards:
 
 | ID | Owns | Build | Tests | Evidence | Anti-scope |
 |---|---|---|---|---|---|
-| M12-001 PvP arena | `cx-net`, `cx-mission` | 2-4 players, small destructible map, server-authoritative validation. | Stress run. | Bandwidth/cheat notes. | No launch PvP promise. |
-| M12-002 scale shard | `cx-headless`, `cx-net`, `cx-bench` | N=20 small-shard simulation for 10 minutes. | Load test. | Perf/desync report. | No MMO product commitment. |
-| M12-003 DR-005 review | vault only | Revisit multiplayer posture with evidence. | N/A. | Updated DR or research log. | No silent scope expansion. |
+| M12-001 pvp_arena gameplay | `cx-server`, `cx-mission`, `content/scenarios/pvp/` | 2-8 player server-authoritative match server; PvP scenarios; latency-masked client prediction. | 4-8 player stress run. | Match run bundle; bandwidth + cheat notes. | No ranked ladder yet (post-launch). |
+| M12-002 PvP anti-cheat | `cx-server-anti-cheat` | `competitive` default; `tournament_strict` opt-in; replay drift detection; rejection events. | Anti-cheat fixture tests; spike-rate kick test. | Audit log sample. | No client-side anti-cheat lock-down. |
+| M12-003 PvP perf / bandwidth | `cx-net`, `cx-bench`, `cx-server` | Bandwidth/authority/cheat models tested at 4-8 player density; perf gates per T-PERF. | Bench run. | Perf report. | No infinite-scale PvP. |
+
+MMO shard task cards (per [[spec/persistent-mmo-architecture]]):
+
+| ID | Owns | Build | Tests | Evidence | Anti-scope |
+|---|---|---|---|---|---|
+| M12-101 mmo_shard world manifest | `content/worlds/`, `cx-mission` | Persistent world manifest schema (region map, materials, hazards, faction territories); validates with `cx-mod validate`. | Schema validation tests. | Sample world manifest. | No seamless world. |
+| M12-102 mmo_shard persistence | `cx-server-persistence` | Snapshot every 10 min + append-only journal; restart restore <30 s; crash + restart resumes within 1 min. | MMO-002, MMO-003 tests. | Persistence run-bundle. | No proprietary cloud DB. |
+| M12-103 mmo_shard interest management | `cx-net`, `cx-sim-core` | Clients only receive events/snapshots for entities in their interest set; per-client interest range computation server-side. | MMO-009 test; event-volume audit. | Interest-set sample. | No client-side cheating with hidden info. |
+| M12-104 mmo_shard account model | `cx-server`, `cx-net` | Token-based bearer; expiry; rotation; never logged. Local account + lobby_directory token + Steam/EOS/PlayFab adapter shapes. | Token redaction tests. | Account adapter doc. | No mandatory account for solo/private. |
+| M12-105 mmo_shard mission director | `cx-mission`, `cx-ai` | Per-faction contract pool; mission director generates contracts; players can resume across sessions within timeout. | Director persistence test. | Contract pool sample. | No live cross-shard contracts. |
+| M12-106 mmo_shard 50-client soak | `cx-bench`, `cx-server`, `cx-headless` | 50 simulated clients (`cxctl` puppets) connect for 1 hour at ≥30 Hz target. | MMO-004 test. | Soak run bundle + perf report. | No 1000-client moonshot. |
+| M12-107 mmo_shard 100-client stretch | `cx-bench`, `cx-server` | 100 simulated clients sustained for 30 minutes; degraded mode acceptable. | MMO-005 test. | Stretch run bundle + degraded-mode report. | No flagship-tier (200+) at v1. |
+| M12-108 cross-shard lobby/portal | `cx-server` (lobby_directory mode) | Two shards on different ports; lobby/portal lists both; player log-out from Shard A and log-in on Shard B works. | MMO-006 test. | Cross-shard transcript. | No cross-shard live combat. |
+| M12-109 mmo_shard mod compatibility | `cx-mod`, `cx-server` | Per-shard pinned package set + trust tier ceiling; clients see manifest before join; mismatch produces actionable diff; server-only mods allowed. | MMO-007 test. | Mod compatibility doc. | No global mod CDN. |
+| M12-110 mmo_shard anti-cheat | `cx-server-anti-cheat` | `competitive` default; operator-tunable; ban list persists; appeals out-of-game per operator policy. | MMO-008 test. | Audit log sample. | No tournament-grade. |
+| M12-111 mmo_shard LLM mind | `cx-ai::mind`, `cx-server` | Mind workers run server-side; clients never see prompts; mind events redacted in client-visible event stream per DR-032. | MMO-010 test. | Redaction-test report. | No client-side LLM. |
+| M12-112 mmo_shard schema migration | `cx-server-persistence`, `cx-save` | v0.1 shard state loads on v0.2 with declared migration handlers. | MMO-011 test. | Migration registry. | No silent data loss. |
+| M12-113 mmo_shard no-cloud reference | `tools/`, `docs/mmo-hosting.md` | Operator runs shard with no proprietary cloud dependency (local FS, local lobby_directory). | MMO-012 test. | Hosting guide. | No publisher-only mode. |
+| M12-114 DR-005/013/034/035 review | vault only | Revisit multiplayer + backend + server + MMO postures with M9-M12 evidence. | N/A. | Updated DRs or research log. | No silent scope expansion. |
+
+M12 E2E:
+
+```bash
+# PvP
+cargo run -p cx-server -- --mode pvp_arena --scenario pvp/breach_arena --max-clients 4 --anti-cheat-profile competitive --write-run-bundle
+cargo run -p cx-bench -- --scenario pvp/breach_arena --profile pvp --runs 5 --write-bench-report
+
+# MMO shard
+cargo run -p cx-server -- --mode mmo_shard --bootstrap-empty-shard
+cargo run -p cx-server -- --mode mmo_shard --scenario mmo/frontier_v1 --simulate-clients 50 --duration-min 60 --write-run-bundle
+cargo run -p cx-server -- --mode mmo_shard --scenario mmo/frontier_v1 --simulate-clients 100 --duration-min 30 --write-run-bundle
+
+# Cross-shard
+cargo run -p cx-server -- --mode lobby_directory --bind 0.0.0.0:7878 &
+cargo run -p cx-server -- --mode mmo_shard --bind 0.0.0.0:9001 --lobby-register http://localhost:7878 &
+cargo run -p cx-server -- --mode mmo_shard --bind 0.0.0.0:9002 --lobby-register http://localhost:7878 &
+
+# MMO acceptance suite
+cargo run -p cx-e2e -- --suite MMO-001..MMO-012 --write-run-bundle
+
+# MMO replay verification
+cargo run -p cx-headless -- replay prototype_runs/native/<m12_mmo_run> --verify-checksums
+```
+
+Human gate: project-owner runs a small public shard for at least one session; community-tester feedback captured.
 
 ---
 
@@ -417,6 +552,7 @@ These side tracks are not separate "later" workstreams. Every milestone final au
 | T-PLATFORM | M0 | Keep current-platform commands passing; preserve Win/Linux/macOS portability in paths, file watching, case sensitivity, GPU backend assumptions, and input/audio setup. | Validation log; CI log when available. |
 | T-CONTROL | M0 | Add semantic control/observation coverage for every new gameplay/UI action; prefer `cxctl` for E2E; record debug capabilities in the manifest. | `cxctl` command log, observation sample, and run-bundle events. |
 | T-PHYS | M0 | Any new gameplay object that is physical gets a collision class/proxy/matrix entry/event policy or a tested cosmetic/sensor/filter reason. | Collision matrix diff, `collision.*` event sample, or explicit `collision_filter_reason`. |
+| T-SERVER | M0 (config stubs); M9 (full) | Any change that affects multiplayer/server modes/persistence/anti-cheat/admin must extend the `cx-server` config schema or anti-cheat profile registry, register migration handlers if persisted state changes, and audit which `cx-server` modes were touched. | Server config diff, anti-cheat profile change, persistence schema bump, or `lobby_directory` schema change documented per milestone. |
 | T-MOD | M5 | Any new gameplay data should be data-driven unless hardcoded as a deliberate prototype shortcut; shortcuts must be named. | Schema/fixture test or explicit shortcut note. |
 | T-AUDIO | M4 | Any player-facing combat, mech, command-core, alarm, or UI feedback that needs sound later should emit an event/caption hook now. | Event/caption hook in run bundle. |
 | T-SAVE | M5 | New persistent identity/state must define save ownership even if no final save UI exists. | Save/load roundtrip or "not persistent yet" note. |

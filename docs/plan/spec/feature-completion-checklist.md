@@ -52,6 +52,9 @@ feeds:
 > [!info] Current coverage
 > 497 checklist rows: 16 milestone proof rows, 106 milestone scope rows, 90 milestone done-criteria rows, 80 roadmap feature-index rows, 68 side-track rows, 89 native task-card rows, 24 validation rows, 12 bug-hunt rows, and 12 definition-of-done rows.
 
+> [!warning] Stale: M9-M12 scope expanded 2026-05-05 (post-direction-shift)
+> The closed-direction shift on 2026-05-05 (DR-005 + DR-013 re-closed; new DR-034 dedicated server app; new DR-035 persistent MMO architecture; new T-SERVER side track) substantially expanded M9 task cards (4 → 18), M11 (3 → 9), M12 (3 → 17 = 3 PvP + 14 MMO), added the T-SERVER side track, and added new event categories (`server`, `anti_cheat`, `mmo`) to the run-bundle schema. **This checklist's M9/M10/M11/M12 + T-SERVER + side-track + feature-index + validation rows are out of date until the next regeneration.** Authoritative scope until then: [[spec/prototype-roadmap]], [[spec/native-implementation-backlog]], [[spec/server-app-architecture]], [[spec/persistent-mmo-architecture]]. New acceptance suites to track on regeneration: SERVER-001..SERVER-016, MMO-001..MMO-012.
+
 ## Rating System
 
 | Column | Who Fills It | Scale | Meaning |

@@ -1,154 +1,154 @@
 ---
 type: decision
 id: DR-013
-status: open
-priority: P1
-revisit_trigger: "Reopen when DR-005 produces co-op/PvP bandwidth evidence, a public playtest is scheduled, package/replay sharing becomes a core loop, or the project chooses a platform backend."
+status: closed-direction
+priority: P0
+closed_at: 2026-05-05
+revisit_trigger: "Backend cost or operator complexity exceeds the AI-augmented-solo team model (DR-026); platform certification forces a backend redesign; account/identity provider becomes contractually mandatory; or community-hosting posture proves incompatible with multiplayer scale."
 ---
 
-← [[decisions/index|decision records]] · [[dashboards/decision-tracker|decision tracker]] · [[dashboards/research-readiness|readiness]] · [[spec/backend-networking|backend/networking posture]] · [[spec/backend-service-hub-slice-a|backend service/hub Slice A]]
+← [[decisions/index|decision records]] · [[dashboards/decision-tracker|decision tracker]] · [[spec/server-app-architecture|server app architecture]] · [[spec/persistent-mmo-architecture|persistent MMO architecture]] · [[spec/backend-networking|backend networking]] · [[spec/backend-service-hub-slice-a|backend service/hub Slice A]] · [[decisions/dr-005-multiplayer-posture|DR-005]] · [[decisions/dr-034-dedicated-server-application|DR-034]] · [[decisions/dr-035-persistent-mmo-architecture|DR-035]]
 
-# DR-013: Backend Service Scope
+# DR-013: Backend Services Architecture
 
-> [!info] Status: OPEN; LEAN: local-first service spine + optional adapters
-> Build the backend only where it makes the game, modding, replay/debug, hub UX, diagnostics, and future co-op experiments better. Start with a local-first service spine and schema-compatible adapters. Do not couple early backend work to accounts, matchmaking, anti-cheat, monetization, or a public PvP promise.
+> [!success] Status: CLOSED-DIRECTION (project owner committed 2026-05-05)
+> Backend services are first-class. They support a self-hostable dedicated server app (DR-034), persistent MMO shards (DR-035), package/replay sharing, server discovery, and the optional account/identity surface for public modes. **Local-first remains the default for solo/private LAN play; backend services unlock as online modes are used.** Any operator can run any service tier with no proprietary cloud dependency.
 
-## Context
+## Decision
 
-[[spec/backend-service-hub-slice-a]] already defines a buildable first backend/hub slice. This record decides what belongs in the durable backend spine versus what should stay as optional platform/community/live-service research until prototypes prove the need.
+**Full backend service spine + dedicated server app + community hosting + optional first-party services.**
 
-The decision matters because a Cortex-like game has unusual backend pressure: mod/package compatibility, replay evidence, AI failure reports, server discovery, terrain-sync metadata, and deep links all need shared schemas even if the game launches solo-first.
+This DR replaces the prior "local-first service spine + optional adapters" lean. The user's commitment on 2026-05-05 promotes backend services from optional-research-only to a launch-supported product surface, while preserving the local-first default for solo and private play.
 
-## Options
+## What This Locks In
 
-| Option | Summary | Best Case | Worst Case |
-|---|---|---|---|
-| A | No backend until online is committed. | Fastest short-term path; no ops burden. | Hub, package compatibility, replay sharing, diagnostics, and co-op experiments all reinvent data shapes later. |
-| B | Local-first service spine + static/heartbeat adapters. | Gives the game a durable service contract without live-service lock-in. | Some backend work ships before online fun is proven. |
-| C | Public community backend from prototype start. | Early server list, replay sharing, and mod registry create community energy. | Moderation, abuse, privacy, uptime, and compatibility costs distract from actor feel and AI. |
-| D | Platform-first backend (Steam/EOS/PlayFab/Unity/etc.). | Faster public multiplayer/lobby integration if a platform is chosen. | Platform lock-in and account assumptions leak into core schema too early. |
-| E | Live-service/account-economy-first backend. | Monetization, inventory, and events can be researched quickly. | The game becomes service-led before the core physics/AI loop is excellent. |
-
-## Pros And Cons
-
-| Option | Pros | Cons | Unknowns |
-|---|---|---|---|
-| A | Maximum focus on simulation and AI; no server maintenance. | Weakens package, replay, diagnostics, hub, and online prototype readiness. | Whether local-only tooling can remain coherent without shared schemas. |
-| B | Supports solo/local/offline flows; keeps platform choice open; feeds package builder, replay recorder, hub, and diagnostics. | Requires disciplined scope control and schema maintenance. | Exact API/process boundary after DR-001 engine choice. |
-| C | Tests real community behavior early; makes server discovery tangible. | Requires auth, moderation, rate limits, privacy, logs, abuse handling, deployment, and support. | Whether public multiplayer is fun or viable yet. |
-| D | Reuses proven lobby, relay, matchmaking, server query, and identity systems. | Can force Steam/EOS/PlayFab/Unity concepts into a game still proving its local loop. | Target stores, platform terms, SDK fit, and transport model. |
-| E | Useful later for cosmetics, retention, events, inventory, and experiments. | High risk to fairness, modding trust, and design focus. | Whether monetization is wanted at all. |
-
-## Evaluation
-
-| Lens | A: no backend | B: local-first spine | C: public backend early | D: platform-first | E: live-service first |
-|---|---|---|---|---|---|
-| Player value | Low until online exists | High: better hub, replays, packages, diagnostics | Medium/high if community online works | Medium if platform flow is smooth | Low before core loop is proven |
-| Readability | Weak join/error explanations | Strong join blockers and diagnostics | Strong if maintained | Strong but platform-shaped | Risky: economy UI noise |
-| AI burden | No direct help | Strong AI failure reports and replay indexes | Strong, but noisy public reports | Depends on platform telemetry | Distracts from AI trust |
-| UX burden | Hidden compatibility failures | Manageable dense hub and resolver | Higher moderation/account surfaces | SDK/platform UX constraints | High economy/account UI |
-| Performance risk | None | Low local API/event overhead | Medium deployment/event volume | Medium SDK/transport integration | Medium/high service coupling |
-| Modding impact | Weak registry story | Strong package manifest spine | Strong but moderation-heavy | Workshop/platform dependent | Risky if inventory gates mods |
-| Networking/replay impact | Late integration risk | Strong metadata, hashes, run evidence | Strong but public risk | Strong for platform networks | Misaligned with sync evidence |
-| Content cost | Low now, higher later | Moderate fixtures/schemas | High live data + moderation | Medium integration docs/tools | High economy/content treadmill |
-| Retention upside | Local only | Replays, challenges, package discovery | Community servers/replays | Friends/lobbies/invites | High but ethically sensitive |
-| Ethics/fairness | Clean | Clean if privacy/redaction stays first | Needs moderation/privacy policy | Platform terms apply | Highest risk |
-
-## Service Tier Matrix
-
-| Tier | Services | Scope Decision | Why |
-|---|---|---|---|
-| Slice A local/core | `/v1/health`, schema/version report, local package registry, join eligibility, deep-link parser, local server supervisor, local replay/report index, diagnostics export, privacy redaction. | Build now. | Directly supports solo/local play, package compatibility, workbench UX, recorder evidence, and future co-op tests. |
-| Slice A fixtures | Static `servers.json`, `packages.json`, `replays.json`, resolver fixtures, fake process adapter, compatibility failure rows. | Build now with fixtures. | Lets UX/backend tests run before real public hosting or transport exists. |
-| Optional online prototype | Static or heartbeat server directory, package manifest registry, content dependency resolver, replay upload/share sandbox, consented telemetry summaries, daily seed/challenge metadata. | Prototype when useful; keep adapters swappable. | Tests community value without making a launch promise. |
-| Platform adapter candidates | Steam server browser, Steam Datagram Relay/GameNetworkingSockets, EOS lobbies/sessions, PlayFab lobbies/servers, self-hosted directory, LAN discovery. | Research/prototype behind the same service contract. | The game should not choose a platform by accident through schema drift. |
-| Not a launch commitment yet | Matchmaking, accounts/profiles, cloud save, leaderboards, relay allocation, anti-cheat/trust enforcement, moderation/admin tools. | Design interfaces only when a prototype asks for them. | They imply public service responsibilities and product promises. |
-| Research/later | Account economy, gacha/collection inventory, cosmetics marketplace, paid mod storefront. | Research freely; do not couple to Slice A. | These are product/economy decisions, not prerequisites for the best first playable. |
-
-## Backend Objects That Must Stay Shared
-
-| Object | Required Consumers | Minimum Fields |
+| Service Tier | Status | Notes |
 |---|---|---|
-| `ServerSummary` | Hub, deep links, join resolver, replay recorder, future networking tests. | Version, protocol, mode, map/hash, terrain-sync profile, players/bots, package set, content hash, trust/mod safety, join state, heartbeat/expiry, warnings. |
-| `PackageManifestSummary` | Package builder, workbench, server browser, replay viewer, diagnostics. | Package id/version, manifest hash, source/provenance, dependencies, script capability flags, trust tier, compatible game/schema versions. |
-| `JoinEligibilityResult` | Hub, deep links, package builder, recorder, support diagnostics. | `can_join`/`needs_action`/`blocked`, reason codes, repair/download/workbench route, redaction state, event id. |
-| `ReplaySummary` | Replay browser, AI trust harness, death recap, bug reports, future sharing. | Run id, map/hash, package hash, actors, tags, duration, schema version, failure markers, privacy flags. |
-| `DiagnosticsReport` | Developer tools, support, AI/replay debugging. | Redacted environment summary, schema versions, latest join failure, package mismatch, crash/exit state, replay/report pointers. |
+| Local game services (health, schema, package registry, join eligibility, deep-link parser, local replay/report index, diagnostics export, redaction) | **Required at launch.** Same shape as the prior Slice A. | Files-on-disk + in-process services for solo/private play. |
+| Local server supervisor | **Required at launch.** | Drives `cx-server` lifecycle from the client when the player hosts. |
+| `lobby_directory` service | **Required at launch.** | Aggregates community-hosted shards; multiple instances can exist; default community list ships in the launch SKU. Also one of the `cx-server --mode` options (DR-034). |
+| Account/identity adapter | **Required at launch** for public shards. **Optional** for private play. | Plug-in: local account file (private), `lobby_directory` token (community), Steam/EOS/PlayFab adapters (post-launch ready). |
+| Server discovery / browser | **Required at launch.** | Filter by mode, region, ping, player count, package set, ruleset, trust tier. |
+| Package / mod registry | **Required at launch.** | Package hashes + manifest summaries + dependency graph; reused by client, server, and editor. |
+| Replay / report index | **Required at launch.** | Per-run bundle metadata; queryable; redacted by default. |
+| Diagnostics + telemetry | **Required at launch.** | Local diagnostics with consented exports; redaction tests required. |
+| Persistent MMO shard services (snapshot store, event journal, durable storage adapter) | **Required at launch** as one shape of `cx-server-persistence`. | DR-035; community-hostable; no proprietary cloud lock-in. |
+| Anti-cheat foundation (server-side validation hooks, ban list, audit log) | **Required at launch.** | Foundation only; tournament-grade is post-launch. |
+| Optional first-party hosted services (cloud save sync, server browser cluster, ranked leaderboards, event aggregation) | **Optional, post-launch.** | Adapters; no v1 commitment to operate them. |
+| Live-service economy / cosmetic shop / marketplace | **NOT a launch commitment.** | DR-031 anti-goal; remains rejected. |
 
-## Evidence
+| Architectural Pin | Commitment |
+|---|---|
+| One service contract | All gameplay/server/client/replay consumers share `ServerSummary`, `PackageManifestSummary`, `JoinEligibilityResult`, `ReplaySummary`, `DiagnosticsReport`, `ShardSnapshotSummary`, `LobbyEntry` shapes. |
+| Schema versioning | Every service object carries `schema_version`; migrations are mandatory before bumping. |
+| Transport | HTTPS REST + WebSocket for `lobby_directory`; QUIC/UDP for sim transport (per DR-005). |
+| Persistence | Local filesystem default; S3-compatible / network filesystem / durable journal adapters available; no hard cloud dependency. |
+| Account credentials | Token-based bearer; tokens have expiry; tokens are NEVER written to run bundles or replay events. |
+| Privacy / redaction | Default-on for all run-bundle exports; tested per BACK-SCOPE-07; opt-in for diagnostics sharing. |
+| Adapter posture | Steam, EOS, PlayFab, Unity Multiplay, Sony/MS/Nintendo are **adapter** layers behind shared contracts; the core never depends on any one platform. |
+| Observability | Prometheus-compatible metrics endpoint per server; structured JSON logs; health/readiness endpoints. |
+| Open-source posture for backend code | Friendly to community-hosted operators; documentation and reference deployments ship with the launch SKU. |
 
-| Evidence | Source | Confidence |
-|---|---|---|
-| OpenSoldat separates engine, base content, launcher, and lobby; its launcher/server rows prove server discovery is UX, not just networking plumbing. | [[comparables/opensoldat-satellites-local-audit]], [[spec/backend-service-hub-slice-a]] | High |
-| OpenSoldat base content uses deterministic package hashes for pure server compatibility. | `../comparables_repos/opensoldat-base/README.md`, `../comparables_repos/opensoldat-base/create_smod.py`, [[comparables/opensoldat-satellites-local-audit]] | High |
-| Steamworks treats community/dedicated game servers and a unified server browser as first-class, with API access via `ISteamMatchmakingServers`. | Steamworks Game Servers and `ISteamMatchmakingServers` docs in [[references/sources]] | High |
-| Steam server queries support map, tags/data, dedicated/secure, not-full/has-player/no-player, address, and direct server rules queries. | Steamworks `ISteamMatchmakingServers` docs in [[references/sources]] | High |
-| Steam Datagram Relay can hide IPs and uses game-coordinator/ticket/certificate flows for stronger dedicated-server admission. | Steam Datagram Relay docs in [[references/sources]] | Medium/high; platform-specific |
-| Unity Lobby marks inactive lobbies after heartbeat/update gaps and hides inactive public lobbies from query/quick-join results. | Unity Lobby heartbeat docs in [[references/sources]] | High |
-| Unity Multiplay server readiness explicitly separates process start from "ready for players" and uses readiness/health checks for allocations. | Unity Multiplay server-readiness docs in [[references/sources]] | High, but service is in transition after March 31, 2026 |
-| PlayFab multiplayer services are modular: lobbies, matchmaking, party, and servers can be used independently or combined. | PlayFab multiplayer overview in [[references/sources]] | Medium/high; platform-specific |
-| EOS exposes lobbies, sessions, P2P, voice, anti-cheat, metrics, and game services as separable modules. | EOS docs/search results in [[references/sources]] | Medium; needs direct implementation audit before platform choice |
+## What This Explicitly REJECTS
 
-## Current Recommendation
+| Rejected Pattern | Why |
+|---|---|
+| "Local-first only" / "no backend until online is committed" | The user's 2026-05-05 commitment requires backend at launch for community hosting + MMO. |
+| "Public community backend from prototype start" | Still rejected as a Slice A obligation; the local-first default + adapter pattern protects sim/AI quality during M0..M7. Public services arrive in M9..M12. |
+| Platform-first backend (Steam/EOS-only) | Adapters yes, lock-in no. The core service contract is platform-neutral. |
+| Live-service economy spine | DR-031 forbids. Backend is for gameplay/community surfaces, not monetization. |
+| Forced account systems | Solo and private play work without accounts. |
+| Forced first-party hosted MMO | Architecture supports community-hosted shards by default. |
+| Hidden / non-documented hosting | Reference deployments + Docker images + hosting guide ship at launch. |
 
-Recommendation: **Option B: local-first service spine + optional adapters.**
+## Why Not The Alternatives
 
-Build the service contract now, but keep the runtime deployment local/file-backed until an online prototype proves public service value. The backend should be boring infrastructure that makes the best game easier to build: package compatibility, clear join blockers, replay/debug indexing, local host lifecycle, diagnostics, and hub navigation.
+| Alternative | Why Rejected |
+|---|---|
+| Backend stays "OPEN, local-first lean" forever | Conflicts with DR-005 multiplayer launch ladder + DR-035 MMO commitment. |
+| Steam-only backend | Lock-in. Linux + Windows community hosting must work without a Steam account. |
+| Cloud-database-first MMO persistence | Operator cost; conflicts with community-hosted MMO. Local FS + journal is enough; cloud is an adapter. |
+| Backend implies live-service / monetization | Contradicts DR-031; we explicitly separate gameplay services from economy. |
+| Single first-party `lobby_directory` only | Operator monoculture risk; we ship as a multi-instance protocol. |
 
-This is not a "small ambition" choice. It preserves optionality for Steam/EOS/PlayFab/self-hosted/LAN later, while avoiding the trap of building accounts, matchmaking, anti-cheat, and economy before actor feel, AI, destruction, replay, and equipment workbench quality are proven.
+## Evidence Trail
 
-## Prototype Or Validation Plan
+- Project owner verbatim (2026-05-05): "I want to have an entire server app designed to run our app. anyone can host multiplayer games, as well as the persistent MMO mode."
+- DR-005 multiplayer architecture closes with full ladder including community-hosted PvP and MMO shards.
+- DR-034 dedicated server app commits to `cx-server` as a launch artifact.
+- DR-035 persistent MMO architecture commits to community-hostable shards.
+- Source patterns: Steamworks Game Servers + Steam Datagram Relay (community-hostable + relay-optional), EOS sessions/lobbies/relay (modular), PlayFab multiplayer (modular), Unity Multiplay readiness (process+ready separation), OpenSoldat satellites (launcher/lobby/base content separation), Project Zomboid dedicated server (community ops), Space Station 14 (round-based persistence + community).
+- Cross-DR coherence: DR-013's prior "local-first + optional adapters" lean is preserved as the default solo/private posture; the closed-direction now explicitly extends scope to public services as launch-supported.
 
-| Test | What It Proves | Pass/Fail |
-|---|---|---|
-| BACK-SCOPE-01 | Static/local service can serve health, servers, packages, replays, and join eligibility from fixtures. | Pass if all endpoints load and all schemas are versioned. |
-| BACK-SCOPE-02 | Join blockers are concrete and action-oriented. | Pass if every disabled server row maps to a specific package/update/trust/password/replay/action route. |
-| BACK-SCOPE-03 | Heartbeat/expiry behavior works without public ops. | Pass if fixture/local rows expire or degrade deterministically. |
-| BACK-SCOPE-04 | Local supervisor readiness is structured. | Pass if process states never depend on parsing stdout text. |
-| BACK-SCOPE-05 | Package builder and server browser share manifest identity. | Pass if the same package hash fields drive workbench diagnostics and join eligibility. |
-| BACK-SCOPE-06 | Replay summaries remain useful offline. | Pass if the hub can browse local replays/reports with backend offline. |
-| BACK-SCOPE-07 | Deep links are safe. | Pass if no plain password, invite token, absolute local path, or private IP leaks into events or reports. |
-| BACK-SCOPE-08 | Recorder events cover backend UX. | Pass if fetch, heartbeat, join decision, content resolve, deep link, local health, and diagnostics events export through the run-bundle event envelope. |
-| BACK-SCOPE-09 | Adapter boundary stays clean. | Pass if Steam/EOS/PlayFab/self-hosted/LAN concepts map into the shared objects without changing core UI components. |
-| BACK-SCOPE-10 | Public-service escalation is explicit. | Pass if adding matchmaking/accounts/leaderboards requires a new DR or a reopened DR-013 entry. |
+## Service Tier Matrix (Updated)
 
-## Risks
+| Tier | Services | Status | Why |
+|---|---|---|---|
+| Local game core (Slice A) | health, schema/version report, local package registry, join eligibility, deep-link parser, local server supervisor, local replay/report index, diagnostics export, privacy redaction. | Required at launch. | Solo/local play, package compatibility, workbench UX, recorder evidence; same as prior Slice A. |
+| Server lifecycle (Slice B) | `cx-server-ops` health/readiness/metrics, log shipping, drain shutdown, restart hooks. | **Required at launch.** | DR-034 dedicated server app. |
+| Server discovery (Slice B) | `lobby_directory` service: shard list, presence, package set summary, trust tier, ping. | **Required at launch.** | DR-005 community hosting + DR-035 MMO discovery. |
+| Account/identity adapter (Slice B) | Local account, lobby token, Steam/EOS/PlayFab adapter shapes. | **Required at launch** for public shards. | DR-035 account model. |
+| Persistence (Slice B) | `cx-server-persistence` snapshot store + event journal + durable storage adapter. | **Required at launch.** | DR-035 MMO mode. |
+| Anti-cheat foundation (Slice B) | Server-side validation hooks, profiles, ban list, audit log. | **Required at launch.** | DR-005 anti-cheat foundation. |
+| Replay / report sharing (Slice C) | Optional opt-in upload of run-bundle metadata; replay browser. | Optional, post-launch. | Retention/community surface. |
+| First-party server browser cluster | Cloud-hosted aggregation across community lobby_directory instances. | Optional, post-launch. | Convenience; community can run without it. |
+| Cloud save sync | Cross-device save sync. | Optional, post-launch. | DR-029. |
+| Ranked leaderboards | PvP / contract leaderboard service. | Optional, post-launch. | Competitive; not v1. |
+| Live-service economy / shop / marketplace | Cosmetic / DLC store. | **NOT a launch commitment.** | DR-031 forbids predatory; expansion DLC is a separate distribution channel. |
+
+## Prototype / Validation Plan
+
+| Test | What It Proves |
+|---|---|
+| BACK-SCOPE-01..10 | Existing tests still apply (per [[spec/backend-service-hub-slice-a]]). |
+| SERVER-001..SERVER-016 | Dedicated server lifecycle works for all modes (DR-034). |
+| MMO-001..MMO-012 | MMO shard services + persistence + interest mgmt + community hosting (DR-035). |
+| BACK-LOBBY-01 | `lobby_directory` lists 3 community shards across 2 operators; client browses + joins. |
+| BACK-ACCOUNT-01 | Local account file works for private LAN; Steam adapter resolves identity for public shard; tokens never appear in run bundles. |
+| BACK-PERSIST-01 | Snapshot store + journal restore reproduces shard state within 1 minute of crash. |
+| BACK-ANTI-CHEAT-01 | Server-side rate limit + replay drift detection + ban list persists. |
+| BACK-OPS-01 | Reference Docker image runs `cx-server` unchanged; `/health` + `/ready` + `/metrics` work. |
+
+## Risks And Mitigations
 
 | Risk | Mitigation |
 |---|---|
-| The backend becomes a live-service project too early. | Keep Slice A file-backed/local and ban accounts/matchmaking/economy from the core path until a prototype proves need. |
-| Platform docs seduce the design into platform lock-in. | Treat Steam/EOS/PlayFab/Unity as adapters behind shared objects, not the source of truth. |
-| Server browser UI becomes noisy. | Use [[spec/ux-wireframes-slice-a]] and [[decisions/dr-012-accessibility-comfort-readability]]: dense table, explicit blockers, scalable text, no color-only state. |
-| Mod/package hashes confuse players. | Route issues into workbench actions with readable package names, provenance, and repair/download choices. |
-| Diagnostics leak private data. | Keep redaction tests in [[spec/backend-service-hub-slice-a]] and prototype run bundles. |
-| The service spine distracts from actor feel. | Sequence implementation after A0/A1 or build only fixture schemas until the first sandbox exists. |
+| Backend complexity overruns DR-026 team capacity | Modular crate boundaries; community-runnable defaults; first-party services are post-launch only. |
+| Cloud cost spirals | Local FS + journal default; cloud adapters are operator-funded. |
+| Account/identity provider lock-in | Plug-in adapter; local account works for private; `lobby_directory` token is operator-friendly. |
+| Service contract drift | Schema versioning + migration handlers + cross-consumer tests at every milestone. |
+| Mod compatibility chaos | Package hashes + trust tiers + clear mismatch UI; per-server admission policy. |
+| Replay/report privacy leaks | Default-on redaction; BACK-SCOPE-07 tests; never log tokens or absolute local paths. |
+| Anti-cheat false positives | Tiered profiles; tournament-grade is post-launch; appeal-out-of-game per operator policy. |
 
 ## Revisit Trigger
 
-Reopen this decision when:
-
-- DR-005 produces bandwidth/authority evidence for co-op or PvP.
-- A public playtest/server directory is scheduled.
-- Package registry or replay sharing becomes a primary retention loop.
-- The project chooses a platform backend or store.
-- User explicitly decides accounts, leaderboards, gacha/economy, or public matchmaking should move from research into product scope.
-- New source evidence contradicts this recommendation.
+- Backend cost or operator complexity exceeds the DR-026 AI-augmented-solo team model.
+- Platform certification (Steam/Sony/MS/Nintendo) forces a backend redesign.
+- Account/identity provider becomes contractually mandatory in a way that conflicts with community hosting.
+- Community-hosting posture proves incompatible with multiplayer scale.
+- A future business decision elevates first-party hosted services to launch commitments.
 
 ## Source Trail
 
+- Project owner direction (2026-05-05).
+- [[spec/server-app-architecture]]
+- [[spec/persistent-mmo-architecture]]
+- [[spec/backend-networking]]
 - [[spec/backend-service-hub-slice-a]]
-- [[systems/networking-backend-frontend]]
-- [[comparables/opensoldat-satellites-local-audit]]
-- [[systems/replay-determinism-and-run-evidence]]
 - [[spec/package-builder-workbench-slice-a]]
-- [[spec/ux-wireframes-slice-a]]
+- [[systems/networking-backend-frontend]]
+- [[systems/replay-determinism-and-run-evidence]]
+- [[comparables/opensoldat-satellites-local-audit]]
+- [[decisions/dr-002-replay-event-architecture]]
 - [[decisions/dr-005-multiplayer-posture]]
 - [[decisions/dr-006-modding-data-model]]
 - [[decisions/dr-010-license-reuse-matrix]]
-- Steamworks Game Servers: `https://partner.steamgames.com/doc/features/multiplayer/game_servers`
-- Steamworks `ISteamMatchmakingServers`: `https://partner.steamgames.com/doc/api/ISteamMatchmakingServers`
-- Steam Datagram Relay: `https://partner.steamgames.com/doc/features/multiplayer/steamdatagramrelay`
-- Unity Lobby heartbeat: `https://docs.unity.com/lobby/heartbeat-a-lobby`
-- Unity Multiplay server readiness: `https://docs.unity.com/en-us/multiplay-hosting/concepts/server-readiness`
-- PlayFab multiplayer overview: `https://learn.microsoft.com/en-us/gaming/playfab/multiplayer/mpintro`
-- EOS game services overview: `https://dev.epicgames.com/docs/epic-online-services/index`
+- [[decisions/dr-024-native-engine-stack]]
+- [[decisions/dr-026-team-and-repo-model]]
+- [[decisions/dr-029-save-game-model]]
+- [[decisions/dr-031-content-economy-and-monetization-posture]]
+- [[decisions/dr-034-dedicated-server-application]]
+- [[decisions/dr-035-persistent-mmo-architecture]]
+- Steamworks Game Servers, Steam Datagram Relay, EOS, PlayFab, Unity Lobby + Multiplay docs.
+- [[research-log/2026-05-05-multiplayer-and-mmo-direction]]

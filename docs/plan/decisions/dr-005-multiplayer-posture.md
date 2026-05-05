@@ -1,122 +1,138 @@
 ---
 type: decision
 id: DR-005
-status: open
+status: closed-direction
 priority: P0
-revisit_trigger: "When a terrain-event-rate prototype + authority feasibility memo are complete."
+closed_at: 2026-05-05
+revisit_trigger: "Networking transport library proves infeasible after M9/M10 prototyping; bandwidth budgets cannot be hit at MMO scale; community-hosting posture conflicts with platform certification; or post-launch evidence shows competitive PvP is incompatible with the chassis/destruction sim."
 ---
 
-← [[decisions/index|decision records]] · [[systems/networking-backend-frontend|networking]] · [[engine/network-terrain-replication-lifecycle|terrain replication]] · [[comparables/soldat-and-opensoldat|OpenSoldat lessons]] · [[comparables/openlierox-local-audit|OpenLieroX audit]]
+← [[decisions/index|decision records]] · [[dashboards/decision-tracker|decision tracker]] · [[spec/server-app-architecture|server app architecture]] · [[spec/persistent-mmo-architecture|persistent MMO architecture]] · [[spec/prototype-roadmap|native roadmap]] · [[decisions/dr-013-backend-service-scope|DR-013]] · [[decisions/dr-034-dedicated-server-application|DR-034]] · [[decisions/dr-035-persistent-mmo-architecture|DR-035]]
 
-# DR-005: Multiplayer Posture
+# DR-005: Multiplayer Architecture And Launch Scope
 
-> [!info] Status: OPEN; LEAN: solo-first + co-op-ready architecture; prototype networking (including PvP experiments) freely; no launch PvP promise yet
+> [!success] Status: CLOSED-DIRECTION (project owner committed 2026-05-05)
+> The full multiplayer ladder is part of the launch SKU: **solo + split-screen + LAN co-op + online co-op + community-hostable dedicated PvP arenas + persistent MMO shards**. All modes use one server-authoritative simulation hosted by the same `cx-server` binary (DR-034). Anyone can host any mode without proprietary cloud dependencies. Persistent MMO shards are first-class (DR-035), not a post-launch experiment.
 
-## Context
+## Decision
 
-Cortex/CCCP/C4 networking is RakNet-era and bitmap-delta-based. GameNetworkingSockets is a transport, not a game-state model. Terrain destruction + per-pixel material + Lua AI + heavy gibs are difficult to sync. The decision here is about **launch promise**, not research. PvP and online experiments are encouraged at any time as research/prototype work; this DR only governs what we *commit to ship* at launch. See [[engine/network-terrain-replication-lifecycle]] and [[systems/networking-backend-frontend]].
+**Server-authoritative simulation; one dedicated server binary; full multiplayer ladder at launch.**
 
-## Options
+This DR replaces the prior "solo-first + co-op-ready architecture; no launch PvP promise yet" posture. The user's commitment on 2026-05-05 is to ship multiplayer as a first-class product surface, not a post-launch milestone.
 
-| Option | Summary |
+## What This Locks In
+
+| Mode | Status | First Proof |
+|---|---|---|
+| Solo (offline) | Required at launch. No account needed. | M0..M7 progression. |
+| Split-screen local | Optional at launch (input remap UX cost). | Post-M7 evaluation. |
+| LAN co-op | **Required at launch.** | M10 LAN Co-op milestone. |
+| Online co-op (private) | **Required at launch.** | M11 Online Co-op milestone. |
+| Public online co-op (community-hosted) | **Required at launch.** | M11 + M12. |
+| PvP arena (community-hosted) | **Required at launch.** | M12 PvP milestone. |
+| Persistent MMO shards (community-hostable) | **Required at launch** as a supported mode. | M12 MMO milestone. |
+| Ranked PvP / first-party MMO hosting | Optional, post-launch. | Post-launch evaluation. |
+
+| Architectural Pin | Commitment |
 |---|---|
-| A. Solo-only at launch | No multiplayer; design simulation freely. |
-| B. Solo + local co-op (split-screen) | Local 2-4 players; no online. |
-| C. Solo + online co-op (server-authoritative) | Online with one host per session. |
-| D. Solo + small online co-op + dedicated servers | Adds dedicated server option. |
-| E. Live PvP (competitive) | Full competitive online. |
-| F. Async strategic layer + local combat | Online for campaign/contracts/factions only; combat stays local. |
+| Authority | 100% server-authoritative for sim state, terrain mutation, AI decisions, mission director, save persistence. Clients use prediction + reconciliation only for player-driven actor. |
+| Server binary | One `cx-server` binary with `--mode <coop_room\|pvp_arena\|lan_room\|mmo_shard\|lobby_directory\|ranked_arena>`. Same sim, terrain, physics, equipment, chassis, AI, replay, mod, control as the client. See [[spec/server-app-architecture]]. |
+| Hosting | Community-hostable by default. Steam Datagram Relay / EOS / PlayFab / Unity Multiplay are **adapters**, not requirements. |
+| Account | **Not required** for solo or private LAN/co-op rooms. Required for public shards (per DR-035). |
+| Anti-cheat | Server-authoritative validation as a foundation; tournament-grade is post-launch. Anti-cheat profiles: `casual`, `competitive`, `tournament_strict`. |
+| Modding | Server runs the same `cx-mod` package format as the client; mod hash sync is mandatory; trust tiers gate per-server admission (DR-006). |
+| Replay determinism | Server-authoritative replay; per-client run bundles align tick-for-tick (DR-002). |
+| LLM mind | Mind workers may run server-side (DR-032); clients see reason labels only, never prompts. |
+| Networking transport | Decided in M9/M10: candidate trait-bound implementations of `lightyear`, `renet`, `quinn`. Selection committed before M11 begins. |
+| Bandwidth target | TBD per T-PERF; per-client floor 64 KB/s in dense combat; MMO mode 30 Hz acceptable to fit budgets. |
 
-## Pros And Cons
+## What This Explicitly REJECTS
 
-| Option | Pros | Cons | Unknowns |
-|---|---|---|---|
-| A | Maximum sim freedom. | Loses social retention. | None. |
-| B | Local couch co-op nostalgia. | Modest reach; doesn't help online community. | Input remap UX cost. |
-| C | Best balance for solo-first promise. | Bandwidth + authority scale; replay/event must be solid. | Bandwidth at heavy combat density. |
-| D | Community servers + modding power. | Server hosting cost; abuse moderation. | Operator demand. |
-| E | Highest retention if it works. | Determinism/authority/cheating all hard with destructible sim. | Probably not viable in scope. |
-| F | Adds online without sim sync risk. | Doesn't satisfy "play together" expectation. | Whether players accept async-only. |
+| Rejected Pattern | Why |
+|---|---|
+| "No launch PvP promise" | The user's 2026-05-05 commitment elevates PvP to launch. Community hosting + anti-cheat foundation make this feasible without a publisher-scale ops team. |
+| "MMO mode is post-launch experiment only" | DR-035 promotes MMO shard mode to a launch-supported mode. Community-hosted shards remove the operator-cost objection. |
+| Client-authoritative sim state | Cheating risk; replay/determinism risk; networking instability. Server is authoritative for everything that matters. |
+| Forced first-party hosting | Architecture supports community hosting first; first-party is optional adapter. |
+| Forced account systems for private play | Solo and LAN/private co-op work without any account. |
+| Different sim logic for server vs client | One `cx-sim-core`; server omits render/audio crates only. |
+| Brute-force replication | Use snapshot/event hybrid + interest management per DR-002 + persistent MMO architecture. |
+| Subscription-funded MMO | Conflicts with DR-031 content economy. |
 
-## Evaluation
+## Why Not The Alternatives
 
-| Lens | A | B | C | D | E | F |
-|---|---|---|---|---|---|---|
-| Player value | Strong sim | Local social | Online social | Online + mod | Competitive | Persistence |
-| Readability | High | Medium | Medium | Medium | Low | High |
-| AI burden | Lowest | Low | Medium | Medium | Highest | Low |
-| UX burden | Low | Medium | High | High | Highest | Medium |
-| Performance risk | Lowest | Low | High | High | Highest | Lowest |
-| Modding impact | Highest | High | High (mods + servers) | Highest | Hard (anti-cheat) | High |
-| Networking/replay impact | None | None | Strong | Strong | Strongest | Backend only |
-| Content cost | Lowest | Low | High | High | Highest | Medium |
-| Retention upside | Medium | Medium | High | High | Highest | Medium |
-| Ethics/fairness | Low | Low | Medium | Medium | Hardest | Low |
+| Alternative | Why Rejected |
+|---|---|
+| Solo + LAN only at launch | Underdelivers on the contract-and-base sandbox social promise; the user wants community to be first-class. |
+| Solo + LAN + online co-op (no PvP, no MMO) | Same as above; misses the unique community hosting opportunity. |
+| Single-shard seamless world MMO | Sim cost; out of scope. Shard-with-portal is enough. |
+| Publisher-only hosted MMO | Operator cost; conflicts with DR-026 solo-with-AI team model. |
+| Fully decentralized P2P | Authority/anti-cheat too weak; rejected. Server-authoritative is non-negotiable. |
+| Different server binaries per mode | Operational complexity; mod compatibility hell. One binary, multiple modes. |
 
-## Evidence
+## Evidence Trail
 
-| Evidence | Source | Confidence |
-|---|---|---|
-| CCCP networking is RakNet bitmap-delta + multiplayer activities; not modern. | [[engine/network-terrain-replication-lifecycle]] | High |
-| C4 has more visible multiplayer infrastructure including NAT punch. | [[repos/c4-continuation-engine]] | High |
-| OpenSoldat refactored to GameNetworkingSockets but still implements custom snapshots/deltas and game-state packets. | [[comparables/opensoldat-local-audit]] | High |
-| OpenSoldat local code applies client-sent position, velocity, aim, keys, weapon, and ammo state with limited validation, making it a cautionary authority model for public online play. | [[comparables/opensoldat-local-audit]] | High |
-| OpenLieroX legacy packets include movement/control/rope/weapon/velocity plus carve/damage messages; server-side read accepts client movement fields, making it another cautionary authority model. | [[comparables/openlierox-local-audit]] | High |
-| OpenLieroX NewNet has save/restore/checksum/rollback-style intent but current source does not prove a finished reliable model. | [[comparables/openlierox-local-audit]] | High |
-| OpenLieroX public changelogs repeatedly fixed rope, explosion, shot desync, invisible laser, dedicated server, upload-limit, and file-transfer/network issues. | [[comparables/openlierox-local-audit]] | Medium |
-| Determinism with Lua + physics + RNG is widely known to be hard. | Industry standard; Noita talks. | High |
-| Solo-first product promise dominates research. | [[strategy/best-cortex-like-game-principles]] | High |
-| Replay/event architecture (DR-002) is the prerequisite for online. | [[systems/replay-event-architecture]] | High |
+- Project owner verbatim (2026-05-05): "I think it makes sence to plan out Multiplayer and PVP and MMO capability. I want to have an entire server app designed to run our app. anyone can host multiplayer games, as well as the persistent MMO mode."
+- Source patterns: Source dedicated server, Quake/Quake-Live community model, Project Zomboid dedicated server, Space Station 13/14 round-based persistence, Minecraft Realms-vs-Bukkit split, EVE Online single-shard architecture (anti-pattern; we're not doing that), Steam Game Servers + Steam Datagram Relay, EOS sessions, Unity Lobby + Multiplay readiness, PlayFab modular multiplayer.
+- Cross-DR coherence: DR-024 already commits to "MMO-ready architecture from day one"; this DR closes the open posture so DR-024 isn't aspirational.
+- DR-026 team model + DR-031 economy + DR-013 backend scope all support community-hosted servers as the default; DR-005 ratifies this.
 
-## Current Recommendation
-
-Recommendation for **launch commitments**: **Posture A+B at launch with C-ready architecture; D, E, F as post-launch milestones if/when proven**.
-
-- Ship solo-first.
-- Add local co-op (B) early.
-- Build all simulation/networking-relevant interfaces (event log, server authority hooks, snapshot writer, client prediction friendliness) so that **C is implementation work, not a redesign**.
-- Live PvP (E) is not a launch promise yet. Prototype it freely whenever it could improve the game; promote to a launch promise only after a bandwidth/authority/cheating prototype passes.
-- F (async strategic layer) can come post-launch.
-
-Why: protects sim freedom; keeps the solo-first promise truthful at launch; preserves online optionality; supports ambitious networking experiments without forcing premature commitments.
-
-## Prototype Or Validation Plan
-
-| Test | What It Proves | Pass/Fail |
-|---|---|---|
-| Terrain-event rate at peak combat (1 host + 20 actors). | Bandwidth budget for online co-op (C). | Pass = under target bandwidth (e.g. 64 KB/s/client). |
-| Rope/tether reconciliation test. | Whether mobility mastery can be predicted/authoritatively corrected without feeling bad. | Pass = attach/release/force corrections are readable and rare. |
-| Projectile/terrain semantic event test. | Whether explosions, beams, drills, and child projectiles can sync as events instead of bitmap spam. | Pass = no visible divergence after 5-minute combat replay. |
-| Authority feasibility memo (server vs host vs deterministic). | Authority model viability. | Memo identifies one viable model with risk profile. |
-| Co-op prototype with two clients on local network. | C path is real. | Pass = same world state for 5 minutes; Fail = drift. |
-| Local split-screen (B). | Input remap + camera scope. | Pass = playable for 10 minutes without confusion. |
-
-## Risks
+## Risks And Mitigations
 
 | Risk | Mitigation |
 |---|---|
-| Online expectations from comparable shooters pull PvP into a premature launch promise. | Be honest in communication: "solo-first launch; online co-op planned; PvP is being prototyped but not promised". |
-| Server costs balloon. | Co-op-first; rely on host or community-run dedicated server until usage data justifies more. |
-| Cheating ecosystem pressures anti-cheat. | Server-authoritative design; replay/event log enables review. |
-| Mods incompatible with co-op. | Per-mod compatibility tier; mod hash sync. |
-| PvP prototype reveals real fun before sim is ready. | Capture findings in a new sub-DR; do not let excitement skip the bandwidth/authority work. |
+| Bandwidth at peak combat density | Snapshot/event hybrid; interest management; per-region replication; T-PERF gates at M10/M11/M12. |
+| Anti-cheat is hard with destructible sim | Server-authoritative simulation; replay drift detection; tiered profiles; tournament-grade is post-launch. |
+| Mod compatibility across servers | Hash sync; trust tiers; clear mismatch UI; auto-download off by default for production. |
+| MMO persistence corruption | Atomic snapshot writes; journal replay validation; rolling backups (DR-035). |
+| Community hosting cost / availability | First-party Docker images + reference deployments; `lobby_directory` aggregates community shards; we don't take responsibility for uptime of community shards. |
+| Networking transport churn | Trait-bound `cx-net` adapter; selection committed before M11; library swap is local to one crate. |
+| Platform certification (Steam/EOS) | Adapters; can launch on Steam without locking to Steam-only. |
+| Replay drift across clients | Stable pair ordering, deterministic islands, per-client checksums in M10/M11 acceptance tests. |
+| Operator burnout | Minimal-config dedicated server; reference Docker; community templates; T-SERVER side track tracks ops UX. |
+
+## Prototype / Validation Plan
+
+| Test | What It Proves |
+|---|---|
+| M9 SERVER-001..SERVER-016 | Dedicated server binary works in `coop_room`, `pvp_arena`, `lan_room`, `mmo_shard` modes. |
+| M10 LAN co-op | Two LAN clients survive a 5-min Breach Contract; per-client bundles align. |
+| M11 online co-op | Two friends in different cities co-op a Breach Contract through NAT/relay; mod hash sync works. |
+| M12 PvP arena | 4-8 players in a small destructible map; server-authoritative; bandwidth + cheat models tested. |
+| M12 MMO-001..MMO-012 | MMO shard mode boots, persists, restarts cleanly; 50 simulated clients for 1 hour; 100 for 30 min. |
+| Headless replay verification | `cx-headless replay --verify-checksums` per-client and per-server bundles align tick-for-tick. |
+| Anti-cheat profile validation | Input-rate-spike client kicked; ban list persists across restart. |
 
 ## Revisit Trigger
 
-Reopen this decision when:
-
-- Terrain-event prototype measures actual bandwidth.
-- Replay/event architecture (DR-002) is operational.
-- Community demand data exists post-launch.
-- A change in product goal (e.g. competitive ladder) is requested.
+- Networking transport library proves infeasible after M9/M10 prototyping.
+- Bandwidth budgets cannot be hit at MMO scale.
+- Community-hosting posture conflicts with platform certification (Steam/Sony/MS/Nintendo).
+- Post-launch evidence shows competitive PvP is incompatible with the chassis/destruction sim.
+- A subscription/free-to-play business decision conflicts with DR-031.
+- Cross-shard live combat or seamless world becomes a strategic priority (would require DR-035 amendment).
 
 ## Source Trail
 
-- [[engine/network-terrain-replication-lifecycle]]
+- Project owner direction (2026-05-05).
+- [[spec/server-app-architecture]]
+- [[spec/persistent-mmo-architecture]]
+- [[spec/backend-networking]]
+- [[spec/backend-service-hub-slice-a]]
 - [[systems/networking-backend-frontend]]
+- [[engine/network-terrain-replication-lifecycle]]
 - [[comparables/soldat-and-opensoldat]]
 - [[comparables/opensoldat-local-audit]]
+- [[comparables/opensoldat-satellites-local-audit]]
 - [[comparables/openlierox-local-audit]]
-- [[systems/replay-event-architecture]]
-- [[repos/c4-continuation-engine]]
-- [[strategy/best-cortex-like-game-principles]]
+- [[decisions/dr-002-replay-event-architecture]]
+- [[decisions/dr-006-modding-data-model]]
+- [[decisions/dr-013-backend-service-scope]]
+- [[decisions/dr-024-native-engine-stack]]
+- [[decisions/dr-026-team-and-repo-model]]
+- [[decisions/dr-031-content-economy-and-monetization-posture]]
+- [[decisions/dr-032-hybrid-llm-ai-direction]]
+- [[decisions/dr-033-full-collision-physics-direction]]
+- [[decisions/dr-034-dedicated-server-application]]
+- [[decisions/dr-035-persistent-mmo-architecture]]
+- [[research-log/2026-05-05-multiplayer-and-mmo-direction]]

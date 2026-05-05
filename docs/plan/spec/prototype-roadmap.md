@@ -38,14 +38,16 @@ feeds:
   - DR-031
   - DR-032
   - DR-033
+  - DR-034
+  - DR-035
 ---
 
-← [[spec/index|spec section]] · [[spec/authoritative-game-spec-v0|game spec v0]] · [[spec/native-implementation-backlog|native backlog]] · [[spec/feature-completion-checklist|feature checklist]] · [[spec/full-collision-physics-plan|full collision plan]] · [[spec/ai-control-observability-layer|AI control/observability]] · [[spec/prototype-implementation-backlog-slice-a|historical HTML backlog]] · [[dashboards/research-readiness|readiness]] · [[decisions/index|decisions]] · [VAULT_PLAN.md](../../VAULT_PLAN.md) · [HTML-era snapshot](../research-log/2026-05-04-prototype-roadmap-html-snapshot.md)
+← [[spec/index|spec section]] · [[spec/authoritative-game-spec-v0|game spec v0]] · [[spec/native-implementation-backlog|native backlog]] · [[spec/feature-completion-checklist|feature checklist]] · [[spec/server-app-architecture|server app architecture]] · [[spec/persistent-mmo-architecture|persistent MMO architecture]] · [[spec/full-collision-physics-plan|full collision plan]] · [[spec/hybrid-llm-ai-plan|hybrid LLM AI plan]] · [[spec/ai-control-observability-layer|AI control/observability]] · [[spec/prototype-implementation-backlog-slice-a|historical HTML backlog]] · [[dashboards/research-readiness|readiness]] · [[decisions/index|decisions]] · [VAULT_PLAN.md](../../VAULT_PLAN.md) · [HTML-era snapshot](../research-log/2026-05-04-prototype-roadmap-html-snapshot.md)
 
 # Native Build Roadmap
 
 > [!summary] What this is
-> The native development roadmap. Replaces the prior browser-lab-flavored roadmap in full. The project is a **greenfield Rust native game** built on Bevy + wgpu as foundation, with custom core crates for the systems that make this game special. Targets desktop-first (Win/Linux/macOS) at 4K/120 ceiling with 1080p/60 floor and Steam Deck 800p/60 compatibility, MMO-ready from day one, with first-class scenario editor and modding at launch.
+> The native development roadmap. Replaces the prior browser-lab-flavored roadmap in full. The project is a **greenfield Rust native game** built on Bevy + wgpu as foundation, with custom core crates for the systems that make this game special. Targets desktop-first (Win/Linux/macOS) at 4K/120 ceiling with 1080p/60 floor and Steam Deck 800p/60 compatibility. The launch SKU includes a **dedicated server binary (`cx-server`) anyone can host** for LAN co-op, online co-op, public PvP arenas, and **persistent MMO shards** (DR-005 + DR-013 + DR-034 + DR-035). First-class scenario editor and modding at launch (DR-030 + DR-006).
 
 > [!warning] Authority boundary
 > This is a planning anchor. Milestones, ticket counts, and per-feature detail will move as evidence comes in. The structure (M0..M12 + side tracks) is committed. Specific timelines and ticket boundaries will be tuned per milestone.
@@ -90,14 +92,15 @@ feeds:
   - [M6.5 — LLM Mind Lab](#m65--llm-mind-lab)
   - [M7 — Mission Director And Breach Contract Proof Mission](#m7--mission-director-and-breach-contract-proof-mission)
   - [M8 — Scenario Editor And Mod Tools](#m8--scenario-editor-and-mod-tools)
-  - [M9 — Headless Server And Determinism Islands](#m9--headless-server-and-determinism-islands)
+  - [M9 — Dedicated Server App + Determinism Islands](#m9--dedicated-server-app--determinism-islands)
   - [M10 — LAN Co-op](#m10--lan-co-op)
-  - [M11 — Online Co-op (Private)](#m11--online-co-op-private)
-  - [M12 — PvP And MMO Experiments](#m12--pvp-and-mmo-experiments)
+  - [M11 — Online Co-op (Self-Hosted Dedicated Servers)](#m11--online-co-op-self-hosted-dedicated-servers)
+  - [M12 — Public PvP Arenas + Persistent MMO Shards](#m12--public-pvp-arenas--persistent-mmo-shards)
 - [Side Track Details](#side-track-details)
   - [T-CONTROL — AI Control And Observability](#t-control--ai-control-and-observability)
   - [T-LLM — Async LLM Mind Layer](#t-llm--async-llm-mind-layer)
   - [T-PHYS — Full Collision And Physical Consequence](#t-phys--full-collision-and-physical-consequence)
+  - [T-SERVER — Dedicated Server App Lifecycle And Community Hosting](#t-server--dedicated-server-app-lifecycle-and-community-hosting)
   - [T-PLATFORM — Cross-Platform CI And Steam Deck](#t-platform--cross-platform-ci-and-steam-deck)
   - [T-MOD — Modding And Scripting](#t-mod--modding-and-scripting)
   - [T-AUDIO — Diegetic SFX And Captions](#t-audio--diegetic-sfx-and-captions)
@@ -128,10 +131,12 @@ If you only have time to read four things before starting work:
 If you have more time, also read in roughly this order:
 
 - [[spec/ai-control-observability-layer]] — `cx-control` / `cxctl` / observation stream / UI tree (cross-cutting from M0).
+- [[spec/server-app-architecture]] — `cx-server` dedicated server binary; modes (`coop_room`, `pvp_arena`, `lan_room`, `mmo_shard`, `lobby_directory`); community-hosting posture (T-SERVER / M9..M12).
+- [[spec/persistent-mmo-architecture]] — MMO shard mode, persistence, interest management, account model, MMO-001..MMO-012 (M12 / DR-035).
 - [[spec/full-collision-physics-plan]] — collision classes, matrix, projectile-projectile rules, CCD tiers, impulse-to-damage, COLL-001..COLL-012 (T-PHYS / M5.5).
 - [[spec/hybrid-llm-ai-plan]] — async LLM mind layer with strict schemas, mock provider, validator, replay logging (T-LLM / M6.5).
 - [[references/prototype-run-bundle-schema]] — run-bundle event categories, manifest/summary/notes contract, per-milestone acceptance gates.
-- [[decisions/index]] and [[dashboards/decision-tracker]] — DR-001..DR-033 with current direction and lean.
+- [[decisions/index]] and [[dashboards/decision-tracker]] — DR-001..DR-035 with current direction and lean.
 - [[references/usage-ledger]] — log when external code/data/assets enter the project.
 - [[research-log/moonshot-register]] — wild ideas; promote only with a DR.
 - [[prototypes/actor-feel-lab-a1-human-playtest-2026-05-04]] — the "ok I guess" signal that informs M1.5 acceptance.
@@ -179,6 +184,20 @@ A junior agent must never have to guess what these words mean. If a term is used
 | **Mind task** | A queued LLM request with kind, deadline, cost cap, observation, output schema. Async; never blocks sim. |
 | **Mind worker** | An async background worker that consumes mind tasks and submits validated `AiMindProposal` results. Local AI never waits on it. |
 | **Mock provider** | The deterministic LLM provider used by CI, AI-H, replay, and mind-lab tests. Always built. No API keys. |
+| **`cx-server`** | The dedicated server binary (DR-034). Same Rust workspace; same sim path as the client. Modes: `coop_room`, `pvp_arena`, `lan_room`, `mmo_shard`, `lobby_directory`. Linux + Windows. Reference Docker image ships at launch. |
+| **Dedicated server / server app** | Synonyms for `cx-server`. Anyone can host. |
+| **Server mode** | A run-mode of `cx-server` selected via `--mode`. One binary, multiple modes. |
+| **Coop room** | `cx-server --mode coop_room`: private/public co-op session for 2-4 (configurable up to 8). |
+| **PvP arena** | `cx-server --mode pvp_arena`: server-authoritative PvP for 2-8 with anti-cheat foundation. |
+| **LAN room** | `cx-server --mode lan_room`: LAN-discovered co-op session. |
+| **MMO shard** | `cx-server --mode mmo_shard`: persistent long-running world; 50-200 concurrent target; community-hostable per DR-035. |
+| **Lobby directory** | `cx-server --mode lobby_directory`: public registry that aggregates community-hosted shards. |
+| **Anti-cheat profile** | Named tuning bundle for server-side input/state validation: `casual`, `competitive`, `tournament_strict`. |
+| **Snapshot store** | MMO shard's compressed binary snapshot directory; default cadence 10 min. |
+| **Event journal** | Append-only per-tick event log for MMO shards; supports point-in-time recovery. |
+| **Interest management** | Server-side filter that delivers events/snapshots only for in-range entities to each client. Required for MMO scale. |
+| **Lobby/portal** | UI flow for cross-shard travel. Player logs out on Shard A, logs in on Shard B; no live cross-shard combat at v1. |
+| **Trust tier** | Per-mod label (`vanilla`, `verified`, `community`, `experimental`); operators pin a max trust accepted from clients. |
 | **Manifest (scenario)** | RON file in `content/scenarios/` describing teams, objectives, materials, command core, base systems, capability requirements, director config, save fields. |
 | **Mission director** | The system that paces a scenario: reinforcement, LZ risk, objective escalation. Emits commander-decision events with reason labels. |
 | **Module** | A chassis subcomponent with damage states (jet, shield, sensor, repair-drone, weapon-mount). Failures emit reason-labeled events. |
@@ -345,7 +364,10 @@ The milestone is fully done when:
 | Target platforms | Desktop-first: Windows, Linux, macOS. Steam Deck 800p/60 floor. Headless Linux server later. Web only for labs/tools/demos. No mobile (DR-025). |
 | Team model | AI-augmented solo/small-core. Modular repo so AI agents can own crates without breakage (DR-026). |
 | Pacing & control | Hybrid real-time tactical. Direct possession optional. Strategy-first valid (DR-015 + DR-026). |
-| Multiplayer phasing | MMO-ready architecture from day one; ship solo-first first. Solo lab → split-screen → LAN co-op → online co-op → PvP/MMO (DR-005 + DR-026). |
+| Multiplayer phasing | **Full ladder at launch** (DR-005 closed): solo + LAN co-op + online co-op + community-hostable public PvP arenas + persistent MMO shards. Server-authoritative simulation; one `cx-server` binary; community-hostable by default; no proprietary cloud lock-in. Ranked PvP and first-party hosting are post-launch. |
+| Dedicated server app | **`cx-server` ships at launch** (DR-034). Same Rust workspace; same sim/terrain/physics/equipment/chassis/AI/replay/mod crates; modes selected via `--mode <coop_room\|pvp_arena\|lan_room\|mmo_shard\|lobby_directory>`. Linux + Windows; reference Docker image; documented hosting guide. See [[spec/server-app-architecture]]. |
+| Persistent MMO mode | **MMO shard is a launch-supported mode** (DR-035). Bounded shard-with-portal model (NOT seamless world); 50-200 concurrent target; community-hostable; persistent terrain/bases/veterans/factions/commander memory; account required for public shards, NOT for private LAN/co-op. **No subscription**. See [[spec/persistent-mmo-architecture]]. |
+| Backend services | Local-first default for solo/private play; full backend service spine (lobby_directory, account adapter, persistence, anti-cheat foundation, observability) ships at launch (DR-013). Steam/EOS/PlayFab/Unity Multiplay are optional adapters, never required. |
 | Visual fidelity | Target 4K/120 strong desktop; floor 1080p/60; Steam Deck 800p/60. Pixel-sim battlefield + comic-noir UI + scalable SDF/vector text + 200% UI scaling (DR-019 + DR-028). |
 | Audio | Diegetic industrial synth-dread; audio-as-tactical-UI; mandatory captions (DR-020). |
 | Sim model | Fixed 60/120 Hz islands; AI/terrain budgeted-async; deterministic where it earns its keep. |
@@ -374,8 +396,9 @@ The milestone is fully done when:
 | AI | **Custom crate** | DR-022 humanlike-bar means perception/memory/doctrine/adaptation; not off-the-shelf. |
 | Replay/event | **Custom crate** | DR-002/DR-018 event taxonomy + scenario manifest + run-bundle schema. |
 | AI/dev control | **Custom crate + CLI** | `cx-control` schemas plus `cxctl` so agents/tests can observe and act without screenshots. |
-| Networking | **Custom crate** built on a transport (lightyear / renet / quinn TBD) | DR-005 MMO-ready architecture. Authority boundaries, snapshot/event hybrid, deterministic islands. |
-| Save | **Custom crate** | DR-029 versioned + migration-safe + replay-linked. |
+| Networking | **Custom crate** built on a transport (lightyear / renet / quinn TBD) | DR-005 server-authoritative architecture. Authority boundaries, snapshot/event hybrid, deterministic islands. Transport selection committed before M11. |
+| Dedicated server | **Custom binary `cx-server` + ops/persistence/anti-cheat/admin crates** | DR-034 single-binary multi-mode server. Linux + Windows. Reuses every sim crate. See [[spec/server-app-architecture]]. |
+| Save / persistence | **Custom crate** (client + shared with server-side persistence) | DR-029 versioned + migration-safe + replay-linked; MMO shard persistence per DR-035. |
 | UI | egui (Bevy plugin) for tools/workbench; **custom Bevy UI or egui-skinned** for game HUD | Comic-noir UI requires control egui can't fully give; tools can use egui. |
 | Audio | Bevy audio backend or kira | Diegetic-first mix; caption events drive subtitle UI. |
 | Modding scripts | mlua (Lua) or Rhai — pick during M8 | Lua is familiar; Rhai is Rust-native. Decide based on M5/M6 needs. |
@@ -452,7 +475,12 @@ cortex-game/                          # cargo workspace root
 │   ├── cx-audio/                     # diegetic mix, caption events
 │   ├── cx-mod/                       # mod loader, schema validator, script host
 │   ├── cx-tools-editor/              # in-engine scenario/package workbench (DR-030)
-│   ├── cx-headless/                  # headless server binary
+│   ├── cx-headless/                  # headless sim runner used by replay verification + CI
+│   ├── cx-server/                    # dedicated server binary (DR-034); modes: coop_room, pvp_arena, lan_room, mmo_shard, lobby_directory
+│   ├── cx-server-ops/                # server lifecycle: config, health/readiness, metrics, drain shutdown, restart hooks
+│   ├── cx-server-persistence/        # MMO shard snapshot/journal/restore (DR-035); also reused for save migration tests
+│   ├── cx-server-anti-cheat/         # server-side input validation, replay drift detection, profiles, ban list, audit log
+│   ├── cx-server-admin/              # admin/console API (capability-gated) over the cx-control envelope
 │   └── cx-bench/                     # perf harness
 ├── assets/                           # sprites, audio, manifests, scenes
 ├── content/                          # base game packages (data + manifests + scripts)
@@ -507,6 +535,11 @@ members = [
   "crates/cx-mod",
   "crates/cx-tools-editor",
   "crates/cx-headless",
+  "crates/cx-server",
+  "crates/cx-server-ops",
+  "crates/cx-server-persistence",
+  "crates/cx-server-anti-cheat",
+  "crates/cx-server-admin",
   "crates/cx-bench",
 ]
 
@@ -681,9 +714,10 @@ cd cortex-game
 # create rust-toolchain.toml, Cargo.toml, rustfmt.toml, clippy.toml, .cargo/config.toml, .gitignore as above
 for crate in cx-app cx-sim-core cx-terrain cx-physics cx-actor cx-chassis cx-equipment \
              cx-ai cx-mission cx-replay cx-control cxctl cx-e2e cx-save cx-net cx-render-2d \
-             cx-ui cx-audio cx-mod cx-tools-editor cx-headless cx-bench; do
+             cx-ui cx-audio cx-mod cx-tools-editor cx-headless cx-server cx-server-ops \
+             cx-server-persistence cx-server-anti-cheat cx-server-admin cx-bench; do
   case "$crate" in
-    cx-app|cxctl|cx-e2e|cx-headless|cx-bench) crate_kind="--bin" ;;
+    cx-app|cxctl|cx-e2e|cx-headless|cx-server|cx-bench) crate_kind="--bin" ;;
     *) crate_kind="--lib" ;;
   esac
   cargo new $crate_kind crates/$crate --name $crate
@@ -888,6 +922,43 @@ Single source of truth for every CLI flag. If a flag exists in the codebase but 
 | `--verify-checksums` | false | Verify deterministic checksums. |
 | `--first-divergence` | false | On replay diverge, dump the first divergence. |
 | `--bind <addr>` | `127.0.0.1:0` | Network bind for net-driven mode. |
+
+### `cx-server`
+
+The dedicated server binary (DR-034). Same Rust workspace; same sim path as the client. See [[spec/server-app-architecture]].
+
+| Flag | Default | Meaning |
+|---|---|---|
+| `--mode <mode>` | required | One of `coop_room`, `pvp_arena`, `lan_room`, `mmo_shard`, `lobby_directory`, `ranked_arena`. |
+| `--config <path>` | `./server.ron` | RON config file; overrides individual flags. |
+| `--scenario <id>` | from config | Scenario id (or shard manifest id for MMO). |
+| `--seed <u64>` | from manifest | Override the manifest's seed. |
+| `--bind <addr>` | `0.0.0.0:0` | Listen address. |
+| `--public-address <addr>` | none | Address advertised to lobby_directory. |
+| `--max-clients <N>` | per-mode default | Concurrent client cap. |
+| `--package-set <list>` | from config | Comma-separated list of required packages (chassis, equipment, materials, scenarios, AI doctrines). |
+| `--mod-packs <list>` | empty | Optional mod packs (`server_only: true` allowed). |
+| `--anti-cheat-profile <name>` | per-mode default | `casual`, `competitive`, or `tournament_strict`. |
+| `--persistence-enabled` | mode default | Force persistence on/off (default ON for `mmo_shard`, OFF for arenas). |
+| `--persistence-storage-dir <path>` | `./shard-state/` | Where to write snapshots and journal. |
+| `--snapshot-interval-ticks <N>` | per-mode default | Override snapshot cadence. |
+| `--ai-mind-enabled` | false | Enable server-side LLM mind workers (DR-032). |
+| `--lobby-register <url>` | none | Register with a `lobby_directory` instance after boot. |
+| `--metrics-bind <addr>` | `127.0.0.1:9090` | Prometheus metrics bind address. |
+| `--health-path <path>` | `/health` | Health endpoint path. |
+| `--ready-path <path>` | `/ready` | Readiness endpoint path. |
+| `--log-level <level>` | `info` | `error\|warn\|info\|debug\|trace`. |
+| `--log-format <fmt>` | `json` | `json` or `pretty`. |
+| `--admin-capabilities <list>` | empty | Comma list of admin capabilities to enable (e.g. `kick,save,hot_load_scenario`). |
+| `--debug-capabilities <list>` | empty | Comma list of debug capabilities (forces a flag in run-bundle manifest). |
+| `--ticks <u64>` | unlimited | Auto-exit after N sim ticks (smoke). |
+| `--simulate-clients <N>` | 0 | Spawn N internal `cxctl` puppet clients (M12 stress harness). |
+| `--duration-min <N>` | unlimited | Auto-exit after N wall-minutes. |
+| `--write-run-bundle` | false | Emit per-session run bundle on close. |
+| `--validate-config-only` | false | Validate the config + exit 0; no listen. |
+| `--bootstrap-empty-shard` | false | (`mmo_shard` only) Initialize a fresh shard with default world manifest, then exit. |
+| `--auto-discover` | false | (`lan_room` only) Broadcast LAN presence. |
+| `--allow-package-mismatch` | false | Debug only; permits clients with mismatched mod hashes (records in run-bundle manifest). |
 
 ### `cx-bench`
 
@@ -1238,6 +1309,11 @@ Some milestones produce stubs that later milestones must replace without breakin
 | Full collision affordances → AI trust harness | M5.5 | M6 | M6 AI reads collision affordances and events from M5.5: body blocking, debris obstruction, projectile danger, doors/shields, and collision damage reasons. AI must not ignore physical contacts. |
 | Replay event taxonomy → headless replay | M3 | M9 | All M3 events MUST be deterministically reproducible from manifest+seed+inputs. Cosmetic-only events are flagged with `cosmetic: true` and excluded from replay verification. |
 | Per-client bundles → align tick-for-tick | M10 | M11/M12 | Bundles share `run_id`; per-client bundles use `<run_id>__client_<role>` directory suffix. |
+| `cx-headless` sim runner → `cx-server` dedicated server | M3/M9 | M9..M12 | M3 ships `cx-headless` for replay verification; M9 wraps it with `cx-server-ops` (lifecycle, health, metrics, persistence, anti-cheat) without changing the sim path. `cx-headless` continues to be used by CI/replay even after `cx-server` ships. |
+| Server lifecycle stubs → full `cx-server` modes | M0 | M9 | M0 reserves config schema fields + capability gates for `--control-api`, `--debug-capabilities`, secret-redaction. M9 implements `--mode <coop_room\|pvp_arena\|lan_room\|mmo_shard\|lobby_directory>` against those stubs. |
+| Save game state → MMO shard persistence | M5/T-SAVE | M12/DR-035 | M5 writes the v0.1 save format. M9 reuses the format for per-session co-op archive. M12 extends it for MMO shard snapshot/journal persistence. Schema bumps go through registered migration handlers (DR-029). |
+| Anti-cheat foundation hooks → tournament profile | M9 | M11/M12 | M9 ships profile registry (`casual`/`competitive`/`tournament_strict`) + audit log skeleton. M11 enables `competitive` for online co-op. M12 enables `tournament_strict` for ranked PvP (post-launch). |
+| Mod package hashes → server-side mod compatibility | M5/M8/T-MOD | M9..M12 | M5 ships package format + hash. M8 ships package builder + registry. M9 enables server-side mod loading + hash-mismatch UI on join. Server-only mods (`server_only: true`) ship with M11/M12. |
 | Local AI doctrine/blackboard hooks → LLM mind layer | M6 | M6.5 | M6 exposes hook points: utility-weight patch API, commander-blackboard goal API, doctrine-tag set API, dialogue-queue API, memory-write API. M6.5 wires `cx-ai::mind::policy` to those hooks. M6 must NEVER call the LLM layer directly; it only exposes the hooks. |
 | Observation stream → `MindObservationFrame` | T-CONTROL (M0+) | T-LLM (M6.5) | M6.5 adds the compressor that derives `MindObservationFrame` from the `cx-control` observation stream + replay events. The compressor enforces fog-of-war BEFORE any provider sees a prompt. |
 | Run-bundle event taxonomy → `mind` events | M3 | M6.5 | M3 reserves the `mind` event category in the schema. M6.5 fills it with `mind.task_created`, `mind.prompt_recorded` (hashes only by default; raw text behind `debug_capabilities`), `mind.response_received`, `mind.proposal_validated`, `mind.patch_applied`, `mind.patch_rejected`, `mind.memory_written`. |
@@ -1267,10 +1343,11 @@ Before doing any feature work, the agent runs the milestone's kickoff smoke. If 
 | M6.5 | `cargo run -p cx-ai --bin mind_lab -- --suite MIND-001..MIND-010 --provider mock --write-run-bundle` | Mind lab suite passes against mock; local AI keeps acting through provider sleep/fail/stale; replay shows mind events. |
 | M7 | `cargo run -p cx-e2e -- --scenario breach_contract --script win_path --expect win --write-run-bundle` | Breach Contract win path is real. |
 | M8 | `cargo run -p cx-mod -- validate content/ mods/ --strict && cargo run -p cx-e2e -- --scenario sample_mod_breach --expect win --write-run-bundle` | Mod loads + plays. |
-| M9 | `cargo run -p cx-headless -- --scenario breach_contract --ticks 36000 --verify-checksums` | 10-min headless replay verified. |
-| M10 | `cargo run -p cx-headless -- replay-compare <client_a_bundle> <client_b_bundle>` | Per-client bundles align. |
-| M11 | M10 smoke + cross-host smoke through transport adapter. | Transport adapter holds. |
-| M12 | M10/M11 smokes + N=20 stress harness. | Architecture is plausible at scale. |
+| M9 | `cargo run -p cx-server -- --mode coop_room --scenario breach_contract --ticks 36000 --write-run-bundle` then `cargo run -p cx-headless -- replay <m9_run> --verify-checksums` | Dedicated server boots and runs a co-op room; 10-min replay verified. |
+| M9 | `cargo run -p cx-server -- --mode lan_room --auto-discover` (smoke) and `cargo run -p cx-server -- --mode mmo_shard --bootstrap-empty-shard` (smoke). | Each `cx-server` mode boots. |
+| M10 | `cargo run -p cx-server -- --mode lan_room` (host) + 2 `cx-app` clients on LAN, then `cargo run -p cx-headless -- replay-compare <client_a_bundle> <client_b_bundle>` | Per-client bundles align tick-for-tick. |
+| M11 | M10 smoke + `cargo run -p cx-server -- --mode coop_room --public-bind 0.0.0.0:0` reachable through the chosen transport with `lobby_directory` integration. | Self-hosted online co-op with mod hash sync works. |
+| M12 | `cargo run -p cx-server -- --mode pvp_arena` 4-player stress + `cargo run -p cx-server -- --mode mmo_shard --simulate-clients 50 --duration-min 60` + MMO-001..MMO-012 suite. | PvP + MMO architecture is real at launch scale. |
 
 ---
 
@@ -1290,10 +1367,10 @@ Before doing any feature work, the agent runs the milestone's kickoff smoke. If 
 | M6.5 | LLM Mind Lab | Async LLM mind layer with strict schemas, mock provider, validator, policy compiler, replay logging, deterministic fallback; one visible doctrine patch in a controlled breach scenario | M3, M6 | Optional v1; required for DR-032 closure evidence |
 | M7 | Mission Director + Breach Contract | Typed manifest; director; command-core minimum; base-system slice; first proof mission playable | M1..M6 plus M5.5 | Yes |
 | M8 | Scenario Editor + Mod Tools | In-engine workbench; same manifest format; mod loader; package builder | M3, M5, M7 | Yes |
-| M9 | Headless Server + Determinism Islands | Headless sim binary; deterministic island contracts; replay-from-events | M3, M7 | Yes |
-| M10 | LAN Co-op | 2 clients on local network; replicated state; survival of one Breach Contract | M9 | Optional v1 |
-| M11 | Online Co-op (Private) | NAT/relay; lobby; package hash sync | M10 | Optional v1 |
-| M12 | PvP/MMO Experiments | Bandwidth/authority/cheat models tested at scale | M10, M11 | Post-launch only |
+| M9 | Dedicated Server App + Determinism Islands | `cx-server` binary boots in `coop_room`/`pvp_arena`/`lan_room`/`mmo_shard`/`lobby_directory` modes; SERVER-001..SERVER-016 acceptance suite; deterministic islands; replay verification | M3, M7 | **Yes** (was post-launch experiment; now launch commitment per DR-005 + DR-034) |
+| M10 | LAN Co-op | 2-4 clients on local network via `cx-server --mode lan_room`; replicated state; survival of one Breach Contract; per-client bundles align tick-for-tick | M9 | **Yes** (launch commitment) |
+| M11 | Online Co-op (Self-Hosted Dedicated Servers) | NAT/relay via `cx-server --mode coop_room`; lobby + package hash sync; community member can host a public co-op session friends in different cities can join | M10 | **Yes** (launch commitment) |
+| M12 | Public PvP Arenas + Persistent MMO Shards | `cx-server --mode pvp_arena` with anti-cheat foundation; `cx-server --mode mmo_shard` with persistence + interest management + 50-100 concurrent player target; MMO-001..MMO-012 + PvP stress tests | M10, M11 | **Yes** (launch commitment per DR-005 + DR-035) |
 
 ---
 
@@ -1306,6 +1383,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 | T-CONTROL | AI control and observability | M0..M12 |
 | T-LLM | Async LLM mind layer | M3, M6, M6.5..M12 |
 | T-PHYS | Full collision and physical consequence | M0..M12; M5.5 primary |
+| T-SERVER | Dedicated server app lifecycle and community hosting | M0 (config stubs); M9..M12 primary; lifelong from M9 |
 | T-PLATFORM | Cross-platform CI and Steam Deck | M0..M12 |
 | T-MOD | Modding and scripting | M5..M8 primary; lifelong |
 | T-AUDIO | Diegetic SFX and captions | M4..M7 primary; lifelong |
@@ -1631,81 +1709,134 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 ---
 
-### M9 — Headless Server And Determinism Islands
+### M9 — Dedicated Server App + Determinism Islands
 
-**What it proves:** The sim runs without rendering on a Linux headless target. Deterministic islands are real and testable. Replays from events alone reconstruct identical state.
+**What it proves:** `cx-server` is a working dedicated server binary anyone can host. It runs in any of the supported modes against the same sim path the client uses. Determinism islands are real and testable. Replays from events alone reconstruct identical state. SERVER-001..SERVER-016 from [[spec/server-app-architecture]] all pass.
 
-**Scope:**
-- `cx-headless` headless binary: same sim, no renderer, no audio, network-driven inputs.
+**Scope (per [[spec/server-app-architecture]] + [[decisions/dr-034-dedicated-server-application|DR-034]]):**
+- `cx-server` binary: thin entry point pulling `cx-sim-core`, `cx-terrain`, `cx-physics`, `cx-actor`, `cx-chassis`, `cx-equipment`, `cx-ai`, `cx-mission`, `cx-replay`, `cx-net`, `cx-control`, `cx-save`, `cx-mod`. No render/UI/audio crates.
+- `cx-server-ops`: config loader (RON), mode selector, health (`/health`), readiness (`/ready`), Prometheus metrics endpoint, structured JSON logs, drain shutdown, restart hooks.
+- `cx-server-persistence` minimum: snapshot writer + event journal + restore loop (full MMO scope lands in M12 but the API ships in M9).
+- `cx-server-anti-cheat` foundation: server-authoritative input validation, rate-limit hooks, capability gates, audit log skeleton, profile registry (`casual`, `competitive`, `tournament_strict`).
+- `cx-server-admin`: capability-gated `cxctl`-shape admin endpoints (kick, save, restart, hot-load scenario).
+- `cx-headless` stays as the headless sim runner used by replay verification + CI; `cx-server` consumes it for the deterministic island.
 - Determinism island contracts documented and validated: which subsystems are bit-deterministic; which are stochastic-but-replayable; which are cosmetic only.
-- Headless replay-from-events: given a run bundle, the headless server replays and produces identical checksums.
-- Performance pass: headless can run 10× real-time on baseline hardware for replay validation.
+- Reference Docker image: minimal `cx-server` image suitable for community deployments.
+- CLI Reference entries for `cx-server`, `cx-server-ops`, `cx-server-admin` per [CLI Reference](#cli-reference).
+- Networking transport library committed (decision between lightyear / renet / quinn locked at M9 close).
 
 **Done-criteria:**
+- [ ] SERVER-001..SERVER-016 (per [[spec/server-app-architecture]]) all pass against a checked run bundle.
+- [ ] `cx-server --mode coop_room` boots, accepts 2-4 clients, runs a Breach Contract to completion, archives a per-session run bundle.
+- [ ] `cx-server --mode pvp_arena` boots and accepts a 4-player session.
+- [ ] `cx-server --mode lan_room` is auto-discovered by client on the same LAN.
+- [ ] `cx-server --mode mmo_shard` boots with default config; persistence snapshot every 10 min; restart restore <30 s (full MMO acceptance is M12).
+- [ ] `cx-server --mode lobby_directory` returns a list of registered shards.
 - [ ] A 10-minute M7 mission run replays headlessly with bit-identical actor/terrain/inventory checksums.
-- [ ] Headless server runs on a Linux VPS without graphics drivers.
+- [ ] Reference Docker image runs the server unchanged on Linux; documented in `docs/server-hosting.md`.
 - [ ] DET-A acceptance tests pass.
+- [ ] Networking transport library decision committed in vault (DR amendment if needed).
 
-**Cross-DR:** DR-002, DR-005, DR-024, DR-025.
+**Cross-DR:** DR-002, DR-005, DR-013, DR-024, DR-025, DR-026, DR-029, DR-034.
 
 ---
 
 ### M10 — LAN Co-op
 
-**What it proves:** Two clients on a local network can play one Breach Contract together with replicated state, authority resolution, and replay parity.
+**What it proves:** Two-to-four clients on a local network can play one Breach Contract together via `cx-server --mode lan_room` with replicated state, authority resolution, anti-cheat foundation enabled, and replay parity.
 
 **Scope:**
-- `cx-net` authority model: server-authoritative for sim; clients send inputs, receive snapshots + events.
-- LAN discovery (no NAT yet).
-- Lobby + ready-up.
-- Replicated state: actors, terrain, inventory, mission state.
-- Co-op friendly fire policy (configurable per scenario).
-- Per-client replay bundles that align.
+- `cx-net` authority model: server-authoritative for sim; clients send inputs (via `cx-control` envelope), receive snapshots + events.
+- LAN discovery (mDNS / UDP broadcast) to find local `cx-server` instances; no NAT punch-through yet.
+- Lobby + ready-up flow inside the client (driven by the same `lobby_directory` schema).
+- Replicated state: actors, terrain, inventory, objective state, base modules.
+- Co-op friendly fire policy (configurable per scenario; defaults per DR-018 consequence ladder).
+- Per-client replay bundles that align tick-for-tick (`cx-headless replay-compare`).
+- Anti-cheat profile `casual` enabled by default for LAN; logs but does not kick.
+- Mod hash sync between server and clients on join.
 
 **Done-criteria:**
 - [ ] Two clients survive one 5-minute Breach Contract together with no desync.
-- [ ] Both clients' replay bundles align tick-for-tick.
-- [ ] Bandwidth budget within target (TBD per T-PERF).
+- [ ] Both clients' replay bundles align tick-for-tick under `cx-headless replay-compare`.
+- [ ] Bandwidth budget within target (per T-PERF).
+- [ ] Mod hash mismatch produces a clean diff UI, not a crash.
 
-**Cross-DR:** DR-005, DR-013, DR-024, DR-025.
+**Cross-DR:** DR-002, DR-005, DR-006, DR-013, DR-024, DR-025, DR-034.
 
 ---
 
-### M11 — Online Co-op (Private)
+### M11 — Online Co-op (Self-Hosted Dedicated Servers)
 
-**What it proves:** Online co-op works through NAT/relay between two friends. Package hash sync prevents version mismatch crashes.
+**What it proves:** A community member can host an internet-reachable `cx-server --mode coop_room` instance, register it with a `lobby_directory` (community or first-party), and friends in different cities can find it, join via NAT-traversal/relay, and complete a Breach Contract together. Mod hash sync prevents version mismatch crashes.
 
 **Scope:**
-- NAT punch-through or relay (transport library decision).
-- Lobby with code-based join.
-- Package hash sync: server checks client packages match; soft-fail with auto-download for the dev workflow; hard-fail with mismatch report for shipping.
+- NAT punch-through or relay using the chosen transport (decided in M9).
+- `lobby_directory` integration: server registers, heartbeats, deregisters; clients query and filter.
+- Lobby UI in the client: code-based join (private) + browse-list (public).
+- Package hash sync: server checks client packages match; soft-fail with auto-download for dev workflow; hard-fail with mismatch report for shipping.
 - Latency compensation: client-side prediction + server reconciliation for player actor; pure replication for AI bots.
+- Steam Datagram Relay / EOS adapter optional; behind cargo features `net-steam`, `net-eos`.
+- Reference systemd / launchd / Docker configs for self-hosted operators.
+- Anti-cheat profile `competitive` enabled by default for online co-op (community-tunable).
+- Account adapter: local file works for private; lobby_directory token works for public; Steam/EOS/PlayFab adapters stubbed behind cargo features.
 
 **Done-criteria:**
-- [ ] Two friends in different cities co-op a Breach Contract.
-- [ ] Latency masking works at 50-150ms RTT without obvious jitter.
-- [ ] Package mismatch produces a clean error, not a crash.
+- [ ] Two friends in different cities co-op a Breach Contract via a self-hosted `cx-server`.
+- [ ] Latency masking works at 50-150 ms RTT without obvious jitter.
+- [ ] Package mismatch produces a clean error with downloadable diff, not a crash.
+- [ ] `lobby_directory` registers + heartbeats + deregisters cleanly.
+- [ ] Anti-cheat `competitive` profile rejects an input-rate-spike client and writes `system.anti_cheat_kicked` to the run bundle.
 
-**Cross-DR:** DR-005, DR-013, DR-024.
+**Cross-DR:** DR-002, DR-005, DR-006, DR-013, DR-024, DR-026, DR-034.
 
 ---
 
-### M12 — PvP And MMO Experiments
+### M12 — Public PvP Arenas + Persistent MMO Shards
 
-**What it proves:** The architecture can support PvP and large-scale online without re-architecting. Or it tells us where the wall is.
+**What it proves:** The architecture supports public PvP arenas and persistent MMO shards under `cx-server`, with community-hostable defaults, anti-cheat foundation enabled, persistence proven across restart, interest management proven at scale, and per-client run bundles aligning tick-for-tick.
 
-**Scope (gated, post-launch):**
-- PvP prototype: 2-4 players in a small destructible map.
-- Anti-cheat foundation: server-authoritative simulation; all client actions validated.
+**Scope (now launch-committed; was post-launch only):**
+
+PvP arena half (`cx-server --mode pvp_arena`):
+- 2-8 player server-authoritative match server.
+- Anti-cheat profile `competitive` default; tournament profile available.
+- Replay archive per match.
+- Latency-masked client prediction with reconciliation; pure replication for any AI bots in the arena.
+- PvP-specific scenarios under `content/scenarios/pvp/`.
 - Bandwidth/authority/cheat models tested at 4-8 player density.
-- MMO experiment (R&D only): persistent world prototype with N players in same shard.
+
+MMO shard half (`cx-server --mode mmo_shard`, per [[spec/persistent-mmo-architecture]]):
+- Persistent world manifest (region map, materials, hazards, faction territories).
+- Persistent state store: snapshot every 10 min + append-only event journal.
+- Persistent terrain (carved/repaired regions survive reboot).
+- Persistent bases (DR-027 base layouts + module HP/ammo/power state).
+- Persistent named-actor veterans across sessions.
+- Persistent faction state + commander memory + LLM mind memory writes (per DR-022 + DR-032).
+- Account adapter required for public shards (local file / lobby_directory token / Steam/EOS optional).
+- Interest management: clients only receive events/snapshots for in-range entities.
+- Anti-cheat profile `competitive` default; operator-tunable per shard.
+- 50-100 concurrent player target (community + regional tiers); 100-200 stretch (flagship tier).
+- MMO-001..MMO-012 acceptance suite from [[spec/persistent-mmo-architecture]].
+- Reference Docker image + hosting guide for MMO operators.
+
+Cross-shard:
+- Lobby/portal model: player log-out on Shard A, log-in on Shard B; no live cross-shard combat or trade.
+- Multiple shards on same machine or across operators; lobby_directory aggregates listings.
 
 **Done-criteria:**
-- [ ] PvP is stable enough to run public stress tests.
-- [ ] MMO prototype runs N=20 players for 10 minutes without desync.
-- [ ] DR-005 launch posture is reconsidered with prototype evidence.
+- [ ] `cx-server --mode pvp_arena` runs a 4-player match for 10 minutes; per-client bundles align; anti-cheat events logged.
+- [ ] PvP server-authoritative simulation rejects all client-claimed actor states that diverge from server snapshots.
+- [ ] PvP bandwidth budget within target.
+- [ ] MMO-001..MMO-012 all pass.
+- [ ] 50 simulated clients (`cxctl` puppets) connect to one shard for 1 hour at ≥30 Hz sim with no desync.
+- [ ] 100 simulated clients sustained for 30 minutes; perf report records degraded modes.
+- [ ] Snapshot persists every 10 min; shard restart resumes from snapshot in <30 s with no state loss.
+- [ ] Crash + restart resumes within 1 minute via journal replay.
+- [ ] Two shards run concurrently; lobby/portal lists both; cross-shard log-out/log-in works.
+- [ ] Reference Docker image runs the MMO shard unchanged.
+- [ ] No proprietary cloud database dependency.
 
-**Cross-DR:** DR-005, DR-013, DR-024.
+**Cross-DR:** DR-002, DR-005, DR-013, DR-018, DR-022, DR-024, DR-027, DR-029, DR-031, DR-032, DR-033, DR-034, DR-035.
 
 ---
 
@@ -1751,6 +1882,33 @@ This is the built-in "eyes, ears, hands, and voice" layer for AI implementation 
 - Debug-only actions are capability-gated, disabled by default, and recorded in the run manifest.
 
 **Done-criteria per milestone:** every new player-facing control or UI action is either controllable through `cxctl`/the control API or explicitly marked human-only with a reason; every new critical screen state has a structured observation/event/caption equivalent.
+
+---
+
+### T-SERVER — Dedicated Server App Lifecycle And Community Hosting
+
+Spans M0 (config stubs) and M9..M12 primary; lifelong from M9. See [[spec/server-app-architecture]], [[spec/persistent-mmo-architecture]], [[decisions/dr-005-multiplayer-posture]], [[decisions/dr-013-backend-service-scope]], [[decisions/dr-034-dedicated-server-application]], [[decisions/dr-035-persistent-mmo-architecture]].
+
+This track ensures the dedicated server binary `cx-server` is a first-class launch artifact. Anyone can host any supported mode (LAN co-op, online co-op, public PvP arena, persistent MMO shard, lobby directory) using the same binary, the same sim path, the same mod packages, and no proprietary cloud lock-in.
+
+| Aspect | Pin |
+|---|---|
+| Binary | `cx-server` is part of the launch SKU. Linux + Windows; macOS server is nice-to-have. |
+| Modes | One binary, multi-mode: `coop_room`, `pvp_arena`, `lan_room`, `mmo_shard`, `lobby_directory`, `ranked_arena` (post-launch). |
+| Sim parity | Same `cx-sim-core`, `cx-terrain`, `cx-physics`, `cx-actor`, `cx-chassis`, `cx-equipment`, `cx-ai`, `cx-mission`, `cx-replay`, `cx-control`, `cx-net`, `cx-save`, `cx-mod`. No fork. |
+| Authority | 100% server-authoritative simulation. Clients use prediction + reconciliation only for player-driven actor. |
+| Configuration | RON config file; validated by `cx-mod validate`; schema-versioned; migration handlers registered (DR-029). |
+| Hosting posture | Community-hostable by default. Reference Docker image + Linux + Windows hosting guide ship at launch. Steam/EOS/PlayFab/Unity Multiplay are optional adapters behind cargo features. |
+| Account requirement | Optional for solo/private LAN/co-op rooms. Required for public shards (DR-035). |
+| Anti-cheat foundation | Server-authoritative input validation; profiles `casual`, `competitive`, `tournament_strict`; ban list persisted; audit log appended. Tournament-grade is post-launch. |
+| Mod compatibility | Mandatory mod hash sync; trust tiers gate per-server admission; auto-download off by default. Server-only mods allowed (`server_only: true` in package manifest). |
+| Persistence | MMO mode uses snapshot store + event journal; recovery = snapshot + journal replay; rolling backups. (DR-035) |
+| Observability | Structured JSON logs; Prometheus-compatible metrics; `/health` + `/ready` endpoints; per-session run bundles. |
+| Admin API | `cxctl --capability admin` over the same JSON-RPC envelope as the client. Capability-gated; opt-in. |
+| LLM mind | Mind workers may run server-side per DR-032; clients see reason labels only. |
+| Replay determinism | Server-authoritative replay; per-client run bundles align tick-for-tick. |
+
+**Done-criteria per milestone:** every milestone that touches multiplayer/server/MMO/anti-cheat extends `cx-server` with the relevant mode/config/event/observability surface; per-milestone audit lists `cx-server` modes touched, anti-cheat profile changes, persistence schema bumps, and `lobby_directory` schema bumps.
 
 ---
 
@@ -1893,8 +2051,8 @@ flowchart TB
   M7 --> M9
   M65 -.eval suite.-> M9
   M9 --> M10[M10 LAN Co-op]
-  M10 --> M11[M11 Online Co-op]
-  M11 --> M12[M12 PvP/MMO Experiments]
+  M10 --> M11[M11 Online Co-op + Self-Hosted]
+  M11 --> M12[M12 Public PvP + Persistent MMO]
 
   T0[T-CONTROL] -.-> M0
   T0 -.-> M12
@@ -1905,6 +2063,9 @@ flowchart TB
   TP[T-PHYS] -.-> M0
   TP -.-> M55
   TP -.-> M12
+  TS[T-SERVER] -.-> M0
+  TS -.-> M9
+  TS -.-> M12
   T1[T-PLATFORM] -.-> M0
   T1 -.-> M12
   T2[T-MOD] -.-> M5
@@ -1995,13 +2156,30 @@ Quick lookup: which milestone owns which feature.
 | In-engine scenario editor | M8 |
 | Mod loader + package builder | M8 |
 | Lua/Rhai script host | M8 |
-| Headless dedicated server | M9 |
+| `cx-headless` sim runner (replay verification + CI) | M3, M9 |
+| `cx-server` dedicated server binary (T-SERVER) | M9, M10, M11, M12 |
+| `cx-server-ops` lifecycle (config, health, readiness, metrics, drain shutdown) | M9 |
+| `cx-server-persistence` (snapshot + journal + restore) | M9 (foundation), M12 (MMO scope) |
+| `cx-server-anti-cheat` (validation, profiles, ban list, audit log) | M9 (foundation), M11/M12 (profiles) |
+| `cx-server-admin` (capability-gated admin API) | M9 |
+| Reference Docker image + hosting guide | M9 |
+| `cx-server --mode coop_room` | M9 (boot), M10/M11 (production) |
+| `cx-server --mode pvp_arena` | M9 (boot), M12 (production) |
+| `cx-server --mode lan_room` | M9 (boot), M10 (production) |
+| `cx-server --mode mmo_shard` | M9 (boot), M12 (production) |
+| `cx-server --mode lobby_directory` | M9 (boot), M11/M12 (production) |
 | Determinism island contracts | M9 |
-| LAN co-op | M10 |
-| Online co-op (NAT) | M11 |
-| Package hash sync | M11 |
-| PvP prototype | M12 |
-| MMO experiment | M12 |
+| LAN co-op via `cx-server` | M10 |
+| Online co-op via self-hosted `cx-server` | M11 |
+| Package hash sync (server-authoritative) | M11 |
+| Anti-cheat profiles (`casual`/`competitive`/`tournament_strict`) | M9 (registry), M11/M12 (live) |
+| Public PvP arena | M12 |
+| Persistent MMO shard | M12 |
+| MMO snapshot + journal persistence | M12 |
+| MMO interest management | M12 |
+| Cross-shard lobby/portal | M12 |
+| MMO-001..MMO-012 acceptance suite | M12 |
+| SERVER-001..SERVER-016 acceptance suite | M9..M12 |
 | Diegetic audio + captions | T-AUDIO, M4..M7 |
 | Save game system | T-SAVE, M5..M9 |
 | CI matrix Win/Linux/macOS | T-PLATFORM, M0..M12 |
@@ -2038,8 +2216,16 @@ These commands are the default validation surface for implementation agents. If 
 | Mind cost-cap smoke | `cargo run -p cx-ai --bin mind_lab -- --suite MIND-009 --provider mock --max-run-cost-usd 0.0 --write-run-bundle` | M6.5 |
 | Mind fairness audit | `cargo run -p cx-ai --bin mind_lab -- --suite MIND-006 --provider mock --write-run-bundle` | M6.5 |
 | Package/mod validation | `cargo run -p cx-mod -- validate content/ mods/ --strict` | M8 |
-| Headless server smoke | `cargo run -p cx-headless -- --scenario breach_contract --ticks 3600 --verify-checksums` | M9 |
-| LAN/online replay alignment | Compare per-client run bundles with `cx-headless replay-compare`. | M10+ |
+| Headless replay verification | `cargo run -p cx-headless -- --scenario breach_contract --ticks 3600 --verify-checksums` | M9 |
+| Dedicated server smoke | `cargo run -p cx-server -- --mode coop_room --scenario breach_contract --ticks 36000 --write-run-bundle` then `cargo run -p cx-headless -- replay prototype_runs/native/<m9_run> --verify-checksums` | M9/T-SERVER |
+| Server modes smoke | `cargo run -p cx-server -- --mode <coop_room\|pvp_arena\|lan_room\|mmo_shard\|lobby_directory> --validate-config-only` | M9/T-SERVER |
+| Server health/readiness check | `curl http://127.0.0.1:9090/health` and `/ready` after `cx-server` boots; check `/metrics` Prometheus surface. | M9/T-SERVER |
+| LAN/online replay alignment | Compare per-client run bundles with `cargo run -p cx-headless -- replay-compare <client_a_bundle> <client_b_bundle>`. | M10+ |
+| Mod hash sync smoke | `cargo run -p cx-server -- --mode coop_room --package-set base,official_dlc_a` against a client with mismatched packages; verify clean diff UI. | M11/T-SERVER |
+| Anti-cheat foundation smoke | `cargo run -p cx-server -- --mode pvp_arena --anti-cheat-profile competitive` with a `cxctl` puppet emitting input-rate spikes; verify kick + audit log + ban-list persist. | M11/T-SERVER |
+| MMO shard suite | `cargo run -p cx-server -- --mode mmo_shard --simulate-clients 50 --duration-min 60 --suite MMO-001..MMO-012 --write-run-bundle` | M12/T-SERVER |
+| MMO persistence restart smoke | Boot `cx-server --mode mmo_shard`; let it run 10 min; SIGKILL; restart; verify journal replay + state restore <1 min. | M12/T-SERVER |
+| MMO interest management audit | `cxctl observe --stream` against a 50-client shard; assert event volume per client matches interest range, not full shard volume. | M12/T-SERVER |
 
 If a command does not exist yet, the milestone that first lists it must either implement it or explicitly record a blocker and replacement check.
 
@@ -2103,10 +2289,10 @@ For M0..M12, a milestone is done only when all agent-completable items below are
 | M6.5 | MIND-001..MIND-010 pass against mock provider; local AI keeps acting through provider sleep/fail/stale; replay shows `mind` events with redacted prompts. |
 | M7 | Project owner plays Breach Contract 5 times; A-FEEL gate met. |
 | M8 | Player authors a Breach Contract variant + sample mod loads. |
-| M9 | 10-minute mission replays headlessly bit-identical. |
-| M10 | LAN co-op survives one Breach Contract; per-client bundles align. |
-| M11 | Online co-op survives one Breach Contract; package hash mismatch handled. |
-| M12 | PvP stable for stress tests; MMO prototype N=20 for 10 minutes. |
+| M9 | `cx-server` boots in all 5 modes; SERVER-001..SERVER-016 pass; 10-minute mission replays headlessly bit-identical; reference Docker image runs unchanged. |
+| M10 | LAN co-op via `cx-server --mode lan_room` survives one Breach Contract; per-client bundles align tick-for-tick; mod hash sync works. |
+| M11 | A community member self-hosts `cx-server --mode coop_room`; friends in different cities join via NAT/relay; package hash mismatch handled cleanly; anti-cheat `competitive` profile rejects spike-rate clients. |
+| M12 | `cx-server --mode pvp_arena` runs 4-8 player matches with anti-cheat foundation; `cx-server --mode mmo_shard` MMO-001..MMO-012 all pass; 50 simulated clients for 1 hour at ≥30 Hz; persistence + restart proven; no proprietary cloud dependency. |
 
 ---
 
@@ -2134,6 +2320,14 @@ For M0..M12, a milestone is done only when all agent-completable items below are
 | LLM fairness leak (T-LLM) | A prompt could leak hidden enemy state. | Observation compressor enforces fog-of-war BEFORE provider sees a prompt; MIND-006 acceptance test audits prompts. |
 | LLM determinism contamination (T-LLM) | Live cloud calls would break replay parity. | CI uses mock only; replay reuses recorded `AiMindProposal`s; live cloud never required for tests. |
 | LLM provider/model deprecation (T-LLM) | OpenAI/Anthropic/local stack churn could break adapters. | Provider trait + cargo-feature-gated adapters; model IDs are `MindProviderConfig` data; M6.5 ships against mock first. |
+| Dedicated server operational complexity (T-SERVER) | Community operators may struggle with config, ports, anti-cheat tuning. | Reference Docker images + minimal config + explicit hosting guide + community templates; tiered anti-cheat profiles; opinionated defaults. |
+| MMO persistence corruption (T-SERVER / DR-035) | Crash mid-write could corrupt shard state. | Atomic snapshot writes (temp + rename); journal replay validates on restore; rolling backups; recovery test in MMO-002/003. |
+| MMO sim cost at 100+ concurrent players (T-SERVER / DR-035) | Frame budget could overrun at scale. | Interest management; sub-region tick budgets; offload AI/LLM to background; degrade to 30 Hz; T-PERF gates at M12. |
+| Server/client mod-hash mismatch hell (T-SERVER) | Players blocked from joining due to opaque package errors. | Pinned package set per server; clear diff UI; trust tiers; auto-download off by default for production. |
+| Anti-cheat false positives on community servers (T-SERVER) | Player frustration; operator headaches. | Tiered profiles (`casual` default, `competitive` opt-in, `tournament_strict` opt-in); operator-tunable; appeal-out-of-game per operator policy. |
+| Networking transport library churn (T-SERVER / DR-005) | lightyear/renet/quinn ecosystem could change after our pick. | Trait-bound `cx-net` adapter; selection committed before M11; library swap is local to one crate. |
+| Platform certification (Steam/Sony/MS/Nintendo) forces server-app fork (T-SERVER) | Some platforms require submission-only multiplayer / anti-cheat / sandboxing. | Adapter posture; can ship Steam without locking out Linux community hosting; revisit DR-005/DR-034 if a platform requires structural changes. |
+| First-party MMO hosting cost spirals (T-SERVER / DR-035) | If the project starts hosting publisher-grade shards, ops cost balloons. | First-party hosting is **optional**; community-hosted is the default; we don't take responsibility for community shard uptime. |
 
 ---
 
@@ -2143,17 +2337,23 @@ This roadmap explicitly does NOT include for v1:
 
 - Mobile platform.
 - Cloud save (optional later).
-- Live-service economy.
-- Public PvP at launch (M12 is post-launch).
-- Account system (deferred to backend service scope).
-- Marketplace / paid mods.
+- Live-service economy. Premium one-time purchase + free modding only (DR-031).
+- Marketplace / paid mods. Mod authors keep their work; no publisher cut on user-authored content.
+- Subscription-funded MMO. Operators may charge for hosting their own shard; the base SKU does NOT include a subscription (DR-031 + DR-035).
 - Full colony sim (per DR-027).
 - Noita-grade material chemistry (moonshot).
 - VR/AR.
 - Per-pixel deformable rigid bodies (chassis are sprite-based with module damage; no Teardown-style voxel sim).
 - Naive all-pairs collision. Full collision uses broadphase, filters, proxies, CCD tiers, and budgets; missing physical pair rules are bugs.
 - Silent ghosting of physical gameplay objects. If something physical does not collide, it needs a tested `collision_filter_reason` and replay/debug visibility.
-- Multi-region simultaneous combat in MMO mode (M12 is small-shard exploration).
+- Seamless single-shard MMO world (DR-035). Multi-shard with portal/lobby is the v1 model.
+- Cross-shard live combat or trade at v1 (DR-035). Reopens via DR-035 amendment if a future direction warrants it.
+- Cross-shard veteran transfer at v1 (DR-035 open follow-up).
+- Auto-population of MMO shards with bots dressed as players. NPCs/AI are visibly AI; player count metric is humans only (DR-035).
+- A "lite" dedicated server stripped of mod support (DR-034). The server runs the same `cx-mod` packages as the client.
+- Different sim logic for server vs client (DR-034). One `cx-sim-core`; server omits render/audio/UI crates only.
+- Forced first-party hosting for any multiplayer mode (DR-034). Community-hostable is the default; first-party is an optional adapter.
+- Forced account systems for solo or private LAN/co-op rooms (DR-035). Public shards do require an account (local or pluggable provider).
 - Voice chat (use external; we provide text + captions).
 - Full localization at v1 (English-first; localization plan TBD).
 - LLMs in the reflex / tactical loop (8-16 ms / 100-250 ms). Mind workers are async-only per DR-032.
@@ -2173,6 +2373,10 @@ This roadmap explicitly does NOT include for v1:
 - [[decisions/dr-032-hybrid-llm-ai-direction]]
 - [[spec/full-collision-physics-plan]]
 - [[decisions/dr-033-full-collision-physics-direction]]
+- [[spec/server-app-architecture]]
+- [[spec/persistent-mmo-architecture]]
+- [[decisions/dr-034-dedicated-server-application]]
+- [[decisions/dr-035-persistent-mmo-architecture]]
 - [[spec/prototype-implementation-backlog-slice-a]]
 - [[spec/setting-and-world-frame]]
 - [[spec/chassis-armor-mechs-and-origins]]
