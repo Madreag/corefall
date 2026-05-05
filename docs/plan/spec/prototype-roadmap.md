@@ -137,6 +137,27 @@ If you have more time, also read: [[decisions/index]], [[dashboards/decision-tra
 | Modding scripts | mlua (Lua) or Rhai — pick during M8 | Lua is familiar; Rhai is Rust-native. Decide based on M5/M6 needs. |
 | Build / CI | cargo + GitHub Actions (Win/Linux/macOS matrix) | Per DR-025. |
 
+### Stack Question: Why Not C + raylib + stb?
+
+This was evaluated as a stack sanity check, not as a new formal product decision. The roadmap stays on Rust + Bevy/wgpu because the target is not only "draw a fast 2D game." The target is 4K/120, destructible pixel terrain, replay/debug, save migration, humanlike AI, modding/workbench tooling, future headless/network architecture, and AI-agent-heavy implementation.
+
+Full comparison note: [[references/rust-bevy-wgpu-vs-c-raylib-stb]].
+
+| Area | Rust + Bevy/wgpu + custom crates | C + raylib + stb |
+|---|---|---|
+| Raw control | High. | Highest. |
+| Time to first pixels | Medium. | Excellent. |
+| 4K/120 renderer path | Strong with custom wgpu hot paths. | Possible, but OpenGL-first and more custom work. |
+| GPU terrain/compute future | Strong: Vulkan, Metal, DX12, WebGPU through wgpu. | Weaker: raylib is OpenGL-centered. |
+| AI-agent coding safety | Strong: Rust types, crates, tests, compiler catches many mistakes. | Riskier: memory bugs, pointer lifetime, data races, and ownership mistakes are easier. |
+| Modular repo ownership | Excellent with Cargo workspace crates. | Possible, but more manual build/API discipline. |
+| Replay/save/schema/event systems | Excellent with Rust types and serialization ecosystem. | Possible, but more hand-rolled. |
+| UI/workbench/editor | Better via Bevy, egui, custom tooling, and typed data. | Mostly custom work. |
+| Modding pipeline | Better for schema validation, package diagnostics, source provenance, and migration. | Possible, but more hand-rolled. |
+| Long-term engine quality | Better fit for this project's ambition. | Better fit only for a minimalist handmade engine. |
+
+Allowed use of raylib/stb: throwaway prototypes, asset converters, image utilities, procedural terrain experiments, minimal-dependency benchmarks, and reference implementations. Do not let those side experiments become the product engine by inertia.
+
 ---
 
 ## Repository Layout
