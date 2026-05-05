@@ -3,14 +3,17 @@ type: decision
 id: DR-007
 status: open
 priority: P0
-revisit_trigger: "When terrain backend prototype shows performance for 1280x720 scene with 20 actors + heavy combat."
+revisit_trigger: "M5.6/M5.7 active-material kernel + hazard package prototypes settle implementation specifics (CPU vs GPU kernel, exact material count, chunk size, snapshot cadence) at perf target; or M5.6 evidence forces a different architecture choice; or DR-036 direction is amended."
 ---
 
-← [[decisions/index|decision records]] · [[systems/physics-and-destruction-models|physics/destruction]] · [[systems/material-and-mobility-affordance-schema|material schema]] · [[engine/terrain-mutation-and-pathfinding-lifecycle|terrain mutation]] · [[engine/terrain-materials|terrain/materials]] · [[comparables/openlierox-local-audit|OpenLieroX audit]]
+← [[decisions/index|decision records]] · [[decisions/dr-036-systemic-material-simulation-direction|DR-036]] · [[comparables/noita-grade-material-simulation-research|Noita-grade material research]] · [[systems/physics-and-destruction-models|physics/destruction]] · [[systems/material-and-mobility-affordance-schema|material schema]] · [[engine/terrain-mutation-and-pathfinding-lifecycle|terrain mutation]] · [[engine/terrain-materials|terrain/materials]] · [[comparables/openlierox-local-audit|OpenLieroX audit]]
 
 # DR-007: Terrain And Material Model
 
-> [!info] Status: OPEN; LEAN: prototype solids + curated hazards first; keep Noita-grade liquids/gases as moonshot research until proven fun and readable
+> [!info] Status: OPEN; LEAN updated 2026-05-05: hybrid active-region pixel sim + curated launch material set + Noita-grade systemic ambition (per DR-036). Implementation specifics remain open until M5.6/M5.7 prototype evidence.
+
+> [!note] Direction parent
+> The architecture-level direction (Noita-grade systemic causality, hybrid active-region + room/atmosphere + reaction engine) is closed in [[decisions/dr-036-systemic-material-simulation-direction]]. This DR remains OPEN to track implementation specifics (CPU vs GPU kernel, exact material count, chunk size, snapshot cadence) per M5.6/M5.7 evidence.
 
 ## Context
 

@@ -40,14 +40,15 @@ feeds:
   - DR-033
   - DR-034
   - DR-035
+  - DR-036
 ---
 
-← [[spec/index|spec section]] · [[spec/authoritative-game-spec-v0|game spec v0]] · [[spec/native-implementation-backlog|native backlog]] · [[spec/feature-completion-checklist|feature checklist]] · [[spec/server-app-architecture|server app architecture]] · [[spec/persistent-mmo-architecture|persistent MMO architecture]] · [[spec/full-collision-physics-plan|full collision plan]] · [[spec/hybrid-llm-ai-plan|hybrid LLM AI plan]] · [[spec/ai-control-observability-layer|AI control/observability]] · [[spec/prototype-implementation-backlog-slice-a|historical HTML backlog]] · [[dashboards/research-readiness|readiness]] · [[decisions/index|decisions]] · [VAULT_PLAN.md](../../VAULT_PLAN.md) · [HTML-era snapshot](../research-log/2026-05-04-prototype-roadmap-html-snapshot.md)
+← [[spec/index|spec section]] · [[spec/authoritative-game-spec-v0|game spec v0]] · [[spec/native-implementation-backlog|native backlog]] · [[spec/feature-completion-checklist|feature checklist]] · [[spec/server-app-architecture|server app architecture]] · [[spec/persistent-mmo-architecture|persistent MMO architecture]] · [[spec/full-collision-physics-plan|full collision plan]] · [[spec/hybrid-llm-ai-plan|hybrid LLM AI plan]] · [[spec/ai-control-observability-layer|AI control/observability]] · [[comparables/noita-grade-material-simulation-research|systemic material research]] · [[spec/prototype-implementation-backlog-slice-a|historical HTML backlog]] · [[dashboards/research-readiness|readiness]] · [[decisions/index|decisions]] · [VAULT_PLAN.md](../../VAULT_PLAN.md) · [HTML-era snapshot](../research-log/2026-05-04-prototype-roadmap-html-snapshot.md)
 
 # Native Build Roadmap
 
 > [!summary] What this is
-> The native development roadmap. Replaces the prior browser-lab-flavored roadmap in full. The project is a **greenfield Rust native game** built on Bevy + wgpu as foundation, with custom core crates for the systems that make this game special. Targets desktop-first (Win/Linux/macOS) at 4K/120 ceiling with 1080p/60 floor and Steam Deck 800p/60 compatibility. The full-product architecture includes a **dedicated server binary (`cx-server`) anyone can host** for LAN co-op, online co-op, public PvP arenas, and **persistent MMO shards** (DR-005 + DR-013 + DR-034 + DR-035). M12 proves PvP/MMO readiness; earlier milestones are not blocked on M12-scale soak tests. First-class scenario editor and modding at launch (DR-030 + DR-006).
+> The native development roadmap. Replaces the prior browser-lab-flavored roadmap in full. The project is a **greenfield Rust native game** built on Bevy + wgpu as foundation, with custom core crates for the systems that make this game special. Targets desktop-first (Win/Linux/macOS) at 4K/120 ceiling with 1080p/60 floor and Steam Deck 800p/60 compatibility. The full-product architecture includes a **dedicated server binary (`cx-server`) anyone can host** for LAN co-op, online co-op, public PvP arenas, and **persistent MMO shards** (DR-005 + DR-013 + DR-034 + DR-035), and **Noita-grade systemic material simulation** (DR-036) where every material is a verb, every reaction has a cause chain, every hazard has an overlay/caption/replay event. M12 proves PvP/MMO readiness; earlier milestones are not blocked on M12-scale soak tests. First-class scenario editor and modding at launch (DR-030 + DR-006).
 
 > [!warning] Authority boundary
 > This is a planning anchor. Milestones, ticket counts, and per-feature detail will move as evidence comes in. The structure (M0..M12 + side tracks) is committed. Specific timelines and ticket boundaries will be tuned per milestone.
@@ -88,10 +89,15 @@ feeds:
   - [M4 — HUD And Comic-Noir UI](#m4--hud-and-comic-noir-ui)
   - [M5 — Equipment, Chassis, And Damage Grammar](#m5--equipment-chassis-and-damage-grammar)
   - [M5.5 — Full Collision Gauntlet](#m55--full-collision-gauntlet)
+  - [M5.6 — Material Kernel](#m56--material-kernel)
+  - [M5.7 — Hazard Package](#m57--hazard-package)
   - [M6 — AI Core And Trust Harness](#m6--ai-core-and-trust-harness)
   - [M6.5 — LLM Mind Lab](#m65--llm-mind-lab)
+  - [M6.6 — AI Material Competence](#m66--ai-material-competence)
   - [M7 — Mission Director And Breach Contract Proof Mission](#m7--mission-director-and-breach-contract-proof-mission)
+  - [M7.5 — Base Atmospherics](#m75--base-atmospherics)
   - [M8 — Scenario Editor And Mod Tools](#m8--scenario-editor-and-mod-tools)
+  - [M8.5 — Material Lab](#m85--material-lab)
   - [M9 — Dedicated Server App + Determinism Islands](#m9--dedicated-server-app--determinism-islands)
   - [M10 — LAN Co-op](#m10--lan-co-op)
   - [M11 — Online Co-op (Self-Hosted Dedicated Servers)](#m11--online-co-op-self-hosted-dedicated-servers)
@@ -101,6 +107,7 @@ feeds:
   - [T-LLM — Async LLM Mind Layer](#t-llm--async-llm-mind-layer)
   - [T-PHYS — Full Collision And Physical Consequence](#t-phys--full-collision-and-physical-consequence)
   - [T-SERVER — Dedicated Server App Lifecycle And Community Hosting](#t-server--dedicated-server-app-lifecycle-and-community-hosting)
+  - [T-MAT — Systemic Materials, Chemistry, And Atmospheres](#t-mat--systemic-materials-chemistry-and-atmospheres)
   - [T-PLATFORM — Cross-Platform CI And Steam Deck](#t-platform--cross-platform-ci-and-steam-deck)
   - [T-MOD — Modding And Scripting](#t-mod--modding-and-scripting)
   - [T-AUDIO — Diegetic SFX And Captions](#t-audio--diegetic-sfx-and-captions)
@@ -198,6 +205,21 @@ A junior agent must never have to guess what these words mean. If a term is used
 | **Interest management** | Server-side filter that delivers events/snapshots only for in-range entities to each client. Required for MMO scale. |
 | **Lobby/portal** | UI flow for cross-shard travel. Player logs out on Shard A, logs in on Shard B; no live cross-shard combat at v1. |
 | **Trust tier** | Per-mod label (`vanilla`, `verified`, `community`, `experimental`); operators pin a max trust accepted from clients. |
+| **Active material kernel** | The CPU-deterministic chunked CA in `cx-material` that simulates per-pixel materials in active regions. 64×64 chunks; dirty rects; sleeping chunks. Per DR-036. |
+| **Reaction table** | Data-driven pair/triple material reactions with priority, temperature thresholds, catalysts, byproducts. Every reaction emits a replay-recorded `reaction.*` event with cause chain. |
+| **Density layering** | Stable layering of immiscible liquids by density (oil floats on water, sludge sinks, gas rises). Implemented via density-compare swap rule in the active kernel. |
+| **Phase change** | Temperature-driven material transition (water ↔ steam, lava ↔ rock). Recorded as a `material.*` event with parent cause. |
+| **Hazard perception map** | Per-actor view of nearby material/temperature/electricity/gas fields used by AI for pathing and tactical decisions (M6.6 / DR-036). Respects fog-of-war (DR-022 + DR-032 fairness). |
+| **AI affordance tag** | Per-material label (`avoid`, `seek`, `use-as-weapon`, `extinguish-with`, `neutralize-with`, `vent`, `pump`) consumed by AI utility scoring. |
+| **Hull / room / atmosphere** | Barotrauma-style room volume in `cx-atmos` with water level, oxygen level, pressure, fire state, toxic gas. Connected via gaps. |
+| **Gap** | Connection between two hulls (or a hull and outside). Open/closed state. Carries water/oxygen/gas flow + flow force. |
+| **Reaction event** | Replay-recorded `reaction.*` event capturing reagents, byproducts, priority, temperature, catalysts, and parent cause. |
+| **Material event** | Replay-recorded `material.*` event capturing material id, contact point, temperature, state change, and parent cause. |
+| **Atmosphere event** | Replay-recorded `atmosphere.*` event capturing hull/gap/pump/vent state changes. |
+| **Affliction** | Per-actor systemic state (`wetness`, `burning`, `corroded`, `electrified`, `poisoned`, `asphyxiating`, `suffocating`, `drowning`, `depressurizing`). Visible on HUD. |
+| **Material lab** | The `cx-tools-editor --mode material_lab` workbench. Brushes, inspect, recipe journal, stamps, AI puppet test. Designer authors a tiny reaction puzzle in <10 minutes (M8.5). |
+| **Launch material set** | 17 materials shipped at launch (air, dirt/sand, rock/concrete, metal, wood/organic, water, steam/mist, smoke, fire/heat, oil/fuel, acid, toxic sludge/liquid, toxic gas, lava, blood/vomit, electricity charge, pebble/debris). Per DR-036. |
+| **Expansion materials** | Materials gated behind material lab + balance review (slime, brine, coolant, cryo, fuel vapor, foam, nanogel, alchemic precursor, Midas, biological variants). |
 | **Manifest (scenario)** | RON file in `content/scenarios/` describing teams, objectives, materials, command core, base systems, capability requirements, director config, save fields. |
 | **Mission director** | The system that paces a scenario: reinforcement, LZ risk, objective escalation. Emits commander-decision events with reason labels. |
 | **Module** | A chassis subcomponent with damage states (jet, shield, sensor, repair-drone, weapon-mount). Failures emit reason-labeled events. |
@@ -368,6 +390,7 @@ The milestone is fully done when:
 | Dedicated server app | **`cx-server` is a full-product artifact** (DR-034). Same Rust workspace; same sim/terrain/physics/equipment/chassis/AI/replay/mod crates; modes selected via `--mode <coop_room\|pvp_arena\|lan_room\|mmo_shard\|lobby_directory>`. Linux + Windows; reference Docker image; documented hosting guide. See [[spec/server-app-architecture]]. |
 | Persistent MMO mode | **MMO shard is a full-product target mode** (DR-035). Bounded shard-with-portal model (NOT seamless world); 50-200 concurrent target; community-hostable; persistent terrain/bases/veterans/factions/commander memory; account required for public shards, NOT for private LAN/co-op. **No subscription**. M12 proves readiness. See [[spec/persistent-mmo-architecture]]. |
 | Backend services | Local-first default for solo/private play; public-server service spine (lobby_directory, account adapter, persistence, anti-cheat foundation, observability) is built as online modes mature (DR-013). Steam/EOS/PlayFab/Unity Multiplay are optional adapters, never required. |
+| Systemic material simulation | **Noita-grade systemic causality** is a launch product surface (DR-036), not a moonshot. Hybrid: active-region per-pixel material sim + rigid-body collision (DR-033) + Barotrauma-style room/atmosphere networks + reaction engine + AI hazard perception + replay/event audit. Curated launch material set (17 materials); expansion via material lab. Every material is a verb; every reaction has a cause chain; every hazard has an overlay/caption/replay event. T-MAT side track + M5.6/M5.7/M6.6/M7.5/M8.5 milestones. See [[comparables/noita-grade-material-simulation-research]]. |
 | Visual fidelity | Target 4K/120 strong desktop; floor 1080p/60; Steam Deck 800p/60. Pixel-sim battlefield + comic-noir UI + scalable SDF/vector text + 200% UI scaling (DR-019 + DR-028). |
 | Audio | Diegetic industrial synth-dread; audio-as-tactical-UI; mandatory captions (DR-020). |
 | Sim model | Fixed 60/120 Hz islands; AI/terrain budgeted-async; deterministic where it earns its keep. |
@@ -392,6 +415,9 @@ The milestone is fully done when:
 | Sim core | **Custom crate** with fixed-tick scheduler | Bevy's frame loop is for rendering; sim must run on a fixed-tick deterministic island. |
 | Pixel terrain | **Custom crate** | Chunked, GPU-assisted, mutable per-pixel material. Off-the-shelf has no answer. |
 | Physics/collision | **Custom crate** with staged broadphase/narrowphase/CCD | Need full collision matrix, projectile-projectile contacts, terrain chunk proxies, limb/equipment/mech contacts, impulse-to-damage, replay-visible contact events, and 4K/120 budgets (DR-033). |
+| Active material kernel | **Custom crate** `cx-material` (CPU-deterministic; chunked 64×64; dirty rects; sleeping chunks) | Noita-grade systemic causality at the active-region scale; reaction table + density layering + phase change + electricity/conductivity/wetness; per DR-036. |
+| Room / atmosphere networks | **Custom crate** `cx-atmos` | Barotrauma-style hulls/gaps/pumps/vents/oxygen/pressure/fire networks; powers DR-027 deep combat-base; per DR-036. |
+| Pipe / power / signal networks | **Custom crate** `cx-utility-net` (or fold into `cx-mission`) | Stationeers-style atmospherics + power graph for base equipment; sensor-readable + AI-controllable; per DR-036. |
 | Body/chassis/mech model | **Custom crate** | DR-014/021 chassis grammar is unique to this project. |
 | AI | **Custom crate** | DR-022 humanlike-bar means perception/memory/doctrine/adaptation; not off-the-shelf. |
 | Replay/event | **Custom crate** | DR-002/DR-018 event taxonomy + scenario manifest + run-bundle schema. |
@@ -459,6 +485,8 @@ cortex-game/                          # cargo workspace root
 │   ├── cx-sim-core/                  # fixed-tick scheduler, time, RNG, deterministic islands
 │   ├── cx-terrain/                   # chunked pixel terrain + materials + GPU carving
 │   ├── cx-physics/                   # custom 2D physics (collision, atom-style probes)
+│   ├── cx-material/                  # active material kernel: per-pixel CA, reaction table, density layering, phase change, electricity, replay-deterministic (DR-036)
+│   ├── cx-atmos/                     # room/volume/atmosphere networks: hulls/gaps/pumps/vents/oxygen/pressure/fire (DR-036)
 │   ├── cx-actor/                     # actor components, controller intent layer
 │   ├── cx-chassis/                   # armor/mech/origin grammar (DR-014/021)
 │   ├── cx-equipment/                 # role records, modules, jam/eject/repair
@@ -518,6 +546,8 @@ members = [
   "crates/cx-sim-core",
   "crates/cx-terrain",
   "crates/cx-physics",
+  "crates/cx-material",
+  "crates/cx-atmos",
   "crates/cx-actor",
   "crates/cx-chassis",
   "crates/cx-equipment",
@@ -712,10 +742,10 @@ jobs:
 mkdir -p cortex-game/crates
 cd cortex-game
 # create rust-toolchain.toml, Cargo.toml, rustfmt.toml, clippy.toml, .cargo/config.toml, .gitignore as above
-for crate in cx-app cx-sim-core cx-terrain cx-physics cx-actor cx-chassis cx-equipment \
-             cx-ai cx-mission cx-replay cx-control cxctl cx-e2e cx-save cx-net cx-render-2d \
-             cx-ui cx-audio cx-mod cx-tools-editor cx-headless cx-server cx-server-ops \
-             cx-server-persistence cx-server-anti-cheat cx-server-admin cx-bench; do
+for crate in cx-app cx-sim-core cx-terrain cx-physics cx-material cx-atmos cx-actor cx-chassis \
+             cx-equipment cx-ai cx-mission cx-replay cx-control cxctl cx-e2e cx-save cx-net \
+             cx-render-2d cx-ui cx-audio cx-mod cx-tools-editor cx-headless cx-server \
+             cx-server-ops cx-server-persistence cx-server-anti-cheat cx-server-admin cx-bench; do
   case "$crate" in
     cx-app|cxctl|cx-e2e|cx-headless|cx-server|cx-bench) crate_kind="--bin" ;;
     *) crate_kind="--lib" ;;
@@ -885,6 +915,11 @@ Single source of truth for every CLI flag. If a flag exists in the codebase but 
 | `observe --mind-frame <scope>` | Print one compact, fog-of-war-filtered `MindObservationFrame` for an LLM mind worker. | `<scope>` ∈ `actor`, `squad`, `faction`, `mission_director`, `post_mission`. Optional `--ref <id>` to pin the actor/squad/faction. Optional `--once`/`--stream`. Output is the JSON payload of the `MindObservationFrame`. |
 | `observe --collisions` | Stream or snapshot live collision pairs, filters, contact normals, TOI, impulses, projectile deflections, recent `collision.*` events, and budget/degradation status (T-PHYS, M5.5). | Optional `--once`/`--stream --hz <N>`, `--filter <class-pair>`, `--include-cosmetic`, `--scope <actor\|squad\|faction\|all>`, `--last <N>` for last-N collision events. |
 | `inspect collision <event-id>` | Print the full `collision.*` event payload by id: classes, materials, contact point/normal, TOI fraction, impulses, parent cause chain, and follow-up damage/projectile-deflection links (T-PHYS, M5.5). | Optional `--format json\|ron`, `--with-parents`, `--with-children`. |
+| `observe --materials` | Stream or snapshot active-region material/temperature/state grid; per-pixel id, temperature, density, last reaction, parent cause (T-MAT, M5.6+). | Optional `--once`/`--stream --hz <N>`, `--scope chunk:<x>,<y>` or `--scope all`, `--filter <material-id>`, `--last <N>` for last-N material events. |
+| `observe --atmospheres` | Stream or snapshot per-room atmosphere state: water level, oxygen, pressure, fire state, toxic gas, connected hulls/gaps (T-MAT, M7.5). | Optional `--once`/`--stream --hz <N>`, `--scope <room-id\|all>`. |
+| `observe --reactions` | Stream or snapshot recent `reaction.*` events: reagents, byproducts, temperature, parent cause chain (T-MAT, M5.6+). | Optional `--once`/`--stream --hz <N>`, `--filter <reaction-tag>`, `--last <N>`. |
+| `inspect material <event-id>` | Print the full `material.*` event payload by id: material id, contact point, temperature, state, parent cause, follow-up reaction/damage links. | Optional `--format json\|ron`, `--with-parents`, `--with-children`. |
+| `inspect reaction <event-id>` | Print the full `reaction.*` event payload by id: reagents, byproducts, priority, temperature, catalysts, parent cause chain. | Optional `--format json\|ron`, `--with-parents`, `--with-children`. |
 | `act <action> ...` | Send a single semantic action; returns accepted/rejected. | `<action>` from the action grammar; see [Action Model](#control-transport-and-envelope). |
 | `ui tree` | Print the current UI tree. | `--scope <window\|focused\|all>`. |
 | `ui click <id>` | Click a UI element by stable id. | `--scope <window\|focused>`. |
@@ -1339,10 +1374,15 @@ Before doing any feature work, the agent runs the milestone's kickoff smoke. If 
 | M4 | `cargo run -p cx-e2e -- --scenario micro_breach --ui-scale 2.0 --high-contrast --verify-focus --write-run-bundle` | UI passes ACC-A floor. |
 | M5 | `cargo run -p cx-e2e -- --scenario m5_chassis_wreck_eject --expect pilot_extracted --write-run-bundle` | Chassis grammar end-to-end. |
 | M5.5 | `cargo run -p cx-e2e -- --scenario m5_5_full_collision_gauntlet --suite COLL-001..COLL-012 --write-run-bundle` | Full collision matrix, CCD, projectile-projectile, impulse damage, replay, and perf evidence exist. |
+| M5.6 | `cargo run -p cx-e2e -- --scenario m5_6_material_kernel --suite MAT-01,MAT-02,MAT-03,MAT-06,MAT-13 --write-run-bundle` | Material kernel + reaction table + density layering + replay determinism. |
+| M5.7 | `cargo run -p cx-e2e -- --scenario m5_7_hazard_package --suite MAT-04,MAT-05,MAT-07,MAT-08-stub --write-run-bundle` | Acid/electricity/debris/ingestion damage routes through armor/limbs. |
 | M6 | `cargo run -p cx-ai --bin ai_harness -- --suite AI-H-01..AI-H-06 --write-run-bundle` | Harness suite passes. |
 | M6.5 | `cargo run -p cx-ai --bin mind_lab -- --suite MIND-001..MIND-010 --provider mock --write-run-bundle` | Mind lab suite passes against mock; local AI keeps acting through provider sleep/fail/stale; replay shows mind events. |
+| M6.6 | `cargo run -p cx-ai --bin ai_harness -- --suite AI-MAT-01..AI-MAT-08 --write-run-bundle` | AI material competence suite passes; AI avoids/uses materials with reason labels. |
 | M7 | `cargo run -p cx-e2e -- --scenario breach_contract --script win_path --expect win --write-run-bundle` | Breach Contract win path is real. |
+| M7.5 | `cargo run -p cx-e2e -- --scenario m7_5_base_atmospherics --suite MAT-09,MAT-10 --write-run-bundle` | Hull/gap/pump/vent/oxygen/pressure/fire networks; flooding + breach + repair scenarios pass. |
 | M8 | `cargo run -p cx-mod -- validate content/ mods/ --strict && cargo run -p cx-e2e -- --scenario sample_mod_breach --expect win --write-run-bundle` | Mod loads + plays. |
+| M8.5 | `cargo run -p cx-tools-editor -- --mode material_lab --scenario m8_5_acid_trap_puzzle --suite MAT-11,MAT-14 --write-run-bundle && cargo run -p cx-mod -- validate mods/sample_material_pack/ --strict` | Designer authors + exports + reloads a material puzzle; mod pack with new material loads cleanly. |
 | M9 | `cargo run -p cx-server -- --mode coop_room --scenario breach_contract --ticks 36000 --write-run-bundle` then `cargo run -p cx-headless -- replay <m9_run> --verify-checksums` | Dedicated server boots and runs a co-op room; 10-min replay verified. |
 | M9 | `cargo run -p cx-server -- --mode lan_room --auto-discover` (smoke) and `cargo run -p cx-server -- --mode mmo_shard --bootstrap-empty-shard` (smoke). | Each `cx-server` mode boots. |
 | M10 | `cargo run -p cx-server -- --mode lan_room` (host) + 2 `cx-app` clients on LAN, then `cargo run -p cx-headless -- replay-compare <client_a_bundle> <client_b_bundle>` | Per-client bundles align tick-for-tick. |
@@ -1363,10 +1403,15 @@ Before doing any feature work, the agent runs the milestone's kickoff smoke. If 
 | M4 | HUD + Comic-Noir UI | HUD reads sim state; comic-noir cards; accessibility floor | M1, M3 | Yes |
 | M5 | Equipment + Chassis + Damage Grammar | Role records; modules; armor layers; jam/eject/repair/salvage events | M1, M3 | Yes |
 | M5.5 | Full Collision Gauntlet | Collision matrix; limb/equipment/body/mech/base/projectile contacts; projectile-projectile; CCD; impulse damage; collision events; replay/perf proof | M2, M3, M5 | Yes |
+| M5.6 | Material Kernel | Active material grid (Noita-style) + reaction table + density layering + replay determinism + minimal sand/water/steam/oil/fire baseline (MAT-01..MAT-03, MAT-06, MAT-13 minimal) | M2, M3, M5.5 | Yes (DR-036) |
+| M5.7 | Hazard Package | Acid/toxic/electricity/debris damage routes through armor/limbs/equipment (MAT-04, MAT-05, MAT-07); ingestion/vomit/container loop foundation (MAT-08 stub) | M5, M5.5, M5.6 | Yes (DR-036) |
 | M6 | AI Core + Trust Harness | Perception/memory/utility/doctrine; reason-label events; AI-H scenario runner | M1, M3, M5.5 | Yes |
 | M6.5 | LLM Mind Lab | Async LLM mind layer with strict schemas, mock provider, validator, policy compiler, replay logging, deterministic fallback; one visible doctrine patch in a controlled breach scenario | M3, M6 | Optional v1; required for DR-032 closure evidence |
+| M6.6 | AI Material Competence | AI hazard perception map + affordance tags + route costs + tactical material use; AI-MAT-01..AI-MAT-08 acceptance suite (MAT-12) | M5.6, M5.7, M6 | Yes (DR-036) |
 | M7 | Mission Director + Breach Contract | Typed manifest; director; command-core minimum; base-system slice; first proof mission playable | M1..M6 plus M5.5 | Yes |
+| M7.5 | Base Atmospherics | Hull/gap/pump/vent/oxygen/pressure network for bases/mechs/sealed chambers (MAT-09, MAT-10); damageable life support; flooding/fire/smoke through rooms | M5.6, M5.7, M7 | Yes (DR-036) |
 | M8 | Scenario Editor + Mod Tools | In-engine workbench; same manifest format; mod loader; package builder | M3, M5, M7 | Yes |
+| M8.5 | Material Lab | Material brush/inspect/recipe/stamp/test editor (MAT-11, MAT-14); designer authors a tiny reaction puzzle in minutes; community-shareable material packs | M5.6, M5.7, M8 | Yes (DR-036) |
 | M9 | Dedicated Server App + Determinism Islands | `cx-server` binary boots in all modes, passes M9 core server lifecycle subset, deterministic islands, replay verification, and reference Docker smoke; PvP/MMO scale tests remain M12 | M3, M7 | **Yes** (server architecture commitment per DR-005 + DR-034) |
 | M10 | LAN Co-op | 2-4 clients on local network via `cx-server --mode lan_room`; replicated state; survival of one Breach Contract; per-client bundles align tick-for-tick | M9 | **Yes** (evidence-gated full-product target) |
 | M11 | Online Co-op (Self-Hosted Dedicated Servers) | NAT/relay via `cx-server --mode coop_room`; lobby + package hash sync; community member can host a public co-op session friends in different cities can join | M10 | **Yes** (evidence-gated full-product target) |
@@ -1384,6 +1429,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 | T-LLM | Async LLM mind layer | M3, M6, M6.5..M12 |
 | T-PHYS | Full collision and physical consequence | M0..M12; M5.5 primary |
 | T-SERVER | Dedicated server app lifecycle and community hosting | M0 (config stubs); M9..M12 primary; lifelong from M9 |
+| T-MAT | Systemic materials, chemistry, and atmospheres | M2 (foundation); M5.6/M5.7/M6.6/M7.5/M8.5 primary; lifelong from M5.6 |
 | T-PLATFORM | Cross-platform CI and Steam Deck | M0..M12 |
 | T-MOD | Modding and scripting | M5..M8 primary; lifelong |
 | T-AUDIO | Diegetic SFX and captions | M4..M7 primary; lifelong |
@@ -1608,6 +1654,62 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 ---
 
+### M5.6 — Material Kernel
+
+**What it proves:** The active-region material kernel from DR-036 / [[comparables/noita-grade-material-simulation-research]] is real. Active material grid + reaction table + density layering + phase change + chunked dirty rects + sleeping chunks + replay determinism. Sand falls, water pools, steam rises, oil floats on water, fire ignites oil/wood, water extinguishes fire. Every reaction emits a replay-recorded `material.*` / `reaction.*` event with cause chain.
+
+**Scope (MAT-01, MAT-02, MAT-03, MAT-06, MAT-13 minimal):**
+- `cx-material` crate: chunked CA grid (64×64 per chunk default; Noita pattern); deterministic update order; dirty-rect tracker; sleeping chunk policy; per-pixel material id + temperature + state; CPU-deterministic kernel (GPU experiments deferred).
+- Material schema (data-first per DR-036): `id`, `display_name`, `category`, `movement_class`, `density`, `viscosity`, `mass_per_pixel`, `hardness`, `heat_capacity`, `thermal_conductivity`, `temperature`, `ignition_temperature`, `burn_rate`, `oxygen_requirement`, `burn_products`, `phase_changes`, `conductivity`, `wetting`, `reaction_tags`, `ai_affordances`, `ui_overlay_color`, `caption_priority`, `performance_tier`, `network_replay_mode`. Validates through `cx-mod validate`.
+- Launch material set v0 (subset for M5.6): air, dirt/sand, rock, water, steam/mist, oil/fuel, fire/heat, smoke. Wood/organic stubs.
+- Reaction table: data-driven pair/triple reactions with priority/temperature/catalysts/byproducts. Examples: `water + fire → steam` (consumes both, spawns steam); `oil + ignition → fire on oil surface`; `lava + water → rock + steam` (with heat dump).
+- Density layering: `oil` floats on `water`; `lava` sinks below lighter fluids; gas rises.
+- Phase change kernel: water ↔ steam at temperature thresholds.
+- Replay determinism: `cx-replay` `material` + `reaction` event categories; per-chunk material checksum; first-divergence reports.
+- Performance gates: dirty-rect updates only; sleeping chunks; chunk-budget governor; perf counters in `summary.json`.
+- Observation hook: `cxctl observe --materials` snapshots material/temperature/state for in-range chunks (DR-036).
+
+**Done-criteria:**
+- [ ] MAT-01 active material kernel: 256×256 sandbox runs sand/water/oil/steam/fire for 5 minutes at ≥60 FPS on baseline hardware.
+- [ ] MAT-02 reaction table: water+fire→steam, oil+spark→fire-on-oil, lava+water→rock+steam, all with `reaction.*` events.
+- [ ] MAT-03 fire package: oil trail burns; sealed room consumes oxygen (room model arrives in M7.5; M5.6 uses an active-chunk oxygen field stub); water extinguishes fire.
+- [ ] MAT-06 density/layering: stable oil-on-water, sludge-below-water, gas-above-air without jitter for 60 seconds.
+- [ ] MAT-13 minimal replay determinism: same seed/inputs produce identical material checksum after 10,000 ticks.
+- [ ] Chunk budget: 32 active 64×64 chunks at 60 Hz on baseline hardware without dropping below sim tick budget (per T-PERF).
+- [ ] `cxctl observe --materials --once --scope chunk:0,0` returns a JSON material/temperature/state snapshot for the chunk.
+- [ ] Run bundle includes `material.*` and `reaction.*` events; replay-from-events reproduces the run with matching checksum.
+
+**Cross-DR:** DR-002, DR-006, DR-007, DR-024, DR-028, DR-033, DR-036.
+
+---
+
+### M5.7 — Hazard Package
+
+**What it proves:** The systemic hazard surface from DR-036 lands at combat scale. Acid corrodes terrain/armor; toxic gas asphyxiates without mask; electricity conducts through wet metal; pebble debris damages by impulse; ingestion of unsafe material causes affliction + spawns vomit material. Every hazard has an overlay, caption, and parent-linked event chain through to body/equipment/chassis damage (DR-003 + DR-018 + DR-033).
+
+**Scope (MAT-04, MAT-05, MAT-07; MAT-08 stub):**
+- Material set additions: acid, toxic sludge, toxic gas, electricity charge field, blood/vomit, pebble/debris.
+- Reactions: `acid + water → neutralized + sediment` (water reduces acid potency); `acid + metal/concrete → corrosion damage + reduced solidity`; `electricity + water-puddle → conductive shock zone`; `electricity + metal → arc + grounded path`.
+- Material → damage routing per DR-033 / DR-003 chain: `material_contact` → `armor_zone` filter → `actor_limb` damage → `actor_status` event with cause chain.
+- Hazard affliction layer: `wetness`, `burning`, `corroded`, `electrified`, `poisoned`, `asphyxiating`. Per-actor; visible on HUD (M4 stubs become real here).
+- Pebble/debris rigid body: kicked/thrown debris with mass, velocity, sharpness; bounces off armor at low energy, damages limbs at high energy (per DR-033 collision events).
+- Ingestion stub (MAT-08 partial): material can be ingested via authored interaction; spawns affliction + may spawn `blood`/`vomit` material in the world.
+- Caption + audio stubs: every new hazard event has a caption per T-AUDIO + T-ACCESSIBILITY.
+- AI affordance tags wired to materials (MAT-12 lands properly in M6.6; M5.7 stubs the data so M6 utility scorer can use them).
+
+**Done-criteria:**
+- [ ] MAT-04 acid neutralization: pour water into acid pool; verify reaction, byproducts, and damage reduction.
+- [ ] MAT-05 electricity through wet metal: energize a puddle touching a metal door + actor; verify conduction; ground path reduces hazard.
+- [ ] MAT-07 debris impact: kicked pebble damages enemy at speed; bounces at low speed; armor reduces damage threshold.
+- [ ] MAT-08 stub: actor ingests toxic sludge → poisoned affliction + vomit material spawn.
+- [ ] Every hazard event has a caption (M4 caption pipeline).
+- [ ] HUD shows wetness/burning/corroded/electrified/poisoned/asphyxiating affliction icons.
+- [ ] Run bundle: parent-linked chain from material contact → armor → limb → actor status, all with replay events.
+
+**Cross-DR:** DR-002, DR-003, DR-006, DR-007, DR-012, DR-018, DR-020, DR-024, DR-028, DR-033, DR-036.
+
+---
+
 ### M6 — AI Core And Trust Harness
 
 **What it proves:** The 8-criteria humanlike AI bar from DR-022 has a runnable harness. Perception, memory, doctrine, reason labels, recovery, and replay are all in place. Strategic adaptation across missions is staged but not yet required to fire.
@@ -1662,6 +1764,32 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 ---
 
+### M6.6 — AI Material Competence
+
+**What it proves:** AI from M6 reads the same material/hazard fields players see (DR-036 + DR-022 fairness criterion). Bots avoid electrified water, use water against fire/acid, vent toxic gas, kick debris opportunistically. Every AI material decision emits a reason label that ties back to a `material.*` / `reaction.*` event.
+
+**Scope (MAT-12):**
+- AI hazard perception map: per-actor view of nearby material/temperature/electricity/gas fields; respects fog-of-war (DR-022 + DR-032 fairness).
+- AI affordance tags consumed: `avoid` (electrified water, lava, toxic gas), `seek` (cover, water for healing/extinguish), `use-as-weapon` (kicked debris, oil pour + ignition), `extinguish-with` (water, foam), `neutralize-with` (water against acid), `vent` (open door / use pump for gas/smoke), `pump` (mech/base interaction).
+- Utility scorer extension: hazard cost added to path cost; tactical material use as discrete action choices.
+- Reason labels: `tactic_chosen` events include `material_*` reasons (e.g. `material_acid_neutralize_with_water`, `material_electrified_water_avoid`, `material_oil_trail_ignite_for_kill`).
+- AI-MAT-01..AI-MAT-08 acceptance suite (a `cx-ai --bin ai_harness --suite AI-MAT-01..AI-MAT-08` smoke).
+- LLM mind layer (DR-032): material observations enter `MindObservationFrame` so high-level commander/squad doctrine can recommend material strategies in async.
+
+**Done-criteria:**
+- [ ] AI-MAT-01: Bot avoids electrified water puddle; tactic_chosen reason cites the hazard.
+- [ ] AI-MAT-02: Bot uses water bottle to extinguish ally on fire; reason cites `extinguish-with`.
+- [ ] AI-MAT-03: Bot pours acid neutralizer (water) on acid pool to safe-pass; reason cites `neutralize-with`.
+- [ ] AI-MAT-04: Bot waits for vent or uses pump to clear toxic gas before traversing room.
+- [ ] AI-MAT-05: Bot kicks debris at unsuspecting enemy when ammo is low; reason cites `use-as-weapon`.
+- [ ] AI-MAT-06: Friendly bot warns commander via radio caption when commander is about to enter electrified water.
+- [ ] AI-MAT-07: Bot routes around fire-on-oil trail; switches route when oil is extinguished.
+- [ ] AI-MAT-08: AI-H regression suite (M6) still passes after material competence lands.
+
+**Cross-DR:** DR-002, DR-008, DR-009, DR-012, DR-022, DR-024, DR-032, DR-036.
+
+---
+
 ### M7 — Mission Director And Breach Contract Proof Mission
 
 **What it proves:** Everything above composes into one playable Breach Contract mission. Manifest format works. Command core works minimally. Base systems work minimally. Mission director paces the encounter. The first proof mission can be played, won, lost, replayed, debriefed.
@@ -1687,6 +1815,33 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 ---
 
+### M7.5 — Base Atmospherics
+
+**What it proves:** Barotrauma-style hull/gap/pump/vent/oxygen/pressure/fire networks layer on top of M5.6 material kernel + M7 mission director (DR-027 deep combat-base + DR-036). Bases, mechs, ships, sealed chambers can be **rooms with state**. Breaches flood; pumps recover; oxygen runs out; fire grows with oxygen and is extinguished by water; pressure differentials move actors and items.
+
+**Scope (MAT-09, MAT-10):**
+- `cx-atmos` crate: hulls (rooms with volume + water level + oxygen level + pressure + fire state); gaps (room-to-room/outside connections with open/closed state and flow force); per-tick equalize step; connected-hull search.
+- Equipment: oxygen generator, pump, vent, filter, sensor, powered door, alarm. Each is a base/mech module per DR-027 + DR-034 + DR-035.
+- Power/condition coupling: equipment runs on command-core power (DR-015) + has condition (degraded → failed); damage chain integrates with M5/M5.5 chassis grammar.
+- Material ↔ atmosphere bridge: M5.6 active-material chunks update room state at chunk boundaries (water mass aggregates into hull water level; fire propagates into hull fire state; toxic gas raises room toxicity).
+- Pressure forces on actors/items: breach + pressure differential pulls/pushes actors and loose items per DR-033 collision impulse routing.
+- Replay events: `atmosphere.*` event category (`atmos.hull_breached`, `atmos.flooded`, `atmos.depressurized`, `atmos.oxygen_depleted`, `atmos.fire_started`, `atmos.fire_extinguished`, `atmos.pump_repaired`, `atmos.vent_opened`, `atmos.alarm_triggered`).
+- HUD: per-room oxygen/water/pressure/fire overlay (toggleable); affliction icons (suffocating, drowning, depressurizing) tie back to M5.7 hazard package.
+- Mission director hooks (M7): contracts can fire room-state objectives ("seal the breach", "rescue from flooding", "vent toxic gas", "restart pumps", "evacuate before depressurization").
+
+**Done-criteria:**
+- [ ] MAT-09 hull/gap network: blast a hull breach; verify flooding + pressure equalization + actor pull force.
+- [ ] MAT-10 base equipment loop: damage a pump; oxygen + water levels respond; AI repair task fires; restored function brings room back to nominal.
+- [ ] Fire system: ignite oil in a sealed room; verify fire grows with oxygen, dies in vacuum, is extinguished by water; smoke routes through vents.
+- [ ] Pressure forces: pressure-differential breach pulls a loose item out of the room with replay event chain.
+- [ ] HUD per-room overlays render at 100% / 200% UI scale.
+- [ ] Mission director can author "seal the breach" / "rescue from flooding" / "vent gas" objectives.
+- [ ] Replay verifies headlessly with bit-identical room state checksums.
+
+**Cross-DR:** DR-002, DR-005, DR-007, DR-013, DR-015, DR-017, DR-018, DR-022, DR-024, DR-027, DR-033, DR-034, DR-035, DR-036.
+
+---
+
 ### M8 — Scenario Editor And Mod Tools
 
 **What it proves:** Players can author scenarios using the same manifest format the engine ships with. Mod loader works. Package builder produces deterministic packages.
@@ -1706,6 +1861,33 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 - [ ] PACK-A and MOD-A acceptance tests pass.
 
 **Cross-DR:** DR-006, DR-010, DR-017, DR-024, DR-030.
+
+---
+
+### M8.5 — Material Lab
+
+**What it proves:** Designers + modders can build, share, and debug systemic material content using the same `cx-mod` package format the engine ships. A designer authors a tiny reaction puzzle (acid trap with water counter, oil-fire chain reaction, electrified-water shock zone) in minutes and shares it through the standard package builder.
+
+**Scope (MAT-11, MAT-14):**
+- `cx-tools-editor` material lab mode: brush tools, material palette, recipe inspector, stamp save/load, snapshot/delta undo (Powder Toy pattern), test-run with replay capture, AI puppet test (`cxctl` puppet validates a hazard).
+- Material inspect tool: click any pixel; shows material id, temperature, state, density, last reaction, parent cause.
+- Recipe journal: reactions discovered by the designer/player are recorded; UI shows reagents → byproducts; debrief cause chains link back.
+- Stamps: regions of material+terrain can be saved as `.cxstamp` files; placed into other scenarios; community-shareable.
+- Material packs: `.cxpkg` mod packages can declare new materials, reactions, ingestion effects, pipe devices, AI affordances; validated by `cx-mod validate`.
+- Accessibility floor: 200% scale; high-contrast overlays; color-independent state labels for material categories.
+- AI test puppet: `cxctl` puppet plays the puzzle; designer sees AI affordance reasoning in real-time.
+- Run-bundle integration: lab session emits `material.*` + `reaction.*` + `atmosphere.*` events for designer review.
+
+**Done-criteria:**
+- [ ] MAT-11 inspect tool works on every launch material; tooltip shows id/temperature/state/density/last reaction.
+- [ ] MAT-14 designer authors an acid-trap puzzle in <10 minutes; exports `.cxpkg`; another machine loads + plays it.
+- [ ] Recipe journal records discovered reactions in run bundle; debrief links each to a reaction event.
+- [ ] Stamp tool saves a region; loads in another scenario; preserves material state.
+- [ ] AI puppet test: `cxctl --bot puppet --scenario <author-pkg>` plays the lab scenario; reasoning trace visible.
+- [ ] Mod pack with one new material loads in a scenario without engine crash; mismatched packages show clean diff UI.
+- [ ] Accessibility floor: lab UI passes ACC-A floor.
+
+**Cross-DR:** DR-002, DR-006, DR-008, DR-009, DR-010, DR-012, DR-022, DR-024, DR-030, DR-032, DR-033, DR-036.
 
 ---
 
@@ -1933,6 +2115,33 @@ This track ensures the game never slips into "sprites pass through each other ex
 
 ---
 
+### T-MAT — Systemic Materials, Chemistry, And Atmospheres
+
+Spans M2 (foundation) and M5.6/M5.7/M6.6/M7.5/M8.5 primary; lifelong from M5.6. See [[comparables/noita-grade-material-simulation-research]] (50-source synthesis) and [[decisions/dr-036-systemic-material-simulation-direction]].
+
+This track captures the systemic material simulation: every material is a verb, every reaction has a cause chain, every hazard has an overlay/caption/replay event. The architecture is hybrid: active-region per-pixel material sim (Noita) + rigid-body collision (DR-033 / T-PHYS) + Barotrauma-style room/atmosphere networks + reaction engine + AI hazard perception + replay/event audit.
+
+| Aspect | Pin |
+|---|---|
+| Core kernel | `cx-material` CPU-deterministic chunked CA (64×64 per chunk default; Noita pattern); dirty rects; sleeping chunks. GPU experiments deferred until determinism + replay parity are proven. |
+| Reaction engine | Data-driven pair/triple reactions with priority, temperature, catalysts, byproducts. Every reaction emits a replay-recorded `reaction.*` event with cause chain. |
+| Room/atmosphere | `cx-atmos` Barotrauma-style hulls/gaps/pumps/vents/oxygen/pressure/fire networks. Approximate (not real-unit) per Barotrauma's own scope lesson. |
+| Pipe/power/signal | Stationeers-style atmospherics + power graph; sensor-readable + AI-controllable. Ships in M7.5 / M5.7 stubs; lives in `cx-atmos` and/or `cx-mission`. |
+| Material schema | Data-first per DR-036; fields cover movement, density, mass, hardness, thermal, ignition, phase, conductivity, wetting, reaction_tags, ingestion, container, ai_affordances, ui_overlay, performance_tier, network_replay_mode. |
+| Launch material set (17) | Air, dirt/sand, rock/concrete, metal, wood/organic, water, steam/mist, smoke, fire/heat, oil/fuel, acid, toxic sludge/liquid, toxic gas, lava, blood/vomit, electricity charge, pebble/debris. |
+| Expansion materials | Slime, brine, coolant, cryo, fuel vapor, foam, nanogel, alchemic precursor, Midas/gold-maker, biological acid/blood variants — gated behind material lab + balance review. |
+| AI rule | From M6.6 onward, AI reads the same material/hazard fields players see (DR-022 fairness); affordance tags drive utility scoring + reason labels. |
+| Replay determinism | CPU deterministic kernel; chunk update order pinned; per-chunk material checksums; first-divergence reports. |
+| Multiplayer / MMO | Server-authoritative material state per DR-005 / DR-034 / DR-035; bounded active regions; mod hash sync includes material schemas. |
+| Performance | Active-region budgets; sleeping chunks; LOD; perf gates at every material milestone. T-PERF + T-MAT track. |
+| Modding | Material schema, reaction tables, atmosphere device packs are first-class moddable surfaces (DR-006). Mod hash sync (DR-034). |
+| Captioning + accessibility | Every hazard event has a caption per T-AUDIO + T-ACCESSIBILITY. Color-independent state labels for material categories. |
+| Observation API | `cxctl observe --materials`, `cxctl observe --atmospheres`, `cxctl observe --reactions` (T-CONTROL extension); see CLI Reference. |
+
+**Done-criteria per milestone:** each milestone touching materials/atmospheres adds the relevant material rows, reaction-table entries, atmosphere-device entries, AI affordance tags, captions, replay events, and perf counters. New materials require an inspect overlay, AI affordance, replay event, and lab fixture before they ship in production scenarios.
+
+---
+
 ### T-PLATFORM — Cross-Platform CI And Steam Deck
 
 Spans M0..M12. From M0:
@@ -2035,18 +2244,32 @@ flowchart TB
   M2 --> M55[M5.5 Full Collision Gauntlet]
   M5 --> M55
   M3 --> M55
+  M55 --> M56[M5.6 Material Kernel]
+  M2 --> M56
+  M56 --> M57[M5.7 Hazard Package]
+  M5 --> M57
+  M55 --> M57
   M55 --> M6[M6 AI + Trust Harness]
   M3 --> M6
   M6 --> M65[M6.5 LLM Mind Lab]
   M3 --> M65
+  M57 --> M66[M6.6 AI Material Competence]
+  M6 --> M66
   M4 --> M7[M7 Mission Director + Breach Contract]
   M5 --> M7
   M55 --> M7
   M6 --> M7
+  M66 -.optional augmentation.-> M7
   M65 -.optional augmentation.-> M7
+  M7 --> M75[M7.5 Base Atmospherics]
+  M56 --> M75
+  M57 --> M75
   M3 --> M8[M8 Scenario Editor + Mods]
   M5 --> M8
   M7 --> M8
+  M8 --> M85[M8.5 Material Lab]
+  M56 --> M85
+  M57 --> M85
   M3 --> M9[M9 Headless + Determinism]
   M7 --> M9
   M65 -.eval suite.-> M9
@@ -2066,6 +2289,12 @@ flowchart TB
   TS[T-SERVER] -.-> M0
   TS -.-> M9
   TS -.-> M12
+  TM[T-MAT] -.-> M2
+  TM -.-> M56
+  TM -.-> M57
+  TM -.-> M66
+  TM -.-> M75
+  TM -.-> M85
   T1[T-PLATFORM] -.-> M0
   T1 -.-> M12
   T2[T-MOD] -.-> M5
@@ -2108,6 +2337,21 @@ Quick lookup: which milestone owns which feature.
 | Material system + affordances | M2 |
 | GPU-assisted terrain carving | M2 |
 | Material overlay UI | M2, M4 |
+| Active material kernel (Noita-style CA) | M5.6, T-MAT |
+| Reaction table (data-driven) | M5.6, T-MAT |
+| Density layering + phase change | M5.6, T-MAT |
+| Hazard package (acid/electricity/debris/ingestion) | M5.7, T-MAT |
+| Material → damage routing | M5.7, T-MAT |
+| Affliction layer (wetness/burning/corroded/electrified/poisoned/asphyxiating) | M5.7, T-MAT |
+| AI hazard perception map + affordance tags | M6.6, T-MAT |
+| `material` + `reaction` event categories in run bundles | M3, M5.6 |
+| `cxctl observe --materials/--atmospheres/--reactions` | M5.6, M7.5, T-MAT |
+| Hull / gap / pump / vent / oxygen / pressure networks | M7.5, T-MAT |
+| `atmosphere` event category in run bundles | M7.5 |
+| Material lab (brush/inspect/recipe/stamp) | M8.5, T-MAT |
+| Material packs (mod content) | M8.5, T-MAT |
+| MAT-01..MAT-14 prototype slices | M5.6/M5.7/M6.6/M7.5/M8.5 |
+| AI-MAT-01..AI-MAT-08 acceptance suite | M6.6 |
 | Event taxonomy (full) | M3 |
 | Snapshots + checksums | M3 |
 | Headless replay | M3, M9 |
@@ -2210,6 +2454,16 @@ These commands are the default validation surface for implementation agents. If 
 | Save/load roundtrip | `cargo run -p cx-e2e -- --scenario <scenario-id> --save-load-roundtrip --verify-checksums` | M5/T-SAVE |
 | Full collision gauntlet | `cargo run -p cx-e2e -- --scenario m5_5_full_collision_gauntlet --suite COLL-001..COLL-012 --write-run-bundle` then `cargo run -p cx-headless -- replay prototype_runs/native/<m5_5_run> --verify-checksums` | M5.5/T-PHYS |
 | Collision observation stream | `cargo run -p cxctl -- observe --collisions --stream --hz 30 --scenario m5_5_full_collision_gauntlet` | M5.5/T-PHYS |
+| Material kernel suite | `cargo run -p cx-e2e -- --scenario m5_6_material_kernel --suite MAT-01,MAT-02,MAT-03,MAT-06,MAT-13 --write-run-bundle` then `cargo run -p cx-headless -- replay prototype_runs/native/<m5_6_run> --verify-checksums` | M5.6/T-MAT |
+| Hazard package suite | `cargo run -p cx-e2e -- --scenario m5_7_hazard_package --suite MAT-04,MAT-05,MAT-07,MAT-08-stub --write-run-bundle` | M5.7/T-MAT |
+| AI material competence | `cargo run -p cx-ai --bin ai_harness -- --suite AI-MAT-01..AI-MAT-08 --write-run-bundle` | M6.6/T-MAT |
+| Base atmospherics suite | `cargo run -p cx-e2e -- --scenario m7_5_base_atmospherics --suite MAT-09,MAT-10 --write-run-bundle` then `cargo run -p cx-headless -- replay prototype_runs/native/<m7_5_run> --verify-checksums` | M7.5/T-MAT |
+| Material lab suite | `cargo run -p cx-tools-editor -- --mode material_lab --suite MAT-11,MAT-14 --write-run-bundle` | M8.5/T-MAT |
+| Material observation stream | `cargo run -p cxctl -- observe --materials --stream --hz 30 --scope chunk:0,0` | M5.6/T-MAT |
+| Atmosphere observation stream | `cargo run -p cxctl -- observe --atmospheres --stream --hz 5 --scope all` | M7.5/T-MAT |
+| Reaction event tail | `cargo run -p cxctl -- observe --reactions --stream --hz 30` | M5.6/T-MAT |
+| Material schema validate | `cargo run -p cx-mod -- validate content/materials/ --strict` | M5.6/T-MAT |
+| Material determinism | `cargo run -p cx-bench -- --scenario m5_6_material_kernel --profile material --runs 100 --check-checksum-stability` | M5.6+/T-MAT |
 | AI harness | `cargo run -p cx-ai --bin ai_harness -- --suite AI-H-01..AI-H-06 --write-run-bundle` | M6 |
 | Mind frame observation | `cargo run -p cxctl -- observe --mind-frame squad_alpha --once` | M6.5 |
 | Mind lab suite (mock) | `cargo run -p cx-ai --bin mind_lab -- --suite MIND-001..MIND-010 --provider mock --write-run-bundle` | M6.5 |
@@ -2285,10 +2539,15 @@ For M0..M12, a milestone is done only when all agent-completable items below are
 | M4 | HUD-01..HUD-03 + ACC-A floor pass with 5 playtesters. |
 | M5 | Powered armor + light mech work end-to-end with chassis grammar; pilot eject works. |
 | M5.5 | COLL-001..COLL-012 pass; collision matrix/proxies/CCD/projectile-projectile/impulse damage replay headlessly with perf evidence. |
+| M5.6 | MAT-01..MAT-03, MAT-06, MAT-13 minimal pass; active material kernel + reaction table + density layering + replay determinism with `material.*` and `reaction.*` events. |
+| M5.7 | MAT-04, MAT-05, MAT-07 pass + MAT-08 stub; acid/electricity/debris/ingestion damage routes through armor/limbs/equipment; afflictions visible. |
 | M6 | 6 of 8 DR-022 AI criteria demonstrably met; AI-H-01..06 pass. |
 | M6.5 | MIND-001..MIND-010 pass against mock provider; local AI keeps acting through provider sleep/fail/stale; replay shows `mind` events with redacted prompts. |
+| M6.6 | AI-MAT-01..AI-MAT-08 pass; AI material competence with reason labels; AI-H regression still passes. |
 | M7 | Project owner plays Breach Contract 5 times; A-FEEL gate met. |
+| M7.5 | MAT-09, MAT-10 pass; Barotrauma-style hull/gap/pump/vent/oxygen/pressure/fire networks; mission director can author room-state objectives. |
 | M8 | Player authors a Breach Contract variant + sample mod loads. |
+| M8.5 | MAT-11, MAT-14 pass; designer authors + exports + reloads a material puzzle in <10 minutes; community mod pack with new material loads cleanly. |
 | M9 | `cx-server` boots in all 5 modes; M9 server-core subset passes; 10-minute mission replays headlessly bit-identical; reference Docker image runs unchanged. |
 | M10 | LAN co-op via `cx-server --mode lan_room` survives one Breach Contract; per-client bundles align tick-for-tick; mod hash sync works. |
 | M11 | A community member self-hosts `cx-server --mode coop_room`; friends in different cities join via NAT/relay; package hash mismatch handled cleanly; anti-cheat `competitive` profile rejects spike-rate clients. |
@@ -2328,6 +2587,15 @@ For M0..M12, a milestone is done only when all agent-completable items below are
 | Networking transport library churn (T-SERVER / DR-005) | lightyear/renet/quinn ecosystem could change after our pick. | Trait-bound `cx-net` adapter; selection committed before M11; library swap is local to one crate. |
 | Platform certification (Steam/Sony/MS/Nintendo) forces server-app fork (T-SERVER) | Some platforms require submission-only multiplayer / anti-cheat / sandboxing. | Adapter posture; can ship Steam without locking out Linux community hosting; revisit DR-005/DR-034 if a platform requires structural changes. |
 | First-party MMO hosting cost spirals (T-SERVER / DR-035) | If the project starts hosting publisher-grade shards, ops cost balloons. | First-party hosting is **optional**; community-hosted is the default; we don't take responsibility for community shard uptime. |
+| Material kernel cost explosion (T-MAT / DR-036) | Per-pixel CA + fire + electricity + reactions can blow the 4K/120 budget. | Active-region budgets, dirty rects, sleeping chunks, LOD, perf gates at every material milestone (M5.6, M5.7, M7.5, M8.5). |
+| Unfair invisible material deaths (T-MAT / DR-036) | One lava droplet or toxic gas plume can feel like a crash, not a system. | Mandatory hazard overlays + captions; warning audio; replay cause chains; AI captions for visible bots; grace windows; debrief inspect tool. |
+| AI looks stupid around systemic hazards (T-MAT / DR-036) | DR-022 humanlike bar fails if AI walks through electrified water or ignites itself. | M6.6 AI-MAT-01..AI-MAT-08 acceptance suite; affordance tags wired into utility scoring; forced regression scenarios. |
+| Replay nondeterminism for material kernel (T-MAT / DR-036) | Reaction order can diverge across platforms. | CPU deterministic kernel; chunk update order pinned; per-chunk material checksums; first-divergence reports; M5.6 acceptance gate. |
+| Material count balloons (T-MAT / DR-036) | Hundreds of materials would dilute readability + AI competence. | Curated launch set (17 materials); expansion gated behind material lab + balance review; new materials require inspect overlay + AI affordance + replay event before shipping. |
+| Hidden chemistry feels random (T-MAT / DR-036) | Players can't learn what they can't see. | Recipe journal; inspect tool; debrief cause chains; mission hints; rare alchemy recipes are explicitly opt-in/lab-gated. |
+| Atmosphere model conflicts with combat-base scope (T-MAT / DR-036 / DR-027) | Stationeers-grade engineering pulls focus from combat genre. | Approximate consistent rules (Barotrauma scope lesson); expose telemetry only where it serves combat genre; M7.5 done-criteria specifically reject real-unit physics. |
+| Material licensing contamination (T-MAT) | Powder Toy is GPL-3 (study-only); Barotrauma source is public-but-not-FOSS (study-only). | Custom implementation; usage-ledger entries required for any reuse; vault note `[[comparables/noita-grade-material-simulation-research]]` documents posture per source. |
+| MMO mod sync diverges on materials (T-MAT / DR-035) | Per-shard material packs could create incompatible reactions. | Server-authoritative material state; mod hash sync; material schema migration handlers; trust-tier ceiling per shard. |
 
 ---
 
@@ -2341,7 +2609,6 @@ This roadmap explicitly does NOT include for v1:
 - Marketplace / paid mods. Mod authors keep their work; no publisher cut on user-authored content.
 - Subscription-funded MMO. Operators may charge for hosting their own shard; the base SKU does NOT include a subscription (DR-031 + DR-035).
 - Full colony sim (per DR-027).
-- Noita-grade material chemistry (moonshot).
 - VR/AR.
 - Per-pixel deformable rigid bodies (chassis are sprite-based with module damage; no Teardown-style voxel sim).
 - Naive all-pairs collision. Full collision uses broadphase, filters, proxies, CCD tiers, and budgets; missing physical pair rules are bugs.
@@ -2360,6 +2627,13 @@ This roadmap explicitly does NOT include for v1:
 - Hard dependency on a paid LLM API for the core game, CI, AI-H, or replay tests.
 - Free-form chatbot UI bolted onto combat. Generated text surfaces only as captioned radio lines, debrief cards, replay annotations.
 - LLM-emitted executable code into a live campaign. Workbench validation is required for any future script generation.
+- Pure freeform Noita material sim (every-pixel-everywhere always active). T-MAT uses bounded active-region kernels per DR-036.
+- Hidden material chemistry without inspect/replay/AI-readable cause chains. Every reaction must be inspectable.
+- Real-unit physics simulation for atmosphere/pressure/thermal. Approximate consistent rules per DR-036 + Barotrauma's own scope lesson.
+- Hundreds of launch materials. Curated launch set (17) + material-lab expansion path; new materials require inspect overlay + AI affordance + replay event before shipping.
+- AI walking through systemic hazards blindly. Per DR-022 fairness + DR-036 hazard perception requirement; M6.6 AI-MAT regression suite.
+- Different sim logic for client vs server in materials. Server-authoritative material state per DR-005 / DR-034 / DR-035.
+- Auto-population of player count via material/system bots dressed as humans. Player counts are humans only.
 
 ---
 

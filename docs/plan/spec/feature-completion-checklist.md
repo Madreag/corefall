@@ -39,6 +39,7 @@ feeds:
   - DR-033
   - DR-034
   - DR-035
+  - DR-036
 ---
 
 <- [[spec/index|spec section]] · [[spec/prototype-roadmap|native roadmap]] · [[spec/native-implementation-backlog|native backlog]] · [[spec/authoritative-game-spec-v0|game spec v0]] · [[dashboards/research-readiness|readiness]] · [VAULT_PLAN.md](../../VAULT_PLAN.md)
@@ -56,6 +57,9 @@ feeds:
 
 > [!important] Server/MMO addendum active
 > The 2026-05-05 server direction added DR-034, DR-035, T-SERVER, server/anti-cheat/MMO run-bundle categories, and expanded M9-M12. This file now includes a focused addendum so implementing agents have checklist rows immediately. The next full regeneration should merge these rows into the normal sections and remove the historical M9-M12 labels.
+
+> [!important] Material/T-MAT addendum active
+> The 2026-05-05 systemic material direction added DR-036, T-MAT, M5.6/M5.7/M6.6/M7.5/M8.5 milestones, `cx-material`/`cx-atmos` crates, and four new run-bundle event categories (`material`/`reaction`/`atmosphere`/`affliction`). This file now includes a focused Material/T-MAT addendum so implementing agents have checklist rows immediately. The next full regeneration should merge these rows into the normal sections and remove the M5.6/M5.7/M6.6/M7.5/M8.5 historical labels.
 
 ## Rating System
 
@@ -90,6 +94,7 @@ feeds:
 - [Roadmap Feature Index Checklist](#roadmap-feature-index-checklist)
 - [Side Track Checklist](#side-track-checklist)
 - [Server/MMO Addendum Checklist](#servermmo-addendum-checklist)
+- [Material/T-MAT Addendum Checklist](#materialt-mat-addendum-checklist)
 - [Native Task Card Checklist](#native-task-card-checklist)
 - [Global Validation And Bug Hunt Checklist](#global-validation-and-bug-hunt-checklist)
 
@@ -114,6 +119,30 @@ Use these rows for all M9-M12/T-SERVER work until the checklist is fully regener
 | [ ] | `M12-PVP-ARENA` | `cx-server --mode pvp_arena` runs a 4-8 player public arena with server-authoritative state and replay-aligned clients. | [[spec/prototype-roadmap#M12 — Public PvP Arenas + Persistent MMO Shards]] | - | - | - | - | - | - | - | Uses `competitive` default; `tournament_strict` opt-in only. |
 | [ ] | `M12-MMO-SUITE` | MMO-001..MMO-012 all pass, including 50-client 1-hour soak, persistence restart, interest management, no-cloud reference. | [[spec/persistent-mmo-architecture#Acceptance Suite]] | - | - | - | - | - | - | - | M12 evidence gate; failure reopens DR-035. |
 | [ ] | `M12-PVP-MMO-DR-REVIEW` | DR-005/013/034/035 reviewed with M9-M12 evidence; scope promoted, adjusted, or reopened explicitly. | [[spec/native-implementation-backlog#M12 — Public PvP Arenas + Persistent MMO Shards]] | - | - | - | - | - | - | - | No silent demotion or silent scope expansion. |
+
+---
+
+## Material/T-MAT Addendum Checklist
+
+Use these rows for all M5.6/M5.7/M6.6/M7.5/M8.5/T-MAT work until the checklist is fully regenerated. Human ratings stay blank until the owner gives them.
+
+| Done | ID | Feature / Requirement | Source | Evidence | H-Full | H-Quality | H-Review | AI-Full | AI-Quality | AI-Review | Notes |
+|---|---|---|---|---|---:|---:|---:|---:|---:|---:|---|
+| [ ] | `TMAT-P00` | T-MAT side track: systemic material simulation (active-region CA + reaction table + atmospheres + affordance/affliction layer) is a core feel pillar; curated 17-material launch set per DR-036. | [[spec/prototype-roadmap#T-MAT — Systemic Material Simulation Track]] | - | - | - | - | - | - | - | Owns `cx-material`, `cx-atmos`. CPU-deterministic kernel; replay-deterministic; server-authoritative. |
+| [ ] | `TMAT-CRATES` | `cx-material` (chunked CA kernel) + `cx-atmos` (Barotrauma-style hull/gap/atmosphere networks) crates exist with `AGENTS.md` boundary docs and integrate with `cx-terrain`/`cx-physics`/`cx-replay`/`cx-server`. | [[decisions/dr-036-systemic-material-simulation-direction]] | - | - | - | - | - | - | - | Workspace now 29 crates. |
+| [ ] | `TMAT-EVENTS` | Run-bundle event categories `material`, `reaction`, `atmosphere`, `affliction` defined in `prototype-run-bundle-schema.md` and emitted from sim with parent cause chains. | [[references/prototype-run-bundle-schema#Event Category Baseline]] | - | - | - | - | - | - | - | Required before any M5.6+ run bundle can validate. |
+| [ ] | `M5.6-MAT-KERNEL` | M5.6 done-criteria: MAT-01..MAT-03 + MAT-06 + MAT-13 minimal pass; active material kernel + reaction table + density layering + replay determinism with `material.*` and `reaction.*` events. | [[spec/native-implementation-backlog#M5.6 — Material Kernel]] | - | - | - | - | - | - | - | Per-chunk material checksums in snapshots. |
+| [ ] | `M5.6-CXCTL` | `cxctl observe --materials/--reactions` and `cxctl inspect material/reaction <event-id>` per CLI reference. | [[spec/prototype-roadmap#CLI Reference]] | - | - | - | - | - | - | - | Required for AI-agent and accessibility tooling. |
+| [ ] | `M5.7-HAZARD` | M5.7 done-criteria: MAT-04 + MAT-05 + MAT-07 pass; MAT-08 stub lands; acid/electricity/debris/ingestion damage routes through M5.5 impulse path and the affliction layer; HUD overlay screenshots captured. | [[spec/native-implementation-backlog#M5.7 — Hazard Package]] | - | - | - | - | - | - | - | Mandatory hazard overlays + captions; replay cause chains required. |
+| [ ] | `M5.7-AFFLICTION` | Affliction layer (`wetness`, `burning`, `corroded`, `electrified`, `poisoned`, `asphyxiating`, `concussed`, `drowning`, `depressurizing`) wired into actor state + HUD; `affliction.*` events emitted with cause chains. | [[spec/native-implementation-backlog#M5.7 — Hazard Package]] | - | - | - | - | - | - | - | Visible on HUD; decay rules per material registry. |
+| [ ] | `M6.6-AI-MAT` | M6.6 done-criteria: AI-MAT-01..AI-MAT-08 acceptance suite passes; AI material competence with reason labels; AI-H regression remains green. | [[spec/native-implementation-backlog#M6.6 — AI Material Competence]] | - | - | - | - | - | - | - | DR-022 humanlike-bar fairness + fog-of-war required for hazard perception. |
+| [ ] | `M6.6-AFFORDANCE` | Per-material AI affordance tags (`avoid`, `seek`, `use-as-weapon`, `extinguish-with`, `neutralize-with`, `vent`, `pump`) wired into utility scoring; closed-enum reason labels (`hazard_unknown`, `hazard_underestimated`, `hazard_traded_for_objective`, `hazard_avoided`, `hazard_exploited`, `hazard_recovered`, `friendly_fire_avoided`). | [[spec/native-implementation-backlog#M6.6 — AI Material Competence]] | - | - | - | - | - | - | - | No free-text reasons. |
+| [ ] | `M7.5-ATMOS` | M7.5 done-criteria: MAT-09 + MAT-10 pass; Barotrauma-style hull/gap/pump/vent/oxygen/pressure/fire networks; mission director can author room-state objectives. | [[spec/native-implementation-backlog#M7.5 — Base Atmospherics]] | - | - | - | - | - | - | - | Server-authoritative atmosphere state per DR-005/DR-034/DR-035. |
+| [ ] | `M7.5-CXCTL-ATMOS` | `cxctl observe --atmospheres --stream --hz 5 --scope <room-id\|all>` exposes per-hull state stream. | [[spec/prototype-roadmap#CLI Reference]] | - | - | - | - | - | - | - | Designer + AI agent + accessibility consumers. |
+| [ ] | `M8.5-MAT-LAB` | M8.5 done-criteria: MAT-11 + MAT-14 pass; designer authors + exports + reloads a material puzzle in <10 minutes; community mod pack with new material loads cleanly. | [[spec/native-implementation-backlog#M8.5 — Material Lab]] | - | - | - | - | - | - | - | Required gate for adding materials beyond launch 17. |
+| [ ] | `M8.5-EXPANSION-GATE` | `cx-mod validate --strict` rejects expansion materials missing inspect overlay, AI affordance tag, replay event payload, recipe journal entry, or accessibility caption. | [[spec/native-implementation-backlog#M8.5 — Material Lab]] | - | - | - | - | - | - | - | Schema-enforced; no half-spec'd packs. |
+| [ ] | `M8.5-RECIPE-JOURNAL` | In-engine recipe journal logs designer-triggered reactions and persists across editor sessions; exportable as scenario hint content fragment. | [[spec/native-implementation-backlog#M8.5 — Material Lab]] | - | - | - | - | - | - | - | Player-readable; respects fog-of-war for player runs. |
+| [ ] | `TMAT-DR-REVIEW` | DR-007/036 reviewed with M5.6-M8.5 evidence; scope promoted, adjusted, or reopened explicitly. | [[decisions/dr-036-systemic-material-simulation-direction]] | - | - | - | - | - | - | - | No silent demotion or silent scope expansion. |
 
 ---
 

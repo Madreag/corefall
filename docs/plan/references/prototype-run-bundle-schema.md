@@ -12,9 +12,12 @@ feeds:
   - DR-013
   - DR-024
   - DR-033
+  - DR-034
+  - DR-035
+  - DR-036
 ---
 
-← [[references/sources|sources]] · [[spec/prototype-roadmap|native roadmap]] · [[spec/native-implementation-backlog|native backlog]] · [[spec/full-collision-physics-plan|full collision plan]] · [[spec/prototype-implementation-backlog-slice-a|historical Slice-A backlog]] · [[spec/replay-recorder-slice-a|recorder Slice A]] · [[spec/accessibility-comfort-slice-a|accessibility/comfort Slice A]] · [[decisions/dr-013-backend-service-scope|DR-013 backend scope]] · [[systems/replay-determinism-and-run-evidence|determinism/run evidence]] · [[spec/actor-feel-sandbox-slice-a|actor-feel Slice A]] · [[spec/terrain-material-sandbox-slice-a|terrain/material Slice A]]
+← [[references/sources|sources]] · [[spec/prototype-roadmap|native roadmap]] · [[spec/native-implementation-backlog|native backlog]] · [[spec/full-collision-physics-plan|full collision plan]] · [[decisions/dr-036-systemic-material-simulation-direction|DR-036 material direction]] · [[comparables/noita-grade-material-simulation-research|noita-grade material research]] · [[spec/prototype-implementation-backlog-slice-a|historical Slice-A backlog]] · [[spec/replay-recorder-slice-a|recorder Slice A]] · [[spec/accessibility-comfort-slice-a|accessibility/comfort Slice A]] · [[decisions/dr-013-backend-service-scope|DR-013 backend scope]] · [[systems/replay-determinism-and-run-evidence|determinism/run evidence]] · [[spec/actor-feel-sandbox-slice-a|actor-feel Slice A]] · [[spec/terrain-material-sandbox-slice-a|terrain/material Slice A]]
 
 # Prototype Run Bundle Schema
 
@@ -80,6 +83,10 @@ Good/Bad/Meh should be about observed play and debug evidence, not only personal
 | `server` | `server.boot`, `server.mode_selected`, `server.config_loaded`, `server.client_admitted`, `server.client_dropped`, `server.snapshot_written`, `server.snapshot_restored`, `server.journal_flushed`, `server.persistence_recovered`, `server.health_probe`, `server.metrics_sample`, `server.drain_started`, `server.drain_completed`, `server.shutdown` | Dedicated server lifecycle (DR-034 / [[spec/server-app-architecture]]); audit mode selection, client admit/drop, persistence cadence, health/readiness probes, drain shutdown. Tokens never written; redacted by default. |
 | `anti_cheat` | `anti_cheat.profile_applied`, `anti_cheat.input_rate_warning`, `anti_cheat.input_rate_kicked`, `anti_cheat.snapshot_drift`, `anti_cheat.capability_violation`, `anti_cheat.banned`, `anti_cheat.appeal_logged` | Server-authoritative anti-cheat foundation (DR-005 / DR-034); every rejection writes a reason label and parent-event chain; audit log appended for offline review. |
 | `mmo` | `mmo.shard_started`, `mmo.shard_world_loaded`, `mmo.player_joined`, `mmo.player_left`, `mmo.contract_accepted`, `mmo.contract_resumed`, `mmo.contract_completed`, `mmo.faction_state_changed`, `mmo.commander_memory_written`, `mmo.cross_shard_handoff` | Persistent MMO shard mode (DR-035 / [[spec/persistent-mmo-architecture]]); audit shard lifecycle, account joins/leaves, contract director, faction memory, cross-shard handoffs. Account ids redacted by default. |
+| `material` | `material.chunk_dirtied`, `material.chunk_slept`, `material.chunk_woken`, `material.active_region_changed`, `material.budget_exceeded`, `material.contact_started`, `material.phase_changed`, `material.density_swap`, `material.acid_contact`, `material.electricity_arc`, `material.debris_impact`, `material.first_divergence` | Active material kernel (DR-036 / T-MAT / [[comparables/noita-grade-material-simulation-research]]); audit per-chunk activity, sleep/wake transitions, phase transitions, density layering, hazard contacts, replay divergence per-chunk. Per-chunk material checksums in snapshots. |
+| `reaction` | `reaction.triggered`, `reaction.byproduct_emitted`, `reaction.skipped_priority`, `reaction.skipped_threshold`, `reaction.catalyzed`, `reaction.recipe_journal_logged` | Reaction table engine (DR-036); audit pair/triple reaction firing, priority ordering, temperature thresholds, catalysts, byproducts, recipe-journal entries for material lab. Cause-chain links upstream `material.*` and downstream `damage.*`/`affliction.*`. |
+| `atmosphere` | `atmosphere.hull_state_changed`, `atmosphere.gap_opened`, `atmosphere.gap_closed`, `atmosphere.flooding_started`, `atmosphere.pressure_equalized`, `atmosphere.breach_decompression`, `atmosphere.fire_propagated`, `atmosphere.smoke_filled`, `atmosphere.toxic_gas_migrated`, `atmosphere.pump_action`, `atmosphere.vent_action` | Barotrauma-style hull/gap/pump/vent/oxygen/pressure/fire networks (M7.5 / DR-036); audit hull state, gap connectivity, flow, breach, fire/smoke/gas propagation, pump/vent actions. Server-authoritative per DR-005 / DR-034 / DR-035. |
+| `affliction` | `affliction.set`, `affliction.cleared`, `affliction.escalated`, `affliction.decayed`, `affliction.stack_added` | Per-actor affliction layer (M5.7 / DR-036): `wetness`, `burning`, `corroded`, `electrified`, `poisoned`, `asphyxiating`, `concussed`, `drowning`, `depressurizing`. HUD-visible; cause-chained to upstream `material.*` / `reaction.*` events. |
 | `combat` | `weapon_fired`, `projectile_spawned`, `projectile_hit_mo`, `weapon_reloaded` | Damage readability, replay, equipment balance. |
 | `body` | `wound_added`, `actor_status_changed`, `body_gibbed`, `inventory_dropped` | HUD, death recap, UX trust. |
 | `terrain` | `terrain_material_probe`, `terrain_penetration_threshold`, `terrain_carve_mask`, `terrain_fill_or_repair`, `path_material_refresh` | Terrain model, AI path trust, networking bandwidth. |
@@ -105,14 +112,19 @@ Good/Bad/Meh should be about observed play and debug evidence, not only personal
 | M4 HUD/comic-noir UI | HUD, overlays, death/material explanations, accessibility settings, caption evidence, and screenshots/captures show the player-facing state clearly. |
 | M5 equipment/chassis | Item role labels, damage-stage state, armor/chassis effects, bot-usable fields, loadout validation, repair/salvage, and ejection/disable evidence are captured. |
 | M5.5 full collision gauntlet | `collision.*` events captured for collision matrix coverage, limb/body/equipment/mech/base/projectile contacts, projectile-projectile deflection/fuze/detonation cases, CCD/tunneling fixtures, impulse-to-damage routing, collision-filter reasons, `cxctl observe --collisions`, perf counters, and headless replay checksums. |
+| M5.6 material kernel | `material.*` and `reaction.*` events captured for chunked CA kernel, sleep/wake transitions, density layering, phase change, reaction table firing with priority/threshold/catalyst evidence, per-chunk material checksums in snapshots, `cxctl observe --materials/--reactions`, headless replay checksums match (DR-036 / T-MAT). |
+| M5.7 hazard package | `material.*`, `reaction.*`, `affliction.*`, `damage.*` chained events for acid/electricity/debris/ingestion-stub damage routing through M5.5 impulse pathway and the affliction layer; HUD overlay screenshots; AI-H regression remains green (DR-036 / T-MAT). |
 | M6 AI trust harness | Bot intent, perception facts, doctrine/personality labels, mistakes, recovery actions, blocked-path reasons, and explanation overlays are captured by AI-H scenarios. |
 | M6.5 LLM mind lab | `mind.*` events captured for every task: prompt hash (raw text only when `debug` capability is on), response hash, validator result with reasons, applied patch ids, rejected proposals, memory writes; mock-provider runs are deterministic; live provider runs are flagged but never required for CI. |
+| M6.6 AI material competence | AI-MAT-01..AI-MAT-08 acceptance suite passes; `ai_hazard_map_updated` events with fog-of-war audit; `tactic_chosen` and `tactic_scored` events carry affordance-tag reasons; `ai_path_avoided_hazard`, `ai_recovery_action`, `ai_friendly_fire_check`, `ai_hazard_exploit` events captured; AI-H regression remains green (DR-036 / DR-022). |
 | M7 mission director | Manifest-driven objectives, director events, command-core/base-power state, debrief/retry state, and scenario completion/failure evidence are captured. |
+| M7.5 base atmospherics | `atmosphere.*` events captured for hull state, gap topology, flooding, pressure equalization, breach decompression, fire propagation, smoke fill, toxic gas migration, pump/vent actions; mission director hull-state objectives evaluated; `cxctl observe --atmospheres`; server-authoritative replay checksums match (DR-036 / DR-005 / DR-034 / DR-035). |
 | M9 dedicated server app | `server.*` events captured for boot, mode selection, config load, client admit/drop, persistence cadence, health/readiness probes, drain shutdown; M9 server-core subset passes against checked run bundles. |
 | M10 LAN co-op | Per-client run bundles archived; replay-compare aligns tick-for-tick; mod hash sync events captured; `anti_cheat.profile_applied` logs profile `casual`. |
 | M11 online co-op (self-hosted dedicated servers) | Per-client run bundles archived through NAT/relay; lobby_directory register/heartbeat/deregister captured; mod hash sync diff captured on mismatch; `anti_cheat.input_rate_kicked` logged when client misbehaves. |
 | M12 PvP arena + persistent MMO shard | `mmo.*` events captured for shard lifecycle, player join/leave, contract director, faction memory, cross-shard handoff; MMO-001..MMO-012 acceptance suite passes; PvP arena per-match bundles align. |
 | M8 editor/mod tools | Edited scenario/package data, validation diagnostics, content hashes, sample mod load evidence, and workbench screenshots are captured. |
+| M8.5 material lab | `cx-tools-editor --mode material_lab` workbench evidence: brush/inspect/recipe-journal/stamp captures; designer authoring transcript ≤10 minutes; sample expansion material pack validates with `cx-mod validate --strict`; new material affordance verified by AI puppet test; modded run bundle archived (DR-036 / T-MAT). |
 | M9+ networking/headless tracks | Headless replay, authority/replication events, config hashes, divergence reports, and bandwidth/performance counters are captured before any network posture can close. |
 
 ## Historical Slice-A Acceptance Gates
@@ -145,6 +157,8 @@ The checker is a gate for evidence hygiene, not a declaration that a prototype i
 
 - [[spec/prototype-roadmap]]
 - [[spec/native-implementation-backlog]]
+- [[decisions/dr-036-systemic-material-simulation-direction]]
+- [[comparables/noita-grade-material-simulation-research]]
 - [[spec/ai-control-observability-layer]]
 - [[spec/prototype-implementation-backlog-slice-a]]
 - [[spec/replay-recorder-slice-a]]

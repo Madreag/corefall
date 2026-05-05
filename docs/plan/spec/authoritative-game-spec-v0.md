@@ -41,6 +41,7 @@ feeds:
   - DR-033
   - DR-034
   - DR-035
+  - DR-036
 ---
 
 ← [[spec/index|spec section]] · [[spec/prototype-roadmap|prototype roadmap]] · [[spec/prototype-implementation-backlog-slice-a|implementation backlog]] · [[dashboards/research-readiness|readiness]] · [[dashboards/system-heatmap|system heatmap]] · [[decisions/index|decisions]] · [[prototypes/index|prototype evidence]] · [root plan](../../VAULT_PLAN.md)
@@ -125,6 +126,7 @@ These are v0 product-direction commitments. They still need prototype evidence b
 | Direct control | Player movement, aim, weapon, tool, damage/status, and recovery loops are first-class, but bodies must remain AI-usable when not possessed. | A1 actor-feel runs, A-FEEL tests, DR-015 commander-only and handoff tests. |
 | Destructible terrain | Terrain and material affordances are core to navigation, combat, tools, AI, missions, replay, and UX. | MAT-T terrain/material sandbox tests. |
 | Full physical collision | **Everything physical collides by default** unless an explicit tested filter says otherwise (DR-033). Weapons, limbs, bodies, armor, mechs, terrain, objects, shields, debris, base parts, and projectiles are physical systems. Projectile-projectile contact is in scope; kinetic bullet-bullet contact deflects/fragments/loses energy unless authored explosive/fuze behavior says otherwise. Physics impulse can damage limbs, armor, equipment, chassis modules, terrain, and base objects. | [[decisions/dr-033-full-collision-physics-direction]], [[spec/full-collision-physics-plan]], M5.5 COLL-001..COLL-012. |
+| Systemic material simulation | **Hybrid systemic materials are a core feel pillar** (DR-036): bounded active-region per-pixel CA kernel (`cx-material`) + Barotrauma-style hull/atmosphere networks (`cx-atmos`) + data-driven reaction table + per-actor affordance/affliction layer. Curated **17-material launch set** (air, dirt/sand, rock/concrete, metal, wood/organic, water, steam/mist, smoke, fire/heat, oil/fuel, acid, toxic sludge/liquid, toxic gas, lava, blood/vomit, electricity charge, pebble/debris). Expansion materials gated behind material lab (M8.5). AI material competence required (M6.6). Replay-deterministic; server-authoritative. | [[decisions/dr-036-systemic-material-simulation-direction]], [[comparables/noita-grade-material-simulation-research]], M5.6 MAT-01..03 + MAT-06 + MAT-13, M5.7 MAT-04/05/07 + MAT-08-stub, M6.6 AI-MAT-01..AI-MAT-08, M7.5 MAT-09/10, M8.5 MAT-11/14. |
 | Replay/debug | Every meaningful prototype must produce inspectable run evidence. | [[references/prototype-run-bundle-schema]], [[spec/replay-recorder-slice-a]]. |
 | AI trust | Friendly AI is a launch-quality bar, not decoration, but only proven harness behavior can be promised. | AI-H and AI-EQ tests. |
 | Loadout/workbench | Equipment roles, source provenance, bot suitability, package warnings, and mission capabilities must be visible. | LOAD-A, LOAD-R, LOAD-W, LOAD-FIELD, and PACK tests. |
@@ -141,7 +143,6 @@ These are v0 product-direction commitments. They still need prototype evidence b
 | Subscription-funded MMO | Forbidden. | Conflicts with DR-031 content economy. Operators may charge for hosting their own shard; the base SKU does not include a subscription. See [[decisions/dr-035-persistent-mmo-architecture]]. |
 | Cross-shard live combat or seamless single-world MMO | Out of scope at v1. | Multi-shard with lobby/portal is the v1 model. Reopens via DR-035 amendment. |
 | Account economy / gacha / paid collection | Research and private prototype only. | Fairness, modding trust, ethics, and economy require a future release-facing DR beyond [[decisions/dr-011-progression-retention-loop]]. |
-| Noita-grade material chemistry at launch | Moonshot, not v0 promise. | The launch path is curated material affordances until [[decisions/dr-007-terrain-material-model]] has run evidence. |
 | Full deterministic replay | Open research. | The current posture is hybrid semantic events, snapshots, checksums, and deterministic islands only when proven. |
 | Final engine implementation | Direction + stack closed; specifics open within stack. | DR-001 direction closed (greenfield + CCCP reference); DR-024 stack closed (Rust + Bevy/wgpu hybrid + custom crates); transport library, scripting host, and per-crate API specifics decided per-milestone. |
 | Final arsenal balance | Open. | Generated role cards and overlap audits are seed data; runtime item behavior and AI-H evidence must decide. |
@@ -206,8 +207,8 @@ The first playable exits only when [[spec/prototype-implementation-backlog-slice
 
 | Area | v0 Direction | Open Boundary |
 |---|---|---|
-| Terrain representation | Prototype with curated material affordances before richer material simulation. | Backend may change after MAT-T and DR-007 evidence. |
-| Material set | Slice A starts with air, dirt, concrete, metal, nohook/anchor material, hazard, loose fill, repair/fill. | Noita-grade chemistry stays MS-01 until isolated tests prove value/perf. |
+| Terrain representation | Prototype with curated material affordances before richer material simulation; full systemic kernel + atmosphere networks land at M5.6/M5.7/M7.5 per [[decisions/dr-036-systemic-material-simulation-direction]]. | Backend may change after MAT-T and DR-007 evidence; DR-036 closes the systemic direction. |
+| Material set | Slice A starts with curated 8-material affordances (air, dirt, concrete, metal, nohook/anchor, hazard, loose fill, repair/fill); full launch set is **17 materials** per DR-036 (adds water, steam/mist, smoke, fire/heat, oil/fuel, acid, toxic sludge/liquid, toxic gas, lava, blood/vomit, electricity charge, pebble/debris). | Expansion materials gated behind material lab (M8.5) per [[decisions/dr-036-systemic-material-simulation-direction]]. |
 | Destruction events | Every carve, blast, fill, repair, dirty-region update, path refresh, and terrain snapshot emits replay/debug data. | Event volume and snapshot sizes feed DR-002/DR-005/DR-007. |
 | Mobility affordances | Anchorability, nohook, jet safety, path cost, hazard, and climb/cover implications must be visible to player and AI. | Mobility tools can split to A.1 if they block gun/dig feel. |
 | Structural complexity | Collapse/support rules are prototype-only until readability and performance are proven. | Avoid hidden simulation that the HUD cannot explain. |
@@ -338,14 +339,14 @@ Moonshots stay alive in [[research-log/moonshot-register]] and must not block th
 
 | Moonshot | v0 Treatment |
 |---|---|
-| Noita-grade material chemistry | Isolate as MS-01; do not mix into A2 unless the curated material set is already readable and performant. |
+| Noita-grade material chemistry | **Promoted to active commitment** via [[decisions/dr-036-systemic-material-simulation-direction]] (M5.6/M5.7/M6.6/M7.5/M8.5). Curated 17-material launch set; expansion materials remain moonshot-status until material lab + balance review. |
 | Live PvP | Isolate as MS-02 or DR-005 follow-up; do not delay local replay/terrain evidence. |
 | AI personality engine | Prototype after AI-H can measure basic competence. |
 | Veteran/legacy actors | Prototype with RET-A after body/replay/debrief exists. |
 | Lua REPL + scene scrubber | Good workbench experiment after package-builder basics. |
 | Tactical map as replay scrub UI | Prototype alongside UX-W; do not assume it is the command UI. |
 | Adaptive commander | Prototype after Breach Contract reason strings exist. |
-| Material lab as shipping mode | Revisit after MAT-T. |
+| Material lab as shipping mode | **Promoted to active commitment** via [[decisions/dr-036-systemic-material-simulation-direction]] §Material Lab (M8.5 MAT-11/14). Designer authors a tiny puzzle in <10 minutes; community mod packs can ship expansion materials with full schema compliance. |
 | Async strategic layer | Revisit after backend fixture contracts. |
 | Voxel/2.5D experiment | Separate experiment only. |
 | Cosmetic collection economy | Research only until fairness/modding DR. |
@@ -356,7 +357,7 @@ Moonshots stay alive in [[research-log/moonshot-register]] and must not block th
 | Question | Current Status | Must Resolve With |
 |---|---|---|
 | Should the final game build on CCCP, a fork, or a greenfield engine? | **Closed** — greenfield native (DR-001) on Rust + Bevy/wgpu hybrid + custom core crates (DR-024). CCCP is read-only reference. | [[decisions/dr-001-engine-strategy]], [[decisions/dr-024-native-engine-stack]], [[engine/cccp-build-run-audit]]. |
-| What terrain backend best balances feel, readability, AI, replay, and networking? | Open. Curated material Slice A chosen for test. | MAT-T runs and [[decisions/dr-007-terrain-material-model]]. |
+| What terrain backend best balances feel, readability, AI, replay, and networking? | **Direction closed** (2026-05-05): hybrid systemic per [[decisions/dr-036-systemic-material-simulation-direction]] (active-region CA + reaction table + atmospheres + curated launch set). Implementation specifics close at M5.6/M5.7/M7.5. | MAT-T + M5.6/M5.7/M7.5 run bundles; [[decisions/dr-007-terrain-material-model]] + [[decisions/dr-036-systemic-material-simulation-direction]]. |
 | How deterministic can replay be? | Open. Hybrid event/snapshot/checksum posture. | REC-A/DET-A run bundles. |
 | How much AI complexity is enough for solo trust? | Open. Harness requirements ready. Local AI is the floor; async LLM "mind" workers (DR-032) add doctrine/memory/personality/debriefs as proposals only. | AI-H and AI-EQ runs, [[decisions/dr-008-ai-architecture]], M6.5 MIND-001..MIND-010 against mock provider per [[spec/hybrid-llm-ai-plan]]. |
 | What command UX should ship? | Open lean: direct + slowdown + optional tactical map. | UX-W/ORDER tests and [[decisions/dr-009-command-ux-style]]. |
@@ -404,6 +405,7 @@ Moonshots stay alive in [[research-log/moonshot-register]] and must not block th
 - [[spec/progression-retention]]
 - [[spec/prototype-roadmap]]
 - [[spec/prototype-implementation-backlog-slice-a]]
+- [[comparables/noita-grade-material-simulation-research]]
 - [[dashboards/research-readiness]]
 - [[dashboards/system-heatmap]]
 - [[decisions/index]]

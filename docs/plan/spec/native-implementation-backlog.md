@@ -39,6 +39,7 @@ feeds:
   - DR-033
   - DR-034
   - DR-035
+  - DR-036
 ---
 
 <- [[spec/index|spec section]] · [[spec/prototype-roadmap|native roadmap]] · [[spec/feature-completion-checklist|feature checklist]] · [[spec/authoritative-game-spec-v0|game spec v0]] · [[spec/server-app-architecture|server app architecture]] · [[spec/persistent-mmo-architecture|persistent MMO architecture]] · [[spec/full-collision-physics-plan|full collision plan]] · [[spec/hybrid-llm-ai-plan|hybrid LLM AI plan]] · [[spec/ai-control-observability-layer|AI control/observability]] · [[references/prototype-run-bundle-schema|run-bundle schema]] · [VAULT_PLAN.md](../../VAULT_PLAN.md)
@@ -278,6 +279,68 @@ Human gate: project-owner may play the gauntlet for feel, but all COLL-* tests a
 
 ---
 
+## M5.6 — Material Kernel
+
+> [!important] Kickoff prerequisites
+> M2 (terrain + materials) and M3 (replay/event recorder) must be complete; M5.5 (full collision physics) must be complete enough to expose contact + impulse data the kernel can subscribe to. Read [[decisions/dr-036-systemic-material-simulation-direction]], [[decisions/dr-007-terrain-material-model]], and [[comparables/noita-grade-material-simulation-research]] in full BEFORE feature work. Run [M5.6 Kickoff Smoke](../spec/prototype-roadmap.md#per-milestone-kickoff-smoke). M5.6 is not done until MAT-01..MAT-03 + MAT-06 + MAT-13 pass and the run replays headlessly with material/reaction checksums.
+
+> [!warning] Hard rules
+> Active-region only (no everywhere-always sim). 64×64 chunks, dirty rects, sleeping chunks, per-chunk material checksum. CPU-deterministic kernel; chunk update order pinned; no platform-specific atomics in the inner loop. No GPU-only material updates that bypass replay. Curated launch material set (17) per DR-036; expansion materials require material lab + balance review (M8.5+).
+
+| ID | Owns | Build | Tests | Evidence | Anti-scope |
+|---|---|---|---|---|---|
+| MAT-01 chunked material grid | `cx-material`, `cx-terrain` | 64×64 active material chunks with `MaterialId`, `Temperature`, `State`, `Charge` fields per pixel. Sparse storage; dirty-rect tracking; sleeping chunks; per-chunk material checksum; integration with `cx-terrain` chunk grid. | Chunk roundtrip tests; sleep/wake transitions; checksum stability under no-op ticks. | `material_chunk_dirtied/slept/woken` events; per-chunk checksum field in snapshots. | No global per-pixel update pass; no GPU-only state. |
+| MAT-02 launch material registry | `cx-material`, `cx-mod`, `content/materials/` | Curated 17-material registry per DR-036: air, dirt/sand, rock/concrete, metal, wood/organic, water, steam/mist, smoke, fire/heat, oil/fuel, acid, toxic sludge/liquid, toxic gas, lava, blood/vomit, electricity charge, pebble/debris. Each material defines density, viscosity, conductivity, ignition point, melting/boiling thresholds, AI affordance tags, hazard overlay id, sound id. | Registry roundtrip; missing-field validation; affordance-tag enum coverage. | Schema audit in run bundle; `cx-mod validate content/materials/ --strict` passes. | No expansion materials shipped here; no per-shader-only material data. |
+| MAT-03 reaction table + engine | `cx-material`, `content/reactions/` | Data-driven pair/triple reaction table with priority, temperature thresholds, catalysts, byproducts, probability (deterministic via per-chunk RNG). Reaction engine consumes table; emits `reaction.*` events with cause chain. | Per-pair fixture tests; priority ordering tests; catalyst tests; byproduct mass-conservation tests where applicable. | `reaction.*` events visible in run bundle; reaction inspect via `cxctl observe --reactions`. | No hidden reactions without replay events; no implicit chemistry baked into rendering. |
+| MAT-04 active-region scheduler | `cx-material`, `cx-physics` | Active-region selector based on actor proximity, recent edits, recent reactions, fire/electricity propagation; inactive chunks sleep with checksum verification on wake. Per-frame budget + LOD tier (full/coarse/sleeping). | Active-region selection tests; budget enforcement tests; perf bench. | `material_active_region_changed`, `material_budget_exceeded` events; perf counters. | No always-on global update path. |
+| MAT-05 density layering + flow | `cx-material` | Stable layering rule for immiscible liquids (oil floats on water, sludge sinks). Gravity-driven flow with viscosity factor. Gas rises with diffusion. | Layering fixture tests (oil-on-water, sludge sink, steam rise); flow rate tests by viscosity. | Layering scenario in MAT-01..03 run bundle. | No real fluid-dynamics simulation; no Navier-Stokes. |
+| MAT-06 phase change | `cx-material` | Temperature-driven phase transitions: water ↔ steam, lava ↔ rock, ice ↔ water (if shipped), oil ↔ fire. Each transition emits `material.*` event with parent cause. | Per-transition fixture tests; threshold tests. | Phase change events visible in M5.6 run bundle. | No alchemy here; no phase change for solids beyond launch list. |
+| MAT-13 replay/perf/bug hunt | `cx-headless`, `cx-bench`, `tools/`, vault | Headless replay checksum for material kernel (per-chunk material checksums + reaction event order). Perf report. First-divergence report on mismatch. Bug-hunt log. | Replay verify; 1080p/60 active-region budget pass; perf bench captured. | Prototype note under `prototypes/` with final audit. | No "works once" completion. |
+| MAT-control `cxctl observe --materials/--reactions` | `cx-control`, `cxctl`, `cx-material` | `cxctl observe --materials --stream --hz 30 --scope chunk:<x>,<y>` and `cxctl observe --reactions --stream --hz 30` and `cxctl inspect material/reaction <event-id>` per [Roadmap CLI Reference](../spec/prototype-roadmap.md#cli-reference). | CLI snapshot tests; stream freshness tests. | Observation samples in run notes. | No screenshot-only material debugging. |
+
+M5.6 E2E:
+
+```bash
+cargo run -p cx-e2e -- --scenario m5_6_material_kernel --suite MAT-01,MAT-02,MAT-03,MAT-06,MAT-13 --write-run-bundle
+cargo run -p cxctl -- observe --materials --stream --hz 30 --scope chunk:0,0
+cargo run -p cxctl -- observe --reactions --stream --hz 30
+cargo run -p cx-headless -- replay prototype_runs/native/<m5_6_run> --verify-checksums
+cargo run -p cx-bench -- --scenario m5_6_material_kernel --profile material --runs 100 --check-checksum-stability
+cargo run -p cx-mod -- validate content/materials/ --strict
+```
+
+Human gate: project-owner may play the kernel scenarios for feel, but all MAT-* tests are agent-completable.
+
+---
+
+## M5.7 — Hazard Package
+
+> [!important] Kickoff prerequisites
+> M5.6 must be complete (kernel + reaction table + density layering + phase change). M5.5 collision must route impulse-to-damage so material hazards can route through that same path. Read [[decisions/dr-036-systemic-material-simulation-direction]] §Hazard Coverage and the linked Barotrauma posture in [[comparables/noita-grade-material-simulation-research]]. Run [M5.7 Kickoff Smoke](../spec/prototype-roadmap.md#per-milestone-kickoff-smoke). M5.7 is not done until MAT-04, MAT-05, MAT-07 pass and MAT-08 stub lands with the affliction model wired to HUD.
+
+> [!warning] Hard rules
+> Every hazard death must have a replay-visible cause chain (`material.*` → `reaction.*` → `damage.*` → `actor.*`). No invisible/instant lava death; pre-warning audio + hazard overlay required. AI must have an affordance tag for every hazard before that hazard ships in a mission (M6.6 gate). Afflictions are a state layer on the actor, not free-floating effect blobs.
+
+| ID | Owns | Build | Tests | Evidence | Anti-scope |
+|---|---|---|---|---|---|
+| MAT-04 acid hazard | `cx-material`, `cx-actor`, `cx-equipment`, `cx-chassis` | Acid material with corrosion-over-time damage, armor degradation, equipment jam chance, neutralization by water/base reactions. Affliction `corroded`. | Acid pool damage fixture; armor-zone degrade test; neutralization test. | `material.acid_contact`, `damage.acid_applied`, `affliction.corroded_set`; HUD shows affliction. | No instant-kill acid; no acid that bypasses armor without replay event. |
+| MAT-05 electricity hazard | `cx-material`, `cx-actor`, `cx-equipment` | Electricity charge propagates through conductive materials (water, metal), arcs to grounded actors, stuns or damages, can ignite oil/fuel. Affliction `electrified`. | Conductivity chain test (water-metal-actor); arc-jump fixture; ignition cross-test with oil. | `material.electricity_arc`, `damage.electric_applied`, `affliction.electrified_set`. | No magic chain-lightning; conductivity follows material registry. |
+| MAT-07 debris/blunt impact | `cx-material`, `cx-physics`, `cx-chassis` | Debris/pebble materials behave as small physical bodies with impulse-to-damage routing through M5.5; collapse cascades for stacked debris. Affliction `concussed` for repeated head impacts. | Debris pile collapse test; impact damage threshold test by material/sharpness. | `damage.debris_impact_applied`; collapse events. | No granular sand fluid here (deferred to expansion). |
+| MAT-08 ingestion stub | `cx-actor`, `cx-material` | Stub: actor ingestion model for toxic gas / smoke / acid mist with afflictions `asphyxiating`, `poisoned`, `coughing`. Stub: route through breathing model placeholder; full network behavior lands in M7.5. | Toxic-gas exposure fixture; affliction stack test. | `affliction.poisoned_set`, `affliction.asphyxiating_set`. | No full pulmonary sim; full atmospheric routing waits for M7.5. |
+| MAT-affliction layer | `cx-actor`, `cx-ui` | Per-actor affliction state (`wetness`, `burning`, `corroded`, `electrified`, `poisoned`, `asphyxiating`, `concussed`). Visible on HUD. Decay/clear rules per material registry. | Affliction stack tests; HUD render test; decay tests. | `affliction.*` events; HUD screenshot. | No invisible afflictions; no permanent uncleanable afflictions outside design intent. |
+| MAT-hazard overlay UI | `cx-ui`, `cx-render-2d`, `cx-material` | Hazard overlay (color-blind safe) for acid/electricity/fire/toxic gas/lava + caption hooks. Toggle key + accessibility default-on for low-vision profiles. | Overlay screenshot tests at 100% and 200% UI scale; high-contrast mode test. | Hazard overlay screenshots in M5.7 run bundle. | No color-only hazard signaling. |
+
+M5.7 E2E:
+
+```bash
+cargo run -p cx-e2e -- --scenario m5_7_hazard_package --suite MAT-04,MAT-05,MAT-07,MAT-08-stub --write-run-bundle
+cargo run -p cx-headless -- replay prototype_runs/native/<m5_7_run> --verify-checksums
+```
+
+Human gate: human playtester confirms hazard signal-to-death readability and HUD legibility before promotion to M6.
+
+---
+
 ## M6 — AI Core And Trust Harness
 
 | ID | Owns | Build | Tests | Evidence | Anti-scope |
@@ -330,6 +393,37 @@ Human gate: **none**. M6.5 is fully agent-completable; humans review the audit r
 
 ---
 
+## M6.6 — AI Material Competence
+
+> [!important] Kickoff prerequisites
+> M6 (AI core + AI-H harness) and M5.6 + M5.7 must be complete (kernel + reaction table + hazards + afflictions). Read [[decisions/dr-036-systemic-material-simulation-direction]] §AI Material Competence and [[decisions/dr-022-ai-humanlike-bar]]. Run [M6.6 Kickoff Smoke](../spec/prototype-roadmap.md#per-milestone-kickoff-smoke). M6.6 is not done until AI-MAT-01..AI-MAT-08 pass and AI-H-01..06 regression remains green.
+
+> [!warning] Hard rules
+> AI must respect fog-of-war on hazard perception (AI cannot perceive a toxic gas plume on the other side of a wall the player can't see either). Affordance tags drive utility scoring; no hand-coded "always run from acid" overrides. AI mistakes around hazards are allowed (per DR-022 humanlike imperfection) but they MUST emit reason labels (`hazard_unknown`, `hazard_underestimated`, `hazard_traded_for_objective`).
+
+| ID | Owns | Build | Tests | Evidence | Anti-scope |
+|---|---|---|---|---|---|
+| AI-MAT-01 hazard perception map | `cx-ai`, `cx-material` | Per-actor sampled hazard map of nearby material/temperature/charge/gas fields, fog-of-war respected. Updates on tick budget. | Fog-of-war audit (hidden hazard never appears in map); update-budget test. | `ai_hazard_map_updated` events. | No raw-state passthrough; no global omniscience. |
+| AI-MAT-02 affordance tag wiring | `cx-ai`, `cx-material` | Material registry affordance tags (`avoid`, `seek`, `use-as-weapon`, `extinguish-with`, `neutralize-with`, `vent`, `pump`) consumed by utility scoring. | Per-tag scoring fixture; doctrine override fixture. | `tactic_scored` reason labels include affordance tag id. | No hard-coded material strings outside registry. |
+| AI-MAT-03 hazard avoidance | `cx-ai`, `cx-actor` | Pathfinding prefers safe routes; replans on hazard detection; emits reason labels on detour. | Acid-pool detour fixture; electrified-water detour fixture; toxic-gas detour. | `ai_path_avoided_hazard` events. | No infallible avoidance; humanlike misses allowed with reason labels. |
+| AI-MAT-04 hazard exploitation | `cx-ai`, `cx-equipment` | AI uses water against burning enemies, acid against unarmored, electricity against grouped enemies in water; doctrine-tag-gated. | Per-doctrine fixture (`improviser` exploits; `defensive` does not). | `tactic_chosen` events with `exploit_hazard:<id>` reason. | No griefing-only doctrines; no autoplay puzzle solver. |
+| AI-MAT-05 friendly-fire safety | `cx-ai` | AI checks team membership before exploiting hazards on friendlies; emits reason labels on near-miss; escalates by doctrine. | Friendly-in-blast fixture; `cautious` vs `aggressive` doctrine difference. | `ai_friendly_fire_check` events. | No magic "I just don't shoot teammates" override; check is real and visible. |
+| AI-MAT-06 self-preservation | `cx-ai`, `cx-actor` | AI extricates from hazards: ignites → drop weapon + dive into water; drowning → climb; corroded → equip swap; electrified → break contact. | Per-affliction recovery fixture. | `ai_recovery_action` events with `affliction:<id>` reason. | No instantaneous teleport-out; recoveries are realistic actions. |
+| AI-MAT-07 base atmospherics awareness (stub) | `cx-ai`, `cx-atmos` (stub binding) | Stub: AI consumes future M7.5 atmosphere telemetry; for M6.6 the stub is a fake provider that returns synthetic hull state; verify scoring path works end-to-end. | Synthetic hull state fixture; scoring path test. | Stub trait + tests; wired-up gate for M7.5. | No real M7.5 work shipped here. |
+| AI-MAT-08 reason label coverage | `cx-ai`, `cx-replay` | Every hazard-related decision emits a parent-linked replay reason label drawn from a closed enum (`hazard_unknown`, `hazard_underestimated`, `hazard_traded_for_objective`, `hazard_avoided`, `hazard_exploited`, `hazard_recovered`, `friendly_fire_avoided`). | Reason-label coverage test (no decisions emit `unknown` outside enum). | Reason-label histogram in run note. | No free-text reasons; closed enum enforced. |
+
+M6.6 E2E:
+
+```bash
+cargo run -p cx-ai --bin ai_harness -- --suite AI-MAT-01..AI-MAT-08 --write-run-bundle
+cargo run -p cx-ai --bin ai_harness -- --suite AI-H-01..AI-H-06 --write-run-bundle  # regression
+cargo run -p cx-headless -- replay prototype_runs/native/<m6_6_run> --verify-checksums
+```
+
+Human gate: human playtester rates AI competence around hazards on the DR-022 humanlike scale; result archived in run note.
+
+---
+
 ## M7 — Mission Director And Breach Contract
 
 | ID | Owns | Build | Tests | Evidence | Anti-scope |
@@ -351,6 +445,36 @@ Human gate: project-owner plays five runs and records verbatim reaction.
 
 ---
 
+## M7.5 — Base Atmospherics
+
+> [!important] Kickoff prerequisites
+> M5.6 (material kernel) and M7 (mission director + Breach Contract) must be complete. Read [[decisions/dr-036-systemic-material-simulation-direction]] §Base Atmospherics and the Barotrauma posture in [[comparables/noita-grade-material-simulation-research]]. Run [M7.5 Kickoff Smoke](../spec/prototype-roadmap.md#per-milestone-kickoff-smoke). M7.5 is not done until MAT-09 + MAT-10 pass and the mission director can author room-state objectives.
+
+> [!warning] Hard rules
+> Approximate consistent rules; not a real-unit physics simulation. Hull/gap/pump/vent/oxygen/pressure/fire networks must be replay-deterministic and inspectable via `cxctl observe --atmospheres`. Server-authoritative atmosphere state (DR-005 / DR-034 / DR-035). Mission director authors objectives in terms of hull state (`pressurize hull H3`, `vent toxic gas from hull H7`); `cx-mod` validates hull/gap topology at scenario load.
+
+| ID | Owns | Build | Tests | Evidence | Anti-scope |
+|---|---|---|---|---|---|
+| MAT-09 hull/gap topology | `cx-atmos`, `cx-mission`, `content/scenarios/` | Per-scenario hull volumes + gap connections. Each hull tracks water level, oxygen level, pressure, fire state, toxic gas mass. Gaps carry flow state + force. Topology validation at scenario load. | Topology roundtrip; isolated/connected hull tests; gap-state transition tests. | `atmosphere.hull_state_changed`, `atmosphere.gap_opened/closed` events. | No real Navier-Stokes; no per-pixel atmosphere. |
+| MAT-10 atmosphere flow + breach | `cx-atmos`, `cx-mission` | Hull flooding (water flows down through gaps), oxygen depletion, pressure equalization, breach handling (sudden gap opening to outside). Pump + vent + door entities with admin actions; flow rates from material registry. | Flooding rate test; pressure equalization test; breach decompression test; pump/vent action tests. | `atmosphere.*` events visible in M7.5 run bundle. | No real-unit pressure (use approximate scalar 0..1 normalized to design intent). |
+| MAT-11 fire + smoke network (atmospheric) | `cx-atmos`, `cx-material` | Fire propagates room-to-room through gaps using oxygen/fuel; smoke fills connected hulls; toxic gas migrates by gap pressure. Fires emit heat that triggers M5.6 phase changes (water → steam). | Fire spread fixture; smoke fill fixture; oxygen depletion via fire. | Fire propagation events; smoke event chain. | No purely cosmetic smoke; smoke must affect breathing model. |
+| MAT-mission director hull objectives | `cx-mission`, `cx-atmos` | Mission director can author objectives like `pressurize <hull>`, `oxygenate <hull>`, `extinguish <hull>`, `vent toxic <hull>`, `flood <hull>`. Reason labels per commander decision. | Per-objective fixture in M7.5 scenario. | `mission.objective_progress` events with hull id. | No campaign generator. |
+| MAT-atmosphere observation | `cx-control`, `cxctl`, `cx-atmos` | `cxctl observe --atmospheres --stream --hz 5 --scope <room-id\|all>` exposes hull state stream + per-hull inspect. | CLI snapshot tests; stream freshness tests. | Atmosphere observation samples in run notes. | No screenshot-only debugging. |
+| MAT-server authority (atmos) | `cx-server`, `cx-atmos` | Server-authoritative atmosphere state per DR-005 / DR-034 / DR-035; client receives atmosphere snapshots, never simulates locally. | Server-vs-client divergence test (synthetic). | Replay determinism test passes for atmosphere. | No client-side authoritative hull state. |
+
+M7.5 E2E:
+
+```bash
+cargo run -p cx-e2e -- --scenario m7_5_base_atmospherics --suite MAT-09,MAT-10 --write-run-bundle
+cargo run -p cxctl -- observe --atmospheres --stream --hz 5 --scope all
+cargo run -p cx-headless -- replay prototype_runs/native/<m7_5_run> --verify-checksums
+cargo run -p cx-bench -- --scenario m7_5_base_atmospherics --profile material --runs 50 --check-checksum-stability
+```
+
+Human gate: project-owner plays a flooding-and-repair scenario and confirms readability of room-state objectives.
+
+---
+
 ## M8 — Scenario Editor And Mod Tools
 
 | ID | Owns | Build | Tests | Evidence | Anti-scope |
@@ -366,6 +490,34 @@ M8 E2E:
 cargo run -p cx-mod -- validate content/ mods/ --strict
 cargo run -p cx-e2e -- --scenario sample_mod_breach --expect win --write-run-bundle
 ```
+
+---
+
+## M8.5 — Material Lab
+
+> [!important] Kickoff prerequisites
+> M5.6, M5.7, M6.6, M7.5, M8 must be complete (kernel + reactions + hazards + AI competence + atmospherics + scenario editor). Read [[decisions/dr-036-systemic-material-simulation-direction]] §Material Lab and §Authoring Discipline. Run [M8.5 Kickoff Smoke](../spec/prototype-roadmap.md#per-milestone-kickoff-smoke). M8.5 is not done until MAT-11 + MAT-14 pass and a designer authors + exports + reloads a working material puzzle in <10 minutes.
+
+> [!warning] Hard rules
+> Material lab is the gate for adding materials beyond the launch 17. New materials require: inspect overlay sample, AI affordance tag declared, replay event payload, recipe journal entry, accessibility caption. `cx-mod validate --strict` rejects packs missing any of these. No "dump 50 materials and see what works" pattern.
+
+| ID | Owns | Build | Tests | Evidence | Anti-scope |
+|---|---|---|---|---|---|
+| MAT-11 material lab workbench | `cx-tools-editor`, `cx-ui`, `cx-material` | New `--mode material_lab` for `cx-tools-editor`: brush palette (paint material, paint temperature, paint charge), inspect tool (pixel readout), recipe journal (which reactions designer triggered), stamp library (water-on-fire, acid-on-flesh, electricity-in-water), AI puppet test (drop a bot in lab and check affordance scoring). | Editor state tests; brush + stamp tests; AI puppet test. | Material lab screenshots in M8.5 run bundle. | No marketplace. |
+| MAT-12 expansion materials gate | `cx-mod`, `content/materials/expansion/` | Schema requirement for any non-launch material: inspect overlay color, AI affordance tags, replay event payload, recipe journal entry, hazard caption. `cx-mod validate --strict` rejects packs missing any. | Per-required-field validation test; rejection diagnostics test. | Schema audit report. | No relaxation of launch-set rules. |
+| MAT-14 material pack mod | `mods/sample_material_pack/`, `content/` | A sample mod pack adding 1-2 expansion materials (e.g., slime, foam) with full schema compliance, AI affordance, replay events, hazard captions. Loads cleanly via M8 mod tools. | Validate/load/run sample material pack; AI puppet test passes for new affordance. | Modded run bundle with new material. | No half-spec'd mod packs that bypass launch-rules. |
+| MAT-recipe journal | `cx-tools-editor`, `cx-ui` | In-engine recipe journal: shows "you just triggered: water + electricity → arc; oil + heat → fire". Persists across editor sessions. Exportable as content fragment for scenario hints. | Journal write/read tests; export roundtrip. | Journal screenshots. | No autoplay puzzle solver. |
+| MAT-acid puzzle scenario | `content/scenarios/m8_5_acid_trap_puzzle.ron` | Designer authors a tiny puzzle scenario: acid pool blocks path; player must find oil + neutralize. Authored entirely in material lab + scenario editor; tested against M6 AI puppet. | Scenario validates; E2E win/loss; designer authors in <10 minutes (timed). | Authoring transcript + checked run bundle. | No campaign generator. |
+
+M8.5 E2E:
+
+```bash
+cargo run -p cx-tools-editor -- --mode material_lab --scenario m8_5_acid_trap_puzzle --suite MAT-11,MAT-14 --write-run-bundle
+cargo run -p cx-mod -- validate mods/sample_material_pack/ --strict
+cargo run -p cx-headless -- replay prototype_runs/native/<m8_5_run> --verify-checksums
+```
+
+Human gate: a non-AI human designer authors the m8_5_acid_trap_puzzle scenario in <10 minutes; transcript archived in run note.
 
 ---
 
