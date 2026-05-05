@@ -50,7 +50,7 @@ feeds:
 > Build scope still comes from [[spec/prototype-roadmap]] and [[spec/native-implementation-backlog]]. This checklist tracks completion, evidence, human ratings, and AI self-ratings. If the roadmap/backlog changes, update this checklist in the same pass.
 
 > [!info] Current coverage
-> 496 checklist rows: 16 milestone proof rows, 106 milestone scope rows, 90 milestone done-criteria rows, 80 roadmap feature-index rows, 68 side-track rows, 89 native task-card rows, 24 validation rows, 12 bug-hunt rows, and 11 definition-of-done rows.
+> 497 checklist rows: 16 milestone proof rows, 106 milestone scope rows, 90 milestone done-criteria rows, 80 roadmap feature-index rows, 68 side-track rows, 89 native task-card rows, 24 validation rows, 12 bug-hunt rows, and 12 definition-of-done rows.
 
 ## Rating System
 
@@ -905,7 +905,8 @@ These rows come from the roadmap validation matrix, bug-hunt checklist, and defi
 | [ ] | `DOD-08` | UI/accessibility: Any user-facing surface has screenshot evidence and ACC-A status when applicable. | [[spec/prototype-roadmap#Definition Of Done]] | - | - | - | - | - | - | - |  |
 | [ ] | `DOD-09` | Bug hunt: Bug checklist is completed; found bugs are fixed or logged as accepted known issues. | [[spec/prototype-roadmap#Definition Of Done]] | - | - | - | - | - | - | - |  |
 | [ ] | `DOD-10` | Vault: Prototype/research note is updated with run links, test commands, screenshots, final audit, and next actions. | [[spec/prototype-roadmap#Definition Of Done]] | - | - | - | - | - | - | - |  |
-| [ ] | `DOD-11` | Human gates: Human-only checks are marked `READY_FOR_HUMAN`, with a short playtest checklist. | [[spec/prototype-roadmap#Definition Of Done]] | - | - | - | - | - | - | - |  |
+| [ ] | `DOD-11` | Feature checklist: [[spec/feature-completion-checklist]] rows are updated for affected roadmap features, milestone scope, done-criteria, side tracks, and native task cards. | [[spec/prototype-roadmap#Definition Of Done]] | - | - | - | - | - | - | - | Added 2026-05-05 to match the roadmap's 12-row Definition Of Done. |
+| [ ] | `DOD-12` | Human gates: Human-only checks are marked `READY_FOR_HUMAN`, with a short playtest checklist. | [[spec/prototype-roadmap#Definition Of Done]] | - | - | - | - | - | - | - |  |
 
 ---
 

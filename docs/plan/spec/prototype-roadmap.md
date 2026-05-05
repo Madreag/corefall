@@ -118,14 +118,24 @@ feeds:
 
 ## Read Order
 
-If you only have time to read three things before starting work:
+If you only have time to read four things before starting work:
 
 1. [[spec/authoritative-game-spec-v0]] — what the game is.
 2. This roadmap — what gets built and in what order.
 3. [[spec/native-implementation-backlog]] — concrete native task cards for the current milestone.
 4. [[spec/feature-completion-checklist]] — completion/rating rows that must be updated when work lands.
 
-If you have more time, also read: [[decisions/index]], [[dashboards/decision-tracker]], [[references/prototype-run-bundle-schema]], [[spec/ai-control-observability-layer]], [[references/usage-ledger]], [[research-log/moonshot-register]], [[prototypes/actor-feel-lab-a1-human-playtest-2026-05-04]] (the "ok I guess" signal that informs M1.5 acceptance), and [[spec/prototype-implementation-backlog-slice-a]] only as a historical/browser-lab backlog.
+If you have more time, also read in roughly this order:
+
+- [[spec/ai-control-observability-layer]] — `cx-control` / `cxctl` / observation stream / UI tree (cross-cutting from M0).
+- [[spec/full-collision-physics-plan]] — collision classes, matrix, projectile-projectile rules, CCD tiers, impulse-to-damage, COLL-001..COLL-012 (T-PHYS / M5.5).
+- [[spec/hybrid-llm-ai-plan]] — async LLM mind layer with strict schemas, mock provider, validator, replay logging (T-LLM / M6.5).
+- [[references/prototype-run-bundle-schema]] — run-bundle event categories, manifest/summary/notes contract, per-milestone acceptance gates.
+- [[decisions/index]] and [[dashboards/decision-tracker]] — DR-001..DR-033 with current direction and lean.
+- [[references/usage-ledger]] — log when external code/data/assets enter the project.
+- [[research-log/moonshot-register]] — wild ideas; promote only with a DR.
+- [[prototypes/actor-feel-lab-a1-human-playtest-2026-05-04]] — the "ok I guess" signal that informs M1.5 acceptance.
+- [[spec/prototype-implementation-backlog-slice-a]] — historical browser/HTML A0..A7 backlog; reference only when explicitly assigned to old actor-feel-lab work.
 
 ---
 
