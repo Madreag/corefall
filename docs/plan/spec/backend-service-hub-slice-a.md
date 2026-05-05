@@ -4,12 +4,15 @@ status: prototype-reqs
 ready_when: "A static/heartbeat backend, hub browser, join-eligibility resolver, deep-link parser, and local-server supervisor pass BACK-A-01..BACK-A-12."
 ---
 
-← [[spec/index|spec section]] · [[spec/backend-networking|backend/networking posture]] · [[systems/networking-backend-frontend|networking/backend/frontend]] · [[comparables/opensoldat-satellites-local-audit|OpenSoldat satellite audit]] · [[systems/modding-package-and-workbench|modding workbench]] · [[spec/replay-recorder-slice-a|replay recorder Slice A]]
+← [[spec/index|spec section]] · [[decisions/dr-013-backend-service-scope|DR-013 backend service scope]] · [[spec/backend-networking|backend/networking posture]] · [[systems/networking-backend-frontend|networking/backend/frontend]] · [[comparables/opensoldat-satellites-local-audit|OpenSoldat satellite audit]] · [[systems/modding-package-and-workbench|modding workbench]] · [[spec/replay-recorder-slice-a|replay recorder Slice A]] · [[spec/ux-wireframes-slice-a|UX wireframes Slice A]]
 
 # Backend Service And Hub Slice A
 
 > [!summary] Purpose
-> Convert the OpenSoldat base/launcher/lobby audit plus current platform research into a concrete first backend/frontend slice. This is **not** a launch commitment to public PvP, matchmaking, accounts, gacha, or a live service. It is the minimum infrastructure needed for server discovery, local hosting, content compatibility, replay browsing, diagnostics, and future co-op-ready architecture.
+> Convert the OpenSoldat base/launcher/lobby audit plus current platform research into a concrete first backend/frontend slice. [[decisions/dr-013-backend-service-scope]] sets the boundary: local-first service spine now, optional adapters later. This is **not** a launch commitment to public PvP, matchmaking, accounts, gacha, or a live service. It is the minimum infrastructure needed for server discovery, local hosting, content compatibility, replay browsing, diagnostics, and future co-op-ready architecture.
+
+> [!tip] UX companion
+> Hub layout, server-row readability, join blockers, replay browsing, diagnostics, and settings/accessibility flows are translated into screen requirements in [[spec/ux-wireframes-slice-a]].
 
 > [!important] Product stance
 > Build the best game first. Backend scope exists to support the game: fast local play, strong AI, replay/debug, mod compatibility, safe joining, good UX, and future community growth. License/reuse tracking is documentation only; it must not block private prototypes.
@@ -312,13 +315,16 @@ These events feed [[spec/replay-recorder-slice-a]] and future support tools.
 ### Public
 
 - Steamworks Game Servers: `https://partner.steamgames.com/doc/features/multiplayer/game_servers`
+- Steamworks `ISteamMatchmakingServers`: `https://partner.steamgames.com/doc/api/ISteamMatchmakingServers`
 - Steamworks Multiplayer Overview: `https://partner.steamgames.com/doc/features/multiplayer`
 - Steam Datagram Relay: `https://partner.steamgames.com/doc/features/multiplayer/steamdatagramrelay`
 - Valve Master Server Query Protocol: `https://developer.valvesoftware.com/wiki/Master_Server_Query_Protocol`
 - Valve Server Queries: `https://developer.valvesoftware.com/wiki/Server_Queries`
 - Unity Lobby: `https://docs.unity.com/en-us/lobby`
+- Unity Lobby heartbeat: `https://docs.unity.com/lobby/heartbeat-a-lobby`
 - Unity Multiplay ecosystem: `https://docs.unity.com/multiplay-hosting/concepts/ecosystem`
 - Unity Multiplay game server events: `https://docs.unity.com/en-us/multiplay-hosting/concepts/server-events`
+- Unity Multiplay server readiness: `https://docs.unity.com/en-us/multiplay-hosting/concepts/server-readiness`
 
 ## Research Log
 

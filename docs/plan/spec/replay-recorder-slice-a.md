@@ -10,7 +10,7 @@ feeds:
   - DR-008
 ---
 
-← [[spec/index|spec section]] · [[spec/replay-event-architecture|replay/event spec stub]] · [[systems/replay-event-architecture|replay/event system brief]] · [[decisions/dr-002-replay-event-architecture|DR-002]] · [[spec/actor-feel-sandbox-slice-a|actor-feel Slice A]]
+← [[spec/index|spec section]] · [[spec/replay-event-architecture|replay/event spec stub]] · [[systems/replay-event-architecture|replay/event system brief]] · [[systems/replay-determinism-and-run-evidence|determinism/run evidence]] · [[references/prototype-run-bundle-schema|run-bundle schema]] · [[decisions/dr-002-replay-event-architecture|DR-002]] · [[spec/actor-feel-sandbox-slice-a|actor-feel Slice A]] · [[references/equipment-ai-behavior-contract|equipment AI behavior contract]] · [[references/equipment-ai-summary-seed-slice-a|equipment AI summary seed]]
 
 # Replay Recorder Slice A
 
@@ -30,11 +30,13 @@ For Slice A, the recorder is not a cinematic replay browser. It is debugging and
 | Source | Requirement Pulled Forward |
 |---|---|
 | [[systems/replay-event-architecture]] | Hybrid event log + snapshots, event bus boundaries, death recap, JSON Lines debug export. |
+| [[systems/replay-determinism-and-run-evidence]] | Hybrid determinism posture, DET-A tests, checksum/snapshot expectations, local comparable lessons, and run-bundle evidence deltas. |
 | [[spec/actor-feel-sandbox-slice-a]] | Slice A event hooks, test scene, material set, REC-01/REC-02 acceptance pressure. |
 | [[engine/direct-control-and-actor-feel-lifecycle]] | Capture `Controller` intent before actor/item systems consume it. |
 | [[engine/projectile-to-impact-lifecycle]] | Weapon fire, spawned particles, projectile/terrain/body impact causality. |
 | [[engine/body-damage-wound-gib-lifecycle]] | Wounds, status changes, inventory fallout, gib/attachable consequences. |
 | [[engine/terrain-mutation-and-pathfinding-lifecycle]] | Terrain dirty regions, penetration, dislodged pixels, path invalidation. |
+| [[references/equipment-ai-summary-seed-slice-a]] | Required `ai_item_*` event families, reason labels, item claim states, source confidence, and scenario refs for equipment decisions in replay/export output. |
 | [[comparables/opensoldat-local-audit]] | Demo/input capture and snapshot/delta caution for combat traces. |
 | [[comparables/the-powder-toy-local-audit]] | Snapshot/delta undo, save/stamp mentality, tool-driven material edits. |
 | [[comparables/openlierox-local-audit]] | Shared input/control surface, terrain-carve consequences, legacy/NewNet caution. |
@@ -53,6 +55,8 @@ For Slice A, the recorder is not a cinematic replay browser. It is debugging and
 ## Event Envelope
 
 Keep the envelope boring. Interesting data belongs in `payload`, not in one-off top-level fields.
+
+The concrete Slice A JSONL event contract lives in [[references/prototype-run-bundle-schema]] and `prototype-recorder-event.schema.json`.
 
 | Field | Required | Notes |
 |---|---|---|
@@ -75,12 +79,27 @@ Keep the envelope boring. Interesting data belongs in `payload`, not in one-off 
 > [!danger] Stable id requirement
 > Do not rely on raw `MOID` or pointer identity as the only replay identifier. `MovableMan::GetMOFromID` explicitly warns that Lua ownership and pooled memory can leave stale pointers or newly allocated objects at old addresses (`MovableMan.cpp:126-143`). The recorder needs its own stable `record_id` layer.
 
+## Determinism Posture
+
+Slice A should emit enough data to test determinism without depending on it. The recorder is successful if it can explain and anchor a run even when pure input replay drifts.
+
+| Requirement | Source | Acceptance Pressure |
+|---|---|---|
+| Record input intent every relevant tick. | [[systems/replay-determinism-and-run-evidence]] | DET-A-01 and REC-A-01 can compare input sequence to consequences. |
+| Emit checksums at a fixed cadence. | [[systems/replay-determinism-and-run-evidence]] | DET-A-02 reports mismatch count and DET-A-03 can identify first divergent tick. |
+| Snapshot actor, inventory, and dirty terrain chunks. | [[systems/replay-determinism-and-run-evidence]] | DET-A-04 and DET-A-05 provide scrub/death recap anchors even if re-sim drifts. |
+| Treat equipment AI events as causal replay events. | [[references/equipment-ai-behavior-contract]], [[references/equipment-ai-summary-seed-slice-a]], [[spec/equipment-loadout]] | DET-A-06 links role-card ids, package ids, claim states, selected/refused reasons, required event families, source confidence, and item results. |
+| Validate every serious run with the run-bundle checker. | [[references/prototype-run-bundle-schema]] | DET-A-07 and REC-A-05 prevent stale or detached evidence. |
+
 ## Hook Map
 
 | Event | Hook Candidate | Minimum Payload | Why It Matters |
 |---|---|---|---|
 | `input_intent` | Before/after `Controller::Update()`; player path starts at `Controller.cpp:147`, `GetInputFromPlayer()` at `185`, `UpdatePlayerInput()` at `225`. | actor id, player id, input mode, buttons, analog move/aim, selected item. | Lets player, AI, replay, and future net prediction share one control surface. |
 | `ai_intent` | `Controller::ShouldUpdateAIThisFrame()` and AI behavior code paths; throttle evidence at `Controller.cpp:196-208`. | actor id, order id, tactic, target, path state, update interval. | AI trust failures need the same recorder surface as player control. |
+| `ai_item_choice` | [[references/equipment-ai-behavior-contract]] and [[references/equipment-ai-summary-seed-slice-a]] item decision contract. | actor id, order context, selected item id, target context, score inputs, selected reason, top rejected items, source confidence, summary row id. | Explains why a bot used a weapon/tool/support item. |
+| `ai_item_refusal` | [[references/equipment-ai-behavior-contract]] refusal taxonomy plus [[references/equipment-ai-summary-seed-slice-a]] reason labels. | actor id, refused item id, claim state, reason label, source or missing field, first fix action, scenario ref. | Turns bot failures into UI/package/replay diagnostics. |
+| `ai_item_result` | AI-H-LOAD harness result and item execution outcome. | item id, expected effect, actual outcome, interruption/failure reason, claim-state delta, summary row id. | Lets harness results improve or regress bot trust labels. |
 | `weapon_fired` | `HDFirearm::Update()` firing loop: rounds counted at `HDFirearm.cpp:672-707`; particles launched at `723-798`; recoil at `891-919`. | actor id, weapon id, muzzle pos, aim angle, shake, recoil force, ammo before/after, round count. | Parent event for projectile, recoil, sound/alarm, and player aim feedback. |
 | `projectile_spawned` | `HDFirearm.cpp:741-798` when `Round::PopNextParticle()` particles are positioned, assigned velocity, team, and added to `MovableMan`. | projectile id, parent weapon event, particle preset, pos, velocity, team, lifetime/lethal range. | Necessary for cause chains and future deterministic small tests. |
 | `weapon_reloaded` | `HDFirearm::Reload()` at `HDFirearm.cpp:590-617` and reload completion at `863-875`. | weapon id, actor id, had magazine, magazine id, reload duration, result. | Explains "why did fire fail?" and buy/loadout readiness UI. |
@@ -158,6 +177,14 @@ Default Slice A retention: keep the last 30 seconds in memory and write the full
 | REC-A-05 | Snapshot roundtrip smoke test | Exported JSONL has a run header, at least one actor snapshot, at least one terrain snapshot/checksum, and an end summary. |
 | REC-A-06 | Volume budget | A 60-second spam run records event counts/bytes/sec/drops; pass target starts as zero recorder stalls and visible dropped-event counters if budget is exceeded. |
 | REC-A-07 | Reentrancy guard | Events emitted from collision/terrain hooks do not mutate simulation state or call scripts from the recorder path. |
+| DET-A-01 | Input replay probe | A 30-second fixed-seed actor run records input intent and can replay the same control command sequence through the same tick range. |
+| DET-A-02 | Checksum surface | Run emits `sim_checksum` events at a fixed cadence and summary reports mismatch count. |
+| DET-A-03 | First divergence report | Injected or observed mismatch reports first divergent tick, nearest parent event, and category. |
+| DET-A-04 | Snapshot restore smoke | Actor/inventory snapshot restores enough state for viewer anchor or death recap context. |
+| DET-A-05 | Terrain chunk evidence | One dig/explosion run emits dirty chunk checksum/payload and snapshot byte count. |
+| DET-A-06 | Equipment causality | Loadout/equipment run links item role id to selected/refused reason and resulting replay event. |
+| REC-A-LOAD-02 | AI summary event parity | Equipment replay/export rows use the required reason labels and event families from [[references/equipment-ai-summary-seed-slice-a]] for every bot item choice/refusal/result. |
+| DET-A-07 | Run-bundle hygiene | `prototype_run_check.py` passes and DET/REC tests cite real event ids. |
 
 ## First Build Tickets
 
@@ -210,6 +237,10 @@ Default Slice A retention: keep the last 30 seconds in memory and write the full
 - `Cortex-Command-Community-Project/Source/Managers/MovableMan.cpp:30`, `97`, `126`, `1166`
 - `Cortex-Command-Community-Project/Source/System/Atom.cpp:96`
 - [[systems/replay-event-architecture]]
+- [[references/equipment-ai-behavior-contract]]
+- [[references/equipment-ai-summary-seed-slice-a]]
+- [[references/prototype-run-bundle-schema]]
+- [[systems/replay-determinism-and-run-evidence]]
 - [[spec/actor-feel-sandbox-slice-a]]
 - [[comparables/opensoldat-local-audit]]
 - [[comparables/the-powder-toy-local-audit]]

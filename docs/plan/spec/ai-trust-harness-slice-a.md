@@ -9,7 +9,7 @@ feeds:
   - DR-009
 ---
 
-← [[spec/index|spec section]] · [[spec/ai-and-command|AI and command spec stub]] · [[systems/ai-trust-test-suite|AI trust suite]] · [[engine/ai-order-lifecycle|AI order lifecycle]] · [[spec/replay-recorder-slice-a|recorder Slice A]] · [[decisions/dr-008-ai-architecture|DR-008]]
+← [[spec/index|spec section]] · [[spec/ai-and-command|AI and command spec stub]] · [[systems/ai-trust-test-suite|AI trust suite]] · [[engine/ai-order-lifecycle|AI order lifecycle]] · [[spec/replay-recorder-slice-a|recorder Slice A]] · [[references/equipment-ai-behavior-contract|equipment AI behavior contract]] · [[references/equipment-ai-summary-seed-slice-a|equipment AI summary seed]] · [[references/equipment-device-loadout-field-atlas|equipment field atlas]] · [[references/equipment-ai-scenarios-slice-a|equipment AI scenarios]] · [[references/equipment-loadout-fixtures-slice-a|LOAD-A fixtures]] · [[decisions/dr-008-ai-architecture|DR-008]]
 
 # AI Trust Harness Slice A
 
@@ -32,12 +32,22 @@ This harness should run alongside [[spec/actor-feel-sandbox-slice-a]] and [[spec
 | [[engine/ai-order-lifecycle]] | C++ controller/path plumbing, Lua behavior coroutines, AI update throttle, alarm processing. |
 | [[spec/replay-recorder-slice-a]] | Event envelope, stable ids, cause chains, snapshots, JSONL/export, death/failure recap. |
 | [[spec/actor-feel-sandbox-slice-a]] | Test scene, actor/material/equipment baseline, serializable intent/control surface. |
+| [[references/equipment-loadout-fixtures-slice-a]] | First item/loadout fixtures for weapon choice, breach tool choice, explosive refusal, support use, and pickup-value scenarios. |
+| [[references/equipment-manual-overlay-patches]] | Manual bot competence and catalog-visibility patches, including launcher `Good` demotion until harness proof and scripted tool use contexts. |
+| [[references/equipment-overlay-merged-preview]] | Patch-applied item diagnostics and fixture reports for LOAD-A scenario generation. |
+| [[references/equipment-ai-behavior-contract]] | Required item-choice fields, refusal/reason label taxonomy, consumer contract, scenario mapping, and AI-EQ tickets for bot equipment behavior. |
+| [[references/equipment-ai-summary-seed-slice-a]] | Generated bot-facing item-use rows for all 106 role-card records: claim state, decision inputs, blackboard keys, required reason labels, required event families, scenario refs, source confidence, and first fix actions. |
+| [[references/equipment-device-loadout-field-atlas]] | Exact CCCP source fields that AI item-choice/refusal labels should cite, including range, support, danger, material, ammo, and scripted-use inputs. |
+| [[references/equipment-ai-scenarios-slice-a]] | Nine AI-H-LOAD manifest seeds for equipment-specific bot tests. |
 | [[systems/material-and-mobility-affordance-schema]] | AI-visible material/tool/mobility/hazard fields and refusal labels. |
 | [[comparables/opensoldat-local-audit]] | Bots use gameplay control states; demos and HUD make bot behavior inspectable. |
 | [[comparables/openlierox-local-audit]] | Bot stuck recovery, rope/movement heuristics, weapon/path decisions, terrain clearing, and network caution. |
 | Unreal AI Debugging docs | Centralized runtime debug surfaces for behavior, path/nav, perception, and query state. |
 | CRYENGINE Modular Behavior Tree Debugging docs | Per-agent execution history and active branch visualization are useful even when final AI is not behavior-tree based. |
 | Recast Navigation README | Navigation systems need debug visualization; tile/cache/crowd concepts are inspiration, not a drop-in fit for pixel terrain. |
+| Unreal Visual Logger and Gameplay Debugger | Scenario runner output should be inspectable as timeline state and runtime overlay, not only pass/fail text. |
+| BehaviorTree.CPP Groot2 monitor/log replay | Even without committing to behavior trees, AI tactics need live status transitions, replayable logs, and blackboard-style state snapshots. |
+| Unity Test Framework | AI harness runs should eventually support command-line automation and play-mode style checks, not only manual debug-menu runs. |
 
 ## Harness Scope
 
@@ -86,6 +96,9 @@ These events extend [[spec/replay-recorder-slice-a]]. They should use the same e
 | `ai_stuck_state_changed` | actor id, stuck time, average velocity, blocker id/material, old/new state. | Core trust metric. |
 | `ai_recovery_action` | actor id, action, reason, retry time, expected outcome. | Failures are acceptable only if recovery is legible. |
 | `ai_tool_choice` | actor id, tool/item id, target material, expected effect, rejected tools. | Breaching/digging is a first-class action. |
+| `ai_item_choice` | actor id, order context, selected item id, target context, score inputs, selected reason, rejected alternatives. | Makes weapon/tool/support choice inspectable by UI, workbench, and replay. |
+| `ai_item_refusal` | actor id, refused item id, refusal reason, source/missing field, first fix action. | Lets bots fail honestly instead of silently misusing equipment. |
+| `ai_item_result` | actor id, item id, expected effect, outcome, interruption/failure reason, claim-state delta. | Connects harness results back into bot trust badges. |
 | `ai_hazard_reflex` | actor id, hazard id/type, risk score, action/refusal. | Prevents "solo AI walks into obvious death" failures. |
 | `ai_friendly_fire_check` | actor id, weapon id, target id, blocked actors, decision. | Makes squad trust testable. |
 | `ai_test_assertion` | scenario id, assertion id, status, measured value, threshold. | Machine-readable pass/fail report. |
@@ -120,6 +133,22 @@ These are harness bootstrap scenarios. They do not replace the full AI-01..AI-12
 | AI-H-04 | Weapon/tool pickup | AI-10 | Unarmed bot near weapon and digger under light threat. | Bot evaluates reachable item, moves to it, picks it up, resumes useful behavior. |
 | AI-H-05 | Medikit/reflex interrupt | AI-09 | Hurt bot with medikit, then threat appears. | Bot heals only when safe and interrupts healing when threat crosses threshold. |
 | AI-H-06 | Friendly obstruction | AI-08 | Two friendly bots in narrow bunker path. | Bot emits blocked/yield/recovery labels and avoids permanent clumping. |
+
+## Equipment Scenario Seeds
+
+[[references/equipment-ai-scenarios-slice-a]] adds AI-H-LOAD-01..AI-H-LOAD-09 on top of the bootstrap scenarios. [[references/equipment-ai-behavior-contract]] is the reason-label and data contract those scenarios should consume before an item earns a bot-default claim. [[references/equipment-ai-summary-seed-slice-a]] is the generated row-level seed that tells the harness which items are bot-default candidates, risky/manual, non-catalog, or still blocked and which blackboard keys, events, reason labels, and first fixes each row requires. [[references/equipment-device-loadout-field-atlas]] is the field-source checklist for those reason labels.
+
+| ID | Fixture | Focus |
+|---|---|---|
+| AI-H-LOAD-01 | `assault_basic` | Weapon choice and friendly-fire line checks. |
+| AI-H-LOAD-02 | `engineer_breach` | Material-aware breach/tool choice. |
+| AI-H-LOAD-03 | `medic_rescue` | Rescue/support use and threat interrupts. |
+| AI-H-LOAD-04 | `sniper_overwatch` | LOS, target priority, and range-band switching. |
+| AI-H-LOAD-05 | `grenadier_risky` | Explosive refusal and danger radius. |
+| AI-H-LOAD-06 | `heavy_craft_killer` | Heavy weapon target classes and minimum range. |
+| AI-H-LOAD-07 | `scout_salvager` | Scan, disarm, pickup value, and grapple caution. |
+| AI-H-LOAD-08 | `bad_loadout_missing_breach` | Missing-capability preflight. |
+| AI-H-LOAD-09 | `bad_loadout_bot_unsafe` | Unsafe bot explosive loadout block. |
 
 ## Full Suite Mapping
 
@@ -176,6 +205,8 @@ These are harness bootstrap scenarios. They do not replace the full AI-01..AI-12
 | AI-HARNESS-08 | Debug overlay smoke | Viewer/overlay can show current order, behavior, target, path, stuck state, and latest assertion. |
 | AI-HARNESS-09 | Report export | Runner emits a machine-readable result plus a human-readable summary table. |
 | AI-HARNESS-10 | Regression repeatability | Same seed produces comparable event categories and assertion outcomes across three runs; exact physics determinism is not required yet. |
+| AI-HARNESS-11 | Equipment AI summary seed coverage | AI-H-LOAD runner can join scenario fixture item ids to [[references/equipment-ai-summary-seed-slice-a]] rows and reports claim state, blackboard keys, required reason labels, required events, and source confidence for every selected/refused item. |
+| AI-HARNESS-12 | Bot-default promotion gate | No item moves from `seeded_risky_pending_harness` or `manual_or_supervised_until_harness` into bot-default without replay-linked `ai_item_choice`, `ai_item_refusal`, and `ai_item_result` evidence. |
 
 ## First Build Tickets
 
@@ -188,9 +219,13 @@ These are harness bootstrap scenarios. They do not replace the full AI-01..AI-12
 | 5 | Build simple report writer. | JSON + markdown report lists metrics, failures, and replay path. |
 | 6 | Add AI-H-02 path blockage fixture. | Stuck/path invalidation and recovery are testable. |
 | 7 | Add AI-H-03 breach fixture. | Tool/material decision is testable. |
-| 8 | Add overlay panel for current order/behavior/path/stuck/assertion. | AI-HARNESS-08 is testable. |
-| 9 | Add run-history comparison. | Same-seed regression deltas become visible. |
-| 10 | Expand to AI-H-04..AI-H-06. | Pickup, medikit, and obstruction tests become automated. |
+| 8 | Consume [[references/equipment-ai-scenarios-slice-a]] in the runner. | Assault, engineer, grenadier, scout, medic, heavy, sniper, and negative fixtures can run. |
+| 8A | Consume [[references/equipment-ai-behavior-contract]] reason labels and item-decision fields. | AI-H-LOAD reports include `ai_item_choice`, `ai_item_refusal`, `ai_item_result`, top rejected options, and bot-claim-state deltas. |
+| 8B | Consume [[references/equipment-device-loadout-field-atlas]] field-source labels. | AI-H-LOAD reports cite normalized field sources such as danger radius, support requirement, range band, material fit, ammo pressure, or scripted-use status. |
+| 8C | Consume [[references/equipment-ai-summary-seed-slice-a]] claim states and required event families. | AI-H-LOAD reports show the row-level bot contract before execution and the harness result after execution without inventing hidden AI item semantics. |
+| 9 | Add overlay panel for current order/behavior/path/stuck/assertion. | AI-HARNESS-08 is testable. |
+| 10 | Add run-history comparison. | Same-seed regression deltas become visible. |
+| 11 | Expand to AI-H-04..AI-H-06. | Pickup, medikit, and obstruction tests become automated. |
 
 ## Failure Modes
 
@@ -225,7 +260,16 @@ These are harness bootstrap scenarios. They do not replace the full AI-01..AI-12
 - `Cortex-Command-Community-Project/Data/Base.rte/AI/SharedBehaviors.lua:25`, `379`, `520`, `653`, `778`
 - `Cortex-Command-Community-Project/Data/Base.rte/AI/HumanBehaviors.lua:568`, `703`, `1500`
 - `Cortex-Command-Community-Project/Data/Base.rte/Activities/Utility/TacticsHandler.lua:1`, `68`, `223`
+- [[references/equipment-ai-scenarios-slice-a]]
+- [[references/equipment-ai-behavior-contract]]
+- [[references/equipment-ai-summary-seed-slice-a]]
+- [[references/equipment-device-loadout-field-atlas]]
+- [[references/equipment-overlay-merged-preview]]
 - Unreal AI Debugging: `https://dev.epicgames.com/documentation/en-us/unreal-engine/ai-debugging-in-unreal-engine`
+- Unreal Visual Logger: `https://dev.epicgames.com/documentation/en-us/unreal-engine/visual-logger-in-unreal-engine`
+- Unreal Gameplay Debugger: `https://dev.epicgames.com/documentation/en-us/unreal-engine/using-the-gameplay-debugger-in-unreal-engine`
 - CRYENGINE Modular Behavior Tree Debugging: `https://www.cryengine.com/docs/static/engines/cryengine-5/categories/23756813/pages/23310620`
 - Recast Navigation: `https://github.com/recastnavigation/recastnavigation`
+- BehaviorTree.CPP Groot2 tutorial: `https://www.behaviortree.dev/docs/tutorial-basics/tutorial_11_groot2`
+- Unity Test Framework: `https://docs.unity3d.com/6000.3/Documentation/Manual/test-framework/test-framework-introduction.html`
 - GDC Vault, AI Behavior Editing and Debugging in The Division: `https://gdcvault.com/play/1023382/AI-Behavior-Editing-and-Debugging`

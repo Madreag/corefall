@@ -12,7 +12,7 @@ feeds:
   - DR-009
 ---
 
-← [[spec/index|spec section]] · [[spec/prototype-roadmap|prototype roadmap]] · [[decisions/dr-004-first-playable-slice|DR-004 first playable]] · [[engine/direct-control-and-actor-feel-lifecycle|direct control lifecycle]] · [[systems/material-and-mobility-affordance-schema|material/mobility schema]] · [[systems/replay-event-architecture|replay/event architecture]]
+← [[spec/index|spec section]] · [[spec/prototype-roadmap|prototype roadmap]] · [[references/prototype-run-bundle-schema|run-bundle schema]] · [[systems/replay-determinism-and-run-evidence|determinism/run evidence]] · [[decisions/dr-004-first-playable-slice|DR-004 first playable]] · [[engine/direct-control-and-actor-feel-lifecycle|direct control lifecycle]] · [[systems/material-and-mobility-affordance-schema|material/mobility schema]] · [[systems/replay-event-architecture|replay/event architecture]]
 
 # Actor-Feel Sandbox Slice A
 
@@ -38,6 +38,7 @@ This slice is not a public demo, campaign promise, multiplayer promise, or final
 | [[comparables/the-powder-toy-local-audit]] | Data-first material fields, snapshots/deltas, tool feedback, sandbox/lab value. |
 | [[systems/material-and-mobility-affordance-schema]] | Minimum material set, material overlay modes, AI material contract, replay/network terrain events. |
 | [[systems/replay-event-architecture]] | Input trace + event log + periodic snapshots from day one. |
+| [[systems/replay-determinism-and-run-evidence]] | Hybrid run-evidence posture, checksums, actor/inventory/terrain snapshots, and DET-A acceptance tests for the same actor-feel run. |
 | [[systems/ux-overlay-screen-brief]] | HUD, material overlay, death cause, reticle, and tool-readability acceptance tests. |
 | [[systems/damage-equipment-and-items]] | Wounds, equipment fallout, item role clarity, and damage readability need early hooks. |
 
@@ -141,6 +142,8 @@ Do not add more items until these five roles are readable. The goal is depth per
 ## Event Hooks
 
 These events are enough to make Slice A useful for DR-002, DR-003, DR-005, DR-007, DR-008, and DR-009. Names can change later, but each concept should exist.
+
+When these hooks are implemented, run output should follow [[references/prototype-run-bundle-schema]] so A-FEEL evidence can be checked and compared across runs.
 
 | Event | Required Payload |
 |---|---|
@@ -261,6 +264,7 @@ Private prototyping may copy/adapt patterns freely. If any code, data, sprites, 
 - [[engine/direct-control-and-actor-feel-lifecycle]]
 - [[systems/material-and-mobility-affordance-schema]]
 - [[systems/replay-event-architecture]]
+- [[systems/replay-determinism-and-run-evidence]]
 - [[systems/ux-overlay-screen-brief]]
 - [[systems/damage-equipment-and-items]]
 - [[comparables/opensoldat-local-audit]]

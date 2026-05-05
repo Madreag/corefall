@@ -4,11 +4,12 @@ status: stub
 ready_when: "HUD-01..HUD-03, ORDER-01, BUY-01 acceptance tests pass."
 ---
 
-← [[spec/index|spec section]] · [[systems/ux-overlay-screen-brief|UX overlay brief]] · [[systems/ux-ui-and-retention|UX/retention]]
+← [[spec/index|spec section]] · [[spec/ux-wireframes-slice-a|UX wireframes Slice A]] · [[systems/ux-overlay-screen-brief|UX overlay brief]] · [[systems/ux-ui-and-retention|UX/retention]]
 
 # UX/UI Model
 
 > [!warning] Stub
+> Build-facing UX wireframes, accessibility floors, and UX-W acceptance tests now live in [[spec/ux-wireframes-slice-a]].
 
 ## What goes here when ready
 
@@ -21,6 +22,7 @@ ready_when: "HUD-01..HUD-03, ORDER-01, BUY-01 acceptance tests pass."
 ## Inputs
 
 - [[systems/ux-overlay-screen-brief]]
+- [[spec/ux-wireframes-slice-a]]
 - [[systems/ux-ui-and-retention]]
 - [[game/player-loop-and-ux]]
 - [[decisions/dr-003-body-damage-readability]]

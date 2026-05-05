@@ -4,7 +4,7 @@ status: prototype-reqs
 ready_when: "Terrain/material sandbox runs MAT-T-01..MAT-T-10 with overlay, dirty-region, path, recorder, and perf outputs."
 ---
 
-← [[spec/index|spec section]] · [[systems/material-and-mobility-affordance-schema|material schema]] · [[engine/terrain-mutation-and-pathfinding-lifecycle|terrain mutation lifecycle]] · [[decisions/dr-007-terrain-material-model|DR-007]]
+← [[spec/index|spec section]] · [[systems/material-and-mobility-affordance-schema|material schema]] · [[references/prototype-run-bundle-schema|run-bundle schema]] · [[systems/replay-determinism-and-run-evidence|determinism/run evidence]] · [[engine/terrain-mutation-and-pathfinding-lifecycle|terrain mutation lifecycle]] · [[decisions/dr-007-terrain-material-model|DR-007]]
 
 # Terrain Material Sandbox Slice A
 
@@ -42,6 +42,7 @@ The sandbox should answer five questions before the future game spec commits to 
 | [[systems/material-and-mobility-affordance-schema]] | Candidate launch/lab/mod material fields and overlay contract. |
 | [[spec/actor-feel-sandbox-slice-a]] | Control feel, tool, material, HUD, and event hooks that this sandbox should reuse. |
 | [[spec/replay-recorder-slice-a]] | Event envelope, snapshot cadence, viewer/export expectations. |
+| [[systems/replay-determinism-and-run-evidence]] | Dirty terrain chunk snapshots, checksum/byte-count evidence, and deterministic-island gates for terrain mutation. |
 | [[spec/ai-trust-harness-slice-a]] | AI event contract, blocked-path reasons, material decision reports. |
 | [[comparables/the-powder-toy-local-audit]] | Data-first materials, side fields, Lua/tooling, snapshot-delta lessons. |
 | [[comparables/openlierox-local-audit]] | Hookability, passability, damage material flags, and mask-based carving lessons. |
@@ -85,6 +86,8 @@ The sandbox should answer five questions before the future game spec commits to 
 ## Event Contract Additions
 
 Use the [[spec/replay-recorder-slice-a]] envelope. Add these event kinds before implementation:
+
+Run artifacts should follow [[references/prototype-run-bundle-schema]] and [[systems/replay-determinism-and-run-evidence]] so MAT-T evidence includes checked event counts, dirty-region events, terrain chunk checksums, snapshot bytes, path refresh events, screenshots, and performance counters.
 
 | Event | Required Payload | Why |
 |---|---|---|
@@ -184,6 +187,8 @@ Use the [[spec/replay-recorder-slice-a]] envelope. Add these event kinds before 
 - `../Cortex-Command-Community-Project/Source/System/PathFinder.cpp`
 - [[engine/terrain-mutation-and-pathfinding-lifecycle]]
 - [[systems/material-and-mobility-affordance-schema]]
+- [[references/prototype-run-bundle-schema]]
+- [[systems/replay-determinism-and-run-evidence]]
 - [[spec/actor-feel-sandbox-slice-a]]
 - [[spec/replay-recorder-slice-a]]
 - [[spec/ai-trust-harness-slice-a]]
