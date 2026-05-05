@@ -23,6 +23,35 @@ Root planning files live here:
 
 Before implementing a milestone, read the canonical vault directly. If any path below is missing, search the canonical vault with `rg --files` and ask the user before making architecture-changing assumptions.
 
+## Short Assignment Expansion
+
+If the user says something short like:
+
+```text
+Implement M0 from /Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md
+```
+
+or:
+
+```text
+Implement M1
+```
+
+treat that as a complete milestone assignment. Do not ask the user for a larger prompt. Expand the short assignment using this `AGENTS.md`, the canonical roadmap, the native backlog, the feature checklist, the AI-coder reading list, and the milestone's linked DRs/specs.
+
+For any milestone assignment, the worker must:
+
+1. Read the mandatory docs below.
+2. Read the assigned milestone section in the roadmap.
+3. Read the assigned milestone task cards in the native backlog.
+4. Read the assigned milestone rows in the feature checklist.
+5. Run the Open Decision Gates pre-check before locking any open decision.
+6. Implement all agent-completable task cards for the milestone.
+7. Run Standard Validation plus milestone-specific validation.
+8. Produce run-bundle evidence under `prototype_runs/native/`.
+9. Update the canonical vault roadmap/checklist and repo-local changelog.
+10. Leave both repos commit-ready, and commit only when the user asks or when the active assignment explicitly includes committing.
+
 ## Mandatory Read Order Before Any Milestone
 
 Read these in order before implementing a roadmap milestone:
