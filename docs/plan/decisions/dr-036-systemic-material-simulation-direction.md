@@ -33,7 +33,7 @@ This DR ratifies what [[comparables/noita-grade-material-simulation-research]] r
 | Pipe/power/signal networks | Stationeers-style atmosphere/pipe/power networks for base equipment (oxygen generators, pumps, vents, filters, sensors, doors, alarms). Sensor-readable + AI-controllable. |
 | AI hazard perception | AI reads material/hazard/pressure/electricity fields with the same data players see. AI affordance tags (avoid, seek, use-as-weapon, extinguish-with, neutralize-with, vent, pump). |
 | Replay determinism | Material kernel is deterministic; same seed/inputs produce identical material checksums. Same authoritative server-replay model as DR-005 / DR-034. |
-| Observation API | `cxctl observe --materials`, `cxctl observe --atmospheres`, `cxctl observe --reactions` for AI agents and tests. New `material`, `atmosphere`, `reaction` event categories. |
+| Observation API | `cxctl observe --materials`, `cxctl observe --atmospheres`, `cxctl observe --reactions` for AI agents and tests. New `material`, `reaction`, `atmosphere`, and `affliction` event categories. |
 | Performance posture | Active-region budgets per chunk; sleeping chunks; LOD; dirty rects; material kernel chunked at 64×64 minimum (Noita pattern). |
 | Modding | Material schema is moddable per DR-006; mods declare reactions, materials, ingestion effects, pipe devices, AI affordances. Server-side mod compatibility enforced per DR-034. |
 | Anti-cheat / fairness | Server-authoritative material state in multiplayer per DR-005. Bounded active regions; material events from outside interest range are not delivered. |
@@ -71,7 +71,7 @@ This DR ratifies what [[comparables/noita-grade-material-simulation-research]] r
   - DR-033 (full collision physics) projectile-deflection / collision-damage already produces material consequences; DR-036 specifies WHAT consequences.
   - DR-027 (deep combat-base) gets Barotrauma-style hull/gap/pump/vent/oxygen/pressure model.
   - DR-022 (humanlike AI) gets material hazard perception requirement.
-  - DR-002 (replay/event architecture) gets `material`, `atmosphere`, `reaction` event categories.
+  - DR-002 (replay/event architecture) gets `material`, `reaction`, `atmosphere`, and `affliction` event categories.
   - DR-006 (modding data model) gets material schema as a first-class moddable surface.
   - DR-005 / DR-034 / DR-035 (multiplayer/server/MMO) get server-authoritative material state.
 
@@ -109,7 +109,7 @@ This DR ratifies what [[comparables/noita-grade-material-simulation-research]] r
 | DR-027 combat-base scope | Barotrauma-style room/atmosphere model lands as base infrastructure. |
 | DR-033 full collision physics | Collision impulse → material reaction → damage chain. |
 | DR-022 humanlike AI bar | Hazard perception is testable per AI-H-MAT scenarios. |
-| DR-002 replay/event architecture | New `material`, `atmosphere`, `reaction` event categories. |
+| DR-002 replay/event architecture | New `material`, `reaction`, `atmosphere`, and `affliction` event categories. |
 | DR-006 modding data model | Material schema is a first-class moddable surface. |
 | DR-005 / DR-013 / DR-034 / DR-035 | Server-authoritative material state in multiplayer/MMO modes. |
 | DR-031 content economy | Material lab + community packs are free; commercial expansions follow DR-031. |

@@ -613,7 +613,7 @@ Human gate: project-owner LAN co-op session of one Breach Contract.
 | M11-006 account adapter foundation | `cx-server`, `cx-net` | Local account file (private), `lobby_directory` token (community), Steam/EOS/PlayFab adapters stubbed behind cargo features (`net-steam`, `net-eos`, `net-playfab`). | Adapter contract tests; redaction tests for tokens. | Adapter shape doc; redaction-test report. | No first-party identity service. |
 | M11-007 Steam Datagram Relay adapter (optional) | `cx-net` (cargo feature `net-steam`) | Behind cargo feature; off by default; documented usage. | Adapter shape contract tests. | Adapter doc. | No Steam-only design. |
 | M11-008 reference systemd / launchd / Docker | `tools/`, `docs/server-hosting.md` | Reference deployment templates for self-hosted operators. | Smoke deployment of each. | Templates committed. | No production registry. |
-| M11-009 online co-op proof | `cx-server`, `content/scenarios/` | Two friends in different cities co-op a Breach Contract via self-hosted `cx-server`; per-client bundles align. | Cross-host smoke. | Per-client run bundles + alignment report. | No public PvP. |
+| M11-009 online co-op proof | `cx-server`, `content/scenarios/` | Two friends in different cities co-op a Breach Contract via self-hosted `cx-server`; per-client bundles align. | Cross-host smoke. | Per-client run bundles + alignment report. | Public PvP belongs to M12, not this M11 co-op proof. |
 
 M11 E2E:
 

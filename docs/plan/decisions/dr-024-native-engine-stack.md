@@ -18,7 +18,7 @@ revisit_trigger: "Bevy or wgpu blocks a critical capability we cannot work aroun
 
 **Rust + Bevy + wgpu + custom core crates, in a modular cargo workspace.**
 
-This closes the "implementation specifics" subdecision left open by DR-001. DR-001 committed to greenfield native + CCCP as reference; this DR picks the language, runtime, renderer foundation, and the modular pattern.
+This closes the engine-stack subdecision that DR-001 intentionally left for the native planning round. DR-001 committed to greenfield native + CCCP as reference; this DR picks the language, runtime, renderer foundation, and the modular pattern.
 
 ## What This Locks In
 

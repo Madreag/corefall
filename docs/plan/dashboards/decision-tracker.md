@@ -132,13 +132,13 @@ These can become DRs when evidence accumulates:
 2. Add to this tracker with priority, lean, and closes-when trigger.
 3. Cross-link from the relevant `systems/` or `engine/` note.
 4. Update [[dashboards/research-readiness]] if it changes a gate.
-5. When closed, mark `status: closed` in the record's frontmatter and move to a "closed" section here.
+5. When closed, mark `status: closed-direction` or `status: closed` in the record's frontmatter and move to a "closed" section here.
 
 ## Closed Decisions
 
 | ID | Title | Closed | Direction |
 |---|---|---|---|
-| [[decisions/dr-001-engine-strategy|DR-001]] | Engine strategy (direction) | 2026-05-04 | Greenfield native core + CCCP as reference lab. Implementation specifics still open. |
+| [[decisions/dr-001-engine-strategy|DR-001]] | Engine strategy (direction) | 2026-05-04 | Greenfield native core + CCCP as reference lab; native implementation stack is closed by [[decisions/dr-024-native-engine-stack|DR-024]]. |
 | [[decisions/dr-014-tone-player-promise|DR-014]] | Tone and player promise | 2026-05-04 | Tactical pulp sci-fi disaster sandbox + first-class chassis/armor/mechs/origins. |
 | [[decisions/dr-015-player-identity-control-posture|DR-015]] | Player identity and control posture | 2026-05-04 | Command-core operator; strategy-first, pilot-optional, rooted-base power, risky embedded-avatar play. |
 | [[decisions/dr-016-setting-and-world-frame|DR-016]] | Setting & world frame | 2026-05-04 | Frontier disaster-contract sci-fi. Merc/rescue/salvage outfit. Command-core lore-flexible. |

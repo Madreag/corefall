@@ -12,9 +12,12 @@ feeds:
   - DR-022
   - DR-024
   - DR-033
+  - DR-034
+  - DR-035
+  - DR-036
 ---
 
-<- [[spec/index|spec section]] · [[spec/prototype-roadmap|native roadmap]] · [[spec/native-implementation-backlog|native backlog]] · [[spec/full-collision-physics-plan|full collision plan]] · [[references/prototype-run-bundle-schema|run-bundle schema]]
+<- [[spec/index|spec section]] · [[spec/prototype-roadmap|native roadmap]] · [[spec/native-implementation-backlog|native backlog]] · [[spec/full-collision-physics-plan|full collision plan]] · [[spec/server-app-architecture|server app]] · [[spec/persistent-mmo-architecture|persistent MMO]] · [[comparables/noita-grade-material-simulation-research|material simulation research]] · [[references/prototype-run-bundle-schema|run-bundle schema]]
 
 # AI Control And Observability Layer
 
@@ -34,7 +37,7 @@ Screenshots and video captures remain useful evidence, but they are not the prim
 | `cx-control` crate | Shared command/observation/event schemas. | M0 |
 | Local control server | JSON-RPC or compact JSON messages over localhost WebSocket plus optional Unix domain socket / named pipe. | M0/M1 |
 | CLI client | `cxctl` for scripts: load scenario, step, observe, act, replay, assert, dump bundle. | M0/M1 |
-| Headless bridge | Same commands work in `cx-headless`; rendering is optional. | M3/M9 |
+| Headless/server bridge | Same commands work in `cx-headless` and capability-gated `cx-server`; rendering is optional. | M3/M9 |
 | UI semantic tree | Query/click/type/focus every UI action by stable id, role, label, state, and bounds. | M4 |
 | Bot SDK surface | Versioned API for player bots and modded agents, backed by the same command/observation schemas. | M6/M8 |
 
@@ -108,6 +111,7 @@ Every observation packet should include enough data for an AI agent to decide an
 | Actors | stable ids, team, position, velocity, aim, stance, health/status, body zones, armor, chassis, inventory, visible damage, AI intent label. |
 | Equipment | selected item, ammo, heat/energy, reload state, jam/damage stage, valid actions, refusal reasons. |
 | Terrain | sampled local material grid, breachable surfaces, hazards, path blockers, recent edits, tool affordances. |
+| Materials and atmospheres | active material cells, liquids/gases, local reactions, fire/electric/toxic hazards, pressure/oxygen, afflictions, containment state, and material-lab fixtures. |
 | Objectives | active tasks, timers, extraction, fail states, command-core/base-power state. |
 | UI tree | windows, panels, buttons, sliders, lists, focus target, stable ids, text, enabled/disabled state, bounds. |
 | Audio/caption feed | caption id, source, priority, spatial hint, transcript, alert class. |
@@ -125,7 +129,7 @@ The automation layer should only expose actions that map to real gameplay or UI 
 | Tactical controls | select unit, issue order, queue order, set rally point, follow/protect/breach/retreat, assume direct control, release to AI. |
 | UI controls | focus by id, click by id, set slider, choose option, type text, submit/cancel, navigate tabs. |
 | Scenario controls | load scenario, reset, set seed, pause, step ticks, run for N ticks, set speed, capture bundle. |
-| Inspection | query entity, query UI tree, query terrain patch, query event chain, query last failure reason, query collision pair, query collision filter reason, query collision damage chain. |
+| Inspection | query entity, query UI tree, query terrain patch, query material patch, query atmosphere cell, query reaction chain, query event chain, query last failure reason, query collision pair, query collision filter reason, query collision damage chain. |
 | Debug-only | spawn fixture, teleport, force damage, reveal map, grant item. Disabled unless the run manifest declares debug capability. |
 
 All action requests should return `accepted`, `rejected`, or `queued`, with a reason label and the tick where the command took effect.
@@ -139,6 +143,8 @@ cxctl scenario load micro_breach --seed 42
 cxctl observe --once --format json
 cxctl observe --stream --hz 30
 cxctl observe --collisions --stream --hz 30
+cxctl observe --materials --stream --hz 30
+cxctl observe --atmosphere --stream --hz 10
 cxctl act move --x 1.0
 cxctl act aim --world 320,140
 cxctl act fire --pressed true
@@ -181,10 +187,14 @@ cxctl replay verify prototype_runs/native/<run_id>
 | M4 | Expose semantic UI tree and UI actions; screenshots become audit evidence, not control dependency. |
 | M5 | Expose equipment, chassis, armor, damage-stage, eject, repair, and salvage observations/actions. |
 | M5.5 | Expose `cxctl observe --collisions` and `cxctl inspect collision <event-id>` for collision matrix, live contacts, filters, projectile-projectile outcomes, impulse damage, CCD/TOI, and collision budget state (see [[spec/full-collision-physics-plan]] and [[decisions/dr-033-full-collision-physics-direction]]). |
+| M5.6 | Expose `cxctl observe --materials`, `cxctl inspect material <cell-or-region>`, and deterministic material/reaction event chains for active-region CA, material transitions, containment, fire/liquid/gas/electric interactions, and material budget state (see [[comparables/noita-grade-material-simulation-research]] and [[decisions/dr-036-systemic-material-simulation-direction]]). |
 | M6 | Reuse the same layer for AI-H harness bots; bot decisions cite observation fields and event ids. |
 | M6.5 | Derive `MindObservationFrame` from this layer with fog-of-war filtering; expose `cxctl observe --mind-frame <scope>` for LLM mind workers (see [[spec/hybrid-llm-ai-plan]] and [[decisions/dr-032-hybrid-llm-ai-direction]]). |
+| M6.6 | Add AI-facing material competence observations: hazard labels, safe/unsafe material affordances, containment opportunities, and explainable avoidance/rescue decisions. |
 | M7 | Scenario director, command-core/base-power, debrief, and retry are controllable/queryable. |
+| M7.5 | Expose `cxctl observe --atmosphere`, room pressure/oxygen/toxin state, leak paths, powered doors/vents/shields, and base-life-support events for command-core/base atmospherics. |
 | M8 | Editor and mod tooling expose semantic UI and package validation commands. |
+| M8.5 | Material lab scenarios expose fixture setup, reaction assertions, material sample export/import, and player-authored material test bundles through the same control contract. |
 | M9 | `cx-server` exposes the same `cx-control` envelope for admin (capability-gated) + observation. `cxctl --target server://host:port` connects to a running server for ops/audit (see [[spec/server-app-architecture]] and [[decisions/dr-034-dedicated-server-application]]). |
 | M10..M12 | Per-client and per-server run bundles use the same envelope; replay/replay-compare verifies multi-client and shard observation streams. |
 | M9+ | Headless/server modes use the same command/observation contract for replay, LAN, online, public PvP, and persistent MMO shards. |
@@ -208,11 +218,25 @@ The full observation stream also exposes a collision-focused view for T-PHYS and
 
 This view is mandatory for implementation agents. They should be able to debug collision without repeatedly screenshotting the app.
 
+### Derived: Material Observation Frames
+
+The material-focused view is the mandatory debug surface for T-MAT and DR-036. `cxctl observe --materials` and `cxctl observe --atmosphere` return:
+
+- active-region bounds, dirty cells, material ids, temperature/electric/toxic/flammable state, and material budget counters;
+- liquid/gas/solid layering, containment, leak paths, pressure, oxygen, and toxin summaries;
+- recent `material.*`, `reaction.*`, `atmosphere.*`, and `affliction.*` events with parent cause chains;
+- reaction explanations such as `water_neutralized_acid`, `oil_ignited_by_spark`, `toxic_gas_asphyxiated_actor`, or `electricity_conducted_through_liquid`;
+- AI-readable hazard affordances and refusal reasons;
+- first-divergence data during replay verification.
+
+This view is required before any material hazard can graduate from lab fixture to combat scenario. If the player can die from it, an AI worker must be able to inspect and replay why.
+
 ## Definition Of Done
 
 - An AI implementation agent (Codex, Factory droid, Claude Code, Cursor, or any future tool) can launch a scenario, observe state, move/aim/fire/use UI, run assertions, and write a run bundle without image-based control.
 - Every player-visible control has a matching semantic action or UI command.
 - Every critical state a human can understand from the screen has a structured observation, caption, or event equivalent.
+- Every critical material, atmosphere, collision, and server/shard state has a structured observation or event equivalent before it is treated as milestone-complete.
 - E2E tests for gameplay and UI prefer `cxctl`/control API over OS-level input where possible.
 - The interface is documented enough for future bot authors to build against versioned schemas.
 
@@ -221,6 +245,10 @@ This view is mandatory for implementation agents. They should be able to debug c
 - [[spec/prototype-roadmap]] — pinned transport, CLI reference, repository layout, kickoff smoke.
 - [[spec/native-implementation-backlog]] — M0-006 control bootstrap task card, milestone integration tasks.
 - [[spec/full-collision-physics-plan]] — collision observation and M5.5 T-PHYS contract.
+- [[comparables/noita-grade-material-simulation-research]] — material/atmosphere/reaction research feeding T-MAT.
+- [[decisions/dr-036-systemic-material-simulation-direction]] — material simulation direction and M5.6/M5.7/M6.6/M7.5/M8.5 hooks.
+- [[spec/server-app-architecture]] — dedicated server control/admin surface.
+- [[spec/persistent-mmo-architecture]] — shard observation and replay/ops needs.
 - [[references/prototype-run-bundle-schema]] — `control` event category and run-bundle gates.
 - [[systems/replay-determinism-and-run-evidence]] — deterministic-island contract.
 - [[spec/ai-trust-harness-slice-a]] — AI-H scenario runner reuses this layer.

@@ -53,13 +53,13 @@ feeds:
 > Build scope still comes from [[spec/prototype-roadmap]] and [[spec/native-implementation-backlog]]. This checklist tracks completion, evidence, human ratings, and AI self-ratings. If the roadmap/backlog changes, update this checklist in the same pass.
 
 > [!info] Current coverage
-> 497 baseline checklist rows plus the server/MMO addendum below. The old M9-M12 rows remain for continuity, but agents implementing M9-M12 must use the addendum plus [[spec/prototype-roadmap]], [[spec/native-implementation-backlog]], [[spec/server-app-architecture]], and [[spec/persistent-mmo-architecture]] as the authoritative scope until the next full regeneration.
+> 497 baseline checklist rows plus focused Server/MMO and Material/T-MAT addenda below. M9-M12 baseline rows are summary rows; agents implementing M9-M12 must use the addendum plus [[spec/prototype-roadmap]], [[spec/native-implementation-backlog]], [[spec/server-app-architecture]], and [[spec/persistent-mmo-architecture]] as the authoritative scope until the next full regeneration.
 
 > [!important] Server/MMO addendum active
-> The 2026-05-05 server direction added DR-034, DR-035, T-SERVER, server/anti-cheat/MMO run-bundle categories, and expanded M9-M12. This file now includes a focused addendum so implementing agents have checklist rows immediately. The next full regeneration should merge these rows into the normal sections and remove the historical M9-M12 labels.
+> The 2026-05-05 server direction added DR-034, DR-035, T-SERVER, server/anti-cheat/MMO run-bundle categories, and expanded M9-M12. This file now includes a focused addendum so implementing agents have checklist rows immediately. The next full regeneration should merge these rows into the normal M9-M12 scope/done/task sections and remove this temporary addendum callout.
 
 > [!important] Material/T-MAT addendum active
-> The 2026-05-05 systemic material direction added DR-036, T-MAT, M5.6/M5.7/M6.6/M7.5/M8.5 milestones, `cx-material`/`cx-atmos` crates, and four new run-bundle event categories (`material`/`reaction`/`atmosphere`/`affliction`). This file now includes a focused Material/T-MAT addendum so implementing agents have checklist rows immediately. The next full regeneration should merge these rows into the normal sections and remove the M5.6/M5.7/M6.6/M7.5/M8.5 historical labels.
+> The 2026-05-05 systemic material direction added DR-036, T-MAT, M5.6/M5.7/M6.6/M7.5/M8.5 milestones, `cx-material`/`cx-atmos` crates, and four new run-bundle event categories (`material`/`reaction`/`atmosphere`/`affliction`). This file now includes a focused Material/T-MAT addendum so implementing agents have checklist rows immediately. The next full regeneration should merge these rows into the normal milestone/side-track sections and remove this temporary addendum callout.
 
 ## Rating System
 
@@ -128,7 +128,7 @@ Use these rows for all M5.6/M5.7/M6.6/M7.5/M8.5/T-MAT work until the checklist i
 
 | Done | ID | Feature / Requirement | Source | Evidence | H-Full | H-Quality | H-Review | AI-Full | AI-Quality | AI-Review | Notes |
 |---|---|---|---|---|---:|---:|---:|---:|---:|---:|---|
-| [ ] | `TMAT-P00` | T-MAT side track: systemic material simulation (active-region CA + reaction table + atmospheres + affordance/affliction layer) is a core feel pillar; curated 17-material launch set per DR-036. | [[spec/prototype-roadmap#T-MAT — Systemic Material Simulation Track]] | - | - | - | - | - | - | - | Owns `cx-material`, `cx-atmos`. CPU-deterministic kernel; replay-deterministic; server-authoritative. |
+| [ ] | `TMAT-P00` | T-MAT side track: systemic material simulation (active-region CA + reaction table + atmospheres + affordance/affliction layer) is a core feel pillar; curated 17-material launch set per DR-036. | [[spec/prototype-roadmap#T-MAT — Systemic Materials, Chemistry, And Atmospheres]] | - | - | - | - | - | - | - | Owns `cx-material`, `cx-atmos`. CPU-deterministic kernel; replay-deterministic; server-authoritative. |
 | [ ] | `TMAT-CRATES` | `cx-material` (chunked CA kernel) + `cx-atmos` (Barotrauma-style hull/gap/atmosphere networks) crates exist with `AGENTS.md` boundary docs and integrate with `cx-terrain`/`cx-physics`/`cx-replay`/`cx-server`. | [[decisions/dr-036-systemic-material-simulation-direction]] | - | - | - | - | - | - | - | Workspace now 29 crates. |
 | [ ] | `TMAT-EVENTS` | Run-bundle event categories `material`, `reaction`, `atmosphere`, `affliction` defined in `prototype-run-bundle-schema.md` and emitted from sim with parent cause chains. | [[references/prototype-run-bundle-schema#Event Category Baseline]] | - | - | - | - | - | - | - | Required before any M5.6+ run bundle can validate. |
 | [ ] | `M5.6-MAT-KERNEL` | M5.6 done-criteria: MAT-01..MAT-03 + MAT-06 + MAT-13 minimal pass; active material kernel + reaction table + density layering + replay determinism with `material.*` and `reaction.*` events. | [[spec/native-implementation-backlog#M5.6 — Material Kernel]] | - | - | - | - | - | - | - | Per-chunk material checksums in snapshots. |
@@ -213,7 +213,7 @@ These rows come from the `Scope` lists under each roadmap milestone. They are br
 | Done | ID | Feature / Requirement | Source | Evidence | H-Full | H-Quality | H-Review | AI-Full | AI-Quality | AI-Review | Notes |
 |---|---|---|---|---|---:|---:|---:|---:|---:|---:|---|
 | [ ] | `M3-P00` | Milestone proof: Event taxonomy is complete enough that any prior milestone's run can be replayed headlessly and produce identical state checksums. Determinism islands are real. | [[spec/prototype-roadmap#M3 — Replay And Event Recorder]] | - | - | - | - | - | - | - | Milestone-level proof row. |
-| [ ] | `M3-S01` | `cx-replay` event taxonomy expanded to cover all event categories from [[systems/replay-event-architecture]]: combat, body, terrain, AI, logistics, mission, modifier, network. | [[spec/prototype-roadmap#M3 — Replay And Event Recorder]] | - | - | - | - | - | - | - |  |
+| [ ] | `M3-S01` | `cx-replay` event taxonomy expanded to cover every baseline category in [[references/prototype-run-bundle-schema#Event Category Baseline]], including control, mind, collision, server, anti-cheat, MMO, material, reaction, atmosphere, affliction, combat/body/terrain/AI, UX/accessibility/performance, snapshots, and determinism. New categories must be added to the schema first, then recorder filters, viewer filters, summary counters, and checklist rows. | [[spec/prototype-roadmap#M3 — Replay And Event Recorder]] | - | - | - | - | - | - | - | Schema is the authority; this row must not carry a divergent hand-maintained category list. |
 | [ ] | `M3-S02` | Snapshot writer: full actor/inventory/terrain snapshot at scene start + every objective change. | [[spec/prototype-roadmap#M3 — Replay And Event Recorder]] | - | - | - | - | - | - | - |  |
 | [ ] | `M3-S03` | Checksum producer: per-tick or per-snapshot. | [[spec/prototype-roadmap#M3 — Replay And Event Recorder]] | - | - | - | - | - | - | - |  |
 | [ ] | `M3-S04` | Headless replay binary: replays a run bundle without rendering and produces matching checksums. | [[spec/prototype-roadmap#M3 — Replay And Event Recorder]] | - | - | - | - | - | - | - |  |
@@ -314,15 +314,15 @@ These rows come from the `Scope` lists under each roadmap milestone. They are br
 | [ ] | `M8-S05` | Scenario validator: catches missing fields, broken refs, AI policy violations, accessibility issues. | [[spec/prototype-roadmap#M8 — Scenario Editor And Mod Tools]] | - | - | - | - | - | - | - |  |
 | [ ] | `M8-S06` | One sample mod: adds a new chassis archetype using the same grammar. | [[spec/prototype-roadmap#M8 — Scenario Editor And Mod Tools]] | - | - | - | - | - | - | - |  |
 
-### M9 - Headless Server And Determinism Islands
+### M9 - Dedicated Server App + Determinism Islands
 
 | Done | ID | Feature / Requirement | Source | Evidence | H-Full | H-Quality | H-Review | AI-Full | AI-Quality | AI-Review | Notes |
 |---|---|---|---|---|---:|---:|---:|---:|---:|---:|---|
-| [ ] | `M9-P00` | Milestone proof: The sim runs without rendering on a Linux headless target. Deterministic islands are real and testable. Replays from events alone reconstruct identical state. | [[spec/prototype-roadmap#M9 — Headless Server And Determinism Islands]] | - | - | - | - | - | - | - | Milestone-level proof row. |
-| [ ] | `M9-S01` | `cx-headless` headless binary: same sim, no renderer, no audio, network-driven inputs. | [[spec/prototype-roadmap#M9 — Headless Server And Determinism Islands]] | - | - | - | - | - | - | - |  |
-| [ ] | `M9-S02` | Determinism island contracts documented and validated: which subsystems are bit-deterministic; which are stochastic-but-replayable; which are cosmetic only. | [[spec/prototype-roadmap#M9 — Headless Server And Determinism Islands]] | - | - | - | - | - | - | - |  |
-| [ ] | `M9-S03` | Headless replay-from-events: given a run bundle, the headless server replays and produces identical checksums. | [[spec/prototype-roadmap#M9 — Headless Server And Determinism Islands]] | - | - | - | - | - | - | - |  |
-| [ ] | `M9-S04` | Performance pass: headless can run 10× real-time on baseline hardware for replay validation. | [[spec/prototype-roadmap#M9 — Headless Server And Determinism Islands]] | - | - | - | - | - | - | - |  |
+| [ ] | `M9-P00` | Milestone proof: `cx-server` runs headless as the dedicated server app, boots all mode configs, passes the M9 server-core subset, writes server/replay evidence, and ships a reference Docker image. | [[spec/prototype-roadmap#M9 — Dedicated Server App + Determinism Islands]] | - | - | - | - | - | - | - | Milestone-level proof row; full task coverage lives in Server/MMO addendum. |
+| [ ] | `M9-S01` | `cx-server` dedicated server binary: same sim path, no renderer/UI/audio crates, `--mode`, `--config`, and `--validate-config-only`. | [[spec/prototype-roadmap#M9 — Dedicated Server App + Determinism Islands]] | - | - | - | - | - | - | - |  |
+| [ ] | `M9-S02` | Determinism island contracts documented and validated: which subsystems are bit-deterministic; which are stochastic-but-replayable; which are cosmetic only. | [[spec/prototype-roadmap#M9 — Dedicated Server App + Determinism Islands]] | - | - | - | - | - | - | - |  |
+| [ ] | `M9-S03` | Server replay/evidence path: M9 run bundle captures `server.*`, snapshot, journal, health/readiness, metrics, drain, and replay checksum evidence. | [[spec/prototype-roadmap#M9 — Dedicated Server App + Determinism Islands]] | - | - | - | - | - | - | - |  |
+| [ ] | `M9-S04` | M9 server-core subset passes without prematurely requiring M12 PvP/MMO scale tests. | [[spec/prototype-roadmap#M9 — Dedicated Server App + Determinism Islands]] | - | - | - | - | - | - | - |  |
 
 ### M10 - LAN Co-op
 
@@ -336,21 +336,21 @@ These rows come from the `Scope` lists under each roadmap milestone. They are br
 | [ ] | `M10-S05` | Co-op friendly fire policy (configurable per scenario). | [[spec/prototype-roadmap#M10 — LAN Co-op]] | - | - | - | - | - | - | - |  |
 | [ ] | `M10-S06` | Per-client replay bundles that align. | [[spec/prototype-roadmap#M10 — LAN Co-op]] | - | - | - | - | - | - | - |  |
 
-### M11 - Online Co-op (Private)
+### M11 - Online Co-op (Self-Hosted Dedicated Servers)
 
 | Done | ID | Feature / Requirement | Source | Evidence | H-Full | H-Quality | H-Review | AI-Full | AI-Quality | AI-Review | Notes |
 |---|---|---|---|---|---:|---:|---:|---:|---:|---:|---|
-| [ ] | `M11-P00` | Milestone proof: Online co-op works through NAT/relay between two friends. Package hash sync prevents version mismatch crashes. | [[spec/prototype-roadmap#M11 — Online Co-op (Private)]] | - | - | - | - | - | - | - | Milestone-level proof row. |
-| [ ] | `M11-S01` | NAT punch-through or relay (transport library decision). | [[spec/prototype-roadmap#M11 — Online Co-op (Private)]] | - | - | - | - | - | - | - |  |
-| [ ] | `M11-S02` | Lobby with code-based join. | [[spec/prototype-roadmap#M11 — Online Co-op (Private)]] | - | - | - | - | - | - | - |  |
-| [ ] | `M11-S03` | Package hash sync: server checks client packages match; soft-fail with auto-download for the dev workflow; hard-fail with mismatch report for shipping. | [[spec/prototype-roadmap#M11 — Online Co-op (Private)]] | - | - | - | - | - | - | - |  |
-| [ ] | `M11-S04` | Latency compensation: client-side prediction + server reconciliation for player actor; pure replication for AI bots. | [[spec/prototype-roadmap#M11 — Online Co-op (Private)]] | - | - | - | - | - | - | - |  |
+| [ ] | `M11-P00` | Milestone proof: Self-hosted online co-op works through `cx-server --mode coop_room`; remote friends join, package hash sync prevents mismatch crashes, and a Breach Contract completes with replay-aligned clients. | [[spec/prototype-roadmap#M11 — Online Co-op (Self-Hosted Dedicated Servers)]] | - | - | - | - | - | - | - | Milestone-level proof row. |
+| [ ] | `M11-S01` | NAT punch-through or relay transport behind a trait boundary; no proprietary hosting lock-in. | [[spec/prototype-roadmap#M11 — Online Co-op (Self-Hosted Dedicated Servers)]] | - | - | - | - | - | - | - |  |
+| [ ] | `M11-S02` | Lobby directory / code-based join path for community-hosted co-op rooms. | [[spec/prototype-roadmap#M11 — Online Co-op (Self-Hosted Dedicated Servers)]] | - | - | - | - | - | - | - |  |
+| [ ] | `M11-S03` | Package hash sync: server checks client packages match; soft-fail with clear dev workflow; hard-fail with mismatch report for shipping. | [[spec/prototype-roadmap#M11 — Online Co-op (Self-Hosted Dedicated Servers)]] | - | - | - | - | - | - | - |  |
+| [ ] | `M11-S04` | Latency compensation: client-side prediction + server reconciliation for player actor; pure replication for AI bots. | [[spec/prototype-roadmap#M11 — Online Co-op (Self-Hosted Dedicated Servers)]] | - | - | - | - | - | - | - |  |
 
-### M12 - PvP And MMO Experiments
+### M12 - Public PvP Arenas + Persistent MMO Shards
 
 | Done | ID | Feature / Requirement | Source | Evidence | H-Full | H-Quality | H-Review | AI-Full | AI-Quality | AI-Review | Notes |
 |---|---|---|---|---|---:|---:|---:|---:|---:|---:|---|
-| [ ] | `M12-P00` | Milestone proof: The architecture can support PvP and large-scale online without re-architecting. Or it tells us where the wall is. | [[spec/prototype-roadmap#M12 — PvP And MMO Experiments]] | - | - | - | - | - | - | - | Milestone-level proof row. |
+| [ ] | `M12-P00` | Milestone proof: `cx-server` proves public PvP arena readiness and persistent MMO shard readiness through M12 gates; failures reopen DR-005/DR-035 explicitly instead of silently demoting scope. | [[spec/prototype-roadmap#M12 — Public PvP Arenas + Persistent MMO Shards]] | - | - | - | - | - | - | - | Milestone-level proof row; full task coverage lives in Server/MMO addendum. |
 
 ---
 
@@ -496,13 +496,13 @@ These rows come from the roadmap milestone `Done-criteria` lists. A milestone is
 | [ ] | `M8-D03` | Sample mod's new chassis works in M7 mission. | [[spec/prototype-roadmap#M8 — Scenario Editor And Mod Tools]] | - | - | - | - | - | - | - |  |
 | [ ] | `M8-D04` | PACK-A and MOD-A acceptance tests pass. | [[spec/prototype-roadmap#M8 — Scenario Editor And Mod Tools]] | - | - | - | - | - | - | - |  |
 
-### M9 - Headless Server And Determinism Islands
+### M9 - Dedicated Server App + Determinism Islands
 
 | Done | ID | Feature / Requirement | Source | Evidence | H-Full | H-Quality | H-Review | AI-Full | AI-Quality | AI-Review | Notes |
 |---|---|---|---|---|---:|---:|---:|---:|---:|---:|---|
-| [ ] | `M9-D01` | A 10-minute M7 mission run replays headlessly with bit-identical actor/terrain/inventory checksums. | [[spec/prototype-roadmap#M9 — Headless Server And Determinism Islands]] | - | - | - | - | - | - | - |  |
-| [ ] | `M9-D02` | Headless server runs on a Linux VPS without graphics drivers. | [[spec/prototype-roadmap#M9 — Headless Server And Determinism Islands]] | - | - | - | - | - | - | - |  |
-| [ ] | `M9-D03` | DET-A acceptance tests pass. | [[spec/prototype-roadmap#M9 — Headless Server And Determinism Islands]] | - | - | - | - | - | - | - |  |
+| [ ] | `M9-D01` | `cx-server` boots all five mode configs and the M9 server-core acceptance subset passes. | [[spec/prototype-roadmap#M9 — Dedicated Server App + Determinism Islands]] | - | - | - | - | - | - | - |  |
+| [ ] | `M9-D02` | Dedicated server runs on a Linux VPS or Docker image without graphics drivers and exposes health/readiness/metrics. | [[spec/prototype-roadmap#M9 — Dedicated Server App + Determinism Islands]] | - | - | - | - | - | - | - |  |
+| [ ] | `M9-D03` | Replay/checksum and persistence smoke evidence pass for the server-core subset. | [[spec/prototype-roadmap#M9 — Dedicated Server App + Determinism Islands]] | - | - | - | - | - | - | - |  |
 
 ### M10 - LAN Co-op
 
@@ -512,21 +512,21 @@ These rows come from the roadmap milestone `Done-criteria` lists. A milestone is
 | [ ] | `M10-D02` | Both clients' replay bundles align tick-for-tick. | [[spec/prototype-roadmap#M10 — LAN Co-op]] | - | - | - | - | - | - | - |  |
 | [ ] | `M10-D03` | Bandwidth budget within target (TBD per T-PERF). | [[spec/prototype-roadmap#M10 — LAN Co-op]] | - | - | - | - | - | - | - |  |
 
-### M11 - Online Co-op (Private)
+### M11 - Online Co-op (Self-Hosted Dedicated Servers)
 
 | Done | ID | Feature / Requirement | Source | Evidence | H-Full | H-Quality | H-Review | AI-Full | AI-Quality | AI-Review | Notes |
 |---|---|---|---|---|---:|---:|---:|---:|---:|---:|---|
-| [ ] | `M11-D01` | Two friends in different cities co-op a Breach Contract. | [[spec/prototype-roadmap#M11 — Online Co-op (Private)]] | - | - | - | - | - | - | - |  |
-| [ ] | `M11-D02` | Latency masking works at 50-150ms RTT without obvious jitter. | [[spec/prototype-roadmap#M11 — Online Co-op (Private)]] | - | - | - | - | - | - | - |  |
-| [ ] | `M11-D03` | Package mismatch produces a clean error, not a crash. | [[spec/prototype-roadmap#M11 — Online Co-op (Private)]] | - | - | - | - | - | - | - |  |
+| [ ] | `M11-D01` | Two friends in different cities complete a Breach Contract through a self-hosted `coop_room`. | [[spec/prototype-roadmap#M11 — Online Co-op (Self-Hosted Dedicated Servers)]] | - | - | - | - | - | - | - |  |
+| [ ] | `M11-D02` | Latency masking works at 50-150ms RTT without obvious jitter. | [[spec/prototype-roadmap#M11 — Online Co-op (Self-Hosted Dedicated Servers)]] | - | - | - | - | - | - | - |  |
+| [ ] | `M11-D03` | Package mismatch produces a clean error, not a crash. | [[spec/prototype-roadmap#M11 — Online Co-op (Self-Hosted Dedicated Servers)]] | - | - | - | - | - | - | - |  |
 
-### M12 - PvP And MMO Experiments
+### M12 - Public PvP Arenas + Persistent MMO Shards
 
 | Done | ID | Feature / Requirement | Source | Evidence | H-Full | H-Quality | H-Review | AI-Full | AI-Quality | AI-Review | Notes |
 |---|---|---|---|---|---:|---:|---:|---:|---:|---:|---|
-| [ ] | `M12-D01` | PvP is stable enough to run public stress tests. | [[spec/prototype-roadmap#M12 — PvP And MMO Experiments]] | - | - | - | - | - | - | - |  |
-| [ ] | `M12-D02` | MMO prototype runs N=20 players for 10 minutes without desync. | [[spec/prototype-roadmap#M12 — PvP And MMO Experiments]] | - | - | - | - | - | - | - |  |
-| [ ] | `M12-D03` | DR-005 launch posture is reconsidered with prototype evidence. | [[spec/prototype-roadmap#M12 — PvP And MMO Experiments]] | - | - | - | - | - | - | - |  |
+| [ ] | `M12-D01` | PvP arena readiness gate passes for 4-8 players with server authority, replay-aligned clients, and competitive anti-cheat default. | [[spec/prototype-roadmap#M12 — Public PvP Arenas + Persistent MMO Shards]] | - | - | - | - | - | - | - |  |
+| [ ] | `M12-D02` | MMO readiness gate passes with MMO-001..MMO-012, including 50-client 1-hour soak, persistence restart, and interest management. | [[spec/prototype-roadmap#M12 — Public PvP Arenas + Persistent MMO Shards]] | - | - | - | - | - | - | - |  |
+| [ ] | `M12-D03` | DR-005/DR-035 scope is reviewed with M12 evidence; failures reopen the DRs explicitly. | [[spec/prototype-roadmap#M12 — Public PvP Arenas + Persistent MMO Shards]] | - | - | - | - | - | - | - |  |
 
 ---
 
@@ -866,14 +866,14 @@ These rows come from [[spec/native-implementation-backlog]]. They are the concre
 | [ ] | `M8-002` | package builder. Build: Deterministic `.cxpkg`, manifest/provenance validation, dependency graph. Tests: Package determinism tests. Anti-scope: No public hosting. | [[spec/native-implementation-backlog#M8 — Scenario Editor And Mod Tools]] | - | - | - | - | - | - | - | Owns: `cx-mod`, `tools/`. Evidence target: PACK-A report. |
 | [ ] | `M8-003` | script host. Build: Implement chosen Lua/Rhai sandbox with capability declarations. Tests: Sandbox denies FS/network by default. Anti-scope: No unbounded script API. | [[spec/native-implementation-backlog#M8 — Scenario Editor And Mod Tools]] | - | - | - | - | - | - | - | Owns: `cx-mod`. Evidence target: Script-host test report. |
 | [ ] | `M8-004` | sample mod. Build: New chassis + scenario + AI doctrine sample mod. Tests: Validate/load/run sample mod. Anti-scope: No full mod catalog. | [[spec/native-implementation-backlog#M8 — Scenario Editor And Mod Tools]] | - | - | - | - | - | - | - | Owns: `mods/sample_*`, `content/`. Evidence target: Modded run bundle. |
-### M9 - Headless Server And Determinism Islands
+### M9 - Dedicated Server App + Determinism Islands
 
 | Done | ID | Feature / Requirement | Source | Evidence | H-Full | H-Quality | H-Review | AI-Full | AI-Quality | AI-Review | Notes |
 |---|---|---|---|---|---:|---:|---:|---:|---:|---:|---|
-| [ ] | `M9-001` | headless binary. Build: Run sim without renderer/audio; load scenario; accept scripted inputs. Tests: Linux headless smoke. Anti-scope: No public server browser. | [[spec/native-implementation-backlog#M9 — Headless Server And Determinism Islands]] | - | - | - | - | - | - | - | Owns: `cx-headless`, `cx-app`. Evidence target: Headless logs in bundle. |
-| [ ] | `M9-002` | determinism contracts. Build: Document deterministic/stochastic/cosmetic subsystems. Tests: Contract tests. Anti-scope: No whole-engine determinism claim. | [[spec/native-implementation-backlog#M9 — Headless Server And Determinism Islands]] | - | - | - | - | - | - | - | Owns: `cx-sim-core`, `cx-replay`, docs. Evidence target: Determinism report. |
-| [ ] | `M9-003` | replay-from-events. Build: 10-minute M7 replay verifies actor/terrain/inventory checksums. Tests: Replay compare. Anti-scope: No network sync yet. | [[spec/native-implementation-backlog#M9 — Headless Server And Determinism Islands]] | - | - | - | - | - | - | - | Owns: `cx-headless`, `cx-replay`. Evidence target: First-divergence report if fail. |
-| [ ] | `M9-004` | headless perf. Build: 10x real-time replay validation target. Tests: Bench test. Anti-scope: No optimization-only rabbit hole. | [[spec/native-implementation-backlog#M9 — Headless Server And Determinism Islands]] | - | - | - | - | - | - | - | Owns: `cx-bench`, `cx-headless`. Evidence target: Perf report. |
+| [ ] | `M9-001` | dedicated server binary. Build: `cx-server` runs without renderer/UI/audio; loads config; supports `--mode` and `--validate-config-only`. Tests: Linux headless smoke. Anti-scope: No PvP/MMO scale acceptance here. | [[spec/native-implementation-backlog#M9 — Dedicated Server App + Determinism Islands]] | - | - | - | - | - | - | - | Owns: `cx-server`, `cx-server-ops`, `cx-app`. Evidence target: Server boot logs in bundle. |
+| [ ] | `M9-002` | determinism contracts. Build: Document deterministic/stochastic/cosmetic subsystems. Tests: Contract tests. Anti-scope: No whole-engine determinism claim. | [[spec/native-implementation-backlog#M9 — Dedicated Server App + Determinism Islands]] | - | - | - | - | - | - | - | Owns: `cx-sim-core`, `cx-replay`, docs. Evidence target: Determinism report. |
+| [ ] | `M9-003` | replay/server evidence path. Build: Server-core run verifies actor/terrain/inventory checksums and writes `server.*` events. Tests: Replay compare. Anti-scope: No client-authoritative shortcut. | [[spec/native-implementation-backlog#M9 — Dedicated Server App + Determinism Islands]] | - | - | - | - | - | - | - | Owns: `cx-server`, `cx-replay`. Evidence target: First-divergence report if fail. |
+| [ ] | `M9-004` | server-core perf/ops. Build: Health/readiness/metrics/drain/Docker path meets M9 server-core budget. Tests: Bench + ops smoke. Anti-scope: No optimization-only rabbit hole. | [[spec/native-implementation-backlog#M9 — Dedicated Server App + Determinism Islands]] | - | - | - | - | - | - | - | Owns: `cx-bench`, `cx-server-ops`, `cx-server`. Evidence target: Perf/ops report. |
 ### M10 - LAN Co-op
 
 | Done | ID | Feature / Requirement | Source | Evidence | H-Full | H-Quality | H-Review | AI-Full | AI-Quality | AI-Review | Notes |
@@ -881,20 +881,20 @@ These rows come from [[spec/native-implementation-backlog]]. They are the concre
 | [ ] | `M10-001` | authority model. Build: Server-authoritative input/snapshot/event model. Tests: Unit tests for input validation. Anti-scope: No anti-cheat product. | [[spec/native-implementation-backlog#M10 — LAN Co-op]] | - | - | - | - | - | - | - | Owns: `cx-net`, `cx-sim-core`. Evidence target: Authority memo. |
 | [ ] | `M10-002` | LAN discovery/lobby. Build: Host/list/join on LAN; ready-up. Tests: Local two-client smoke. Anti-scope: No NAT/relay. | [[spec/native-implementation-backlog#M10 — LAN Co-op]] | - | - | - | - | - | - | - | Owns: `cx-net`, `cx-ui`. Evidence target: Lobby screenshot. |
 | [ ] | `M10-003` | replication. Build: Actors, terrain, inventory, objective state replicate; per-client bundles align. Tests: Replay compare across clients. Anti-scope: No public matchmaking. | [[spec/native-implementation-backlog#M10 — LAN Co-op]] | - | - | - | - | - | - | - | Owns: `cx-net`, `cx-replay`. Evidence target: Two-client run bundles. |
-### M11 - Online Co-op Private
+### M11 - Online Co-op (Self-Hosted Dedicated Servers)
 
 | Done | ID | Feature / Requirement | Source | Evidence | H-Full | H-Quality | H-Review | AI-Full | AI-Quality | AI-Review | Notes |
 |---|---|---|---|---|---:|---:|---:|---:|---:|---:|---|
-| [ ] | `M11-001` | transport adapter. Build: NAT/relay candidate behind trait boundary. Tests: Simulated latency tests. Anti-scope: No platform lock-in. | [[spec/native-implementation-backlog#M11 — Online Co-op Private]] | - | - | - | - | - | - | - | Owns: `cx-net`. Evidence target: Transport decision note. |
-| [ ] | `M11-002` | package hash sync. Build: Join preflight checks content hashes and produces clean mismatch actions. Tests: Mismatch tests. Anti-scope: No public mod CDN. | [[spec/native-implementation-backlog#M11 — Online Co-op Private]] | - | - | - | - | - | - | - | Owns: `cx-net`, `cx-mod`, `cx-ui`. Evidence target: Join-failure screenshots. |
-| [ ] | `M11-003` | online session smoke. Build: Two remote clients complete private co-op Breach Contract. Tests: Remote run compare. Anti-scope: No public launch promise. | [[spec/native-implementation-backlog#M11 — Online Co-op Private]] | - | - | - | - | - | - | - | Owns: `cx-net`, `cx-app`. Evidence target: Per-client bundles. |
-### M12 - PvP And MMO Experiments
+| [ ] | `M11-001` | transport adapter. Build: NAT/relay candidate behind trait boundary for self-hosted `coop_room`. Tests: Simulated latency tests. Anti-scope: No platform lock-in. | [[spec/native-implementation-backlog#M11 — Online Co-op (Self-Hosted Dedicated Servers)]] | - | - | - | - | - | - | - | Owns: `cx-net`. Evidence target: Transport decision note. |
+| [ ] | `M11-002` | package hash sync. Build: Join preflight checks content hashes and produces clean mismatch actions. Tests: Mismatch tests. Anti-scope: No public mod CDN. | [[spec/native-implementation-backlog#M11 — Online Co-op (Self-Hosted Dedicated Servers)]] | - | - | - | - | - | - | - | Owns: `cx-net`, `cx-mod`, `cx-ui`. Evidence target: Join-failure screenshots. |
+| [ ] | `M11-003` | online session smoke. Build: Two remote clients complete a self-hosted co-op Breach Contract. Tests: Remote run compare. Anti-scope: No first-party-only hosting path. | [[spec/native-implementation-backlog#M11 — Online Co-op (Self-Hosted Dedicated Servers)]] | - | - | - | - | - | - | - | Owns: `cx-net`, `cx-app`, `cx-server`. Evidence target: Per-client bundles. |
+### M12 - Public PvP Arenas + Persistent MMO Shards
 
 | Done | ID | Feature / Requirement | Source | Evidence | H-Full | H-Quality | H-Review | AI-Full | AI-Quality | AI-Review | Notes |
 |---|---|---|---|---|---:|---:|---:|---:|---:|---:|---|
-| [ ] | `M12-001` | PvP arena. Build: 2-4 players, small destructible map, server-authoritative validation. Tests: Stress run. Anti-scope: No launch PvP promise. | [[spec/native-implementation-backlog#M12 — PvP And MMO Experiments]] | - | - | - | - | - | - | - | Owns: `cx-net`, `cx-mission`. Evidence target: Bandwidth/cheat notes. |
-| [ ] | `M12-002` | scale shard. Build: N=20 small-shard simulation for 10 minutes. Tests: Load test. Anti-scope: No MMO product commitment. | [[spec/native-implementation-backlog#M12 — PvP And MMO Experiments]] | - | - | - | - | - | - | - | Owns: `cx-headless`, `cx-net`, `cx-bench`. Evidence target: Perf/desync report. |
-| [ ] | `M12-003` | DR-005 review. Build: Revisit multiplayer posture with evidence. Tests: N/A. Anti-scope: No silent scope expansion. | [[spec/native-implementation-backlog#M12 — PvP And MMO Experiments]] | - | - | - | - | - | - | - | Owns: vault only. Evidence target: Updated DR or research log. |
+| [ ] | `M12-001` | PvP arena. Build: 4-8 players, small destructible map, server-authoritative validation, competitive anti-cheat default. Tests: Stress run. Anti-scope: No ranked ladder here. | [[spec/native-implementation-backlog#M12 — Public PvP Arenas + Persistent MMO Shards]] | - | - | - | - | - | - | - | Owns: `cx-server`, `cx-net`, `cx-mission`, `cx-server-anti-cheat`. Evidence target: Bandwidth/cheat notes. |
+| [ ] | `M12-002` | MMO shard. Build: 50-client readiness gate with persistence, interest management, and no-cloud reference. Tests: MMO-001..MMO-012. Anti-scope: No seamless single-shard world. | [[spec/native-implementation-backlog#M12 — Public PvP Arenas + Persistent MMO Shards]] | - | - | - | - | - | - | - | Owns: `cx-server`, `cx-net`, `cx-bench`, `cx-server-persistence`. Evidence target: Perf/desync/persistence report. |
+| [ ] | `M12-003` | DR-005/DR-035 review. Build: Review multiplayer/MMO posture with M12 evidence. Tests: N/A. Anti-scope: No silent demotion or silent scope expansion. | [[spec/native-implementation-backlog#M12 — Public PvP Arenas + Persistent MMO Shards]] | - | - | - | - | - | - | - | Owns: vault only. Evidence target: Updated DR or research log. |
 
 ---
 

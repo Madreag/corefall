@@ -249,7 +249,7 @@ These tests become M5.5 and T-PHYS requirements.
 | M5.5 | Full Collision Gauntlet: matrix, projectile-projectile, limb/equipment/body/debris/mech/base contacts, CCD, impulse damage, replay/perf proof. |
 | M6 | AI harness consumes collision affordances and reason-labels collision-aware choices. |
 | M7 | Mission director and base systems rely on doors/shields/turrets/repair pads being real collision objects. |
-| M9+ | Headless/server deterministic islands decide which collision pairs are authoritative for multiplayer. |
+| M9+ | `cx-headless` and `cx-server` deterministic islands decide which collision pairs are authoritative for LAN, online co-op, public PvP, and persistent MMO shards. |
 
 ## Research Synthesis
 

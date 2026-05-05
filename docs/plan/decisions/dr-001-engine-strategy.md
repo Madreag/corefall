@@ -1,21 +1,22 @@
 ---
 type: decision
 id: DR-001
-status: open
+status: closed-direction
 priority: P0
-revisit_trigger: "When a build/run audit, license review, and a small actor-feel prototype are all complete."
+closed_at: 2026-05-04
+revisit_trigger: "If M0/M1 greenfield bootstrap fails to produce a playable actor-feel slice on schedule, CCCP reference work reveals a decisive reuse advantage, or DR-024's Rust/Bevy/wgpu stack blocks a critical capability."
 ---
 
 ← [[decisions/index|decision records]] · [[spec/index|spec section]] · [[dashboards/research-readiness|readiness]] · [[engine/cccp-build-run-audit|CCCP build/run audit]] · [[design/opportunities-for-our-fork|fork opportunities]]
 
 # DR-001: Engine Strategy
 
-> [!success] Status: DIRECTION CLOSED (project owner committed 2026-05-04). Implementation specifics still open.
+> [!success] Status: DIRECTION CLOSED (project owner committed 2026-05-04). Implementation stack direction is closed by [[decisions/dr-024-native-engine-stack]].
 > **Direction:** Greenfield native core + CCCP as reference lab. Build a new engine. Use CCCP for mechanics archaeology, feel comparison, content taxonomy, equipment roles, AI/pathfinding lessons, terrain/destruction behavior, mistakes-to-avoid, and possibly a one-way import/converter tool later. Do **not** let CCCP define the final data format, physics model, UI, AI architecture, mod API, or backend/replay/event model.
 >
 > **Constraint inherited from project owner:** "Best engine, best physics, best performance, best network latency, best UX, best UI, MOST HUMANLIKE AI IN THE GAME, all enjoyable." These are not soft hopes; they are the bar. The greenfield path is justified because no fork inherits all of them at the level required.
 >
-> Still open: language/runtime, ECS or OOP, renderer (WebGPU/wgpu/Vulkan/native), determinism boundary, exact data schema, repo structure, build/CI plan. These are implementation specifics that the actor-feel + recorder + chassis Slice-A prototypes inform.
+> Remaining evidence work: prove the Rust + Bevy/wgpu greenfield path through M0/M1/M1.5, keep CCCP as a read-only reference lab, and reopen only if a prototype gate fails or a reference audit reveals a decisive reuse advantage.
 
 ## Context
 

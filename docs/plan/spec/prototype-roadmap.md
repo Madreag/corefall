@@ -141,9 +141,11 @@ If you have more time, also read in roughly this order:
 - [[spec/server-app-architecture]] — `cx-server` dedicated server binary; modes (`coop_room`, `pvp_arena`, `lan_room`, `mmo_shard`, `lobby_directory`); community-hosting posture (T-SERVER / M9..M12).
 - [[spec/persistent-mmo-architecture]] — MMO shard mode, persistence, interest management, account model, MMO-001..MMO-012 (M12 / DR-035).
 - [[spec/full-collision-physics-plan]] — collision classes, matrix, projectile-projectile rules, CCD tiers, impulse-to-damage, COLL-001..COLL-012 (T-PHYS / M5.5).
+- [[decisions/dr-036-systemic-material-simulation-direction]] — systemic material direction: bounded active-region CA kernel, reaction table, affliction layer, atmospheres, material lab, AI material competence (T-MAT / M5.6..M8.5).
+- [[comparables/noita-grade-material-simulation-research]] — source-backed material/chemistry/atmosphere research for Noita, Powder Toy, Barotrauma, Oxygen Not Included, Stationeers, and open-source falling-sand projects.
 - [[spec/hybrid-llm-ai-plan]] — async LLM mind layer with strict schemas, mock provider, validator, replay logging (T-LLM / M6.5).
 - [[references/prototype-run-bundle-schema]] — run-bundle event categories, manifest/summary/notes contract, per-milestone acceptance gates.
-- [[decisions/index]] and [[dashboards/decision-tracker]] — DR-001..DR-035 with current direction and lean.
+- [[decisions/index]] and [[dashboards/decision-tracker]] — DR-001..DR-036 with current direction and lean.
 - [[references/usage-ledger]] — log when external code/data/assets enter the project.
 - [[research-log/moonshot-register]] — wild ideas; promote only with a DR.
 - [[prototypes/actor-feel-lab-a1-human-playtest-2026-05-04]] — the "ok I guess" signal that informs M1.5 acceptance.
@@ -1556,7 +1558,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 **What it proves:** Event taxonomy is complete enough that any prior milestone's run can be replayed headlessly and produce identical state checksums. Determinism islands are real.
 
 **Scope:**
-- `cx-replay` event taxonomy expanded to cover all event categories from [[systems/replay-event-architecture]]: combat, body, terrain, AI, logistics, mission, modifier, network.
+- `cx-replay` event taxonomy expanded to cover every baseline category in [[references/prototype-run-bundle-schema#Event Category Baseline]]: `input`, `control`, `mind`, `collision`, `server`, `anti_cheat`, `mmo`, `material`, `reaction`, `atmosphere`, `affliction`, `combat`, `body`, `terrain`, `ai`, `logistics`, `mission`, `system`, `snapshot`, `determinism`, `ux`, `accessibility`, and `performance`. New event categories must be added to the schema first, then wired into recorder filters, viewer filters, summary counters, and checklist rows.
 - Snapshot writer: full actor/inventory/terrain snapshot at scene start + every objective change.
 - Checksum producer: per-tick or per-snapshot.
 - Headless replay binary: replays a run bundle without rendering and produces matching checksums.
