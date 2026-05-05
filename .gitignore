@@ -1,0 +1,24 @@
+.DS_Store
+*.log
+*.tmp
+*.swp
+*.swo
+.env
+.env.*
+!.env.example
+
+# Rust / Cargo
+target/
+
+# Generated prototype evidence
+prototype_runs/
+run_bundles/
+captures/
+screenshots/
+
+# IDE
+.idea/
+.vscode/
+
+# OS
+Thumbs.db
