@@ -17,7 +17,22 @@ Each note should include:
 - Commands run.
 - Run-bundle paths.
 - Feature checklist rows updated.
+- Roadmap sections updated, or a short reason why no roadmap update was needed.
+- Changelog entry added.
 - Bugs found and fixed.
 - Known issues.
 - AI self-ratings for full implementation and quality.
 - Human review status.
+
+The repo-only changelog lives at:
+
+```text
+../../CHANGELOG.md
+```
+
+The canonical roadmap and checklist live in the vault:
+
+```text
+/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md
+/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/feature-completion-checklist.md
+```

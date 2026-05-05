@@ -34,6 +34,7 @@ Use [AGENTS.md](AGENTS.md) for the exact AI worker read order.
 game/                     # native game workspace will be scaffolded here
 docs/implementation-log/  # milestone notes, evidence summaries, bug logs
 prototype_runs/native/    # generated run bundles once prototypes exist
+CHANGELOG.md              # repo-only implementation changelog
 ```
 
 ## First Milestones
@@ -45,3 +46,7 @@ The expected start is:
 3. M1.5 - Micro Breach Fun Slice
 
 Do not jump to M2 until M0/M1/M1.5 are coherent enough to give terrain, replay, control, and fun-loop evidence somewhere to attach.
+
+## Completion Discipline
+
+After any feature or milestone implementation, update the canonical vault roadmap/checklist and the repo-local [CHANGELOG.md](CHANGELOG.md). The canonical roadmap and checklist remain in the research vault, not duplicated here.

@@ -87,8 +87,10 @@ prototype_runs/native/
 
 Every completed task must update or produce:
 
-- The relevant checklist evidence in the canonical `feature-completion-checklist.md`
+- The relevant checklist rows in the canonical `feature-completion-checklist.md`; check off completed rows and fill evidence, commands, run-bundle paths, and AI self-ratings.
+- The canonical `prototype-roadmap.md`; update milestone/feature status, evidence links, changed scope, open follow-ups, and any newly discovered dependency or sequencing issue. If no roadmap edit is needed, say why in the implementation log.
 - A milestone note under `docs/implementation-log/`
+- A repo-local entry in `CHANGELOG.md`
 - Run-bundle paths
 - Commands run
 - Bugs found and fixed
@@ -96,6 +98,41 @@ Every completed task must update or produce:
 - AI self-ratings for implementation completeness and quality
 
 Use human rating fields only for user/human review. AI agents fill only AI self-rating fields and evidence notes.
+
+Canonical checklist:
+
+```text
+/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/feature-completion-checklist.md
+```
+
+Canonical roadmap:
+
+```text
+/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md
+```
+
+Repo-only changelog:
+
+```text
+CHANGELOG.md
+```
+
+## Completion Contract
+
+After implementing any feature, task card, side-track item, or milestone, an agent must leave the project in a state where another agent can see exactly what changed and what remains.
+
+Required completion actions:
+
+1. Update code and tests in `game/`.
+2. Run the validation commands required by the assigned roadmap/backlog section.
+3. Emit or update run-bundle evidence when the task includes runnable behavior.
+4. Update the canonical vault checklist rows that correspond to the completed work.
+5. Update the canonical roadmap if status, scope, dependencies, evidence, commands, risks, or follow-up work changed.
+6. Add or update the milestone implementation note under `docs/implementation-log/`.
+7. Add a concise repo-local entry to `CHANGELOG.md`.
+8. Report any vault updates that could not be completed, with exact file paths and reasons.
+
+Do not mark work complete if the checklist/roadmap updates are skipped. If a task genuinely does not affect the roadmap, record "roadmap update not needed" in the implementation log and explain why.
 
 ## Reference Repos And Reuse
 
