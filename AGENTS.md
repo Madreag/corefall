@@ -50,30 +50,30 @@ If the canonical `spec/ai-coder-reading-list.md` disagrees with the list above, 
 
 ## Repository Layout
 
-The native game workspace lives at the corefall repo's `corefall-game/` directory. This matches the canonical roadmap's [Repository Layout](https://.../prototype-roadmap.md#repository-layout) name; no path mapping is needed.
+The native game workspace lives at the corefall repo's `game/` directory. This matches the canonical roadmap's [Repository Layout](https://.../prototype-roadmap.md#repository-layout) name; no path mapping is needed.
 
 | Canonical (in roadmap) | This repo |
 |---|---|
-| `corefall-game/` (workspace root) | `corefall-game/` |
-| `corefall-game/Cargo.toml` | `corefall-game/Cargo.toml` |
-| `corefall-game/crates/cx-app` ... `cx-server` | `corefall-game/crates/cx-app` ... `cx-server` |
-| `corefall-game/content/` | `corefall-game/content/` |
-| `corefall-game/mods/` | `corefall-game/mods/` |
-| `corefall-game/scripts/cxctl/` | `corefall-game/scripts/cxctl/` |
-| `corefall-game/assets/` | `corefall-game/assets/` |
-| `corefall-game/tests/` | `corefall-game/tests/` |
-| `corefall-game/tools/` | `corefall-game/tools/` |
+| `game/` (workspace root) | `game/` |
+| `game/Cargo.toml` | `game/Cargo.toml` |
+| `game/crates/cf-app` ... `cf-server` | `game/crates/cf-app` ... `cf-server` |
+| `game/content/` | `game/content/` |
+| `game/mods/` | `game/mods/` |
+| `game/scripts/cfctl/` | `game/scripts/cfctl/` |
+| `game/assets/` | `game/assets/` |
+| `game/tests/` | `game/tests/` |
+| `game/tools/` | `game/tools/` |
 | Run-bundle root | `prototype_runs/native/` (at corefall repo root) |
 | Implementation logs | `docs/implementation-log/` (at corefall repo root) |
 | Repo-only changelog | `CHANGELOG.md` (at corefall repo root) |
 
-The crate name prefix `cx-` is shorthand for the workspace; it is preserved across the rename for stability of `cargo run -p cx-<name>` invocations and to keep the existing AGENTS.md / decision records / task cards valid. If the user later asks to rename the prefix to `cf-`, that is a separate workspace-wide migration with its own DR.
+The crate name prefix is `cf-` throughout the implementation repo and canonical vault. Use `cargo run -p cf-<name>` for workspace binaries and keep new crates on the same prefix unless a future DR explicitly changes the naming convention.
 
 Do not put source code in the planning vault. Do not copy the whole vault into this repo. Implementation notes and milestone evidence belong in this repo under `docs/implementation-log/` and `prototype_runs/native/`.
 
 ## Per-Crate AGENTS.md
 
-Once `corefall-game/` is bootstrapped as a workspace with crates, every crate ships its own `AGENTS.md` per the [Per-Crate AGENTS.md Template](https://.../prototype-roadmap.md#per-crate-agentsmd-template) in the canonical roadmap. The crate's `AGENTS.md` is the boundary contract:
+Once `game/` is bootstrapped as a workspace with crates, every crate ships its own `AGENTS.md` per the [Per-Crate AGENTS.md Template](https://.../prototype-roadmap.md#per-crate-agentsmd-template) in the canonical roadmap. The crate's `AGENTS.md` is the boundary contract:
 
 - Owns
 - Public API Boundary
@@ -87,20 +87,20 @@ M0's task cards include creating the first set of per-crate AGENTS.md files alon
 
 ## Standard Validation
 
-Run these from `corefall-game/` unless a task card narrows the set:
+Run these from `game/` unless a task card narrows the set:
 
 ```bash
 cargo fmt --all --check
 cargo check --workspace --all-targets
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
-cargo run -p cxctl -- observe --once
+cargo run -p cfctl -- observe --once
 python3 /Users/erol/projects/cortex-command-repos-all/research_tools/prototype_run_check.py /Users/erol/projects/corefall/prototype_runs/native/<run_id>
 ```
 
 Milestones with gameplay/tool UI also require a scripted E2E command and a screenshot/capture artifact listed in `summary.json.artifacts`.
 
-`cxctl` lives at `corefall-game/crates/cxctl/`. Invoke as `cargo run -p cxctl -- <subcommand>` during M0..M1; once installed or added to PATH, `cxctl <subcommand>` is shorthand. The full CLI surface is pinned in the canonical [CLI Reference](https://.../prototype-roadmap.md#cli-reference).
+`cfctl` lives at `game/crates/cfctl/`. Invoke as `cargo run -p cfctl -- <subcommand>` during M0..M1; once installed or added to PATH, `cfctl <subcommand>` is shorthand. The full CLI surface is pinned in the canonical [CLI Reference](https://.../prototype-roadmap.md#cli-reference).
 
 ## Run-Bundle Naming
 
@@ -127,9 +127,9 @@ If a milestone touches an OPEN decision record or topic-level open decision:
 
 ## Eyes, Ears, Hands Rule
 
-Every player-facing surface must be controllable and observable through the planned `cx-control` / `cxctl` layer unless explicitly marked human-only with a reason.
+Every player-facing surface must be controllable and observable through the planned `cf-control` / `cfctl` layer unless explicitly marked human-only with a reason.
 
-The rule: any pixel a human can interact with on screen, the AI worker must be able to drive through `cxctl`. Screenshot-only testing is not enough. A milestone is incomplete if AI agents cannot inspect and drive the new gameplay/UI surface through structured commands.
+The rule: any pixel a human can interact with on screen, the AI worker must be able to drive through `cfctl`. Screenshot-only testing is not enough. A milestone is incomplete if AI agents cannot inspect and drive the new gameplay/UI surface through structured commands.
 
 See the canonical [[spec/ai-control-observability-layer]] for the full observe/inspect/act surface; every new player-facing surface must extend it.
 
@@ -179,7 +179,7 @@ After implementing any feature, task card, side-track item, or milestone, an age
 
 Required completion actions:
 
-1. Update code and tests in `corefall-game/`.
+1. Update code and tests in `game/`.
 2. Run the Standard Validation commands (above) plus any milestone-specific validation from the assigned roadmap/backlog section.
 3. Emit or update run-bundle evidence when the task includes runnable behavior.
 4. Update the canonical vault checklist rows that correspond to the completed work.
@@ -187,7 +187,7 @@ Required completion actions:
 6. Add or update the milestone implementation note under `docs/implementation-log/`.
 7. Add a concise repo-local entry to `CHANGELOG.md`.
 8. If the milestone closes a DR, update the DR file + `decisions/index.md` + `dashboards/decision-tracker.md` + `dashboards/research-readiness.md` + a dated `research-log/` note in the same pass.
-9. Verify every new player-facing surface is reachable from `cxctl` with assert/inspect coverage.
+9. Verify every new player-facing surface is reachable from `cfctl` with assert/inspect coverage.
 10. Report any vault updates that could not be completed, with exact file paths and reasons.
 
 Do not mark work complete if the checklist/roadmap updates are skipped. If a task genuinely does not affect the roadmap, record "roadmap update not needed" in the implementation log and explain why.
@@ -239,7 +239,7 @@ Current direction:
 
 - Don't write source code under `cortext_command_vault/`. The vault is planning, not implementation.
 - Don't edit canonical reference repos under `/Users/erol/projects/cortex-command-repos-all/{Cortex-Command-*,comparables_repos/*}` unless the user explicitly says so.
-- Don't use `rand::thread_rng()` inside sim crates (`cx-sim-core`, `cx-physics`, `cx-material`, `cx-ai`, ...). Sim RNG must be seeded and recorded per the manifest.
+- Don't use `rand::thread_rng()` inside sim crates (`cf-sim-core`, `cf-physics`, `cf-material`, `cf-ai`, ...). Sim RNG must be seeded and recorded per the manifest.
 - Don't use `println!` in production code. Use `tracing` per the canonical [Logging, Tracing, And Error Policy](https://.../prototype-roadmap.md#logging-tracing-and-error-policy).
 - Don't `unwrap()` on user-controllable inputs.
 - Don't skip the Open Decision Gates pre-check before assigning a milestone.
@@ -247,7 +247,7 @@ Current direction:
 - Don't push directly to `main` without local Standard Validation.
 - Don't mark work complete if the canonical checklist/roadmap updates are skipped.
 - Don't add cloud-save dependencies during T-SAVE work; cloud-save backend decision is post-launch.
-- Don't introduce a UI surface without a matching `cx-control` / `cxctl` path. Eyes/ears/hands rule.
+- Don't introduce a UI surface without a matching `cf-control` / `cfctl` path. Eyes/ears/hands rule.
 
 ## Starting Point
 
