@@ -60,6 +60,7 @@ feeds:
 - [[#Read Order|Read Order]]
 - [[#Glossary|Glossary]]
 - [[#Agent Implementation Contract|Agent Implementation Contract]]
+  - [[#Short Assignment Contract|Short Assignment Contract]]
   - [[#Open Decision Gates Protocol|Open Decision Gates Protocol]]
 - [[#Milestone Handoff Template|Milestone Handoff Template]]
 - [[#Human Playtest Checklist Template|Human Playtest Checklist Template]]
@@ -253,6 +254,35 @@ A junior agent must never have to guess what these words mean. If a term is used
 
 This roadmap is intended to be assignable to an AI implementation agent one milestone at a time. A milestone is not complete because code compiles or a feature appears once. The agent must build, test, bug hunt, repair, document evidence, and update the vault.
 
+### Short Assignment Contract
+
+The user should be able to assign work with a short prompt such as:
+
+```text
+Implement M0 from /Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md
+```
+
+or:
+
+```text
+Implement M1.
+```
+
+That short prompt is a complete milestone assignment. The worker must expand it through the canonical docs rather than asking the user to paste a giant handoff prompt.
+
+For every short milestone assignment, the worker must:
+
+1. Read `/Users/erol/projects/corefall/AGENTS.md` first if working in the Corefall implementation repo.
+2. Follow [[#Read Order|Read Order]], [[spec/ai-coder-reading-list]], this contract, the assigned milestone section, and the assigned milestone's task cards in [[spec/native-implementation-backlog]].
+3. Apply [[#Open Decision Gates Protocol|Open Decision Gates Protocol]] before locking schemas, event envelopes, architecture decisions, UI/accessibility posture, or other open-DR surfaces.
+4. Implement all agent-completable task cards for the milestone.
+5. Run [[#Validation Command Matrix|Validation Command Matrix]] plus the milestone-specific validation commands.
+6. Produce run-bundle evidence under `/Users/erol/projects/corefall/prototype_runs/native/`.
+7. Update [[spec/feature-completion-checklist]] with evidence and AI self-ratings.
+8. Update this roadmap if status, scope, evidence, risks, dependencies, or follow-up work changed.
+9. Add or update `/Users/erol/projects/corefall/docs/implementation-log/<date>-<milestone>.md` and `/Users/erol/projects/corefall/CHANGELOG.md`.
+10. Leave both repos commit-ready, and commit only when the user asks or when the active assignment explicitly includes committing.
+
 ### Required Agent Loop
 
 | Phase | Required Action | Output |
@@ -334,17 +364,18 @@ When a milestone gathers evidence that **invalidates** a still-open lean, the wo
 Use this template when assigning a milestone to an AI agent.
 
 ```markdown
-Goal: Implement milestone <M#> from cortext_command_vault/spec/native-implementation-backlog.md.
+Goal: Implement milestone <M#> from /Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md.
 
 Context (read in this order):
-1. AGENTS.md (root).
-2. cortext_command_vault/spec/authoritative-game-spec-v0.md.
-3. cortext_command_vault/spec/prototype-roadmap.md (especially the Open Decision Gates Protocol + the milestone's section + Open DR gates row).
-4. cortext_command_vault/spec/native-implementation-backlog.md (milestone task cards).
-5. cortext_command_vault/spec/feature-completion-checklist.md (Open Decision Gates Checklist + the milestone scope/done-criteria/task rows).
-6. cortext_command_vault/spec/ai-control-observability-layer.md (every player surface MUST be reachable from cfctl).
-7. The milestone's linked DRs/spec pages, including any cross-cutting plan (full-collision-physics-plan, hybrid-llm-ai-plan, server-app-architecture, persistent-mmo-architecture, dr-036-systemic-material-simulation-direction).
-8. cortext_command_vault/references/prototype-run-bundle-schema.md (run-bundle event categories + acceptance gates).
+1. /Users/erol/projects/corefall/AGENTS.md.
+2. /Users/erol/projects/cortex-command-repos-all/AGENTS.md.
+3. /Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/authoritative-game-spec-v0.md.
+4. /Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md (especially the Short Assignment Contract, Open Decision Gates Protocol, the milestone's section, and the Open DR gates row).
+5. /Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/native-implementation-backlog.md (milestone task cards).
+6. /Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/feature-completion-checklist.md (Open Decision Gates Checklist + the milestone scope/done-criteria/task rows).
+7. /Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/ai-control-observability-layer.md (every player surface MUST be reachable from cfctl).
+8. The milestone's linked DRs/spec pages, including any cross-cutting plan (full-collision-physics-plan, hybrid-llm-ai-plan, server-app-architecture, persistent-mmo-architecture, dr-036-systemic-material-simulation-direction).
+9. /Users/erol/projects/cortex-command-repos-all/cortext_command_vault/references/prototype-run-bundle-schema.md (run-bundle event categories + acceptance gates).
 
 Open Decision Gates pre-check:
 - Identify every still-open DR or topic-level decision listed in the milestone's "Open DR gates" row.
