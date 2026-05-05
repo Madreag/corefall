@@ -12,6 +12,11 @@ Use this file to summarize what changed in the implementation repo. Do not copy 
 
 ## Unreleased
 
+### Changed
+
+- Renamed the planned native workspace directory from `game/` to `corefall-game/` so the corefall repo matches the canonical roadmap's Repository Layout name. No mapping table needed; `corefall-game/` is the workspace root in both the canonical docs and this repo.
+- Tightened `AGENTS.md` per a pre-implementation review: added Repository Layout (canonical = this repo), Per-Crate AGENTS.md mandate, Standard Validation block with exact commands, Run-Bundle Naming, Git Hygiene, Secrets Posture, and a Do-Not list. Added vault home to the mandatory read order. Pinned `cxctl` invocation path and run-bundle root.
+
 ### Added
 
 - Repo-local changelog and completion discipline requiring implementation agents to update the canonical vault roadmap/checklist after feature or milestone work.

@@ -31,7 +31,7 @@ Use [AGENTS.md](AGENTS.md) for the exact AI worker read order.
 ## Repo Layout
 
 ```text
-game/                     # native game workspace will be scaffolded here
+corefall-game/            # native game workspace will be scaffolded here (matches canonical roadmap name)
 docs/implementation-log/  # milestone notes, evidence summaries, bug logs
 prototype_runs/native/    # generated run bundles once prototypes exist
 CHANGELOG.md              # repo-only implementation changelog
