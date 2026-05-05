@@ -246,12 +246,46 @@ cargo run -p cx-e2e -- --scenario m5_chassis_wreck_eject --expect pilot_extracte
 | M6-003 mistakes/recovery | `cx-ai`, `cx-replay` | Panic/hesitate/miss/stuck/recover behavior with reason labels. | Recovery scenario tests. | `ai_recovery_action`. | No fake randomness without causes. |
 | M6-004 AI-H harness | `cx-ai`, `cx-headless`, `tools/` | Runnable AI-H-01..06 suite with report output. | Harness pass/fail tests. | AI-H report bundle. | No broad campaign AI. |
 | M6-005 bot overlay | `cx-ui`, `cx-ai` | Visible intent labels for friendly/enemy bots. | Screenshot capture. | Overlay screenshot. | No dialogue system. |
+| M6-006 mind hooks (T-LLM bridge) | `cx-ai` | Expose hook points that the future M6.5 mind layer will call: utility-weight patch API, commander-blackboard goal API, doctrine-tag set API, dialogue-queue API, memory-write API. M6 itself MUST NOT call any LLM. | Hook tests with synthetic patches; AI-H stays green when no hooks are called. | Hook trait docs in `cx-ai::doctrine`; example synthetic patch in tests. | No LLM runtime dependency in M6. |
 
 M6 E2E:
 
 ```bash
 cargo run -p cx-ai --bin ai_harness -- --suite AI-H-01..AI-H-06 --write-run-bundle
 ```
+
+---
+
+## M6.5 — LLM Mind Lab
+
+> [!important] Kickoff prerequisites
+> M6 must be complete (including M6-006 hook points). Read [[spec/hybrid-llm-ai-plan]] and [[decisions/dr-032-hybrid-llm-ai-direction]] in full BEFORE feature work. Run [M6.5 Kickoff Smoke](../spec/prototype-roadmap.md#per-milestone-kickoff-smoke). M6.5 is not done until MIND-001..MIND-010 pass against the deterministic mock provider, replay shows `mind` events, and local AI keeps acting through provider sleep/fail/stale/cost-cap.
+
+> [!warning] Hard rules
+> No live cloud LLM is required for any test. CI uses the mock provider only. Cloud/local provider adapters are cargo-feature-gated. Local AI MUST keep acting when the provider is disabled, sleeping, failing, returning malformed/stale output, or exhausted of budget. **Anti-goal: No LLM in the reflex/tactical loop.**
+
+| ID | Owns | Build | Tests | Evidence | Anti-scope |
+|---|---|---|---|---|---|
+| M6.5-001 mind schemas | `cx-ai::mind::schema`, `cortex-game/crates/cx-ai/schemas/mind/v1/` | Define `MindObservationFrame`, `MindTask`, `AiMindProposal`, `MindValidationResult`, `MindMemoryRecord`, `MindProviderConfig` per [[spec/hybrid-llm-ai-plan]]; emit JSON Schemas via `schemars`. | Roundtrip tests; bad-example rejection tests; schema-version mismatch test. | Schemas committed; example proposal validates. | No public schema export yet. |
+| M6.5-002 mock provider | `cx-ai::mind::provider::mock` | Deterministic provider that consumes a canned-script directory; supports inject-canned, inject-malformed, inject-timeout, inject-stale, inject-cost-overflow modes. | Per-mode tests; CI uses mock only. | Mock provider used by all MIND-* tests. | No live cloud calls in mock. |
+| M6.5-003 provider trait + adapters | `cx-ai::mind::provider` (cargo features `mind-openai`, `mind-anthropic`, `mind-ollama`, `mind-openai-compatible`) | Shared async trait; OpenAI Responses API adapter; Anthropic Messages API adapter; Ollama adapter; OpenAI-compatible adapter (vLLM/llama.cpp); each behind a cargo feature; secrets read from env per `MindProviderConfig.api_key_env`. | Adapter contract tests with mocked HTTP; feature-gate tests verify default build excludes cloud. | Adapter docs; example `MindProviderConfig`. | No vendor SDK lock-in; no API keys in repo. |
+| M6.5-004 observation compressor | `cx-ai::mind::compressor`, `cx-control`, `cx-replay` | Derive `MindObservationFrame` from the `cx-control` observation stream + recent replay events; enforce fog-of-war BEFORE any provider sees a prompt. | Fog-of-war audit tests (synthetic hidden enemy never appears in frame); compactness tests; `cxctl observe --mind-frame <scope>` smoke. | Sample frames in run notes. | No raw-state passthrough. |
+| M6.5-005 proposal validator | `cx-ai::mind::validator` | Reject stale, invalid, impossible, unfair, over-budget, hidden-info, and capability-violating proposals; replay-visible reasons. | Per-rejection-class unit tests; MIND-003/004/006/009 acceptance pass. | Validator decision log. | No silent acceptance. |
+| M6.5-006 policy compiler | `cx-ai::mind::policy` | Convert accepted proposals into utility-weight patches, commander goals, doctrine tags, dialogue-queue entries, and `MindMemoryRecord` writes via M6 hook points. | Patch-application tests; doctrine-patch visibility test (MIND-005). | One visible doctrine patch in micro_breach_mind_lab. | No direct low-level action emission. |
+| M6.5-007 mind events + run-bundle integration | `cx-replay`, `cx-ai::mind::events`, `tools/run_bundle_check.py` | Emit `mind.task_created`, `mind.prompt_recorded` (hashes by default; raw text only behind `debug_capabilities`), `mind.response_received`, `mind.proposal_validated`, `mind.patch_applied`, `mind.patch_rejected`, `mind.memory_written`. Update run-bundle checker to recognize the `mind` category. | Bundle-validation tests; secret-redaction tests. | Run bundles include `mind` events; redaction verified. | No raw secrets in run bundles. |
+| M6.5-008 mind dashboard (dev) | `cx-tools-editor`, `cx-ui` | Dev-only workbench panel showing task count, stale rate, provider failures, estimated cost, model routing, and accept/reject reasons. | Dashboard render tests; screenshot. | Dashboard capture in M6.5 note. | No player-facing UI yet. |
+| M6.5-009 micro_breach_mind_lab scenario | `content/scenarios/micro_breach_mind_lab.ron`, `content/mind/profiles/` | The M6.5 lab scenario in three modes (`mind_off`, `mind_mock`, `mind_live_optional`) with a sample commander mind profile and one designed doctrine-patch opportunity. | Scenario validates with `cx-mod validate`; all three modes load. | Scenario file + sample profile + canned-script. | No content tied to a specific cloud model id. |
+| M6.5-010 MIND-* acceptance suite | `cx-ai`, `cx-headless`, `cx-bench`, `tests/` | Implement `cx-ai --bin mind_lab` with `--suite MIND-001..MIND-010 --provider <mock|...> --write-run-bundle`. Cover: baseline (off), nonblocking timeout, malformed response, stale response, doctrine-patch visibility, fog-of-war fairness, memory write, replay audit, cost cap, humanlike-score delta. | All MIND-* pass against mock; AI-H regression remains green; failure modes produce useful first-divergence reports. | MIND-001..MIND-010 run bundles archived; AI-H humanlike-score delta report. | No reliance on live cloud during CI. |
+
+M6.5 E2E:
+
+```bash
+cargo run -p cxctl -- observe --mind-frame squad_alpha --once
+cargo run -p cx-ai --bin mind_lab -- --suite MIND-001..MIND-010 --provider mock --write-run-bundle
+cargo run -p cx-headless -- replay prototype_runs/native/<m6_5_run> --verify-checksums
+```
+
+Human gate: **none**. M6.5 is fully agent-completable; humans review the audit report.
 
 ---
 

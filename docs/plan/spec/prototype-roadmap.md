@@ -84,6 +84,7 @@ feeds:
   - [M4 — HUD And Comic-Noir UI](#m4--hud-and-comic-noir-ui)
   - [M5 — Equipment, Chassis, And Damage Grammar](#m5--equipment-chassis-and-damage-grammar)
   - [M6 — AI Core And Trust Harness](#m6--ai-core-and-trust-harness)
+  - [M6.5 — LLM Mind Lab](#m65--llm-mind-lab)
   - [M7 — Mission Director And Breach Contract Proof Mission](#m7--mission-director-and-breach-contract-proof-mission)
   - [M8 — Scenario Editor And Mod Tools](#m8--scenario-editor-and-mod-tools)
   - [M9 — Headless Server And Determinism Islands](#m9--headless-server-and-determinism-islands)
@@ -92,6 +93,7 @@ feeds:
   - [M12 — PvP And MMO Experiments](#m12--pvp-and-mmo-experiments)
 - [Side Track Details](#side-track-details)
   - [T-CONTROL — AI Control And Observability](#t-control--ai-control-and-observability)
+  - [T-LLM — Async LLM Mind Layer](#t-llm--async-llm-mind-layer)
   - [T-PLATFORM — Cross-Platform CI And Steam Deck](#t-platform--cross-platform-ci-and-steam-deck)
   - [T-MOD — Modding And Scripting](#t-mod--modding-and-scripting)
   - [T-AUDIO — Diegetic SFX And Captions](#t-audio--diegetic-sfx-and-captions)
@@ -148,7 +150,12 @@ A junior agent must never have to guess what these words mean. If a term is used
 | **Event id** | Stable id of the form `<run_id>:<tick>:<seq>`. Globally unique per run. Used for parent-cause chains. |
 | **Fixed tick** | The 60 Hz (or 120 Hz) sim cadence; render is decoupled and interpolates between ticks. |
 | **Junior agent** | The default reader/implementer of this roadmap. Treat them as competent in Rust and game programming basics, but assume they have NOT read CCCP source, the prior HTML lab, or the rest of this vault. |
+| **`AiMindProposal`** | The strict-schema output an LLM mind worker may produce. Doctrine patches, squad orders, dialogue, memory writes; never raw actions. See [[spec/hybrid-llm-ai-plan]]. |
 | **Manifest (run)** | `run_manifest.json` inside a run bundle. Identifies build, scenario, seed, schema versions, capabilities, expected tests. |
+| **Mind frame** | A compact, fog-of-war-filtered observation packet sent to an LLM mind worker. Derived from the `cx-control` observation stream. |
+| **Mind task** | A queued LLM request with kind, deadline, cost cap, observation, output schema. Async; never blocks sim. |
+| **Mind worker** | An async background worker that consumes mind tasks and submits validated `AiMindProposal` results. Local AI never waits on it. |
+| **Mock provider** | The deterministic LLM provider used by CI, AI-H, replay, and mind-lab tests. Always built. No API keys. |
 | **Manifest (scenario)** | RON file in `content/scenarios/` describing teams, objectives, materials, command core, base systems, capability requirements, director config, save fields. |
 | **Mission director** | The system that paces a scenario: reinforcement, LZ risk, objective escalation. Emits commander-decision events with reason labels. |
 | **Module** | A chassis subcomponent with damage states (jet, shield, sensor, repair-drone, weapon-mount). Failures emit reason-labeled events. |
@@ -315,6 +322,7 @@ The milestone is fully done when:
 | Save game | Versioned local-first campaign saves + replay/run bundles. Multiple slots, autosave, ironman, scenario policies, migration-safe (DR-029). |
 | Content economy | Premium game + free modding. Expansions/DLC/cosmetics later. No core-mechanic monetization (DR-031). |
 | Modding | Schema-first + scripting (Lua/Rhai TBD); package builder + validator; first-class at launch (DR-006). |
+| Async LLM mind layer | Optional async "mind" workers (cloud or local) propose doctrine, memory, personality, debriefs, commander adaptation through strict `AiMindProposal` schemas. **Local AI never blocks on an LLM. No API key required for the core game, CI, or AI-H** (DR-032). See T-LLM + M6.5. |
 
 ---
 
@@ -806,6 +814,7 @@ Single source of truth for every CLI flag. If a flag exists in the codebase but 
 |---|---|---|
 | `observe --once` | Print one observation snapshot to stdout. | `--format json|ron`, `--scenario <id>` (auto-launches if no app is running and `--auto-launch`). |
 | `observe --stream --hz <N>` | Stream observations at N Hz to stdout. | `--format json`, `--filter <category>`. |
+| `observe --mind-frame <scope>` | Print one compact, fog-of-war-filtered `MindObservationFrame` for an LLM mind worker. | `<scope>` ∈ `actor`, `squad`, `faction`, `mission_director`, `post_mission`. Optional `--ref <id>` to pin the actor/squad/faction. Optional `--once`/`--stream`. Output is the JSON payload of the `MindObservationFrame`. |
 | `act <action> ...` | Send a single semantic action; returns accepted/rejected. | `<action>` from the action grammar; see [Action Model](#control-transport-and-envelope). |
 | `ui tree` | Print the current UI tree. | `--scope <window\|focused\|all>`. |
 | `ui click <id>` | Click a UI element by stable id. | `--scope <window\|focused>`. |
@@ -1191,6 +1200,9 @@ Some milestones produce stubs that later milestones must replace without breakin
 | Save stub → real save | M5 | T-SAVE | M5 writes a save with the v0.1 format. Each subsequent milestone that adds save fields bumps `schema_version` and registers a migration. |
 | Replay event taxonomy → headless replay | M3 | M9 | All M3 events MUST be deterministically reproducible from manifest+seed+inputs. Cosmetic-only events are flagged with `cosmetic: true` and excluded from replay verification. |
 | Per-client bundles → align tick-for-tick | M10 | M11/M12 | Bundles share `run_id`; per-client bundles use `<run_id>__client_<role>` directory suffix. |
+| Local AI doctrine/blackboard hooks → LLM mind layer | M6 | M6.5 | M6 exposes hook points: utility-weight patch API, commander-blackboard goal API, doctrine-tag set API, dialogue-queue API, memory-write API. M6.5 wires `cx-ai::mind::policy` to those hooks. M6 must NEVER call the LLM layer directly; it only exposes the hooks. |
+| Observation stream → `MindObservationFrame` | T-CONTROL (M0+) | T-LLM (M6.5) | M6.5 adds the compressor that derives `MindObservationFrame` from the `cx-control` observation stream + replay events. The compressor enforces fog-of-war BEFORE any provider sees a prompt. |
+| Run-bundle event taxonomy → `mind` events | M3 | M6.5 | M3 reserves the `mind` event category in the schema. M6.5 fills it with `mind.task_created`, `mind.prompt_recorded` (hashes only by default; raw text behind `debug_capabilities`), `mind.response_received`, `mind.proposal_validated`, `mind.patch_applied`, `mind.patch_rejected`, `mind.memory_written`. |
 
 ---
 
@@ -1213,6 +1225,7 @@ Before doing any feature work, the agent runs the milestone's kickoff smoke. If 
 | M4 | `cargo run -p cx-e2e -- --scenario micro_breach --ui-scale 2.0 --high-contrast --verify-focus --write-run-bundle` | UI passes ACC-A floor. |
 | M5 | `cargo run -p cx-e2e -- --scenario m5_chassis_wreck_eject --expect pilot_extracted --write-run-bundle` | Chassis grammar end-to-end. |
 | M6 | `cargo run -p cx-ai --bin ai_harness -- --suite AI-H-01..AI-H-06 --write-run-bundle` | Harness suite passes. |
+| M6.5 | `cargo run -p cx-ai --bin mind_lab -- --suite MIND-001..MIND-010 --provider mock --write-run-bundle` | Mind lab suite passes against mock; local AI keeps acting through provider sleep/fail/stale; replay shows mind events. |
 | M7 | `cargo run -p cx-e2e -- --scenario breach_contract --script win_path --expect win --write-run-bundle` | Breach Contract win path is real. |
 | M8 | `cargo run -p cx-mod -- validate content/ mods/ --strict && cargo run -p cx-e2e -- --scenario sample_mod_breach --expect win --write-run-bundle` | Mod loads + plays. |
 | M9 | `cargo run -p cx-headless -- --scenario breach_contract --ticks 36000 --verify-checksums` | 10-min headless replay verified. |
@@ -1234,6 +1247,7 @@ Before doing any feature work, the agent runs the milestone's kickoff smoke. If 
 | M4 | HUD + Comic-Noir UI | HUD reads sim state; comic-noir cards; accessibility floor | M1, M3 | Yes |
 | M5 | Equipment + Chassis + Damage Grammar | Role records; modules; armor layers; jam/eject/repair/salvage events | M1, M3 | Yes |
 | M6 | AI Core + Trust Harness | Perception/memory/utility/doctrine; reason-label events; AI-H scenario runner | M1, M3, M5 | Yes |
+| M6.5 | LLM Mind Lab | Async LLM mind layer with strict schemas, mock provider, validator, policy compiler, replay logging, deterministic fallback; one visible doctrine patch in a controlled breach scenario | M3, M6 | Optional v1; required for DR-032 closure evidence |
 | M7 | Mission Director + Breach Contract | Typed manifest; director; command-core minimum; base-system slice; first proof mission playable | M1..M6 | Yes |
 | M8 | Scenario Editor + Mod Tools | In-engine workbench; same manifest format; mod loader; package builder | M3, M5, M7 | Yes |
 | M9 | Headless Server + Determinism Islands | Headless sim binary; deterministic island contracts; replay-from-events | M3, M7 | Yes |
@@ -1250,6 +1264,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 | ID | Title | Spans Milestones |
 |---|---|---|
 | T-CONTROL | AI control and observability | M0..M12 |
+| T-LLM | Async LLM mind layer | M3, M6, M6.5..M12 |
 | T-PLATFORM | Cross-platform CI and Steam Deck | M0..M12 |
 | T-MOD | Modding and scripting | M5..M8 primary; lifelong |
 | T-AUDIO | Diegetic SFX and captions | M4..M7 primary; lifelong |
@@ -1462,6 +1477,38 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 ---
 
+### M6.5 — LLM Mind Lab
+
+**What it proves:** An async LLM "mind" layer can run alongside local AI without blocking it. Strict-schema proposals (doctrine patches, squad orders, dialogue, memory writes) flow through a validator and policy compiler. A deterministic mock provider drives CI; cloud/local providers (OpenAI, Anthropic, Ollama, OpenAI-compatible) sit behind feature gates. Local AI keeps acting through provider sleep, failure, malformed/stale responses, and cost-cap exhaustion. **No API key is required to ship, test, or play.**
+
+**Scope (per [[spec/hybrid-llm-ai-plan]]):**
+- `cx-ai::mind::schema`: `MindObservationFrame`, `MindTask`, `AiMindProposal`, `MindValidationResult`, `MindMemoryRecord`, `MindProviderConfig`. JSON Schemas under `cortex-game/crates/cx-ai/schemas/mind/v1/`.
+- `cx-ai::mind::provider`: shared trait + adapters (`mock` always built; `openai`/`anthropic`/`ollama`/`openai-compatible` behind cargo features `mind-openai`, `mind-anthropic`, `mind-ollama`, `mind-openai-compatible`).
+- `cx-ai::mind::compressor`: derives `MindObservationFrame` from the `cx-control` observation stream + replay events with fog-of-war filtering.
+- `cx-ai::mind::validator`: rejects stale, invalid, impossible, unfair, over-budget, hidden-info, capability-violating proposals.
+- `cx-ai::mind::policy`: applies accepted proposals as utility-weight patches, commander-blackboard goals, doctrine tags, dialogue queue entries, and `MindMemoryRecord` writes.
+- `cx-replay`: new `mind` event category (see [[references/prototype-run-bundle-schema]]) with `mind.task_created`, `mind.prompt_recorded`, `mind.response_received`, `mind.proposal_validated`, `mind.patch_applied`, `mind.patch_rejected`, `mind.memory_written`.
+- `cxctl observe --mind-frame <scope>`: emit a compact mind frame for `actor`/`squad`/`faction`/`mission_director`/`post_mission` scopes (no screenshots).
+- `content/scenarios/micro_breach_mind_lab.ron`: the M6.5 scenario in three modes (`mind_off`, `mind_mock`, `mind_live_optional`).
+- `cx-tools-editor`: dev-only mind dashboard (task count, stale rate, provider failures, estimated cost, model routing, accept/reject reasons).
+
+**Done-criteria:**
+- [ ] MIND-001 — `ai_mind.enabled=false` baseline plays the scenario; AI-H tests pass.
+- [ ] MIND-002 — Provider sleeps 30 s; actors keep fighting/retreating/reloading/rescuing; scenario completes locally.
+- [ ] MIND-003 — Malformed JSON is rejected; replay records rejection; game continues.
+- [ ] MIND-004 — Response arriving after `valid_until_tick` is rejected or downgraded to post-hoc memory.
+- [ ] MIND-005 — Accepted proposal patches utility weights and produces visible reason labels.
+- [ ] MIND-006 — Mind prompt excludes hidden enemy state unless explicit debug capability.
+- [ ] MIND-007 — Post-encounter memory writes are visible in run bundle and feed later prompt context.
+- [ ] MIND-008 — Replay viewer shows mind task, prompt hash, provider class, proposal summary, validator result, applied patch ids.
+- [ ] MIND-009 — Provider tasks halt at `max_run_cost_usd`; local AI continues.
+- [ ] MIND-010 — AI-H report compares local-only vs mind-enabled runs across all 8 DR-022 criteria.
+- [ ] CI uses mock provider only; live cloud calls are never required for any test.
+
+**Cross-DR:** DR-002, DR-006, DR-008, DR-009, DR-012, DR-013, DR-022, DR-024, DR-032.
+
+---
+
 ### M7 — Mission Director And Breach Contract Proof Mission
 
 **What it proves:** Everything above composes into one playable Breach Contract mission. Manifest format works. Command core works minimally. Base systems work minimally. Mission director paces the encounter. The first proof mission can be played, won, lost, replayed, debriefed.
@@ -1589,6 +1636,32 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 ## Side Track Details
 
+### T-LLM — Async LLM Mind Layer
+
+Spans M3, M6, M6.5..M12. See [[spec/hybrid-llm-ai-plan]] and [[decisions/dr-032-hybrid-llm-ai-direction]].
+
+This track captures the async LLM "mind" workers that augment — but never block — local AI. Local reflex (8-16 ms) and tactical (100-250 ms) decisions stay 100% local. Mind tasks run async in background workers (2-30 s, or between missions for reflection) and submit validated `AiMindProposal` results that the policy compiler turns into utility-weight patches, commander goals, doctrine tags, dialogue, and structured memory writes.
+
+| Aspect | Pin |
+|---|---|
+| Default mode | `mock` (deterministic). No API key required. |
+| Schemas | `MindObservationFrame`, `MindTask`, `AiMindProposal`, `MindValidationResult`, `MindMemoryRecord`, `MindProviderConfig` per [[spec/hybrid-llm-ai-plan]]. |
+| Provider portfolio | OpenAI Responses API + Structured Outputs; Anthropic Messages API; Ollama; OpenAI-compatible (vLLM, llama.cpp); deterministic mock. All behind one trait; cloud adapters cargo-feature-gated. |
+| Latency contract | Local AI never waits. Every task has a deadline; stale responses are rejected or downgraded to memory. |
+| Determinism | CI uses mock only. Replay reuses recorded proposals. Live cloud calls never required for any test. |
+| Fairness | Observation compressor enforces fog-of-war. MIND-006 audits that prompts exclude hidden enemy state unless explicit debug capability. |
+| Captioning | Every generated dialogue line emits a caption per T-AUDIO + T-ACCESSIBILITY. |
+| Localization | English-first at v1 (matches Anti-Goals); language is a `MindProviderConfig.language` field for future packs. |
+| Replay/audit | New `mind` event category in run bundles per [[references/prototype-run-bundle-schema]]; secrets redacted. |
+| Player default | Disabled. Opt-in via settings; mock-first; cloud/local providers each require explicit configuration. |
+| Multiplayer | Server-authoritative LLM cognition; clients see resulting orders/events, never privileged prompts. |
+| Modding | LLM-authored profile/doctrine packs are mod data, validated by the standard package builder. |
+| Cost budget | `max_run_cost_usd` hard cap per `MindProviderConfig`. CI: $0; dev iteration: $0.10; M6.5 lab: $0.25; player default: off; opt-in power-user: $0.50. |
+
+**Done-criteria per milestone:** every milestone that touches AI/UI/captions extends the mind layer with the relevant observation/proposal/event shape; CI never depends on live providers; the run-bundle audit shows every mind task with its provider class, prompt hash, response hash, validator result, and accepted patch ids.
+
+---
+
 ### T-CONTROL — AI Control And Observability
 
 Spans M0..M12. See [[spec/ai-control-observability-layer]].
@@ -1707,20 +1780,28 @@ flowchart TB
   M3 --> M5
   M5 --> M6[M6 AI + Trust Harness]
   M3 --> M6
+  M6 --> M65[M6.5 LLM Mind Lab]
+  M3 --> M65
   M4 --> M7[M7 Mission Director + Breach Contract]
   M5 --> M7
   M6 --> M7
+  M65 -.optional augmentation.-> M7
   M3 --> M8[M8 Scenario Editor + Mods]
   M5 --> M8
   M7 --> M8
   M3 --> M9[M9 Headless + Determinism]
   M7 --> M9
+  M65 -.eval suite.-> M9
   M9 --> M10[M10 LAN Co-op]
   M10 --> M11[M11 Online Co-op]
   M11 --> M12[M12 PvP/MMO Experiments]
 
   T0[T-CONTROL] -.-> M0
   T0 -.-> M12
+  TL[T-LLM] -.-> M3
+  TL -.-> M6
+  TL -.-> M65
+  TL -.-> M12
   T1[T-PLATFORM] -.-> M0
   T1 -.-> M12
   T2[T-MOD] -.-> M5
@@ -1780,6 +1861,18 @@ Quick lookup: which milestone owns which feature.
 | AI reason labels | M6 |
 | AI-H scenario runner | M6 |
 | Cross-mission commander state | M6, M7 |
+| Async LLM mind layer (T-LLM) | M6.5, T-LLM |
+| `MindObservationFrame` + `MindTask` + `AiMindProposal` schemas | M6.5 |
+| Provider adapters (mock + OpenAI + Anthropic + Ollama + OpenAI-compatible) | M6.5 |
+| Mock LLM provider for CI | M6.5 |
+| Observation compressor (fog-of-war filter) | M6.5 |
+| Proposal validator + policy compiler | M6.5 |
+| `mind` event category in run bundles | M3, M6.5 |
+| `cxctl observe --mind-frame` | M6.5 |
+| LLM mind dashboard (dev/debug) | M6.5, M8 |
+| MIND-001..MIND-010 acceptance suite | M6.5 |
+| LLM-driven debrief / commander adaptation | M7 (optional augmentation), M9 |
+| LLM-authored mod profiles (workbench) | M8 |
 | Mission manifest schema | M7 |
 | Mission director | M7 |
 | Command-core mechanic | M7 |
@@ -1825,6 +1918,10 @@ These commands are the default validation surface for implementation agents. If 
 | Accessibility smoke | `cargo run -p cx-e2e -- --scenario <scenario-id> --ui-scale 2.0 --high-contrast --verify-focus` | M4 |
 | Save/load roundtrip | `cargo run -p cx-e2e -- --scenario <scenario-id> --save-load-roundtrip --verify-checksums` | M5/T-SAVE |
 | AI harness | `cargo run -p cx-ai --bin ai_harness -- --suite AI-H-01..AI-H-06 --write-run-bundle` | M6 |
+| Mind frame observation | `cargo run -p cxctl -- observe --mind-frame squad_alpha --once` | M6.5 |
+| Mind lab suite (mock) | `cargo run -p cx-ai --bin mind_lab -- --suite MIND-001..MIND-010 --provider mock --write-run-bundle` | M6.5 |
+| Mind cost-cap smoke | `cargo run -p cx-ai --bin mind_lab -- --suite MIND-009 --provider mock --max-run-cost-usd 0.0 --write-run-bundle` | M6.5 |
+| Mind fairness audit | `cargo run -p cx-ai --bin mind_lab -- --suite MIND-006 --provider mock --write-run-bundle` | M6.5 |
 | Package/mod validation | `cargo run -p cx-mod -- validate content/ mods/ --strict` | M8 |
 | Headless server smoke | `cargo run -p cx-headless -- --scenario breach_contract --ticks 3600 --verify-checksums` | M9 |
 | LAN/online replay alignment | Compare per-client run bundles with `cx-headless replay-compare`. | M10+ |
@@ -1885,6 +1982,7 @@ For M0..M12, a milestone is done only when all agent-completable items below are
 | M4 | HUD-01..HUD-03 + ACC-A floor pass with 5 playtesters. |
 | M5 | Powered armor + light mech work end-to-end with chassis grammar; pilot eject works. |
 | M6 | 6 of 8 DR-022 AI criteria demonstrably met; AI-H-01..06 pass. |
+| M6.5 | MIND-001..MIND-010 pass against mock provider; local AI keeps acting through provider sleep/fail/stale; replay shows `mind` events with redacted prompts. |
 | M7 | Project owner plays Breach Contract 5 times; A-FEEL gate met. |
 | M8 | Player authors a Breach Contract variant + sample mod loads. |
 | M9 | 10-minute mission replays headlessly bit-identical. |
@@ -1908,6 +2006,12 @@ For M0..M12, a milestone is done only when all agent-completable items below are
 | Steam Deck perf doesn't hit 800p/60 | Compatibility floor missed. | Test at every milestone; degrade gracefully; reduce particle/lighting on lower spec. |
 | Modding breaks determinism | Mods could desync replays. | Mod scripts run in a sandboxed deterministic island; non-deterministic ops are forbidden in sim-tick scope. |
 | Cross-DR conflicts emerge | A new DR contradicts an existing one. | Decision-tracker is the single source of truth; conflicts trigger a DR review. |
+| LLM cost overruns (T-LLM) | Live cloud calls can be expensive at iteration scale. | `MindProviderConfig.max_run_cost_usd` hard cap; per-task budget; mock-by-default for CI/dev; M6.5 lab caps at $0.25/run. |
+| LLM latency spikes (T-LLM) | A slow response could starve the policy compiler. | Async only with deadlines; staleness check; local AI never waits; MIND-002 acceptance test. |
+| LLM hallucination / invalid actions (T-LLM) | A model could output plans the validator can't recognize. | Strict `AiMindProposal` schema + validator; bounded caption length; no live arbitrary code; MIND-003/004 acceptance tests. |
+| LLM fairness leak (T-LLM) | A prompt could leak hidden enemy state. | Observation compressor enforces fog-of-war BEFORE provider sees a prompt; MIND-006 acceptance test audits prompts. |
+| LLM determinism contamination (T-LLM) | Live cloud calls would break replay parity. | CI uses mock only; replay reuses recorded `AiMindProposal`s; live cloud never required for tests. |
+| LLM provider/model deprecation (T-LLM) | OpenAI/Anthropic/local stack churn could break adapters. | Provider trait + cargo-feature-gated adapters; model IDs are `MindProviderConfig` data; M6.5 ships against mock first. |
 
 ---
 
@@ -1928,6 +2032,10 @@ This roadmap explicitly does NOT include for v1:
 - Multi-region simultaneous combat in MMO mode (M12 is small-shard exploration).
 - Voice chat (use external; we provide text + captions).
 - Full localization at v1 (English-first; localization plan TBD).
+- LLMs in the reflex / tactical loop (8-16 ms / 100-250 ms). Mind workers are async-only per DR-032.
+- Hard dependency on a paid LLM API for the core game, CI, AI-H, or replay tests.
+- Free-form chatbot UI bolted onto combat. Generated text surfaces only as captioned radio lines, debrief cards, replay annotations.
+- LLM-emitted executable code into a live campaign. Workbench validation is required for any future script generation.
 
 ---
 
@@ -1936,6 +2044,8 @@ This roadmap explicitly does NOT include for v1:
 - [[spec/authoritative-game-spec-v0]]
 - [[spec/native-implementation-backlog]]
 - [[spec/ai-control-observability-layer]]
+- [[spec/hybrid-llm-ai-plan]]
+- [[decisions/dr-032-hybrid-llm-ai-direction]]
 - [[spec/prototype-implementation-backlog-slice-a]]
 - [[spec/setting-and-world-frame]]
 - [[spec/chassis-armor-mechs-and-origins]]

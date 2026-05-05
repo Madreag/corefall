@@ -37,6 +37,7 @@ feeds:
   - DR-029
   - DR-030
   - DR-031
+  - DR-032
 ---
 
 ← [[spec/index|spec section]] · [[spec/prototype-roadmap|prototype roadmap]] · [[spec/prototype-implementation-backlog-slice-a|implementation backlog]] · [[dashboards/research-readiness|readiness]] · [[dashboards/system-heatmap|system heatmap]] · [[decisions/index|decisions]] · [[prototypes/index|prototype evidence]] · [root plan](../../VAULT_PLAN.md)
@@ -109,6 +110,7 @@ These are v0 product-direction commitments. They still need prototype evidence b
 | Scenario editor | **First-class in-engine editor at launch** using the same typed manifest as engine + director + procedural + player-authored content (DR-030). | [[decisions/dr-017-mission-generation-strategy]], [[decisions/dr-030-scenario-editor-commitment]]. |
 | Content economy | **Premium one-time purchase + free modding**; expansions/DLC/cosmetics post-launch; **no pay-to-win, gacha, gameplay-gating battle pass, or marketplace cut on user mods** (DR-031). | [[decisions/dr-031-content-economy-and-monetization-posture]]. |
 | Combat-base scope | **Deep combat-base** (command core + power + shields + turrets + sensors + doors + repair + hangar + storage + traps + breachable structure). NOT colony sim (DR-027). | [[decisions/dr-027-combat-base-scope]], [[spec/command-core-base-power]]. |
+| Hybrid LLM AI direction | **Local AI owns the body at frame speed**; async LLM "mind" workers run in the background and submit validated `AiMindProposal` schemas (doctrine patches, squad goals, dialogue, memory, post-mission reflection, commander adaptation). **Local AI never blocks on an LLM**; **no API key required to ship, test, or play.** Default mode is `mock` (deterministic). T-LLM side track + M6.5 milestone (DR-032). | [[decisions/dr-032-hybrid-llm-ai-direction]], [[spec/hybrid-llm-ai-plan]]. |
 | AI bar | **Most humanlike AI in the genre** (DR-014 / DR-008 raised bar). Friendly and enemy bots must communicate intent, model perception/memory, exhibit personality/doctrine, make readable mistakes, and learn-from-defeat. Beyond utility scoring once basics work. | AI-H + AI-EQ + future humanlike-AI tests. |
 | Player identity / control posture | **Command-core operator** (DR-015). The player can play strategy-first through orders and AI autonomy, direct-pilot bodies/mechs when desired, or fluidly switch between both. Direct control is optional intervention, not a mandatory always-on mode. | Commander-only breach test, pilot-intervention handoff test, AI handoff replay labels. |
 | Command core / base power | The command core is a rooted/mobile/embedded strategic object. Rooted: powers base shields, turrets, sensors, doors, repair platforms, energy pads, command relays, logistics. Embedded: creates a stronger core-bearing avatar while base systems weaken/offline. | CORE-A tests in [[spec/command-core-base-power]]. |
@@ -348,7 +350,7 @@ Moonshots stay alive in [[research-log/moonshot-register]] and must not block th
 | Should the final game build on CCCP, a fork, or a greenfield engine? | **Closed** — greenfield native (DR-001) on Rust + Bevy/wgpu hybrid + custom core crates (DR-024). CCCP is read-only reference. | [[decisions/dr-001-engine-strategy]], [[decisions/dr-024-native-engine-stack]], [[engine/cccp-build-run-audit]]. |
 | What terrain backend best balances feel, readability, AI, replay, and networking? | Open. Curated material Slice A chosen for test. | MAT-T runs and [[decisions/dr-007-terrain-material-model]]. |
 | How deterministic can replay be? | Open. Hybrid event/snapshot/checksum posture. | REC-A/DET-A run bundles. |
-| How much AI complexity is enough for solo trust? | Open. Harness requirements ready. | AI-H and AI-EQ runs, [[decisions/dr-008-ai-architecture]]. |
+| How much AI complexity is enough for solo trust? | Open. Harness requirements ready. Local AI is the floor; async LLM "mind" workers (DR-032) add doctrine/memory/personality/debriefs as proposals only. | AI-H and AI-EQ runs, [[decisions/dr-008-ai-architecture]], M6.5 MIND-001..MIND-010 against mock provider per [[spec/hybrid-llm-ai-plan]]. |
 | What command UX should ship? | Open lean: direct + slowdown + optional tactical map. | UX-W/ORDER tests and [[decisions/dr-009-command-ux-style]]. |
 | What multiplayer posture is viable? | Open lean: solo-first/co-op-ready, no PvP promise. | Event volume, terrain snapshot, authority prototype, [[decisions/dr-005-multiplayer-posture]]. |
 | What backend scope is worth building now? | Local-first spine chosen for Slice A. | BACK-SCOPE/BACK-A evidence and [[decisions/dr-013-backend-service-scope]]. |

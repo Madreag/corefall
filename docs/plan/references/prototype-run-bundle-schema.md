@@ -74,6 +74,7 @@ Good/Bad/Meh should be about observed play and debug evidence, not only personal
 |---|---|---|
 | `input` | `input_intent`, `tool_selected_for_material` | Actor feel, replay, future net prediction, AI harness. |
 | `control` | `control_command_received`, `control_command_accepted`, `control_command_rejected`, `control_observation_sent`, `control_assertion_result` | AI/Codex automation, E2E tests, future bot SDK, replay/debug evidence. |
+| `mind` | `mind.task_created`, `mind.prompt_recorded` (hashes by default; raw text only when `manifest.capabilities.debug` is true), `mind.response_received`, `mind.proposal_validated`, `mind.patch_applied`, `mind.patch_rejected`, `mind.memory_written` | Async LLM mind layer (DR-032 / [[spec/hybrid-llm-ai-plan]]); audit prompt/response provenance, validator decisions, applied patches, structured memory writes; secrets redacted by default. |
 | `combat` | `weapon_fired`, `projectile_spawned`, `projectile_hit_mo`, `weapon_reloaded` | Damage readability, replay, equipment balance. |
 | `body` | `wound_added`, `actor_status_changed`, `body_gibbed`, `inventory_dropped` | HUD, death recap, UX trust. |
 | `terrain` | `terrain_material_probe`, `terrain_penetration_threshold`, `terrain_carve_mask`, `terrain_fill_or_repair`, `path_material_refresh` | Terrain model, AI path trust, networking bandwidth. |
@@ -99,6 +100,7 @@ Good/Bad/Meh should be about observed play and debug evidence, not only personal
 | M4 HUD/comic-noir UI | HUD, overlays, death/material explanations, accessibility settings, caption evidence, and screenshots/captures show the player-facing state clearly. |
 | M5 equipment/chassis | Item role labels, damage-stage state, armor/chassis effects, bot-usable fields, loadout validation, repair/salvage, and ejection/disable evidence are captured. |
 | M6 AI trust harness | Bot intent, perception facts, doctrine/personality labels, mistakes, recovery actions, blocked-path reasons, and explanation overlays are captured by AI-H scenarios. |
+| M6.5 LLM mind lab | `mind.*` events captured for every task: prompt hash (raw text only when `debug` capability is on), response hash, validator result with reasons, applied patch ids, rejected proposals, memory writes; mock-provider runs are deterministic; live provider runs are flagged but never required for CI. |
 | M7 mission director | Manifest-driven objectives, director events, command-core/base-power state, debrief/retry state, and scenario completion/failure evidence are captured. |
 | M8 editor/mod tools | Edited scenario/package data, validation diagnostics, content hashes, sample mod load evidence, and workbench screenshots are captured. |
 | M9+ networking/headless tracks | Headless replay, authority/replication events, config hashes, divergence reports, and bandwidth/performance counters are captured before any network posture can close. |

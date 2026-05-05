@@ -178,9 +178,16 @@ cxctl replay verify prototype_runs/native/<run_id>
 | M4 | Expose semantic UI tree and UI actions; screenshots become audit evidence, not control dependency. |
 | M5 | Expose equipment, chassis, armor, damage-stage, eject, repair, and salvage observations/actions. |
 | M6 | Reuse the same layer for AI-H harness bots; bot decisions cite observation fields and event ids. |
+| M6.5 | Derive `MindObservationFrame` from this layer with fog-of-war filtering; expose `cxctl observe --mind-frame <scope>` for LLM mind workers (see [[spec/hybrid-llm-ai-plan]] and [[decisions/dr-032-hybrid-llm-ai-direction]]). |
 | M7 | Scenario director, command-core/base-power, debrief, and retry are controllable/queryable. |
 | M8 | Editor and mod tooling expose semantic UI and package validation commands. |
 | M9+ | Headless/server modes use the same command/observation contract for replay, LAN, online, and scale tests. |
+
+### Derived: Mind Observation Frames
+
+The full observation stream is the source of truth. Mind workers (LLM advisors, DR-032 / [[spec/hybrid-llm-ai-plan]]) consume a **derived, compact, fog-of-war-filtered subset** called `MindObservationFrame`. The compressor lives in `cx-ai::mind::compressor` and reads from this layer. Fog-of-war is enforced **before** any provider sees a prompt.
+
+`cxctl observe --mind-frame <scope>` returns a single frame for `actor`, `squad`, `faction`, `mission_director`, or `post_mission` scope (with optional `--ref <id>` to pin the subject). This is the same semantic surface that mind workers consume; CI uses it for fairness audits.
 
 ## Definition Of Done
 
