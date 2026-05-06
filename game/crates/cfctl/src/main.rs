@@ -68,8 +68,10 @@ enum Cmd {
         hz: u32,
         #[arg(long)]
         scenario: Option<String>,
-        #[arg(long, default_value_t = 42)]
-        seed: u64,
+        /// Optional seed override. When omitted, the scenario manifest's seed is used so that
+        /// `cfctl observe --inline` matches `cf-app` for the same scenario (shared determinism contract).
+        #[arg(long)]
+        seed: Option<u64>,
         #[arg(long, default_value_t = 60)]
         tick_rate_hz: u32,
         #[arg(long)]
@@ -263,7 +265,7 @@ async fn cmd_observe(
     stream: bool,
     hz: u32,
     scenario: Option<String>,
-    seed: u64,
+    seed: Option<u64>,
     tick_rate_hz: u32,
     settings_only: bool,
     format: OutputFormat,
@@ -293,7 +295,7 @@ async fn cmd_observe(
             tick_rate_hz: tick_rate_hz.max(1),
             paced: false,
             settings: Settings::default(),
-            seed_override: Some(seed),
+            seed_override: seed,
             duration_ticks_override: Some(1),
             debug_inject_panic_at_tick: None,
         };
@@ -814,6 +816,7 @@ async fn drain_subprocess_stderr(child: &mut Child) -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use clap::Parser;
 
     #[test]
     fn version_command_prints_schema_version() {
@@ -826,5 +829,53 @@ mod tests {
         assert!(want_inline_default(false, false, false, true));
         assert!(!want_inline_default(false, false, true, false));
         assert!(want_inline_default(true, false, true, false));
+    }
+
+    #[test]
+    fn run_seed_defaults_to_none_so_manifest_seed_wins() {
+        let cli = Cli::try_parse_from(["cfctl", "run", "--scenario", "m0_blank"]).unwrap();
+        match cli.command {
+            Cmd::Run { seed, .. } => assert_eq!(
+                seed, None,
+                "cfctl run --seed must default to None so the scenario manifest's seed flows \
+                 unchanged into build_engine_config (shared determinism contract with cf-app). \
+                 Any default value here force-passes Some(default) and rejects scenarios whose \
+                 manifest seed differs (M0.2-F3 reject path)."
+            ),
+            other => panic!("expected Cmd::Run, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn run_seed_explicit_value_passes_through() {
+        let cli = Cli::try_parse_from(["cfctl", "run", "--scenario", "m0_blank", "--seed", "7"]).unwrap();
+        match cli.command {
+            Cmd::Run { seed, .. } => assert_eq!(seed, Some(7)),
+            other => panic!("expected Cmd::Run, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn observe_seed_defaults_to_none_so_manifest_seed_wins() {
+        let cli = Cli::try_parse_from(["cfctl", "observe", "--once", "--scenario", "m0_blank"]).unwrap();
+        match cli.command {
+            Cmd::Observe { seed, .. } => assert_eq!(
+                seed, None,
+                "cfctl observe --seed must default to None so the scenario manifest's seed flows \
+                 unchanged into build_engine_config (shared determinism contract with cf-app). \
+                 Any default value here force-passes Some(default) and rejects scenarios whose \
+                 manifest seed differs (M0.2-F3 reject path)."
+            ),
+            other => panic!("expected Cmd::Observe, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn observe_seed_explicit_value_passes_through() {
+        let cli = Cli::try_parse_from(["cfctl", "observe", "--once", "--scenario", "m0_blank", "--seed", "7"]).unwrap();
+        match cli.command {
+            Cmd::Observe { seed, .. } => assert_eq!(seed, Some(7)),
+            other => panic!("expected Cmd::Observe, got {other:?}"),
+        }
     }
 }
