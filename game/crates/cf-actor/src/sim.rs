@@ -447,12 +447,19 @@ fn step_projectiles(state: &mut ActorSimState, deps: StepDeps, report: &mut Step
     let mut survivors: Vec<Projectile> = Vec::with_capacity(state.projectiles.len());
     let projectiles = std::mem::take(&mut state.projectiles);
     for mut projectile in projectiles {
-        projectile.position.x += projectile.velocity.x * deps.tick_dt;
-        projectile.position.y += projectile.velocity.y * deps.tick_dt;
+        let start = projectile.position;
+        let end = Vec2::new(
+            projectile.position.x + projectile.velocity.x * deps.tick_dt,
+            projectile.position.y + projectile.velocity.y * deps.tick_dt,
+        );
+        projectile.position = end;
         if projectile.remaining_ticks > 0 {
             projectile.remaining_ticks -= 1;
         }
-        let mut hit_target: Option<(ActorId, Vec2, f32)> = None;
+        // Swept segment-vs-AABB so fast projectiles cannot tunnel through actors that
+        // sit between two sampled positions; we pick the earliest entry along the segment
+        // (BTreeMap iteration order breaks ties by ActorId for determinism).
+        let mut hit_target: Option<(ActorId, Vec2, f32, f32)> = None;
         for actor in state.world.actors.values() {
             if actor.id == projectile.owner {
                 continue;
@@ -460,11 +467,15 @@ fn step_projectiles(state: &mut ActorSimState, deps: StepDeps, report: &mut Step
             if actor.status.is_dead() {
                 continue;
             }
-            if hits_aabb(projectile.position, actor.position, actor.half_extents) {
-                hit_target = Some((actor.id, projectile.position, projectile.damage));
-                break;
+            if let Some(t) = segment_hits_aabb(start, end, actor.position, actor.half_extents) {
+                let hit_pos = Vec2::new(start.x + (end.x - start.x) * t, start.y + (end.y - start.y) * t);
+                match hit_target {
+                    Some((_, _, _, best_t)) if t >= best_t => {}
+                    _ => hit_target = Some((actor.id, hit_pos, projectile.damage, t)),
+                }
             }
         }
+        let hit_target = hit_target.map(|(id, pos, dmg, _)| (id, pos, dmg));
         if let Some((target_id, hit_pos, damage)) = hit_target {
             let target = state
                 .world
@@ -504,12 +515,44 @@ fn step_projectiles(state: &mut ActorSimState, deps: StepDeps, report: &mut Step
     state.projectiles = survivors;
 }
 
-fn hits_aabb(point: Vec2, centre: Vec2, half_extents: Vec2) -> bool {
+/// Returns the entry parameter `t` in `[0, 1]` for the segment `start -> end` against the
+/// AABB centred on `centre` with `half_extents`, or `None` if the segment misses. A point
+/// already inside the AABB at `start` returns `Some(0.0)`.
+fn segment_hits_aabb(start: Vec2, end: Vec2, centre: Vec2, half_extents: Vec2) -> Option<f32> {
     let min_x = centre.x - half_extents.x;
     let max_x = centre.x + half_extents.x;
     let min_y = centre.y - half_extents.y;
     let max_y = centre.y + half_extents.y;
-    point.x >= min_x && point.x <= max_x && point.y >= min_y && point.y <= max_y
+    let dx = end.x - start.x;
+    let dy = end.y - start.y;
+    let mut t_near = f32::NEG_INFINITY;
+    let mut t_far = f32::INFINITY;
+    if dx.abs() <= f32::EPSILON {
+        if start.x < min_x || start.x > max_x {
+            return None;
+        }
+    } else {
+        let t1 = (min_x - start.x) / dx;
+        let t2 = (max_x - start.x) / dx;
+        let (lo, hi) = if t1 <= t2 { (t1, t2) } else { (t2, t1) };
+        t_near = t_near.max(lo);
+        t_far = t_far.min(hi);
+    }
+    if dy.abs() <= f32::EPSILON {
+        if start.y < min_y || start.y > max_y {
+            return None;
+        }
+    } else {
+        let t1 = (min_y - start.y) / dy;
+        let t2 = (max_y - start.y) / dy;
+        let (lo, hi) = if t1 <= t2 { (t1, t2) } else { (t2, t1) };
+        t_near = t_near.max(lo);
+        t_far = t_far.min(hi);
+    }
+    if t_near > t_far || t_far < 0.0 || t_near > 1.0 {
+        return None;
+    }
+    Some(t_near.clamp(0.0, 1.0))
 }
 
 #[cfg(test)]
@@ -650,6 +693,51 @@ mod tests {
         assert!(hits >= 9, "all 9 shots must connect; got {hits}");
         let dummy = state.world.actors.get(&ActorId(2)).unwrap();
         assert!(dummy.status.is_dead(), "dummy hp should drop to zero");
+    }
+
+    #[test]
+    fn fast_projectile_hits_actor_via_swept_segment() {
+        // Regression: at the M1 rifle's 1200 units/s a projectile travels 20 units per
+        // tick, which is wider than the default 16-unit actor AABB. Without a swept
+        // segment-vs-AABB test the projectile point can step over an actor between two
+        // sampled positions and miss entirely. Place a dummy whose AABB sits cleanly
+        // between two consecutive projectile points so a non-swept check would tunnel.
+        let mut world = ActorWorld::new(0.0, -980.0);
+        let inv = Inventory::with_rifle(RIFLE_M1_DEFAULT_ID);
+        let mut shooter = ActorState::player(ActorId(1), "blue", Vec2::new(50.0, 16.0), 100.0, inv);
+        shooter.on_ground = true;
+        world.insert(shooter);
+        // Muzzle x = 50 + 12 = 62, +20/tick. After 16 ticks the projectile is at x=382;
+        // after 17 ticks it is at x=402. An AABB centred at x=391 spans [383, 399], which
+        // both sampled points miss but the segment crosses.
+        let mut dummy = ActorState::player(ActorId(2), "red", Vec2::new(391.0, 16.0), 100.0, Inventory::default());
+        dummy.controllable = false;
+        dummy.on_ground = true;
+        world.insert(dummy);
+        let mut state = ActorSimState::new(world);
+        state.ensure_rifle_for(
+            ActorId(1),
+            RifleState::new(rifle_preset(RIFLE_M1_DEFAULT_ID).unwrap(), 60),
+        );
+        let mut intents = BTreeMap::new();
+        intents.insert(
+            ActorId(1),
+            ControlIntent {
+                actor: ActorId(1),
+                fire: true,
+                ..ControlIntent::new(ActorId(1), IntentSource::Cfctl)
+            },
+        );
+        let mut total_hits = 0;
+        for _ in 0..40 {
+            let report = step(&mut state, &mut intents, deps());
+            total_hits += report.hits.len();
+            intents.insert(ActorId(1), ControlIntent::new(ActorId(1), IntentSource::Cfctl));
+        }
+        assert_eq!(
+            total_hits, 1,
+            "swept segment must register the otherwise-tunneling shot"
+        );
     }
 
     #[test]
