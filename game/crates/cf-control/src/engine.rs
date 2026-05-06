@@ -921,11 +921,11 @@ impl M0Engine {
         snapshot
     }
 
-    fn reject_actor_command<'a>(
+    fn reject_actor_command(
         &self,
         tick: Tick,
         sim_time_ms: f64,
-        state: std::sync::RwLockWriteGuard<'a, EngineMutable>,
+        state: std::sync::RwLockWriteGuard<'_, EngineMutable>,
         method: &str,
     ) -> CommandResult {
         drop(state);
@@ -1117,6 +1117,13 @@ impl From<&ActorSimState> for ActorWorldSnapshot {
     }
 }
 
+/// Cause label for `actor.actor_status_changed` events emitted from `step_one_actor`.
+///
+/// In M1 the only mutator inside `step_one_actor` that touches `actor.status` is
+/// `actor.reset()` (called when the player issues `act.player.reset`). Damage-driven
+/// transitions land in the projectile-hit loop with cause `projectile_hit`. The
+/// `intent` branch is reserved for future intent-driven status changes (e.g. M5
+/// chassis ejection, M5.6 hazard contact) and is not currently reachable.
 fn status_change_cause(outcome: &ActorTickOutcome) -> &'static str {
     if outcome.reset {
         "reset"
@@ -1438,6 +1445,28 @@ impl EngineHandle for M0Engine {
                     );
                     return CommandResult::rejected("act_player_move_not_available_in_m0", tick.0);
                 }
+                // Defense-in-depth: the JSON-RPC server rejects NaN/Inf at the wire
+                // layer, but the engine dispatch is also reachable from cf-app's keyboard
+                // bridge (and any future bridge / direct-dispatch caller). Reject here
+                // too so a non-finite axis cannot leak into pending_intent and NaN-poison
+                // the muzzle / projectile path.
+                if !x.is_finite() || !y.is_finite() {
+                    drop(state);
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_rejected",
+                        json!({
+                            "method": "act.player.move",
+                            "reason": "axis_must_be_finite",
+                            "x": x,
+                            "y": y,
+                        }),
+                        None,
+                    );
+                    return CommandResult::rejected("axis_must_be_finite", tick.0);
+                }
                 let player = state.player_actor;
                 if let Some(player_id) = player {
                     state.pending_intent.actor = player_id;
@@ -1498,6 +1527,28 @@ impl EngineHandle for M0Engine {
             ControlCommand::ActPlayerAim { x, y } => {
                 if !self.config.has_actor_world {
                     return self.reject_actor_command(tick, sim_time_ms, state, "act.player.aim");
+                }
+                // Defense-in-depth (mirrors act.player.move): non-finite aim must NEVER
+                // reach pending_intent. cf_actor::sim::step normalizes the aim, but
+                // `Vec2::normalize_or_x` only short-circuits on a tiny vector — a NaN/Inf
+                // input survives normalization and propagates into the muzzle origin,
+                // projectile velocity, and recoil sign.
+                if !x.is_finite() || !y.is_finite() {
+                    drop(state);
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_rejected",
+                        json!({
+                            "method": "act.player.aim",
+                            "reason": "aim_must_be_finite",
+                            "x": x,
+                            "y": y,
+                        }),
+                        None,
+                    );
+                    return CommandResult::rejected("aim_must_be_finite", tick.0);
                 }
                 let player = state.player_actor;
                 if let Some(player_id) = player {
@@ -2486,15 +2537,114 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn m1_act_player_aim_rejects_nonfinite_via_server_layer() {
-        // The server layer (process_request) catches NaN/Inf BEFORE dispatch. This test
-        // exercises the engine path: with finite values, aim is accepted. Negative-path
-        // tests for the server layer live in tests/live_ws_acceptance.rs.
+    async fn m1_act_player_aim_accepts_finite_at_engine_layer() {
+        // Sanity: with finite values, engine dispatch accepts aim.
         let path = write_m1_scenario();
         let config = load_m1_test_config(path);
         let engine = M0Engine::new(config);
         engine.record_run_started();
         let result = engine.dispatch(ControlCommand::ActPlayerAim { x: 1.0, y: 0.0 }).await;
         assert_eq!(result.status, crate::state::ControlEnvelopeStatus::Accepted);
+    }
+
+    #[tokio::test]
+    async fn m1_act_player_aim_rejects_nonfinite_at_engine_layer() {
+        // Defense-in-depth: the JSON-RPC server layer rejects NaN/Inf before dispatch
+        // (see live_ws_m1_act_player_aim_nan_rejected). The engine ALSO rejects at the
+        // dispatch boundary so any future caller (cf-app keyboard bridge, future mouse
+        // bridge, future gamepad bridge, future direct-dispatch script) cannot leak
+        // NaN/Inf into pending_intent and NaN-poison the muzzle / projectile path.
+        let path = write_m1_scenario();
+        let config = load_m1_test_config(path);
+        let engine = M0Engine::new(config);
+        engine.record_run_started();
+        for (x, y) in [
+            (f32::NAN, 0.0),
+            (0.0, f32::NAN),
+            (f32::INFINITY, 0.0),
+            (0.0, f32::NEG_INFINITY),
+        ] {
+            let result = engine.dispatch(ControlCommand::ActPlayerAim { x, y }).await;
+            assert_eq!(
+                result.status,
+                crate::state::ControlEnvelopeStatus::Rejected,
+                "aim ({x}, {y}) must reject"
+            );
+            assert_eq!(result.reason.as_deref(), Some("aim_must_be_finite"));
+        }
+    }
+
+    #[tokio::test]
+    async fn m1_act_player_move_rejects_nonfinite_at_engine_layer() {
+        // Defense-in-depth mirror for act.player.move (cf-app's keyboard bridge produces
+        // 0.0 / ±1.0 today, but a future mouse / gamepad / scripted bridge could send a
+        // NaN/Inf move axis through engine.dispatch directly).
+        let path = write_m1_scenario();
+        let config = load_m1_test_config(path);
+        let engine = M0Engine::new(config);
+        engine.record_run_started();
+        for (x, y) in [
+            (f32::NAN, 0.0),
+            (0.0, f32::NAN),
+            (f32::INFINITY, 0.0),
+            (0.0, f32::NEG_INFINITY),
+        ] {
+            let result = engine.dispatch(ControlCommand::ActPlayerMove { x, y }).await;
+            assert_eq!(
+                result.status,
+                crate::state::ControlEnvelopeStatus::Rejected,
+                "move ({x}, {y}) must reject"
+            );
+            assert_eq!(result.reason.as_deref(), Some("axis_must_be_finite"));
+        }
+    }
+
+    #[tokio::test]
+    async fn m1_kill_chain_records_actor_status_changed_with_projectile_hit_cause() {
+        // M1-D04 end-to-end evidence via the dispatch path: drive the engine through
+        // act.player.aim + act.player.fire enough times to kill the dummy, then assert
+        // the recorder captured an actor.actor_status_changed event with cause
+        // "projectile_hit". Engine + sim test `projectile_eventually_hits_dummy_and_can_kill_it`
+        // already proves the underlying physics; this test adds the dispatch + event
+        // emission proof.
+        let path = write_m1_scenario();
+        let config = load_m1_test_config(path);
+        let engine = M0Engine::new(config);
+        engine.record_run_started();
+        // Settle to ground first.
+        for _ in 0..10 {
+            engine.drive_tick();
+        }
+        let _ = engine.dispatch(ControlCommand::ActPlayerAim { x: 1.0, y: 0.0 }).await;
+        // Fire 9 shots (dummy has 100 HP, rifle 12 dmg/hit → 9 hits = 108 dmg). Each shot
+        // requires the rifle's fire interval (6 ticks) to cool down between presses.
+        let fire_interval_ticks = cf_equipment::rifle_preset(cf_equipment::RIFLE_M1_DEFAULT_ID)
+            .unwrap()
+            .fire_interval_ticks as usize;
+        for _ in 0..12 {
+            let _ = engine.dispatch(ControlCommand::ActPlayerFire { pressed: true }).await;
+            // Drive enough ticks for the fired projectile to reach the dummy at x=900
+            // before the next shot (player at x=200, projectile speed 1200 unit/s ≈ 20
+            // unit/tick at 60 Hz → 35 ticks to cross 700 units).
+            for _ in 0..fire_interval_ticks.max(35) {
+                engine.drive_tick();
+            }
+        }
+        let events = engine.recorder().snapshot_events();
+        let kill_event = events.iter().find(|e| {
+            e.category == "actor"
+                && e.event_type == "actor_status_changed"
+                && e.payload["new_status"] == "dead"
+                && e.payload["cause"] == "projectile_hit"
+        });
+        assert!(
+            kill_event.is_some(),
+            "expected a projectile_hit-caused dead status transition; got events: {:?}",
+            events
+                .iter()
+                .filter(|e| e.event_type == "actor_status_changed")
+                .map(|e| e.payload.clone())
+                .collect::<Vec<_>>()
+        );
     }
 }
