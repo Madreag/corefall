@@ -40,6 +40,13 @@ feeds:
   - DR-034
   - DR-035
   - DR-036
+  - DR-037
+  - DR-038
+  - DR-039
+  - DR-040
+  - DR-041
+  - DR-042
+  - DR-043
 ---
 
 <- [[spec/index|spec section]] · [[spec/prototype-roadmap|native roadmap]] · [[spec/native-implementation-backlog|native backlog]] · [[spec/authoritative-game-spec-v0|game spec v0]] · [[dashboards/research-readiness|readiness]] · [VAULT_PLAN.md](../../VAULT_PLAN.md)
@@ -57,6 +64,72 @@ feeds:
 
 > [!important] Server/MMO addendum active
 > The 2026-05-05 server direction added DR-034, DR-035, T-SERVER, server/anti-cheat/MMO run-bundle categories, and expanded M9-M12. This file now includes a focused addendum so implementing agents have checklist rows immediately. The next full regeneration should merge these rows into the normal M9-M12 scope/done/task sections and remove this temporary addendum callout.
+
+> [!important] World/Environment/Mining/Match/Comms addendum active
+> The 2026-05-06 design pass added DR-039 (worlds), DR-040 (environmental conditions), DR-041 (mining), DR-042 (game modes / match grammar), DR-043 (voice + radio comms), four new milestones (M5.10 Worlds + Environmental Aggregation, M7.7 Day/Night/Weather, M8.6 Mining, M9.5 Voice + Radio Comms), promoted M6.6 to AI Environmental Competence, and extended M7/M11/M12 with match grammar. This file uses a focused addendum below; the next full regeneration should merge these rows into the normal milestone scope/done/task sections and remove this temporary addendum callout.
+
+### M5.10 — Worlds Catalog & Environmental Aggregation (DR-039 + DR-040)
+
+| Row | Scope | Done When | Evidence | AI Self-Rating | Human Rating |
+|---|---|---|---|---|---|
+| M5.10-A | World manifest schema (12 launch worlds) | `cf-mod validate content/worlds/ --strict` passes; `world.loaded` event in run bundles. | `prototype_runs/native/<m5_10_run>/manifest.json`. | | |
+| M5.10-B | Astrography kernel (simplified circular Keplerian) | ASTRO-A-01..ASTRO-A-03 pass; sparse `astrography.tick` events; per-pair `comms_latency_changed` events. | Run-bundle astrography events. | | |
+| M5.10-C | EnvironmentSignal aggregator | ENV-A-01..ENV-A-04 pass; aggregator perf ≤ 5% frame budget on Steam Deck floor. | Bench report; ENV-A run-bundle deltas. | | |
+| M5.10-D | 15-class hazard taxonomy | ENV-A-05..ENV-A-09 pass; per-class threshold cause-chain. | Hazard transition events. | | |
+| M5.10-E | cfctl observation surface | `cfctl observe --environment / --worlds / --astrography / --hazards` snapshot tests. | CLI snapshot fixtures. | | |
+| M5.10-F | Acceptance scenario | `m5_10_environment_aggregation` scenario: full ENV-A + ASTRO-A suite. | Checked run bundle. | | |
+| M5.10-G | Replay/perf/bug hunt | ENV-A-15 + ASTRO-A-05 byte-identical replay; bug-hunt log. | Prototype note under `prototypes/`. | | |
+
+### M7.7 — Day/Night/Weather (DR-039 + DR-040)
+
+| Row | Scope | Done When | Evidence | AI Self-Rating | Human Rating |
+|---|---|---|---|---|---|
+| M7.7-A | Day/night kernel (per-world cycle) | DAY-A-01..DAY-A-03 pass; modulates ambient lux + temperature. | Run-bundle weather events. | | |
+| M7.7-B | Weather event kernel (per-world weather table) | WEATHER-A-01..WEATHER-A-04 pass; deterministic per scenario seed. | Weather event chain. | | |
+| M7.7-C | Precursor wiring (M2 lux + M5.7 dust + M5.6 thermal + M5.9 atmosphere) | Per-precursor fixture tests. | Cross-kernel cause-chain. | | |
+| M7.7-D | AI weather doctrine | AI-WEATHER-A-01..AI-WEATHER-A-05 pass; AI puppet under each weather class. | AI doctrine events. | | |
+| M7.7-E | cfctl observation surface | `cfctl observe --weather / --day-night` snapshot tests. | CLI snapshot fixtures. | | |
+| M7.7-F | Acceptance scenario | `m7_7_weather_kernel` scenario: full WEATHER-A + DAY-A + AI-WEATHER-A suite. | Checked run bundle. | | |
+| M7.7-G | Replay/perf/bug hunt | WEATHER-A-15 byte-identical replay; bug-hunt log. | Prototype note under `prototypes/`. | | |
+
+### M8.6 — Mining and Extraction (DR-041)
+
+| Row | Scope | Done When | Evidence | AI Self-Rating | Human Rating |
+|---|---|---|---|---|---|
+| M8.6-A | Ore registry (12 launch ores) | `cf-mod validate content/ores/ --strict` passes. | Schema audit. | | |
+| M8.6-B | Ore deposit kernel + per-world deposits | DEPOSIT-A-01..DEPOSIT-A-03 pass. | World-load deposit manifest. | | |
+| M8.6-C | Sample tool + drill tool + extraction kernel | SAMPLE-A + DRILL-A + EXTRACT-A pass. | Run-bundle mining events. | | |
+| M8.6-D | Refining + smelting + trade ledger | REFINE-A + SMELT-A + TRADE-A pass; cause-chain to atmospherics combustion. | Run-bundle mining + atmospherics events. | | |
+| M8.6-E | AI miner doctrine | AI-MINE-A-01..AI-MINE-A-06 pass; vacuum-only-robot doctrine. | AI doctrine events. | | |
+| M8.6-F | cfctl observation surface | `cfctl observe --deposits / --mining-events / --refineries / --smelters / --trade-ledger` snapshot tests. | CLI snapshot fixtures. | | |
+| M8.6-G | Acceptance scenario | `m8_6_mining_pipeline` scenario: full pipeline + AI doctrine in coop. | Checked run bundle. | | |
+| M8.6-H | Replay/perf/bug hunt | MINE-A-15 byte-identical replay; bug-hunt log. | Prototype note under `prototypes/`. | | |
+
+### Match Grammar (DR-042) — M7 Bunker Defence Proof Mission + M11/M12 Match Grammar
+
+| Row | Scope | Done When | Evidence | AI Self-Rating | Human Rating |
+|---|---|---|---|---|---|
+| MATCH-A (M7) | Bunker Defence as M7 proof mission (1v1 + 2v2 + 3v3 + 4v4 + asymmetric N-team via team-config flexibility) | `cf-server --mode coop_room --scenario bunker_defence_2v2` runs end-to-end; team-config flexibility tests. | Checked run bundle with match events. | | |
+| MATCH-B (M11) | Symmetric Arena + Asymmetric N-Team + Coop-vs-AI online | M11 acceptance (per [[spec/server-app-architecture]] + [[spec/persistent-mmo-architecture]]). | M11 acceptance run bundles. | | |
+| MATCH-C (M12) | FFA + Campaign + AI-fill policy + match identity per-shard | M12 PvP arena suite + persistent shard suite. | M12 acceptance run bundles. | | |
+
+### M9.5 — Voice and Radio Comms (DR-043)
+
+| Row | Scope | Done When | Evidence | AI Self-Rating | Human Rating |
+|---|---|---|---|---|---|
+| M9.5-A | Voice acoustic kernel (Steam Audio) | VOICE-A-01..VOICE-A-05 pass; acoustic propagation through atmosphere + sealed-helmet exception. | Run-bundle voice events. | | |
+| M9.5-B | Voice Opus codec + server-authoritative routing | VOICE-A-06..VOICE-A-07 pass; latency budget < 100 ms. | Codec + transport events. | | |
+| M9.5-C | Voice equipment + origin gating (helmet pickup, throat mic, bone conductor) | VOICE-A-08 pass; per-origin equipment tests. | Equipment events. | | |
+| M9.5-D | Radio kernel (ACRE2 multipath; HF/VHF/UHF/Microwave bands; 4 propagation modes) | RADIO-A-01..RADIO-A-06 pass; LOS + multipath + skywave propagation. | Run-bundle radio events with cause + SNR + path_kind. | | |
+| M9.5-E | Radio equipment (handheld VHF, backpack VHF, HF, satellite, antennas) | RADIO-A-07..RADIO-A-08 pass; antenna directional gain + battery drain. | Radio equipment events. | | |
+| M9.5-F | Frequency tuning + encryption | RADIO-A-09..RADIO-A-11 pass; encryption mismatch rejection. | Tuning + encryption events. | | |
+| M9.5-G | Jamming + interference (active jammer; solar flare; EMP) | RADIO-A-12..RADIO-A-14 pass. | Interference events. | | |
+| M9.5-H | Origin radio gating (humans equip; robots built-in; androids modular) | RADIO-A-15 pass; slot-assign rejection tests. | Radio equipment events with origin payload. | | |
+| M9.5-I | Acoustic trauma body damage | TRAUMA-A-01..TRAUMA-A-03 pass; routes through M5.7 hazard package. | Voice events with `reason: hearing_damage`. | | |
+| M9.5-J | Mission-director comms-policy hooks | POLICY-A-01..POLICY-A-03 pass; RF silence + frequency segregation + jamming overlay. | Mission events with comms-policy changes. | | |
+| M9.5-K | cfctl comms observation surface | `cfctl observe --voice / --radio / --frequencies / --interference` snapshot tests. | CLI snapshot fixtures. | | |
+| M9.5-L | Acceptance scenario | `m9_5_voice_radio_comms` scenario: full VOICE-A + RADIO-A + TRAUMA-A + POLICY-A suite. | Checked run bundle. | | |
+| M9.5-M | Replay/perf/bug hunt | RADIO-A-15 + VOICE-A-15 byte-identical replay (radio events fully replay; voice routes as cause-effect not raw audio). | Prototype note under `prototypes/`. | | |
 
 > [!important] Material/T-MAT addendum active
 > The 2026-05-05 systemic material direction added DR-036, T-MAT, M5.6/M5.7/M6.6/M7.5/M8.5 milestones, `cf-material`/`cf-atmos` crates, and four new run-bundle event categories (`material`/`reaction`/`atmosphere`/`affliction`). This file now includes a focused Material/T-MAT addendum so implementing agents have checklist rows immediately. The next full regeneration should merge these rows into the normal milestone/side-track sections and remove this temporary addendum callout.

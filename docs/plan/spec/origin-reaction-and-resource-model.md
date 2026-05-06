@@ -18,7 +18,7 @@ feeds:
   - DR-036
 ---
 
-← [[index|vault home]] · [[spec/index|spec section]] · [[spec/chassis-armor-mechs-and-origins|chassis/armor/mechs/origins]] · [[spec/body-damage-model|body damage model]] · [[spec/atmospherics-and-chemistry-model|atmospherics/chemistry]] · [[spec/gravity-and-ballistics-model|gravity/ballistics]] · [[spec/full-collision-physics-plan|full collision plan]] · [[spec/equipment-loadout|equipment/loadout]] · [[spec/prototype-roadmap|native roadmap]] · [[spec/native-implementation-backlog|native backlog]] · [[decisions/dr-003-body-damage-readability|DR-003]] · [[decisions/dr-014-tone-player-promise|DR-014]] · [[decisions/dr-033-full-collision-physics-direction|DR-033]] · [[decisions/dr-036-systemic-material-simulation-direction|DR-036]] · [[decisions/dr-037-stationeers-grade-atmospherics-direction|DR-037]] · [[decisions/dr-038-universal-gravity-and-ballistics-direction|DR-038]]
+← [[index|vault home]] · [[spec/index|spec section]] · [[spec/chassis-armor-mechs-and-origins|chassis/armor/mechs/origins]] · [[spec/body-damage-model|body damage model]] · [[spec/atmospherics-and-chemistry-model|atmospherics/chemistry]] · [[spec/gravity-and-ballistics-model|gravity/ballistics]] · [[spec/celestial-bodies-and-worlds-model|worlds catalog]] · [[spec/environmental-conditions-model|environmental conditions]] · [[spec/comms-voice-and-radio-model|comms/voice/radio]] · [[spec/full-collision-physics-plan|full collision plan]] · [[spec/equipment-loadout|equipment/loadout]] · [[spec/prototype-roadmap|native roadmap]] · [[spec/native-implementation-backlog|native backlog]] · [[decisions/dr-003-body-damage-readability|DR-003]] · [[decisions/dr-014-tone-player-promise|DR-014]] · [[decisions/dr-033-full-collision-physics-direction|DR-033]] · [[decisions/dr-036-systemic-material-simulation-direction|DR-036]] · [[decisions/dr-037-stationeers-grade-atmospherics-direction|DR-037]] · [[decisions/dr-038-universal-gravity-and-ballistics-direction|DR-038]] · [[decisions/dr-040-environmental-conditions-and-hazards-direction|DR-040]] · [[decisions/dr-043-voice-comms-and-radio-direction|DR-043]]
 
 # Origin Reaction And Resource Model
 
@@ -404,6 +404,19 @@ These are the prototype acceptance tests that close this contract end-to-end. Th
 - [[decisions/dr-033-full-collision-physics-direction]]
 - [[decisions/dr-036-systemic-material-simulation-direction]]
 - [[research-log/2026-05-06-origin-reaction-and-resource-design-intent]]
+
+## Origin Radio Gating (Cross-Reference Per DR-043)
+
+Per [[spec/comms-voice-and-radio-model]] origin gating:
+
+| Origin | Radio access | How |
+|---|---|---|
+| **Human** | Equipped radio (occupies equipment slot) | Player chooses radio at loadout; uses suit power OR battery cell. |
+| **Robot** | **Built-in radio** | Powered by chassis `power` resource. Frequency tuning via UI. Built-in antenna may be omnidirectional or chassis-shape-dependent. |
+| **Android** | **Built-in OR modular upgrade** | Some android variants ship with built-in (default frequency-tuneable; powered by `battery_charge`). Modular upgrade adds the radio without taking an equipment slot. |
+| Modder origin | Per modder spec | Schema declares radio access. |
+
+Slot-assign rejects with `wrong_origin_for_equipment` when humans attempt to equip a robot's built-in-radio item or vice versa. AI bot picks emit `wrong_origin_for_treatment` for inappropriate radio assignments. Origin-gated equipment validation per [[spec/native-implementation-backlog#M5.8 — Origin Resource & Overclock Pass]]; full radio runtime kernel lands at M9.5 per [[decisions/dr-043-voice-comms-and-radio-direction]].
 
 ## Change Log
 

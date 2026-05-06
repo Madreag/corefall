@@ -40,6 +40,13 @@ feeds:
   - DR-034
   - DR-035
   - DR-036
+  - DR-037
+  - DR-038
+  - DR-039
+  - DR-040
+  - DR-041
+  - DR-042
+  - DR-043
 ---
 
 <- [[spec/index|spec section]] · [[spec/prototype-roadmap|native roadmap]] · [[spec/feature-completion-checklist|feature checklist]] · [[spec/authoritative-game-spec-v0|game spec v0]] · [[spec/server-app-architecture|server app architecture]] · [[spec/persistent-mmo-architecture|persistent MMO architecture]] · [[spec/full-collision-physics-plan|full collision plan]] · [[spec/hybrid-llm-ai-plan|hybrid LLM AI plan]] · [[spec/ai-control-observability-layer|AI control/observability]] · [[references/prototype-run-bundle-schema|run-bundle schema]] · [VAULT_PLAN.md](../../VAULT_PLAN.md)
@@ -426,6 +433,41 @@ Human gate: project-owner playtests sealed-room-breach scenario + Mars airlock c
 
 ---
 
+## M5.10 — Worlds Catalog & Environmental Aggregation
+
+> [!important] Kickoff prerequisites
+> M5.5..M5.9 must be complete. Read [[spec/celestial-bodies-and-worlds-model]] + [[spec/environmental-conditions-model]] in full BEFORE feature work. Read [[decisions/dr-039-celestial-bodies-and-worlds-direction]] + [[decisions/dr-040-environmental-conditions-and-hazards-direction]]. Run [[spec/prototype-roadmap#Per-Milestone Kickoff Smoke|M5.10 Kickoff Smoke]] (to be added).
+
+> [!warning] Hard rules
+> No subsystem queries gravity / atmosphere / radiation / thermal / acoustic from anywhere except `cf-environment`'s aggregation API on the actor query path. The aggregator is the integration layer; primary kernels (`cf-atmos`, `cf-physics`, `cf-materials`, `cf-radiation`, `cf-thermal`, `cf-acoustics`) remain authoritative. World catalog is data-driven (RON manifests under `content/worlds/`); no hardcoded planets in code. Astrography uses simplified circular Keplerian model (deterministic, period-locked); no real ephemeris. Comms latency derived from per-pair body distance via light-speed (`distance_km / 299_792.458`).
+
+| ID | Owns | Build | Tests | Evidence | Anti-scope |
+|---|---|---|---|---|---|
+| M5.10-001 world manifest schema | `cf-world`, `content/worlds/` | `World { id, kind, name, parent, ambient: AmbientAtmosphere, gravity_g, surface_temp_range_k, day_length_s, year_length_s, eccentricity, axial_tilt_deg, magnetosphere, weather_table, ore_deposits, scenic_seed }`. 12 launch worlds (Earth, Earth's Moon, Mars, Phobos, Deimos, Mimas, Europa, Vulcan, Venus, Sol, BeltAsteroidA-1, OrbitalStationA-1). Modder schema for new worlds. | Roundtrip tests; missing-field validation; modder world loader test. | `cf-mod validate content/worlds/ --strict` passes; `world.loaded` event in run bundles. | No hardcoded world strings outside content. |
+| M5.10-002 astrography kernel | `cf-world` | Simplified circular Keplerian: `pos(t) = parent_pos + r · [cos(2π·t/T_orbit), sin(2π·t/T_orbit)]`. Per-tick parent-chain resolution. Per-body-pair distance + comms light-lag computation. | ASTRO-A-01 (Earth-Mars distance round-trip across full year); ASTRO-A-02 (eclipse event firing); ASTRO-A-03 (parent-chain resolution: Phobos via Mars via Sol). | `astrography.tick` (sparse, per-minute), `astrography.distance_changed`, `astrography.comms_latency_changed`, `astrography.eclipse` events. | No real ephemeris (JPL); no per-tick astrography update at 60 Hz. |
+| M5.10-003 environment signal aggregator | `cf-environment` | `EnvironmentSignal { gravity_g, atmosphere_kPa, atmosphere_O2_pp, breathable, temperature_K, radiation_mSv_h, dust_load, light_lux, wind_speed_m_s, ambient_acoustic_db, magnetosphere_strength, scenic_seed }` per actor per tick. SoA storage; aggregation cost ≤ 5% of frame budget on Steam Deck floor. Threshold-gated `signal_changed` deltas + per-second `bundle_snapshot`. | ENV-A-01 (Mars walk: dust + low-g + thin atmosphere coherent); ENV-A-02 (Vulcan: thermal + autoignition risk + breathable=false); ENV-A-03 (vacuum belt asteroid: zero atm + thermal extremes); ENV-A-04 (vacuum-suit roundtrip: external thermal stays, internal life-support stable); per-actor aggregation cost test. | `environment.signal_changed`, `environment.hazard_detected`, `environment.hazard_cleared`, `environment.bundle_snapshot`, `environment.aggregator_perf` events. | Aggregator never replaces primary kernels; never makes decisions for actors. |
+| M5.10-004 hazard taxonomy | `cf-environment` | 15-class hazard taxonomy per [[spec/environmental-conditions-model]]: Vacuum, ThinAtmosphere, ToxicAtmosphere, OxygenDeficient, OxygenRich, ExtremeCold, ExtremeHeat, IonizingRadiation, Microgravity, HighGravity, Dust, ElectricalDischarge, AcousticOverload, ChemicalContamination, BiologicalContamination. Per-class threshold rules + cause-chain. | ENV-A-05..ENV-A-09 (per-hazard fixture tests). | Hazard transition events with cause and severity. | No silent hazard escalation; events fire on every threshold crossing. |
+| M5.10-005 cfctl observation | `cf-control`, `cfctl`, `cf-environment`, `cf-world` | `cfctl observe --environment / --worlds / --astrography / --hazards` per [[spec/prototype-roadmap#CLI Reference]]. `cfctl inspect environment/world/hazard <id>`. | CLI snapshot tests; stream freshness tests. | Observation samples in run notes. | No screenshot-only environmental debugging. |
+| M5.10-006 acceptance scenario | `content/scenarios/m5_10_environment_aggregation.ron`, `cf-e2e` | Full scenario: Earth surface + Mars surface + Vulcan landing + vacuum belt asteroid; per-actor environment aggregation across all 4 worlds in one run. | Full ENV-A + ASTRO-A suite. | Checked run bundle with environment + astrography + world events. | No hand-tested-only acceptance. |
+| M5.10-007 replay/perf/bug hunt | `cf-headless`, `cf-bench`, `tools/`, vault | Headless replay checksum; aggregator perf budget on Deck floor; first-divergence event; bug-hunt log. | ENV-A-15 + ASTRO-A-05 (byte-identical determinism replay). | Prototype note under `prototypes/`. | No "works once" completion. |
+
+M5.10 E2E:
+
+```bash
+cargo run -p cf-e2e -- --scenario m5_10_environment_aggregation --suite ENV-A-01..ENV-A-15,ASTRO-A-01..ASTRO-A-05 --write-run-bundle
+cargo run -p cfctl -- observe --environment --stream --hz 10
+cargo run -p cfctl -- observe --worlds --once --format json
+cargo run -p cfctl -- observe --astrography --stream --hz 1
+cargo run -p cfctl -- observe --hazards --stream --hz 10
+cargo run -p cf-headless -- replay prototype_runs/native/<m5_10_run> --verify-checksums
+cargo run -p cf-bench -- --scenario m5_10_environment_aggregation --profile environment --runs 100 --check-checksum-stability
+cargo run -p cf-mod -- validate content/worlds/ --strict
+```
+
+Human gate: project-owner playtests Mars walk + Vulcan landing + belt-asteroid mining cargo run + vacuum-suit failure mode before promotion to M6. Confirms ENV-A + ASTRO-A pass byte-identically across replay.
+
+---
+
 ## M6 — AI Core And Trust Harness
 
 | ID | Owns | Build | Tests | Evidence | Anti-scope |
@@ -560,6 +602,38 @@ Human gate: project-owner plays a flooding-and-repair scenario and confirms read
 
 ---
 
+## M7.7 — Day/Night/Weather
+
+> [!important] Kickoff prerequisites
+> M5.10 (Worlds + Environmental Aggregation), M6.6 (AI Environmental Competence), M7 (Mission Director), M7.5 (Base Atmospherics) must be complete. Read [[spec/celestial-bodies-and-worlds-model]] §Weather + [[spec/environmental-conditions-model]] in full. Read [[decisions/dr-039-celestial-bodies-and-worlds-direction]] + [[decisions/dr-040-environmental-conditions-and-hazards-direction]]. Run [[spec/prototype-roadmap#Per-Milestone Kickoff Smoke|M7.7 Kickoff Smoke]] (to be added).
+
+> [!warning] Hard rules
+> Weather kernel reads world manifest weather table only; no hardcoded planet weather. Day/night cycle is per-world and uses `World.day_length_s`. Weather events are deterministic per scenario seed + tick. Weather precursors (M2 ambient lux + M5.7 dust class + M5.6 thermal kernel + M5.9 atmosphere kernel) are wired from earlier milestones. AI tactics adjust to weather (M6.6 environmental competence).
+
+| ID | Owns | Build | Tests | Evidence | Anti-scope |
+|---|---|---|---|---|---|
+| M7.7-001 day/night kernel | `cf-world`, `cf-environment` | Per-world day/night cycle; modulates ambient lux + temperature drop + radiation reduction (no sun). Cycle tied to `World.day_length_s`. Routes through `EnvironmentSignal.light_lux` + `temperature_K`. | DAY-A-01 (Earth 24h cycle: lux peak/trough); DAY-A-02 (Mars 24.6h cycle); DAY-A-03 (Mimas tide-locked: no day cycle). | `weather.day_started`, `weather.night_started` events. | No global lighting hack outside world manifests. |
+| M7.7-002 weather event kernel | `cf-weather`, `cf-environment` | Weather event scheduler reads `World.weather_table`. Per-world seasonal/regional weather: Earth (rain, snow, storm, fog, clear), Mars (dust storm, dust devil, clear), Vulcan (acid rain, ash fall, sulfur fog, clear), Mimas (none, vacuum), Europa (ice geyser, vacuum). Deterministic per scenario seed; ramp-up/ramp-down phases. | WEATHER-A-01 (Mars dust storm reduces visibility + adds dust load); WEATHER-A-02 (Earth thunderstorm: rain + lightning + thermal drop); WEATHER-A-03 (Vulcan acid rain damages exposed armor); WEATHER-A-04 (Mimas: no weather events ever). | `weather.event_started`, `weather.event_progressed`, `weather.intensity_ramp`, `weather.precipitation_started/ended`, `weather.event_ended` events. | No client-side weather; no per-pixel rain that diverges across replays. |
+| M7.7-003 weather precursor wiring | `cf-environment` | Wire M2 (sky/ambient lux) + M5.7 (dust hazard class) + M5.6 (thermal kernel) + M5.9 (atmosphere kernel) precursor signals INTO the weather kernel as inputs/outputs. Atmospheric pressure changes during storms; humidity affects condensation; ash fall raises particulate density. | Precursor wiring fixture tests per-precursor. | Cross-kernel cause-chain in run bundle. | No precursor that ignores weather (e.g., dust system that doesn't see dust storm). |
+| M7.7-004 AI weather doctrine | `cf-ai`, `cf-environment` | AI bots adjust tactics based on `EnvironmentSignal.weather_kind` + intensity: take cover during storms; pause forward push during whiteout; route around acid rain; hunker down for high-radiation events. Doctrine fields per affordance. | AI-WEATHER-A-01..AI-WEATHER-A-05 (per-weather doctrine fixture tests); AI puppet under each weather class. | `ai.weather_doctrine_engaged`, `ai.weather_doctrine_disengaged` events. | No AI that pretends weather doesn't exist; no AI that always shelters. |
+| M7.7-005 cfctl weather observation | `cf-control`, `cfctl`, `cf-weather` | `cfctl observe --weather / --day-night` per [[spec/prototype-roadmap#CLI Reference]]. `cfctl inspect weather-event <id>`. | CLI snapshot tests; stream freshness tests. | Observation samples in run notes. | No screenshot-only weather debugging. |
+| M7.7-006 acceptance scenario | `content/scenarios/m7_7_weather_kernel.ron`, `cf-e2e` | Full scenario: Earth thunderstorm + Mars dust storm + Vulcan acid rain + Mimas no-weather + tide-locked Europa. Per-world weather coherence. | Full WEATHER-A + DAY-A + AI-WEATHER-A suite. | Checked run bundle with weather + day/night + AI weather doctrine events. | No hand-tested-only acceptance. |
+| M7.7-007 replay/perf/bug hunt | `cf-headless`, `cf-bench`, `tools/`, vault | Headless replay checksum; weather kernel perf budget on Deck floor; first-divergence event; bug-hunt log. | WEATHER-A-15 (byte-identical determinism replay across long weather sequences). | Prototype note under `prototypes/`. | No "works once" completion. |
+
+M7.7 E2E:
+
+```bash
+cargo run -p cf-e2e -- --scenario m7_7_weather_kernel --suite WEATHER-A-01..WEATHER-A-15,DAY-A-01..DAY-A-05,AI-WEATHER-A-01..AI-WEATHER-A-05 --write-run-bundle
+cargo run -p cfctl -- observe --weather --stream --hz 1
+cargo run -p cfctl -- observe --day-night --stream --hz 0.1
+cargo run -p cf-headless -- replay prototype_runs/native/<m7_7_run> --verify-checksums
+cargo run -p cf-bench -- --scenario m7_7_weather_kernel --profile weather --runs 50 --check-checksum-stability
+```
+
+Human gate: project-owner plays Earth thunderstorm + Mars dust storm + Vulcan acid rain + AI doctrine adjusts visibly.
+
+---
+
 ## M8 — Scenario Editor And Mod Tools
 
 | ID | Owns | Build | Tests | Evidence | Anti-scope |
@@ -606,6 +680,47 @@ Human gate: a non-AI human designer authors the m8_5_acid_trap_puzzle scenario i
 
 ---
 
+## M8.6 — Mining and Extraction
+
+> [!important] Kickoff prerequisites
+> M5.5..M5.10 must be complete; M7 + M7.5 mission director live. Read [[spec/mining-and-extraction-model]] in full. Read [[decisions/dr-041-mining-and-extraction-direction]]. Read [[spec/celestial-bodies-and-worlds-model]] §Ore Deposits. Run [[spec/prototype-roadmap#Per-Milestone Kickoff Smoke|M8.6 Kickoff Smoke]] (to be added).
+
+> [!warning] Hard rules
+> Mining is a server-authoritative ledger; clients send intents, server validates. Sample → drill → extract → refine → smelt is the canonical pipeline; no shortcuts. Ore deposits live in `World.ore_deposits`; no hardcoded ore distributions. Anti-cheat: every drilling+extraction action emits replay events with cause-chain so theft / duplication / impossible yields are detectable. Cargo overflow + deposit exhaustion are first-class events.
+
+| ID | Owns | Build | Tests | Evidence | Anti-scope |
+|---|---|---|---|---|---|
+| M8.6-001 ore registry | `cf-mining`, `content/ores/` | 12 launch ores: iron, copper, nickel, gold, silver, uranium, lithium, water-ice, methane-ice, helium-3 (lunar), platinum-group-metals, ammonia-ice. Per-ore: hardness, refining yield curve, refining temperature, smelting temperature, value, flag list. Modder schema. | Roundtrip tests; missing-field validation; modder ore loader test. | `cf-mod validate content/ores/ --strict` passes. | No hardcoded ore strings outside content. |
+| M8.6-002 ore deposit kernel | `cf-mining`, `cf-world` | World manifests declare per-region ore deposits with quality + abundance distribution. Server selects deposits at scenario load via deterministic seed. `OreDeposit { ore_id, quality_pct, kg_remaining, hardness_modifier, contamination_pct }`. | DEPOSIT-A-01 (Mars iron+copper deposits load); DEPOSIT-A-02 (belt asteroid platinum); DEPOSIT-A-03 (Mimas water-ice). | `world.loaded` event includes deposit manifest. | No client-side deposit data. |
+| M8.6-003 sample tool | `cf-equipment`, `cf-mining` | Handheld geological scanner; scan radius + cooldown; reads `OreDeposit` and reveals to player UI. Origin-gated equipment slot. | SAMPLE-A-01 (Mars surface scan reveals iron/copper); SAMPLE-A-02 (vacuum belt scan with hardsuit). | `mining.sampled` events with ore_id + cell + quality + cause. | No silent always-on scan. |
+| M8.6-004 drill tool + drilling kernel | `cf-equipment`, `cf-mining`, `cf-physics` | Drill bit hardness vs ore hardness; drilling time = `(ore_hardness · kg_target) / (bit_hardness · drill_power · efficiency)`. Heat buildup → bit damage. Drill power consumed from suit/chassis power. Vibration affects nearby fragile structures. | DRILL-A-01 (drill iron deposit); DRILL-A-02 (drill bit overheat → break); DRILL-A-03 (drill on belt asteroid in vacuum). | `mining.drilled` events with kg + heat + cause. | No "instant mine" exploits. |
+| M8.6-005 extraction kernel | `cf-mining`, `cf-equipment` | Extracted ore goes to cargo (suit cargo / chassis cargo / dropship cargo / base storage). Cargo capacity limits → overflow. Origin-gated cargo (humans light, robots heavy, mechs heaviest). | EXTRACT-A-01 (cargo fill); EXTRACT-A-02 (cargo overflow → drop on ground); EXTRACT-A-03 (deposit exhaustion). | `mining.extracted`, `mining.cargo_overflow`, `mining.deposit_exhausted` events. | No infinite-cargo cheats. |
+| M8.6-006 refining kernel | `cf-mining`, `content/refineries/` | Refinery building consumes raw ore + electricity + (optional) catalyst → produces concentrate at locked yield curves. Per-ore refining temp + time. Slag byproduct. | REFINE-A-01 (iron concentrate); REFINE-A-02 (copper-with-impurity); REFINE-A-03 (water-ice → liquid water). | `mining.refined` events with input/output kg + cause. | No magic 100% yield. |
+| M8.6-007 smelting kernel | `cf-mining`, `content/smelters/`, `cf-atmos` | Smelter building (foundry) consumes concentrate + heat → ingots. Heat from atmospherics kernel; combustion runs through atmospherics combustion engine. Slag byproduct. | SMELT-A-01 (iron ingot); SMELT-A-02 (copper ingot with H2 reduction); SMELT-A-03 (slag heat dump into atmosphere). | `mining.smelted` events; cause-chained to `atmospherics.combustion_started`. | No silent slag dumping (always emits replay events). |
+| M8.6-008 trade ledger | `cf-mining`, `cf-mission`, `cf-server` | Match-scope trade ledger: per-team ingot stockpiles → match objectives + monetary value. Anti-cheat: every transfer emits cause-chain event. | TRADE-A-01 (transfer ingot from team1 to team2 via dropship); TRADE-A-02 (theft detection: server rejects unauth transfer); TRADE-A-03 (market rate fluctuation). | `mining.market_trade`, `mining.theft_detected` events. | No off-server economy. |
+| M8.6-009 AI miner doctrine | `cf-ai`, `cf-mining` | AI miner doctrine (AI-MINE-A): scan → dispatch best origin (robot for vacuum, mech for hard ore, human for surface) → drill → extract → return cargo → refine. Behaviors handle deposit exhaustion + cargo overflow + bit failure + interruption. Robot origin preferred for vacuum + heat extremes per [[spec/origin-reaction-and-resource-model]]. | AI-MINE-A-01..AI-MINE-A-05 (full mining cycle for each origin); AI-MINE-A-06 (vacuum-only-robot doctrine: AI sends robot, not human, to belt asteroid). | AI doctrine events for each phase. | No AI that ignores cargo capacity. |
+| M8.6-010 cfctl mining observation | `cf-control`, `cfctl`, `cf-mining` | `cfctl observe --deposits / --mining-events / --refineries / --smelters / --trade-ledger` per [[spec/prototype-roadmap#CLI Reference]]. `cfctl inspect deposit/refinery/smelter <id>`. | CLI snapshot tests; stream freshness tests. | Observation samples in run notes. | No screenshot-only mining debugging. |
+| M8.6-011 acceptance scenario | `content/scenarios/m8_6_mining_pipeline.ron`, `cf-e2e` | Full scenario: belt asteroid + Mars surface + Mimas ice mining. Robot mines belt platinum; human + drill rig mines Mars iron; mech mines Mimas water-ice; full sample → drill → extract → refine → smelt → trade pipeline; AI miner doctrine in coop mode. | Full SAMPLE-A + DRILL-A + EXTRACT-A + REFINE-A + SMELT-A + TRADE-A + AI-MINE-A suite. | Checked run bundle with mining + AI doctrine events. | No hand-tested-only acceptance. |
+| M8.6-012 replay/perf/bug hunt | `cf-headless`, `cf-bench`, `tools/`, vault | Headless replay checksum; mining kernel perf budget on Deck floor; first-divergence event; bug-hunt log. | MINE-A-15 (byte-identical determinism replay across long mining cycles). | Prototype note under `prototypes/`. | No "works once" completion. |
+
+M8.6 E2E:
+
+```bash
+cargo run -p cf-e2e -- --scenario m8_6_mining_pipeline --suite SAMPLE-A,DRILL-A,EXTRACT-A,REFINE-A,SMELT-A,TRADE-A,AI-MINE-A --write-run-bundle
+cargo run -p cfctl -- observe --deposits --once --format json
+cargo run -p cfctl -- observe --mining-events --stream --hz 5
+cargo run -p cfctl -- observe --refineries --stream --hz 5
+cargo run -p cfctl -- observe --smelters --stream --hz 5
+cargo run -p cfctl -- observe --trade-ledger --once
+cargo run -p cf-headless -- replay prototype_runs/native/<m8_6_run> --verify-checksums
+cargo run -p cf-bench -- --scenario m8_6_mining_pipeline --profile mining --runs 50 --check-checksum-stability
+cargo run -p cf-mod -- validate content/ores/ content/refineries/ content/smelters/ --strict
+```
+
+Human gate: project-owner runs full belt asteroid platinum cycle with robot operative + Mars iron cycle with mech + verifies cargo overflow + verifies deposit exhaustion + verifies AI miner doctrine in coop.
+
+---
+
 ## M9 — Dedicated Server App + Determinism Islands
 
 > [!important] Kickoff prerequisites
@@ -647,6 +762,47 @@ docker run --rm cf-server:latest --validate-config-only
 ```
 
 Human gate: optional. Project owner can manually host a `coop_room` and play a Breach Contract; SERVER-001..016 are agent-completable.
+
+---
+
+## M9.5 — Voice and Radio Comms
+
+> [!important] Kickoff prerequisites
+> M5.5..M5.10 + M7.7 + M9 must be complete. Read [[spec/comms-voice-and-radio-model]] in full BEFORE feature work. Read [[decisions/dr-043-voice-comms-and-radio-direction]]. Verify Steam Audio Apache-2.0 license; integrate via `steam-audio-rs` binding (or stand up the binding ourselves). Verify ACRE2 multipath model + bevy_kira_audio + Opus codec + bevy_oddio. Run [[spec/prototype-roadmap#Per-Milestone Kickoff Smoke|M9.5 Kickoff Smoke]] (to be added).
+
+> [!warning] Hard rules
+> Voice runs through Steam Audio for occlusion + transmission + reflection. Radio runs through ACRE2-tier multipath model (4 modes: Arcade, LOS Simple, LOS Multipath default, Longley-Rice ITM). HF/VHF/UHF/Microwave bands with locked propagation rules. Frequency tuning. Encryption. Origin gating: humans equip a radio (slot), robots have built-in (chassis power), androids modular. Per-receiver propagation events with cause labels. Server-authoritative voice routing; clients send Opus-encoded packets to server, server fans out to receivers passing acoustic + radio gates. Acoustic trauma is a body-damage affliction (M5.7 hazard package). Match-comms-policy hooks (M7 mission director).
+
+| ID | Owns | Build | Tests | Evidence | Anti-scope |
+|---|---|---|---|---|---|
+| M9.5-001 voice acoustic kernel (Steam Audio) | `cf-acoustic`, `cf-comms-voice` | Steam Audio integration: per-listener-per-source occlusion + transmission + reflection. Air pressure dependency: voice attenuates in low pressure, blocks in vacuum (sealed helmet exception). Geometry feeds from `cf-physics` collision shapes + `cf-atmos` room-graph. Apache-2.0 license logged in `references/usage-ledger.md`. | VOICE-A-01 (in-room shout: heard); VOICE-A-02 (through-wall: muffled); VOICE-A-03 (vacuum: silent); VOICE-A-04 (sealed-helmet pickup: heard); VOICE-A-05 (sealed-helmet-only-no-radio: silent). | `voice.transmission_started`, `voice.transmission_received`, `voice.transmission_blocked` events. | No fake voice that ignores atmosphere. |
+| M9.5-002 voice opus codec + transport | `cf-net`, `cf-comms-voice` | Server-authoritative routing: clients send PCM → encode Opus 16-32 kbps → server → fan out to passing receivers → decode → Steam Audio per-listener mix. Push-to-talk + open-mic + always-on. | VOICE-A-06 (codec roundtrip); VOICE-A-07 (server fan-out latency budget < 100 ms). | `voice.codec_encoded`, `voice.codec_decoded` events; transport latency in `voice.transmission_received` payload. | No P2P voice (server-authoritative). |
+| M9.5-003 voice equipment + origin gating | `cf-equipment`, `cf-actor`, `cf-comms-voice` | EVA helmet + hardsuit voice pickup; throat mic; bone conductor. Origin gating: humans equip helmet (occupies slot), robots built-in chassis voice, androids modular. Slot-assign rejects with `wrong_origin_for_equipment`. | VOICE-A-08 (per-origin equipment fixture tests). | Equipment-voice events. | No "everyone has voice" magic. |
+| M9.5-004 radio kernel (ACRE2 multipath) | `cf-radio`, `cf-comms-radio` | Per-channel `RadioLink` graph: per-pair propagation (LOS, terrain occlusion, frequency-band attenuation, ground-bounce, ionosphere-skip for HF). 4 modes: Arcade / LOS Simple / LOS Multipath (default) / Longley-Rice ITM (20 MHz - 20 GHz). Configurable per scenario manifest. SNR + path_kind classification. | RADIO-A-01 (LOS VHF link works); RADIO-A-02 (over-hill VHF blocked); RADIO-A-03 (HF skywave Earth-only, day/night dependent); RADIO-A-04 (UHF terrain-attenuated); RADIO-A-05 (microwave LOS only); RADIO-A-06 (cross-planet HF impossible: comms latency only via dropship/satellite). | `radio.transmission_started`, `radio.transmission_received`, `radio.transmission_blocked` events with cause + SNR + path_kind. | No magic always-works radio. |
+| M9.5-005 radio equipment | `cf-equipment`, `cf-comms-radio`, `content/radios/` | Radio rosters: handheld VHF (squad-radio), backpack VHF (longer range), HF transceiver, satellite uplink, dropship-mounted base radio. Antenna types (whip, dipole, yagi-directional, ground-plane). Power source (battery, suit-power, chassis-power, base-power). | RADIO-A-07 (antenna directional gain); RADIO-A-08 (battery drain). | Radio equipment events. | No "everyone gets satellite" magic. |
+| M9.5-006 frequency tuning + encryption | `cf-comms-radio`, `cf-control` | Per-radio `frequency_hz` + `encryption_key` (NULL = clear, optional crypto-key). UI to tune. Encryption mismatched → packet rejected. | RADIO-A-09 (frequency tuning); RADIO-A-10 (encryption mismatch rejection); RADIO-A-11 (eavesdrop on clear frequency). | `radio.tuned`, `radio.encryption_changed` events. | No magic crypto-break. |
+| M9.5-007 jamming + interference | `cf-comms-radio`, `cf-equipment`, `cf-environment` | Active jammer equipment: emits noise on band, raises noise floor, blocks adjacent frequencies. Solar flare event (M7.7 weather): boosts ionospheric noise across HF/VHF. EMP weapon: temporary band kill. | RADIO-A-12 (jammer kills VHF); RADIO-A-13 (solar flare kills HF day/night cycles); RADIO-A-14 (EMP knockout 30 s). | `radio.interference_event` events. | No always-on perfect comms. |
+| M9.5-008 origin radio gating | `cf-equipment`, `cf-actor`, `cf-comms-radio` | Humans must equip a radio item (slot consumed). Robots have built-in chassis radio (auto-tuneable). Androids ship with built-in OR modular upgrade. Slot-assign rejects with `wrong_origin_for_equipment`; AI bot picks emit `wrong_origin_for_treatment`. Cross-link [[spec/origin-reaction-and-resource-model#Origin Radio Gating (Cross-Reference Per DR-043)]]. | RADIO-A-15 (per-origin radio fixture tests); slot-assign rejection tests. | Radio equipment events with origin payload. | No silent slot acceptance for wrong-origin items. |
+| M9.5-009 acoustic trauma + body damage | `cf-actor`, `cf-comms-voice`, `cf-environment` | High-decibel events (explosion in enclosed room, jet engine close-in, sonic weapon) raise `EnvironmentSignal.ambient_acoustic_db`. Per-actor hearing damage threshold; partial hearing loss (filter on incoming voice) + tinnitus (overlay) + temporary deafness (block). Routes through M5.7 hazard package. | TRAUMA-A-01 (explosion in sealed room); TRAUMA-A-02 (sonic weapon); TRAUMA-A-03 (suit hearing protection mitigates). | `voice.transmission_blocked` events with `reason: hearing_damage`. | No instant deafness for plot reasons. |
+| M9.5-010 mission-director comms-policy hooks | `cf-mission`, `cf-comms-radio`, `cf-comms-voice` | Match policy: per-team default frequencies; per-mission radio bans (RF silence campaign); per-mission jamming overlays. Match grammar (DR-042) wires to comms policy. | POLICY-A-01 (RF silence mission); POLICY-A-02 (per-team frequency segregation); POLICY-A-03 (jamming overlay). | `mission.comms_policy_changed` events. | No hidden mission-director comms moves. |
+| M9.5-011 cfctl comms observation | `cf-control`, `cfctl`, `cf-comms-voice`, `cf-comms-radio` | `cfctl observe --voice / --radio / --frequencies / --interference` per [[spec/prototype-roadmap#CLI Reference]]. `cfctl inspect voice-link/radio-link <id>`. | CLI snapshot tests; stream freshness tests. | Observation samples in run notes. | No screenshot-only comms debugging. |
+| M9.5-012 acceptance scenario | `content/scenarios/m9_5_voice_radio_comms.ron`, `cf-e2e` | Full scenario: 4-player coop on Mars; humans + robots + android operative; HF link to Earth (high latency, day/night dependent); VHF squad link (LOS multipath); jamming overlay; sealed-helmet-pickup-only-no-radio test; acoustic trauma test; encryption test. | Full VOICE-A + RADIO-A + TRAUMA-A + POLICY-A suite. | Checked run bundle with voice + radio events. | No hand-tested-only acceptance. |
+| M9.5-013 replay/perf/bug hunt | `cf-headless`, `cf-bench`, `tools/`, vault | Headless replay checksum; voice + radio kernel perf budget on Deck floor; first-divergence event; bug-hunt log. | RADIO-A-15 + VOICE-A-15 (byte-identical determinism replay across long voice + radio sequences; voice IS not part of replay byte-identity but RADIO event chain IS — voice routes through replay events as cause-effect not raw audio). | Prototype note under `prototypes/`. | No "works once" completion. |
+
+M9.5 E2E:
+
+```bash
+cargo run -p cf-e2e -- --scenario m9_5_voice_radio_comms --suite VOICE-A,RADIO-A,TRAUMA-A,POLICY-A --write-run-bundle
+cargo run -p cfctl -- observe --voice --stream --hz 10
+cargo run -p cfctl -- observe --radio --stream --hz 10
+cargo run -p cfctl -- observe --frequencies --once
+cargo run -p cfctl -- observe --interference --stream --hz 5
+cargo run -p cf-headless -- replay prototype_runs/native/<m9_5_run> --verify-checksums
+cargo run -p cf-bench -- --scenario m9_5_voice_radio_comms --profile comms --runs 50 --check-checksum-stability
+cargo run -p cf-mod -- validate content/radios/ --strict
+```
+
+Human gate: project-owner runs 4-player coop on Mars; verifies LOS multipath VHF + HF skywave to Earth + jamming overlay + acoustic trauma + sealed-helmet-pickup-only-no-radio test passes; voice acoustically blocked in vacuum; encryption mismatch produces clean rejection.
 
 ---
 

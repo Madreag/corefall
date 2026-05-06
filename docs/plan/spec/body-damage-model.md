@@ -10,9 +10,11 @@ feeds:
   - DR-009
   - DR-011
   - DR-014
+  - DR-040
+  - DR-043
 ---
 
-← [[spec/index|spec section]] · [[engine/body-damage-wound-gib-lifecycle|body damage lifecycle]] · [[engine/projectile-to-impact-lifecycle|projectile impact]] · [[systems/damage-equipment-and-items|damage/equipment primer]] · [[spec/equipment-loadout|equipment model]] · [[spec/chassis-armor-mechs-and-origins|chassis/armor/mechs/origins]] · [[spec/origin-reaction-and-resource-model|origin reaction/resource model]] · [[spec/atmospherics-and-chemistry-model|atmospherics/chemistry]] · [[spec/gravity-and-ballistics-model|gravity/ballistics]] · [[spec/replay-recorder-slice-a|replay recorder]] · [[spec/ux-wireframes-slice-a|UX wireframes]] · [[spec/ai-trust-harness-slice-a|AI harness]] · [[references/prototype-run-bundle-schema|run-bundle schema]] · [[decisions/dr-003-body-damage-readability|DR-003]] · [[decisions/dr-037-stationeers-grade-atmospherics-direction|DR-037]] · [[decisions/dr-038-universal-gravity-and-ballistics-direction|DR-038]]
+← [[spec/index|spec section]] · [[engine/body-damage-wound-gib-lifecycle|body damage lifecycle]] · [[engine/projectile-to-impact-lifecycle|projectile impact]] · [[systems/damage-equipment-and-items|damage/equipment primer]] · [[spec/equipment-loadout|equipment model]] · [[spec/chassis-armor-mechs-and-origins|chassis/armor/mechs/origins]] · [[spec/origin-reaction-and-resource-model|origin reaction/resource model]] · [[spec/atmospherics-and-chemistry-model|atmospherics/chemistry]] · [[spec/gravity-and-ballistics-model|gravity/ballistics]] · [[spec/environmental-conditions-model|environmental conditions]] · [[spec/comms-voice-and-radio-model|comms/voice/radio]] · [[spec/replay-recorder-slice-a|replay recorder]] · [[spec/ux-wireframes-slice-a|UX wireframes]] · [[spec/ai-trust-harness-slice-a|AI harness]] · [[references/prototype-run-bundle-schema|run-bundle schema]] · [[decisions/dr-003-body-damage-readability|DR-003]] · [[decisions/dr-037-stationeers-grade-atmospherics-direction|DR-037]] · [[decisions/dr-038-universal-gravity-and-ballistics-direction|DR-038]] · [[decisions/dr-040-environmental-conditions-and-hazards-direction|DR-040]] · [[decisions/dr-043-voice-comms-and-radio-direction|DR-043]]
 
 # Body / Damage Model
 
@@ -103,6 +105,9 @@ Design rule: HP remains useful, but it cannot be the only public truth. The read
 | `equipment_fault` | Damaged weapon/tool/armor/mech module changes behavior without necessarily injuring the actor. | Emit condition-stage changes, jam/fault labels, smoke/spark state, repair/swap options. |
 | `chemical_bio` | Future poison/acid/stim/bleed modifiers. | Treat as effect stack with bodypart or actor target; keep visible in advanced panel. |
 | `terrain_crush` | Dropship/body collision, fall, unstable impact, terrain/object physics. | Emit causality from terrain/object/contact so death recap can say what killed the actor. |
+| `radiation` (per [[spec/environmental-conditions-model]] / DR-040) | Cumulative ionizing-radiation dose from solar flares (vacuum), reactor leaks, contaminated zones, uranium ore deposits, radiation weapons. | Track `radiation_dose_mSv` per actor; threshold afflictions: nausea (mild), radiation sickness (moderate), acute radiation syndrome (severe). Robots immune to biological effects but suffer electronics fault at extreme dose. |
+| `thermal_environmental` (per [[spec/environmental-conditions-model]] / DR-040) | Sustained extreme cold (Mimas, Europa, vacuum) → frostbite + hypothermia; sustained extreme heat (Vulcan, foundry, ash fall) → burns + heatstroke. | Track `body_temperature_K` per actor; threshold afflictions per origin (humans break first; androids slower; robots tolerate widest range). |
+| `acoustic_trauma` (per [[spec/comms-voice-and-radio-model]] / DR-043) | High-decibel events (explosion in enclosed room, jet engine close-in, sonic weapon) → partial hearing loss + tinnitus + temporary deafness. | Read `EnvironmentSignal.ambient_acoustic_db`; threshold per actor; suit hearing protection mitigates; afflictions filter incoming voice. |
 
 ## Body Part Contract
 

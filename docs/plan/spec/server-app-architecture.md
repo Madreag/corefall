@@ -20,9 +20,12 @@ feeds:
   - DR-033
   - DR-034
   - DR-035
+  - DR-039
+  - DR-042
+  - DR-043
 ---
 
-← [[spec/index|spec section]] · [[spec/prototype-roadmap|native roadmap]] · [[spec/native-implementation-backlog|native backlog]] · [[spec/persistent-mmo-architecture|persistent MMO architecture]] · [[spec/backend-networking|backend networking]] · [[decisions/dr-005-multiplayer-posture|DR-005]] · [[decisions/dr-013-backend-service-scope|DR-013]] · [[decisions/dr-034-dedicated-server-application|DR-034]]
+← [[spec/index|spec section]] · [[spec/prototype-roadmap|native roadmap]] · [[spec/native-implementation-backlog|native backlog]] · [[spec/persistent-mmo-architecture|persistent MMO architecture]] · [[spec/backend-networking|backend networking]] · [[spec/game-modes-and-match-grammar|game modes / match grammar]] · [[spec/comms-voice-and-radio-model|comms/voice/radio]] · [[spec/celestial-bodies-and-worlds-model|worlds catalog]] · [[decisions/dr-005-multiplayer-posture|DR-005]] · [[decisions/dr-013-backend-service-scope|DR-013]] · [[decisions/dr-034-dedicated-server-application|DR-034]] · [[decisions/dr-039-celestial-bodies-and-worlds-direction|DR-039]] · [[decisions/dr-042-game-modes-and-match-grammar-direction|DR-042]] · [[decisions/dr-043-voice-comms-and-radio-direction|DR-043]]
 
 # Server App Architecture (`cf-server`)
 
@@ -146,6 +149,9 @@ The sim tick rate matches the client (60 Hz default; 120 Hz option). Render is a
 | Mission director | Server-authoritative. Clients see commander events with reason strings. |
 | Save / persistence | Server-authoritative for MMO shards; client-authoritative for solo + private LAN sessions; mixed for online co-op (host server holds the save). |
 | Anti-cheat | Server-authoritative. Server-side validators are mandatory; client-side hints are not trusted. |
+| Match grammar (per [[spec/game-modes-and-match-grammar]] / DR-042) | Server-authoritative. `Match` schema (Bunker Defence + Symmetric Arena + FFA + Asymmetric N-Team + Coop-vs-AI + Campaign) lives on the server. Team config flexibility (1v1 through NvN, FFA, asymmetric, coop) enforced server-side. AI fills empty slots per `Match.ai_fill_policy`. |
+| Voice routing (per [[spec/comms-voice-and-radio-model]] / DR-043) | Server-authoritative voice routing. Clients send Opus-encoded packets; server fans out to receivers passing acoustic + radio gates (Steam Audio occlusion + ACRE2 multipath). No P2P voice. |
+| Radio link state (per [[spec/comms-voice-and-radio-model]] / DR-043) | Server-authoritative `RadioLink` graph + per-pair propagation + frequency tuning + encryption. Clients send tx intent; server validates + routes. |
 
 ## Networking Transport
 

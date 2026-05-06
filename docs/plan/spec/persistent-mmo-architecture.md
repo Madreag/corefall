@@ -17,9 +17,12 @@ feeds:
   - DR-032
   - DR-034
   - DR-035
+  - DR-039
+  - DR-042
+  - DR-043
 ---
 
-← [[spec/index|spec section]] · [[spec/server-app-architecture|server app architecture]] · [[spec/prototype-roadmap|native roadmap]] · [[spec/native-implementation-backlog|native backlog]] · [[decisions/dr-005-multiplayer-posture|DR-005]] · [[decisions/dr-013-backend-service-scope|DR-013]] · [[decisions/dr-035-persistent-mmo-architecture|DR-035]]
+← [[spec/index|spec section]] · [[spec/server-app-architecture|server app architecture]] · [[spec/prototype-roadmap|native roadmap]] · [[spec/native-implementation-backlog|native backlog]] · [[spec/game-modes-and-match-grammar|game modes / match grammar]] · [[spec/comms-voice-and-radio-model|comms/voice/radio]] · [[spec/celestial-bodies-and-worlds-model|worlds catalog]] · [[decisions/dr-005-multiplayer-posture|DR-005]] · [[decisions/dr-013-backend-service-scope|DR-013]] · [[decisions/dr-035-persistent-mmo-architecture|DR-035]] · [[decisions/dr-039-celestial-bodies-and-worlds-direction|DR-039]] · [[decisions/dr-042-game-modes-and-match-grammar-direction|DR-042]] · [[decisions/dr-043-voice-comms-and-radio-direction|DR-043]]
 
 # Persistent MMO Architecture
 
@@ -115,6 +118,10 @@ Clients only receive events/snapshots for entities in their interest set:
 | Base modules | Visible range; owner's faction always; allied factions per relationship. |
 | Audio captions | Caption events delivered for player-audible sources only. |
 | AI reason labels | Allied AI always; visible enemy AI when they take an action; persisted offline cognition only at debrief time. |
+| Voice (per [[spec/comms-voice-and-radio-model]] / DR-043) | Acoustic propagation only — Steam Audio occlusion + atmosphere gates. Vacuum = silent (sealed-helmet exception). Voice fan-out through server. |
+| Radio link state (per DR-043) | Per-frequency interest set: receivers tuned to source's frequency + within ACRE2 multipath coverage. Encryption mismatched → packet dropped at server gate. Cross-shard radio links (HF skywave Earth-only; satellite uplinks to other worlds) handled per per-pair body distance + light-lag. |
+| Match grammar (per [[spec/game-modes-and-match-grammar]] / DR-042) | Match identity per-shard; shard may host multiple concurrent matches (Bunker Defence + Symmetric Arena + FFA + Asymmetric N-Team + Coop-vs-AI). Match join/leave events propagate to interest set via team membership. |
+| World binding (per [[spec/celestial-bodies-and-worlds-model]] / DR-039) | Each shard binds to one world (Earth/Mars/Vulcan/etc.) at boot; per-shard ambient + gravity + day/night + ore deposits. Cross-shard travel via dropship/rocket between shards (M12+ feature; queued). |
 
 Interest is computed server-side; clients do not request entities they shouldn't see (anti-information-leak).
 

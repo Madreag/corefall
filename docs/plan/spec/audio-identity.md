@@ -9,7 +9,7 @@ feeds:
   - DR-020
 ---
 
-← [[spec/index|spec section]] · [[spec/authoritative-game-spec-v0|game spec v0]] · [[decisions/dr-020-audio-identity|DR-020]] · [[decisions/dr-012-accessibility-comfort-readability|DR-012]] · [[decisions/dr-014-tone-player-promise|DR-014]]
+← [[spec/index|spec section]] · [[spec/authoritative-game-spec-v0|game spec v0]] · [[spec/comms-voice-and-radio-model|comms/voice/radio]] · [[decisions/dr-020-audio-identity|DR-020]] · [[decisions/dr-012-accessibility-comfort-readability|DR-012]] · [[decisions/dr-014-tone-player-promise|DR-014]] · [[decisions/dr-043-voice-comms-and-radio-direction|DR-043]]
 
 # Audio Identity
 

@@ -1931,6 +1931,31 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 ---
 
+### M5.10 — Environmental Conditions Aggregation
+
+**What it proves:** A single per-tick per-actor `EnvironmentSignal` struct ([[spec/environmental-conditions-model]]) bundles every environmental signal (atmospheric, gravitational, thermal, radiation, photic, EM, weather, water, acoustic, day/night, comms) into one source of truth. Every consumer (AI doctrine, HUD, accessibility, replay, audio mixer, mission director, server) reads the same bundle. No subsystem queries individual kernels for environmental data. Closes [[decisions/dr-040-environmental-conditions-and-hazards-direction]].
+
+**Scope (per [[spec/environmental-conditions-model]]):**
+
+- `cf-environment` aggregator crate: per-tick computation; SoA actors; SIMD-friendly; sleeping actors skip.
+- 15-class closed-enum hazard taxonomy (`hypoxic`, `combustible_atmosphere`, `toxic_atmosphere`, `breach_decomp`, `hyperthermic`, `hypothermic`, `radiation`, `low_visibility`, `glare`, `em_disruption`, `wind_force`, `drowning_hazard`, `vacuum_no_voice`, `comms_blackout`, `gravity_shift`).
+- Tick schedule: aggregator runs after all signal-producing kernels (M5.5 collision, M5.6 material, M5.7 hazard, M5.9 atmospherics, M5.8 origin resource), before all consumers (M6 AI, M4 HUD, M3 replay events).
+- `cfctl observe --environment <actor>` exposes the bundle.
+- New `environment` run-bundle event category with sparse delta events + per-second snapshot.
+- CI grep gate: no consumer reads atmospheric / gravitational data outside `cf-environment::for_actor(...)`.
+
+**Done-criteria:**
+- [ ] ENV-A-01..ENV-A-10 acceptance suite passes byte-identically.
+- [ ] AI doctrine (M6.6 promoted) consumes EnvironmentSignal exclusively.
+- [ ] HUD reads bundle for hazard chip rendering.
+- [ ] Active-region budget at 50-actor scenario meets Steam Deck floor.
+
+**Cross-DR:** DR-002, DR-003, DR-007, DR-008, DR-022, DR-024, DR-036, DR-037, DR-038, DR-039, **DR-040** (closes).
+
+**Open DR gates:** DR-022 (humanlike AI bar — M5.10 + M6.6 are joint closure milestones); DR-040 (this milestone IS DR-040 closure). Per Open Decision Gates Protocol.
+
+---
+
 ### M6 — AI Core And Trust Harness
 
 **What it proves:** The 8-criteria humanlike AI bar from DR-022 has a runnable harness. Perception, memory, doctrine, reason labels, recovery, and replay are all in place. Strategic adaptation across missions is staged but not yet required to fire.
@@ -1989,7 +2014,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 ---
 
-### M6.6 — AI Material Competence
+### M6.6 — AI Environmental Competence (Promoted From AI Material Competence Per DR-040)
 
 **What it proves:** AI from M6 reads the same material/hazard fields players see (DR-036 + DR-022 fairness criterion). Bots avoid electrified water, use water against fire/acid, vent toxic gas, kick debris opportunistically. Every AI material decision emits a reason label that ties back to a `material.*` / `reaction.*` event.
 
@@ -2011,13 +2036,16 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 - [ ] AI-MAT-07: Bot routes around fire-on-oil trail; switches route when oil is extinguished.
 - [ ] AI-MAT-08: AI-H regression suite (M6) still passes after material competence lands.
 
-**Cross-DR:** DR-002, DR-008, DR-009, DR-012, DR-022, DR-024, DR-032, DR-036.
+**Cross-DR:** DR-002, DR-008, DR-009, DR-012, DR-022, DR-024, DR-032, DR-036, DR-039 (per-world doctrine), DR-040 (consumes EnvironmentSignal), DR-043 (subscribes to radio chatter).
 
-**Open DR gates:** DR-002, DR-008 (M6.6 extends DR-008 utility scorer with material affordances — confirm reason-label enum), DR-009 (AI material decisions surface in command UX — confirm), DR-012 (hazard overlays + AI captions must be color-blind safe — confirm). Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
+**Open DR gates:** DR-002, DR-008 (M6.6 extends DR-008 utility scorer with environmental affordances — confirm reason-label enum), DR-009 (AI environmental decisions surface in command UX — confirm), DR-012 (hazard overlays + AI captions must be color-blind safe — confirm). Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
+
+> [!important] Promoted scope per DR-040
+> M6.6 was originally "AI Material Competence" (per DR-036). Per DR-040, M6.6 is promoted to **AI Environmental Competence**: AI doctrine reads the unified [[spec/environmental-conditions-model|EnvironmentSignal]] bundle, covering materials AND atmosphere AND gravity AND thermal AND radiation AND photic AND EM AND weather AND comms. AI-MAT-01..08 still ship; new AI-ENV-* scenarios add per-world doctrine (Mars dust storm visibility; Vulcan combustible-atmosphere awareness; Mimas microgravity grenade arcs; vacuum radio-only comms; Bunker Defence per-team doctrine). AI miner doctrine (AI-MINE-A 8 tests) lands at M8.6 but uses the same EnvironmentSignal source.
 
 ---
 
-### M7 — Mission Director And Breach Contract Proof Mission
+### M7 — Mission Director, Breach Contract Proof Mission, And Bunker Defence Proof Mission (Per DR-042)
 
 **What it proves:** Everything above composes into one playable Breach Contract mission. Manifest format works. Command core works minimally. Base systems work minimally. Mission director paces the encounter. The first proof mission can be played, won, lost, replayed, debriefed.
 
@@ -2038,9 +2066,12 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 - [ ] Project owner plays the mission at least 5 times and writes a verbatim reaction.
 - [ ] At this point, the **A-FEEL gate from the prior HTML playtest is met** — the lab has something to do, not just operate.
 
-**Cross-DR:** DR-014, DR-015, DR-016, DR-017, DR-018, DR-021, DR-022, DR-027.
+**Cross-DR:** DR-014, DR-015, DR-016, DR-017, DR-018, DR-021, DR-022, DR-027, **DR-042** (Bunker Defence Proof Mission is the M7 closure / A-FEEL gate per DR-042), DR-039 (mission references World), DR-040 (mission director reads EnvironmentSignal for dynamic-event triggers), DR-043 (mission comms_policy declared).
 
-**Open DR gates:** DR-004 (first playable scope — M7 IS the Breach Contract closure milestone; when M7 done-criteria pass, update DR-004 status to CLOSED-DIRECTION + revisit_trigger). DR-009 (command UX — M7 ships director + commander surfaces; confirm reason-label posture). DR-011 (progression/retention — M7 retry/debrief/replay loop is the seed for RET-A; confirm debrief shape with user before RET-A scope locks). Topic-level: localization plan is OPEN — flag any baked English strings in mission/director text. Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
+**Open DR gates:** DR-004 (first playable scope — M7 IS the Breach Contract closure milestone; when M7 done-criteria pass, update DR-004 status to CLOSED-DIRECTION + revisit_trigger). DR-009 (command UX — M7 ships director + commander surfaces; confirm reason-label posture). DR-011 (progression/retention — M7 retry/debrief/replay loop is the seed for RET-A; confirm debrief shape with user before RET-A scope locks). DR-042 (Bunker Defence Proof Mission per match-grammar — confirm the asymmetric attacker-vs-defender configuration with rooted bunker + dropship attacker is playable). Topic-level: localization plan is OPEN — flag any baked English strings in mission/director text. Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
+
+> [!important] Bunker Defence Proof Mission per DR-042
+> M7 was originally just the Breach Contract Proof Mission. Per DR-042, M7 ALSO ships the **Bunker Defence Proof Mission** as the second proof mission and the canonical A-FEEL gate for Match grammar. Defender is rooted (per DR-027) with command core, base power, sealed life support, pre-deployed AI guards. Attacker is dropship-deployed with breach kit + buy menu. Coop-Defence variant (1 human defender + AI-filled defenders vs all-AI attackers) is the testable launch configuration. Match comms policy at M7 = ProximityOnly (full Realistic policy lands at M9.5 + M11/M12).
 
 ---
 
@@ -2073,6 +2104,35 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 **Cross-DR:** DR-002, DR-005, DR-007, DR-013, DR-015, DR-017, DR-018, DR-022, DR-024, DR-027, DR-033, DR-034, DR-035, DR-036.
 
 **Open DR gates:** DR-002 (atmosphere event category extends DR-002 contract), DR-007 (M7.5 closes DR-007 atmospheric implementation specifics under DR-036), DR-012 (hull-state UI overlays must satisfy ACC-A floor — confirm with user). Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
+
+---
+
+### M7.7 — Day/Night, Weather & Dynamic Events (Per DR-039 + DR-040)
+
+**What it proves:** Day/night cycle runs from each World's `astro.rotation_period_seconds + axial_tilt_deg + semi_major_axis_au + parent.solar_distance_au` (per [[spec/celestial-bodies-and-worlds-model]]). Weather kernel fires per-world weather events (Mars dust storms; Vulcan thermal storms; Europa cryo storms; solar flares; meteor showers; magnetic storms). Mission director authors dynamic-event sequences. EnvironmentSignal `weather` and `day_night` slices populate from this kernel; AI doctrine (M6.6) reacts; HUD shows; replay records.
+
+**Scope:**
+
+- `cf-environment::day_night` kernel: per-tick local solar time + sun elevation + solar phase per World data.
+- `cf-environment::weather` kernel: per-world weather variation table; deterministic event firing per scenario seed; intensity ramps + decay; precipitation kinds (dust, rain, snow, acid, ash, meteor_fall).
+- Weather event roster (locked launch set): `mars_dust_storm`, `mars_local_dust_devil`, `mars_thermal_inversion`, `vulcan_thermal_storm`, `vulcan_oxidizer_pocket`, `europa_cryo_storm`, `mimas_meteor_shower`, `solar_flare_minor`, `solar_flare_major`, `magnetic_storm`, `earth_thunderstorm` (placeholder).
+- Mission director hooks (M7): missions can author dynamic events (`weather_starts_at_tick`, `weather_intensity_ramp`, `solar_flare_during_extraction`).
+- EnvironmentSignal feeds: `day_night.local_solar_time_s` + `day_night.phase` + `weather.active_event` + `weather.intensity_0_1` + `weather.wind_mps` + `weather.visibility_m` + `weather.precipitation` + `weather.eta_to_change_s`.
+- Run-bundle event categories `weather` (event_started / progressed / ended) + `astrography.tick` (sparse positional snapshot).
+- HUD: day/night band indicator + weather chip + storm direction arrow; accessibility caption for weather change.
+
+**Done-criteria:**
+
+- [ ] WEATHER-A acceptance suite: per-world weather events fire deterministically across replay; intensity ramps + decay match expected curves.
+- [ ] Mars dust storm reduces visibility (atmospheric absorption + photic darkness); AI rerouting reflected in run bundle.
+- [ ] Vulcan thermal storm raises ambient temperature; combustion autoignition risk in volatiles-rich rooms; AI ducks indoors per M6.6.
+- [ ] Solar flare raises EM noise (radio degradation per DR-043); AI commander pauses cross-body comms; ConOp falls back to local-authority orders.
+- [ ] Day/night cycle drives photic exposure; AI mission director triggers "attack at dawn" timing.
+- [ ] Determinism replay across full storm scenario.
+
+**Cross-DR:** DR-002, DR-005 (server-authoritative weather state), DR-007, DR-008, DR-012, DR-022, DR-027, DR-034, DR-035, DR-036, DR-037, DR-038, **DR-039** (per-world weather table), **DR-040** (EnvironmentSignal weather + day_night slices).
+
+**Open DR gates:** DR-039 (closed; needs evidence), DR-040 (closed; needs evidence). Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
 
 ---
 
@@ -2129,6 +2189,37 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 ---
 
+### M8.6 — Mining And Extraction (Per DR-041)
+
+**What it proves:** Full mining-and-extraction pipeline runs end to end: sample → drill → extract → refine → smelt → use. Per-world ore deposits load from the World catalog (DR-039). 12 launch ores ship. Mining tools (Sampler, LightDigger, HeavyDrill, CoreDrill, RefiningStation, SmelterFurnace, EnrichmentReactor, OreCargoBay, ConveyorBelt) ship with origin compatibility. AI miner doctrine passes AI-MINE-A 8-test acceptance suite. Server-authoritative resource ledger replicates per [[spec/persistent-mmo-architecture]]. Mining missions land in the mission director.
+
+**Scope (per [[spec/mining-and-extraction-model]]):**
+
+- `cf-equipment` mining tool roles + content data rows.
+- `cf-material` ore-as-material entries promoted from M5.6 stub.
+- `cf-mission` mining objective schema + dynamic-event hooks (extraction-under-fire, deposit-collapse-eta).
+- `cf-server-persistence` resource ledger (per-shard; audit-logged; anti-cheat).
+- Per-world ore deposit generator (deterministic seed; veined / pocketed / streak / uniform distribution).
+- AI miner doctrine: prospect / drill / refine / haul / retreat with reason labels.
+- `cfctl observe --mining` exposes per-actor + per-station + per-shard ledger state.
+- New `mining` run-bundle event category.
+- M8 scenario editor extension: mining objective authoring panel.
+
+**Done-criteria:**
+
+- [ ] AI-MINE-A-01..AI-MINE-A-08 acceptance suite passes byte-identically.
+- [ ] 12 launch ores load + smelt + refine through full pipeline.
+- [ ] Mining missions are authorable in M8 scenario editor + winnable / losable.
+- [ ] Server-authoritative resource ledger replicates across shard restart.
+- [ ] Origin gating: robot mines vacuum belt without life-support warning; human refuses without sealed suit + tank.
+- [ ] Determinism replay across full mining mission.
+
+**Cross-DR:** DR-006 (mining content moddable), DR-007, DR-011 (intrinsic retention), DR-013, DR-017, DR-022, DR-024, DR-027, DR-031 (economy), DR-034, DR-035, DR-036, DR-039 (per-world deposits), DR-040 (AI reads EnvironmentSignal), **DR-041** (closes).
+
+**Open DR gates:** DR-041 (this milestone IS DR-041 closure); DR-031 (resource economy at launch must satisfy DR-031 monetization posture — confirm). Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
+
+---
+
 ### M9 — Dedicated Server App + Determinism Islands
 
 **What it proves:** `cf-server` is a working dedicated server binary anyone can host. It runs core lifecycle and mode-selection paths against the same sim path the client uses. Determinism islands are real and testable. Replays from events alone reconstruct identical state. The M9 server-core subset from [[spec/server-app-architecture]] passes; M12 owns PvP/MMO scale acceptance.
@@ -2163,6 +2254,44 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 ---
 
+### M9.5 — Voice & Radio Comms (Per DR-043)
+
+**What it proves:** Full ACRE2-tier radio + Steam Audio-tier voice simulation runs deterministically. Voice propagates through atmospheric medium (vacuum = no sound; walls + materials attenuate per Steam Audio raytraced occlusion + transmission + reverb). Radio uses ACRE2 multipath terrain model: FSPL + multipath + antenna gain + per-band audio reconstruction. Origin gating works: humans equip; robots built-in (powered by `power`); androids built-in OR modular (powered by `battery_charge`). AI subscribes to chatter. Server-authoritative voice routing on `cf-server`. Captions per DR-012.
+
+**Scope (per [[spec/comms-voice-and-radio-model]]):**
+
+- `cf-comms` crate: acoustic propagation kernel (Steam Audio-style geometry occlusion + transmission + reverb) + radio propagation kernel (ACRE2 multipath + antenna gain).
+- Audio middleware: `bevy_kira_audio` (Kira; Apache-2.0; Rust-native) primary; `bevy_fmod` optional feature flag.
+- Voice codec: Opus (royalty-free; speech-optimized; low-latency).
+- Frequency band registry: HF / VHF / UHF / Microwave with locked range / voice / penetration / antenna characteristics.
+- Radio hardware roster: PRR-Lite, Squad-Mk1, Squad-Mk2, LongHaul-AT, Dish-Beacon, HAM-Field, Ionopulse (lore), Robot-Internal, Android-Module.
+- Antenna roster: whip, long whip, dipole wire, yagi, microwave dish, helical, ground-spike.
+- Audio reconstruction: band-limit (300-3000 Hz typical voice), compander, static-gating by SNR, distortion at low SNR, squelch tail.
+- Origin gating: humans equip radio (slot); robots have built-in (powered by `power`); androids built-in OR modular (slot-free; powered by `battery_charge`).
+- Server-authoritative voice routing on `cf-server`; clients send Opus streams; server runs propagation + reconstruction; per-receiver mixed audio OR raw + reconstruction params.
+- AI subscriptions: AI agents subscribe to assigned frequencies; `radio.transmission_received` events trigger doctrine reasoning; "going dark" tactical mute.
+- New `voice` + `radio` run-bundle event categories.
+- New T-COMMS side track tracks comms surface across M2 / M4 / M5 / M5.7 / M5.10 / M6.6 / M9.5 / M10 / M11 / M12.
+
+**Done-criteria:**
+
+- [ ] COMMS-A-01..COMMS-A-15 acceptance suite passes byte-identically.
+- [ ] Vacuum scenario: voice transmission emits `voice.transmission_blocked{reason=vacuum}`; only radio carries comms.
+- [ ] Indoor bunker: voice attenuates per occlusion + reverberates per Steam Audio.
+- [ ] Hill between two VHF radios: signal weakens per ACRE2 multipath.
+- [ ] Solar flare degrades radio reception; static rises in audio reconstruction.
+- [ ] Robot uses built-in radio; no equipment slot occupied; `power` consumption ticks.
+- [ ] Human attempts robot's built-in-radio item → rejected with `wrong_origin_for_equipment`.
+- [ ] EMP weapon disrupts robot radio temporarily; recovers after cooldown.
+- [ ] Caption coverage 100% (DR-012 floor).
+- [ ] Earth-Mars radio link respects astrography light-lag from DR-039.
+
+**Cross-DR:** DR-002, DR-005, DR-006, DR-008, DR-012, DR-013, DR-014, DR-018, DR-020 (extends), DR-022, DR-024, DR-027, DR-031, DR-033, DR-034, DR-035, DR-037, DR-038, DR-039, DR-040, DR-042, **DR-043** (closes).
+
+**Open DR gates:** DR-043 (this milestone IS DR-043 closure); DR-020 audio identity (M9.5 extends DR-020 with full comms surface; confirm). Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
+
+---
+
 ### M10 — LAN Co-op
 
 **What it proves:** Two-to-four clients on a local network can play one Breach Contract together via `cf-server --mode lan_room` with replicated state, authority resolution, anti-cheat foundation enabled, and replay parity.
@@ -2189,7 +2318,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 ---
 
-### M11 — Online Co-op (Self-Hosted Dedicated Servers)
+### M11 — Online Co-op (Self-Hosted Dedicated Servers) — Extended For Full Match Grammar Per DR-042
 
 **What it proves:** A community member can host an internet-reachable `cf-server --mode coop_room` instance, register it with a `lobby_directory` (community or first-party), and friends in different cities can find it, join via NAT-traversal/relay, and complete a Breach Contract together. Mod hash sync prevents version mismatch crashes.
 
@@ -2217,7 +2346,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 ---
 
-### M12 — Public PvP Arenas + Persistent MMO Shards
+### M12 — Public PvP Arenas + Persistent MMO Shards — Extended With Bunker Defence Flagship Per DR-042 + Realistic Comms Per DR-043
 
 **What it proves:** The architecture supports public PvP arenas and persistent MMO shards under `cf-server`, with community-hostable defaults, anti-cheat foundation enabled, persistence proven across restart, interest management proven at scale, and per-client run bundles aligning tick-for-tick.
 

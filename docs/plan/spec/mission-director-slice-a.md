@@ -9,9 +9,13 @@ feeds:
   - DR-007
   - DR-008
   - DR-009
+  - DR-039
+  - DR-040
+  - DR-042
+  - DR-043
 ---
 
-<- [[spec/index|spec section]] · [[spec/missions-and-objectives|missions and objectives]] · [[systems/destruction-objective-mission-patterns|destruction-objective patterns]] · [[engine/activity-scenario-lifecycle|activity lifecycle]] · [[spec/equipment-loadout|equipment/loadout]] · [[spec/ai-trust-harness-slice-a|AI harness]] · [[spec/replay-recorder-slice-a|replay recorder]]
+<- [[spec/index|spec section]] · [[spec/missions-and-objectives|missions and objectives]] · [[systems/destruction-objective-mission-patterns|destruction-objective patterns]] · [[engine/activity-scenario-lifecycle|activity lifecycle]] · [[spec/equipment-loadout|equipment/loadout]] · [[spec/ai-trust-harness-slice-a|AI harness]] · [[spec/replay-recorder-slice-a|replay recorder]] · [[spec/celestial-bodies-and-worlds-model|worlds catalog]] · [[spec/environmental-conditions-model|environmental conditions]] · [[spec/game-modes-and-match-grammar|game modes / match grammar]] · [[spec/comms-voice-and-radio-model|comms/voice/radio]]
 
 # Mission Director Slice A
 
@@ -257,6 +261,19 @@ AI implication: commander packages and friendly bot assignments can only claim c
 | Equipment | Use LOAD-A fixtures and role cards. Mission asks for capabilities; UI explains missing capability risks. |
 | Replay | Export objective, commander, LZ, delivery, terrain, intensity, AI order, and mission end events. |
 | UX | HUD objective marker, command reason panel, LZ danger marker, loadout capability strip, debrief recap. |
+
+## World, Match Grammar, Weather, and Comms Policy Hooks
+
+> [!note] Cross-reference
+> Slice A Breach Contract is the simplest mission. The full match grammar (Bunker Defence, Symmetric Arena, FFA, Asymmetric N-Team, Coop-vs-AI, Campaign) lands at later milestones (M7 + M11 + M12) per [[spec/game-modes-and-match-grammar]] / DR-042. Mission director hooks below are the integration anchors.
+
+| Hook | Source-of-truth | Mission director responsibility |
+|---|---|---|
+| **World binding** | `Mission.world_id` → [[spec/celestial-bodies-and-worlds-model]] | Resolve world manifest at scenario load; pass per-world ambient + gravity + day/night + ore deposits to runtime kernels (`cf-atmos`, `cf-physics`, `cf-mining`, `cf-environment`). |
+| **Match grammar** | `Match.kind` (`BunkerDefence`, `SymmetricArena`, `FFA`, `AsymmetricNTeam`, `CoopVsAI`, `Campaign`) → [[spec/game-modes-and-match-grammar]] | Wire team-config-flexibility (1v1 through NvN, FFA, asymmetric, coop); fire `match.victory_condition_met` event chain. AI fills empty player slots per `Match.ai_fill_policy`. |
+| **Weather policy** | `Mission.weather_policy` → [[spec/environmental-conditions-model]] / DR-040 | Optional weather override (force dust storm; force RF silence solar flare; force clear). Per-mission scripted weather events. Wire M7.7 weather kernel events into mission objectives (e.g., "extract before dust storm peak"). |
+| **Comms policy** | `Mission.comms_policy` → [[spec/comms-voice-and-radio-model]] / DR-043 | Per-team default frequencies; per-mission radio bans (RF silence campaign mission); jamming overlays. Fire `mission.comms_policy_changed` events. Match grammar declares default frequencies + encryption keys; mission director may modify per-phase. |
+| **Hazard escalation** | M5.7 hazard package + M5.10 environment aggregation | Mission director can author objectives like `evacuate before radiation peak`, `breach hull while contained`, `extinguish atmosphere fire before reactor breach`. Reasons cause-chained from `EnvironmentSignal.hazard_detected`. |
 
 ## Save And Replay Contract
 

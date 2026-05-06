@@ -10,7 +10,7 @@ feeds:
   - DR-017
 ---
 
-← [[spec/index|spec section]] · [[spec/authoritative-game-spec-v0|game spec v0]] · [[spec/product-promise|product promise]] · [[spec/command-core-base-power|command core]] · [[decisions/dr-016-setting-and-world-frame|DR-016]] · [[decisions/dr-014-tone-player-promise|DR-014]] · [[decisions/dr-015-player-identity-control-posture|DR-015]]
+← [[spec/index|spec section]] · [[spec/authoritative-game-spec-v0|game spec v0]] · [[spec/product-promise|product promise]] · [[spec/command-core-base-power|command core]] · [[spec/celestial-bodies-and-worlds-model|worlds catalog]] · [[spec/environmental-conditions-model|environmental conditions]] · [[decisions/dr-016-setting-and-world-frame|DR-016]] · [[decisions/dr-014-tone-player-promise|DR-014]] · [[decisions/dr-015-player-identity-control-posture|DR-015]] · [[decisions/dr-039-celestial-bodies-and-worlds-direction|DR-039]] · [[decisions/dr-040-environmental-conditions-and-hazards-direction|DR-040]]
 
 # Setting And World Frame
 
