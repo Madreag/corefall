@@ -20,6 +20,10 @@ feeds:
 > [!important] Hand this list (or a subset) to the worker
 > When assigning a milestone or single roadmap feature, paste the relevant rows below into the agent prompt. The agent must confirm each read in the milestone vault note. The [[spec/prototype-roadmap#Open Decision Gates Protocol|Open Decision Gates Protocol]] applies to every task.
 
+> [!tip] When assigning a review or bug hunt
+> Add [[spec/ai-code-review-bug-hunt-skills]] to the read list. In Claude Code inside `/Users/erol/projects/corefall`, invoke `/corefall-review <milestone-or-range>`. Reviewer agents should run the separate diff review, full affected-code review, contract gap review, edge-case hunt, test audit, determinism/replay review, `cfctl` observability review, and final synthesis judge described there.
+> Before any milestone is accepted, run `/corefall-review <milestone>`, fix every verified issue, and rerun `/corefall-review <milestone>` until it returns `Accept` or the user explicitly approves each exact remaining deferral.
+
 ## Mandatory For Every Task (Read In Order)
 
 | # | Document | Why |
@@ -32,6 +36,8 @@ feeds:
 | 6 | [[spec/ai-control-observability-layer]] | Eyes/ears/hands rule. Every player-facing surface MUST be reachable from `cfctl`. |
 | 7 | [[references/prototype-run-bundle-schema]] | Run-bundle schema, event category baseline, native milestone acceptance gates. |
 | 8 | [[decisions/index]] + [[dashboards/decision-tracker]] | Current DR status + still-open topics. |
+
+For a dedicated review task, also read [[spec/ai-code-review-bug-hunt-skills]] before inspecting code. In Claude Code, the project-local skill lives at `/Users/erol/projects/corefall/.claude/skills/corefall-review/SKILL.md`.
 
 ## Read Conditionally Per Milestone
 

@@ -100,11 +100,40 @@ Good/Bad/Meh should be about observed play and debug evidence, not only personal
 | `accessibility` | `ux_accessibility_setting_changed`, text scale applied, contrast mode, focus path tested, caption shown, flash suppressed, screen shake scaled. | ACC-A evidence, comfort/readability regression, workbench accessibility, run-bundle audits. |
 | `performance` | frame cost, dirty rect cost, event volume, path refresh cost. | DR-002/DR-005/DR-007 risk budgets. |
 
+## DR-002 v1 Lock Extensions (added 2026-05-05 in M0 pass)
+
+The DR-002 hybrid event-log + snapshots lean was confirmed during M0 implementation. The additions below extend (do NOT replace) the canonical contract:
+
+### `run_manifest.json` extensions
+
+| Field | Type | Meaning |
+|---|---|---|
+| `checksum.algorithm` | string | Hash function used for `determinism.sim_checksum` events. Default: `"blake3"`. |
+| `checksum.scope` | string | Named state scope hashed. M0 ships `"sim_state_v1"` covering `tick_counter || rng_state_bytes`. M2 appends terrain chunk material grid; M3 appends actor/inventory state; layout-breaking changes bump to `_v2` and register a migration. |
+| `checksum.cadence_ticks` | u64 | Ticks between automatic checksum emits (M0: 60). |
+| `tick_rate_hz` | u32 | Configured fixed-tick rate the run was executed at (M0 defaults to 60; 120 Hz is a first-class option). Run bundles MUST record the rate that was actually used; the engine MUST NOT hardcode a rate that disagrees with this field. |
+| `settings` | object | Flat KV block of the six DR-012 accessibility flags active at run start: `ui_scale`, `high_contrast`, `captions`, `reduced_motion`, `reduced_shake`, `reduced_flash`. |
+
+### `summary.json` extensions
+
+| Field | Type | Meaning |
+|---|---|---|
+| `final_sim_checksum` | string \| null | Hex of the last `determinism.sim_checksum` event payload. M0.1 onward: bundles MUST emit at least one final `determinism.sim_checksum` on `run_finished` so this field is non-null on a valid run. Empty/0-tick runs MAY still report null. |
+| `checksum_event_count` | u64 | Number of `determinism.sim_checksum` events recorded. M0.1 onward: ≥ 1 on every successful run. |
+| `first_tick` | u64 \| null | Tick of the first event in `events.jsonl`. |
+| `last_tick` | u64 \| null | Tick of the last event in `events.jsonl`. |
+| `performance.tick_rate_hz` | u32 | Configured tick rate this run targeted (mirror of `run_manifest.json.tick_rate_hz`). Lets summary-only consumers compare wall-clock pacing without reopening the manifest. |
+| `performance.p99_tick_ms` | f64 | 99th-percentile per-tick cost in milliseconds. M0 captures wall time spent inside `M0Engine::drive_tick`; future milestones append substep / kernel costs without changing the field name. |
+| `performance.avg_tick_ms` | f64 | Mean per-tick cost in milliseconds, reported alongside `p99_tick_ms`. |
+| `performance.wall_seconds` | f64 | Wall-clock seconds the run consumed. For a paced run, this should be ≈ `ticks_run / tick_rate_hz`. |
+
+These extensions are append-only on the schema; the run-bundle checker does not require them and will not reject manifests/summaries that omit them. Future milestones (M3 closure of DR-002) MAY tighten the checker once snapshot/replay verification flows land.
+
 ## Native Milestone Acceptance Gates
 
 | Milestone | Run Bundle Must Prove |
 |---|---|
-| M0 engine bootstrap | Native app starts/ends cleanly, seed/config/build metadata are captured, fixed-tick smoke evidence exists, `cfctl observe/run` evidence exists, and the bundle validates with `prototype_run_check.py`. |
+| M0 engine bootstrap | Native app starts/ends cleanly, seed/config/build metadata are captured, fixed-tick smoke evidence exists, `cfctl observe/run` evidence exists, the bundle validates with `prototype_run_check.py`, and the v1 checksum/settings extensions above are populated. |
 | M1 actor controller | Input, movement, aim, weapon, reload, status, HUD, semantic control actions, actor/equipment observations, and recorder events are captured from the native controller scene. |
 | M1.5 micro breach fun slice | Win/loss state, objective timer, reactive enemy behavior, temporary soft-breach surface edits, control-driven win/loss scripts, observation stream freshness, and HUD objective readability are captured. |
 | M2 terrain/materials | Material probe, penetration, carve/fill, dirty-region refresh, path refresh hooks, and performance counters are captured from mutable terrain actions. |

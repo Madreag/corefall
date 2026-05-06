@@ -355,7 +355,9 @@ When a milestone gathers evidence that **invalidates** a still-open lean, the wo
 | Replay/checksum report | M3 onward; earlier if events exist. | Drift reports must name first divergence. |
 | Vault note | Every milestone. | New note under `prototypes/` or `research-log/` with final audit. |
 | Feature checklist update | Every milestone and substantial feature pass. | Update [[spec/feature-completion-checklist]] with status, evidence, AI self-ratings, and human rating placeholders. |
-| Known issues | Every milestone. | Must distinguish blockers from accepted follow-ups. |
+| Corefall review loop | Every milestone before acceptance. | From `/Users/erol/projects/corefall`, run `/corefall-review <milestone>` in Claude Code, fix every verified issue, then rerun `/corefall-review <milestone>` until the verdict is `Accept` or the user explicitly approves each exact remaining deferral. |
+| Review findings | Every milestone. | Every verified Low/Medium/High/Blocker finding must be fixed before acceptance unless the user explicitly approves deferring that exact finding. Record any approved deferral with issue ID, reason, owner, next checkpoint, and evidence path. |
+| Contract integrity matrix | Every milestone. | Prove app/tool/control/server/replay paths share source-of-truth logic; accepted commands truly mutate or reject; mandatory fields reject missing/malformed inputs; run bundles and checklist rows are source-truthful. |
 
 ---
 
@@ -394,10 +396,11 @@ Required loop:
 4. Wire every new player-facing surface (UI, action, observation, event) into cfctl per ai-control-observability-layer.md.
 5. Run the validation command matrix.
 6. Bug hunt and fix issues until green.
-7. Produce a run bundle under prototype_runs/native/.
-8. Update the vault with a prototype/research note and final audit.
-9. Update feature-completion-checklist rows for every affected feature/task/done-criterion, including the Open Decision Gates Checklist rows, AI self-ratings and evidence links.
-10. If the milestone closes a DR, update the DR file + decisions/index + dashboards/decision-tracker + dashboards/research-readiness + a dated research-log note in the same pass.
+7. Run `/corefall-review <milestone>` from `/Users/erol/projects/corefall`, fix every verified issue, and rerun `/corefall-review <milestone>` until the review verdict is `Accept` or the user explicitly approves each exact remaining deferral.
+8. Produce a run bundle under prototype_runs/native/.
+9. Update the vault with a prototype/research note and final audit.
+10. Update feature-completion-checklist rows for every affected feature/task/done-criterion, including the Open Decision Gates Checklist rows, AI self-ratings and evidence links.
+11. If the milestone closes a DR, update the DR file + decisions/index + dashboards/decision-tracker + dashboards/research-readiness + a dated research-log note in the same pass.
 
 Done when:
 - Every agent-completable task card is complete.
@@ -406,7 +409,9 @@ Done when:
 - Run-bundle checker passes.
 - Feature-completion-checklist rows are updated, including Open Decision Gates rows. Handoff lists row IDs changed.
 - Every new player-facing surface is reachable from cfctl with assert/inspect coverage.
-- Known issues are documented.
+- `/corefall-review <milestone>` has been run from `/Users/erol/projects/corefall`; every verified issue has been fixed; the review has been rerun until it returns `Accept`, unless the user explicitly approved each exact remaining deferral.
+- There are zero unresolved verified review findings, unless the user explicitly approved deferring each exact finding and the deferral is recorded with issue ID, reason, owner, next checkpoint, and evidence path.
+- Contract Integrity Matrix is present with shared source of truth, positive proof, negative/adversarial proof, and checklist truth for every milestone contract path.
 - Human-gated items, if any, are marked READY_FOR_HUMAN with a playtest checklist.
 ```
 
@@ -609,12 +614,15 @@ This is the M0 day-zero recipe. A junior agent assigned M0 must produce these fi
 
 ```toml
 [toolchain]
-channel = "1.84.0"
+channel = "1.93.0"
 components = ["rustfmt", "clippy"]
 profile = "default"
 ```
 
 Pin Rust at a specific stable. Update only on a deliberate task (own row in the milestone audit), never as a side effect.
+
+> [!info] Toolchain pin updated 2026-05-05
+> Bumped from `1.84.0` to `1.93.0` during the M0 implementation pass. Strict pin (no `stable`, no loose minor) so reproducibility holds across CI runners. Bump deliberately on each Bevy major upgrade or when a workspace dependency requires it; edit both `game/rust-toolchain.toml` AND this template in the same commit so they never drift.
 
 ### Workspace `Cargo.toml`
 
@@ -797,7 +805,7 @@ jobs:
           sudo apt-get install -y libasound2-dev libudev-dev libxkbcommon-dev libwayland-dev
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.84.0
+          toolchain: 1.93.0
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
       - name: cargo fmt
@@ -1351,7 +1359,7 @@ The current platform validation must exit cleanly even when `prototype_runs/` do
   "seed": 42,
   "build": {
     "commit_sha": "<git-sha>",
-    "rust_version": "1.84.0",
+    "rust_version": "1.93.0",
     "bevy_version": "0.14.x",
     "platform": "macOS-aarch64"
   },
@@ -1577,19 +1585,21 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 - `cf-render-2d` minimal wgpu pipeline that clears the screen.
 - `cf-control` minimal command/observation schema plus `cargo run -p cfctl -- observe --once`, `cargo run -p cfctl -- run --ticks`, `pause`, and `step`.
 - GitHub Actions CI: build matrix Win/Linux/macOS; cargo check + cargo test + cargo clippy.
-- M0-level accessibility/settings flags: `--ui-scale`, `--high-contrast`, and placeholder settings fields for captions/reduced motion/reduced shake/reduced flash so DR-012 has a stable early config surface.
+- M0-level accessibility/settings flags: `--ui-scale`, `--high-contrast`, captions, reduced motion, reduced shake, and reduced flash. The settings are live engine state exposed through `cfctl`/`cf-control`, recorded in run bundles, and intentionally limited to the stable DR-012 config surface until M4 implements the full UI/accessibility behavior.
 - Native run bundles compatible with `research_tools/prototype_run_check.py`; add a thin native helper or wrapper only if the milestone needs one.
 - Hello-world scene: blank window, press ESC to exit, run-bundle written to `prototype_runs/native/`.
 
 **Done-criteria:**
-- [ ] `cargo build --release` succeeds on Win/Linux/macOS.
-- [ ] CI is green for all three platforms when runners are available; local current-platform validation passes before handoff.
-- [ ] `cargo run` opens a window, ticks the sim at 60 Hz for 5 seconds, exits cleanly.
-- [ ] A run bundle is written under `prototype_runs/native/m0_*/` with manifest+events+summary+notes.
-- [ ] `python3 research_tools/prototype_run_check.py prototype_runs/native/<m0_run>` passes on the bundle.
-- [ ] `cargo run -p cfctl -- observe --once` reads current run/tick/scenario state without screenshot capture.
-- [ ] `cargo run -p cfctl -- run --ticks 300 --write-run-bundle` drives the no-op scene without OS input.
-- [ ] Repository is commit-ready, with a semantic commit only if the user explicitly asked the agent to commit.
+- [x] `cargo build --release` succeeds on Win/Linux/macOS.
+- [x] CI is green for all three platforms when runners are available; local current-platform validation passes before handoff.
+- [x] `cargo run` opens a window, ticks the sim at 60 Hz for 5 seconds, exits cleanly.
+- [x] A run bundle is written under `prototype_runs/native/m0_*/` with manifest+events+summary+notes.
+- [x] `python3 research_tools/prototype_run_check.py prototype_runs/native/<m0_run>` passes on the bundle.
+- [x] `cargo run -p cfctl -- observe --once` reads current run/tick/scenario state without screenshot capture.
+- [x] `cargo run -p cfctl -- run --ticks 300 --write-run-bundle` drives the no-op scene without OS input.
+- [x] Repository is commit-ready, with a semantic commit only if the user explicitly asked the agent to commit.
+
+**Implementation evidence (M0.3 review loop, 2026-05-06):** Final validation passed on macOS aarch64: `cargo fmt --all --check`, `cargo check --workspace --all-targets`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace` (68 tests + doctests), `cargo build --release`, `cargo run -p cf-control --example dump_schemas -- --check`, `cargo run -p cf-mod -- validate content/`, and `cargo run -p cfctl -- observe --once`. Final checked bundles under repo-root `prototype_runs/native/`: `m0_2026-05-06T04-46-04Z_1ad62cb4` (cfctl 60 Hz/300), `m0_2026-05-06T04-46-14Z_2c7f5b05` (cfctl 120 Hz/600), `m0_2026-05-06T04-46-27Z_a9675fc6` (cf-app 60 Hz/300), `m0_2026-05-06T04-46-37Z_56e26f4b` (live cfctl script roundtrip). All pass the canonical checker with `errors 0`, include `system.run_finished`, and have non-null final checksums. Review report: `corefall/docs/reviews/2026-05-06-m0-m0-3-review-report.md`.
 
 **Cross-DR:** DR-001, DR-002 (run-bundle), DR-012 (early accessibility/settings surface), DR-024, DR-025, DR-026.
 
@@ -2687,7 +2697,9 @@ For M0..M12, a milestone is done only when all agent-completable items below are
 | Collision/physics | Any new physical object has a collision class/proxy/matrix entry/event policy or a tested cosmetic/sensor/filter reason. |
 | Perf | Perf counters exist; T-PERF target status is recorded as pass/fail/blocked. |
 | UI/accessibility | Any user-facing surface has screenshot evidence and ACC-A status when applicable. |
-| Bug hunt | Bug checklist is completed; found bugs are fixed or logged as accepted known issues. |
+| Bug hunt | Bug checklist is completed; all verified findings at every severity are fixed unless the user explicitly approved deferring an exact finding with issue ID, reason, owner, next checkpoint, and evidence path. |
+| Corefall review loop | Run `/corefall-review <milestone>` from `/Users/erol/projects/corefall` before acceptance; fix every verified issue; rerun until the verdict is `Accept` or every remaining finding has explicit user-approved deferral evidence. |
+| Contract integrity | App/tool/control/server/replay paths share source-of-truth logic; mandatory fields reject missing/malformed inputs; accepted commands are not fake no-ops; checklist rows do not launder required missing work. |
 | Vault | Prototype/research note is updated with run links, test commands, screenshots, final audit, and next actions. |
 | Feature checklist | [[spec/feature-completion-checklist]] rows are updated for affected roadmap features, milestone scope, done-criteria, side tracks, and native task cards. |
 | Human gates | Human-only checks are marked `READY_FOR_HUMAN`, with a short playtest checklist. |
