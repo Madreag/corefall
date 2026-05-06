@@ -2,7 +2,9 @@
 
 # Corefall
 
-**A 2D side-view tactical physics sandbox where every gas, every grain, every bullet, and every body is real.**
+**A 2D side-view tactical physics sandbox where every gas, every grain, every bullet, every body, every world, and every transmission is real.**
+
+**Featuring Bunker Defence as the flagship game mode** — attackers vs defenders with full coop on either side, 1v1 / 2v2 / 3v3 / 4v4 / 1v1v1v1 / 2v1 / any combination. Ten worlds at launch (Earth, Mars, Phobos, Deimos, Earth's Moon, Mimas, Europa, Vulcan, Venus, Sol — plus belt-asteroid + orbital-station classes), real Stationeers-grade atmospherics, universal gravity, ACRE2-tier voice + radio simulation, mining, and origin-aware bodies (humans, androids, robots — each with structurally different physics).
 
 [![Rust 1.93](https://img.shields.io/badge/Rust-1.93.0-CE422B?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org)
 [![Bevy 0.14](https://img.shields.io/badge/Bevy-0.14-232326?style=for-the-badge&logo=bevy&logoColor=white)](https://bevyengine.org)
@@ -25,17 +27,21 @@
 
 ## What Corefall Is
 
-Corefall is the implementation repo for a **tactical pulp sci-fi disaster sandbox** — a side-view, pixel-physics game where every body, every machine, every pipe, every droplet of coolant, and every cubic meter of gas is a real first-class simulated thing. You command a small mercenary, rescue, and salvage outfit on a collapsing frontier. You can play strategically as a continuity commander, or take direct control of a body, android, power armor suit, or mech when the moment requires.
+Corefall is the implementation repo for a **tactical pulp sci-fi disaster sandbox** — a side-view, pixel-physics game where every body, every machine, every pipe, every droplet of coolant, every cubic meter of gas, every world in the sky, and every voice on the radio is a real first-class simulated thing. You command a small mercenary, rescue, and salvage outfit on a collapsing frontier. You can play strategically as a continuity commander, or take direct control of a body, android, power armor suit, or mech when the moment requires.
 
 You will:
 
+- **Defend the bunker** as 1-4 humans + AI guards holding a rooted command-core base against a dropship-deployed attacker team — or BE the attackers, breaching pressure seals and venting the defender's atmosphere. (Or 2v2. Or 3v3. Or 4v4. Or coop-vs-AI on either side. **Bunker Defence is the flagship mode.**)
+- **Choose a planet, moon, or asteroid** for your match. Each world has real atmospheric ambient + gravity + day length + weather. Mars has dust storms; Vulcan ignites if you spark a flammable mix; Mimas at 0.0064g lets grenades arc for hours.
+- **Coordinate your squad over real radio** with realistic propagation: hills break VHF line-of-sight, HAM radios bounce off the ionosphere on Earth, EMP weapons disrupt your robot's built-in radio, solar flares dump static into your link to base.
 - **Breach a sealed bunker** by knowing that the room behind the airlock is filled with high-O2 atmosphere, that your enemy is using oil-fed tools, and that one round into a coolant line will produce a steam-flash that buys you three seconds of cover.
 - **Watch your android operative** start to slow down as her battery runs low, because the EMP took out her organic-side comms and the synthetic side is now drawing more than she can replenish.
 - **Carry a wounded human teammate** through a Mars surface section while watching the oxygen meter on her helmet drain faster than usual because there's a 1.5mm puncture nobody's noticed yet.
 - **Lose a robot** to a thermal-throttle cascade because you ordered too many overclocks while the foundry pumped heat into the room.
 - **Build a base** with real pipe networks, real pressure regulators, real airlocks. Or capture an enemy base by venting it.
+- **Mine ore** from a vacuum belt asteroid (your robot operative is the right tool for this; your human can't survive there without sealed life-support overhead).
 
-This is not a Cortex Command remake. It is a **best-of-genre synthesis** that takes Cortex Command's command-core / dropship / chassis / digging fantasy and sets it on top of Stationeers-grade atmospherics, Noita-grade systemic materials, full collision physics, and universal gravity. AI bots are first-class teammates and rivals. Replay is deterministic. Modding is data-first. Accessibility is a floor, not an afterthought.
+This is not a Cortex Command remake. It is a **best-of-genre synthesis** that takes Cortex Command's command-core / dropship / chassis / digging fantasy and sets it on top of Stationeers-grade atmospherics, Noita-grade systemic materials, full collision physics, universal gravity, ACRE2-tier voice + radio simulation, and a full astrography of playable worlds. AI bots are first-class teammates and rivals. Replay is deterministic. Modding is data-first. Accessibility is a floor, not an afterthought.
 
 ---
 
