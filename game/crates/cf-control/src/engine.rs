@@ -521,7 +521,12 @@ impl M0Engine {
             }
             let cadence = ChecksumConfig::m0_default().cadence_ticks;
             if cadence > 0 && tick.0 % cadence == 0 {
-                let cs = sim_state_v1(tick, &state.rng);
+                let actor_bytes = state
+                    .actor_state
+                    .as_ref()
+                    .map(|s| s.checksum_bytes())
+                    .unwrap_or_default();
+                let cs = sim_state_v1(tick, &state.rng, &actor_bytes);
                 let sim_time_ms = state.clock.sim_time_ms();
                 checksum_payload = Some((tick, sim_time_ms, cs.to_hex()));
                 // M0.2-F4: emit a tick_sample summarizing the last `cadence` ticks.
@@ -816,7 +821,12 @@ impl M0Engine {
         let state = self.state.read().expect("engine state poisoned");
         let tick = state.clock.tick();
         let sim_time_ms = state.clock.sim_time_ms();
-        let cs = sim_state_v1(tick, &state.rng);
+        let actor_bytes = state
+            .actor_state
+            .as_ref()
+            .map(|s| s.checksum_bytes())
+            .unwrap_or_default();
+        let cs = sim_state_v1(tick, &state.rng, &actor_bytes);
         drop(state);
         self.recorder.record(
             tick,

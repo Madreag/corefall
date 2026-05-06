@@ -351,7 +351,12 @@ fn log_tick_progress(holder: Res<EngineHolder>, mut runtime: ResMut<AppRuntime>)
 /// `ControlIntent` so human input runs through exactly the same path as
 /// `cfctl act.player.*` commands. Movement is continuous (held keys); jump /
 /// fire / reload / select are edge-triggered.
-fn ingest_player_input(holder: Res<EngineHolder>, keys: Res<ButtonInput<KeyCode>>, rt: Option<Res<ControlRuntime>>) {
+fn ingest_player_input(
+    holder: Res<EngineHolder>,
+    keys: Res<ButtonInput<KeyCode>>,
+    rt: Option<Res<ControlRuntime>>,
+    mut last_move_x: Local<f32>,
+) {
     let _ = rt; // Reserved; ControlRuntime presence does not gate human input.
     if !holder.0.config().has_actor_world {
         return;
@@ -371,16 +376,26 @@ fn ingest_player_input(holder: Res<EngineHolder>, keys: Res<ButtonInput<KeyCode>
         KeyCode::ArrowDown,
     );
     let aim_x = if move_x.abs() > 1e-3 { move_x.signum() } else { 0.0 };
+    // Only dispatch a move command when the human input actually changes. Idle samples
+    // (e.g. no key pressed and last sample was also zero) must NOT clobber sticky
+    // `cfctl act.player.move` values, since `ControlIntent.move_x` is continuous and
+    // latest-value-wins. Edge-triggered transitions (key press / release / direction
+    // change) still fire so releasing a key promptly stops the actor.
+    let move_changed = (move_x - *last_move_x).abs() > f32::EPSILON;
+    let dispatch_move = move_changed;
+    *last_move_x = move_x;
     let block_on = futures_block_on;
     block_on(async {
-        let _ = holder
-            .0
-            .dispatch(ControlCommand::ActPlayerMove {
-                x: move_x,
-                y: 0.0,
-                source: IntentSource::Human,
-            })
-            .await;
+        if dispatch_move {
+            let _ = holder
+                .0
+                .dispatch(ControlCommand::ActPlayerMove {
+                    x: move_x,
+                    y: 0.0,
+                    source: IntentSource::Human,
+                })
+                .await;
+        }
         if aim_x.abs() > 1e-3 || aim_y.abs() > 1e-3 {
             let _ = holder
                 .0
