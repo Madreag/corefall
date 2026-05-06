@@ -73,7 +73,6 @@ pub struct Projectile {
     pub velocity: Vec2,
     pub damage: f32,
     pub remaining_ticks: u32,
-    pub spawned_event_id: Option<String>,
 }
 
 /// Entire mutable sim state owned by the engine across ticks.
@@ -169,7 +168,6 @@ pub struct HitOutcome {
     pub damage: f32,
     pub previous_status: Status,
     pub new_status: Status,
-    pub spawned_event_id: Option<String>,
 }
 
 /// Spawned projectile metadata for the recorder.
@@ -188,7 +186,6 @@ pub struct ExpiredProjectile {
     pub id: u64,
     pub owner: ActorId,
     pub last_position: Vec2,
-    pub spawned_event_id: Option<String>,
 }
 
 /// All structured outcomes from one [`step`]. The engine turns these into recorder
@@ -417,9 +414,13 @@ fn step_one_actor(
             } else {
                 actor.aim.normalize_or_x()
             };
+            // Project the forward offset along the aim direction so the muzzle origin
+            // tracks vertical/diagonal aim (e.g. straight up no longer collapses to the
+            // actor's centre x because `signum(0)` is 0). The vertical rifle offset is
+            // independent of aim — it represents where the rifle sits on the chassis.
             let muzzle = Vec2::new(
-                actor.position.x + aim.x.signum() * spec.muzzle_forward_offset,
-                actor.position.y + spec.muzzle_vertical_offset,
+                actor.position.x + aim.x * spec.muzzle_forward_offset,
+                actor.position.y + spec.muzzle_vertical_offset + aim.y * spec.muzzle_forward_offset,
             );
             let velocity = Vec2::new(aim.x * spec.projectile_speed, aim.y * spec.projectile_speed);
             (muzzle, velocity, spec.damage_per_hit)
@@ -434,7 +435,6 @@ fn step_one_actor(
             velocity,
             damage,
             remaining_ticks: max_flight,
-            spawned_event_id: None,
         });
         report.spawned_projectiles.push(SpawnedProjectile {
             id: projectile_id,
@@ -498,7 +498,6 @@ fn step_projectiles(state: &mut ActorSimState, deps: StepDeps, report: &mut Step
                 damage,
                 previous_status,
                 new_status,
-                spawned_event_id: projectile.spawned_event_id.clone(),
             });
             continue;
         }
@@ -511,7 +510,6 @@ fn step_projectiles(state: &mut ActorSimState, deps: StepDeps, report: &mut Step
                 id: projectile.id,
                 owner: projectile.owner,
                 last_position: projectile.position,
-                spawned_event_id: projectile.spawned_event_id.clone(),
             });
             continue;
         }
