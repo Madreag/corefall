@@ -358,12 +358,19 @@ fn step_one_actor(
         return outcome;
     }
 
-    // Tick the rifle (separate borrow from the actor world).
+    // Tick the rifle (separate borrow from the actor world). Fire/reload intent only
+    // applies when the actor's currently selected inventory slot is the rifle; otherwise
+    // the rifle still ticks (so cooldowns advance) but ignores the pressed edges.
+    let rifle_selected = state
+        .world
+        .actors
+        .get(&actor_id)
+        .is_some_and(|a| a.inventory.selected_item().is_rifle());
     let rifle_outcomes = if let Some(rifle) = state.rifles.get_mut(&actor_id) {
         let inputs = RifleTickInputs {
-            fire_pressed: intent.fire,
-            reload_pressed: intent.reload,
-            auto_reload_when_empty: deps.auto_reload_when_empty,
+            fire_pressed: intent.fire && rifle_selected,
+            reload_pressed: intent.reload && rifle_selected,
+            auto_reload_when_empty: deps.auto_reload_when_empty && rifle_selected,
         };
         tick_rifle(rifle, inputs)
     } else {
@@ -399,7 +406,7 @@ fn step_one_actor(
                 actor.position.x + aim.x.signum() * spec.muzzle_forward_offset,
                 actor.position.y + spec.muzzle_vertical_offset,
             );
-            let velocity = Vec2::new(aim.x.signum() * spec.projectile_speed, 0.0);
+            let velocity = Vec2::new(aim.x * spec.projectile_speed, aim.y * spec.projectile_speed);
             (muzzle, velocity, spec.damage_per_hit, spec.projectile_max_flight_ticks)
         };
         outcome.muzzle_origin = Some(muzzle);

@@ -677,7 +677,7 @@ impl M0Engine {
                         "actor": outcome.actor.0,
                         "impulse": outcome.landed_impulse,
                     }),
-                    None,
+                    Some(intent_event_id.clone()),
                 );
             }
             if outcome.reload_started {
@@ -697,7 +697,7 @@ impl M0Engine {
                     "equipment",
                     "weapon_reloaded",
                     json!({"actor": outcome.actor.0}),
-                    None,
+                    Some(intent_event_id.clone()),
                 );
             }
             if outcome.dry_fire {
@@ -756,7 +756,7 @@ impl M0Engine {
                     "hit_position": [hit.hit_position.x, hit.hit_position.y],
                     "damage": hit.damage,
                 }),
-                None,
+                Some(intent_event_id.clone()),
             );
             if hit.previous_status != hit.new_status {
                 self.recorder.record(
@@ -771,7 +771,7 @@ impl M0Engine {
                         "cause": "projectile_hit",
                         "projectile_event": projectile_event_id,
                     }),
-                    None,
+                    Some(intent_event_id.clone()),
                 );
             }
         }
@@ -786,7 +786,7 @@ impl M0Engine {
                     "owner": expired.owner.0,
                     "last_position": [expired.last_position.x, expired.last_position.y],
                 }),
-                None,
+                Some(intent_event_id.clone()),
             );
         }
     }
