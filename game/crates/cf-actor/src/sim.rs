@@ -291,6 +291,16 @@ fn step_one_actor(
                 actor.aim = intent.aim.normalize_or_x();
                 outcome.aim = actor.aim;
             }
+            // Refresh ground contact from the current resting position so a jump pressed
+            // on the first tick after spawn or reset (where `on_ground` defaults to false)
+            // is honored when the actor is already standing on the floor. Mirrors the
+            // `was_on_ground` check inside `step_kinematics`.
+            if !actor.on_ground
+                && actor.velocity.y <= 0.0
+                && (actor.position.y - (floor_y + actor.half_extents.y)).abs() < 1e-3
+            {
+                actor.on_ground = true;
+            }
             if accepted_input && intent.jump {
                 let (new_vy, accepted) = apply_jump(JumpInputs {
                     velocity_y: actor.velocity.y,

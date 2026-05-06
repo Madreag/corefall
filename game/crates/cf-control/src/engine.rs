@@ -1612,7 +1612,13 @@ impl EngineHandle for M0Engine {
                 if let Some(player_id) = player {
                     state.pending_intent.actor = player_id;
                     state.pending_intent.source = source;
-                    state.pending_intent.fire = pressed;
+                    // `pressed: false` is an explicit release (a no-op for M1's
+                    // single-press rifle per the schema). Only a press raises the
+                    // edge so a release sent in the same tick as a prior press
+                    // does not erase the queued shot before `drive_tick` runs.
+                    if pressed {
+                        state.pending_intent.fire = true;
+                    }
                     drop(state);
                     self.recorder.record(
                         tick,
