@@ -322,6 +322,56 @@ Current direction:
 - Never include vault file paths in commit subjects unless the commit is vault-only.
 - Do not push directly to `main` without a local Standard Validation pass.
 
+## Cursor Bugbot Loop
+
+The corefall GitHub repo has [Cursor Bugbot](https://cursor.com/docs/bugbot) installed as a GitHub App. Bugbot reviews every PR push and is **not** the same as the project-local `corefall-review` skill. Treat its findings/autofixes as advisory, not authoritative.
+
+### How the loop runs
+
+Every time a commit lands on a PR branch:
+
+1. Bugbot review fires automatically.
+2. If Bugbot finds an issue, it produces an **autofix commit** authored as `Cursor Agent <cursoragent@cursor.com>` and pushes it directly to the PR branch.
+3. The autofix triggers another Bugbot review.
+4. Bugbot autofix loops up to **3 times** per PR push.
+5. After the 3 autofix iterations, Bugbot produces findings and waits for the human/agent to react.
+6. **Any human/agent push to the PR branch re-triggers the full 3-iteration autofix loop** from step 1.
+
+The loop runs in parallel with the GitHub Actions CI matrix. Bugbot can produce autofix commits **even while CI is still running** on an earlier commit. The matrix may already be a few commits behind by the time you look at it.
+
+### Required behavior when reviewing a PR with Bugbot
+
+1. **Do not push to the PR branch while Bugbot loops are still running.** Every push restarts the 3-iteration cycle and adds more Cursor Agent commits to evaluate. Wait for the user to confirm Bugbot + CI are settled before pushing fixes. The user will signal when the loops are done.
+2. **Pull the branch and inspect every Cursor Agent commit since the last human commit, one by one.** For each:
+   - Read the diff against the actual codebase, not just the commit message.
+   - Cross-check Bugbot's stated root cause against the real failing CI step (read CI logs, not just the Bugbot summary).
+   - Decide: is this a real bug? Is the fix actually addressing the right cause? Does the fix introduce a regression?
+3. **Revert wrong autofixes with `git revert <sha>`**, not by force-pushing over them. Use a revert commit message that explains *why* the autofix was wrong (false positive, wrong RCA, masks a deeper issue, breaks something else). This preserves the audit trail of what Bugbot proposed and why it was rejected.
+4. **For Bugbot findings that are false positives**, leave an inline PR comment on the file/line that Bugbot flagged, explaining why it's not a real bug. This prevents Bugbot from re-flagging the same finding on subsequent runs.
+5. **Only push real fixes.** Every push triggers another 3-iteration Bugbot cycle. Batch real fixes into a single commit when possible.
+6. **Real CI failures take precedence over Bugbot diagnoses.** Read the actual GitHub Actions log for the failing step. Bugbot tends to surface plausible but secondary issues that are masked by an earlier step failing first.
+
+### Failure mode the rule prevents
+
+On PR #1 (`m0-engine-bootstrap`, Madreag/corefall, 5/5/2026):
+
+- The Windows CI job failed at `cargo fmt --all -- --check` with "Incorrect newline style" on every `.rs` file. Root cause: no `.gitattributes` in the repo, so `actions/checkout@v4` honored git's default `core.autocrlf=true` on Windows runners and rewrote LF → CRLF on checkout, which violated `rustfmt.toml`'s `newline_style = "Unix"`.
+- Bugbot diagnosed the Windows failure as **"Windows bundle validation fails"** and autofixed `python3` → `python` in the run-bundle validation step (because `actions/setup-python@v5` only guarantees `python` on Windows).
+- The autofix was a **valid forward-looking fix** but **not the cause of the current failure** — `cargo fmt` fired before the validation step, so the validation step never ran on Windows. Bugbot surfaced a real-but-secondary issue and advertised it as the fix.
+- The agent (correctly) read the actual CI log, identified the line-ending root cause, kept Bugbot's autofix commit (it was right about something), and added `.gitattributes` on top to fix the actual blocker.
+
+If the agent had blindly trusted Bugbot's diagnosis without reading the CI log, it would have merged the autofix expecting CI to pass — and the next push would have failed Windows again at the same `cargo fmt` step.
+
+### Cursor Agent commit signature
+
+Autofix commits are authored as:
+
+```text
+Author: Cursor Agent <cursoragent@cursor.com>
+```
+
+Search for this signature when auditing recent PR history. These are NOT human commits and NOT `corefall-review` skill commits. They come from the GitHub App and need explicit human/agent review before they're trusted.
+
 ## Secrets Posture
 
 - Never commit API keys, `.env` files, signing keys, or LLM provider tokens.
