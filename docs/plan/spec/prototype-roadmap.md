@@ -1865,6 +1865,72 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 ---
 
+### M5.8 — Origin Resource & Overclock Pass
+
+**What it proves:** The per-origin reaction matrix from [[spec/origin-reaction-and-resource-model]] becomes runtime: humans / androids / robots have distinct shot-reaction events, distinct healing affordances, distinct resource accumulators, distinct overclock state machines, distinct affliction sets, and distinct HUD treatments. The G-Force vision blackout effect lands. Origin-gated equipment (helmet, oxygen tank, food, medkits, drugs) rejects wrong-origin use cases with structured reason labels rather than silent no-op.
+
+**Scope:**
+- `cf-actor` extension: `origin_id` enum field on chassis records (`human`, `android_*`, `robot`, modder origins).
+- `cf-physics` impulse-to-damage routing extension: per-origin branches in M5.5-008 — humans accumulate `g_load_dose` + `concussion_dose`; androids accumulate at reduced rates; robots route equivalent impulse into per-module `internal_shock` damage.
+- New resource accumulators on actors: `caloric_energy` (humans + android organic side), `battery_charge` (android battery variants), `power` (robots — gates every action with `resource.power_action_rejected` reject path mirroring M0.2-F3), `heat` (robot global / android per-module), `oxygen_supply` (humans + androids with helmet+tank in non-breathable ambient).
+- New afflictions: `internal_shock`, `coolant_leaking`, `oil_leaking`, `overheating`, `low_battery`, `power_starved`, `weak`, `exhausted`, `hypoxia`, `downclocked`, `heat_exhaustion`. All visible on HUD with origin-filtered chip set (no `concussed` chip on robot, no `internal_shock` chip on human, etc.).
+- Voluntary overclock state machine on robot/android chassis: tier-based aim/move/reload/sensor speed boost + power drain + heat gain. Per-module overclock for androids; whole-processor for robots.
+- Involuntary downclock state machine: passive heat triggers `chassis_thermal_throttle_started` with `scope: global | module:<id>`; visually distinct HUD chip from voluntary overclock.
+- Coolant + oil leak channels for robots: penetrating round / armor-cracked module emits `chassis_leak_started` with channel + rate; particles route into the M5.6 material kernel for ground pooling and ignition reactions.
+- G-Force vision blackout HUD effect: vignette darkens proportional to `g_load_dose` for humans; reduced curve for androids; never for robots. Accessibility flag `--reduced-g-force-blackout` reduces curve; non-visual caption + HUD icon fallback.
+- Origin-gated equipment validation: `helmet`, `oxygen_tank`, `food`, `medkit`, `drug` items declare `origin_compatibility`; slot-assign rejects with `wrong_origin_for_equipment`; AI bot picks emit `wrong_origin_for_treatment` for medkit-on-robot etc.
+- AI doctrine origin awareness (M6.6 owns deeper integration): origin-specific reason labels for `wrong_origin_for_treatment`, `power_below_threshold`, `low_battery_module_lockout`.
+- New CLI surfaces: `cfctl observe --origin-state <actor>` shows resources + afflictions + overclock + downclock state.
+
+**Done-criteria:**
+- [ ] ORIGIN-A-01..ORIGIN-A-10 pass (combat reaction matrix per origin).
+- [ ] ORIGIN-A-11..ORIGIN-A-15 pass (environment resistance — vacuum/oxygen, heat tolerance, downclock vs overclock, helmet breach, robot oxygen tank rejection).
+- [ ] G-Force vision blackout fires on human at sustained burst damage; never fires on robot; reduced curve on android.
+- [ ] Robot tries to fire weapon with `power < required_power` → action rejected with structured reason; replay records `resource.power_action_rejected`.
+- [ ] Bot tries medkit on robot ally → rejected with `wrong_origin_for_treatment`; replay records `ai_item_refusal`.
+- [ ] HUD shows origin-filtered chip set for each origin (no `concussed` on robots, no `internal_shock` on humans, etc.).
+
+**Cross-DR:** DR-003, DR-008, DR-012, DR-014, DR-018, DR-027, DR-033, DR-036, DR-037 (oxygen consumption reads from atmospherics), DR-038 (fall damage reads g per origin gate).
+
+**Open DR gates:** DR-003 (origin-filtered HUD chip set — confirm posture with project owner before shipping), DR-012 (G-Force vision blackout requires accessibility fallback — confirm `--reduced-g-force-blackout` UX with user), DR-018 (origin-specific death meanings — confirm rescue/finish defaults per origin variant), DR-014 (origin promise — confirm robot/android/human as launch origins; modder origins gated to M8+). Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
+
+---
+
+### M5.9 — Atmospherics-Grade Kernel
+
+**What it proves:** Stationeers-grade atmospherics is real. Every atmosphere unit (room cell, pipe network, suit, canister, lung, furnace, base module) tracks per-gas mole quantities + temperature + volume, computes pressure via `P = nRT/V` with `R = 8314.46`, exchanges contents and heat with neighbors, undergoes gradual phase change with latent heat, supports stoichiometric combustion with deterministic energy yields, and emits replay events for every transition. Pipe networks are first-class; rooms detect sealing automatically; doors are pressure barriers with state machines; suits run breathing math against canister/filter/waste-tank slots; per-planet ambient is an infinite reservoir with locked composition. Wind from ΔP applies impulse force on entities. Universal gravity field reads through one source for atmospherics density layering AND projectile drag AND material kernel density layering.
+
+**Scope (per [[spec/atmospherics-and-chemistry-model]] + [[spec/gravity-and-ballistics-model]]):**
+- `cf-atmos` becomes the kernel crate: gas registry (10 launch gases + 6 launch liquid mixtures), `Atmosphere` unit struct, kernel tick loop, active-region scheduling (sleeping atmospheres skipped per checksum).
+- `cf-atmos::combustion`: 6 locked launch reactions (Volatiles+O2/N2O/O3, H2+O2/N2O/O3) with stoichiometry + autoignition T + min ratio thresholds + reaction rate function per Stationeers wiki.
+- `cf-atmos::phase_change`: per-gas vapor pressure curve; gradual condensation/evaporation/freezing with latent heat exchange; pipe rupture if frozen content > 0.05 mol/L OR liquid stress > 100% OR ΔP > 60.795 MPa (gas pipe) / 6.079 MPa (liquid pipe).
+- `cf-atmos::pipe_network`: connected-segment graph; pumps / valves / regulators (forward + back-pressure) / volume + turbo pumps / filtration / one-way / purge / pressurant / condensation / expansion valves / condensation + evaporation chambers.
+- `cf-atmos::room_detection`: per-tick connected-volume detection from sealed barriers; sealed-cell collapse for kernel performance; per-cell partial-pressure HUD queries.
+- `cf-atmos::door_state_machine`: closed_sealed / closed_unsealed / cycling_open / open / cycling_close / breached. Airlock controller (canonical 2-door + 2-active-vent + console assembly).
+- `cf-atmos::suit_life_support`: lung + helmet + suit nested atmospheres; canister + filter + waste-tank slots; breathing math `0.0048 mol/tick · BreathingRate · BreathingEfficiency`; helmet flush function; filter max waste-tank pressure 4052 kPa.
+- `cf-atmos::planetary_ambient`: locked per-planet ambient (Earth, Mars, Moon, Mimas, Europa, Vulcan, Venus); modder schema for new ambients via `content/worlds/`.
+- `cf-atmos::wind`: ΔP-driven impulse force on actors / dropped items / debris / gibs; routes through M5.5-008 contact solver as a force input.
+- `cf-physics::gravity::GravityField`: layered field (cell > region > ambient); per-actor / per-projectile sampling; SIMD-friendly per-cell array.
+- `cf-physics::gravity::overrides`: gravity well, low-g lab, magnetic boots, damaged grav generator, reverse-g chamber. Activation events.
+- `cf-physics::ballistics`: projectile integration with `a = (F_gravity + F_drag + F_collision) / m`; drag coefficient × cross-sectional-area per projectile; ρ_local from atmospherics.
+- `cf-atmos::stratification`: per-tick partial-pressure adjustment proportional to local g × molar mass spread; CO2 sinks, H2 rises; uniform mix at 0g; flips at reverse g.
+- `cfctl observe --atmospheres`, `--pipe-networks`, `--rooms`, `--suits`, `--gravity`, `--ballistics`. `cfctl inspect atmosphere <atm-id>` etc.
+- New scenario: `content/scenarios/m5_9_atmospherics_kernel.ron` with sealed room + Mars airlock + furnace combustion + EVA suit life-support + wind-from-vacuum-breach setpieces.
+
+**Done-criteria:**
+- [ ] ATMOS-A-01..ATMOS-A-15 pass (PV=nRT correctness, mixing, pressure spike on heating, combustion stoichiometry, pipe networks, filtration, planetary ambient, suit life-support, filter mismatch failure mode, helmet flush, phase change, wind force, photosynthesis, furnace combustion math, determinism replay).
+- [ ] GRAV-A-01..GRAV-A-10 pass (per-planet drop tests, projectile arc with vacuum vs Earth atmosphere, override regions, magnetic boots, liquid layering, gas stratification, determinism replay).
+- [ ] cargo run -p cf-headless replay <m5_9_run> --verify-checksums passes byte-identically.
+- [ ] Active-region perf budget: 60 Hz default + 120 Hz validated path on Steam Deck floor; 4K/120 strong desktop validated.
+- [ ] No hardcoded `9.81` anywhere in production code. CI grep gate.
+- [ ] No subsystem reads atmosphere from anywhere except `cf-atmos`. CI grep gate.
+
+**Cross-DR:** DR-002, DR-005, DR-006, DR-007, DR-008, DR-012, DR-013, DR-024, DR-027, DR-029, DR-033, DR-034, DR-035, DR-036, **DR-037** (this milestone IS DR-037 closure), **DR-038** (this milestone is part of DR-038 closure with M5.5).
+
+**Open DR gates:** DR-007 (atmosphere kernel boundary with terrain/material kernel — confirm coupling at M5.6/M5.9 boundary), DR-013 (per-planet ambient as scenario manifest field — confirm storage shape), DR-027 (base atmospheric modules vs combat-base scope — confirm which modules are launch vs M8.5), DR-037 (atmospherics-grade direction is now CLOSED but kernel evidence required to move it from `closed-direction` to `closed-direction-with-evidence`), DR-038 (universal gravity is now CLOSED but per-cell sampling perf evidence required). Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
+
+---
+
 ### M6 — AI Core And Trust Harness
 
 **What it proves:** The 8-criteria humanlike AI bar from DR-022 has a runnable harness. Perception, memory, doctrine, reason labels, recovery, and replay are all in place. Strategic adaptation across missions is staged but not yet required to fire.
@@ -1978,9 +2044,12 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 ---
 
-### M7.5 — Base Atmospherics
+### M7.5 — Base Atmospherics (Extended For Stationeers-Grade Per DR-037)
 
-**What it proves:** Barotrauma-style hull/gap/pump/vent/oxygen/pressure/fire networks layer on top of M5.6 material kernel + M7 mission director (DR-027 deep combat-base + DR-036). Bases, mechs, ships, sealed chambers can be **rooms with state**. Breaches flood; pumps recover; oxygen runs out; fire grows with oxygen and is extinguished by water; pressure differentials move actors and items.
+**What it proves:** Barotrauma-style room/gap/pump/vent/oxygen/pressure/fire networks layer on top of the **M5.9 atmospherics-grade kernel** (real PV=nRT) + M5.6 material kernel + M7 mission director (DR-027 deep combat-base + DR-036 + **DR-037**). Bases, mechs, ships, sealed chambers are **first-class atmospheres** with per-gas mole tracking, real pressure, deterministic combustion, gradual phase change, suit life-support, and Stationeers-grade pipe network engineering. Breaches flood; pumps recover; oxygen runs out per breathing math; fire follows combustion stoichiometry and grows with O2/Volatiles ratio + autoignition T; pressure differentials move actors and items per ΔP × interface area; airlocks cycle between two atmospheres with locked door state machines.
+
+> [!note] M7.5 scope extension
+> When DR-037 closed (2026-05-06), M7.5 inherited: real PV=nRT instead of approximate room atmosphere; locked gas registry with specific heats + autoignition T; deterministic combustion stoichiometry; gradual phase change with latent heat; first-class pipe networks (pumps, valves, regulators, filtration, condensation/evaporation chambers); EVA + Hardsuit life-support with breathing math; per-planet ambient. The M5.9 kernel does the heavy lifting; M7.5 wires in the base modules + mission director hooks + HUD + AI awareness.
 
 **Scope (MAT-09, MAT-10):**
 - `cf-atmos` crate: hulls (rooms with volume + water level + oxygen level + pressure + fire state); gaps (room-to-room/outside connections with open/closed state and flow force); per-tick equalize step; connected-hull search.

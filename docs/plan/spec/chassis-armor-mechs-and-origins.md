@@ -10,7 +10,7 @@ feeds:
   - DR-014
 ---
 
-← [[spec/index|spec section]] · [[spec/authoritative-game-spec-v0|game spec v0]] · [[spec/body-damage-model|body damage model]] · [[spec/equipment-loadout|equipment/loadout]] · [[decisions/dr-014-tone-player-promise|DR-014 tone]] · [[decisions/dr-003-body-damage-readability|DR-003 body damage]] · [[decisions/dr-008-ai-architecture|DR-008 AI]]
+← [[spec/index|spec section]] · [[spec/authoritative-game-spec-v0|game spec v0]] · [[spec/body-damage-model|body damage model]] · [[spec/origin-reaction-and-resource-model|origin reaction/resource model]] · [[spec/equipment-loadout|equipment/loadout]] · [[decisions/dr-014-tone-player-promise|DR-014 tone]] · [[decisions/dr-003-body-damage-readability|DR-003 body damage]] · [[decisions/dr-008-ai-architecture|DR-008 AI]]
 
 # Chassis, Armor, Mechs, And Origins
 
@@ -102,15 +102,19 @@ This keeps "planting the core into a unit" from becoming invisible RPG math. The
 
 ## Origins / Races
 
-Origins are actor families with shared grammar but distinct defaults. They are not balance-skinned humans; they have different chassis baselines, damage profiles, and AI doctrines.
+Origins are actor families with shared grammar but distinct defaults. They are not balance-skinned humans; they have different chassis baselines, damage profiles, AI doctrines, healing affordances, resource models, environment resistance, and HUD feedback.
+
+> [!important] Per-origin reaction/resource contract lives in its own page
+> The detailed branch matrix (force-feedback content, G-load susceptibility, concussion vs internal-shock, fall damage, limb wounds vs module failure, bleed vs coolant/oil leak, healing affordances, overclock vs downclock, resource model, environment resistance, affliction extensions, ORIGIN-A acceptance tests) is locked in [[spec/origin-reaction-and-resource-model]]. This page owns the grammar; that page owns the per-origin behavior table that M5 / M5.5 / M5.7 / proposed M5.8 implement.
 
 | Origin Class | Primary Differences | Notes |
 |---|---|---|
-| Organic / human | Standard wound model, can be revived/treated, fatigue, morale. | Baseline. |
-| Powered organic | Organic with cybernetic enhancements; mixed wound + module model. | Treat as bridge. |
-| Synthetic / android | No organic wounds; module/circuit damage; vulnerable to EMP; immune to gas/bio. | First-class, not a re-skin. |
-| Construct / drone | Pilot-less; controlled remotely; bandwidth-limited; can disconnect. | Different doctrine: sacrificeable. |
-| Heavy biomech / fused | Chassis grown rather than built; self-repair; weak to specific energy types. | Future pulp-sci-fi flavor. |
+| Organic / human | Standard wound model, can be revived/treated, fatigue, morale. Highest G-Force / concussion susceptibility, highest fall damage tolerance ceiling lowest, full bleed model, eats food, uses medkits + drugs, caloric energy resource. Needs sealed helmet + oxygen tank in vacuum. | Baseline. See [[spec/origin-reaction-and-resource-model#Origin Reaction Matrix]]. |
+| Powered organic | Organic with cybernetic enhancements; mixed wound + module model. | Treat as bridge — inherits human reaction defaults plus per-cybernetic-module overclock / heat per [[spec/origin-reaction-and-resource-model#Robot-Specific: Internal Shock + Leaks + Overclock]]. |
+| Synthetic / android | Wound model on organic side, module/circuit damage on synthetic side; vulnerable to EMP; reduced bleed; reduced G-load; per-installed-module overclock. Some variants ship with batteries; battery depletion → slowdown → ability lockout. Eats food, uses medkits + drugs (organic side). Needs sealed helmet + oxygen tank in vacuum (default; sealed-android variants are an open question). | First-class, not a re-skin. See [[spec/origin-reaction-and-resource-model#Origin Reaction Matrix]] and [[spec/origin-reaction-and-resource-model#Environment Resistance Matrix]]. |
+| Synthetic / robot | NO organic wounds, NO bleed, NO concussion, NO G-load. Internal-shock damage to modules instead. Coolant + oil leak channels. Whole-processor overclock (voluntary boost) AND involuntary downclock under sustained heat. `power` resource gates every action. Vacuum-immune; heat-tolerant but downclocks under heat; cannot eat food / use medkits / take drugs. Repaired via repair tools, coolant/oil refills, module swaps. | First-class, not a re-skin. See [[spec/origin-reaction-and-resource-model#Origin Reaction Matrix]] and [[spec/origin-reaction-and-resource-model#Heat Tolerance — Robot Downclock vs Overclock]]. |
+| Construct / drone | Pilot-less; controlled remotely; bandwidth-limited; can disconnect. | Different doctrine: sacrificeable. Inherits robot reaction defaults plus disconnect-on-bandwidth-loss behavior. |
+| Heavy biomech / fused | Chassis grown rather than built; self-repair; weak to specific energy types. | Future pulp-sci-fi flavor. Inherits hybrid organic/synthetic posture per [[spec/origin-reaction-and-resource-model]] open questions. |
 
 Number of origins at launch is open. The grammar is fixed.
 
@@ -201,6 +205,7 @@ Without this in Slice A, the body damage / replay / AI / equipment claims in [[s
 - [[decisions/dr-006-modding-data-model]]
 - [[decisions/dr-008-ai-architecture]]
 - [[spec/body-damage-model]]
+- [[spec/origin-reaction-and-resource-model]]
 - [[spec/equipment-loadout]]
 - [[systems/ux-overlay-screen-brief]]
 - [[spec/ux-wireframes-slice-a]]
@@ -210,3 +215,4 @@ Without this in Slice A, the body damage / replay / AI / equipment claims in [[s
 - [[systems/replay-event-architecture]]
 - [[systems/damage-equipment-and-items]]
 - [[references/prototype-run-bundle-schema]]
+- [[research-log/2026-05-06-origin-reaction-and-resource-design-intent]]

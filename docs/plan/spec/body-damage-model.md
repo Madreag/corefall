@@ -12,7 +12,7 @@ feeds:
   - DR-014
 ---
 
-← [[spec/index|spec section]] · [[engine/body-damage-wound-gib-lifecycle|body damage lifecycle]] · [[engine/projectile-to-impact-lifecycle|projectile impact]] · [[systems/damage-equipment-and-items|damage/equipment primer]] · [[spec/equipment-loadout|equipment model]] · [[spec/chassis-armor-mechs-and-origins|chassis/armor/mechs/origins]] · [[spec/replay-recorder-slice-a|replay recorder]] · [[spec/ux-wireframes-slice-a|UX wireframes]] · [[spec/ai-trust-harness-slice-a|AI harness]] · [[references/prototype-run-bundle-schema|run-bundle schema]] · [[decisions/dr-003-body-damage-readability|DR-003]]
+← [[spec/index|spec section]] · [[engine/body-damage-wound-gib-lifecycle|body damage lifecycle]] · [[engine/projectile-to-impact-lifecycle|projectile impact]] · [[systems/damage-equipment-and-items|damage/equipment primer]] · [[spec/equipment-loadout|equipment model]] · [[spec/chassis-armor-mechs-and-origins|chassis/armor/mechs/origins]] · [[spec/origin-reaction-and-resource-model|origin reaction/resource model]] · [[spec/atmospherics-and-chemistry-model|atmospherics/chemistry]] · [[spec/gravity-and-ballistics-model|gravity/ballistics]] · [[spec/replay-recorder-slice-a|replay recorder]] · [[spec/ux-wireframes-slice-a|UX wireframes]] · [[spec/ai-trust-harness-slice-a|AI harness]] · [[references/prototype-run-bundle-schema|run-bundle schema]] · [[decisions/dr-003-body-damage-readability|DR-003]] · [[decisions/dr-037-stationeers-grade-atmospherics-direction|DR-037]] · [[decisions/dr-038-universal-gravity-and-ballistics-direction|DR-038]]
 
 # Body / Damage Model
 
