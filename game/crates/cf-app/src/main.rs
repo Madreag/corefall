@@ -14,6 +14,7 @@ use bevy::{
 };
 use clap::Parser;
 
+use cf_actor::IntentSource;
 use cf_control::{
     engine::{run_m0_inline, M0Engine, M0EngineConfig},
     runtime::{build_engine_config, resolve_run_bundle_root, ConfigInputs},
@@ -374,25 +375,54 @@ fn ingest_player_input(holder: Res<EngineHolder>, keys: Res<ButtonInput<KeyCode>
     block_on(async {
         let _ = holder
             .0
-            .dispatch(ControlCommand::ActPlayerMove { x: move_x, y: 0.0 })
+            .dispatch(ControlCommand::ActPlayerMove {
+                x: move_x,
+                y: 0.0,
+                source: IntentSource::Human,
+            })
             .await;
         if aim_x.abs() > 1e-3 || aim_y.abs() > 1e-3 {
             let _ = holder
                 .0
-                .dispatch(ControlCommand::ActPlayerAim { x: aim_x, y: aim_y })
+                .dispatch(ControlCommand::ActPlayerAim {
+                    x: aim_x,
+                    y: aim_y,
+                    source: IntentSource::Human,
+                })
                 .await;
         }
         if keys.just_pressed(KeyCode::Space) {
-            let _ = holder.0.dispatch(ControlCommand::ActPlayerJump).await;
+            let _ = holder
+                .0
+                .dispatch(ControlCommand::ActPlayerJump {
+                    source: IntentSource::Human,
+                })
+                .await;
         }
         if keys.just_pressed(KeyCode::Enter) || keys.just_pressed(KeyCode::KeyJ) {
-            let _ = holder.0.dispatch(ControlCommand::ActPlayerFire { pressed: true }).await;
+            let _ = holder
+                .0
+                .dispatch(ControlCommand::ActPlayerFire {
+                    pressed: true,
+                    source: IntentSource::Human,
+                })
+                .await;
         }
         if keys.just_pressed(KeyCode::KeyR) {
-            let _ = holder.0.dispatch(ControlCommand::ActPlayerReload).await;
+            let _ = holder
+                .0
+                .dispatch(ControlCommand::ActPlayerReload {
+                    source: IntentSource::Human,
+                })
+                .await;
         }
         if keys.just_pressed(KeyCode::KeyL) {
-            let _ = holder.0.dispatch(ControlCommand::ActPlayerReset).await;
+            let _ = holder
+                .0
+                .dispatch(ControlCommand::ActPlayerReset {
+                    source: IntentSource::Human,
+                })
+                .await;
         }
         for (slot_key, slot) in [
             (KeyCode::Digit1, 0u32),
@@ -401,7 +431,13 @@ fn ingest_player_input(holder: Res<EngineHolder>, keys: Res<ButtonInput<KeyCode>
             (KeyCode::Digit4, 3u32),
         ] {
             if keys.just_pressed(slot_key) {
-                let _ = holder.0.dispatch(ControlCommand::ActPlayerSelectItem { slot }).await;
+                let _ = holder
+                    .0
+                    .dispatch(ControlCommand::ActPlayerSelectItem {
+                        slot,
+                        source: IntentSource::Human,
+                    })
+                    .await;
             }
         }
     });

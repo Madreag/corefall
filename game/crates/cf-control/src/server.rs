@@ -31,6 +31,8 @@ use tokio::{
 };
 use tokio_tungstenite::{accept_async, tungstenite::Message};
 
+use cf_actor::IntentSource;
+
 use crate::{
     envelope::{
         error_codes, JsonRpcError, JsonRpcId, JsonRpcNotification, JsonRpcRequest, JsonRpcResponse,
@@ -101,13 +103,13 @@ pub enum ControlCommand {
     Resume,
     Step { ticks: u64 },
     RunForTicks { ticks: u64, write_run_bundle: bool },
-    ActPlayerMove { x: f32, y: f32 },
-    ActPlayerJump,
-    ActPlayerAim { x: f32, y: f32 },
-    ActPlayerFire { pressed: bool },
-    ActPlayerReload,
-    ActPlayerSelectItem { slot: u32 },
-    ActPlayerReset,
+    ActPlayerMove { x: f32, y: f32, source: IntentSource },
+    ActPlayerJump { source: IntentSource },
+    ActPlayerAim { x: f32, y: f32, source: IntentSource },
+    ActPlayerFire { pressed: bool, source: IntentSource },
+    ActPlayerReload { source: IntentSource },
+    ActPlayerSelectItem { slot: u32, source: IntentSource },
+    ActPlayerReset { source: IntentSource },
     SettingsSet { changes: SettingsPatch },
     RunBundleWrite { id_override: Option<String> },
     Shutdown { write_run_bundle: bool },
@@ -455,7 +457,13 @@ async fn process_request<E: EngineHandle>(
             if !p.x.is_finite() || !p.y.is_finite() {
                 return Some(invalid_param_reason(request.id, "axis_must_be_finite"));
             }
-            let result = engine.dispatch(ControlCommand::ActPlayerMove { x: p.x, y: p.y }).await;
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerMove {
+                    x: p.x,
+                    y: p.y,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
             Some(ack_response(request.id, &result))
         }
         "act.player.jump" => {
@@ -463,7 +471,11 @@ async fn process_request<E: EngineHandle>(
                 Ok(v) => v,
                 Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
             };
-            let result = engine.dispatch(ControlCommand::ActPlayerJump).await;
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerJump {
+                    source: IntentSource::Cfctl,
+                })
+                .await;
             Some(ack_response(request.id, &result))
         }
         "act.player.aim" => {
@@ -474,7 +486,13 @@ async fn process_request<E: EngineHandle>(
             if !p.x.is_finite() || !p.y.is_finite() {
                 return Some(invalid_param_reason(request.id, "aim_must_be_finite"));
             }
-            let result = engine.dispatch(ControlCommand::ActPlayerAim { x: p.x, y: p.y }).await;
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerAim {
+                    x: p.x,
+                    y: p.y,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
             Some(ack_response(request.id, &result))
         }
         "act.player.fire" => {
@@ -483,7 +501,10 @@ async fn process_request<E: EngineHandle>(
                 Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
             };
             let result = engine
-                .dispatch(ControlCommand::ActPlayerFire { pressed: p.pressed })
+                .dispatch(ControlCommand::ActPlayerFire {
+                    pressed: p.pressed,
+                    source: IntentSource::Cfctl,
+                })
                 .await;
             Some(ack_response(request.id, &result))
         }
@@ -492,7 +513,11 @@ async fn process_request<E: EngineHandle>(
                 Ok(v) => v,
                 Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
             };
-            let result = engine.dispatch(ControlCommand::ActPlayerReload).await;
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerReload {
+                    source: IntentSource::Cfctl,
+                })
+                .await;
             Some(ack_response(request.id, &result))
         }
         "act.player.select_item" => {
@@ -501,7 +526,10 @@ async fn process_request<E: EngineHandle>(
                 Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
             };
             let result = engine
-                .dispatch(ControlCommand::ActPlayerSelectItem { slot: p.slot })
+                .dispatch(ControlCommand::ActPlayerSelectItem {
+                    slot: p.slot,
+                    source: IntentSource::Cfctl,
+                })
                 .await;
             Some(ack_response(request.id, &result))
         }
@@ -510,7 +538,11 @@ async fn process_request<E: EngineHandle>(
                 Ok(v) => v,
                 Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
             };
-            let result = engine.dispatch(ControlCommand::ActPlayerReset).await;
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerReset {
+                    source: IntentSource::Cfctl,
+                })
+                .await;
             Some(ack_response(request.id, &result))
         }
         "act.settings.set" => {

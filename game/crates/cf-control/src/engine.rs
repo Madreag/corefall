@@ -1426,7 +1426,7 @@ impl EngineHandle for M0Engine {
                 );
                 CommandResult::accepted(tick.0)
             }
-            ControlCommand::ActPlayerMove { x, y } => {
+            ControlCommand::ActPlayerMove { x, y, source } => {
                 if !self.config.has_actor_world {
                     drop(state);
                     self.recorder.record(
@@ -1470,7 +1470,7 @@ impl EngineHandle for M0Engine {
                 let player = state.player_actor;
                 if let Some(player_id) = player {
                     state.pending_intent.actor = player_id;
-                    state.pending_intent.source = IntentSource::Cfctl;
+                    state.pending_intent.source = source;
                     state.pending_intent.move_x = x.clamp(-1.0, 1.0);
                     // y is reserved for future ladder/climb input.
                     let _ = y;
@@ -1501,14 +1501,14 @@ impl EngineHandle for M0Engine {
                     CommandResult::rejected("no_player_actor", tick.0)
                 }
             }
-            ControlCommand::ActPlayerJump => {
+            ControlCommand::ActPlayerJump { source } => {
                 if !self.config.has_actor_world {
                     return self.reject_actor_command(tick, sim_time_ms, state, "act.player.jump");
                 }
                 let player = state.player_actor;
                 if let Some(player_id) = player {
                     state.pending_intent.actor = player_id;
-                    state.pending_intent.source = IntentSource::Cfctl;
+                    state.pending_intent.source = source;
                     state.pending_intent.jump = true;
                     drop(state);
                     self.recorder.record(
@@ -1524,7 +1524,7 @@ impl EngineHandle for M0Engine {
                     self.reject_actor_command(tick, sim_time_ms, state, "act.player.jump")
                 }
             }
-            ControlCommand::ActPlayerAim { x, y } => {
+            ControlCommand::ActPlayerAim { x, y, source } => {
                 if !self.config.has_actor_world {
                     return self.reject_actor_command(tick, sim_time_ms, state, "act.player.aim");
                 }
@@ -1553,7 +1553,7 @@ impl EngineHandle for M0Engine {
                 let player = state.player_actor;
                 if let Some(player_id) = player {
                     state.pending_intent.actor = player_id;
-                    state.pending_intent.source = IntentSource::Cfctl;
+                    state.pending_intent.source = source;
                     state.pending_intent.aim = Vec2::new(x, y);
                     drop(state);
                     self.recorder.record(
@@ -1569,14 +1569,14 @@ impl EngineHandle for M0Engine {
                     self.reject_actor_command(tick, sim_time_ms, state, "act.player.aim")
                 }
             }
-            ControlCommand::ActPlayerFire { pressed } => {
+            ControlCommand::ActPlayerFire { pressed, source } => {
                 if !self.config.has_actor_world {
                     return self.reject_actor_command(tick, sim_time_ms, state, "act.player.fire");
                 }
                 let player = state.player_actor;
                 if let Some(player_id) = player {
                     state.pending_intent.actor = player_id;
-                    state.pending_intent.source = IntentSource::Cfctl;
+                    state.pending_intent.source = source;
                     state.pending_intent.fire = pressed;
                     drop(state);
                     self.recorder.record(
@@ -1592,14 +1592,14 @@ impl EngineHandle for M0Engine {
                     self.reject_actor_command(tick, sim_time_ms, state, "act.player.fire")
                 }
             }
-            ControlCommand::ActPlayerReload => {
+            ControlCommand::ActPlayerReload { source } => {
                 if !self.config.has_actor_world {
                     return self.reject_actor_command(tick, sim_time_ms, state, "act.player.reload");
                 }
                 let player = state.player_actor;
                 if let Some(player_id) = player {
                     state.pending_intent.actor = player_id;
-                    state.pending_intent.source = IntentSource::Cfctl;
+                    state.pending_intent.source = source;
                     state.pending_intent.reload = true;
                     drop(state);
                     self.recorder.record(
@@ -1615,14 +1615,14 @@ impl EngineHandle for M0Engine {
                     self.reject_actor_command(tick, sim_time_ms, state, "act.player.reload")
                 }
             }
-            ControlCommand::ActPlayerSelectItem { slot } => {
+            ControlCommand::ActPlayerSelectItem { slot, source } => {
                 if !self.config.has_actor_world {
                     return self.reject_actor_command(tick, sim_time_ms, state, "act.player.select_item");
                 }
                 let player = state.player_actor;
                 if let Some(player_id) = player {
                     state.pending_intent.actor = player_id;
-                    state.pending_intent.source = IntentSource::Cfctl;
+                    state.pending_intent.source = source;
                     state.pending_intent.selected_item = Some(ItemSlot(slot));
                     drop(state);
                     self.recorder.record(
@@ -1638,14 +1638,14 @@ impl EngineHandle for M0Engine {
                     self.reject_actor_command(tick, sim_time_ms, state, "act.player.select_item")
                 }
             }
-            ControlCommand::ActPlayerReset => {
+            ControlCommand::ActPlayerReset { source } => {
                 if !self.config.has_actor_world {
                     return self.reject_actor_command(tick, sim_time_ms, state, "act.player.reset");
                 }
                 let player = state.player_actor;
                 if let Some(player_id) = player {
                     state.pending_intent.actor = player_id;
-                    state.pending_intent.source = IntentSource::Cfctl;
+                    state.pending_intent.source = source;
                     state.pending_intent.reset = true;
                     drop(state);
                     self.recorder.record(
@@ -2133,7 +2133,13 @@ mod tests {
         let scenario_path = write_test_scenario();
         let config = load_test_scenario_and_config(scenario_path);
         let engine = M0Engine::new(config);
-        let result = engine.dispatch(ControlCommand::ActPlayerMove { x: 1.0, y: 0.0 }).await;
+        let result = engine
+            .dispatch(ControlCommand::ActPlayerMove {
+                x: 1.0,
+                y: 0.0,
+                source: IntentSource::Cfctl,
+            })
+            .await;
         assert_eq!(result.status, crate::state::ControlEnvelopeStatus::Rejected);
         assert_eq!(result.reason.as_deref(), Some("act_player_move_not_available_in_m0"));
         let rejection = engine
@@ -2344,7 +2350,13 @@ mod tests {
         let engine = M0Engine::new(config);
         engine.record_run_started();
 
-        let result = engine.dispatch(ControlCommand::ActPlayerMove { x: 1.0, y: 0.0 }).await;
+        let result = engine
+            .dispatch(ControlCommand::ActPlayerMove {
+                x: 1.0,
+                y: 0.0,
+                source: IntentSource::Cfctl,
+            })
+            .await;
         assert_eq!(result.status, crate::state::ControlEnvelopeStatus::Accepted);
         engine.drive_tick();
         let events = engine.recorder().snapshot_events();
@@ -2362,7 +2374,12 @@ mod tests {
         let engine = M0Engine::new(config);
         engine.record_run_started();
 
-        let result = engine.dispatch(ControlCommand::ActPlayerFire { pressed: true }).await;
+        let result = engine
+            .dispatch(ControlCommand::ActPlayerFire {
+                pressed: true,
+                source: IntentSource::Cfctl,
+            })
+            .await;
         assert_eq!(result.status, crate::state::ControlEnvelopeStatus::Accepted);
         engine.drive_tick();
         let events = engine.recorder().snapshot_events();
@@ -2391,7 +2408,13 @@ mod tests {
         let engine = M0Engine::new(config);
         engine.record_run_started();
 
-        let _ = engine.dispatch(ControlCommand::ActPlayerAim { x: 0.0, y: 1.0 }).await;
+        let _ = engine
+            .dispatch(ControlCommand::ActPlayerAim {
+                x: 0.0,
+                y: 1.0,
+                source: IntentSource::Cfctl,
+            })
+            .await;
         engine.drive_tick();
         let frame = engine.snapshot(None).await;
         let player = frame
@@ -2416,7 +2439,11 @@ mod tests {
             engine.drive_tick();
         }
         // Now jump should succeed.
-        let _ = engine.dispatch(ControlCommand::ActPlayerJump).await;
+        let _ = engine
+            .dispatch(ControlCommand::ActPlayerJump {
+                source: IntentSource::Cfctl,
+            })
+            .await;
         engine.drive_tick();
         let events = engine.recorder().snapshot_events();
         let jumped = events
@@ -2432,7 +2459,11 @@ mod tests {
         let engine = M0Engine::new(config);
         engine.record_run_started();
 
-        let _ = engine.dispatch(ControlCommand::ActPlayerReset).await;
+        let _ = engine
+            .dispatch(ControlCommand::ActPlayerReset {
+                source: IntentSource::Cfctl,
+            })
+            .await;
         engine.drive_tick();
         let events = engine.recorder().snapshot_events();
         assert!(events.iter().any(|e| e.event_type == "actor_reset"));
@@ -2444,7 +2475,12 @@ mod tests {
         let config = load_m1_test_config(path);
         let engine = M0Engine::new(config);
         engine.record_run_started();
-        let _ = engine.dispatch(ControlCommand::ActPlayerSelectItem { slot: 1 }).await;
+        let _ = engine
+            .dispatch(ControlCommand::ActPlayerSelectItem {
+                slot: 1,
+                source: IntentSource::Cfctl,
+            })
+            .await;
         engine.drive_tick();
         let frame = engine.snapshot(None).await;
         let player = frame
@@ -2501,7 +2537,13 @@ mod tests {
                 let _ = player.apply_damage(1000.0);
             }
         }
-        let _ = engine.dispatch(ControlCommand::ActPlayerMove { x: 1.0, y: 0.0 }).await;
+        let _ = engine
+            .dispatch(ControlCommand::ActPlayerMove {
+                x: 1.0,
+                y: 0.0,
+                source: IntentSource::Cfctl,
+            })
+            .await;
         engine.drive_tick();
         // Actor should not have moved (status::Dead refuses input).
         let frame = engine.snapshot(None).await;
@@ -2520,8 +2562,19 @@ mod tests {
         let engine = M0Engine::new(config);
         engine.record_run_started();
         // Move + fire to mutate state.
-        let _ = engine.dispatch(ControlCommand::ActPlayerMove { x: 1.0, y: 0.0 }).await;
-        let _ = engine.dispatch(ControlCommand::ActPlayerFire { pressed: true }).await;
+        let _ = engine
+            .dispatch(ControlCommand::ActPlayerMove {
+                x: 1.0,
+                y: 0.0,
+                source: IntentSource::Cfctl,
+            })
+            .await;
+        let _ = engine
+            .dispatch(ControlCommand::ActPlayerFire {
+                pressed: true,
+                source: IntentSource::Cfctl,
+            })
+            .await;
         engine.drive_tick();
         // Reset.
         let _ = engine.dispatch(ControlCommand::ScenarioReset).await;
@@ -2543,7 +2596,13 @@ mod tests {
         let config = load_m1_test_config(path);
         let engine = M0Engine::new(config);
         engine.record_run_started();
-        let result = engine.dispatch(ControlCommand::ActPlayerAim { x: 1.0, y: 0.0 }).await;
+        let result = engine
+            .dispatch(ControlCommand::ActPlayerAim {
+                x: 1.0,
+                y: 0.0,
+                source: IntentSource::Cfctl,
+            })
+            .await;
         assert_eq!(result.status, crate::state::ControlEnvelopeStatus::Accepted);
     }
 
@@ -2564,7 +2623,13 @@ mod tests {
             (f32::INFINITY, 0.0),
             (0.0, f32::NEG_INFINITY),
         ] {
-            let result = engine.dispatch(ControlCommand::ActPlayerAim { x, y }).await;
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerAim {
+                    x,
+                    y,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
             assert_eq!(
                 result.status,
                 crate::state::ControlEnvelopeStatus::Rejected,
@@ -2589,7 +2654,13 @@ mod tests {
             (f32::INFINITY, 0.0),
             (0.0, f32::NEG_INFINITY),
         ] {
-            let result = engine.dispatch(ControlCommand::ActPlayerMove { x, y }).await;
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerMove {
+                    x,
+                    y,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
             assert_eq!(
                 result.status,
                 crate::state::ControlEnvelopeStatus::Rejected,
@@ -2615,14 +2686,25 @@ mod tests {
         for _ in 0..10 {
             engine.drive_tick();
         }
-        let _ = engine.dispatch(ControlCommand::ActPlayerAim { x: 1.0, y: 0.0 }).await;
+        let _ = engine
+            .dispatch(ControlCommand::ActPlayerAim {
+                x: 1.0,
+                y: 0.0,
+                source: IntentSource::Cfctl,
+            })
+            .await;
         // Fire 9 shots (dummy has 100 HP, rifle 12 dmg/hit → 9 hits = 108 dmg). Each shot
         // requires the rifle's fire interval (6 ticks) to cool down between presses.
         let fire_interval_ticks = cf_equipment::rifle_preset(cf_equipment::RIFLE_M1_DEFAULT_ID)
             .unwrap()
             .fire_interval_ticks as usize;
         for _ in 0..12 {
-            let _ = engine.dispatch(ControlCommand::ActPlayerFire { pressed: true }).await;
+            let _ = engine
+                .dispatch(ControlCommand::ActPlayerFire {
+                    pressed: true,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
             // Drive enough ticks for the fired projectile to reach the dummy at x=900
             // before the next shot (player at x=200, projectile speed 1200 unit/s ≈ 20
             // unit/tick at 60 Hz → 35 ticks to cross 700 units).
