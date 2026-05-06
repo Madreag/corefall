@@ -12,6 +12,42 @@ Use this file to summarize what changed in the implementation repo. Do not copy 
 
 ## Unreleased
 
+### Added (M1 — Actor Controller And Sim Core)
+
+- **One actor is playable** on the native engine. Movement, jump, aim, fire, reload, status state machine, projectile flight, and damage-routing all run through the fixed-tick sim and emit replay events. The HTML lab is superseded as the iteration harness.
+- **`cf-actor` is real**, not a stub. Owns `ActorId`, `Status` (STABLE/UNSTABLE/DOWNED/DEAD), `Inventory`, `InventoryItem`, `ItemSlot`, `Vec2`, `IntentSource`, `ControlIntent`, `ActorState`, `ActorWorld`, `ActorObservation`. Adds `sim` module with `ActorSimState`, `step`, `Projectile`, `StepReport` covering the per-tick actor pipeline.
+- **`cf-physics` is real**. Stateless `step_kinematics` (gravity + ground collision + landed-impulse), `apply_horizontal_motion` (ground/air acceleration + friction + region clamp), `apply_jump`, `apply_recoil`. M5.5 will swap in the full collision matrix per DR-033.
+- **`cf-equipment` is real**. `RifleSpec`, `RifleState`, `tick_rifle`, `RIFLE_M1_DEFAULT_ID`. The rifle is 10 RPS / 30-round mag / 1.5 s reload / 12 dmg / 1200 unit/s muzzle velocity / 90-tick projectile lifetime. M5 expands to the full role-record system.
+- **Seven new JSON-RPC methods** under the M1 method catalog: `act.player.move`, `act.player.jump`, `act.player.aim`, `act.player.fire`, `act.player.reload`, `act.player.select_item`, `act.player.reset`. All seven are gated on the loaded scenario carrying typed `actors[]`; M0 scenarios reject with `act_player_unavailable_no_actor_world`. NaN/Inf inputs reject with `axis_must_be_finite` / `aim_must_be_finite`. Unknown fields reject via `deny_unknown_fields`. Missing `schema_version` rejects via the same `schema_version_missing` path as every other M0 method. **All seven methods route through `M0Engine::dispatch` regardless of source — Bevy keyboard input and cfctl JSON-RPC commands share the exact same sim path.**
+- **New event categories: `input.*`, `actor.*`, `equipment.*`, `combat.*`** matching the canonical `references/prototype-run-bundle-schema.md` baseline. Per-tick events:
+  - `input.intent_received` (one per tick when an actor world is loaded; carries the consumed intent + applied move axis + accepted-jump flag).
+  - `actor.actor_status_changed`, `actor.actor_reset`, `actor.actor_jumped`, `actor.actor_landed`, `actor.actor_snapshot` (cadence 60).
+  - `equipment.selected_item_changed`, `equipment.weapon_reload_started`, `equipment.weapon_reloaded`, `equipment.weapon_dry_fire`, `equipment.weapon_fired`.
+  - `combat.projectile_spawned`, `combat.projectile_hit`, `combat.projectile_expired`.
+  - All M1 events parent-link to the same tick's `input.intent_received` event so cause chains are queryable.
+- **Scenario manifest extended** for M1: typed `actors[]` array with `ScenarioActor { id, team, spawn, controllable, hp, inventory: ScenarioInventory { rifle: Option<String> }, half_extents }`, plus `floor_y`. Validation rejects unknown rifle preset ids, multiple controllable actors, and duplicate actor ids.
+- **`m1_actor_range.ron`** scenario fixture: 1280×720 region with a flat floor at y=16, one controllable player at (200, 32) with a `rifle_m1_default`, one stationary target dummy at (900, 32). `expected_tests = ["M1-SMOKE-01", "M1-FIRE-01", "M1-MOVE-01", "M1-RELOAD-01"]`.
+- **`m1_move_jump_fire_reload.cfctl.json`** control script drives the engine through every M1 input via `act.player.*` methods; the produced run bundle captures 13 distinct M1 event types (weapon_fired, projectile_spawned, projectile_expired, actor_jumped, actor_landed, weapon_reload_started, weapon_reloaded, selected_item_changed, command_accepted, intent_received, sim_checksum, actor_snapshot, tick_sample).
+- **Bevy app shell extended** with two new plugins: `cf-render-2d::ActorSpritePlugin` (colored rectangles per actor + floor + aim reticle, all driven by `ActorRenderState` written from the engine snapshot each frame) and `cf-ui::StatusStripPlugin` (four-line text overlay: STATUS / ITEM / HP / Reticle, with `READY 30/30` / `RELOADING NN%` / `EMPTY` / `COOLDOWN Nt` / `NO RIFLE` formatting). `cf-app::ingest_player_input` system samples WASD/arrows for movement + aim, Space for jump, Enter/J for fire, R for reload, L for reset, 1-4 for inventory slot — all routed through the same `M0Engine::dispatch` path cfctl uses.
+- **`cfctl` extended** with `act player-move|player-jump|player-aim|player-fire|player-reload|player-select-item|player-reset` subcommands. `script run` declares an optional top-level `scenario` field that routes into the auto-launched cf-app's `--scenario` flag. After `sim.step` / `sim.run_for_ticks`, cfctl polls `observe.once` until the engine has actually advanced the requested tick count before sending the next command (otherwise the next command would overwrite Stepping(N) before `drive_tick` advances even one tick). This makes `cfctl script run` deterministic against the wall-clock-paced server loop.
+- **JSON Schemas** under `crates/cf-control/schemas/v1/` regenerate to 25 entries (was 19): seven new `act_player_*` schemas + `actor_view`. Guarded by `static_schema_files_match_dump` test + the CI `dump_schemas --check` gate.
+- **Per-crate AGENTS.md** for `cf-actor`, `cf-physics`, `cf-equipment`, `cf-render-2d`, `cf-ui` updated from M0 stubs to the M1 surface. `cf-control` AGENTS.md adds the M1 method catalog + new event categories + the `scenario.reset` clock contract pitfall.
+- **159 tests passing** (was 73 in M0.4): 13 new in `cf-actor`, 7 in `cf-physics`, 8 in `cf-equipment`, 5 in `cf-ui`, 2 in `cf-render-2d`, 12 new in `cf-control` engine + 4 scenario tests, 12 new live WebSocket acceptance tests for the M1 method catalog. All M0 tests still pass unchanged.
+
+**M1 acceptance bundles** (all PASS via `python3 game/tools/prototype_run_check.py`; all under repo-root `prototype_runs/native/`):
+
+| run_id | mode | tick_rate_hz | ticks | wall_seconds | events |
+|---|---|---:|---:|---:|---:|
+| `m1_2026-05-06T17-18-45Z_03d17743` | cf-app inline (60s smoke) | 60 | 3600 | 60.00 | 3785 |
+| `m1_2026-05-06T17-19-50Z_9cd611da` | cf-app inline (5s @ 120Hz) | 120 | 600 | 5.00 | 635 |
+| `m1_2026-05-06T17-18-11Z_ac18c89b` | cfctl script (auto-launches cf-app `--scenario m1_actor_range`) | 60 | 169 | server | 392 |
+
+### Fixed (M1 stabilization)
+
+- **`scenario.reset` no longer rewinds the sim clock.** Pre-fix, calling `scenario.reset` after the engine had advanced caused `events.jsonl` to violate tick monotonicity (later events at higher ticks followed by `command_accepted` at tick 0). The reset now resets RNG + actor world + pending intent but leaves `SimClock.tick()` unchanged; reset is a content reload, not a time-warp. Captured in the engine `ControlCommand::ScenarioReset` handler with an explicit comment.
+- **`cfctl script run` now waits for `sim.step` ticks to actually advance** before sending the next command. The cf-app server loop is paced at wall clock (60 Hz default), so without the wait the next command was overwriting `SimMode::Stepping(N)` before `drive_tick` could step even once. cfctl now polls `observe.once` until `tick >= effective_tick + requested_ticks` (with a 50 ms/tick deadline + 2 s floor).
+- **NaN/Inf input rejection on `act.player.move` and `act.player.aim`** at the server layer (`axis_must_be_finite` / `aim_must_be_finite`) so dispatch never sees non-finite floats. Live WS test `live_ws_m1_act_player_aim_nan_rejected` covers it.
+
 ### Fixed (M0.4 — F7 path-safety follow-up)
 
 After the M0.3 verdict, an independent reviewer recommended landing **F7 only**: a CI assertion that no `prototype_runs` directory exists outside `./prototype_runs` at the corefall repo root, plus a `cf-replay` unit test that the bundle writer resolves to the repo root rather than the cwd.

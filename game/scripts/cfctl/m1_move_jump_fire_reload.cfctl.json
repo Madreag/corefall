@@ -1,0 +1,29 @@
+{
+  "description": "M1 actor controller round-trip: walk right, jump, aim, fire a burst, reload, switch slot, walk back. Uses semantic act.player.* methods so the same code path drives human and cfctl input.",
+  "scenario": "m1_actor_range",
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+    { "method": "act.player.aim", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "act.player.move", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "sim.step", "params": { "ticks": 12 } },
+    { "method": "act.player.jump", "params": {} },
+    { "method": "sim.step", "params": { "ticks": 6 } },
+    { "method": "act.player.fire", "params": { "pressed": true } },
+    { "method": "sim.step", "params": { "ticks": 6 } },
+    { "method": "act.player.fire", "params": { "pressed": true } },
+    { "method": "sim.step", "params": { "ticks": 6 } },
+    { "method": "act.player.fire", "params": { "pressed": true } },
+    { "method": "sim.step", "params": { "ticks": 6 } },
+    { "method": "act.player.reload", "params": {} },
+    { "method": "sim.step", "params": { "ticks": 90 } },
+    { "method": "act.player.select_item", "params": { "slot": 1 } },
+    { "method": "sim.step", "params": { "ticks": 1 } },
+    { "method": "act.player.select_item", "params": { "slot": 0 } },
+    { "method": "sim.step", "params": { "ticks": 1 } },
+    { "method": "act.player.move", "params": { "x": -1.0, "y": 0.0 } },
+    { "method": "sim.step", "params": { "ticks": 30 } },
+    { "method": "act.player.move", "params": { "x": 0.0, "y": 0.0 } },
+    { "method": "sim.step", "params": { "ticks": 6 } },
+    { "method": "observe.once", "params": {} }
+  ]
+}

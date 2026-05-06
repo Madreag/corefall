@@ -17,12 +17,13 @@ use clap::Parser;
 use cf_control::{
     engine::{run_m0_inline, M0Engine, M0EngineConfig},
     runtime::{build_engine_config, resolve_run_bundle_root, ConfigInputs},
-    server::{ControlServer, ControlServerConfig},
-    Settings,
+    server::{ControlCommand, ControlServer, ControlServerConfig},
+    EngineHandle, Settings,
 };
-use cf_render_2d::CfRenderPlugin;
+use cf_render_2d::{ActorRenderState, ActorSpritePlugin, CfRenderPlugin};
 use cf_replay::diagnostics;
 use cf_sim_core::WallClock;
+use cf_ui::{HudRifle, HudState, StatusStripPlugin};
 
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -273,7 +274,10 @@ fn run_bevy(config: M0EngineConfig, control_api: bool, control_port: u16, _uds: 
         })
         .disable::<LogPlugin>();
 
-    app.add_plugins(plugins).add_plugins(CfRenderPlugin::default());
+    app.add_plugins(plugins)
+        .add_plugins(CfRenderPlugin::default())
+        .add_plugins(ActorSpritePlugin)
+        .add_plugins(StatusStripPlugin);
     app.insert_resource(Time::<Fixed>::from_hz(f64::from(config.tick_rate_hz)));
     app.insert_resource(EngineHolder(engine.clone()));
     app.insert_resource(AppRuntime {
@@ -286,7 +290,14 @@ fn run_bevy(config: M0EngineConfig, control_api: bool, control_port: u16, _uds: 
 
     app.add_systems(FixedUpdate, drive_engine_tick).add_systems(
         Update,
-        (esc_or_close_to_exit, check_completion, log_tick_progress).chain(),
+        (
+            esc_or_close_to_exit,
+            check_completion,
+            log_tick_progress,
+            ingest_player_input,
+            sync_actor_state_to_render,
+        )
+            .chain(),
     );
 
     app.run();
@@ -333,6 +344,143 @@ fn log_tick_progress(holder: Res<EngineHolder>, mut runtime: ResMut<AppRuntime>)
         tracing::debug!(target: "cf::app", tick = cur, "sim progressing");
         runtime.last_announced_tick = cur;
     }
+}
+
+/// Sample the keyboard each frame and fold it into the engine's pending
+/// `ControlIntent` so human input runs through exactly the same path as
+/// `cfctl act.player.*` commands. Movement is continuous (held keys); jump /
+/// fire / reload / select are edge-triggered.
+fn ingest_player_input(holder: Res<EngineHolder>, keys: Res<ButtonInput<KeyCode>>, rt: Option<Res<ControlRuntime>>) {
+    let _ = rt; // Reserved; ControlRuntime presence does not gate human input.
+    if !holder.0.config().has_actor_world {
+        return;
+    }
+    let move_x = keyboard_axis(
+        &keys,
+        KeyCode::KeyD,
+        KeyCode::KeyA,
+        KeyCode::ArrowRight,
+        KeyCode::ArrowLeft,
+    );
+    let aim_y = keyboard_axis(
+        &keys,
+        KeyCode::KeyW,
+        KeyCode::KeyS,
+        KeyCode::ArrowUp,
+        KeyCode::ArrowDown,
+    );
+    let aim_x = if move_x.abs() > 1e-3 { move_x.signum() } else { 0.0 };
+    let block_on = futures_block_on;
+    block_on(async {
+        let _ = holder
+            .0
+            .dispatch(ControlCommand::ActPlayerMove { x: move_x, y: 0.0 })
+            .await;
+        if aim_x.abs() > 1e-3 || aim_y.abs() > 1e-3 {
+            let _ = holder
+                .0
+                .dispatch(ControlCommand::ActPlayerAim { x: aim_x, y: aim_y })
+                .await;
+        }
+        if keys.just_pressed(KeyCode::Space) {
+            let _ = holder.0.dispatch(ControlCommand::ActPlayerJump).await;
+        }
+        if keys.just_pressed(KeyCode::Enter) || keys.just_pressed(KeyCode::KeyJ) {
+            let _ = holder.0.dispatch(ControlCommand::ActPlayerFire { pressed: true }).await;
+        }
+        if keys.just_pressed(KeyCode::KeyR) {
+            let _ = holder.0.dispatch(ControlCommand::ActPlayerReload).await;
+        }
+        if keys.just_pressed(KeyCode::KeyL) {
+            let _ = holder.0.dispatch(ControlCommand::ActPlayerReset).await;
+        }
+        for (slot_key, slot) in [
+            (KeyCode::Digit1, 0u32),
+            (KeyCode::Digit2, 1u32),
+            (KeyCode::Digit3, 2u32),
+            (KeyCode::Digit4, 3u32),
+        ] {
+            if keys.just_pressed(slot_key) {
+                let _ = holder.0.dispatch(ControlCommand::ActPlayerSelectItem { slot }).await;
+            }
+        }
+    });
+}
+
+fn keyboard_axis(keys: &ButtonInput<KeyCode>, pos_a: KeyCode, neg_a: KeyCode, pos_b: KeyCode, neg_b: KeyCode) -> f32 {
+    let pos = keys.pressed(pos_a) || keys.pressed(pos_b);
+    let neg = keys.pressed(neg_a) || keys.pressed(neg_b);
+    match (pos, neg) {
+        (true, false) => 1.0,
+        (false, true) => -1.0,
+        _ => 0.0,
+    }
+}
+
+/// Block on a single async dispatch. The control engine is used through async traits
+/// even from the synchronous Bevy schedule; the body is small and all work is
+/// in-process so blocking is fine.
+fn futures_block_on<F, T>(future: F) -> T
+where
+    F: std::future::Future<Output = T>,
+{
+    use std::task::{Context, Poll};
+
+    let waker = noop_waker();
+    let mut cx = Context::from_waker(&waker);
+    let mut future = Box::pin(future);
+    loop {
+        match future.as_mut().poll(&mut cx) {
+            Poll::Ready(out) => return out,
+            Poll::Pending => std::thread::yield_now(),
+        }
+    }
+}
+
+fn noop_waker() -> std::task::Waker {
+    use std::task::{RawWaker, RawWakerVTable, Waker};
+    fn raw() -> RawWaker {
+        RawWaker::new(std::ptr::null(), &VTABLE)
+    }
+    unsafe fn clone(_: *const ()) -> RawWaker {
+        raw()
+    }
+    unsafe fn wake(_: *const ()) {}
+    unsafe fn wake_by_ref(_: *const ()) {}
+    unsafe fn drop(_: *const ()) {}
+    static VTABLE: RawWakerVTable = RawWakerVTable::new(clone, wake, wake_by_ref, drop);
+    // SAFETY: `RawWaker` here is constructed from a static `VTABLE` whose function
+    // pointers are no-ops; the resulting `Waker` is sound.
+    unsafe { Waker::from_raw(raw()) }
+}
+
+/// Copy the engine's actor world + rifle state into the Bevy render + HUD
+/// resources every frame. The engine is the single source of truth; render +
+/// HUD never own authoritative state.
+fn sync_actor_state_to_render(
+    holder: Res<EngineHolder>,
+    mut render_state: ResMut<ActorRenderState>,
+    mut hud_state: ResMut<HudState>,
+) {
+    let snapshot = holder.0.actor_render_snapshot();
+    render_state.actors = snapshot.actors.clone();
+    render_state.player_actor_id = snapshot.player_actor_id;
+    render_state.region_width = holder.0.config().region_width;
+    render_state.region_height = holder.0.config().region_height;
+    render_state.floor_y = snapshot.floor_y;
+
+    hud_state.tick = snapshot.tick;
+    hud_state.tick_rate_hz = holder.0.config().tick_rate_hz;
+    hud_state.player = snapshot
+        .player_actor_id
+        .and_then(|id| snapshot.actors.iter().find(|a| a.id == id).cloned());
+    hud_state.rifle = snapshot.player_rifle.as_ref().map(|r| HudRifle {
+        ammo: r.ammo,
+        capacity: r.capacity,
+        fire_cooldown_ticks: r.fire_cooldown_ticks,
+        reload_remaining_ticks: r.reload_remaining_ticks,
+        reload_total_ticks: r.reload_total_ticks,
+    });
 }
 
 fn esc_or_close_to_exit(

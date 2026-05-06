@@ -36,6 +36,35 @@ pub struct ObserveFrame {
     pub events_since: u64,
     pub events: Vec<serde_json::Value>,
     pub settings: ObserveSettings,
+    /// M1: typed projection of every actor in the world. Empty in M0 scenarios.
+    #[serde(default)]
+    pub actors: Vec<ActorView>,
+    /// Convenience pointer to the player actor in `actors` by id, if any.
+    #[serde(default)]
+    pub player_actor_id: Option<u64>,
+}
+
+/// Public projection of one actor for the observe envelope. Mirrors
+/// `cf_actor::ActorObservation` with extra fields (rifle ammo / cooldown / reload
+/// state) the engine wires through.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ActorView {
+    pub id: u64,
+    pub team: String,
+    pub controllable: bool,
+    pub position: [f32; 2],
+    pub velocity: [f32; 2],
+    pub aim: [f32; 2],
+    pub on_ground: bool,
+    pub status: String,
+    pub hp: f32,
+    pub hp_max: f32,
+    pub selected_slot: u32,
+    pub selected_item: String,
+    pub rifle_ammo: Option<u32>,
+    pub rifle_capacity: Option<u32>,
+    pub rifle_fire_cooldown_ticks: Option<u32>,
+    pub rifle_reload_remaining_ticks: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]

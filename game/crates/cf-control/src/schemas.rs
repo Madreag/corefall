@@ -67,9 +67,64 @@ pub struct ObserveSubscribeParams {
 #[serde(deny_unknown_fields)]
 pub struct ActPlayerMoveParams {
     pub schema_version: u32,
+    /// Move axis in [-1.0, +1.0]. Negative = left, positive = right.
     pub x: f32,
+    /// Reserved for vertical input (ladders / climbing). Ignored in M1.
     #[serde(default)]
     pub y: f32,
+}
+
+/// `act.player.jump` — edge-triggered jump request.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerJumpParams {
+    pub schema_version: u32,
+}
+
+/// `act.player.aim` — set the player's aim vector (will be normalized).
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerAimParams {
+    pub schema_version: u32,
+    pub x: f32,
+    pub y: f32,
+}
+
+/// `act.player.fire` — edge-triggered fire request.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerFireParams {
+    pub schema_version: u32,
+    /// `true` (default) = press fire this tick; `false` = explicit release for future
+    /// hold-to-fire weapons. M1's rifle is single-press; release is a no-op.
+    #[serde(default = "default_true")]
+    pub pressed: bool,
+}
+
+/// `act.player.reload` — edge-triggered reload request.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerReloadParams {
+    pub schema_version: u32,
+}
+
+/// `act.player.select_item` — set the active inventory slot.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerSelectItemParams {
+    pub schema_version: u32,
+    pub slot: u32,
+}
+
+/// `act.player.reset` — return the player to their spawn with full HP / ammo.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerResetParams {
+    pub schema_version: u32,
+}
+
+fn default_true() -> bool {
+    true
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -120,12 +175,19 @@ pub fn dump_v1() -> BTreeMap<String, String> {
         entry::<ObserveOnceParams>("observe_once_params"),
         entry::<ObserveSubscribeParams>("observe_subscribe_params"),
         entry::<ActPlayerMoveParams>("act_player_move_params"),
+        entry::<ActPlayerJumpParams>("act_player_jump_params"),
+        entry::<ActPlayerAimParams>("act_player_aim_params"),
+        entry::<ActPlayerFireParams>("act_player_fire_params"),
+        entry::<ActPlayerReloadParams>("act_player_reload_params"),
+        entry::<ActPlayerSelectItemParams>("act_player_select_item_params"),
+        entry::<ActPlayerResetParams>("act_player_reset_params"),
         entry::<RunBundleWriteParams>("run_bundle_write_params"),
         entry::<SystemShutdownParams>("system_shutdown_params"),
         entry::<SettingsPatch>("settings_patch"),
         entry::<Settings>("settings"),
         entry::<ObserveFrame>("observe_frame"),
         entry::<ObserveSettings>("observe_settings"),
+        entry::<crate::state::ActorView>("actor_view"),
     ] {
         out.insert(name, body);
     }

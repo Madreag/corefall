@@ -55,9 +55,59 @@ fn write_blank_scenario() -> PathBuf {
 }
 
 async fn spawn_server(seed: u64) -> (String, tokio::task::JoinHandle<std::io::Result<()>>) {
-    let scenario_path = write_blank_scenario();
+    spawn_server_with_scenario(seed, write_blank_scenario(), "m0_blank").await
+}
+
+fn write_m1_scenario() -> PathBuf {
+    let mut p = std::env::temp_dir();
+    let seq = WS_TEST_SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let nanos = cf_sim_core::WallClock
+        .now_utc()
+        .timestamp_nanos_opt()
+        .unwrap_or_default();
+    p.push(format!("cf_control_m1_ws_{}_{}_{}.ron", std::process::id(), seq, nanos));
+    std::fs::write(
+        &p,
+        r#"(
+  schema_version: 1,
+  id: "m1_actor_range",
+  display_name: "M1 Actor Range",
+  description: "M1 WS acceptance fixture",
+  seed: 7,
+  duration_ticks: Some(120),
+  region: (anchor: (0.0, 0.0), width: 1280.0, height: 720.0),
+  gravity: -980.0,
+  floor_y: 16.0,
+  teams: [],
+  actors: [
+    (id: 1, team: "blue", spawn: (200.0, 32.0), controllable: true, hp: 100.0,
+      inventory: (rifle: Some("rifle_m1_default")), half_extents: Some((8.0, 16.0))),
+    (id: 2, team: "red", spawn: (900.0, 32.0), controllable: false, hp: 100.0,
+      inventory: (rifle: None)),
+  ],
+  objectives: [],
+  director: None,
+  capabilities: (debug: false, control_api: true, save_load: false),
+  save_fields: [],
+  expected_tests: ["M1-SMOKE-01"],
+  notes: "",
+)"#,
+    )
+    .unwrap();
+    p
+}
+
+async fn spawn_m1_server() -> (String, tokio::task::JoinHandle<std::io::Result<()>>) {
+    spawn_server_with_scenario(7, write_m1_scenario(), "m1_actor_range").await
+}
+
+async fn spawn_server_with_scenario(
+    seed: u64,
+    scenario_path: PathBuf,
+    scenario_id: &str,
+) -> (String, tokio::task::JoinHandle<std::io::Result<()>>) {
     let inputs = ConfigInputs {
-        scenario_id: "m0_blank".into(),
+        scenario_id: scenario_id.into(),
         scenario_path,
         run_mode: "ws-test".into(),
         run_bundle_root: std::env::temp_dir(),
@@ -195,7 +245,7 @@ async fn live_ws_step_zero_rejected() {
 }
 
 #[tokio::test]
-async fn live_ws_act_player_move_rejected_until_m1() {
+async fn live_ws_act_player_move_rejected_in_m0_scenario() {
     let (url, handle) = spawn_server(42).await;
     let response = send_and_recv(
         &url,
@@ -213,6 +263,249 @@ async fn live_ws_act_player_move_rejected_until_m1() {
         .expect("M0 act.player.move must reject because no player actor exists yet");
     assert_eq!(error["message"], "command_rejected");
     assert_eq!(error["data"]["reason"], "act_player_move_not_available_in_m0");
+}
+
+#[tokio::test]
+async fn live_ws_m1_act_player_move_accepted_when_actor_world_present() {
+    let (url, handle) = spawn_m1_server().await;
+    let response = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 100,
+            "method": "act.player.move",
+            "params": {"schema_version": 1, "x": 1.0, "y": 0.0}
+        }),
+    )
+    .await;
+    handle.abort();
+    let result = response.get("result").expect("M1 scenario must accept act.player.move");
+    assert_eq!(result["status"], "accepted");
+}
+
+#[tokio::test]
+async fn live_ws_m1_act_player_jump_accepted() {
+    let (url, handle) = spawn_m1_server().await;
+    let response = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 101,
+            "method": "act.player.jump",
+            "params": {"schema_version": 1}
+        }),
+    )
+    .await;
+    handle.abort();
+    assert_eq!(response["result"]["status"], "accepted");
+}
+
+#[tokio::test]
+async fn live_ws_m1_act_player_aim_accepted() {
+    let (url, handle) = spawn_m1_server().await;
+    let response = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 102,
+            "method": "act.player.aim",
+            "params": {"schema_version": 1, "x": -1.0, "y": 0.5}
+        }),
+    )
+    .await;
+    handle.abort();
+    assert_eq!(response["result"]["status"], "accepted");
+}
+
+#[tokio::test]
+async fn live_ws_m1_act_player_aim_nan_rejected() {
+    let (url, handle) = spawn_m1_server().await;
+    let response = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 103,
+            "method": "act.player.aim",
+            "params": {"schema_version": 1, "x": "NaN", "y": 0.0}
+        }),
+    )
+    .await;
+    handle.abort();
+    let err = response.get("error").expect("string aim must reject");
+    assert_eq!(err["code"], -32602);
+}
+
+#[tokio::test]
+async fn live_ws_m1_act_player_fire_accepted_and_records_weapon_event() {
+    let (url, handle) = spawn_m1_server().await;
+    // Aim explicitly so the engine has a stable direction.
+    let _ = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 200,
+            "method": "act.player.aim",
+            "params": {"schema_version": 1, "x": 1.0, "y": 0.0}
+        }),
+    )
+    .await;
+    let response = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 201,
+            "method": "act.player.fire",
+            "params": {"schema_version": 1, "pressed": true}
+        }),
+    )
+    .await;
+    handle.abort();
+    assert_eq!(response["result"]["status"], "accepted");
+}
+
+#[tokio::test]
+async fn live_ws_m1_act_player_reload_accepted() {
+    let (url, handle) = spawn_m1_server().await;
+    let response = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 300,
+            "method": "act.player.reload",
+            "params": {"schema_version": 1}
+        }),
+    )
+    .await;
+    handle.abort();
+    assert_eq!(response["result"]["status"], "accepted");
+}
+
+#[tokio::test]
+async fn live_ws_m1_act_player_select_item_accepted() {
+    let (url, handle) = spawn_m1_server().await;
+    let response = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 400,
+            "method": "act.player.select_item",
+            "params": {"schema_version": 1, "slot": 1}
+        }),
+    )
+    .await;
+    handle.abort();
+    assert_eq!(response["result"]["status"], "accepted");
+}
+
+#[tokio::test]
+async fn live_ws_m1_act_player_reset_accepted() {
+    let (url, handle) = spawn_m1_server().await;
+    let response = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 500,
+            "method": "act.player.reset",
+            "params": {"schema_version": 1}
+        }),
+    )
+    .await;
+    handle.abort();
+    assert_eq!(response["result"]["status"], "accepted");
+}
+
+#[tokio::test]
+async fn live_ws_m1_act_player_jump_rejected_in_m0_scenario() {
+    let (url, handle) = spawn_server(42).await;
+    let response = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 600,
+            "method": "act.player.jump",
+            "params": {"schema_version": 1}
+        }),
+    )
+    .await;
+    handle.abort();
+    let err = response
+        .get("error")
+        .expect("M0 scenarios must reject every act.player.* method except move's M0-specific reason");
+    assert_eq!(err["data"]["reason"], "act_player_unavailable_no_actor_world");
+}
+
+#[tokio::test]
+async fn live_ws_m1_observe_includes_actor_view() {
+    let (url, handle) = spawn_m1_server().await;
+    let response = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 700,
+            "method": "observe.once",
+            "params": {"schema_version": 1}
+        }),
+    )
+    .await;
+    handle.abort();
+    let result = response.get("result").expect("observe.once must return a frame");
+    let actors = result.get("actors").and_then(|v| v.as_array()).expect("actors array");
+    assert!(!actors.is_empty(), "M1 observation must include actors[]");
+    assert_eq!(result["player_actor_id"], 1);
+    let player = &actors[0];
+    assert_eq!(player["rifle_capacity"], 30);
+    assert_eq!(player["rifle_ammo"], 30);
+    assert_eq!(player["status"], "stable");
+}
+
+#[tokio::test]
+async fn live_ws_m1_unknown_field_rejected_on_aim() {
+    let (url, handle) = spawn_m1_server().await;
+    let response = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 800,
+            "method": "act.player.aim",
+            "params": {"schema_version": 1, "x": 1.0, "y": 0.0, "typo": true}
+        }),
+    )
+    .await;
+    handle.abort();
+    let err = response.get("error").expect("unknown field must reject");
+    assert_eq!(err["code"], -32602);
+}
+
+#[tokio::test]
+async fn live_ws_m1_missing_schema_version_rejects_every_act_player() {
+    let (url, handle) = spawn_m1_server().await;
+    let methods: &[(&str, serde_json::Value)] = &[
+        ("act.player.move", json!({"x": 1.0, "y": 0.0})),
+        ("act.player.jump", json!({})),
+        ("act.player.aim", json!({"x": 1.0, "y": 0.0})),
+        ("act.player.fire", json!({"pressed": true})),
+        ("act.player.reload", json!({})),
+        ("act.player.select_item", json!({"slot": 0})),
+        ("act.player.reset", json!({})),
+    ];
+    for (i, (method, params)) in methods.iter().enumerate() {
+        let response = send_and_recv(
+            &url,
+            json!({
+                "jsonrpc": "2.0",
+                "id": 900 + i as i64,
+                "method": method,
+                "params": params
+            }),
+        )
+        .await;
+        let err = response
+            .get("error")
+            .unwrap_or_else(|| panic!("{method} must reject missing schema_version"));
+        assert_eq!(err["code"], -32602, "{method} must reject missing schema_version");
+        assert_eq!(err["data"]["reason"], "schema_version_missing");
+    }
+    handle.abort();
 }
 
 #[tokio::test]

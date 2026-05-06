@@ -1141,6 +1141,8 @@ dependencies = [
 name = "cf-actor"
 version = "0.0.1"
 dependencies = [
+ "cf-equipment",
+ "cf-physics",
  "serde",
  "tracing",
 ]
@@ -1160,10 +1162,13 @@ dependencies = [
  "anyhow",
  "bevy",
  "blake3",
+ "cf-actor",
  "cf-control",
+ "cf-equipment",
  "cf-render-2d",
  "cf-replay",
  "cf-sim-core",
+ "cf-ui",
  "chrono",
  "clap",
  "hex",
@@ -1216,6 +1221,9 @@ dependencies = [
  "anyhow",
  "async-trait",
  "blake3",
+ "cf-actor",
+ "cf-equipment",
+ "cf-physics",
  "cf-replay",
  "cf-sim-core",
  "chrono",
@@ -1311,6 +1319,7 @@ name = "cf-render-2d"
 version = "0.0.1"
 dependencies = [
  "bevy",
+ "cf-actor",
  "serde",
  "tracing",
 ]
@@ -1416,6 +1425,8 @@ dependencies = [
 name = "cf-ui"
 version = "0.0.1"
 dependencies = [
+ "bevy",
+ "cf-actor",
  "serde",
  "tracing",
 ]
