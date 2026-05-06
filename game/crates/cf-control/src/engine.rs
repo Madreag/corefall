@@ -2527,6 +2527,43 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn m1_actor_render_snapshot_hides_rifle_when_non_rifle_slot_selected() {
+        // M1-FIX-9 regression: actor_render_snapshot() must clear player_rifle when
+        // the player's currently-selected slot is not a rifle, so the HUD shows
+        // "NO RIFLE" instead of READY/COOLDOWN.
+        let path = write_m1_scenario();
+        let config = load_m1_test_config(path);
+        let engine = M0Engine::new(config);
+        engine.record_run_started();
+        // Default selection (slot 0 = rifle) - HUD should show rifle.
+        let snap_a = engine.actor_render_snapshot();
+        assert!(snap_a.player_rifle.is_some(), "rifle slot selected -> HUD shows rifle");
+        // Select an empty slot.
+        let _ = engine
+            .dispatch(ControlCommand::ActPlayerSelectItem {
+                slot: 1,
+                source: IntentSource::Cfctl,
+            })
+            .await;
+        engine.drive_tick();
+        let snap_b = engine.actor_render_snapshot();
+        assert!(
+            snap_b.player_rifle.is_none(),
+            "non-rifle slot -> HUD hides rifle (NO RIFLE)"
+        );
+        // Switch back to slot 0.
+        let _ = engine
+            .dispatch(ControlCommand::ActPlayerSelectItem {
+                slot: 0,
+                source: IntentSource::Cfctl,
+            })
+            .await;
+        engine.drive_tick();
+        let snap_c = engine.actor_render_snapshot();
+        assert!(snap_c.player_rifle.is_some(), "back to slot 0 -> HUD shows rifle again");
+    }
+
+    #[tokio::test]
     async fn m1_actor_snapshot_event_emitted_at_cadence() {
         let path = write_m1_scenario();
         let config = load_m1_test_config(path);
