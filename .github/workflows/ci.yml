@@ -1,0 +1,91 @@
+name: ci
+on:
+  pull_request: {}
+  push:
+    branches: [main]
+
+jobs:
+  test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: game
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Linux deps
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libudev-dev libxkbcommon-dev libwayland-dev pkg-config
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.93.0
+          components: rustfmt, clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: game -> target
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: cargo fmt
+        run: cargo fmt --all -- --check
+      - name: cargo check
+        run: cargo check --workspace --all-targets
+      - name: cargo clippy
+        run: cargo clippy --workspace --all-targets -- -D warnings
+      - name: cargo test
+        run: cargo test --workspace
+      - name: cargo build release
+        run: cargo build --release
+      - name: cf-mod validate content
+        run: cargo run --release -p cf-mod -- validate content/
+      - name: schemas in sync (dump_schemas --check)
+        run: cargo run --release -p cf-control --example dump_schemas -- --check
+      - name: cfctl observe smoke (60 Hz)
+        run: cargo run --release -p cfctl -- observe --once --scenario m0_blank --format json
+      - name: cfctl run smoke (60 Hz)
+        run: cargo run --release -p cfctl -- run --scenario m0_blank --ticks 300 --tick-rate-hz 60 --write-run-bundle --run-bundle-dir ../prototype_runs/native
+      - name: cfctl run smoke (120 Hz)
+        run: cargo run --release -p cfctl -- run --scenario m0_blank --ticks 240 --tick-rate-hz 120 --write-run-bundle --run-bundle-dir ../prototype_runs/native
+      - name: cf-app headless run-seconds 5
+        shell: bash
+        run: cargo run --release -p cf-app -- --scenario m0_blank --headless-smoke --run-seconds 5 --write-run-bundle --run-bundle-dir ../prototype_runs/native
+      - name: validate run bundles (REQUIRED)
+        shell: bash
+        run: |
+          set -euo pipefail
+          BUNDLES=$(ls -dt ../prototype_runs/native/m0_* | head -n3)
+          if [ -z "$BUNDLES" ]; then
+            echo "No M0 run bundles produced; failing CI."
+            exit 1
+          fi
+          for B in $BUNDLES; do
+            echo "Validating $B"
+            python3 tools/prototype_run_check.py "$B"
+          done
+      - name: enforce repo-root prototype_runs path (M0.4-F7)
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        run: |
+          set -euo pipefail
+          # The corefall run-bundle contract requires every bundle to live under
+          # `<repo-root>/prototype_runs/native/`. If any other `prototype_runs/` directory
+          # exists anywhere else in the working tree (e.g. `game/prototype_runs/` because
+          # a binary defaulted to a cwd-relative path), fail CI.
+          STRAY=$(find . -type d -name prototype_runs \
+            -not -path './prototype_runs' \
+            -not -path './prototype_runs/*' \
+            -not -path './target/*' \
+            -not -path './.git/*' \
+            || true)
+          if [ -n "$STRAY" ]; then
+            echo "ERROR: prototype_runs/ directories found outside repo root:"
+            echo "$STRAY"
+            echo "All run bundles MUST live under <repo-root>/prototype_runs/native/. See cf_replay::bundle_paths."
+            exit 1
+          fi
+          echo "OK: only ./prototype_runs exists (or none)."

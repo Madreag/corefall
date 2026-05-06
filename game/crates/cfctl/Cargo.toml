@@ -1,0 +1,28 @@
+[package]
+name = "cfctl"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "cfctl"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+clap = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+tokio = { workspace = true }
+tokio-tungstenite = { workspace = true }
+futures-util = { workspace = true }
+chrono = { workspace = true }
+blake3 = { workspace = true }
+hex = { workspace = true }
+cf-control = { path = "../cf-control" }
+cf-replay = { path = "../cf-replay" }
+cf-sim-core = { path = "../cf-sim-core" }

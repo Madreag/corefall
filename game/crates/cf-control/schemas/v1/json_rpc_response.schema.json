@@ -1,0 +1,61 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "JsonRpcResponse",
+  "type": "object",
+  "required": [
+    "id",
+    "jsonrpc"
+  ],
+  "properties": {
+    "error": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/JsonRpcError"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "id": {
+      "$ref": "#/definitions/JsonRpcId"
+    },
+    "jsonrpc": {
+      "type": "string"
+    },
+    "result": true
+  },
+  "definitions": {
+    "JsonRpcError": {
+      "type": "object",
+      "required": [
+        "code",
+        "message"
+      ],
+      "properties": {
+        "code": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "data": true,
+        "message": {
+          "type": "string"
+        }
+      }
+    },
+    "JsonRpcId": {
+      "anyOf": [
+        {
+          "type": "integer",
+          "format": "int64"
+        },
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  }
+}

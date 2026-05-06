@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ActPlayerMoveParams",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "x"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0.0
+    },
+    "x": {
+      "type": "number",
+      "format": "float"
+    },
+    "y": {
+      "default": 0.0,
+      "type": "number",
+      "format": "float"
+    }
+  },
+  "additionalProperties": false
+}

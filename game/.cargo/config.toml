@@ -1,0 +1,7 @@
+[build]
+
+[alias]
+ci-fmt = "fmt --all -- --check"
+ci-check = "check --workspace --all-targets"
+ci-clippy = "clippy --workspace --all-targets -- -D warnings"
+ci-test = "test --workspace"

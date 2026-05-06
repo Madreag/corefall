@@ -1,0 +1,7 @@
+avoid-breaking-exported-api = false
+too-many-arguments-threshold = 8
+type-complexity-threshold = 250
+disallowed-methods = [
+  { path = "rand::thread_rng", reason = "Use cf-sim-core::Rng inside sim islands; wrap in cf-control for non-sim helpers." },
+  { path = "std::time::SystemTime::now", reason = "Use sim tick or cf-sim-core::WallClock to keep determinism intact." },
+]

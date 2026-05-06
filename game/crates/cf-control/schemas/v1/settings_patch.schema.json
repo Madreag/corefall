@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "SettingsPatch",
+  "type": "object",
+  "properties": {
+    "captions": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "high_contrast": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "reduced_flash": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "reduced_motion": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "reduced_shake": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "ui_scale": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "format": "float"
+    }
+  },
+  "additionalProperties": false
+}

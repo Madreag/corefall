@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ObserveSettings",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "settings"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0.0
+    },
+    "settings": {
+      "$ref": "#/definitions/Settings"
+    }
+  },
+  "definitions": {
+    "Settings": {
+      "type": "object",
+      "required": [
+        "captions",
+        "high_contrast",
+        "reduced_flash",
+        "reduced_motion",
+        "reduced_shake",
+        "ui_scale"
+      ],
+      "properties": {
+        "captions": {
+          "type": "boolean"
+        },
+        "high_contrast": {
+          "type": "boolean"
+        },
+        "reduced_flash": {
+          "type": "boolean"
+        },
+        "reduced_motion": {
+          "type": "boolean"
+        },
+        "reduced_shake": {
+          "type": "boolean"
+        },
+        "ui_scale": {
+          "type": "number",
+          "format": "float"
+        }
+      }
+    }
+  }
+}

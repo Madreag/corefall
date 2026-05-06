@@ -1,0 +1,73 @@
+[workspace]
+resolver = "2"
+members = [
+  "crates/cf-app",
+  "crates/cf-sim-core",
+  "crates/cf-terrain",
+  "crates/cf-physics",
+  "crates/cf-material",
+  "crates/cf-atmos",
+  "crates/cf-actor",
+  "crates/cf-chassis",
+  "crates/cf-equipment",
+  "crates/cf-ai",
+  "crates/cf-mission",
+  "crates/cf-replay",
+  "crates/cf-control",
+  "crates/cfctl",
+  "crates/cf-e2e",
+  "crates/cf-save",
+  "crates/cf-net",
+  "crates/cf-render-2d",
+  "crates/cf-ui",
+  "crates/cf-audio",
+  "crates/cf-mod",
+  "crates/cf-tools-editor",
+  "crates/cf-headless",
+  "crates/cf-server",
+  "crates/cf-server-ops",
+  "crates/cf-server-persistence",
+  "crates/cf-server-anti-cheat",
+  "crates/cf-server-admin",
+  "crates/cf-bench",
+]
+
+[workspace.package]
+version = "0.0.1"
+edition = "2021"
+rust-version = "1.84"
+license = "Apache-2.0 OR MIT"
+publish = false
+
+[workspace.dependencies]
+bevy = { version = "0.14", default-features = false, features = ["bevy_winit", "bevy_render", "bevy_core_pipeline", "bevy_sprite", "bevy_text", "bevy_ui", "tonemapping_luts", "ktx2", "zstd", "x11"] }
+glam = "0.27"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+ron = "0.8"
+thiserror = "1"
+anyhow = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+rand_xoshiro = "0.6"
+rand_core = "0.6"
+blake3 = "1"
+clap = { version = "4", features = ["derive", "env"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "io-util", "sync", "time", "process"] }
+tokio-tungstenite = "0.23"
+schemars = "0.8"
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
+hex = "0.4"
+futures-util = "0.3"
+async-trait = "0.1"
+
+[profile.dev]
+opt-level = 1
+
+[profile.dev.package."*"]
+opt-level = 3
+
+[profile.release]
+lto = "thin"
+codegen-units = 1
+debug = true
