@@ -383,14 +383,14 @@ fn step_one_actor(
     if rifle_outcomes.fired_this_tick {
         outcome.fired = true;
         outcome.recoil_applied = rifle_outcomes.recoil_impulse_applied;
-        let spec = state
+        let (spec, max_flight) = state
             .rifles
             .get(&actor_id)
-            .map(|r| r.spec.clone())
+            .map(|r| (r.spec.clone(), r.projectile_max_flight_ticks()))
             .expect("fired rifle must have a state");
 
         // Reborrow actor briefly to apply recoil + read aim/position.
-        let (muzzle, velocity, damage, max_flight) = {
+        let (muzzle, velocity, damage) = {
             let actor = state
                 .world
                 .actors
@@ -407,7 +407,7 @@ fn step_one_actor(
                 actor.position.y + spec.muzzle_vertical_offset,
             );
             let velocity = Vec2::new(aim.x * spec.projectile_speed, aim.y * spec.projectile_speed);
-            (muzzle, velocity, spec.damage_per_hit, spec.projectile_max_flight_ticks)
+            (muzzle, velocity, spec.damage_per_hit)
         };
         outcome.muzzle_origin = Some(muzzle);
         let projectile_id = state.allocate_projectile_id();
@@ -522,7 +522,10 @@ mod tests {
         world.insert(dummy);
 
         let mut state = ActorSimState::new(world);
-        state.ensure_rifle_for(ActorId(1), RifleState::new(rifle_preset(RIFLE_M1_DEFAULT_ID).unwrap()));
+        state.ensure_rifle_for(
+            ActorId(1),
+            RifleState::new(rifle_preset(RIFLE_M1_DEFAULT_ID).unwrap(), 60),
+        );
         let intents = BTreeMap::new();
         (state, intents)
     }
@@ -618,7 +621,7 @@ mod tests {
         // Fire 9 shots (12 dmg * 9 = 108 > 100 hp on the dummy). Allow ~120 ticks for travel.
         let mut shots_fired = 0;
         let mut hits = 0;
-        let fire_interval_ticks = rifle_preset(RIFLE_M1_DEFAULT_ID).unwrap().fire_interval_ticks;
+        let fire_interval_ticks = rifle_preset(RIFLE_M1_DEFAULT_ID).unwrap().fire_interval_ticks(60);
         for tick in 0..240u32 {
             let intent = if tick % fire_interval_ticks == 0 && shots_fired < 9 {
                 shots_fired += 1;
@@ -691,6 +694,109 @@ mod tests {
         let rifle = state.rifles.get(&ActorId(1)).unwrap();
         let mag_capacity = rifle_preset(RIFLE_M1_DEFAULT_ID).unwrap().mag_capacity;
         assert_eq!(rifle.ammo_in_mag, mag_capacity);
+    }
+
+    #[test]
+    fn fire_blocked_when_selected_slot_is_not_rifle() {
+        // M1-FIX-11 regression: selecting an empty slot must gate fire/reload so
+        // inventory selection drives gameplay, not just the HUD.
+        let (mut state, mut intents) = setup();
+        intents.insert(
+            ActorId(1),
+            ControlIntent {
+                actor: ActorId(1),
+                selected_item: Some(ItemSlot(1)),
+                ..ControlIntent::new(ActorId(1), IntentSource::Human)
+            },
+        );
+        let _ = step(&mut state, &mut intents, deps());
+        // Now the selected slot is 1 (Empty). Pressing fire must NOT spawn a projectile
+        // even though the actor still owns the rifle in slot 0.
+        intents.insert(
+            ActorId(1),
+            ControlIntent {
+                actor: ActorId(1),
+                fire: true,
+                ..ControlIntent::new(ActorId(1), IntentSource::Human)
+            },
+        );
+        let report = step(&mut state, &mut intents, deps());
+        assert!(
+            report.spawned_projectiles.is_empty(),
+            "fire must be gated on selected slot"
+        );
+        let player = report.actor_outcomes.iter().find(|o| o.actor == ActorId(1)).unwrap();
+        assert!(!player.fired);
+        // Ammo should still be untouched.
+        let mag = rifle_preset(RIFLE_M1_DEFAULT_ID).unwrap().mag_capacity;
+        assert_eq!(state.rifles.get(&ActorId(1)).unwrap().ammo_in_mag, mag);
+    }
+
+    #[test]
+    fn vertical_aim_produces_vertical_projectile_velocity() {
+        // M1-FIX-12 regression: aim straight up must yield (0, +speed) projectile
+        // velocity, not (0, 0). Diagonal aim must scale both components.
+        use crate::Vec2;
+        let (mut state, mut intents) = setup();
+        intents.insert(
+            ActorId(1),
+            ControlIntent {
+                actor: ActorId(1),
+                aim: Vec2::new(0.0, 1.0),
+                fire: true,
+                ..ControlIntent::new(ActorId(1), IntentSource::Human)
+            },
+        );
+        let report = step(&mut state, &mut intents, deps());
+        assert_eq!(report.spawned_projectiles.len(), 1);
+        let projectile = &report.spawned_projectiles[0];
+        let speed = rifle_preset(RIFLE_M1_DEFAULT_ID).unwrap().projectile_speed;
+        assert!(
+            projectile.velocity.x.abs() < 1e-3,
+            "vertical aim must zero out vx, got {}",
+            projectile.velocity.x
+        );
+        assert!(
+            (projectile.velocity.y - speed).abs() < 1e-3,
+            "vertical aim must produce vy = +speed, got {}",
+            projectile.velocity.y
+        );
+    }
+
+    #[test]
+    fn reset_restores_selected_slot_to_default() {
+        // M1-FIX-8 regression: act.player.reset must restore selected slot back to
+        // slot 0 so the actor can fire again after being reset.
+        let (mut state, mut intents) = setup();
+        // Select slot 1 (Empty).
+        intents.insert(
+            ActorId(1),
+            ControlIntent {
+                actor: ActorId(1),
+                selected_item: Some(ItemSlot(1)),
+                ..ControlIntent::new(ActorId(1), IntentSource::Human)
+            },
+        );
+        let _ = step(&mut state, &mut intents, deps());
+        assert_eq!(
+            state.world.actors.get(&ActorId(1)).unwrap().inventory.selected,
+            ItemSlot(1)
+        );
+        // Reset.
+        intents.insert(
+            ActorId(1),
+            ControlIntent {
+                actor: ActorId(1),
+                reset: true,
+                ..ControlIntent::new(ActorId(1), IntentSource::Human)
+            },
+        );
+        let _ = step(&mut state, &mut intents, deps());
+        assert_eq!(
+            state.world.actors.get(&ActorId(1)).unwrap().inventory.selected,
+            ItemSlot(0),
+            "reset must clear selected back to slot 0 so the rifle is firable again"
+        );
     }
 
     #[test]

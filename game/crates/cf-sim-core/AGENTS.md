@@ -4,7 +4,7 @@
 - Fixed-tick scheduler (60 Hz default; 120 Hz selectable).
 - `Tick(u64)`, `WallClock`, `SimClock` types; `pause`/`resume`/`step(n)`/`run_for(n)` API.
 - Deterministic `Rng` wrapper around `Xoshiro256StarStar`.
-- `sim_state_v1` checksum scope helper (M0: `tick_counter || rng_state_bytes`; future milestones append fields).
+- `sim_state_v1` checksum scope helper (M0: `tick_counter || rng_state_bytes`; M1+ appends caller-supplied bytes via the `extra` parameter; the byte layout is append-only so the `_v1` suffix is preserved).
 - Run-id and event-id helpers used by every binary.
 
 ## Public API Boundary

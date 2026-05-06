@@ -77,30 +77,46 @@ pub struct M0EngineConfig {
     pub has_actor_world: bool,
 }
 
-/// Snapshot of the initial actor world + per-actor rifle state. Held in the engine
-/// config so `scenario.reset` can rebuild the world without reloading the manifest from
-/// disk. Cloned cheaply (BTreeMaps + small Vecs).
+/// Snapshot of the initial actor world. Held in the engine config so `scenario.reset`
+/// can rebuild the world without reloading the manifest from disk. Per-actor
+/// `RifleState` is built at engine init via [`build_rifles_for_world`] so the
+/// configured `tick_rate_hz` is honoured (60 Hz vs 120 Hz produce different tick
+/// budgets but the same real-time RPS / reload duration).
 #[derive(Debug, Clone, PartialEq)]
 pub struct InitialActorWorld {
     pub world: ActorWorld,
-    pub rifles: BTreeMap<ActorId, cf_equipment::RifleState>,
     pub player: Option<ActorId>,
 }
 
 impl InitialActorWorld {
     pub fn from_scenario(scenario: &Scenario) -> Self {
         let mut world = ActorWorld::new(scenario.floor_y, scenario.gravity);
-        let mut rifles: BTreeMap<ActorId, cf_equipment::RifleState> = BTreeMap::new();
         for actor in &scenario.actors {
             let state = actor.build_state();
-            if let Some(rifle) = actor.rifle_state() {
-                rifles.insert(state.id, rifle);
-            }
             world.insert(state);
         }
         let player = world.player;
-        Self { world, rifles, player }
+        Self { world, player }
     }
+}
+
+/// Build a per-actor `RifleState` map from the world for the configured `tick_rate_hz`.
+/// Each actor whose currently-selected slot OR any other slot holds a rifle gets a
+/// state entry. We key on inventory contents (not on selection) so swapping slots at
+/// runtime never strands an existing rifle's ammo / cooldown.
+fn build_rifles_for_world(world: &ActorWorld, tick_rate_hz: u32) -> BTreeMap<ActorId, cf_equipment::RifleState> {
+    let mut rifles = BTreeMap::new();
+    for actor in world.actors.values() {
+        for item in &actor.inventory.items {
+            if let cf_actor::InventoryItem::Rifle { preset } = item {
+                if let Some(spec) = cf_equipment::rifle_preset(preset) {
+                    rifles.insert(actor.id, cf_equipment::RifleState::new(spec, tick_rate_hz));
+                    break;
+                }
+            }
+        }
+    }
+    rifles
 }
 
 impl M0EngineConfig {
@@ -172,6 +188,8 @@ impl M0EngineConfig {
             cfg.has_actor_world = true;
             cfg.initial_actor_world = Some(InitialActorWorld::from_scenario(scenario));
             // Bump the milestone hint when the scenario actually carries an actor world.
+            // Per-actor RifleState is built lazily in M0Engine::new with the configured
+            // tick_rate_hz so 60 Hz vs 120 Hz produce identical real-time RPS / reload.
             cfg.milestone = "m1".to_string();
         }
         cfg
@@ -351,8 +369,8 @@ impl M0Engine {
         let tick_dt_ms = 1000.0 / f64::from(config.tick_rate_hz.max(1));
         let (actor_state, player_actor) = if let Some(initial) = &config.initial_actor_world {
             let mut sim_state = ActorSimState::new(initial.world.clone());
-            for (id, rifle) in &initial.rifles {
-                sim_state.ensure_rifle_for(*id, rifle.clone());
+            for (id, rifle) in build_rifles_for_world(&initial.world, config.tick_rate_hz) {
+                sim_state.ensure_rifle_for(id, rifle);
             }
             (Some(sim_state), initial.player)
         } else {
@@ -917,14 +935,21 @@ impl M0Engine {
                 snapshot.actors.push(cf_actor::ActorObservation::from(actor));
             }
             if let Some(player_id) = sim.world.player {
-                if let Some(rifle) = sim.rifles.get(&player_id) {
-                    snapshot.player_rifle = Some(crate::engine::RifleHudView {
-                        ammo: rifle.ammo_in_mag,
-                        capacity: rifle.spec.mag_capacity,
-                        fire_cooldown_ticks: rifle.fire_cooldown_ticks,
-                        reload_remaining_ticks: rifle.reload_remaining_ticks,
-                        reload_total_ticks: rifle.spec.reload_ticks,
-                    });
+                let rifle_selected = sim
+                    .world
+                    .actors
+                    .get(&player_id)
+                    .is_some_and(|a| a.inventory.selected_item().is_rifle());
+                if rifle_selected {
+                    if let Some(rifle) = sim.rifles.get(&player_id) {
+                        snapshot.player_rifle = Some(crate::engine::RifleHudView {
+                            ammo: rifle.ammo_in_mag,
+                            capacity: rifle.spec.mag_capacity,
+                            fire_cooldown_ticks: rifle.fire_cooldown_ticks,
+                            reload_remaining_ticks: rifle.reload_remaining_ticks,
+                            reload_total_ticks: rifle.reload_ticks(),
+                        });
+                    }
                 }
             }
         }
@@ -1146,7 +1171,7 @@ fn m0_notes_addendum() -> String {
     "## DR-002 v1 schema lock\n\n\
 - Event envelope: `{schema_version, run_id, tick, sim_time_ms, event_id, category, event_type, payload, parent_event_id?, dropped_count?}`.\n\
 - M0 categories: `system`, `control`, `determinism`. `snapshot` opens at M3.\n\
-- Checksum: `algorithm=blake3`, `scope=sim_state_v1` (M0 covers `tick_counter || rng_state_bytes`; M2/M3 append actor/inventory/terrain bytes without bumping the suffix; layout-breaking bumps go to `_v2`).\n\
+- Checksum: `algorithm=blake3`, `scope=sim_state_v1` (M0 covers `tick_counter || rng_state_bytes`; M1 appends actor/inventory/projectile bytes via `cf_actor::sim::ActorSimState::checksum_bytes()`; M2/M3 will append terrain bytes; all without bumping the suffix; layout-breaking bumps go to `_v2`).\n\
 - Manifest extensions: `checksum.{algorithm,scope,cadence_ticks}`, `settings:{...}` block.\n\
 - Summary extensions: `final_sim_checksum`, `checksum_event_count`, `first_tick`, `last_tick`.\n\
 - M3 picks up replay verification (`first_divergence` event), the `snapshot` category, and full headless replay parity.\n\
@@ -1335,8 +1360,8 @@ impl EngineHandle for M0Engine {
                 state.tick_durations_us.clear();
                 if let Some(initial) = self.config.initial_actor_world.as_ref() {
                     let mut sim_state = ActorSimState::new(initial.world.clone());
-                    for (id, rifle) in &initial.rifles {
-                        sim_state.ensure_rifle_for(*id, rifle.clone());
+                    for (id, rifle) in build_rifles_for_world(&initial.world, self.config.tick_rate_hz) {
+                        sim_state.ensure_rifle_for(id, rifle);
                     }
                     state.actor_state = Some(sim_state);
                     state.player_actor = initial.player;
@@ -2707,7 +2732,7 @@ mod tests {
         // requires the rifle's fire interval (6 ticks) to cool down between presses.
         let fire_interval_ticks = cf_equipment::rifle_preset(cf_equipment::RIFLE_M1_DEFAULT_ID)
             .unwrap()
-            .fire_interval_ticks as usize;
+            .fire_interval_ticks(60) as usize;
         for _ in 0..12 {
             let _ = engine
                 .dispatch(ControlCommand::ActPlayerFire {

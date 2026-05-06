@@ -29,14 +29,19 @@ use serde::{Deserialize, Serialize};
 /// Spec for one rifle preset. Loaded from a hard-coded registry in M1; M5 introduces
 /// the full role-record schema (`cf-equipment::RoleRecord`) and a `content/equipment/`
 /// data path.
+///
+/// Timings are stored in seconds, NOT ticks, so the same preset behaves identically
+/// at 60 Hz and 120 Hz. Use [`RifleSpec::fire_interval_ticks`] etc. to derive tick
+/// counts for the configured `tick_rate_hz`. This honours the AGENTS.md
+/// "No-Compromise Performance Defaults" rule (no hardcoded 60 Hz constants).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RifleSpec {
     pub preset_id: String,
-    /// Ticks between consecutive shots (cool-down). 6 ticks at 60 Hz = 10 RPS.
-    pub fire_interval_ticks: u32,
+    /// Seconds between consecutive shots. `0.1` = 10 RPS.
+    pub fire_interval_seconds: f32,
     pub mag_capacity: u32,
-    /// Ticks the actor spends reloading. 90 ticks at 60 Hz = 1.5 s.
-    pub reload_ticks: u32,
+    /// Seconds the actor spends reloading. `1.5` = 1.5 s.
+    pub reload_seconds: f32,
     /// Horizontal recoil impulse applied to the firer's velocity_x (units / s).
     pub recoil_impulse: f32,
     /// Distance forward of the actor centre to spawn the projectile (world units).
@@ -48,8 +53,42 @@ pub struct RifleSpec {
     /// Damage applied to the first hit body (M1 keeps damage instantaneous; M5 routes
     /// through the chassis grammar).
     pub damage_per_hit: f32,
-    /// Hard ceiling on flight time so projectiles can't outlive the run if they miss.
-    pub projectile_max_flight_ticks: u32,
+    /// Seconds of flight time before the projectile expires if it never hits.
+    pub projectile_lifetime_seconds: f32,
+}
+
+impl RifleSpec {
+    #[allow(
+        clippy::cast_possible_truncation,
+        clippy::cast_sign_loss,
+        clippy::cast_precision_loss
+    )]
+    fn seconds_to_ticks(seconds: f32, tick_rate_hz: u32) -> u32 {
+        let rate = tick_rate_hz.max(1);
+        let ticks = (f64::from(seconds.max(0.0)) * f64::from(rate)).round();
+        if ticks < 1.0 {
+            1
+        } else if ticks > f64::from(u32::MAX) {
+            u32::MAX
+        } else {
+            ticks as u32
+        }
+    }
+
+    /// Ticks between consecutive shots at the given tick rate. Always ≥ 1.
+    pub fn fire_interval_ticks(&self, tick_rate_hz: u32) -> u32 {
+        Self::seconds_to_ticks(self.fire_interval_seconds, tick_rate_hz)
+    }
+
+    /// Ticks for one full reload at the given tick rate. Always ≥ 1.
+    pub fn reload_ticks(&self, tick_rate_hz: u32) -> u32 {
+        Self::seconds_to_ticks(self.reload_seconds, tick_rate_hz)
+    }
+
+    /// Maximum projectile flight ticks at the given tick rate. Always ≥ 1.
+    pub fn projectile_max_flight_ticks(&self, tick_rate_hz: u32) -> u32 {
+        Self::seconds_to_ticks(self.projectile_lifetime_seconds, tick_rate_hz)
+    }
 }
 
 /// Stable id for the M1 default rifle preset. Use [`rifle_preset`] to materialize the
@@ -59,15 +98,15 @@ pub const RIFLE_M1_DEFAULT_ID: &str = "rifle_m1_default";
 fn rifle_m1_default() -> RifleSpec {
     RifleSpec {
         preset_id: RIFLE_M1_DEFAULT_ID.to_string(),
-        fire_interval_ticks: 6,
+        fire_interval_seconds: 0.1,
         mag_capacity: 30,
-        reload_ticks: 90,
+        reload_seconds: 1.5,
         recoil_impulse: 25.0,
         muzzle_forward_offset: 12.0,
         muzzle_vertical_offset: 4.0,
         projectile_speed: 1200.0,
         damage_per_hit: 12.0,
-        projectile_max_flight_ticks: 90,
+        projectile_lifetime_seconds: 1.5,
     }
 }
 
@@ -86,10 +125,15 @@ pub fn rifle_preset(preset_id: &str) -> Option<RifleSpec> {
     rifle_presets().get(preset_id).cloned()
 }
 
-/// Per-actor rifle state machine.
+/// Per-actor rifle state machine. Carries the configured `tick_rate_hz` so timings
+/// derived from `RifleSpec` (in seconds) resolve to a stable tick budget at both
+/// 60 Hz and 120 Hz simulations.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RifleState {
     pub spec: RifleSpec,
+    /// Tick rate the engine ticks this rifle at; used to convert `spec.*_seconds`
+    /// to tick counts. Always ≥ 1 (clamped at construction).
+    pub tick_rate_hz: u32,
     pub ammo_in_mag: u32,
     /// Ticks until the rifle can fire again. 0 = ready.
     pub fire_cooldown_ticks: u32,
@@ -98,13 +142,29 @@ pub struct RifleState {
 }
 
 impl RifleState {
-    pub fn new(spec: RifleSpec) -> Self {
+    pub fn new(spec: RifleSpec, tick_rate_hz: u32) -> Self {
         Self {
             ammo_in_mag: spec.mag_capacity,
             fire_cooldown_ticks: 0,
             reload_remaining_ticks: 0,
+            tick_rate_hz: tick_rate_hz.max(1),
             spec,
         }
+    }
+
+    /// Cool-down after a shot, in ticks at this rifle's configured tick rate.
+    pub fn fire_interval_ticks(&self) -> u32 {
+        self.spec.fire_interval_ticks(self.tick_rate_hz)
+    }
+
+    /// Full reload duration in ticks at this rifle's configured tick rate.
+    pub fn reload_ticks(&self) -> u32 {
+        self.spec.reload_ticks(self.tick_rate_hz)
+    }
+
+    /// Maximum projectile flight in ticks at this rifle's configured tick rate.
+    pub fn projectile_max_flight_ticks(&self) -> u32 {
+        self.spec.projectile_max_flight_ticks(self.tick_rate_hz)
     }
 
     pub fn ready_to_fire(&self) -> bool {
@@ -187,7 +247,7 @@ pub fn tick_rifle(state: &mut RifleState, inputs: RifleTickInputs) -> TickOutcom
     let want_reload =
         inputs.reload_pressed || (inputs.auto_reload_when_empty && state.ammo_in_mag == 0 && !state.is_reloading());
     if want_reload && !state.is_reloading() && state.ammo_in_mag < state.spec.mag_capacity {
-        state.reload_remaining_ticks = state.spec.reload_ticks;
+        state.reload_remaining_ticks = state.reload_ticks();
         // Cancel the pending fire cooldown; reloading takes over.
         state.fire_cooldown_ticks = 0;
         outcomes.reload_started = true;
@@ -198,7 +258,7 @@ pub fn tick_rifle(state: &mut RifleState, inputs: RifleTickInputs) -> TickOutcom
             outcomes.dry_fire = true;
         } else if state.fire_cooldown_ticks == 0 {
             state.ammo_in_mag -= 1;
-            state.fire_cooldown_ticks = state.spec.fire_interval_ticks;
+            state.fire_cooldown_ticks = state.fire_interval_ticks();
             outcomes.fired_this_tick = true;
             outcomes.recoil_impulse_applied = state.spec.recoil_impulse;
         }
@@ -212,7 +272,11 @@ mod tests {
     use super::*;
 
     fn rifle() -> RifleState {
-        RifleState::new(rifle_preset(RIFLE_M1_DEFAULT_ID).expect("default preset"))
+        rifle_at(60)
+    }
+
+    fn rifle_at(tick_rate_hz: u32) -> RifleState {
+        RifleState::new(rifle_preset(RIFLE_M1_DEFAULT_ID).expect("default preset"), tick_rate_hz)
     }
 
     #[test]
@@ -225,8 +289,9 @@ mod tests {
 
     #[test]
     fn fire_decrements_ammo_and_starts_cooldown() {
-        let spec = rifle_preset(RIFLE_M1_DEFAULT_ID).unwrap();
         let mut r = rifle();
+        let cooldown = r.fire_interval_ticks();
+        let mag = r.spec.mag_capacity;
         let outcomes = tick_rifle(
             &mut r,
             RifleTickInputs {
@@ -235,14 +300,14 @@ mod tests {
             },
         );
         assert!(outcomes.fired_this_tick);
-        assert_eq!(r.ammo_in_mag, spec.mag_capacity - 1);
-        assert_eq!(r.fire_cooldown_ticks, spec.fire_interval_ticks);
+        assert_eq!(r.ammo_in_mag, mag - 1);
+        assert_eq!(r.fire_cooldown_ticks, cooldown);
     }
 
     #[test]
     fn cannot_fire_during_cooldown() {
-        let spec = rifle_preset(RIFLE_M1_DEFAULT_ID).unwrap();
         let mut r = rifle();
+        let mag = r.spec.mag_capacity;
         let _ = tick_rifle(
             &mut r,
             RifleTickInputs {
@@ -258,15 +323,16 @@ mod tests {
             },
         );
         assert!(!blocked.fired_this_tick);
-        assert_eq!(r.ammo_in_mag, spec.mag_capacity - 1);
+        assert_eq!(r.ammo_in_mag, mag - 1);
     }
 
     #[test]
     fn dry_fire_when_empty() {
-        let spec = rifle_preset(RIFLE_M1_DEFAULT_ID).unwrap();
         let mut r = rifle();
-        for _ in 0..spec.mag_capacity {
-            for _ in 0..spec.fire_interval_ticks {
+        let mag = r.spec.mag_capacity;
+        let cooldown = r.fire_interval_ticks();
+        for _ in 0..mag {
+            for _ in 0..cooldown {
                 let _ = tick_rifle(
                     &mut r,
                     RifleTickInputs {
@@ -297,8 +363,9 @@ mod tests {
 
     #[test]
     fn reload_takes_full_duration() {
-        let spec = rifle_preset(RIFLE_M1_DEFAULT_ID).unwrap();
         let mut r = rifle();
+        let mag = r.spec.mag_capacity;
+        let reload = r.reload_ticks();
         let _ = tick_rifle(
             &mut r,
             RifleTickInputs {
@@ -314,13 +381,13 @@ mod tests {
             },
         );
         assert!(started.reload_started);
-        for _ in 0..(spec.reload_ticks - 1) {
+        for _ in 0..(reload - 1) {
             let _ = tick_rifle(&mut r, RifleTickInputs::default());
             assert!(r.is_reloading());
         }
         let completion = tick_rifle(&mut r, RifleTickInputs::default());
         assert!(completion.reload_completed);
-        assert_eq!(r.ammo_in_mag, spec.mag_capacity);
+        assert_eq!(r.ammo_in_mag, mag);
         assert!(!r.is_reloading());
     }
 
@@ -357,5 +424,58 @@ mod tests {
     fn rifle_preset_lookup() {
         assert!(rifle_preset(RIFLE_M1_DEFAULT_ID).is_some());
         assert!(rifle_preset("nonexistent").is_none());
+    }
+
+    #[test]
+    fn timings_scale_with_tick_rate() {
+        // 10 RPS / 1.5 s reload / 1.5 s flight at the canonical M1 preset.
+        let spec = rifle_preset(RIFLE_M1_DEFAULT_ID).unwrap();
+        // 60 Hz: 6 / 90 / 90.
+        assert_eq!(spec.fire_interval_ticks(60), 6);
+        assert_eq!(spec.reload_ticks(60), 90);
+        assert_eq!(spec.projectile_max_flight_ticks(60), 90);
+        // 120 Hz: 12 / 180 / 180.
+        assert_eq!(spec.fire_interval_ticks(120), 12);
+        assert_eq!(spec.reload_ticks(120), 180);
+        assert_eq!(spec.projectile_max_flight_ticks(120), 180);
+        // RifleState resolves the same values via its configured tick_rate_hz.
+        let r60 = rifle_at(60);
+        let r120 = rifle_at(120);
+        assert_eq!(r60.fire_interval_ticks(), 6);
+        assert_eq!(r120.fire_interval_ticks(), 12);
+        assert_eq!(r60.reload_ticks(), 90);
+        assert_eq!(r120.reload_ticks(), 180);
+    }
+
+    #[test]
+    fn fire_rate_real_time_equivalent_at_60hz_and_120hz() {
+        // Drive both 60 Hz and 120 Hz rifles for the same wall-clock window and
+        // assert the same number of shots fired. Window: 1.0 s -> exactly 10 shots
+        // at 10 RPS. At 60 Hz that's 60 ticks; at 120 Hz that's 120 ticks.
+        fn shots_in_window(tick_rate_hz: u32, ticks: u32) -> u32 {
+            let mut r = rifle_at(tick_rate_hz);
+            let mut shots = 0;
+            for _ in 0..ticks {
+                let outcomes = tick_rifle(
+                    &mut r,
+                    RifleTickInputs {
+                        fire_pressed: true,
+                        ..Default::default()
+                    },
+                );
+                if outcomes.fired_this_tick {
+                    shots += 1;
+                }
+            }
+            shots
+        }
+        let shots_60 = shots_in_window(60, 60);
+        let shots_120 = shots_in_window(120, 120);
+        assert_eq!(shots_60, shots_120, "10 RPS must hold across tick rates");
+        // Should be 10 shots in 1 s for 10 RPS (one shot per fire_interval, ~10 shots).
+        assert!(
+            (9..=11).contains(&shots_60),
+            "expected ~10 RPS, got {shots_60} at 60 Hz"
+        );
     }
 }

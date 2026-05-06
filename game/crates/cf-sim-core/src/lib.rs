@@ -4,9 +4,12 @@
 //! - Fixed 60 Hz default tick rate; 120 Hz selectable.
 //! - Seeded `Xoshiro256**` RNG. Sim code MUST NOT call `rand::thread_rng` (lints disallow it).
 //! - `WallClock` exposes UTC time only outside the sim island; sim systems use the integer `Tick`.
-//! - The `sim_state_v1` checksum scope at M0 covers `tick_counter || rng_state_bytes`. Future
-//!   milestones append actor/inventory/terrain bytes without bumping the suffix; layout-changing
-//!   bumps go to `sim_state_v2`. See `docs/implementation-log/2026-05-05-m0-engine-bootstrap.md`.
+//! - The `sim_state_v1` checksum scope at M0 covers `tick_counter || rng_state_bytes`. M1
+//!   appends caller-supplied bytes (e.g. `cf_actor::sim::ActorSimState::checksum_bytes()`)
+//!   so authoritative actor/inventory/projectile state participates in the divergence
+//!   guarantee. The byte layout is append-only so the `_v1` suffix is preserved;
+//!   layout-changing bumps go to `sim_state_v2`. See
+//!   `docs/implementation-log/2026-05-05-m0-engine-bootstrap.md`.
 
 use std::time::{Duration, Instant};
 

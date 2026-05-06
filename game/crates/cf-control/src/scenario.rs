@@ -141,9 +141,9 @@ impl ScenarioActor {
         actor
     }
 
-    pub fn rifle_state(&self) -> Option<RifleState> {
+    pub fn rifle_state(&self, tick_rate_hz: u32) -> Option<RifleState> {
         let preset = self.inventory.rifle.as_deref()?;
-        rifle_preset(preset).map(RifleState::new)
+        rifle_preset(preset).map(|spec| RifleState::new(spec, tick_rate_hz))
     }
 }
 
@@ -276,7 +276,7 @@ mod tests {
         assert_eq!(player.inventory.rifle.as_deref(), Some("rifle_m1_default"));
         let player_state = player.build_state();
         assert!(player_state.controllable);
-        assert!(player.rifle_state().is_some());
+        assert!(player.rifle_state(60).is_some());
     }
 
     #[test]

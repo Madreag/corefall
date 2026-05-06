@@ -343,8 +343,10 @@ impl ActorState {
         }
     }
 
-    /// Reset the actor back to its spawn state. Inventory is reset to its scenario
-    /// configuration; HP and status return to full.
+    /// Reset the actor back to its spawn state. Position, velocity, aim, on-ground,
+    /// status, and HP all return to defaults; the selected inventory slot is cleared
+    /// to `0` so the actor can fire its rifle again after `act.player.reset`.
+    /// Inventory items themselves are not rewound (slot contents are immutable in M1).
     pub fn reset(&mut self) {
         self.position = self.spawn;
         self.velocity = Vec2::ZERO;
@@ -352,6 +354,7 @@ impl ActorState {
         self.on_ground = false;
         self.status = Status::Stable;
         self.hp = self.hp_max;
+        self.inventory.selected = ItemSlot(0);
     }
 
     /// Apply damage with a cause string. Returns the new status if it changed.
