@@ -159,7 +159,9 @@ fn update_status_strip(
     if let Some(mut text) = item_query.iter_mut().next() {
         text.sections[0].value = format!(
             "ITEM: slot {} / {}",
-            player.map(|p| p.selected_slot).unwrap_or(0),
+            player
+                .map(|p| p.selected_slot.saturating_add(1).to_string())
+                .unwrap_or_else(|| "--".to_string()),
             player
                 .map(|p| p.selected_item.clone())
                 .unwrap_or_else(|| "--".to_string())

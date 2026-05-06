@@ -130,12 +130,29 @@ fn sync_actor_sprites(
         (&mut Transform, &mut Visibility),
         (With<ReticleRenderTag>, Without<ActorRenderTag>, Without<FloorRenderTag>),
     >,
+    mut camera_query: Query<
+        &mut Transform,
+        (
+            With<Camera>,
+            Without<ActorRenderTag>,
+            Without<FloorRenderTag>,
+            Without<ReticleRenderTag>,
+        ),
+    >,
 ) {
     // Place the floor centred under the play region.
     if state.region_width > 0.0 {
         if let Some(mut transform) = floor_query.iter_mut().next() {
             transform.translation = Vec3::new(state.region_width * 0.5, state.floor_y - 4.0, -0.5);
             // also re-scale the floor sprite via custom_size update below in actor sync iteration.
+        }
+        // Centre the 2D camera on the play region so authored scenarios in
+        // bottom-left coordinates (e.g. M1's 1280x720 with target at x=900) stay
+        // on-screen. The default `Camera2dBundle` sits at the world origin, which
+        // would clip everything past x = window_width / 2.
+        if let Some(mut camera_transform) = camera_query.iter_mut().next() {
+            camera_transform.translation.x = state.region_width * 0.5;
+            camera_transform.translation.y = state.region_height * 0.5;
         }
     }
 
