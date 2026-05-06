@@ -1,0 +1,22 @@
+(
+  schema_version: 1,
+  id: "m0_blank",
+  display_name: "M0 Blank Scene",
+  description: "Empty scene used for engine bootstrap and run-bundle smoke per spec/native-implementation-backlog M0-007.",
+  seed: 42,
+  duration_ticks: Some(300),
+  region: (anchor: (0.0, 0.0), width: 1280.0, height: 720.0),
+  gravity: -980.0,
+  teams: [],
+  actors: [],
+  objectives: [],
+  director: None,
+  capabilities: (
+    debug: false,
+    control_api: true,
+    save_load: false,
+  ),
+  save_fields: [],
+  expected_tests: ["M0-SMOKE-01"],
+  notes: "M0 fixture; no teams/actors/terrain/objectives. M1 introduces actor + rifle + status strip; M1.5 wires the first objective state machine.",
+)

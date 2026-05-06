@@ -1,0 +1,10 @@
+{
+  "description": "M0 DR-012 settings roundtrip: set ui_scale + high_contrast + captions, then observe.settings, then runbundle.write.",
+  "steps": [
+    { "method": "observe.settings", "params": {} },
+    { "method": "act.settings.set", "params": { "ui_scale": 2.0, "high_contrast": true, "captions": false, "reduced_motion": true, "reduced_shake": true, "reduced_flash": true } },
+    { "method": "observe.settings", "params": {} },
+    { "method": "sim.step", "params": { "ticks": 60 } },
+    { "method": "observe.once", "params": {} }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "CommandAck",
+  "type": "object",
+  "required": [
+    "effective_tick",
+    "schema_version",
+    "status"
+  ],
+  "properties": {
+    "effective_tick": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "reason": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0.0
+    },
+    "status": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false
+}

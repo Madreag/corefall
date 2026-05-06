@@ -23,6 +23,93 @@ Root planning files live here:
 
 Before implementing a milestone, read the canonical vault directly. If any path below is missing, search the canonical vault with `rg --files` and ask the user before making architecture-changing assumptions.
 
+## Milestone Authority Stack
+
+For milestone scope and acceptance, documents are not peers. Use this authority order every time:
+
+1. The user's current assignment or explicit correction.
+2. The assigned milestone section in `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md`.
+3. The assigned milestone task cards in `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/native-implementation-backlog.md`.
+4. DRs/spec files that the roadmap or backlog explicitly links for that milestone.
+5. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/feature-completion-checklist.md` as tracking and evidence only.
+6. Implementation logs, `CHANGELOG.md`, run bundles, notes, review reports, and handoff summaries as evidence only.
+
+If a lower-authority file says a roadmap/backlog requirement is deferred, partial, unnecessary, or complete, that claim is invalid unless the roadmap/backlog was changed first with explicit user approval. Do not use evidence files to redefine milestone scope.
+
+When files conflict:
+
+- Roadmap/backlog wins for what must be built.
+- Linked DR/spec wins only for the detailed shape of an item already in roadmap/backlog scope.
+- Checklist/log/changelog/run-bundle claims must be corrected to match the roadmap/backlog, not the other way around.
+- If the roadmap and backlog disagree on a material requirement, stop and ask the user before implementing or marking completion.
+
+## Milestone Acceptance Gate
+
+A milestone is complete only when every roadmap done-criterion and every backlog task card for that milestone is PASS with evidence. Every handoff, review, or completion report must include an ID-by-ID acceptance matrix:
+
+```text
+M<id>-001: PASS/FAIL - evidence
+M<id>-002: PASS/FAIL - evidence
+...
+```
+
+Any `FAIL`, `PARTIAL`, `DEFERRED`, `READY_FOR_HUMAN`, or "lands later" item in roadmap/backlog scope means the milestone is not complete. The only exception is when the roadmap/backlog itself marks the item as human-gated or future scope.
+
+No verified review finding may be carried forward by default. Low, Medium, High, and Blocker findings must all be fixed before the milestone is called complete. The only exception is an explicit user-approved deferral for that exact finding; the deferral must record the issue ID, reason, owner, next milestone/checkpoint, and evidence path in the implementation log, `CHANGELOG.md`, checklist row, and roadmap/DR docs if scope or risk changed.
+
+Do not summarize a milestone as complete from prose. Completion is the acceptance matrix plus validation evidence.
+
+## Contract Integrity Gate
+
+Passing commands are not enough. Every milestone must prove that implementation behavior matches the roadmap/backlog contract through the same code paths users, tools, CI, and future milestones will rely on.
+
+Hard rules:
+
+- No parallel production paths. `cf-app`, `cfctl`, `cf-control`, `cf-replay`, scenario loading, metadata generation, schema validation, and run-bundle writing must share the same core contract code whenever they claim the same behavior. If a helper bypasses production behavior, name it `*_test_*`, keep it test-only where possible, and never call it from binaries.
+- No fake success. A command returning `accepted`, `ok`, or `PASS` must either perform the requested state change or reject the request with a specific error. Ignoring unsupported fields, silently defaulting malformed params, or accepting no-op command semantics is a milestone failure.
+- Required fields are required. If a spec says a field is mandatory, missing or malformed input must fail in both tests and live `cfctl`/JSON-RPC validation. Do not treat absence as compatible unless the spec explicitly allows it.
+- Evidence must be source-truthful. Run bundles, summaries, observations, and checklist rows must reflect the loaded scenario, active config, current binary/git state, and actual runtime path. Hardcoded metadata must not masquerade as loaded manifest/build data.
+- Checklist rows cannot launder deferrals. If a checked row's notes contain `deferred`, `follow-up`, `not implemented`, `reserved`, `fake`, `stub`, `placeholder`, or equivalent wording for required roadmap/backlog scope, the row is not complete unless the user explicitly approved that exact deferral.
+- Every reviewed bug needs a regression proof. For each verified finding, add a test or validation command that would have failed before the fix and now passes. If a test is impossible, document why and provide the strongest equivalent live validation.
+
+Every milestone closeout must include a **Contract Integrity Matrix**:
+
+```text
+Contract path: <cf-app/cfctl/server/replay/etc>
+Shared source of truth: <module/function/schema>
+Positive proof: <test/command/bundle>
+Negative/adversarial proof: <test/command/error>
+Checklist truth: <rows updated, no hidden deferrals>
+```
+
+If a contract path has no negative/adversarial proof, do not mark it complete.
+
+## No-Compromise Performance Defaults
+
+Corefall is a no-compromise performance and feel project. Do not turn roadmap defaults into hardcoded ceilings.
+
+Performance-sensitive values must be configuration-driven unless the roadmap/backlog explicitly marks them as fixed invariants. This includes:
+
+- Sim tick rate.
+- Render cadence / frame pacing.
+- Input sampling cadence.
+- Physics substeps / solver iteration counts.
+- Network send, receive, rollback, snapshot, and interpolation rates.
+- Replay checksum cadence and snapshot cadence.
+- Asset streaming budgets, worker counts, memory budgets, and quality tiers.
+
+If a milestone names a default or validation value, implement it as a default, not as an architectural constant. Example: `60 Hz default; 120 Hz option` means the engine must accept tick-rate configuration and must not contain gameplay/control/replay/render assumptions that only work at 60 Hz.
+
+Tick-rate policy until the canonical roadmap says otherwise:
+
+- M0 may keep the roadmap's 60 Hz compatibility/default validation path.
+- M0 must preserve and validate a 120 Hz path wherever fixed-tick sim behavior is implemented.
+- 128 Hz is a candidate for later evidence-based evaluation, especially for network/server cadence, but must not be blocked by M0 architecture.
+- Run bundles and observations must record the configured tick rate.
+- Tests for fixed-tick systems must cover more than one tick rate whenever the system is tick-rate-sensitive.
+
+Hardcoded performance-sensitive constants are a milestone failure unless they are named constants backed by roadmap/backlog text and exposed through the relevant config surface. If an agent believes a value should be fixed for design reasons, it must be recorded as an explicit roadmap/backlog decision before being treated as fixed.
+
 ## Short Assignment Expansion
 
 If the user says something short like:
@@ -44,13 +131,15 @@ For any milestone assignment, the worker must:
 1. Read the mandatory docs below.
 2. Read the assigned milestone section in the roadmap.
 3. Read the assigned milestone task cards in the native backlog.
-4. Read the assigned milestone rows in the feature checklist.
+4. Read the assigned milestone rows in the feature checklist as evidence/tracking only, not scope authority.
 5. Run the Open Decision Gates pre-check before locking any open decision.
 6. Implement all agent-completable task cards for the milestone.
 7. Run Standard Validation plus milestone-specific validation.
 8. Produce run-bundle evidence under `prototype_runs/native/`.
 9. Update the canonical vault roadmap/checklist and repo-local changelog.
-10. Leave both repos commit-ready, and commit only when the user asks or when the active assignment explicitly includes committing.
+10. Produce the ID-by-ID acceptance matrix from the Milestone Acceptance Gate.
+11. Confirm no performance-sensitive roadmap default was hardcoded as an architectural ceiling.
+12. Leave both repos commit-ready, and commit only when the user asks or when the active assignment explicitly includes committing.
 
 ## Mandatory Read Order Before Any Milestone
 
@@ -76,6 +165,18 @@ For milestone-specific docs, use the tables in:
 ```
 
 If the canonical `spec/ai-coder-reading-list.md` disagrees with the list above, the canonical list wins. Propose a row update there in the same pass and commit the AGENTS.md edit alongside it.
+
+## Review And Bug-Hunt Skill
+
+Claude Code has a project-local review skill installed at:
+
+```text
+.claude/skills/corefall-review/SKILL.md
+```
+
+Use `/corefall-review <milestone-or-range>` for deep milestone reviews, bug hunts, gap finding, and pre-merge audits. The skill runs a separate diff review, full affected-code review, contract gap review, edge-case hunt, test audit, Rust/determinism/security/performance review, `cfctl` observability review, and vault coherence pass.
+
+Repo-specific review behavior is pinned in the skill entrypoint at `.claude/skills/corefall-review/SKILL.md`. If the user asks "review M0", "bug hunt this", "find misses", or "is this done?", treat that as enough context to invoke the review skill and review the current working tree or supplied commit/range. If the review finds any verified issue at any severity, the next action is a fix/stabilization pass, not milestone acceptance, unless the user explicitly approves deferring that exact issue.
 
 ## Repository Layout
 
@@ -178,8 +279,12 @@ Required completion actions:
 8. If the milestone closes a DR, update the DR file + `decisions/index.md` + `dashboards/decision-tracker.md` + `dashboards/research-readiness.md` + a dated `research-log/` note in the same pass.
 9. Verify every new player-facing surface is reachable from `cfctl` with assert/inspect coverage.
 10. Report any vault updates that could not be completed, with exact file paths and reasons.
+11. Report the milestone acceptance matrix with every roadmap done-criterion and every backlog task card marked PASS or FAIL.
+12. Report the performance/config audit for the milestone: which tick rates, frame rates, solver rates, network rates, replay cadences, and quality budgets are configurable; which values were validated; and why any fixed constant is allowed.
+13. Run `/corefall-review <milestone>` from `/Users/erol/projects/corefall`, fix every verified finding at every severity, and rerun `/corefall-review <milestone>` until the verdict is `Accept`. If the user explicitly defers a finding, record the deferral ID, reason, owner, next checkpoint, and evidence path.
+14. Report the Contract Integrity Matrix proving shared code paths, required-field rejection, fake-success absence, source-truthful evidence, and checklist truth.
 
-Do not mark work complete if the checklist/roadmap updates are skipped. If a task genuinely does not affect the roadmap, record "roadmap update not needed" in the implementation log and explain why.
+Do not mark work complete if the checklist/roadmap updates are skipped. Do not mark work complete if any roadmap done-criterion or backlog task card is deferred, partial, or only documented as future work. Do not mark work complete until `/corefall-review <milestone>` has been run and rerun to `Accept`, unless every remaining verified finding has explicit user-approved deferral evidence. Do not mark work complete if the Contract Integrity Matrix is missing positive and negative/adversarial proof for each contract path. Do not mark work complete if a performance-sensitive value is hardcoded without roadmap/backlog authority and a config-path explanation. If a task genuinely does not affect the roadmap, record "roadmap update not needed" in the implementation log and explain why.
 
 ## Reference Repos And Reuse
 
@@ -217,6 +322,56 @@ Current direction:
 - Never include vault file paths in commit subjects unless the commit is vault-only.
 - Do not push directly to `main` without a local Standard Validation pass.
 
+## Cursor Bugbot Loop
+
+The corefall GitHub repo has [Cursor Bugbot](https://cursor.com/docs/bugbot) installed as a GitHub App. Bugbot reviews every PR push and is **not** the same as the project-local `corefall-review` skill. Treat its findings/autofixes as advisory, not authoritative.
+
+### How the loop runs
+
+Every time a commit lands on a PR branch:
+
+1. Bugbot review fires automatically.
+2. If Bugbot finds an issue, it produces an **autofix commit** authored as `Cursor Agent <cursoragent@cursor.com>` and pushes it directly to the PR branch.
+3. The autofix triggers another Bugbot review.
+4. Bugbot autofix loops up to **3 times** per PR push.
+5. After the 3 autofix iterations, Bugbot produces findings and waits for the human/agent to react.
+6. **Any human/agent push to the PR branch re-triggers the full 3-iteration autofix loop** from step 1.
+
+The loop runs in parallel with the GitHub Actions CI matrix. Bugbot can produce autofix commits **even while CI is still running** on an earlier commit. The matrix may already be a few commits behind by the time you look at it.
+
+### Required behavior when reviewing a PR with Bugbot
+
+1. **Do not push to the PR branch while Bugbot loops are still running.** Every push restarts the 3-iteration cycle and adds more Cursor Agent commits to evaluate. Wait for the user to confirm Bugbot + CI are settled before pushing fixes. The user will signal when the loops are done.
+2. **Pull the branch and inspect every Cursor Agent commit since the last human commit, one by one.** For each:
+   - Read the diff against the actual codebase, not just the commit message.
+   - Cross-check Bugbot's stated root cause against the real failing CI step (read CI logs, not just the Bugbot summary).
+   - Decide: is this a real bug? Is the fix actually addressing the right cause? Does the fix introduce a regression?
+3. **Revert wrong autofixes with `git revert <sha>`**, not by force-pushing over them. Use a revert commit message that explains *why* the autofix was wrong (false positive, wrong RCA, masks a deeper issue, breaks something else). This preserves the audit trail of what Bugbot proposed and why it was rejected.
+4. **For Bugbot findings that are false positives**, leave an inline PR comment on the file/line that Bugbot flagged, explaining why it's not a real bug. This prevents Bugbot from re-flagging the same finding on subsequent runs.
+5. **Only push real fixes.** Every push triggers another 3-iteration Bugbot cycle. Batch real fixes into a single commit when possible.
+6. **Real CI failures take precedence over Bugbot diagnoses.** Read the actual GitHub Actions log for the failing step. Bugbot tends to surface plausible but secondary issues that are masked by an earlier step failing first.
+
+### Failure mode the rule prevents
+
+On PR #1 (`m0-engine-bootstrap`, Madreag/corefall, 5/5/2026):
+
+- The Windows CI job failed at `cargo fmt --all -- --check` with "Incorrect newline style" on every `.rs` file. Root cause: no `.gitattributes` in the repo, so `actions/checkout@v4` honored git's default `core.autocrlf=true` on Windows runners and rewrote LF → CRLF on checkout, which violated `rustfmt.toml`'s `newline_style = "Unix"`.
+- Bugbot diagnosed the Windows failure as **"Windows bundle validation fails"** and autofixed `python3` → `python` in the run-bundle validation step (because `actions/setup-python@v5` only guarantees `python` on Windows).
+- The autofix was a **valid forward-looking fix** but **not the cause of the current failure** — `cargo fmt` fired before the validation step, so the validation step never ran on Windows. Bugbot surfaced a real-but-secondary issue and advertised it as the fix.
+- The agent (correctly) read the actual CI log, identified the line-ending root cause, kept Bugbot's autofix commit (it was right about something), and added `.gitattributes` on top to fix the actual blocker.
+
+If the agent had blindly trusted Bugbot's diagnosis without reading the CI log, it would have merged the autofix expecting CI to pass — and the next push would have failed Windows again at the same `cargo fmt` step.
+
+### Cursor Agent commit signature
+
+Autofix commits are authored as:
+
+```text
+Author: Cursor Agent <cursoragent@cursor.com>
+```
+
+Search for this signature when auditing recent PR history. These are NOT human commits and NOT `corefall-review` skill commits. They come from the GitHub App and need explicit human/agent review before they're trusted.
+
 ## Secrets Posture
 
 - Never commit API keys, `.env` files, signing keys, or LLM provider tokens.
@@ -235,6 +390,7 @@ Current direction:
 - Don't commit API keys, `.env` files, signing keys, or LLM provider tokens.
 - Don't push directly to `main` without local Standard Validation.
 - Don't mark work complete if the canonical checklist/roadmap updates are skipped.
+- Don't create root review instruction/report files. Standing review rules live in `.claude/skills/corefall-review/SKILL.md`; review reports belong under `docs/reviews/`.
 - Don't add cloud-save dependencies during T-SAVE work; cloud-save backend decision is post-launch.
 - Don't introduce a UI surface without a matching `cf-control` / `cfctl` path. Eyes/ears/hands rule.
 

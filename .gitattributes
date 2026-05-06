@@ -1,0 +1,34 @@
+# Lock line endings to LF across all OSes so Windows CI runners cannot
+# convert source files to CRLF on checkout (which breaks `cargo fmt --check`
+# under `rustfmt.toml`'s `newline_style = "Unix"` and breaks deterministic
+# checksum/replay contracts that hash source/text content).
+* text=auto eol=lf
+
+# Explicit text declarations for the file types this workspace ships.
+*.rs        text eol=lf
+*.toml      text eol=lf
+*.md        text eol=lf
+*.json      text eol=lf
+*.ron       text eol=lf
+*.yml       text eol=lf
+*.yaml      text eol=lf
+*.py        text eol=lf
+*.sh        text eol=lf
+*.cfctl.json text eol=lf
+.gitignore  text eol=lf
+.gitattributes text eol=lf
+LICENSE*    text eol=lf
+
+# Binary types we may add later (icons, sprites, audio). Left explicit so
+# Windows checkout never mangles them.
+*.png  binary
+*.jpg  binary
+*.jpeg binary
+*.gif  binary
+*.ico  binary
+*.icns binary
+*.wav  binary
+*.ogg  binary
+*.mp3  binary
+*.bin  binary
+*.exe  binary

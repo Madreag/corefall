@@ -1,0 +1,28 @@
+# Cargo build output (mirrors workspace root rule; safe to keep both)
+/target
+**/*.rs.bk
+Cargo.lock.bak
+
+# Editor / IDE
+/.idea
+/.vscode
+*.iml
+.fleet/
+.zed/
+
+# Local-only run bundles produced inside game/ (anything starting with `local_`)
+/prototype_runs/native/local_*
+
+# Cargo debug / profiling
+*.profraw
+*.profdata
+flamegraph.svg
+perf.data
+perf.data.old
+
+# OS
+.DS_Store
+._*
+Thumbs.db
+ehthumbs.db
+Desktop.ini

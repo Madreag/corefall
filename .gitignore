@@ -1,16 +1,52 @@
+# Transient / log
 *.log
 *.tmp
+*.pid
+
+# Editor swap / backup
 *.swp
 *.swo
-.DS_Store
+.*.swp
+.*.swo
+*~
+*.bak
+*.orig
+*.rej
+.netrwhist
+
+# Secrets / env (do NOT weaken this — see corefall AGENTS.md "Secrets Posture")
 .env
 .env.*
 !.env.example
+.envrc
 
 # Rust / Cargo
 target/
+**/*.rs.bk
 
-# Generated prototype evidence
+# Python (game/tools/ vendors prototype_run_check.py; future tools may grow)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.python-version
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+pip-log.txt
+.coverage
+coverage/
+htmlcov/
+
+# Profiling / debugging artifacts
+flamegraph.svg
+perf.data
+perf.data.old
+*.profraw
+*.profdata
+
+# Generated prototype evidence (run bundles are gitignored — keep README marker only)
 prototype_runs/*
 !prototype_runs/native/
 prototype_runs/native/*
@@ -19,9 +55,33 @@ run_bundles/
 captures/
 screenshots/
 
-# IDE
+# IDE / editor / tool
 .idea/
 .vscode/
+*.iml
+.fleet/
+.zed/
+.cursor/
 
-# OS
+# Claude Code per-machine local state (project-shared skills under .claude/skills/ stay tracked)
+.claude/settings.local.json
+.claude/cache/
+.claude/local/
+
+# macOS
+.DS_Store
+._*
+.AppleDouble
+.LSOverride
+.Spotlight-V100
+.Trashes
+.fseventsd
+
+# Windows
 Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# Linux
+.Trash-*
+.directory
