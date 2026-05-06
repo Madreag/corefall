@@ -80,6 +80,7 @@ jobs:
             -not -path './prototype_runs' \
             -not -path './prototype_runs/*' \
             -not -path './target/*' \
+            -not -path './game/target/*' \
             -not -path './.git/*' \
             || true)
           if [ -n "$STRAY" ]; then
