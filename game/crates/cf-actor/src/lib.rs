@@ -293,9 +293,13 @@ impl ControlIntent {
         self.reset = false;
     }
 
+    /// Returns true when no actively-driven input is present. `aim` is a
+    /// continuous field that persists across ticks (not cleared by
+    /// [`clear_edges`](Self::clear_edges)), so it is intentionally excluded
+    /// here — a sticky aim direction does not indicate the player is
+    /// currently providing input.
     pub fn is_idle(&self) -> bool {
         self.move_x.abs() < f32::EPSILON
-            && self.aim == Vec2::ZERO
             && !self.jump
             && !self.fire
             && !self.reload

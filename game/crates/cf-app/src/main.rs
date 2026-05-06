@@ -356,6 +356,7 @@ fn ingest_player_input(
     keys: Res<ButtonInput<KeyCode>>,
     rt: Option<Res<ControlRuntime>>,
     mut last_move_x: Local<f32>,
+    mut last_aim: Local<(f32, f32)>,
 ) {
     let _ = rt; // Reserved; ControlRuntime presence does not gate human input.
     if !holder.0.config().has_actor_world {
@@ -384,6 +385,15 @@ fn ingest_player_input(
     let move_changed = (move_x - *last_move_x).abs() > f32::EPSILON;
     let dispatch_move = move_changed;
     *last_move_x = move_x;
+    // Mirror the move-edge detection for aim: only dispatch when the aim
+    // vector actually changes. Aim is a continuous, latest-value-wins field
+    // on `ControlIntent`, so re-sending the same vector every frame both
+    // wastes a `RwLock` write on the engine and risks clobbering sticky
+    // `cfctl act.player.aim` values on idle frames.
+    let aim_active = aim_x.abs() > 1e-3 || aim_y.abs() > 1e-3;
+    let aim_changed = (aim_x - last_aim.0).abs() > f32::EPSILON || (aim_y - last_aim.1).abs() > f32::EPSILON;
+    let dispatch_aim = aim_active && aim_changed;
+    *last_aim = (aim_x, aim_y);
     let block_on = futures_block_on;
     block_on(async {
         if dispatch_move {
@@ -396,7 +406,7 @@ fn ingest_player_input(
                 })
                 .await;
         }
-        if aim_x.abs() > 1e-3 || aim_y.abs() > 1e-3 {
+        if dispatch_aim {
             let _ = holder
                 .0
                 .dispatch(ControlCommand::ActPlayerAim {
