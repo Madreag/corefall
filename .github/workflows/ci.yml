@@ -65,7 +65,7 @@ jobs:
           fi
           for B in $BUNDLES; do
             echo "Validating $B"
-            python3 tools/prototype_run_check.py "$B"
+            python tools/prototype_run_check.py "$B"
           done
       - name: enforce repo-root prototype_runs path (M0.4-F7)
         shell: bash
