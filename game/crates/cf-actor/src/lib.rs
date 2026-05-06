@@ -124,11 +124,17 @@ impl Vec2 {
         (self.x * self.x + self.y * self.y).sqrt()
     }
 
-    /// Returns a unit vector. If the input is the zero vector, returns `Vec2::new(1.0, 0.0)`
-    /// so consumers (e.g. weapon muzzle origin) never produce NaNs.
+    /// Returns a unit vector. If the input is the zero vector OR contains a non-finite
+    /// component (NaN / Inf), returns `Vec2::new(1.0, 0.0)` so consumers (e.g. weapon
+    /// muzzle origin, projectile velocity, recoil) never produce NaNs. NaN comparisons
+    /// always return false, so a plain `len < 1e-6` guard is NOT sufficient — we must
+    /// explicitly check `is_finite()` on every component.
     pub fn normalize_or_x(self) -> Vec2 {
+        if !self.x.is_finite() || !self.y.is_finite() {
+            return Vec2::new(1.0, 0.0);
+        }
         let len = self.length();
-        if len < 1e-6 {
+        if !len.is_finite() || len < 1e-6 {
             Vec2::new(1.0, 0.0)
         } else {
             Vec2::new(self.x / len, self.y / len)
@@ -564,6 +570,30 @@ mod tests {
         assert_eq!(quantize_f32(f32::NAN), 0);
         assert_eq!(quantize_f32(f32::INFINITY), 0);
         assert_eq!(quantize_f32(0.5), 512);
+    }
+
+    #[test]
+    fn normalize_or_x_rejects_nonfinite_components() {
+        // NaN/Inf must NOT pass through `len < 1e-6` (NaN comparisons return false),
+        // otherwise the division produces poison values that propagate to muzzle origin,
+        // projectile velocity, and recoil. Defense-in-depth fallback to (1, 0).
+        for (x, y) in [
+            (f32::NAN, 0.0),
+            (0.0, f32::NAN),
+            (f32::NAN, f32::NAN),
+            (f32::INFINITY, 0.0),
+            (0.0, f32::NEG_INFINITY),
+            (f32::INFINITY, f32::INFINITY),
+        ] {
+            let n = Vec2::new(x, y).normalize_or_x();
+            assert_eq!(n, Vec2::new(1.0, 0.0), "non-finite ({x}, {y}) must normalize to (1, 0)");
+        }
+        // Finite zero stays at (1, 0).
+        assert_eq!(Vec2::new(0.0, 0.0).normalize_or_x(), Vec2::new(1.0, 0.0));
+        // Finite unit vectors normalize correctly.
+        let n = Vec2::new(3.0, 4.0).normalize_or_x();
+        assert!((n.x - 0.6).abs() < 1e-6);
+        assert!((n.y - 0.8).abs() < 1e-6);
     }
 
     #[test]

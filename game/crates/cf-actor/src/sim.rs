@@ -301,11 +301,15 @@ fn step_one_actor(
             {
                 actor.on_ground = true;
             }
+            // Tuning is read once and shared across jump/horizontal-motion/kinematics so
+            // any change to ActorTuning (e.g. M5 chassis grammar) propagates uniformly
+            // instead of leaving stale hardcoded values in jump-impulse space.
+            let tuning = ActorTuning::default();
             if accepted_input && intent.jump {
                 let (new_vy, accepted) = apply_jump(JumpInputs {
                     velocity_y: actor.velocity.y,
                     on_ground: actor.on_ground,
-                    jump_impulse: 420.0,
+                    jump_impulse: tuning.jump_impulse,
                 });
                 actor.velocity.y = new_vy;
                 if accepted {
@@ -316,7 +320,6 @@ fn step_one_actor(
             let move_x_input = if accepted_input { intent.move_x } else { 0.0 };
             outcome.move_x = move_x_input;
 
-            let tuning = ActorTuning::default();
             let h_out = apply_horizontal_motion(HorizontalInputs {
                 position_x: actor.position.x,
                 velocity_x: actor.velocity.x,
@@ -792,6 +795,35 @@ mod tests {
         let rifle = state.rifles.get(&ActorId(1)).unwrap();
         let mag_capacity = rifle_preset(RIFLE_M1_DEFAULT_ID).unwrap().mag_capacity;
         assert_eq!(rifle.ammo_in_mag, mag_capacity);
+    }
+
+    #[test]
+    fn jump_impulse_uses_actor_tuning_field() {
+        // Regression: the jump apply path used to hardcode 420.0 instead of reading
+        // ActorTuning::jump_impulse, so any tuning change was silently dead code.
+        // We assert post-jump vy equals ActorTuning::jump_impulse minus the one-tick
+        // gravity decay (apply_jump runs before step_kinematics inside step_one_actor,
+        // so the post-tick vy reflects exactly one frame of gravity).
+        let (mut state, mut intents) = setup();
+        let dep = deps();
+        let gravity_step = state.world.gravity * dep.tick_dt;
+        intents.insert(
+            ActorId(1),
+            ControlIntent {
+                actor: ActorId(1),
+                jump: true,
+                ..ControlIntent::new(ActorId(1), IntentSource::Human)
+            },
+        );
+        let _ = step(&mut state, &mut intents, dep);
+        let actor = state.world.actors.get(&ActorId(1)).unwrap();
+        let expected = ActorTuning::default().jump_impulse + gravity_step;
+        assert!(
+            (actor.velocity.y - expected).abs() < 1e-3,
+            "post-jump vy must equal ActorTuning::jump_impulse ({}) minus one tick of gravity (={expected}); got {}",
+            ActorTuning::default().jump_impulse,
+            actor.velocity.y
+        );
     }
 
     #[test]
