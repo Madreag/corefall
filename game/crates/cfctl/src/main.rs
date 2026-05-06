@@ -86,8 +86,10 @@ enum Cmd {
         scenario: String,
         #[arg(long, default_value_t = 300)]
         ticks: u64,
-        #[arg(long, default_value_t = 42)]
-        seed: u64,
+        /// Optional seed override. When omitted, the scenario manifest's seed is used so that
+        /// `cfctl run` matches `cf-app` for the same scenario (shared determinism contract).
+        #[arg(long)]
+        seed: Option<u64>,
         #[arg(long, default_value_t = 60)]
         tick_rate_hz: u32,
         #[arg(long)]
@@ -348,7 +350,7 @@ fn want_inline_default(inline_flag: bool, once: bool, stream: bool, settings_onl
 fn cmd_run(
     scenario_id: String,
     ticks: u64,
-    seed: u64,
+    seed: Option<u64>,
     tick_rate_hz: u32,
     write_run_bundle: bool,
     run_bundle_dir: Option<PathBuf>,
@@ -376,7 +378,7 @@ fn cmd_run(
             high_contrast,
             ..Settings::default()
         },
-        seed_override: Some(seed),
+        seed_override: seed,
         duration_ticks_override: if ticks > 0 { Some(ticks) } else { None },
         debug_inject_panic_at_tick: None,
     };
