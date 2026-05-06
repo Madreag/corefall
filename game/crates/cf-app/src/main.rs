@@ -471,38 +471,37 @@ fn keyboard_axis(keys: &ButtonInput<KeyCode>, pos_a: KeyCode, neg_a: KeyCode, po
 /// Block on a single async dispatch. The control engine is used through async traits
 /// even from the synchronous Bevy schedule; the body is small and all work is
 /// in-process so blocking is fine.
+///
+/// Uses a thread-parking waker so that if any future implementation ever returns
+/// `Poll::Pending` (for example, a future engine backed by `tokio::sync::RwLock`),
+/// the current thread parks until the waker is signalled instead of spinning.
 fn futures_block_on<F, T>(future: F) -> T
 where
     F: std::future::Future<Output = T>,
 {
-    use std::task::{Context, Poll};
+    use std::sync::Arc;
+    use std::task::{Context, Poll, Wake};
+    use std::thread::{self, Thread};
 
-    let waker = noop_waker();
+    struct ThreadWaker(Thread);
+    impl Wake for ThreadWaker {
+        fn wake(self: Arc<Self>) {
+            self.0.unpark();
+        }
+        fn wake_by_ref(self: &Arc<Self>) {
+            self.0.unpark();
+        }
+    }
+
+    let waker = Arc::new(ThreadWaker(thread::current())).into();
     let mut cx = Context::from_waker(&waker);
     let mut future = Box::pin(future);
     loop {
         match future.as_mut().poll(&mut cx) {
             Poll::Ready(out) => return out,
-            Poll::Pending => std::thread::yield_now(),
+            Poll::Pending => thread::park(),
         }
     }
-}
-
-fn noop_waker() -> std::task::Waker {
-    use std::task::{RawWaker, RawWakerVTable, Waker};
-    fn raw() -> RawWaker {
-        RawWaker::new(std::ptr::null(), &VTABLE)
-    }
-    unsafe fn clone(_: *const ()) -> RawWaker {
-        raw()
-    }
-    unsafe fn wake(_: *const ()) {}
-    unsafe fn wake_by_ref(_: *const ()) {}
-    unsafe fn drop(_: *const ()) {}
-    static VTABLE: RawWakerVTable = RawWakerVTable::new(clone, wake, wake_by_ref, drop);
-    // SAFETY: `RawWaker` here is constructed from a static `VTABLE` whose function
-    // pointers are no-ops; the resulting `Waker` is sound.
-    unsafe { Waker::from_raw(raw()) }
 }
 
 /// Copy the engine's actor world + rifle state into the Bevy render + HUD

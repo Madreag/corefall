@@ -282,9 +282,11 @@ fn step_one_actor(
                 early_exit: true,
             }
         } else {
-            if let Some(slot) = intent.selected_item {
-                if actor.inventory.try_select(slot) {
-                    outcome.selection_changed = Some(slot);
+            if accepted_input {
+                if let Some(slot) = intent.selected_item {
+                    if actor.inventory.try_select(slot) {
+                        outcome.selection_changed = Some(slot);
+                    }
                 }
             }
             if accepted_input && intent.aim != Vec2::ZERO {
