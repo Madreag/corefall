@@ -139,7 +139,9 @@ async fn spawn_server_with_scenario(
 
 async fn send_and_recv(url: &str, request: Value) -> Value {
     let (mut ws, _resp) = connect_async(url).await.expect("ws connect");
-    ws.send(Message::Text(request.to_string())).await.expect("ws send");
+    ws.send(Message::Text(request.to_string().into()))
+        .await
+        .expect("ws send");
     loop {
         let msg = tokio::time::timeout(Duration::from_secs(3), ws.next())
             .await

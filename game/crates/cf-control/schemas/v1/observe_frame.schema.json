@@ -1,25 +1,14 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ObserveFrame",
   "type": "object",
-  "required": [
-    "events",
-    "events_since",
-    "run_id",
-    "run_status",
-    "scenario",
-    "schema_version",
-    "settings",
-    "sim_time_ms",
-    "tick"
-  ],
   "properties": {
     "actors": {
       "description": "M1: typed projection of every actor in the world. Empty in M0 scenarios.",
-      "default": [],
       "type": "array",
+      "default": [],
       "items": {
-        "$ref": "#/definitions/ActorView"
+        "$ref": "#/$defs/ActorView"
       }
     },
     "events": {
@@ -29,23 +18,23 @@
     "events_since": {
       "type": "integer",
       "format": "uint64",
-      "minimum": 0.0
+      "minimum": 0
     },
     "player_actor_id": {
       "description": "Convenience pointer to the player actor in `actors` by id, if any.",
-      "default": null,
       "type": [
         "integer",
         "null"
       ],
       "format": "uint64",
-      "minimum": 0.0
+      "default": null,
+      "minimum": 0
     },
     "run_id": {
       "type": "string"
     },
     "run_status": {
-      "$ref": "#/definitions/RunStatus"
+      "$ref": "#/$defs/RunStatus"
     },
     "scenario": {
       "type": "string"
@@ -53,10 +42,10 @@
     "schema_version": {
       "type": "integer",
       "format": "uint32",
-      "minimum": 0.0
+      "minimum": 0
     },
     "settings": {
-      "$ref": "#/definitions/ObserveSettings"
+      "$ref": "#/$defs/ObserveSettings"
     },
     "sim_time_ms": {
       "type": "number",
@@ -65,27 +54,24 @@
     "tick": {
       "type": "integer",
       "format": "uint64",
-      "minimum": 0.0
+      "minimum": 0
     }
   },
-  "definitions": {
+  "required": [
+    "schema_version",
+    "run_id",
+    "tick",
+    "sim_time_ms",
+    "run_status",
+    "scenario",
+    "events_since",
+    "events",
+    "settings"
+  ],
+  "$defs": {
     "ActorView": {
-      "description": "Public projection of one actor for the observe envelope. Mirrors `cf_actor::ActorObservation` with extra fields (rifle ammo / cooldown / reload state) the engine wires through.",
+      "description": "Public projection of one actor for the observe envelope. Mirrors\n`cf_actor::ActorObservation` with extra fields (rifle ammo / cooldown / reload\nstate) the engine wires through.",
       "type": "object",
-      "required": [
-        "aim",
-        "controllable",
-        "hp",
-        "hp_max",
-        "id",
-        "on_ground",
-        "position",
-        "selected_item",
-        "selected_slot",
-        "status",
-        "team",
-        "velocity"
-      ],
       "properties": {
         "aim": {
           "type": "array",
@@ -110,7 +96,7 @@
         "id": {
           "type": "integer",
           "format": "uint64",
-          "minimum": 0.0
+          "minimum": 0
         },
         "on_ground": {
           "type": "boolean"
@@ -130,7 +116,7 @@
             "null"
           ],
           "format": "uint32",
-          "minimum": 0.0
+          "minimum": 0
         },
         "rifle_capacity": {
           "type": [
@@ -138,7 +124,7 @@
             "null"
           ],
           "format": "uint32",
-          "minimum": 0.0
+          "minimum": 0
         },
         "rifle_fire_cooldown_ticks": {
           "type": [
@@ -146,7 +132,7 @@
             "null"
           ],
           "format": "uint32",
-          "minimum": 0.0
+          "minimum": 0
         },
         "rifle_reload_remaining_ticks": {
           "type": [
@@ -154,7 +140,7 @@
             "null"
           ],
           "format": "uint32",
-          "minimum": 0.0
+          "minimum": 0
         },
         "rifle_reload_total_ticks": {
           "type": [
@@ -162,7 +148,7 @@
             "null"
           ],
           "format": "uint32",
-          "minimum": 0.0
+          "minimum": 0
         },
         "selected_item": {
           "type": "string"
@@ -170,7 +156,7 @@
         "selected_slot": {
           "type": "integer",
           "format": "uint32",
-          "minimum": 0.0
+          "minimum": 0
         },
         "status": {
           "type": "string"
@@ -187,24 +173,38 @@
           "maxItems": 2,
           "minItems": 2
         }
-      }
+      },
+      "required": [
+        "id",
+        "team",
+        "controllable",
+        "position",
+        "velocity",
+        "aim",
+        "on_ground",
+        "status",
+        "hp",
+        "hp_max",
+        "selected_slot",
+        "selected_item"
+      ]
     },
     "ObserveSettings": {
       "type": "object",
-      "required": [
-        "schema_version",
-        "settings"
-      ],
       "properties": {
         "schema_version": {
           "type": "integer",
           "format": "uint32",
-          "minimum": 0.0
+          "minimum": 0
         },
         "settings": {
-          "$ref": "#/definitions/Settings"
+          "$ref": "#/$defs/Settings"
         }
-      }
+      },
+      "required": [
+        "schema_version",
+        "settings"
+      ]
     },
     "RunStatus": {
       "type": "string",
@@ -217,14 +217,6 @@
     },
     "Settings": {
       "type": "object",
-      "required": [
-        "captions",
-        "high_contrast",
-        "reduced_flash",
-        "reduced_motion",
-        "reduced_shake",
-        "ui_scale"
-      ],
       "properties": {
         "captions": {
           "type": "boolean"
@@ -245,7 +237,15 @@
           "type": "number",
           "format": "float"
         }
-      }
+      },
+      "required": [
+        "ui_scale",
+        "high_contrast",
+        "captions",
+        "reduced_motion",
+        "reduced_shake",
+        "reduced_flash"
+      ]
     }
   }
 }

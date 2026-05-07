@@ -1,15 +1,12 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "SystemShutdownParams",
   "type": "object",
-  "required": [
-    "schema_version"
-  ],
   "properties": {
     "schema_version": {
       "type": "integer",
       "format": "uint32",
-      "minimum": 0.0
+      "minimum": 0
     },
     "write_run_bundle": {
       "type": [
@@ -18,5 +15,8 @@
       ]
     }
   },
-  "additionalProperties": false
+  "additionalProperties": false,
+  "required": [
+    "schema_version"
+  ]
 }

@@ -1,32 +1,24 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ObserveSettings",
   "type": "object",
-  "required": [
-    "schema_version",
-    "settings"
-  ],
   "properties": {
     "schema_version": {
       "type": "integer",
       "format": "uint32",
-      "minimum": 0.0
+      "minimum": 0
     },
     "settings": {
-      "$ref": "#/definitions/Settings"
+      "$ref": "#/$defs/Settings"
     }
   },
-  "definitions": {
+  "required": [
+    "schema_version",
+    "settings"
+  ],
+  "$defs": {
     "Settings": {
       "type": "object",
-      "required": [
-        "captions",
-        "high_contrast",
-        "reduced_flash",
-        "reduced_motion",
-        "reduced_shake",
-        "ui_scale"
-      ],
       "properties": {
         "captions": {
           "type": "boolean"
@@ -47,7 +39,15 @@
           "type": "number",
           "format": "float"
         }
-      }
+      },
+      "required": [
+        "ui_scale",
+        "high_contrast",
+        "captions",
+        "reduced_motion",
+        "reduced_shake",
+        "reduced_flash"
+      ]
     }
   }
 }
