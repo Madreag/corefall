@@ -63,7 +63,7 @@ For a dedicated review task, also read [[spec/ai-code-review-bug-hunt-skills]] b
 | **M9 — Dedicated Server App** | [[decisions/dr-005-multiplayer-posture]], [[decisions/dr-013-backend-service-scope]], [[decisions/dr-034-dedicated-server-application]], [[spec/server-app-architecture]], [[spec/backend-networking]], [[spec/backend-service-hub-slice-a]]. Networking transport library MUST close in M9 or M10. |
 | **M10 — LAN Co-op** | [[decisions/dr-005-multiplayer-posture]], [[decisions/dr-006-modding-data-model]], [[decisions/dr-013-backend-service-scope]], [[decisions/dr-034-dedicated-server-application]], [[spec/server-app-architecture]]. |
 | **M11 — Online Co-op (Self-Hosted)** | [[decisions/dr-005-multiplayer-posture]], [[decisions/dr-006-modding-data-model]], [[decisions/dr-013-backend-service-scope]], [[decisions/dr-034-dedicated-server-application]], [[spec/server-app-architecture]]. |
-| **M12 — Public PvP Arenas + Persistent MMO Shards** | [[decisions/dr-035-persistent-mmo-architecture]], [[decisions/dr-005-multiplayer-posture]], [[decisions/dr-011-progression-retention-loop]], [[decisions/dr-031-content-economy-and-monetization-posture]], [[spec/persistent-mmo-architecture]]. Anti-grind/anti-gacha posture must be preserved. |
+| **M12 — Public PvP Arenas + Persistent MMO Shards** | [[decisions/dr-035-persistent-mmo-architecture]], [[decisions/dr-005-multiplayer-posture]], [[decisions/dr-011-progression-retention-loop]], [[decisions/dr-031-content-economy-and-monetization-posture]], [[decisions/dr-057-optional-gacha-battle-pass-and-private-prototype-license-posture]], [[spec/persistent-mmo-architecture]]. Anti-grind posture and DR-057 dormant/default-off optional economy hooks must be preserved. |
 
 ## Read Per Cross-Cutting Feature
 
@@ -80,6 +80,7 @@ For a dedicated review task, also read [[spec/ai-code-review-bug-hunt-skills]] b
 | Any collision / physics work | [[decisions/dr-033-full-collision-physics-direction]], [[spec/full-collision-physics-plan]], [[systems/physics-and-destruction-models]]. |
 | Any replay / event capture work | [[decisions/dr-002-replay-event-architecture]], [[systems/replay-event-architecture]], [[systems/replay-determinism-and-run-evidence]], [[spec/replay-recorder-slice-a]], [[references/prototype-run-bundle-schema]]. |
 | Any LLM / mind worker | [[decisions/dr-032-hybrid-llm-ai-direction]], [[spec/hybrid-llm-ai-plan]]. |
+| Any optional economy, cosmetic battle-pass, collection, or gacha-like hook | [[decisions/dr-011-progression-retention-loop]], [[decisions/dr-031-content-economy-and-monetization-posture]], [[decisions/dr-057-optional-gacha-battle-pass-and-private-prototype-license-posture]], [[spec/progression-retention]], [[spec/liveops-and-endgame]], [[spec/legal-and-compliance]]. Must default off, avoid power locks/FOMO, and expose `cfctl test economy-disabled`, `battle-pass-disabled`, and `no-power-locks`. |
 
 ## Hard Rules The Worker Must Always Follow
 

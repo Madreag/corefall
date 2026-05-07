@@ -82,18 +82,18 @@ revisit_trigger: "Launch posture changes (e.g., publisher onboarded); compliance
 | **Modding rights** | Modders retain copyright on their mod content. License them to other players via Workshop (CC-BY-SA default; modder can pick). |
 | **Anti-harassment + Code of Conduct** | Discord ToS + in-game chat moderation. Reportable infractions. |
 | **Accessibility compliance** | Per DR-012 + T-ACCESSIBILITY. WCAG 2.1 AA targeted for UI. Caption support per ADA / EU Accessibility Act. |
-| **Content rating disclosures** | Loot boxes: NONE (per DR-031). Gambling mechanics: NONE. In-app purchases: NONE at launch. Online interactions: yes. User-generated content: yes (Workshop). Disclosed on store page. |
+| **Content rating disclosures** | Loot boxes/gacha-like collection: NONE by default at launch; dormant optional hooks follow DR-057 and require a future activation DR before release-facing use. Gambling mechanics: NONE. In-app purchases: NONE at launch. Online interactions: yes. User-generated content: yes (Workshop). Disclosed on store page. |
 
 ### Live-ops foundation (post-launch)
 
-Per DR-031 (no pay-to-win, no gacha, no marketplace cut). Live-ops at launch is **infrastructure only**, not content-economy treadmill.
+Per DR-031 (no pay-to-win, no gameplay-gating battle pass, no marketplace cut) and DR-057 (optional cosmetic battle-pass/gacha-like hooks late, dormant, default-off). Live-ops at launch is **infrastructure only**, not content-economy treadmill.
 
 | Component | Detail |
 |---|---|
-| **Cosmetics pipeline** | Skins, decals, paint jobs, voice packs, emblems, victory poses. Earned via play (achievements, mastery, mission completion, replay shares). NEVER paid. NEVER gacha. |
+| **Cosmetics pipeline** | Skins, decals, paint jobs, voice packs, emblems, victory poses. Earned via play by default (achievements, mastery, mission completion, replay shares). Optional paid-cosmetic or gacha-like collection hooks stay disabled unless DR-057 activation gates pass. |
 | **DLC infrastructure** | Optional paid expansions post-launch (new factions, campaign chapters, new worlds). NEVER core mechanics. NEVER pay-to-win. |
 | **Balance hot-patch** | Post-launch balance changes via signed content patch. ~Quarterly. Driven by telemetry + community feedback. |
-| **Content updates** | Quarterly: new missions, new mods spotlighted, new community challenges, new launch-tier-extension factions/weapons. NEVER paid for v1.0 owners. |
+| **Content updates** | Quarterly: new missions, new mods spotlighted, new community challenges, new launch-tier-extension factions/weapons. Never sell gameplay power or required core fixes. |
 | **Seasonal events (optional)** | Holiday events (Halloween scenario, winter scenario) for community engagement. Time-limited. NO FOMO mechanics (ephemeral cosmetics OK if also obtainable later). |
 | **Community challenges** | Weekly leaderboard challenges: speedrun a mission, survive Bunker Defence, build a base. Replay-share-driven. AI-judge-assisted. |
 | **Mod-creator support** | Featured mods, mod-spotlight in launcher, modder credits on official channels. |

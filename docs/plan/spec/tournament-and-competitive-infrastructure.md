@@ -40,7 +40,7 @@ feeds:
 | Season length | 12 weeks default. |
 | Promotion / demotion | At ELO thresholds; promotion match optional. |
 | Reset | Per-season soft reset (e.g., back to Silver baseline; placement matches re-determine). |
-| Rewards | Cosmetic emblem + paint per tier achieved. NEVER paid. NEVER power. |
+| Rewards | Cosmetic emblem + paint per tier achieved. Tournament rewards are earned by default and never grant power. Optional paid-cosmetic economy hooks stay separate and disabled unless DR-057 activation gates are met. |
 
 ## Tournament Bracket Infrastructure
 

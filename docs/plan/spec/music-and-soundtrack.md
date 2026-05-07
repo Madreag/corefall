@@ -1,7 +1,7 @@
 ---
 type: spec
 status: closed-direction
-authority: "Music + soundtrack: AI-composed adaptive layers (Suno/Udio cloud + MusicGen/Stable Audio Open local) + diegetic-first mix + adaptive crossfade per EnvironmentSignal/match phase. 30+ launch tracks. FMOD or bevy_kira_audio."
+authority: "Music + soundtrack: AI-composed adaptive layers (Suno/Udio/ElevenLabs cloud + MusicGen/Stable Audio Open local) + diegetic-first mix + adaptive crossfade per EnvironmentSignal/match phase. 30+ launch tracks. FMOD or bevy_kira_audio. Private prototypes are ledger-first; release/sale assets require cleanup or clearance."
 ready_when: "All launch tracks composed + mastered; adaptive layering responds to gameplay events; SFX library covers 400+ events with caption coverage; FMOD/Kira mix passes diegetic-first per DR-020."
 feeds:
   - DR-012
@@ -14,6 +14,7 @@ feeds:
   - DR-044
   - DR-046
   - DR-047
+  - DR-057
 ---
 
 ← [[spec/index|spec section]] · [[spec/audio-identity|audio identity]] · [[spec/art-and-asset-pipeline|art pipeline]] · [[spec/comms-voice-and-radio-model|comms]] · [[decisions/dr-020-audio-identity|DR-020]] · [[decisions/dr-044-audiovisual-production-pipeline|DR-044]]
@@ -28,10 +29,10 @@ feeds:
 
 | Component | Detail |
 |---|---|
-| **Music composer (cloud)** | Suno v5 / Udio v2 / ElevenLabs Music candidates. License review pre-launch; rights depend on plan and terms at generation time. AI-prompted by project-owner; iterations via AI agent. |
-| **Music composer (local fallback)** | MusicGen/AudioCraft is prototype-only unless weights are replaced, self-trained, or commercially licensed. AudioCraft code is MIT; released model weights are CC-BY-NC 4.0. |
-| **SFX generator** | Stable Audio Open 1.0; generates up to 47s audio at 44.1 kHz from text prompts. Local. Stability AI Community License / commercial-use registration or enterprise review required before release assets ship. |
-| **Voice generator (NPC dialogue)** | ElevenLabs (license review) OR XTTS-v2 / Tortoise (open-source). Skip if license blocks. |
+| **Music composer (cloud)** | Suno v5 / Udio v2 / ElevenLabs Music candidates. Private prototypes log terms at generation time; public sale/release requires cleanup or current clearance. AI-prompted by project-owner; iterations via AI agent. |
+| **Music composer (local fallback)** | MusicGen/AudioCraft is allowed for private prototypes unless weights are replaced, self-trained, or commercially licensed for release. AudioCraft code is MIT; released model weights are CC-BY-NC 4.0. |
+| **SFX generator** | Stable Audio Open 1.0; generates up to 47s audio at 44.1 kHz from text prompts. Local. Private prototypes allowed with ledger entry; Stability AI Community License / commercial-use registration or enterprise review required before public sale/release assets ship. |
+| **Voice generator (NPC dialogue)** | ElevenLabs subscription available but not exclusive; XTTS-v2 / Tortoise remain candidates. Do not skip private prototypes for license uncertainty; log provenance and clean/replace before public sale/release. |
 | **Mixer** | FMOD Studio (free under $200K/yr) wrapped via `bevy_fmod` OR pure-Rust `bevy_kira_audio` (Apache-2.0; lower-feature). Preferred: FMOD for adaptive layering + spatial; fallback Kira. |
 | **Adaptive system** | `cf-audio-adaptive` crate. Reads `EnvironmentSignal`, match phase, mission director state, combat intensity. Emits crossfade commands to FMOD/Kira. |
 | **Spatial audio** | Steam Audio per DR-043 (Apache-2.0). Already integrated for voice/radio; reused for music spatial cues (radio music, base PA system). |
@@ -176,7 +177,7 @@ sfx: (
     spatial: true,
     falloff_radius_m: 100,
     caption: "AK-47 gunfire",
-    license: "Stable Audio Open 1.0; project-owner generated; Stability AI Community License; commercial-use registration/enterprise review required",
+    license: "Stable Audio Open 1.0; project-owner generated; Stability AI Community License; private prototype ledger entry required; commercial-use registration/enterprise review required before public sale/release",
 )
 ```
 
@@ -190,11 +191,13 @@ sfx: (
 - [ ] Spatial audio works for voice/radio (Steam Audio integration).
 - [ ] usage-ledger covers every track + SFX.
 - [ ] CI gate: every track + SFX has license + caption + replay event coverage.
+- [ ] `cf-asset-ledger check --mode private` passes before retaining generated tracks/SFX; `--mode release` passes before public sale/release.
 
 ## Source Trail
 
 - [[decisions/dr-020-audio-identity]]
 - [[decisions/dr-044-audiovisual-production-pipeline]]
+- [[decisions/dr-057-optional-gacha-battle-pass-and-private-prototype-license-posture]]
 - Stable Audio Open overview: https://stability.ai/news-updates/introducing-stable-audio-open
 - Stable Audio Open model card/license: https://huggingface.co/stabilityai/stable-audio-open-1.0
 - Suno terms: https://suno.com/terms

@@ -168,7 +168,7 @@ If you have more time, also read in roughly this order:
 - [[comparables/noita-grade-material-simulation-research]] — source-backed material/chemistry/atmosphere research for Noita, Powder Toy, Barotrauma, Oxygen Not Included, Stationeers, and open-source falling-sand projects.
 - [[spec/hybrid-llm-ai-plan]] — async LLM mind layer with strict schemas, mock provider, validator, replay logging (T-LLM / M6.5).
 - [[references/prototype-run-bundle-schema]] — run-bundle event categories, manifest/summary/notes contract, per-milestone acceptance gates.
-- [[decisions/index]] and [[dashboards/decision-tracker]] — DR-001..DR-056 with current direction and lean.
+- [[decisions/index]] and [[dashboards/decision-tracker]] — DR-001..DR-057 with current direction and lean.
 - [[references/usage-ledger]] — log when external code/data/assets enter the project.
 - [[research-log/moonshot-register]] — wild ideas; promote only with a DR.
 - [[prototypes/actor-feel-lab-a1-human-playtest-2026-05-04]] — the "ok I guess" signal that informs M1.5 acceptance.
@@ -185,7 +185,7 @@ A junior agent must never have to guess what these words mean. If a term is used
 | **Actor** | A simulated entity with `Position`, `Velocity`, `Aim`, `Status`, and `Inventory`. Includes infantry, powered armor, and mech-pilot pairs. |
 | **Action** | A semantic player-or-AI request to do something (move, fire, click UI). Routed through `cf-control` and consumed by sim systems on the next fixed tick. |
 | **Anti-scope** | What a task card must NOT grow into. If you start drifting toward an anti-scope item, stop and write a follow-up task card instead. |
-| **Bevy version** | Pinned in `Cargo.toml`; do not bump without a milestone's explicit upgrade task. |
+| **Bevy version** | Pinned in `Cargo.toml` for reproducibility. Current verified baseline is Bevy `0.18.1` as of 2026-05-07; do not bump again without a milestone's explicit upgrade task. |
 | **Broadphase** | The cheap first collision pass that finds possible pairs using spatial structures. Required before narrowphase; brute-force all-pairs is not acceptable for gameplay scale. |
 | **Capability gate** | A flag in the run manifest that explicitly enables a debug-only or remote-access feature. Default off. |
 | **Chassis** | An armor/mech/origin grouping with layered armor zones, modules, and pilot binding. See [[spec/chassis-armor-mechs-and-origins]]. |
@@ -343,7 +343,7 @@ No milestone should use a human-gated item to hide incomplete agent-completable 
 | [[decisions/dr-008-ai-architecture|DR-008]] | OPEN | Hybrid jobs + utility scoring + scripted hooks | M6, M6.5, M6.6, M7, M11, M12 | Confirm utility/job/scripted-hook split before adding new AI subsystems (M6). AI-01..AI-12 + AI-H suite close the DR. |
 | [[decisions/dr-009-command-ux-style|DR-009]] | OPEN | Direct + slowdown overlay + optional tactical map | M4, M5, M6, M7, M8 | Confirm command UX posture (slowdown ratio, tactical map opt-in, order grammar) before adding command surfaces. ORDER-01 closes the DR. |
 | [[decisions/dr-010-license-reuse-matrix|DR-010]] | OPEN | Documentation only; ledger tracks usage | All | When external code/asset/data enters the project, log it in `[[references/usage-ledger]]`. No release-readiness gating during private prototyping. Public-release decision closes the DR. |
-| [[decisions/dr-011-progression-retention-loop|DR-011]] | OPEN | Intrinsic-first hybrid: mastery + autonomy + veterans + salvage + replays + creator challenges | M7, M11, M12 | Confirm retention model (no gacha/grind) before designing campaign loops in M7+. RET-A-01..RET-A-06 close the DR. |
+| [[decisions/dr-011-progression-retention-loop|DR-011]] | OPEN | Intrinsic-first hybrid: mastery + autonomy + veterans + salvage + replays + creator challenges; optional economy hooks late/default-off per DR-057 | M7, M11, M12 | Confirm retention model avoids obligation/pay-for-power pressure before designing campaign loops in M7+. RET-A-01..RET-A-06 close the DR; any battle-pass/gacha-like activation follows DR-057. |
 | [[decisions/dr-012-accessibility-comfort-readability|DR-012]] | OPEN | Slice-A accessibility/comfort floor, not late compliance | M0, M4, M5.7, M6.6, M7, M7.5, M8, M8.5 | Confirm UI scale, contrast, captions, remap, reduced motion are wired into the milestone's player surfaces. ACC-A-01..16 close the DR. |
 | Networking transport library (topic) | OPEN | lightyear vs renet vs quinn | M9, M10, M11, M12 | Decision deferred to M9/M10 prototyping. Worker MUST present transport options + perf evidence to user before committing to one library in `cf-net`. |
 | Modding script host (topic) | OPEN | mlua vs Rhai | M5, M8 | Decision deferred to M5 implementation. Worker MUST run `cf-mod` script-host benchmark + capability-gate audit and ask the user before locking the host. |
@@ -962,8 +962,8 @@ Until M5 chassis art arrives, milestones use procedurally generated or simple-PN
 
 | Asset | Location | M0..M4 Source | M5+ Source |
 |---|---|---|---|
-| Actor sprite (infantry) | `assets/placeholders/actors/infantry_idle.png` | 16×16 procedurally drawn at build time, OR a checked-in 16×16 PNG with bright distinct colors for parts. | Hand-authored pixel art per chassis archetype. |
-| Materials | `assets/placeholders/materials/<name>.png` | Solid 1×1 colored swatch per material id. | Hand-authored per material. |
+| Actor sprite (infantry) | `assets/placeholders/actors/infantry_idle.png` | 16×16 procedurally drawn at build time, OR a checked-in 16×16 PNG generated by `tools/asset_gen` with bright distinct colors for parts. | AI-agent-generated Tier 2/3 pixel art per chassis archetype. |
+| Materials | `assets/placeholders/materials/<name>.png` | Solid 1×1 colored swatch per material id. | AI-agent-generated per-material texture/normal/emissive set. |
 | Audio cues | `assets/placeholders/audio/<event>.ogg` | 200ms sine/square synth blips at distinct frequencies. | Diegetic synth-dread per [[spec/audio-identity]]. |
 | Fonts | `assets/placeholders/fonts/<name>.ttf` | Use a permissively licensed monospace + display pair (e.g. JetBrains Mono + Press Start 2P; check usage-ledger). | Final SDF/vector text per [[decisions/dr-019-visual-direction]]. |
 | Sprites for HUD | `assets/placeholders/ui/<element>.png` | 9-slice or solid-color rectangles. | Comic-noir UI per DR-019. |
@@ -2946,13 +2946,13 @@ These milestones run mostly in parallel with the M0..M12 sim milestones. They co
 
 **What it proves:** Per [[spec/legal-and-compliance]]. Trademark filed + LLC + EULA/ToS/PP drafted + age ratings approved + attribution screen auto-generated + AI-asset usage-ledger audit clean.
 
-**Cross-DR:** DR-006, DR-010, DR-012, DR-031, DR-044, DR-046, DR-047.
+**Cross-DR:** DR-006, DR-010, DR-012, DR-031, DR-044, DR-046, DR-047, DR-057.
 
 ### M-LIVEOPS — Cosmetics + DLC + Balance + Endgame Foundation (parallel to M11..M12 + Post-Launch)
 
-**What it proves:** Per [[spec/liveops-and-endgame]]. Cosmetics earnable (NEVER paid); DLC infrastructure ready; balance hot-patch deploy works; procedural contracts active; mastery functional; speedrun.com integration; daily seed leaderboard; Workshop endless content discoverable.
+**What it proves:** Per [[spec/liveops-and-endgame]]. Cosmetics earnable by default; optional paid/cosmetic economy hooks remain disabled unless DR-057 activation evidence exists; DLC infrastructure ready; balance hot-patch deploy works; procedural contracts active; mastery functional; speedrun.com integration; daily seed leaderboard; Workshop endless content discoverable.
 
-**Cross-DR:** DR-005, DR-011, DR-017, DR-018, DR-024, DR-027, DR-031, DR-035, DR-042, DR-045, DR-046, DR-047.
+**Cross-DR:** DR-005, DR-011, DR-017, DR-018, DR-024, DR-027, DR-031, DR-035, DR-042, DR-045, DR-046, DR-047, DR-057.
 
 ### M-CREATOR — Streaming + Photo Mode + Replay Sharing (parallel to M9..M12)
 

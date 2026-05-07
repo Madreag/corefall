@@ -1,8 +1,8 @@
 ---
 type: spec
 status: closed-direction
-authority: "Legal + compliance: trademark, business entity, EULA, ToS, Privacy Policy, age rating, GDPR/CCPA/LGPD, open-source attribution, AI-asset licensing, modding rights, accessibility compliance, no loot boxes."
-ready_when: "Trademark filed; EULA/ToS/PP drafted by counsel; age ratings submitted; attribution screen auto-generated; AI-asset usage-ledger complete."
+authority: "Legal + compliance: trademark, business entity, EULA, ToS, Privacy Policy, age rating, GDPR/CCPA/LGPD, open-source attribution, AI-asset licensing, modding rights, accessibility compliance, and any release-facing optional economy review. Private prototypes are ledger-first, not legal-gate-first."
+ready_when: "Trademark filed; EULA/ToS/PP drafted by counsel; age ratings submitted; attribution screen auto-generated; AI-asset usage-ledger complete; release/sale asset cleanup completed only if public sale/release becomes real."
 feeds:
   - DR-006
   - DR-010
@@ -11,6 +11,7 @@ feeds:
   - DR-044
   - DR-046
   - DR-047
+  - DR-057
 ---
 
 ← [[spec/index|spec section]] · [[decisions/dr-047-launch-and-live-operations|DR-047]] · [[references/usage-ledger|usage-ledger]]
@@ -29,6 +30,7 @@ feeds:
 | **Age rating submission** | Project owner via IARC self-rating + ESRB/PEGI/USK certs | Pre-launch (4-8 weeks) |
 | **Open-source attribution screen** | AI agent auto-generated from `Cargo.lock` via `cargo-about` | M0 (CI gate per release) |
 | **AI-asset usage-ledger audit** | Project owner | Pre-launch (full audit + license verification) |
+| **Private prototype ledger mode** | AI agent + project owner | Ongoing; never blocks private generation if provenance/status is logged |
 
 ## EULA / ToS / Privacy Policy
 
@@ -80,11 +82,13 @@ In-game credits screen lists every OSS dependency + license. Per-release update 
 Per DR-044 + [[references/usage-ledger]]:
 
 - Every AI-generated asset has an entry: prompt, seed, model, LoRA, license, regenerable Y/N.
+- Private prototype retention is ledger-first per DR-057. Legal clearance should not block use of the best generation/audio tools while the project is private and not for sale.
 - No open-weight model is assumed release-cleared without checking the exact model/weight license. Stable Audio Open uses Stability AI Community License / commercial registration rules; AudioCraft code is MIT but released MusicGen weights are CC-BY-NC 4.0.
 - LoRAs sourced from Civitai with permissive licenses; verified pre-launch.
 - Suno/Udio music subject to TOS review pre-launch (commercial use currently allowed; revisit).
 - ElevenLabs voice subject to TOS review pre-launch.
 - Tier-3 AI-agent cleanup doesn't change underlying model licensing.
+- Before public sale/release, each retained generated asset is cleared, replaced, relicensed, or regenerated through a release-safe source.
 
 ## Modding Rights
 
@@ -106,8 +110,8 @@ Per DR-012 + T-ACCESSIBILITY:
 
 ## Content Rating Disclosures
 
-- Loot boxes: NONE (per DR-031 + DR-047).
-- Gambling mechanics: NONE.
+- Loot boxes / gacha-like collection: NONE by default at launch. Optional late architecture may exist disabled per DR-057; any release-facing activation requires a new activation DR, age/rating/legal review, odds disclosure, regional controls, anti-FOMO archive, and no gameplay power locks.
+- Gambling mechanics: NONE by default; any future randomized paid surface must pass jurisdiction review before activation.
 - In-app purchases: NONE at launch.
 - Online interactions: yes.
 - User-generated content: yes (Workshop).
@@ -122,6 +126,7 @@ Per DR-012 + T-ACCESSIBILITY:
 - [ ] Age ratings submitted + approved.
 - [ ] Attribution screen auto-generated + linked from main menu.
 - [ ] AI-asset usage-ledger audit passed.
+- [ ] `cf-asset-ledger check --mode private` passes for retained private prototypes; `--mode release` passes before any public sale/release.
 - [ ] Privacy policy auto-generated from event definitions.
 - [ ] DPAs signed with all third-party services.
 
@@ -130,5 +135,6 @@ Per DR-012 + T-ACCESSIBILITY:
 - [[decisions/dr-047-launch-and-live-operations]]
 - [[decisions/dr-031-content-economy-and-monetization-posture]]
 - [[decisions/dr-010-license-reuse-matrix]]
+- [[decisions/dr-057-optional-gacha-battle-pass-and-private-prototype-license-posture]]
 - cargo-about: https://github.com/EmbarkStudios/cargo-about
 - WCAG 2.1: https://www.w3.org/TR/WCAG21/

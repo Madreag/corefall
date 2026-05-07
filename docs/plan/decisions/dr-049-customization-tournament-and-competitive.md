@@ -47,7 +47,7 @@ revisit_trigger: "Customization depth proves balance-prohibitive; ELO/MMR system
 | **Lobby spectator slot** | Spectator joins lobby without playing; for press, content creators, friends. |
 | **Tournament-grade anti-cheat profile** | Per DR-005 post-launch; explicit milestone in M-COMP. |
 
-### Cosmetic earn paths (NEVER paid; per DR-031)
+### Cosmetic earn paths (earned-by-default; per DR-031 + DR-057)
 
 | Path | Reward |
 |---|---|

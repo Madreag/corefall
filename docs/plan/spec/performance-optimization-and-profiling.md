@@ -1,7 +1,7 @@
 ---
 type: spec
 status: closed-direction
-authority: "Performance optimization track for physics-heavy + emulation-heavy game. Hot paths inventory + SIMD + Bevy parallel + spatial partitioning + GPU compute (deterministic) + memory arenas + zero-allocation + cache-friendly SoA + PGO. AI-agent-driven via cfctl benchmarks."
+authority: "Performance optimization track for physics-heavy + emulation-heavy game. Hot paths inventory + SIMD + Bevy parallel + spatial partitioning + GPU compute tiers + memory arenas + zero-allocation + cache-friendly SoA + PGO. AI-agent-driven via cfctl benchmarks. Server owns truth; GPU owns richness; client owns feel."
 ready_when: "All hot paths SIMD-optimized + multi-threaded; per-tier perf budget pass on Steam Deck/1080p/4K; CI bench regression test active; memory leak soak (24h+) clean; AI agent can drive perf hunts via cfctl."
 feeds:
   - DR-001
@@ -142,20 +142,38 @@ struct ActorSet {
 | AI-agent hunt | `cfctl bench analyze --scenario X --target-tier deck` |
 | PGO | `cargo pgo` per release |
 
-### GPU compute (deterministic)
+### GPU compute tiers
 
-Material kernel scale-up + particle effects. Deterministic verified per-vendor.
+The GPU should do as much as possible without compromising replay, save, server authority, or multiplayer sync. GPU work is classified before implementation:
+
+| Tier | What GPU can do | Authoritative? | Policy |
+|---|---|---|---|
+| Tier 0: Presentation | Lighting, particles, decals, smoke/fog/fire visuals, glow, heat shimmer, trails, casings, debug overlays. | No. | Use aggressively. |
+| Tier 1: Client prediction | Local movement prediction, provisional projectiles/impacts, interpolation/extrapolation. | No; server corrects. | Use aggressively for feel. |
+| Tier 2: Advisory compute | Broadphase candidates, pathfinding heatmaps, visibility hints, AI perception maps, compression hints. | No; CPU/server validates. | Use freely with validation. |
+| Tier 3: Server GPU acceleration | Material chunks, atmosphere diffusion, large path fields, compression, batch queries. | Maybe, if CPU-equivalent. | Optional; CPU fallback required for community headless servers. |
+| Tier 4: Authoritative GPU sim | Terrain/material/gas/projectile/body truth. | Yes. | Only after certification. |
+
+Material kernel scale-up starts CPU SIMD first, then Tier 2/Tier 3 GPU assists, then Tier 4 only if certified.
 
 ```rust
 // Material kernel: CPU baseline; optional GPU dispatch
-fn material_update(state: &mut MaterialState, gpu_enabled: bool) {
-    if gpu_enabled && is_deterministic_gpu() {
-        gpu_dispatch_material_update(state);
-    } else {
-        cpu_simd_material_update(state);
+fn material_update(state: &mut MaterialState, backend: SimBackend) {
+    match backend {
+        SimBackend::Cpu => cpu_simd_material_update(state),
+        SimBackend::GpuAdvisory => {
+            let hints = gpu_material_hints(state);
+            cpu_simd_material_update_with_validated_hints(state, hints);
+        }
+        SimBackend::GpuCertified(cert) if cert.matches_current_matrix() => {
+            gpu_dispatch_material_update_certified(state, cert);
+        }
+        SimBackend::GpuCertified(_) => cpu_simd_material_update(state),
     }
 }
 ```
+
+Tier 4 certification requires same seed, same inputs, same mod set, 10K+ ticks per kernel, per-tick BLAKE3 checksum, final byte-identical state, coverage on NVIDIA/AMD/Intel/Apple/Steam Deck, no unproven atomics or order-dependent reductions, and permanent CPU fallback.
 
 ## Determinism Preservation
 
@@ -175,6 +193,7 @@ fn material_update(state: &mut MaterialState, gpu_enabled: bool) {
 | `cfctl bench analyze --scenario X --target-tier deck` | Auto-identify bottleneck |
 | `cfctl bench memory --scenario X --duration 60s --soak` | Memory leak detection |
 | `cfctl bench gpu --scenario X --gpu-time` | Per-GPU-pass timing |
+| `cfctl test gpu-authority-cert --kernel X --ticks 10000 --matrix all` | Tier 4 certification attempt; fails closed to CPU/advisory. |
 | `cfctl bench network-snapshot --scenario X --snapshot-size --bandwidth` | Per-snapshot bandwidth |
 | `cfctl bench cold-load --scenario X` | First-launch perf |
 | `cfctl bench replay-throughput --bundle X` | Replay throughput |
@@ -218,12 +237,14 @@ $ cargo allocator-stats --crate cf-physics --hot-path
 - [ ] AI agent can drive perf hunts via cfctl.
 - [ ] PGO workflow integrated.
 - [ ] Per-milestone perf gate verified.
+- [ ] GPU compute kernels classified Tier 0..4 with CPU fallback and authority tests.
 
 ## Source Trail
 
 - [[decisions/dr-054-performance-optimization-and-profiling]]
 - Bevy profiling: https://github.com/bevyengine/bevy/blob/main/docs/profiling.md
-- Bevy 0.17 release notes: https://bevy.org/news/bevy-0-17/
+- Bevy 0.18 release notes: https://bevy.org/news/bevy-0-18/
+- Bevy latest crate docs (`0.18.1` as of 2026-05-07 audit): https://docs.rs/crate/bevy/latest
 - Bevy fixed timestep docs: https://docs.rs/bevy/latest/bevy/time/struct.Fixed.html
 - Bevy ECS Patterns: https://mcpmarket.com/tools/skills/bevy-ecs-patterns
 - Steam Deck compatibility checklist: https://partner.steamgames.com/doc/steamdeck/compat

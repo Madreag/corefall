@@ -6,12 +6,12 @@ priority: P1
 revisit_trigger: "When actor-feel, recorder, buy/loadout, and one repeatable mission loop can be played for three sessions."
 ---
 
-← [[decisions/index|decision records]] · [[systems/ux-ui-and-retention|UX/retention]] · [[spec/progression-retention|progression spec]] · [[spec/core-loop|core loop]] · [[research-log/moonshot-register|moonshots]]
+← [[decisions/index|decision records]] · [[systems/ux-ui-and-retention|UX/retention]] · [[spec/progression-retention|progression spec]] · [[spec/core-loop|core loop]] · [[decisions/dr-057-optional-gacha-battle-pass-and-private-prototype-license-posture|DR-057]] · [[research-log/moonshot-register|moonshots]]
 
 # DR-011: Progression And Retention Loop
 
 > [!info] Status: OPEN; LEAN: intrinsic-first hybrid
-> The current lean is a Cortex-specific retention stack: mastery, autonomy, readable AI, persistent campaign stakes, salvage/loadout experimentation, short repeatable challenges, replay sharing, and creator content. Daily seeds, roguelite structure, async strategy, and collection mechanics are open prototype tracks. They are not launch commitments until tests prove they improve the game without damaging fairness, modding, or player trust.
+> The current lean is a Cortex-specific retention stack: mastery, autonomy, readable AI, persistent campaign stakes, salvage/loadout experimentation, short repeatable challenges, replay sharing, and creator content. Daily seeds, roguelite structure, async strategy, collection mechanics, cosmetic battle-pass hooks, and gacha-like collection experiments are open prototype tracks. Per DR-057, they are late/optional/toggleable architecture hooks, not launch commitments or early-roadmap drivers, until tests prove they improve the game without damaging fairness, modding, accessibility, or player trust.
 
 ## Context
 
@@ -118,16 +118,16 @@ flowchart LR
 
 ## Monetization And Collection Boundary
 
-This record does not ban gacha, collection, battle passes, daily rewards, cosmetics, or copied monetization patterns for private research. It only says they should not lead the spec until the core game proves it can earn return play through intrinsic value.
+This record does not ban gacha-like collection, collection, battle passes, daily rewards, cosmetics, or copied monetization patterns for private research. DR-057 now locks the owner clarification: optional gacha-like collection and cosmetic battle-pass architecture may be designed in for later use, but it must be dormant/toggleable, late-priority, non-pay-to-win, anti-FOMO, modder-aware, accessible, and CLI-testable.
 
 | Mechanic | Prototype Freely? | Spec Commitment Bar |
 |---|---|---|
 | Cosmetic collection | Yes. | Must not confuse combat readability or mod identity. |
 | Actor biographies / portraits / scars | Yes. | Must be earnable/readable and not hide tactical power. |
 | Randomized equipment drops | Yes. | Core counters and terrain tools must stay available through transparent play paths. |
-| Paid/random gacha | Yes for private prototypes. | Needs a separate ethics/economy DR before any release commitment. |
+| Paid/random gacha-like collection | Yes for private prototypes and late architecture hooks. | Must default off; no power locks; activation needs a future release-facing DR, legal/rating review, odds disclosure, and `cfctl test no-power-locks`. |
 | Daily login rewards | Yes. | Must not punish breaks or create mandatory chores. |
-| Battle pass / seasonal track | Yes. | Needs backend, modding, and fairness evidence. |
+| Cosmetic battle pass / seasonal track | Yes, but late and toggleable. | Must default off; no gameplay gates; needs backend, modding, accessibility, anti-FOMO, and fairness evidence before activation. |
 
 ## Evidence
 
@@ -152,7 +152,7 @@ This record does not ban gacha, collection, battle passes, daily rewards, cosmet
 | Salvage economy becomes grind. | Favor tactical options, repairs, and scenario unlocks over linear scrap inflation. |
 | Generated contracts produce impossible AI/path states. | Contract generator must run AI/material/path validation before surfacing a seed. |
 | Daily seeds become obligation. | "Daily" should mean shared seed of the day, not missed-reward punishment. |
-| Collection/gacha corrupts sandbox trust. | Keep collection as prototype-only until a separate ethics/economy DR; never hide core counters behind opaque random access in a settled spec. |
+| Collection/gacha corrupts sandbox trust. | Keep optional collection dormant/toggleable until a future activation DR; never hide core counters behind opaque random access in a settled spec. |
 | Async strategy layer consumes backend effort before the game is fun. | Keep local campaign state first; backend/hub Slice A can share replays/seeds before it runs a persistent world. |
 
 ## Current Spec Implications
@@ -175,6 +175,7 @@ Reopen this record when:
 - Monetization becomes a release-facing question.
 - A moonshot from [[research-log/moonshot-register]] graduates into prototype evidence.
 - Player sessions show the return loop is driven by obligation, confusion, or grind rather than mastery and stories.
+- Cosmetic battle-pass or gacha-like collection hooks move from dormant architecture into production activation per DR-057.
 
 ## Source Trail
 
@@ -182,6 +183,7 @@ Reopen this record when:
 - [[spec/progression-retention]]
 - [[spec/core-loop]]
 - [[spec/product-promise]]
+- [[decisions/dr-057-optional-gacha-battle-pass-and-private-prototype-license-posture]]
 - [[references/sources]]
 - [[comparables/the-powder-toy-local-audit]]
 - [[comparables/openlierox-local-audit]]

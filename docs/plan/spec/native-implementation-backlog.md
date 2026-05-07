@@ -60,6 +60,7 @@ feeds:
   - DR-054
   - DR-055
   - DR-056
+  - DR-057
 ---
 
 <- [[spec/index|spec section]] · [[spec/prototype-roadmap|native roadmap]] · [[spec/feature-completion-checklist|feature checklist]] · [[spec/authoritative-game-spec-v0|game spec v0]] · [[spec/server-app-architecture|server app architecture]] · [[spec/persistent-mmo-architecture|persistent MMO architecture]] · [[spec/full-collision-physics-plan|full collision plan]] · [[spec/hybrid-llm-ai-plan|hybrid LLM AI plan]] · [[spec/ai-control-observability-layer|AI control/observability]] · [[references/prototype-run-bundle-schema|run-bundle schema]] · [VAULT_PLAN.md](../../VAULT_PLAN.md)
@@ -148,6 +149,7 @@ python3 research_tools/prototype_run_check.py prototype_runs/native/<m0_run>
 
 | ID | Owns | Build | Tests | Evidence | Anti-scope |
 |---|---|---|---|---|---|
+| M1-000 Bevy 0.18.1 pin + migration audit | `game/Cargo.toml`, `game/Cargo.lock`, Bevy-facing crates (`cf-app`, `cf-render-2d`, `cf-ui`, `cf-audio`, `cf-tools-editor`) | Update the workspace Bevy dependency to the latest verified crate (`0.18.1` as of 2026-05-07 per DR-024), pin the exact version, and fix root API migrations in the owning crates. Use the current Bevy APIs directly; do not add compatibility wrappers that preserve obsolete 0.14 assumptions. | `cargo update -p bevy --precise 0.18.1`; `cargo fmt --all --check`; `cargo check --workspace --all-targets`; `cargo test --workspace`; `cargo run -p cfctl -- observe --once`. | Implementation note names Bevy version, API migrations, `Cargo.lock` delta, and any Bevy feature changes. Run bundle after the upgrade proves the app/control path still works. | No gameplay scope; no renderer redesign; no deferring compile errors behind feature flags. |
 | M1-001 control intent | `cf-actor`, `cf-sim-core`, `cf-replay` | Input maps to `ControlIntent` before sim consequences: move, jump, aim, fire, reload, selected item. | Input serialization test; intent precedes action event. | Run bundle with `input_intent`. | No rollback/netcode. |
 | M1-002 actor movement | `cf-actor`, `cf-physics` | Position/velocity, gravity, ground collision, jump/fall/recovery, reset. | Unit tests for gravity/ground/contact; E2E movement route. | 5-minute run with actor snapshots. | No complex ragdoll. |
 | M1-003 rifle loop | `cf-equipment`, `cf-actor` | One rifle: fire interval, ammo, reload, recoil, muzzle origin, hit/miss event. | Ammo/reload/recoil tests; scripted fire/reload E2E. | `weapon_fired`, `weapon_reloaded`, `projectile_*` events. | No large arsenal. |

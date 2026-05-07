@@ -62,6 +62,7 @@ feeds:
   - DR-054
   - DR-055
   - DR-056
+  - DR-057
 ---
 
 ← [[spec/index|spec section]] · [[spec/prototype-roadmap|prototype roadmap]] · [[spec/prototype-implementation-backlog-slice-a|implementation backlog]] · [[dashboards/research-readiness|readiness]] · [[dashboards/system-heatmap|system heatmap]] · [[decisions/index|decisions]] · [[prototypes/index|prototype evidence]] · [root plan](../../VAULT_PLAN.md)
@@ -132,7 +133,7 @@ These are v0 product-direction commitments. They still need prototype evidence b
 | Visual fidelity | Ceiling **4K @ 120 Hz** strong desktop; default **1080p @ 60 Hz** mid-range; floor **Steam Deck 800p @ 60 Hz**. 60 Hz fixed sim island, render decoupled (DR-028). | [[decisions/dr-028-visual-fidelity-targets]]. |
 | Save model | **Versioned local-first `.cfsave`** with replay archive linkage; multi-slot, autosave, ironman, scenario policies, migration handlers; cloud post-launch (DR-029). | [[decisions/dr-029-save-game-model]]. |
 | Scenario editor | **First-class in-engine editor at launch** using the same typed manifest as engine + director + procedural + player-authored content (DR-030). | [[decisions/dr-017-mission-generation-strategy]], [[decisions/dr-030-scenario-editor-commitment]]. |
-| Content economy | **Premium one-time purchase + free modding**; expansions/DLC/cosmetics post-launch; **no pay-to-win, gacha, gameplay-gating battle pass, or marketplace cut on user mods** (DR-031). | [[decisions/dr-031-content-economy-and-monetization-posture]]. |
+| Content economy | **Premium one-time purchase + free modding**; expansions/DLC/cosmetics post-launch; **no pay-to-win, gameplay-gating battle pass, or marketplace cut on user mods** (DR-031). Optional cosmetic battle-pass and gacha-like collection hooks may be architected late, disabled by default, and never power-gating per DR-057. | [[decisions/dr-031-content-economy-and-monetization-posture]], [[decisions/dr-057-optional-gacha-battle-pass-and-private-prototype-license-posture]]. |
 | Combat-base scope | **Deep combat-base** (command core + power + shields + turrets + sensors + doors + repair + hangar + storage + traps + breachable structure). NOT colony sim (DR-027). | [[decisions/dr-027-combat-base-scope]], [[spec/command-core-base-power]]. |
 | Hybrid LLM AI direction | **Local AI owns the body at frame speed**; async LLM "mind" workers run in the background and submit validated `AiMindProposal` schemas (doctrine patches, squad goals, dialogue, memory, post-mission reflection, commander adaptation). **Local AI never blocks on an LLM**; **no API key required to ship, test, or play.** Default mode is `mock` (deterministic). T-LLM side track + M6.5 milestone (DR-032). | [[decisions/dr-032-hybrid-llm-ai-direction]], [[spec/hybrid-llm-ai-plan]]. |
 | AI bar | **Most humanlike AI in the genre** (DR-014 / DR-008 raised bar). Friendly and enemy bots must communicate intent, model perception/memory, exhibit personality/doctrine, make readable mistakes, and learn-from-defeat. Beyond utility scoring once basics work. | AI-H + AI-EQ + future humanlike-AI tests. |
@@ -153,7 +154,7 @@ These are v0 product-direction commitments. They still need prototype evidence b
 | Chassis/armor/mechs | **First-class** (DR-014). Armor layers, damageable equipment, mechs, powered armor, robots/androids, multiple origins/races, staged machine/body damage, pilot rescue/eject, repair/salvage. Not stat-boost suits; chassis grammar from [[spec/chassis-armor-mechs-and-origins]]. | CHASSIS-A tests; one chassis-bearing actor in Slice A. |
 | Accessibility floor | Text scale, contrast, no-color-only states, same-input navigation, remap/holds, captions, reduced motion/shake/flash are early requirements. | ACC-A and UX-W tests. |
 | Modding | Schema-first data, Lua escape hatches, package builder, loader parity, diagnostics, and provenance are product scope. Player-authored scenarios are core (per scope flexibility). | MOD-A, PACK-A, CONTENT-A tests. |
-| Backend posture | **Full backend service spine + dedicated server app + community hosting + optional first-party services** (DR-013 closed). Local-first remains the default for solo/private LAN play; `lobby_directory`, account adapter, persistence, anti-cheat foundation, and observability ship at launch. Steam/EOS/PlayFab/Unity Multiplay are optional adapters. No subscription, no marketplace, no live-service economy. | BACK-SCOPE, BACK-A, SERVER-001..SERVER-016, MMO-001..MMO-012 tests. |
+| Backend posture | **Full backend service spine + dedicated server app + community hosting + optional first-party services** (DR-013 closed). Local-first remains the default for solo/private LAN play; `lobby_directory`, account adapter, persistence, anti-cheat foundation, and observability ship at launch. Steam/EOS/PlayFab/Unity Multiplay are optional adapters. No subscription or marketplace. Optional economy hooks are late/toggleable and default-off per DR-057. | BACK-SCOPE, BACK-A, SERVER-001..SERVER-017, MMO-001..MMO-012 tests. |
 
 ## Explicit Non-Commitments v0
 
@@ -162,7 +163,7 @@ These are v0 product-direction commitments. They still need prototype evidence b
 | Live PvP | **Architected from day one; M12 readiness gate** (DR-005 closed 2026-05-05). Public PvP arenas via community-hostable `cf-server --mode pvp_arena`; ranked PvP with leaderboards is post-launch. | M12 acceptance suite per [[spec/prototype-roadmap]]; anti-cheat foundation per [[spec/server-app-architecture]]. |
 | Subscription-funded MMO | Forbidden. | Conflicts with DR-031 content economy. Operators may charge for hosting their own shard; the base SKU does not include a subscription. See [[decisions/dr-035-persistent-mmo-architecture]]. |
 | Cross-shard live combat or seamless single-world MMO | Out of scope at v1. | Multi-shard with lobby/portal is the v1 model. Reopens via DR-035 amendment. |
-| Account economy / gacha / paid collection | Research and private prototype only. | Fairness, modding trust, ethics, and economy require a future release-facing DR beyond [[decisions/dr-011-progression-retention-loop]]. |
+| Account economy / gacha-like paid collection / cosmetic battle pass | Architecturally allowed as dormant late hooks; private prototype only until explicitly activated. | DR-057 requires toggleable/default-off config, no gameplay power locks, anti-FOMO archive/earn-back path, accessibility/localization/modder parity, cfctl tests, legal/rating review, and a future release-facing activation DR. |
 | Full deterministic replay | Open research. | The current posture is hybrid semantic events, snapshots, checksums, and deterministic islands only when proven. |
 | Final engine implementation | Direction + stack closed; specifics open within stack. | DR-001 direction closed (greenfield + CCCP reference); DR-024 stack closed (Rust + Bevy/wgpu hybrid + custom crates); transport library, scripting host, and per-crate API specifics decided per-milestone. |
 | Final arsenal balance | Open. | Generated role cards and overlap audits are seed data; runtime item behavior and AI-H evidence must decide. |
@@ -333,7 +334,7 @@ Equipment is a shared system contract, not a catalog page.
 | Veterans | Named actors, scars, specialties, and recovery stories are retention candidates. | Prototype before campaign commitment. |
 | Chassis identity | Armor sets, mech hulls, repaired modules, android shells, robot frames, and origin histories can become memorable return-loop objects if they stay tactical and readable. | Prototype through CHASSIS-A and RET-A before campaign commitment. |
 | Salvage | Salvage creates tactical recovery and material consequences. | Must not punish experimentation into restart-only behavior. |
-| Collection/economy | Cosmetics and collection can be researched privately; any randomization or monetization experiment is prototype-only and must not corrupt modding, fairness, anti-FOMO, or the DR-031 no-gacha release posture. | Future monetization ethics DR before any release-facing economy commitment. |
+| Collection/economy | Cosmetics and collection can be researched privately; any randomization or monetization experiment is prototype-only unless DR-057 activation gates are met, and must not corrupt modding, fairness, anti-FOMO, accessibility, localization, or no-power-lock guarantees. | Future activation DR before any release-facing economy commitment. |
 
 ## Prototype Tracks
 

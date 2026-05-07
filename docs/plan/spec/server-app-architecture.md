@@ -20,6 +20,8 @@ feeds:
   - DR-033
   - DR-034
   - DR-035
+  - DR-052
+  - DR-054
   - DR-039
   - DR-042
   - DR-043
@@ -33,7 +35,7 @@ feeds:
 > A single dedicated server binary (`cf-server`) is a full-product artifact. Anyone can host any supported game mode (co-op, PvP arena, persistent MMO shard) with no proprietary dependency. The server is a first-class native artifact alongside the client app, modding tools, and scenario editor.
 
 > [!important] Hard rules
-> Every gameplay mode is server-authoritative. The client app and `cf-server` share the **same** sim core, terrain, physics, equipment, chassis, AI, replay, mod loader, and `cf-control` schemas. There is no "server-only" branch of game logic. Public dedicated servers do not require an Anthropic/OpenAI/Steam/Epic account; cloud features are optional adapters.
+> Every gameplay mode is server-authoritative. **Server owns truth. GPU owns richness. Client owns feel.** The client app and `cf-server` share the **same** sim core, terrain, physics, equipment, chassis, AI, replay, mod loader, and `cf-control` schemas. There is no "server-only" branch of game logic. Public dedicated servers do not require an Anthropic/OpenAI/Steam/Epic account; cloud features are optional adapters.
 
 ## Purpose
 
@@ -100,14 +102,19 @@ ServerConfig(
     storage_dir: "./shard-state/",
     retain_snapshots: 30,
   ),
-  anti_cheat: (
-    enabled: true,
-    profile: "competitive",
-    log_dir: "./anti-cheat/",
-  ),
-  ai_mind: (
-    enabled: false,
-    config_path: "content/config/mind.ron",
+	  anti_cheat: (
+	    enabled: true,
+	    profile: "competitive",
+	    log_dir: "./anti-cheat/",
+	  ),
+	  sim_backend: (
+	    mode: "cpu",                 // cpu | gpu_advisory | gpu_certified
+	    require_cpu_fallback: true,
+	    gpu_certification_manifest: None,
+	  ),
+	  ai_mind: (
+	    enabled: false,
+	    config_path: "content/config/mind.ron",
   ),
   ops: (
     log_level: "info",
@@ -136,7 +143,7 @@ Adding a new field bumps `schema_version`; older configs migrate via registered 
 6. Periodically: persist (MMO mode), rotate logs, expose metrics, run health/readiness probes.
 7. On shutdown: drain clients with reason, finalize replay archive, flush persistence, signal exit code.
 
-The sim tick rate matches the client (60 Hz default; 120 Hz option). Render is absent; physics/AI/replay budgets stay deterministic.
+The sim tick rate matches the client (60 Hz default; 120 Hz option). Render is absent; physics/AI/replay budgets stay deterministic. Solo uses the same local in-process authority path without internet transport, so save/replay/cfctl behavior does not fork from multiplayer behavior.
 
 ## Authority Model
 
@@ -144,10 +151,14 @@ The sim tick rate matches the client (60 Hz default; 120 Hz option). Render is a
 |---|---|
 | Player input | Client sends `cf-control` actions; server validates against capability + rate limit + anti-cheat profile; only accepted actions enter the sim. |
 | Sim state | 100% server-authoritative. Clients receive snapshots + event deltas; clients use prediction + reconciliation only for player-driven actor (per DR-005). |
+| Local feel / prediction | Client CPU/GPU may predict player actor, provisional projectiles, trails, impacts, animation, and interpolation immediately. The server correction path wins and emits `prediction_corrected` reason labels. |
+| GPU presentation | Client GPU owns visual richness: lighting, particles, smoke, fog, decals, trails, heat shimmer, debug overlays, camera effects, and audio visualization. These are cosmetic/presentation unless a future DR-054 Tier 4 certification marks a kernel authoritative. |
+| GPU advisory compute | Broadphase candidates, pathfinding heatmaps, visibility hints, AI perception maps, compression hints, and debug overlays can be GPU-computed, but server/CPU validates before Truth changes. |
+| Server sim backend | `cpu` is required and canonical. `gpu_advisory` may accelerate hints only. `gpu_certified` may affect truth only with the DR-054 certification manifest and CPU fallback. |
 | Terrain mutation | Server-authoritative. Clients render dirty regions delivered by snapshot/event deltas. |
 | AI decisions | Server-authoritative. Clients see reason labels via event stream. |
 | Mission director | Server-authoritative. Clients see commander events with reason strings. |
-| Save / persistence | Server-authoritative for MMO shards; client-authoritative for solo + private LAN sessions; mixed for online co-op (host server holds the save). |
+| Save / persistence | Server-authoritative for MMO shards; local in-process authority for solo; host/server authority for private LAN and online co-op saves. |
 | Anti-cheat | Server-authoritative. Server-side validators are mandatory; client-side hints are not trusted. |
 | Match grammar (per [[spec/game-modes-and-match-grammar]] / DR-042) | Server-authoritative. `Match` schema (Bunker Defence + Symmetric Arena + FFA + Asymmetric N-Team + Coop-vs-AI + Campaign) lives on the server. Team config flexibility (1v1 through NvN, FFA, asymmetric, coop) enforced server-side. AI fills empty slots per `Match.ai_fill_policy`. |
 | Voice routing (per [[spec/comms-voice-and-radio-model]] / DR-043) | Server-authoritative voice routing. Clients send Opus-encoded packets; server fans out to receivers passing acoustic + radio gates (Steam Audio occlusion + ACRE2 multipath). No P2P voice. |
@@ -252,6 +263,7 @@ The default ship state is: **a player downloads `cf-server`, fills in 5 config f
 | SERVER-014 | M9 core | Capability `god`/`debug` is off by default; requires explicit config opt-in; opt-in is recorded in run-bundle manifest. |
 | SERVER-015 | M9 core | Drain shutdown: SIGTERM produces graceful client disconnect with reason, replay flush, persistence save, exit code 0 within 10 seconds. |
 | SERVER-016 | M9 core | Reference Docker image runs the dedicated server unmodified; documented in `docs/server-hosting.md`. |
+| SERVER-017 | M9/M11 | `sim_backend=cpu`, `sim_backend=gpu_advisory`, and `sim_backend=gpu_certified` config modes validate. CPU mode is always available; advisory mode cannot mutate truth; certified mode requires a DR-054 certification manifest. |
 
 ## Anti-Goals
 

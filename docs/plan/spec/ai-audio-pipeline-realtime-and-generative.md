@@ -1,7 +1,7 @@
 ---
 type: spec
 status: closed-direction
-authority: "AI audio pipeline: 5-tier production (Stable Audio Open SFX, Suno/Udio music, MusicGen ambient, XTTS/Coqui voice, FMOD/Kira runtime) + real-time procedural audio (impact, doppler, atmospheric absorption, footstep variety, reverb, voice phoneme lip-sync, music adaptive layering). NO humans crafting any audio."
+authority: "AI audio pipeline: 5-tier production (Stable Audio Open SFX, Suno/Udio/ElevenLabs music, MusicGen ambient, XTTS/Coqui/ElevenLabs voice, FMOD/Kira runtime) + real-time procedural audio (impact, doppler, atmospheric absorption, footstep variety, reverb, voice phoneme lip-sync, music adaptive layering). NO humans crafting any audio. Private prototypes are ledger-first; release/sale assets require cleanup or clearance."
 ready_when: "All 400+ SFX clips generated + tagged + caption-bound; 30+ music tracks composed + stems exported; 24+ NPCs voice-cloned with 50-100 dialogue lines each; runtime adaptive layering responds; all per DR-053."
 feeds:
   - DR-012
@@ -15,6 +15,7 @@ feeds:
   - DR-046
   - DR-047
   - DR-053
+  - DR-057
 ---
 
 ← [[spec/index|spec section]] · [[decisions/dr-053-ai-audio-pipeline-realtime-and-generative|DR-053]] · [[spec/audio-identity|audio identity]] · [[spec/music-and-soundtrack|music/soundtrack]] · [[spec/comms-voice-and-radio-model|voice/radio]]
@@ -32,7 +33,7 @@ feeds:
 
 | Tool | Detail |
 |---|---|
-| Stable Audio Open 1.0 (Stability AI Community License; local 32GB VRAM) | Per-event prompt template + deterministic seed. 47s max clips at 44.1 kHz. Commercial-use registration/enterprise review required before release assets ship. |
+| Stable Audio Open 1.0 (Stability AI Community License; local 32GB VRAM) | Per-event prompt template + deterministic seed. 47s max clips at 44.1 kHz. Private prototypes allowed with ledger entry; commercial-use registration/enterprise review required before public sale/release assets ship. |
 | Per-event prompt template | E.g., "AK-47 single shot indoor reverb tactical shooter gameplay-ready" |
 | Auto-trim/normalize/EQ | librosa + numpy; remove silence + match -16 LUFS + EQ per category |
 | Auto-caption | Generated from prompt; caption text bound to clip |
@@ -60,7 +61,7 @@ Main theme + 12 world themes + 6 combat layers + 4 base-tension + 4 menu/UI + 8 
 |---|---|
 | Suno v5 cloud OR Udio v2 cloud | Per-track prompt + seed. Iterations via AI agent. |
 | Stem export | Demucs 4-stem split (drums/bass/melody/other) |
-| Per-track license review | Pre-launch; logged in usage-ledger |
+| Per-track license review | Private prototypes log terms at generation time; public sale/release requires cleanup or current clearance |
 | Adaptive layer extraction | Per-track 4-6 stems; FMOD parameter automation per stem |
 
 ### Tier 3 — Ambient Music + Procedural
@@ -80,7 +81,7 @@ Per-faction commander voice + ~24 named NPCs + 50-100 dialogue lines per NPC.
 | Tool | Detail |
 |---|---|
 | XTTS-v2 / Coqui TTS local | Free; 16 languages; 6s reference clip → cloned voice |
-| ElevenLabs cloud | Hero NPCs (license review pre-launch) |
+| ElevenLabs cloud | Hero NPCs; subscription available but not exclusive. Private prototypes log terms at generation time; public sale/release requires cleanup or current clearance. |
 | Tortoise-TTS local (Apache-2.0) | High-quality offline; slower |
 | Per-NPC voice model | Reference 6s clip stored in `content/audio/voice_models/<npc_id>/` |
 | Phoneme lip-sync output | Animation tags (`mouth_phoneme_a/e/i/o/u`) per [[spec/animation-system]] |
@@ -271,12 +272,14 @@ Voice budget governor: drop oldest non-critical first.
 - [ ] Runtime adaptive layering responds to gameplay.
 - [ ] All audio caption-coverage 100% on critical.
 - [ ] usage-ledger covers every generated asset.
+- [ ] `cf-asset-ledger check --mode private` passes for retained private prototype audio; `--mode release` is reserved for public sale/release cleanup.
 - [ ] FMOD or Kira mix passes diegetic-first per DR-020.
 - [ ] Modder parity verified.
 
 ## Source Trail
 
 - [[decisions/dr-053-ai-audio-pipeline-realtime-and-generative]]
+- [[decisions/dr-057-optional-gacha-battle-pass-and-private-prototype-license-posture]]
 - Stable Audio Open overview: https://stability.ai/news-updates/introducing-stable-audio-open
 - Stable Audio Open model card/license: https://huggingface.co/stabilityai/stable-audio-open-1.0
 - Suno terms: https://suno.com/terms

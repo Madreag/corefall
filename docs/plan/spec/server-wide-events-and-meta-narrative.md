@@ -36,7 +36,7 @@ Limited-time anomaly bursts; community-wide objectives; cosmetic-only rewards pe
 | **Anomaly outbreak** | Cross-faction shared threat; cooperative; ends per server (when objective met or time expires). |
 | **Solar storm** | Disrupts radio across Earth-orbit shards (per DR-043); cross-shard tactical implication. |
 | **Faction conquest event** | Faction expansion attempt across shards; defenders cooperate to repel. |
-| **Black market run** | Limited-time vendor with rare equipment (NEVER paid); appears for ~6h. |
+| **Black market run** | Limited-window in-world vendor with rare equipment; archived/earn-back equivalent remains available after the event. Never paid power. |
 | **Ghost ship contact** | Mystery dropship arrives; players investigate; lore unlock. |
 | **Community challenge week** | Weekly leaderboard challenges; speedrun + survival + bunker design. |
 

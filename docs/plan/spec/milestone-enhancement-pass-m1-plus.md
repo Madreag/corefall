@@ -18,9 +18,10 @@ feeds:
   - DR-054
   - DR-055
   - DR-056
+  - DR-057
 ---
 
-← [[spec/index|spec section]] · [[decisions/dr-056-per-milestone-enhancement-pass-m1-plus|DR-056]] · [[spec/prototype-roadmap|roadmap]] · [[decisions/dr-052-network-sync-rollback-and-cli-testable-determinism|DR-052]] · [[decisions/dr-053-ai-audio-pipeline-realtime-and-generative|DR-053]] · [[decisions/dr-054-performance-optimization-and-profiling|DR-054]] · [[decisions/dr-055-game-feel-juice-and-flow-state|DR-055]]
+← [[spec/index|spec section]] · [[decisions/dr-056-per-milestone-enhancement-pass-m1-plus|DR-056]] · [[decisions/dr-057-optional-gacha-battle-pass-and-private-prototype-license-posture|DR-057]] · [[spec/prototype-roadmap|roadmap]] · [[decisions/dr-052-network-sync-rollback-and-cli-testable-determinism|DR-052]] · [[decisions/dr-053-ai-audio-pipeline-realtime-and-generative|DR-053]] · [[decisions/dr-054-performance-optimization-and-profiling|DR-054]] · [[decisions/dr-055-game-feel-juice-and-flow-state|DR-055]]
 
 # Per-Milestone Enhancement Pass M1+
 
@@ -38,7 +39,7 @@ feeds:
 - [ ] Replay determinism CI matrix passes (per platform + per architecture) per DR-002 + DR-052.
 - [ ] All player surfaces scriptable via cfctl per T-CONTROL.
 - [ ] AI agent-driven validation report logged per DR-026 + DR-056.
-- [ ] All audio cues generated via DR-053 pipeline + usage-ledger logged.
+- [ ] All audio cues generated via DR-053 pipeline + usage-ledger logged; private prototypes pass `cf-asset-ledger check --mode private`, and public sale/release candidates pass `cf-asset-ledger check --mode release` per DR-057.
 - [ ] All gameplay events have juice rules per DR-055.
 - [ ] Accessibility ACC-A floor verified (UI 200% + high contrast + captions + reduced motion) per DR-012.
 - [ ] Localization keyed strings (Tier-A 11 languages) verified per DR-046.
@@ -53,6 +54,7 @@ feeds:
 
 **Add to scope:**
 - Input prediction for player-driven actor (per DR-052 client prediction).
+- Bevy workspace pin updated to the latest verified crate (`0.18.1` as of 2026-05-07), exact-pinned, and compile/test-validated per DR-024.
 - Recoil curves per weapon (per DR-055).
 - Camera punch on damage taken.
 - Animation event tags fire correctly (per [[spec/animation-system]]).
@@ -61,6 +63,7 @@ feeds:
 - ACC-A: keyboard remap + reduced motion settings.
 
 **Add to done-criteria:** Universal enhancement template.
+- `cargo update -p bevy --precise 0.18.1`, `cargo check --workspace --all-targets`, `cargo test --workspace`, and `cargo run -p cfctl -- observe --once` pass after the Bevy migration.
 
 ### M1.5 — Micro Breach Fun Slice
 

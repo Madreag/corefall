@@ -4,12 +4,12 @@ status: exploratory-reqs
 ready_when: "RET-A tests have results from actor-feel, replay, loadout, and one repeatable mission prototype."
 ---
 
-← [[spec/index|spec section]] · [[decisions/dr-011-progression-retention-loop|DR-011]] · [[decisions/dr-014-tone-player-promise|DR-014]] · [[systems/ux-ui-and-retention|UX/retention]] · [[spec/core-loop|core loop]] · [[spec/chassis-armor-mechs-and-origins|chassis/armor/mechs/origins]] · [[research-log/moonshot-register|moonshots]]
+← [[spec/index|spec section]] · [[decisions/dr-011-progression-retention-loop|DR-011]] · [[decisions/dr-014-tone-player-promise|DR-014]] · [[decisions/dr-057-optional-gacha-battle-pass-and-private-prototype-license-posture|DR-057]] · [[systems/ux-ui-and-retention|UX/retention]] · [[spec/core-loop|core loop]] · [[spec/chassis-armor-mechs-and-origins|chassis/armor/mechs/origins]] · [[research-log/moonshot-register|moonshots]]
 
 # Progression And Retention
 
 > [!warning] Exploratory requirements
-> This page is a design target and test plan, not a settled launch promise. It exists so prototypes can test the return loop with real gameplay evidence. Prototype daily seeds, roguelite structures, collection mechanics, async strategy, and copied/reused reference ideas freely; promote only what improves the game.
+> This page is a design target and test plan, not a settled launch promise. It exists so prototypes can test the return loop with real gameplay evidence. Prototype daily seeds, roguelite structures, collection mechanics, cosmetic battle-pass hooks, gacha-like collection experiments, async strategy, and copied/reused reference ideas freely; promote only what improves the game. Per DR-057, optional economy hooks are late, toggleable, default-off, and cannot gate gameplay power.
 
 ## North Star
 
@@ -39,7 +39,7 @@ Retention is a game-quality requirement here, not just a metric target. A good s
 | Persistence | Actors, salvage, command core state, base power grid, base modules, enemy commander, contract history. | Save/campaign stub; not built yet. |
 | Learning | Replay/event recap explains deaths, breaches, AI failures, and losses. | [[spec/replay-recorder-slice-a]] |
 | Sharing | Deterministic seed cards, replay exports, mod/package hashes. | [[spec/backend-service-hub-slice-a]], [[spec/package-builder-workbench-slice-a]] |
-| Optional collection | Cosmetic/story/trophy layer first; power collection only after fairness DR. | Future monetization/economy DR. |
+| Optional collection/economy | Cosmetic/story/trophy layer first; gacha-like and battle-pass hooks dormant/default-off; no power collection without future activation DR. | [[decisions/dr-057-optional-gacha-battle-pass-and-private-prototype-license-posture]] |
 
 ## Core Loop Integration
 
@@ -69,7 +69,7 @@ Retention is a game-quality requirement here, not just a metric target. A good s
 | `salvage_manifest` | recovered items, scrap/material types, enemy tech, damaged gear, base repair deltas. | Economy, loadout, workbench. |
 | `enemy_commander` | commander id, doctrine, visible adaptations, grudges, recent defeats, scouting clues. | AI harness, campaign UI, mission briefing. |
 | `replay_card` | seed, result, loadout, key events, actor fates, package versions, share hash. | Replay viewer, community browser, support/debug. |
-| `collection_entry` | cosmetic/story/trophy id, source event, unlock path, release-readiness tag. | Optional cosmetics/identity; future economy DR. |
+| `collection_entry` | cosmetic/story/trophy id, source event, unlock path, optional odds group, release-readiness tag, accessibility caption, localization key, mod provenance. | Optional cosmetics/identity; DR-057 dormant economy hooks. |
 
 ## Prototype Acceptance Tests
 
@@ -128,6 +128,7 @@ Retention is a game-quality requirement here, not just a metric target. A good s
 | No core-power opacity | Core counters, terrain tools, and role coverage need transparent access in any settled spec. |
 | No missed-reward punishment | Shared daily seeds are fine; missed daily chores are not a retention foundation. |
 | No UI dark patterns | No fake urgency, hidden costs, confusing currency, obstructed cancellation, or disguised purchases in any release-facing plan. |
+| Optional economy dormant by default | Battle-pass/gacha-like surfaces must be disable-able by server config and absent from UI/telemetry when disabled. |
 | Modding remains first-class | Official progression must not make mods feel second-class or invalid by default. |
 | AI must understand progression | Veteran traits, item roles, and contract constraints need AI metadata and harness cases. |
 | Replays must explain progression losses | If an actor dies, a contract fails, or salvage is lost, the recap must explain why. |
@@ -143,11 +144,12 @@ Retention is a game-quality requirement here, not just a metric target. A good s
 | Can enemy commanders adapt without feeling unfair? | RET-A-05 plus AI-H scenario failures. |
 | Does salvage improve tactics or just create chores? | Loadout edits and salvage usage metrics. |
 | Which sharing layer comes first: local replay cards, backend upload, or mod browser? | Backend/hub Slice A tests. |
-| Can collection mechanics add identity without harming fairness? | RET-A-08 and future monetization/economy DR. |
+| Can collection mechanics add identity without harming fairness? | RET-A-08, `cfctl test no-power-locks`, and future DR-057 activation evidence. |
 
 ## Source Trail
 
 - [[decisions/dr-011-progression-retention-loop]]
+- [[decisions/dr-057-optional-gacha-battle-pass-and-private-prototype-license-posture]]
 - [[systems/ux-ui-and-retention]]
 - [[spec/core-loop]]
 - [[spec/product-promise]]

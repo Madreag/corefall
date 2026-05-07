@@ -9,7 +9,7 @@ ready_when: "DR-005/DR-013/DR-034/DR-035 stay coherent; M9-M12 bandwidth/server 
 # Backend / Networking Posture
 
 > [!info] Current posture
-> [[decisions/dr-013-backend-service-scope]] sets the backend service boundary: build a local-first service spine for solo/private play, then extend the same contracts into `cf-server`, `lobby_directory`, public-server discovery, account adapters for public shards, anti-cheat foundation, and MMO persistence as M9-M12 evidence matures. Economy/gacha layers remain separate research tracks.
+> [[decisions/dr-013-backend-service-scope]] sets the backend service boundary: build a local-first service spine for solo/private play, then extend the same contracts into `cf-server`, `lobby_directory`, public-server discovery, account adapters for public shards, anti-cheat foundation, and MMO persistence as M9-M12 evidence matures. Optional economy/gacha-like layers remain separate, dormant, default-off research tracks per [[decisions/dr-057-optional-gacha-battle-pass-and-private-prototype-license-posture|DR-057]].
 
 ## Service Scope Summary
 
@@ -20,7 +20,7 @@ ready_when: "DR-005/DR-013/DR-034/DR-035 stay coherent; M9-M12 bandwidth/server 
 | Public server services | Build as M9-M12 online modes mature | `lobby_directory`, server browser, account adapter for public shards, anti-cheat foundation, persistence/journal services, server observability. |
 | Platform adapters | Research behind the shared contract | Steam server browser/SDR/GameNetworkingSockets, EOS lobbies/sessions, PlayFab lobby/server services, self-hosted directory, LAN discovery. |
 | Still not launch commitments | Require future evidence/DR | Ranked matchmaking, cloud save, leaderboards, first-party relay allocation, tournament-grade anti-cheat, moderation/admin product. |
-| Research/later economy | Research freely, do not couple to Slice A | Account economy, gacha/collection inventory, cosmetics marketplace, paid mod storefront. |
+| Research/later economy | Research freely, do not couple to Slice A | Account economy, gacha-like collection inventory, cosmetic battle pass, cosmetics marketplace. Must default off and pass DR-057 activation gates before release-facing use. |
 
 ## What goes here when ready
 
@@ -31,7 +31,7 @@ ready_when: "DR-005/DR-013/DR-034/DR-035 stay coherent; M9-M12 bandwidth/server 
 - Launcher/hub role: local game, server browser, replays, settings, mods/workbench, diagnostics.
 - Replay/network evidence bridge: event volume, snapshot size, dirty terrain chunk checksums, content hashes, replay schema, and first-divergence reports from [[systems/replay-determinism-and-run-evidence]].
 - Slice A implementation requirements for the backend/hub live in [[spec/backend-service-hub-slice-a]].
-- Tracks not yet promoted to product commitments: ranked matchmaking, account economy, first-party cloud hosting, tournament anti-cheat product, and live monetization. Each gets its own DR when it matures.
+- Tracks not yet promoted to product commitments: ranked matchmaking, account economy, cosmetic battle pass, gacha-like collection, first-party cloud hosting, tournament anti-cheat product, and live monetization. Optional economy hooks follow DR-057 and need a future activation DR when they mature.
 
 ## Inputs
 

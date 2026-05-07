@@ -350,8 +350,8 @@ Per [[spec/music-and-soundtrack]] and [[decisions/dr-047-launch-and-live-operati
 | Component | Tier 1 | Tier 2 | Tier 3 |
 |---|---|---|---|
 | **Music tracks** | Synth blip jingles | Suno v5 / Udio AI-composed tracks (cloud) OR MusicGen-Medium local | Final mix in FMOD Studio; adaptive layering; mastering pass. |
-| **SFX library** | Synth squares | Stable Audio Open 1.0 (Stability AI Community License, local on 32GB VRAM; commercial-use registration/enterprise review required) generated per-event; Freesound.org search for niche cues | Final tagged + caption-bound + spatialized via Steam Audio per DR-043. |
-| **Voice (NPCs)** | Text-only | ElevenLabs (license review) OR open-source XTTS-v2 / Tortoise (slower, free) | Final pass + audio normalization. Skip if license blocks. |
+| **SFX library** | Synth squares | Stable Audio Open 1.0 (Stability AI Community License, local on 32GB VRAM; private prototype ledger entry required; commercial-use registration/enterprise review required before public sale/release) generated per-event; Freesound.org search for niche cues | Final tagged + caption-bound + spatialized via Steam Audio per DR-043. |
+| **Voice (NPCs)** | Text-only | ElevenLabs subscription available but not exclusive; XTTS-v2 / Tortoise remain candidates | Final pass + audio normalization. Private prototypes are ledger-first; public sale/release requires cleanup or clearance. |
 | **Adaptive music system** | Static loop per scene | Per-scenario layered tracks (combat / tension / ambient / debrief) crossfade by `EnvironmentSignal` | Per-mission director phase changes. |
 
 ## Cross-Tier — Modding Parity
@@ -383,7 +383,7 @@ Modders must be able to:
 - [ ] Re-running pipeline produces deterministic output (seed-based).
 - [ ] Modders can use the same pipeline (`cf-asset-pipeline init` works).
 - [ ] usage-ledger covers 100% of AI-generated assets.
-- [ ] License audit clean (no GPL contamination, no unlicensed model output).
+- [ ] Private-mode usage-ledger audit clean for all retained prototypes; release-mode license audit clean before public sale/release.
 - [ ] Steam Deck performance budget met (Tier 3 assets render at 800p/60).
 - [ ] Modding workshop accepts Tier 2/3 assets.
 - [ ] Tier 1 → Tier 2 → Tier 3 transition is invisible to player (file-name swap).
@@ -394,6 +394,7 @@ Modders must be able to:
 - ❌ Cloud-only generation. Local-first per DR-013.
 - ❌ Letting Tier 2 ship without cleanup pass on hero assets. Quality floor matters.
 - ❌ Generating assets without usage-ledger entry. License risk.
+- ❌ Treating public-release license review as a blocker for private prototype quality. Ledger first; cleanup before sale/release.
 - ❌ Locking modders out of the pipeline. Modding parity per DR-006 + DR-045.
 - ❌ "AI art means we don't need quality control." Cleanup + palette enforcement + faction discipline mandatory.
 
@@ -404,6 +405,7 @@ Modders must be able to:
 - [[decisions/dr-044-audiovisual-production-pipeline]] — DR locking 3-tier direction.
 - [[decisions/dr-045-launch-content-roster]] — content scale that this pipeline must serve.
 - [[references/usage-ledger]] — per-asset license + provenance log.
+- [[decisions/dr-057-optional-gacha-battle-pass-and-private-prototype-license-posture]] — ledger-first private prototypes; release cleanup before sale/release.
 - ComfyUI: https://github.com/comfyanonymous/ComfyUI
 - Pixel Art XL LoRA: https://civitai.com/models/120096/pixel-art-xl
 - ComfyUI-PixelArt-Detector: https://github.com/dimtoneff/ComfyUI-PixelArt-Detector

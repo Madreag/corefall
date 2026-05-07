@@ -1,7 +1,7 @@
 ---
 type: spec
 status: closed-direction
-authority: "Network sync architecture: server-authoritative + client prediction + reconciliation + rollback netcode (PvP) + deterministic lockstep (LAN) + snapshot interpolation (online co-op) + bit-deterministic replay across all platforms. AI-agent-driven sync tests via cfctl."
+authority: "Network sync architecture: server owns truth, GPU owns richness, client owns feel. Server-authoritative + client prediction + reconciliation + rollback netcode (PvP) + deterministic lockstep (LAN) + snapshot interpolation (online co-op) + bit-deterministic replay across all platforms. AI-agent-driven sync tests via cfctl."
 ready_when: "All match modes pass deterministic-replay CI; rollback netcode for PvP latency <50ms feel-test; lag compensation for shooter combat <120ms; cross-platform determinism verified."
 feeds:
   - DR-002
@@ -15,6 +15,7 @@ feeds:
   - DR-046
   - DR-047
   - DR-052
+  - DR-054
 ---
 
 ← [[spec/index|spec section]] · [[decisions/dr-052-network-sync-rollback-and-cli-testable-determinism|DR-052]] · [[spec/server-app-architecture|server app]] · [[spec/persistent-mmo-architecture|MMO architecture]] · [[spec/ai-control-observability-layer|cfctl/T-CONTROL]]
@@ -22,18 +23,29 @@ feeds:
 # Network Sync, Rollback Netcode & Cross-Platform Determinism
 
 > [!summary] What this page is
-> The complete network architecture and determinism contract. Solves user's "all players perfectly in sync with every action without delay" requirement. AI-agent-testable via cfctl scripts. Cross-platform replay-determinism is the foundation; per-mode network adapter is the implementation.
+> The complete network architecture and determinism contract. Solves the owner's "all players perfectly in sync with every action without delay" target by making local feel immediate while server truth prevents permanent divergence. AI-agent-testable via cfctl scripts. Cross-platform replay-determinism is the foundation; per-mode network adapter is the implementation.
 
 ## Per-Mode Network Architecture
 
 | Mode | Architecture | Frame budget |
 |---|---|---|
-| Solo | Pure local sim | N/A |
+| Solo | Local in-process authoritative server/sim path; no internet transport | N/A |
 | LAN co-op (M10) | Deterministic lockstep | 16ms input delay (1 frame at 60Hz) |
 | Online co-op (M11) | Server-auth + client prediction + snapshot interp + lag compensation | 50-200ms target latency tolerance |
 | PvP arena (M12) | Rollback netcode (GGPO) + server validation | 16-50ms input delay (1-3 frames at 60Hz) |
 | MMO shard (M12) | Server-auth + interest mgmt + snapshot delta | Adaptive 60-120Hz tick |
 | Cross-shard events | Eventually-consistent broadcaster | Not real-time |
+
+## Authority And GPU Tiering
+
+| Class | Examples | Rule |
+|---|---|---|
+| Truth | Health, inventory, mission state, terrain collision, material/gas/fire truth, confirmed projectile hits, base power, doors/platforms, AI final decisions, save/replay state, PvP validation. | Server/local authoritative sim decides. GPU may affect only after DR-054 Tier 4 certification. |
+| Prediction | Local movement, provisional projectile path, provisional impact, held-weapon response. | Client CPU/GPU predicts immediately; server correction path reconciles. |
+| Presentation | Lighting, smoke, particles, trails, decals, camera shake, audio, interpolation, debug overlays. | Client GPU should be used aggressively; machine-to-machine divergence is acceptable. |
+| Advisory | Broadphase candidates, pathfinding heatmaps, visibility hints, AI perception maps, compression hints. | Can be GPU-computed; CPU/server validates before truth changes. |
+
+True zero internet lag is impossible. The target is no perceptible input lag for local feel and no divergent authoritative game state.
 
 ## Determinism Contract
 
@@ -202,10 +214,12 @@ Per DR-054.
 - [ ] Network simulator integrated.
 - [ ] Anti-cheat invariants enforced.
 - [ ] Per-milestone sync verification per DR-056.
+- [ ] `cfctl test sim-backend-authority --backend cpu,gpu_advisory,gpu_certified` proves CPU truth, advisory non-authority, and certified manifest enforcement.
 
 ## Source Trail
 
 - [[decisions/dr-052-network-sync-rollback-and-cli-testable-determinism]]
+- [[decisions/dr-054-performance-optimization-and-profiling]]
 - [[spec/server-app-architecture]]
 - [[spec/persistent-mmo-architecture]]
 - GGPO: https://www.ggpo.net/

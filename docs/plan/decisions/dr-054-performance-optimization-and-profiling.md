@@ -12,7 +12,7 @@ revisit_trigger: "Per-tier perf budget exceeded; SIMD path produces non-determin
 # DR-054: Performance Optimization & Profiling Track
 
 > [!success] Status: CLOSED-DIRECTION (project owner committed 2026-05-06)
-> Comprehensive perf optimization track for physics-heavy + emulation-heavy game. **Hot paths**: material kernel (32+ active 64×64 chunks @ 60Hz), atmospherics (100+ atmospheres @ 60Hz), physics narrowphase (1000+ entities), replay event recording (100K+ events/run), pathfinding (10+ AI bots × per-tick), renderer (4K/120 ceiling), network serialization (snapshot delta encoding). **Optimization stack**: `std::simd` + `wide` SIMD + Bevy parallel systems + spatial partitioning + GPU compute (where deterministic) + memory arenas + zero-allocation hot paths + cache-friendly SoA layout + profile-guided optimization. **AI-agent-driven** perf regression hunts via cfctl benchmarks + flamegraphs + bottleneck identification.
+> Comprehensive perf optimization track for physics-heavy + emulation-heavy game. **Hot paths**: material kernel (32+ active 64×64 chunks @ 60Hz), atmospherics (100+ atmospheres @ 60Hz), physics narrowphase (1000+ entities), replay event recording (100K+ events/run), pathfinding (10+ AI bots × per-tick), renderer (4K/120 ceiling), network serialization (snapshot delta encoding). **Optimization stack**: `std::simd` + `wide` SIMD + Bevy parallel systems + spatial partitioning + GPU compute tiers + memory arenas + zero-allocation hot paths + cache-friendly SoA layout + profile-guided optimization. Owner rule: **server owns truth, GPU owns richness, client owns feel**. **AI-agent-driven** perf regression hunts via cfctl benchmarks + flamegraphs + bottleneck identification.
 
 ## Decision
 
@@ -56,7 +56,7 @@ Each milestone must hit ALL three tiers in its acceptance suite.
 | **Zero-allocation patterns** | Per-tick hot loops; reuse buffers; pre-allocated capacities | M2+ |
 | **Cache-friendly SoA layout** | Per-component data; avoid AoS where vectorizable | M5+ |
 | **Profile-guided optimization** (PGO) | Release builds; compiler-driven | M9+ (when scenario library is rich enough) |
-| **GPU compute (where deterministic)** | Material kernel scale-up (post-CPU baseline); particle effects | M9+ post-baseline |
+| **GPU compute tiers** | Presentation, prediction, advisory, optional server acceleration, and certified authoritative kernels | M2+ visual; M5.6+ advisory/material; M9+ certification |
 | **Lazy initialization** | Per-mod hot-load; per-scenario asset load | M0+ |
 | **Reduce allocations in hot loops** | Lint via `cargo-clippy-allocator-stats` | M0+ |
 
@@ -69,6 +69,26 @@ Each milestone must hit ALL three tiers in its acceptance suite.
 | Multi-threading must be deterministic | Bevy parallel system order respected; per-system seed; no global RNG |
 | Object pools must produce identical results across runs | Pool allocation order deterministic |
 | Cache miss != different result | Logical correctness independent of cache state |
+
+### GPU compute authority tiers
+
+| Tier | What GPU can do | Authoritative? | Use policy |
+|---|---|---|---|
+| **Tier 0: Presentation** | Lighting, particles, decals, smoke/fog/fire visuals, glow, heat shimmer, shell casings, bullet trails, high-res visual atmosphere layer, debug overlays, audio visualizers. | No. | Use aggressively on clients. Cosmetic divergence is acceptable. |
+| **Tier 1: Client prediction** | Local movement prediction, provisional projectile paths, provisional impacts, client-side interpolation/extrapolation. | No; server corrects. | Use aggressively to hide latency. Corrections emit replay labels. |
+| **Tier 2: Advisory compute** | Pathfinding heatmaps, broadphase candidates, visibility hints, AI perception maps, compression/decompression hints. | No; CPU/server validates. | Use freely once validation rejects bad hints. |
+| **Tier 3: Server GPU acceleration** | Material chunks, atmosphere diffusion, large path fields, compression, batch queries. | Maybe, behind CPU-equivalent output. | Optional for official/high-end servers; CPU path required for community headless servers. |
+| **Tier 4: Authoritative GPU sim** | Terrain/material/gas/projectile/body truth. | Yes. | Only after certification matrix passes; CPU fallback always present. |
+
+Minimum Tier 4 certification:
+
+- Same seed, same inputs, same mod set.
+- 10K+ ticks per kernel.
+- Per-tick BLAKE3 checksum.
+- Final state byte-identical to CPU canonical path.
+- Matrix covers NVIDIA, AMD, Intel, Apple, and Steam Deck.
+- No atomics/order-dependent reductions unless proven stable in the matrix.
+- Fallback CPU path remains built and testable forever.
 
 ### Profile-guided optimization workflow
 
@@ -169,7 +189,7 @@ Hot paths cannot allocate during sim tick; static-sized buffers; arena-pooled.
 |---|---|
 | No optimization (rely on hardware) | Steam Deck floor would fail. |
 | Single-threaded sim | Modern multi-core hardware underutilized. |
-| GPU compute everywhere | Determinism issues; cross-vendor IEEE-754 inconsistencies. |
+| GPU compute everywhere as truth | Determinism issues; cross-vendor IEEE-754/order inconsistencies. Rejected only for authority, not for presentation/prediction/advisory richness. |
 | C++/native vs Rust | Per DR-024; Rust's safety + perf parity established. |
 | Manual memory management | Per Rust; ECS handles pooling via archetype. |
 | Defer optimization to post-launch | Steam Deck floor would gate launch. |
@@ -177,8 +197,10 @@ Hot paths cannot allocate during sim tick; static-sized buffers; arena-pooled.
 ## Evidence Trail
 
 - Project owner verbatim (2026-05-06): "we are a physics and emulation heavy game, systems need to be optimized."
+- Project owner clarification (2026-05-07): "Server owns truth. GPU owns richness. Client owns feel."
 - Bevy profiling docs: https://github.com/bevyengine/bevy/blob/main/docs/profiling.md
-- Bevy 0.17 release notes: https://bevy.org/news/bevy-0-17/
+- Bevy 0.18 release notes: https://bevy.org/news/bevy-0-18/
+- Bevy latest crate docs (`0.18.1` as of 2026-05-07 audit): https://docs.rs/crate/bevy/latest
 - Bevy fixed timestep docs: https://docs.rs/bevy/latest/bevy/time/struct.Fixed.html
 - Bevy ECS Patterns: https://mcpmarket.com/tools/skills/bevy-ecs-patterns
 - Bevy Metrics: https://metrics.bevy.org/
@@ -197,5 +219,6 @@ Hot paths cannot allocate during sim tick; static-sized buffers; arena-pooled.
 - Per-tier perf budget exceeded.
 - SIMD path produces non-deterministic output.
 - GPU compute hot path proves harder than CPU.
+- Tier 4 GPU certification fails across any target platform.
 - Profile-guided optimization regresses.
 - AI agents cannot drive perf regression hunts via cfctl.

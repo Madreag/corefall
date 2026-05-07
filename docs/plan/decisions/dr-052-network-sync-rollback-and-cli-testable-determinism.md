@@ -12,7 +12,7 @@ revisit_trigger: "Network sync drift detected in production; rollback netcode ad
 # DR-052: Network Synchronization, Rollback Netcode & CLI-Testable Determinism
 
 > [!success] Status: CLOSED-DIRECTION (project owner committed 2026-05-06)
-> Hybrid network model per match mode: **server-authoritative simulation** (DR-005) + **client-side prediction with reconciliation** + **rollback netcode for PvP arenas** (M12) + **deterministic lockstep for LAN co-op** (M10) + **snapshot interpolation for online co-op** (M11) + **bit-deterministic replay across all platforms** (DR-002). All sync paths fully testable via cfctl scripts: `cfctl test sync-drift`, `cfctl test latency-injection`, `cfctl test rollback-burst`, `cfctl test replay-determinism`. Floating-point determinism guaranteed via `f32` strict ordering + `STD::FROUND_TO_NEAREST` + cross-platform LLVM compile flags + per-tick checksum.
+> Hybrid network model per match mode: **server-authoritative simulation** (DR-005) + **client-side prediction with reconciliation** + **rollback netcode for PvP arenas** (M12) + **deterministic lockstep for LAN co-op** (M10) + **snapshot interpolation for online co-op** (M11) + **bit-deterministic replay across all platforms** (DR-002). Owner architecture: **server owns truth, GPU owns richness, client owns feel.** All sync paths fully testable via cfctl scripts: `cfctl test sync-drift`, `cfctl test latency-injection`, `cfctl test rollback-burst`, `cfctl test replay-determinism`. Floating-point determinism guaranteed via `f32` strict ordering + `STD::FROUND_TO_NEAREST` + cross-platform LLVM compile flags + per-tick checksum.
 
 ## Decision
 
@@ -20,12 +20,21 @@ revisit_trigger: "Network sync drift detected in production; rollback netcode ad
 
 | Mode | Architecture | Rationale |
 |---|---|---|
-| **Solo / single-player** | Pure local sim; no network. Per-tick replay event chain. | Trivial; replay-deterministic. |
+| **Solo / single-player** | Local in-process authoritative server/sim path; no internet/network transport required. Per-tick replay event chain. | Same authority, replay, save, cfctl, and future multiplayer migration path as online modes without network cost. |
 | **LAN co-op (M10)** | **Deterministic lockstep**. All clients run identical sim; only inputs sent. Sync probe per 60-tick interval; first-divergence-event detector. | Matches GGPO/Rollback precedent for tactical games; near-zero latency on LAN; bandwidth bounded by input size. |
 | **Online co-op (M11)** | **Server-authoritative simulation + client prediction + reconciliation + snapshot interpolation**. Clients predict locally for player-driven actor; server is canonical. Snapshot interp for remote actors at -100ms history buffer. Lag compensation per CS:Source model. | Tolerates 50-200ms latency; remote actor positions hidden behind interp buffer; player actor feels responsive. |
 | **PvP arena (M12)** | **Rollback netcode** (GGPO-style) + server-authoritative state validation + anti-cheat invariants. Local prediction + 8-frame rollback window per match-tick mismatch. Input delay 1-3 frames at 60Hz (16-50ms). | Matches fighting-game precedent; sub-perceptual latency for competitive PvP. |
 | **MMO shard (M12)** | **Server-authoritative + interest management + snapshot delta encoding**. Per-actor interest set per [[spec/persistent-mmo-architecture]]. Tick rate adaptive per client (60Hz floor, 120Hz ceiling for high-bandwidth). | Scales to 50-200 concurrent players; bandwidth-aware. |
 | **Server-server (cross-shard events)** | **Eventually-consistent event broadcaster**. Per [[spec/server-wide-events-and-meta-narrative]]. Centralized event-state authority; per-shard verifies signed JSON. | Cross-shard MMO events; not real-time; eventually-consistent. |
+
+### Authority taxonomy
+
+| Class | Meaning | GPU/client role | Can diverge visually? |
+|---|---|---|---|
+| **Truth** | Actor health, inventory/resources, mission state, terrain collision, material/gas/fire truth, projectile hit confirmation, base power, doors/platforms, AI final decisions, saves/replays, PvP validation. | Server/local authoritative sim computes or validates. GPU may accelerate only if certified equivalent to CPU. | No. |
+| **Prediction** | Local player movement, temporary projectile path, provisional impact, held-weapon response. | Client CPU/GPU predicts immediately, then reconciles to server. | Briefly, then corrected. |
+| **Presentation** | Lighting, smoke visuals, particles, trails, decals, interpolation, camera shake, audio, debug overlays. | Client GPU should do this aggressively. | Yes. |
+| **Advisory** | Broadphase candidates, pathfinding heatmaps, visibility hints, AI perception maps, compression/decompression hints. | GPU/server/client can compute hints; CPU/server validates before truth changes. | Yes, until validated. |
 
 ### Determinism guarantees
 
@@ -36,6 +45,10 @@ revisit_trigger: "Network sync drift detected in production; rollback netcode ad
 | **Replay reproducibility** | Same manifest + seed + inputs reproduces same final state byte-for-byte. | `cf-replay` event log + per-tick checksums; `cf-headless replay --verify-checksums` walks every event, asserts state matches. |
 | **Cosmetic vs gameplay** | Cosmetic systems (particles, decals beyond gameplay impact, audio cosmetic flag) **NOT** in determinism island. Gameplay-critical (physics, sim, AI decisions, projectile trajectories) **IS** deterministic. | Per-system `cosmetic: true` flag; replay events tagged. |
 | **Network input ordering** | Per-tick input batches collected on server; deterministic ordering by client_id. | Server-authoritative input queue; tie-break by player_id ascending. |
+
+### GPU authority rule
+
+GPU work is welcome for richness and performance, but it is not authoritative by default. A GPU kernel may affect Truth only after the certification matrix in DR-054 passes across NVIDIA, AMD, Intel, Apple, and Steam Deck with the same seed, same inputs, same mod set, 10K+ ticks per kernel, per-tick BLAKE3 checksums, and final byte-identical state against the CPU path. Until then, GPU output is Presentation, Prediction, or Advisory.
 
 ### Client prediction + reconciliation
 
@@ -49,6 +62,8 @@ For online co-op (M11) + MMO (M12):
 | **Prediction window** | 1-3 frames at 60Hz (16-50ms). Capped at server's max-allowed-prediction. |
 | **Mispredict handling** | Server-state-wins; client visually corrects with smooth interpolation. Reason label `prediction_corrected` emitted to replay. |
 | **Anti-cheat** | Server validates every client input against current state; rejects impossible inputs (e.g., shoot-through-wall, teleport, infinite-ammo). |
+
+Prediction exists to remove perceptible input lag, not to remove server authority. True zero internet lag is impossible; the target is immediate local feel plus no permanent divergent game state.
 
 ### Rollback netcode (M12 PvP arena)
 
@@ -157,6 +172,7 @@ Per [[spec/post-launch-operations-and-platform]]. `cf-network-sim` dev-tool:
 ## Evidence Trail
 
 - Project owner verbatim (2026-05-06): "network system needs to have all players perfectly in sync with every action without delay - and this should be able to be tested by the AI coding agent via the CLI and scripts since all actions can be controlled and viewed."
+- Project owner clarification (2026-05-07): "Server owns truth. GPU owns richness. Client owns feel."
 - GGPO Rollback Networking SDK: https://www.ggpo.net/
 - SnapNet Netcode Architectures Part 3: Snapshot Interpolation: https://snapnet.dev/blog/netcode-architectures-part-3-snapshot-interpolation/
 - Source Multiplayer Networking (Valve): https://developer.valvesoftware.com/wiki/Source_Multiplayer_Networking
@@ -174,3 +190,4 @@ Per [[spec/post-launch-operations-and-platform]]. `cf-network-sim` dev-tool:
 - Per-platform float determinism breaks.
 - Bandwidth budget exceeded under MMO load.
 - Anti-cheat invariants insufficient against new attack vectors.
+- A gameplay system tries to make uncertified GPU output authoritative.

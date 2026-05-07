@@ -16,14 +16,15 @@ feeds:
   - DR-045
   - DR-046
   - DR-047
+  - DR-057
 ---
 
-← [[spec/index|spec section]] · [[decisions/dr-047-launch-and-live-operations|DR-047]] · [[decisions/dr-031-content-economy-and-monetization-posture|DR-031]]
+← [[spec/index|spec section]] · [[decisions/dr-047-launch-and-live-operations|DR-047]] · [[decisions/dr-031-content-economy-and-monetization-posture|DR-031]] · [[decisions/dr-057-optional-gacha-battle-pass-and-private-prototype-license-posture|DR-057]]
 
 # Live Ops & Endgame
 
 > [!important] Foundation only at launch
-> Per DR-031: NO pay-to-win, NO gacha, NO marketplace cut. Live ops at launch is **infrastructure only**, not content-economy treadmill. Cosmetics are EARNED via play, NEVER paid.
+> Per DR-031: NO pay-to-win, NO gameplay-gating battle pass, NO marketplace cut. Per DR-057, optional cosmetic battle-pass and gacha-like collection hooks may exist only as late, toggleable, default-off architecture until a future activation DR proves fairness, anti-FOMO, accessibility, localization, modder parity, and rating/legal readiness. Live ops at launch is **infrastructure only**, not content-economy treadmill. Cosmetics are earned via play by default.
 
 ## Cosmetics Pipeline
 
@@ -37,7 +38,7 @@ feeds:
 | Victory poses | Match victory streaks | Animated end-of-match poses. |
 | Replay highlight templates | Mastery + sharing | For streamer overlay templates. |
 
-NEVER paid. NEVER gacha. NEVER FOMO.
+Default posture: earned through play, no power, no FOMO. Optional paid-cosmetic or gacha-like collection activation is dormant and must pass DR-057 activation gates before it can become release-facing.
 
 ## DLC Infrastructure
 
@@ -46,7 +47,7 @@ Ready at launch but no DLC ships v1.0. Post-launch evaluation:
 - New campaign chapters (paid; OPTIONAL; never gates core).
 - New factions (paid; visual + lore + signature gear).
 - New worlds (paid; visual + biome + atmospheric).
-- New cosmetic packs (paid).
+- New cosmetic packs (paid, optional, no gameplay power).
 
 Per DR-031: NEVER pays-for-power. NEVER pay-to-win.
 
@@ -62,7 +63,7 @@ Per DR-031: NEVER pays-for-power. NEVER pay-to-win.
 - Halloween scenario (October).
 - Winter scenario (December).
 - Anniversary scenario (launch+1yr).
-- Time-limited but NO FOMO mechanics (ephemeral cosmetics OK if also obtainable later).
+- Time-limited presentation is allowed only when the post-event archive and earn-back path remain available; no "miss it forever" cosmetics or progression.
 
 ## Community Challenges
 

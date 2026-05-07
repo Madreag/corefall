@@ -38,10 +38,11 @@ This closes the engine-stack subdecision that DR-001 intentionally left for the 
 | Audio | Bevy audio backend or kira. |
 | Modding scripts | mlua (Lua) or Rhai — pick during M5 implementation. |
 | Build / CI | cargo + GitHub Actions (Win/Linux/macOS matrix). |
+| Current Bevy baseline | Latest verified Bevy crate is `0.18.1` as of 2026-05-07; active code pins exact `0.18.1` until the next scheduled upgrade task. |
 
 ## What This Does NOT Lock
 
-- Specific Bevy version or upgrade cadence.
+- "Never upgrade" posture. Bevy is pinned per milestone for reproducibility, but scheduled upgrade tasks may move to the latest verified release.
 - Whether the custom 2D renderer eventually replaces Bevy's renderer or stays as a hot-path supplement.
 - Lua vs Rhai for scripting (decision deferred to M5).
 - Specific transport library for networking.
@@ -61,7 +62,7 @@ This closes the engine-stack subdecision that DR-001 intentionally left for the 
 
 - Project owner verbatim (2026-05-04 stack round): chose Rust + Bevy/wgpu hybrid + custom core crates as the native stack.
 - DR-001 already committed to greenfield native (2026-05-04).
-- Bevy ecosystem maturity (versions 0.13+/0.14+) is sufficient for this workload.
+- Bevy 0.18 shipped on 2026-01-13 and the latest crates.io/docs.rs release is 0.18.1 as of the 2026-05-07 audit; Corefall should stay on the latest verified release, pinned in `Cargo.toml`, then upgrade only as explicit milestone work.
 - wgpu cross-platform parity (DX12/Vulkan/Metal/WebGPU) covers all DR-025 platform targets.
 - DR-002 replay/event work fits naturally as a custom Bevy plugin/crate.
 
@@ -94,6 +95,9 @@ This closes the engine-stack subdecision that DR-001 intentionally left for the 
 ## Source Trail
 
 - Project owner stack-round answers (2026-05-04).
+- Project owner clarification (2026-05-07): check latest first, update if needed, then pin.
+- Bevy 0.18 release notes: https://bevy.org/news/bevy-0-18/
+- Bevy latest crate docs (`0.18.1` as of 2026-05-07 audit): https://docs.rs/crate/bevy/latest
 - [[decisions/dr-001-engine-strategy]] — direction predecessor.
 - [[decisions/dr-002-replay-event-architecture]]
 - [[decisions/dr-022-ai-humanlike-bar]]
