@@ -209,7 +209,7 @@ Per DR-052 + T-CONTROL.
 - Jenova Chen "Flow in Games" thesis: https://www.jenovachen.com/flowingames/Flow_in_games_final.pdf
 - Game feel survey: https://pure.itu.dk/files/91131028/TG3072241.pdf
 - Hit-stop / juice patterns: https://www.reddit.com/r/pcgaming/comments/1jd737y/why_does_hitting_things_in_some_games_feel_like_so_much_better_than/
-- Captured in [[research-log/2026-05-06-third-pass-audit-followup]] (TBD).
+- Captured in [[research-log/2026-05-07-comprehensive-audit-report]].
 
 ## Revisit Trigger
 

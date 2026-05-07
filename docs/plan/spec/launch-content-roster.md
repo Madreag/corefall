@@ -555,7 +555,7 @@ Per `cf-audio` registry. Caption-bound per DR-020. Organized by category: weapon
 Every roster entry follows [[spec/art-and-asset-pipeline]] 3-tier pipeline:
 1. AI agent generates Tier 1 SVG placeholder (M0..M2).
 2. AI agent generates Tier 2 ComfyUI sprite/animation/VFX/audio (M2..M5).
-3. AI agent + project-owner finalize Tier 3 hand-polish + variants (M5+).
+3. AI agent finalizes Tier 3 cleanup + variants (M5+); project-owner review is approval only.
 
 Schema: `content/<category>/<id>.ron` per [[decisions/dr-006-modding-data-model]] schema-first.
 

@@ -33,10 +33,10 @@ revisit_trigger: "Shell UI playtest reveals first-30-seconds friction; tutorial 
 | **Achievements + collection** | Per-achievement comic-panel reveal. Collection of unlocked chassis variants, weapon skins, faction emblems, replay highlights, named-NPC encounters. | Per DR-031 cosmetics post-launch. |
 | **Replay viewer** | Scrub + speed control + multi-camera (player POV / commander map / first-person) + bookmark + clip export + shareable link. | Per DR-002 + DR-024. |
 | **Codex / lore browser** | In-game encyclopedia: factions, worlds, characters, weapons, materials. AI-generated lore copy + flavor text + comic-panel snapshots. Unlocked via play. | Replayability + worldbuilding payoff. |
-| **Photo mode** | Free camera + freeze sim + filter presets (comic / noir / pixel-pure / dramatic-light) + screenshot export with credits stamp. | Streaming/creator support per DR-063. |
+| **Photo mode** | Free camera + freeze sim + filter presets (comic / noir / pixel-pure / dramatic-light) + screenshot export with credits stamp. | Streaming/creator support per DR-047 + [[spec/streaming-and-creator-features]]. |
 | **Cosmetic locker** | Unlocked skins, decals, paint jobs, voice packs, victory poses, emblems. Earned via play, never paid. Cosmetics post-launch. | Per DR-031. |
 | **Death cam** | Auto-replay last 5s on death from killer POV; "show me why" handoff. | Per DR-023. |
-| **Mod manager** | Browse Workshop / Local mods. Subscribe / install / update / uninstall. Trust tiers per DR-034. Hot-load. | Per DR-006 + DR-059. |
+| **Mod manager** | Browse Workshop / Local mods. Subscribe / install / update / uninstall. Trust tiers per DR-034. Hot-load. | Per DR-006 + DR-050. |
 
 ### Flashy + punchy juice rules
 
@@ -109,7 +109,7 @@ Launch language set:
 | `content/narrative/` | Codex + dialogue + bios + tutorial scripts. AI-authored, schema-validated. |
 | `content/i18n/<lang>/` | Per-language `.ftl` string packs. AI-translated, community-reviewed. |
 | `content/missions/<id>/briefing.json` | Per-mission narrative payload. |
-| Cosmetics + achievements | Stub at launch; unlock via play; cosmetics-as-a-service post-launch per DR-061. |
+| Cosmetics + achievements | Stub at launch; unlock via play; cosmetics and achievements remain earned, anti-FOMO, and non-paid per DR-031 + DR-047 + DR-049. |
 
 ## What This Does NOT Lock
 

@@ -163,7 +163,7 @@ revisit_trigger: "Accessibility-plus features impact perf budget; sustainability
 - WCAG 2.1 AAA: aspirational beyond DR-012 floor (AA targeted).
 - Hades sustainability: ongoing community support 5+ years post-launch.
 - Stardew Valley sustainability: 8+ years post-launch; active modding ecosystem.
-- Captured in [[research-log/2026-05-06-second-pass-audit-followup]] (TBD).
+- Captured in [[research-log/2026-05-07-comprehensive-audit-report]].
 
 ## Revisit Trigger
 

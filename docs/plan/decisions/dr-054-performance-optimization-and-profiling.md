@@ -178,15 +178,19 @@ Hot paths cannot allocate during sim tick; static-sized buffers; arena-pooled.
 
 - Project owner verbatim (2026-05-06): "we are a physics and emulation heavy game, systems need to be optimized."
 - Bevy profiling docs: https://github.com/bevyengine/bevy/blob/main/docs/profiling.md
+- Bevy 0.17 release notes: https://bevy.org/news/bevy-0-17/
+- Bevy fixed timestep docs: https://docs.rs/bevy/latest/bevy/time/struct.Fixed.html
 - Bevy ECS Patterns: https://mcpmarket.com/tools/skills/bevy-ecs-patterns
 - Bevy Metrics: https://metrics.bevy.org/
 - Bevy Cheat Book Performance: https://bevy-cheatbook.github.io/setup/perf.html
+- Steam Deck compatibility checklist: https://partner.steamgames.com/doc/steamdeck/compat
+- NVIDIA floating-point determinism guidance: https://developer.nvidia.com/blog/controlling-floating-point-determinism-in-nvidia-cccl/
 - "The Essence of Entity Component System" (Tian Zhao): SAC2026 paper.
 - `wide` Rust SIMD crate: https://crates.io/crates/wide
 - `tracy-client` Rust: https://crates.io/crates/tracy-client
 - `puffin` profiler: https://crates.io/crates/puffin
 - `criterion` benchmark: https://github.com/bheisler/criterion.rs
-- Captured in [[research-log/2026-05-06-third-pass-audit-followup]] (TBD).
+- Captured in [[research-log/2026-05-07-comprehensive-audit-report]].
 
 ## Revisit Trigger
 

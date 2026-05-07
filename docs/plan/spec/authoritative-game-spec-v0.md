@@ -3,8 +3,8 @@ type: spec
 status: planning-anchor-v0
 authority: "Direction and scope for the first-playable prototype only. Not a release commitment."
 scope: first-playable-prototype-and-launch-direction
-last_updated: 2026-05-04
-ready_when: "This v0 is replaced by a run-evidence-backed Slice B/C spec after A1..A7 prototype results close or revise the open decisions."
+last_updated: 2026-05-07
+ready_when: "This v0 is replaced by a run-evidence-backed Slice B/C spec after native M1+ prototype results close or revise the still-open decisions and DR-056 universal enhancement checks have evidence."
 feeds:
   - DR-001
   - DR-002
@@ -42,6 +42,26 @@ feeds:
   - DR-034
   - DR-035
   - DR-036
+  - DR-037
+  - DR-038
+  - DR-039
+  - DR-040
+  - DR-041
+  - DR-042
+  - DR-043
+  - DR-044
+  - DR-045
+  - DR-046
+  - DR-047
+  - DR-048
+  - DR-049
+  - DR-050
+  - DR-051
+  - DR-052
+  - DR-053
+  - DR-054
+  - DR-055
+  - DR-056
 ---
 
 ← [[spec/index|spec section]] · [[spec/prototype-roadmap|prototype roadmap]] · [[spec/prototype-implementation-backlog-slice-a|implementation backlog]] · [[dashboards/research-readiness|readiness]] · [[dashboards/system-heatmap|system heatmap]] · [[decisions/index|decisions]] · [[prototypes/index|prototype evidence]] · [root plan](../../VAULT_PLAN.md)
@@ -313,7 +333,7 @@ Equipment is a shared system contract, not a catalog page.
 | Veterans | Named actors, scars, specialties, and recovery stories are retention candidates. | Prototype before campaign commitment. |
 | Chassis identity | Armor sets, mech hulls, repaired modules, android shells, robot frames, and origin histories can become memorable return-loop objects if they stay tactical and readable. | Prototype through CHASSIS-A and RET-A before campaign commitment. |
 | Salvage | Salvage creates tactical recovery and material consequences. | Must not punish experimentation into restart-only behavior. |
-| Collection/economy | Cosmetics/collection/gacha can be researched privately but must not corrupt modding or fairness commitments. | Future monetization ethics DR before release commitment. |
+| Collection/economy | Cosmetics and collection can be researched privately; any randomization or monetization experiment is prototype-only and must not corrupt modding, fairness, anti-FOMO, or the DR-031 no-gacha release posture. | Future monetization ethics DR before any release-facing economy commitment. |
 
 ## Prototype Tracks
 
@@ -358,7 +378,7 @@ Moonshots stay alive in [[research-log/moonshot-register]] and must not block th
 |---|---|---|
 | Should the final game build on CCCP, a fork, or a greenfield engine? | **Closed** — greenfield native (DR-001) on Rust + Bevy/wgpu hybrid + custom core crates (DR-024). CCCP is read-only reference. | [[decisions/dr-001-engine-strategy]], [[decisions/dr-024-native-engine-stack]], [[engine/cccp-build-run-audit]]. |
 | What terrain backend best balances feel, readability, AI, replay, and networking? | **Direction closed** (2026-05-05): hybrid systemic per [[decisions/dr-036-systemic-material-simulation-direction]] (active-region CA + reaction table + atmospheres + curated launch set). Implementation specifics close at M5.6/M5.7/M7.5. | MAT-T + M5.6/M5.7/M7.5 run bundles; [[decisions/dr-007-terrain-material-model]] + [[decisions/dr-036-systemic-material-simulation-direction]]. |
-| How deterministic can replay be? | Open. Hybrid event/snapshot/checksum posture. | REC-A/DET-A run bundles. |
+| How deterministic can replay be? | **Direction closed** by DR-052: bit-identical replay is the target. Implementation evidence remains open and must prove deterministic islands with event/snapshot/checksum fixtures. | REC-A/DET-A run bundles, M3 replay matrix, M9-M12 network sync evidence, [[decisions/dr-052-network-sync-rollback-and-cli-testable-determinism]]. |
 | How much AI complexity is enough for solo trust? | Open. Harness requirements ready. Local AI is the floor; async LLM "mind" workers (DR-032) add doctrine/memory/personality/debriefs as proposals only. | AI-H and AI-EQ runs, [[decisions/dr-008-ai-architecture]], M6.5 MIND-001..MIND-010 against mock provider per [[spec/hybrid-llm-ai-plan]]. |
 | What command UX should ship? | Open lean: direct + slowdown + optional tactical map. | UX-W/ORDER tests and [[decisions/dr-009-command-ux-style]]. |
 | What multiplayer posture is viable? | **Closed** (2026-05-05): solo + LAN co-op + online co-op + community-hostable public PvP arenas + persistent MMO shards via the `cf-server` dedicated server binary. Subscription forbidden; cross-shard live combat forbidden at v1. | M9-M12 acceptance evidence per [[spec/prototype-roadmap]]; [[decisions/dr-005-multiplayer-posture]]; [[decisions/dr-013-backend-service-scope]]; [[decisions/dr-034-dedicated-server-application]]; [[decisions/dr-035-persistent-mmo-architecture]]; [[spec/server-app-architecture]]; [[spec/persistent-mmo-architecture]]. |
@@ -367,7 +387,7 @@ Moonshots stay alive in [[research-log/moonshot-register]] and must not block th
 | How far should armor, mechs, robots, androids, and species/origins go? | Open. Direction accepted; prototype evidence missing. | [[decisions/dr-014-tone-player-promise]], [[spec/chassis-armor-mechs-and-origins]], CHASSIS-A tests. |
 | How should body damage stay readable instead of noisy? | Coarse silhouette + advanced opt-in lean. | BODY-A, HUD, REC-A recap tests and [[decisions/dr-003-body-damage-readability]]. |
 | What retention loop is fair and durable? | Intrinsic-first hybrid lean. | RET-A tests and future economy/fairness DR if monetization becomes real. |
-| What audio identity and localization plan should exist? | Not yet specified. | New DRs or spec pages after first playable UX vocabulary stabilizes. |
+| What audio identity and localization plan should exist? | **Specified direction exists**: DR-020 audio identity, DR-046 player-facing surfaces/localization, DR-053 AI audio pipeline, and [[spec/localization-plan]] define the current target. Evidence still needs implementation fixtures. | `cf-caption-check`, `cf-i18n-check`, M4/M-MUSIC/M-LOCALIZATION run bundles, and pre-launch license review. |
 
 ## Implementation Rules
 

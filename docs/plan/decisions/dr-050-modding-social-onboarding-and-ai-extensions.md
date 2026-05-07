@@ -126,7 +126,7 @@ revisit_trigger: "Modder count drops; social features create harassment vectors;
 - Helldivers 2 mentor / community-driven onboarding: 60%+ first-month retention.
 - Path of Exile mod ecosystem: voluntary tip jars + modder credits = active ecosystem 10+ years.
 - Souls / Elden Ring AI difficulty: named presets + intentional-feeling difficulty = mass-appeal hard mode.
-- Captured in [[research-log/2026-05-06-second-pass-audit-followup]] (TBD).
+- Captured in [[research-log/2026-05-07-comprehensive-audit-report]].
 
 ## Revisit Trigger
 

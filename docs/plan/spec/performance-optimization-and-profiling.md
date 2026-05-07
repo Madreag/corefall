@@ -223,7 +223,11 @@ $ cargo allocator-stats --crate cf-physics --hot-path
 
 - [[decisions/dr-054-performance-optimization-and-profiling]]
 - Bevy profiling: https://github.com/bevyengine/bevy/blob/main/docs/profiling.md
+- Bevy 0.17 release notes: https://bevy.org/news/bevy-0-17/
+- Bevy fixed timestep docs: https://docs.rs/bevy/latest/bevy/time/struct.Fixed.html
 - Bevy ECS Patterns: https://mcpmarket.com/tools/skills/bevy-ecs-patterns
+- Steam Deck compatibility checklist: https://partner.steamgames.com/doc/steamdeck/compat
+- NVIDIA floating-point determinism guidance: https://developer.nvidia.com/blog/controlling-floating-point-determinism-in-nvidia-cccl/
 - `wide` SIMD crate: https://crates.io/crates/wide
 - `tracy-client`: https://crates.io/crates/tracy-client
 - `puffin` profiler: https://crates.io/crates/puffin

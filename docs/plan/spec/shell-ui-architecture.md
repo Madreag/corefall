@@ -67,12 +67,12 @@ feeds:
 | **Hub UI** | Base / squad / campaign / mods / progression overview | All categories accessible. |
 | **Replay viewer** | Scrub + speed + multi-cam + bookmark + clip export | Per DR-002. |
 | **Codex / lore browser** | In-game encyclopedia | All factions/worlds/characters/weapons/materials unlockable + browsable. |
-| **Photo mode** | Free camera + freeze + filters + screenshot export | Per DR-063 streaming/creator features. |
+| **Photo mode** | Free camera + freeze + filters + screenshot export | Per DR-047 + [[spec/streaming-and-creator-features]]. |
 | **Cosmetic locker** | Unlocked skins/decals/paint/voice/emblems | Earned via play (never paid per DR-031). |
 | **Achievements** | List + per-achievement unlock animation | 60-100 achievements at launch. |
 | **Death cam** | Auto-replay last 5s on death | "Show me why" handoff per DR-023. |
 | **Mod manager** | Browse Workshop / Local / Subscribe / Install / Update / Uninstall | Trust tiers per DR-034. |
-| **Workshop submission** | One-button mod publish from in-game | Per DR-006 + DR-059. |
+| **Workshop submission** | One-button mod publish from in-game | Per DR-006 + DR-050 + DR-047. |
 | **Difficulty / accessibility presets** | Standard/Easy/Hard/Custom + sliders | Per DR-023 + DR-012. |
 
 ## Settings Tree (Detail)

@@ -49,7 +49,7 @@ Audio is a first-class HUD surface, not decoration:
 
 | Non-Commitment | Why |
 |---|---|
-| Specific composer / soundtrack vendor | Open. Could be commissioned, library-based, or procedural. |
+| Specific AI soundtrack provider / model stack | Open. Must be AI-generated or procedural, license-reviewed, caption-bound, and usage-ledger logged per DR-044 + DR-053. |
 | Whether the synth layer is generative or pre-composed | Open. Generative is moonshot. |
 | Voice acting depth (radio chatter style) | Open. Could be procedural snippets, full VO, or none. |
 | 3D / spatial audio implementation | Open. 2D side-view doesn't strictly need full HRTF, but stereo positioning matters. |

@@ -15,6 +15,11 @@ feeds:
   - DR-034
   - DR-035
   - DR-036
+  - DR-052
+  - DR-053
+  - DR-054
+  - DR-055
+  - DR-056
 ---
 
 <- [[spec/index|spec section]] · [[spec/prototype-roadmap|native roadmap]] · [[spec/native-implementation-backlog|native backlog]] · [[spec/full-collision-physics-plan|full collision plan]] · [[spec/server-app-architecture|server app]] · [[spec/persistent-mmo-architecture|persistent MMO]] · [[comparables/noita-grade-material-simulation-research|material simulation research]] · [[references/prototype-run-bundle-schema|run-bundle schema]]
@@ -329,3 +334,5 @@ This view is required before any material hazard can graduate from lab fixture t
 - [[systems/replay-determinism-and-run-evidence]] — deterministic-island contract.
 - [[spec/ai-trust-harness-slice-a]] — AI-H scenario runner reuses this layer.
 - [[spec/ux-wireframes-slice-a]] — UI-tree primitives.
+- [[decisions/dr-052-network-sync-rollback-and-cli-testable-determinism]] — network sync and cross-platform replay requirements.
+- [[decisions/dr-056-per-milestone-enhancement-pass-m1-plus]] — every M1+ milestone must prove cfctl reachability.

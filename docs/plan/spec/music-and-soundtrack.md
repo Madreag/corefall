@@ -28,9 +28,9 @@ feeds:
 
 | Component | Detail |
 |---|---|
-| **Music composer (cloud)** | Suno v5 (currently leads quality per 2026 reviews) OR Udio v2. Both allow commercial use; license review pre-launch. Cost ~$10-25/month. AI-prompted by project-owner; iterations via AI agent. |
-| **Music composer (local fallback)** | MusicGen-Medium (Meta, MIT-licensed) OR Stable Audio Open 1.0 (Apache-2.0). Local 32GB VRAM runs both. Lower quality than Suno but no licensing risk. |
-| **SFX generator** | Stable Audio Open 1.0 (Apache-2.0); generates up to 47s audio at 44.1 kHz from text prompts. Local. |
+| **Music composer (cloud)** | Suno v5 / Udio v2 / ElevenLabs Music candidates. License review pre-launch; rights depend on plan and terms at generation time. AI-prompted by project-owner; iterations via AI agent. |
+| **Music composer (local fallback)** | MusicGen/AudioCraft is prototype-only unless weights are replaced, self-trained, or commercially licensed. AudioCraft code is MIT; released model weights are CC-BY-NC 4.0. |
+| **SFX generator** | Stable Audio Open 1.0; generates up to 47s audio at 44.1 kHz from text prompts. Local. Stability AI Community License / commercial-use registration or enterprise review required before release assets ship. |
 | **Voice generator (NPC dialogue)** | ElevenLabs (license review) OR XTTS-v2 / Tortoise (open-source). Skip if license blocks. |
 | **Mixer** | FMOD Studio (free under $200K/yr) wrapped via `bevy_fmod` OR pure-Rust `bevy_kira_audio` (Apache-2.0; lower-feature). Preferred: FMOD for adaptive layering + spatial; fallback Kira. |
 | **Adaptive system** | `cf-audio-adaptive` crate. Reads `EnvironmentSignal`, match phase, mission director state, combat intensity. Emits crossfade commands to FMOD/Kira. |
@@ -162,7 +162,7 @@ track: (
         ( id: "melody", file: "tier3/music/world_mars_ambient_melody.ogg", default_volume: 0.3 ),
         ( id: "tension", file: "tier3/music/world_mars_ambient_tension.ogg", default_volume: 0.0 ),
     ],
-    license: "Suno v5; project-owner generated; commercial use OK; logged in usage-ledger",
+    license: "AI music provider; project-owner generated; terms checked at generation time; logged in usage-ledger",
     bpm: 80,
     tempo_synced: true,
 )
@@ -176,7 +176,7 @@ sfx: (
     spatial: true,
     falloff_radius_m: 100,
     caption: "AK-47 gunfire",
-    license: "Stable Audio Open 1.0; project-owner generated; Apache-2.0",
+    license: "Stable Audio Open 1.0; project-owner generated; Stability AI Community License; commercial-use registration/enterprise review required",
 )
 ```
 
@@ -195,9 +195,11 @@ sfx: (
 
 - [[decisions/dr-020-audio-identity]]
 - [[decisions/dr-044-audiovisual-production-pipeline]]
-- Stable Audio Open 1.0: https://stability.ai/news-updates/introducing-stable-audio-open
-- Suno v5: https://suno.com/
-- Udio v2: https://www.udio.com/
-- MusicGen: https://github.com/facebookresearch/audiocraft
+- Stable Audio Open overview: https://stability.ai/news-updates/introducing-stable-audio-open
+- Stable Audio Open model card/license: https://huggingface.co/stabilityai/stable-audio-open-1.0
+- Suno terms: https://suno.com/terms
+- Udio terms: https://www.udio.com/terms-of-service
+- MusicGen / AudioCraft code + weight-license split: https://github.com/facebookresearch/audiocraft
+- ElevenLabs Music terms: https://elevenlabs.io/eleven-music-v1-terms
 - bevy_kira_audio: https://crates.io/crates/bevy_kira_audio
 - bevy_fmod: https://github.com/Salzian/bevy_fmod

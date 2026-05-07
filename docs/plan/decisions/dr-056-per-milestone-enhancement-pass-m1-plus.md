@@ -68,7 +68,7 @@ Add:
 - Per-tick checksum (blake3); replay determinism CI matrix per platform
 - Replay branching (multiple replay paths from same checkpoint)
 - Replay editing tools prototype (replay-as-data per DR-002)
-- Replay sharing infrastructure (per DR-063 streaming features)
+- Replay sharing infrastructure (per DR-047 streaming/creator features)
 
 #### M4 — HUD And Comic-Noir UI
 
@@ -315,7 +315,7 @@ Add:
 - Project owner verbatim (2026-05-06): "make sure we got everything planned and fully complete. all features well thought out for user retention, while staying true to the vision. UX should be perfect. UI should be perfect. all features should be perfect."
 - DR-052..DR-055 establish the foundations (network sync, AI audio, perf, game feel).
 - DR-056 binds them into per-milestone enhancement contract.
-- Captured in [[research-log/2026-05-06-third-pass-audit-followup]] (TBD).
+- Captured in [[research-log/2026-05-07-comprehensive-audit-report]].
 
 ## Revisit Trigger
 

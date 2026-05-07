@@ -164,7 +164,7 @@ Per [[spec/post-launch-operations-and-platform]]. `cf-network-sim` dev-tool:
 - A physics engine with incremental rollback: https://news.ycombinator.com/item?id=47981979
 - Cross-platform floating-point determinism: https://github.com/Unity-Technologies/Unity.Mathematics/issues/88
 - Bevy lightyear: https://github.com/cBournhonesque/lightyear
-- Captured in [[research-log/2026-05-06-third-pass-audit-followup]] (TBD).
+- Captured in [[research-log/2026-05-07-comprehensive-audit-report]].
 
 ## Revisit Trigger
 

@@ -84,7 +84,7 @@ feeds:
 - Per-tick checksum (blake3); replay determinism CI matrix per platform.
 - Replay branching (multiple replay paths from same checkpoint).
 - Replay editing tools prototype (replay-as-data per DR-002).
-- Replay sharing infrastructure (per DR-063 streaming features).
+- Replay sharing infrastructure (per DR-047 streaming/creator features).
 
 ### M4 — HUD And Comic-Noir UI
 
@@ -302,3 +302,4 @@ Per-milestone CI:
 - [[decisions/dr-055-game-feel-juice-and-flow-state]]
 - [[spec/prototype-roadmap]]
 - [[spec/native-implementation-backlog]]
+- [[research-log/2026-05-07-comprehensive-audit-report]]

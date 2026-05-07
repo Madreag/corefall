@@ -12,7 +12,7 @@ revisit_trigger: "AI audio quality fails playtest cohort; runtime latency exceed
 # DR-053: AI Audio Pipeline — Real-Time + Generative (No Humans Crafting)
 
 > [!success] Status: CLOSED-DIRECTION (project owner committed 2026-05-06)
-> Complete AI-driven audio pipeline. **NO humans crafting any audio.** 5 production tiers: (1) Stable Audio Open 1.0 (Apache-2.0 local) for SFX library generation, (2) Suno v5 / Udio v2 cloud for hero music tracks, (3) MusicGen-Medium (Meta MIT) local for ambient music, (4) XTTS-v2 / Coqui TTS local + ElevenLabs cloud for voice, (5) FMOD Studio / bevy_kira_audio runtime adaptive layering + Steam Audio spatial. **Plus runtime generation**: real-time procedural audio for combat impact + atmospheric ambience based on EnvironmentSignal + per-actor voice synthesis with phoneme lip-sync. AI agents produce + tag + caption + license-log everything.
+> Complete AI-driven audio pipeline. **NO humans crafting any audio.** 5 production tiers: (1) Stable Audio Open 1.0 (Stability AI Community License; commercial-use registration/enterprise review required) for SFX library generation, (2) Suno v5 / Udio v2 / ElevenLabs cloud candidates for hero music tracks, (3) MusicGen/AudioCraft local for prototype-only ambient music unless weights are replaced or commercially licensed, (4) XTTS-v2 / Coqui TTS local + ElevenLabs cloud for voice, (5) FMOD Studio / bevy_kira_audio runtime adaptive layering + Steam Audio spatial. **Plus runtime generation**: real-time procedural audio for combat impact + atmospheric ambience based on EnvironmentSignal + per-actor voice synthesis with phoneme lip-sync. AI agents produce + tag + caption + license-log everything.
 
 ## Decision
 
@@ -20,9 +20,9 @@ revisit_trigger: "AI audio quality fails playtest cohort; runtime latency exceed
 
 | Tier | Use case | Tools | License |
 |---|---|---|---|
-| **Tier 1 — SFX library generation** | 400+ launch SFX clips: weapons, footsteps, equipment, environment, UI, combat, voice barks. | Stable Audio Open 1.0 (local; 32GB VRAM); per-event prompt template + deterministic seed; auto-trim/normalize/EQ via `librosa` + `numpy`; auto-caption from prompt. | Apache-2.0 (commercial-friendly). |
+| **Tier 1 — SFX library generation** | 400+ launch SFX clips: weapons, footsteps, equipment, environment, UI, combat, voice barks. | Stable Audio Open 1.0 (local; 32GB VRAM); per-event prompt template + deterministic seed; auto-trim/normalize/EQ via `librosa` + `numpy`; auto-caption from prompt. | Stability AI Community License; commercial-use registration/enterprise review required before release assets ship. |
 | **Tier 2 — Hero music tracks** | Main theme + 12 world themes + 6 combat layers + 4 base-tension + 4 menu/UI + 8 mission stings + 3 antagonist motifs. | Suno v5 cloud OR Udio v2 cloud. Per-track prompt + seed. Stem export (drums/bass/melody/tension via Demucs). | Suno commercial-use OK 2026; license review pre-launch. |
-| **Tier 3 — Ambient music + procedural** | Long-loop ambient, world-specific drones, planet atmospherics. | MusicGen-Medium (Meta MIT) local. Lower-quality than Suno; no licensing risk. | MIT. |
+| **Tier 3 — Ambient music + procedural** | Long-loop ambient, world-specific drones, planet atmospherics. | MusicGen/AudioCraft local only for prototypes unless weights are replaced, self-trained, or commercially licensed. | AudioCraft code is MIT; released model weights are CC-BY-NC 4.0 and not release-safe for commercial assets. |
 | **Tier 4 — Voice / NPC dialogue** | Per-faction commander voice + ~24 named NPCs + 50-100 dialogue lines per NPC. | XTTS-v2 / Coqui TTS local (free, ~6s reference clip → cloned voice in 16 languages); ElevenLabs cloud for hero NPCs; Tortoise-TTS local for high-quality offline. | XTTS / Coqui: CPML; ElevenLabs: review TOS pre-launch; Tortoise: Apache-2.0. |
 | **Tier 5 — Runtime adaptive + spatial mix** | Per-tick adaptive crossfade per match phase + Steam Audio per DR-043 spatial + FMOD Studio adaptive layering OR bevy_kira_audio + custom Rust mixing. | FMOD Studio (free under $200K/yr revenue) wrapped via `bevy_fmod`, OR bevy_kira_audio (Apache-2.0). | FMOD: free under threshold; Kira: Apache-2.0. |
 
@@ -174,7 +174,7 @@ Voice budget governor:
 |---|---|
 | AI-augmented solo dev | Per DR-026; humans crafting audio = unsustainable. AI pipeline produces 400+ SFX + 30+ tracks + ~2400 voice lines (24 NPCs × 100 lines) without human bottleneck. |
 | 32GB VRAM available | Per project owner; Stable Audio Open + XTTS + MusicGen all run locally. No cloud lock-in for SFX/voice. |
-| License safety | All open-weight models commercially usable; logged in usage-ledger; verified pre-launch. |
+| License safety | No model is assumed release-safe by reputation. usage-ledger records model, weights/license, prompt, seed, and commercial-use basis; release assets require explicit license clearance. |
 | Determinism + regenerability | Same prompt + seed + model = same audio. Reproducible; modders can extend. |
 | Real-time variety | Pre-baked SFX get repetitive; runtime procedural variety (footsteps, doppler, atmospheric absorption) keeps audio fresh. |
 | Tactical readability per DR-020 | Diegetic-first; caption coverage 100%; spatial audio per Steam Audio + DR-043. |
@@ -192,20 +192,20 @@ Voice budget governor:
 ## Evidence Trail
 
 - Project owner verbatim (2026-05-06): "Figure out the best way to implement an AI audio pipeline for the game - nothing will be crafted by humans."
-- Stable Audio Open 1.0 (Apache-2.0): https://stability.ai/news-updates/introducing-stable-audio-open
+- Stable Audio Open 1.0 model card/license: https://huggingface.co/stabilityai/stable-audio-open-1.0
 - Stable Audio 2.5 (cloud): https://stability.ai/stable-audio
-- Suno v5 commercial: https://suno.com/ (review TOS pre-launch)
-- Udio v2: https://www.udio.com/
-- MusicGen (Meta MIT): https://github.com/facebookresearch/audiocraft
+- Suno terms: https://suno.com/terms
+- Udio terms: https://www.udio.com/terms-of-service
+- MusicGen / AudioCraft code + weight-license split: https://github.com/facebookresearch/audiocraft
 - Coqui XTTS-v2: https://huggingface.co/coqui/XTTS-v2 (16 languages; 6s voice clone)
 - Tortoise-TTS (Apache-2.0): https://github.com/neonbjb/tortoise-tts
-- ElevenLabs: https://elevenlabs.io/ (license review)
+- ElevenLabs Music terms: https://elevenlabs.io/eleven-music-v1-terms
 - FMOD Studio: https://www.fmod.com/ (free <$200K/yr)
 - bevy_kira_audio: https://crates.io/crates/bevy_kira_audio
 - bevy_fundsp: Rust DSP library
 - Steam Audio: https://valvesoftware.github.io/steam-audio/ (Apache-2.0)
 - AudioCraft Demucs (stem separation): https://github.com/facebookresearch/audiocraft
-- Captured in [[research-log/2026-05-06-third-pass-audit-followup]] (TBD).
+- Captured in [[research-log/2026-05-07-comprehensive-audit-report]].
 
 ## Revisit Trigger
 

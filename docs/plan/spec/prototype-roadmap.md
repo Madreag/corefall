@@ -2,7 +2,7 @@
 type: spec
 status: planning-anchor-v0
 authority: "Native build roadmap (Rust + Bevy/wgpu hybrid + custom core crates). Replaces the prior browser-lab-flavored roadmap. Specific tickets/timelines remain open."
-last_updated: 2026-05-05
+last_updated: 2026-05-07
 ready_when: "M0..M3 land in the native repo and produce a playable, AI-controllable, replay-recordable, terrain-mutable single-actor scene that supersedes the HTML lab as the iteration harness."
 feeds:
   - DR-001
@@ -41,6 +41,26 @@ feeds:
   - DR-034
   - DR-035
   - DR-036
+  - DR-037
+  - DR-038
+  - DR-039
+  - DR-040
+  - DR-041
+  - DR-042
+  - DR-043
+  - DR-044
+  - DR-045
+  - DR-046
+  - DR-047
+  - DR-048
+  - DR-049
+  - DR-050
+  - DR-051
+  - DR-052
+  - DR-053
+  - DR-054
+  - DR-055
+  - DR-056
 ---
 
 ← [[spec/index|spec section]] · [[spec/authoritative-game-spec-v0|game spec v0]] · [[spec/native-implementation-backlog|native backlog]] · [[spec/feature-completion-checklist|feature checklist]] · [[spec/server-app-architecture|server app architecture]] · [[spec/persistent-mmo-architecture|persistent MMO architecture]] · [[spec/full-collision-physics-plan|full collision plan]] · [[spec/hybrid-llm-ai-plan|hybrid LLM AI plan]] · [[spec/ai-control-observability-layer|AI control/observability]] · [[comparables/noita-grade-material-simulation-research|systemic material research]] · [[spec/prototype-implementation-backlog-slice-a|historical HTML backlog]] · [[dashboards/research-readiness|readiness]] · [[decisions/index|decisions]] · [VAULT_PLAN.md](../../VAULT_PLAN.md) · [HTML-era snapshot](../research-log/2026-05-04-prototype-roadmap-html-snapshot.md)
@@ -113,6 +133,7 @@ feeds:
   - [[#T-PLATFORM — Cross-Platform CI And Steam Deck|T-PLATFORM — Cross-Platform CI And Steam Deck]]
   - [[#T-MOD — Modding And Scripting|T-MOD — Modding And Scripting]]
   - [[#T-AUDIO — Diegetic SFX And Captions|T-AUDIO — Diegetic SFX And Captions]]
+  - [[#T-COMMS — Voice And Radio Simulation|T-COMMS — Voice And Radio Simulation]]
   - [[#T-SAVE — Save Game System|T-SAVE — Save Game System]]
   - [[#T-ACCESSIBILITY — Accessibility Floor|T-ACCESSIBILITY — Accessibility Floor]]
   - [[#T-PERF — Performance Targets And Budgets|T-PERF — Performance Targets And Budgets]]
@@ -147,7 +168,7 @@ If you have more time, also read in roughly this order:
 - [[comparables/noita-grade-material-simulation-research]] — source-backed material/chemistry/atmosphere research for Noita, Powder Toy, Barotrauma, Oxygen Not Included, Stationeers, and open-source falling-sand projects.
 - [[spec/hybrid-llm-ai-plan]] — async LLM mind layer with strict schemas, mock provider, validator, replay logging (T-LLM / M6.5).
 - [[references/prototype-run-bundle-schema]] — run-bundle event categories, manifest/summary/notes contract, per-milestone acceptance gates.
-- [[decisions/index]] and [[dashboards/decision-tracker]] — DR-001..DR-036 with current direction and lean.
+- [[decisions/index]] and [[dashboards/decision-tracker]] — DR-001..DR-056 with current direction and lean.
 - [[references/usage-ledger]] — log when external code/data/assets enter the project.
 - [[research-log/moonshot-register]] — wild ideas; promote only with a DR.
 - [[prototypes/actor-feel-lab-a1-human-playtest-2026-05-04]] — the "ok I guess" signal that informs M1.5 acceptance.
@@ -239,7 +260,7 @@ A junior agent must never have to guess what these words mean. If a term is used
 | **Scenario** | A single playable unit identified by an id (`m0_blank`, `m1_actor_range`, `micro_breach`, `breach_contract`, ...). Loaded from a scenario manifest. |
 | **Scenario id** | The string used by `--scenario <id>` flags. Maps 1:1 to a manifest file in `content/scenarios/<id>.ron`. |
 | **Seed** | A `u64` deterministic seed for the run's RNG. Default: read from manifest; overridable via `--seed <u64>`. |
-| **Side track** | A cross-cutting concern (T-CONTROL, T-LLM, T-PHYS, T-PLATFORM, T-MOD, T-AUDIO, T-SAVE, T-ACCESSIBILITY, T-PERF) with its own done-criteria that intersect every milestone. |
+| **Side track** | A cross-cutting concern (T-CONTROL, T-LLM, T-PHYS, T-PLATFORM, T-MOD, T-AUDIO, T-COMMS, T-SAVE, T-ACCESSIBILITY, T-PERF, T-ART, T-I18N, etc.) with its own done-criteria that intersect every milestone. |
 | **Snapshot** | A periodic full state dump (actor/inventory/terrain) used for replay anchoring and drift detection. |
 | **Soft breach** | M1.5's stub destructible surface; replaced by M2's full chunked terrain without breaking replay consumers. |
 | **Swept shape** | A moving ray/capsule/convex proxy tested across a tick to find impact before tunneling can occur. |
@@ -1565,6 +1586,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 | T-PLATFORM | Cross-platform CI and Steam Deck | M0..M12 |
 | T-MOD | Modding and scripting | M5..M8 primary; lifelong |
 | T-AUDIO | Diegetic SFX and captions | M4..M7 primary; lifelong |
+| T-COMMS | Voice and radio simulation | M2/M4/M5/M5.7/M5.10/M6.6 precursors; M9.5 primary; M10..M12 sync |
 | T-SAVE | Save game system | M5..M9 primary; lifelong |
 | T-ACCESSIBILITY | Accessibility floor | M4..M8 primary; lifelong |
 | T-PERF | Performance targets and budgets | M0..M12 |
@@ -2552,6 +2574,25 @@ Spans M4..M7 primary; lifelong from M4.
 
 **Done-criteria:** All M4..M7 SFX have captions; mix passes 5 deaf-accessibility playtest sessions.
 
+### T-COMMS — Voice And Radio Simulation
+
+Spans M2 / M4 / M5 / M5.7 / M5.10 / M6.6 / M9.5 / M10 / M11 / M12. See [[spec/comms-voice-and-radio-model]] and [[decisions/dr-043-voice-comms-and-radio-direction]].
+
+This track owns the voice/radio surface so it does not disappear between environmental simulation, equipment, UI, AI, server, and accessibility work. Voice propagation and radio routing are gameplay systems, not decoration: they must be server-authoritative, captioned, replay-visible, scriptable by `cfctl`, and mode-aware per DR-052.
+
+| Aspect | Pin |
+|---|---|
+| Medium model | Voice reads atmosphere/acoustic slices from `EnvironmentSignal`; vacuum and sealed spaces behave differently. |
+| Radio model | Bands, antenna class, terrain obstruction, multipath, SNR, jamming, encryption, and compression are data-driven. |
+| Equipment/origin gating | Humans equip radios; robots have built-in powered radios; androids have built-in or modular radio routes. |
+| AI parity | AI subscribes to chatter through the same observable comms events and emits reason labels for heard/missed orders. |
+| Caption/accessibility | Every voice/radio cue has captions, full-subtitle mode, speaker/source metadata, and color-independent channel labels. |
+| Network sync | M9.5+ comms uses DR-052 mode declarations: local lockstep fixtures, server-authoritative online routing, snapshot playback for replay. |
+| Modding | Modders can author radio hardware, comms policies, jamming fields, voice packs, and caption packs through validated schemas. |
+| CLI | `cfctl observe --voice`, `cfctl observe --radio`, `cfctl act radio-tune`, `cfctl act radio-transmit`, `cfctl test comms-propagation`, `cfctl test radio-snr`. |
+
+**Done-criteria per milestone:** every milestone touching atmospheres, equipment, hazards, UI, AI, server, or match grammar updates the comms event schema and command/observation coverage. No audible or readable comms cue ships without caption, replay event, sync mode, mod schema, and AI observation parity.
+
 ### T-SAVE — Save Game System
 
 Spans M5..M9 primary; lifelong from M5.
@@ -2651,7 +2692,7 @@ These milestones run mostly in parallel with the M0..M12 sim milestones. They co
 
 **Cross-DR:** DR-019, DR-020, DR-024, DR-026, DR-031, DR-044, DR-045.
 
-### M-ART-2 — Tier 3 Hand-Polish + Variants (parallel to M5..M9)
+### M-ART-2 — Tier 3 AI Cleanup + Variants (parallel to M5..M9)
 
 **What it proves:** Hero assets (player chassis, named NPCs, signature weapons, key bases) are pixel-perfect, palette-locked, animation-tagged, with procedural variants. Final art quality.
 
@@ -2666,7 +2707,7 @@ These milestones run mostly in parallel with the M0..M12 sim milestones. They co
 **Done-criteria:**
 - [ ] All hero assets pass cleanup at pixel-perfect standard.
 - [ ] All variants procedurally generated.
-- [ ] Aseprite cleanup automation runs without manual intervention 90%+ of time.
+- [ ] Aseprite cleanup automation runs without operator escalation 90%+ of time.
 - [ ] No off-palette pixels in any hero asset (CI gate).
 - [ ] Animation event tags complete on every hero animation (CI gate).
 
@@ -3327,7 +3368,8 @@ flowchart TB
   M3 --> M9[M9 Headless + Determinism]
   M7 --> M9
   M65 -.eval suite.-> M9
-  M9 --> M10[M10 LAN Co-op]
+  M9 --> M95[M9.5 Voice + Radio Comms]
+  M95 --> M10[M10 LAN Co-op]
   M10 --> M11[M11 Online Co-op + Self-Hosted]
   M11 --> M12[M12 Public PvP + Persistent MMO]
 
@@ -3355,6 +3397,9 @@ flowchart TB
   T2 -.-> M8
   T3[T-AUDIO] -.-> M4
   T3 -.-> M7
+  TC[T-COMMS] -.-> M2
+  TC -.-> M95
+  TC -.-> M12
   T4[T-SAVE] -.-> M5
   T4 -.-> M9
   T5[T-ACCESSIBILITY] -.-> M4

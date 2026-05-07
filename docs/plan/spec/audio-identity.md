@@ -1,7 +1,7 @@
 ---
 type: spec
 status: planning-anchor-v0
-authority: "Audio identity and mix policy. Specific instruments/tools/composer remain open."
+authority: "Audio identity and mix policy. Specific instruments/tools/AI-provider stack remain open."
 ready_when: "First playable Slice A demonstrates diegetic-first mix with one situational synth-dread cue and full caption coverage."
 feeds:
   - DR-012
@@ -80,7 +80,7 @@ Per [[decisions/dr-012-accessibility-comfort-readability]] and [[spec/accessibil
 
 | Question | Status |
 |---|---|
-| Composer / soundtrack vendor | Open. Could be commissioned, library-based, procedural. |
+| AI soundtrack provider / model stack | Open. Must be AI-generated or procedural, license-reviewed, caption-bound, and usage-ledger logged per DR-044 + DR-053. |
 | Synth layer: generative or pre-composed? | Open. Generative is moonshot. |
 | Voice acting depth (radio chatter style) | Open. Procedural snippets, full VO, or none. |
 | 3D / spatial audio implementation | Open. Stereo positioning at minimum. |

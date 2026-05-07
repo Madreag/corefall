@@ -111,7 +111,7 @@ Per DR-027, extended:
 - Vampire Survivors retention: 50+ hr median play time per Steam; endless wave + meta-progression pattern.
 - FTL retention: 40+ hr median play time per Steam; permadeath roguelite.
 - Slay the Spire retention: 80+ hr median play time per Steam; daily climb / replay pattern.
-- Captured in [[research-log/2026-05-06-second-pass-audit-followup]] (TBD).
+- Captured in [[research-log/2026-05-07-comprehensive-audit-report]].
 
 ## Revisit Trigger
 

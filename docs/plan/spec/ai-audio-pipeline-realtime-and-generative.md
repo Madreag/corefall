@@ -32,7 +32,7 @@ feeds:
 
 | Tool | Detail |
 |---|---|
-| Stable Audio Open 1.0 (Apache-2.0; local 32GB VRAM) | Per-event prompt template + deterministic seed. 47s max clips at 44.1 kHz. |
+| Stable Audio Open 1.0 (Stability AI Community License; local 32GB VRAM) | Per-event prompt template + deterministic seed. 47s max clips at 44.1 kHz. Commercial-use registration/enterprise review required before release assets ship. |
 | Per-event prompt template | E.g., "AK-47 single shot indoor reverb tactical shooter gameplay-ready" |
 | Auto-trim/normalize/EQ | librosa + numpy; remove silence + match -16 LUFS + EQ per category |
 | Auto-caption | Generated from prompt; caption text bound to clip |
@@ -69,7 +69,7 @@ Long-loop ambient, world-specific drones, planet atmospherics.
 
 | Tool | Detail |
 |---|---|
-| MusicGen-Medium (Meta MIT) local | Lower-quality than Suno but no licensing risk |
+| MusicGen/AudioCraft local | Prototype-only unless weights are replaced, self-trained, or commercially licensed. AudioCraft code is MIT; released weights are CC-BY-NC 4.0. |
 | Per-world ambient | Generated per [[spec/celestial-bodies-and-worlds-model]] world spec |
 | Stable Audio Open for stings | Short bursts (3-10s) |
 
@@ -277,13 +277,14 @@ Voice budget governor: drop oldest non-critical first.
 ## Source Trail
 
 - [[decisions/dr-053-ai-audio-pipeline-realtime-and-generative]]
-- Stable Audio Open 1.0: https://stability.ai/news-updates/introducing-stable-audio-open
-- Suno v5: https://suno.com/
-- Udio v2: https://www.udio.com/
-- MusicGen: https://github.com/facebookresearch/audiocraft
+- Stable Audio Open overview: https://stability.ai/news-updates/introducing-stable-audio-open
+- Stable Audio Open model card/license: https://huggingface.co/stabilityai/stable-audio-open-1.0
+- Suno terms: https://suno.com/terms
+- Udio terms: https://www.udio.com/terms-of-service
+- MusicGen / AudioCraft code + weight-license split: https://github.com/facebookresearch/audiocraft
 - Coqui XTTS-v2: https://huggingface.co/coqui/XTTS-v2
 - Tortoise-TTS: https://github.com/neonbjb/tortoise-tts
-- ElevenLabs: https://elevenlabs.io/
+- ElevenLabs Music terms: https://elevenlabs.io/eleven-music-v1-terms
 - FMOD Studio: https://www.fmod.com/
 - bevy_kira_audio: https://crates.io/crates/bevy_kira_audio
 - bevy_fundsp: Rust DSP library

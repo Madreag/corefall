@@ -80,11 +80,11 @@ In-game credits screen lists every OSS dependency + license. Per-release update 
 Per DR-044 + [[references/usage-ledger]]:
 
 - Every AI-generated asset has an entry: prompt, seed, model, LoRA, license, regenerable Y/N.
-- Open-weight models (SDXL, Flux.1-dev, Stable Audio Open, MusicGen) are commercially usable; logged.
+- No open-weight model is assumed release-cleared without checking the exact model/weight license. Stable Audio Open uses Stability AI Community License / commercial registration rules; AudioCraft code is MIT but released MusicGen weights are CC-BY-NC 4.0.
 - LoRAs sourced from Civitai with permissive licenses; verified pre-launch.
 - Suno/Udio music subject to TOS review pre-launch (commercial use currently allowed; revisit).
 - ElevenLabs voice subject to TOS review pre-launch.
-- Tier-3 hand-polish doesn't change underlying model licensing.
+- Tier-3 AI-agent cleanup doesn't change underlying model licensing.
 
 ## Modding Rights
 

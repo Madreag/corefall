@@ -55,7 +55,7 @@ revisit_trigger: "Launch posture changes (e.g., publisher onboarded); compliance
 
 | Feature | Detail |
 |---|---|
-| **Steam Workshop** | Mod packages publishable from in-game. Community can subscribe + auto-install. Per DR-006 + DR-059. Trust tiers gate. |
+| **Steam Workshop** | Mod packages publishable from in-game. Community can subscribe + auto-install. Per DR-006 + DR-050. Trust tiers gate. |
 | **Steam Achievements** | 60-100 achievements. Most are "play 1 of each chassis" / "complete each mission" type; ~10 hidden / lore / mastery achievements. |
 | **Steam Cloud** | Saves + replay archive auto-sync. Encrypted. Per DR-029. |
 | **Steam Friends + Invites** | Friend list, party invite to lobby, presence ("In Bunker Defence — Mars"). |
@@ -78,7 +78,7 @@ revisit_trigger: "Launch posture changes (e.g., publisher onboarded); compliance
 | **Age rating** | ESRB (Mature 17+ likely; violence + blood). PEGI (16-18). USK (DE; 16). CERO (JP; D 17+). Submission via IARC self-rating + ESRB cert. |
 | **Privacy / GDPR / CCPA / LGPD** | Cookie/data prompts. Right-to-deletion. Privacy-by-default in EU. Data Processing Agreement with Sentry/Steam/etc. |
 | **Open-source attribution** | In-game credits screen lists every OSS dependency + license. Auto-generated from `Cargo.lock` via `cargo-about`. |
-| **Music + asset licensing** | Every Tier-2 AI-generated asset logged in usage-ledger with prompt+seed+model+license. Tier-3 hand-polish doesn't change licensing. Suno/Udio music subject to TOS review pre-launch (commercial use allowed currently; revisit). |
+| **Music + asset licensing** | Every Tier-2/Tier-3 AI-generated asset logged in usage-ledger with prompt+seed+model+license. AI-agent cleanup doesn't change licensing. Suno/Udio/ElevenLabs/MusicGen/Stable Audio candidates require TOS/license review pre-launch. |
 | **Modding rights** | Modders retain copyright on their mod content. License them to other players via Workshop (CC-BY-SA default; modder can pick). |
 | **Anti-harassment + Code of Conduct** | Discord ToS + in-game chat moderation. Reportable infractions. |
 | **Accessibility compliance** | Per DR-012 + T-ACCESSIBILITY. WCAG 2.1 AA targeted for UI. Caption support per ADA / EU Accessibility Act. |

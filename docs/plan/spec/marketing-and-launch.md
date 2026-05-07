@@ -23,7 +23,7 @@ feeds:
 
 **Launched 6-12 months pre-release.**
 
-- Title art (Tier 3 hand-polished)
+- Title art (Tier 3 AI-agent-polished)
 - Capsule art (small/medium/large/header per Steam spec)
 - 10+ screenshots (at-launch + Tier 3 polished)
 - 90-second reveal trailer

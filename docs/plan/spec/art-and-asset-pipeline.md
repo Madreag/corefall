@@ -1,7 +1,7 @@
 ---
 type: spec
 status: closed-direction
-authority: "AI-driven 3-tier audiovisual production pipeline. Tier 1 (SVG procedural) for rapid prototyping; Tier 2 (ComfyUI/diffusion) for placeholder-quality proof-of-concept; Tier 3 (hand-polished + AI-augmented) for final product. Same 3 tiers cover sprites, animation, VFX, lighting, shadows, sky, video, audio."
+authority: "AI-driven 3-tier audiovisual production pipeline. Tier 1 (SVG procedural) for rapid prototyping; Tier 2 (ComfyUI/diffusion) for placeholder-quality proof-of-concept; Tier 3 (AI-agent-polished final pass) for final product. Same 3 tiers cover sprites, animation, VFX, lighting, shadows, sky, video, audio."
 ready_when: "All three tiers produce shippable assets via AI agents end-to-end; modders can run the same pipeline; ComfyUI workflows committed; usage-ledger covers every generated asset."
 feeds:
   - DR-019
@@ -19,7 +19,7 @@ feeds:
 # Art And Asset Pipeline (3-Tier AI-Driven)
 
 > [!summary] What this page is
-> The complete asset production plan. Every sprite, animation, VFX, lighting effect, decal, sky/background, video clip, and audio cue follows the same 3-tier pipeline: Tier 1 procedural placeholder → Tier 2 ComfyUI/diffusion-generated → Tier 3 hand-polished + AI-augmented. AI agents drive every step. Modders use the same pipeline.
+> The complete asset production plan. Every sprite, animation, VFX, lighting effect, decal, sky/background, video clip, and audio cue follows the same 3-tier pipeline: Tier 1 procedural placeholder → Tier 2 ComfyUI/diffusion-generated → Tier 3 AI-agent-polished final pass. AI agents drive every creation step. Human review is QA/approval only. Modders use the same pipeline.
 
 > [!important] Hardware floor
 > Project owner has 32GB VRAM (RTX 4090-class). Pipeline assumes that floor. Tier 1 runs on any CPU. Tier 2 requires ≥12GB VRAM (Tier 2 minimum) or ≥24GB VRAM (Tier 2 ideal: Flux.1-dev + AnimateDiff + Stable Video Diffusion comfortably). Tier 3 runs Aseprite + Spine + FMOD on any modern CPU.
@@ -37,7 +37,7 @@ flowchart LR
     QUANT -->|background remove + sheet pack| PNG2[Production-quality sprite<br/>game/assets/tier2/]
 
     PNG2 -->|Tier 3| ASE[Aseprite headless cleanup<br/>tools/aseprite_cleanup.py]
-    ASE -->|hand-polish + recolor + variants| PNG3[Final art<br/>game/assets/tier3/]
+    ASE -->|AI cleanup + recolor + variants| PNG3[Final art<br/>game/assets/tier3/]
     PNG3 -->|spritesheet packer| SHEET[atlas + animation manifest]
 ```
 
@@ -228,7 +228,7 @@ game/assets/tier2/
 - [ ] Faction recolor variant generation (one source asset → 8 faction variants) takes <5 min per asset.
 - [ ] Mod-author can run `cf-asset-pipeline regen --mod my_mod --tier 2` and get production-quality output.
 
-## Tier 3 — Hand-Polished + AI-Augmented Final (M5+)
+## Tier 3 — AI-Agent-Polished Final (M5+)
 
 **Goal:** Hero assets (player chassis, named NPCs, signature weapons, key bases) are pixel-perfect, palette-locked, animation-tagged, with procedural variants. Non-hero assets get Tier 2 + automated cleanup pass.
 
@@ -255,8 +255,8 @@ game/assets/tier2/
    - Dithering polish
    - Anti-aliasing removal
    - Isolated-pixel removal
-4. Project-owner reviews via Aseprite GUI (5-10 min). Manual touch-up if needed (uncommon at Tier 3 with good Tier 2).
-5. Animation event tag pass: AI agent tags footstep frames, casing-eject frames, muzzle-flash anchors via per-frame metadata. Manually adjusted if needed.
+4. Project-owner reviews via Aseprite GUI (5-10 min) for acceptance only. Any required correction becomes a prompt/tooling change and is re-run by the AI agent.
+5. Animation event tag pass: AI agent tags footstep frames, casing-eject frames, muzzle-flash anchors via per-frame metadata. Any adjustment is made through the tool pipeline, not hand-authored frames.
 6. Variants generated procedurally:
    - Faction recolors (palette swap)
    - Damage stages (decal overlays + sprite swap for severe stages)
@@ -286,7 +286,7 @@ All other roster entries (~600+) stay at Tier 2 quality with automated cleanup p
 
 - [ ] All hero assets pass cleanup at pixel-perfect standard.
 - [ ] All variants procedurally generated.
-- [ ] Aseprite cleanup automation runs without manual intervention 90%+ of time.
+- [ ] Aseprite cleanup automation runs without operator escalation 90%+ of time.
 - [ ] FMOD/bevy_kira mixer pass at final master.
 - [ ] No off-palette pixels in any hero asset (CI gate).
 - [ ] Animation event tags complete on every hero animation (CI gate).
@@ -350,7 +350,7 @@ Per [[spec/music-and-soundtrack]] and [[decisions/dr-047-launch-and-live-operati
 | Component | Tier 1 | Tier 2 | Tier 3 |
 |---|---|---|---|
 | **Music tracks** | Synth blip jingles | Suno v5 / Udio AI-composed tracks (cloud) OR MusicGen-Medium local | Final mix in FMOD Studio; adaptive layering; mastering pass. |
-| **SFX library** | Synth squares | Stable Audio Open 1.0 (Apache-2.0, local on 32GB VRAM) generated per-event; Freesound.org search for niche cues | Final tagged + caption-bound + spatialized via Steam Audio per DR-043. |
+| **SFX library** | Synth squares | Stable Audio Open 1.0 (Stability AI Community License, local on 32GB VRAM; commercial-use registration/enterprise review required) generated per-event; Freesound.org search for niche cues | Final tagged + caption-bound + spatialized via Steam Audio per DR-043. |
 | **Voice (NPCs)** | Text-only | ElevenLabs (license review) OR open-source XTTS-v2 / Tortoise (slower, free) | Final pass + audio normalization. Skip if license blocks. |
 | **Adaptive music system** | Static loop per scene | Per-scenario layered tracks (combat / tension / ambient / debrief) crossfade by `EnvironmentSignal` | Per-mission director phase changes. |
 

@@ -47,6 +47,19 @@ feeds:
   - DR-041
   - DR-042
   - DR-043
+  - DR-044
+  - DR-045
+  - DR-046
+  - DR-047
+  - DR-048
+  - DR-049
+  - DR-050
+  - DR-051
+  - DR-052
+  - DR-053
+  - DR-054
+  - DR-055
+  - DR-056
 ---
 
 <- [[spec/index|spec section]] · [[spec/prototype-roadmap|native roadmap]] · [[spec/native-implementation-backlog|native backlog]] · [[spec/authoritative-game-spec-v0|game spec v0]] · [[dashboards/research-readiness|readiness]] · [VAULT_PLAN.md](../../VAULT_PLAN.md)
@@ -840,6 +853,17 @@ These rows come from roadmap side-track details. Side tracks are cross-cutting o
 | [ ] | `T-AUDIO-R04` | Mix policy: synth music ducks under critical alarms. | [[spec/prototype-roadmap#T-AUDIO — Diegetic SFX And Captions]] | - | - | - | - | - | - | - |  |
 | [ ] | `T-AUDIO-R05` | Captioned playback in replay viewer. | [[spec/prototype-roadmap#T-AUDIO — Diegetic SFX And Captions]] | - | - | - | - | - | - | - |  |
 | [ ] | `T-AUDIO-D06` | Done criteria: All M4..M7 SFX have captions; mix passes 5 deaf-accessibility playtest sessions. | [[spec/prototype-roadmap#T-AUDIO — Diegetic SFX And Captions]] | - | - | - | - | - | - | - |  |
+
+### T-COMMS - Voice And Radio Simulation
+
+| Done | ID | Feature / Requirement | Source | Evidence | H-Full | H-Quality | H-Review | AI-Full | AI-Quality | AI-Review | Notes |
+|---|---|---|---|---|---:|---:|---:|---:|---:|---:|---|
+| [ ] | `T-COMMS-R01` | Voice propagation reads atmosphere/acoustic slices from `EnvironmentSignal`; vacuum/no-medium behavior is testable. | [[spec/prototype-roadmap#T-COMMS — Voice And Radio Simulation]] | - | - | - | - | - | - | - |  |
+| [ ] | `T-COMMS-R02` | Radio model covers band, antenna, obstruction, multipath, SNR, jamming, encryption, and compression fields. | [[spec/prototype-roadmap#T-COMMS — Voice And Radio Simulation]] | - | - | - | - | - | - | - |  |
+| [ ] | `T-COMMS-R03` | Human/robot/android origin gating matches DR-043 equipment/resource rules. | [[spec/prototype-roadmap#T-COMMS — Voice And Radio Simulation]] | - | - | - | - | - | - | - |  |
+| [ ] | `T-COMMS-R04` | Every voice/radio cue emits caption, replay event, source/speaker metadata, and full-subtitle entry. | [[spec/prototype-roadmap#T-COMMS — Voice And Radio Simulation]] | - | - | - | - | - | - | - |  |
+| [ ] | `T-COMMS-R05` | `cfctl observe --voice`, `cfctl observe --radio`, `cfctl act radio-tune`, `cfctl act radio-transmit`, `cfctl test comms-propagation`, and `cfctl test radio-snr` exist. | [[spec/prototype-roadmap#T-COMMS — Voice And Radio Simulation]] | - | - | - | - | - | - | - |  |
+| [ ] | `T-COMMS-D06` | Done criteria: M9.5+ comms passes DR-052 sync mode checks, AI observation parity, mod schema validation, and caption/full-subtitle audit. | [[spec/prototype-roadmap#T-COMMS — Voice And Radio Simulation]] | - | - | - | - | - | - | - |  |
 
 ### T-SAVE - Save Game System
 

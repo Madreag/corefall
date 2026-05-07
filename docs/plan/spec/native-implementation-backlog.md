@@ -47,6 +47,19 @@ feeds:
   - DR-041
   - DR-042
   - DR-043
+  - DR-044
+  - DR-045
+  - DR-046
+  - DR-047
+  - DR-048
+  - DR-049
+  - DR-050
+  - DR-051
+  - DR-052
+  - DR-053
+  - DR-054
+  - DR-055
+  - DR-056
 ---
 
 <- [[spec/index|spec section]] · [[spec/prototype-roadmap|native roadmap]] · [[spec/feature-completion-checklist|feature checklist]] · [[spec/authoritative-game-spec-v0|game spec v0]] · [[spec/server-app-architecture|server app architecture]] · [[spec/persistent-mmo-architecture|persistent MMO architecture]] · [[spec/full-collision-physics-plan|full collision plan]] · [[spec/hybrid-llm-ai-plan|hybrid LLM AI plan]] · [[spec/ai-control-observability-layer|AI control/observability]] · [[references/prototype-run-bundle-schema|run-bundle schema]] · [VAULT_PLAN.md](../../VAULT_PLAN.md)

@@ -108,7 +108,7 @@ revisit_trigger: "Customization depth proves balance-prohibitive; ELO/MMR system
 - Helldivers 2 customization: ~80 attachments per weapon class drives 100hr+ retention.
 - Deep Rock Galactic: extensive cosmetic + mastery system; intrinsic-only; 200hr+ median play time.
 - LoL/Valorant esports infrastructure: observer/commentator tools required for scene crystallization.
-- Captured in [[research-log/2026-05-06-second-pass-audit-followup]] (TBD).
+- Captured in [[research-log/2026-05-07-comprehensive-audit-report]].
 
 ## Revisit Trigger
 
