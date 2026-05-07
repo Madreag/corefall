@@ -402,6 +402,14 @@ fn ingest_player_input(
     }
     if dispatch_aim {
         *last_aim = (aim_x, aim_y);
+    } else if !aim_active {
+        // Aim went inactive (all aim keys released). We deliberately do NOT
+        // dispatch a zero-aim command so sticky `cfctl act.player.aim` values
+        // are preserved, but we MUST clear the local tracker. Otherwise the
+        // next time the player presses the same aim direction, `aim_changed`
+        // would compare against the stale non-zero `last_aim` and decide the
+        // dispatch is unnecessary, silently dropping the freshly pressed input.
+        *last_aim = (0.0, 0.0);
     }
     let block_on = futures_block_on;
     block_on(async {

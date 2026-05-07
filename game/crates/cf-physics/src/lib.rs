@@ -163,13 +163,15 @@ pub fn apply_horizontal_motion(inputs: HorizontalInputs) -> HorizontalOutputs {
     HorizontalOutputs { position_x, velocity_x }
 }
 
-/// Apply a recoil impulse along the negation of `aim_x`, scaled by `recoil_impulse`.
-/// `aim_x` should be the firer's aim x-component; vertical recoil isn't modeled in M1
-/// (the rifle preset only kicks horizontally). Returns the new horizontal velocity.
+/// Apply a recoil impulse along the negation of the firer's aim direction, scaled by
+/// `recoil_impulse`. `aim_x` should be the x-component of the (already-normalized) aim
+/// vector; the recoil is projected through that x-component so vertical aim produces no
+/// horizontal kick (instead of an arbitrary leftward jolt) and diagonal aim only kicks
+/// by the horizontal projection. Vertical recoil isn't modeled in M1 (the rifle preset
+/// only kicks horizontally). Returns the new horizontal velocity.
 #[must_use]
 pub fn apply_recoil(velocity_x: f32, aim_x: f32, recoil_impulse: f32) -> f32 {
-    let dir = if aim_x.abs() < 1e-6 { 1.0 } else { aim_x.signum() };
-    velocity_x - dir * recoil_impulse
+    velocity_x - aim_x * recoil_impulse
 }
 
 #[cfg(test)]
