@@ -2553,6 +2553,71 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn m1_act_player_fire_release_preserves_queued_press() {
+        // Regression proof for the cf-app keyboard bridge contract: key release sends
+        // `pressed: false` so future hold-to-fire weapons can observe release edges.
+        // M1's rifle is press-edge driven, so release must be accepted but must not
+        // erase a still-unconsumed press before the next fixed tick drains the intent.
+        let path = write_m1_scenario();
+        let config = load_m1_test_config(path);
+        let engine = M0Engine::new(config);
+        engine.record_run_started();
+
+        let press = engine
+            .dispatch(ControlCommand::ActPlayerFire {
+                pressed: true,
+                source: IntentSource::Human,
+            })
+            .await;
+        assert_eq!(press.status, crate::state::ControlEnvelopeStatus::Accepted);
+
+        let release = engine
+            .dispatch(ControlCommand::ActPlayerFire {
+                pressed: false,
+                source: IntentSource::Human,
+            })
+            .await;
+        assert_eq!(
+            release.status,
+            crate::state::ControlEnvelopeStatus::Accepted,
+            "explicit fire release must stay a valid command"
+        );
+
+        engine.drive_tick();
+        let events = engine.recorder().snapshot_events();
+        let intent = events
+            .iter()
+            .find(|e| e.category == "input" && e.event_type == "intent_received")
+            .expect("input.intent_received must be recorded after press+release");
+        assert_eq!(
+            intent.payload.get("source").and_then(|v| v.as_str()),
+            Some("human"),
+            "same-tick press+release should retain the human source"
+        );
+        assert_eq!(
+            intent.payload.get("fire").and_then(|v| v.as_bool()),
+            Some(true),
+            "release must not clobber the queued fire edge before drive_tick"
+        );
+        assert!(
+            events
+                .iter()
+                .any(|e| e.category == "equipment" && e.event_type == "weapon_fired"),
+            "queued press must still fire after same-tick release; events: {:?}",
+            events
+                .iter()
+                .map(|e| (e.category.clone(), e.event_type.clone(), e.payload.clone()))
+                .collect::<Vec<_>>()
+        );
+        assert!(
+            events
+                .iter()
+                .any(|e| e.category == "combat" && e.event_type == "projectile_spawned"),
+            "queued press must still spawn a projectile after same-tick release"
+        );
+    }
+
+    #[tokio::test]
     async fn m1_act_player_aim_normalizes_and_records_event() {
         let path = write_m1_scenario();
         let config = load_m1_test_config(path);
