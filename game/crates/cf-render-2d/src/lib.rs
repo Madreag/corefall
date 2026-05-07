@@ -44,7 +44,7 @@ impl Plugin for CfRenderPlugin {
 }
 
 fn spawn_camera(mut commands: Commands) {
-    commands.spawn((Camera2dBundle::default(), Name::new("cf::render::main_camera")));
+    commands.spawn((Camera2d, Name::new("cf::render::main_camera")));
 }
 
 // ---------------------------------------------------------------------------
@@ -98,29 +98,23 @@ impl Plugin for ActorSpritePlugin {
 fn spawn_floor_and_reticle(mut commands: Commands) {
     // Floor (placeholder; real chunked terrain lands at M2).
     commands.spawn((
-        SpriteBundle {
-            sprite: Sprite {
-                color: Color::srgb(0.15, 0.18, 0.20),
-                custom_size: Some(Vec2::new(2048.0, 8.0)),
-                ..default()
-            },
-            transform: Transform::from_translation(Vec3::new(0.0, 0.0, -0.5)),
+        Sprite {
+            color: Color::srgb(0.15, 0.18, 0.20),
+            custom_size: Some(Vec2::new(2048.0, 8.0)),
             ..default()
         },
+        Transform::from_translation(Vec3::new(0.0, 0.0, -0.5)),
         FloorRenderTag,
         Name::new("cf::render::floor"),
     ));
     commands.spawn((
-        SpriteBundle {
-            sprite: Sprite {
-                color: Color::srgb(0.95, 0.65, 0.30),
-                custom_size: Some(Vec2::new(4.0, 4.0)),
-                ..default()
-            },
-            transform: Transform::from_translation(Vec3::new(0.0, 0.0, 1.0)),
-            visibility: Visibility::Hidden,
+        Sprite {
+            color: Color::srgb(0.95, 0.65, 0.30),
+            custom_size: Some(Vec2::new(4.0, 4.0)),
             ..default()
         },
+        Transform::from_translation(Vec3::new(0.0, 0.0, 1.0)),
+        Visibility::Hidden,
         ReticleRenderTag,
         Name::new("cf::render::reticle"),
     ));
@@ -142,7 +136,7 @@ fn sync_actor_sprites(
     mut camera_query: Query<
         &mut Transform,
         (
-            With<Camera>,
+            With<Camera2d>,
             Without<ActorRenderTag>,
             Without<FloorRenderTag>,
             Without<ReticleRenderTag>,
@@ -161,7 +155,7 @@ fn sync_actor_sprites(
         }
         // Centre the 2D camera on the play region so authored scenarios in
         // bottom-left coordinates (e.g. M1's 1280x720 with target at x=900) stay
-        // on-screen. The default `Camera2dBundle` sits at the world origin, which
+        // on-screen. The default Bevy 2D camera sits at the world origin, which
         // would clip everything past x = window_width / 2.
         if let Some(mut camera_transform) = camera_query.iter_mut().next() {
             camera_transform.translation.x = region_center_x;
@@ -189,15 +183,12 @@ fn sync_actor_sprites(
             }
         } else {
             let mut entity_commands = commands.spawn((
-                SpriteBundle {
-                    sprite: Sprite {
-                        color,
-                        custom_size: Some(Vec2::new(16.0, 32.0)),
-                        ..default()
-                    },
-                    transform: Transform::from_translation(Vec3::new(pos.x, pos.y, 0.5)),
+                Sprite {
+                    color,
+                    custom_size: Some(Vec2::new(16.0, 32.0)),
                     ..default()
                 },
+                Transform::from_translation(Vec3::new(pos.x, pos.y, 0.5)),
                 ActorRenderTag { id: actor.id },
                 Name::new(format!("cf::render::actor::{}", actor.id)),
             ));

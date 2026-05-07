@@ -28,7 +28,7 @@
 - Depended on by: `cf-app` (the bridge fills `ActorRenderState`).
 
 ## Common Pitfalls
-- Bevy 0.14 moved `ClearColorConfig` into `core_2d`; the M0 plugin uses the `Camera2dBundle::default()` + `ClearColor` resource to stay version-agnostic.
+- Bevy is pinned at 0.18.1 for M1; keep render code on current Bevy APIs and do not add compatibility shims for obsolete 0.14 names.
 - The render layer must NEVER read or mutate `cf-control::M0Engine` directly; the cf-app bridge owns that copy step.
 - Actor color is keyed by team string (`blue` / `red` / fallback) and dimmed when status is `downed` or `dead`.
 

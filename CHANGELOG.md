@@ -12,6 +12,13 @@ Use this file to summarize what changed in the implementation repo. Do not copy 
 
 ## Unreleased
 
+### Changed (M1 — Bevy 0.18.1 migration)
+
+- **Workspace Bevy pin moved from 0.14 to exact 0.18.1** per the current roadmap/DR-024 direction. The dependency feature set was migrated from removed `zstd` to `zstd_rust`, with `bevy_log` and `default_font` made explicit because default Bevy features stay disabled.
+- **Rust package MSRV metadata now matches the pinned toolchain posture** (`rust-version = "1.93"`), while `rust-toolchain.toml` remains pinned to `1.93.0`.
+- **Bevy 0.18 API migration landed at the root call sites**: `Camera2dBundle`/`SpriteBundle`/`NodeBundle`/`TextBundle` usage was replaced with 0.18 component-style spawning; `EventReader`/`EventWriter` became `MessageReader`/`MessageWriter`; `WindowResolution::new` now uses integer physical dimensions.
+- **Run-bundle Bevy metadata fallback updated to `0.18.1`** in `cf-control`, so bundles stay truthful even when compile-time environment injection is absent.
+
 ### Added (M1 — Actor Controller And Sim Core)
 
 - **One actor is playable** on the native engine. Movement, jump, aim, fire, reload, status state machine, projectile flight, and damage-routing all run through the fixed-tick sim and emit replay events. The HTML lab is superseded as the iteration harness.

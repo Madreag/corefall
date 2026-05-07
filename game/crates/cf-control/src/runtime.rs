@@ -146,7 +146,7 @@ pub fn rustc_version() -> String {
 
 /// Pinned Bevy major version. Mirrored in `workspace.dependencies.bevy`.
 pub fn bevy_version() -> &'static str {
-    "0.14"
+    "0.18.1"
 }
 
 /// Convenience used by `cf-app`/`cfctl` when they want to pre-flight scenario discovery.

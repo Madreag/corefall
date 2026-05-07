@@ -72,7 +72,7 @@ impl Plugin for StatusStripPlugin {
 }
 
 fn spawn_status_strip(mut commands: Commands) {
-    let style = Style {
+    let root_node = Node {
         position_type: PositionType::Absolute,
         top: Val::Px(12.0),
         left: Val::Px(12.0),
@@ -81,29 +81,23 @@ fn spawn_status_strip(mut commands: Commands) {
         padding: UiRect::all(Val::Px(8.0)),
         ..default()
     };
-    let text_style = TextStyle {
+    let text_font = TextFont {
         font_size: 18.0,
-        color: Color::srgb(0.96, 0.96, 0.92),
         ..default()
     };
+    let text_color = TextColor(Color::srgb(0.96, 0.96, 0.92));
     commands
         .spawn((
-            NodeBundle {
-                style,
-                background_color: BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.45)),
-                ..default()
-            },
+            root_node,
+            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.45)),
             StatusStripRoot,
             Name::new("cf::ui::status_strip"),
         ))
         .with_children(|parent| {
-            parent.spawn((
-                TextBundle::from_section("STATUS: --", text_style.clone()),
-                StatusStripText,
-            ));
-            parent.spawn((TextBundle::from_section("ITEM: --", text_style.clone()), ItemStripText));
-            parent.spawn((TextBundle::from_section("HP: --", text_style.clone()), AmmoStripText));
-            parent.spawn((TextBundle::from_section("NO RIFLE", text_style), ReticleStripText));
+            parent.spawn((Text::new("STATUS: --"), text_font.clone(), text_color, StatusStripText));
+            parent.spawn((Text::new("ITEM: --"), text_font.clone(), text_color, ItemStripText));
+            parent.spawn((Text::new("HP: --"), text_font.clone(), text_color, AmmoStripText));
+            parent.spawn((Text::new("NO RIFLE"), text_font, text_color, ReticleStripText));
         });
 }
 
@@ -149,7 +143,7 @@ fn update_status_strip(
 ) {
     let player = state.player.as_ref();
     if let Some(mut text) = status_query.iter_mut().next() {
-        text.sections[0].value = format!(
+        **text = format!(
             "STATUS: {}",
             player
                 .map(|p| p.status.to_uppercase())
@@ -157,7 +151,7 @@ fn update_status_strip(
         );
     }
     if let Some(mut text) = item_query.iter_mut().next() {
-        text.sections[0].value = format!(
+        **text = format!(
             "ITEM: slot {} / {}",
             player
                 .map(|p| p.selected_slot.saturating_add(1).to_string())
@@ -168,13 +162,13 @@ fn update_status_strip(
         );
     }
     if let Some(mut text) = ammo_query.iter_mut().next() {
-        text.sections[0].value = match player {
+        **text = match player {
             Some(p) => format!("HP: {} / {}", p.hp as i32, p.hp_max as i32),
             None => "HP: --".to_string(),
         };
     }
     if let Some(mut text) = reticle_query.iter_mut().next() {
-        text.sections[0].value = rifle_status_line(state.rifle.as_ref());
+        **text = rifle_status_line(state.rifle.as_ref());
     }
 }
 

@@ -266,7 +266,7 @@ fn run_bevy(config: M0EngineConfig, control_api: bool, control_port: u16, _uds: 
         .set(WindowPlugin {
             primary_window: Some(Window {
                 title: format!("Corefall — M0 Engine Bootstrap (v{APP_VERSION})"),
-                resolution: WindowResolution::new(1280.0, 720.0),
+                resolution: WindowResolution::new(1280, 720),
                 present_mode: PresentMode::AutoVsync,
                 resizable: true,
                 ..default()
@@ -323,19 +323,19 @@ fn drive_engine_tick(holder: Res<EngineHolder>, mut runtime: ResMut<AppRuntime>)
     }
 }
 
-fn check_completion(holder: Res<EngineHolder>, runtime: Res<AppRuntime>, mut events: EventWriter<AppExit>) {
+fn check_completion(holder: Res<EngineHolder>, runtime: Res<AppRuntime>, mut events: MessageWriter<AppExit>) {
     if holder.0.shutdown_requested() {
         // Drain any pending runbundle.write before exit so a `system.shutdown` arriving
         // after target_ticks still produces evidence. (Acceptance fix M3.)
         drain_pending_bundle(&holder.0);
-        events.send(AppExit::Success);
+        events.write(AppExit::Success);
         return;
     }
     if runtime.duration_ticks > 0 && holder.0.current_tick().0 >= runtime.duration_ticks {
         // Same drain on the natural-exit path: a runbundle.write arriving after the budget
         // hit must still be honored.
         drain_pending_bundle(&holder.0);
-        events.send(AppExit::Success);
+        events.write(AppExit::Success);
     }
 }
 
@@ -600,16 +600,16 @@ fn sync_actor_state_to_render(
 
 fn esc_or_close_to_exit(
     keys: Res<ButtonInput<KeyCode>>,
-    mut close_events: EventReader<WindowCloseRequested>,
-    mut events: EventWriter<AppExit>,
+    mut close_events: MessageReader<WindowCloseRequested>,
+    mut events: MessageWriter<AppExit>,
 ) {
     if keys.just_pressed(KeyCode::Escape) {
         tracing::info!(target: "cf::app", "ESC pressed; exiting");
-        events.send(AppExit::Success);
+        events.write(AppExit::Success);
     }
     if close_events.read().next().is_some() {
         tracing::info!(target: "cf::app", "window close requested; exiting");
-        events.send(AppExit::Success);
+        events.write(AppExit::Success);
     }
 }
 

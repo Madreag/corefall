@@ -250,7 +250,7 @@ fn bevy_version_string() -> String {
         .to_string()
 }
 
-const BEVY_VERSION_FALLBACK: &str = "0.14";
+const BEVY_VERSION_FALLBACK: &str = "0.18.1";
 
 /// Record a `system.panic` event into a recorder + bump the `error` severity counter.
 /// `tick` / `sim_time_ms` should be the engine's current values so the event slots into
