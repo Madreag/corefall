@@ -2,9 +2,11 @@
 
 # Corefall
 
-**A 2D side-view tactical physics sandbox where every gas, every grain, every bullet, every body, every world, and every transmission is real.**
+**Cortex-Command-like tactical pulp sci-fi disaster sandbox**
 
-**Featuring Bunker Defence as the flagship game mode** — attackers vs defenders with full coop on either side, 1v1 / 2v2 / 3v3 / 4v4 / 1v1v1v1 / 2v1 / any combination. Ten worlds at launch (Earth, Mars, Phobos, Deimos, Earth's Moon, Mimas, Europa, Vulcan, Venus, Sol — plus belt-asteroid + orbital-station classes), real Stationeers-grade atmospherics, universal gravity, ACRE2-tier voice + radio simulation, mining, and origin-aware bodies (humans, androids, robots — each with structurally different physics).
+**Server owns truth. GPU owns richness. Client owns feel.**
+
+A 2D side-view physics sandbox where every gas, grain, bullet, body, world, and transmission is real. Bunker Defence is the flagship mode: attackers breach, defenders hold the command core, and every pressure seal, radio shadow, projectile, wound, fire, and collapsing room is part of the same replayable simulation.
 
 [![Rust 1.95](https://img.shields.io/badge/Rust-1.95.0-CE422B?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org)
 [![Bevy 0.18.1](https://img.shields.io/badge/Bevy-0.18.1-232326?style=for-the-badge&logo=bevy&logoColor=white)](https://bevyengine.org)
@@ -21,27 +23,46 @@
 [![Status](https://img.shields.io/badge/status-pre--alpha%20%28M1%20active%29-orange?style=flat-square)](#project-status)
 [![Vault](https://img.shields.io/badge/research-research%20vault-purple?style=flat-square)](https://github.com/Madreag/corefall#research-vault)
 
+**Current proof:** M0 closed, M1 actor controller active, deterministic run bundles in CI.<br>
+**Roadmap lock:** server-authoritative multiplayer, deterministic replay, AI-only art/audio pipeline, modder-parity tooling, accessibility-plus, Steam Deck floor, and no pay-to-win.
+
+**[Project status](#project-status) · [Roadmap shape](#roadmap-shape) · [Tech stack](#tech-stack) · [Getting started](#getting-started) · [CI](#ci)**
+
 </div>
 
 ---
 
 ## What Corefall Is
 
-Corefall is the implementation repo for a **tactical pulp sci-fi disaster sandbox** — a side-view, pixel-physics game where every body, every machine, every pipe, every droplet of coolant, every cubic meter of gas, every world in the sky, and every voice on the radio is a real first-class simulated thing. You command a small mercenary, rescue, and salvage outfit on a collapsing frontier. You can play strategically as a continuity commander, or take direct control of a body, android, power armor suit, or mech when the moment requires.
+Corefall is the implementation repo for a **tactical pulp sci-fi disaster sandbox**. The player fantasy is Cortex Command's command-core, dropship, chassis, digging, and body-swapping chaos rebuilt around a stricter simulation contract: deterministic replay, server-authoritative multiplayer, real atmospherics, systemic materials, universal gravity, full collision, and scriptable AI/modder workflows from day one.
 
 You will:
 
-- **Defend the bunker** as 1-4 humans + AI guards holding a rooted command-core base against a dropship-deployed attacker team — or BE the attackers, breaching pressure seals and venting the defender's atmosphere. (Or 2v2. Or 3v3. Or 4v4. Or coop-vs-AI on either side. **Bunker Defence is the flagship mode.**)
-- **Choose a planet, moon, or asteroid** for your match. Each world has real atmospheric ambient + gravity + day length + weather. Mars has dust storms; Vulcan ignites if you spark a flammable mix; Mimas at 0.0064g lets grenades arc for hours.
-- **Coordinate your squad over real radio** with realistic propagation: hills break VHF line-of-sight, HAM radios bounce off the ionosphere on Earth, EMP weapons disrupt your robot's built-in radio, solar flares dump static into your link to base.
-- **Breach a sealed bunker** by knowing that the room behind the airlock is filled with high-O2 atmosphere, that your enemy is using oil-fed tools, and that one round into a coolant line will produce a steam-flash that buys you three seconds of cover.
-- **Watch your android operative** start to slow down as her battery runs low, because the EMP took out her organic-side comms and the synthetic side is now drawing more than she can replenish.
-- **Carry a wounded human teammate** through a Mars surface section while watching the oxygen meter on her helmet drain faster than usual because there's a 1.5mm puncture nobody's noticed yet.
-- **Lose a robot** to a thermal-throttle cascade because you ordered too many overclocks while the foundry pumped heat into the room.
-- **Build a base** with real pipe networks, real pressure regulators, real airlocks. Or capture an enemy base by venting it.
-- **Mine ore** from a vacuum belt asteroid (your robot operative is the right tool for this; your human can't survive there without sealed life-support overhead).
+- **Defend the bunker** as 1-4 humans plus AI guards, or play the attackers and breach it with dropships, explosives, tunneling, pressure sabotage, fire, and misdirection.
+- **Fight across worlds** with different ambient atmospheres, gravity, weather, day length, and hazards: Earth, Mars, Phobos, Deimos, the Moon, Mimas, Europa, Vulcan, Venus, Sol-zone habitats, belt asteroids, and orbital stations.
+- **Use physics as tactics**: vent rooms, overpressure corridors, light flammable atmospheres, cut coolant lines, collapse terrain, redirect gravity, burn oxygen, mine ore, and salvage wreckage.
+- **Swap between origins**: humans breathe and concuss, androids bridge organic and synthetic failure chains, robots overclock, downclock, short, leak coolant, and ignore hazards that kill flesh.
+- **Coordinate over simulated comms** with radio propagation, interference, EMP failure, captions, accessibility fallbacks, and AI reason labels that explain what bots believe is happening.
+- **Build, capture, or destroy bases** with real rooms, pipes, airlocks, pressure regulators, power, storage, fabrication, doors, platforms, and modder-defined modules.
 
 This is not a Cortex Command remake. It is a **best-of-genre synthesis** that takes Cortex Command's command-core / dropship / chassis / digging fantasy and sets it on top of Stationeers-grade atmospherics, Noita-grade systemic materials, full collision physics, universal gravity, ACRE2-tier voice + radio simulation, and a full astrography of playable worlds. AI bots are first-class teammates and rivals. Replay is deterministic. Modding is data-first. Accessibility is a floor, not an afterthought.
+
+---
+
+## Roadmap Shape
+
+The roadmap now covers **57 closed/directional decision records**, **28 production/content/launch milestones**, and **33 side tracks** in the canonical vault. The repo should be read as the executable slice of that plan, not the whole design database.
+
+| Area | Current Direction |
+|---|---|
+| Authority model | Solo runs as an in-process server. Multiplayer uses `cf-server` as the canonical fixed-tick truth. Clients predict feel locally; server corrections preserve shared state. |
+| GPU policy | GPU is used aggressively for rendering, particles, lighting, smoke, debug overlays, prediction, advisory maps, and optional certified server acceleration. CPU deterministic sim remains the required authoritative fallback. |
+| Asset/audio pipeline | All project assets and audio are AI-agent-authored, ledgered, regenerable where possible, captioned where audible, and exposed to modders through the same pipeline. |
+| Content target | Launch roadmap tracks 70+ weapons, 44+ actors, 18+ vehicles, 60+ base objects, 8 factions, 30+ missions, 12 worlds with biomes, 17 materials, 12 ores, 30+ tracks, and 400+ SFX. |
+| Shell and platform | Title/menu/settings/lobby/workbench/briefing/debrief/map/achievements/replay viewer/codex/photo mode/cosmetic locker/death cam/mod manager, plus Steam Workshop, cloud, achievements, input, and Deck readiness. |
+| Accessibility | ACC-A floor plus cognitive, motor, hearing, reading, and sensory presets. Captions, full subtitles, reduced motion/shake/flash, UI scaling, high contrast, remap/hold alternatives, and screen-reader paths are roadmap gates. |
+| Modding | Modders extend chassis, weapons, materials, atmospheres, missions, AI doctrines, audio, animations, scripts, factions, localization, and test runs with the same schema-first pipeline as the base game. |
+| Monetization posture | Premium one-time purchase direction, free modding, community-hostable servers, no pay-to-win. Optional cosmetic-only gacha/battle-pass hooks are late-cycle, dormant/default-off systems and require a future activation DR. |
 
 ---
 
@@ -109,10 +130,12 @@ Every layer emits replay events. Every cause chain is reproducible. Every AI age
 | **Origin-aware bodies** | Humans, androids, and robots have **structurally different reaction chains**. Robots take internal-shock damage, leak coolant, and downclock under heat. Androids breathe, bleed, and overclock per installed module. Humans concuss, eat, and need oxygen tanks. |
 | **AI as teammate and rival** | Bots are first-class. They reason, plan, panic, recover, and explain themselves through reason labels. The 8-criteria humanlike-AI bar is testable. An optional async LLM "mind" layer proposes doctrine without ever blocking the local AI. |
 | **Replay determinism** | Same seed + same inputs = byte-identical event stream. Debug with replay scrubbing. Network with confidence. Audit AI behavior with cause chains. |
+| **Server truth, rich clients** | Server owns authoritative state; clients own immediate feel and GPU-rich presentation. Prediction is allowed, divergence is not. Single player uses the same architecture in-process. |
+| **AI-authored production** | Art, audio, captions, provenance, and regeneration metadata are pipeline artifacts, not side notes. No retained asset skips the ledger. |
 | **Modding as a first-class promise** | Schema-first, Lua escape hatches where useful, workbench tooling. Add a gas, a reaction, an origin, a planet — all data rows. |
 | **Multiplayer ladder** | Solo + LAN co-op + online co-op + community-hostable public PvP arenas + persistent MMO shards. Same `cf-server` binary, multi-mode. Anyone can host. |
 | **Accessibility floor** | Captions, contrast, no-color-only UI, focus traversal, reduced motion, reduced shake, reduced flash, reduced G-Force blackout — all from Slice A onward. |
-| **No-compromise performance defaults** | Performance-sensitive values are config-driven, never hardcoded. Steam Deck floor at 1080p/60. 4K/120 strong-desktop ceiling. |
+| **No-compromise performance defaults** | Performance-sensitive values are config-driven, never hardcoded. Steam Deck floor at 800p/60, 1080p/60 mid-tier, 4K/120 strong-desktop ceiling. |
 
 ---
 
@@ -239,8 +262,9 @@ Corefall is built from a deliberate, opinionated, evidence-tracked **research va
 
 The vault contains:
 
-- **Decision records** (DR-001 through DR-038, plus open topics) — every major direction choice with pros, cons, evidence, revisit triggers.
-- **Spec pages** for product promise, body damage, chassis/armor/mechs/origins, equipment/loadout, atmospherics & chemistry, gravity & ballistics, AI, replay, mission director, full collision physics, and more.
+- **Decision records** (DR-001 through DR-057, plus future activation gates) — every major direction choice with pros, cons, evidence, revisit triggers.
+- **55+ spec pages** for product promise, body damage, chassis/armor/mechs/origins, equipment/loadout, atmospherics & chemistry, gravity & ballistics, AI, replay, mission director, full collision physics, accessibility-plus, localization, AI asset/audio production, modding, networking, launch operations, and more.
+- **Production roadmap** covering M0 through launch, side tracks, CLI/control contracts, DR-056 universal enhancement gates, and per-milestone Steam Deck/network/replay/accessibility/modding/testability budgets.
 - **Comparable game audits** — local code audits of Cortex Command (CCCP), OpenSoldat, OpenLieroX, The Powder Toy, plus public-source / public-doc research on Noita, Stationeers, Barotrauma, Oxygen Not Included.
 - **Research log** — chronological record of every research pass with source citations.
 - **Prototype evidence** — run bundles + smokes + acceptance test results.
@@ -260,7 +284,7 @@ The vault is the long-term knowledge base. This repo is the implementation. The 
 |---|---|
 | Rust toolchain | 1.95.0 (pinned via `game/rust-toolchain.toml`) |
 | Cargo | bundled with rustup |
-| Python | 3.x (for `game/tools/prototype_run_check.py` run-bundle validator) |
+| Python | 3.11+ (for `game/tools/prototype_run_check.py` and `game/tools/dependency_drift_report.py`) |
 | OS | Linux + macOS + Windows; Steam Deck floor target |
 
 ### Build And Run
@@ -274,6 +298,7 @@ cargo fmt --all -- --check
 cargo check --workspace --all-targets
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
+python3 tools/dependency_drift_report.py --workspace-root . --format markdown
 
 # Smoke runs (M0 / M1 placeholder scenarios)
 cargo run -p cfctl -- observe --once --scenario m0_blank
@@ -309,6 +334,7 @@ GitHub Actions runs on every push and PR:
 - `cargo clippy --workspace --all-targets -- -D warnings`
 - `cargo test --workspace`
 - `cargo build --release`
+- Dependency drift report on the Linux leg (`tools/dependency_drift_report.py`) for direct registry deps and transitive duplicate review
 - `cf-mod validate content/`
 - Schema drift check (`dump_schemas --check`)
 - `cfctl observe smoke` + `cfctl run smoke` (60 Hz + 120 Hz)
@@ -317,6 +343,8 @@ GitHub Actions runs on every push and PR:
 - Enforce repo-root `prototype_runs/` path (M0.4-F7 guard)
 
 Matrix: Linux + macOS + Windows.
+
+The dependency drift report is intentionally advisory. It flags direct dependencies that have newer registry releases and prints a capped `cargo tree -d` sample, but it does not fail CI by default because duplicate transitive versions can be expected while upstream Bevy/wgpu/windows crates migrate. Use `--deny-outdated` only for explicit upgrade sweeps and `--duplicate-line-limit 0` when you need the full duplicate tree.
 
 ---
 

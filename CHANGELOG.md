@@ -12,6 +12,13 @@ Use this file to summarize what changed in the implementation repo. Do not copy 
 
 ## Unreleased
 
+### Added (README and dependency hygiene)
+
+- Added `game/tools/dependency_drift_report.py`, a repo-local advisory report for direct workspace dependency drift and transitive duplicate crate versions.
+- CI now prints the dependency drift report on every push/PR without failing on expected upstream duplicate transitive crates.
+- Refreshed the root README top section around the current roadmap: server-authoritative truth, GPU-rich clients, AI-only asset/audio production, modder parity, accessibility-plus, Steam Deck floor, no pay-to-win, and the expanded vault roadmap shape.
+- Refreshed `game/README.md` so it describes the live native workspace instead of future M0 scaffolding.
+
 ### Changed (toolchain and dependency refresh)
 
 - **Rust toolchain pin moved from 1.93.0 to 1.95.0** across `game/rust-toolchain.toml`, workspace `rust-version`, README badges, and CI installation.
