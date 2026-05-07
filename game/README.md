@@ -1,8 +1,8 @@
 # Corefall Native Workspace
 
-The native Rust workspace will live here. Directory name `game/` matches the canonical roadmap's `Repository Layout` section in `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md` — no path mapping needed.
+This is the native Rust workspace for Corefall. Directory name `game/` matches the canonical roadmap's `Repository Layout` section in `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md` — no path mapping needed.
 
-Do not scaffold this by guessing. Start M0 from the canonical roadmap and backlog:
+M0 is closed; M1 actor controller and sim-core work is active. The root [README](../README.md) is the public project overview. Start implementation work from the canonical roadmap and backlog:
 
 ```text
 /Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md
@@ -10,6 +10,16 @@ Do not scaffold this by guessing. Start M0 from the canonical roadmap and backlo
 /Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/feature-completion-checklist.md
 ```
 
-Expected M0 work includes the Cargo workspace, toolchain files, CI, fixed-tick app shell, run-bundle writer, and initial `cf-control` / `cfctl` bootstrap.
+The workspace currently contains 29 `cf-*` crates, the pinned Rust toolchain, CI validation, fixed-tick app shell, run-bundle writer, JSON-RPC control plane, `cfctl`, content validation, schema drift checks, and dependency drift reporting.
 
 Crate prefix `cf-` is the canonical workspace shorthand. Use it consistently for crates, commands, schemas, and scripts unless a future DR explicitly changes the naming convention.
+
+Useful local checks:
+
+```bash
+cargo fmt --all -- --check
+cargo check --workspace --all-targets
+cargo clippy --workspace --all-targets -- -D warnings
+cargo test --workspace
+python3 tools/dependency_drift_report.py --workspace-root . --format markdown
+```
