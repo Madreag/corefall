@@ -462,6 +462,22 @@ fn ingest_player_input(
                 })
                 .await;
         }
+        // Mirror the press with an explicit release so the keyboard bridge
+        // honors the `ActPlayerFireParams.pressed` contract: the schema
+        // documents `false` as "explicit release for future hold-to-fire
+        // weapons." M1's single-press rifle treats fire as an edge that
+        // `clear_edges()` resets each tick, so this is a no-op today, but
+        // omitting it leaves a latent contract gap that would silently break
+        // future hold-to-fire weapons routed through this bridge.
+        if keys.just_released(KeyCode::Enter) || keys.just_released(KeyCode::KeyJ) {
+            let _ = holder
+                .0
+                .dispatch(ControlCommand::ActPlayerFire {
+                    pressed: false,
+                    source: IntentSource::Human,
+                })
+                .await;
+        }
         if keys.just_pressed(KeyCode::KeyR) {
             let _ = holder
                 .0

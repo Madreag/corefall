@@ -377,6 +377,26 @@ fn step_one_actor(
         if let Some(rifle) = state.rifles.get_mut(&actor_id) {
             rifle.reset();
         }
+        // Mirror `ControlCommand::ScenarioReset` semantics for the resetting actor's
+        // own projectiles: drain any of their pre-reset shots from the projectile
+        // pool so a player who fires and then immediately resets cannot have their
+        // pre-reset projectile hit the dummy after respawn. Only the resetting
+        // actor's projectiles are cleared (other actors' shots still fly), and
+        // each cleared projectile is reported as expired so the engine emits a
+        // matching `combat.projectile_expired` event and every spawned projectile
+        // in the run-bundle has a balanced termination event.
+        state.projectiles.retain(|p| {
+            if p.owner == actor_id {
+                report.expired_projectiles.push(ExpiredProjectile {
+                    id: p.id,
+                    owner: p.owner,
+                    last_position: p.position,
+                });
+                false
+            } else {
+                true
+            }
+        });
         return outcome;
     }
     if !pass.accepted_input {
@@ -809,6 +829,47 @@ mod tests {
         let rifle = state.rifles.get(&ActorId(1)).unwrap();
         let mag_capacity = rifle_preset(RIFLE_M1_DEFAULT_ID).unwrap().mag_capacity;
         assert_eq!(rifle.ammo_in_mag, mag_capacity);
+    }
+
+    #[test]
+    fn reset_clears_resetting_actors_inflight_projectiles() {
+        // Regression: `intent.reset` must mirror `ControlCommand::ScenarioReset`
+        // and clear the resetting actor's own pre-reset projectiles. Without this,
+        // a player who fires and then immediately resets in the next tick can have
+        // their pre-reset shot hit the dummy after respawn, which contradicts the
+        // user-facing semantics of "reset to spawn with full HP / ammo".
+        let (mut state, mut intents) = setup();
+        intents.insert(
+            ActorId(1),
+            ControlIntent {
+                actor: ActorId(1),
+                fire: true,
+                ..ControlIntent::new(ActorId(1), IntentSource::Human)
+            },
+        );
+        let _ = step(&mut state, &mut intents, deps());
+        assert_eq!(state.projectiles.len(), 1, "fire must spawn one projectile");
+        let projectile_id = state.projectiles[0].id;
+        intents.insert(
+            ActorId(1),
+            ControlIntent {
+                actor: ActorId(1),
+                reset: true,
+                ..ControlIntent::new(ActorId(1), IntentSource::Human)
+            },
+        );
+        let report = step(&mut state, &mut intents, deps());
+        assert!(
+            state.projectiles.iter().all(|p| p.owner != ActorId(1)),
+            "reset must drain the resetting actor's own projectiles"
+        );
+        assert!(
+            report
+                .expired_projectiles
+                .iter()
+                .any(|e| e.id == projectile_id && e.owner == ActorId(1)),
+            "every cleared projectile must be reported as expired so the event log balances spawned and expired"
+        );
     }
 
     #[test]
