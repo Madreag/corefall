@@ -513,13 +513,7 @@ impl M0Engine {
                 state.pending_intent.clear_edges();
                 let region_min_x = 0.0_f32;
                 let region_max_x = self.config.region_width.max(0.0);
-                let region_max_y = self
-                    .config
-                    .initial_actor_world
-                    .as_ref()
-                    .map(|w| w.world.floor_y)
-                    .unwrap_or(0.0)
-                    + self.config.region_height.max(0.0);
+                let region_max_y = self.config.region_height.max(0.0);
                 let tick_dt = SimConfig {
                     tick_rate_hz: self.config.tick_rate_hz,
                 }
