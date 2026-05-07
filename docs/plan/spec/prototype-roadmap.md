@@ -2923,6 +2923,234 @@ These milestones run mostly in parallel with the M0..M12 sim milestones. They co
 
 **What it proves:** All previous milestones close; v1.0 ships; launch day trailer published; press coverage live; Discord launch event; first 24h crash + telemetry monitoring; first community Q&A.
 
+### M-ENDGAME — Endgame Modes (parallel to M11..M12)
+
+**What it proves:** All 10 endgame modes from [[spec/endgame-modes-and-retention-loops]] play end-to-end. Persistent veterans deep loop functional. Bunker meta carries across modes. Async PvP via ghost replays queue functional.
+
+**Scope:** Per [[spec/endgame-modes-and-retention-loops]] + DR-048.
+- `mode_roguelite`, `mode_last_stand`, `mode_endless`, `mode_time_attack`, `mode_ngp`, `mode_async_pvp`, `mode_custom_rules`, `mode_bot_tournament`, `mode_community_jam`, `mode_daily`.
+- Persistent veteran roster (20 active + 50 retired).
+- Cross-mode skill drift, voice line evolution, equipment-wear visualization.
+- Bunker design persistence + sharing + Hall of Fame.
+- Ghost-replay async PvP queue + matchmaker.
+- Anti-FOMO compliance audit.
+
+**Cross-DR:** DR-005, DR-011, DR-017, DR-018, DR-027, DR-031, DR-035, DR-042, DR-045, DR-047, DR-048.
+
+### M-WORLD-EVENTS — Cross-Shard World Events (parallel to M12)
+
+**What it proves:** Per [[spec/server-wide-events-and-meta-narrative]]. Cross-shard event broadcaster + per-shard scheduler + community vote integration + anti-FOMO archive + pre-launch ARG infrastructure.
+
+**Scope:**
+- `cf-server-event-broadcaster` (centralized event-state authority; community-hostable).
+- Per-shard event scheduler.
+- Discord + Reddit community vote integration.
+- Live dev event broadcast.
+- Twitch-driven crowd missions.
+- Anti-FOMO archive validation.
+- Pre-launch ARG engine.
+
+**Cross-DR:** DR-005, DR-013, DR-014, DR-016, DR-017, DR-022, DR-031, DR-035, DR-042, DR-046, DR-047, DR-048.
+
+### M-CUSTOM — Customization Depth (parallel to M5..M11)
+
+**What it proves:** Per [[spec/customization-and-progression-depth]]. ~80 weapon attachments + ~50 salvage crafting recipes + 1-30 mastery rank per chassis/faction/weapon + loadout templates + paint/decal + voice packs + vendor economy + item-comparison UI.
+
+**Scope:**
+- Attachment slot system + ~80 launch attachments.
+- Salvage crafting + ~50 recipes.
+- Mastery progression (NEVER power per DR-031).
+- Loadout templates + Workshop sharing.
+- Paint mask + decal placement UI.
+- Voice packs.
+- Vendor / economy NPCs (per CCCP).
+- Item-comparison UI.
+
+**Cross-DR:** DR-006, DR-009, DR-019, DR-031, DR-041, DR-045, DR-046, DR-047, DR-049.
+
+### M-COMP — Tournament & Competitive Infrastructure (parallel to M11..M12)
+
+**What it proves:** Per [[spec/tournament-and-competitive-infrastructure]]. ELO/MMR + ranked brackets + tournament admin + observer/commentator + replay analysis + coach mode + warm-up + tournament-grade anti-cheat.
+
+**Scope:**
+- ELO/MMR (Glicko-2) per-mode.
+- 7-tier ranked brackets (Bronze..Champion); per-season cosmetic-only reset.
+- Tournament admin tools (single/double-elim/swiss/round-robin).
+- Per-tournament cf-server instance.
+- Observer cam + commentator overlay + multi-window PiP + stream delay.
+- Replay analysis (heatmap + decision tree + counterfactual + per-decision utility).
+- Match-history aggregate.
+- Anti-rage-quit penalties.
+- Pre-match warm-up area.
+- Coach mode (consent-based).
+- Lobby spectator slot.
+- Tournament-grade anti-cheat profile.
+
+**Cross-DR:** DR-002, DR-005, DR-022, DR-024, DR-031, DR-034, DR-042, DR-046, DR-047, DR-049.
+
+### M-MOD-EXT — Modding Ecosystem Extensions (parallel to M8..M12)
+
+**What it proves:** Per [[spec/modding-ecosystem-extensions]]. Mod versioning + dependency mgmt + conflict detection + analytics + tip jar + curation + collab + AI-driven test runs + auto-update + rollback + auto-docs.
+
+**Scope:**
+- Mod versioning + semver dependency resolution.
+- Conflict detection (asset/stat/capability/script).
+- Mod-creator analytics (opt-in).
+- Voluntary tip jar (0% project cut per DR-031).
+- Mod-of-the-week curation.
+- Discord modder rooms + shared package projects.
+- AI-driven mod test runs.
+- Mod-private cloud.
+- Auto-update + rollback.
+- Mod-author-controlled localization.
+- Mod SDK auto-docs.
+
+**Cross-DR:** DR-006, DR-024, DR-031, DR-034, DR-045, DR-046, DR-047, DR-050.
+
+### M-SOCIAL — Social Features (parallel to M9..M12)
+
+**What it proves:** Per [[spec/social-and-onboarding-extensions]] §Social. Guilds + in-game messaging + co-op campaign saves + cross-shard friends + voice party + gifting + mission-share + guild bunker designs + cross-Workshop coordination.
+
+**Scope:**
+- Guild / clan system (8-50 players).
+- In-game messaging beyond match lobby.
+- Co-op campaign saves (4-player party persistent).
+- Cross-shard friends list.
+- Voice party (Steam/EOS adapter).
+- Player-to-player gifting (NEVER cash, NEVER marketplace cut per DR-031).
+- Mission-share invite.
+- Guild-managed bunker designs.
+- Cross-Workshop coordination tools.
+
+**Cross-DR:** DR-005, DR-024, DR-031, DR-046, DR-047, DR-050.
+
+### M-ONBOARD-PLUS — New-Player Onboarding Plus (parallel to M9..M12)
+
+**What it proves:** Per [[spec/social-and-onboarding-extensions]] §Onboarding-Plus. Mentor system + beginner matchmaking + first-30-min telemetry + adaptive difficulty + demo carry-over + tip-of-the-day + guide PDF + locale-aware hint pacing.
+
+**Cross-DR:** DR-008, DR-012, DR-022, DR-023, DR-031, DR-046, DR-050.
+
+### M-AI-QUALITY — AI Quality & Transparency Extensions (parallel to M6..M12)
+
+**What it proves:** Per [[spec/social-and-onboarding-extensions]] §AI Quality. AI difficulty visibility + faction personality identifiability + mistake narration + AI training mode for modders + AI-vs-AI tournaments + transparency mode + play-as-Husk + voice variety per origin + bot-loadout-hostility.
+
+**Cross-DR:** DR-008, DR-022, DR-031, DR-046, DR-050.
+
+### M-ACC-PLUS — Accessibility-Plus (parallel to M9..M12)
+
+**What it proves:** Per [[spec/accessibility-plus-and-sustainability]]. All accessibility-plus presets functional. Community-tested with disability advocacy partners.
+
+**Scope:**
+- Cognitive (lower stimulation, simple HUD, paced tutorial).
+- Motor (single-button, gesture, eye tracking, slow-mo, one-handed, hold/toggle config).
+- Hearing (sign language, sub-bass cues, full subtitles, audio description).
+- Reading (OpenDyslexic, high-contrast, TTS, large-print).
+- Sensory (pause-on-loss, low-violence, anti-overload, anxiety-mode).
+- Color blind (8 protocols).
+- Cinematic accessibility.
+
+**Cross-DR:** DR-012, DR-024, DR-031, DR-046, DR-047, DR-051.
+
+### M-SUSTAIN — Sustainability + Sunset Plan (lifelong from M12)
+
+**What it proves:** Per [[spec/accessibility-plus-and-sustainability]] §Sustainability. 5-year content plan documented; sunset trigger criteria documented; open-source path documented; server hosting handoff documented.
+
+**Cross-DR:** DR-001, DR-005, DR-006, DR-024, DR-031, DR-035, DR-047, DR-051.
+
+### M-CONSOLE-EVAL — Console + Cloud Gaming + TV-Friendly Evaluation (post-launch)
+
+**What it proves:** Per [[spec/post-launch-operations-and-platform]] §Console. Per-platform eval + cert path + revenue share negotiation. Switch/Switch 2 + PS5 + Xbox Series + Mac App Store + Linux Flathub + cloud gaming + Steam Big Picture / TV-friendly UI + Steam Link / Moonlight.
+
+**Cross-DR:** DR-024, DR-025, DR-028, DR-031, DR-047, DR-051.
+
+### M-PERF-POLISH — Performance Polish (parallel to M11..M12)
+
+**What it proves:** Per [[spec/post-launch-operations-and-platform]] §Performance Polish. Network indicator + auto-quality + cold-load benchmark + memory leak detection + save backup + anti-cheat heuristics + server health dashboard + network simulator + crash-recovery flow.
+
+**Cross-DR:** DR-005, DR-024, DR-028, DR-029, DR-034, DR-047, DR-051.
+
+### M-CS-OPS — Customer Support + Sales Operations (post-launch)
+
+**What it proves:** Per [[spec/post-launch-operations-and-platform]] §Customer Support + Sales. Ticket system + Stripe direct-sales + refund + tax + sale calendar + bundle + affiliate program + sales reports.
+
+**Cross-DR:** DR-013, DR-024, DR-031, DR-047, DR-051.
+
+### M-MKT-EXTRAS — Marketing Extras (pre-launch + post-launch)
+
+**What it proves:** Per [[spec/post-launch-operations-and-platform]] §Marketing Extras. Pre-launch ARG + OST + art book + comic + wiki + dev streams + Q&A + roadmap voting + bug bounty + translator credits + schools.
+
+**Cross-DR:** DR-019, DR-024, DR-031, DR-047, DR-051.
+
+---
+
+## New Side Tracks (Per DR-048..DR-051)
+
+### T-ENDGAME — Endgame Modes & Retention
+
+Spans M-ENDGAME + M-WORLD-EVENTS; lifelong from M11.
+- 10 endgame modes per [[spec/endgame-modes-and-retention-loops]].
+- Persistent veterans deep loop.
+- Bunker meta carries across modes.
+- Cross-shard world events.
+- Anti-FOMO archive.
+
+**Done-criteria:** All 10 modes play end-to-end; cross-shard event broadcaster live.
+
+### T-COMP — Competitive Infrastructure
+
+Spans M-COMP; lifelong from M10.
+- ELO/MMR + brackets.
+- Tournament admin + observer/commentator.
+- Replay analysis.
+- Anti-rage-quit + warm-up + coach.
+- Tournament-grade anti-cheat.
+
+**Done-criteria:** Tournament-hostable by community; observer/commentator tools attract competitive scene.
+
+### T-CUSTOM — Customization Depth
+
+Spans M-CUSTOM; lifelong from M5.
+- ~80 attachments + ~50 crafting recipes.
+- Mastery 1-30 (intrinsic only).
+- Loadout templates + Workshop sharing.
+- Paint + decals + voice packs.
+- Vendor economy.
+
+**Done-criteria:** All weapon classes have attachment slots; mastery functional; vendor NPCs travel.
+
+### T-MOD-EXT — Modding Ecosystem Extensions
+
+Spans M-MOD-EXT; lifelong from M8.
+- Versioning + conflict detection + analytics + tip jar + curation + collab + AI-test-runs + auto-update + auto-docs.
+
+**Done-criteria:** Modder retention metrics positive; community-hosted ecosystem alive.
+
+### T-SOCIAL — Social Features
+
+Spans M-SOCIAL + M-ONBOARD-PLUS; lifelong from M9.
+- Guilds + messaging + co-op + voice party + gifting + cross-shard friends.
+- Mentor + beginner pool + first-30-min telemetry + adaptive difficulty + demo carry-over.
+
+**Done-criteria:** New-player retention >40% at hour 1; social glue working.
+
+### T-ACC-PLUS — Accessibility-Plus
+
+Spans M-ACC-PLUS; lifelong from M9.
+- Cognitive + motor + hearing + reading + sensory + color blind + cinematic accessibility.
+
+**Done-criteria:** All presets functional; community-tested with disability advocacy partners.
+
+### T-SUSTAIN — Sustainability + Sunset
+
+Spans M-SUSTAIN; lifelong from M12.
+- 5-year content plan.
+- Sunset trigger criteria.
+- Open-source path.
+- Server hosting handoff.
+- Content archival.
+
+**Done-criteria:** Plan documented; sunset trigger flow tested.
+
 ---
 
 ## New Side Tracks (Per DR-044, DR-045, DR-046, DR-047)
