@@ -23,7 +23,7 @@ use cf_physics::{
     apply_horizontal_motion, apply_jump, apply_recoil, step_kinematics, HorizontalInputs, JumpInputs, StepInputs,
 };
 
-use crate::{ActorId, ActorWorld, ControlIntent, IntentSource, ItemSlot, Status, Vec2};
+use crate::{quantize_f32, ActorId, ActorWorld, ControlIntent, IntentSource, ItemSlot, Status, Vec2};
 
 /// Per-actor rifle state tracked alongside the actor world. Keyed by [`ActorId`]; only
 /// actors carrying a rifle in their inventory get an entry.
@@ -125,21 +125,14 @@ impl ActorSimState {
         for p in &self.projectiles {
             out.extend_from_slice(&p.id.to_le_bytes());
             out.extend_from_slice(&p.owner.0.to_le_bytes());
-            out.extend_from_slice(&quantize(p.position.x).to_le_bytes());
-            out.extend_from_slice(&quantize(p.position.y).to_le_bytes());
-            out.extend_from_slice(&quantize(p.velocity.x).to_le_bytes());
-            out.extend_from_slice(&quantize(p.velocity.y).to_le_bytes());
+            out.extend_from_slice(&quantize_f32(p.position.x).to_le_bytes());
+            out.extend_from_slice(&quantize_f32(p.position.y).to_le_bytes());
+            out.extend_from_slice(&quantize_f32(p.velocity.x).to_le_bytes());
+            out.extend_from_slice(&quantize_f32(p.velocity.y).to_le_bytes());
             out.extend_from_slice(&p.remaining_ticks.to_le_bytes());
         }
         out
     }
-}
-
-fn quantize(value: f32) -> i32 {
-    if !value.is_finite() {
-        return 0;
-    }
-    (value * 1024.0).round() as i32
 }
 
 /// One actor's outcome for the tick.

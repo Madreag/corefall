@@ -238,6 +238,10 @@ pub fn tick_rifle(state: &mut RifleState, inputs: RifleTickInputs) -> TickOutcom
         if state.reload_remaining_ticks == 0 {
             state.ammo_in_mag = state.spec.mag_capacity;
             outcomes.reload_completed = true;
+            // Reload finished this tick; the fire check below would otherwise see a
+            // zero cooldown and fire on the same tick. Defer firing to the next tick
+            // to match the documented "shoot again on the very next tick" semantics.
+            return outcomes;
         }
     } else if state.fire_cooldown_ticks > 0 {
         state.fire_cooldown_ticks -= 1;

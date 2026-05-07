@@ -421,7 +421,7 @@ impl ActorState {
 
 /// Quantize an `f32` to a deterministic `i32` representation for cross-platform checksum
 /// stability. Per-pixel resolution is plenty for the M1 actor; finer scales can append.
-fn quantize_f32(value: f32) -> i32 {
+pub(crate) fn quantize_f32(value: f32) -> i32 {
     if !value.is_finite() {
         return 0;
     }
