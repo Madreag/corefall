@@ -1234,7 +1234,17 @@ impl EngineHandle for M0Engine {
                 .actors
                 .values()
                 .map(|a| {
-                    let rifle = sim.rifles.get(&a.id);
+                    // Gate rifle fields on the actor's currently-selected slot, mirroring
+                    // `actor_render_snapshot` (which the cf-app HUD reads). When a non-rifle
+                    // slot is selected the wire shows null/None for ammo/capacity/cooldowns
+                    // so external observers (cfctl, replay viewers, AI agents) match what
+                    // the player sees in the HUD ("NO RIFLE"). The rifle keeps its physical
+                    // state in `sim.rifles` regardless of selection — this view is filtered.
+                    let rifle = if a.inventory.selected_item().is_rifle() {
+                        sim.rifles.get(&a.id)
+                    } else {
+                        None
+                    };
                     ActorView {
                         id: a.id.0,
                         team: a.team.clone(),
@@ -2569,6 +2579,69 @@ mod tests {
         engine.drive_tick();
         let snap_c = engine.actor_render_snapshot();
         assert!(snap_c.player_rifle.is_some(), "back to slot 0 -> HUD shows rifle again");
+    }
+
+    #[tokio::test]
+    async fn m1_observe_actor_view_hides_rifle_state_when_non_rifle_slot_selected() {
+        // Mirrors `m1_actor_render_snapshot_hides_rifle_when_non_rifle_slot_selected` for
+        // the wire-format `ActorView` exposed via `observe.once` / `observe.subscribe`.
+        // The cfctl/replay/AI consumers must see the same NO RIFLE state the player sees
+        // in the HUD; otherwise external observers mis-attribute fire-press behavior.
+        let path = write_m1_scenario();
+        let config = load_m1_test_config(path);
+        let engine = M0Engine::new(config);
+        engine.record_run_started();
+        // Default selection (slot 0 = rifle) - ActorView must show rifle fields.
+        let frame_a = engine.snapshot(None).await;
+        let player_a = frame_a
+            .actors
+            .iter()
+            .find(|a| Some(a.id) == frame_a.player_actor_id)
+            .unwrap();
+        assert!(
+            player_a.rifle_ammo.is_some(),
+            "rifle slot selected -> rifle_ammo populated"
+        );
+        assert!(player_a.rifle_capacity.is_some());
+        // Select an empty slot.
+        let _ = engine
+            .dispatch(ControlCommand::ActPlayerSelectItem {
+                slot: 1,
+                source: IntentSource::Cfctl,
+            })
+            .await;
+        engine.drive_tick();
+        let frame_b = engine.snapshot(None).await;
+        let player_b = frame_b
+            .actors
+            .iter()
+            .find(|a| Some(a.id) == frame_b.player_actor_id)
+            .unwrap();
+        assert!(
+            player_b.rifle_ammo.is_none(),
+            "non-rifle slot -> rifle_ammo must be None on the wire"
+        );
+        assert!(player_b.rifle_capacity.is_none());
+        assert!(player_b.rifle_fire_cooldown_ticks.is_none());
+        assert!(player_b.rifle_reload_remaining_ticks.is_none());
+        // Re-select rifle slot 0.
+        let _ = engine
+            .dispatch(ControlCommand::ActPlayerSelectItem {
+                slot: 0,
+                source: IntentSource::Cfctl,
+            })
+            .await;
+        engine.drive_tick();
+        let frame_c = engine.snapshot(None).await;
+        let player_c = frame_c
+            .actors
+            .iter()
+            .find(|a| Some(a.id) == frame_c.player_actor_id)
+            .unwrap();
+        assert!(
+            player_c.rifle_ammo.is_some(),
+            "back to slot 0 -> rifle_ammo populated again"
+        );
     }
 
     #[tokio::test]

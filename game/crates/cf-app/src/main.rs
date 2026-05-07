@@ -382,8 +382,7 @@ fn ingest_player_input(
     // `cfctl act.player.move` values, since `ControlIntent.move_x` is continuous and
     // latest-value-wins. Edge-triggered transitions (key press / release / direction
     // change) still fire so releasing a key promptly stops the actor.
-    let move_changed = (move_x - *last_move_x).abs() > f32::EPSILON;
-    let dispatch_move = move_changed;
+    let dispatch_move = (move_x - *last_move_x).abs() > f32::EPSILON;
     // Mirror the move-edge detection for aim: only dispatch when the aim
     // vector actually changes. Aim is a continuous, latest-value-wins field
     // on `ControlIntent`, so re-sending the same vector every frame both
