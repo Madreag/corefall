@@ -1446,6 +1446,11 @@ impl EngineHandle for M0Engine {
                     .map(|s| s.projectiles.iter().map(|p| (p.id, p.owner, p.position)).collect())
                     .unwrap_or_default();
                 let next_projectile_id_carry = state.actor_state.as_ref().map(|s| s.next_projectile_id()).unwrap_or(0);
+                // Preserve the pre-reset intent source so the next idle tick's
+                // `input.intent_received` event still attributes to whoever was
+                // driving (cfctl OR human at the keyboard) rather than spuriously
+                // flipping to `cfctl` because the reset handler hardcoded a default.
+                let preserved_source = state.pending_intent.source;
                 if let Some(initial) = self.config.initial_actor_world.as_ref() {
                     let mut sim_state = ActorSimState::new(initial.world.clone());
                     sim_state.set_next_projectile_id(next_projectile_id_carry);
@@ -1454,8 +1459,7 @@ impl EngineHandle for M0Engine {
                     }
                     state.actor_state = Some(sim_state);
                     state.player_actor = initial.player;
-                    state.pending_intent =
-                        ControlIntent::new(initial.player.unwrap_or(ActorId(0)), IntentSource::Cfctl);
+                    state.pending_intent = ControlIntent::new(initial.player.unwrap_or(ActorId(0)), preserved_source);
                 }
                 state.intent_epoch = state.intent_epoch.wrapping_add(1);
                 drop(state);
@@ -2833,6 +2837,42 @@ mod tests {
         // After reset, the actor is at spawn (200, 32) with full ammo.
         assert!((player.position[0] - 200.0).abs() < 0.5);
         assert_eq!(player.rifle_ammo, Some(30));
+    }
+
+    #[tokio::test]
+    async fn m1_scenario_reset_preserves_intent_source() {
+        // Regression: ScenarioReset rebuilt pending_intent with a hardcoded
+        // IntentSource::Cfctl regardless of who was previously controlling the actor.
+        // Now we preserve the pre-reset source so the next idle tick's
+        // input.intent_received correctly attributes (cfctl OR human) and the
+        // replay event log doesn't contain spurious source flips on reset.
+        let path = write_m1_scenario();
+        let config = load_m1_test_config(path);
+        let engine = M0Engine::new(config);
+        engine.record_run_started();
+        // Drive a Human-source aim so pending_intent.source = Human.
+        let _ = engine
+            .dispatch(ControlCommand::ActPlayerAim {
+                x: 1.0,
+                y: 0.0,
+                source: IntentSource::Human,
+            })
+            .await;
+        // Now reset — pre-fix this would clobber source back to Cfctl.
+        let _ = engine.dispatch(ControlCommand::ScenarioReset).await;
+        // Next tick should record input.intent_received with source = human.
+        engine.drive_tick();
+        let events = engine.recorder().snapshot_events();
+        let intent_events: Vec<_> = events
+            .iter()
+            .filter(|e| e.category == "input" && e.event_type == "intent_received")
+            .collect();
+        let last_intent = intent_events.last().expect("at least one intent_received event");
+        assert_eq!(
+            last_intent.payload.get("source").and_then(|v| v.as_str()),
+            Some("human"),
+            "post-reset intent must preserve the Human source",
+        );
     }
 
     #[tokio::test]

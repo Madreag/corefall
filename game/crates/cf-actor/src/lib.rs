@@ -401,7 +401,10 @@ impl ActorState {
     }
 
     /// Hash bytes for the M1 deterministic checksum extension. Layout-stable; future
-    /// milestones append fields without bumping the schema.
+    /// milestones append fields without bumping the schema. Field encodings are picked
+    /// to round-trip the full source domain — the inventory slot writes its full `u32`
+    /// (`ItemSlot.0.to_le_bytes()`) so growing the inventory beyond 255 slots in a
+    /// future milestone cannot silently collide divergent states into the same hash.
     pub fn checksum_bytes(&self) -> Vec<u8> {
         let mut out = Vec::with_capacity(96);
         out.extend_from_slice(&self.id.0.to_le_bytes());
@@ -413,8 +416,8 @@ impl ActorState {
         out.extend_from_slice(&quantize_f32(self.aim.y).to_le_bytes());
         out.extend_from_slice(&quantize_f32(self.hp).to_le_bytes());
         out.push(self.status as u8);
-        out.push(self.on_ground as u8);
-        out.push(self.inventory.selected.0 as u8);
+        out.push(u8::from(self.on_ground));
+        out.extend_from_slice(&self.inventory.selected.0.to_le_bytes());
         out
     }
 }
@@ -622,7 +625,26 @@ mod tests {
         let inv = Inventory::with_rifle("rifle_m1_default");
         let actor = ActorState::player(ActorId(7), "blue", Vec2::new(1.0, 2.0), 100.0, inv);
         let bytes = actor.checksum_bytes();
-        // 8 (id) + 4*7 (positions+vel+aim+hp) + 1*3 (status, on_ground, slot) = 39
-        assert_eq!(bytes.len(), 39);
+        // 8 (id u64) + 4*7 (position.x/y, velocity.x/y, aim.x/y, hp as i32) + 1 (status u8)
+        // + 1 (on_ground u8) + 4 (selected slot u32) = 42 bytes.
+        assert_eq!(bytes.len(), 42);
+    }
+
+    #[test]
+    fn checksum_distinguishes_high_inventory_slots() {
+        // Regression: inventory.selected used to be cast `as u8`, silently truncating
+        // the u32 ItemSlot. Slots 256 and 0 collided into the same checksum byte. Now
+        // the full u32 is serialized so growing the inventory beyond 255 slots can't
+        // hide divergent state behind identical bytes.
+        let inv = Inventory::with_rifle("rifle_m1_default");
+        let mut actor_a = ActorState::player(ActorId(1), "blue", Vec2::ZERO, 100.0, inv.clone());
+        let mut actor_b = ActorState::player(ActorId(1), "blue", Vec2::ZERO, 100.0, inv);
+        actor_a.inventory.selected = ItemSlot(0);
+        actor_b.inventory.selected = ItemSlot(256);
+        assert_ne!(
+            actor_a.checksum_bytes(),
+            actor_b.checksum_bytes(),
+            "slot 0 and slot 256 must produce different checksum bytes"
+        );
     }
 }
