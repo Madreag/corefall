@@ -2701,6 +2701,42 @@ mod tests {
             "rifle slot selected -> rifle_ammo populated"
         );
         assert!(player_a.rifle_capacity.is_some());
+        assert!(
+            player_a.rifle_reload_total_ticks.is_some(),
+            "rifle slot selected -> reload total is visible to cfctl/AI observers"
+        );
+
+        let _ = engine
+            .dispatch(ControlCommand::ActPlayerFire {
+                pressed: true,
+                source: IntentSource::Cfctl,
+            })
+            .await;
+        engine.drive_tick();
+        let _ = engine
+            .dispatch(ControlCommand::ActPlayerReload {
+                source: IntentSource::Cfctl,
+            })
+            .await;
+        engine.drive_tick();
+        let frame_reload = engine.snapshot(None).await;
+        let player_reload = frame_reload
+            .actors
+            .iter()
+            .find(|a| Some(a.id) == frame_reload.player_actor_id)
+            .unwrap();
+        assert!(
+            player_reload
+                .rifle_reload_remaining_ticks
+                .is_some_and(|ticks| ticks > 0),
+            "reload command should expose remaining reload ticks"
+        );
+        assert_eq!(
+            player_reload.rifle_reload_total_ticks,
+            Some(90),
+            "M1 rifle reload is 1.5s at the 60 Hz test default"
+        );
+
         // Select an empty slot.
         let _ = engine
             .dispatch(ControlCommand::ActPlayerSelectItem {
@@ -2722,6 +2758,7 @@ mod tests {
         assert!(player_b.rifle_capacity.is_none());
         assert!(player_b.rifle_fire_cooldown_ticks.is_none());
         assert!(player_b.rifle_reload_remaining_ticks.is_none());
+        assert!(player_b.rifle_reload_total_ticks.is_none());
         // Re-select rifle slot 0.
         let _ = engine
             .dispatch(ControlCommand::ActPlayerSelectItem {
@@ -2740,6 +2777,7 @@ mod tests {
             player_c.rifle_ammo.is_some(),
             "back to slot 0 -> rifle_ammo populated again"
         );
+        assert_eq!(player_c.rifle_reload_total_ticks, Some(90));
     }
 
     #[tokio::test]
