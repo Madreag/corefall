@@ -1219,7 +1219,17 @@ fn status_change_cause(outcome: &ActorTickOutcome) -> &'static str {
         outcome.reset,
         "status_change_cause called for an outcome with no known cause; M1 only emits step_one_actor status changes via actor.reset(). Extend ActorTickOutcome with an explicit cause discriminant before adding new mutators."
     );
-    "reset"
+    // Defensive fallback for release builds: if a future milestone introduces
+    // another status-mutating path inside `step_one_actor` without extending
+    // `ActorTickOutcome` with an explicit cause discriminant, mislabeling the
+    // change as `reset` would silently corrupt replay/cause-chain analysis.
+    // Surfacing `unknown` makes the contract gap visible in the run bundle so
+    // it can be caught and fixed rather than masquerading as a reset.
+    if outcome.reset {
+        "reset"
+    } else {
+        "unknown"
+    }
 }
 
 fn m0_notes_addendum() -> String {
