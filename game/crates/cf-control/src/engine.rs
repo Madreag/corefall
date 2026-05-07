@@ -805,8 +805,13 @@ impl M0Engine {
             );
         }
         for hit in &report.hits {
-            let projectile_event_id = format!("projectile:{}", hit.projectile_id);
-            self.recorder.record(
+            // Capture the real event_id of the projectile_hit so the follow-up
+            // actor_status_changed can both reference it via the `projectile_event`
+            // payload field AND parent-chain to it (a stronger cause-chain link than
+            // the same-tick input.intent_received). The recorder makes this id
+            // available; the previous synthetic "projectile:N" string was a label
+            // that pointed to no real event.
+            let projectile_hit_event_id = self.recorder.record(
                 tick,
                 sim_time_ms,
                 "combat",
@@ -831,9 +836,9 @@ impl M0Engine {
                         "previous_status": hit.previous_status.as_str(),
                         "new_status": hit.new_status.as_str(),
                         "cause": "projectile_hit",
-                        "projectile_event": projectile_event_id,
+                        "projectile_event": projectile_hit_event_id,
                     }),
-                    Some(intent_event_id.clone()),
+                    Some(projectile_hit_event_id.clone()),
                 );
             }
         }
@@ -1204,15 +1209,17 @@ impl From<&ActorSimState> for ActorWorldSnapshot {
 ///
 /// In M1 the only mutator inside `step_one_actor` that touches `actor.status` is
 /// `actor.reset()` (called when the player issues `act.player.reset`). Damage-driven
-/// transitions land in the projectile-hit loop with cause `projectile_hit`. The
-/// `intent` branch is reserved for future intent-driven status changes (e.g. M5
-/// chassis ejection, M5.6 hazard contact) and is not currently reachable.
+/// transitions are emitted from a separate projectile-hit loop with cause
+/// `projectile_hit`, never via this helper. Future milestones (M5 chassis ejection,
+/// M5.6 hazard contact, etc.) MUST extend [`ActorTickOutcome`] with an explicit
+/// cause discriminant rather than relying on a generic catch-all label here, so
+/// the cause-chain stays semantically correct for replay analysis.
 fn status_change_cause(outcome: &ActorTickOutcome) -> &'static str {
-    if outcome.reset {
-        "reset"
-    } else {
-        "intent"
-    }
+    debug_assert!(
+        outcome.reset,
+        "status_change_cause called for an outcome with no known cause; M1 only emits step_one_actor status changes via actor.reset(). Extend ActorTickOutcome with an explicit cause discriminant before adding new mutators."
+    );
+    "reset"
 }
 
 fn m0_notes_addendum() -> String {
