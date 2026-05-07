@@ -580,6 +580,8 @@ fn sync_actor_state_to_render(
     render_state.player_actor_id = snapshot.player_actor_id;
     render_state.region_width = holder.0.config().region_width;
     render_state.region_height = holder.0.config().region_height;
+    render_state.region_anchor_x = holder.0.config().region_anchor_x;
+    render_state.region_anchor_y = holder.0.config().region_anchor_y;
     render_state.floor_y = snapshot.floor_y;
 
     hud_state.tick = snapshot.tick;

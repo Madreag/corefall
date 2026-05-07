@@ -60,6 +60,12 @@ pub struct ActorRenderState {
     pub player_actor_id: Option<u64>,
     pub region_width: f32,
     pub region_height: f32,
+    /// Bottom-left anchor of the play region in world space. Mirrors
+    /// `M0EngineConfig::region_anchor_{x,y}` so the render layer can centre the
+    /// floor + camera over the actual region for scenarios that don't anchor at
+    /// the world origin.
+    pub region_anchor_x: f32,
+    pub region_anchor_y: f32,
     pub floor_y: f32,
 }
 
@@ -125,7 +131,10 @@ fn sync_actor_sprites(
     mut commands: Commands,
     mut state: ResMut<ActorRenderState>,
     mut actor_query: Query<(Entity, &ActorRenderTag, &mut Transform, &mut Sprite)>,
-    mut floor_query: Query<&mut Transform, (With<FloorRenderTag>, Without<ActorRenderTag>, Without<ReticleRenderTag>)>,
+    mut floor_query: Query<
+        (&mut Transform, &mut Sprite),
+        (With<FloorRenderTag>, Without<ActorRenderTag>, Without<ReticleRenderTag>),
+    >,
     mut reticle_query: Query<
         (&mut Transform, &mut Visibility),
         (With<ReticleRenderTag>, Without<ActorRenderTag>, Without<FloorRenderTag>),
@@ -140,19 +149,23 @@ fn sync_actor_sprites(
         ),
     >,
 ) {
-    // Place the floor centred under the play region.
+    // Place the floor centred under the play region. The region's bottom-left
+    // anchor may be non-zero, so derive the world-space centre from
+    // `region_anchor + region_size * 0.5` instead of assuming `(0, 0)`.
     if state.region_width > 0.0 {
-        if let Some(mut transform) = floor_query.iter_mut().next() {
-            transform.translation = Vec3::new(state.region_width * 0.5, state.floor_y - 4.0, -0.5);
-            // also re-scale the floor sprite via custom_size update below in actor sync iteration.
+        let region_center_x = state.region_anchor_x + state.region_width * 0.5;
+        let region_center_y = state.region_anchor_y + state.region_height * 0.5;
+        if let Some((mut transform, mut sprite)) = floor_query.iter_mut().next() {
+            transform.translation = Vec3::new(region_center_x, state.floor_y - 4.0, -0.5);
+            sprite.custom_size = Some(Vec2::new(state.region_width, 8.0));
         }
         // Centre the 2D camera on the play region so authored scenarios in
         // bottom-left coordinates (e.g. M1's 1280x720 with target at x=900) stay
         // on-screen. The default `Camera2dBundle` sits at the world origin, which
         // would clip everything past x = window_width / 2.
         if let Some(mut camera_transform) = camera_query.iter_mut().next() {
-            camera_transform.translation.x = state.region_width * 0.5;
-            camera_transform.translation.y = state.region_height * 0.5;
+            camera_transform.translation.x = region_center_x;
+            camera_transform.translation.y = region_center_y;
         }
     }
 
