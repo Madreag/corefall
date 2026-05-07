@@ -51,6 +51,12 @@ pub struct M0EngineConfig {
     /// Region dimensions copied from the scenario manifest (for run-bundle metadata).
     pub region_width: f32,
     pub region_height: f32,
+    /// Region bottom-left anchor copied from the scenario manifest. Used together with
+    /// `region_width`/`region_height` to derive the world-space X/Y bounds that the sim
+    /// step uses for actor clamping and projectile out-of-bounds expiry. Defaults to
+    /// `(0.0, 0.0)` for M0/M1 scenarios that anchor at the world origin.
+    pub region_anchor_x: f32,
+    pub region_anchor_y: f32,
     pub config_hash: String,
     pub commit_sha: String,
     pub rust_version: String,
@@ -147,6 +153,8 @@ impl M0EngineConfig {
             tick_rate_hz: 60,
             region_width: 0.0,
             region_height: 0.0,
+            region_anchor_x: 0.0,
+            region_anchor_y: 0.0,
             config_hash: String::new(),
             commit_sha: env!("CARGO_PKG_VERSION").to_string(),
             rust_version: rustc_version_string(),
@@ -184,6 +192,8 @@ impl M0EngineConfig {
         };
         cfg.region_width = scenario.region.width;
         cfg.region_height = scenario.region.height;
+        cfg.region_anchor_x = scenario.region.anchor.0;
+        cfg.region_anchor_y = scenario.region.anchor.1;
         if scenario.has_actor_world() {
             cfg.has_actor_world = true;
             cfg.initial_actor_world = Some(InitialActorWorld::from_scenario(scenario));
@@ -203,7 +213,12 @@ impl M0EngineConfig {
             self.seed,
             self.duration_ticks,
             self.tick_rate_hz,
-            (self.region_width, self.region_height),
+            (
+                self.region_anchor_x,
+                self.region_anchor_y,
+                self.region_width,
+                self.region_height,
+            ),
             self.run_mode,
             self.control_api_enabled,
             self.debug_capabilities.join(","),
@@ -253,6 +268,13 @@ pub fn report_panic_to_recorder(recorder: &Arc<Recorder>, tick: u64, sim_time_ms
         None,
     );
 }
+
+/// Upper bound on the number of per-tick duration samples retained in
+/// `EngineMutable::tick_durations_us`. Only the last `cadence_ticks` entries are ever
+/// read by `TickSampleStats::from_recent`, so anything above this cap is dead weight.
+/// Set well above the default 60 Hz cadence to leave headroom for higher tick rates
+/// and larger checksum cadences without trimming on every tick.
+const TICK_DURATIONS_HISTORY_CAP: usize = 4096;
 
 /// Periodic per-tick performance stats emitted as `system.tick_sample`. Keeps M0 evidence
 /// of per-tick cost in the run bundle without waiting for the M3 perf overlay.
@@ -518,9 +540,9 @@ impl M0Engine {
             if state.actor_state.is_some() {
                 let intent = state.pending_intent.clone();
                 state.pending_intent.clear_edges();
-                let region_min_x = 0.0_f32;
-                let region_max_x = self.config.region_width.max(0.0);
-                let region_max_y = self.config.region_height.max(0.0);
+                let region_min_x = self.config.region_anchor_x;
+                let region_max_x = self.config.region_anchor_x + self.config.region_width.max(0.0);
+                let region_max_y = self.config.region_anchor_y + self.config.region_height.max(0.0);
                 let tick_dt = SimConfig {
                     tick_rate_hz: self.config.tick_rate_hz,
                 }
@@ -566,6 +588,14 @@ impl M0Engine {
         }
         let elapsed_us = start.elapsed().as_micros().min(u128::from(u64::MAX)) as u64;
         state.tick_durations_us.push(elapsed_us);
+        // `TickSampleStats::from_recent` only ever reads the last `cadence_ticks` entries
+        // (default 60). Cap the buffer well above that so long-running sessions without a
+        // `scenario.reset` don't accumulate millions of dead entries (~1.7 MB/hr at 60 Hz).
+        // Drain in batches so the trim cost amortises to O(1) per tick.
+        if state.tick_durations_us.len() > TICK_DURATIONS_HISTORY_CAP * 2 {
+            let drop = state.tick_durations_us.len() - TICK_DURATIONS_HISTORY_CAP;
+            state.tick_durations_us.drain(..drop);
+        }
         let new_tick = state.clock.tick().0;
         drop(state);
         // Publish the latest tick so the panic reporter records `system.panic` at the
