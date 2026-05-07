@@ -93,7 +93,7 @@ pub enum ScenarioLoadError {
     Ron {
         path: String,
         #[source]
-        source: ron::error::SpannedError,
+        source: Box<ron::error::SpannedError>,
     },
     #[error("scenario id mismatch: expected {expected}, found {found} in {path}")]
     IdMismatch {
@@ -155,7 +155,7 @@ impl Scenario {
         })?;
         let scenario: Scenario = ron::from_str(&text).map_err(|source| ScenarioLoadError::Ron {
             path: path.display().to_string(),
-            source,
+            source: Box::new(source),
         })?;
         scenario.validate(&path.display().to_string())?;
         Ok(scenario)

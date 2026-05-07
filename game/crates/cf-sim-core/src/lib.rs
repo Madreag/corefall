@@ -13,7 +13,7 @@
 
 use std::time::{Duration, Instant};
 
-use rand_core::{RngCore, SeedableRng};
+use rand_core::{Rng as RandRng, SeedableRng};
 use rand_xoshiro::Xoshiro256StarStar;
 use serde::{Deserialize, Serialize};
 

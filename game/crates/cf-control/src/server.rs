@@ -236,7 +236,7 @@ async fn handle_connection<E: EngineHandle>(
                 let response =
                     process_request(&text, engine.as_ref(), &subscribe_hz, &subscribe_filter, max_observe_hz).await;
                 if let Some(payload) = response {
-                    let _ = out_tx.send(Message::Text(payload));
+                    let _ = out_tx.send(Message::Text(payload.into()));
                 }
             }
             Message::Ping(payload) => {
@@ -276,7 +276,7 @@ fn spawn_observation_loop<E: EngineHandle>(
                         params: serde_json::to_value(&frame).unwrap_or(serde_json::Value::Null),
                     };
                     if let Ok(payload) = serde_json::to_string(&notification) {
-                        if out_tx.send(Message::Text(payload)).is_err() {
+                        if out_tx.send(Message::Text(payload.into())).is_err() {
                             break;
                         }
                     }

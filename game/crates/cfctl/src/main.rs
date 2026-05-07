@@ -738,7 +738,7 @@ impl Session {
             "method": method,
             "params": params,
         });
-        self.ws.send(Message::Text(req.to_string())).await?;
+        self.ws.send(Message::Text(req.to_string().into())).await?;
         loop {
             let msg = tokio::time::timeout(Duration::from_secs(8), self.ws.next())
                 .await

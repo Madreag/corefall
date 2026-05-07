@@ -6,8 +6,8 @@
 
 **Featuring Bunker Defence as the flagship game mode** — attackers vs defenders with full coop on either side, 1v1 / 2v2 / 3v3 / 4v4 / 1v1v1v1 / 2v1 / any combination. Ten worlds at launch (Earth, Mars, Phobos, Deimos, Earth's Moon, Mimas, Europa, Vulcan, Venus, Sol — plus belt-asteroid + orbital-station classes), real Stationeers-grade atmospherics, universal gravity, ACRE2-tier voice + radio simulation, mining, and origin-aware bodies (humans, androids, robots — each with structurally different physics).
 
-[![Rust 1.93](https://img.shields.io/badge/Rust-1.93.0-CE422B?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org)
-[![Bevy 0.14](https://img.shields.io/badge/Bevy-0.14-232326?style=for-the-badge&logo=bevy&logoColor=white)](https://bevyengine.org)
+[![Rust 1.95](https://img.shields.io/badge/Rust-1.95.0-CE422B?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org)
+[![Bevy 0.18.1](https://img.shields.io/badge/Bevy-0.18.1-232326?style=for-the-badge&logo=bevy&logoColor=white)](https://bevyengine.org)
 [![wgpu](https://img.shields.io/badge/wgpu-render-FFCC00?style=for-the-badge&logo=webgpu&logoColor=black)](https://wgpu.rs)
 [![Tokio](https://img.shields.io/badge/Tokio-async-3F8FFF?style=for-the-badge&logo=tokio&logoColor=white)](https://tokio.rs)
 [![License](https://img.shields.io/badge/license-Apache--2.0%20OR%20MIT-blue?style=for-the-badge)](#license)
@@ -144,8 +144,8 @@ We **also** lean on the open Rust gamedev ecosystem: [Bevy](https://bevyengine.o
 
 | Layer | Tooling |
 |---|---|
-| Language | [Rust](https://www.rust-lang.org) edition 2021, MSRV 1.84, dev toolchain pinned to 1.93.0 |
-| Engine | [Bevy](https://bevyengine.org) 0.14 + [wgpu](https://wgpu.rs) for 2D / GPU; custom core crates for sim |
+| Language | [Rust](https://www.rust-lang.org) edition 2021, MSRV/toolchain pinned to 1.95.0 |
+| Engine | [Bevy](https://bevyengine.org) 0.18.1 + [wgpu](https://wgpu.rs) for 2D / GPU; custom core crates for sim |
 | Physics | Custom collision + custom material kernel + custom atmospherics kernel + universal gravity field |
 | Async | [Tokio](https://tokio.rs) for the JSON-RPC control plane and dedicated server |
 | Networking (planned) | TBD between [Lightyear](https://github.com/cBournhonesque/lightyear) / [renet](https://github.com/lucaspoffo/renet) / [quinn](https://github.com/quinn-rs/quinn); decision deferred to M9/M10 |
@@ -258,7 +258,7 @@ The vault is the long-term knowledge base. This repo is the implementation. The 
 
 | Tool | Version |
 |---|---|
-| Rust toolchain | 1.93.0 (pinned via `game/rust-toolchain.toml`) |
+| Rust toolchain | 1.95.0 (pinned via `game/rust-toolchain.toml`) |
 | Cargo | bundled with rustup |
 | Python | 3.x (for `game/tools/prototype_run_check.py` run-bundle validator) |
 | OS | Linux + macOS + Windows; Steam Deck floor target |

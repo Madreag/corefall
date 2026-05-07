@@ -1,23 +1,23 @@
 {
-  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ActPlayerSelectItemParams",
   "description": "`act.player.select_item` — set the active inventory slot.",
   "type": "object",
-  "required": [
-    "schema_version",
-    "slot"
-  ],
   "properties": {
     "schema_version": {
       "type": "integer",
       "format": "uint32",
-      "minimum": 0.0
+      "minimum": 0
     },
     "slot": {
       "type": "integer",
       "format": "uint32",
-      "minimum": 0.0
+      "minimum": 0
     }
   },
-  "additionalProperties": false
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "slot"
+  ]
 }
