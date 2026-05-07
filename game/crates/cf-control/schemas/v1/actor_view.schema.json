@@ -1,0 +1,122 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "ActorView",
+  "description": "Public projection of one actor for the observe envelope. Mirrors `cf_actor::ActorObservation` with extra fields (rifle ammo / cooldown / reload state) the engine wires through.",
+  "type": "object",
+  "required": [
+    "aim",
+    "controllable",
+    "hp",
+    "hp_max",
+    "id",
+    "on_ground",
+    "position",
+    "selected_item",
+    "selected_slot",
+    "status",
+    "team",
+    "velocity"
+  ],
+  "properties": {
+    "aim": {
+      "type": "array",
+      "items": {
+        "type": "number",
+        "format": "float"
+      },
+      "maxItems": 2,
+      "minItems": 2
+    },
+    "controllable": {
+      "type": "boolean"
+    },
+    "hp": {
+      "type": "number",
+      "format": "float"
+    },
+    "hp_max": {
+      "type": "number",
+      "format": "float"
+    },
+    "id": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0.0
+    },
+    "on_ground": {
+      "type": "boolean"
+    },
+    "position": {
+      "type": "array",
+      "items": {
+        "type": "number",
+        "format": "float"
+      },
+      "maxItems": 2,
+      "minItems": 2
+    },
+    "rifle_ammo": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint32",
+      "minimum": 0.0
+    },
+    "rifle_capacity": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint32",
+      "minimum": 0.0
+    },
+    "rifle_fire_cooldown_ticks": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint32",
+      "minimum": 0.0
+    },
+    "rifle_reload_remaining_ticks": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint32",
+      "minimum": 0.0
+    },
+    "rifle_reload_total_ticks": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint32",
+      "minimum": 0.0
+    },
+    "selected_item": {
+      "type": "string"
+    },
+    "selected_slot": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0.0
+    },
+    "status": {
+      "type": "string"
+    },
+    "team": {
+      "type": "string"
+    },
+    "velocity": {
+      "type": "array",
+      "items": {
+        "type": "number",
+        "format": "float"
+      },
+      "maxItems": 2,
+      "minItems": 2
+    }
+  }
+}

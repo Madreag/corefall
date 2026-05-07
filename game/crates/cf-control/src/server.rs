@@ -31,6 +31,8 @@ use tokio::{
 };
 use tokio_tungstenite::{accept_async, tungstenite::Message};
 
+use cf_actor::IntentSource;
+
 use crate::{
     envelope::{
         error_codes, JsonRpcError, JsonRpcId, JsonRpcNotification, JsonRpcRequest, JsonRpcResponse,
@@ -38,8 +40,9 @@ use crate::{
     },
     schemas::SCHEMA_VERSION,
     schemas::{
-        ActPlayerMoveParams, ObserveOnceParams, ObserveSubscribeParams, RunBundleWriteParams, RunForTicksParams,
-        ScenarioLoadParams, StepParams, SystemShutdownParams,
+        ActPlayerAimParams, ActPlayerFireParams, ActPlayerJumpParams, ActPlayerMoveParams, ActPlayerReloadParams,
+        ActPlayerResetParams, ActPlayerSelectItemParams, ObserveOnceParams, ObserveSubscribeParams,
+        RunBundleWriteParams, RunForTicksParams, ScenarioLoadParams, StepParams, SystemShutdownParams,
     },
     state::{ControlEnvelopeStatus, ObserveFrame, ObserveSettings},
     Settings,
@@ -100,7 +103,13 @@ pub enum ControlCommand {
     Resume,
     Step { ticks: u64 },
     RunForTicks { ticks: u64, write_run_bundle: bool },
-    ActPlayerMove { x: f32, y: f32 },
+    ActPlayerMove { x: f32, y: f32, source: IntentSource },
+    ActPlayerJump { source: IntentSource },
+    ActPlayerAim { x: f32, y: f32, source: IntentSource },
+    ActPlayerFire { pressed: bool, source: IntentSource },
+    ActPlayerReload { source: IntentSource },
+    ActPlayerSelectItem { slot: u32, source: IntentSource },
+    ActPlayerReset { source: IntentSource },
     SettingsSet { changes: SettingsPatch },
     RunBundleWrite { id_override: Option<String> },
     Shutdown { write_run_bundle: bool },
@@ -445,7 +454,95 @@ async fn process_request<E: EngineHandle>(
                 Ok(v) => v,
                 Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
             };
-            let result = engine.dispatch(ControlCommand::ActPlayerMove { x: p.x, y: p.y }).await;
+            if !p.x.is_finite() || !p.y.is_finite() {
+                return Some(invalid_param_reason(request.id, "axis_must_be_finite"));
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerMove {
+                    x: p.x,
+                    y: p.y,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.jump" => {
+            let _p: ActPlayerJumpParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerJump {
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.aim" => {
+            let p: ActPlayerAimParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            if !p.x.is_finite() || !p.y.is_finite() {
+                return Some(invalid_param_reason(request.id, "aim_must_be_finite"));
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerAim {
+                    x: p.x,
+                    y: p.y,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.fire" => {
+            let p: ActPlayerFireParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerFire {
+                    pressed: p.pressed,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.reload" => {
+            let _p: ActPlayerReloadParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerReload {
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.select_item" => {
+            let p: ActPlayerSelectItemParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerSelectItem {
+                    slot: p.slot,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.reset" => {
+            let _p: ActPlayerResetParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerReset {
+                    source: IntentSource::Cfctl,
+                })
+                .await;
             Some(ack_response(request.id, &result))
         }
         "act.settings.set" => {
@@ -665,6 +762,8 @@ mod tests {
                     schema_version: SCHEMA_VERSION,
                     settings: Settings::default(),
                 },
+                actors: vec![],
+                player_actor_id: None,
             }
         }
         async fn settings_snapshot(&self) -> Settings {

@@ -12,6 +12,10 @@ use std::{
 use chrono::{DateTime, Utc};
 use serde_json::json;
 
+use cf_actor::{
+    sim::{step as actor_step, ActorSimState, ActorTickOutcome, StepDeps, StepReport},
+    ActorId, ActorWorld, ControlIntent, IntentSource, ItemSlot, Vec2,
+};
 use cf_replay::{
     diagnostics, BuildInfo, BundleInputs, CapabilitiesBlock, CaptureConfig, ChecksumConfig, PerfSample, Recorder,
     RunManifest, SceneInfo, SettingsBlock, TestRecord, CONTROL_SCHEMA_VERSION, EVENT_ENVELOPE_VERSION,
@@ -24,8 +28,9 @@ use cf_sim_core::{
 };
 
 use crate::{
+    scenario::Scenario,
     server::{async_trait, CommandResult, ControlCommand, EngineHandle, SettingsPatch},
-    state::{ObserveFrame, ObserveSettings, RunStatus},
+    state::{ActorView, ObserveFrame, ObserveSettings, RunStatus},
     Settings, SCHEMA_VERSION,
 };
 
@@ -46,6 +51,12 @@ pub struct M0EngineConfig {
     /// Region dimensions copied from the scenario manifest (for run-bundle metadata).
     pub region_width: f32,
     pub region_height: f32,
+    /// Region bottom-left anchor copied from the scenario manifest. Used together with
+    /// `region_width`/`region_height` to derive the world-space X/Y bounds that the sim
+    /// step uses for actor clamping and projectile out-of-bounds expiry. Defaults to
+    /// `(0.0, 0.0)` for M0/M1 scenarios that anchor at the world origin.
+    pub region_anchor_x: f32,
+    pub region_anchor_y: f32,
     pub config_hash: String,
     pub commit_sha: String,
     pub rust_version: String,
@@ -63,6 +74,55 @@ pub struct M0EngineConfig {
     /// produce a real run bundle containing a `system.panic` event for M0-008 evidence.
     /// Production runs leave this `None`. Mirrored by `cf-app --debug-inject-panic-at-tick`.
     pub debug_inject_panic_at_tick: Option<u64>,
+    /// M1: initial actor world built from the scenario manifest. `None` for M0-style
+    /// scenarios (`m0_blank`) where the engine ticks an empty sim with no actors.
+    pub initial_actor_world: Option<InitialActorWorld>,
+    /// True when the scenario manifest declared at least one typed `actors[]` entry.
+    /// Used by the engine to decide whether `act.player.*` commands should be applied
+    /// or rejected as `act_player_unavailable_no_actor_world`.
+    pub has_actor_world: bool,
+}
+
+/// Snapshot of the initial actor world. Held in the engine config so `scenario.reset`
+/// can rebuild the world without reloading the manifest from disk. Per-actor
+/// `RifleState` is built at engine init via [`build_rifles_for_world`] so the
+/// configured `tick_rate_hz` is honoured (60 Hz vs 120 Hz produce different tick
+/// budgets but the same real-time RPS / reload duration).
+#[derive(Debug, Clone, PartialEq)]
+pub struct InitialActorWorld {
+    pub world: ActorWorld,
+    pub player: Option<ActorId>,
+}
+
+impl InitialActorWorld {
+    pub fn from_scenario(scenario: &Scenario) -> Self {
+        let mut world = ActorWorld::new(scenario.floor_y, scenario.gravity);
+        for actor in &scenario.actors {
+            let state = actor.build_state();
+            world.insert(state);
+        }
+        let player = world.player;
+        Self { world, player }
+    }
+}
+
+/// Build a per-actor `RifleState` map from the world for the configured `tick_rate_hz`.
+/// Each actor whose currently-selected slot OR any other slot holds a rifle gets a
+/// state entry. We key on inventory contents (not on selection) so swapping slots at
+/// runtime never strands an existing rifle's ammo / cooldown.
+fn build_rifles_for_world(world: &ActorWorld, tick_rate_hz: u32) -> BTreeMap<ActorId, cf_equipment::RifleState> {
+    let mut rifles = BTreeMap::new();
+    for actor in world.actors.values() {
+        for item in &actor.inventory.items {
+            if let cf_actor::InventoryItem::Rifle { preset } = item {
+                if let Some(spec) = cf_equipment::rifle_preset(preset) {
+                    rifles.insert(actor.id, cf_equipment::RifleState::new(spec, tick_rate_hz));
+                    break;
+                }
+            }
+        }
+    }
+    rifles
 }
 
 impl M0EngineConfig {
@@ -93,6 +153,8 @@ impl M0EngineConfig {
             tick_rate_hz: 60,
             region_width: 0.0,
             region_height: 0.0,
+            region_anchor_x: 0.0,
+            region_anchor_y: 0.0,
             config_hash: String::new(),
             commit_sha: env!("CARGO_PKG_VERSION").to_string(),
             rust_version: rustc_version_string(),
@@ -111,6 +173,8 @@ impl M0EngineConfig {
             expected_tests: Vec::new(),
             paced: false,
             debug_inject_panic_at_tick: None,
+            initial_actor_world: None,
+            has_actor_world: false,
         }
     }
 
@@ -128,23 +192,39 @@ impl M0EngineConfig {
         };
         cfg.region_width = scenario.region.width;
         cfg.region_height = scenario.region.height;
+        cfg.region_anchor_x = scenario.region.anchor.0;
+        cfg.region_anchor_y = scenario.region.anchor.1;
+        if scenario.has_actor_world() {
+            cfg.has_actor_world = true;
+            cfg.initial_actor_world = Some(InitialActorWorld::from_scenario(scenario));
+            // Bump the milestone hint when the scenario actually carries an actor world.
+            // Per-actor RifleState is built lazily in M0Engine::new with the configured
+            // tick_rate_hz so 60 Hz vs 120 Hz produce identical real-time RPS / reload.
+            cfg.milestone = "m1".to_string();
+        }
         cfg
     }
 
     pub fn config_hash_input(&self) -> String {
         format!(
-            "milestone={}|scenario={}|seed={}|ticks={}|hz={}|region={:?}|mode={}|control_api={}|debug={}|settings={:?}|expected_tests={:?}",
+            "milestone={}|scenario={}|seed={}|ticks={}|hz={}|region={:?}|mode={}|control_api={}|debug={}|settings={:?}|expected_tests={:?}|has_actor_world={}",
             self.milestone,
             self.scenario_id,
             self.seed,
             self.duration_ticks,
             self.tick_rate_hz,
-            (self.region_width, self.region_height),
+            (
+                self.region_anchor_x,
+                self.region_anchor_y,
+                self.region_width,
+                self.region_height,
+            ),
             self.run_mode,
             self.control_api_enabled,
             self.debug_capabilities.join(","),
             self.settings,
             self.expected_tests,
+            self.has_actor_world,
         )
     }
 
@@ -170,7 +250,7 @@ fn bevy_version_string() -> String {
         .to_string()
 }
 
-const BEVY_VERSION_FALLBACK: &str = "0.14";
+const BEVY_VERSION_FALLBACK: &str = "0.18.1";
 
 /// Record a `system.panic` event into a recorder + bump the `error` severity counter.
 /// `tick` / `sim_time_ms` should be the engine's current values so the event slots into
@@ -188,6 +268,13 @@ pub fn report_panic_to_recorder(recorder: &Arc<Recorder>, tick: u64, sim_time_ms
         None,
     );
 }
+
+/// Upper bound on the number of per-tick duration samples retained in
+/// `EngineMutable::tick_durations_us`. Only the last `cadence_ticks` entries are ever
+/// read by `TickSampleStats::from_recent`, so anything above this cap is dead weight.
+/// Set well above the default 60 Hz cadence to leave headroom for higher tick rates
+/// and larger checksum cadences without trimming on every tick.
+const TICK_DURATIONS_HISTORY_CAP: usize = 4096;
 
 /// Periodic per-tick performance stats emitted as `system.tick_sample`. Keeps M0 evidence
 /// of per-tick cost in the run bundle without waiting for the M3 perf overlay.
@@ -263,6 +350,20 @@ struct EngineMutable {
     pending_runbundle: bool,
     shutdown_requested: bool,
     tick_durations_us: Vec<u64>,
+    /// M1: pending player intent for the next tick. The dispatch handlers update fields
+    /// here; `drive_tick` consumes the intent, applies it, then clears the edge-triggered
+    /// fields. Continuous fields (`move_x`, `aim`) persist tick-to-tick.
+    pending_intent: ControlIntent,
+    /// M1: actor world + rifles + projectiles. `None` for M0 scenarios.
+    actor_state: Option<ActorSimState>,
+    /// Cached player actor id from the actor world for fast access.
+    player_actor: Option<ActorId>,
+    /// Monotonic counter incremented whenever `pending_intent` is externally
+    /// reset (e.g. `scenario.reset` zeroes it). Edge-detecting input bridges
+    /// (`cf-app::ingest_player_input`) watch this to know when their cached
+    /// "last sent" trackers are stale and must redispatch held keys, even if
+    /// the keyboard state itself has not changed.
+    intent_epoch: u64,
 }
 
 fn observed_run_status(state: &EngineMutable) -> RunStatus {
@@ -294,6 +395,16 @@ impl M0Engine {
         let initial_settings = config.settings.clone();
         let current_tick = Arc::new(std::sync::atomic::AtomicU64::new(0));
         let tick_dt_ms = 1000.0 / f64::from(config.tick_rate_hz.max(1));
+        let (actor_state, player_actor) = if let Some(initial) = &config.initial_actor_world {
+            let mut sim_state = ActorSimState::new(initial.world.clone());
+            for (id, rifle) in build_rifles_for_world(&initial.world, config.tick_rate_hz) {
+                sim_state.ensure_rifle_for(id, rifle);
+            }
+            (Some(sim_state), initial.player)
+        } else {
+            (None, None)
+        };
+        let pending_intent = ControlIntent::new(player_actor.unwrap_or(ActorId(0)), IntentSource::Cfctl);
 
         diagnostics::set_panic_reporter({
             let recorder = recorder.clone();
@@ -313,6 +424,10 @@ impl M0Engine {
                 pending_runbundle: false,
                 shutdown_requested: false,
                 tick_durations_us: Vec::with_capacity(1024),
+                pending_intent,
+                actor_state,
+                player_actor,
+                intent_epoch: 0,
             }),
             recorder,
             current_tick,
@@ -407,32 +522,91 @@ impl M0Engine {
     }
 
     /// Drive a single tick. Emits a `determinism.sim_checksum` and a `system.tick_sample`
-    /// every `cadence_ticks` ticks (M0 default = 60).
+    /// every `cadence_ticks` ticks (M0 default = 60). When the engine carries an
+    /// [`ActorSimState`], drives the M1 actor pipeline and emits the resulting `input.*`
+    /// / `actor.*` / `equipment.*` / `combat.*` / `body.*` events.
     pub fn drive_tick(&self) -> Option<Tick> {
         let start = Instant::now();
         let mut state = self.state.write().expect("engine state poisoned");
         let advanced = state.clock.advance();
         let mut checksum_payload: Option<(Tick, f64, String)> = None;
         let mut tick_sample_payload: Option<(Tick, f64, TickSampleStats)> = None;
+        let mut step_report: Option<(Tick, f64, ControlIntent, StepReport)> = None;
+        let mut snapshot_payload: Option<(Tick, f64, ActorWorldSnapshot)> = None;
         if let Some(tick) = advanced {
             state.rng.next_u64();
+            // M1: step the actor world if present. The pending intent is consumed and
+            // its edge-triggered fields cleared so the next tick starts fresh.
+            if state.actor_state.is_some() {
+                let intent = state.pending_intent.clone();
+                state.pending_intent.clear_edges();
+                let region_min_x = self.config.region_anchor_x;
+                let region_max_x = self.config.region_anchor_x + self.config.region_width.max(0.0);
+                let region_max_y = self.config.region_anchor_y + self.config.region_height.max(0.0);
+                let tick_dt = SimConfig {
+                    tick_rate_hz: self.config.tick_rate_hz,
+                }
+                .tick_dt()
+                .as_secs_f32();
+                let auto_reload = false;
+                let player = state.player_actor;
+                let mut intents = BTreeMap::new();
+                if let Some(player_id) = player {
+                    intents.insert(player_id, intent.clone());
+                }
+                let actor_state = state.actor_state.as_mut().expect("actor state present");
+                let report = actor_step(
+                    actor_state,
+                    &mut intents,
+                    StepDeps {
+                        tick_dt,
+                        region_min_x,
+                        region_max_x,
+                        region_max_y,
+                        auto_reload_when_empty: auto_reload,
+                    },
+                );
+                step_report = Some((tick, state.clock.sim_time_ms(), intent, report));
+            }
             let cadence = ChecksumConfig::m0_default().cadence_ticks;
             if cadence > 0 && tick.0 % cadence == 0 {
-                let cs = sim_state_v1(tick, &state.rng);
+                let actor_bytes = state
+                    .actor_state
+                    .as_ref()
+                    .map(|s| s.checksum_bytes())
+                    .unwrap_or_default();
+                let cs = sim_state_v1(tick, &state.rng, &actor_bytes);
                 let sim_time_ms = state.clock.sim_time_ms();
                 checksum_payload = Some((tick, sim_time_ms, cs.to_hex()));
                 // M0.2-F4: emit a tick_sample summarizing the last `cadence` ticks.
                 let stats = TickSampleStats::from_recent(&state.tick_durations_us, cadence as usize);
                 tick_sample_payload = Some((tick, sim_time_ms, stats));
+                if let Some(actor_state) = state.actor_state.as_ref() {
+                    snapshot_payload = Some((tick, sim_time_ms, ActorWorldSnapshot::from(actor_state)));
+                }
             }
         }
         let elapsed_us = start.elapsed().as_micros().min(u128::from(u64::MAX)) as u64;
         state.tick_durations_us.push(elapsed_us);
+        // `TickSampleStats::from_recent` only ever reads the last `cadence_ticks` entries
+        // (default 60). Cap the buffer well above that so long-running sessions without a
+        // `scenario.reset` don't accumulate millions of dead entries (~1.7 MB/hr at 60 Hz).
+        // Drain in batches so the trim cost amortises to O(1) per tick.
+        if state.tick_durations_us.len() > TICK_DURATIONS_HISTORY_CAP * 2 {
+            let drop = state.tick_durations_us.len() - TICK_DURATIONS_HISTORY_CAP;
+            state.tick_durations_us.drain(..drop);
+        }
         let new_tick = state.clock.tick().0;
         drop(state);
         // Publish the latest tick so the panic reporter records `system.panic` at the
         // current tick (preserves events.jsonl monotonic ordering).
         self.current_tick.store(new_tick, std::sync::atomic::Ordering::Relaxed);
+
+        // Emit M1 events from the actor step.
+        if let Some((tick, sim_time_ms, intent, report)) = step_report {
+            self.emit_actor_events(tick, sim_time_ms, &intent, &report);
+        }
+
         if let Some((tick, sim_time_ms, hex)) = checksum_payload {
             self.recorder.record(
                 tick,
@@ -467,7 +641,221 @@ impl M0Engine {
                 None,
             );
         }
+        if let Some((tick, sim_time_ms, snapshot)) = snapshot_payload {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "actor",
+                "actor_snapshot",
+                json!({
+                    "actors": snapshot.actors,
+                    "player_actor_id": snapshot.player_actor_id,
+                }),
+                None,
+            );
+        }
         advanced
+    }
+
+    fn emit_actor_events(&self, tick: Tick, sim_time_ms: f64, intent: &ControlIntent, report: &StepReport) {
+        // input.intent_received reflects what was actually consumed (after status gating).
+        let player_outcome = report.actor_outcomes.iter().find(|o| o.actor == intent.actor).cloned();
+        let player_view = json!({
+            "actor": intent.actor.0,
+            "source": match intent.source {
+                IntentSource::Human => "human",
+                IntentSource::Cfctl => "cfctl",
+            },
+            "move_x": intent.move_x,
+            "aim_x": intent.aim.x,
+            "aim_y": intent.aim.y,
+            "jump": intent.jump,
+            "fire": intent.fire,
+            "reload": intent.reload,
+            "selected_item": intent.selected_item.map(|s| s.0),
+            "reset": intent.reset,
+            "applied_move_x": player_outcome.as_ref().map(|o| o.move_x).unwrap_or(0.0),
+            "jump_accepted": player_outcome.as_ref().map(|o| o.jump_accepted).unwrap_or(false),
+        });
+        // Always emit input.intent_received once per tick, even when idle, so replay
+        // tooling can confirm input flow.
+        let intent_event_id = self
+            .recorder
+            .record(tick, sim_time_ms, "input", "intent_received", player_view, None);
+
+        for outcome in &report.actor_outcomes {
+            if outcome.previous_status != outcome.new_status {
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "actor",
+                    "actor_status_changed",
+                    json!({
+                        "actor": outcome.actor.0,
+                        "previous_status": outcome.previous_status.as_str(),
+                        "new_status": outcome.new_status.as_str(),
+                        "cause": status_change_cause(outcome),
+                    }),
+                    Some(intent_event_id.clone()),
+                );
+            }
+            if outcome.reset {
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "actor",
+                    "actor_reset",
+                    json!({"actor": outcome.actor.0}),
+                    Some(intent_event_id.clone()),
+                );
+            }
+            if let Some(slot) = outcome.selection_changed {
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "equipment",
+                    "selected_item_changed",
+                    json!({"actor": outcome.actor.0, "slot": slot.0}),
+                    Some(intent_event_id.clone()),
+                );
+            }
+            if outcome.jump_accepted {
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "actor",
+                    "actor_jumped",
+                    json!({"actor": outcome.actor.0}),
+                    Some(intent_event_id.clone()),
+                );
+            }
+            if outcome.landed_impulse > 0.5 {
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "actor",
+                    "actor_landed",
+                    json!({
+                        "actor": outcome.actor.0,
+                        "impulse": outcome.landed_impulse,
+                    }),
+                    Some(intent_event_id.clone()),
+                );
+            }
+            if outcome.reload_started {
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "equipment",
+                    "weapon_reload_started",
+                    json!({"actor": outcome.actor.0}),
+                    Some(intent_event_id.clone()),
+                );
+            }
+            if outcome.reload_completed {
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "equipment",
+                    "weapon_reloaded",
+                    json!({"actor": outcome.actor.0}),
+                    Some(intent_event_id.clone()),
+                );
+            }
+            if outcome.dry_fire {
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "equipment",
+                    "weapon_dry_fire",
+                    json!({"actor": outcome.actor.0}),
+                    Some(intent_event_id.clone()),
+                );
+            }
+            if outcome.fired {
+                let muzzle = outcome.muzzle_origin.unwrap_or(Vec2::ZERO);
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "equipment",
+                    "weapon_fired",
+                    json!({
+                        "actor": outcome.actor.0,
+                        "muzzle_origin": [muzzle.x, muzzle.y],
+                        "recoil_impulse": outcome.recoil_applied,
+                    }),
+                    Some(intent_event_id.clone()),
+                );
+            }
+        }
+        for spawn in &report.spawned_projectiles {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "combat",
+                "projectile_spawned",
+                json!({
+                    "id": spawn.id,
+                    "owner": spawn.owner.0,
+                    "origin": [spawn.origin.x, spawn.origin.y],
+                    "velocity": [spawn.velocity.x, spawn.velocity.y],
+                    "damage": spawn.damage,
+                }),
+                Some(intent_event_id.clone()),
+            );
+        }
+        for hit in &report.hits {
+            // Capture the real event_id of the projectile_hit so the follow-up
+            // actor_status_changed can both reference it via the `projectile_event`
+            // payload field AND parent-chain to it (a stronger cause-chain link than
+            // the same-tick input.intent_received). The recorder makes this id
+            // available; the previous synthetic "projectile:N" string was a label
+            // that pointed to no real event.
+            let projectile_hit_event_id = self.recorder.record(
+                tick,
+                sim_time_ms,
+                "combat",
+                "projectile_hit",
+                json!({
+                    "projectile_id": hit.projectile_id,
+                    "shooter": hit.shooter.0,
+                    "target": hit.target.0,
+                    "hit_position": [hit.hit_position.x, hit.hit_position.y],
+                    "damage": hit.damage,
+                }),
+                Some(intent_event_id.clone()),
+            );
+            if hit.previous_status != hit.new_status {
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "actor",
+                    "actor_status_changed",
+                    json!({
+                        "actor": hit.target.0,
+                        "previous_status": hit.previous_status.as_str(),
+                        "new_status": hit.new_status.as_str(),
+                        "cause": "projectile_hit",
+                        "projectile_event": projectile_hit_event_id,
+                    }),
+                    Some(projectile_hit_event_id.clone()),
+                );
+            }
+        }
+        for expired in &report.expired_projectiles {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "combat",
+                "projectile_expired",
+                json!({
+                    "id": expired.id,
+                    "owner": expired.owner.0,
+                    "last_position": [expired.last_position.x, expired.last_position.y],
+                }),
+                Some(intent_event_id.clone()),
+            );
+        }
     }
 
     pub fn record_run_finished(&self, exit_code: i32) {
@@ -495,7 +883,12 @@ impl M0Engine {
         let state = self.state.read().expect("engine state poisoned");
         let tick = state.clock.tick();
         let sim_time_ms = state.clock.sim_time_ms();
-        let cs = sim_state_v1(tick, &state.rng);
+        let actor_bytes = state
+            .actor_state
+            .as_ref()
+            .map(|s| s.checksum_bytes())
+            .unwrap_or_default();
+        let cs = sim_state_v1(tick, &state.rng, &actor_bytes);
         drop(state);
         self.recorder.record(
             tick,
@@ -521,6 +914,15 @@ impl M0Engine {
 
     pub fn shutdown_requested(&self) -> bool {
         self.state.read().map(|s| s.shutdown_requested).unwrap_or(false)
+    }
+
+    /// Monotonic counter that increments whenever `pending_intent` is
+    /// externally reset (currently only `scenario.reset`). Input bridges that
+    /// edge-trigger dispatch on keyboard-state change watch this so that
+    /// holding a key across a reset still produces a fresh dispatch on the
+    /// next frame.
+    pub fn intent_epoch(&self) -> u64 {
+        self.state.read().map(|s| s.intent_epoch).unwrap_or(0)
     }
 
     pub fn pending_runbundle(&self) -> bool {
@@ -564,6 +966,70 @@ impl M0Engine {
             wall_seconds,
             tick_rate_hz: self.config.tick_rate_hz,
         }
+    }
+
+    /// Snapshot of the actor world for the Bevy bridge in `cf-app`. Decoupled from
+    /// `EngineHandle::snapshot` (which serializes to JSON for the JSON-RPC envelope) so
+    /// the bridge doesn't pay JSON serialization cost every frame.
+    pub fn actor_render_snapshot(&self) -> ActorRenderSnapshot {
+        let state = self.state.read().expect("engine state poisoned");
+        let tick = state.clock.tick().0;
+        let mut snapshot = ActorRenderSnapshot {
+            tick,
+            floor_y: 0.0,
+            actors: Vec::new(),
+            player_actor_id: None,
+            player_rifle: None,
+        };
+        if let Some(sim) = state.actor_state.as_ref() {
+            snapshot.floor_y = sim.world.floor_y;
+            snapshot.player_actor_id = sim.world.player.map(|id| id.0);
+            for actor in sim.world.actors.values() {
+                snapshot.actors.push(cf_actor::ActorObservation::from(actor));
+            }
+            if let Some(player_id) = sim.world.player {
+                let rifle_selected = sim
+                    .world
+                    .actors
+                    .get(&player_id)
+                    .is_some_and(|a| a.inventory.selected_item().is_rifle());
+                if rifle_selected {
+                    if let Some(rifle) = sim.rifles.get(&player_id) {
+                        snapshot.player_rifle = Some(crate::engine::RifleHudView {
+                            ammo: rifle.ammo_in_mag,
+                            capacity: rifle.spec.mag_capacity,
+                            fire_cooldown_ticks: rifle.fire_cooldown_ticks,
+                            reload_remaining_ticks: rifle.reload_remaining_ticks,
+                            reload_total_ticks: rifle.reload_ticks(),
+                        });
+                    }
+                }
+            }
+        }
+        snapshot
+    }
+
+    fn reject_actor_command(
+        &self,
+        tick: Tick,
+        sim_time_ms: f64,
+        state: std::sync::RwLockWriteGuard<'_, EngineMutable>,
+        method: &str,
+    ) -> CommandResult {
+        drop(state);
+        self.recorder.record(
+            tick,
+            sim_time_ms,
+            "control",
+            "command_rejected",
+            json!({
+                "method": method,
+                "reason": "act_player_unavailable_no_actor_world",
+                "fix_hint": "load an M1+ scenario such as m1_actor_range that declares actors[]."
+            }),
+            None,
+        );
+        CommandResult::rejected("act_player_unavailable_no_actor_world", tick.0)
     }
 
     pub fn write_run_bundle(&self, ended_at: DateTime<Utc>, exit_code: i32) -> Result<PathBuf, cf_replay::BundleError> {
@@ -654,7 +1120,7 @@ impl M0Engine {
             },
             seed: self.config.seed,
             started_at_utc: self.started_at.to_rfc3339(),
-            duration_target_sec: f64::from(self.config.duration_ticks as u32) / f64::from(self.config.tick_rate_hz),
+            duration_target_sec: self.config.duration_ticks as f64 / f64::from(self.config.tick_rate_hz),
             material_schema_version: "n/a-m0".to_string(),
             config_hash: self.config.config_hash.clone(),
             assumptions_tested: self.config.assumptions_tested.clone(),
@@ -682,11 +1148,95 @@ impl M0Engine {
     }
 }
 
+/// Snapshot of the actor world for cf-app's Bevy bridge. Cheap to clone; reuses
+/// `cf-actor::ActorObservation` which is the public actor projection.
+#[derive(Debug, Clone, Default)]
+pub struct ActorRenderSnapshot {
+    pub tick: u64,
+    pub floor_y: f32,
+    pub actors: Vec<cf_actor::ActorObservation>,
+    pub player_actor_id: Option<u64>,
+    pub player_rifle: Option<RifleHudView>,
+}
+
+/// Rifle ammo / cooldown / reload bundle for the HUD bridge. Mirrors `cf-ui::HudRifle`
+/// without depending on cf-ui.
+#[derive(Debug, Clone, Default)]
+pub struct RifleHudView {
+    pub ammo: u32,
+    pub capacity: u32,
+    pub fire_cooldown_ticks: u32,
+    pub reload_remaining_ticks: u32,
+    pub reload_total_ticks: u32,
+}
+
+/// Compact projection of the actor world emitted as the payload of `actor.actor_snapshot`
+/// events at the configured cadence (60 ticks by default).
+struct ActorWorldSnapshot {
+    actors: Vec<serde_json::Value>,
+    player_actor_id: Option<u64>,
+}
+
+impl From<&ActorSimState> for ActorWorldSnapshot {
+    fn from(sim: &ActorSimState) -> Self {
+        let actors = sim
+            .world
+            .actors
+            .values()
+            .map(|a| {
+                json!({
+                    "id": a.id.0,
+                    "team": a.team,
+                    "controllable": a.controllable,
+                    "position": [a.position.x, a.position.y],
+                    "velocity": [a.velocity.x, a.velocity.y],
+                    "aim": [a.aim.x, a.aim.y],
+                    "on_ground": a.on_ground,
+                    "status": a.status.as_str(),
+                    "hp": a.hp,
+                    "hp_max": a.hp_max,
+                })
+            })
+            .collect();
+        Self {
+            actors,
+            player_actor_id: sim.world.player.map(|id| id.0),
+        }
+    }
+}
+
+/// Cause label for `actor.actor_status_changed` events emitted from `step_one_actor`.
+///
+/// In M1 the only mutator inside `step_one_actor` that touches `actor.status` is
+/// `actor.reset()` (called when the player issues `act.player.reset`). Damage-driven
+/// transitions are emitted from a separate projectile-hit loop with cause
+/// `projectile_hit`, never via this helper. Future milestones (M5 chassis ejection,
+/// M5.6 hazard contact, etc.) MUST extend [`ActorTickOutcome`] with an explicit
+/// cause discriminant rather than relying on a generic catch-all label here, so
+/// the cause-chain stays semantically correct for replay analysis.
+fn status_change_cause(outcome: &ActorTickOutcome) -> &'static str {
+    debug_assert!(
+        outcome.reset,
+        "status_change_cause called for an outcome with no known cause; M1 only emits step_one_actor status changes via actor.reset(). Extend ActorTickOutcome with an explicit cause discriminant before adding new mutators."
+    );
+    // Defensive fallback for release builds: if a future milestone introduces
+    // another status-mutating path inside `step_one_actor` without extending
+    // `ActorTickOutcome` with an explicit cause discriminant, mislabeling the
+    // change as `reset` would silently corrupt replay/cause-chain analysis.
+    // Surfacing `unknown` makes the contract gap visible in the run bundle so
+    // it can be caught and fixed rather than masquerading as a reset.
+    if outcome.reset {
+        "reset"
+    } else {
+        "unknown"
+    }
+}
+
 fn m0_notes_addendum() -> String {
     "## DR-002 v1 schema lock\n\n\
 - Event envelope: `{schema_version, run_id, tick, sim_time_ms, event_id, category, event_type, payload, parent_event_id?, dropped_count?}`.\n\
 - M0 categories: `system`, `control`, `determinism`. `snapshot` opens at M3.\n\
-- Checksum: `algorithm=blake3`, `scope=sim_state_v1` (M0 covers `tick_counter || rng_state_bytes`; M2/M3 append actor/inventory/terrain bytes without bumping the suffix; layout-breaking bumps go to `_v2`).\n\
+- Checksum: `algorithm=blake3`, `scope=sim_state_v1` (M0 covers `tick_counter || rng_state_bytes`; M1 appends actor/inventory/projectile bytes via `cf_actor::sim::ActorSimState::checksum_bytes()`; M2/M3 will append terrain bytes; all without bumping the suffix; layout-breaking bumps go to `_v2`).\n\
 - Manifest extensions: `checksum.{algorithm,scope,cadence_ticks}`, `settings:{...}` block.\n\
 - Summary extensions: `final_sim_checksum`, `checksum_event_count`, `first_tick`, `last_tick`.\n\
 - M3 picks up replay verification (`first_divergence` event), the `snapshot` category, and full headless replay parity.\n\
@@ -742,6 +1292,50 @@ fn apply_settings_patch(settings: &mut Settings, patch: &SettingsPatch) -> Vec<S
 impl EngineHandle for M0Engine {
     async fn snapshot(&self, _filter: Option<&str>) -> ObserveFrame {
         let state = self.state.read().expect("engine state poisoned");
+        let actors = if let Some(sim) = state.actor_state.as_ref() {
+            sim.world
+                .actors
+                .values()
+                .map(|a| {
+                    // Gate rifle fields on the actor's currently-selected slot, mirroring
+                    // `actor_render_snapshot` (which the cf-app HUD reads). When a non-rifle
+                    // slot is selected the wire shows null/None for ammo/capacity/cooldowns
+                    // so external observers (cfctl, replay viewers, AI agents) match what
+                    // the player sees in the HUD ("NO RIFLE"). The rifle keeps its physical
+                    // state in `sim.rifles` regardless of selection — this view is filtered.
+                    let rifle = if a.inventory.selected_item().is_rifle() {
+                        sim.rifles.get(&a.id)
+                    } else {
+                        None
+                    };
+                    ActorView {
+                        id: a.id.0,
+                        team: a.team.clone(),
+                        controllable: a.controllable,
+                        position: [a.position.x, a.position.y],
+                        velocity: [a.velocity.x, a.velocity.y],
+                        aim: [a.aim.x, a.aim.y],
+                        on_ground: a.on_ground,
+                        status: a.status.as_str().to_string(),
+                        hp: a.hp,
+                        hp_max: a.hp_max,
+                        selected_slot: a.inventory.selected.0,
+                        selected_item: a.inventory.selected_item().label().to_string(),
+                        rifle_ammo: rifle.map(|r| r.ammo_in_mag),
+                        rifle_capacity: rifle.map(|r| r.spec.mag_capacity),
+                        rifle_fire_cooldown_ticks: rifle.map(|r| r.fire_cooldown_ticks),
+                        rifle_reload_remaining_ticks: rifle.map(|r| r.reload_remaining_ticks),
+                        rifle_reload_total_ticks: rifle.map(|r| r.reload_ticks()),
+                    }
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
+        let player_actor_id = state
+            .actor_state
+            .as_ref()
+            .and_then(|sim| sim.world.player.map(|id| id.0));
         let frame = ObserveFrame {
             schema_version: SCHEMA_VERSION,
             run_id: self.recorder.run_id().to_string(),
@@ -755,6 +1349,8 @@ impl EngineHandle for M0Engine {
                 schema_version: SCHEMA_VERSION,
                 settings: state.settings.clone(),
             },
+            actors,
+            player_actor_id,
         };
         let tick = state.clock.tick();
         let sim_time_ms = state.clock.sim_time_ms();
@@ -832,16 +1428,60 @@ impl EngineHandle for M0Engine {
                 }
             }
             ControlCommand::ScenarioReset => {
-                state.clock = SimClock::new(SimConfig {
-                    tick_rate_hz: self.config.tick_rate_hz,
-                });
+                // Reset the world state (RNG + actor world + pending intent) but do NOT
+                // rewind the clock. Rewinding would violate `events.jsonl` monotonicity if
+                // any events were recorded at higher ticks before the reset. The clock is a
+                // monotonic timeline; `scenario.reset` is a content reload, not a time-warp.
                 state.rng = Rng::from_seed(self.config.seed);
                 state.tick_durations_us.clear();
-                let tick = state.clock.tick();
+                // Capture in-flight projectiles + the projectile-id counter from the old
+                // sim state before we replace it. We emit a `combat.projectile_expired`
+                // event for each discarded projectile so every `combat.projectile_spawned`
+                // entry in the event log has a matched termination event, and we carry
+                // the counter forward so post-reset projectile ids never alias pre-reset
+                // ones — the event log is a single monotonic timeline that replay
+                // analyzers correlate by `projectile_id`.
+                let discarded_projectiles: Vec<(u64, ActorId, Vec2)> = state
+                    .actor_state
+                    .as_ref()
+                    .map(|s| s.projectiles.iter().map(|p| (p.id, p.owner, p.position)).collect())
+                    .unwrap_or_default();
+                let next_projectile_id_carry = state.actor_state.as_ref().map(|s| s.next_projectile_id()).unwrap_or(0);
+                // Preserve the pre-reset intent source so the next idle tick's
+                // `input.intent_received` event still attributes to whoever was
+                // driving (cfctl OR human at the keyboard) rather than spuriously
+                // flipping to `cfctl` because the reset handler hardcoded a default.
+                let preserved_source = state.pending_intent.source;
+                if let Some(initial) = self.config.initial_actor_world.as_ref() {
+                    let mut sim_state = ActorSimState::new(initial.world.clone());
+                    sim_state.set_next_projectile_id(next_projectile_id_carry);
+                    for (id, rifle) in build_rifles_for_world(&initial.world, self.config.tick_rate_hz) {
+                        sim_state.ensure_rifle_for(id, rifle);
+                    }
+                    state.actor_state = Some(sim_state);
+                    state.player_actor = initial.player;
+                    state.pending_intent = ControlIntent::new(initial.player.unwrap_or(ActorId(0)), preserved_source);
+                }
+                state.intent_epoch = state.intent_epoch.wrapping_add(1);
                 drop(state);
+                for (projectile_id, owner, last_position) in &discarded_projectiles {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "combat",
+                        "projectile_expired",
+                        json!({
+                            "id": projectile_id,
+                            "owner": owner.0,
+                            "last_position": [last_position.x, last_position.y],
+                            "cause": "scenario_reset",
+                        }),
+                        None,
+                    );
+                }
                 self.recorder.record(
                     tick,
-                    0.0,
+                    sim_time_ms,
                     "control",
                     "command_accepted",
                     json!({"method": "scenario.reset"}),
@@ -931,23 +1571,246 @@ impl EngineHandle for M0Engine {
                 );
                 CommandResult::accepted(tick.0)
             }
-            ControlCommand::ActPlayerMove { x, y } => {
-                drop(state);
-                self.recorder.record(
-                    tick,
-                    sim_time_ms,
-                    "control",
-                    "command_rejected",
-                    json!({
-                        "method": "act.player.move",
-                        "reason": "act_player_move_not_available_in_m0",
-                        "x": x,
-                        "y": y,
-                        "fix_hint": "M0 has no player actor; M1 wires act.player.move to ControlIntent."
-                    }),
-                    None,
-                );
-                CommandResult::rejected("act_player_move_not_available_in_m0", tick.0)
+            ControlCommand::ActPlayerMove { x, y, source } => {
+                if !self.config.has_actor_world {
+                    drop(state);
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_rejected",
+                        json!({
+                            "method": "act.player.move",
+                            "reason": "act_player_move_not_available_in_m0",
+                            "x": x,
+                            "y": y,
+                            "fix_hint": "M0 has no player actor; load an M1 scenario such as m1_actor_range to enable act.player.*."
+                        }),
+                        None,
+                    );
+                    return CommandResult::rejected("act_player_move_not_available_in_m0", tick.0);
+                }
+                // Defense-in-depth: the JSON-RPC server rejects NaN/Inf at the wire
+                // layer, but the engine dispatch is also reachable from cf-app's keyboard
+                // bridge (and any future bridge / direct-dispatch caller). Reject here
+                // too so a non-finite axis cannot leak into pending_intent and NaN-poison
+                // the muzzle / projectile path.
+                if !x.is_finite() || !y.is_finite() {
+                    drop(state);
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_rejected",
+                        json!({
+                            "method": "act.player.move",
+                            "reason": "axis_must_be_finite",
+                            "x": x,
+                            "y": y,
+                        }),
+                        None,
+                    );
+                    return CommandResult::rejected("axis_must_be_finite", tick.0);
+                }
+                let player = state.player_actor;
+                if let Some(player_id) = player {
+                    state.pending_intent.actor = player_id;
+                    state.pending_intent.source = source;
+                    state.pending_intent.move_x = x.clamp(-1.0, 1.0);
+                    // y is reserved for future ladder/climb input.
+                    let _ = y;
+                    drop(state);
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_accepted",
+                        json!({"method": "act.player.move", "x": x, "y": y, "actor": player_id.0}),
+                        None,
+                    );
+                    CommandResult::accepted(tick.0)
+                } else {
+                    drop(state);
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_rejected",
+                        json!({
+                            "method": "act.player.move",
+                            "reason": "no_player_actor",
+                            "fix_hint": "scenario manifest must declare exactly one actor with controllable=true."
+                        }),
+                        None,
+                    );
+                    CommandResult::rejected("no_player_actor", tick.0)
+                }
+            }
+            ControlCommand::ActPlayerJump { source } => {
+                if !self.config.has_actor_world {
+                    return self.reject_actor_command(tick, sim_time_ms, state, "act.player.jump");
+                }
+                let player = state.player_actor;
+                if let Some(player_id) = player {
+                    state.pending_intent.actor = player_id;
+                    state.pending_intent.source = source;
+                    state.pending_intent.jump = true;
+                    drop(state);
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_accepted",
+                        json!({"method": "act.player.jump", "actor": player_id.0}),
+                        None,
+                    );
+                    CommandResult::accepted(tick.0)
+                } else {
+                    self.reject_actor_command(tick, sim_time_ms, state, "act.player.jump")
+                }
+            }
+            ControlCommand::ActPlayerAim { x, y, source } => {
+                if !self.config.has_actor_world {
+                    return self.reject_actor_command(tick, sim_time_ms, state, "act.player.aim");
+                }
+                // Defense-in-depth (mirrors act.player.move): non-finite aim must NEVER
+                // reach pending_intent. cf_actor::sim::step normalizes the aim, but
+                // `Vec2::normalize_or_x` only short-circuits on a tiny vector — a NaN/Inf
+                // input survives normalization and propagates into the muzzle origin,
+                // projectile velocity, and recoil sign.
+                if !x.is_finite() || !y.is_finite() {
+                    drop(state);
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_rejected",
+                        json!({
+                            "method": "act.player.aim",
+                            "reason": "aim_must_be_finite",
+                            "x": x,
+                            "y": y,
+                        }),
+                        None,
+                    );
+                    return CommandResult::rejected("aim_must_be_finite", tick.0);
+                }
+                let player = state.player_actor;
+                if let Some(player_id) = player {
+                    state.pending_intent.actor = player_id;
+                    state.pending_intent.source = source;
+                    state.pending_intent.aim = Vec2::new(x, y);
+                    drop(state);
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_accepted",
+                        json!({"method": "act.player.aim", "actor": player_id.0, "x": x, "y": y}),
+                        None,
+                    );
+                    CommandResult::accepted(tick.0)
+                } else {
+                    self.reject_actor_command(tick, sim_time_ms, state, "act.player.aim")
+                }
+            }
+            ControlCommand::ActPlayerFire { pressed, source } => {
+                if !self.config.has_actor_world {
+                    return self.reject_actor_command(tick, sim_time_ms, state, "act.player.fire");
+                }
+                let player = state.player_actor;
+                if let Some(player_id) = player {
+                    state.pending_intent.actor = player_id;
+                    state.pending_intent.source = source;
+                    // `pressed: false` is an explicit release (a no-op for M1's
+                    // single-press rifle per the schema). Only a press raises the
+                    // edge so a release sent in the same tick as a prior press
+                    // does not erase the queued shot before `drive_tick` runs.
+                    if pressed {
+                        state.pending_intent.fire = true;
+                    }
+                    drop(state);
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_accepted",
+                        json!({"method": "act.player.fire", "actor": player_id.0, "pressed": pressed}),
+                        None,
+                    );
+                    CommandResult::accepted(tick.0)
+                } else {
+                    self.reject_actor_command(tick, sim_time_ms, state, "act.player.fire")
+                }
+            }
+            ControlCommand::ActPlayerReload { source } => {
+                if !self.config.has_actor_world {
+                    return self.reject_actor_command(tick, sim_time_ms, state, "act.player.reload");
+                }
+                let player = state.player_actor;
+                if let Some(player_id) = player {
+                    state.pending_intent.actor = player_id;
+                    state.pending_intent.source = source;
+                    state.pending_intent.reload = true;
+                    drop(state);
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_accepted",
+                        json!({"method": "act.player.reload", "actor": player_id.0}),
+                        None,
+                    );
+                    CommandResult::accepted(tick.0)
+                } else {
+                    self.reject_actor_command(tick, sim_time_ms, state, "act.player.reload")
+                }
+            }
+            ControlCommand::ActPlayerSelectItem { slot, source } => {
+                if !self.config.has_actor_world {
+                    return self.reject_actor_command(tick, sim_time_ms, state, "act.player.select_item");
+                }
+                let player = state.player_actor;
+                if let Some(player_id) = player {
+                    state.pending_intent.actor = player_id;
+                    state.pending_intent.source = source;
+                    state.pending_intent.selected_item = Some(ItemSlot(slot));
+                    drop(state);
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_accepted",
+                        json!({"method": "act.player.select_item", "actor": player_id.0, "slot": slot}),
+                        None,
+                    );
+                    CommandResult::accepted(tick.0)
+                } else {
+                    self.reject_actor_command(tick, sim_time_ms, state, "act.player.select_item")
+                }
+            }
+            ControlCommand::ActPlayerReset { source } => {
+                if !self.config.has_actor_world {
+                    return self.reject_actor_command(tick, sim_time_ms, state, "act.player.reset");
+                }
+                let player = state.player_actor;
+                if let Some(player_id) = player {
+                    state.pending_intent.actor = player_id;
+                    state.pending_intent.source = source;
+                    state.pending_intent.reset = true;
+                    drop(state);
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_accepted",
+                        json!({"method": "act.player.reset", "actor": player_id.0}),
+                        None,
+                    );
+                    CommandResult::accepted(tick.0)
+                } else {
+                    self.reject_actor_command(tick, sim_time_ms, state, "act.player.reset")
+                }
             }
             ControlCommand::SettingsSet { changes } => {
                 if changes.is_empty() {
@@ -1421,7 +2284,13 @@ mod tests {
         let scenario_path = write_test_scenario();
         let config = load_test_scenario_and_config(scenario_path);
         let engine = M0Engine::new(config);
-        let result = engine.dispatch(ControlCommand::ActPlayerMove { x: 1.0, y: 0.0 }).await;
+        let result = engine
+            .dispatch(ControlCommand::ActPlayerMove {
+                x: 1.0,
+                y: 0.0,
+                source: IntentSource::Cfctl,
+            })
+            .await;
         assert_eq!(result.status, crate::state::ControlEnvelopeStatus::Rejected);
         assert_eq!(result.reason.as_deref(), Some("act_player_move_not_available_in_m0"));
         let rejection = engine
@@ -1583,5 +2452,671 @@ mod tests {
         b.fill_config_hash();
         assert_eq!(a.config_hash, b.config_hash);
         assert!(!a.config_hash.is_empty());
+    }
+
+    fn write_m1_scenario() -> PathBuf {
+        let mut p = std::env::temp_dir();
+        let seq = TEST_SCENARIO_SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        p.push(format!("m1_actor_range_{}_{}.ron", std::process::id(), seq));
+        std::fs::write(
+            &p,
+            r#"(
+  schema_version: 1,
+  id: "m1_actor_range",
+  display_name: "M1 Actor Range",
+  description: "M1 engine test fixture.",
+  seed: 7,
+  duration_ticks: Some(120),
+  region: (anchor: (0.0, 0.0), width: 1280.0, height: 720.0),
+  gravity: -980.0,
+  floor_y: 16.0,
+  teams: [],
+  actors: [
+    (id: 1, team: "blue", spawn: (200.0, 32.0), controllable: true, hp: 100.0,
+      inventory: (rifle: Some("rifle_m1_default")), half_extents: Some((8.0, 16.0))),
+    (id: 2, team: "red", spawn: (900.0, 32.0), controllable: false, hp: 100.0,
+      inventory: (rifle: None)),
+  ],
+  objectives: [],
+  director: None,
+  capabilities: (debug: false, control_api: true, save_load: false),
+  save_fields: [],
+  expected_tests: ["M1-SMOKE-01"],
+  notes: "",
+)"#,
+        )
+        .unwrap();
+        p
+    }
+
+    fn load_m1_test_config(path: PathBuf) -> M0EngineConfig {
+        let scenario = crate::scenario::Scenario::load_from_file(&path).unwrap();
+        M0EngineConfig::for_loaded_scenario(&scenario, path)
+    }
+
+    #[tokio::test]
+    async fn m1_act_player_move_updates_pending_intent_and_emits_input_event() {
+        let path = write_m1_scenario();
+        let config = load_m1_test_config(path);
+        let engine = M0Engine::new(config);
+        engine.record_run_started();
+
+        let result = engine
+            .dispatch(ControlCommand::ActPlayerMove {
+                x: 1.0,
+                y: 0.0,
+                source: IntentSource::Cfctl,
+            })
+            .await;
+        assert_eq!(result.status, crate::state::ControlEnvelopeStatus::Accepted);
+        engine.drive_tick();
+        let events = engine.recorder().snapshot_events();
+        let intent = events
+            .iter()
+            .find(|e| e.category == "input" && e.event_type == "intent_received")
+            .expect("input.intent_received must be recorded");
+        assert!((intent.payload["move_x"].as_f64().unwrap() - 1.0).abs() < 1e-3);
+    }
+
+    #[tokio::test]
+    async fn m1_act_player_fire_spawns_projectile_event() {
+        let path = write_m1_scenario();
+        let config = load_m1_test_config(path);
+        let engine = M0Engine::new(config);
+        engine.record_run_started();
+
+        let result = engine
+            .dispatch(ControlCommand::ActPlayerFire {
+                pressed: true,
+                source: IntentSource::Cfctl,
+            })
+            .await;
+        assert_eq!(result.status, crate::state::ControlEnvelopeStatus::Accepted);
+        engine.drive_tick();
+        let events = engine.recorder().snapshot_events();
+        assert!(
+            events
+                .iter()
+                .any(|e| e.category == "equipment" && e.event_type == "weapon_fired"),
+            "weapon_fired must land in events: {:?}",
+            events
+                .iter()
+                .map(|e| (e.category.clone(), e.event_type.clone()))
+                .collect::<Vec<_>>()
+        );
+        assert!(
+            events
+                .iter()
+                .any(|e| e.category == "combat" && e.event_type == "projectile_spawned"),
+            "projectile_spawned must land in events"
+        );
+    }
+
+    #[tokio::test]
+    async fn m1_act_player_fire_release_preserves_queued_press() {
+        // Regression proof for the cf-app keyboard bridge contract: key release sends
+        // `pressed: false` so future hold-to-fire weapons can observe release edges.
+        // M1's rifle is press-edge driven, so release must be accepted but must not
+        // erase a still-unconsumed press before the next fixed tick drains the intent.
+        let path = write_m1_scenario();
+        let config = load_m1_test_config(path);
+        let engine = M0Engine::new(config);
+        engine.record_run_started();
+
+        let press = engine
+            .dispatch(ControlCommand::ActPlayerFire {
+                pressed: true,
+                source: IntentSource::Human,
+            })
+            .await;
+        assert_eq!(press.status, crate::state::ControlEnvelopeStatus::Accepted);
+
+        let release = engine
+            .dispatch(ControlCommand::ActPlayerFire {
+                pressed: false,
+                source: IntentSource::Human,
+            })
+            .await;
+        assert_eq!(
+            release.status,
+            crate::state::ControlEnvelopeStatus::Accepted,
+            "explicit fire release must stay a valid command"
+        );
+
+        engine.drive_tick();
+        let events = engine.recorder().snapshot_events();
+        let intent = events
+            .iter()
+            .find(|e| e.category == "input" && e.event_type == "intent_received")
+            .expect("input.intent_received must be recorded after press+release");
+        assert_eq!(
+            intent.payload.get("source").and_then(|v| v.as_str()),
+            Some("human"),
+            "same-tick press+release should retain the human source"
+        );
+        assert_eq!(
+            intent.payload.get("fire").and_then(|v| v.as_bool()),
+            Some(true),
+            "release must not clobber the queued fire edge before drive_tick"
+        );
+        assert!(
+            events
+                .iter()
+                .any(|e| e.category == "equipment" && e.event_type == "weapon_fired"),
+            "queued press must still fire after same-tick release; events: {:?}",
+            events
+                .iter()
+                .map(|e| (e.category.clone(), e.event_type.clone(), e.payload.clone()))
+                .collect::<Vec<_>>()
+        );
+        assert!(
+            events
+                .iter()
+                .any(|e| e.category == "combat" && e.event_type == "projectile_spawned"),
+            "queued press must still spawn a projectile after same-tick release"
+        );
+    }
+
+    #[tokio::test]
+    async fn m1_act_player_aim_normalizes_and_records_event() {
+        let path = write_m1_scenario();
+        let config = load_m1_test_config(path);
+        let engine = M0Engine::new(config);
+        engine.record_run_started();
+
+        let _ = engine
+            .dispatch(ControlCommand::ActPlayerAim {
+                x: 0.0,
+                y: 1.0,
+                source: IntentSource::Cfctl,
+            })
+            .await;
+        engine.drive_tick();
+        let frame = engine.snapshot(None).await;
+        let player = frame
+            .actors
+            .iter()
+            .find(|a| Some(a.id) == frame.player_actor_id)
+            .unwrap();
+        // Aim normalized to unit vector (0, 1).
+        assert!((player.aim[1] - 1.0).abs() < 1e-3);
+    }
+
+    #[tokio::test]
+    async fn m1_act_player_jump_rejected_in_air_recorded() {
+        let path = write_m1_scenario();
+        let config = load_m1_test_config(path);
+        let engine = M0Engine::new(config);
+        engine.record_run_started();
+
+        // First jump from spawn (above ground) — actor is NOT on_ground until physics
+        // drops it, so the first jump is refused. Tick a few times so the actor lands.
+        for _ in 0..6 {
+            engine.drive_tick();
+        }
+        // Now jump should succeed.
+        let _ = engine
+            .dispatch(ControlCommand::ActPlayerJump {
+                source: IntentSource::Cfctl,
+            })
+            .await;
+        engine.drive_tick();
+        let events = engine.recorder().snapshot_events();
+        let jumped = events
+            .iter()
+            .any(|e| e.category == "actor" && e.event_type == "actor_jumped");
+        assert!(jumped, "actor_jumped should land after the actor settles on the floor");
+    }
+
+    #[tokio::test]
+    async fn m1_act_player_reset_emits_actor_reset_event() {
+        let path = write_m1_scenario();
+        let config = load_m1_test_config(path);
+        let engine = M0Engine::new(config);
+        engine.record_run_started();
+
+        let _ = engine
+            .dispatch(ControlCommand::ActPlayerReset {
+                source: IntentSource::Cfctl,
+            })
+            .await;
+        engine.drive_tick();
+        let events = engine.recorder().snapshot_events();
+        assert!(events.iter().any(|e| e.event_type == "actor_reset"));
+    }
+
+    #[tokio::test]
+    async fn m1_act_player_select_item_changes_slot_in_observation() {
+        let path = write_m1_scenario();
+        let config = load_m1_test_config(path);
+        let engine = M0Engine::new(config);
+        engine.record_run_started();
+        let _ = engine
+            .dispatch(ControlCommand::ActPlayerSelectItem {
+                slot: 1,
+                source: IntentSource::Cfctl,
+            })
+            .await;
+        engine.drive_tick();
+        let frame = engine.snapshot(None).await;
+        let player = frame
+            .actors
+            .iter()
+            .find(|a| Some(a.id) == frame.player_actor_id)
+            .unwrap();
+        assert_eq!(player.selected_slot, 1);
+    }
+
+    #[tokio::test]
+    async fn m1_actor_render_snapshot_hides_rifle_when_non_rifle_slot_selected() {
+        // M1-FIX-9 regression: actor_render_snapshot() must clear player_rifle when
+        // the player's currently-selected slot is not a rifle, so the HUD shows
+        // "NO RIFLE" instead of READY/COOLDOWN.
+        let path = write_m1_scenario();
+        let config = load_m1_test_config(path);
+        let engine = M0Engine::new(config);
+        engine.record_run_started();
+        // Default selection (slot 0 = rifle) - HUD should show rifle.
+        let snap_a = engine.actor_render_snapshot();
+        assert!(snap_a.player_rifle.is_some(), "rifle slot selected -> HUD shows rifle");
+        // Select an empty slot.
+        let _ = engine
+            .dispatch(ControlCommand::ActPlayerSelectItem {
+                slot: 1,
+                source: IntentSource::Cfctl,
+            })
+            .await;
+        engine.drive_tick();
+        let snap_b = engine.actor_render_snapshot();
+        assert!(
+            snap_b.player_rifle.is_none(),
+            "non-rifle slot -> HUD hides rifle (NO RIFLE)"
+        );
+        // Switch back to slot 0.
+        let _ = engine
+            .dispatch(ControlCommand::ActPlayerSelectItem {
+                slot: 0,
+                source: IntentSource::Cfctl,
+            })
+            .await;
+        engine.drive_tick();
+        let snap_c = engine.actor_render_snapshot();
+        assert!(snap_c.player_rifle.is_some(), "back to slot 0 -> HUD shows rifle again");
+    }
+
+    #[tokio::test]
+    async fn m1_observe_actor_view_hides_rifle_state_when_non_rifle_slot_selected() {
+        // Mirrors `m1_actor_render_snapshot_hides_rifle_when_non_rifle_slot_selected` for
+        // the wire-format `ActorView` exposed via `observe.once` / `observe.subscribe`.
+        // The cfctl/replay/AI consumers must see the same NO RIFLE state the player sees
+        // in the HUD; otherwise external observers mis-attribute fire-press behavior.
+        let path = write_m1_scenario();
+        let config = load_m1_test_config(path);
+        let engine = M0Engine::new(config);
+        engine.record_run_started();
+        // Default selection (slot 0 = rifle) - ActorView must show rifle fields.
+        let frame_a = engine.snapshot(None).await;
+        let player_a = frame_a
+            .actors
+            .iter()
+            .find(|a| Some(a.id) == frame_a.player_actor_id)
+            .unwrap();
+        assert!(
+            player_a.rifle_ammo.is_some(),
+            "rifle slot selected -> rifle_ammo populated"
+        );
+        assert!(player_a.rifle_capacity.is_some());
+        assert!(
+            player_a.rifle_reload_total_ticks.is_some(),
+            "rifle slot selected -> reload total is visible to cfctl/AI observers"
+        );
+
+        let _ = engine
+            .dispatch(ControlCommand::ActPlayerFire {
+                pressed: true,
+                source: IntentSource::Cfctl,
+            })
+            .await;
+        engine.drive_tick();
+        let _ = engine
+            .dispatch(ControlCommand::ActPlayerReload {
+                source: IntentSource::Cfctl,
+            })
+            .await;
+        engine.drive_tick();
+        let frame_reload = engine.snapshot(None).await;
+        let player_reload = frame_reload
+            .actors
+            .iter()
+            .find(|a| Some(a.id) == frame_reload.player_actor_id)
+            .unwrap();
+        assert!(
+            player_reload
+                .rifle_reload_remaining_ticks
+                .is_some_and(|ticks| ticks > 0),
+            "reload command should expose remaining reload ticks"
+        );
+        assert_eq!(
+            player_reload.rifle_reload_total_ticks,
+            Some(90),
+            "M1 rifle reload is 1.5s at the 60 Hz test default"
+        );
+
+        // Select an empty slot.
+        let _ = engine
+            .dispatch(ControlCommand::ActPlayerSelectItem {
+                slot: 1,
+                source: IntentSource::Cfctl,
+            })
+            .await;
+        engine.drive_tick();
+        let frame_b = engine.snapshot(None).await;
+        let player_b = frame_b
+            .actors
+            .iter()
+            .find(|a| Some(a.id) == frame_b.player_actor_id)
+            .unwrap();
+        assert!(
+            player_b.rifle_ammo.is_none(),
+            "non-rifle slot -> rifle_ammo must be None on the wire"
+        );
+        assert!(player_b.rifle_capacity.is_none());
+        assert!(player_b.rifle_fire_cooldown_ticks.is_none());
+        assert!(player_b.rifle_reload_remaining_ticks.is_none());
+        assert!(player_b.rifle_reload_total_ticks.is_none());
+        // Re-select rifle slot 0.
+        let _ = engine
+            .dispatch(ControlCommand::ActPlayerSelectItem {
+                slot: 0,
+                source: IntentSource::Cfctl,
+            })
+            .await;
+        engine.drive_tick();
+        let frame_c = engine.snapshot(None).await;
+        let player_c = frame_c
+            .actors
+            .iter()
+            .find(|a| Some(a.id) == frame_c.player_actor_id)
+            .unwrap();
+        assert!(
+            player_c.rifle_ammo.is_some(),
+            "back to slot 0 -> rifle_ammo populated again"
+        );
+        assert_eq!(player_c.rifle_reload_total_ticks, Some(90));
+    }
+
+    #[tokio::test]
+    async fn m1_actor_snapshot_event_emitted_at_cadence() {
+        let path = write_m1_scenario();
+        let config = load_m1_test_config(path);
+        let engine = M0Engine::new(config);
+        engine.record_run_started();
+        for _ in 0..60 {
+            engine.drive_tick();
+        }
+        let events = engine.recorder().snapshot_events();
+        assert!(events
+            .iter()
+            .any(|e| e.category == "actor" && e.event_type == "actor_snapshot"));
+    }
+
+    #[tokio::test]
+    async fn m1_observe_includes_actor_view_with_rifle_state() {
+        let path = write_m1_scenario();
+        let config = load_m1_test_config(path);
+        let engine = M0Engine::new(config);
+        engine.record_run_started();
+        let frame = engine.snapshot(None).await;
+        assert!(!frame.actors.is_empty());
+        let player = frame
+            .actors
+            .iter()
+            .find(|a| Some(a.id) == frame.player_actor_id)
+            .unwrap();
+        assert_eq!(player.rifle_capacity, Some(30));
+        assert_eq!(player.rifle_ammo, Some(30));
+    }
+
+    #[tokio::test]
+    async fn m1_dead_player_rejects_movement_input() {
+        let path = write_m1_scenario();
+        let config = load_m1_test_config(path);
+        let engine = M0Engine::new(config);
+        engine.record_run_started();
+        // Force player into Dead status by directly mutating world state via reset-then-damage.
+        {
+            let mut state = engine.state.write().unwrap();
+            if let Some(sim) = state.actor_state.as_mut() {
+                let player = sim.world.player_actor_mut().unwrap();
+                let _ = player.apply_damage(1000.0);
+            }
+        }
+        let _ = engine
+            .dispatch(ControlCommand::ActPlayerMove {
+                x: 1.0,
+                y: 0.0,
+                source: IntentSource::Cfctl,
+            })
+            .await;
+        engine.drive_tick();
+        // Actor should not have moved (status::Dead refuses input).
+        let frame = engine.snapshot(None).await;
+        let player = frame
+            .actors
+            .iter()
+            .find(|a| Some(a.id) == frame.player_actor_id)
+            .unwrap();
+        assert_eq!(player.status, "dead");
+    }
+
+    #[tokio::test]
+    async fn m1_scenario_reset_rebuilds_actor_world() {
+        let path = write_m1_scenario();
+        let config = load_m1_test_config(path);
+        let engine = M0Engine::new(config);
+        engine.record_run_started();
+        // Move + fire to mutate state.
+        let _ = engine
+            .dispatch(ControlCommand::ActPlayerMove {
+                x: 1.0,
+                y: 0.0,
+                source: IntentSource::Cfctl,
+            })
+            .await;
+        let _ = engine
+            .dispatch(ControlCommand::ActPlayerFire {
+                pressed: true,
+                source: IntentSource::Cfctl,
+            })
+            .await;
+        engine.drive_tick();
+        // Reset.
+        let _ = engine.dispatch(ControlCommand::ScenarioReset).await;
+        let frame = engine.snapshot(None).await;
+        let player = frame
+            .actors
+            .iter()
+            .find(|a| Some(a.id) == frame.player_actor_id)
+            .unwrap();
+        // After reset, the actor is at spawn (200, 32) with full ammo.
+        assert!((player.position[0] - 200.0).abs() < 0.5);
+        assert_eq!(player.rifle_ammo, Some(30));
+    }
+
+    #[tokio::test]
+    async fn m1_scenario_reset_preserves_intent_source() {
+        // Regression: ScenarioReset rebuilt pending_intent with a hardcoded
+        // IntentSource::Cfctl regardless of who was previously controlling the actor.
+        // Now we preserve the pre-reset source so the next idle tick's
+        // input.intent_received correctly attributes (cfctl OR human) and the
+        // replay event log doesn't contain spurious source flips on reset.
+        let path = write_m1_scenario();
+        let config = load_m1_test_config(path);
+        let engine = M0Engine::new(config);
+        engine.record_run_started();
+        // Drive a Human-source aim so pending_intent.source = Human.
+        let _ = engine
+            .dispatch(ControlCommand::ActPlayerAim {
+                x: 1.0,
+                y: 0.0,
+                source: IntentSource::Human,
+            })
+            .await;
+        // Now reset — pre-fix this would clobber source back to Cfctl.
+        let _ = engine.dispatch(ControlCommand::ScenarioReset).await;
+        // Next tick should record input.intent_received with source = human.
+        engine.drive_tick();
+        let events = engine.recorder().snapshot_events();
+        let intent_events: Vec<_> = events
+            .iter()
+            .filter(|e| e.category == "input" && e.event_type == "intent_received")
+            .collect();
+        let last_intent = intent_events.last().expect("at least one intent_received event");
+        assert_eq!(
+            last_intent.payload.get("source").and_then(|v| v.as_str()),
+            Some("human"),
+            "post-reset intent must preserve the Human source",
+        );
+    }
+
+    #[tokio::test]
+    async fn m1_act_player_aim_accepts_finite_at_engine_layer() {
+        // Sanity: with finite values, engine dispatch accepts aim.
+        let path = write_m1_scenario();
+        let config = load_m1_test_config(path);
+        let engine = M0Engine::new(config);
+        engine.record_run_started();
+        let result = engine
+            .dispatch(ControlCommand::ActPlayerAim {
+                x: 1.0,
+                y: 0.0,
+                source: IntentSource::Cfctl,
+            })
+            .await;
+        assert_eq!(result.status, crate::state::ControlEnvelopeStatus::Accepted);
+    }
+
+    #[tokio::test]
+    async fn m1_act_player_aim_rejects_nonfinite_at_engine_layer() {
+        // Defense-in-depth: the JSON-RPC server layer rejects NaN/Inf before dispatch
+        // (see live_ws_m1_act_player_aim_nan_rejected). The engine ALSO rejects at the
+        // dispatch boundary so any future caller (cf-app keyboard bridge, future mouse
+        // bridge, future gamepad bridge, future direct-dispatch script) cannot leak
+        // NaN/Inf into pending_intent and NaN-poison the muzzle / projectile path.
+        let path = write_m1_scenario();
+        let config = load_m1_test_config(path);
+        let engine = M0Engine::new(config);
+        engine.record_run_started();
+        for (x, y) in [
+            (f32::NAN, 0.0),
+            (0.0, f32::NAN),
+            (f32::INFINITY, 0.0),
+            (0.0, f32::NEG_INFINITY),
+        ] {
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerAim {
+                    x,
+                    y,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            assert_eq!(
+                result.status,
+                crate::state::ControlEnvelopeStatus::Rejected,
+                "aim ({x}, {y}) must reject"
+            );
+            assert_eq!(result.reason.as_deref(), Some("aim_must_be_finite"));
+        }
+    }
+
+    #[tokio::test]
+    async fn m1_act_player_move_rejects_nonfinite_at_engine_layer() {
+        // Defense-in-depth mirror for act.player.move (cf-app's keyboard bridge produces
+        // 0.0 / ±1.0 today, but a future mouse / gamepad / scripted bridge could send a
+        // NaN/Inf move axis through engine.dispatch directly).
+        let path = write_m1_scenario();
+        let config = load_m1_test_config(path);
+        let engine = M0Engine::new(config);
+        engine.record_run_started();
+        for (x, y) in [
+            (f32::NAN, 0.0),
+            (0.0, f32::NAN),
+            (f32::INFINITY, 0.0),
+            (0.0, f32::NEG_INFINITY),
+        ] {
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerMove {
+                    x,
+                    y,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            assert_eq!(
+                result.status,
+                crate::state::ControlEnvelopeStatus::Rejected,
+                "move ({x}, {y}) must reject"
+            );
+            assert_eq!(result.reason.as_deref(), Some("axis_must_be_finite"));
+        }
+    }
+
+    #[tokio::test]
+    async fn m1_kill_chain_records_actor_status_changed_with_projectile_hit_cause() {
+        // M1-D04 end-to-end evidence via the dispatch path: drive the engine through
+        // act.player.aim + act.player.fire enough times to kill the dummy, then assert
+        // the recorder captured an actor.actor_status_changed event with cause
+        // "projectile_hit". Engine + sim test `projectile_eventually_hits_dummy_and_can_kill_it`
+        // already proves the underlying physics; this test adds the dispatch + event
+        // emission proof.
+        let path = write_m1_scenario();
+        let config = load_m1_test_config(path);
+        let engine = M0Engine::new(config);
+        engine.record_run_started();
+        // Settle to ground first.
+        for _ in 0..10 {
+            engine.drive_tick();
+        }
+        let _ = engine
+            .dispatch(ControlCommand::ActPlayerAim {
+                x: 1.0,
+                y: 0.0,
+                source: IntentSource::Cfctl,
+            })
+            .await;
+        // Fire 9 shots (dummy has 100 HP, rifle 12 dmg/hit → 9 hits = 108 dmg). Each shot
+        // requires the rifle's fire interval (6 ticks) to cool down between presses.
+        let fire_interval_ticks = cf_equipment::rifle_preset(cf_equipment::RIFLE_M1_DEFAULT_ID)
+            .unwrap()
+            .fire_interval_ticks(60) as usize;
+        for _ in 0..12 {
+            let _ = engine
+                .dispatch(ControlCommand::ActPlayerFire {
+                    pressed: true,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            // Drive enough ticks for the fired projectile to reach the dummy at x=900
+            // before the next shot (player at x=200, projectile speed 1200 unit/s ≈ 20
+            // unit/tick at 60 Hz → 35 ticks to cross 700 units).
+            for _ in 0..fire_interval_ticks.max(35) {
+                engine.drive_tick();
+            }
+        }
+        let events = engine.recorder().snapshot_events();
+        let kill_event = events.iter().find(|e| {
+            e.category == "actor"
+                && e.event_type == "actor_status_changed"
+                && e.payload["new_status"] == "dead"
+                && e.payload["cause"] == "projectile_hit"
+        });
+        assert!(
+            kill_event.is_some(),
+            "expected a projectile_hit-caused dead status transition; got events: {:?}",
+            events
+                .iter()
+                .filter(|e| e.event_type == "actor_status_changed")
+                .map(|e| e.payload.clone())
+                .collect::<Vec<_>>()
+        );
     }
 }

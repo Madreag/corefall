@@ -117,7 +117,8 @@ enum Cmd {
         #[arg(long, default_value_t = 1)]
         ticks: u64,
     },
-    /// Server-driven `act.settings.set`.
+    /// Server-driven `act.*` family. M0 only ships `settings-set`; M1 adds the
+    /// `act.player.*` family (`move`, `jump`, `aim`, `fire`, `reload`, `select-item`, `reset`).
     Act {
         #[command(subcommand)]
         action: ActAction,
@@ -156,6 +157,36 @@ enum ActAction {
         #[arg(long)]
         reduced_flash: Option<bool>,
     },
+    /// `act.player.move x=<-1..1>` — M1+ scenarios only.
+    PlayerMove {
+        #[arg(long)]
+        x: f32,
+        #[arg(long, default_value_t = 0.0)]
+        y: f32,
+    },
+    /// `act.player.jump` — edge-triggered.
+    PlayerJump,
+    /// `act.player.aim x=<f32> y=<f32>` — vector is normalized server-side.
+    PlayerAim {
+        #[arg(long)]
+        x: f32,
+        #[arg(long)]
+        y: f32,
+    },
+    /// `act.player.fire` — edge-triggered single shot.
+    PlayerFire {
+        #[arg(long, default_value_t = true)]
+        pressed: bool,
+    },
+    /// `act.player.reload` — edge-triggered.
+    PlayerReload,
+    /// `act.player.select_item slot=<u32>`.
+    PlayerSelectItem {
+        #[arg(long)]
+        slot: u32,
+    },
+    /// `act.player.reset` — return to spawn with full HP / ammo.
+    PlayerReset,
 }
 
 #[derive(Debug, Subcommand)]
@@ -472,6 +503,21 @@ async fn cmd_act(
             }
             session.send_request("act.settings.set", Value::Object(params)).await?
         }
+        ActAction::PlayerMove { x, y } => session.send_request("act.player.move", json!({"x": x, "y": y})).await?,
+        ActAction::PlayerJump => session.send_request("act.player.jump", json!({})).await?,
+        ActAction::PlayerAim { x, y } => session.send_request("act.player.aim", json!({"x": x, "y": y})).await?,
+        ActAction::PlayerFire { pressed } => {
+            session
+                .send_request("act.player.fire", json!({"pressed": pressed}))
+                .await?
+        }
+        ActAction::PlayerReload => session.send_request("act.player.reload", json!({})).await?,
+        ActAction::PlayerSelectItem { slot } => {
+            session
+                .send_request("act.player.select_item", json!({"slot": slot}))
+                .await?
+        }
+        ActAction::PlayerReset => session.send_request("act.player.reset", json!({})).await?,
     };
     println!("{}", serde_json::to_string(&result).unwrap());
     session.close().await?;
@@ -493,11 +539,16 @@ async fn cmd_script(
     let text = std::fs::read_to_string(&path).with_context(|| format!("read {}", path.display()))?;
     let script: ControlScript = serde_json::from_str(&text).with_context(|| format!("parse {}", path.display()))?;
     // L4: only ask the auto-launched cf-app to write a bundle if this script actually needs one.
+    // M1: route the script's declared `scenario` (if any) into the auto-launched cf-app so
+    // act.player.* methods land on a real actor world.
     let mut session = Session::open_with(
         connect,
         auto_launch_port,
         no_auto_launch,
-        AutoLaunchOpts { write_run_bundle },
+        AutoLaunchOpts {
+            write_run_bundle,
+            scenario: script.scenario.clone(),
+        },
     )
     .await?;
     let mut steps_results = Vec::new();
@@ -511,6 +562,25 @@ async fn cmd_script(
             "method": step.method,
             "result": result,
         }));
+        // After sim.step / sim.run_for_ticks, poll observe.once until the engine has
+        // actually advanced the requested number of ticks. The server runs the SimClock
+        // at wall-clock rate (60 Hz default) so without this poll the next script command
+        // overwrites Stepping(N) before drive_tick can advance even one tick.
+        if let Some(extra_ticks) = ticks_to_wait_for(&step.method, &step.params) {
+            let target_tick = current_tick(&result).map(|t| t + extra_ticks).unwrap_or(0);
+            let poll_deadline = std::time::Instant::now() + Duration::from_millis((extra_ticks * 50).max(2_000));
+            loop {
+                if std::time::Instant::now() > poll_deadline {
+                    break;
+                }
+                let frame = session.send_request("observe.once", json!({})).await?;
+                let live_tick = frame.get("tick").and_then(|t| t.as_u64()).unwrap_or(0);
+                if live_tick >= target_tick {
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(15)).await;
+            }
+        }
     }
     if write_run_bundle {
         let result = session.send_request("runbundle.write", json!({})).await?;
@@ -529,10 +599,32 @@ async fn cmd_script(
     Ok(())
 }
 
+/// Returns `Some(ticks)` if the script step requests sim.step / sim.run_for_ticks; the
+/// caller polls observe.once until the engine has advanced that many ticks before sending
+/// the next command (otherwise the next command overwrites Stepping(N) before drive_tick
+/// advances).
+fn ticks_to_wait_for(method: &str, params: &Value) -> Option<u64> {
+    match method {
+        "sim.step" | "sim.run_for_ticks" => params.get("ticks").and_then(|t| t.as_u64()),
+        _ => None,
+    }
+}
+
+/// Extract the engine tick from a CommandAck `result`. Returns `0` when the response
+/// shape is unexpected (the caller's poll loop will still advance via the deadline).
+fn current_tick(result: &Value) -> Option<u64> {
+    result.get("effective_tick").and_then(|v| v.as_u64())
+}
+
 #[derive(Debug, Deserialize)]
 struct ControlScript {
     #[serde(default)]
     description: Option<String>,
+    /// Optional scenario id the auto-launched cf-app should load. M0 scripts omit this
+    /// and inherit `m0_blank`; M1 scripts that exercise `act.player.*` set this to
+    /// `m1_actor_range` so the engine has an actor world to drive.
+    #[serde(default)]
+    scenario: Option<String>,
     steps: Vec<ScriptStep>,
 }
 
@@ -713,14 +805,18 @@ struct AutoLaunchOpts {
     /// observability scripts that call `runbundle.write`). For `observe --once`, `pause`, etc.,
     /// leave it false to keep `prototype_runs/native/` clean. (L4 fix.)
     write_run_bundle: bool,
+    /// Scenario id to load in the auto-launched cf-app. Defaults to `m0_blank`. M1 scripts
+    /// that need an actor world override this with `m1_actor_range` so `act.player.*` works.
+    scenario: Option<String>,
 }
 
 async fn launch_cf_app(port: u16, opts: AutoLaunchOpts) -> Result<Child> {
     let bin = locate_cf_app_binary()?;
     // `--ticks 0` = run until shutdown when --control-api is set; cfctl will send system.shutdown on close.
+    let scenario = opts.scenario.clone().unwrap_or_else(|| "m0_blank".into());
     let mut args: Vec<String> = vec![
         "--scenario".into(),
-        "m0_blank".into(),
+        scenario,
         "--headless-smoke".into(),
         "--control-api".into(),
         "--control-port".into(),
