@@ -103,6 +103,21 @@ impl ActorSimState {
         self.rifles.entry(actor_id).or_insert(state);
     }
 
+    /// Current value of the projectile-id counter. Exposed so callers that rebuild
+    /// the sim state (e.g. `scenario.reset`) can carry the counter forward and keep
+    /// `projectile_id` globally unique across resets in the (monotonic) event log.
+    pub fn next_projectile_id(&self) -> u64 {
+        self.next_projectile_id
+    }
+
+    /// Override the projectile-id counter. The next allocated projectile id will
+    /// be `id`. Used by `scenario.reset` to preserve uniqueness of `projectile_id`
+    /// across the reset boundary; the event log's `combat.projectile_*` cause-chain
+    /// would otherwise alias pre-reset and post-reset projectiles.
+    pub fn set_next_projectile_id(&mut self, id: u64) {
+        self.next_projectile_id = id;
+    }
+
     fn allocate_projectile_id(&mut self) -> u64 {
         let id = self.next_projectile_id;
         self.next_projectile_id += 1;

@@ -1423,8 +1423,22 @@ impl EngineHandle for M0Engine {
                 // monotonic timeline; `scenario.reset` is a content reload, not a time-warp.
                 state.rng = Rng::from_seed(self.config.seed);
                 state.tick_durations_us.clear();
+                // Capture in-flight projectiles + the projectile-id counter from the old
+                // sim state before we replace it. We emit a `combat.projectile_expired`
+                // event for each discarded projectile so every `combat.projectile_spawned`
+                // entry in the event log has a matched termination event, and we carry
+                // the counter forward so post-reset projectile ids never alias pre-reset
+                // ones — the event log is a single monotonic timeline that replay
+                // analyzers correlate by `projectile_id`.
+                let discarded_projectiles: Vec<(u64, ActorId, Vec2)> = state
+                    .actor_state
+                    .as_ref()
+                    .map(|s| s.projectiles.iter().map(|p| (p.id, p.owner, p.position)).collect())
+                    .unwrap_or_default();
+                let next_projectile_id_carry = state.actor_state.as_ref().map(|s| s.next_projectile_id()).unwrap_or(0);
                 if let Some(initial) = self.config.initial_actor_world.as_ref() {
                     let mut sim_state = ActorSimState::new(initial.world.clone());
+                    sim_state.set_next_projectile_id(next_projectile_id_carry);
                     for (id, rifle) in build_rifles_for_world(&initial.world, self.config.tick_rate_hz) {
                         sim_state.ensure_rifle_for(id, rifle);
                     }
@@ -1435,6 +1449,21 @@ impl EngineHandle for M0Engine {
                 }
                 state.intent_epoch = state.intent_epoch.wrapping_add(1);
                 drop(state);
+                for (projectile_id, owner, last_position) in &discarded_projectiles {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "combat",
+                        "projectile_expired",
+                        json!({
+                            "id": projectile_id,
+                            "owner": owner.0,
+                            "last_position": [last_position.x, last_position.y],
+                            "cause": "scenario_reset",
+                        }),
+                        None,
+                    );
+                }
                 self.recorder.record(
                     tick,
                     sim_time_ms,
