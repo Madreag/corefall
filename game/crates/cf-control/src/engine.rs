@@ -513,6 +513,13 @@ impl M0Engine {
                 state.pending_intent.clear_edges();
                 let region_min_x = 0.0_f32;
                 let region_max_x = self.config.region_width.max(0.0);
+                let region_max_y = self
+                    .config
+                    .initial_actor_world
+                    .as_ref()
+                    .map(|w| w.world.floor_y)
+                    .unwrap_or(0.0)
+                    + self.config.region_height.max(0.0);
                 let tick_dt = SimConfig {
                     tick_rate_hz: self.config.tick_rate_hz,
                 }
@@ -532,6 +539,7 @@ impl M0Engine {
                         tick_dt,
                         region_min_x,
                         region_max_x,
+                        region_max_y,
                         auto_reload_when_empty: auto_reload,
                     },
                 );
@@ -1067,7 +1075,7 @@ impl M0Engine {
             },
             seed: self.config.seed,
             started_at_utc: self.started_at.to_rfc3339(),
-            duration_target_sec: f64::from(self.config.duration_ticks as u32) / f64::from(self.config.tick_rate_hz),
+            duration_target_sec: self.config.duration_ticks as f64 / f64::from(self.config.tick_rate_hz),
             material_schema_version: "n/a-m0".to_string(),
             config_hash: self.config.config_hash.clone(),
             assumptions_tested: self.config.assumptions_tested.clone(),

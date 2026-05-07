@@ -60,6 +60,11 @@ pub struct StepDeps {
     pub tick_dt: f32,
     pub region_min_x: f32,
     pub region_max_x: f32,
+    /// Upper Y bound (in world units) for projectile out-of-bounds expiry. Derived
+    /// from the scenario region height by the engine; the X-axis already uses
+    /// `region_min_x` / `region_max_x`, and this mirrors the same data-driven
+    /// pattern on the Y-axis instead of a hardcoded constant.
+    pub region_max_y: f32,
     pub auto_reload_when_empty: bool,
 }
 
@@ -504,7 +509,7 @@ fn step_projectiles(state: &mut ActorSimState, deps: StepDeps, report: &mut Step
         let oob = projectile.position.x < deps.region_min_x - 64.0
             || projectile.position.x > deps.region_max_x + 64.0
             || projectile.position.y < state.world.floor_y - 64.0
-            || projectile.position.y > state.world.floor_y + 4096.0;
+            || projectile.position.y > deps.region_max_y + 64.0;
         if oob || projectile.remaining_ticks == 0 {
             report.expired_projectiles.push(ExpiredProjectile {
                 id: projectile.id,
@@ -591,6 +596,7 @@ mod tests {
             tick_dt: 1.0 / 60.0,
             region_min_x: 0.0,
             region_max_x: 1280.0,
+            region_max_y: 720.0,
             auto_reload_when_empty: false,
         }
     }
