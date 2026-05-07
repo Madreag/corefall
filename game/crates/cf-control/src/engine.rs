@@ -336,6 +336,12 @@ struct EngineMutable {
     actor_state: Option<ActorSimState>,
     /// Cached player actor id from the actor world for fast access.
     player_actor: Option<ActorId>,
+    /// Monotonic counter incremented whenever `pending_intent` is externally
+    /// reset (e.g. `scenario.reset` zeroes it). Edge-detecting input bridges
+    /// (`cf-app::ingest_player_input`) watch this to know when their cached
+    /// "last sent" trackers are stale and must redispatch held keys, even if
+    /// the keyboard state itself has not changed.
+    intent_epoch: u64,
 }
 
 fn observed_run_status(state: &EngineMutable) -> RunStatus {
@@ -399,6 +405,7 @@ impl M0Engine {
                 pending_intent,
                 actor_state,
                 player_actor,
+                intent_epoch: 0,
             }),
             recorder,
             current_tick,
@@ -872,6 +879,15 @@ impl M0Engine {
 
     pub fn shutdown_requested(&self) -> bool {
         self.state.read().map(|s| s.shutdown_requested).unwrap_or(false)
+    }
+
+    /// Monotonic counter that increments whenever `pending_intent` is
+    /// externally reset (currently only `scenario.reset`). Input bridges that
+    /// edge-trigger dispatch on keyboard-state change watch this so that
+    /// holding a key across a reset still produces a fresh dispatch on the
+    /// next frame.
+    pub fn intent_epoch(&self) -> u64 {
+        self.state.read().map(|s| s.intent_epoch).unwrap_or(0)
     }
 
     pub fn pending_runbundle(&self) -> bool {
@@ -1380,6 +1396,7 @@ impl EngineHandle for M0Engine {
                     state.pending_intent =
                         ControlIntent::new(initial.player.unwrap_or(ActorId(0)), IntentSource::Cfctl);
                 }
+                state.intent_epoch = state.intent_epoch.wrapping_add(1);
                 drop(state);
                 self.recorder.record(
                     tick,

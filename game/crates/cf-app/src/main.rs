@@ -357,18 +357,18 @@ fn ingest_player_input(
     rt: Option<Res<ControlRuntime>>,
     mut last_move_x: Local<f32>,
     mut last_aim: Local<(f32, f32)>,
+    mut last_intent_epoch: Local<u64>,
 ) {
     let _ = rt; // Reserved; ControlRuntime presence does not gate human input.
     if !holder.0.config().has_actor_world {
         return;
     }
-    let move_x = keyboard_axis(
-        &keys,
-        KeyCode::KeyD,
-        KeyCode::KeyA,
-        KeyCode::ArrowRight,
-        KeyCode::ArrowLeft,
-    );
+    // WASD letters drive movement; arrow keys drive aim. Decoupling the two
+    // axes lets the player strafe (e.g. move left while aiming right), which
+    // the previous `aim_x = move_x.signum()` shortcut made impossible. W/S
+    // remain on aim_y as alternative bindings to Up/Down for ergonomic reach.
+    let move_x = keyboard_axis_pair(&keys, KeyCode::KeyD, KeyCode::KeyA);
+    let aim_x = keyboard_axis_pair(&keys, KeyCode::ArrowRight, KeyCode::ArrowLeft);
     let aim_y = keyboard_axis(
         &keys,
         KeyCode::KeyW,
@@ -376,13 +376,26 @@ fn ingest_player_input(
         KeyCode::ArrowUp,
         KeyCode::ArrowDown,
     );
-    let aim_x = if move_x.abs() > 1e-3 { move_x.signum() } else { 0.0 };
+    // `scenario.reset` (and any future op that zeroes `pending_intent` out
+    // from under us) bumps the engine's `intent_epoch`. When that happens we
+    // must redispatch any currently-held keys: the engine has forgotten the
+    // sticky values, but our edge-detecting locals still hold the pre-reset
+    // sample, so without this poke a held movement key would silently drop.
+    let engine_epoch = holder.0.intent_epoch();
+    let epoch_changed = engine_epoch != *last_intent_epoch;
+    if epoch_changed {
+        *last_intent_epoch = engine_epoch;
+        *last_move_x = 0.0;
+        *last_aim = (0.0, 0.0);
+    }
     // Only dispatch a move command when the human input actually changes. Idle samples
     // (e.g. no key pressed and last sample was also zero) must NOT clobber sticky
     // `cfctl act.player.move` values, since `ControlIntent.move_x` is continuous and
     // latest-value-wins. Edge-triggered transitions (key press / release / direction
-    // change) still fire so releasing a key promptly stops the actor.
-    let dispatch_move = (move_x - *last_move_x).abs() > f32::EPSILON;
+    // change) still fire so releasing a key promptly stops the actor. After an
+    // epoch change, force a dispatch when the key is still held so the engine
+    // sees the live state.
+    let dispatch_move = (move_x - *last_move_x).abs() > f32::EPSILON || (epoch_changed && move_x.abs() > 1e-3);
     // Mirror the move-edge detection for aim: only dispatch when the aim
     // vector actually changes. Aim is a continuous, latest-value-wins field
     // on `ControlIntent`, so re-sending the same vector every frame both
@@ -390,7 +403,7 @@ fn ingest_player_input(
     // `cfctl act.player.aim` values on idle frames.
     let aim_active = aim_x.abs() > 1e-3 || aim_y.abs() > 1e-3;
     let aim_changed = (aim_x - last_aim.0).abs() > f32::EPSILON || (aim_y - last_aim.1).abs() > f32::EPSILON;
-    let dispatch_aim = aim_active && aim_changed;
+    let dispatch_aim = aim_active && (aim_changed || epoch_changed);
     // Only update the tracker when we actually dispatch. Updating it on every
     // frame would silently desync from the engine state when keys are released
     // (e.g. last_aim resets to (0, 0) without dispatching, then a redundant
@@ -488,6 +501,14 @@ fn keyboard_axis(keys: &ButtonInput<KeyCode>, pos_a: KeyCode, neg_a: KeyCode, po
     let pos = keys.pressed(pos_a) || keys.pressed(pos_b);
     let neg = keys.pressed(neg_a) || keys.pressed(neg_b);
     match (pos, neg) {
+        (true, false) => 1.0,
+        (false, true) => -1.0,
+        _ => 0.0,
+    }
+}
+
+fn keyboard_axis_pair(keys: &ButtonInput<KeyCode>, pos: KeyCode, neg: KeyCode) -> f32 {
+    match (keys.pressed(pos), keys.pressed(neg)) {
         (true, false) => 1.0,
         (false, true) => -1.0,
         _ => 0.0,

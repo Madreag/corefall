@@ -60,17 +60,23 @@ impl ActorId {
 }
 
 /// Body status state machine (M1 minimum surface; M3/M4/M5 expand wounds + chassis layers).
+///
+/// `#[repr(u8)]` with explicit discriminants pins the layout used by
+/// [`ActorState::checksum_bytes`] so future milestones can append new variants
+/// (after `Dead`) without silently shifting determinism checksums. Inserting a
+/// variant in the middle would require bumping the checksum schema.
+#[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Status {
     /// Healthy and acting normally.
-    Stable,
+    Stable = 0,
     /// Below `hp_unstable_threshold`; movement still works but HUD warns.
-    Unstable,
+    Unstable = 1,
     /// At/below `hp_downed_threshold`; player loses control but is not yet dead.
-    Downed,
+    Downed = 2,
     /// HP at zero; cannot recover this run.
-    Dead,
+    Dead = 3,
 }
 
 impl Status {
