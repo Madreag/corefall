@@ -156,6 +156,14 @@
           "format": "uint32",
           "minimum": 0.0
         },
+        "rifle_reload_total_ticks": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0.0
+        },
         "selected_item": {
           "type": "string"
         },

@@ -1325,6 +1325,7 @@ impl EngineHandle for M0Engine {
                         rifle_capacity: rifle.map(|r| r.spec.mag_capacity),
                         rifle_fire_cooldown_ticks: rifle.map(|r| r.fire_cooldown_ticks),
                         rifle_reload_remaining_ticks: rifle.map(|r| r.reload_remaining_ticks),
+                        rifle_reload_total_ticks: rifle.map(|r| r.reload_ticks()),
                     }
                 })
                 .collect()

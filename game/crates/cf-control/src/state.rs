@@ -65,6 +65,7 @@ pub struct ActorView {
     pub rifle_capacity: Option<u32>,
     pub rifle_fire_cooldown_ticks: Option<u32>,
     pub rifle_reload_remaining_ticks: Option<u32>,
+    pub rifle_reload_total_ticks: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
