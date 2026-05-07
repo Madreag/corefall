@@ -2,7 +2,7 @@
 
 This is the native Rust workspace for Corefall. Directory name `game/` matches the canonical roadmap's `Repository Layout` section in `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md` — no path mapping needed.
 
-M0 is closed; M1 actor controller and sim-core work is active. The root [README](../README.md) is the public project overview. Start implementation work from the canonical roadmap and backlog:
+M0 and M1 are both closed (PRs #1 and #2 merged); M1.5 — Micro Breach Fun Slice — is the active milestone. The root [README](../README.md) is the public project overview. Start implementation work from the canonical roadmap and backlog:
 
 ```text
 /Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md

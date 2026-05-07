@@ -20,10 +20,11 @@ A 2D side-view physics sandbox where every gas, grain, bullet, body, world, and 
 [![Windows](https://img.shields.io/badge/Windows-supported-0078D6?style=flat-square&logo=windows&logoColor=white)](#)
 [![Steam Deck](https://img.shields.io/badge/Steam_Deck-floor_target-1A9FFF?style=flat-square&logo=steamdeck&logoColor=white)](#)
 
-[![Status](https://img.shields.io/badge/status-pre--alpha%20%28M1%20active%29-orange?style=flat-square)](#project-status)
+[![Status](https://img.shields.io/badge/status-pre--alpha%20%28M0%20%2B%20M1%20closed%2C%20M1.5%20next%29-orange?style=flat-square)](#project-status)
 [![Vault](https://img.shields.io/badge/research-research%20vault-purple?style=flat-square)](https://github.com/Madreag/corefall#research-vault)
 
-**Current proof:** M0 closed, M1 actor controller active, deterministic run bundles in CI.<br>
+**Current proof:** M0 + M1 closed. One actor is playable end-to-end through the same fixed-tick sim path that AI/cfctl drives; movement, jump, aim, fire, reload, status state machine, projectile flight, and damage routing all emit deterministic replay events. Run bundles validate under repo-root `prototype_runs/native/` at 60 Hz and 120 Hz, with CI green on Linux + macOS + Windows.<br>
+**Next up:** M1.5 — Micro Breach Fun Slice. First-fun-evidence run before deeper systems land.<br>
 **Roadmap lock:** server-authoritative multiplayer, deterministic replay, AI-only art/audio pipeline, modder-parity tooling, accessibility-plus, Steam Deck floor, and no pay-to-win.
 
 **[Project status](#project-status) · [Roadmap shape](#roadmap-shape) · [Tech stack](#tech-stack) · [Getting started](#getting-started) · [CI](#ci)**
@@ -227,8 +228,8 @@ game/crates/
 | Milestone | Status | What It Proves |
 |---|---|---|
 | **M0 — Engine Bootstrap** | ✅ **Closed** ([PR #1](https://github.com/Madreag/corefall/pull/1) merged) | 29-crate workspace, JSON-RPC control plane, cfctl, replay run-bundle writer, deterministic 60 Hz / 120 Hz sim, panic capture, CI matrix on Linux + macOS + Windows. |
-| **M1 — Actor Controller And Sim Core** | 🔄 **Active** | Single actor, fixed-tick controller, basic rifle loop, deterministic replay events. |
-| M1.5 — Micro Breach Fun Slice | 🔜 Next | First-fun-evidence run before deeper systems land. |
+| **M1 — Actor Controller And Sim Core** | ✅ **Closed** ([PR #2](https://github.com/Madreag/corefall/pull/2) merged) | Single playable actor with movement, jump, aim, rifle fire, reload, status state machine, projectile flight, and damage routing — all through the fixed-tick sim. Seven `act.player.*` JSON-RPC methods route human + cfctl + AI input through one shared dispatch path. Tick-rate-independent rifle timing (10 RPS / 1.5 s reload identical at 60 Hz and 120 Hz). |
+| **M1.5 — Micro Breach Fun Slice** | 🔄 **Active** (next) | First-fun-evidence run: 60-90 s win/loss scenario with one reactive enemy, soft breach surface, objective state machine, and scripted E2E for both paths before deeper systems land. |
 | M2 — Pixel Terrain And Materials | ⏳ Planned | Deformable terrain + material kernel scaffold. |
 | M3 — Replay And Event Recorder | ⏳ Planned | DR-002 v1 lock — full event recorder + viewer. |
 | M4 — HUD And Comic-Noir UI | ⏳ Planned | Silhouette HUD + module strip + accessibility floor. |
@@ -300,26 +301,42 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 python3 tools/dependency_drift_report.py --workspace-root . --format markdown
 
-# Smoke runs (M0 / M1 placeholder scenarios)
+# Smoke runs (M0 blank + M1 actor range)
 cargo run -p cfctl -- observe --once --scenario m0_blank
 cargo run -p cfctl -- run --scenario m0_blank --ticks 300 --tick-rate-hz 60 --paced --write-run-bundle
 cargo run -p cf-app -- --scenario m0_blank --headless-smoke --run-seconds 5 --write-run-bundle
 
-# Validate the run bundle
+# Play the M1 actor range (windowed): WASD = move, Space = jump, arrows = aim,
+# Enter / J = fire, R = reload, L = reset, 1-4 = inventory slot, Esc = quit.
+cargo run -p cf-app -- --scenario m1_actor_range
+
+# Drive the M1 scenario through cfctl (same dispatch path the keyboard uses)
+cargo run -p cfctl -- run --scenario m1_actor_range --ticks 300 --tick-rate-hz 60 --paced --write-run-bundle
+
+# Validate any run bundle
 python3 tools/prototype_run_check.py ../prototype_runs/native/m0_*
+python3 tools/prototype_run_check.py ../prototype_runs/native/m1_*
 ```
 
 ### CLI Reference
 
-`cfctl` is the operator + AI control client. The full surface is documented in the canonical vault roadmap (CLI Reference section); the M0 subset is:
+`cfctl` is the operator + AI control client. The full surface is documented in the canonical vault roadmap (CLI Reference section); the currently-shipped subset is:
 
-| Command | What |
-|---|---|
-| `cfctl observe --once --scenario <id>` | One-shot snapshot of game state. |
-| `cfctl observe --stream --hz <N>` | Stream observation frames at N Hz. |
-| `cfctl run --scenario <id> --ticks <N> --paced --write-run-bundle` | Run a scenario for N ticks paced to wall clock. |
-| `cfctl scenario load <id> [--seed <N>]` | Load a scenario (seed override is M0-rejected). |
-| `cfctl pause` / `step --ticks <N>` / `version` | Sim control + protocol version. |
+| Command | Milestone | What |
+|---|---|---|
+| `cfctl observe --once --scenario <id>` | M0 | One-shot snapshot of game state. |
+| `cfctl observe --stream --hz <N>` | M0 | Stream observation frames at N Hz. |
+| `cfctl run --scenario <id> --ticks <N> --paced --write-run-bundle` | M0 | Run a scenario for N ticks paced to wall clock. |
+| `cfctl scenario load <id> [--seed <N>]` | M0 | Load a scenario (seed override is M0-rejected). |
+| `cfctl pause` / `step --ticks <N>` / `version` | M0 | Sim control + protocol version. |
+| `cfctl act player-move --x <-1..1>` | M1 | Continuous horizontal movement intent (latest-value-wins). |
+| `cfctl act player-jump` | M1 | Edge-triggered jump on the next tick. |
+| `cfctl act player-aim --x <f32> --y <f32>` | M1 | Set aim vector (NaN/Inf rejected). |
+| `cfctl act player-fire [--pressed true\|false]` | M1 | Edge-triggered rifle fire (release is a no-op for M1's single-press rifle). |
+| `cfctl act player-reload` | M1 | Begin reload (1.5 s real time at any tick rate). |
+| `cfctl act player-select-item --slot <0..3>` | M1 | Switch inventory slot. |
+| `cfctl act player-reset` | M1 | Respawn at scenario position with full HP / ammo / slot 0. |
+| `cfctl script run <path>` | M1 | Replay a `.cfctl.json` script (auto-launches `cf-app` with the right scenario, polls until ticks advance between commands). |
 
 Post-M5+ CLI extensions (atmospherics, materials, gravity, ballistics, origin-state, suit, pipe-network, room) are documented in [the canonical roadmap](https://github.com/Madreag/corefall#research-vault).
 
