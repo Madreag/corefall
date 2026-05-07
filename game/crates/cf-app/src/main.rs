@@ -384,7 +384,6 @@ fn ingest_player_input(
     // change) still fire so releasing a key promptly stops the actor.
     let move_changed = (move_x - *last_move_x).abs() > f32::EPSILON;
     let dispatch_move = move_changed;
-    *last_move_x = move_x;
     // Mirror the move-edge detection for aim: only dispatch when the aim
     // vector actually changes. Aim is a continuous, latest-value-wins field
     // on `ControlIntent`, so re-sending the same vector every frame both
@@ -393,7 +392,17 @@ fn ingest_player_input(
     let aim_active = aim_x.abs() > 1e-3 || aim_y.abs() > 1e-3;
     let aim_changed = (aim_x - last_aim.0).abs() > f32::EPSILON || (aim_y - last_aim.1).abs() > f32::EPSILON;
     let dispatch_aim = aim_active && aim_changed;
-    *last_aim = (aim_x, aim_y);
+    // Only update the tracker when we actually dispatch. Updating it on every
+    // frame would silently desync from the engine state when keys are released
+    // (e.g. last_aim resets to (0, 0) without dispatching, then a redundant
+    // dispatch fires next time keys are pressed even though the engine still
+    // holds the old aim). Same applies to last_move_x.
+    if dispatch_move {
+        *last_move_x = move_x;
+    }
+    if dispatch_aim {
+        *last_aim = (aim_x, aim_y);
+    }
     let block_on = futures_block_on;
     block_on(async {
         if dispatch_move {
