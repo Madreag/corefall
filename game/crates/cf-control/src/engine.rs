@@ -432,9 +432,6 @@ struct EngineMutable {
     reactive_guards: BTreeMap<ActorId, cf_ai::ReactiveGuard>,
     /// M1.5: mission state machine. `None` when the scenario is sandbox-only.
     mission: Option<cf_mission::MissionState>,
-    /// M1.5: tick the mission was started at (so reset can rewind objective
-    /// timers without rewinding the engine clock).
-    mission_started_at_tick: u64,
     /// M1.5: monotonic id counter for guard projectiles. We share the actor
     /// projectile pool but allocate ids from a separate range so guard shots
     /// don't alias the player's projectile_id space across resets.
@@ -531,7 +528,6 @@ impl M0Engine {
                 pending_dig: None,
                 reactive_guards,
                 mission,
-                mission_started_at_tick: 0,
                 next_guard_projectile_id: 1_000_000,
             }),
             recorder,
@@ -624,13 +620,6 @@ impl M0Engine {
             json!({"settings": settings_value}),
             None,
         );
-    }
-
-    /// M1.5: bundle returned from `cf-terrain::try_dig` plus the dig source.
-    /// Stored locally inside drive_tick so events can be emitted after the
-    /// state guard is dropped.
-    fn _dig_event_marker(&self) {
-        // Existence-only documentation anchor.
     }
 
     /// Drive a single tick. Emits a `determinism.sim_checksum` and a `system.tick_sample`
@@ -1532,6 +1521,7 @@ impl M0Engine {
                     max_hp: s.max_hp,
                     broken: s.broken,
                     refusal_reason: s.refusal_reason.clone(),
+                    dig_range: s.dig_range,
                 });
             }
         }
@@ -1743,6 +1733,11 @@ pub struct BreachRenderView {
     pub max_hp: f32,
     pub broken: bool,
     pub refusal_reason: Option<String>,
+    /// Maximum distance from the player's centre to the nearest point on the
+    /// strip's AABB for the dig to be considered "in range". Mirrors
+    /// [`cf_terrain::BreachStrip::dig_range`] so HUD/render consumers can
+    /// compute an in-range check that matches the engine's dig contract.
+    pub dig_range: f32,
 }
 
 /// M1.5: HUD-side projection of mission state.
@@ -2222,7 +2217,6 @@ impl EngineHandle for M0Engine {
                 // the live engine tick so the timer measures from reset.
                 if let Some(mission) = state.mission.as_mut() {
                     mission.reset(tick.0);
-                    state.mission_started_at_tick = tick.0;
                 }
                 drop(state);
                 for (projectile_id, owner, last_position) in &discarded_projectiles {
