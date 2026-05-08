@@ -1,0 +1,195 @@
+name: release
+on:
+  push:
+    tags:
+      - 'v*-bp*'
+      - 'v1.0.0'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: build (${{ matrix.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            artifact_name: corefall-linux-x86_64
+            archive_ext: tar.zst
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            artifact_name: corefall-windows-x86_64
+            archive_ext: zip
+          - os: macos-13
+            target: x86_64-apple-darwin
+            artifact_name: corefall-macos-x86_64
+            archive_ext: tar.zst
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            artifact_name: corefall-macos-aarch64
+            archive_ext: tar.zst
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: game
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - name: Install Linux deps
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libudev-dev libxkbcommon-dev libwayland-dev pkg-config zstd
+
+      - name: Install zstd (macOS)
+        if: runner.os == 'macOS'
+        run: brew install zstd
+
+      - name: Install Rust 1.95.0 with target
+        run: |
+          rustup toolchain install 1.95.0 --profile minimal
+          rustup target add ${{ matrix.target }} --toolchain 1.95.0
+          rustup show active-toolchain
+          rustc --version
+
+      - uses: Swatinem/rust-cache@v2.9.1
+        with:
+          workspaces: game -> target
+          key: release-${{ matrix.target }}
+
+      - name: cargo build release (cf-app + cfctl + cf-e2e)
+        run: cargo build --release --target ${{ matrix.target }} -p cf-app -p cfctl -p cf-e2e
+
+      - name: Stage release artifacts
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF##*/}"
+          STAGE="${{ matrix.artifact_name }}-${TAG}"
+          mkdir -p "../staging/${STAGE}"
+
+          # Binaries
+          BIN_DIR="target/${{ matrix.target }}/release"
+          if [ "${{ runner.os }}" = "Windows" ]; then
+            cp "${BIN_DIR}/cf-app.exe" "${BIN_DIR}/cfctl.exe" "${BIN_DIR}/cf-e2e.exe" "../staging/${STAGE}/"
+          else
+            cp "${BIN_DIR}/cf-app" "${BIN_DIR}/cfctl" "${BIN_DIR}/cf-e2e" "../staging/${STAGE}/"
+          fi
+
+          # Content + scripts (relative to corefall repo root, so step out of game/)
+          cp -R content "../staging/${STAGE}/content"
+          cp -R scripts/cfctl "../staging/${STAGE}/cfctl-scripts"
+
+          # Repo-level docs
+          cp ../README.md ../CHANGELOG.md ../AGENTS.md "../staging/${STAGE}/" || true
+          if [ -f ../LICENSE ]; then cp ../LICENSE "../staging/${STAGE}/"; fi
+          if [ -f ../LICENSE-MIT ]; then cp ../LICENSE-MIT "../staging/${STAGE}/"; fi
+          if [ -f ../LICENSE-APACHE ]; then cp ../LICENSE-APACHE "../staging/${STAGE}/"; fi
+
+          # Latest BP fun-proof run bundle + summary grid (pick the most recent
+          # m1.5_*, m2.5_*, etc. matching the BP under prototype_runs/native/).
+          # If no bundle is checked into the repo we skip silently — the next BP
+          # closure will populate it.
+          if [ -d "../prototype_runs/native" ]; then
+            LATEST_BUNDLE=$(ls -dt ../prototype_runs/native/m*_* 2>/dev/null | head -n1 || true)
+            if [ -n "${LATEST_BUNDLE}" ]; then
+              BUNDLE_NAME=$(basename "${LATEST_BUNDLE}")
+              mkdir -p "../staging/${STAGE}/run-bundle-exemplar"
+              cp -R "${LATEST_BUNDLE}/." "../staging/${STAGE}/run-bundle-exemplar/" || true
+              if [ -f "${LATEST_BUNDLE}/captures/summary_grid.png" ]; then
+                cp "${LATEST_BUNDLE}/captures/summary_grid.png" "../staging/${STAGE}/summary_grid.png"
+              fi
+              echo "Bundled exemplar: ${BUNDLE_NAME}"
+            fi
+          fi
+
+      - name: Pack archive (Linux/macOS tar.zst)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF##*/}"
+          STAGE="${{ matrix.artifact_name }}-${TAG}"
+          cd ../staging
+          tar --use-compress-program='zstd -19' -cf "${STAGE}.tar.zst" "${STAGE}"
+          shasum -a 256 "${STAGE}.tar.zst" > "${STAGE}.tar.zst.sha256"
+
+      - name: Pack archive (Windows zip)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tag = "${env:GITHUB_REF}".Split("/")[-1]
+          $stage = "${{ matrix.artifact_name }}-$tag"
+          Push-Location ../staging
+          Compress-Archive -Path "$stage" -DestinationPath "$stage.zip" -CompressionLevel Optimal
+          $hash = (Get-FileHash -Algorithm SHA256 "$stage.zip").Hash.ToLower()
+          Set-Content -Path "$stage.zip.sha256" -Value "$hash *$stage.zip"
+          Pop-Location
+
+      - name: Upload artifact (archive + checksum)
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}
+          path: |
+            staging/${{ matrix.artifact_name }}-*.${{ matrix.archive_ext }}
+            staging/${{ matrix.artifact_name }}-*.${{ matrix.archive_ext }}.sha256
+          retention-days: 14
+
+  release:
+    name: publish release
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6.0.2
+
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: "3.x"
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: release-artifacts
+
+      - name: Generate release notes
+        id: notes
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF##*/}"
+          mkdir -p release-staging
+          # Move all archives + checksums into one flat dir.
+          find release-artifacts -type f \( -name '*.tar.zst' -o -name '*.zip' -o -name '*.sha256' \) -exec cp {} release-staging/ \;
+          # Aggregate SHA256SUMS.txt
+          (cd release-staging && cat *.sha256 | sed 's| \*| |g' | sort > SHA256SUMS.txt && rm -f *.sha256)
+          # Generate release notes
+          python3 game/tools/generate_release_notes.py \
+            --tag "$TAG" \
+            --staging release-staging \
+            --output release-staging/RELEASE_NOTES.md
+
+      - name: Determine prerelease flag
+        id: flag
+        shell: bash
+        run: |
+          TAG="${GITHUB_REF##*/}"
+          if [ "$TAG" = "v1.0.0" ]; then
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release-staging/*.tar.zst
+            release-staging/*.zip
+            release-staging/SHA256SUMS.txt
+          body_path: release-staging/RELEASE_NOTES.md
+          prerelease: ${{ steps.flag.outputs.prerelease == 'true' }}
+          draft: false
+          fail_on_unmatched_files: true
