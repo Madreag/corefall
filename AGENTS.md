@@ -511,6 +511,7 @@ Search for this signature when auditing recent PR history. These are NOT human c
 - Don't create root review instruction/report files. Standing review rules live in `.claude/skills/corefall-review/SKILL.md`; review reports belong under `docs/reviews/`.
 - Don't add cloud-save dependencies during T-SAVE work; cloud-save backend decision is post-launch.
 - Don't introduce a UI surface without a matching `cf-control` / `cfctl` path. Eyes/ears/hands rule.
+- Don't ship visible actor movement as a static sliding pawn once the milestone owns actor/body presentation. Controlled actors are animation-first while responsive, physics-first while disrupted, and always replay/event-visible.
 
 ## Starting Point
 
@@ -523,8 +524,10 @@ Closed Build Points (do NOT re-implement; treat as reference + regression surfac
 
 Active Build Point (default starting target unless the user assigns a different one):
 
-- **BP2** — M2 Pixel Terrain And Materials + M2.5 Micro Reactor Defense.
+- **BP2** — M2 Pixel Terrain And Materials + M2.5 Micro Reactor Defense + M3A Event Recorder Core.
 
-When BP2 closes, the next default is BP3 (M3A/M3B replay + M4A/M4B comic-noir UI).
+When BP2 closes, the next default is BP3 (M3B replay viewer/debrief + M4A readability/accessibility + M5 equipment/chassis/body graph).
 
-Do not skip the micro-fun-slice interlude inside any BP that has one (M1.5 in BP1, M2.5 in BP2, M5.5.5 in BP5, M5.9.5 in BP7). Every interlude exists because each major systems milestone needs *fun* evidence before the next BP unlocks; the actor-feel lab alone was too sterile, the terrain kernel alone is just deformation, and so on. The interlude is a 60-90 s scenario driven by `cfctl` scripts + cf-e2e expectations + run-bundle evidence at multiple tick rates, gated by the human-playtest survey for that BP.
+Do not skip the micro-fun-slice interlude inside any BP that has one (M1.5 in BP1, M2.5 in BP2, M5.5.5 in BP4, M5.9.5 in BP5). Every interlude exists because each major systems milestone needs *fun* evidence before the next BP unlocks; the actor-feel lab alone was too sterile, the terrain kernel alone is just deformation, and so on. The interlude is a 60-90 s scenario driven by `cfctl` scripts + cf-e2e expectations + run-bundle evidence at multiple tick rates, gated by the human-playtest survey for that BP.
+
+Treat roadmap text as a minimum bar, not a ceiling. Before implementation and before acceptance, analyze the assigned milestone for player-facing, physics, AI, UI, replay, `cfctl`, performance, save/load, modding, and accessibility gaps that are implied by the product promise but underspecified in the task card. Implement the stronger coherent version when it stays inside the milestone's scope; otherwise document the gap and update the vault so the next milestone cannot miss it.
