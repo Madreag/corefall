@@ -56,7 +56,9 @@ pub struct ReactiveGuardParams {
     pub sight_radius: f32,
     /// Total cone angle in degrees (so half on each side of the facing direction).
     pub sight_cone_degrees: f32,
-    /// Time after first sighting before the guard can fire. Clamped to ≥ 0.05 s.
+    /// Time after first sighting before the guard can fire. Setting `0.0`
+    /// produces an instant settle (no delay); any positive sub-tick value is
+    /// rounded up to one tick.
     pub aim_settle_seconds: f32,
     /// Probability `[0, 1]` that an otherwise-valid shot misses (aim drift). The
     /// engine uses the seeded RNG so the same scenario+seed produces identical
@@ -126,7 +128,14 @@ impl ReactiveGuardParams {
 
 fn seconds_to_ticks(seconds: f32, tick_rate_hz: u32) -> u32 {
     let rate = tick_rate_hz.max(1);
-    let ticks = (f64::from(seconds.max(0.0)) * f64::from(rate)).round();
+    let clamped = seconds.max(0.0);
+    // Preserve the explicit "no delay" intent: callers passing exactly 0.0
+    // get 0 ticks. Any positive sub-tick duration still rounds up to 1 so
+    // a configured timer can never silently disappear into the rounding.
+    if clamped == 0.0 {
+        return 0;
+    }
+    let ticks = (f64::from(clamped) * f64::from(rate)).round();
     if ticks < 1.0 {
         1
     } else if ticks > f64::from(u32::MAX) {
@@ -989,20 +998,16 @@ mod tests {
         let player = player_actor(700.0, 32.0);
         let mut rng = Rng::from_seed(7);
 
-        // Tick 1: aim-settle SET to 1; no fire yet.
+        // Tick 1: aim_settle = 0 means instant settle, guard fires immediately and
+        // burst_pause SETS to 18.
         let r1 = step(&mut guard, tick_inputs(1, &actor, Some(&player)), &mut rng);
-        assert!(r1.fire.is_none(), "tick 1: aim_settle still active");
-
-        // Tick 2: aim-settle decrements to 0, fires, burst_pause SETS to 18.
-        let r2 = step(&mut guard, tick_inputs(2, &actor, Some(&player)), &mut rng);
-        assert!(r2.fire.is_some(), "tick 2: aim settled, must fire");
+        assert!(r1.fire.is_some(), "tick 1: zero aim_settle, must fire");
         assert_eq!(guard.burst_pause_remaining_ticks, 18);
 
-        // Ticks 3-20: burst_pause must block for the full 18-tick duration.
-        // (Ticks 3-14 are also blocked by fire_cooldown=12; ticks 15-20 are
-        // blocked by burst_pause alone since fire_cooldown has cleared by then.
-        // Pre-fix, burst_pause cleared at tick 20 so tick 20 would have fired.)
-        for tick in 3..=20 {
+        // Ticks 2-19: burst_pause must block for the full 18-tick duration.
+        // (Ticks 2-13 are also blocked by fire_cooldown=12; ticks 14-19 are
+        // blocked by burst_pause alone since fire_cooldown has cleared by then.)
+        for tick in 2..=19 {
             let r = step(&mut guard, tick_inputs(tick, &actor, Some(&player)), &mut rng);
             assert!(
                 r.fire.is_none(),
@@ -1010,11 +1015,11 @@ mod tests {
             );
         }
 
-        // Tick 21: pause expired (prev=0); fire_cooldown also clear; guard fires again.
-        let r21 = step(&mut guard, tick_inputs(21, &actor, Some(&player)), &mut rng);
+        // Tick 20: pause expired (prev=0); fire_cooldown also clear; guard fires again.
+        let r20 = step(&mut guard, tick_inputs(20, &actor, Some(&player)), &mut rng);
         assert!(
-            r21.fire.is_some(),
-            "tick 21: pause + cooldown expired, fire should resume"
+            r20.fire.is_some(),
+            "tick 20: pause + cooldown expired, fire should resume"
         );
     }
 }
