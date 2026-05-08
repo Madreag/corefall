@@ -91,14 +91,6 @@ pub struct CaptureStateHandle {
     pub events_log: Arc<Mutex<VecDeque<CaptureFrameEntry>>>,
 }
 
-impl CaptureStateHandle {
-    pub fn from_state(state: &CaptureState) -> Self {
-        Self {
-            events_log: state.events_log.clone(),
-        }
-    }
-}
-
 #[derive(Clone, Debug, Serialize, Deserialize)]
 pub struct CaptureFrameEntry {
     pub frame_index: u64,
@@ -290,13 +282,6 @@ impl CaptureManifest {
         let json = serde_json::to_string_pretty(self).map_err(|e| std::io::Error::other(e.to_string()))?;
         std::fs::write(path, json)
     }
-}
-
-pub fn write_capture_manifest(config: &CaptureConfig, state: &CaptureState) -> std::io::Result<PathBuf> {
-    let path = config.output_dir.join("capture_manifest.json");
-    let manifest = CaptureManifest::from_state(config, state);
-    manifest.write_to(&path)?;
-    Ok(path)
 }
 
 /// Write the capture manifest using a `CaptureStateHandle` (does not require

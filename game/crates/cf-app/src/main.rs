@@ -434,18 +434,23 @@ fn sync_engine_tick_to_capture_clock(holder: Res<EngineHolder>, mut clock: ResMu
 #[derive(Resource, Default)]
 struct CaptureRecorderCursor(usize);
 
-const CAPTURE_KEYFRAME_EVENT_TYPES: &[&str] = &[
-    "objective_started",
-    "objective_completed",
-    "objective_failed",
-    "mission_resolved",
-    "terrain_carved",
-    "tool_refused",
-    "projectile_hit",
-    "actor_status_changed",
-    "weapon_fired",
-    "state_changed",
-    "panic",
+/// (category, event_type) pairs that trigger a capture keyframe. Matching the
+/// full `category.event_type` shape (rather than just `event_type`) keeps the
+/// keyframe set aligned with the documented contract — `ai.state_changed` and
+/// `system.panic` are intentionally narrow, and a future `control.state_changed`
+/// or other-category `panic` must not silently inflate the summary grid.
+const CAPTURE_KEYFRAME_EVENT_TYPES: &[(&str, &str)] = &[
+    ("mission", "objective_started"),
+    ("mission", "objective_completed"),
+    ("mission", "objective_failed"),
+    ("mission", "mission_resolved"),
+    ("terrain", "terrain_carved"),
+    ("terrain", "tool_refused"),
+    ("combat", "projectile_hit"),
+    ("actor", "actor_status_changed"),
+    ("equipment", "weapon_fired"),
+    ("ai", "state_changed"),
+    ("system", "panic"),
 ];
 
 fn pump_recorder_events_into_capture_keyframes(
@@ -461,7 +466,10 @@ fn pump_recorder_events_into_capture_keyframes(
     let new_events = recorder.events_since(cursor.0);
     cursor.0 = recorder.event_log_len();
     for ev in new_events {
-        if CAPTURE_KEYFRAME_EVENT_TYPES.iter().any(|t| ev.event_type == *t) {
+        if CAPTURE_KEYFRAME_EVENT_TYPES
+            .iter()
+            .any(|(cat, ty)| ev.category == *cat && ev.event_type == *ty)
+        {
             let label = format!("{}::{}", ev.category, ev.event_type);
             writer.write(CaptureKeyframeRequested {
                 tick: ev.tick,

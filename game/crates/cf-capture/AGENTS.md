@@ -8,8 +8,8 @@
   baseline cadence (10 Hz default) plus event-triggered keyframes, and writes
   `captures/frame_<index>_t<tick>.png` + `captures/capture_manifest.json` next to
   each run-bundle.
-- `frame_filename(...)`, `ensure_capture_dir(...)`, `write_capture_manifest(...)`
-  helpers.
+- `frame_filename(...)`, `ensure_capture_dir(...)`,
+  `write_capture_manifest_from_handle(...)` helpers.
 - The `COMPOSER_SCHEMA_REV` constant + the `capture_manifest.json` shape that
   `game/tools/capture_grid.py` reads.
 
@@ -17,7 +17,8 @@
 
 - Stable: `CfCapturePlugin`, `CaptureConfig`, `CaptureState`, `CaptureClock`,
   `CaptureKeyframeRequested`, `CaptureMode`, `CaptureManifest`,
-  `write_capture_manifest`, `ensure_capture_dir`, `frame_filename`.
+  `CaptureStateHandle`, `write_capture_manifest_from_handle`,
+  `ensure_capture_dir`, `frame_filename`.
 - Internal: per-frame Bevy systems (`capture_baseline_system`,
   `capture_keyframe_system`); subject to change without notice.
 - Schema: `capture_manifest.json` is consumed by `game/tools/capture_grid.py`.
