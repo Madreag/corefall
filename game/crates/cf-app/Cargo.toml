@@ -27,6 +27,7 @@ cf-sim-core = { path = "../cf-sim-core" }
 cf-replay = { path = "../cf-replay" }
 cf-control = { path = "../cf-control" }
 cf-render-2d = { path = "../cf-render-2d" }
+cf-capture = { path = "../cf-capture" }
 cf-ui = { path = "../cf-ui" }
 cf-actor = { path = "../cf-actor" }
 cf-equipment = { path = "../cf-equipment" }

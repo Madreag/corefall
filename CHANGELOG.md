@@ -12,6 +12,31 @@ Use this file to summarize what changed in the implementation repo. Do not copy 
 
 ## Unreleased
 
+### Added (T-CAPTURE — Frame Capture, Grid Composer, And BP Fun-Proof Automation)
+
+- **New `cf-capture` crate** (workspace member 30) layered on top of `cf-render-2d`. Owns `CfCapturePlugin`, `CaptureConfig`, `CaptureState`, `CaptureClock`, `CaptureMode`, `CaptureKeyframeRequested`, `CaptureFrameEntry`, `CaptureManifest`, `CaptureStateHandle`. 6 unit tests (interval math + filename padding + manifest round-trip).
+- **Bevy 0.18 `Screenshot` API integration**: `cf-app --capture-grid` spawns `Screenshot::primary_window().observe(save_to_disk(...))` at a configurable baseline cadence (10 Hz default = every 6 ticks at 60 Hz tick) plus event-triggered keyframes for `objective_*`, `mission_resolved`, `terrain_carved`, `tool_refused`, `projectile_hit`, `actor_status_changed`, `weapon_fired`, `state_changed`, `panic`. Frames land in `prototype_runs/native/<run_id>/captures/frame_<index>_t<tick>.png` + `capture_manifest.json`.
+- **New flags on `cf-app`**: `--capture-grid`, `--capture-frames-hz <N>`, `--no-capture-events`, `--headless-capture` (scope-limited; logs warning until offscreen-RenderTarget readback ships).
+- **New `game/tools/capture_grid.py`** (Pillow-based composer). Reads `capture_manifest.json`, downsamples PNGs to 320×180 thumbnails, composes 8×8 `grid_NNN.png` files with tick + event-label overlays burned in, plus a `summary_grid.png` (one frame per major event, max 64 frames) for high-level agent review. Per-grid metadata in `grid_NNN.json` + `summary_grid.json`. Records `non_blank_ratio` for black-frame regression detection. Supports `--dry-run` for manifest validation without writing.
+- **New flags on `cf-e2e`**: `--capture-grid`, `--capture-frames-hz`, `--no-capture-events`, `--composer-script`, `--python-bin`. When `--capture-grid` is set, cf-e2e launches cf-app windowed (drops `--headless-smoke`), drives the script, force-issues a final `observe.once` to recover the engine `run_id`, sleeps 250 ms for the screenshot observers to flush, invokes the composer, and merges the composer's JSON output into the observation under the `capture` key. New `key>=value` and `key<=value` operators on `--expect` so capture thresholds (`capture.summary_grid.non_blank_ratio>=0.95`) resolve through the same lookup path as `mission.result=won`.
+- **Recorder helper** added to `cf-replay::Recorder`: `events_since(after_idx) -> Vec<Event>` so cf-app's keyframe pump doesn't clone the full event log every frame.
+- **`CaptureStateHandle` shared-handle pattern**: cf-app holds an `Arc<Mutex<VecDeque<CaptureFrameEntry>>>` outside Bevy's World so the manifest still writes after `app.run()` returns and Bevy reaps its resources during shutdown.
+- **Per-crate `AGENTS.md`** for `cf-capture` covering Owns / Public API / Does NOT Own / Test Surface / Cross-Crate Contracts / Common Pitfalls / Source Trail. Notes the determinism contract (capture path is read-only against ObserveFrame; never mutates sim state) and the headless-mode scope limit.
+
+**T-CAPTURE acceptance** (`m1_2026-05-08T03-30-23Z_5703728c`):
+
+- Bundle PASSES canonical checker (`errors 0`, 320 events, 1 test).
+- 50 PNG frames captured at 10 Hz over 5 s (baseline cadence honored at 60 Hz tick rate).
+- `capture_manifest.json` schema_rev=1; runtime_tick_rate_hz=60; mode=Windowed.
+- `grid_001.png` composed with 50 frames in 8×7 layout, tick overlays visible in each cell.
+- `summary_grid.png` composed; `non_blank_ratio: 0.98` (49 of 50 frames have visible content; one initial pre-render frame is black as expected).
+- `cf-e2e --capture-grid --expect capture.summary_grid.non_blank_ratio>=0.95` would PASS.
+
+**Vault updates** (canonical):
+
+- `cortext_command_vault/spec/prototype-roadmap.md` — new T-CAPTURE row in the side-tracks summary table + new `### T-CAPTURE` section after T-PERF with cadence policy, keyframe types, BP closure-gate role, LLM-input contract, determinism contract, and BP2/BP5/BP7/BP12 done-criteria.
+- `cortext_command_vault/references/prototype-run-bundle-schema.md` — `captures/` rows expanded: `frame_<tick>.png`, `grid_<NNN>.png`, `summary_grid.png`, `grid.json`, with `summary.json.artifacts[].type` values `capture-frame`, `capture-grid`, `capture-summary-grid`.
+
 ### Added (M1.5 — Micro Breach Fun Slice)
 
 - **Three real crates wired up** (replacing M0 stubs): `cf-mission` (objective state machine + `MissionState` / `MissionView`), `cf-terrain` (soft-breach barrier with M2-compatible event payloads + dig vocabulary `out_of_range` / `material_metal_nohook` / `already_broken` / `unknown_target`), `cf-ai` (DR-008 LEAN reactive guard: scripted job FSM + deterministic utility scoring + scripted aim-settle/miss-roll/burst pacing).

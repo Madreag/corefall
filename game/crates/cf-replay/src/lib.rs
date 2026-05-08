@@ -363,6 +363,19 @@ impl Recorder {
         self.inner.lock().map(|inner| inner.events.clone()).unwrap_or_default()
     }
 
+    pub fn events_since(&self, after_idx: usize) -> Vec<Event> {
+        self.inner
+            .lock()
+            .map(|inner| {
+                if after_idx >= inner.events.len() {
+                    Vec::new()
+                } else {
+                    inner.events[after_idx..].to_vec()
+                }
+            })
+            .unwrap_or_default()
+    }
+
     pub fn counts(&self) -> EventCounts {
         let inner = self
             .inner

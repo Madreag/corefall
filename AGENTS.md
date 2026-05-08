@@ -50,10 +50,11 @@ A Build Point is complete only when:
 - Every milestone inside the BP PASSES the Milestone Acceptance Gate (ID-by-ID matrix below).
 - Every milestone inside the BP PASSES the Contract Integrity Gate (matrix below) with positive AND negative/adversarial proof.
 - Run-bundle evidence exists for every fun-proof slice inside the BP at multiple tick rates (60 Hz default + 120 Hz validation, more if the BP touches network/server/replay cadence).
+- **T-CAPTURE evidence is mandatory from BP2 onward**: every fun-proof scenario must emit a `summary_grid.png` + `capture_manifest.json` (recorded in `summary.json.artifacts`), and the cf-e2e script must include `--expect capture.summary_grid.non_blank_ratio>=0.95` to catch black-frame regressions. See `cortext_command_vault/spec/prototype-roadmap.md` §T-CAPTURE for the full contract.
 - `/corefall-review <bp>` verdict is `Accept` for the full BP scope, not just one milestone inside it.
-- The per-BP human-playtest survey is recorded in `prototype_runs/native/<bp>_*` notes — answering the question "did the new systems make the game more fun than the previous BP?" with concrete observations. The survey is mandatory; a green Acceptance Matrix without a recorded playtest answer is not a closed BP.
+- The per-BP human-playtest survey is recorded in `prototype_runs/native/<bp>_*` notes — answering the question "did the new systems make the game more fun than the previous BP?" with concrete observations. The survey row MUST reference the summary grid PNG path it was answered against. The survey is mandatory; a green Acceptance Matrix without a recorded playtest answer is not a closed BP.
 
-Do not call a BP closed from prose. Closure is the per-milestone Acceptance + Contract Integrity matrices PLUS the playtest survey row PLUS the BP-level review verdict.
+Do not call a BP closed from prose. Closure is the per-milestone Acceptance + Contract Integrity matrices PLUS the T-CAPTURE summary grid PLUS the playtest survey row PLUS the BP-level review verdict.
 
 ## Milestone Acceptance Gate
 

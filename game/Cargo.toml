@@ -19,6 +19,7 @@ members = [
   "crates/cf-save",
   "crates/cf-net",
   "crates/cf-render-2d",
+  "crates/cf-capture",
   "crates/cf-ui",
   "crates/cf-audio",
   "crates/cf-mod",
@@ -59,6 +60,8 @@ chrono = { version = "0.4", default-features = false, features = ["clock", "serd
 hex = "0.4"
 futures-util = "0.3"
 async-trait = "0.1"
+image = { version = "0.25", default-features = false, features = ["png"] }
+crossbeam-channel = "0.5"
 
 [profile.dev]
 opt-level = 1

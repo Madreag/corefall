@@ -622,6 +622,13 @@ impl M0Engine {
         );
     }
 
+    /// M1.5: bundle returned from `cf-terrain::try_dig` plus the dig source.
+    /// Stored locally inside drive_tick so events can be emitted after the
+    /// state guard is dropped.
+    fn _dig_event_marker(&self) {
+        // Existence-only documentation anchor.
+    }
+
     /// Drive a single tick. Emits a `determinism.sim_checksum` and a `system.tick_sample`
     /// every `cadence_ticks` ticks (M0 default = 60). When the engine carries an
     /// [`ActorSimState`], drives the M1 actor pipeline and emits the resulting `input.*`
@@ -819,7 +826,6 @@ impl M0Engine {
                     mission_payload = Some((tick, sim_time_ms, report));
                 }
             }
-
             let cadence = ChecksumConfig::m0_default().cadence_ticks;
             if cadence > 0 && tick.0 % cadence == 0 {
                 let actor_bytes = build_checksum_bytes(&state);

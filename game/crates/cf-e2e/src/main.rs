@@ -60,6 +60,22 @@ struct Cli {
     timeout_seconds: u64,
     #[arg(long, default_value_t = 17900u16)]
     control_port: u16,
+    /// T-CAPTURE: enable cf-capture frame readback + grid composition.
+    /// When set, the spawned cf-app runs in windowed mode (NOT --headless-smoke)
+    /// so the wgpu swapchain is available for screenshot readback. After the
+    /// run, `game/tools/capture_grid.py <run_dir>` is invoked to compose grids.
+    #[arg(long)]
+    capture_grid: bool,
+    #[arg(long, default_value_t = 10.0)]
+    capture_frames_hz: f32,
+    #[arg(long)]
+    no_capture_events: bool,
+    /// Path to `python3` used to invoke the grid composer. Defaults to `python3`.
+    #[arg(long, default_value = "python3")]
+    python_bin: String,
+    /// Path to `capture_grid.py`. Defaults to `<repo>/game/tools/capture_grid.py`.
+    #[arg(long)]
+    composer_script: Option<PathBuf>,
 }
 
 fn init_diagnostics() {
@@ -99,7 +115,14 @@ async fn main() -> Result<()> {
         tracing::warn!(target: "cf::e2e", "script scenario {scenario} overrides --scenario {}", cli.scenario);
     }
 
-    let mut child = launch_cf_app(cli.control_port, &scenario, cli.write_run_bundle)?;
+    let mut child = launch_cf_app(LaunchOptions {
+        port: cli.control_port,
+        scenario: &scenario,
+        write_run_bundle: cli.write_run_bundle,
+        capture_grid: cli.capture_grid,
+        capture_frames_hz: cli.capture_frames_hz,
+        no_capture_events: cli.no_capture_events,
+    })?;
     let url = format!("ws://127.0.0.1:{}", cli.control_port);
     let mut session = match wait_for_ws(&url, Duration::from_secs(8)).await {
         Ok(ws) => Session {
@@ -149,24 +172,71 @@ async fn main() -> Result<()> {
         let _ = session.send("runbundle.write", json!({})).await?;
     }
 
-    let observation = last_observe.context("script never executed observe.once")?;
+    if cli.capture_grid {
+        // Capture composition needs the engine's run_id; force a final observe.once
+        // even if the script never asked for one.
+        let final_obs = session.send("observe.once", json!({})).await?;
+        last_observe = Some(final_obs);
+    }
+
+    let mut observation = last_observe.context("script never executed observe.once")?;
+
+    // Run grid composition while cf-app is still alive (frames keep landing as observers fire).
+    if cli.capture_grid {
+        let run_id = observation
+            .get("run_id")
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        if let Some(run_id) = run_id {
+            let bundle_root = cf_replay::resolve_run_bundle_root(None);
+            let run_dir = bundle_root.join(&run_id);
+            // Settle: give the screenshot observers ~250 ms to flush PNGs to disk.
+            tokio::time::sleep(Duration::from_millis(250)).await;
+            let composer = cli.composer_script.clone().unwrap_or_else(default_composer_script);
+            match invoke_composer(&cli.python_bin, &composer, &run_dir) {
+                Ok(stats) => {
+                    if let Value::Object(map) = &mut observation {
+                        map.insert("capture".into(), stats);
+                    }
+                }
+                Err(e) => {
+                    tracing::warn!(target: "cf::e2e", "capture_grid composer failed: {e}");
+                }
+            }
+        } else {
+            tracing::warn!(target: "cf::e2e", "observe.once did not return run_id; skipping capture_grid composition");
+        }
+    }
+
     let mut all_pass = true;
     for expect in &cli.expect {
-        let (key, expected_value) = match expect.split_once('=') {
-            Some((k, v)) => (k, v),
+        let parsed = match parse_expect(expect) {
+            Some(p) => p,
             None => {
-                tracing::error!(target: "cf::e2e", expect = %expect, "expectation must be `key=value`");
+                tracing::error!(target: "cf::e2e", expect = %expect, "expectation must be `key=value`, `key>=value`, or `key<=value`");
                 all_pass = false;
                 continue;
             }
         };
-        let actual = lookup(&observation, key);
+        let actual = lookup(&observation, parsed.key);
         let actual_str = match &actual {
             Some(Value::String(s)) => s.clone(),
             Some(v) => v.to_string(),
             None => "<missing>".to_string(),
         };
-        if actual_str.trim_matches('"') == expected_value {
+        let pass = match parsed.op {
+            ExpectOp::Eq => actual_str.trim_matches('"') == parsed.value,
+            ExpectOp::Ge | ExpectOp::Le => {
+                let lhs = actual.as_ref().and_then(json_as_f64);
+                let rhs: Option<f64> = parsed.value.parse().ok();
+                match (lhs, rhs, parsed.op) {
+                    (Some(a), Some(b), ExpectOp::Ge) => a >= b,
+                    (Some(a), Some(b), ExpectOp::Le) => a <= b,
+                    _ => false,
+                }
+            }
+        };
+        if pass {
             tracing::info!(target: "cf::e2e", expect = %expect, "PASS");
         } else {
             tracing::error!(target: "cf::e2e", expect = %expect, actual = %actual_str, "FAIL");
@@ -269,19 +339,39 @@ impl Session {
     }
 }
 
-fn launch_cf_app(port: u16, scenario: &str, write_run_bundle: bool) -> Result<Child> {
+struct LaunchOptions<'a> {
+    port: u16,
+    scenario: &'a str,
+    write_run_bundle: bool,
+    capture_grid: bool,
+    capture_frames_hz: f32,
+    no_capture_events: bool,
+}
+
+fn launch_cf_app(opts: LaunchOptions<'_>) -> Result<Child> {
     let bin = locate_cf_app_binary()?;
     let mut args: Vec<String> = vec![
         "--scenario".into(),
-        scenario.into(),
-        "--headless-smoke".into(),
+        opts.scenario.into(),
         "--control-api".into(),
         "--control-port".into(),
-        port.to_string(),
+        opts.port.to_string(),
         "--ticks".into(),
         "0".into(),
     ];
-    if write_run_bundle {
+    if !opts.capture_grid {
+        // Default: keep the legacy headless path the M0/M1/M1.5 cf-e2e scripts use.
+        args.push("--headless-smoke".into());
+    }
+    if opts.capture_grid {
+        args.push("--capture-grid".into());
+        args.push("--capture-frames-hz".into());
+        args.push(format!("{}", opts.capture_frames_hz));
+        if opts.no_capture_events {
+            args.push("--no-capture-events".into());
+        }
+    }
+    if opts.write_run_bundle {
         args.push("--write-run-bundle".into());
         args.push("--run-bundle-dir".into());
         args.push(cf_replay::resolve_run_bundle_root(None).display().to_string());
@@ -357,6 +447,94 @@ async fn wait_for_ws(url: &str, total_timeout: Duration) -> Result<WsStream> {
 /// - `mission.result` / `mission.loss_reason` / `mission.active_objective`
 /// - `objective.<id>` => `mission.objectives[id==<id>].status`
 /// - `breach.<id>.broken` / `breach.<id>.hp` etc.
+#[derive(Debug, Clone, Copy)]
+enum ExpectOp {
+    Eq,
+    Ge,
+    Le,
+}
+
+#[derive(Debug)]
+struct Expect<'a> {
+    key: &'a str,
+    op: ExpectOp,
+    value: &'a str,
+}
+
+fn parse_expect(raw: &str) -> Option<Expect<'_>> {
+    if let Some((k, v)) = raw.split_once(">=") {
+        return Some(Expect {
+            key: k.trim(),
+            op: ExpectOp::Ge,
+            value: v.trim(),
+        });
+    }
+    if let Some((k, v)) = raw.split_once("<=") {
+        return Some(Expect {
+            key: k.trim(),
+            op: ExpectOp::Le,
+            value: v.trim(),
+        });
+    }
+    raw.split_once('=').map(|(k, v)| Expect {
+        key: k.trim(),
+        op: ExpectOp::Eq,
+        value: v.trim(),
+    })
+}
+
+fn json_as_f64(value: &Value) -> Option<f64> {
+    match value {
+        Value::Number(n) => n.as_f64(),
+        Value::String(s) => s.parse().ok(),
+        _ => None,
+    }
+}
+
+fn default_composer_script() -> PathBuf {
+    if let Ok(repo) = std::env::var("CARGO_MANIFEST_DIR") {
+        let p = PathBuf::from(repo)
+            .join("..")
+            .join("..")
+            .join("tools")
+            .join("capture_grid.py");
+        if p.exists() {
+            return p;
+        }
+    }
+    let exe = std::env::current_exe().unwrap_or_default();
+    let mut walk = exe.as_path();
+    while let Some(parent) = walk.parent() {
+        let candidate = parent.join("game").join("tools").join("capture_grid.py");
+        if candidate.exists() {
+            return candidate;
+        }
+        walk = parent;
+    }
+    PathBuf::from("game/tools/capture_grid.py")
+}
+
+fn invoke_composer(python_bin: &str, script: &Path, run_dir: &Path) -> Result<Value> {
+    let captures_dir = run_dir.join("captures");
+    if !captures_dir.exists() {
+        anyhow::bail!(
+            "captures dir {} does not exist (cf-app may not have produced any frames)",
+            captures_dir.display()
+        );
+    }
+    let output = std::process::Command::new(python_bin)
+        .arg(script)
+        .arg(run_dir)
+        .output()
+        .with_context(|| format!("spawn {python_bin} {}", script.display()))?;
+    if !output.status.success() {
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        anyhow::bail!("composer exited with {}: {}", output.status, stderr.trim());
+    }
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    serde_json::from_str(&stdout).with_context(|| format!("composer stdout was not JSON: {stdout}"))
+}
+
 /// - `enemy.<actor_id>.state` etc.
 fn lookup(value: &Value, key: &str) -> Option<Value> {
     let parts: Vec<&str> = key.split('.').collect();

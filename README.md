@@ -69,6 +69,7 @@ The canonical roadmap now covers **57 closed/directional decision records**, **3
 | Monetization posture | Premium one-time purchase direction, free modding, community-hostable servers, no pay-to-win. Optional cosmetic-only gacha/battle-pass hooks are late-cycle, dormant/default-off systems and require a future activation DR. |
 | Production T-tracks | 4 dedicated late-anchored tracks ride alongside the gameplay spine: **T-CONTENT-ART** (AI-authored art/animation/VFX/decals/lighting/music/SFX/launch roster), **T-CONTENT-NARRATIVE** (~80,000 words bible/codex/dialogue), **T-LOCALIZATION** (Project Fluent + 11 Tier-A langs + 8 Tier-B UI-only + mod-localization), **T-LIVEOPS** (telemetry, marketing, Steam, legal, post-launch ops). Each finalizes at BP12; placeholder generation begins at BP3+. |
 | Micro-fun-slice cadence | After every major systems milestone, a short interlude proves the new system is *fun* before the next one stacks on top: M1.5 (breach), M2.5 (reactor defense), M5.5.5 (sabotage with collision + breach), M5.9.5 (pressure hold). Each is a 60-90 s scenario driven by cfctl, validated by run bundles, gated by a human-playtest survey before the next BP unlocks. |
+| AI-agent self-testing | **T-CAPTURE** layer (BP2+): cf-app emits PNG frame readbacks at 10 Hz baseline + event-triggered keyframes; `game/tools/capture_grid.py` composes them into 8×8 grid PNGs + a `summary_grid.png` (one frame per major event, ≤64 frames). cf-e2e drives the loop end-to-end. AI agents read the summary grid via the `Read` tool to validate motion + physics + effects without a human eyeballing every smoke run. |
 
 ---
 
@@ -92,7 +93,7 @@ The Roadmap V2 layer groups gameplay milestones into **13 Build Points (BP0..BP1
 | **BP11** | Networking spine | M9 + M9.5 | (LAN co-op smoke) | ⏳ Planned |
 | **BP12** | Online co-op + PvP + MMO + launch | M10 + M11 + M12 + production T-track finalization | (launch GA build) | ⏳ Planned |
 
-**Build Point closure gate:** Every BP closeout requires (a) every milestone inside it PASS in the Acceptance Matrix, (b) the Contract Integrity Matrix proving shared code paths + negative/adversarial proof, (c) run-bundle evidence for every fun-proof slice at multiple tick rates, (d) `/corefall-review <bp>` verdict = `Accept`, and (e) the per-BP human-playtest gate (Did the new systems make the game more fun than the previous BP? — recorded in `prototype_runs/native/<bp>_*` notes).
+**Build Point closure gate:** Every BP closeout requires (a) every milestone inside it PASS in the Acceptance Matrix, (b) the Contract Integrity Matrix proving shared code paths + negative/adversarial proof, (c) run-bundle evidence for every fun-proof slice at multiple tick rates, (d) **T-CAPTURE evidence** (each fun-proof script emits a `summary_grid.png` + `capture_manifest.json` recorded in `summary.json.artifacts`; `--expect capture.summary_grid.non_blank_ratio>=0.95` mandatory from BP2 onward), (e) `/corefall-review <bp>` verdict = `Accept`, and (f) the per-BP human-playtest gate (Did the new systems make the game more fun than the previous BP? — recorded in `prototype_runs/native/<bp>_*` notes; the answer must reference the summary grid path it was answered against).
 
 **Production-track wiring:** T-CONTENT-ART, T-CONTENT-NARRATIVE, T-LOCALIZATION, and T-LIVEOPS run alongside the BP spine but only finalize at BP12. They begin placeholder generation at BP3+ so the gameplay spine isn't blocked on art/audio/copy/legal.
 
@@ -221,7 +222,7 @@ We **also** lean on the open Rust gamedev ecosystem: [Bevy](https://bevyengine.o
 
 ## The Workspace
 
-29 crates today (see [game/Cargo.toml](game/Cargo.toml)). Each crate carries its own `AGENTS.md` boundary contract. Crates marked **(real)** have shipped real implementations; the rest are stubs that will fill in at their owning milestone.
+30 crates today (see [game/Cargo.toml](game/Cargo.toml)). Each crate carries its own `AGENTS.md` boundary contract. Crates marked **(real)** have shipped real implementations; the rest are stubs that will fill in at their owning milestone.
 
 ```text
 game/crates/
@@ -237,6 +238,7 @@ game/crates/
 ├── cf-mission              # (real)  M1.5: Objective/MissionState/MissionView + objective state machine
 ├── cf-ai                   # (real)  M1.5: ReactiveGuard FSM + utility scoring + scripted aim-settle + DR-008 LEAN
 ├── cf-render-2d            # (real)  wgpu 2D pipeline + actor + breach + extraction-zone sprite systems
+├── cf-capture              # (real)  T-CAPTURE: PNG readbacks at 10 Hz baseline + event keyframes; capture_manifest.json for the composer
 ├── cf-ui                   # (real)  comic-noir UI presentation (10-line HUD: STATUS / ITEM / HP / Reticle / OBJECTIVE / MISSION / ENEMY / BREACH / EVENT)
 ├── cf-e2e                  # (real)  M1.5: scripted end-to-end runner with auto-launch + --expect <key>=<value> assertions
 ├── cf-mod                  # (real)  content schema validator + manifest walker
@@ -394,6 +396,30 @@ python3 tools/prototype_run_check.py ../prototype_runs/native/m1.5_*
 | `cfctl act player-reset` | M1 | Respawn at scenario position with full HP / ammo / slot 0. |
 | `cfctl act player-dig [--target <breach_id>]` | M1.5 | Edge-triggered terrain dig. With no target, picks the nearest in-range breach strip; rejects `out_of_range` / `material_metal_nohook` / `already_broken` / `unknown_target`. |
 | `cfctl script run <path>` | M1 | Replay a `.cfctl.json` script (auto-launches `cf-app` with the right scenario, polls until ticks advance between commands). |
+| `cf-app --capture-grid --capture-frames-hz 10` | T-CAPTURE | Emit PNG frame readbacks at 10 Hz baseline (configurable) + event-triggered keyframes into `<run_bundle>/captures/`. Add `--no-capture-events` to suppress keyframes; `--headless-capture` for the (scope-limited) offscreen-RenderTarget path. |
+| `python3 game/tools/capture_grid.py <run_dir>` | T-CAPTURE | Compose `frame_*.png` into 8×8 `grid_NNN.png` + `summary_grid.png` with tick + event-label overlays. Requires Pillow. |
+| `cf-e2e --script <path> --capture-grid --expect capture.summary_grid.non_blank_ratio>=0.95` | T-CAPTURE | One-shot: launch cf-app windowed, replay script, compose grids, assert. New `key>=value` and `key<=value` operators on `--expect` for numeric thresholds. |
+
+**Run the M1.5 fun slice:**
+
+```bash
+# Win path (player breaches outer wall, neutralizes guard 2, reaches extraction zone in ~430 ticks)
+cargo run -p cfctl -- script run scripts/cfctl/micro_breach_win.cfctl.json --write-run-bundle
+
+# Loss path (player dies at guard 2 in ~1015 ticks)
+cargo run -p cfctl -- script run scripts/cfctl/micro_breach_loss.cfctl.json --write-run-bundle
+
+# Or drive cf-app windowed and use KeyG to dig:
+cargo run -p cf-app -- --scenario micro_breach
+# WASD = move, Space = jump, arrows = aim, Enter/J = fire, R = reload, G = dig, L = reset, 1-4 = inventory slot, Esc = quit.
+
+# Run the cf-e2e harness (auto-launches cf-app, replays script, asserts expectations)
+cargo run -p cf-e2e -- --script scripts/cfctl/micro_breach_win.cfctl.json \
+    --expect mission.result=won \
+    --expect "objective.reach_extraction=Completed" \
+    --expect breach.outer_wall.broken=true \
+    --expect "enemy.guard_2.state=Dead"
+```
 
 **Run the M1.5 fun slice:**
 
@@ -427,7 +453,7 @@ GitHub Actions runs on every push and PR:
 - `cargo fmt --all -- --check` (with `.gitattributes` locking LF line endings cross-OS)
 - `cargo check --workspace --all-targets`
 - `cargo clippy --workspace --all-targets -- -D warnings`
-- `cargo test --workspace` (M1.5 raises the suite to **189 tests passing** on top of M1's 159 and M0's 73)
+- `cargo test --workspace` (T-CAPTURE adds 6 more → **195 tests passing**; M1.5 brought the suite to 189; M1 to 159; M0 to 73)
 - `cargo build --release`
 - Dependency drift report on the Linux leg (`tools/dependency_drift_report.py`) for direct registry deps and transitive duplicate review
 - `cf-mod validate content/` (validates M0 + M1 + M1.5 scenario manifests)
