@@ -15,6 +15,10 @@ use bevy::{
 use clap::Parser;
 
 use cf_actor::IntentSource;
+use cf_capture::{
+    write_capture_manifest_from_handle, CaptureClock, CaptureConfig, CaptureKeyframeRequested, CaptureMode,
+    CaptureStateHandle, CfCapturePlugin,
+};
 use cf_control::{
     engine::{run_m0_inline, M0Engine, M0EngineConfig},
     runtime::{build_engine_config, resolve_run_bundle_root, ConfigInputs},
@@ -88,6 +92,61 @@ struct Cli {
     /// Production runs should never set this.
     #[arg(long)]
     debug_inject_panic_at_tick: Option<u64>,
+    /// T-CAPTURE: enable cf-capture frame readback. Defaults to off; pass with no value to
+    /// turn on the windowed swapchain capture path at the default 10 Hz cadence.
+    #[arg(long)]
+    capture_grid: bool,
+    /// T-CAPTURE baseline cadence. 10 Hz default = capture every 6 ticks at 60 Hz tick.
+    /// Lower values reduce disk + LLM-input pressure; higher values increase motion fidelity.
+    #[arg(long, default_value_t = 10.0)]
+    capture_frames_hz: f32,
+    /// T-CAPTURE: when present, suppress event-triggered keyframes (mission_*, terrain_carved,
+    /// projectile_hit, actor_status_changed, weapon_fired, ai.state_changed, system.panic).
+    /// Default is keyframes ON.
+    #[arg(long)]
+    no_capture_events: bool,
+    /// T-CAPTURE: switch to offscreen RenderTarget::Image readback (true headless mode without
+    /// an OS window). Currently scope-limited; the flag is accepted but the actual offscreen
+    /// path is logged-only until the BP2 closure pass lands the wgpu readback wiring.
+    /// Use windowed-hidden mode (default) for now.
+    #[arg(long)]
+    headless_capture: bool,
+}
+
+#[derive(Debug, Clone)]
+struct CaptureOptions {
+    enabled: bool,
+    frames_hz: f32,
+    event_keyframes: bool,
+    headless: bool,
+}
+
+impl CaptureOptions {
+    fn from_cli(cli: &Cli) -> Self {
+        Self {
+            enabled: cli.capture_grid,
+            frames_hz: cli.capture_frames_hz,
+            event_keyframes: !cli.no_capture_events,
+            headless: cli.headless_capture,
+        }
+    }
+
+    fn build_config(&self, output_dir: PathBuf, runtime_tick_rate_hz: u32) -> CaptureConfig {
+        CaptureConfig {
+            enabled: self.enabled,
+            frames_hz: self.frames_hz,
+            event_keyframes: self.event_keyframes,
+            output_dir,
+            thumbnail_w: cf_capture::DEFAULT_THUMBNAIL_W,
+            thumbnail_h: cf_capture::DEFAULT_THUMBNAIL_H,
+            runtime_tick_rate_hz,
+            mode: if self.headless {
+                CaptureMode::OffscreenImage
+            } else {
+                CaptureMode::Windowed
+            },
+        }
+    }
 }
 
 fn main() -> Result<()> {
@@ -95,12 +154,19 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
     let scenario_path = locate_scenario(&cli.scenario)?;
     let config = build_config(&cli, scenario_path)?;
-    tracing::info!(target: "cf::app", scenario = %cli.scenario, headless_smoke = cli.headless_smoke, control_api = cli.control_api, tick_rate_hz = cli.tick_rate_hz, "cf-app M0 starting");
+    let capture_opts = CaptureOptions::from_cli(&cli);
+    tracing::info!(target: "cf::app", scenario = %cli.scenario, headless_smoke = cli.headless_smoke, control_api = cli.control_api, tick_rate_hz = cli.tick_rate_hz, capture_grid = cli.capture_grid, "cf-app M0 starting");
 
     match (cli.headless_smoke, cli.control_api) {
         (true, true) => run_headless_server(config, cli.control_port, cli.control_uds.clone()),
         (true, false) => run_headless(config),
-        (false, _) => run_bevy(config, cli.control_api, cli.control_port, cli.control_uds.clone()),
+        (false, _) => run_bevy(
+            config,
+            cli.control_api,
+            cli.control_port,
+            cli.control_uds.clone(),
+            capture_opts,
+        ),
     }
 }
 
@@ -250,7 +316,13 @@ struct ControlRuntime {
     server_handle: Mutex<Option<tokio::task::JoinHandle<std::io::Result<()>>>>,
 }
 
-fn run_bevy(config: M0EngineConfig, control_api: bool, control_port: u16, _uds: Option<PathBuf>) -> Result<()> {
+fn run_bevy(
+    config: M0EngineConfig,
+    control_api: bool,
+    control_port: u16,
+    _uds: Option<PathBuf>,
+    capture_opts: CaptureOptions,
+) -> Result<()> {
     let engine = Arc::new(M0Engine::new(config.clone()));
     engine.record_run_started();
     engine.record_setting_snapshot();
@@ -260,6 +332,22 @@ fn run_bevy(config: M0EngineConfig, control_api: bool, control_port: u16, _uds: 
     } else {
         None
     };
+
+    let captures_dir = engine.run_bundle_dir().join("captures");
+    let capture_config = capture_opts.build_config(captures_dir.clone(), config.tick_rate_hz);
+    let capture_enabled = capture_config.enabled;
+    if capture_enabled && matches!(capture_config.mode, CaptureMode::OffscreenImage) {
+        tracing::warn!(
+            target: "cf::capture",
+            "headless-capture is scope-limited (T-CAPTURE-OFFSCREEN); falling back to baseline log-only output. \
+             Use windowed-hidden mode (default) for visual proof until the offscreen RenderTarget readback ships."
+        );
+    }
+    if capture_enabled {
+        if let Err(e) = cf_capture::ensure_capture_dir(&captures_dir) {
+            tracing::warn!(target: "cf::capture", "failed to create captures dir {}: {e}", captures_dir.display());
+        }
+    }
 
     let mut app = App::new();
     let plugins = DefaultPlugins
@@ -279,6 +367,12 @@ fn run_bevy(config: M0EngineConfig, control_api: bool, control_port: u16, _uds: 
         .add_plugins(CfRenderPlugin::default())
         .add_plugins(ActorSpritePlugin)
         .add_plugins(StatusStripPlugin);
+    let capture_handle = CaptureStateHandle::default();
+    app.add_plugins(CfCapturePlugin {
+        config: capture_config.clone(),
+        state_handle: capture_handle.clone(),
+    });
+    app.insert_resource(CaptureRecorderCursor::default());
     app.insert_resource(Time::<Fixed>::from_hz(f64::from(config.tick_rate_hz)));
     app.insert_resource(EngineHolder(engine.clone()));
     app.insert_resource(AppRuntime {
@@ -297,15 +391,76 @@ fn run_bevy(config: M0EngineConfig, control_api: bool, control_port: u16, _uds: 
             log_tick_progress,
             ingest_player_input,
             sync_actor_state_to_render,
+            sync_engine_tick_to_capture_clock,
+            pump_recorder_events_into_capture_keyframes,
         )
             .chain(),
     );
 
     app.run();
 
+    if capture_enabled {
+        match write_capture_manifest_from_handle(&capture_config, &capture_handle) {
+            Ok(path) => tracing::info!(
+                target: "cf::capture",
+                "capture manifest written to {}",
+                path.display()
+            ),
+            Err(e) => tracing::warn!(
+                target: "cf::capture",
+                "failed to write capture manifest: {e}"
+            ),
+        }
+    }
+
     // After the Bevy app exits, finalize the run bundle.
     finalize_engine(engine, config.write_run_bundle)?;
     Ok(())
+}
+
+fn sync_engine_tick_to_capture_clock(holder: Res<EngineHolder>, mut clock: ResMut<CaptureClock>) {
+    clock.current_tick = holder.0.current_tick().0;
+}
+
+#[derive(Resource, Default)]
+struct CaptureRecorderCursor(usize);
+
+const CAPTURE_KEYFRAME_EVENT_TYPES: &[&str] = &[
+    "objective_started",
+    "objective_completed",
+    "objective_failed",
+    "mission_resolved",
+    "terrain_carved",
+    "tool_refused",
+    "projectile_hit",
+    "actor_status_changed",
+    "weapon_fired",
+    "state_changed",
+    "panic",
+];
+
+fn pump_recorder_events_into_capture_keyframes(
+    holder: Res<EngineHolder>,
+    config: Res<CaptureConfig>,
+    mut cursor: ResMut<CaptureRecorderCursor>,
+    mut writer: MessageWriter<CaptureKeyframeRequested>,
+) {
+    if !config.enabled || !config.event_keyframes {
+        return;
+    }
+    let recorder = holder.0.recorder();
+    let new_events = recorder.events_since(cursor.0);
+    cursor.0 = recorder.event_log_len();
+    for ev in new_events {
+        if CAPTURE_KEYFRAME_EVENT_TYPES.iter().any(|t| ev.event_type == *t) {
+            let label = format!("{}::{}", ev.category, ev.event_type);
+            writer.write(CaptureKeyframeRequested {
+                tick: ev.tick,
+                event_type: format!("{}.{}", ev.category, ev.event_type),
+                label,
+            });
+        }
+    }
 }
 
 fn drive_engine_tick(holder: Res<EngineHolder>, mut runtime: ResMut<AppRuntime>) {
