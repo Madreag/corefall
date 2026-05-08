@@ -47,7 +47,6 @@
 use serde::{Deserialize, Serialize};
 
 use cf_actor::{ActorId, ActorState, Status, Vec2};
-use cf_equipment::RifleSpec;
 use cf_sim_core::Rng;
 
 /// Tunable parameters for the M1.5 reactive guard.
@@ -760,12 +759,6 @@ fn try_fire(
         will_miss,
         lifetime_ticks,
     })
-}
-
-/// Convenience for binding the M1 rifle preset to a guard's projectile lifetime
-/// in tick-rate-aware ticks. Used by tests.
-pub fn lifetime_ticks_for_rifle(spec: &RifleSpec, tick_rate_hz: u32) -> u32 {
-    spec.projectile_max_flight_ticks(tick_rate_hz)
 }
 
 #[cfg(test)]

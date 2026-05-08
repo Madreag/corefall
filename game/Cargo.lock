@@ -1317,7 +1317,6 @@ name = "cf-ai"
 version = "0.0.1"
 dependencies = [
  "cf-actor",
- "cf-equipment",
  "cf-sim-core",
  "serde",
  "tracing",

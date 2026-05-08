@@ -464,7 +464,7 @@ fn pump_recorder_events_into_capture_keyframes(
     }
     let recorder = holder.0.recorder();
     let new_events = recorder.events_since(cursor.0);
-    cursor.0 = recorder.event_log_len();
+    cursor.0 += new_events.len();
     for ev in new_events {
         if CAPTURE_KEYFRAME_EVENT_TYPES
             .iter()
