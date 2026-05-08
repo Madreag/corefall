@@ -259,6 +259,7 @@ A junior agent must never have to guess what these words mean. If a term is used
 | **Reaction event** | Replay-recorded `reaction.*` event capturing reagents, byproducts, priority, temperature, catalysts, and parent cause. |
 | **Material event** | Replay-recorded `material.*` event capturing material id, contact point, temperature, state change, and parent cause. |
 | **Atmospherics event** | Replay-recorded `atmospherics.*` event capturing hull/gap/aperture/pump/vent/flow/thermal state changes. |
+| **Actor presentation contract** | Controlled actors are animation-first while responsive, physics-first while disrupted, and always replay/event-visible. Walking/running/crouching/climbing/jetting must read as body motion, not a static sliding pawn. Limbs remain controlled secondary physics during normal play and become stronger physical bodies during knockdown, ragdoll, limb loss, pressure/wind/explosion, and death. See [[spec/animation-system]], [[spec/body-damage-model]], [[spec/full-collision-physics-plan]], and DR-055. |
 | **Affliction** | Per-actor systemic state (`wetness`, `burning`, `corroded`, `electrified`, `poisoned`, `asphyxiating`, `suffocating`, `drowning`, `depressurizing`). Visible on HUD. |
 | **Material lab** | The `cf-tools-editor --mode material_lab` workbench. Brushes, inspect, recipe journal, stamps, AI puppet test. Designer authors a tiny reaction puzzle in <10 minutes (M8.5). |
 | **Launch material set** | 17 materials shipped at launch (air, dirt/sand, rock/concrete, metal, wood/organic, water, steam/mist, smoke, fire/heat, oil/fuel, acid, toxic sludge/liquid, toxic gas, lava, blood/vomit, electricity charge, pebble/debris). Per DR-036. |
@@ -345,6 +346,27 @@ For every short milestone assignment, the worker must:
 | Human-gated | Requires project-owner playtest, multi-person playtest, accessibility tester feedback, platform hardware the agent cannot access, or subjective fun assessment. | Agent must prepare the build, scripted evidence, and playtest checklist; mark the gate `READY_FOR_HUMAN` instead of pretending it passed. |
 
 No milestone should use a human-gated item to hide incomplete agent-completable work.
+
+### Minimum Bar And Enhancement Rule
+
+The roadmap is the **minimum bar**, not the ceiling. A worker assigned a milestone must first implement the documented milestone contract, then perform a short design-coverage pass before acceptance:
+
+1. Read the milestone's linked DRs/specs and identify any underspecified player-facing behavior, physics consequence, AI-readable state, UI/readability state, replay event, `cfctl` observation/action, perf counter, save field, or modding/schema surface.
+2. Strengthen the implementation and docs when the gap is agent-completable and inside the milestone's theme. Do not ask the user to re-paste design intent already present in the vault.
+3. If the enhancement changes a still-open decision, use [[#Open Decision Gates Protocol|Open Decision Gates Protocol]] before locking it.
+4. Record the enhancement in the milestone note, the checklist rows, and this roadmap when it creates a new durable contract.
+5. Never use "the roadmap did not explicitly say that" as a reason to ship a static, fake, no-op, non-readable, non-observable, or non-replayable version of a core game promise.
+
+For actor control specifically: **no actor may ship as a static sliding pawn once its milestone owns visible movement presentation.** The minimum acceptable posture is animation-first while controlled, physics-first while disrupted, with state exposed through replay, HUD, `cfctl`, and capture evidence.
+
+## No-Compromise Performance Defaults
+
+Performance-sensitive values in this roadmap are defaults and validation targets, not hardcoded ceilings, unless a DR explicitly says otherwise.
+
+- Sim tick rate, render cadence, input sampling, physics substeps, solver iterations, network snapshot/send cadence, replay checksum cadence, worker counts, memory budgets, quality tiers, and asset streaming budgets must be config-driven.
+- If a milestone says "60 Hz default" or "4K/120 ceiling", implement the value as a named config/default and record it in run bundles, observations, and perf reports.
+- CPU-heavy systems need a measured hot-path budget plus parallel/background/GPU posture. GPU-heavy systems need render/upload counters and must not bypass replay-authoritative state.
+- No worker may reduce the roadmap's performance ambition by hiding a fixed low ceiling in source code. If a ceiling is genuinely needed, create or update the relevant DR first.
 
 ### Open Decision Gates Protocol
 
@@ -1518,6 +1540,7 @@ Some milestones produce stubs that later milestones must replace without breakin
 | M5.9.5 atmospheric-kill telemetry → M6.6 AI environmental competence | M5.9.5 | M6.6 | `mission.atmospheric_kill: bool` becomes a stable mission-state field. M6.6 AI environmental competence regression tests assert AI doesn't ignore atmospheric kill opportunities AND doesn't blindly walk into vented rooms. |
 | M3A event taxonomy → M3B viewer | M3A | M3B | M3A locks the event envelope + checksums + headless replay. M3B layers viewer + scrub + cause-chain on top WITHOUT changing the envelope. Event additions during M3B require a fresh DR-002 confirmation pass. |
 | M4A readability HUD → M4B comic-noir polish | M4A | M4B | M4A locks the `cf-ui::HudState` resource shape + ACC-A floor. M4B layers comic-noir styling + DR-019 polish ON TOP of the same `HudState` without renaming fields; new fields require a migration entry per the existing M1.5/M4 mini-HUD bridge. |
+| Actor sprite/pawn → body graph → physical limbs | M1/M1.5 | M4A/M5/M5.5/M5.9 | M1/M1.5 may use placeholder actor presentation. M4A exposes readable stance and body-zone HUD states. M5 replaces pawn-only body state with a real actor body graph: head, torso, arms, legs, hands, feet, backpack/jetpack, equipment sockets, armor coverage, wounds, and attachment data. M5.5 gives those limbs collision proxies and impulse-to-damage routing. M5.9 lets gravity, pressure wind, liquid/gas jets, and low-g affect actors, limbs, dropped items, debris, and gibs. |
 | Reactive enemy → AI core | M1.5 | M6 | M1.5 enemy emits `ai_perception`, `tactic_chosen`, `weapon_fired`, `actor_status_changed` with reason labels. The same event names and reason-label vocabulary are reused by M6. |
 | Mini HUD → comic-noir HUD | M1.5/M4 | M4/M7 | Mini HUD writes status to the same `cf-ui::HudState` resource M4 reads. Adding fields is allowed; renames require a migration entry. |
 | Scenario manifest skeleton → full schema | M0/M1.5 | M7 | Scenario RON files bump `schema_version` only with a registered migration handler. Older scenarios continue to load via migration. |
@@ -1710,6 +1733,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 | T-LOCALIZATION | Strings/fonts/lang packs/mod-localization (Tier-A 11 langs + Tier-B UI-only 8 langs) | BP3+ string-source discipline; **BP12** finalization |
 | T-LIVEOPS | Telemetry, bug tooling, playtest program, marketing, Steam/platform integration, legal/compliance, post-launch ops | BP10+ pre-launch wiring; **BP12** finalization |
 | T-CAPTURE | Frame capture, grid composer, and BP fun-proof automation for AI-agent self-testing | BP2+ primary; lifelong from BP2 |
+| T-RELEASE | Per-BP cross-platform GitHub Releases (Linux + Windows + macOS x86_64/aarch64); pre-release flag stays ON until **BP12** (v1.0.0 GA) | BP1+ primary; lifelong from BP1 |
 
 ---
 
@@ -1913,6 +1937,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 **M4A Scope (readability + ACC-A floor, BP3):**
 - `cf-ui` HUD: body silhouette (DR-003 style); module strip stub; ammo + reload; objective banner; timer; last-important-event ticker.
+- Readable movement/stance state: walking, running, crouching, climbing, jetting, braced, knocked, downed, and damaged-limb states are visible through HUD labels/icons and `cfctl observe`, even if the animation art is still placeholder.
 - Status banners ("ARMOR CRACKED LEFT", "JET FAILED", "EJECT NOW") triggered by chassis events (text-only at M4A; comic-noir styling lands at M4B).
 - Material overlay UI integrated; tool-validity color cues.
 - Accessibility floor: 200% text scale + reflow; high-contrast mode; color-independent state labels; controller route through HUD; remap holds; captions.
@@ -1945,7 +1970,9 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 **What it proves:** The chassis grammar from DR-014/021 works on the native engine. One powered-armor actor and one light mech actor exercise the full ladder of layers + modules + damage stages + jam + eject + repair + salvage.
 
 **Scope:**
+- `cf-actor` body graph: head, torso, left/right upper arm, forearm, hand, thigh, shin, foot, backpack/jetpack, held-device sockets, armor coverage parts, wound containers, attachment joints, and movement-contribution fields. This is the first milestone where actor limbs become authoritative gameplay data rather than only visual hints.
 - `cf-chassis` chassis components: layered armor zones, modules with state, pilot/operator binding.
+- Actor presentation contract: controlled actors use walk/run/crouch/climb/jet animations or documented placeholders with event tags; aiming blends upper body/arm pose over locomotion; damaged/lost limbs alter gait, weapon handling, crawling, gear drop, and climb/jump/jet affordances. No static sliding pawn is acceptable for M5 acceptance.
 - Damage stages: `nominal` → `degraded` → `module-warning` → `module-failed` → `weapon-jammed` → `armor-cracked` → `disabled` → `pilot-injured` → `eject` → `bail-too-late` → `wreck` → `gibbed/exploded`.
 - Module system: jet, shield, sensor, repair-drone, weapon-mount; each with damage states.
 - `cf-equipment` role records implementation; LOAD-A fixture support; AI policy hints.
@@ -1955,6 +1982,9 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 **Done-criteria:**
 - [ ] Player can take damage and progress through stages with HUD + replay parity.
+- [ ] Actor body graph exists with limbs, equipment sockets, armor coverage, wounds, attachment joints, and movement-contribution data inspectable via `cfctl inspect actor`.
+- [ ] Walk/run/crouch/climb/jet presentation is not a static slide: animation events or placeholder animation-state events prove gait/stance/thrust transitions, foot-contact tags, and upper-body aim blending.
+- [ ] Limb damage has visible/mechanical consequences: limp, crawl, one-arm handling, dropped gear, disabled grip, reduced climb/jump/jet capability, or documented equivalent per origin/chassis.
 - [ ] Module damage produces module-warning → failure with reason labels.
 - [ ] Pilot eject works: player ejects from a wrecked mech and continues as foot infantry.
 - [ ] Chassis salvage emits `chassis_salvaged` with recoverable modules.
@@ -1973,6 +2003,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 **Scope (per [[spec/full-collision-physics-plan]]):**
 - `cf-physics` collision pipeline: broadphase, narrowphase, contact manifold, stable pair ids, collision matrix loader, deterministic pair ordering, and contact-event emission.
 - Collision classes and proxies for actor core, limbs, armor zones, held weapons, loose items, kinetic projectiles, explosive projectiles, terrain proxies, debris chunks, mech parts, base objects, force fields, and sensor triggers.
+- Controlled animation / physical-limb blend: connected self-collision filters keep normal locomotion responsive; disrupted states (knocked, stunned, ragdoll, limb detached, wind/pressure/explosion, dead) increase physics authority. Every filter has `collision_filter_reason`; detached/destroyed limbs collide normally.
 - Explicit collision matrix: player/player, unit/unit, AI/AI, enemy/enemy, ally/ally, limb/limb, limb/body, limb/weapon, weapon/weapon, projectile/body, projectile/terrain, projectile/equipment, projectile/shield, projectile/projectile, debris/body, mech/infantry, base/object interactions.
 - CCD tiers: discrete, speculative, sweep ray, sweep capsule, sweep shape, and TOI substep. Fast projectiles, important limbs, command-core bodies, and mech crush contacts cannot tunnel through thin terrain or units.
 - Projectile-projectile contact: kinetic bullet-bullet deflects/fragments/tumbles/loses energy; explosive projectile contacts can detonate, fuze-fail, or deflect by authored profile.
@@ -1986,6 +2017,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 - [ ] COLL-001 collision matrix generator fails on any physical pair with no rule.
 - [ ] COLL-002 player/ally/enemy/AI unit-unit body collisions block, shove, knock down, and recover with events.
 - [ ] COLL-003 limb-to-limb, limb-to-body, limb-to-terrain, and limb-to-door contacts work; detached limbs collide normally.
+- [ ] Controlled-animation vs physical-limb blend is proven: walking/aiming stays responsive, jetting lets limbs trail under gravity/inertia without wrecking aim, and knockdown/death/pressure/explosion transitions to stronger physics authority with events.
 - [ ] COLL-004 held weapons collide with limbs, terrain, doors, and other held weapons; owner self-filter is reason-labeled.
 - [ ] COLL-005 bullets hit bodies, armor, weapons, dropped items, terrain, shields, and mech modules with distinct events.
 - [ ] COLL-006 bullet-bullet/projectile-projectile contacts produce deflection/fragment/fuze/detonation outcomes per projectile profile.
@@ -2950,6 +2982,95 @@ Spans BP2+; **lifelong from BP2** (every fun-proof slice from M2.5 onward emits 
 - Side-by-side diff grid for replay-vs-live regression detection.
 - AI-readable JSON event manifest co-located with the grid (`summary_grid.events.json`) so an agent can pre-filter without parsing PNG overlays.
 
+### T-RELEASE — Per-BP Cross-Platform GitHub Releases
+
+> [!info] Roadmap V2 addition (BP1+)
+> This track exists so every Build Point closure produces a publishable, downloadable, verifiable artifact under [https://github.com/Madreag/corefall/releases](https://github.com/Madreag/corefall/releases). The BP closure gate already produces every artifact a release needs (run-bundle evidence, `summary_grid.png`, cf-e2e win/loss scripts, content scenarios, the human-playtest survey row). T-RELEASE wraps those in a tagged cross-platform release so determinism (DR-002) is verifiable on third-party hardware, the Steam Deck floor (DR-024) is testable per-BP, the per-BP human-playtest gate is easier to fulfill, and the launch-ops infrastructure (DR-047 / T-LIVEOPS) doesn't have to be invented from scratch at BP12.
+
+Spans BP1+; **lifelong from BP1** (every BP closure from BP1 onward emits a tagged release).
+
+**Owned surfaces:**
+
+- `.github/workflows/release.yml` — GitHub Actions workflow triggered on `v*-bp*` tag push. Build matrix: `x86_64-unknown-linux-gnu`, `x86_64-pc-windows-msvc`, `x86_64-apple-darwin`, `aarch64-apple-darwin`.
+- `game/tools/generate_release_notes.py` — Python helper that reads the latest `prototype_runs/native/<bp>_*` notes + the BP's `summary_grid.png` + the merged-PR bodies for the BP and emits a release notes payload.
+- Tag convention + version axis (see below).
+
+**Versioning axis:**
+
+| Tag | BP | What ships | Pre-release? |
+|---|---:|---|---|
+| `v0.0.0-bp0` | BP0 | (M0 only — pure tooling proof; tag-only, no binaries) | n/a |
+| `v0.1.0-bp1` | BP1 | M0 + M1 + M1.5 + T-CAPTURE infrastructure (first playable) | yes |
+| `v0.2.0-bp2` | BP2 | + M2 chunked terrain + M2.5 micro reactor defense + M3A event core/headless replay | yes |
+| `v0.3.0-bp3` | BP3 | + M3B replay viewer/debrief + M4A readability/ACC-A + M5 equipment/chassis/body graph | yes |
+| `v0.4.0-bp4` | BP4 | + M5.5 collision gauntlet + M5.5.5 micro sabotage + M5.6 material kernel + M5.7 hazards + M5.8 origin pass | yes |
+| `v0.5.0-bp5` | BP5 | + M5.9 atmospherics + M5.9.5 pressure hold + M5.10 worlds/environment aggregation | yes |
+| `v0.6.0-bp6` | BP6 | + M6 AI core + M6.5 LLM mind + M6.6 material/environmental competence | yes |
+| `v0.7.0-bp7` | BP7 | + M7 mission director + M7.5 base atmospherics + M7.7 weather/day-night + M4B comic-noir polish | yes |
+| `v0.8.0-bp8` | BP8 | + M8 editor + M8.5 material lab + M8.6 mining/extraction | yes |
+| `v0.9.0-bp9` | BP9 | + M9 dedicated server + M10 LAN co-op | yes |
+| `v0.10.0-bp10` | BP10 | + M11 online co-op + M9.5 voice/radio comms | yes |
+| `v0.11.0-bp11` | BP11 | + M12 public PvP arenas + persistent MMO shards | yes |
+| **`v1.0.0`** | BP12 | + production T-track finalization: launch art/audio/content, narrative, localization, live-ops, legal/platform readiness. **Pre-release flag drops; this is launch GA.** | NO |
+
+**Per-release artifacts:**
+
+- `corefall-linux-x86_64-v<tag>.tar.zst` — `cf-app`, `cfctl`, `cf-e2e` binaries + `content/` + `scripts/cfctl/` + the BP's `summary_grid.png` + the BP's exemplar run bundle.
+- `corefall-windows-x86_64-v<tag>.zip` — Windows variants of the same.
+- `corefall-macos-x86_64-v<tag>.tar.zst` + `corefall-macos-aarch64-v<tag>.tar.zst` — macOS variants, ad-hoc signed for now.
+- `SHA256SUMS.txt` — checksums of every artifact + the bundled `run_manifest.json` so contributors can verify checksum determinism.
+- `summary_grid.png` — the BP's hero capture grid (also embedded in release notes).
+
+**Release notes contract (auto-generated):**
+
+- **Header:** Hero `summary_grid.png` from the BP's fun-proof slice.
+- **Scope summary:** Which milestones the BP bundled; what shipped vs deferred.
+- **Run-bundle stats table:** events, ticks, tick rate, p99 ms, final checksum.
+- **Human-playtest survey:** copied verbatim from `prototype_runs/native/<bp>_*/notes.md`.
+- **Install instructions:** macOS Gatekeeper warning ("right-click → Open"; ad-hoc signed); Windows SmartScreen warning ("More info → Run anyway"). Code signing is a T-LIVEOPS task at BP10+.
+- **Determinism contract:** "Run `./cfctl script run scripts/cfctl/<bp>_funproof.cfctl.json --write-run-bundle --tick-rate-hz 60 --seed <N>` against this build and the resulting `final_sim_checksum` MUST equal `<sha>` printed in this release. Drift = bug, please file an issue."
+- **Linked PRs:** the squash commit(s) that landed in the BP.
+- **Linked vault notes:** evidence note + checklist row + roadmap section.
+
+**Steam Deck verification (best-effort, NOT a blocker):**
+
+- The Linux `.tar.zst` is the Deck artifact. No separate build.
+- Per-BP closure aims for "boots + the fun-proof scenario plays + run bundle PASSES checker on Deck hardware". When no Deck access, mark `READY_FOR_DECK_VERIFICATION` in the release notes and ship the Linux build anyway.
+- T-PLATFORM owns the Deck floor (1080p/60 mid-tier baseline; 800p/60 Deck floor). T-RELEASE just exposes the artifact.
+
+**Code signing posture:**
+
+- BP1..BP9: ad-hoc / unsigned. Document the install warning per platform.
+- BP10..BP11: T-LIVEOPS pre-launch wiring activates code signing infrastructure (Apple notarization, Windows Authenticode). Releases at BP10+ MUST be code-signed.
+- BP12: full code signing required for launch GA.
+
+**Determinism contract (DR-002):**
+
+- Every release MUST include the BP's exemplar `run_manifest.json` + the recorded `final_sim_checksum` for the fun-proof scenario at seed N.
+- A third party running `cfctl script run scripts/cfctl/<bp>_funproof.cfctl.json --tick-rate-hz 60 --seed <N> --write-run-bundle` against the released binary MUST produce a matching `final_sim_checksum`.
+- Checksum mismatch is a determinism bug and blocks BP closure retroactively. T-PLATFORM owns the Deck floor + cross-platform compile invariants; T-RELEASE owns the bytes-out-the-door verification.
+
+**BP closure-gate role (BP1 onward):**
+
+- Every BP closure MUST produce a tagged release matching the versioning axis above.
+- The release notes MUST embed the BP's `summary_grid.png` (T-CAPTURE artifact) + the human-playtest survey row.
+- `/corefall-review <bp>` reads the published release URL when issuing the BP-level Accept verdict.
+- Until BP12 the release is `pre-release: true` on GitHub. Drop this flag ONLY at v1.0.0.
+
+**Done-criteria (cumulative across BPs):**
+
+- [x] BP1 closure: T-RELEASE shipped end-to-end (release.yml + generate_release_notes.py + retroactive `v0.1.0-bp1` tag from main HEAD with M1.5 `summary_grid.png` as hero, all four cross-platform binaries published).
+- [ ] BP2..BP11: every BP closure emits a tagged release per the versioning axis. Pre-release flag stays ON.
+- [ ] BP10/BP11: code signing infrastructure activated by T-LIVEOPS.
+- [ ] BP12 finalization: `v1.0.0` GA release; pre-release flag DROPPED; full code signing on every artifact; determinism checksum table covers every shipping scenario.
+
+**Open extensions (post-BP1, not in initial scope):**
+
+- Cargo binstall metadata so `cargo binstall corefall-cli` works for `cfctl` + `cf-e2e`.
+- Steam Deck `.flatpak` artifact alongside the `.tar.zst` (post-BP10).
+- Auto-update check inside `cf-app` that pings the GitHub Releases API and surfaces a "new BP available" toast (post-BP10).
+- Reproducible-builds attestation (sigstore or in-toto provenance) per release.
+
 ---
 
 ## Production, Content, And Launch Milestones (Per DR-044, DR-045, DR-046, DR-047)
@@ -3522,8 +3643,9 @@ Spans M5..M-CONTENT-ACTORS; lifelong from M5.
 - Sprite-sheet for non-hero + skeletal-rigged for hero.
 - Per-frame animation event tags.
 - Procedural overlays (recoil, knockback, ragdoll).
+- Actor presentation contract: animation-first while controlled, physics-first while disrupted, and always replay/event-visible. Walking/running/crouching/climbing/jetting must read as body motion; aiming blends upper-body/arm pose over locomotion; jetpack/low-g limbs trail under gravity/inertia while aim/control remain playable; pressure/wind/explosions/knockdown/death increase physics authority.
 
-**Done-criteria:** All roster actors have complete 30+ animation set.
+**Done-criteria:** All roster actors have complete 30+ animation set; every controlled locomotion state emits animation tags/pose events; every disrupted transition emits physics/animation/replay events; `cfctl observe actor` and capture grids can prove the actor is not a static sliding pawn.
 
 ### T-VFX — VFX, Particles, Decals
 
@@ -4039,6 +4161,7 @@ For M0..M12, a milestone is done only when all agent-completable items below are
 | Replay | Required replay/checksum claims are backed by headless verification or explicitly not claimed. |
 | Collision/physics | Any new physical object has a collision class/proxy/matrix entry/event policy or a tested cosmetic/sensor/filter reason. |
 | Physical profile | Any new gameplay-physical object has mass, material/composition, durability/damage routing, and relevant temperature/electrical/container/AI/debug properties or a tested opt-out reason. |
+| Actor presentation | Any milestone that owns visible actor movement/body state proves the actor is not a static sliding pawn: locomotion animation/state tags, body/limb graph, physics authority transitions, `cfctl` observation, replay events, and capture evidence exist at the milestone's maturity level. |
 | Perf | Perf counters exist; T-PERF target status is recorded as pass/fail/blocked. |
 | Multicore/GPU | New CPU-heavy systems have measured hot-path budgets and a parallel/background/GPU posture; new GPU-heavy systems have render/upload counters and do not bypass replay-authoritative state. |
 | UI/accessibility | Any user-facing surface has screenshot evidence and ACC-A status when applicable. |
@@ -4062,7 +4185,7 @@ For M0..M12, a milestone is done only when all agent-completable items below are
 | M2.5 | Micro Reactor Defense can be won/lost in 60-90 s using M2 chunked terrain + M1 actor; cf-e2e proves both paths; reuses M1.5 fun-proof shape. |
 | M3 | Headless replay produces identical checksums to live run (M3A part); viewer + scrub + cause-chain (M3B part) closes DR-002. |
 | M4 | HUD-01..HUD-03 + ACC-A floor pass with 5 playtesters (M4A); comic-noir mission cards + status banners + DR-019 polish (M4B). |
-| M5 | Powered armor + light mech work end-to-end with chassis grammar; pilot eject works. |
+| M5 | Powered armor + light mech work end-to-end with chassis grammar; actor body graph + limbs/equipment sockets/armor coverage exist; locomotion is animation/state-tagged rather than static sliding; pilot eject works. |
 | M5.5 | COLL-001..COLL-012 pass; collision matrix/proxies/CCD/projectile-projectile/impulse damage replay headlessly with perf evidence. |
 | M5.5.5 | Micro Sabotage can be won/lost in 60-90 s using M5.5 collision + M5 chassis; cf-e2e proves both paths; reuses M1.5 fun-proof shape. |
 | M5.6 | MAT-01..MAT-03, MAT-06, MAT-13 minimal pass; active material kernel + reaction table + density layering + replay determinism with `material.*` and `reaction.*` events. |

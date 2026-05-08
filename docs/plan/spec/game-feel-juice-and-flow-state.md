@@ -50,8 +50,12 @@ feeds:
 
 ## Animation Polish
 
+> [!important] Actor presentation minimum bar
+> Corefall actors must feel like bodies, not sliding icons. Controlled movement is animation-first: walk/run/crouch/climb/jet states read clearly, aim/weapon pose blends over locomotion, and recoil/body weight are visible. Disrupted movement is physics-first: knockdown, limb loss, explosions, pressure wind, death, and ragdoll increase physical authority. The blend must stay playable: jetpack/low-g limbs may trail under gravity/inertia, but aim/control limbs remain stable enough to play unless damage says otherwise.
+
 | Element | Detail |
 |---|---|
+| Controlled locomotion | Walk/run/crouch/climb/jet state changes produce animation tags, foot anchors, body lean, and `cfctl observe actor` pose/stance fields. |
 | Animation cancel windows | Per-action cancel windows (e.g., reload can be cancelled at frame 6+ for combat readiness; not earlier) |
 | Animation interrupt patterns | High-priority animations (death, eject, limb-loss) interrupt lower-priority cleanly |
 | Snap-to-target vs free aim | Per-weapon: snipers slight magnetic snap on ADS; pistols pure free aim. Aim-assist scales per-platform |
@@ -60,6 +64,7 @@ feeds:
 | Procedural knockback | Per-impulse from `cf-physics`; actor center pushback + secondary jiggle on bones (skeletal) or sprite scale punch (sprite) |
 | Limb tracking (aim) | Skeletal: arm + weapon bones rotate to track aim_pitch. Sprite: pose-blend |
 | Foot-IK | Footstep frame anchor; per-surface footstep SFX; foot-on-terrain physics |
+| Physics authority transition | Controlled limbs use bounded secondary motion; knocked/stunned/dead/pressure/explosion/limb-detached states raise physics authority and emit replay-visible `physics.authority_changed` / `body.*` / `collision.*` events. |
 
 ## Camera Punch System
 
@@ -163,6 +168,7 @@ Configurable: off / light / medium / heavy.
 ## Done-Criteria
 
 - [ ] All juice rules trigger correctly per gameplay event.
+- [ ] Actor presentation is animation-first while controlled, physics-first while disrupted, and never degrades into a static sliding pawn after the milestone owns visible movement.
 - [ ] Flow state difficulty curve verified in playtest.
 - [ ] AI agent drives juice rule audit via cfctl.
 - [ ] ACC-A reduce-motion respected per accessibility.

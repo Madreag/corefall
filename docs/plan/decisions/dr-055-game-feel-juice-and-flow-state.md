@@ -44,8 +44,12 @@ revisit_trigger: "Game feel polish overrun budget; flow state difficulty curve f
 
 ### Animation polish
 
+> [!important] Actor presentation minimum bar
+> The game must not ship actors as static sliding pawns once a milestone owns visible movement/body presentation. Controlled actors are **animation-first while responsive** and **physics-first while disrupted**. Walking/running/crouching/climbing/jetting read as body motion; aiming blends upper-body/arm pose over locomotion; jetpack/low-g limbs trail under gravity/inertia while aim/control remain playable; knockdown, stun, death, limb loss, pressure wind, and explosion increase physics authority and emit replay events.
+
 | Element | Detail |
 |---|---|
+| **Controlled locomotion** | Walk/run/crouch/climb/jet state changes produce animation tags, foot anchors, body lean, and `cfctl observe actor` pose/stance fields. |
 | **Animation cancel** | Per-action cancel windows (e.g., reload can be cancelled at frame 6+ for combat readiness; not earlier). Per-weapon configurable. |
 | **Animation interrupt patterns** | High-priority animations (death, eject, limb-loss) interrupt lower-priority animations cleanly. |
 | **Snap-to-target vs free aim** | Per-weapon: snipers have slight magnetic snap on aim-down-sight; pistols are pure free aim. Aim-assist scales per-platform (controller higher; KB/M minimal). |
@@ -54,6 +58,7 @@ revisit_trigger: "Game feel polish overrun budget; flow state difficulty curve f
 | **Procedural knockback** | Per-impulse from `cf-physics`; actor center pushback + secondary jiggle on bones (skeletal) or sprite scale punch (sprite). |
 | **Limb tracking (aim)** | Skeletal: arm + weapon bones rotate to track aim_pitch. Sprite: pose-blend between aim_up/aim_mid/aim_down. |
 | **Foot-IK** | Footstep frame anchor; per-surface footstep SFX; foot-on-terrain physics. |
+| **Physics authority transition** | Controlled limbs use bounded secondary motion. Knocked, stunned, dead, pressure-wind, explosion, and limb-detached states raise physics authority and emit `physics.authority_changed`, `body.*`, and `collision.*` replay events. |
 
 ### Camera punch system
 

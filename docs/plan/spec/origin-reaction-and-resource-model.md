@@ -29,7 +29,7 @@ feeds:
 > Captured 2026-05-06 as **design intent**, not as a final settled value table. The grammar (which branches exist, which events fire, which HUD surfaces light up, which resources tick) is a commitment. The numbers (impulse thresholds, blackout curves, battery drain rates, thermal slopes) stay open until M5/M5.5/M5.7 prototype evidence backs them.
 
 > [!important] Out of scope right now
-> M0 is closed. M1 is the active milestone (actor controller and sim core). **Nothing on this page is implemented in M0 or M1.** Any worker reading this during M1 must NOT add origin-specific branches to actor / damage / resource code. The first implementation surface is M5 (chassis-bound origin field) and M5.5 (origin-aware impulse routing). M1 may carry placeholder origin tags on actors only if the actor record already needs an `origin_id` field for save-roundtrip; behavior must remain identity-equivalent across origins until M5.
+> BP1 is closed and BP2 is active. **Nothing on this page is implemented in M0, M1, M1.5, or BP2.** Any worker reading this before M5 must NOT add origin-specific branches to actor / damage / resource code. The first implementation surface is M5 (chassis-bound origin field), M5.5 (origin-aware impulse routing), and M5.8 (origin reaction/resource runtime). Earlier milestones may carry placeholder origin tags on actors only if the actor record already needs an `origin_id` field for save-roundtrip; behavior must remain identity-equivalent across origins until M5.
 
 ## Why This Page Exists
 
@@ -130,6 +130,8 @@ Both share the `heat` resource accumulator and the `chassis_module_damaged{cause
 - The AI doctrine response (an AI bot under involuntary downclock should retreat from heat source; an AI bot that engaged overclock voluntarily should drop overclock first).
 
 Androids inherit a per-module version of downclock — under sustained heat, individual modules can throttle without the rest of the body throttling. The `chassis_thermal_throttle_*` events use the same `scope: global | module:<id>` field as the overclock events.
+
+## Force-Feedback Contract
 
 Every chassis-bearing actor that takes a hit MUST emit `body_force_feedback` regardless of origin. Origin only determines the *content* of the feedback, not whether it fires.
 
@@ -420,5 +422,5 @@ Slot-assign rejects with `wrong_origin_for_equipment` when humans attempt to equ
 
 ## Change Log
 
-- 2026-05-06: Captured during M1 from user-supplied design intent (Round 1: combat reactions, healing affordances, resources, overclock). Status: `design-intent-post-m1`. M5/M5.5/M5.7 task cards cross-link here; new M5.8 milestone proposed but not yet wired into the canonical roadmap.
+- 2026-05-06: Captured during M1 from user-supplied design intent (Round 1: combat reactions, healing affordances, resources, overclock). Status: `design-intent-post-m1`. M5/M5.5/M5.7 task cards cross-link here; M5.8 is now wired into Roadmap V2 as the origin resource and overclock pass.
 - 2026-05-06 (later same session): Round 2 added — Environment Resistance Matrix (vacuum/oxygen consumption, heat tolerance, involuntary downclock vs voluntary overclock). New resources `oxygen_supply`; new afflictions `hypoxia`, `downclocked`, `heat_exhaustion`; future-flagged `frostbite`, `irradiated`. New events `resource.oxygen_changed`, `helmet_breach`, `chassis_thermal_throttle_*`. New tests ORIGIN-A-11..15. Helmet + oxygen tank equipment contract added. M7.5 atmospherics tagged as the environment-signal owner; M5.8 lands the actor-side accumulator and throttle state machine.

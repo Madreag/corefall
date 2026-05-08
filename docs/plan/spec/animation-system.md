@@ -20,6 +20,23 @@ feeds:
 
 # Animation System
 
+## Core Actor Presentation Rule
+
+> [!important] Minimum bar
+> The final design should not be a static sliding pawn. Controlled actors are **animation-first while responsive**, **physics-first while disrupted**, and **always replay/event-visible**. Normal locomotion uses readable walk/run/crouch/climb/jet animation; body physics layers on top through controlled secondary motion. When the actor is knocked down, stunned, dead, limb-damaged, depressurized, blasted, or wind-pushed, physics authority increases and the transition emits replay events.
+
+| Situation | Expected behavior |
+|---|---|
+| Normal walking/running | Walk/run animation, foot contact, surface-aware footsteps, body weight, recoil sway. |
+| Aiming while walking | Upper-body/arm aim pose blends over locomotion. Weapon tracks hand socket/IK. |
+| Jetpack / low gravity | Body is moved by thrust + gravity. Legs/arms trail, swing, and react physically, while aim/control limbs remain stabilized enough to play. |
+| Knocked down / stunned / dead | Physics takes over more strongly: ragdoll, limb collisions, tumbling, impact damage. |
+| Limb damaged/lost | Animation changes: limp, one-arm weapon handling, crawl, fall, drop gear, disabled grip, slower climb. |
+| Heavy armor / mech suit | Different gait, slower acceleration, more inertia, servos/hydraulics, different fall and landing forces. |
+| Pressure/wind/explosion | Limbs/body can be pushed, spun, slammed, damaged, or pinned by physical forces. |
+
+This is a playability rule, not only an art rule. `cf-anim`, `cf-actor`, `cf-physics`, `cf-chassis`, `cf-replay`, `cf-ui`, and `cf-control` must agree on the current posture/pose/physics-authority state.
+
 ## Approach
 
 **Hybrid: sprite-sheet for non-hero + skeletal-rigged for hero chassis + procedural overlays for everyone.**
@@ -29,6 +46,17 @@ feeds:
 | **Sprite-sheet** | All non-hero actors (humans light/heavy, robots, drones, civilians, husks, turrets). 4-12 frames per action. | Bevy `bevy_sprite` + custom animation manifest. AI-generated per [[spec/art-and-asset-pipeline]]. |
 | **Skeletal-rigged** | All 18 hero player chassis (3 PA tiers, 5 mech tiers, 4 robots, 4 androids, 1 drone) + named NPCs. Bone hierarchy + IK + animation curves. | `bevy_spine` (Spine runtime, free) OR `bevy_dragonbones` (DragonBones, free). Author in Spine Essential ($69) or DragonBones Pro (free). |
 | **Procedural overlays** | Recoil, knockback, limb tracking (aim), ragdoll on death, weapon-IK to hand sockets, jet-flame intensity. | Bevy procedural transforms; physics engine integration via `cf-physics`. |
+
+## Physics Authority Blend
+
+| Mode | Primary owner | Physics behavior | Required events / observations |
+|---|---|---|---|
+| `controlled_locomotion` | Animation state machine | Root motion / velocity are controlled; limbs use secondary spring/inertia within stability limits. | `animation.state_changed`, `animation.tag_fired`, `actor.stance_changed`; `cfctl observe actor` shows pose + stance. |
+| `controlled_airborne` | Movement controller + animation | Jet/jump thrust moves body; limbs trail under gravity/inertia/wind; aim arm remains stabilized unless damaged. | `actor.airborne_state_changed`, `animation.jet_thrust_pose`, `physics.secondary_limb_motion_sample` (sparse). |
+| `braced_or_aiming` | Animation + weapon IK | Feet/torso/weapon sockets stabilize; recoil applies procedural overlay. | `animation.ik_target_updated`, `equipment.weapon_recoil_applied`. |
+| `impaired_control` | Damage + animation | Limp, crawl, one-arm handling, disabled grip, reduced climb/jump/jet capability. | `body.limb_function_changed`, `actor.mobility_changed`, `equipment.grip_state_changed`. |
+| `disrupted_physics` | Physics solver | Knockdown, stun, pressure gust, explosion, tumble, pinned/crush states raise physics authority. | `physics.authority_changed`, `collision.contact_impulse_applied`, parent-linked body/equipment damage. |
+| `ragdoll_or_gib` | Physics solver | Death/limb detachment uses deterministic ragdoll/gib proxies. | `animation.ragdoll_begin`, `body.limb_detached`, `collision.*`, `body.gib_spawned`. |
 
 ## Animation Set per Chassis
 
@@ -150,6 +178,11 @@ chassis: (
 ## Done-Criteria
 
 - [ ] Every roster actor has a complete animation set defined.
+- [ ] Actor locomotion never appears as a static sliding pawn once the milestone owns visible actor presentation.
+- [ ] Walk/run/crouch/climb/jet states have animation state changes, event tags, and capture evidence.
+- [ ] Jetpack/low-g motion demonstrates controlled secondary limb physics without destroying player aim/control.
+- [ ] Knocked/stunned/dead/pressure/wind/explosion states demonstrate increased physics authority with replay events.
+- [ ] Limb damage changes animation and capability: limp, one-arm handling, crawl, disabled grip, gear drop, or origin/chassis-specific equivalent.
 - [ ] Animation event tags fire correctly on frame.
 - [ ] Procedural overlays compose without visual jitter.
 - [ ] Ragdoll engages deterministically on death.

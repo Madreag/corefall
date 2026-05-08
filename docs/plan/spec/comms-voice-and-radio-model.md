@@ -64,7 +64,7 @@ There is no canonical contract for voice + radio in the vault today. DR-020 (aud
 
 This page locks the contract. Reference research:
 
-- **ACRE2** (IDI-Systems) — Arma 3 realistic radio mod. Locked propagation model: free-space path loss + multipath terrain + antenna direction + frequency tuning. Source: [[references/sources#comms-research|sources ledger]].
+- **ACRE2** (IDI-Systems) — Arma 3 realistic radio mod. Locked propagation model: free-space path loss + multipath terrain + antenna direction + frequency tuning. Source: [[references/sources#Comms research (voice + radio simulation, 2026-05-06)|sources ledger]].
 - **TFAR** (Task Force Arrowhead Radio) — TeamSpeak integration with SR (rifleman / squad), LR (long range / vehicle), PRR (personal role) radio classes.
 - **Steam Audio** (Valve, Apache-2.0) — geometry-based acoustic propagation: occlusion, transmission, reflection, baked + raytraced reverb. Reference for our acoustic model.
 - **Real military radios**: AN/PRC-152 (30-512 MHz multiband), AN/PRC-148 MBITR (VHF/UHF), SINCGARS (VHF FM 30-87.975 MHz, frequency-hopping), Personal Role Radio (low-power short-range).

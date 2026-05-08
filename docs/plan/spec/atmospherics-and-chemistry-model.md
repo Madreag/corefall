@@ -32,13 +32,13 @@ feeds:
 > [!summary] What this page is
 > The canonical contract for **Stationeers-grade as the minimum bar, then beyond it**: gas chemistry, real pressure simulation (PV=nRT), combustion stoichiometry, phase change, pipe networks, room atmospheres, planetary atmospheres, suit life-support, base atmospherics modules, doors and weapon-created holes as pressure barriers/apertures, vents/valves/regulators/filters, breach detection, gas/liquid pressure jets, wind from pressure differentials, and heat transfer through materials. Every simulation surface — actors, equipment, chassis modules, base modules, terrain materials, weather, weapons, fire — reads from this model. There is one atmospherics/thermal simulation; everyone subscribes.
 >
-> The grammar mirrors Stationeers (the minimum acceptable feel target; 29+ source citations in [[references/sources#stationeers-atmospherics-research|sources ledger]]) but the project is allowed to go beyond it with more gases, more elements, more materials, richer heat transfer, and tighter combat/base coupling when prototypes prove readability, performance, replay determinism, and fun.
+> The grammar mirrors Stationeers (the minimum acceptable feel target; 29+ source citations in [[references/sources#Stationeers atmospherics research (29+ sources, 2026-05-06)|sources ledger]]) but the project is allowed to go beyond it with more gases, more elements, more materials, richer heat transfer, and tighter combat/base coupling when prototypes prove readability, performance, replay determinism, and fun.
 
 > [!warning] Authority boundary
 > Captured 2026-05-06 as **design intent**. The model (which equations apply, which gases ship at launch, which events fire, which devices interface with which networks) is a commitment. Specific numeric tuning (per-planet ambient values, per-device flow rates, per-actor breathing rates) stays open until M7.5 / M5.9 prototype evidence backs them.
 
 > [!important] Out of scope right now
-> M0 is closed. M1 is the active milestone. **Nothing on this page is implemented in M0/M1/M2/M3/M4.** The first implementation surface is the extended M7.5 (Base Atmospherics, currently shallow) and a new proposed **M5.9 — Atmospherics-Grade Kernel** that lands the gas registry, PV=nRT engine, pipe network topology, room detection, and combustion. Earlier milestones may carry placeholder fields (e.g., a `room_id` field on actors) only if they're identity-no-op until the kernel lands.
+> BP1 is closed and BP2 is active. **Nothing on this page is implemented in M0/M1/M1.5/M2/M3A/M3B/M4A/M4B.** The first implementation surface is **M5.9 — Atmospherics-Grade Kernel**, followed by M5.9.5 pressure-hold proof and M7.5 base-atmospherics integration. Earlier milestones may carry placeholder fields (e.g., a `room_id` field on actors) only if they're identity-no-op until the kernel lands.
 
 ## Why This Page Exists
 
@@ -58,10 +58,10 @@ This page locks all of that. Other pages cross-link here instead of restating it
 ## Principles (locked)
 
 1. **One simulation, many subscribers.** Every system that reads "is there oxygen here" / "what's the pressure" / "is it on fire" / "what's the temperature" reads from the atmospherics kernel. No parallel atmosphere models in actor / weapon / fire / weather code.
-2. **Real ideal gas law, all the time.** Every atmosphere unit (room cell, pipe network, suit interior, canister, lung) tracks `n` (moles per gas type), `V` (volume in liters), `T` (temperature in Kelvin), and computes `P = nRT/V` on demand. R = 8314.46 J/(kmol·K) per Stationeers convention (note: kilomole, not mole, because the engine works in kPa·L = J·1000). Source: [[references/sources#stationeers-pressure-volume-quantity-temperature|Stationeers wiki Pressure/Volume/Quantity/Temperature]].
-3. **Combustion is stoichiometry, not a flag.** Each combustion reaction has a fixed mole equation, energy release in joules per mole, autoignition temperature, and minimum ratio thresholds for ignition. Per-tick reaction rate is a deterministic function of temperature and present moles. Source: [[references/sources#stationeers-volatiles|Volatiles]], [[references/sources#stationeers-hydrogen|Hydrogen]], [[references/sources#stationeers-furnace-temperature-and-pressure-math|Furnace math]].
-4. **Phase change is gradual, not instant.** Gases ↔ liquids ↔ solids transition over time per phase diagram. Liquids always co-exist with a gas (any gas can be the pressurant). Latent heat is consumed on evaporation and released on condensation. Source: [[references/sources#stationeers-phase-change-guide|Phase Change guide]].
-5. **Pipe networks are first-class atmospheres.** A connected pipe segment graph is one atmosphere. Pumps, valves, regulators, filtration units, condensation chambers split networks. Each piece of network state (volume, total moles, partial moles per gas, temperature) is one record. Source: [[references/sources#stationeers-atmosphere|Atmosphere § Pipe Networks]].
+2. **Real ideal gas law, all the time.** Every atmosphere unit (room cell, pipe network, suit interior, canister, lung) tracks `n` (moles per gas type), `V` (volume in liters), `T` (temperature in Kelvin), and computes `P = nRT/V` on demand. R = 8314.46 J/(kmol·K) per Stationeers convention (note: kilomole, not mole, because the engine works in kPa·L = J·1000). Source: [[references/sources#Stationeers atmospherics research (29+ sources, 2026-05-06)|Stationeers wiki Pressure/Volume/Quantity/Temperature]].
+3. **Combustion is stoichiometry, not a flag.** Each combustion reaction has a fixed mole equation, energy release in joules per mole, autoignition temperature, and minimum ratio thresholds for ignition. Per-tick reaction rate is a deterministic function of temperature and present moles. Source: [[references/sources#Stationeers atmospherics research (29+ sources, 2026-05-06)|Volatiles]], [[references/sources#Stationeers atmospherics research (29+ sources, 2026-05-06)|Hydrogen]], [[references/sources#Stationeers atmospherics research (29+ sources, 2026-05-06)|Furnace math]].
+4. **Phase change is gradual, not instant.** Gases ↔ liquids ↔ solids transition over time per phase diagram. Liquids always co-exist with a gas (any gas can be the pressurant). Latent heat is consumed on evaporation and released on condensation. Source: [[references/sources#Stationeers atmospherics research (29+ sources, 2026-05-06)|Phase Change guide]].
+5. **Pipe networks are first-class atmospheres.** A connected pipe segment graph is one atmosphere. Pumps, valves, regulators, filtration units, condensation chambers split networks. Each piece of network state (volume, total moles, partial moles per gas, temperature) is one record. Source: [[references/sources#Stationeers atmospherics research (29+ sources, 2026-05-06)|Atmosphere § Pipe Networks]].
 6. **Rooms are first-class atmospheres.** A connected sealed-volume graph is one atmosphere. Walls/floors/ceilings are barriers (sealed); doors/windows are barriers with state (open/closed/breached). Vacuum dissipates atmosphere within "a few large grid atmospheres of distance" — exact rule per kernel.
 7. **No invisible chemistry.** Every reaction emits replay events. Every phase change emits replay events. Every breach emits replay events. The run-bundle reproduces the atmosphere state from event stream.
 8. **Determinism > visual fidelity for sim core.** Kernel runs CPU-deterministic. Per-cell shader hints are presentation; the source of truth is the kernel state.
@@ -159,7 +159,7 @@ Locked combustion table for the launch gas set. Reaction rate is a deterministic
 | Hydrogen + Nitrous Oxide | `1 H2 + 1 N2O → 1 Steam + 1 N2` | **612** | 323.15 K (50 °C) | ≥ 5% N2O AND ≥ 5% H2 |
 | Hydrogen + Ozone | `3 H2 + 1 O3 → 4 Steam` | **1836** | 423.15 K (150 °C) | ≥ 5% O3 AND ≥ 5% H2 |
 
-Source: [[references/sources#stationeers-volatiles|Volatiles]], [[references/sources#stationeers-hydrogen|Hydrogen]], [[references/sources#stationeers-furnace-temperature-and-pressure-math|Furnace temperature and pressure math]].
+Source: [[references/sources#Stationeers atmospherics research (29+ sources, 2026-05-06)|Volatiles]], [[references/sources#Stationeers atmospherics research (29+ sources, 2026-05-06)|Hydrogen]], [[references/sources#Stationeers atmospherics research (29+ sources, 2026-05-06)|Furnace temperature and pressure math]].
 
 **Reaction rate (per tick):**
 
@@ -184,7 +184,7 @@ Pressure spikes from combustion can rupture pipes/canisters/walls per their `pre
 
 ## Phase Change
 
-Gases ↔ liquids ↔ solids gradually. Source: [[references/sources#stationeers-phase-change-guide|Phase Change guide]].
+Gases ↔ liquids ↔ solids gradually. Source: [[references/sources#Stationeers atmospherics research (29+ sources, 2026-05-06)|Phase Change guide]].
 
 ```text
 For each gas g in atmosphere:
@@ -222,7 +222,7 @@ Per Stationeers: condensation increases temperature; evaporation decreases tempe
 
 ## Pipe Networks
 
-A pipe network is one atmosphere shared across all connected pipe segments (default 100 L per segment per Stationeers). Pumps, valves, regulators, filtration units, condensation/evaporation chambers split the network into separate atmospheres. Source: [[references/sources#stationeers-atmosphere|Atmosphere § Pipe Networks]], [[references/sources#stationeers-pipe-volume-pump|Pipe Volume Pump]].
+A pipe network is one atmosphere shared across all connected pipe segments (default 100 L per segment per Stationeers). Pumps, valves, regulators, filtration units, condensation/evaporation chambers split the network into separate atmospheres. Source: [[references/sources#Stationeers atmospherics research (29+ sources, 2026-05-06)|Atmosphere § Pipe Networks]], [[references/sources#Stationeers atmospherics research (29+ sources, 2026-05-06)|Pipe Volume Pump]].
 
 | Device | Owns | What It Does |
 |---|---|---|
@@ -276,6 +276,8 @@ Breach detection: if a sealed-room atmosphere loses > X% pressure per tick OR a 
 
 ## Flow, Wind, Liquid Jets, And Breach Holes
 
+### Wind From Pressure Differentials
+
 When two atmospheres or liquid volumes are connected and have different pressures or fluid heads, matter flows from high potential to low potential. Per Stationeers:
 
 > Flux of gases between open atmospheric systems is indicated by the particles travelling from higher-pressure to lower pressure regions. The difference in pressure accelerates that movement, causing loose objects and player to get pulled and flung about by the flux.
@@ -312,7 +314,7 @@ Player techniques that must be valid:
 
 ## Suit / Helmet / Lung Life-Support
 
-Each player and AI actor has internal atmospheres for helmet, suit, and lungs. Source: [[references/sources#stationeers-eva-suit|EVA Suit]], [[references/sources#stationeers-hardsuit|Hardsuit]].
+Each player and AI actor has internal atmospheres for helmet, suit, and lungs. Source: [[references/sources#Stationeers atmospherics research (29+ sources, 2026-05-06)|EVA Suit]], [[references/sources#Stationeers atmospherics research (29+ sources, 2026-05-06)|Hardsuit]].
 
 | Atmosphere | Volume | Function |
 |---|---|---|
@@ -367,7 +369,7 @@ At normal difficulty + perfect efficiency: 1.728 mol O2 / minute consumed; 0.864
 
 ## Planetary Atmospheres
 
-Each scenario / world has an ambient atmosphere — an infinite reservoir with locked composition, temperature, pressure. Source: [[references/sources#stationeers-atmosphere|Atmosphere § Specific Planetary Atmospheres]].
+Each scenario / world has an ambient atmosphere — an infinite reservoir with locked composition, temperature, pressure. Source: [[references/sources#Stationeers atmospherics research (29+ sources, 2026-05-06)|Atmosphere § Specific Planetary Atmospheres]].
 
 | World Archetype | Pressure | Temperature Range | Composition (mole fractions) | Notes |
 |---|---|---|---|---|

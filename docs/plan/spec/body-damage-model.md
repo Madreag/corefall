@@ -80,6 +80,8 @@ Can a player, bot, replay viewer, and loadout/workbench UI all explain one actor
 
 Design rule: HP remains useful, but it cannot be the only public truth. The readable truth is status + part consequence + item fallout + rescue/treatment possibility.
 
+Design rule: body damage also drives presentation. Once M5 owns the body graph, limb/body state must feed animation and movement: damaged legs limp or crawl, damaged arms impair grip/aim/reload, backpack/jetpack damage changes thrust and route choices, and detached parts become physical objects when M5.5 lands. The actor remains animation-first while controlled, but damage/disruption can raise physics authority through `UNSTABLE`, `KNOCKED_OUT`, `DEAD`, ragdoll, pressure wind, explosion, crush, or limb-detach states.
+
 ## Status Vocabulary
 
 | Status | Meaning | Player Feedback | AI Implication | Event |

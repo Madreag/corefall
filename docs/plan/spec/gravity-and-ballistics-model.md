@@ -31,7 +31,7 @@ feeds:
 > Captured 2026-05-06 as **design intent**. The model (universal field, per-planet config, per-cell override, ballistic integration) is a commitment. Specific numeric tuning (per-planet g values, per-projectile drag, terminal velocity) stays open until GRAV-A prototype evidence backs them.
 
 > [!important] Out of scope right now
-> M0 is closed. M1 is the active milestone. **Nothing on this page is implemented in M0/M1/M2/M3/M4 beyond a placeholder `gravity_g` config field on the scenario manifest** (which can be inert until M5.5 collision lands). The ballistic trajectory math, density-layering coupling, and per-cell override land in extended M5.5 + M5.6 + new M5.9.
+> BP1 is closed and BP2 is active. **Nothing on this page is implemented in M0/M1/M1.5/M2/M3A/M3B/M4A/M4B beyond placeholder `gravity_g` manifest/config fields** (which can stay inert until M5.5 collision lands). Ballistic trajectory math, density-layering coupling, and per-cell overrides land across M5.5 + M5.6 + M5.9.
 
 ## Why This Page Exists
 
@@ -206,6 +206,13 @@ Add `gravity` and `ballistics` event categories. All payloads include `parent_ev
 - Stratification kernel runs at sleeping-aware cadence — only sealed atmospheres with multi-gas mixes and significant ΔM run the per-tick stratification step.
 - Determinism: integration order is fixed; no platform-specific atomics in the inner loop.
 
+## Milestone Routing
+
+- M5.5 introduces collision and impulse routing hooks that can sample local gravity.
+- M5.6 material kernel uses gravity for density layering and settling.
+- M5.9 atmospherics uses gravity for gas/liquid stratification and pressure-flow interaction.
+- M5.10 environment aggregation exposes gravity slices to AI/HUD/replay through `EnvironmentSignal`.
+
 ## Out Of Scope (during M0..M4)
 
 - M0/M1: scenario manifest carries `gravity_g` field but engine ignores it (placeholder).
@@ -230,4 +237,4 @@ Add `gravity` and `ballistics` event categories. All payloads include `parent_ev
 
 ## Change Log
 
-- 2026-05-06: Captured during M1 from user-supplied design intent ("gravity should be a thing that affects materials, bullets, entities, everything really"). Status: `design-intent-post-m1`. Universal gravity field; per-planet defaults locked; per-cell override schema defined; integration with M5.5 collision + M5.6 material kernel + atmospherics density layering + ballistics math + replay event family extension. New M5.9 milestone proposed; existing M5.5 task card to be extended with `GravityField::sample` integration in the impulse-to-damage routing.
+- 2026-05-06: Captured during M1 from user-supplied design intent ("gravity should be a thing that affects materials, bullets, entities, everything really"). Status: `design-intent-post-m1`. Universal gravity field; per-planet defaults locked; per-cell override schema defined; integration with M5.5 collision + M5.6 material kernel + M5.9 atmospherics density layering + ballistics math + replay event family extension.
