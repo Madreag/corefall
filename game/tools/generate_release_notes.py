@@ -174,7 +174,7 @@ BP_ANCHOR_PREFIXES = {
 }
 
 BP_SMOKE_SCENARIOS = {
-    "bp0": "m1_actor_range",
+    "bp0": "m0_blank",
     "bp1": "micro_breach",
     "bp2": "micro_reactor_defense",
     "bp3": "m5_chassis_wreck_eject",

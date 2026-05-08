@@ -15,6 +15,7 @@ Use this file to summarize what changed in the implementation repo. Do not copy 
 ### Fixed (Roadmap V2 release scope alignment)
 
 - **`game/tools/generate_release_notes.py`** BP scope table now matches the canonical Roadmap V2 Build Point map: BP2 is `M2 + M2.5 + M3A`, BP3 is `M3B + M4A + M5`, BP4 is `M5.5 + M5.5.5 + M5.6 + M5.7 + M5.8`, and later BPs follow the vault exactly.
+- BP0/BP1 release-note scope is aligned with the release/versioning axis: BP0 is M0 tag-only tooling proof, while BP1 is the first playable release containing M1 + M1.5. BP0 install smoke now uses `m0_blank`.
 - Added explicit BP exemplar bundle prefixes so release archives prefer the BP's fun-proof slice (for example `m2.5_*` for BP2) before falling back to infrastructure bundles such as M3A.
 - Release-note install snippets now use the BP's exemplar smoke scenario (for example `micro_reactor_defense` for BP2) instead of always pointing at the old `m1_actor_range` smoke.
 - Release notes now include the promised linked-evidence section: merged PR numbers are discovered from the release commit range, `gh pr view` pulls PR titles/bodies/URLs when `GH_TOKEN` is available, git-log fallback keeps local runs useful, and `BP_VAULT_NOTES` emits canonical vault notes per Build Point. The release workflow now passes `GH_TOKEN` into the generator.
