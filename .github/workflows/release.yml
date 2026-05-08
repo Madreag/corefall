@@ -173,7 +173,7 @@ jobs:
           # Move all archives + checksums into one flat dir.
           find release-artifacts -type f \( -name '*.tar.zst' -o -name '*.zip' -o -name '*.sha256' \) -exec cp {} release-staging/ \;
           # Aggregate SHA256SUMS.txt
-          (cd release-staging && cat *.sha256 | sed 's| \*| |g' | sort > SHA256SUMS.txt && rm -f *.sha256)
+          (cd release-staging && cat *.sha256 | sed 's| \*|  |g' | sort > SHA256SUMS.txt && rm -f *.sha256)
           # Generate release notes
           python3 game/tools/generate_release_notes.py \
             --tag "$TAG" \
