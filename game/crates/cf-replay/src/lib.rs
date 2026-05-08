@@ -1,7 +1,7 @@
 //! M0-004: run-bundle writer + DR-002 v1 event envelope.
 //!
 //! Schema strings come from the canonical run-bundle checker
-//! (`research_tools/prototype_run_check.py` in the planning vault):
+//! (`game/tools/prototype_run_check.py`, vendored from the planning vault):
 //!   - manifest: `prototype-run-manifest.v0.1`
 //!   - event: `prototype-recorder-event.v0.1`
 //!   - summary: `prototype-run-summary.v0.1`

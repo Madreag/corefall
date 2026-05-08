@@ -12,6 +12,16 @@ Use this file to summarize what changed in the implementation repo. Do not copy 
 
 ## Unreleased
 
+### Fixed (Roadmap V2 release scope alignment)
+
+- **`game/tools/generate_release_notes.py`** BP scope table now matches the canonical Roadmap V2 Build Point map: BP2 is `M2 + M2.5 + M3A`, BP3 is `M3B + M4A + M5`, BP4 is `M5.5 + M5.5.5 + M5.6 + M5.7 + M5.8`, and later BPs follow the vault exactly.
+- BP0/BP1 release-note scope is aligned with the release/versioning axis: BP0 is M0 tag-only tooling proof, while BP1 is the first playable release containing M1 + M1.5. BP0 install smoke now uses `m0_blank`.
+- Added explicit BP exemplar bundle prefixes so release archives prefer the BP's fun-proof slice (for example `m2.5_*` for BP2) before falling back to infrastructure bundles such as M3A.
+- Release-note install snippets now use the BP's exemplar smoke scenario (for example `micro_reactor_defense` for BP2) instead of always pointing at the old `m1_actor_range` smoke.
+- Release notes now include the promised linked-evidence section: merged PR numbers are discovered from the release commit range, `gh pr view` pulls PR titles/bodies/URLs when `GH_TOKEN` is available, git-log fallback keeps local runs useful, and `BP_VAULT_NOTES` emits canonical vault notes per Build Point. The release workflow now passes `GH_TOKEN` into the generator.
+- CI cache restore/save is now non-blocking; `Swatinem/rust-cache` outages or Windows cache issues no longer fail the build before Corefall's own validation commands run.
+- README closure gate now includes T-RELEASE evidence, and the status banner calls out the remaining retroactive `v0.1.0-bp1` release debt instead of implying a release exists before a tag is published.
+
 ### Fixed (T-RELEASE rehearsal: Bevy 0.18 features split + non_blank_ratio truth)
 
 A T-RELEASE rehearsal pass on macOS (Apple M4 Pro / Sequoia 15.7.3) discovered the captured frames were entirely the cf-render-2d clear color `#0d121a` — no actor sprite, floor strip, breach strip, or HUD text was actually being drawn to the swapchain. The previous `non_blank_ratio: 0.98` evidence was misleading because Pillow's `getbbox()` reported any non-(0,0,0,0) pixel as content. Two fixes landed:
@@ -27,7 +37,7 @@ See `docs/implementation-log/2026-05-08-tcapture-frame-grid.md` "Post-merge adde
 ### Added (T-RELEASE — Per-BP Cross-Platform GitHub Releases)
 
 - **New `.github/workflows/release.yml`** triggered on `v*-bp*` tag push (or `v1.0.0`). Build matrix: Linux (`x86_64-unknown-linux-gnu`), Windows (`x86_64-pc-windows-msvc`), macOS x86_64 (`macos-13`), macOS aarch64 (`macos-latest`). Builds `cf-app + cfctl + cf-e2e` in `--release` mode, packages with content/ + scripts/cfctl/ + summary_grid.png + the BP's exemplar run bundle, computes SHA256SUMS, generates release notes, publishes via `softprops/action-gh-release@v2`. Pre-release flag stays ON until `v1.0.0`.
-- **New `game/tools/generate_release_notes.py`** (Python 3, no third-party deps). Reads BP tag → looks up scope from a static BP_SCOPE table → finds the most recent run bundle that anchors the BP → emits Markdown with hero summary_grid section + scope summary + run-bundle stats table + verbatim human-playtest survey + per-platform install instructions (Gatekeeper / SmartScreen warnings) + determinism contract (cfctl one-liner + expected `final_sim_checksum`) + SHA256SUMS table + cross-references to AGENTS.md / vault / CHANGELOG.
+- **New `game/tools/generate_release_notes.py`** (Python 3, no third-party deps). Reads BP tag → looks up scope from a static BP_SCOPE table → finds the most recent run bundle that anchors the BP → emits Markdown with hero summary_grid section + scope summary + run-bundle stats table + verbatim human-playtest survey + per-platform install instructions (Gatekeeper / SmartScreen warnings) + determinism contract (cfctl one-liner + expected `final_sim_checksum`) + linked PR body excerpts + canonical vault-note links + SHA256SUMS table + cross-references to AGENTS.md / vault / CHANGELOG.
 - **New T-RELEASE side track** in canonical vault `prototype-roadmap.md` with full versioning axis (BP1 → `v0.1.0-bp1` ... BP12 → `v1.0.0`), per-release artifact contract, code-signing posture (ad-hoc through BP9; T-LIVEOPS activates Apple notarization + Windows Authenticode at BP10+), Steam Deck verification posture (best-effort, NOT a blocker), and BP closure-gate role.
 - **AGENTS.md Build Point Closure Gate updated**: T-RELEASE tag is now mandatory from BP1 onward. Closure is now per-milestone Acceptance + Contract Integrity matrices PLUS the T-CAPTURE summary grid PLUS the T-RELEASE tagged GitHub Release PLUS the playtest survey row PLUS the BP-level review verdict.
 - **README.md banner gains Releases badge** (`shields.io` GitHub release auto-detection) + a "Releases" line in the status banner explaining the versioning axis.
@@ -47,7 +57,7 @@ See `docs/implementation-log/2026-05-08-tcapture-frame-grid.md` "Post-merge adde
 
 - 30 crates in workspace (cf-capture added).
 - **204 tests passing** workspace-wide (M0=73 + M1=86 + M1.5=30 + T-CAPTURE=15 including NaN/Inf frames_hz guards, alert_dwell + burst_pause off-by-one regressions, --headless-smoke + --capture-grid rejection, and instant-fire aim_settle).
-- BP1 closed; BP2 (M2 + M2.5) is now the active Build Point.
+- BP1 closed; BP2 (M2 + M2.5 + M3A) is now the active Build Point.
 - All 3 CI legs (ubuntu, macos, windows) green on both PRs at merge time.
 
 ### Fixed (T-CAPTURE Bugbot loop)
@@ -86,7 +96,7 @@ The T-CAPTURE PR #6 cycled through three Bugbot autofix iterations PLUS two of m
 
 **Vault updates** (canonical):
 
-- `cortext_command_vault/spec/prototype-roadmap.md` — new T-CAPTURE row in the side-tracks summary table + new `### T-CAPTURE` section after T-PERF with cadence policy, keyframe types, BP closure-gate role, LLM-input contract, determinism contract, and BP2/BP5/BP7/BP12 done-criteria.
+- `cortext_command_vault/spec/prototype-roadmap.md` — new T-CAPTURE row in the side-tracks summary table + new `### T-CAPTURE` section after T-PERF with cadence policy, keyframe types, BP closure-gate role, LLM-input contract, determinism contract, and BP2/BP4/BP5/BP12 done-criteria.
 - `cortext_command_vault/references/prototype-run-bundle-schema.md` — `captures/` rows expanded: `frame_<tick>.png`, `grid_<NNN>.png`, `summary_grid.png`, `grid.json`, with `summary.json.artifacts[].type` values `capture-frame`, `capture-grid`, `capture-summary-grid`.
 
 ### Added (M1.5 — Micro Breach Fun Slice)
@@ -203,7 +213,7 @@ After the M0.3 verdict, an independent reviewer recommended landing **F7 only**:
   4. Returns the explicit override unchanged when one is supplied.
   5. Falls back to the default when none is supplied.
 - **CI gate against stray `prototype_runs/` directories.** `.github/workflows/ci.yml` adds an "enforce repo-root prototype_runs path (M0.4-F7)" step that runs `find . -type d -name prototype_runs -not -path './prototype_runs' -not -path './prototype_runs/*' -not -path './target/*' -not -path './.git/*'` and fails CI if any stray directory exists. This protects the repo-root contract from future regressions where a binary defaults to a relative path under `game/`.
-- **Captured M3 follow-up.** `system.run_finished` checker tightening + `expected_outcome` manifest enum (`clean | panic | abort`) added as new task card `M3-006 run-finished outcome contract` in `cortext_command_vault/spec/native-implementation-backlog.md`. Owns: `cf-replay`, `references/prototype-run-bundle-schema.md`, `tools/prototype_run_check.py`. Not implemented in M0.4 — M3 closes DR-002 and is where the contract belongs.
+- **Captured M3A follow-up.** `system.run_finished` checker tightening + `expected_outcome` manifest enum (`clean | panic | abort`) now lives as task card `M3A-005 run-finished outcome contract` in `cortext_command_vault/spec/native-implementation-backlog.md`. Owns: `cf-replay`, `references/prototype-run-bundle-schema.md`, `tools/prototype_run_check.py`. Not implemented in M0.4 — M3A owns the event core and M3B closes DR-002.
 
 **Test count**: 73 tests passing (up from 68 in M0.3; +5 = the 5 new `cf-replay::bundle_paths` regression tests).
 

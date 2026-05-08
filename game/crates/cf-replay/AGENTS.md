@@ -30,7 +30,7 @@
 - Event names this crate emits: none directly; consumers call `Recorder::record(...)`.
 
 ## Common Pitfalls
-- The run-bundle checker (`research_tools/prototype_run_check.py`) enforces version STRINGS, not integers. Don't accept `schema_version: 1` from anywhere.
+- The run-bundle checker (`game/tools/prototype_run_check.py`, vendored from the planning vault) enforces version STRINGS, not integers. Don't accept `schema_version: 1` from anywhere.
 - Every event must have a unique `event_id` of the form `<run_id>:<tick>:<seq>` and ticks must be monotonic.
 - `summary.event_counts.by_category`/`by_type` MUST exactly match the events; the checker compares them.
 - `tests[*].evidence_event_ids` MUST reference real event ids that exist in `events.jsonl`.
@@ -39,5 +39,5 @@
 ## Source Trail
 - DR-002 (replay/event architecture, OPEN — closes at M3).
 - references/prototype-run-bundle-schema.
-- research_tools/prototype_run_check.py.
+- game/tools/prototype_run_check.py.
 - docs/implementation-log/2026-05-05-m0-engine-bootstrap.md.

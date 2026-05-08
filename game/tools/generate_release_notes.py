@@ -35,85 +35,237 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import subprocess
 import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-GENERATOR_VERSION = "0.1.0"
+GENERATOR_VERSION = "0.3.0"
 
 # Static BP scope table. Matches the canonical Build Points table in
 # cortext_command_vault/spec/prototype-roadmap.md. Update both in lockstep.
 BP_SCOPE = {
-    "bp0": ("Engine bootstrap", ["M0"], "(kickoff smoke)"),
+    "bp0": (
+        "Foundation Build",
+        ["M0 — Engine Bootstrap"],
+        "(kickoff smoke)",
+    ),
     "bp1": (
-        "Actor controller + breach fun proof",
-        ["M1", "M1.5", "T-CAPTURE infrastructure"],
+        "Micro Breach Build",
+        [
+            "M1 — Actor Controller And Sim Core",
+            "M1.5 — Micro Breach Fun Slice",
+            "T-CAPTURE infrastructure",
+        ],
         "M1.5 Micro Breach Fun Slice",
     ),
     "bp2": (
-        "Material storytelling",
-        ["M2", "M2.5"],
+        "Terrain & Replay Build",
+        [
+            "M2 — Pixel Terrain And Materials",
+            "M2.5 — Micro Reactor Defense",
+            "M3A — Event Recorder Core",
+        ],
         "M2.5 Micro Reactor Defense",
     ),
     "bp3": (
-        "Replay + comic-noir UI",
-        ["M3A", "M3B", "M4A", "M4B"],
-        "(UI is the proof)",
+        "Combat Readability Build",
+        [
+            "M3B — Replay Viewer And Debrief",
+            "M4A — Readability And ACC-A Floor",
+            "M5 — Equipment, Chassis, And Damage Grammar",
+        ],
+        "M5 Chassis Wreck/Eject",
     ),
     "bp4": (
-        "Equipment + chassis grammar",
-        ["M5"],
-        "(slot/wreck/eject scripted scenario)",
-    ),
-    "bp5": (
-        "Full collision gauntlet + sabotage proof",
-        ["M5.5", "M5.5.5"],
+        "Physics Sandbox Alpha",
+        [
+            "M5.5 — Full Collision Gauntlet",
+            "M5.5.5 — Micro Sabotage",
+            "M5.6 — Material Kernel",
+            "M5.7 — Hazard Package",
+            "M5.8 — Origin Resource & Overclock Pass",
+        ],
         "M5.5.5 Micro Sabotage",
     ),
-    "bp6": (
-        "Material kernel + hazards",
-        ["M5.6", "M5.7"],
-        "(chained-reaction debrief)",
-    ),
-    "bp7": (
-        "Origin + atmospherics + pressure-hold proof",
-        ["M5.8", "M5.9", "M5.9.5", "M5.10"],
+    "bp5": (
+        "Atmospherics & Worlds Alpha",
+        [
+            "M5.9 — Atmospherics-Grade Kernel",
+            "M5.9.5 — Micro Pressure Hold",
+            "M5.10 — Environmental Conditions Aggregation",
+        ],
         "M5.9.5 Micro Pressure Hold",
     ),
+    "bp6": (
+        "AI Combat Alpha",
+        [
+            "M6 — AI Core And Trust Harness",
+            "M6.5 — LLM Mind Lab",
+            "M6.6 — AI Material Competence",
+        ],
+        "AI-H + MIND + AI-MAT acceptance suites",
+    ),
+    "bp7": (
+        "Vertical Slice Alpha",
+        [
+            "M7 — Mission Director And Breach Contract",
+            "M7.5 — Base Atmospherics",
+            "M7.7 — Weather And Day/Night Kernel",
+            "M4B — Comic-Noir Polish",
+        ],
+        "Breach Contract + Bunker Defence proof",
+    ),
     "bp8": (
-        "AI core + LLM mind + material competence",
-        ["M6", "M6.5", "M6.6"],
-        "(8-criteria humanlike bar)",
+        "Creator Alpha",
+        [
+            "M8 — Scenario Editor And Mod Tools",
+            "M8.5 — Material Lab",
+            "M8.6 — Mining, Refining, And Material Economy",
+        ],
+        "Modder parity smoke",
     ),
     "bp9": (
-        "Mission director + base atmospherics",
-        ["M7", "M7.5", "M7.7"],
-        "(proof mission A-FEEL gate)",
+        "Server / LAN Alpha",
+        ["M9 — Dedicated Server App", "M10 — LAN Co-op"],
+        "LAN co-op smoke",
     ),
     "bp10": (
-        "Editor + mod tools + material lab",
-        ["M8", "M8.5", "M8.6"],
-        "(modder parity smoke)",
+        "Online Beta",
+        ["M11 — Online Co-op", "M9.5 — Voice And Radio Comms"],
+        "Self-hosted online co-op + comms",
     ),
     "bp11": (
-        "Networking spine",
-        ["M9", "M9.5"],
-        "(LAN co-op smoke)",
+        "Public Systems Beta",
+        ["M12 — Public PvP Arenas + Persistent MMO Shards"],
+        "PvP arena + MMO shard proof",
     ),
     "bp12": (
-        "Online co-op + PvP + MMO + launch",
+        "Release Candidate",
         [
-            "M10",
-            "M11",
-            "M12",
             "T-CONTENT-ART finalization",
             "T-CONTENT-NARRATIVE finalization",
             "T-LOCALIZATION finalization",
             "T-LIVEOPS finalization",
         ],
-        "(launch GA build)",
+        "Launch GA build",
     ),
+}
+
+# Preferred exemplar bundle prefixes per BP. A BP-tagged bundle wins first, then
+# these prefixes are tried in order. This keeps release archives centered on
+# the BP's fun-proof slice even when the BP also includes infrastructure
+# milestones such as M3A.
+BP_ANCHOR_PREFIXES = {
+    "bp0": ["m0"],
+    "bp1": ["m1.5", "m1"],
+    "bp2": ["m2.5", "m3a", "m2"],
+    "bp3": ["m5", "m4a", "m3b"],
+    "bp4": ["m5.5.5", "m5.8", "m5.7", "m5.6", "m5.5"],
+    "bp5": ["m5.9.5", "m5.10", "m5.9"],
+    "bp6": ["m6.6", "m6.5", "m6"],
+    "bp7": ["m7", "m7.5", "m7.7", "m4b"],
+    "bp8": ["m8.6", "m8.5", "m8"],
+    "bp9": ["m10", "m9"],
+    "bp10": ["m11", "m9.5"],
+    "bp11": ["m12"],
+    "bp12": ["bp12"],
+}
+
+BP_SMOKE_SCENARIOS = {
+    "bp0": "m0_blank",
+    "bp1": "micro_breach",
+    "bp2": "micro_reactor_defense",
+    "bp3": "m5_chassis_wreck_eject",
+    "bp4": "micro_sabotage",
+    "bp5": "micro_pressure_hold",
+    "bp6": "ai_trust_harness",
+    "bp7": "breach_contract",
+    "bp8": "sample_mod_breach",
+    "bp9": "breach_contract",
+    "bp10": "breach_contract",
+    "bp11": "pvp_arena_smoke",
+    "bp12": "breach_contract",
+}
+
+BP_VAULT_NOTES = {
+    "bp0": [
+        "spec/prototype-roadmap.md#BP0",
+        "spec/native-implementation-backlog.md#M0",
+        "spec/feature-completion-checklist.md#M0",
+    ],
+    "bp1": [
+        "spec/prototype-roadmap.md#BP1",
+        "spec/prototype-roadmap.md#M1.5",
+        "spec/feature-completion-checklist.md#BP1",
+        "prototypes/native-m1-5-micro-breach.md",
+    ],
+    "bp2": [
+        "spec/prototype-roadmap.md#BP2",
+        "spec/prototype-roadmap.md#M2.5",
+        "spec/prototype-roadmap.md#M3A",
+        "spec/native-implementation-backlog.md#M2.5",
+        "spec/native-implementation-backlog.md#M3A",
+        "spec/feature-completion-checklist.md#BP2",
+    ],
+    "bp3": [
+        "spec/prototype-roadmap.md#BP3",
+        "spec/prototype-roadmap.md#M3B",
+        "spec/prototype-roadmap.md#M4A",
+        "spec/prototype-roadmap.md#M5",
+        "spec/feature-completion-checklist.md#BP3",
+    ],
+    "bp4": [
+        "spec/prototype-roadmap.md#BP4",
+        "spec/prototype-roadmap.md#M5.5.5",
+        "spec/full-collision-physics-plan.md",
+        "spec/feature-completion-checklist.md#BP4",
+    ],
+    "bp5": [
+        "spec/prototype-roadmap.md#BP5",
+        "spec/atmospherics-and-chemistry-model.md",
+        "decisions/dr-037-stationeers-grade-atmospherics-direction.md",
+        "spec/feature-completion-checklist.md#BP5",
+    ],
+    "bp6": [
+        "spec/prototype-roadmap.md#BP6",
+        "spec/ai-trust-harness-slice-a.md",
+        "spec/hybrid-llm-ai-plan.md",
+        "spec/feature-completion-checklist.md#BP6",
+    ],
+    "bp7": [
+        "spec/prototype-roadmap.md#BP7",
+        "spec/mission-director-slice-a.md",
+        "spec/command-core-base-power.md",
+        "spec/feature-completion-checklist.md#BP7",
+    ],
+    "bp8": [
+        "spec/prototype-roadmap.md#BP8",
+        "spec/modding-model.md",
+        "spec/package-builder-workbench-slice-a.md",
+        "spec/feature-completion-checklist.md#BP8",
+    ],
+    "bp9": [
+        "spec/prototype-roadmap.md#BP9",
+        "spec/server-app-architecture.md",
+        "spec/feature-completion-checklist.md#BP9",
+    ],
+    "bp10": [
+        "spec/prototype-roadmap.md#BP10",
+        "spec/server-app-architecture.md",
+        "spec/feature-completion-checklist.md#BP10",
+    ],
+    "bp11": [
+        "spec/prototype-roadmap.md#BP11",
+        "spec/persistent-mmo-architecture.md",
+        "spec/feature-completion-checklist.md#BP11",
+    ],
+    "bp12": [
+        "spec/prototype-roadmap.md#BP12",
+        "spec/feature-completion-checklist.md#BP12",
+        "spec/authoritative-game-spec-v0.md",
+    ],
 }
 
 
@@ -124,6 +276,17 @@ class TagInfo:
     bp: str
     bp_label: str
     is_launch_ga: bool
+
+
+@dataclass
+class PullRequestEvidence:
+    number: int
+    title: str
+    url: str
+    merged_at: str
+    body_excerpt: str
+    vault_refs: list[str]
+    source: str
 
 
 def parse_tag(raw: str) -> TagInfo:
@@ -146,6 +309,12 @@ def parse_tag(raw: str) -> TagInfo:
             f"axis. Expected `v0.<N>.0-bp<N>` (BP1..BP11) or `v1.0.0` (BP12 launch GA)."
         )
     version, bp_num = m.group(1), int(m.group(2))
+    major, minor, patch = (int(part) for part in version.split("."))
+    if major != 0 or patch != 0 or minor != bp_num:
+        raise SystemExit(
+            f"generate_release_notes: tag '{raw}' does not match the T-RELEASE "
+            f"version axis. BP{bp_num} must use `v0.{bp_num}.0-bp{bp_num}`."
+        )
     bp = f"bp{bp_num}"
     if bp not in BP_SCOPE:
         raise SystemExit(
@@ -161,13 +330,180 @@ def parse_tag(raw: str) -> TagInfo:
     )
 
 
+def run_text(cmd: list[str], cwd: Path, timeout: int = 15) -> Optional[str]:
+    try:
+        proc = subprocess.run(
+            cmd,
+            cwd=cwd,
+            check=False,
+            text=True,
+            capture_output=True,
+            timeout=timeout,
+        )
+    except Exception:
+        return None
+    if proc.returncode != 0:
+        return None
+    return proc.stdout.strip()
+
+
+def previous_bp_tag(tag: TagInfo, repo_root: Path) -> Optional[str]:
+    if tag.bp == "bp0":
+        return None
+    if tag.is_launch_ga:
+        previous = "v0.11.0-bp11"
+    else:
+        bp_num = int(tag.bp.removeprefix("bp"))
+        if bp_num <= 1:
+            return None
+        previous = f"v0.{bp_num - 1}.0-bp{bp_num - 1}"
+    existing = run_text(["git", "tag", "--list", previous], repo_root)
+    return previous if existing == previous else None
+
+
+def commit_range_for_tag(tag: TagInfo, repo_root: Path) -> str:
+    previous = previous_bp_tag(tag, repo_root)
+    if previous:
+        return f"{previous}..HEAD"
+    root = run_text(["git", "rev-list", "--max-parents=0", "HEAD"], repo_root)
+    if root:
+        return f"{root}..HEAD"
+    return "HEAD"
+
+
+def pr_numbers_from_git(tag: TagInfo, repo_root: Path) -> list[int]:
+    commit_range = commit_range_for_tag(tag, repo_root)
+    log = run_text(
+        ["git", "log", "--format=%B%n---END-COMMIT---", commit_range],
+        repo_root,
+        timeout=30,
+    )
+    if not log:
+        return []
+    found: list[int] = []
+    for match in re.finditer(
+        r"(?:Merge\s+pull\s+request\s+#|Merge\s+PR\s+#|PR\s+#|pull/)(\d+)",
+        log,
+        re.IGNORECASE,
+    ):
+        number = int(match.group(1))
+        if number not in found:
+            found.append(number)
+    return found
+
+
+def excerpt(text: str, limit: int = 900) -> str:
+    text = re.sub(r"\s+", " ", text or "").strip()
+    if not text:
+        return "-"
+    if len(text) <= limit:
+        return text
+    return text[: limit - 1].rstrip() + "…"
+
+
+def extract_vault_refs(text: str) -> list[str]:
+    refs: list[str] = []
+    patterns = [
+        r"cortext_command_vault/[A-Za-z0-9_./#-]+\.md(?:#[A-Za-z0-9_.%+-]+)?",
+        r"(?:spec|decisions|dashboards|prototypes|research-log|references|systems|comparables)/[A-Za-z0-9_./#-]+\.md(?:#[A-Za-z0-9_.%+-]+)?",
+        r"\[\[([A-Za-z0-9_./# -]+)\]\]",
+    ]
+    for pattern in patterns:
+        for match in re.finditer(pattern, text or ""):
+            ref = match.group(1) if match.groups() else match.group(0)
+            ref = ref.strip()
+            if ref.startswith("cortext_command_vault/"):
+                ref = ref.removeprefix("cortext_command_vault/")
+            if ref and ref not in refs:
+                refs.append(ref)
+    return refs[:10]
+
+
+def load_pr_with_gh(number: int, repo_root: Path) -> Optional[PullRequestEvidence]:
+    repo = run_text(["git", "config", "--get", "remote.origin.url"], repo_root) or "Madreag/corefall"
+    if repo.startswith("git@github.com:"):
+        repo = repo.removeprefix("git@github.com:").removesuffix(".git")
+    elif repo.startswith("https://github.com/"):
+        repo = repo.removeprefix("https://github.com/").removesuffix(".git")
+    raw = run_text(
+        [
+            "gh",
+            "pr",
+            "view",
+            str(number),
+            "--repo",
+            repo,
+            "--json",
+            "number,title,url,body,mergedAt",
+        ],
+        repo_root,
+        timeout=20,
+    )
+    if not raw:
+        return None
+    try:
+        data = json.loads(raw)
+    except json.JSONDecodeError:
+        return None
+    body = data.get("body") or ""
+    return PullRequestEvidence(
+        number=int(data.get("number") or number),
+        title=data.get("title") or f"PR #{number}",
+        url=data.get("url") or f"https://github.com/{repo}/pull/{number}",
+        merged_at=data.get("mergedAt") or "-",
+        body_excerpt=excerpt(body),
+        vault_refs=extract_vault_refs(body),
+        source="gh",
+    )
+
+
+def fallback_pr_from_git(number: int, repo_root: Path) -> PullRequestEvidence:
+    log = run_text(
+        [
+            "git",
+            "log",
+            "--format=%s%n%b",
+            "--extended-regexp",
+            "--grep",
+            rf"#{number}([^0-9]|$)",
+            "--all-match",
+            "-n",
+            "1",
+        ],
+        repo_root,
+    )
+    title = f"PR #{number}"
+    if log:
+        first = next((line.strip() for line in log.splitlines() if line.strip()), "")
+        if first:
+            title = first
+    return PullRequestEvidence(
+        number=number,
+        title=title,
+        url=f"https://github.com/Madreag/corefall/pull/{number}",
+        merged_at="-",
+        body_excerpt="PR body unavailable in this environment; generated from local git commit references.",
+        vault_refs=extract_vault_refs(log or ""),
+        source="git",
+    )
+
+
+def merged_pr_evidence(tag: TagInfo, repo_root: Path) -> list[PullRequestEvidence]:
+    evidence: list[PullRequestEvidence] = []
+    for number in pr_numbers_from_git(tag, repo_root):
+        item = load_pr_with_gh(number, repo_root) or fallback_pr_from_git(number, repo_root)
+        evidence.append(item)
+    return evidence
+
+
 def find_bp_run_bundle(repo_root: Path, bp: str) -> Optional[Path]:
     """Find the most recent run bundle that corresponds to the BP closure.
 
     Search order:
     1. `prototype_runs/native/<bp>_*` (when a BP-tagged bundle is available)
-    2. The most recent milestone-tagged bundle that anchors the BP per BP_SCOPE
-       (e.g., BP1 → newest m1.5_* bundle; BP2 → newest m2.5_*).
+    2. The most recent milestone-tagged bundle that anchors the BP per
+       BP_ANCHOR_PREFIXES (e.g., BP1 → newest m1.5_* bundle; BP2 → newest
+       m2.5_* before M3A because M2.5 is the fun-proof slice).
     3. Else None — the run-bundle section is skipped.
     """
     bundles_root = repo_root / "prototype_runs" / "native"
@@ -178,12 +514,7 @@ def find_bp_run_bundle(repo_root: Path, bp: str) -> Optional[Path]:
     if bp_bundles:
         return bp_bundles[-1]
     # 2) Fall back to the BP's anchor milestone bundle.
-    anchor_milestones = BP_SCOPE.get(bp, ("", [], ""))[1]
-    for milestone in reversed(anchor_milestones):
-        # M1.5 → m1.5_*, M2.5 → m2.5_*, M5.5.5 → m5.5.5_*, etc.
-        # Hyphens AND spaces both map to underscore so milestone labels like
-        # "T-CAPTURE infrastructure" become "t_capture_infrastructure_*".
-        prefix = milestone.lower().replace("-", "_").replace(" ", "_")
+    for prefix in BP_ANCHOR_PREFIXES.get(bp, []):
         candidates = sorted(bundles_root.glob(f"{prefix}_*"))
         if candidates:
             return candidates[-1]
@@ -322,7 +653,8 @@ def playtest_section(bundle_dir: Optional[Path]) -> str:
     )
 
 
-def install_section() -> str:
+def install_section(tag: TagInfo) -> str:
+    scenario = BP_SMOKE_SCENARIOS.get(tag.bp, "m1_actor_range")
     return (
         "## Install\n"
         "\n"
@@ -334,7 +666,7 @@ def install_section() -> str:
         "```bash\n"
         "tar --use-compress-program='zstd -d' -xf corefall-linux-x86_64-<tag>.tar.zst\n"
         "cd corefall-linux-x86_64-<tag>\n"
-        "./cf-app --scenario m1_actor_range\n"
+        f"./cf-app --scenario {scenario}\n"
         "```\n"
         "\n"
         "Verify checksum (download `SHA256SUMS.txt` alongside the archive):\n"
@@ -346,7 +678,7 @@ def install_section() -> str:
         "tar --use-compress-program='zstd -d' -xf corefall-macos-<arch>-<tag>.tar.zst\n"
         "cd corefall-macos-<arch>-<tag>\n"
         "xattr -dr com.apple.quarantine . || true\n"
-        "./cf-app --scenario m1_actor_range\n"
+        f"./cf-app --scenario {scenario}\n"
         "```\n"
         "\n"
         "Gatekeeper will warn that the binary is unsigned. Right-click `cf-app` → Open the\n"
@@ -358,7 +690,7 @@ def install_section() -> str:
         "```pwsh\n"
         "Expand-Archive corefall-windows-x86_64-<tag>.zip\n"
         "cd corefall-windows-x86_64-<tag>\n"
-        ".\\cf-app.exe --scenario m1_actor_range\n"
+        f".\\cf-app.exe --scenario {scenario}\n"
         "```\n"
         "\n"
         "SmartScreen will warn that the binary is unrecognized. Click **More info → Run\n"
@@ -430,6 +762,51 @@ def sha256sums_section(staging: Path) -> str:
     )
 
 
+def linked_evidence_section(tag: TagInfo, repo_root: Path) -> str:
+    prs = merged_pr_evidence(tag, repo_root)
+    vault_refs = list(BP_VAULT_NOTES.get(tag.bp, []))
+    for pr in prs:
+        for ref in pr.vault_refs:
+            if ref not in vault_refs:
+                vault_refs.append(ref)
+
+    lines = ["## Linked PRs and vault evidence", ""]
+    if prs:
+        lines.extend(
+            [
+                "### Merged PRs in this release range",
+                "",
+                "| PR | Title | Merged | Evidence source | Body excerpt |",
+                "|---|---|---|---|---|",
+            ]
+        )
+        for pr in prs:
+            title = pr.title.replace("|", "\\|")
+            body = pr.body_excerpt.replace("|", "\\|")
+            lines.append(
+                f"| [#{pr.number}]({pr.url}) | {title} | `{pr.merged_at}` | `{pr.source}` | {body} |"
+            )
+        lines.append("")
+    else:
+        lines.extend(
+            [
+                "### Merged PRs in this release range",
+                "",
+                "_No merged PR numbers were found in the local release range. If this was a squash-only or manually-tagged release, add the PR links before publishing._",
+                "",
+            ]
+        )
+
+    lines.extend(["### Canonical vault notes", ""])
+    if vault_refs:
+        for ref in vault_refs:
+            lines.append(f"- `{ref}`")
+    else:
+        lines.append("_No BP-specific vault note mapping exists yet; update `BP_VAULT_NOTES` before publishing this release._")
+    lines.append("")
+    return "\n".join(lines)
+
+
 def footer_section(tag: TagInfo) -> str:
     canonical_bp = (
         "https://github.com/Madreag/corefall/blob/main/AGENTS.md#build-point-closure-gate"
@@ -455,8 +832,9 @@ def build_notes(tag: TagInfo, repo_root: Path, staging: Path) -> str:
         scope_section(tag),
         run_bundle_section(bundle_dir),
         playtest_section(bundle_dir),
-        install_section(),
+        install_section(tag),
         determinism_section(tag, bundle_dir),
+        linked_evidence_section(tag, repo_root),
         sha256sums_section(staging),
         footer_section(tag),
     ]
