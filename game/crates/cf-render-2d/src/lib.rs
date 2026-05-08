@@ -17,7 +17,10 @@
 
 use std::collections::HashMap;
 
+use bevy::asset::RenderAssetUsages;
+use bevy::image::Image;
 use bevy::prelude::*;
+use bevy::render::render_resource::{Extent3d, TextureDimension, TextureFormat};
 
 use cf_actor::ActorObservation;
 
@@ -40,6 +43,44 @@ impl Plugin for CfRenderPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(ClearColor(self.clear_color))
             .add_systems(Startup, spawn_camera);
+    }
+}
+
+/// Bevy 0.18 silently drops sprites whose `Handle<Image>` does not resolve to a
+/// loaded `GpuImage` — `Sprite::from_color` returns a defaulted handle that the
+/// `bevy_sprite_render::queue_sprites` pass `continue`s on, so a "color-only"
+/// sprite never makes it to the draw queue. To get solid-color rectangles back
+/// we register a 1x1 fully-white RGBA image at startup and route every cosmetic
+/// sprite through `solid_sprite()` below, keeping `sprite.color` as the tint.
+#[derive(Resource, Clone, Default)]
+pub struct SolidSpriteImage {
+    pub handle: Handle<Image>,
+}
+
+fn build_solid_sprite_image(mut images: ResMut<Assets<Image>>, mut handle: ResMut<SolidSpriteImage>) {
+    let image = Image::new_fill(
+        Extent3d {
+            width: 1,
+            height: 1,
+            depth_or_array_layers: 1,
+        },
+        TextureDimension::D2,
+        &[255, 255, 255, 255],
+        TextureFormat::Rgba8UnormSrgb,
+        RenderAssetUsages::default(),
+    );
+    handle.handle = images.add(image);
+}
+
+/// Helper: build a Bevy 0.18 `Sprite` that actually renders as a solid color.
+/// Wraps the `SolidSpriteImage` 1x1 white texture so `sprite.color` shows up
+/// correctly without dragging an asset path through every callsite.
+pub fn solid_sprite(image: &SolidSpriteImage, color: Color, size: Vec2) -> Sprite {
+    Sprite {
+        image: image.handle.clone(),
+        color,
+        custom_size: Some(size),
+        ..default()
     }
 }
 
@@ -124,7 +165,8 @@ pub struct ActorSpritePlugin;
 impl Plugin for ActorSpritePlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ActorRenderState>()
-            .add_systems(Startup, spawn_floor_and_reticle)
+            .init_resource::<SolidSpriteImage>()
+            .add_systems(Startup, (build_solid_sprite_image, spawn_floor_and_reticle).chain())
             .add_systems(
                 Update,
                 (sync_actor_sprites, sync_breach_sprites, sync_extraction_zone).chain(),
@@ -132,24 +174,16 @@ impl Plugin for ActorSpritePlugin {
     }
 }
 
-fn spawn_floor_and_reticle(mut commands: Commands) {
+fn spawn_floor_and_reticle(mut commands: Commands, solid: Res<SolidSpriteImage>) {
     // Floor (placeholder; real chunked terrain lands at M2).
     commands.spawn((
-        Sprite {
-            color: Color::srgb(0.15, 0.18, 0.20),
-            custom_size: Some(Vec2::new(2048.0, 8.0)),
-            ..default()
-        },
+        solid_sprite(&solid, Color::srgb(0.15, 0.18, 0.20), Vec2::new(2048.0, 8.0)),
         Transform::from_translation(Vec3::new(0.0, 0.0, -0.5)),
         FloorRenderTag,
         Name::new("cf::render::floor"),
     ));
     commands.spawn((
-        Sprite {
-            color: Color::srgb(0.95, 0.65, 0.30),
-            custom_size: Some(Vec2::new(4.0, 4.0)),
-            ..default()
-        },
+        solid_sprite(&solid, Color::srgb(0.95, 0.65, 0.30), Vec2::new(4.0, 4.0)),
         Transform::from_translation(Vec3::new(0.0, 0.0, 1.0)),
         Visibility::Hidden,
         ReticleRenderTag,
@@ -161,6 +195,7 @@ fn spawn_floor_and_reticle(mut commands: Commands) {
 fn sync_actor_sprites(
     mut commands: Commands,
     mut state: ResMut<ActorRenderState>,
+    solid: Res<SolidSpriteImage>,
     mut actor_query: Query<(Entity, &ActorRenderTag, &mut Transform, &mut Sprite)>,
     mut floor_query: Query<
         (&mut Transform, &mut Sprite),
@@ -220,11 +255,7 @@ fn sync_actor_sprites(
             }
         } else {
             let mut entity_commands = commands.spawn((
-                Sprite {
-                    color,
-                    custom_size: Some(Vec2::new(16.0, 32.0)),
-                    ..default()
-                },
+                solid_sprite(&solid, color, Vec2::new(16.0, 32.0)),
                 Transform::from_translation(Vec3::new(pos.x, pos.y, 0.5)),
                 ActorRenderTag { id: actor.id },
                 Name::new(format!("cf::render::actor::{}", actor.id)),
@@ -271,6 +302,7 @@ fn sync_actor_sprites(
 fn sync_breach_sprites(
     mut commands: Commands,
     state: Res<ActorRenderState>,
+    solid: Res<SolidSpriteImage>,
     mut breach_query: Query<(Entity, &BreachRenderTag, &mut Transform, &mut Sprite)>,
 ) {
     use std::collections::HashMap;
@@ -298,11 +330,7 @@ fn sync_breach_sprites(
             }
         } else {
             commands.spawn((
-                Sprite {
-                    color,
-                    custom_size: Some(size),
-                    ..default()
-                },
+                solid_sprite(&solid, color, size),
                 Transform::from_translation(Vec3::new(centre.x, centre.y, -0.25)),
                 BreachRenderTag { id: breach.id.clone() },
                 Name::new(format!("cf::render::breach::{}", breach.id)),
@@ -320,6 +348,7 @@ fn sync_breach_sprites(
 fn sync_extraction_zone(
     mut commands: Commands,
     state: Res<ActorRenderState>,
+    solid: Res<SolidSpriteImage>,
     mut zone_query: Query<(Entity, &mut Transform, &mut Sprite), With<ExtractionZoneTag>>,
 ) {
     match (&state.extraction_zone, zone_query.iter_mut().next()) {
@@ -344,11 +373,7 @@ fn sync_extraction_zone(
                 (zone.max[1] - zone.min[1]).max(1.0),
             );
             commands.spawn((
-                Sprite {
-                    color: Color::srgba(0.30, 0.85, 0.30, 0.25),
-                    custom_size: Some(size),
-                    ..default()
-                },
+                solid_sprite(&solid, Color::srgba(0.30, 0.85, 0.30, 0.25), size),
                 Transform::from_translation(Vec3::new(centre.x, centre.y, -0.4)),
                 ExtractionZoneTag,
                 Name::new("cf::render::extraction_zone"),
@@ -413,7 +438,13 @@ mod tests {
     #[test]
     fn actor_sprite_plugin_initialises_state() {
         let mut app = App::new();
-        app.add_plugins(MinimalPlugins).add_plugins(ActorSpritePlugin);
+        // Bevy 0.18: ActorSpritePlugin needs Assets<Image> for the
+        // SolidSpriteImage 1x1 white texture (see SolidSpriteImage doc-comment).
+        // MinimalPlugins doesn't include AssetPlugin/ImagePlugin, so we add the
+        // asset registration manually for the unit test.
+        app.add_plugins((MinimalPlugins, AssetPlugin::default()))
+            .init_asset::<Image>()
+            .add_plugins(ActorSpritePlugin);
         app.update();
         let state = app.world().resource::<ActorRenderState>();
         assert!(state.actors.is_empty());

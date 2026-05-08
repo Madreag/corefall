@@ -12,6 +12,31 @@ Use this file to summarize what changed in the implementation repo. Do not copy 
 
 ## Unreleased
 
+### Fixed (T-RELEASE rehearsal: Bevy 0.18 features split + non_blank_ratio truth)
+
+A T-RELEASE rehearsal pass on macOS (Apple M4 Pro / Sequoia 15.7.3) discovered the captured frames were entirely the cf-render-2d clear color `#0d121a` — no actor sprite, floor strip, breach strip, or HUD text was actually being drawn to the swapchain. The previous `non_blank_ratio: 0.98` evidence was misleading because Pillow's `getbbox()` reported any non-(0,0,0,0) pixel as content. Two fixes landed:
+
+- **`game/Cargo.toml`** — added `bevy_sprite_render` + `bevy_ui_render` to the Bevy feature set. Bevy 0.18 split the rendering systems out of `bevy_sprite` / `bevy_ui` into separate crates; we had the component crates but not the render-system crates, so every Sprite + Text/Node was extracted but never queued for drawing.
+- **`game/crates/cf-render-2d/src/lib.rs`** — defensive sprite-image wiring. `ActorSpritePlugin` now owns a `SolidSpriteImage` resource (1x1 white RGBA8) initialized in `Startup` before `spawn_floor_and_reticle`, and routes every cosmetic sprite through `solid_sprite(&solid, color, size)`. Defends against any future Bevy point release that drops the `Image::default()` registration at `Handle<Image>::default()`.
+- **`game/tools/capture_grid.py`** (composer schema rev `0.2.0`) — `non_blank_ratio` now computes histogram-mode color of each downsampled frame and counts pixels whose Manhattan distance from the mode exceeds `NON_BLANK_MIN_PIXEL_DELTA = 12`. A frame is non-blank only if at least `NON_BLANK_MIN_VARIANT_PIXELS = 64` pixels meet that threshold. Re-running against the original BP1 bundle returns `non_blank_ratio: 0.0` (correctly fails); re-running against the post-fix M1.5 bundle returns `0.9844` (correctly passes).
+
+The fix landed alongside two earlier T-RELEASE rehearsal fixes also in this entry: cf-e2e composer race (Session::shutdown_app_only before composer) and cf-app manifest source-truth filter (only references PNGs that exist on disk after Bevy's async screenshot observer queue drains). All four are part of the same T-RELEASE rehearsal pass.
+
+See `docs/implementation-log/2026-05-08-tcapture-frame-grid.md` "Post-merge addendum" for the full forensic walk.
+
+### Added (T-RELEASE — Per-BP Cross-Platform GitHub Releases)
+
+- **New `.github/workflows/release.yml`** triggered on `v*-bp*` tag push (or `v1.0.0`). Build matrix: Linux (`x86_64-unknown-linux-gnu`), Windows (`x86_64-pc-windows-msvc`), macOS x86_64 (`macos-13`), macOS aarch64 (`macos-latest`). Builds `cf-app + cfctl + cf-e2e` in `--release` mode, packages with content/ + scripts/cfctl/ + summary_grid.png + the BP's exemplar run bundle, computes SHA256SUMS, generates release notes, publishes via `softprops/action-gh-release@v2`. Pre-release flag stays ON until `v1.0.0`.
+- **New `game/tools/generate_release_notes.py`** (Python 3, no third-party deps). Reads BP tag → looks up scope from a static BP_SCOPE table → finds the most recent run bundle that anchors the BP → emits Markdown with hero summary_grid section + scope summary + run-bundle stats table + verbatim human-playtest survey + per-platform install instructions (Gatekeeper / SmartScreen warnings) + determinism contract (cfctl one-liner + expected `final_sim_checksum`) + SHA256SUMS table + cross-references to AGENTS.md / vault / CHANGELOG.
+- **New T-RELEASE side track** in canonical vault `prototype-roadmap.md` with full versioning axis (BP1 → `v0.1.0-bp1` ... BP12 → `v1.0.0`), per-release artifact contract, code-signing posture (ad-hoc through BP9; T-LIVEOPS activates Apple notarization + Windows Authenticode at BP10+), Steam Deck verification posture (best-effort, NOT a blocker), and BP closure-gate role.
+- **AGENTS.md Build Point Closure Gate updated**: T-RELEASE tag is now mandatory from BP1 onward. Closure is now per-milestone Acceptance + Contract Integrity matrices PLUS the T-CAPTURE summary grid PLUS the T-RELEASE tagged GitHub Release PLUS the playtest survey row PLUS the BP-level review verdict.
+- **README.md banner gains Releases badge** (`shields.io` GitHub release auto-detection) + a "Releases" line in the status banner explaining the versioning axis.
+- **Feature checklist gains 13 T-RELEASE rows** (4 S + 5 D + 4 O); all pending until the BP1 retroactive tag publishes.
+
+**Why T-RELEASE exists:** The BP closure gate already produces every artifact a release needs (run-bundle evidence, `summary_grid.png`, cf-e2e win/loss scripts, content scenarios, the human-playtest survey row). T-RELEASE wraps those in a tagged cross-platform release so determinism (DR-002) is verifiable on third-party hardware, the Steam Deck floor (DR-024) is testable per-BP, the per-BP human-playtest gate is easier to fulfill, and the launch-ops infrastructure (DR-047 / T-LIVEOPS) doesn't have to be invented from scratch at BP12.
+
+**Why now (BP1 retroactive):** PR #5 + PR #6 already shipped BP1 worth of binaries. A retroactive `v0.1.0-bp1` tag from `main` HEAD lets contributors and future-self download a working M0 + M1 + M1.5 + T-CAPTURE binary today and verify the determinism contract instead of "git clone + cargo build --release".
+
 ### Merged into main (2026-05-08)
 
 - **PR #5 squash-merged** ([commit `0d91451`](https://github.com/Madreag/corefall/commit/0d91451)) — M1.5 Micro Breach Fun Slice + Roadmap V2 Build Points + AGENTS.md refresh. 5 commits squashed (8696b6f...3feff29) including 3 Cursor Agent autofixes (HUD breach material source + dig_range field + miss_roll boundary fix + dead-code removal).

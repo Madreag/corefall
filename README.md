@@ -23,11 +23,13 @@ A 2D side-view physics sandbox where every gas, grain, bullet, body, world, and 
 [![Status](https://img.shields.io/badge/status-pre--alpha%20%28BP1%20%E2%9C%93%20%E2%80%94%20M0%20%2B%20M1%20%2B%20M1.5%20closed%2C%20BP2%20next%29-orange?style=flat-square)](#project-status)
 [![Build Points](https://img.shields.io/badge/Build_Points-BP1%20closed%20%2F%20BP2%20active-2EA043?style=flat-square)](#build-points)
 [![Roadmap V2](https://img.shields.io/badge/roadmap-V2%202026--05--08%20additive-8A2BE2?style=flat-square)](#roadmap-shape)
+[![Releases](https://img.shields.io/github/v/release/Madreag/corefall?include_prereleases&sort=semver&style=flat-square&label=release)](https://github.com/Madreag/corefall/releases)
 [![Vault](https://img.shields.io/badge/research-research%20vault-purple?style=flat-square)](https://github.com/Madreag/corefall#research-vault)
 
 **Current proof:** **BP1 closed.** M0 + M1 + M1.5 all PASS the Milestone Acceptance Gate + Contract Integrity Gate. The Micro Breach Fun Slice plays end-to-end: the player spawns west, digs through a soft concrete wall (`concrete_soft`) while a `metal_nohook` anchor refuses dig, fights one reactive guard with deterministic seeded miss rolls + utility-scored tactics, and reaches the eastern extraction zone within 90 seconds — or dies trying. cf-e2e drives the win script in ~430 ticks (4/4 expectations PASS) and the loss script in ~1015 ticks (3/3 expectations PASS). Mission state machine emits `mission.objective_started/completed/failed/mission_resolved`; reactive enemy emits `ai.ai_perception/tactic_chosen/state_changed`; soft breach emits `terrain.tool_action_started/terrain_carved/tool_refused`. Run bundles validate at 60 Hz and 120 Hz with byte-identical determinism evidence at the same seed. **T-CAPTURE side track also shipped** ([PR #6](https://github.com/Madreag/corefall/pull/6) merged): cf-capture emits PNG frame readbacks at 10 Hz + event keyframes; `capture_grid.py` composes 8×8 grid PNGs + `summary_grid.png` for AI-agent self-testing.<br>
-**Next up:** **BP2 — Material Storytelling.** Anchored at M2 (Pixel Terrain + Materials) with M2.5 (Micro Reactor Defense) as the BP2 fun-proof interlude before BP3 unlocks. Chunked terrain replaces the M1.5 soft-breach strip without breaking replay consumers.<br>
+**Next up:** **BP2 — Terrain & Replay Build.** Anchored at M2 (Pixel Terrain + Materials), M2.5 (Micro Reactor Defense), and M3A (Event Recorder Core / headless replay). Chunked terrain replaces the M1.5 soft-breach strip without breaking replay consumers, and the event core locks the evidence path for every later milestone.<br>
 **Recent merges:** [#5 — M1.5 Micro Breach Fun Slice + Roadmap V2](https://github.com/Madreag/corefall/pull/5) and [#6 — T-CAPTURE side track](https://github.com/Madreag/corefall/pull/6) both squashed into `main`. **204 tests passing** workspace-wide.<br>
+**Releases:** every BP closure publishes a tagged cross-platform release under [github.com/Madreag/corefall/releases](https://github.com/Madreag/corefall/releases) per the **T-RELEASE** side track (Linux + Windows + macOS x86_64 / aarch64 archives + SHA256SUMS + run-bundle exemplar + summary_grid hero). Versioning: `v0.1.0-bp1`, `v0.2.0-bp2`, ..., `v1.0.0` at BP12 launch GA. Pre-release flag stays ON until v1.0.0.<br>
 **Roadmap lock:** server-authoritative multiplayer, deterministic replay, Stationeers-grade-or-better atmospherics/thermal simulation, full physical profiles, AI-only art/audio pipeline, modder-parity tooling, accessibility-plus, Steam Deck floor, and no pay-to-win.
 
 **[Project status](#project-status) · [Build Points](#build-points) · [Roadmap shape](#roadmap-shape) · [Tech stack](#tech-stack) · [Getting started](#getting-started) · [CI](#ci)**
@@ -70,6 +72,7 @@ The canonical roadmap now covers **57 closed/directional decision records**, **3
 | Production T-tracks | 4 dedicated late-anchored tracks ride alongside the gameplay spine: **T-CONTENT-ART** (AI-authored art/animation/VFX/decals/lighting/music/SFX/launch roster), **T-CONTENT-NARRATIVE** (~80,000 words bible/codex/dialogue), **T-LOCALIZATION** (Project Fluent + 11 Tier-A langs + 8 Tier-B UI-only + mod-localization), **T-LIVEOPS** (telemetry, marketing, Steam, legal, post-launch ops). Each finalizes at BP12; placeholder generation begins at BP3+. |
 | Micro-fun-slice cadence | After every major systems milestone, a short interlude proves the new system is *fun* before the next one stacks on top: M1.5 (breach), M2.5 (reactor defense), M5.5.5 (sabotage with collision + breach), M5.9.5 (pressure hold). Each is a 60-90 s scenario driven by cfctl, validated by run bundles, gated by a human-playtest survey before the next BP unlocks. |
 | AI-agent self-testing | **T-CAPTURE** layer (BP2+): cf-app emits PNG frame readbacks at 10 Hz baseline + event-triggered keyframes; `game/tools/capture_grid.py` composes them into 8×8 grid PNGs + a `summary_grid.png` (one frame per major event, ≤64 frames). cf-e2e drives the loop end-to-end. AI agents read the summary grid via the `Read` tool to validate motion + physics + effects without a human eyeballing every smoke run. |
+| Actor presentation | Animation-first while controlled, physics-first while disrupted, and always replay/event-visible. Visible actor movement cannot remain a static sliding pawn once the milestone owns movement/body presentation: walking, running, crouching, climbing, jetting, aim blending, limb damage, knockdown, pressure/wind/explosion response, and mech gait all need observable state, events, and capture evidence at their maturity level. |
 
 ---
 
@@ -81,17 +84,17 @@ The Roadmap V2 layer groups gameplay milestones into **13 Build Points (BP0..BP1
 |---:|---|---|---|---|
 | **BP0** | Engine bootstrap | M0 | (kickoff smoke) | ✅ Closed |
 | **BP1** | Actor controller + breach fun proof | M1 + M1.5 | M1.5 Micro Breach | ✅ **Closed (current)** |
-| **BP2** | Material storytelling | M2 + M2.5 | M2.5 Micro Reactor Defense | 🟢 Active |
-| **BP3** | Replay + comic-noir UI | M3A + M3B + M4A + M4B | (UI is the proof) | ⏳ Planned |
-| **BP4** | Equipment + chassis grammar | M5 | (slot/wreck/eject scripted scenario) | ⏳ Planned |
-| **BP5** | Full collision gauntlet + sabotage proof | M5.5 + M5.5.5 | M5.5.5 Micro Sabotage | ⏳ Planned |
-| **BP6** | Material kernel + hazards | M5.6 + M5.7 | (chained-reaction debrief) | ⏳ Planned |
-| **BP7** | Origin + atmospherics + pressure-hold proof | M5.8 + M5.9 + M5.9.5 + M5.10 | M5.9.5 Micro Pressure Hold | ⏳ Planned |
-| **BP8** | AI core + LLM mind + material competence | M6 + M6.5 + M6.6 | (8-criteria humanlike bar) | ⏳ Planned |
-| **BP9** | Mission director + base atmospherics | M7 + M7.5 + M7.7 | (proof mission A-FEEL gate) | ⏳ Planned |
-| **BP10** | Editor + mod tools + material lab | M8 + M8.5 + M8.6 | (modder parity smoke) | ⏳ Planned |
-| **BP11** | Networking spine | M9 + M9.5 | (LAN co-op smoke) | ⏳ Planned |
-| **BP12** | Online co-op + PvP + MMO + launch | M10 + M11 + M12 + production T-track finalization | (launch GA build) | ⏳ Planned |
+| **BP2** | Terrain & Replay Build | M2 + M2.5 + M3A | M2.5 Micro Reactor Defense + headless replay verifier | 🟢 Active |
+| **BP3** | Combat Readability Build | M3B + M4A + M5 | HUD/body/chassis proof | ⏳ Planned |
+| **BP4** | Physics Sandbox Alpha | M5.5 + M5.5.5 + M5.6 + M5.7 + M5.8 | M5.5.5 Micro Sabotage | ⏳ Planned |
+| **BP5** | Atmospherics & Worlds Alpha | M5.9 + M5.9.5 + M5.10 | M5.9.5 Micro Pressure Hold | ⏳ Planned |
+| **BP6** | AI Combat Alpha | M6 + M6.5 + M6.6 | AI-H / MIND / AI-MAT suites | ⏳ Planned |
+| **BP7** | Vertical Slice Alpha | M7 + M7.5 + M7.7 + M4B | Breach Contract + Bunker Defence proof | ⏳ Planned |
+| **BP8** | Creator Alpha | M8 + M8.5 + M8.6 | modder parity smoke | ⏳ Planned |
+| **BP9** | Server/LAN Alpha | M9 + M10 | LAN co-op smoke | ⏳ Planned |
+| **BP10** | Online Beta | M11 + M9.5 | self-hosted online co-op + comms | ⏳ Planned |
+| **BP11** | Public Systems Beta | M12 | PvP/MMO shard proof | ⏳ Planned |
+| **BP12** | Release Candidate | production T-track finalization | launch GA build | ⏳ Planned |
 
 **Build Point closure gate:** Every BP closeout requires (a) every milestone inside it PASS in the Acceptance Matrix, (b) the Contract Integrity Matrix proving shared code paths + negative/adversarial proof, (c) run-bundle evidence for every fun-proof slice at multiple tick rates, (d) **T-CAPTURE evidence** (each fun-proof script emits a `summary_grid.png` + `capture_manifest.json` recorded in `summary.json.artifacts`; `--expect capture.summary_grid.non_blank_ratio>=0.95` mandatory from BP2 onward), (e) `/corefall-review <bp>` verdict = `Accept`, and (f) the per-BP human-playtest gate (Did the new systems make the game more fun than the previous BP? — recorded in `prototype_runs/native/<bp>_*` notes; the answer must reference the summary grid path it was answered against).
 
@@ -168,6 +171,7 @@ Every layer emits replay events. Every cause chain is reproducible. Every AI age
 |---|---|
 | **Real physics, end to end** | No arcade approximations. Stationeers-grade is the minimum bar: PV = nRT atmospheres, pressure apertures, liquid/gas jets, material heat transfer, universal gravity for everything, full collision by default, stoichiometric combustion, and gradual phase change. |
 | **Origin-aware bodies** | Humans, androids, and robots have **structurally different reaction chains**. Robots take internal-shock damage, leak coolant, and downclock under heat. Androids breathe, bleed, and overclock per installed module. Humans concuss, eat, and need oxygen tanks. |
+| **Animation-first bodies** | Actors do not slide as static pawns. Controlled locomotion is readable animation with physical weight; disrupted states become more physical. Jetpack, pressure, wind, gravity, recoil, limb damage, armor mass, and mech servos all change the body presentation without destroying responsiveness. |
 | **AI as teammate and rival** | Bots are first-class. They reason, plan, panic, recover, and explain themselves through reason labels. The 8-criteria humanlike-AI bar is testable. An optional async LLM "mind" layer proposes doctrine without ever blocking the local AI. |
 | **Replay determinism** | Same seed + same inputs = byte-identical event stream. Debug with replay scrubbing. Network with confidence. Audit AI behavior with cause chains. |
 | **Server truth, rich clients** | Server owns authoritative state; clients own immediate feel and GPU-rich presentation. Prediction is allowed, divergence is not. Single player uses the same architecture in-process. |
@@ -273,33 +277,33 @@ game/crates/
 | BP1 | **T-CAPTURE — Frame capture + grid composer** | ✅ **Shipped** ([PR #6](https://github.com/Madreag/corefall/pull/6) merged) | cf-capture crate + `capture_grid.py` composer + cf-e2e wiring. PNG readbacks at 10 Hz baseline + event-triggered keyframes. AI agents read `summary_grid.png` via the Read tool to validate motion + physics + effects without a human eyeballing every smoke run. T-CAPTURE evidence is mandatory at every BP closure gate from BP2 onward. |
 | BP2 | M2 — Pixel Terrain And Materials | 🟢 **Active** | Deformable chunked terrain + material kernel scaffold. Replaces M1.5 soft-breach strip without breaking replay consumers. |
 | BP2 | **M2.5 — Micro Reactor Defense** | 🆕 V2 | Fun-proof interlude after M2: 60-90 s defend a reactor core while terrain is dug, voxels collapse, debris field forms. cfctl-scripted; same Acceptance + Contract Integrity gates as M1.5. |
-| BP3 | **M3A — Event Recorder Core** | 🆕 V2 split | DR-002 v1 lock — full event recorder, taxonomy, parent-link cause chains, schema-versioned envelope. |
-| BP3 | **M3B — Replay Viewer + Debrief** | 🆕 V2 split | Replay viewer scrubbing, debrief summary, AI reason-label timeline, pause/resume/step/seek. |
-| BP3 | **M4A — Readability + ACC-A Floor** | 🆕 V2 split | Silhouette HUD + module strip + comic-noir tone foundation + accessibility floor. |
-| BP3 | **M4B — Comic-Noir Polish** | 🆕 V2 split | Visual polish, captions, reduced-motion / shake / flash, full-subtitle pipeline, screen-reader paths. |
-| BP4 | M5 — Equipment, Chassis, And Damage Grammar | ⏳ Planned | Per-origin chassis records + damage stages + wreck/eject/salvage. |
-| BP5 | M5.5 — Full Collision Gauntlet | ⏳ Planned | DR-033 closure: full collision + projectile-projectile + CCD tiers + universal gravity field integration. |
-| BP5 | **M5.5.5 — Micro Sabotage** | 🆕 V2 | Fun-proof interlude after M5.5: 60-90 s breach + sabotage scenario combining collision physics with the M1.5 breach pattern. |
-| BP6 | M5.6 — Material Kernel | ⏳ Planned | DR-036 partial closure: chunked CA + reaction table + density layering. |
-| BP6 | M5.7 — Hazard Package | ⏳ Planned | Acid + electricity + debris + ingestion + affliction layer. |
-| BP7 | M5.8 — Origin Resource & Overclock Pass | ⏳ Planned | Per-origin reaction matrix runtime: humans concuss, androids battery-drain, robots overclock + leak coolant. G-Force vision blackout HUD. |
-| BP7 | M5.9 — Atmospherics-Grade Kernel | ⏳ Planned | DR-037 closure: Stationeers-grade-or-better PV=nRT, 10 launch gases + 6 liquid mixtures, combustion, phase change, pipe networks, suit life-support, pressure apertures, liquid/gas jets, material heat transfer, thermal tools, per-planet ambient, and universal-gravity ballistic drag. |
-| BP7 | **M5.9.5 — Micro Pressure Hold** | 🆕 V2 | Fun-proof interlude after M5.9: 60-90 s hold a room while atmosphere is breached, gases mix, fires propagate, suits compensate. |
-| BP7 | **M5.10 — Comms + Reason-Label Lab** | 🆕 V2 | Diegetic comms + AI reason-label HUD + radio shadow + EMP failure precursors. |
-| BP8 | M6 — AI Core And Trust Harness | ⏳ Planned | DR-022 8-criteria humanlike bar testable. |
-| BP8 | M6.5 — LLM Mind Lab | ⏳ Planned | Async LLM mind layer; local AI never blocks; no API key required. |
-| BP8 | M6.6 — AI Material Competence | ⏳ Planned | AI hazard perception with reason labels. |
-| BP9 | M7 — Mission Director And Breach Contract | ⏳ Planned | Proof mission. A-FEEL gate. |
-| BP9 | M7.5 — Base Atmospherics (extended for Stationeers-grade-or-better per DR-037) | ⏳ Planned | Base modules wired into M5.9 kernel: pumps, vents, pressure doors, breach repair, heaters/coolers, radiators, coolant loops, emergency venting, and room-state mission objectives. |
-| BP9 | **M7.7 — Photo Mode + Death Cam** | 🆕 V2 | Photo mode + death cam + replay clip export pipeline. |
-| BP10 | M8 — Scenario Editor And Mod Tools | ⏳ Planned | First-class in-engine editor at launch. |
-| BP10 | M8.5 — Material Lab | ⏳ Planned | Material/reaction lab for promotions to launch set. |
-| BP10 | **M8.6 — Mod Manager + Workshop Bridge** | 🆕 V2 | Steam Workshop + cloud + achievements + input + mod manager + Deck readiness shell wiring. |
-| BP11 | M9 — Dedicated Server App | ⏳ Planned | `cf-server` multi-mode binary; SERVER-001..016 acceptance suite begins. |
-| BP11 | **M9.5 — Voice + Radio Sim** | 🆕 V2 | ACRE2-tier voice + radio simulation across server-authoritative net. |
-| BP12 | M10 — LAN Co-op | ⏳ Planned | Local 2-4 player co-op. |
-| BP12 | M11 — Online Co-op (Self-Hosted Dedicated Servers) | ⏳ Planned | Community-hostable online co-op. |
-| BP12 | M12 — Public PvP Arenas + Persistent MMO Shards | ⏳ Planned | DR-035 MMO-001..012 readiness gate. |
+| BP2 | **M3A — Event Recorder Core** | 🆕 V2 split | DR-002 v1 event-taxonomy lock, schema-versioned envelope, snapshots, checksums, headless replay verifier, and recorder backpressure. |
+| BP3 | **M3B — Replay Viewer + Debrief** | 🆕 V2 split | Replay viewer scrubbing, event filters, debrief summary, parent-chain cause view, and death recap. |
+| BP3 | **M4A — Readability + ACC-A Floor** | 🆕 V2 split | Silhouette HUD, module strip, movement/stance readability, material overlay, and accessibility floor. |
+| BP3 | M5 — Equipment, Chassis, And Damage Grammar | ⏳ Planned | Body graph, equipment sockets, armor coverage, limb consequences, per-origin chassis records, damage stages, wreck/eject/salvage. |
+| BP4 | M5.5 — Full Collision Gauntlet | ⏳ Planned | DR-033 closure: full collision + projectile-projectile + CCD tiers + universal gravity field integration. |
+| BP4 | **M5.5.5 — Micro Sabotage** | 🆕 V2 | Fun-proof interlude after M5.5: 60-90 s breach + sabotage scenario combining collision physics with the M1.5 breach pattern. |
+| BP4 | M5.6 — Material Kernel | ⏳ Planned | DR-036 partial closure: chunked CA + reaction table + density layering. |
+| BP4 | M5.7 — Hazard Package | ⏳ Planned | Acid + electricity + debris + ingestion + affliction layer. |
+| BP4 | M5.8 — Origin Resource & Overclock Pass | ⏳ Planned | Per-origin reaction matrix runtime: humans concuss, androids battery-drain, robots overclock + leak coolant. G-Force vision blackout HUD. |
+| BP5 | M5.9 — Atmospherics-Grade Kernel | ⏳ Planned | DR-037 closure: Stationeers-grade-or-better PV=nRT, gases/liquids, combustion, phase change, pipe networks, suit life-support, pressure apertures, jets, heat transfer, and universal-gravity ballistic drag. |
+| BP5 | **M5.9.5 — Micro Pressure Hold** | 🆕 V2 | Fun-proof interlude after M5.9: 60-90 s hold a room while atmosphere is breached, gases mix, fires propagate, suits compensate. |
+| BP5 | **M5.10 — Environmental Conditions Aggregation** | 🆕 V2 | 12-world catalog + astrography + `EnvironmentSignal` aggregator + 15-class hazard taxonomy + comms light-lag. |
+| BP6 | M6 — AI Core And Trust Harness | ⏳ Planned | DR-022 8-criteria humanlike bar testable. |
+| BP6 | M6.5 — LLM Mind Lab | ⏳ Planned | Async LLM mind layer; local AI never blocks; no API key required. |
+| BP6 | M6.6 — AI Environmental Competence | ⏳ Planned | AI reads material, atmosphere, gravity, thermal, radiation, photic, EM, weather, and comms signals with reason labels. |
+| BP7 | M7 — Mission Director And Breach Contract | ⏳ Planned | Proof mission and A-FEEL gate. |
+| BP7 | M7.5 — Base Atmospherics | ⏳ Planned | Base modules wired into M5.9 kernel: pumps, vents, pressure doors, breach repair, heaters/coolers, radiators, coolant loops, emergency venting, and room-state mission objectives. |
+| BP7 | **M7.7 — Day/Night, Weather & Dynamic Events** | 🆕 V2 | Weather + day-night kernel, AI weather doctrine, and dynamic event hooks. |
+| BP7 | **M4B — Comic-Noir Polish** | 🆕 V2 split | Comic-noir mission cards, stylized event banners, slowdown overlay, and tactical-map polish. |
+| BP8 | M8 — Scenario Editor And Mod Tools | ⏳ Planned | First-class in-engine editor at launch. |
+| BP8 | M8.5 — Material Lab | ⏳ Planned | Material/reaction lab for promotions to launch set. |
+| BP8 | **M8.6 — Mining And Extraction** | 🆕 V2 | Ore registry, deposits, sampling, drilling, extraction, refining, smelting, trade ledger, and AI miner doctrine. |
+| BP9 | M9 — Dedicated Server App | ⏳ Planned | `cf-server` multi-mode binary; SERVER-001..016 acceptance suite begins. |
+| BP9 | M10 — LAN Co-op | ⏳ Planned | Local 2-4 player co-op through `cf-server --mode lan_room`. |
+| BP10 | M11 — Online Co-op (Self-Hosted Dedicated Servers) | ⏳ Planned | Community-hostable online co-op. |
+| BP10 | **M9.5 — Voice + Radio Sim** | 🆕 V2 | ACRE2-tier radio + Steam Audio-tier voice through atmospheric medium; captions mandatory. |
+| BP11 | M12 — Public PvP Arenas + Persistent MMO Shards | ⏳ Planned | DR-035 MMO-001..012 readiness gate. |
 | BP12 | T-CONTENT-ART / T-CONTENT-NARRATIVE / T-LOCALIZATION / T-LIVEOPS finalization | ⏳ Planned | All four production tracks reach launch GA. |
 
 ---

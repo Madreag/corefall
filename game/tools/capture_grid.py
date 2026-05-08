@@ -37,9 +37,19 @@ GRID_COLS = 8
 GRID_ROWS = 8
 FRAMES_PER_GRID = GRID_COLS * GRID_ROWS  # 64
 SUMMARY_GRID_MAX_FRAMES = 64
-COMPOSER_VERSION = "0.1.0"
+COMPOSER_VERSION = "0.2.0"
 DEFAULT_THUMB_W = 320
 DEFAULT_THUMB_H = 180
+
+# A frame is "non-blank" only if it contains pixels that differ meaningfully
+# from a single dominant color. Bevy's clear-screen alone isn't enough: a frame
+# whose only signal is the clear color (e.g. cf-render-2d's #0d121a) must NOT
+# count toward the non_blank_ratio gate, otherwise the metric silently passes
+# even when sprite/UI rendering is broken (as it was on Bevy 0.18 + macOS
+# pre-bevy_sprite_render-feature fix). The metric is a frame-content check, not
+# a "any non-zero pixel" probe.
+NON_BLANK_MIN_VARIANT_PIXELS = 64
+NON_BLANK_MIN_PIXEL_DELTA = 12  # 0..255 per-channel difference from the mode
 
 
 @dataclass(frozen=True)
@@ -100,6 +110,41 @@ def lazy_import_pillow():
         return True
     except ImportError:
         return False
+
+
+def _is_non_blank_frame(src) -> bool:
+    """Return True if the image contains pixels that differ meaningfully from
+    its dominant (mode) color. A frame whose entire content is the renderer's
+    clear color counts as BLANK because the visible scene never composited
+    sprites/UI on top of it. Used to compute `non_blank_ratio` truthfully.
+
+    Implementation notes:
+      * downsampling already happened upstream, so per-pixel iteration over a
+        320x180 thumbnail is ~57k samples — well under a millisecond on a
+        modern CPU.
+      * we treat the histogram-mode color as "background" and count pixels
+        whose Manhattan distance from it exceeds NON_BLANK_MIN_PIXEL_DELTA.
+      * the frame is non-blank if the variant-pixel count >=
+        NON_BLANK_MIN_VARIANT_PIXELS — small enough to capture a single sprite
+        or HUD line, large enough to reject single-pixel JPEG-style noise.
+    """
+    pixels = src.getdata()
+    if not pixels:
+        return False
+    # Find the most common pixel (the "background" / clear color).
+    counts: dict = {}
+    for px in pixels:
+        counts[px] = counts.get(px, 0) + 1
+    mode_color, _ = max(counts.items(), key=lambda kv: kv[1])
+    mr, mg, mb = mode_color[:3]
+    # Count pixels meaningfully different from the mode color.
+    variant_pixels = 0
+    for r, g, b in (px[:3] for px in pixels):
+        if abs(r - mr) + abs(g - mg) + abs(b - mb) >= NON_BLANK_MIN_PIXEL_DELTA:
+            variant_pixels += 1
+            if variant_pixels >= NON_BLANK_MIN_VARIANT_PIXELS:
+                return True
+    return False
 
 
 def compose_grid(
@@ -163,8 +208,7 @@ def compose_grid(
             with Image.open(png_path) as src:
                 src = src.convert("RGB")
                 src.thumbnail((thumb_w, thumb_h), Image.Resampling.LANCZOS)
-                bbox = src.getbbox()
-                if bbox is not None and bbox != (0, 0, 1, 1):
+                if _is_non_blank_frame(src):
                     non_blank += 1
                 col = idx % cols
                 row = idx // cols

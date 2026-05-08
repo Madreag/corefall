@@ -434,6 +434,15 @@ fn run_bevy(
     app.run();
 
     if capture_enabled {
+        // Bevy's `Screenshot::observe(save_to_disk)` is asynchronous: when
+        // `app.run()` returns, the observer queue may still hold frames whose
+        // PNGs haven't been flushed to disk yet. Sleep briefly so those land
+        // before we write the manifest — otherwise the manifest will reference
+        // PNG paths that don't exist (failing the grid composer downstream).
+        // 500 ms is empirically enough on macOS Apple Silicon at 10 Hz capture
+        // baseline; for higher cadences or slower disks we still defensively
+        // filter out missing frames below.
+        std::thread::sleep(std::time::Duration::from_millis(500));
         match write_capture_manifest_from_handle(&capture_config, &capture_handle) {
             Ok(path) => tracing::info!(
                 target: "cf::capture",

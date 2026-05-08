@@ -70,6 +70,14 @@ struct Cli {
     capture_frames_hz: f32,
     #[arg(long)]
     no_capture_events: bool,
+    /// Self-Play Validation Rule "make it possible" clause: lets the harness
+    /// drive the spawned cf-app at a non-default sim tick rate so the
+    /// "60 Hz default + 120 Hz validation" rate-coverage requirement in the
+    /// canonical roadmap can be exercised through a single cf-e2e command
+    /// (instead of forcing the agent to drop down to direct cf-app
+    /// invocation). 0 = use cf-app's default (60 Hz).
+    #[arg(long, default_value_t = 0)]
+    tick_rate_hz: u32,
     /// Path to `python3` used to invoke the grid composer. Defaults to `python3`.
     #[arg(long, default_value = "python3")]
     python_bin: String,
@@ -122,6 +130,7 @@ async fn main() -> Result<()> {
         capture_grid: cli.capture_grid,
         capture_frames_hz: cli.capture_frames_hz,
         no_capture_events: cli.no_capture_events,
+        tick_rate_hz: cli.tick_rate_hz,
     })?;
     let url = format!("ws://127.0.0.1:{}", cli.control_port);
     let mut session = match wait_for_ws(&url, Duration::from_secs(8)).await {
@@ -181,16 +190,25 @@ async fn main() -> Result<()> {
 
     let mut observation = last_observe.context("script never executed observe.once")?;
 
-    // Run grid composition while cf-app is still alive (frames keep landing as observers fire).
+    // Run grid composition. The composer needs `capture_manifest.json` to exist on
+    // disk — and that manifest is only written when cf-app's `app.run()` returns
+    // (i.e., when cf-app has shut down). So we MUST shut down the cf-app process
+    // BEFORE invoking the composer; otherwise the composer fires before the
+    // manifest exists and the entire --capture-grid pipeline silently no-ops.
+    // Discovered during the T-RELEASE rehearsal (PR #7); the BP1 acceptance bundle
+    // was produced by cf-app directly, never through cf-e2e --capture-grid.
     if cli.capture_grid {
         let run_id = observation
             .get("run_id")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
         if let Some(run_id) = run_id {
+            // Drain the WS + tear down cf-app so the manifest gets written.
+            session.shutdown_app_only().await;
             let bundle_root = cf_replay::resolve_run_bundle_root(None);
             let run_dir = bundle_root.join(&run_id);
-            // Settle: give the screenshot observers ~250 ms to flush PNGs to disk.
+            // Belt-and-braces filesystem flush after process exit; on macOS in
+            // particular the bundle dir entries can take a tick to propagate.
             tokio::time::sleep(Duration::from_millis(250)).await;
             let composer = cli.composer_script.clone().unwrap_or_else(default_composer_script);
             match invoke_composer(&cli.python_bin, &composer, &run_dir) {
@@ -330,6 +348,15 @@ impl Session {
     }
 
     async fn shutdown(mut self) {
+        self.shutdown_app_only().await;
+    }
+
+    /// Send `system.shutdown`, close the WS, and wait for the spawned cf-app
+    /// child process to exit. Used both as the normal end-of-script teardown
+    /// AND as the pre-composer hook for --capture-grid runs (cf-capture only
+    /// writes `capture_manifest.json` when cf-app exits, so the composer
+    /// MUST run after this returns). Idempotent: calling twice is safe.
+    async fn shutdown_app_only(&mut self) {
         let _ = self.send("system.shutdown", json!({})).await;
         let _ = self.ws.close(None).await;
         if let Some(mut child) = self.child.take() {
@@ -346,6 +373,8 @@ struct LaunchOptions<'a> {
     capture_grid: bool,
     capture_frames_hz: f32,
     no_capture_events: bool,
+    /// Optional pass-through for `cf-app --tick-rate-hz`. 0 = use cf-app default.
+    tick_rate_hz: u32,
 }
 
 fn launch_cf_app(opts: LaunchOptions<'_>) -> Result<Child> {
@@ -359,6 +388,10 @@ fn launch_cf_app(opts: LaunchOptions<'_>) -> Result<Child> {
         "--ticks".into(),
         "0".into(),
     ];
+    if opts.tick_rate_hz != 0 {
+        args.push("--tick-rate-hz".into());
+        args.push(opts.tick_rate_hz.to_string());
+    }
     if !opts.capture_grid {
         // Default: keep the legacy headless path the M0/M1/M1.5 cf-e2e scripts use.
         args.push("--headless-smoke".into());

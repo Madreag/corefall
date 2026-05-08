@@ -290,15 +290,37 @@ impl CaptureManifest {
 /// Write the capture manifest using a `CaptureStateHandle` (does not require
 /// the live Bevy world). Used by cf-app post-`app.run()` so the manifest still
 /// lands when Bevy reaps its World resources during shutdown.
+///
+/// Source-truthful: only manifest entries whose `<output_dir>/<png_relpath>`
+/// actually exists on disk are kept. Bevy's `Screenshot::observe(save_to_disk)`
+/// is asynchronous and the queue can drop late frames during shutdown, so the
+/// in-memory events_log can reference frames whose PNGs never landed. Filtering
+/// here keeps the downstream grid composer (which fails fast on missing PNGs)
+/// from breaking on every shutdown race. A summary log line records how many
+/// frames were dropped so the issue stays observable.
 pub fn write_capture_manifest_from_handle(
     config: &CaptureConfig,
     handle: &CaptureStateHandle,
 ) -> std::io::Result<PathBuf> {
-    let frames = handle
+    let raw_frames: Vec<CaptureFrameEntry> = handle
         .events_log
         .lock()
-        .map(|log| log.iter().cloned().collect::<Vec<_>>())
+        .map(|log| log.iter().cloned().collect())
         .unwrap_or_default();
+    let raw_count = raw_frames.len();
+    let frames: Vec<CaptureFrameEntry> = raw_frames
+        .into_iter()
+        .filter(|f| config.output_dir.join(&f.png_relpath).is_file())
+        .collect();
+    let dropped = raw_count.saturating_sub(frames.len());
+    if dropped > 0 {
+        tracing::warn!(
+            target: "cf::capture",
+            "dropped {dropped} of {raw_count} manifest entries whose PNG never landed on disk \
+             (likely Bevy screenshot observer queue drained at shutdown). Manifest is now \
+             source-truthful: only frames that exist are recorded."
+        );
+    }
     let manifest = CaptureManifest {
         composer_schema_rev: COMPOSER_SCHEMA_REV,
         frames_hz: config.frames_hz,

@@ -51,10 +51,11 @@ A Build Point is complete only when:
 - Every milestone inside the BP PASSES the Contract Integrity Gate (matrix below) with positive AND negative/adversarial proof.
 - Run-bundle evidence exists for every fun-proof slice inside the BP at multiple tick rates (60 Hz default + 120 Hz validation, more if the BP touches network/server/replay cadence).
 - **T-CAPTURE evidence is mandatory from BP2 onward**: every fun-proof scenario must emit a `summary_grid.png` + `capture_manifest.json` (recorded in `summary.json.artifacts`), and the cf-e2e script must include `--expect capture.summary_grid.non_blank_ratio>=0.95` to catch black-frame regressions. See `cortext_command_vault/spec/prototype-roadmap.md` §T-CAPTURE for the full contract.
+- **T-RELEASE tag mandatory from BP1 onward**: every BP closure produces a tagged GitHub Release matching `v0.<N>.0-bp<N>` (BP1..BP11) or `v1.0.0` (BP12 launch GA). The release ships cross-platform binaries (Linux, Windows, macOS x86_64, macOS aarch64) plus the BP's exemplar run bundle + `summary_grid.png` + auto-generated release notes (run-bundle stats + human-playtest survey + determinism contract + SHA256SUMS). The tag is pushed AFTER the BP's PR is merged into `main`. Pre-release flag stays ON until v1.0.0. See `cortext_command_vault/spec/prototype-roadmap.md` §T-RELEASE for the full contract.
 - `/corefall-review <bp>` verdict is `Accept` for the full BP scope, not just one milestone inside it.
 - The per-BP human-playtest survey is recorded in `prototype_runs/native/<bp>_*` notes — answering the question "did the new systems make the game more fun than the previous BP?" with concrete observations. The survey row MUST reference the summary grid PNG path it was answered against. The survey is mandatory; a green Acceptance Matrix without a recorded playtest answer is not a closed BP.
 
-Do not call a BP closed from prose. Closure is the per-milestone Acceptance + Contract Integrity matrices PLUS the T-CAPTURE summary grid PLUS the playtest survey row PLUS the BP-level review verdict.
+Do not call a BP closed from prose. Closure is the per-milestone Acceptance + Contract Integrity matrices PLUS the T-CAPTURE summary grid PLUS the T-RELEASE tagged GitHub Release PLUS the playtest survey row PLUS the BP-level review verdict.
 
 ## Milestone Acceptance Gate
 
@@ -241,6 +242,7 @@ cargo run -p cf-control --example dump_schemas -- --check
 cargo run -p cf-mod -- validate content/
 cargo run -p cfctl -- observe --once
 python3 /Users/erol/projects/corefall/game/tools/prototype_run_check.py /Users/erol/projects/corefall/prototype_runs/native/<run_id>
+bash /Users/erol/projects/corefall/game/tools/self_play_sweep.sh   # mandatory: see Self-Play Validation Rule
 ```
 
 The vendored `game/tools/prototype_run_check.py` is the canonical CI checker (the original lives in `cortext_command_vault/research_tools/` but the `game/tools/` copy is what M0+ landed and what GitHub Actions runs). Use the `game/tools/` path for any milestone validation.
@@ -280,6 +282,89 @@ The rule: any pixel a human can interact with on screen, the AI worker must be a
 
 See `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/ai-control-observability-layer.md` for the full observe/inspect/act surface; every new player-facing surface must extend it.
 
+## Self-Play Validation Rule
+
+The Eyes/Ears/Hands rule is the **principle**. The Self-Play Validation Rule is the **enforcement**. Both apply to every milestone, every BP, every PR. If you cannot self-play, you have not validated.
+
+### What "self-play" means
+
+The agent (you) must drive the game *through the production cf-control / cfctl path*, observe the result *through the production observe/inspect surface*, and capture *visible* evidence *through cf-capture frame readback*. **Not** "I read the source code and it looks right." **Not** "I ran the unit tests and they pass." Source-truth + unit tests are necessary but not sufficient. You must *play* the game.
+
+The four axes of self-play, all required:
+
+1. **Hands (act)** — every cfctl action in the milestone's scope must be exercised at least once via `cargo run -p cf-e2e -- --script <s> --capture-grid`, with the script driving real `act.player.*` / `act.settings.*` / `scenario.*` / `runbundle.*` JSON-RPC methods. No "the action is available, I checked" — the action must be *invoked*.
+2. **Eyes (see)** — every action's visible result must be verifiable in the resulting `summary_grid.png` via direct image read. Read the PNG yourself, look at the pixels, confirm the expected sprite / HUD / mission-state change is visually present. Do NOT trust the `non_blank_ratio` metric alone — read the image.
+3. **Ears (observe + events)** — every action's logical result must show up in the run bundle's `events.jsonl` AND be reachable via `observe.once` or `inspect.*`. The observe surface must report the post-action state (HP changed, ammo decremented, breach broken, mission step transitioned). Use `cf-e2e --expect key=value` (and `key>=value` / `key<=value` operators) to assert these end-to-end.
+4. **Hear (audio events) [BP6+ when audio lands]** — once `cf-audio` ships, every audible event (gunshot, reload click, breach hit, alert ping) must emit a structured `audio.event_fired` row in `events.jsonl` so AI agents can verify it the same way they verify visual events. Until then this axis is "no audio surface yet" and is a no-op, not a deferral.
+
+### Mandatory Self-Play Validation Matrix
+
+Every milestone closeout report must include this matrix. One row per `act.*` / `scenario.*` / `runbundle.*` / `sim.*` method that the milestone's contract claims to support, plus mission win + loss + headless-smoke + multi-tick-rate rows. Empty cells = milestone not closed.
+
+```text
+Action / scenario               | Hands (script + step)                   | Eyes (frame + visual confirm)            | Ears (event row + observe field)        | Verdict
+act.player.move (positive)      | scripts/cfctl/<s>.cfctl.json step N     | summary_grid frame X: actor moved right  | events.jsonl: act.player.move accepted  | PASS
+act.player.move (NaN reject)    | scripts/cfctl/<s>.cfctl.json step N     | n/a (rejected, no visible change)        | events.jsonl: control.command_rejected  | PASS
+act.player.aim                  | ...                                     | reticle moved                            | observe.once: actor.aim updated         | PASS
+act.player.fire                 | ...                                     | projectile sprite + muzzle / impact      | events.jsonl: weapon_fired + projectile | PASS
+act.player.reload               | ...                                     | HUD READY counter ticks down             | events.jsonl: reload_started/completed  | PASS
+act.player.dig                  | ...                                     | breach strip darkens (M1.5+)             | events.jsonl: terrain_carved            | PASS
+act.player.jump                 | ...                                     | actor sprite Y rises then falls          | events.jsonl: act.player.jump accepted  | PASS
+act.player.select_item          | ...                                     | HUD ITEM line updates                    | observe.once: player_inventory          | PASS
+act.player.reset                | ...                                     | actor returns to spawn                   | events.jsonl: act.player.reset          | PASS
+act.settings.set                | scripts/cfctl/m0_settings_roundtrip     | n/a (logical only, M2+ adds visible)     | observe.settings reflects patch         | PASS
+scenario.reset                  | every script's first step                | grid frame 0 = initial state             | events.jsonl: scenario.reset            | PASS
+scenario.load (mismatched seed) | live_ws_acceptance test                  | n/a                                      | events.jsonl: command_rejected          | PASS
+runbundle.write                 | --write-run-bundle on cf-app             | n/a                                      | run_manifest.json present + valid       | PASS
+sim.run_for_ticks               | every cfctl script                       | grid spans the requested tick window     | events.jsonl spans tick window          | PASS
+Mission win path                | scripts/cfctl/<m>_win.cfctl.json         | summary_grid shows full mission          | mission.result=won                      | PASS
+Mission loss path               | scripts/cfctl/<m>_loss.cfctl.json        | summary_grid shows loss state            | mission.result=lost + loss_reason       | PASS
+Headless smoke (no window)      | cf-app --headless-smoke --scenario <s>   | n/a (no swapchain)                       | run_manifest.json + events.jsonl valid  | PASS
+60 Hz determinism               | cf-app --tick-rate-hz 60                 | grid renders at 60 Hz cadence            | summary.final_sim_checksum stable       | PASS
+120 Hz determinism              | cf-app --tick-rate-hz 120                | grid renders at 120 Hz cadence           | summary.final_sim_checksum stable       | PASS
+```
+
+A milestone is not closed if any row says FAIL, n/a-by-default-but-actually-needed, or "deferred". A milestone is not closed if a row's "Hands" cell says "I checked the source" — that's a failure mode, not a Hands cell. A milestone is not closed if the agent did not personally read the `summary_grid.png` (or per-action frame) and write a one-sentence visual confirmation in the "Eyes" cell.
+
+### The "make it possible" clause
+
+If a milestone's Self-Play Validation Matrix has a row that **cannot** be filled because the harness doesn't support it (e.g., cf-e2e can't pass `--tick-rate-hz`, no script exists for a particular action, observe.once doesn't expose a needed field), the agent MUST extend the harness in the same pass. The point of cf-control + cfctl + cf-e2e + cf-capture is to make every gameplay surface AI-self-testable. If a gap exists, the gap is a milestone bug, not a deferred follow-up.
+
+Concrete extensions the agent is authorized (and required) to make in-pass:
+
+- New cfctl scripts under `game/scripts/cfctl/<scenario>_<purpose>.cfctl.json` whenever a milestone adds an action or a mission path that no existing script exercises.
+- New cf-e2e flags / arguments whenever the spawned cf-app needs a setting cf-e2e currently can't pass through.
+- New `--expect` operators on cf-e2e whenever an assertion can't be expressed with `=` / `>=` / `<=`.
+- New `observe.*` / `inspect.*` JSON-RPC fields whenever the rule asks for a value that observe doesn't currently surface.
+- New `events.jsonl` rows whenever a player-visible state change isn't currently emitted as a structured event.
+
+Each extension lands with the milestone (same PR, same commit chain, same review pass). If an extension would balloon scope beyond a single PR, surface it via `AskUser` BEFORE deferring. Default disposition: implement in current PR.
+
+### Self-Play Sweep — the canonical entry point
+
+`game/tools/self_play_sweep.sh` is the canonical "play the game thoroughly and emit a verdict matrix" entry point. It runs:
+
+- M1 actor controller round-trip (`m1_move_jump_fire_reload.cfctl.json`) at 60 Hz with `--capture-grid`.
+- M1.5 micro_breach **win** path (`micro_breach_win.cfctl.json`) at 60 Hz with `--capture-grid`.
+- M1.5 micro_breach **loss** path (`micro_breach_loss.cfctl.json`) at 60 Hz with `--capture-grid`.
+- M0 settings round-trip (`m0_settings_roundtrip.cfctl.json`) at 60 Hz.
+- 120 Hz determinism check on m1_actor_range via direct cf-app invocation.
+- `--headless-smoke` no-window path on the same scenario.
+- `cfctl observe --once` against a live engine session.
+- `cf-mod validate content/` against every scenario.
+- Run-bundle validation against every produced bundle.
+
+Every milestone closeout, every BP closure, every PR audit must run the self-play sweep and produce its verdict-matrix output as evidence. The sweep is part of Standard Validation; failing it = milestone not closed.
+
+Invocation:
+
+```bash
+cd /Users/erol/projects/corefall
+bash game/tools/self_play_sweep.sh
+```
+
+Output: a `prototype_runs/native/self_play_sweep_<UTC>_<hash>/` directory containing every sub-bundle's run + a top-level `verdict.json` with the per-row PASS/FAIL matrix.
+
 ## CPU/GPU Performance Contract
 
 Corefall must scale on modern multi-core CPUs and modern GPUs. Do not add CPU-heavy gameplay, physics, material, terrain, AI, networking, server, replay, or tooling paths without a measured budget and a clear execution posture.
@@ -315,8 +400,9 @@ Required completion actions:
 13. Run `/corefall-review <milestone>` from `/Users/erol/projects/corefall`, fix every verified finding at every severity, and rerun `/corefall-review <milestone>` until the verdict is `Accept`. If the user explicitly defers a finding, record the deferral ID, reason, owner, next checkpoint, and evidence path.
 14. Report the Contract Integrity Matrix proving shared code paths, required-field rejection, fake-success absence, source-truthful evidence, and checklist truth.
 15. If the milestone closes the last open milestone inside an active Build Point, also: rerun `/corefall-review <bp>` for the full BP scope, update the Build Points Checklist row in `feature-completion-checklist.md`, and record the human-playtest survey in `prototype_runs/native/<bp>_*` notes (answering whether the new BP is more fun than the previous BP, with concrete observations from the fun-proof slice). A BP cannot be reported as closed without the survey row.
+16. Run `bash game/tools/self_play_sweep.sh` and record the verdict matrix in the implementation log + commit message. Every row in the Self-Play Validation Matrix (see "Self-Play Validation Rule" section) must be PASS. The agent must read each `summary_grid.png` produced by the sweep and write a one-sentence visual confirmation per `act.*` action exercised. If the sweep can't exercise a milestone-scope action because of a harness gap, **fix the harness in the same pass** — this is the "make it possible" clause from the Self-Play Validation Rule.
 
-Do not mark work complete if the checklist/roadmap updates are skipped. Do not mark work complete if any roadmap done-criterion or backlog task card is deferred, partial, or only documented as future work. Do not mark work complete until `/corefall-review <milestone>` has been run and rerun to `Accept`, unless every remaining verified finding has explicit user-approved deferral evidence. Do not mark work complete if the Contract Integrity Matrix is missing positive and negative/adversarial proof for each contract path. Do not mark work complete if a performance-sensitive value is hardcoded without roadmap/backlog authority and a config-path explanation. Do not mark a Build Point closed without the per-BP human-playtest survey row in the run bundle. If a task genuinely does not affect the roadmap, record "roadmap update not needed" in the implementation log and explain why.
+Do not mark work complete if the checklist/roadmap updates are skipped. Do not mark work complete if any roadmap done-criterion or backlog task card is deferred, partial, or only documented as future work. Do not mark work complete until `/corefall-review <milestone>` has been run and rerun to `Accept`, unless every remaining verified finding has explicit user-approved deferral evidence. Do not mark work complete if the Contract Integrity Matrix is missing positive and negative/adversarial proof for each contract path. Do not mark work complete if a performance-sensitive value is hardcoded without roadmap/backlog authority and a config-path explanation. Do not mark a Build Point closed without the per-BP human-playtest survey row in the run bundle. **Do not mark work complete if `self_play_sweep.sh` was not run, did not PASS every row in the Self-Play Validation Matrix, or did not produce a `summary_grid.png` per scenario that the agent personally read and visually confirmed.** If a task genuinely does not affect the roadmap, record "roadmap update not needed" in the implementation log and explain why.
 
 ## Reference Repos And Reuse
 
@@ -425,6 +511,7 @@ Search for this signature when auditing recent PR history. These are NOT human c
 - Don't create root review instruction/report files. Standing review rules live in `.claude/skills/corefall-review/SKILL.md`; review reports belong under `docs/reviews/`.
 - Don't add cloud-save dependencies during T-SAVE work; cloud-save backend decision is post-launch.
 - Don't introduce a UI surface without a matching `cf-control` / `cfctl` path. Eyes/ears/hands rule.
+- Don't ship visible actor movement as a static sliding pawn once the milestone owns actor/body presentation. Controlled actors are animation-first while responsive, physics-first while disrupted, and always replay/event-visible.
 
 ## Starting Point
 
@@ -437,8 +524,10 @@ Closed Build Points (do NOT re-implement; treat as reference + regression surfac
 
 Active Build Point (default starting target unless the user assigns a different one):
 
-- **BP2** — M2 Pixel Terrain And Materials + M2.5 Micro Reactor Defense.
+- **BP2** — M2 Pixel Terrain And Materials + M2.5 Micro Reactor Defense + M3A Event Recorder Core.
 
-When BP2 closes, the next default is BP3 (M3A/M3B replay + M4A/M4B comic-noir UI).
+When BP2 closes, the next default is BP3 (M3B replay viewer/debrief + M4A readability/accessibility + M5 equipment/chassis/body graph).
 
-Do not skip the micro-fun-slice interlude inside any BP that has one (M1.5 in BP1, M2.5 in BP2, M5.5.5 in BP5, M5.9.5 in BP7). Every interlude exists because each major systems milestone needs *fun* evidence before the next BP unlocks; the actor-feel lab alone was too sterile, the terrain kernel alone is just deformation, and so on. The interlude is a 60-90 s scenario driven by `cfctl` scripts + cf-e2e expectations + run-bundle evidence at multiple tick rates, gated by the human-playtest survey for that BP.
+Do not skip the micro-fun-slice interlude inside any BP that has one (M1.5 in BP1, M2.5 in BP2, M5.5.5 in BP4, M5.9.5 in BP5). Every interlude exists because each major systems milestone needs *fun* evidence before the next BP unlocks; the actor-feel lab alone was too sterile, the terrain kernel alone is just deformation, and so on. The interlude is a 60-90 s scenario driven by `cfctl` scripts + cf-e2e expectations + run-bundle evidence at multiple tick rates, gated by the human-playtest survey for that BP.
+
+Treat roadmap text as a minimum bar, not a ceiling. Before implementation and before acceptance, analyze the assigned milestone for player-facing, physics, AI, UI, replay, `cfctl`, performance, save/load, modding, and accessibility gaps that are implied by the product promise but underspecified in the task card. Implement the stronger coherent version when it stays inside the milestone's scope; otherwise document the gap and update the vault so the next milestone cannot miss it.

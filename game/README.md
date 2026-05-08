@@ -2,7 +2,7 @@
 
 This is the native Rust workspace for Corefall. Directory name `game/` matches the canonical roadmap's `Repository Layout` section in `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md` — no path mapping needed.
 
-M0 and M1 are both closed (PRs #1 and #2 merged); M1.5 — Micro Breach Fun Slice — is the active milestone. The root [README](../README.md) is the public project overview. Start implementation work from the canonical roadmap and backlog:
+BP1 is closed: M0 Engine Bootstrap, M1 Actor Controller And Sim Core, and M1.5 Micro Breach Fun Slice are all merged and reviewed. BP2 is the active build point: M2 Pixel Terrain And Materials, M2.5 Micro Reactor Defense, and M3A Event Recorder Core / headless replay. The root [README](../README.md) is the public project overview. Start implementation work from the canonical Roadmap V2 and backlog:
 
 ```text
 /Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md
@@ -10,7 +10,7 @@ M0 and M1 are both closed (PRs #1 and #2 merged); M1.5 — Micro Breach Fun Slic
 /Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/feature-completion-checklist.md
 ```
 
-The workspace currently contains 29 `cf-*` crates, the pinned Rust toolchain, CI validation, fixed-tick app shell, run-bundle writer, JSON-RPC control plane, `cfctl`, content validation, schema drift checks, and dependency drift reporting.
+The workspace currently contains the `cf-*` crates, pinned Rust toolchain, CI validation, fixed-tick app shell, run-bundle writer, JSON-RPC control plane, `cfctl`, content validation, schema drift checks, dependency drift reporting, M1 actor controller, M1.5 micro-breach fun slice, and T-CAPTURE frame/grid evidence tooling.
 
 Crate prefix `cf-` is the canonical workspace shorthand. Use it consistently for crates, commands, schemas, and scripts unless a future DR explicitly changes the naming convention.
 
