@@ -39,6 +39,42 @@ Always check:
 
 If any item above is missing, verdict is `Needs Fixes`.
 
+## Self-Play Validation Gate
+
+Source-truth + unit tests are necessary but not sufficient. The reviewer must confirm the implementing agent self-played the milestone through the production cf-control / cfctl path AND visually confirmed the result by reading `summary_grid.png`. See `corefall/AGENTS.md` § **Self-Play Validation Rule** for the four axes (Hands / Eyes / Ears / Hear) and the Mandatory Self-Play Validation Matrix.
+
+Every milestone closeout must include a row-per-action matrix proving:
+
+1. **Hands (act)** — the action was driven via `cf-e2e --script <s> --capture-grid` through real `act.player.*` / `act.settings.*` / `scenario.*` / `runbundle.*` JSON-RPC methods.
+2. **Eyes (see)** — the action's visible result is verifiable in `summary_grid.png` (the agent personally read the PNG, not just the `non_blank_ratio` metric).
+3. **Ears (observe + events)** — the action emits a structured event in `events.jsonl` AND the resulting state is reachable via `observe.once` or `inspect.*`.
+4. **Hear (audio events) [BP6+]** — once `cf-audio` ships, audible events emit `audio.event_fired` rows. Until then this axis is "no audio surface yet" (no-op, not deferral).
+
+Plus mandatory mission-win + mission-loss + headless-smoke + 60 Hz + 120 Hz determinism rows.
+
+If any row says FAIL, n/a-by-default-but-actually-needed, "deferred", or "I checked the source", the verdict is `Needs Fixes`. If the harness can't fill a row (e.g. cf-e2e can't pass a needed setting; observe.once doesn't expose a needed field), the harness gap is a milestone bug — flag it in findings and the implementer must fix the harness in the same pass per the "make it possible" clause.
+
+## Universal Enhancement Audit Gate (DR-056)
+
+Per `cortext_command_vault/spec/milestone-enhancement-pass-m1-plus.md`, every M1+ milestone inherits the Universal Enhancement Done-Criteria on top of its own scope. Audit:
+
+- **Per-tier perf gate** (Steam Deck 800p/60 + 1080p/60 + 4K/120) recorded in `summary.json.performance` or `cf-bench` report.
+- **CI bench regression** (no >5% regression vs baseline) per DR-054.
+- **Memory leak soak** (24h+) clean per DR-051 + DR-054 — may stage at BP boundary; document in implementation log.
+- **Network sync verified** via `cfctl test sync-drift` (or equivalent) per DR-052.
+- **Replay determinism CI matrix** (per platform + per architecture) per DR-002 + DR-052.
+- **All player surfaces scriptable via cfctl** — Eyes/ears/hands rule (T-CONTROL).
+- **AI-agent-driven validation report** logged per DR-026 + DR-056.
+- **All audio cues generated via DR-053 pipeline** + usage-ledger logged.
+- **Game feel / juice rules** per DR-055 — every gameplay event has authored juice response.
+- **Accessibility ACC-A floor verified** (UI 200% + high contrast + captions + reduced motion) per DR-012.
+- **Localization keyed strings** (Tier-A 11 languages) verified per DR-046 — may stage at BP boundary if scope is English-only prototype; document staging.
+- **Modding parity verified** (mod-author can extend; mod-test-run AI agent validates) per DR-006 + DR-050.
+- **Anti-FOMO + anti-pay-to-win audit** passes per DR-031.
+- **Captions for ALL audio** (full-subtitle option) per DR-051.
+
+Plus per-milestone specifics from `milestone-enhancement-pass-m1-plus.md`. If a Universal row FAILS without explicit user-approved deferral evidence, verdict is `Needs Fixes`.
+
 ## Minimum-Bar Design Coverage Gate
 
 Roadmap V2, task cards, and DRs are a **minimum bar**, not a ceiling. During review, verify that the implementer performed a design-coverage pass before acceptance.
@@ -94,13 +130,14 @@ cd /Users/erol/projects/corefall && {
 
 Read these before judging the work:
 
-- `/Users/erol/projects/corefall/AGENTS.md` (especially **Build Point Closure Gate** + **Contract Integrity Gate** + **Cursor Bugbot Loop** sections).
-- `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md` (especially the **Build Points** table BP0..BP12 and the **§T-CAPTURE** side-track section).
+- `/Users/erol/projects/corefall/AGENTS.md` (especially **Build Point Closure Gate** + **Contract Integrity Gate** + **Universal Enhancement Contract (DR-056)** + **Minimum Bar And Enhancement Rule** + **Self-Play Validation Rule** + **Cursor Bugbot Loop** sections).
+- `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md` (especially the **Build Points** table BP0..BP12, the Universal Enhancement Done-Criteria callout above the Milestone Details header, the **Design-Completeness Map**, and the **§T-CAPTURE** + **§T-RELEASE** side-track sections).
 - `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/native-implementation-backlog.md`
 - `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/feature-completion-checklist.md` (per-milestone rows AND the **Build Points Checklist** addendum).
+- `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/milestone-enhancement-pass-m1-plus.md` (Universal Enhancement Done-Criteria + per-milestone enhancement specifics for the assigned milestone).
 - `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/ai-control-observability-layer.md`
 - `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/references/prototype-run-bundle-schema.md` (especially the `captures/` rows and `summary.json.artifacts[].type` values).
-- Relevant DRs and specs linked from the assigned milestone or Build Point.
+- Relevant DRs and specs linked from the assigned milestone or Build Point (including DR-052..057 for the universal contract).
 
 If the review is for M0, also read [references/m0-review.md](references/m0-review.md).
 For the full pass definitions, read [references/review-passes.md](references/review-passes.md).
@@ -120,9 +157,12 @@ Use [templates/review-report.md](templates/review-report.md) for the final repor
 9. Audit Corefall-specific risks: fixed tick, seeded RNG, run bundles, event ordering, `schema_version`, replayability, `cfctl` eyes/ears/hands coverage, accessibility flags, performance budget, and vault/checklist/changelog coherence.
 10. Run a Minimum-Bar Design Coverage Review: confirm the milestone includes expected player-facing behavior, readability, events, `cfctl`, capture, perf, save/mod/accessibility hooks that are inside its scope; log future-scope gaps with the owning milestone.
 11. Run a Contract Integrity Review: shared code paths, no fake success, mandatory-field rejection, source-truthful evidence, no checklist laundering, and regression proof for every prior finding.
-12. Verify with commands when feasible. If M0 or early work cannot test a later system, mark that item `Not yet testable` with the exact future milestone that owns it.
-13. Produce findings first, ordered by severity, with file/line evidence. Include blockers, non-blocking gaps, missing tests, validation run/not run, and next fixes.
-14. If any verified finding remains, set verdict to `Needs Fixes` unless the user explicitly approved deferring that exact finding.
+12. Run a **Self-Play Validation Review**: confirm the implementing agent produced the Self-Play Validation Matrix (Hands / Eyes / Ears / Hear rows + mission win/loss + headless smoke + 60+120 Hz determinism rows), confirm `summary_grid.png` was personally read for every `act.*` action exercised, and confirm the harness was extended in-pass when a row could not be filled (the "make it possible" clause).
+13. Run a **Universal Enhancement Audit (DR-056)**: confirm every M1+ milestone's universal rows PASS (per-tier perf, CI bench regression, memory-leak soak, network sync, replay determinism CI, cfctl scriptability, AI-agent validation report, AI audio pipeline, juice rules, ACC-A floor, Tier-A localization keyed strings, modding parity, anti-FOMO + anti-pay-to-win audit, captions for ALL audio). Allow staging at BP boundary only when documented.
+14. Run a **Design-Completeness Map cross-check**: locate the milestone in the Design-Completeness Map; if the milestone delivers a row in that map, confirm the row's claim against the implementation. If the map and the implementation diverge, flag as a roadmap drift finding.
+15. Verify with commands when feasible. If M0 or early work cannot test a later system, mark that item `Not yet testable` with the exact future milestone that owns it.
+16. Produce findings first, ordered by severity, with file/line evidence. Include blockers, non-blocking gaps, missing tests, validation run/not run, and next fixes.
+17. If any verified finding remains, set verdict to `Needs Fixes` unless the user explicitly approved deferring that exact finding.
 
 ## Severity
 
@@ -142,9 +182,12 @@ Use this order:
 3. Validation status: commands run, pass/fail, commands skipped with reason.
 4. Contract Integrity Matrix: each contract path, shared source of truth, positive proof, negative/adversarial proof, and checklist truth.
 5. Minimum-Bar Design Coverage Matrix: feature/player promise, expected affordance, implemented evidence, omitted/future-owned items.
-6. Test gaps and missing evidence.
-7. Roadmap/checklist/changelog/vault updates required.
-8. Verdict: Accept, Needs Fixes, or Not Reviewable. `Accept` requires zero unresolved verified findings unless every remaining finding has explicit user-approved deferral evidence.
+6. **Self-Play Validation Matrix verification**: confirm every Hands/Eyes/Ears/Hear row passes; flag any "I checked the source" entries.
+7. **Universal Enhancement (DR-056) Audit**: per-tier perf gate + CI bench + memory-leak soak + network sync + replay determinism CI + cfctl scriptability + AI-agent validation + AI audio + juice + ACC-A floor + Tier-A localization + modding parity + anti-FOMO + captions; flag staged rows.
+8. **Design-Completeness Map cross-check**: confirm the milestone's row in the map matches the implementation.
+9. Test gaps and missing evidence.
+10. Roadmap/checklist/changelog/vault updates required.
+11. Verdict: Accept, Needs Fixes, or Not Reviewable. `Accept` requires zero unresolved verified findings unless every remaining finding has explicit user-approved deferral evidence.
 
 ## Loop Semantics
 

@@ -46,6 +46,37 @@ Date:
 |---|---|---|---|---|
 |  |  |  |  |  |
 
+## Self-Play Validation Matrix
+
+| Action / scenario | Hands (script + step) | Eyes (frame + visual confirm) | Ears (event row + observe field) | Verdict |
+|---|---|---|---|---|
+|  |  |  |  |  |
+
+## Universal Enhancement (DR-056) Audit
+
+| Universal Row | Status | Evidence | Notes |
+|---|---|---|---|
+| Per-tier perf gate (Steam Deck 800p/60 + 1080p/60 + 4K/120) |  |  |  |
+| CI bench regression (no >5% vs baseline) |  |  |  |
+| Memory leak soak (24h+) |  |  |  |
+| Network sync verified (`cfctl test sync-drift`) |  |  |  |
+| Replay determinism CI matrix (per platform + per arch) |  |  |  |
+| All player surfaces scriptable via cfctl |  |  |  |
+| AI-agent-driven validation report |  |  |  |
+| AI audio cues via DR-053 + usage-ledger |  |  |  |
+| Game feel / juice rules per DR-055 |  |  |  |
+| Accessibility ACC-A floor |  |  |  |
+| Localization keyed strings (Tier-A 11 langs) |  |  |  |
+| Modding parity |  |  |  |
+| Anti-FOMO + anti-pay-to-win audit |  |  |  |
+| Captions for ALL audio |  |  |  |
+
+## Design-Completeness Map Cross-Check
+
+| Map row owner (BP+milestone) | Implementation evidence | Drift / Gap |
+|---|---|---|
+|  |  |  |
+
 ## Test Gaps And Missing Evidence
 
 - 

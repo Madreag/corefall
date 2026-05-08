@@ -98,6 +98,52 @@ Checklist truth: <rows updated, no hidden deferrals>
 
 If a contract path has no negative/adversarial proof, do not mark it complete.
 
+## Universal Enhancement Contract (DR-056)
+
+Every milestone from M1 onward inherits the **Universal Enhancement Done-Criteria** from `cortext_command_vault/spec/milestone-enhancement-pass-m1-plus.md` on top of its own scope and done-criteria. The universal rows are non-optional — they are part of the milestone closeout contract and must PASS in addition to the milestone's documented Done-criteria:
+
+```text
+Universal Enhancement Done-Criteria (per DR-056):
+- [ ] Per-tier perf gate: Steam Deck 800p/60 + 1080p/60 + 4K/120 reference scenarios.
+- [ ] CI bench regression test (no >5% regression vs baseline) per DR-054.
+- [ ] Memory leak soak (24h+) clean per DR-051 + DR-054.
+- [ ] Network sync verified via cfctl test sync-drift per DR-052.
+- [ ] Replay determinism CI matrix passes (per platform + per architecture) per DR-002 + DR-052.
+- [ ] All player surfaces scriptable via cfctl per T-CONTROL.
+- [ ] AI agent-driven validation report logged per DR-026 + DR-056.
+- [ ] All audio cues generated via DR-053 pipeline + usage-ledger logged.
+- [ ] All gameplay events have juice rules per DR-055.
+- [ ] Accessibility ACC-A floor verified (UI 200% + high contrast + captions + reduced motion) per DR-012.
+- [ ] Localization keyed strings (Tier-A 11 languages) verified per DR-046.
+- [ ] Modding parity verified (mod-author can extend; mod-test-run AI agent validates) per DR-006 + DR-050.
+- [ ] Anti-FOMO + anti-pay-to-win audit passes per DR-031.
+- [ ] Captions for ALL audio (full-subtitle option) per DR-051.
+```
+
+Per-milestone specifics (e.g., M2 GPU compute path investigation + SIMD + cold-load benchmark, M2.5 adaptive difficulty toggle + AI difficulty preset visibility, M3A per-tick checksum + replay determinism CI matrix per platform + replay branching) live in `cortext_command_vault/spec/milestone-enhancement-pass-m1-plus.md`. Read both the Universal Enhancement Done-Criteria section AND the milestone's own row in that document before claiming a milestone closed.
+
+A milestone is not closed if any Universal row FAILS unless the user explicitly approves deferring that exact row with issue ID, reason, owner, next checkpoint, and evidence path. Some Universal rows (e.g., 24h memory-leak soak; modder validation; full Tier-A localization for English-only prototype scope) may be staged at the BP boundary rather than the per-milestone boundary; document the staging plan in the implementation log + checklist row when this happens, and the BP closure gate enforces them collectively.
+
+## Minimum Bar And Enhancement Rule
+
+The roadmap, backlog, DRs, and feature checklist are the **minimum bar**, not the ceiling. A worker assigned a milestone MUST first implement the documented contract, then perform a short design-coverage pass before acceptance:
+
+1. Read the milestone's linked DRs/specs and identify any underspecified player-facing behavior, physics consequence, AI-readable state, UI/readability state, replay event, `cfctl` observation/action, perf counter, save field, accessibility hook, or modding/schema surface that is implied by the product promise but underspecified in the task card.
+2. Strengthen the implementation when the gap is agent-completable and inside the milestone's theme. Do not ask the user to re-paste design intent already present in the vault.
+3. If the enhancement changes a still-open decision, run the Open Decision Gates pre-check before locking it.
+4. Record the enhancement in the implementation log, the checklist rows, and the canonical roadmap when it creates a new durable contract.
+5. Never use "the roadmap did not explicitly say that" as a reason to ship a static, fake, no-op, non-readable, non-observable, or non-replayable version of a core game promise.
+
+For actor control specifically: **no actor may ship as a static sliding pawn once its milestone owns visible movement presentation.** The minimum acceptable posture is animation-first while controlled, physics-first while disrupted, with state exposed through replay, HUD, `cfctl`, and capture evidence. Same rule applies to materials, atmospheres, AI, comms, and every other product promise — fake/no-op/cosmetic-only versions of core promises are unacceptable.
+
+Every milestone closeout must include the **Minimum-Bar Design Coverage Matrix**:
+
+```text
+Feature / entity / surface touched | Obvious expected affordance | Implemented evidence | Future-owned omission, if any
+```
+
+If a row excuses an inside-scope obvious affordance as "not explicitly requested", the milestone is not closed.
+
 ## No-Compromise Performance Defaults
 
 Corefall is a no-compromise performance and feel project. Do not turn roadmap defaults into hardcoded ceilings.
@@ -164,13 +210,14 @@ Read these in order before implementing a roadmap milestone:
 3. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/index.md` (Planning Docs panel)
 4. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/ai-coder-reading-list.md`
 5. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/authoritative-game-spec-v0.md`
-6. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md`
+6. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md` (especially the **Minimum Bar And Enhancement Rule**, the **Universal Enhancement Done-Criteria** callout above the Milestone Details header, the **Design-Completeness Map**, the **Build Points (Roadmap V2)** section, and the assigned milestone's section)
 7. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/native-implementation-backlog.md`
-8. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/feature-completion-checklist.md`
-9. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/ai-control-observability-layer.md`
-10. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/references/prototype-run-bundle-schema.md`
-11. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/decisions/index.md`
-12. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/dashboards/decision-tracker.md`
+8. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/feature-completion-checklist.md` (Build Points Checklist + Milestone Scope/Done-Criteria/Native Task Card rows for the assigned milestone)
+9. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/milestone-enhancement-pass-m1-plus.md` — **Universal Enhancement Done-Criteria (DR-056)** + per-milestone enhancement specifics. Mandatory for every M1+ milestone.
+10. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/ai-control-observability-layer.md`
+11. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/references/prototype-run-bundle-schema.md`
+12. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/decisions/index.md`
+13. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/dashboards/decision-tracker.md`
 
 For milestone-specific docs, use the tables in:
 

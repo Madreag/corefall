@@ -105,3 +105,44 @@ Future M9-M12 networking will amplify every determinism weakness found now.
 - Check mandatory fields by sending missing/malformed inputs through the live protocol.
 - Check that run-bundle and checklist claims come from real runtime sources, not hardcoded defaults.
 - Check every verified bug fix has a regression proof that would have failed before the fix.
+
+## 10. Self-Play Validation Audit
+
+Every M1+ milestone closeout must include the Self-Play Validation Matrix from `corefall/AGENTS.md` § Self-Play Validation Rule. Audit:
+
+- Every `act.*` / `scenario.*` / `runbundle.*` / `sim.*` method in the milestone scope has a Hands row driven via `cf-e2e --script <s> --capture-grid` (real JSON-RPC, not "I checked the source").
+- Every Hands row has a matching Eyes row with a one-sentence visual confirmation from a personally-read `summary_grid.png` (or per-action frame).
+- Every Hands row has a matching Ears row pointing at an `events.jsonl` row + an `observe.once` / `inspect.*` field.
+- Mission win + loss + headless-smoke + 60+120 Hz determinism rows are present and PASS.
+- Negative rows for adversarial inputs (NaN/Inf rejection, unknown_target rejection, mismatched seed rejection) are present.
+- If a row could not be filled because the harness lacked support, the harness was extended in the same pass (the "make it possible" clause). A milestone closing without harness fixes when gaps existed is a Blocker.
+
+## 11. Universal Enhancement Audit (DR-056)
+
+Every M1+ milestone inherits the Universal Enhancement Done-Criteria from `cortext_command_vault/spec/milestone-enhancement-pass-m1-plus.md`. Audit:
+
+- Per-tier perf gate (Steam Deck 800p/60 + 1080p/60 + 4K/120) — recorded in `summary.json.performance` or a `cf-bench` report.
+- CI bench regression (no >5% regression vs baseline) — DR-054.
+- Memory leak soak (24h+) — DR-051 / DR-054. May stage at BP boundary if documented.
+- Network sync verified via `cfctl test sync-drift` — DR-052.
+- Replay determinism CI matrix (per platform + per architecture) — DR-002 / DR-052.
+- All player surfaces scriptable via `cfctl` — T-CONTROL.
+- AI-agent-driven validation report logged — DR-026 / DR-056.
+- AI audio cues via DR-053 pipeline + usage-ledger — DR-053.
+- Game feel / juice rules per DR-055.
+- Accessibility ACC-A floor — DR-012.
+- Localization keyed strings (Tier-A 11 languages) — DR-046. May stage at BP boundary if scope is English-only prototype.
+- Modding parity — DR-006 / DR-050.
+- Anti-FOMO + anti-pay-to-win audit — DR-031.
+- Captions for ALL audio (full-subtitle option) — DR-051.
+
+Plus per-milestone specifics from the same document. If a Universal row FAILS without explicit user-approved deferral evidence (issue ID + reason + owner + next checkpoint + evidence path), verdict is `Needs Fixes`.
+
+## 12. Design-Completeness Map Cross-Check
+
+The roadmap's `Design-Completeness Map` enumerates every product surface and names the BP+milestone that makes it design-complete. Audit:
+
+- The milestone under review SHOULD have at least one row in the Design-Completeness Map (or be part of an M-* / T-* group that owns a row).
+- The row's claim must match the implementation evidence. Drift (e.g., row says "M5 ships full body graph" but the implementation skipped limb damage) is a roadmap-or-implementation drift finding.
+- New product surfaces added during implementation must be added to the Design-Completeness Map in the same pass.
+- A BP cannot close if any row inside the BP's milestone bundle is unchecked or vague.
