@@ -155,6 +155,7 @@ fn main() -> Result<()> {
     let scenario_path = locate_scenario(&cli.scenario)?;
     let config = build_config(&cli, scenario_path)?;
     let capture_opts = CaptureOptions::from_cli(&cli);
+    reject_capture_grid_with_headless_smoke(&cli)?;
     tracing::info!(target: "cf::app", scenario = %cli.scenario, headless_smoke = cli.headless_smoke, control_api = cli.control_api, tick_rate_hz = cli.tick_rate_hz, capture_grid = cli.capture_grid, "cf-app M0 starting");
 
     match (cli.headless_smoke, cli.control_api) {
@@ -168,6 +169,30 @@ fn main() -> Result<()> {
             capture_opts,
         ),
     }
+}
+
+/// Reject the `--headless-smoke --capture-grid` combination at parse time.
+///
+/// The headless paths (`run_headless_server` / `run_headless`) skip the entire
+/// Bevy `DefaultPlugins` stack — there is no swapchain, no render world, and
+/// no `Screenshot` observer to read back. Silently consuming `--capture-grid`
+/// in this combination would produce zero PNGs without a recorded error,
+/// violating the AGENTS.md Contract Integrity Gate ("no fake success").
+///
+/// `cf-e2e --capture-grid` already drops `--headless-smoke` from the spawn
+/// args; this guard catches direct `cf-app` invocations from CI scripts or
+/// operators.
+fn reject_capture_grid_with_headless_smoke(cli: &Cli) -> Result<()> {
+    if cli.headless_smoke && cli.capture_grid {
+        anyhow::bail!(
+            "--capture-grid is incompatible with --headless-smoke: the headless paths skip the \
+             Bevy render world, so there is no swapchain to read back. Drop --headless-smoke to \
+             use the windowed capture path (windowed-hidden mode is fine), or wait for the \
+             offscreen RenderTarget readback to ship per T-CAPTURE done-criteria. \
+             cf-e2e --capture-grid already drops --headless-smoke automatically."
+        );
+    }
+    Ok(())
 }
 
 /// Headless + control API: start the loopback JSON-RPC server, tick the sim at the configured
@@ -1080,6 +1105,38 @@ mod tests {
         assert_eq!(compute_duration(None, Some(2.0), 60), 120);
         assert_eq!(compute_duration(None, Some(2.0), 120), 240);
         assert_eq!(compute_duration(None, None, 60), 0);
+    }
+
+    /// Regression: headless-smoke + capture-grid must reject at startup, not
+    /// silently consume --capture-grid and produce zero PNGs. The headless
+    /// paths skip Bevy's render world, so there is no swapchain to read back.
+    /// Bugbot finding (Medium): "Capture silently dropped in headless mode
+    /// without warning."
+    #[test]
+    fn rejects_capture_grid_combined_with_headless_smoke() {
+        let cli = Cli::try_parse_from(["cf-app", "--scenario", "m0_blank", "--headless-smoke", "--capture-grid"])
+            .expect("CLI parse must succeed; the conflict is enforced post-parse");
+        let err =
+            reject_capture_grid_with_headless_smoke(&cli).expect_err("must reject --headless-smoke + --capture-grid");
+        let msg = err.to_string();
+        assert!(
+            msg.contains("--capture-grid is incompatible with --headless-smoke"),
+            "rejection message must explain the conflict, got: {msg}"
+        );
+    }
+
+    #[test]
+    fn allows_capture_grid_without_headless_smoke() {
+        let cli = Cli::try_parse_from(["cf-app", "--scenario", "m0_blank", "--capture-grid"])
+            .expect("CLI parse must succeed");
+        reject_capture_grid_with_headless_smoke(&cli).expect("--capture-grid alone (windowed path) must be allowed");
+    }
+
+    #[test]
+    fn allows_headless_smoke_without_capture_grid() {
+        let cli = Cli::try_parse_from(["cf-app", "--scenario", "m0_blank", "--headless-smoke"])
+            .expect("CLI parse must succeed");
+        reject_capture_grid_with_headless_smoke(&cli).expect("--headless-smoke alone must be allowed");
     }
 
     #[test]
