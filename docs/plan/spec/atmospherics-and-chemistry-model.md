@@ -1,8 +1,8 @@
 ---
 type: spec
 status: design-intent-post-m1
-authority: "Canonical contract for Stationeers-grade gas chemistry, real pressure (PV=nRT), combustion stoichiometry, phase change, pipe networks, room atmospheres, planetary atmospheres, suit/breathing life-support, base atmospherics modules, and ventilation. Captured during M1; lands at extended M7.5 (Base Atmospherics) and a new proposed M5.9 (atmospherics-grade kernel). M0 and M1 must remain atmospherics-agnostic."
-ready_when: "Extended M7.5 + new M5.9 land; ATMOS-A acceptance suite passes; pipe networks + room atmospheres + EVA suits + furnace combustion + per-planet ambient + phase change all run deterministically against the canonical run-bundle schema."
+authority: "Canonical contract for Stationeers-grade-or-better gas chemistry, real pressure (PV=nRT), combustion stoichiometry, phase change, pipe networks, room atmospheres, planetary atmospheres, suit/breathing life-support, base atmospherics modules, pressure-flow wind/liquid jets, heat transfer through materials, and ventilation. Captured during M1; lands at extended M7.5 (Base Atmospherics) and M5.9 (Atmospherics-Grade Kernel). M0 and M1 must remain atmospherics-agnostic."
+ready_when: "Extended M7.5 + M5.9 land; ATMOS-A acceptance suite passes; pipe networks + room atmospheres + EVA suits + furnace combustion + per-planet ambient + phase change + breach/aperture flow + material heat transfer all run deterministically against the canonical run-bundle schema."
 feeds:
   - DR-002
   - DR-003
@@ -30,9 +30,9 @@ feeds:
 # Atmospherics And Chemistry Model
 
 > [!summary] What this page is
-> The canonical contract for **Stationeers-grade** gas chemistry, real pressure simulation (PV=nRT), combustion stoichiometry, phase change, pipe networks, room atmospheres, planetary atmospheres, suit life-support, base atmospherics modules, doors as pressure barriers, vents/valves/regulators/filters, breach detection, and wind from pressure differentials. Every simulation surface — actors, equipment, chassis modules, base modules, terrain materials, weather, weapons, fire — reads from this model. There is one atmospherics simulation; everyone subscribes.
+> The canonical contract for **Stationeers-grade as the minimum bar, then beyond it**: gas chemistry, real pressure simulation (PV=nRT), combustion stoichiometry, phase change, pipe networks, room atmospheres, planetary atmospheres, suit life-support, base atmospherics modules, doors and weapon-created holes as pressure barriers/apertures, vents/valves/regulators/filters, breach detection, gas/liquid pressure jets, wind from pressure differentials, and heat transfer through materials. Every simulation surface — actors, equipment, chassis modules, base modules, terrain materials, weather, weapons, fire — reads from this model. There is one atmospherics/thermal simulation; everyone subscribes.
 >
-> The grammar mirrors Stationeers (the most authentic atmospherics in any game; 29+ source citations in [[references/sources#stationeers-atmospherics-research|sources ledger]]) but the values stay open until ATMOS-A prototype evidence backs them.
+> The grammar mirrors Stationeers (the minimum acceptable feel target; 29+ source citations in [[references/sources#stationeers-atmospherics-research|sources ledger]]) but the project is allowed to go beyond it with more gases, more elements, more materials, richer heat transfer, and tighter combat/base coupling when prototypes prove readability, performance, replay determinism, and fun.
 
 > [!warning] Authority boundary
 > Captured 2026-05-06 as **design intent**. The model (which equations apply, which gases ship at launch, which events fire, which devices interface with which networks) is a commitment. Specific numeric tuning (per-planet ambient values, per-device flow rates, per-actor breathing rates) stays open until M7.5 / M5.9 prototype evidence backs them.
@@ -66,6 +66,11 @@ This page locks all of that. Other pages cross-link here instead of restating it
 7. **No invisible chemistry.** Every reaction emits replay events. Every phase change emits replay events. Every breach emits replay events. The run-bundle reproduces the atmosphere state from event stream.
 8. **Determinism > visual fidelity for sim core.** Kernel runs CPU-deterministic. Per-cell shader hints are presentation; the source of truth is the kernel state.
 9. **Modder-extensible.** New gases, new reactions, new device types are data-driven. Schema covers the common case; Lua/script escape hatches allowed for affliction logic / device behavior.
+10. **Openings are physical apertures.** Door openings, vents, cracked windows, bullet holes, shaped-charge cuts, blast breaches, pipe ruptures, suit punctures, and terrain cracks create aperture records with area, edge material, normal, source event, and open/closed/breached state. Gas/liquid flow reads those apertures; a hole is not just a decal.
+11. **Heat moves through matter.** Solids, liquids, gases, equipment, armor, weapons, pipes, tanks, doors, and base modules exchange heat through material conductivity/insulation, moving fluids, phase change, combustion, electrical load, collision/friction, and bounded ambient/radiation exchange.
+12. **Temperature is gameplay.** Players must be able to cool, heat, insulate, vent, pump, flood, radiator-loop, phase-change, and power-throttle systems. Hot/cold state affects pressure, suit survival, batteries, weapons, armor, pumps, sensors, doors, bases, AI doctrine, and mission objectives.
+13. **Stationeers-grade is a floor, not a cap.** The launch kernel may start with a curated registry, but the architecture must support more elements, more material phases, more reaction families, and more thermal devices after M8.5 material-lab evidence.
+14. **Performance must scale.** Atmosphere/thermal hot paths are active-region, cache-friendly, multicore-ready, and benchmarked. GPU acceleration is welcome for visualization and future compute, but replay-deterministic CPU truth remains the acceptance path until a GPU compute path proves parity.
 
 ## Atmosphere Unit Model
 
@@ -82,6 +87,8 @@ struct Atmosphere {
     temperature_k: f32,                // kelvin
     insulation_class: Insulator,       // none | partial | sealed | radiator | superinsulator
     pressure_differential_max_pa: f32, // rupture threshold
+    thermal_mass_j_per_k: f32,         // heat capacity of contained matter + structure
+    material_shell: MaterialId,        // wall/container/pipe/suit material for conductivity
     parent: Option<AtmId>,             // for nested atmospheres (suit-in-room)
     flags: AtmFlags,                   // sealed, vented, on_fire, breached, etc.
 }
@@ -250,6 +257,7 @@ A **room** is a connected sealed-volume graph. Walls / floors / ceilings are bar
 - A "sealed room" is a room cell whose every face is either a sealed barrier or an adjacent sealed room cell. Sealing makes the union of those cells a single combined atmosphere update — the kernel collapses adjacent sealed cells into a meta-atmosphere for performance, but per-cell partial pressures are still queryable for the HUD.
 - Open boundaries (vacuum, planetary atmosphere) cause atmosphere dissipation within a few large-grid distances per tick.
 - Walls / windows / pipe segments / containers each carry a `pressure_differential_max_pa` field. Exceeding it causes structural rupture, dumping internal atmosphere to neighbors and breaking the structure.
+- Weapon/projectile/explosive damage can create partial holes before full rupture. A bullet hole is an aperture with small area; a shaped charge cut is a larger aperture; a blown wall section is a full connection. The source event stays in the replay chain so the player can inspect "this room depressurized because round X punched hole Y."
 
 ## Doors And Airlocks
 
@@ -266,16 +274,41 @@ Airlock cycle: vent the chamber to target side, wait for pressure equalization (
 
 Breach detection: if a sealed-room atmosphere loses > X% pressure per tick OR a structure with `pressure_differential_max_pa` ruptures, kernel emits `room_breach` event.
 
-## Wind From Pressure Differentials
+## Flow, Wind, Liquid Jets, And Breach Holes
 
-When two atmospheres are connected and have different pressures, gas flows from high to low. Per Stationeers:
+When two atmospheres or liquid volumes are connected and have different pressures or fluid heads, matter flows from high potential to low potential. Per Stationeers:
 
 > Flux of gases between open atmospheric systems is indicated by the particles travelling from higher-pressure to lower pressure regions. The difference in pressure accelerates that movement, causing loose objects and player to get pulled and flung about by the flux.
 
-- Flow rate is proportional to ΔP and to interface area (open door = 1 cell area; passive vent = small; broken wall = large).
+- Flow rate is proportional to ΔP and to aperture/interface area (open door = large, passive vent = small, bullet hole = tiny, shaped-charge cut = medium, broken wall = large). Extreme ΔP uses a bounded choked-flow cap so the sim stays stable and readable.
+- Every aperture has: `aperture_id`, `from_atm_id`, `to_atm_id`, `area_m2`, `normal`, `edge_material`, `source_event_id`, `open_fraction`, `flow_limit`, `liquid_limit`, `seal_state`, `damage_stage`.
+- Doors/hatches set aperture area by state. Weapon hits create apertures based on projectile energy, material hardness, exit wound, and local damage stage. Repairs reduce aperture area over time rather than snapping to sealed unless the tool explicitly patches it.
+- Liquids flow too. Water, fuel, acid, coolant, blood/vomit, and molten liquids have density, viscosity, temperature, contamination, and phase state. A high-pressure tank or flooded room can jet liquid through a hole, spray actors, push loose objects, cool/heat surfaces, short electronics, spread acid/fuel, or flood lower rooms by gravity.
+- Mixed gas/liquid expulsion is valid: a breached hot tank can vent steam plus boiling liquid; a punctured coolant line sprays cold liquid plus vapor; a pressure door opening can shove mist/smoke/debris.
 - Loose physics objects (dropped equipment, debris, gibs) take an impulse force proportional to local ΔP. Hooks into [[spec/full-collision-physics-plan]] M5.5-008 impulse-to-damage routing.
 - Actors take a wind force on their hull; below threshold = walking is harder; above threshold = pulled toward the lower-pressure side; at extreme = ragdoll → vacuum (the "blown out the airlock" cinematic). Hooks into [[spec/origin-reaction-and-resource-model#Origin Reaction Matrix|origin reaction/resource model]] for fall-damage and force-feedback events.
 - Direction interacts with gravity: heavy gases sink, light gases rise — see [[spec/gravity-and-ballistics-model]].
+
+## Heat Transfer And Thermal Engineering
+
+Temperature is one of the primary systemic axes, equal with pressure, material, and power. It is not a visual-only status.
+
+| Heat Route | Contract |
+|---|---|
+| Conduction | Adjacent solids/structures exchange heat through material thermal conductivity, thickness, contact area, insulation, and damage stage. Metal doors conduct heat faster than ceramic/insulated panels. Armor, weapons, pipes, tanks, and base walls all participate. |
+| Fluid advection/convection | Moving gas/liquid carries heat. A hot gas leak warms a room; cold coolant spray chills armor; a vent loop can intentionally move heat from one chamber to another. |
+| Phase change | Evaporation consumes latent heat; condensation/freezing releases heat. Cooling can be done by expansion/phase-change chambers; heating can happen through compression/combustion. |
+| Combustion/electrical load | Fire, reactors, batteries, motors, pumps, shields, turrets, and overclocked modules produce heat according to load and efficiency. Damage can increase waste heat. |
+| Collision/friction | High-energy impacts, bullet strikes, grinding, and moving machinery can add localized heat when relevant and bounded. |
+| Ambient/radiation | Simplified bounded ambient/radiative exchange lets radiators, vacuum exposure, hot planets, and cold planets matter without requiring full CFD or ray-traced thermal simulation. |
+
+Player techniques that must be valid:
+
+- Install heaters/coolers, wall heat exchangers, radiators, heat sinks, powered pumps, fans/vents, thermal shutters, insulated panels, and emergency dump valves.
+- Build coolant loops using high-heat-capacity gases/liquids, including CO2/Pollutant/Water-style coolants and future material-lab coolants.
+- Use phase-change chambers, expansion valves, condensation/evaporation chambers, and exterior radiators to move heat.
+- Vent hot atmosphere to outside, flood hot machinery, isolate rooms with doors/airlocks, reroute power, or deliberately depressurize a burning compartment.
+- Overheat enemy rooms/equipment, freeze pipes, cool reactors, warm suits, preheat fuel/combustion chambers, and manage battery/weapon/mech thermal limits.
 
 ## Suit / Helmet / Lung Life-Support
 
@@ -390,6 +423,9 @@ Each base module that affects atmosphere is a device with one or more atmosphere
 | Wall Cooler / Wall Heater | Active heat-exchange with attached pipe network; CO2 / Pollutant / Water are good coolants per their high specific heat or latent heat. |
 | Air Conditioner | Sets pipe-network temperature toward target by exchanging heat with another atmosphere. |
 | Pipe Radiator | Passive heat exchange between pipe network and ambient. |
+| Heat Exchanger / Radiator Loop | Moves heat between two pipe networks, a room and pipe network, or pipe network and exterior ambient; supports coolant-loop gameplay. |
+| Insulated Panel / Thermal Door | Reduces conduction and slows fire/heat spread; damage degrades insulation and can create thermal leaks before full breach. |
+| Emergency Vent / Dump Valve | Rapidly vents hot, toxic, or over-pressurized gas/liquid to another atmosphere or exterior reservoir; creates wind/liquid-jet forces if ΔP is high. |
 | Furnace | Combustion chamber for smelting; consumes Fuel (H2+O2) at controlled ratio and temperature. |
 | Gas Generator | Burns combustible gas → produces electricity + waste heat + CO2/Steam. |
 | Gas Fuel Generator (Combustor) | High-rate combustion (90%/tick); higher power output; more violent. |
@@ -411,8 +447,14 @@ The canonical run-bundle schema ([[references/prototype-run-bundle-schema]]) add
 | `atmospherics.atmosphere_destroyed` | atm_id, reason (room_unsealed / device_removed / merged_with) |
 | `atmospherics.atmosphere_merged` | from_atm_id, to_atm_id, reason |
 | `atmospherics.flow` | from_atm_id, to_atm_id, gas, moles_transferred, dt_ticks |
+| `atmospherics.aperture_created` | aperture_id, from_atm_id, to_atm_id, area_m2, edge_material, source_event_id, source_kind (door_open / bullet_hole / blast_breach / pipe_rupture / suit_puncture) |
+| `atmospherics.aperture_changed` | aperture_id, old_area_m2, new_area_m2, reason (damage / repair / door_motion / seal_failure) |
+| `atmospherics.liquid_flow` | from_volume_id, to_volume_id, liquid, liters_transferred, pressure_pa, temperature_k, contamination_tags |
+| `atmospherics.liquid_jet_force_applied` | target_id, liquid, impulse_n_s, pressure_pa, source_aperture_id |
 | `atmospherics.partial_pressure_changed` | atm_id, gas, old_pp, new_pp |
-| `atmospherics.temperature_changed` | atm_id, old_t, new_t, source (heat_exchange / phase_change / combustion / radiation / friction) |
+| `atmospherics.temperature_changed` | atm_id, old_t, new_t, source (conduction / convection / advection / phase_change / combustion / radiation / friction / electrical_load / coolant_loop) |
+| `atmospherics.thermal_transfer` | from_id, to_id, joules, route (conduction / fluid / phase_change / radiator / heat_exchanger), material_id, source_event_id |
+| `atmospherics.thermal_device_tick` | device_id, mode (heat / cool / exchange / radiator / vent), joules_moved, power_w, coolant_id |
 | `atmospherics.phase_change` | atm_id, gas, from_phase, to_phase, moles, parent_event_id |
 | `atmospherics.combustion_started` | atm_id, fuel, oxidizer, autoignition_t_reached, parent_event_id |
 | `atmospherics.combustion_consumed` | atm_id, reaction_id, moles_consumed, energy_released_j, byproducts, dt_ticks |
@@ -446,6 +488,10 @@ Run alongside (not replacing) BODY-A / CHASSIS-A / COLL-A / MAT-* / AI-H / ORIGI
 | ATMOS-A-13 | Plant in hydroponic tray in CO2-rich room | CO2 mol drops over time; O2 mol rises; replay shows the photosynthesis exchange events. |
 | ATMOS-A-14 | Furnace combustion math validation | Add 1 mol O2 + 2 mol H2 + ignite at 300 K; expected T_after = (300×61.9 + 563452) / 234.515 = ~2480 K; expected P_after = 2.9 × P_before × (T_after/T_before). Run-bundle records exact match within float tolerance. |
 | ATMOS-A-15 | Determinism replay | Same seed, same scenario, same actor inputs → identical atmospheric event stream byte-for-byte. |
+| ATMOS-A-16 | Bullet-hole depressurization | Rifle round punches a 2 cm² aperture between a 200 kPa room and vacuum; flow curve follows aperture area and ΔP; actor/item wind impulse is recorded; patch tool reduces area to zero and pressure stabilizes. |
+| ATMOS-A-17 | Liquid jet / flooding | Pressurized water tank is punctured into a room; liquid jet applies impulse to a loose item, wets/cools the struck surface, then floods lower cells by gravity; replay records liquid_flow + liquid_jet_force_applied. |
+| ATMOS-A-18 | Material heat transfer | Hot metal wall adjacent to cold insulated room, uninsulated metal room, and active coolant loop: uninsulated room warms fastest, insulated room slowest, coolant loop removes heat while consuming power; all energy deltas reconcile within tolerance. |
+| ATMOS-A-19 | Player thermal techniques | Overheated base module can be recovered by two valid methods (radiator loop OR emergency vent/flood). Both restore function but leave different risks: heat dumped outside vs pressure/liquid hazard. |
 
 ## Modding Contract
 

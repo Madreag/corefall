@@ -136,7 +136,7 @@ feeds:
   - [[#T-COMMS — Voice And Radio Simulation|T-COMMS — Voice And Radio Simulation]]
   - [[#T-SAVE — Save Game System|T-SAVE — Save Game System]]
   - [[#T-ACCESSIBILITY — Accessibility Floor|T-ACCESSIBILITY — Accessibility Floor]]
-  - [[#T-PERF — Performance Targets And Budgets|T-PERF — Performance Targets And Budgets]]
+  - [[#T-PERF — Performance Targets, Multicore CPU, And GPU Budgets|T-PERF — Performance Targets, Multicore CPU, And GPU Budgets]]
 - [[#Dependency Graph|Dependency Graph]]
 - [[#Feature Index|Feature Index]]
 - [[#Validation Command Matrix|Validation Command Matrix]]
@@ -164,7 +164,7 @@ If you have more time, also read in roughly this order:
 - [[spec/server-app-architecture]] — `cf-server` dedicated server binary; modes (`coop_room`, `pvp_arena`, `lan_room`, `mmo_shard`, `lobby_directory`); community-hosting posture (T-SERVER / M9..M12).
 - [[spec/persistent-mmo-architecture]] — MMO shard mode, persistence, interest management, account model, MMO-001..MMO-012 (M12 / DR-035).
 - [[spec/full-collision-physics-plan]] — collision classes, matrix, projectile-projectile rules, CCD tiers, impulse-to-damage, COLL-001..COLL-012 (T-PHYS / M5.5).
-- [[decisions/dr-036-systemic-material-simulation-direction]] — systemic material direction: bounded active-region CA kernel, reaction table, affliction layer, atmospheres, material lab, AI material competence (T-MAT / M5.6..M8.5).
+- [[decisions/dr-036-systemic-material-simulation-direction]] — systemic material direction: bounded active-region CA kernel, reaction table, affliction layer, atmospheres, material lab, AI material competence (T-MAT / M5.6..M8.5, with DR-037 M5.9 atmospherics-grade kernel).
 - [[comparables/noita-grade-material-simulation-research]] — source-backed material/chemistry/atmosphere research for Noita, Powder Toy, Barotrauma, Oxygen Not Included, Stationeers, and open-source falling-sand projects.
 - [[spec/hybrid-llm-ai-plan]] — async LLM mind layer with strict schemas, mock provider, validator, replay logging (T-LLM / M6.5).
 - [[references/prototype-run-bundle-schema]] — run-bundle event categories, manifest/summary/notes contract, per-milestone acceptance gates.
@@ -209,6 +209,7 @@ A junior agent must never have to guess what these words mean. If a term is used
 | **Event id** | Stable id of the form `<run_id>:<tick>:<seq>`. Globally unique per run. Used for parent-cause chains. |
 | **Fixed tick** | The 60 Hz (or 120 Hz) sim cadence; render is decoupled and interpolates between ticks. |
 | **Full collision** | Product promise that everything physical has collision identity and consequence unless explicitly filtered with tests and replay visibility. It does not mean naive all-pairs simulation. |
+| **Physical profile** | Data contract for every gameplay-physical object: mass, material/composition, collision class/proxy, durability, damage routes, temperature/electrical/container state where relevant, AI affordances, and inspect/debug fields. |
 | **Junior agent** | The default reader/implementer of this roadmap. Treat them as competent in Rust and game programming basics, but assume they have NOT read CCCP source, the prior HTML lab, or the rest of this vault. |
 | **`AiMindProposal`** | The strict-schema output an LLM mind worker may produce. Doctrine patches, squad orders, dialogue, memory writes; never raw actions. See [[spec/hybrid-llm-ai-plan]]. |
 | **Manifest (run)** | `run_manifest.json` inside a run bundle. Identifies build, scenario, seed, schema versions, capabilities, expected tests. |
@@ -236,11 +237,11 @@ A junior agent must never have to guess what these words mean. If a term is used
 | **Phase change** | Temperature-driven material transition (water ↔ steam, lava ↔ rock). Recorded as a `material.*` event with parent cause. |
 | **Hazard perception map** | Per-actor view of nearby material/temperature/electricity/gas fields used by AI for pathing and tactical decisions (M6.6 / DR-036). Respects fog-of-war (DR-022 + DR-032 fairness). |
 | **AI affordance tag** | Per-material label (`avoid`, `seek`, `use-as-weapon`, `extinguish-with`, `neutralize-with`, `vent`, `pump`) consumed by AI utility scoring. |
-| **Hull / room / atmosphere** | Barotrauma-style room volume in `cf-atmos` with water level, oxygen level, pressure, fire state, toxic gas. Connected via gaps. |
-| **Gap** | Connection between two hulls (or a hull and outside). Open/closed state. Carries water/oxygen/gas flow + flow force. |
+| **Hull / room / atmosphere** | Stationeers-grade-or-better atmosphere volume in `cf-atmos` with per-gas moles, temperature, pressure, water/liquid level, fire state, toxic gas, thermal links, and breach apertures. Connected via gaps/apertures. |
+| **Gap / aperture** | Connection between two hulls (or a hull and outside). Open/closed/breached state. Carries gas flow, liquid flow, heat transfer, wind force, and source-event history. Doors, vents, bullet holes, blast breaches, pipe ruptures, and suit punctures all become apertures. |
 | **Reaction event** | Replay-recorded `reaction.*` event capturing reagents, byproducts, priority, temperature, catalysts, and parent cause. |
 | **Material event** | Replay-recorded `material.*` event capturing material id, contact point, temperature, state change, and parent cause. |
-| **Atmosphere event** | Replay-recorded `atmosphere.*` event capturing hull/gap/pump/vent state changes. |
+| **Atmospherics event** | Replay-recorded `atmospherics.*` event capturing hull/gap/aperture/pump/vent/flow/thermal state changes. |
 | **Affliction** | Per-actor systemic state (`wetness`, `burning`, `corroded`, `electrified`, `poisoned`, `asphyxiating`, `suffocating`, `drowning`, `depressurizing`). Visible on HUD. |
 | **Material lab** | The `cf-tools-editor --mode material_lab` workbench. Brushes, inspect, recipe journal, stamps, AI puppet test. Designer authors a tiny reaction puzzle in <10 minutes (M8.5). |
 | **Launch material set** | 17 materials shipped at launch (air, dirt/sand, rock/concrete, metal, wood/organic, water, steam/mist, smoke, fire/heat, oil/fuel, acid, toxic sludge/liquid, toxic gas, lava, blood/vomit, electricity charge, pebble/debris). Per DR-036. |
@@ -496,7 +497,7 @@ The milestone is fully done when:
 | Dedicated server app | **`cf-server` is a full-product artifact** (DR-034). Same Rust workspace; same sim/terrain/physics/equipment/chassis/AI/replay/mod crates; modes selected via `--mode <coop_room\|pvp_arena\|lan_room\|mmo_shard\|lobby_directory>`. Linux + Windows; reference Docker image; documented hosting guide. See [[spec/server-app-architecture]]. |
 | Persistent MMO mode | **MMO shard is a full-product target mode** (DR-035). Bounded shard-with-portal model (NOT seamless world); 50-200 concurrent target; community-hostable; persistent terrain/bases/veterans/factions/commander memory; account required for public shards, NOT for private LAN/co-op. **No subscription**. M12 proves readiness. See [[spec/persistent-mmo-architecture]]. |
 | Backend services | Local-first default for solo/private play; public-server service spine (lobby_directory, account adapter, persistence, anti-cheat foundation, observability) is built as online modes mature (DR-013). Steam/EOS/PlayFab/Unity Multiplay are optional adapters, never required. |
-| Systemic material simulation | **Noita-grade systemic causality** is a launch product surface (DR-036), not a moonshot. Hybrid: active-region per-pixel material sim + rigid-body collision (DR-033) + Barotrauma-style room/atmosphere networks + reaction engine + AI hazard perception + replay/event audit. Curated launch material set (17 materials); expansion via material lab. Every material is a verb; every reaction has a cause chain; every hazard has an overlay/caption/replay event. T-MAT side track + M5.6/M5.7/M6.6/M7.5/M8.5 milestones. See [[comparables/noita-grade-material-simulation-research]]. |
+| Systemic material simulation | **Noita-grade systemic causality** is a launch product surface (DR-036), not a moonshot. Hybrid: active-region per-pixel material sim + rigid-body collision (DR-033) + **Stationeers-grade-or-better atmospherics/thermal simulation** (DR-037) + reaction engine + AI hazard perception + replay/event audit. Curated launch material set (17 materials) starts the project; M8.5 material lab can promote more elements, gases, liquids, and reactions once they have schema, AI, UI, replay, balance, and perf evidence. Every material is a verb; every reaction has a cause chain; every hazard has an overlay/caption/replay event. T-MAT side track + M5.6/M5.7/M5.9/M6.6/M7.5/M8.5 milestones. See [[comparables/noita-grade-material-simulation-research]]. |
 | Visual fidelity | Target 4K/120 strong desktop; floor 1080p/60; Steam Deck 800p/60. Pixel-sim battlefield + comic-noir UI + scalable SDF/vector text + 200% UI scaling (DR-019 + DR-028). |
 | Audio | Diegetic industrial synth-dread; audio-as-tactical-UI; mandatory captions (DR-020). |
 | Sim model | Fixed 60/120 Hz islands; AI/terrain budgeted-async; deterministic where it earns its keep. |
@@ -522,8 +523,8 @@ The milestone is fully done when:
 | Pixel terrain | **Custom crate** | Chunked, GPU-assisted, mutable per-pixel material. Off-the-shelf has no answer. |
 | Physics/collision | **Custom crate** with staged broadphase/narrowphase/CCD | Need full collision matrix, projectile-projectile contacts, terrain chunk proxies, limb/equipment/mech contacts, impulse-to-damage, replay-visible contact events, and 4K/120 budgets (DR-033). |
 | Active material kernel | **Custom crate** `cf-material` (CPU-deterministic; chunked 64×64; dirty rects; sleeping chunks) | Noita-grade systemic causality at the active-region scale; reaction table + density layering + phase change + electricity/conductivity/wetness; per DR-036. |
-| Room / atmosphere networks | **Custom crate** `cf-atmos` | Barotrauma-style hulls/gaps/pumps/vents/oxygen/pressure/fire networks; powers DR-027 deep combat-base; per DR-036. |
-| Pipe / power / signal networks | **Custom crate** `cf-utility-net` (or fold into `cf-mission`) | Stationeers-style atmospherics + power graph for base equipment; sensor-readable + AI-controllable; per DR-036. |
+| Room / atmosphere networks | **Custom crate** `cf-atmos` | Stationeers-grade-or-better PV=nRT room/pipe/suit atmospheres, pressure apertures, gas/liquid flow, thermal transfer, oxygen/pressure/fire networks; powers DR-027 deep combat-base; per DR-036/DR-037. |
+| Pipe / power / signal networks | **Custom crate** `cf-utility-net` (or fold into `cf-mission`) | Stationeers-style atmospherics + power graph + thermal engineering for base equipment; sensor-readable + AI-controllable; per DR-036/DR-037. |
 | Body/chassis/mech model | **Custom crate** | DR-014/021 chassis grammar is unique to this project. |
 | AI | **Custom crate** | DR-022 humanlike-bar means perception/memory/doctrine/adaptation; not off-the-shelf. |
 | Replay/event | **Custom crate** | DR-002/DR-018 event taxonomy + scenario manifest + run-bundle schema. |
@@ -592,7 +593,7 @@ game/                        # cargo workspace root
 │   ├── cf-terrain/                   # chunked pixel terrain + materials + GPU carving
 │   ├── cf-physics/                   # custom 2D physics (collision, atom-style probes)
 │   ├── cf-material/                  # active material kernel: per-pixel CA, reaction table, density layering, phase change, electricity, replay-deterministic (DR-036)
-│   ├── cf-atmos/                     # room/volume/atmosphere networks: hulls/gaps/pumps/vents/oxygen/pressure/fire (DR-036)
+│   ├── cf-atmos/                     # Stationeers-grade room/pipe/suit atmospheres, apertures, liquid/gas flow, thermal networks (DR-036/DR-037)
 │   ├── cf-actor/                     # actor components, controller intent layer
 │   ├── cf-chassis/                   # armor/mech/origin grammar (DR-014/021)
 │   ├── cf-equipment/                 # role records, modules, jam/eject/repair
@@ -1029,7 +1030,7 @@ Single source of truth for every CLI flag. If a flag exists in the codebase but 
 | `observe --collisions` | Stream or snapshot live collision pairs, filters, contact normals, TOI, impulses, projectile deflections, recent `collision.*` events, and budget/degradation status (T-PHYS, M5.5). | Optional `--once`/`--stream --hz <N>`, `--filter <class-pair>`, `--include-cosmetic`, `--scope <actor\|squad\|faction\|all>`, `--last <N>` for last-N collision events. |
 | `inspect collision <event-id>` | Print the full `collision.*` event payload by id: classes, materials, contact point/normal, TOI fraction, impulses, parent cause chain, and follow-up damage/projectile-deflection links (T-PHYS, M5.5). | Optional `--format json\|ron`, `--with-parents`, `--with-children`. |
 | `observe --materials` | Stream or snapshot active-region material/temperature/state grid; per-pixel id, temperature, density, last reaction, parent cause (T-MAT, M5.6+). | Optional `--once`/`--stream --hz <N>`, `--scope chunk:<x>,<y>` or `--scope all`, `--filter <material-id>`, `--last <N>` for last-N material events. |
-| `observe --atmospheres` | Stream or snapshot per-room atmosphere state: water level, oxygen, pressure, fire state, toxic gas, connected hulls/gaps (T-MAT, M7.5). | Optional `--once`/`--stream --hz <N>`, `--scope <room-id\|all>`. |
+| `observe --atmospheres` | Stream or snapshot per-room atmosphere state: per-gas moles, temperature, pressure, water/liquid level, fire state, toxic gas, connected hulls/gaps/apertures, flow force, liquid jets, and thermal links (T-MAT, M5.9, M7.5). | Optional `--once`/`--stream --hz <N>`, `--scope <room-id\|all>`. |
 | `observe --reactions` | Stream or snapshot recent `reaction.*` events: reagents, byproducts, temperature, parent cause chain (T-MAT, M5.6+). | Optional `--once`/`--stream --hz <N>`, `--filter <reaction-tag>`, `--last <N>`. |
 | `inspect material <event-id>` | Print the full `material.*` event payload by id: material id, contact point, temperature, state, parent cause, follow-up reaction/damage links. | Optional `--format json\|ron`, `--with-parents`, `--with-children`. |
 | `inspect reaction <event-id>` | Print the full `reaction.*` event payload by id: reagents, byproducts, priority, temperature, catalysts, parent cause chain. | Optional `--format json\|ron`, `--with-parents`, `--with-children`. |
@@ -1529,11 +1530,12 @@ Before doing any feature work, the agent runs the milestone's kickoff smoke. If 
 | M5.5 | `cargo run -p cf-e2e -- --scenario m5_5_full_collision_gauntlet --suite COLL-001..COLL-012 --write-run-bundle` | Full collision matrix, CCD, projectile-projectile, impulse damage, replay, and perf evidence exist. |
 | M5.6 | `cargo run -p cf-e2e -- --scenario m5_6_material_kernel --suite MAT-01,MAT-02,MAT-03,MAT-06,MAT-13 --write-run-bundle` | Material kernel + reaction table + density layering + replay determinism. |
 | M5.7 | `cargo run -p cf-e2e -- --scenario m5_7_hazard_package --suite MAT-04,MAT-05,MAT-07,MAT-08-stub --write-run-bundle` | Acid/electricity/debris/ingestion damage routes through armor/limbs. |
+| M5.9 | `cargo run -p cf-e2e -- --scenario m5_9_atmospherics_kernel --suite ATMOS-A-01..ATMOS-A-19,GRAV-A-01..GRAV-A-10 --write-run-bundle` | Stationeers-grade-or-better PV=nRT atmospheres, pressure apertures, wind/liquid jets, material heat transfer, thermal tools, gravity/ballistics coupling, replay determinism, and perf evidence. |
 | M6 | `cargo run -p cf-ai --bin ai_harness -- --suite AI-H-01..AI-H-06 --write-run-bundle` | Harness suite passes. |
 | M6.5 | `cargo run -p cf-ai --bin mind_lab -- --suite MIND-001..MIND-010 --provider mock --write-run-bundle` | Mind lab suite passes against mock; local AI keeps acting through provider sleep/fail/stale; replay shows mind events. |
 | M6.6 | `cargo run -p cf-ai --bin ai_harness -- --suite AI-MAT-01..AI-MAT-08 --write-run-bundle` | AI material competence suite passes; AI avoids/uses materials with reason labels. |
 | M7 | `cargo run -p cf-e2e -- --scenario breach_contract --script win_path --expect win --write-run-bundle` | Breach Contract win path is real. |
-| M7.5 | `cargo run -p cf-e2e -- --scenario m7_5_base_atmospherics --suite MAT-09,MAT-10 --write-run-bundle` | Hull/gap/pump/vent/oxygen/pressure/fire networks; flooding + breach + repair scenarios pass. |
+| M7.5 | `cargo run -p cf-e2e -- --scenario m7_5_base_atmospherics --suite MAT-09,MAT-10,ATMOS-A-16..ATMOS-A-19 --write-run-bundle` | Base room/pipe/vent/oxygen/pressure/fire/thermal networks; flooding, breach apertures, pressure/liquid jets, thermal recovery, and repair scenarios pass. |
 | M8 | `cargo run -p cf-mod -- validate content/ mods/ --strict && cargo run -p cf-e2e -- --scenario sample_mod_breach --expect win --write-run-bundle` | Mod loads + plays. |
 | M8.5 | `cargo run -p cf-tools-editor -- --mode material_lab --scenario m8_5_acid_trap_puzzle --suite MAT-11,MAT-14 --write-run-bundle && cargo run -p cf-mod -- validate mods/sample_material_pack/ --strict` | Designer authors + exports + reloads a material puzzle; mod pack with new material loads cleanly. |
 | M9 | `cargo run -p cf-server -- --mode coop_room --scenario breach_contract --ticks 36000 --write-run-bundle` then `cargo run -p cf-headless -- replay <m9_run> --verify-checksums` | Dedicated server boots and runs a co-op room; 10-min replay verified. |
@@ -1582,14 +1584,14 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 | T-LLM | Async LLM mind layer | M3, M6, M6.5..M12 |
 | T-PHYS | Full collision and physical consequence | M0..M12; M5.5 primary |
 | T-SERVER | Dedicated server app lifecycle and community hosting | M0 (config stubs); M9..M12 primary; lifelong from M9 |
-| T-MAT | Systemic materials, chemistry, and atmospheres | M2 (foundation); M5.6/M5.7/M6.6/M7.5/M8.5 primary; lifelong from M5.6 |
+| T-MAT | Systemic materials, chemistry, and atmospheres | M2 (foundation); M5.6/M5.7/M5.9/M6.6/M7.5/M8.5 primary; lifelong from M5.6 |
 | T-PLATFORM | Cross-platform CI and Steam Deck | M0..M12 |
 | T-MOD | Modding and scripting | M5..M8 primary; lifelong |
 | T-AUDIO | Diegetic SFX and captions | M4..M7 primary; lifelong |
 | T-COMMS | Voice and radio simulation | M2/M4/M5/M5.7/M5.10/M6.6 precursors; M9.5 primary; M10..M12 sync |
 | T-SAVE | Save game system | M5..M9 primary; lifelong |
 | T-ACCESSIBILITY | Accessibility floor | M4..M8 primary; lifelong |
-| T-PERF | Performance targets and budgets | M0..M12 |
+| T-PERF | Performance targets, multicore CPU, and GPU budgets | M0..M12 |
 
 ---
 
@@ -1721,7 +1723,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 **What it proves:** Event taxonomy is complete enough that any prior milestone's run can be replayed headlessly and produce identical state checksums. Determinism islands are real.
 
 **Scope:**
-- `cf-replay` event taxonomy expanded to cover every baseline category in [[references/prototype-run-bundle-schema#Event Category Baseline]]: `input`, `control`, `mind`, `collision`, `server`, `anti_cheat`, `mmo`, `material`, `reaction`, `atmosphere`, `affliction`, `combat`, `body`, `terrain`, `ai`, `logistics`, `mission`, `system`, `snapshot`, `determinism`, `ux`, `accessibility`, and `performance`. New event categories must be added to the schema first, then wired into recorder filters, viewer filters, summary counters, and checklist rows.
+- `cf-replay` event taxonomy expanded to cover every baseline category in [[references/prototype-run-bundle-schema#Event Category Baseline]]: `input`, `control`, `mind`, `collision`, `server`, `anti_cheat`, `mmo`, `material`, `reaction`, `atmospherics`, `affliction`, `combat`, `body`, `terrain`, `ai`, `logistics`, `mission`, `system`, `snapshot`, `determinism`, `ux`, `accessibility`, and `performance`. New event categories must be added to the schema first, then wired into recorder filters, viewer filters, summary counters, and checklist rows.
 - Snapshot writer: full actor/inventory/terrain snapshot at scene start + every objective change.
 - Checksum producer: per-tick or per-snapshot.
 - Headless replay binary: replays a run bundle without rendering and produces matching checksums.
@@ -1920,7 +1922,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 ### M5.9 — Atmospherics-Grade Kernel
 
-**What it proves:** Stationeers-grade atmospherics is real. Every atmosphere unit (room cell, pipe network, suit, canister, lung, furnace, base module) tracks per-gas mole quantities + temperature + volume, computes pressure via `P = nRT/V` with `R = 8314.46`, exchanges contents and heat with neighbors, undergoes gradual phase change with latent heat, supports stoichiometric combustion with deterministic energy yields, and emits replay events for every transition. Pipe networks are first-class; rooms detect sealing automatically; doors are pressure barriers with state machines; suits run breathing math against canister/filter/waste-tank slots; per-planet ambient is an infinite reservoir with locked composition. Wind from ΔP applies impulse force on entities. Universal gravity field reads through one source for atmospherics density layering AND projectile drag AND material kernel density layering.
+**What it proves:** Stationeers-grade atmospherics is the **minimum bar**, not the ceiling. Every atmosphere unit (room cell, pipe network, suit, canister, lung, furnace, base module) tracks per-gas mole quantities + temperature + volume, computes pressure via `P = nRT/V` with `R = 8314.46`, exchanges contents and heat with neighbors/material shells, undergoes gradual phase change with latent heat, supports stoichiometric combustion with deterministic energy yields, and emits replay events for every transition. Pipe networks are first-class; rooms detect sealing automatically; doors, vents, windows, weapon holes, blast breaches, pipe ruptures, and suit punctures are pressure apertures; suits run breathing math against canister/filter/waste-tank slots; per-planet ambient is an infinite reservoir with locked composition. Wind from ΔP applies impulse force on entities. Liquid pressure jets/flooding are simulated. Universal gravity field reads through one source for atmospherics density layering AND projectile drag AND material kernel density layering. Hot paths must be multicore/cache-friendly, with GPU acceleration allowed where deterministic parity is proven.
 
 **Scope (per [[spec/atmospherics-and-chemistry-model]] + [[spec/gravity-and-ballistics-model]]):**
 - `cf-atmos` becomes the kernel crate: gas registry (10 launch gases + 6 launch liquid mixtures), `Atmosphere` unit struct, kernel tick loop, active-region scheduling (sleeping atmospheres skipped per checksum).
@@ -1929,6 +1931,9 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 - `cf-atmos::pipe_network`: connected-segment graph; pumps / valves / regulators (forward + back-pressure) / volume + turbo pumps / filtration / one-way / purge / pressurant / condensation / expansion valves / condensation + evaporation chambers.
 - `cf-atmos::room_detection`: per-tick connected-volume detection from sealed barriers; sealed-cell collapse for kernel performance; per-cell partial-pressure HUD queries.
 - `cf-atmos::door_state_machine`: closed_sealed / closed_unsealed / cycling_open / open / cycling_close / breached. Airlock controller (canonical 2-door + 2-active-vent + console assembly).
+- `cf-atmos::apertures`: door openings, vents, cracked windows, bullet holes, shaped-charge cuts, blast breaches, pipe ruptures, suit punctures, and terrain cracks. Each aperture has area, normal, edge material, open fraction, source event, and damage stage. Flow = ΔP × aperture area with bounded choked-flow caps.
+- `cf-atmos::liquid_flow`: pressure/head/gravity-driven liquid jets, sprays, flooding, siphons, and mixed gas/liquid expulsion. Liquids carry mass, density, viscosity, temperature, contamination, phase, and force.
+- `cf-atmos::thermal_transfer`: conduction through material shells, convection/advection through gas/liquid, phase-change latent heat, combustion/electrical/collision heat, and bounded ambient/radiative exchange. Material thermal conductivity and insulation are gameplay fields.
 - `cf-atmos::suit_life_support`: lung + helmet + suit nested atmospheres; canister + filter + waste-tank slots; breathing math `0.0048 mol/tick · BreathingRate · BreathingEfficiency`; helmet flush function; filter max waste-tank pressure 4052 kPa.
 - `cf-atmos::planetary_ambient`: locked per-planet ambient (Earth, Mars, Moon, Mimas, Europa, Vulcan, Venus); modder schema for new ambients via `content/worlds/`.
 - `cf-atmos::wind`: ΔP-driven impulse force on actors / dropped items / debris / gibs; routes through M5.5-008 contact solver as a force input.
@@ -1940,7 +1945,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 - New scenario: `content/scenarios/m5_9_atmospherics_kernel.ron` with sealed room + Mars airlock + furnace combustion + EVA suit life-support + wind-from-vacuum-breach setpieces.
 
 **Done-criteria:**
-- [ ] ATMOS-A-01..ATMOS-A-15 pass (PV=nRT correctness, mixing, pressure spike on heating, combustion stoichiometry, pipe networks, filtration, planetary ambient, suit life-support, filter mismatch failure mode, helmet flush, phase change, wind force, photosynthesis, furnace combustion math, determinism replay).
+- [ ] ATMOS-A-01..ATMOS-A-19 pass (PV=nRT correctness, mixing, pressure spike on heating, combustion stoichiometry, pipe networks, filtration, planetary ambient, suit life-support, filter mismatch failure mode, helmet flush, phase change, wind force, photosynthesis, furnace combustion math, determinism replay, bullet-hole depressurization, liquid jet/flooding, material heat transfer, player thermal techniques).
 - [ ] GRAV-A-01..GRAV-A-10 pass (per-planet drop tests, projectile arc with vacuum vs Earth atmosphere, override regions, magnetic boots, liquid layering, gas stratification, determinism replay).
 - [ ] cargo run -p cf-headless replay <m5_9_run> --verify-checksums passes byte-identically.
 - [ ] Active-region perf budget: 60 Hz default + 120 Hz validated path on Steam Deck floor; 4K/120 strong desktop validated.
@@ -2099,10 +2104,10 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 ### M7.5 — Base Atmospherics (Extended For Stationeers-Grade Per DR-037)
 
-**What it proves:** Barotrauma-style room/gap/pump/vent/oxygen/pressure/fire networks layer on top of the **M5.9 atmospherics-grade kernel** (real PV=nRT) + M5.6 material kernel + M7 mission director (DR-027 deep combat-base + DR-036 + **DR-037**). Bases, mechs, ships, sealed chambers are **first-class atmospheres** with per-gas mole tracking, real pressure, deterministic combustion, gradual phase change, suit life-support, and Stationeers-grade pipe network engineering. Breaches flood; pumps recover; oxygen runs out per breathing math; fire follows combustion stoichiometry and grows with O2/Volatiles ratio + autoignition T; pressure differentials move actors and items per ΔP × interface area; airlocks cycle between two atmospheres with locked door state machines.
+**What it proves:** Base/ship/mech room/gap/pump/vent/oxygen/pressure/fire networks layer on top of the **M5.9 atmospherics-grade kernel** (real PV=nRT) + M5.6 material kernel + M7 mission director (DR-027 deep combat-base + DR-036 + **DR-037**). Bases, mechs, ships, sealed chambers are **first-class atmospheres** with per-gas mole tracking, real pressure, deterministic combustion, gradual phase change, suit life-support, Stationeers-grade pipe network engineering, and thermal-management gameplay. Breaches flood; pumps recover; oxygen runs out per breathing math; fire follows combustion stoichiometry and grows with O2/Volatiles ratio + autoignition T; pressure differentials move actors and items per ΔP × aperture area; bullet holes and blast cuts create real pressure apertures; liquid jets can shove, cool, contaminate, flood, or damage; airlocks cycle between two atmospheres with locked door state machines.
 
 > [!note] M7.5 scope extension
-> When DR-037 closed (2026-05-06), M7.5 inherited: real PV=nRT instead of approximate room atmosphere; locked gas registry with specific heats + autoignition T; deterministic combustion stoichiometry; gradual phase change with latent heat; first-class pipe networks (pumps, valves, regulators, filtration, condensation/evaporation chambers); EVA + Hardsuit life-support with breathing math; per-planet ambient. The M5.9 kernel does the heavy lifting; M7.5 wires in the base modules + mission director hooks + HUD + AI awareness.
+> When DR-037 closed (2026-05-06), M7.5 inherited: real PV=nRT instead of approximate room atmosphere; locked gas registry with specific heats + autoignition T; deterministic combustion stoichiometry; gradual phase change with latent heat; first-class pipe networks (pumps, valves, regulators, filtration, condensation/evaporation chambers); weapon-created apertures; liquid jets/flooding; heat transfer through materials; EVA + Hardsuit life-support with breathing math; per-planet ambient. The M5.9 kernel does the heavy lifting; M7.5 wires in the base modules + mission director hooks + HUD + AI awareness.
 
 **Scope (MAT-09, MAT-10):**
 - `cf-atmos` crate: hulls (rooms with volume + water level + oxygen level + pressure + fire state); gaps (room-to-room/outside connections with open/closed state and flow force); per-tick equalize step; connected-hull search.
@@ -2110,7 +2115,9 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 - Power/condition coupling: equipment runs on command-core power (DR-015) + has condition (degraded → failed); damage chain integrates with M5/M5.5 chassis grammar.
 - Material ↔ atmosphere bridge: M5.6 active-material chunks update room state at chunk boundaries (water mass aggregates into hull water level; fire propagates into hull fire state; toxic gas raises room toxicity).
 - Pressure forces on actors/items: breach + pressure differential pulls/pushes actors and loose items per DR-033 collision impulse routing.
-- Replay events: `atmosphere.*` event category (`atmos.hull_breached`, `atmos.flooded`, `atmos.depressurized`, `atmos.oxygen_depleted`, `atmos.fire_started`, `atmos.fire_extinguished`, `atmos.pump_repaired`, `atmos.vent_opened`, `atmos.alarm_triggered`).
+- Breach apertures: door opening, bullet hole, shaped-charge cut, pipe rupture, or blast breach creates real aperture area; pressure/water/fire/toxic gas moves through it until sealed.
+- Thermal modules: heaters, coolers, heat exchangers, radiators, coolant loops, insulated panels/doors, emergency vent/dump valves. Temperature affects room pressure, equipment performance, battery/weapon heat, suit comfort, and mission objectives.
+- Replay events: `atmospherics.*` event category (`atmospherics.hull_breached`, `atmospherics.flooded`, `atmospherics.depressurized`, `atmospherics.oxygen_depleted`, `atmospherics.fire_started`, `atmospherics.fire_extinguished`, `atmospherics.pump_repaired`, `atmospherics.vent_opened`, `atmospherics.alarm_triggered`, `atmospherics.aperture_created`, `atmospherics.thermal_transfer`).
 - HUD: per-room oxygen/water/pressure/fire overlay (toggleable); affliction icons (suffocating, drowning, depressurizing) tie back to M5.7 hazard package.
 - Mission director hooks (M7): contracts can fire room-state objectives ("seal the breach", "rescue from flooding", "vent toxic gas", "restart pumps", "evacuate before depressurization").
 
@@ -2119,13 +2126,15 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 - [ ] MAT-10 base equipment loop: damage a pump; oxygen + water levels respond; AI repair task fires; restored function brings room back to nominal.
 - [ ] Fire system: ignite oil in a sealed room; verify fire grows with oxygen, dies in vacuum, is extinguished by water; smoke routes through vents.
 - [ ] Pressure forces: pressure-differential breach pulls a loose item out of the room with replay event chain.
+- [ ] Bullet-hole aperture: shoot a pressurized room wall; verify a small jet leaks gas/liquid through the hit location, force scales by aperture area, and patching the hole reduces flow.
+- [ ] Thermal loop: overheat a module; recover it via radiator/coolant loop OR emergency vent/flood; both routes produce distinct replay cause chains.
 - [ ] HUD per-room overlays render at 100% / 200% UI scale.
 - [ ] Mission director can author "seal the breach" / "rescue from flooding" / "vent gas" objectives.
 - [ ] Replay verifies headlessly with bit-identical room state checksums.
 
 **Cross-DR:** DR-002, DR-005, DR-007, DR-013, DR-015, DR-017, DR-018, DR-022, DR-024, DR-027, DR-033, DR-034, DR-035, DR-036.
 
-**Open DR gates:** DR-002 (atmosphere event category extends DR-002 contract), DR-007 (M7.5 closes DR-007 atmospheric implementation specifics under DR-036), DR-012 (hull-state UI overlays must satisfy ACC-A floor — confirm with user). Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
+**Open DR gates:** DR-002 (`atmospherics` event category extends DR-002 contract), DR-007 (M7.5 closes DR-007 atmospheric implementation specifics under DR-036/DR-037), DR-012 (hull-state UI overlays must satisfy ACC-A floor — confirm with user). Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
 
 ---
 
@@ -2194,7 +2203,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 - Material packs: `.cfpkg` mod packages can declare new materials, reactions, ingestion effects, pipe devices, AI affordances; validated by `cf-mod validate`.
 - Accessibility floor: 200% scale; high-contrast overlays; color-independent state labels for material categories.
 - AI test puppet: `cfctl` puppet plays the puzzle; designer sees AI affordance reasoning in real-time.
-- Run-bundle integration: lab session emits `material.*` + `reaction.*` + `atmosphere.*` events for designer review.
+- Run-bundle integration: lab session emits `material.*` + `reaction.*` + `atmospherics.*` events for designer review.
 
 **Done-criteria:**
 - [ ] MAT-11 inspect tool works on every launch material; tooltip shows id/temperature/state/density/last reaction.
@@ -2495,11 +2504,12 @@ This track ensures the dedicated server binary `cf-server` is a first-class laun
 
 Spans M0..M12; M5.5 is the primary proof milestone. See [[spec/full-collision-physics-plan]] and [[decisions/dr-033-full-collision-physics-direction]].
 
-This track ensures the game never slips into "sprites pass through each other except for damage boxes." Everything physical must have a collision class, collision proxy, material/impulse response, and event policy. Exceptions are allowed only when explicit, tested, and replay-visible.
+This track ensures the game never slips into "sprites pass through each other except for damage boxes." Everything gameplay-physical must have mass, material/composition properties, collision class, collision proxy, material/impulse response, damage routes, AI/debug affordances, and event policy. Exceptions are allowed only when explicit, tested, and replay-visible.
 
 | Aspect | Pin |
 |---|---|
 | Default rule | Physical objects collide by default. Missing matrix entries are build/test failures. |
+| Physical profile rule | Units, limbs, armor, weapons, equipment, projectiles, debris, base modules, shields, mech parts, terrain materials, containers, batteries, and mission-critical objects must define or derive a `PhysicalProfile`: mass, material/composition, collision class/proxy, durability, damage routes, relevant thermal/electrical/pressure state, AI affordances, and inspectable debug fields. Cosmetic particles/UI-only markers/pure sensors can opt out only with a tested reason. |
 | Performance rule | No naive all-pairs. Use broadphase, spatial hash/dynamic tree, chunk proxies, CCD tiers, stable pair ordering, and low-value debris budgets. |
 | Projectile rule | Projectiles collide with units, limbs, armor, equipment, terrain, shields, base objects, and selected projectile classes. Kinetic bullet-bullet contacts deflect/fragment/lose energy unless authored otherwise. |
 | Damage rule | Contact impulse can damage limbs, armor, weapons, equipment, mech modules, terrain, shields, and base objects. |
@@ -2508,22 +2518,22 @@ This track ensures the game never slips into "sprites pass through each other ex
 | Control rule | `cfctl observe --collisions` exposes live pair state, filters, recent contacts, and collision budget status. |
 | AI rule | From M6 onward, AI perceives collision-affordance changes and emits reason labels when blocked, shoved, pinned, avoiding debris, or reacting to projectile danger. |
 
-**Done-criteria per milestone:** each milestone final audit says which new physical classes, pairs, filters, events, and perf counters were added. A gameplay object cannot become physical in art/combat without being registered in the T-PHYS matrix or explicitly declared cosmetic/sensor-only.
+**Done-criteria per milestone:** each milestone final audit says which new physical profiles, classes, pairs, filters, events, and perf counters were added. A gameplay object cannot become physical in art/combat without a `PhysicalProfile`, registration in the T-PHYS matrix, and inspectable `cfctl`/replay evidence, unless it is explicitly declared cosmetic/sensor-only with a tested reason.
 
 ---
 
 ### T-MAT — Systemic Materials, Chemistry, And Atmospheres
 
-Spans M2 (foundation) and M5.6/M5.7/M6.6/M7.5/M8.5 primary; lifelong from M5.6. See [[comparables/noita-grade-material-simulation-research]] (50-source synthesis) and [[decisions/dr-036-systemic-material-simulation-direction]].
+Spans M2 (foundation) and M5.6/M5.7/M5.9/M6.6/M7.5/M8.5 primary; lifelong from M5.6. See [[comparables/noita-grade-material-simulation-research]] (50-source synthesis), [[decisions/dr-036-systemic-material-simulation-direction]], and [[decisions/dr-037-stationeers-grade-atmospherics-direction]].
 
-This track captures the systemic material simulation: every material is a verb, every reaction has a cause chain, every hazard has an overlay/caption/replay event. The architecture is hybrid: active-region per-pixel material sim (Noita) + rigid-body collision (DR-033 / T-PHYS) + Barotrauma-style room/atmosphere networks + reaction engine + AI hazard perception + replay/event audit.
+This track captures the systemic material simulation: every material is a verb, every reaction has a cause chain, every hazard has an overlay/caption/replay event. The architecture is hybrid: active-region per-pixel material sim (Noita) + rigid-body collision (DR-033 / T-PHYS) + Stationeers-grade-or-better atmosphere/thermal networks (DR-037) + reaction engine + AI hazard perception + replay/event audit.
 
 | Aspect | Pin |
 |---|---|
 | Core kernel | `cf-material` CPU-deterministic chunked CA (64×64 per chunk default; Noita pattern); dirty rects; sleeping chunks. GPU experiments deferred until determinism + replay parity are proven. |
 | Reaction engine | Data-driven pair/triple reactions with priority, temperature, catalysts, byproducts. Every reaction emits a replay-recorded `reaction.*` event with cause chain. |
-| Room/atmosphere | `cf-atmos` Barotrauma-style hulls/gaps/pumps/vents/oxygen/pressure/fire networks. Approximate (not real-unit) per Barotrauma's own scope lesson. |
-| Pipe/power/signal | Stationeers-style atmospherics + power graph; sensor-readable + AI-controllable. Ships in M7.5 / M5.7 stubs; lives in `cf-atmos` and/or `cf-mission`. |
+| Room/atmosphere | `cf-atmos` Stationeers-grade-or-better PV=nRT atmospheres, pressure apertures, pipe networks, room sealing, suit/lung life-support, wind/liquid jets, and thermal transfer. Stationeers-grade is the minimum acceptance bar; bounded simulation beyond it is allowed with evidence. |
+| Pipe/power/signal | Stationeers-style atmospherics + power graph + thermal engineering; sensor-readable + AI-controllable. Ships in M5.9/M7.5; lives in `cf-atmos`, `cf-material`, `cf-physics`, and/or `cf-mission`. |
 | Material schema | Data-first per DR-036; fields cover movement, density, mass, hardness, thermal, ignition, phase, conductivity, wetting, reaction_tags, ingestion, container, ai_affordances, ui_overlay, performance_tier, network_replay_mode. |
 | Launch material set (17) | Air, dirt/sand, rock/concrete, metal, wood/organic, water, steam/mist, smoke, fire/heat, oil/fuel, acid, toxic sludge/liquid, toxic gas, lava, blood/vomit, electricity charge, pebble/debris. |
 | Expansion materials | Slime, brine, coolant, cryo, fuel vapor, foam, nanogel, alchemic precursor, Midas/gold-maker, biological acid/blood variants — gated behind material lab + balance review. |
@@ -2625,7 +2635,7 @@ Spans M4..M8 primary; lifelong from M4.
 
 **Done-criteria:** Every milestone's user-facing surface passes ACC-A floor.
 
-### T-PERF — Performance Targets And Budgets
+### T-PERF — Performance Targets, Multicore CPU, And GPU Budgets
 
 Spans M0..M12.
 
@@ -2639,7 +2649,21 @@ Sim runs at 60 Hz fixed island (or 120 Hz for high-refresh inputs). Render decou
 
 Per-frame budget at 4K/120: 8.33ms. Sim tick at 60Hz: 16.67ms. AI/terrain async budgets defined per milestone.
 
-**Done-criteria per milestone:** Reference scene meets the three targets.
+**Multicore/GPU contract:**
+- The game must scale on modern multi-core CPUs. CPU-heavy systems must be structured as jobs over chunks, actors, contacts, events, AI tasks, server sessions, or asset batches rather than as one giant single-thread loop.
+- Sim-authoritative deterministic work may remain CPU-side, but it must be chunked, cache-aware, and measured. Hot loops should prefer SoA/packed data, dirty regions, sleeping chunks, stable iteration order, and batch processing. Single-thread CPU work is allowed only when a benchmark shows it is comfortably below budget.
+- Rendering, particle-heavy effects, terrain texture updates, large carving/upload passes, sprite batching, and visual-only post-processing should use wgpu/Bevy render paths or custom wgpu hot paths. GPU work must not bypass replay-authoritative CPU state.
+- Material/terrain/atmosphere/physics kernels must report active chunk counts, dirty counts, candidate pairs, narrowphase pairs, culled pairs, worker queue depth, worker ms, main-thread ms, render ms, GPU upload bytes, and dropped/degraded work where applicable.
+- `cf-bench` owns repeatable perf scenarios. From M2 onward, any milestone adding a CPU/GPU hot path must add or extend a `cf-bench --profile <track>` case and record 1080p/60 status; 4K/120 and Steam Deck status are recorded as soon as the feature has visual/sim weight.
+- Optimization must preserve determinism where determinism is claimed. Parallel code must have stable reduction/order rules, deterministic chunk ordering, and replay checksum evidence.
+- Async/background systems (AI, LLM mind, networking, asset generation, server persistence, replay export) must never block the fixed-tick sim or render critical path; they use bounded queues, deadlines, and backpressure counters.
+
+**CPU/GPU budget evidence per milestone:**
+- `summary.json.performance` or `cf-bench` report includes frame/render ms, fixed-tick sim ms, main-thread ms, worker-thread ms, CPU worker count/utilization, event volume, and hot-system counters for systems touched by the milestone.
+- Final audit lists every new CPU hot path and says: `single-thread cheap`, `jobified/parallelized`, `background worker`, `GPU-assisted`, or `blocked/needs optimization`.
+- If a milestone misses a target, it must name the bottleneck, degraded mode, next optimization, and whether acceptance is blocked.
+
+**Done-criteria per milestone:** Reference scene meets the three targets where the feature is mature enough to measure; otherwise the milestone records target status, bottleneck, and next perf work. No milestone may ship a new CPU-heavy system without counters and a stated parallelization/GPU-offload posture.
 
 ---
 
@@ -3445,11 +3469,11 @@ Quick lookup: which milestone owns which feature.
 | AI hazard perception map + affordance tags | M6.6, T-MAT |
 | `material` + `reaction` event categories in run bundles | M3, M5.6 |
 | `cfctl observe --materials/--atmospheres/--reactions` | M5.6, M7.5, T-MAT |
-| Hull / gap / pump / vent / oxygen / pressure networks | M7.5, T-MAT |
-| `atmosphere` event category in run bundles | M7.5 |
+| Hull / gap / aperture / pump / vent / oxygen / pressure / thermal networks | M5.9, M7.5, T-MAT |
+| `atmospherics` event category in run bundles | M5.9, M7.5 |
 | Material lab (brush/inspect/recipe/stamp) | M8.5, T-MAT |
 | Material packs (mod content) | M8.5, T-MAT |
-| MAT-01..MAT-14 prototype slices | M5.6/M5.7/M6.6/M7.5/M8.5 |
+| MAT-01..MAT-14 + ATMOS-A prototype slices | M5.6/M5.7/M5.9/M6.6/M7.5/M8.5 |
 | AI-MAT-01..AI-MAT-08 acceptance suite | M6.6 |
 | Event taxonomy (full) | M3 |
 | Snapshots + checksums | M3 |
@@ -3556,7 +3580,7 @@ These commands are the default validation surface for implementation agents. If 
 | Material kernel suite | `cargo run -p cf-e2e -- --scenario m5_6_material_kernel --suite MAT-01,MAT-02,MAT-03,MAT-06,MAT-13 --write-run-bundle` then `cargo run -p cf-headless -- replay prototype_runs/native/<m5_6_run> --verify-checksums` | M5.6/T-MAT |
 | Hazard package suite | `cargo run -p cf-e2e -- --scenario m5_7_hazard_package --suite MAT-04,MAT-05,MAT-07,MAT-08-stub --write-run-bundle` | M5.7/T-MAT |
 | AI material competence | `cargo run -p cf-ai --bin ai_harness -- --suite AI-MAT-01..AI-MAT-08 --write-run-bundle` | M6.6/T-MAT |
-| Base atmospherics suite | `cargo run -p cf-e2e -- --scenario m7_5_base_atmospherics --suite MAT-09,MAT-10 --write-run-bundle` then `cargo run -p cf-headless -- replay prototype_runs/native/<m7_5_run> --verify-checksums` | M7.5/T-MAT |
+| Base atmospherics suite | `cargo run -p cf-e2e -- --scenario m7_5_base_atmospherics --suite MAT-09,MAT-10,ATMOS-A-16..ATMOS-A-19 --write-run-bundle` then `cargo run -p cf-headless -- replay prototype_runs/native/<m7_5_run> --verify-checksums` | M7.5/T-MAT |
 | Material lab suite | `cargo run -p cf-tools-editor -- --mode material_lab --suite MAT-11,MAT-14 --write-run-bundle` | M8.5/T-MAT |
 | Material observation stream | `cargo run -p cfctl -- observe --materials --stream --hz 30 --scope chunk:0,0` | M5.6/T-MAT |
 | Atmosphere observation stream | `cargo run -p cfctl -- observe --atmospheres --stream --hz 5 --scope all` | M7.5/T-MAT |
@@ -3617,7 +3641,9 @@ For M0..M12, a milestone is done only when all agent-completable items below are
 | Run bundle | Bundle exists under `prototype_runs/native/` and passes the checker. |
 | Replay | Required replay/checksum claims are backed by headless verification or explicitly not claimed. |
 | Collision/physics | Any new physical object has a collision class/proxy/matrix entry/event policy or a tested cosmetic/sensor/filter reason. |
+| Physical profile | Any new gameplay-physical object has mass, material/composition, durability/damage routing, and relevant temperature/electrical/container/AI/debug properties or a tested opt-out reason. |
 | Perf | Perf counters exist; T-PERF target status is recorded as pass/fail/blocked. |
+| Multicore/GPU | New CPU-heavy systems have measured hot-path budgets and a parallel/background/GPU posture; new GPU-heavy systems have render/upload counters and do not bypass replay-authoritative state. |
 | UI/accessibility | Any user-facing surface has screenshot evidence and ACC-A status when applicable. |
 | Bug hunt | Bug checklist is completed; all verified findings at every severity are fixed unless the user explicitly approved deferring an exact finding with issue ID, reason, owner, next checkpoint, and evidence path. |
 | Corefall review loop | Run `/corefall-review <milestone>` from `/Users/erol/projects/corefall` before acceptance; fix every verified issue; rerun until the verdict is `Accept` or every remaining finding has explicit user-approved deferral evidence. |
@@ -3646,7 +3672,7 @@ For M0..M12, a milestone is done only when all agent-completable items below are
 | M6.5 | MIND-001..MIND-010 pass against mock provider; local AI keeps acting through provider sleep/fail/stale; replay shows `mind` events with redacted prompts. |
 | M6.6 | AI-MAT-01..AI-MAT-08 pass; AI material competence with reason labels; AI-H regression still passes. |
 | M7 | Project owner plays Breach Contract 5 times; A-FEEL gate met. |
-| M7.5 | MAT-09, MAT-10 pass; Barotrauma-style hull/gap/pump/vent/oxygen/pressure/fire networks; mission director can author room-state objectives. |
+| M7.5 | MAT-09, MAT-10 pass; Stationeers-grade room/pipe/vent/oxygen/pressure/fire/thermal networks; breach apertures and pressure/liquid jets work; mission director can author room-state objectives. |
 | M8 | Player authors a Breach Contract variant + sample mod loads. |
 | M8.5 | MAT-11, MAT-14 pass; designer authors + exports + reloads a material puzzle in <10 minutes; community mod pack with new material loads cleanly. |
 | M9 | `cf-server` boots in all 5 modes; M9 server-core subset passes; 10-minute mission replays headlessly bit-identical; reference Docker image runs unchanged. |
@@ -3694,7 +3720,7 @@ For M0..M12, a milestone is done only when all agent-completable items below are
 | Replay nondeterminism for material kernel (T-MAT / DR-036) | Reaction order can diverge across platforms. | CPU deterministic kernel; chunk update order pinned; per-chunk material checksums; first-divergence reports; M5.6 acceptance gate. |
 | Material count balloons (T-MAT / DR-036) | Hundreds of materials would dilute readability + AI competence. | Curated launch set (17 materials); expansion gated behind material lab + balance review; new materials require inspect overlay + AI affordance + replay event before shipping. |
 | Hidden chemistry feels random (T-MAT / DR-036) | Players can't learn what they can't see. | Recipe journal; inspect tool; debrief cause chains; mission hints; rare alchemy recipes are explicitly opt-in/lab-gated. |
-| Atmosphere model conflicts with combat-base scope (T-MAT / DR-036 / DR-027) | Stationeers-grade engineering pulls focus from combat genre. | Approximate consistent rules (Barotrauma scope lesson); expose telemetry only where it serves combat genre; M7.5 done-criteria specifically reject real-unit physics. |
+| Atmosphere model conflicts with combat-base scope (T-MAT / DR-036 / DR-037 / DR-027) | Stationeers-grade-or-better engineering can pull focus from combat if every valve becomes busywork. | Keep Stationeers-grade physics as the simulation floor, but make defaults usable: good prefabs, AI automation, clear overlays, alarm reason labels, scenario difficulty knobs, and opt-in advanced tuning. M5.9/M7.5 must prove the system creates combat stories instead of spreadsheet chores. |
 | Material licensing contamination (T-MAT) | Powder Toy is GPL-3 (study-only); Barotrauma source is public-but-not-FOSS (study-only). | Custom implementation; usage-ledger entries required for any reuse; vault note `[[comparables/noita-grade-material-simulation-research]]` documents posture per source. |
 | MMO mod sync diverges on materials (T-MAT / DR-035) | Per-shard material packs could create incompatible reactions. | Server-authoritative material state; mod hash sync; material schema migration handlers; trust-tier ceiling per shard. |
 
@@ -3730,7 +3756,7 @@ This roadmap explicitly does NOT include for v1:
 - LLM-emitted executable code into a live campaign. Workbench validation is required for any future script generation.
 - Pure freeform Noita material sim (every-pixel-everywhere always active). T-MAT uses bounded active-region kernels per DR-036.
 - Hidden material chemistry without inspect/replay/AI-readable cause chains. Every reaction must be inspectable.
-- Real-unit physics simulation for atmosphere/pressure/thermal. Approximate consistent rules per DR-036 + Barotrauma's own scope lesson.
+- Unbounded CFD / every-pixel gas simulation / "real-world perfect" thermal physics. The committed target is bounded, inspectable, replay-deterministic **Stationeers-grade-or-better** atmospherics/thermal simulation per DR-037: real PV=nRT, pressure apertures, liquid/gas jets, material heat transfer, and player thermal tools inside strict perf/replay budgets.
 - Hundreds of launch materials. Curated launch set (17) + material-lab expansion path; new materials require inspect overlay + AI affordance + replay event before shipping.
 - AI walking through systemic hazards blindly. Per DR-022 fairness + DR-036 hazard perception requirement; M6.6 AI-MAT regression suite.
 - Different sim logic for client vs server in materials. Server-authoritative material state per DR-005 / DR-034 / DR-035.

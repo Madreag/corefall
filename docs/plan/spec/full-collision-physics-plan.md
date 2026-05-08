@@ -29,11 +29,39 @@ feeds:
 > [!warning] Engineering boundary
 > "Full collision" does not mean brute-force all-pairs every tick. It means every physical gameplay object has a collision identity, a collision proxy, a material/impulse response, and replay-visible contact events. Performance comes from broadphase partitioning, filters, CCD tiers, contact budgets, and simplified proxies.
 
+> [!danger] Physical profile contract
+> Every gameplay-physical thing must have a `PhysicalProfile` or equivalent data record. That includes units, limbs, armor zones, weapons, equipment, loose items, projectiles, debris, base modules, doors, turrets, shields, mech parts, terrain materials, containers, power cells, repair pads, and mission-critical objects. Cosmetic particles, UI-only markers, pure sensors, and non-gameplay VFX may opt out only with an explicit tested reason.
+
+## Physical Profile Contract
+
+Every gameplay-physical entity must define, derive, or reference these fields:
+
+| Field | Purpose |
+|---|---|
+| `mass_kg_like` | Relative weight, impulse response, push/crush behavior, recoil, carry burden, fall damage, wind/pressure force, and AI route cost. |
+| `material_id` / `material_profile` | The primary material or composite profile used for hardness, density, conductivity, flammability, thermal behavior, corrosion/acid response, wetness, armor penetration, ricochet, and damage routing. |
+| `composition_layers` | Optional layered stack for armor, chassis, weapons, tanks, doors, shields, batteries, and mechs; examples: ceramic plate over metal frame, soft tissue under armor, insulated battery shell, shield emitter casing. |
+| `collision_class` | Stable class id used by the collision matrix. |
+| `collision_proxy` | Shape/proxy used by broadphase/narrowphase/CCD. |
+| `inertia_or_handling_class` | Movement/recoil/knockback/turning handling for actors, mechs, held weapons, and loose objects. |
+| `durability_or_hp` | Damage capacity and damage-stage thresholds. |
+| `damage_routes` | What happens when hit: wound, dent, crack, jam, leak, ignite, overload, detach, rupture, crush, short, contaminate, or destroy. |
+| `temperature_state` | Temperature / heat capacity / ignition relevance when the object can burn, melt, overheat, freeze, cook off, or transfer heat. |
+| `electrical_state` | Conductivity, charge, battery/power state, short-circuit, EMP, water/electricity interaction where relevant. |
+| `container_or_pressure_state` | Contents, moles/liquid mass, pressure differential, leak/rupture thresholds for tanks, pipes, suits, base modules, batteries, canisters, magazines, fuel cells, and sealed mechs. |
+| `ai_affordances` | AI-readable facts such as heavy, fragile, conductive, explosive, cover, climbable, carryable, blocks path, dangerous when hot, useful as improvised weapon. |
+| `ui_debug_affordances` | Inspect overlay labels, captions, and `cfctl inspect` fields so players/agents understand why it behaved that way. |
+
+Composite objects are allowed. A unit is not one material: it is a physical graph of torso, limbs, organs/robot modules, armor layers, carried gear, batteries, fluids, wounds, and constraints. A mech is a graph of legs, arms, cockpit, reactor/battery, shield emitter, weapons, armor plates, actuators, tanks, and cargo. A weapon is a graph of receiver/barrel/grip/magazine/battery/fuel/coolant/damage state where those parts matter.
+
+The implementation may compress or derive fields for performance, but the authored data must be explainable through events, replay, `cfctl inspect`, and UI/debug overlays.
+
 ## Design Promise
 
 | Promise | Player-Facing Result | Implementation Contract |
 |---|---|---|
 | Bodies are physical | Actors bump, knock down, pin, trip, crush, and shove each other. | Actor bodies, limbs, armor zones, and held items register contact manifolds and impulse events. |
+| Everything has mass/material | Objects feel different because their weight and composition matter. | Every gameplay-physical object owns or derives a `PhysicalProfile`: mass, material/composition, collision class/proxy, durability, damage routes, and inspectable affordances. |
 | Equipment is physical | A rifle can be hit, jammed, knocked away, bent, blocked by a door, or used as a collision object. | Held and dropped equipment has collision proxies, mass, durability, damage stages, and contact reasons. |
 | Projectiles are physical where it matters | Bullets hit armor, terrain, shields, weapons, debris, and other bullets. Ricochets and deflections are explainable. | Fast projectiles use swept ray/capsule/shape casts; projectile-projectile pairs are selective but real for non-cosmetic rounds. |
 | Terrain is physical | Terrain blocks, carves, crumbles, catches bodies, creates hazards, and changes AI path affordances. | Chunk proxies update from dirty terrain regions; material contacts feed damage, pathing, and replay. |
@@ -43,7 +71,7 @@ feeds:
 
 ## Collision Classes
 
-Every class below needs a stable collision class id, one or more collision proxies, a default collision layer, material response data, and event hooks.
+Every class below needs a stable collision class id, one or more collision proxies, a default collision layer, physical profile data, material response data, and event hooks.
 
 | Class | Examples | Proxy Shape | Notes |
 |---|---|---|---|
@@ -302,6 +330,7 @@ Context:
 
 Hard rules:
 - Everything physical collides by default unless a tested `collision_filter_reason` says otherwise.
+- Everything gameplay-physical has mass plus material/composition properties, either authored directly or derived from a composite `PhysicalProfile`.
 - Do not brute-force all-pairs; use broadphase, collision layers, proxies, CCD tiers, and budgets.
 - Projectiles must collide with bodies, armor, equipment, terrain, shields, and selected projectile classes.
 - Kinetic bullet-bullet contacts deflect/fragment/lose energy unless the projectile profile says explosive/fuze behavior.

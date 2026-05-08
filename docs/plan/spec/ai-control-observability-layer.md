@@ -273,7 +273,7 @@ cfctl health --format json
 | M6.5 | Derive `MindObservationFrame` from this layer with fog-of-war filtering; expose `cfctl observe --mind-frame <scope>` for LLM mind workers (see [[spec/hybrid-llm-ai-plan]] and [[decisions/dr-032-hybrid-llm-ai-direction]]). |
 | M6.6 | Add AI-facing material competence observations: hazard labels, safe/unsafe material affordances, containment opportunities, and explainable avoidance/rescue decisions. |
 | M7 | Scenario director, command-core/base-power, debrief, and retry are controllable/queryable. |
-| M7.5 | Expose `cfctl observe --atmospheres`, room pressure/oxygen/toxin state, leak paths, powered doors/vents/shields, and base-life-support events for command-core/base atmospherics. |
+| M7.5 | Expose `cfctl observe --atmospheres`, room pressure/oxygen/toxin/temperature state, aperture/leak paths, liquid/gas jets, thermal links, powered doors/vents/shields, and base-life-support events for command-core/base atmospherics. |
 | M8 | Editor and mod tooling expose semantic UI and package validation commands. |
 | M8.5 | Material lab scenarios expose fixture setup, reaction assertions, material sample export/import, and player-authored material test bundles through the same control contract. |
 | M9 | `cf-server` exposes the same `cf-control` envelope for admin (capability-gated) + observation. `cfctl --target server://host:port` connects to a running server for ops/audit (see [[spec/server-app-architecture]] and [[decisions/dr-034-dedicated-server-application]]). |
@@ -305,7 +305,7 @@ The material-focused view is the mandatory debug surface for T-MAT and DR-036. `
 
 - active-region bounds, dirty cells, material ids, temperature/electric/toxic/flammable state, and material budget counters;
 - liquid/gas/solid layering, containment, leak paths, pressure, oxygen, and toxin summaries;
-- recent `material.*`, `reaction.*`, `atmosphere.*`, and `affliction.*` events with parent cause chains;
+- recent `material.*`, `reaction.*`, `atmospherics.*`, and `affliction.*` events with parent cause chains;
 - reaction explanations such as `water_neutralized_acid`, `oil_ignited_by_spark`, `toxic_gas_asphyxiated_actor`, or `electricity_conducted_through_liquid`;
 - AI-readable hazard affordances and refusal reasons;
 - first-divergence data during replay verification.
