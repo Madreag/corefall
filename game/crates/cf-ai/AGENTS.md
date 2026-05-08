@@ -8,7 +8,7 @@
 
 ## Public API Boundary
 - Types: `ReactiveGuardParams`, `ReactiveGuard`, `GuardState`, `Tactic`, `GuardTickInputs`, `EnemyTickReport`, `PerceptionRecord`, `TacticRecord`, `FireRecord`, `GuardStateTransition`, `ReactiveGuardView`.
-- Functions: `step(&mut ReactiveGuard, GuardTickInputs, &mut Rng) -> EnemyTickReport`, `ReactiveGuard::new`, `ReactiveGuard::reset`, `ReactiveGuard::checksum_bytes`, `lifetime_ticks_for_rifle`.
+- Functions: `step(&mut ReactiveGuard, GuardTickInputs, &mut Rng) -> EnemyTickReport`, `ReactiveGuard::new`, `ReactiveGuard::reset`, `ReactiveGuard::checksum_bytes`.
 
 ## Does NOT Own
 - Recorder events / run-bundle writing → `cf-control` engine emits `ai.*` and `equipment.*`/`combat.*` events from the `EnemyTickReport`.
@@ -20,7 +20,7 @@
 - Unit tests: `cargo test -p cf-ai` covers idle when player absent, engagement on player visible, no-fire during aim settle, fire after aim settles, out-of-cone non-engagement, dead-actor lock to `Dead`, deterministic same-seed playback, out-of-ammo reload, reset.
 
 ## Cross-Crate Contracts
-- Depends on: `cf-actor` (`ActorState`/`ActorId`/`Status`/`Vec2`), `cf-equipment` (`RifleSpec` only via `lifetime_ticks_for_rifle`), `cf-sim-core` (`Rng`).
+- Depends on: `cf-actor` (`ActorState`/`ActorId`/`Status`/`Vec2`), `cf-sim-core` (`Rng`).
 - Depended on by: `cf-control` (engine + scenario + observe envelope + run-bundle event emission).
 - Events emitted by the engine from an `EnemyTickReport`: `ai.ai_perception`, `ai.tactic_chosen`, `ai.state_changed`, plus `equipment.weapon_reload_started`/`weapon_reloaded`/`weapon_dry_fire`/`weapon_fired` and `combat.projectile_spawned` when fire fires this tick.
 

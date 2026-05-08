@@ -47,7 +47,6 @@
 use serde::{Deserialize, Serialize};
 
 use cf_actor::{ActorId, ActorState, Status, Vec2};
-use cf_equipment::RifleSpec;
 use cf_sim_core::Rng;
 
 /// Tunable parameters for the M1.5 reactive guard.
@@ -686,11 +685,17 @@ fn try_fire(
         self_actor.position.y + guard.params.muzzle_vertical_offset + aim_unit.y * guard.params.muzzle_forward_offset,
     ];
     // Miss roll: deterministic from the engine RNG so replays match. We pull one
-    // u64 and project it onto [0, 1).
+    // u64 and project its high 53 bits onto [0, 1). `u64::MAX as f64` would round
+    // up to 2^64 (f64 has only 52 mantissa bits), so the largest u64 values would
+    // produce exactly 1.0 and let `miss_chance == 1.0` ("always miss") still hit.
     let raw = rng.next_u64();
-    let unit_roll = (raw as f64 / u64::MAX as f64) as f32;
+    let unit_roll = ((raw >> 11) as f64 / ((1u64 << 53) as f64)) as f32;
     let miss_threshold = guard.params.miss_chance.clamp(0.0, 1.0);
-    let will_miss = unit_roll < miss_threshold;
+    // f32's ~24-bit mantissa cannot represent values strictly between (1 - 2^-24)
+    // and 1.0, so `unit_roll` can still round up to 1.0 even from the 53-bit
+    // source. Treat `miss_chance >= 1.0` as a guaranteed miss to honor the
+    // documented `[0, 1]` contract.
+    let will_miss = miss_threshold >= 1.0 || unit_roll < miss_threshold;
     let velocity = if will_miss {
         // Drift the projectile a fixed angular amount — enough to miss a 16-wide
         // actor at the maximum sight radius. The drift sign alternates by burst
@@ -730,12 +735,6 @@ fn try_fire(
         will_miss,
         lifetime_ticks,
     })
-}
-
-/// Convenience for binding the M1 rifle preset to a guard's projectile lifetime
-/// in tick-rate-aware ticks. Used by tests.
-pub fn lifetime_ticks_for_rifle(spec: &RifleSpec, tick_rate_hz: u32) -> u32 {
-    spec.projectile_max_flight_ticks(tick_rate_hz)
 }
 
 #[cfg(test)]

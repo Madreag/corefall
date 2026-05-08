@@ -782,35 +782,41 @@ impl M0Engine {
                 }
 
                 step_report = Some((tick, state.clock.sim_time_ms(), intent, report));
+            }
 
-                // M1.5: tick the mission state machine after the actor world settles.
+            // M1.5: tick the mission state machine after the actor world settles.
+            // This runs even when the scenario has no actor world so a breach-only
+            // or timer-only scenario still ticks its loss timer and objectives.
+            if state.mission.is_some() {
                 let sim_time_ms = state.clock.sim_time_ms();
-                if state.mission.is_some() {
-                    // Snapshot inputs so we can drop the actor borrow before we mutate
-                    // the mission slot. The actor world clones cheaply (BTreeMap is
-                    // O(n)); 16-actor scenarios are well within budget.
-                    let breaches_broken = state.breach_world.as_ref().map(|w| w.broken_map()).unwrap_or_default();
-                    let (actors_clone, player_clone) = {
-                        let actor_state_ref = state.actor_state.as_ref().expect("actor state present");
+                // Snapshot inputs so we can drop the actor borrow before we mutate
+                // the mission slot. The actor world clones cheaply (BTreeMap is
+                // O(n)); 16-actor scenarios are well within budget. When no actor
+                // world is loaded we feed the mission an empty actor map.
+                let breaches_broken = state.breach_world.as_ref().map(|w| w.broken_map()).unwrap_or_default();
+                let player_id = state.player_actor;
+                let (actors_clone, player_clone) = match state.actor_state.as_ref() {
+                    Some(actor_state_ref) => {
                         let actors = actor_state_ref.world.actors.clone();
-                        let player_clone = player.and_then(|pid| actors.get(&pid).cloned());
+                        let player_clone = player_id.and_then(|pid| actors.get(&pid).cloned());
                         (actors, player_clone)
-                    };
-                    let mission = state.mission.as_mut().expect("mission present");
-                    let inputs = cf_mission::MissionTickInputs {
-                        tick: tick.0,
-                        player: player_clone.as_ref(),
-                        actors: &actors_clone,
-                        breaches_broken: &breaches_broken,
-                    };
-                    let report = cf_mission::step(mission, inputs);
-                    if !report.objective_completed.is_empty()
-                        || !report.objective_started.is_empty()
-                        || !report.objective_failed.is_empty()
-                        || report.final_result.is_some()
-                    {
-                        mission_payload = Some((tick, sim_time_ms, report));
                     }
+                    None => (BTreeMap::new(), None),
+                };
+                let mission = state.mission.as_mut().expect("mission present");
+                let inputs = cf_mission::MissionTickInputs {
+                    tick: tick.0,
+                    player: player_clone.as_ref(),
+                    actors: &actors_clone,
+                    breaches_broken: &breaches_broken,
+                };
+                let report = cf_mission::step(mission, inputs);
+                if !report.objective_completed.is_empty()
+                    || !report.objective_started.is_empty()
+                    || !report.objective_failed.is_empty()
+                    || report.final_result.is_some()
+                {
+                    mission_payload = Some((tick, sim_time_ms, report));
                 }
             }
 
