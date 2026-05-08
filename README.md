@@ -411,9 +411,9 @@ cargo run -p cf-app -- --scenario micro_breach
 # Run the cf-e2e harness (auto-launches cf-app, replays script, asserts expectations)
 cargo run -p cf-e2e -- --script scripts/cfctl/micro_breach_win.cfctl.json \
     --expect mission.result=won \
-    --expect "objective.reach_extraction=Completed" \
+    --expect "objective.extract=Completed" \
     --expect breach.outer_wall.broken=true \
-    --expect "enemy.guard_2.state=Dead"
+    --expect "enemy.2.state=Dead"
 ```
 
 Post-M5+ CLI extensions (atmospherics, materials, gravity, ballistics, origin-state, suit, pipe-network, room) are documented in [the canonical roadmap](https://github.com/Madreag/corefall#research-vault).

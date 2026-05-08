@@ -677,7 +677,7 @@ fn sync_actor_state_to_render(
             let d2 = (cx - px) * (cx - px) + (cy - py) * (cy - py);
             hud_state.breach = Some(HudBreach {
                 id: b.id.clone(),
-                material: b.refusal_reason.clone().unwrap_or_default(),
+                material: b.material.clone(),
                 hp: b.hp,
                 max_hp: b.max_hp,
                 broken: b.broken,

@@ -1525,6 +1525,7 @@ impl M0Engine {
             for s in world.iter() {
                 snapshot.breaches.push(BreachRenderView {
                     id: s.id.clone(),
+                    material: s.material.clone(),
                     bbox_min: s.bbox_min,
                     bbox_max: s.bbox_max,
                     hp: s.hp,
@@ -1735,6 +1736,7 @@ pub struct EnemyHudView {
 #[derive(Debug, Clone)]
 pub struct BreachRenderView {
     pub id: String,
+    pub material: String,
     pub bbox_min: [f32; 2],
     pub bbox_max: [f32; 2],
     pub hp: f32,
