@@ -28,10 +28,10 @@ Before implementing a milestone, read the canonical vault directly. If any path 
 For milestone scope and acceptance, documents are not peers. Use this authority order every time:
 
 1. The user's current assignment or explicit correction.
-2. The assigned milestone section in `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md`.
+2. The Roadmap V2 Build Points layer + the assigned milestone section in `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md`. The Build Points table (BP0..BP12) bundles related milestones; if a BP is the assignment, every milestone inside it is in scope.
 3. The assigned milestone task cards in `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/native-implementation-backlog.md`.
 4. DRs/spec files that the roadmap or backlog explicitly links for that milestone.
-5. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/feature-completion-checklist.md` as tracking and evidence only.
+5. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/feature-completion-checklist.md` (which now contains both per-milestone rows AND a Build Points Checklist addendum) as tracking and evidence only.
 6. Implementation logs, `CHANGELOG.md`, run bundles, notes, review reports, and handoff summaries as evidence only.
 
 If a lower-authority file says a roadmap/backlog requirement is deferred, partial, unnecessary, or complete, that claim is invalid unless the roadmap/backlog was changed first with explicit user approval. Do not use evidence files to redefine milestone scope.
@@ -42,6 +42,18 @@ When files conflict:
 - Linked DR/spec wins only for the detailed shape of an item already in roadmap/backlog scope.
 - Checklist/log/changelog/run-bundle claims must be corrected to match the roadmap/backlog, not the other way around.
 - If the roadmap and backlog disagree on a material requirement, stop and ask the user before implementing or marking completion.
+
+### Build Point Closure Gate
+
+A Build Point is complete only when:
+
+- Every milestone inside the BP PASSES the Milestone Acceptance Gate (ID-by-ID matrix below).
+- Every milestone inside the BP PASSES the Contract Integrity Gate (matrix below) with positive AND negative/adversarial proof.
+- Run-bundle evidence exists for every fun-proof slice inside the BP at multiple tick rates (60 Hz default + 120 Hz validation, more if the BP touches network/server/replay cadence).
+- `/corefall-review <bp>` verdict is `Accept` for the full BP scope, not just one milestone inside it.
+- The per-BP human-playtest survey is recorded in `prototype_runs/native/<bp>_*` notes — answering the question "did the new systems make the game more fun than the previous BP?" with concrete observations. The survey is mandatory; a green Acceptance Matrix without a recorded playtest answer is not a closed BP.
+
+Do not call a BP closed from prose. Closure is the per-milestone Acceptance + Contract Integrity matrices PLUS the playtest survey row PLUS the BP-level review verdict.
 
 ## Milestone Acceptance Gate
 
@@ -203,7 +215,7 @@ Do not put source code in the planning vault. Do not copy the whole vault into t
 
 ## Per-Crate AGENTS.md
 
-Once `game/` is bootstrapped as a workspace with crates, every crate ships its own `AGENTS.md` per the `Per-Crate AGENTS.md Template` section in `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md`. The crate's `AGENTS.md` is the boundary contract:
+Every crate under `game/crates/cf-*/` ships its own `AGENTS.md` per the `Per-Crate AGENTS.md Template` section in `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md`. The crate's `AGENTS.md` is the boundary contract:
 
 - Owns
 - Public API Boundary
@@ -213,7 +225,7 @@ Once `game/` is bootstrapped as a workspace with crates, every crate ships its o
 - Common Pitfalls
 - Source Trail
 
-M0's task cards include creating the first set of per-crate AGENTS.md files alongside the workspace scaffold.
+The first set of per-crate `AGENTS.md` files landed at M0 alongside the workspace scaffold. Any milestone that promotes a stub crate to a real implementation (M1 promoted cf-actor / cf-physics / cf-equipment / cf-render-2d / cf-ui; M1.5 promoted cf-mission / cf-terrain / cf-ai / cf-e2e) MUST update that crate's `AGENTS.md` from the M0 stub framing to the new owned/public/pitfall surface in the same pass.
 
 ## Standard Validation
 
@@ -224,13 +236,17 @@ cargo fmt --all --check
 cargo check --workspace --all-targets
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
+cargo run -p cf-control --example dump_schemas -- --check
+cargo run -p cf-mod -- validate content/
 cargo run -p cfctl -- observe --once
-python3 /Users/erol/projects/cortex-command-repos-all/research_tools/prototype_run_check.py /Users/erol/projects/corefall/prototype_runs/native/<run_id>
+python3 /Users/erol/projects/corefall/game/tools/prototype_run_check.py /Users/erol/projects/corefall/prototype_runs/native/<run_id>
 ```
 
-Milestones with gameplay/tool UI also require a scripted E2E command and a screenshot/capture artifact listed in `summary.json.artifacts`.
+The vendored `game/tools/prototype_run_check.py` is the canonical CI checker (the original lives in `cortext_command_vault/research_tools/` but the `game/tools/` copy is what M0+ landed and what GitHub Actions runs). Use the `game/tools/` path for any milestone validation.
 
-`cfctl` lives at `game/crates/cfctl/`. Invoke as `cargo run -p cfctl -- <subcommand>` during M0..M1; once installed or added to PATH, `cfctl <subcommand>` is shorthand. The full CLI surface is pinned in the canonical `CLI Reference` section of `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md`.
+Milestones with gameplay/tool UI also require a scripted E2E command (`cargo run -p cf-e2e -- --script <path> --expect <key>=<value>`) and a screenshot/capture artifact listed in `summary.json.artifacts`.
+
+`cfctl` lives at `game/crates/cfctl/`. Invoke as `cargo run -p cfctl -- <subcommand>` until it is installed or added to PATH; once installed, `cfctl <subcommand>` is shorthand. The full CLI surface is pinned in the canonical `CLI Reference` section of `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md`. The currently-shipped subset (M0+M1+M1.5) is mirrored in the corefall `README.md` CLI Reference table.
 
 ## Run-Bundle Naming
 
@@ -297,8 +313,9 @@ Required completion actions:
 12. Report the performance/config audit for the milestone: which tick rates, frame rates, solver rates, network rates, replay cadences, CPU worker counts, thread-pool behavior, GPU upload/render budgets, and quality budgets are configurable; which values were validated; and why any fixed constant or single-thread hot path is allowed.
 13. Run `/corefall-review <milestone>` from `/Users/erol/projects/corefall`, fix every verified finding at every severity, and rerun `/corefall-review <milestone>` until the verdict is `Accept`. If the user explicitly defers a finding, record the deferral ID, reason, owner, next checkpoint, and evidence path.
 14. Report the Contract Integrity Matrix proving shared code paths, required-field rejection, fake-success absence, source-truthful evidence, and checklist truth.
+15. If the milestone closes the last open milestone inside an active Build Point, also: rerun `/corefall-review <bp>` for the full BP scope, update the Build Points Checklist row in `feature-completion-checklist.md`, and record the human-playtest survey in `prototype_runs/native/<bp>_*` notes (answering whether the new BP is more fun than the previous BP, with concrete observations from the fun-proof slice). A BP cannot be reported as closed without the survey row.
 
-Do not mark work complete if the checklist/roadmap updates are skipped. Do not mark work complete if any roadmap done-criterion or backlog task card is deferred, partial, or only documented as future work. Do not mark work complete until `/corefall-review <milestone>` has been run and rerun to `Accept`, unless every remaining verified finding has explicit user-approved deferral evidence. Do not mark work complete if the Contract Integrity Matrix is missing positive and negative/adversarial proof for each contract path. Do not mark work complete if a performance-sensitive value is hardcoded without roadmap/backlog authority and a config-path explanation. If a task genuinely does not affect the roadmap, record "roadmap update not needed" in the implementation log and explain why.
+Do not mark work complete if the checklist/roadmap updates are skipped. Do not mark work complete if any roadmap done-criterion or backlog task card is deferred, partial, or only documented as future work. Do not mark work complete until `/corefall-review <milestone>` has been run and rerun to `Accept`, unless every remaining verified finding has explicit user-approved deferral evidence. Do not mark work complete if the Contract Integrity Matrix is missing positive and negative/adversarial proof for each contract path. Do not mark work complete if a performance-sensitive value is hardcoded without roadmap/backlog authority and a config-path explanation. Do not mark a Build Point closed without the per-BP human-playtest survey row in the run bundle. If a task genuinely does not affect the roadmap, record "roadmap update not needed" in the implementation log and explain why.
 
 ## Reference Repos And Reuse
 
@@ -410,10 +427,17 @@ Search for this signature when auditing recent PR history. These are NOT human c
 
 ## Starting Point
 
-Unless the user assigns a different target, start with:
+Roadmap V2 (2026-05-08) is now authoritative. The implementation spine progresses through Build Points (BP0..BP12); each BP bundles related milestones and closes only when every milestone inside it PASSES the Acceptance + Contract Integrity Gates AND the per-BP human-playtest gate is recorded in `prototype_runs/native/<bp>_*` notes.
 
-1. M0 - Engine Bootstrap
-2. M1 - Actor Controller And Sim Core
-3. M1.5 - Micro Breach Fun Slice
+Closed Build Points (do NOT re-implement; treat as reference + regression surface):
 
-Do not skip M1.5. It exists because the actor-feel lab alone was too sterile; the project needs early fun evidence before deeper systems attach.
+- **BP0** — M0 Engine Bootstrap.
+- **BP1** — M1 Actor Controller And Sim Core + M1.5 Micro Breach Fun Slice.
+
+Active Build Point (default starting target unless the user assigns a different one):
+
+- **BP2** — M2 Pixel Terrain And Materials + M2.5 Micro Reactor Defense.
+
+When BP2 closes, the next default is BP3 (M3A/M3B replay + M4A/M4B comic-noir UI).
+
+Do not skip the micro-fun-slice interlude inside any BP that has one (M1.5 in BP1, M2.5 in BP2, M5.5.5 in BP5, M5.9.5 in BP7). Every interlude exists because each major systems milestone needs *fun* evidence before the next BP unlocks; the actor-feel lab alone was too sterile, the terrain kernel alone is just deformation, and so on. The interlude is a 60-90 s scenario driven by `cfctl` scripts + cf-e2e expectations + run-bundle evidence at multiple tick rates, gated by the human-playtest survey for that BP.

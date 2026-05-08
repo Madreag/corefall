@@ -20,14 +20,17 @@ A 2D side-view physics sandbox where every gas, grain, bullet, body, world, and 
 [![Windows](https://img.shields.io/badge/Windows-supported-0078D6?style=flat-square&logo=windows&logoColor=white)](#)
 [![Steam Deck](https://img.shields.io/badge/Steam_Deck-floor_target-1A9FFF?style=flat-square&logo=steamdeck&logoColor=white)](#)
 
-[![Status](https://img.shields.io/badge/status-pre--alpha%20%28M0%20%2B%20M1%20%2B%20M1.5%20closed%2C%20M2%20next%29-orange?style=flat-square)](#project-status)
+[![Status](https://img.shields.io/badge/status-pre--alpha%20%28BP1%20%E2%9C%93%20%E2%80%94%20M0%20%2B%20M1%20%2B%20M1.5%20closed%2C%20BP2%20next%29-orange?style=flat-square)](#project-status)
+[![Build Points](https://img.shields.io/badge/Build_Points-BP1%20closed%20%2F%20BP2%20active-2EA043?style=flat-square)](#build-points)
+[![Roadmap V2](https://img.shields.io/badge/roadmap-V2%202026--05--08%20additive-8A2BE2?style=flat-square)](#roadmap-shape)
 [![Vault](https://img.shields.io/badge/research-research%20vault-purple?style=flat-square)](https://github.com/Madreag/corefall#research-vault)
 
-**Current proof:** M0 + M1 + M1.5 closed. Micro Breach Fun Slice plays end-to-end: the player spawns west, digs through a soft concrete wall (concrete_soft) while a metal-nohook anchor refuses dig, fights one reactive guard with deterministic seeded miss rolls + utility-scored tactics, and reaches the eastern extraction zone within 90 seconds — or dies trying. cf-e2e drives the win script in ~430 ticks (4/4 expectations PASS) and the loss script in ~1015 ticks (3/3 expectations PASS). Mission state machine emits `mission.objective_started/completed/failed/mission_resolved`; reactive enemy emits `ai.ai_perception/tactic_chosen/state_changed`; soft breach emits `terrain.tool_action_started/terrain_carved/tool_refused`. Run bundles validate at 60 Hz and 120 Hz.<br>
-**Next up:** M2 — Pixel Terrain And Materials. Chunked terrain replaces the M1.5 soft-breach strip without breaking replay consumers.<br>
+**Current proof:** **BP1 closed.** M0 + M1 + M1.5 all PASS the Milestone Acceptance Gate + Contract Integrity Gate. The Micro Breach Fun Slice plays end-to-end: the player spawns west, digs through a soft concrete wall (`concrete_soft`) while a `metal_nohook` anchor refuses dig, fights one reactive guard with deterministic seeded miss rolls + utility-scored tactics, and reaches the eastern extraction zone within 90 seconds — or dies trying. cf-e2e drives the win script in ~430 ticks (4/4 expectations PASS) and the loss script in ~1015 ticks (3/3 expectations PASS). Mission state machine emits `mission.objective_started/completed/failed/mission_resolved`; reactive enemy emits `ai.ai_perception/tactic_chosen/state_changed`; soft breach emits `terrain.tool_action_started/terrain_carved/tool_refused`. Run bundles validate at 60 Hz and 120 Hz with byte-identical determinism evidence at the same seed.<br>
+**Next up:** **BP2 — Material Storytelling.** Anchored at M2 (Pixel Terrain + Materials) with M2.5 (Micro Reactor Defense) as the BP2 fun-proof interlude before BP3 unlocks. Chunked terrain replaces the M1.5 soft-breach strip without breaking replay consumers.<br>
+**PR queue:** [#5 — `m1-5/micro-breach-fun-slice`](https://github.com/Madreag/corefall/pull/5) is in CI + Cursor Bugbot review.<br>
 **Roadmap lock:** server-authoritative multiplayer, deterministic replay, Stationeers-grade-or-better atmospherics/thermal simulation, full physical profiles, AI-only art/audio pipeline, modder-parity tooling, accessibility-plus, Steam Deck floor, and no pay-to-win.
 
-**[Project status](#project-status) · [Roadmap shape](#roadmap-shape) · [Tech stack](#tech-stack) · [Getting started](#getting-started) · [CI](#ci)**
+**[Project status](#project-status) · [Build Points](#build-points) · [Roadmap shape](#roadmap-shape) · [Tech stack](#tech-stack) · [Getting started](#getting-started) · [CI](#ci)**
 
 </div>
 
@@ -52,7 +55,7 @@ This is not a Cortex Command remake. It is a **best-of-genre synthesis** that ta
 
 ## Roadmap Shape
 
-The roadmap now covers **57 closed/directional decision records**, **28 production/content/launch milestones**, and **33 side tracks** in the canonical vault. The repo should be read as the executable slice of that plan, not the whole design database.
+The canonical roadmap now covers **57 closed/directional decision records**, **31 sequenced milestones** (24 gameplay-spine + 3 micro-fun-slice interludes + 4 split sub-milestones from M3/M4), **17 side tracks** including 4 dedicated production tracks (art, narrative, localization, live-ops), and a **13-step Build Points layer (BP0..BP12)** that bundles related milestones into shippable proof slices. The Roadmap V2 (2026-05-08) additive pass kept every prior milestone/DR id stable; BPs and micro-fun interludes layered *on top of* M0..M12 without renaming anything. The repo should be read as the executable slice of that plan, not the whole design database.
 
 | Area | Current Direction |
 |---|---|
@@ -64,6 +67,36 @@ The roadmap now covers **57 closed/directional decision records**, **28 producti
 | Accessibility | ACC-A floor plus cognitive, motor, hearing, reading, and sensory presets. Captions, full subtitles, reduced motion/shake/flash, UI scaling, high contrast, remap/hold alternatives, and screen-reader paths are roadmap gates. |
 | Modding | Modders extend chassis, weapons, materials, atmospheres, missions, AI doctrines, audio, animations, scripts, factions, localization, and test runs with the same schema-first pipeline as the base game. |
 | Monetization posture | Premium one-time purchase direction, free modding, community-hostable servers, no pay-to-win. Optional cosmetic-only gacha/battle-pass hooks are late-cycle, dormant/default-off systems and require a future activation DR. |
+| Production T-tracks | 4 dedicated late-anchored tracks ride alongside the gameplay spine: **T-CONTENT-ART** (AI-authored art/animation/VFX/decals/lighting/music/SFX/launch roster), **T-CONTENT-NARRATIVE** (~80,000 words bible/codex/dialogue), **T-LOCALIZATION** (Project Fluent + 11 Tier-A langs + 8 Tier-B UI-only + mod-localization), **T-LIVEOPS** (telemetry, marketing, Steam, legal, post-launch ops). Each finalizes at BP12; placeholder generation begins at BP3+. |
+| Micro-fun-slice cadence | After every major systems milestone, a short interlude proves the new system is *fun* before the next one stacks on top: M1.5 (breach), M2.5 (reactor defense), M5.5.5 (sabotage with collision + breach), M5.9.5 (pressure hold). Each is a 60-90 s scenario driven by cfctl, validated by run bundles, gated by a human-playtest survey before the next BP unlocks. |
+
+---
+
+## Build Points
+
+The Roadmap V2 layer groups gameplay milestones into **13 Build Points (BP0..BP12)**. A Build Point is a shippable proof slice — when a BP closes, every milestone inside it has the Acceptance Matrix + Contract Integrity Matrix + Performance/Config Audit + run-bundle evidence, *and* the human-playtest gate has been passed. BPs do not replace milestones; they bundle them.
+
+| BP | Anchor | Bundles | Fun-Proof Slice | Status |
+|---:|---|---|---|---|
+| **BP0** | Engine bootstrap | M0 | (kickoff smoke) | ✅ Closed |
+| **BP1** | Actor controller + breach fun proof | M1 + M1.5 | M1.5 Micro Breach | ✅ **Closed (current)** |
+| **BP2** | Material storytelling | M2 + M2.5 | M2.5 Micro Reactor Defense | 🟢 Active |
+| **BP3** | Replay + comic-noir UI | M3A + M3B + M4A + M4B | (UI is the proof) | ⏳ Planned |
+| **BP4** | Equipment + chassis grammar | M5 | (slot/wreck/eject scripted scenario) | ⏳ Planned |
+| **BP5** | Full collision gauntlet + sabotage proof | M5.5 + M5.5.5 | M5.5.5 Micro Sabotage | ⏳ Planned |
+| **BP6** | Material kernel + hazards | M5.6 + M5.7 | (chained-reaction debrief) | ⏳ Planned |
+| **BP7** | Origin + atmospherics + pressure-hold proof | M5.8 + M5.9 + M5.9.5 + M5.10 | M5.9.5 Micro Pressure Hold | ⏳ Planned |
+| **BP8** | AI core + LLM mind + material competence | M6 + M6.5 + M6.6 | (8-criteria humanlike bar) | ⏳ Planned |
+| **BP9** | Mission director + base atmospherics | M7 + M7.5 + M7.7 | (proof mission A-FEEL gate) | ⏳ Planned |
+| **BP10** | Editor + mod tools + material lab | M8 + M8.5 + M8.6 | (modder parity smoke) | ⏳ Planned |
+| **BP11** | Networking spine | M9 + M9.5 | (LAN co-op smoke) | ⏳ Planned |
+| **BP12** | Online co-op + PvP + MMO + launch | M10 + M11 + M12 + production T-track finalization | (launch GA build) | ⏳ Planned |
+
+**Build Point closure gate:** Every BP closeout requires (a) every milestone inside it PASS in the Acceptance Matrix, (b) the Contract Integrity Matrix proving shared code paths + negative/adversarial proof, (c) run-bundle evidence for every fun-proof slice at multiple tick rates, (d) `/corefall-review <bp>` verdict = `Accept`, and (e) the per-BP human-playtest gate (Did the new systems make the game more fun than the previous BP? — recorded in `prototype_runs/native/<bp>_*` notes).
+
+**Production-track wiring:** T-CONTENT-ART, T-CONTENT-NARRATIVE, T-LOCALIZATION, and T-LIVEOPS run alongside the BP spine but only finalize at BP12. They begin placeholder generation at BP3+ so the gameplay spine isn't blocked on art/audio/copy/legal.
+
+See [`cortext_command_vault/spec/prototype-roadmap.md`](https://github.com/Madreag/corefall#research-vault) for the full BP table, milestone-map gap fills, done-criteria summary, kickoff smoke commands, and inter-milestone bridge contracts.
 
 ---
 
@@ -188,39 +221,39 @@ We **also** lean on the open Rust gamedev ecosystem: [Bevy](https://bevyengine.o
 
 ## The Workspace
 
-29 crates today (see [game/Cargo.toml](game/Cargo.toml)). Each crate carries its own `AGENTS.md` boundary contract.
+29 crates today (see [game/Cargo.toml](game/Cargo.toml)). Each crate carries its own `AGENTS.md` boundary contract. Crates marked **(real)** have shipped real implementations; the rest are stubs that will fill in at their owning milestone.
 
 ```text
 game/crates/
-├── cf-app                  # Bevy app shell + window
-├── cf-sim-core             # fixed-tick scheduler + RNG + checksum
-├── cf-control              # JSON-RPC 2.0 control surface (cf-control)
-├── cfctl                   # operator CLI (observe, run, scenario, settings, runbundle, system)
-├── cf-replay               # run-bundle writer + event envelope
-├── cf-actor                # actor records + control intent
-├── cf-equipment            # role records + slot model
-├── cf-chassis              # armor zones + modules + pilot binding
-├── cf-physics              # collision matrix + CCD + impulse routing + GravityField (post-M5.5)
-├── cf-terrain              # pixel terrain + chunk grid (post-M2)
-├── cf-material             # systemic material kernel (post-M5.6)
-├── cf-atmos                # Stationeers-grade-or-better atmospherics + thermal kernel (post-M5.9)
-├── cf-mission              # mission director + objectives
-├── cf-ai                   # perception + utility + doctrine + LLM mind hooks
-├── cf-net                  # client/server transport (post-M9)
-├── cf-render-2d            # wgpu 2D pipeline
-├── cf-ui                   # comic-noir UI presentation
-├── cf-audio                # sound + captions
-├── cf-save                 # versioned .cfsave format
-├── cf-mod                  # content schema validator + manifest
-├── cf-tools-editor         # in-engine scenario / package / mod editors
-├── cf-headless             # CI-friendly headless runner
-├── cf-bench                # perf benchmark harness
-├── cf-e2e                  # scripted end-to-end runner
-├── cf-server               # multi-mode dedicated server (coop_room/pvp_arena/lan_room/mmo_shard/lobby_directory)
-├── cf-server-ops           # ops dashboards + observability
-├── cf-server-persistence   # MMO shard persistence
-├── cf-server-anti-cheat    # anti-cheat foundation
-└── cf-server-admin         # admin tooling
+├── cf-app                  # (real)  Bevy app shell + window + keyboard input + render bridge
+├── cf-sim-core             # (real)  fixed-tick scheduler + RNG + checksum
+├── cf-control              # (real)  JSON-RPC 2.0 control surface (cf-control engine + server)
+├── cfctl                   # (real)  operator CLI (observe, run, scenario, settings, runbundle, system, act.player.*)
+├── cf-replay               # (real)  run-bundle writer + event envelope
+├── cf-actor                # (real)  actor records + control intent + sim step + projectile + status state machine
+├── cf-equipment            # (real)  role records + rifle spec + tick-rate-independent timing
+├── cf-physics              # (real)  kinematics + ground collision + jump + recoil; M5.5 swaps in DR-033 collision matrix
+├── cf-terrain              # (real)  M1.5: BreachStrip + BreachWorld + try_dig with M2-compatible event payloads; M2 replaces with chunked terrain
+├── cf-mission              # (real)  M1.5: Objective/MissionState/MissionView + objective state machine
+├── cf-ai                   # (real)  M1.5: ReactiveGuard FSM + utility scoring + scripted aim-settle + DR-008 LEAN
+├── cf-render-2d            # (real)  wgpu 2D pipeline + actor + breach + extraction-zone sprite systems
+├── cf-ui                   # (real)  comic-noir UI presentation (10-line HUD: STATUS / ITEM / HP / Reticle / OBJECTIVE / MISSION / ENEMY / BREACH / EVENT)
+├── cf-e2e                  # (real)  M1.5: scripted end-to-end runner with auto-launch + --expect <key>=<value> assertions
+├── cf-mod                  # (real)  content schema validator + manifest walker
+├── cf-chassis              # stub    armor zones + modules + pilot binding (M5)
+├── cf-material             # stub    systemic material kernel (M5.6 / DR-036)
+├── cf-atmos                # stub    Stationeers-grade-or-better atmospherics + thermal kernel (M5.9 / DR-037)
+├── cf-net                  # stub    client/server transport (M9)
+├── cf-audio                # stub    sound + captions (M4..M7)
+├── cf-save                 # stub    versioned .cfsave format (M5..M9)
+├── cf-tools-editor         # stub    in-engine scenario / package / mod editors (M8)
+├── cf-headless             # stub    CI-friendly headless runner
+├── cf-bench                # stub    perf benchmark harness
+├── cf-server               # stub    multi-mode dedicated server (M9: coop_room/pvp_arena/lan_room/mmo_shard/lobby_directory)
+├── cf-server-ops           # stub    ops dashboards + observability (M9)
+├── cf-server-persistence   # stub    MMO shard persistence (M12)
+├── cf-server-anti-cheat    # stub    anti-cheat foundation (M11)
+└── cf-server-admin         # stub    admin tooling (M9)
 ```
 
 ---
@@ -230,31 +263,41 @@ game/crates/
 > [!warning] Pre-alpha
 > Corefall is in active development. The repo is public so CI can run unrestricted (free GitHub Actions minutes for public repos), but the game is **not** ready to play yet.
 
-| Milestone | Status | What It Proves |
-|---|---|---|
-| **M0 — Engine Bootstrap** | ✅ **Closed** ([PR #1](https://github.com/Madreag/corefall/pull/1) merged) | 29-crate workspace, JSON-RPC control plane, cfctl, replay run-bundle writer, deterministic 60 Hz / 120 Hz sim, panic capture, CI matrix on Linux + macOS + Windows. |
-| **M1 — Actor Controller And Sim Core** | ✅ **Closed** ([PR #2](https://github.com/Madreag/corefall/pull/2) merged) | Single playable actor with movement, jump, aim, rifle fire, reload, status state machine, projectile flight, and damage routing — all through the fixed-tick sim. Seven `act.player.*` JSON-RPC methods route human + cfctl + AI input through one shared dispatch path. Tick-rate-independent rifle timing (10 RPS / 1.5 s reload identical at 60 Hz and 120 Hz). |
-| **M1.5 — Micro Breach Fun Slice** | ✅ **Closed** | 60-90 s win/loss scenario plays end-to-end via cfctl scripts driving the same dispatch path as the keyboard; reactive guard with DR-008 LEAN (jobs + utility + scripted hooks) fires deterministic seeded miss rolls; soft breach emits M2-compatible `terrain_carved` events; mission state machine emits `objective_*` + `mission_resolved`; cf-e2e asserts win=4/4 + loss=3/3 expectations against observe.once snapshots. |
-| M2 — Pixel Terrain And Materials | ⏳ Planned | Deformable terrain + material kernel scaffold. |
-| M3 — Replay And Event Recorder | ⏳ Planned | DR-002 v1 lock — full event recorder + viewer. |
-| M4 — HUD And Comic-Noir UI | ⏳ Planned | Silhouette HUD + module strip + accessibility floor. |
-| M5 — Equipment, Chassis, And Damage Grammar | ⏳ Planned | Per-origin chassis records + damage stages + wreck/eject/salvage. |
-| M5.5 — Full Collision Gauntlet | ⏳ Planned | DR-033 closure: full collision + projectile-projectile + CCD tiers + universal gravity field integration. |
-| M5.6 — Material Kernel | ⏳ Planned | DR-036 partial closure: chunked CA + reaction table + density layering. |
-| M5.7 — Hazard Package | ⏳ Planned | Acid + electricity + debris + ingestion + affliction layer. |
-| **M5.8 — Origin Resource & Overclock Pass** | 🆕 Proposed | Per-origin reaction matrix runtime: humans concuss, androids battery-drain, robots overclock + leak coolant. G-Force vision blackout HUD. |
-| **M5.9 — Atmospherics-Grade Kernel** | 🆕 Proposed | DR-037 closure: Stationeers-grade-or-better PV=nRT, 10 launch gases + 6 liquid mixtures, combustion, phase change, pipe networks, suit life-support, pressure apertures, liquid/gas jets, material heat transfer, thermal tools, per-planet ambient, and universal-gravity ballistic drag. |
-| M6 — AI Core And Trust Harness | ⏳ Planned | DR-022 8-criteria humanlike bar testable. |
-| M6.5 — LLM Mind Lab | ⏳ Planned | Async LLM mind layer; local AI never blocks; no API key required. |
-| M6.6 — AI Material Competence | ⏳ Planned | AI hazard perception with reason labels. |
-| M7 — Mission Director And Breach Contract | ⏳ Planned | Proof mission. A-FEEL gate. |
-| M7.5 — Base Atmospherics (extended for Stationeers-grade-or-better per DR-037) | ⏳ Planned | Base modules wired into M5.9 kernel: pumps, vents, pressure doors, breach repair, heaters/coolers, radiators, coolant loops, emergency venting, and room-state mission objectives. |
-| M8 — Scenario Editor And Mod Tools | ⏳ Planned | First-class in-engine editor at launch. |
-| M8.5 — Material Lab | ⏳ Planned | Material/reaction lab for promotions to launch set. |
-| M9 — Dedicated Server App | ⏳ Planned | `cf-server` multi-mode binary; SERVER-001..016 acceptance suite begins. |
-| M10 — LAN Co-op | ⏳ Planned | Local 2-4 player co-op. |
-| M11 — Online Co-op (Self-Hosted Dedicated Servers) | ⏳ Planned | Community-hostable online co-op. |
-| M12 — Public PvP Arenas + Persistent MMO Shards | ⏳ Planned | DR-035 MMO-001..012 readiness gate. |
+| BP | Milestone | Status | What It Proves |
+|---:|---|---|---|
+| BP0 | **M0 — Engine Bootstrap** | ✅ **Closed** ([PR #1](https://github.com/Madreag/corefall/pull/1) merged) | 29-crate workspace, JSON-RPC control plane, cfctl, replay run-bundle writer, deterministic 60 Hz / 120 Hz sim, panic capture, CI matrix on Linux + macOS + Windows. |
+| BP1 | **M1 — Actor Controller And Sim Core** | ✅ **Closed** ([PR #2](https://github.com/Madreag/corefall/pull/2) merged) | Single playable actor with movement, jump, aim, rifle fire, reload, status state machine, projectile flight, and damage routing — all through the fixed-tick sim. Seven `act.player.*` JSON-RPC methods route human + cfctl + AI input through one shared dispatch path. Tick-rate-independent rifle timing (10 RPS / 1.5 s reload identical at 60 Hz and 120 Hz). |
+| BP1 | **M1.5 — Micro Breach Fun Slice** | ✅ **Closed** ([PR #5](https://github.com/Madreag/corefall/pull/5) in review) | 60-90 s win/loss scenario plays end-to-end via cfctl scripts driving the same dispatch path as the keyboard; reactive guard with DR-008 LEAN (jobs + utility + scripted hooks) fires deterministic seeded miss rolls; soft breach emits M2-compatible `terrain_carved` events; mission state machine emits `objective_*` + `mission_resolved`; cf-e2e asserts win=4/4 + loss=3/3 expectations against observe.once snapshots. |
+| BP2 | M2 — Pixel Terrain And Materials | 🟢 **Active** | Deformable chunked terrain + material kernel scaffold. Replaces M1.5 soft-breach strip without breaking replay consumers. |
+| BP2 | **M2.5 — Micro Reactor Defense** | 🆕 V2 | Fun-proof interlude after M2: 60-90 s defend a reactor core while terrain is dug, voxels collapse, debris field forms. cfctl-scripted; same Acceptance + Contract Integrity gates as M1.5. |
+| BP3 | **M3A — Event Recorder Core** | 🆕 V2 split | DR-002 v1 lock — full event recorder, taxonomy, parent-link cause chains, schema-versioned envelope. |
+| BP3 | **M3B — Replay Viewer + Debrief** | 🆕 V2 split | Replay viewer scrubbing, debrief summary, AI reason-label timeline, pause/resume/step/seek. |
+| BP3 | **M4A — Readability + ACC-A Floor** | 🆕 V2 split | Silhouette HUD + module strip + comic-noir tone foundation + accessibility floor. |
+| BP3 | **M4B — Comic-Noir Polish** | 🆕 V2 split | Visual polish, captions, reduced-motion / shake / flash, full-subtitle pipeline, screen-reader paths. |
+| BP4 | M5 — Equipment, Chassis, And Damage Grammar | ⏳ Planned | Per-origin chassis records + damage stages + wreck/eject/salvage. |
+| BP5 | M5.5 — Full Collision Gauntlet | ⏳ Planned | DR-033 closure: full collision + projectile-projectile + CCD tiers + universal gravity field integration. |
+| BP5 | **M5.5.5 — Micro Sabotage** | 🆕 V2 | Fun-proof interlude after M5.5: 60-90 s breach + sabotage scenario combining collision physics with the M1.5 breach pattern. |
+| BP6 | M5.6 — Material Kernel | ⏳ Planned | DR-036 partial closure: chunked CA + reaction table + density layering. |
+| BP6 | M5.7 — Hazard Package | ⏳ Planned | Acid + electricity + debris + ingestion + affliction layer. |
+| BP7 | M5.8 — Origin Resource & Overclock Pass | ⏳ Planned | Per-origin reaction matrix runtime: humans concuss, androids battery-drain, robots overclock + leak coolant. G-Force vision blackout HUD. |
+| BP7 | M5.9 — Atmospherics-Grade Kernel | ⏳ Planned | DR-037 closure: Stationeers-grade-or-better PV=nRT, 10 launch gases + 6 liquid mixtures, combustion, phase change, pipe networks, suit life-support, pressure apertures, liquid/gas jets, material heat transfer, thermal tools, per-planet ambient, and universal-gravity ballistic drag. |
+| BP7 | **M5.9.5 — Micro Pressure Hold** | 🆕 V2 | Fun-proof interlude after M5.9: 60-90 s hold a room while atmosphere is breached, gases mix, fires propagate, suits compensate. |
+| BP7 | **M5.10 — Comms + Reason-Label Lab** | 🆕 V2 | Diegetic comms + AI reason-label HUD + radio shadow + EMP failure precursors. |
+| BP8 | M6 — AI Core And Trust Harness | ⏳ Planned | DR-022 8-criteria humanlike bar testable. |
+| BP8 | M6.5 — LLM Mind Lab | ⏳ Planned | Async LLM mind layer; local AI never blocks; no API key required. |
+| BP8 | M6.6 — AI Material Competence | ⏳ Planned | AI hazard perception with reason labels. |
+| BP9 | M7 — Mission Director And Breach Contract | ⏳ Planned | Proof mission. A-FEEL gate. |
+| BP9 | M7.5 — Base Atmospherics (extended for Stationeers-grade-or-better per DR-037) | ⏳ Planned | Base modules wired into M5.9 kernel: pumps, vents, pressure doors, breach repair, heaters/coolers, radiators, coolant loops, emergency venting, and room-state mission objectives. |
+| BP9 | **M7.7 — Photo Mode + Death Cam** | 🆕 V2 | Photo mode + death cam + replay clip export pipeline. |
+| BP10 | M8 — Scenario Editor And Mod Tools | ⏳ Planned | First-class in-engine editor at launch. |
+| BP10 | M8.5 — Material Lab | ⏳ Planned | Material/reaction lab for promotions to launch set. |
+| BP10 | **M8.6 — Mod Manager + Workshop Bridge** | 🆕 V2 | Steam Workshop + cloud + achievements + input + mod manager + Deck readiness shell wiring. |
+| BP11 | M9 — Dedicated Server App | ⏳ Planned | `cf-server` multi-mode binary; SERVER-001..016 acceptance suite begins. |
+| BP11 | **M9.5 — Voice + Radio Sim** | 🆕 V2 | ACRE2-tier voice + radio simulation across server-authoritative net. |
+| BP12 | M10 — LAN Co-op | ⏳ Planned | Local 2-4 player co-op. |
+| BP12 | M11 — Online Co-op (Self-Hosted Dedicated Servers) | ⏳ Planned | Community-hostable online co-op. |
+| BP12 | M12 — Public PvP Arenas + Persistent MMO Shards | ⏳ Planned | DR-035 MMO-001..012 readiness gate. |
+| BP12 | T-CONTENT-ART / T-CONTENT-NARRATIVE / T-LOCALIZATION / T-LIVEOPS finalization | ⏳ Planned | All four production tracks reach launch GA. |
 
 ---
 
@@ -306,7 +349,7 @@ cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 python3 tools/dependency_drift_report.py --workspace-root . --format markdown
 
-# Smoke runs (M0 blank + M1 actor range)
+# Smoke runs (M0 blank + M1 actor range + M1.5 micro breach)
 cargo run -p cfctl -- observe --once --scenario m0_blank
 cargo run -p cfctl -- run --scenario m0_blank --ticks 300 --tick-rate-hz 60 --paced --write-run-bundle
 cargo run -p cf-app -- --scenario m0_blank --headless-smoke --run-seconds 5 --write-run-bundle
@@ -318,9 +361,17 @@ cargo run -p cf-app -- --scenario m1_actor_range
 # Drive the M1 scenario through cfctl (same dispatch path the keyboard uses)
 cargo run -p cfctl -- run --scenario m1_actor_range --ticks 300 --tick-rate-hz 60 --paced --write-run-bundle
 
+# Play the M1.5 Micro Breach Fun Slice (windowed; same controls + KeyG to dig)
+cargo run -p cf-app -- --scenario micro_breach
+
+# Replay the win or loss script through cf-e2e (auto-launches cf-app + asserts expectations)
+cargo run -p cfctl -- script run scripts/cfctl/micro_breach_win.cfctl.json --write-run-bundle
+cargo run -p cfctl -- script run scripts/cfctl/micro_breach_loss.cfctl.json --write-run-bundle
+
 # Validate any run bundle
 python3 tools/prototype_run_check.py ../prototype_runs/native/m0_*
 python3 tools/prototype_run_check.py ../prototype_runs/native/m1_*
+python3 tools/prototype_run_check.py ../prototype_runs/native/m1.5_*
 ```
 
 ### CLI Reference
@@ -341,7 +392,29 @@ python3 tools/prototype_run_check.py ../prototype_runs/native/m1_*
 | `cfctl act player-reload` | M1 | Begin reload (1.5 s real time at any tick rate). |
 | `cfctl act player-select-item --slot <0..3>` | M1 | Switch inventory slot. |
 | `cfctl act player-reset` | M1 | Respawn at scenario position with full HP / ammo / slot 0. |
+| `cfctl act player-dig [--target <breach_id>]` | M1.5 | Edge-triggered terrain dig. With no target, picks the nearest in-range breach strip; rejects `out_of_range` / `material_metal_nohook` / `already_broken` / `unknown_target`. |
 | `cfctl script run <path>` | M1 | Replay a `.cfctl.json` script (auto-launches `cf-app` with the right scenario, polls until ticks advance between commands). |
+
+**Run the M1.5 fun slice:**
+
+```bash
+# Win path (player breaches outer wall, neutralizes guard 2, reaches extraction zone in ~430 ticks)
+cargo run -p cfctl -- script run scripts/cfctl/micro_breach_win.cfctl.json --write-run-bundle
+
+# Loss path (player dies at guard 2 in ~1015 ticks)
+cargo run -p cfctl -- script run scripts/cfctl/micro_breach_loss.cfctl.json --write-run-bundle
+
+# Or drive cf-app windowed and use KeyG to dig:
+cargo run -p cf-app -- --scenario micro_breach
+# WASD = move, Space = jump, arrows = aim, Enter/J = fire, R = reload, G = dig, L = reset, 1-4 = inventory slot, Esc = quit.
+
+# Run the cf-e2e harness (auto-launches cf-app, replays script, asserts expectations)
+cargo run -p cf-e2e -- --script scripts/cfctl/micro_breach_win.cfctl.json \
+    --expect mission.result=won \
+    --expect "objective.reach_extraction=Completed" \
+    --expect breach.outer_wall.broken=true \
+    --expect "enemy.guard_2.state=Dead"
+```
 
 Post-M5+ CLI extensions (atmospherics, materials, gravity, ballistics, origin-state, suit, pipe-network, room) are documented in [the canonical roadmap](https://github.com/Madreag/corefall#research-vault).
 
@@ -354,13 +427,14 @@ GitHub Actions runs on every push and PR:
 - `cargo fmt --all -- --check` (with `.gitattributes` locking LF line endings cross-OS)
 - `cargo check --workspace --all-targets`
 - `cargo clippy --workspace --all-targets -- -D warnings`
-- `cargo test --workspace`
+- `cargo test --workspace` (M1.5 raises the suite to **189 tests passing** on top of M1's 159 and M0's 73)
 - `cargo build --release`
 - Dependency drift report on the Linux leg (`tools/dependency_drift_report.py`) for direct registry deps and transitive duplicate review
-- `cf-mod validate content/`
-- Schema drift check (`dump_schemas --check`)
+- `cf-mod validate content/` (validates M0 + M1 + M1.5 scenario manifests)
+- Schema drift check (`dump_schemas --check`) against 26 static schemas under `crates/cf-control/schemas/v1/` (M1.5 added `act_player_dig_params.schema.json`)
 - `cfctl observe smoke` + `cfctl run smoke` (60 Hz + 120 Hz)
 - `cf-app headless run-seconds 5`
+- M1.5 cf-e2e win + loss script smoke (auto-launches `cf-app --headless-smoke --control-api`, replays scripts, asserts every `--expect <key>=<value>`)
 - Validate every produced run bundle through `tools/prototype_run_check.py`
 - Enforce repo-root `prototype_runs/` path (M0.4-F7 guard)
 
@@ -413,7 +487,7 @@ Built on Rust. Built on Bevy. Inspired by Cortex Command, Noita, Stationeers, Ba
 
 <div align="center">
 
-**[Project status](#project-status) · [Inspirations](#inspirations-and-credits) · [Tech stack](#tech-stack) · [Getting started](#getting-started) · [License](#license)**
+**[Project status](#project-status) · [Build Points](#build-points) · [Inspirations](#inspirations-and-credits) · [Tech stack](#tech-stack) · [Getting started](#getting-started) · [License](#license)**
 
 *One field for gravity. One kernel for atmospheres. One source of truth for everything.*
 
