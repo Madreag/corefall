@@ -39,6 +39,20 @@ Always check:
 
 If any item above is missing, verdict is `Needs Fixes`.
 
+## Minimum-Bar Design Coverage Gate
+
+Roadmap V2, task cards, and DRs are a **minimum bar**, not a ceiling. During review, verify that the implementer performed a design-coverage pass before acceptance.
+
+For every player-facing feature, physical entity, AI behavior, UI surface, scenario, tool command, or release artifact touched by the scope, ask:
+
+- Does it satisfy the literal roadmap/backlog/DR text?
+- Does it also include the obvious game-facing behavior a player would expect from that feature at this maturity level?
+- Is the behavior visible/readable in the game, observable through `cfctl`, recorded in replay/run bundles, testable through E2E, and represented in capture evidence when visual?
+- Does it avoid static/no-op/fake versions of core promises such as sliding actors, fake objective flags, fake success responses, cosmetic-only physics, hidden simulation with no feedback, or untracked release evidence?
+- If an expected behavior is intentionally not in scope, is the exclusion documented in the milestone note/checklist/roadmap with the owning future milestone?
+
+The review should not force later-milestone scope into an early milestone. It should block acceptance when the implemented feature is materially weaker than the milestone's own player promise or when the agent skipped an obvious inside-scope affordance.
+
 ## Important Findings
 
 Treat these as Blocker-level issues unless evidence proves a lower severity is more accurate:
@@ -49,6 +63,7 @@ Treat these as Blocker-level issues unless evidence proves a lower severity is m
 - Sim, replay, physics, AI, material, or networking code introduces nondeterminism without an explicit approved reason.
 - Run-bundle files are missing, invalid, unordered, unversioned, or not checked by the canonical checker.
 - T-CAPTURE evidence (`summary_grid.png` + `capture_manifest.json`) is missing for a BP2+ fun-proof scenario, OR the cf-e2e script lacks the `capture.summary_grid.non_blank_ratio>=0.95` expectation, OR the per-BP human-playtest survey row in `prototype_runs/native/<bp>_*` notes does not reference the summary grid path it was answered against.
+- The implementation meets a narrow task-card wording but misses an obvious inside-scope player-facing affordance, feedback state, `cfctl` observation/action, replay event, failure path, physical profile, or UX expectation implied by the milestone and product promise.
 - User-controllable input can panic, corrupt state, access unintended paths, or bind control/server surfaces outside approved local boundaries.
 - Tests are decorative, tautological, nondeterministic, or do not cover the behavior they claim to protect.
 - Implementation changes require vault/checklist/changelog updates and those updates are missing.
@@ -103,10 +118,11 @@ Use [templates/review-report.md](templates/review-report.md) for the final repor
 7. Audit tests: identify what each test proves, what bug would make it fail, missing negative/property/fuzz/E2E tests, and any tautological or fixture-only tests.
 8. Audit Rust and dependencies: panics, `unwrap`, error types, `unsafe`, deterministic data structures, dependency additions, feature flags, CI, and lints.
 9. Audit Corefall-specific risks: fixed tick, seeded RNG, run bundles, event ordering, `schema_version`, replayability, `cfctl` eyes/ears/hands coverage, accessibility flags, performance budget, and vault/checklist/changelog coherence.
-10. Run a Contract Integrity Review: shared code paths, no fake success, mandatory-field rejection, source-truthful evidence, no checklist laundering, and regression proof for every prior finding.
-11. Verify with commands when feasible. If M0 or early work cannot test a later system, mark that item `Not yet testable` with the exact future milestone that owns it.
-12. Produce findings first, ordered by severity, with file/line evidence. Include blockers, non-blocking gaps, missing tests, validation run/not run, and next fixes.
-13. If any verified finding remains, set verdict to `Needs Fixes` unless the user explicitly approved deferring that exact finding.
+10. Run a Minimum-Bar Design Coverage Review: confirm the milestone includes expected player-facing behavior, readability, events, `cfctl`, capture, perf, save/mod/accessibility hooks that are inside its scope; log future-scope gaps with the owning milestone.
+11. Run a Contract Integrity Review: shared code paths, no fake success, mandatory-field rejection, source-truthful evidence, no checklist laundering, and regression proof for every prior finding.
+12. Verify with commands when feasible. If M0 or early work cannot test a later system, mark that item `Not yet testable` with the exact future milestone that owns it.
+13. Produce findings first, ordered by severity, with file/line evidence. Include blockers, non-blocking gaps, missing tests, validation run/not run, and next fixes.
+14. If any verified finding remains, set verdict to `Needs Fixes` unless the user explicitly approved deferring that exact finding.
 
 ## Severity
 
@@ -125,9 +141,10 @@ Use this order:
 2. Spec contract status: pass/fail/partial/not-yet-testable.
 3. Validation status: commands run, pass/fail, commands skipped with reason.
 4. Contract Integrity Matrix: each contract path, shared source of truth, positive proof, negative/adversarial proof, and checklist truth.
-5. Test gaps and missing evidence.
-6. Roadmap/checklist/changelog/vault updates required.
-7. Verdict: Accept, Needs Fixes, or Not Reviewable. `Accept` requires zero unresolved verified findings unless every remaining finding has explicit user-approved deferral evidence.
+5. Minimum-Bar Design Coverage Matrix: feature/player promise, expected affordance, implemented evidence, omitted/future-owned items.
+6. Test gaps and missing evidence.
+7. Roadmap/checklist/changelog/vault updates required.
+8. Verdict: Accept, Needs Fixes, or Not Reviewable. `Accept` requires zero unresolved verified findings unless every remaining finding has explicit user-approved deferral evidence.
 
 ## Loop Semantics
 
