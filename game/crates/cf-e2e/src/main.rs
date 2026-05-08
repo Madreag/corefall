@@ -70,6 +70,14 @@ struct Cli {
     capture_frames_hz: f32,
     #[arg(long)]
     no_capture_events: bool,
+    /// Self-Play Validation Rule "make it possible" clause: lets the harness
+    /// drive the spawned cf-app at a non-default sim tick rate so the
+    /// "60 Hz default + 120 Hz validation" rate-coverage requirement in the
+    /// canonical roadmap can be exercised through a single cf-e2e command
+    /// (instead of forcing the agent to drop down to direct cf-app
+    /// invocation). 0 = use cf-app's default (60 Hz).
+    #[arg(long, default_value_t = 0)]
+    tick_rate_hz: u32,
     /// Path to `python3` used to invoke the grid composer. Defaults to `python3`.
     #[arg(long, default_value = "python3")]
     python_bin: String,
@@ -122,6 +130,7 @@ async fn main() -> Result<()> {
         capture_grid: cli.capture_grid,
         capture_frames_hz: cli.capture_frames_hz,
         no_capture_events: cli.no_capture_events,
+        tick_rate_hz: cli.tick_rate_hz,
     })?;
     let url = format!("ws://127.0.0.1:{}", cli.control_port);
     let mut session = match wait_for_ws(&url, Duration::from_secs(8)).await {
@@ -364,6 +373,8 @@ struct LaunchOptions<'a> {
     capture_grid: bool,
     capture_frames_hz: f32,
     no_capture_events: bool,
+    /// Optional pass-through for `cf-app --tick-rate-hz`. 0 = use cf-app default.
+    tick_rate_hz: u32,
 }
 
 fn launch_cf_app(opts: LaunchOptions<'_>) -> Result<Child> {
@@ -377,6 +388,10 @@ fn launch_cf_app(opts: LaunchOptions<'_>) -> Result<Child> {
         "--ticks".into(),
         "0".into(),
     ];
+    if opts.tick_rate_hz != 0 {
+        args.push("--tick-rate-hz".into());
+        args.push(opts.tick_rate_hz.to_string());
+    }
     if !opts.capture_grid {
         // Default: keep the legacy headless path the M0/M1/M1.5 cf-e2e scripts use.
         args.push("--headless-smoke".into());
