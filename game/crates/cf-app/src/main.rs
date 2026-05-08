@@ -856,19 +856,25 @@ fn sync_actor_state_to_render(
     if let (Some(player), Some(_)) = (hud_state.player.as_ref(), snapshot.breaches.first()) {
         let px = player.position[0];
         let py = player.position[1];
+        // Match `cf_terrain::BreachStrip::distance_to`: distance to the nearest
+        // point on the AABB, clamped to zero when the player is inside.
+        let aabb_distance = |b: &cf_control::BreachRenderView| -> f32 {
+            let dx = (b.bbox_min[0] - px).max(0.0).max(px - b.bbox_max[0]);
+            let dy = (b.bbox_min[1] - py).max(0.0).max(py - b.bbox_max[1]);
+            ((dx * dx) + (dy * dy)).sqrt()
+        };
         let mut best: Option<(&cf_control::BreachRenderView, f32)> = None;
         for b in &snapshot.breaches {
-            let cx = (b.bbox_min[0] + b.bbox_max[0]) * 0.5;
-            let cy = (b.bbox_min[1] + b.bbox_max[1]) * 0.5;
-            let d2 = (cx - px) * (cx - px) + (cy - py) * (cy - py);
+            let d = aabb_distance(b);
             match best {
-                None => best = Some((b, d2)),
-                Some((_, prev)) if d2 < prev => best = Some((b, d2)),
+                None => best = Some((b, d)),
+                Some((_, prev)) if d < prev => best = Some((b, d)),
                 _ => {}
             }
         }
-        if let Some((b, d2)) = best {
-            // Approximate "in range" with a 64-unit pad against the AABB centre.
+        if let Some((b, d)) = best {
+            // Mirror the engine's dig contract: a strip is in range when the
+            // AABB-boundary distance is within the strip's own `dig_range`.
             hud_state.breach = Some(HudBreach {
                 id: b.id.clone(),
                 material: b.material.clone(),
@@ -876,7 +882,7 @@ fn sync_actor_state_to_render(
                 max_hp: b.max_hp,
                 broken: b.broken,
                 refusal_reason: b.refusal_reason.clone(),
-                in_range: d2 <= 64.0 * 64.0,
+                in_range: d <= b.dig_range,
             });
         } else {
             hud_state.breach = None;

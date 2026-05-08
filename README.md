@@ -421,6 +421,27 @@ cargo run -p cf-e2e -- --script scripts/cfctl/micro_breach_win.cfctl.json \
     --expect "enemy.guard_2.state=Dead"
 ```
 
+**Run the M1.5 fun slice:**
+
+```bash
+# Win path (player breaches outer wall, neutralizes guard 2, reaches extraction zone in ~430 ticks)
+cargo run -p cfctl -- script run scripts/cfctl/micro_breach_win.cfctl.json --write-run-bundle
+
+# Loss path (player dies at guard 2 in ~1015 ticks)
+cargo run -p cfctl -- script run scripts/cfctl/micro_breach_loss.cfctl.json --write-run-bundle
+
+# Or drive cf-app windowed and use KeyG to dig:
+cargo run -p cf-app -- --scenario micro_breach
+# WASD = move, Space = jump, arrows = aim, Enter/J = fire, R = reload, G = dig, L = reset, 1-4 = inventory slot, Esc = quit.
+
+# Run the cf-e2e harness (auto-launches cf-app, replays script, asserts expectations)
+cargo run -p cf-e2e -- --script scripts/cfctl/micro_breach_win.cfctl.json \
+    --expect mission.result=won \
+    --expect "objective.extract=Completed" \
+    --expect breach.outer_wall.broken=true \
+    --expect "enemy.2.state=Dead"
+```
+
 Post-M5+ CLI extensions (atmospherics, materials, gravity, ballistics, origin-state, suit, pipe-network, room) are documented in [the canonical roadmap](https://github.com/Madreag/corefall#research-vault).
 
 ---
