@@ -12,6 +12,18 @@ Use this file to summarize what changed in the implementation repo. Do not copy 
 
 ## Unreleased
 
+### Fixed (T-RELEASE rehearsal: Bevy 0.18 features split + non_blank_ratio truth)
+
+A T-RELEASE rehearsal pass on macOS (Apple M4 Pro / Sequoia 15.7.3) discovered the captured frames were entirely the cf-render-2d clear color `#0d121a` — no actor sprite, floor strip, breach strip, or HUD text was actually being drawn to the swapchain. The previous `non_blank_ratio: 0.98` evidence was misleading because Pillow's `getbbox()` reported any non-(0,0,0,0) pixel as content. Two fixes landed:
+
+- **`game/Cargo.toml`** — added `bevy_sprite_render` + `bevy_ui_render` to the Bevy feature set. Bevy 0.18 split the rendering systems out of `bevy_sprite` / `bevy_ui` into separate crates; we had the component crates but not the render-system crates, so every Sprite + Text/Node was extracted but never queued for drawing.
+- **`game/crates/cf-render-2d/src/lib.rs`** — defensive sprite-image wiring. `ActorSpritePlugin` now owns a `SolidSpriteImage` resource (1x1 white RGBA8) initialized in `Startup` before `spawn_floor_and_reticle`, and routes every cosmetic sprite through `solid_sprite(&solid, color, size)`. Defends against any future Bevy point release that drops the `Image::default()` registration at `Handle<Image>::default()`.
+- **`game/tools/capture_grid.py`** (composer schema rev `0.2.0`) — `non_blank_ratio` now computes histogram-mode color of each downsampled frame and counts pixels whose Manhattan distance from the mode exceeds `NON_BLANK_MIN_PIXEL_DELTA = 12`. A frame is non-blank only if at least `NON_BLANK_MIN_VARIANT_PIXELS = 64` pixels meet that threshold. Re-running against the original BP1 bundle returns `non_blank_ratio: 0.0` (correctly fails); re-running against the post-fix M1.5 bundle returns `0.9844` (correctly passes).
+
+The fix landed alongside two earlier T-RELEASE rehearsal fixes also in this entry: cf-e2e composer race (Session::shutdown_app_only before composer) and cf-app manifest source-truth filter (only references PNGs that exist on disk after Bevy's async screenshot observer queue drains). All four are part of the same T-RELEASE rehearsal pass.
+
+See `docs/implementation-log/2026-05-08-tcapture-frame-grid.md` "Post-merge addendum" for the full forensic walk.
+
 ### Added (T-RELEASE — Per-BP Cross-Platform GitHub Releases)
 
 - **New `.github/workflows/release.yml`** triggered on `v*-bp*` tag push (or `v1.0.0`). Build matrix: Linux (`x86_64-unknown-linux-gnu`), Windows (`x86_64-pc-windows-msvc`), macOS x86_64 (`macos-13`), macOS aarch64 (`macos-latest`). Builds `cf-app + cfctl + cf-e2e` in `--release` mode, packages with content/ + scripts/cfctl/ + summary_grid.png + the BP's exemplar run bundle, computes SHA256SUMS, generates release notes, publishes via `softprops/action-gh-release@v2`. Pre-release flag stays ON until `v1.0.0`.

@@ -181,16 +181,25 @@ async fn main() -> Result<()> {
 
     let mut observation = last_observe.context("script never executed observe.once")?;
 
-    // Run grid composition while cf-app is still alive (frames keep landing as observers fire).
+    // Run grid composition. The composer needs `capture_manifest.json` to exist on
+    // disk — and that manifest is only written when cf-app's `app.run()` returns
+    // (i.e., when cf-app has shut down). So we MUST shut down the cf-app process
+    // BEFORE invoking the composer; otherwise the composer fires before the
+    // manifest exists and the entire --capture-grid pipeline silently no-ops.
+    // Discovered during the T-RELEASE rehearsal (PR #7); the BP1 acceptance bundle
+    // was produced by cf-app directly, never through cf-e2e --capture-grid.
     if cli.capture_grid {
         let run_id = observation
             .get("run_id")
             .and_then(|v| v.as_str())
             .map(|s| s.to_string());
         if let Some(run_id) = run_id {
+            // Drain the WS + tear down cf-app so the manifest gets written.
+            session.shutdown_app_only().await;
             let bundle_root = cf_replay::resolve_run_bundle_root(None);
             let run_dir = bundle_root.join(&run_id);
-            // Settle: give the screenshot observers ~250 ms to flush PNGs to disk.
+            // Belt-and-braces filesystem flush after process exit; on macOS in
+            // particular the bundle dir entries can take a tick to propagate.
             tokio::time::sleep(Duration::from_millis(250)).await;
             let composer = cli.composer_script.clone().unwrap_or_else(default_composer_script);
             match invoke_composer(&cli.python_bin, &composer, &run_dir) {
@@ -330,6 +339,15 @@ impl Session {
     }
 
     async fn shutdown(mut self) {
+        self.shutdown_app_only().await;
+    }
+
+    /// Send `system.shutdown`, close the WS, and wait for the spawned cf-app
+    /// child process to exit. Used both as the normal end-of-script teardown
+    /// AND as the pre-composer hook for --capture-grid runs (cf-capture only
+    /// writes `capture_manifest.json` when cf-app exits, so the composer
+    /// MUST run after this returns). Idempotent: calling twice is safe.
+    async fn shutdown_app_only(&mut self) {
         let _ = self.send("system.shutdown", json!({})).await;
         let _ = self.ws.close(None).await;
         if let Some(mut child) = self.child.take() {

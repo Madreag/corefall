@@ -129,3 +129,30 @@ Tracked as `T-CAPTURE-O01..O04` rows in feature-completion-checklist.md:
 - O02: Side-by-side replay-vs-live diff grid for regression detection.
 - O03: AI-readable `summary_grid.events.json` co-located with the grid.
 - O04: True headless (offscreen RenderTarget) readback for `--headless-capture`.
+
+## Post-merge addendum (2026-05-08, T-RELEASE rehearsal pass)
+
+Initial T-CAPTURE acceptance reported `non_blank_ratio: 0.98` for BP1's M1 acceptance bundle, but a T-RELEASE rehearsal on macOS (Apple M4 Pro / Sequoia 15.7.3) discovered the captured frames were **entirely the cf-render-2d clear color** `#0d121a` — no actor sprite, floor strip, breach strip, or HUD text was actually being drawn to the swapchain. The `non_blank_ratio` metric was passing because Pillow's `getbbox()` treats any pixel different from `(0,0,0,0)` as content, and the clear color `(13,18,26)` qualified.
+
+### Two real bugs landed in this addendum
+
+**1. Bevy 0.18 features split: `bevy_sprite_render` + `bevy_ui_render` were missing.**
+Bevy 0.18 split the rendering systems out of `bevy_sprite` / `bevy_ui` into separate crates. Our `game/Cargo.toml` listed `bevy_sprite` (the component crate) but not `bevy_sprite_render` (the actual render systems), and the same for UI. As a result, every Sprite spawned in cf-render-2d and every Text/Node in cf-ui was extracted but never queued for drawing — the clear pass was the only thing reaching the swapchain. Standalone Bevy 0.18 reproduction (`Sprite::from_color` + `Text2d` in a minimal app with these features missing) confirmed the failure mode.
+
+**Fix:** added `bevy_sprite_render` + `bevy_ui_render` to the bevy feature set in `game/Cargo.toml`. With those features enabled, both sprite + text/UI render correctly into the swapchain on macOS Metal.
+
+**2. cf-render-2d defensive sprite-image wiring.**
+Bevy 0.18's `bevy_sprite_render::queue_sprites` `continue`s on sprites whose `image` handle has no entry in `RenderAssets<GpuImage>`. Bevy's own `ImagePlugin` registers `Image::default()` (a 1x1 white) at `Handle::default()`, so `Sprite::from_color` works through the default-handle path. To avoid relying on a default-handle convention that could shift in a future Bevy point release, cf-render-2d now owns a `SolidSpriteImage` resource (1x1 white RGBA8) initialized in `ActorSpritePlugin::build`, and routes every cosmetic sprite through `solid_sprite(&solid, color, size)`. This is defensive (works even if the default-handle convention changes) and makes the sprite-image dependency explicit at every callsite.
+
+### `non_blank_ratio` metric tightened (composer schema rev 0.2.0)
+
+The previous `getbbox != (0,0,1,1)` test passed any frame whose pixels were non-zero — including pure clear-color frames, which is exactly what we shipped during BP1 acceptance. The composer now computes the histogram-mode color of each downsampled frame and counts pixels whose Manhattan distance from the mode exceeds `NON_BLANK_MIN_PIXEL_DELTA = 12`. A frame is non-blank only if at least `NON_BLANK_MIN_VARIANT_PIXELS = 64` pixels meet that threshold — small enough to capture a single sprite or HUD line, large enough to reject single-pixel JPEG noise. Re-running the composer against the original BP1 bundle (`m1_2026-05-08T03-30-23Z_5703728c`) returns `non_blank_ratio: 0.0`; re-running against the post-fix M1.5 bundle (`m1.5_2026-05-08T08-26-58Z_c08291a4`) returns `non_blank_ratio: 0.9844` for grid 1 and `1.0` for grid 2.
+
+### BP1 acceptance — retroactive note
+
+BP1 was accepted via M1 + M1.5 functional tests (cfctl assertions, mission state events, run-bundle data). The visual proof claim (the `non_blank_ratio: 0.98` row) was misleading because of bug #1: no sprite/UI content ever reached the swapchain. Post-fix, regenerating the M1.5 acceptance bundle produces a real `summary_grid.png` showing the breach scenario play out — actor moves, breach strip degrades, projectile fires, extraction zone activates. BP1 closure stands on the functional gate; the visual evidence is now retroactively correct. T-CAPTURE goes from "metric existed but didn't measure what it claimed" to "metric proves visible scene content".
+
+### Tracked as
+
+- T-CAPTURE-O05 (closed in this commit): Bevy 0.18 features split — bevy_sprite_render + bevy_ui_render.
+- T-CAPTURE-O06 (closed in this commit): non_blank_ratio metric — variance-from-mode instead of getbbox.
