@@ -27,3 +27,11 @@ For each contract path, produce both positive and negative/adversarial proof:
 ## Fix Rule
 
 Every verified issue fixed during stabilization must add or update a regression proof that would have failed before the fix. If the proof is a live command rather than a unit test, record the exact command and run-bundle/result path.
+
+## Universal Enhancement (DR-056) Cross-Check
+
+After Contract Integrity passes, run the Universal Enhancement Audit (review-passes.md §11) and the Self-Play Validation Audit (review-passes.md §10). A milestone with shared production paths + no fake success + truthful evidence is still NOT closed if:
+
+- A Universal Enhancement row FAILS (perf, CI bench, memory soak, network sync, determinism CI, cfctl coverage, AI audio, juice, ACC-A, localization, modding parity, anti-FOMO, captions) without explicit user-approved deferral.
+- The Self-Play Validation Matrix has any FAIL row, "I checked the source" row, or unfilled Eyes row missing visual confirmation from `summary_grid.png`.
+- The Design-Completeness Map row owned by the milestone is unchecked or its claim diverges from the implementation evidence.
