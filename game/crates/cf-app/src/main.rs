@@ -17,7 +17,7 @@ use clap::Parser;
 use cf_actor::IntentSource;
 use cf_capture::{
     write_capture_manifest_from_handle, CaptureClock, CaptureConfig, CaptureKeyframeRequested, CaptureMode,
-    CaptureStateHandle, CfCapturePlugin,
+    CaptureStateHandle, CaptureSystems, CfCapturePlugin,
 };
 use cf_control::{
     engine::{run_m0_inline, M0Engine, M0EngineConfig},
@@ -395,6 +395,15 @@ fn run_bevy(
             pump_recorder_events_into_capture_keyframes,
         )
             .chain(),
+    );
+    // Ensure cf-capture's systems observe the freshest `CaptureClock` tick and
+    // any `CaptureKeyframeRequested` messages written this frame, instead of
+    // racing the unordered scheduler against the chain above.
+    app.configure_sets(
+        Update,
+        CaptureSystems
+            .after(sync_engine_tick_to_capture_clock)
+            .after(pump_recorder_events_into_capture_keyframes),
     );
 
     app.run();
@@ -832,7 +841,7 @@ fn sync_actor_state_to_render(
             let d2 = (cx - px) * (cx - px) + (cy - py) * (cy - py);
             hud_state.breach = Some(HudBreach {
                 id: b.id.clone(),
-                material: b.refusal_reason.clone().unwrap_or_default(),
+                material: b.material.clone(),
                 hp: b.hp,
                 max_hp: b.max_hp,
                 broken: b.broken,

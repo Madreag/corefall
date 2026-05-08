@@ -121,6 +121,13 @@ pub struct CaptureClock {
     pub current_tick: u64,
 }
 
+/// SystemSet covering both capture systems. The host (cf-app) configures this
+/// set to run after the systems that update `CaptureClock` and write
+/// `CaptureKeyframeRequested` so captures see fresh ticks and same-frame
+/// keyframe events instead of stale values from the previous frame.
+#[derive(SystemSet, Hash, Debug, Eq, PartialEq, Clone, Copy)]
+pub struct CaptureSystems;
+
 pub struct CfCapturePlugin {
     pub config: CaptureConfig,
     /// Shared events log handle. The plugin's `CaptureState` resource clones
@@ -139,8 +146,13 @@ impl Plugin for CfCapturePlugin {
             .insert_resource(state)
             .insert_resource(CaptureClock::default())
             .add_message::<CaptureKeyframeRequested>()
-            .add_systems(Update, capture_baseline_system)
-            .add_systems(Update, capture_keyframe_system.after(capture_baseline_system));
+            .add_systems(Update, capture_baseline_system.in_set(CaptureSystems))
+            .add_systems(
+                Update,
+                capture_keyframe_system
+                    .after(capture_baseline_system)
+                    .in_set(CaptureSystems),
+            );
     }
 }
 
