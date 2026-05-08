@@ -92,7 +92,7 @@ else
         --expect "tick>=150" \
         --expect "capture.summary_grid.non_blank_ratio>=0.95" \
         > "$OUTDIR/$ROW.stdout.txt" 2> "$OUTDIR/$ROW.stderr.txt"; then
-        BUNDLE="$(ls -dt "$REPO_ROOT/prototype_runs/native/m1_2026"-* 2>/dev/null | head -n1)"
+        BUNDLE="$(ls -dt "$REPO_ROOT/prototype_runs/native/m1_"* 2>/dev/null | head -n1)"
         add_row "$ROW" "PASS" "${BUNDLE:-?}" "M1 6-action sweep: move + jump + aim + fire + reload + select_item"
     else
         add_row "$ROW" "FAIL" "$OUTDIR/$ROW.stderr.txt" "cf-e2e exit nonzero"
