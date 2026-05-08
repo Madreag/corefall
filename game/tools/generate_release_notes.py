@@ -382,7 +382,7 @@ def pr_numbers_from_git(tag: TagInfo, repo_root: Path) -> list[int]:
         return []
     found: list[int] = []
     for match in re.finditer(
-        r"(?:Merge\s+pull\s+request\s+#|Merge\s+PR\s+#|PR\s+#|pull/|#)(\d+)",
+        r"(?:Merge\s+pull\s+request\s+#|Merge\s+PR\s+#|PR\s+#|pull/)(\d+)",
         log,
         re.IGNORECASE,
     ):
@@ -463,8 +463,9 @@ def fallback_pr_from_git(number: int, repo_root: Path) -> PullRequestEvidence:
             "git",
             "log",
             "--format=%s%n%b",
+            "--extended-regexp",
             "--grep",
-            f"#{number}",
+            rf"#{number}([^0-9]|$)",
             "--all-match",
             "-n",
             "1",
