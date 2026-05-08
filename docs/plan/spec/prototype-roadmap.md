@@ -336,7 +336,8 @@ For every short milestone assignment, the worker must:
 | 7. Rerun | Rerun all validation after fixes. | Clean command matrix. |
 | 8. Evidence | Update vault prototype/research notes with links to run bundle, screenshots, test output, and known gaps. | New or updated note under `cortext_command_vault/prototypes/` or `research-log/`. |
 | 9. Checklist update | Update [[spec/feature-completion-checklist]] rows for affected roadmap features, milestone scope, done-criteria, side tracks, and native task cards. | Checked rows only when evidence exists; AI self-ratings filled; human ratings left blank unless provided. |
-| 10. Final audit | Compare all milestone done-criteria and backlog task cards against actual evidence. | Final audit section in the vault note and concise handoff summary listing checklist IDs changed. |
+| 10. Design coverage | Compare the implemented feature against the milestone's player promise and obvious game-facing affordances. | Minimum-Bar Design Coverage Matrix: feature/entity/surface, expected affordance, implemented evidence, future-owned omissions. |
+| 11. Final audit | Compare all milestone done-criteria and backlog task cards against actual evidence. | Final audit section in the vault note and concise handoff summary listing checklist IDs changed. |
 
 ### Agent-Completable Vs Human-Gated
 
@@ -358,6 +359,12 @@ The roadmap is the **minimum bar**, not the ceiling. A worker assigned a milesto
 5. Never use "the roadmap did not explicitly say that" as a reason to ship a static, fake, no-op, non-readable, non-observable, or non-replayable version of a core game promise.
 
 For actor control specifically: **no actor may ship as a static sliding pawn once its milestone owns visible movement presentation.** The minimum acceptable posture is animation-first while controlled, physics-first while disrupted, with state exposed through replay, HUD, `cfctl`, and capture evidence.
+
+Every milestone closeout must include this matrix:
+
+| Feature / entity / surface touched | Obvious expected affordance | Evidence implemented | Future-owned omission, if any |
+|---|---|---|---|
+| Example: new damageable object | Takes damage through the normal damage path, has visible state changes, emits events, appears in `cfctl inspect`, and can fail the scenario if it is mission-critical. | Test / E2E / run bundle / capture path. | Only list if the omission is outside milestone scope and name the owning future milestone. |
 
 ## No-Compromise Performance Defaults
 
@@ -677,7 +684,7 @@ This is the M0 day-zero recipe. A junior agent assigned M0 must produce these fi
 
 ```toml
 [toolchain]
-channel = "1.93.0"
+channel = "1.95.0"
 components = ["rustfmt", "clippy"]
 profile = "default"
 ```
@@ -685,7 +692,7 @@ profile = "default"
 Pin Rust at a specific stable. Update only on a deliberate task (own row in the milestone audit), never as a side effect.
 
 > [!info] Toolchain pin updated 2026-05-05
-> Bumped from `1.84.0` to `1.93.0` during the M0 implementation pass. Strict pin (no `stable`, no loose minor) so reproducibility holds across CI runners. Bump deliberately on each Bevy major upgrade or when a workspace dependency requires it; edit both `game/rust-toolchain.toml` AND this template in the same commit so they never drift.
+> Bumped from `1.84.0` to `1.95.0` during the M0 implementation pass. Strict pin (no `stable`, no loose minor) so reproducibility holds across CI runners. Bump deliberately on each Bevy major upgrade or when a workspace dependency requires it; edit both `game/rust-toolchain.toml` AND this template in the same commit so they never drift.
 
 ### Workspace `Cargo.toml`
 
@@ -732,7 +739,7 @@ license = "Apache-2.0 OR MIT"
 publish = false
 
 [workspace.dependencies]
-bevy = { version = "0.14", default-features = false, features = ["bevy_winit", "bevy_render", "bevy_core_pipeline", "bevy_sprite", "bevy_text", "bevy_ui", "x11"] }
+bevy = { version = "=0.18.1", default-features = false, features = ["bevy_log", "bevy_winit", "bevy_render", "bevy_core_pipeline", "bevy_sprite", "bevy_sprite_render", "bevy_text", "bevy_ui", "bevy_ui_render", "default_font", "tonemapping_luts", "ktx2", "zstd_rust", "x11"] }
 glam = "0.27"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
@@ -868,7 +875,7 @@ jobs:
           sudo apt-get install -y libasound2-dev libudev-dev libxkbcommon-dev libwayland-dev
       - uses: dtolnay/rust-toolchain@stable
         with:
-          toolchain: 1.93.0
+          toolchain: 1.95.0
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
       - name: cargo fmt
@@ -884,7 +891,7 @@ jobs:
       - name: run-bundle smoke
         run: |
           cargo run -p cfctl -- run --scenario m0_blank --ticks 300 --write-run-bundle
-          python3 ../research_tools/prototype_run_check.py prototype_runs/native/m0_*
+          python3 tools/prototype_run_check.py ../prototype_runs/native/m0_*
 ```
 
 ### Bootstrap Command Sequence (for M0)
@@ -1422,8 +1429,8 @@ The current platform validation must exit cleanly even when `prototype_runs/` do
   "seed": 42,
   "build": {
     "commit_sha": "<git-sha>",
-    "rust_version": "1.93.0",
-    "bevy_version": "0.14.x",
+    "rust_version": "1.95.0",
+    "bevy_version": "0.18.1",
     "platform": "macOS-aarch64"
   },
   "config_hash": "<blake3-of-effective-config>",
@@ -1569,7 +1576,7 @@ Before doing any feature work, the agent runs the milestone's kickoff smoke. If 
 | M0 | `cargo fmt --all -- --check && cargo check --workspace --all-targets && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace` | Workspace is well-formed; lints clean. |
 | M0 | `cargo run -p cf-app -- --scenario m0_blank --headless-smoke --ticks 60` | App launches, ticks 60 sim ticks, exits 0. |
 | M0 | `cargo run -p cfctl -- observe --once --scenario m0_blank` | Control envelope serializes one observation. |
-| M0 | `cargo run -p cfctl -- run --scenario m0_blank --ticks 300 --write-run-bundle && python3 ../research_tools/prototype_run_check.py prototype_runs/native/m0_*` | Run bundle validates. |
+| M0 | `cargo run -p cfctl -- run --scenario m0_blank --ticks 300 --write-run-bundle && python3 tools/prototype_run_check.py ../prototype_runs/native/m0_*` | Run bundle validates. |
 | M1 | `cargo run -p cf-app -- --scenario m1_actor_range --run-seconds 5` | One actor visible; status strip shows. |
 | M1 | `cargo run -p cfctl -- script run m1_move_jump_fire_reload --write-run-bundle` | Scripted control drives actor end-to-end. |
 | M1.5 | `cargo run -p cfctl -- script run micro_breach_win --write-run-bundle` | Win path completes; bundle validates. |
@@ -1614,7 +1621,7 @@ Before doing any feature work, the agent runs the milestone's kickoff smoke. If 
 ## Build Points (Roadmap V2)
 
 > [!important] Build Points are the playable-shippable layer on top of milestones
-> Milestones own the engineering work; **Build Points (BPs)** group milestones into shippable, playable artifacts. Every BP must produce: (1) at least one playable cfctl-driven scenario, (2) a checked run bundle under `prototype_runs/native/`, (3) a `READY_FOR_HUMAN_PLAYTEST` gate (or recorded human reaction note), (4) a published implementation log + `/corefall-review` Accept verdict, and (5) the per-BP DR-closure refresh listed below. BPs are additive: they DO NOT renumber milestones. Existing milestone IDs (M0..M12 + .x sub-milestones) stay stable for backward compat with prior implementation logs, run bundles, and PRs.
+> Milestones own the engineering work; **Build Points (BPs)** group milestones into shippable, playable artifacts. Every BP must produce: (1) at least one playable cfctl-driven scenario, (2) a checked run bundle under `prototype_runs/native/`, (3) T-CAPTURE `summary_grid.png` evidence from BP2 onward, (4) a T-RELEASE tagged pre-release from BP1 onward, (5) a `READY_FOR_HUMAN_PLAYTEST` gate (or recorded human reaction note), (6) a published implementation log + `/corefall-review` Accept verdict, and (7) the per-BP DR-closure refresh listed below. BPs are additive: they DO NOT renumber milestones. Existing milestone IDs (M0..M12 + .x sub-milestones) stay stable for backward compat with prior implementation logs, run bundles, and PRs.
 
 > [!warning] BP fun-proof rule (M1.5 lesson)
 > If a BP groups more than two heavy-systems milestones in a row without a playable interlude, insert a **micro-fun slice** sub-milestone (M1.5 was the prototype: M2.5, M5.5.5, M5.9.5 follow the same shape). Workers MUST NOT enter the next heavy-systems milestone until the prior BP has at least one fun-proof scenario the project owner can play in 60-90 s.
@@ -1626,9 +1633,9 @@ Before doing any feature work, the agent runs the milestone's kickoff smoke. If 
 
 | BP | Title | Milestones Inside | Closes Or Refreshes | Playable Artifact | Status |
 |---|---|---|---|---|---|
-| **BP0** | Foundation Build | M0 + M1 | DR-001, DR-024, DR-025, DR-026; DR-002 refreshed (envelope locked) | `cfctl run --scenario m1_actor_range` end-to-end at 60+120 Hz | <span class="cc-flag cc-green">CLOSED</span> (M0 + M1 closed; bundles `m0_*` + `m1_*` archived) |
-| **BP1** | Micro Breach Build | M1.5 | DR-002 + DR-004 + DR-007 + DR-008 + DR-009 leans confirmed (no closures attempted) | `cf-e2e --script micro_breach_{win,loss}` end-to-end | <span class="cc-flag cc-green">CLOSED</span> (M1.5 closed; bundles `m1.5_*` archived) |
-| **BP2** | Terrain & Replay Build | M2 + M2.5 + M3A | DR-002 (M3A locks event taxonomy + headless replay); DR-007 launch-material set frozen for the chunked-terrain era | `cf-e2e --script m2_dig_concrete_refuse_metal` + M2.5 micro reactor defense + replay verifier | <span class="cc-flag cc-blue">PLANNED</span> |
+| **BP0** | Foundation Build | M0 | DR-001, DR-024, DR-025, DR-026; DR-002 refreshed (envelope locked) | `cfctl run --scenario m0_blank` kickoff smoke at 60+120 Hz | <span class="cc-flag cc-green">CLOSED</span> (M0 closed; bundles `m0_*` archived; tag-only tooling proof) |
+| **BP1** | Micro Breach Build | M1 + M1.5 | DR-002 + DR-004 + DR-007 + DR-008 + DR-009 leans confirmed (no closures attempted) | `cf-e2e --script micro_breach_{win,loss}` end-to-end | <span class="cc-flag cc-green">CLOSED</span> (M1 + M1.5 closed; bundles `m1_*` + `m1.5_*` archived; first playable release axis) |
+| **BP2** | Terrain & Replay Build | M2 + M2.5 + M3A | DR-002 (M3A locks event taxonomy + headless replay); DR-007 launch-material set frozen for the chunked-terrain era | `cf-e2e --script m2_dig_concrete_refuse_metal` + M2.5 micro reactor defense + replay verifier | <span class="cc-flag cc-blue">ACTIVE</span> |
 | **BP3** | Combat Readability Build | M3B + M4A + M5 | DR-002 closure; DR-003 closure; DR-012 ACC-A floor closure; DR-014 / DR-021 chassis grammar landing | `cf-e2e --script breach_contract --ui-scale 2.0 --high-contrast` + M5 chassis wreck/eject | <span class="cc-flag cc-blue">PLANNED</span> |
 | **BP4** | Physics Sandbox Alpha | M5.5 + M5.5.5 + M5.6 + M5.7 + M5.8 | DR-033 closure; DR-036 (M5.6/M5.7) implementation slices; DR-007 implementation specifics partial | M5.5.5 micro sabotage + per-milestone gauntlets (COLL-001..012, MAT-01..03) | <span class="cc-flag cc-blue">PLANNED</span> |
 | **BP5** | Atmospherics & Worlds Alpha | M5.9 + M5.9.5 + M5.10 | DR-037 closure (M5.9); DR-038 closure (with M5.5); DR-039 + DR-040 closures (M5.10) | M5.9.5 micro pressure hold + ENV-A/ATMOS-A/GRAV-A/ASTRO-A acceptance suites | <span class="cc-flag cc-blue">PLANNED</span> |
@@ -1646,11 +1653,31 @@ When the last milestone inside a BP closes, the worker MUST also produce **one e
 
 1. Lists every closed milestone inside the BP with its run-bundle ids.
 2. Identifies the BP's playable artifact (cfctl script id + scenario id) and links to the bundle proving win + loss paths (or N/A when the BP has no playable surface, e.g. BP12).
-3. Records the human-playtest reaction (or `READY_FOR_HUMAN_PLAYTEST` when the project owner is unavailable).
-4. Lists every DR closed/refreshed by the BP and confirms the same-pass updates to `decisions/index.md` + `dashboards/decision-tracker.md` + `dashboards/research-readiness.md` happened.
-5. Lists known follow-ups deferred to the next BP (with explicit user approval recorded inline).
+3. Links the BP's T-CAPTURE `summary_grid.png` + `capture_manifest.json` artifacts (mandatory from BP2 onward) and confirms the agent visually inspected the grid.
+4. Links the T-RELEASE GitHub Release URL + tag + SHA256SUMS artifact (mandatory from BP1 onward; if the release is intentionally delayed, the BP cannot be called closed).
+5. Records the human-playtest reaction (or `READY_FOR_HUMAN_PLAYTEST` when the project owner is unavailable).
+6. Lists every DR closed/refreshed by the BP and confirms the same-pass updates to `decisions/index.md` + `dashboards/decision-tracker.md` + `dashboards/research-readiness.md` happened.
+7. Lists known follow-ups deferred to the next BP (with explicit user approval recorded inline).
 
 This is the ONLY gate that says "the game is now playable / shippable at this maturity level". A milestone closure alone does not advance the BP; the BP advance requires the extra vault note.
+
+### BP12 Completion Meaning
+
+BP12 is not "the systems compile." BP12 means Corefall is a complete releasable game candidate where only final bug fixing, balance tuning, marketing timing, and explicit post-launch expansion remain.
+
+By BP12, the following must be agent/human-verifiable in one release-candidate build:
+
+| Area | BP12 minimum |
+|---|---|
+| Playable game | Title/menu/settings → tutorial/labs → mission select/briefing → playable mission → debrief/reward/save loop works without developer intervention. |
+| Core promise | Bunker Defence, Breach Contract, command-core/base stakes, chassis/equipment, terrain/materials, atmospherics, full collision, AI teammates/enemies, replay, and modding all exist as integrated systems, not isolated demos. |
+| Content | Launch roster from DR-045 is filled or explicitly trimmed by a new DR; placeholder-only actors/weapons/worlds are not acceptable for release-candidate status. |
+| UX/UI | All player-facing surfaces from DR-046 are reachable, readable, keyboard/controller accessible, localized through the string system, and `cfctl`/capture-testable. |
+| Accessibility | DR-012 floor plus DR-051 accessibility-plus requirements pass the acceptance suites; captions/subtitles/settings/remaps/reduced-motion modes are not optional polish. |
+| Multiplayer/server | Dedicated server, LAN, online co-op, public arena/MMO-shard proof, admin/moderation basics, and community-host posture are validated to the scope promised by DR-005/034/035/052. |
+| Release operations | T-RELEASE, T-LIVEOPS, telemetry/crash/bug-report, legal/license ledger, platform packaging, code signing, support docs, and shutdown/sustainability posture are complete. |
+
+If any row above is still missing a core system, BP12 cannot close by relabeling it as polish. The worker must either implement it, create a user-approved scope-change DR, or keep the BP open.
 
 ### What BP IDs do NOT change
 
@@ -1752,7 +1779,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 - `cf-control` minimal command/observation schema plus `cargo run -p cfctl -- observe --once`, `cargo run -p cfctl -- run --ticks`, `pause`, and `step`.
 - GitHub Actions CI: build matrix Win/Linux/macOS; cargo check + cargo test + cargo clippy.
 - M0-level accessibility/settings flags: `--ui-scale`, `--high-contrast`, captions, reduced motion, reduced shake, and reduced flash. The settings are live engine state exposed through `cfctl`/`cf-control`, recorded in run bundles, and intentionally limited to the stable DR-012 config surface until M4 implements the full UI/accessibility behavior.
-- Native run bundles compatible with `research_tools/prototype_run_check.py`; add a thin native helper or wrapper only if the milestone needs one.
+- Native run bundles compatible with `game/tools/prototype_run_check.py`; add a thin native helper or wrapper only if the milestone needs one.
 - Hello-world scene: blank window, press ESC to exit, run-bundle written to `prototype_runs/native/`.
 
 **Done-criteria:**
@@ -1760,7 +1787,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 - [x] CI is green for all three platforms when runners are available; local current-platform validation passes before handoff.
 - [x] `cargo run` opens a window, ticks the sim at 60 Hz for 5 seconds, exits cleanly.
 - [x] A run bundle is written under `prototype_runs/native/m0_*/` with manifest+events+summary+notes.
-- [x] `python3 research_tools/prototype_run_check.py prototype_runs/native/<m0_run>` passes on the bundle.
+- [x] `python3 /Users/erol/projects/corefall/game/tools/prototype_run_check.py /Users/erol/projects/corefall/prototype_runs/native/<m0_run>` passes on the bundle.
 - [x] `cargo run -p cfctl -- observe --once` reads current run/tick/scenario state without screenshot capture.
 - [x] `cargo run -p cfctl -- run --ticks 300 --write-run-bundle` drives the no-op scene without OS input.
 - [x] Repository is commit-ready, with a semantic commit only if the user explicitly asked the agent to commit.
@@ -1909,7 +1936,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 - [ ] A 5-minute M2/M2.5 run can be replayed headlessly and produces identical actor/terrain/inventory checksums.
 - [ ] Drift between replay and live run is reported per-tick with diff (`first_divergence` event).
 - [ ] Run bundle includes manifest, events, summary, snapshots, checksums, captures.
-- [ ] `system.run_finished` outcome contract per M3-006 task card enforced by canonical run-bundle checker.
+- [ ] `system.run_finished` outcome contract per M3A-005 task card enforced by canonical run-bundle checker.
 - [ ] No DR closure attempted at M3A (lean refreshed only).
 
 **M3B Scope (viewer + cause-chain, BP3 polish):**
@@ -2973,7 +3000,7 @@ Spans BP2+; **lifelong from BP2** (every fun-proof slice from M2.5 onward emits 
 **Done-criteria (cumulative across BPs):**
 
 - [ ] BP2 closure: T-CAPTURE shipped end-to-end (cf-capture crate + cf-app flags + composer + cf-e2e wiring + summary_grid evidence for every M2.5 fun-proof script).
-- [ ] BP5/BP7 closure: capture grids exist for M5.5.5 + M5.9.5 fun-proof scripts; BP closure gates reject any closure without capture-grid evidence.
+- [ ] BP4/BP5 closure: capture grids exist for M5.5.5 + M5.9.5 fun-proof scripts; BP closure gates reject any closure without capture-grid evidence.
 - [ ] BP12 finalization: every shipping scenario in `content/scenarios/` has at least one canonical capture grid checked in alongside its run-bundle evidence under `prototype_runs/native/`.
 
 **Open extensions (post-BP2, not in initial scope):**
@@ -3059,7 +3086,8 @@ Spans BP1+; **lifelong from BP1** (every BP closure from BP1 onward emits a tagg
 
 **Done-criteria (cumulative across BPs):**
 
-- [x] BP1 closure: T-RELEASE shipped end-to-end (release.yml + generate_release_notes.py + retroactive `v0.1.0-bp1` tag from main HEAD with M1.5 `summary_grid.png` as hero, all four cross-platform binaries published).
+- [x] T-RELEASE infrastructure: `release.yml` + `generate_release_notes.py` + versioning axis + release artifact contract exist in `corefall`.
+- [ ] BP1 retroactive release publication: push `v0.1.0-bp1` from main HEAD with M1.5 `summary_grid.png` as hero, all four cross-platform binaries published, release marked pre-release.
 - [ ] BP2..BP11: every BP closure emits a tagged release per the versioning axis. Pre-release flag stays ON.
 - [ ] BP10/BP11: code signing infrastructure activated by T-LIVEOPS.
 - [ ] BP12 finalization: `v1.0.0` GA release; pre-release flag DROPPED; full code signing on every artifact; determinism checksum table covers every shipping scenario.
@@ -4086,7 +4114,7 @@ These commands are the default validation surface for implementation agents. If 
 | Unit/integration tests | `cargo test --workspace` | M0 |
 | Native app smoke | `cargo run -p cf-app -- --scenario <milestone-smoke> --run-seconds 5 --write-run-bundle` | M0 |
 | Control API smoke | `cargo run -p cfctl -- observe --once` and `cargo run -p cfctl -- run --ticks 300 --write-run-bundle` against the current milestone scene. | M0 |
-| Run-bundle validation | `python3 research_tools/prototype_run_check.py prototype_runs/native/<run_id>` | M0 |
+| Run-bundle validation | `python3 /Users/erol/projects/corefall/game/tools/prototype_run_check.py /Users/erol/projects/corefall/prototype_runs/native/<run_id>` | M0 |
 | Scripted E2E | `cargo run -p cf-e2e -- --scenario <scenario-id> --expect <result> --write-run-bundle`; prefer `cfctl`/control API actions over OS-level input. | M1.5 |
 | Observation stream check | Stream `cargo run -p cfctl -- observe --stream --hz 30` during a scripted run and verify tick/order/event freshness. | M1.5 |
 | Replay check | `cargo run -p cf-headless -- replay prototype_runs/native/<run_id> --verify-checksums` | M3 |

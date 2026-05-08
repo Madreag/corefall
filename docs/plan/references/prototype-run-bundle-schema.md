@@ -41,10 +41,10 @@ feeds:
 Validation command:
 
 ```bash
-python3 research_tools/prototype_run_check.py <run-dir>
+python3 /Users/erol/projects/corefall/game/tools/prototype_run_check.py /Users/erol/projects/corefall/prototype_runs/native/<run-id>
 ```
 
-The checker intentionally avoids third-party dependencies. JSON Schema files are the canonical field reference; `prototype_run_check.py` enforces the cross-file rules that plain schema validation cannot catch.
+The checker intentionally avoids third-party dependencies. Corefall vendors the checker under `game/tools/`; the vault original remains `research_tools/prototype_run_check.py` for historical/browser-lab runs. JSON Schema files are the canonical field reference; `prototype_run_check.py` enforces the cross-file rules that plain schema validation cannot catch.
 
 ## Required `notes.md` Headings
 
@@ -214,4 +214,4 @@ The checker is a gate for evidence hygiene, not a declaration that a prototype i
 - `prototype-run-manifest.schema.json`
 - `prototype-recorder-event.schema.json`
 - `prototype-run-summary.schema.json`
-- `../../research_tools/prototype_run_check.py`
+- `../../research_tools/prototype_run_check.py` (vault original) / `/Users/erol/projects/corefall/game/tools/prototype_run_check.py` (Corefall vendored copy)

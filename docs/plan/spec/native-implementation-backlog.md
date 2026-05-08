@@ -83,6 +83,8 @@ feeds:
 | Crate ownership | Touch only owned crates/files plus explicit boundary crates. Each crate ships an `AGENTS.md` per the [[spec/prototype-roadmap#Per-Crate AGENTS.md Template|Per-Crate AGENTS.md Template]]. |
 | Events first | Any behavior that affects player understanding, replay, AI, networking, save, or debugging emits an event. |
 | Control first | Every new player-facing control or UI action gets a semantic `cf-control` / `cfctl` path unless explicitly marked human-only. The transport pin is in [[spec/prototype-roadmap#Control Transport And Envelope|Control Transport]]. |
+| Minimum bar | Task cards are the minimum, not the ceiling. For every touched player-facing feature, physical entity, AI behavior, UI surface, scenario, tool command, content schema, or release artifact, write a Minimum-Bar Design Coverage Matrix before acceptance. Implement obvious inside-scope affordances instead of hiding behind narrow wording; document true future-scope omissions with the owning milestone. |
+| Physical profile | Any gameplay-physical object introduced or promoted by a task card needs mass, material/composition, collision proxy/class, durability/damage routing, temperature/electrical/container/AI/debug properties where relevant, or an explicit tested opt-out reason. |
 | Tests required | Every new behavior gets unit or integration coverage per [[spec/prototype-roadmap#Testing Layers|Testing Layers]]; every player-facing milestone gets E2E proof. |
 | Evidence required | Every meaningful run emits a checked run bundle named per [[spec/prototype-roadmap#Run-Bundle Naming Convention|Run-Bundle Naming Convention]] under `prototype_runs/native/`. |
 | Checklist required | Every completed or partially completed task updates [[spec/feature-completion-checklist]] with affected row ids, evidence links, and AI self-ratings. Human rating columns stay blank unless the user provides ratings. |
@@ -100,7 +102,7 @@ cargo check --workspace --all-targets
 cargo clippy --workspace --all-targets -- -D warnings
 cargo test --workspace
 cargo run -p cfctl -- observe --once
-python3 research_tools/prototype_run_check.py prototype_runs/native/<run_id>
+python3 /Users/erol/projects/corefall/game/tools/prototype_run_check.py /Users/erol/projects/corefall/prototype_runs/native/<run_id>
 ```
 
 Milestones with gameplay/tool UI also require a scripted E2E command and a screenshot/capture artifact listed in `summary.json.artifacts`.
@@ -140,7 +142,7 @@ M0 reference E2E:
 cargo run -p cf-app -- --scenario m0_blank --run-seconds 5 --write-run-bundle
 cargo run -p cfctl -- observe --once
 cargo run -p cfctl -- run --ticks 300 --write-run-bundle
-python3 research_tools/prototype_run_check.py prototype_runs/native/<m0_run>
+python3 /Users/erol/projects/corefall/game/tools/prototype_run_check.py /Users/erol/projects/corefall/prototype_runs/native/<m0_run>
 ```
 
 ---
@@ -198,34 +200,75 @@ Human gate: project-owner plays at least three runs and records verbatim reactio
 |---|---|---|---|---|---|
 | M2-001 chunk storage | `cf-terrain` | 256x256 chunk grid, material id per pixel, sparse storage, CPU read/write. | Chunk bounds, material set/get, serialization tests. | Terrain snapshot in run bundle. | No Noita chemistry. |
 | M2-002 material registry | `cf-terrain`, `content/materials/` | Air, dirt, concrete, metal-nohook, hazard, loose fill, repair-fill, anchor; hardness/affordance fields. | Material schema validation. | Material schema version in manifest. | No full research tree. |
-| M2-003 carving pipeline | `cf-terrain`, `cf-render-2d`, `cf-equipment` | Digger and blast carve; CPU fallback; optional wgpu path behind feature flag. | Carve bbox/count tests; GPU/CPU parity if GPU path exists. | Dirty-region and perf counters. | No production destruction VFX. |
-| M2-004 physics integration | `cf-physics`, `cf-terrain` | Actor collision respects terrain after edits; chunk boundary tests. | Collision after carve/fill tests. | E2E dig-through-wall. | No full pathfinding. |
-| M2-005 material overlay | `cf-ui`, `cf-render-2d` | Toggle overlay shows material ids and tool validity. | Screenshot at 100/200% if applicable. | Overlay capture. | No tactical map. |
+| M2-003 carving pipeline | `cf-terrain`, `cf-render-2d`, `cf-equipment` | Digger and blast carve; CPU fallback; optional wgpu path behind feature flag; deterministic material-id replacement. | Carve bbox/count tests; GPU/CPU parity if GPU path exists. | Dirty-region and perf counters. | No production destruction VFX. |
+| M2-004 physics integration | `cf-physics`, `cf-terrain` | Actor collision respects terrain after edits; chunk boundary tests; collision proxy updates within one tick of carve/fill. | Collision after carve/fill tests; actor cannot stand inside newly filled solid. | E2E dig-through-wall. | No full pathfinding. |
+| M2-005 material overlay and tool feedback | `cf-ui`, `cf-render-2d` | Toggle overlay shows material ids, hardness/affordance, and tool validity. Success/refusal labels are non-color-only and visible in captures. | Screenshot/capture at 100/200%; refusal vocabulary tests. | Overlay capture + `summary_grid.png` row. | No tactical map. |
 | M2-006 terrain replay | `cf-replay`, `cf-terrain` | Terrain snapshots/checksums and event replay reconstruct terrain. | Live vs replay checksum test. | Replay report. | No final cinematic replay. |
+| M2-007 terrain observability | `cf-control`, `cfctl`, `cf-terrain` | `cfctl observe --terrain`, `cfctl inspect terrain chunk`, `cfctl inspect material <id>`, and run-bundle material summary. | JSON schema tests; invalid chunk/material id returns structured reason. | `cfctl` transcript in implementation log. | No full editor. |
+| M2-008 loose fill and debris floor | `cf-terrain`, `cf-physics`, `cf-render-2d` | Minimal loose-fill behavior: unsupported loose pixels settle/fall deterministically in bounded dirty regions; carving emits debris particles/loose pixels where configured. | Deterministic settle fixtures; chunk-edge settle tests; perf budget. | Capture shows visible debris/settling; events include cause and bbox. | No systemic fluids, gases, heat, or full CA chemistry. |
 
 M2 E2E:
 
 ```bash
-cargo run -p cf-e2e -- --scenario m2_material_lane --script dig_concrete_refuse_metal --expect win --write-run-bundle
+cargo run -p cf-e2e -- --scenario m2_material_lane --script dig_concrete_refuse_metal --capture-grid --expect win --expect capture.summary_grid.non_blank_ratio>=0.95 --write-run-bundle
 ```
 
 ---
 
-## M3 — Replay And Event Recorder
+## M2.5 — Micro Reactor Defense Fun Slice
 
 | ID | Owns | Build | Tests | Evidence | Anti-scope |
 |---|---|---|---|---|---|
-| M3-001 event taxonomy | `cf-replay` | Stable event envelope, categories, parent ids, schema versions. | Schema/event ordering tests. | Updated run-bundle schema note if fields change. | No analytics service. |
-| M3-002 snapshots/checksums | `cf-replay`, `cf-terrain`, `cf-actor`, `cf-equipment` | Actor/inventory/terrain snapshots and checksums. | Checksum repeatability tests. | `determinism.sim_checksum` events. | No full deterministic promise for cosmetics. |
-| M3-003 headless replay | `cf-headless`, `cf-replay` | Replay M2/M1.5 bundles without rendering and verify checksums. | Replay compare test. | First-divergence report on failure. | No network server yet. |
-| M3-004 viewer | `cf-ui`, `cf-replay` | Event tail, filters, parent-chain view, death/failure recap. | Viewer smoke test; screenshot. | Viewer capture in bundle. | No polished replay browser. |
-| M3-005 recorder backpressure | `cf-replay` | Dropped-event counters and non-blocking recorder path. | Stress event-volume test. | Summary volume/perf rows. | No cloud telemetry. |
-| M3-006 run-finished outcome contract | `cf-replay`, `references/prototype-run-bundle-schema.md`, `tools/prototype_run_check.py` | Add a `expected_outcome` field to `run_manifest.json` constrained to a `clean | panic | abort` enum (clean = orderly `system.run_finished` reached; panic = `system.panic` event must be present and severity `error >= 1`; abort = process killed/SIGINT, no `system.run_finished` required). Tighten the canonical run-bundle checker to enforce: when `expected_outcome=clean`, `summary.json` MUST contain a `system.run_finished` event AND its tick must equal `summary.last_tick`; when `expected_outcome=panic`, `summary.json.event_counts.by_type.panic >= 1` AND `by_severity.error >= 1`; when `expected_outcome=abort`, neither is required. Update `cf-app`, `cfctl run`, `cfctl script run`, and the `--debug-inject-panic-at-tick` path so each writes the right `expected_outcome`. Captured during M0.4-F7: M3 closes DR-002, this is where the run-finished contract belongs. | Engine unit tests for each outcome variant; checker unit/golden tests covering all three; live-WS test that a script ending without `system.run_finished` flagged `clean` fails the checker. | Updated `references/prototype-run-bundle-schema.md` (DR-002 v1 Lock Extensions table); each M3 acceptance bundle ships `expected_outcome`; checker rejects mismatches. | No retry/restart semantics; no auto-classification of process exit reasons (the writer declares intent). |
+| M2.5-001 scenario shell | `cf-mission`, `content/scenarios/` | 60-90s `micro_reactor_defense`: spawn, reactor hp, timer, enemy wave, extraction/survival result. | Manifest validation; objective state tests. | `micro_reactor_defense.ron` + scenario summary. | No full mission director. |
+| M2.5-002 reactor object | `cf-actor`, `cf-physics`, `cf-mission` | Reactor is a damageable static actor/object with hp, aabb hits, damaged/exploding states, and mission-loss reason `reactor_destroyed`. | Damage routing tests; projectile-to-reactor hit tests. | `actor_status_changed` + `mission_resolved` chain. | No base power network yet. |
+| M2.5-003 terrain-driven defense | `cf-terrain`, `cf-equipment`, `cf-ai` | Player must use M2 chunked terrain to dig trench/cover; enemy path/fire reacts to changed terrain affordances enough to prove terrain matters. | Win path requires `terrain_carved >= N`; loss path with no trench fails faster. | Side-by-side run bundles. | No full pathfinding doctrine. |
+| M2.5-004 HUD and feedback | `cf-ui`, `cf-render-2d` | Reactor hp, timer, active objective, enemy pressure, last terrain/refusal event, and material overlay all readable in capture grids. | Capture grid visual checks at 100/200%. | `summary_grid.png` referenced by notes. | No comic-noir polish. |
+| M2.5-005 win/loss scripts | `cf-e2e`, `scripts/cfctl/` | `defend_win` and `reactor_destroyed` scripts drive the same dispatch path as keyboard/control API. | cf-e2e expectations for mission result, loss reason, terrain count, reactor hp. | Bundles at 60 Hz and 120 Hz. | No OS-level input automation. |
+| M2.5-006 BP2 fun note | vault + repo docs | Implementation note answers whether chunked terrain made the game more fun than M1.5 and lists what still feels sterile. | Human gate template filled or `READY_FOR_HUMAN_PLAYTEST`. | `prototypes/native-m2-5-micro-reactor-defense.md`. | Do not claim final fun. |
 
-M3 E2E:
+M2.5 E2E:
+
+```bash
+cargo run -p cf-e2e -- --scenario micro_reactor_defense --script defend_win --capture-grid --expect mission.result=won --expect "terrain.terrain_carved.count>=1" --expect capture.summary_grid.non_blank_ratio>=0.95 --write-run-bundle
+cargo run -p cf-e2e -- --scenario micro_reactor_defense --script reactor_destroyed --capture-grid --expect mission.result=lost --expect mission.loss_reason=reactor_destroyed --expect capture.summary_grid.non_blank_ratio>=0.95 --write-run-bundle
+```
+
+Human gate: project-owner plays at least three runs and records whether the new terrain systems made the game more fun than M1.5.
+
+---
+
+## M3A — Event Recorder Core
+
+| ID | Owns | Build | Tests | Evidence | Anti-scope |
+|---|---|---|---|---|---|
+| M3A-001 event taxonomy lock | `cf-replay`, `references/prototype-run-bundle-schema.md` | Stable event envelope, category baseline, parent ids, schema versions, and required-field rejection. | Schema/event ordering tests; malformed event rejection tests. | Updated schema note if fields change. | No analytics service. |
+| M3A-002 snapshots/checksums | `cf-replay`, `cf-terrain`, `cf-actor`, `cf-equipment` | Actor/inventory/terrain snapshots at scene start/objective changes; deterministic checksums. | Checksum repeatability tests. | `snapshot.*` + `determinism.sim_checksum` events. | No full deterministic promise for cosmetics. |
+| M3A-003 headless replay verifier | `cf-headless`, `cf-replay` | Replay M2/M2.5/M1.5 bundles without rendering and verify checksums. | Replay compare test; 5-minute M2/M2.5 fixture. | First-divergence report on failure. | No network server yet. |
+| M3A-004 recorder backpressure | `cf-replay` | Dropped-event counters, non-blocking recorder path, bounded memory, backpressure events. | Stress event-volume test. | Summary volume/perf rows. | No cloud telemetry. |
+| M3A-005 run-finished outcome contract | `cf-replay`, `references/prototype-run-bundle-schema.md`, `tools/prototype_run_check.py` | Add `expected_outcome` to `run_manifest.json` constrained to `clean | panic | abort`; checker enforces `system.run_finished` for clean, panic event for panic, and declared abort semantics. | Engine unit/golden tests; live-WS mismatch test. | Checker rejects mismatches; acceptance bundles ship `expected_outcome`. | No retry/restart semantics. |
+| M3A-006 BP2 event audit | vault + repo docs | Audit M0/M1/M1.5/M2/M2.5 event coverage against every player-visible outcome, failure, terrain edit, AI tactic, and control action. | Contract Integrity Matrix has positive and negative/adversarial rows. | `prototypes/native-m3a-event-recorder-core.md`. | No viewer/debrief UI yet. |
+
+M3A E2E:
 
 ```bash
 cargo run -p cf-headless -- replay prototype_runs/native/<m2_run> --verify-checksums
+cargo run -p cf-headless -- replay prototype_runs/native/<m2_5_run> --verify-checksums
+```
+
+---
+
+## M3B — Replay Viewer And Debrief
+
+| ID | Owns | Build | Tests | Evidence | Anti-scope |
+|---|---|---|---|---|---|
+| M3B-001 viewer shell | `cf-ui`, `cf-replay`, `cf-tools-replay-viewer` | Event tail, category filter, tick scrubber, pause/step, and bundle loader. | Viewer smoke test; corrupt bundle rejection. | Viewer capture in bundle. | No polished replay browser. |
+| M3B-002 cause-chain view | `cf-ui`, `cf-replay` | Parent-chain view for `actor_died`, `mission_resolved`, terrain breach, reactor destroyed, and projectile hit. | Cause-chain golden tests. | Death/failure recap screenshot. | No analytics dashboard. |
+| M3B-003 debrief summary | `cf-ui`, `cf-mission` | Outcome, objectives, key events, damage/death recap, terrain changes, checksum status. | Debrief layout/capture tests. | Debrief artifact in BP3 note. | No campaign progression UI. |
+
+M3B E2E:
+
+```bash
+cargo run -p cf-tools-replay-viewer -- prototype_runs/native/<m2_5_run>
 ```
 
 ---

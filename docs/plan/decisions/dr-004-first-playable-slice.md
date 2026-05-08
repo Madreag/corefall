@@ -11,6 +11,7 @@ revisit_trigger: "When DR-001 (engine), DR-002 (replay), and the actor-feel sand
 # DR-004: First Playable Slice
 
 > [!info] Status: OPEN; LEAN: single-actor sandbox -> small squad mission -> bunker breach
+> BP1 has completed the A-side proof (M1 + M1.5). DR-004 remains open because the full first-playable promise is the B/C ladder culminating in M7's Breach Contract.
  
 ## Context
 
@@ -62,13 +63,14 @@ Decide what the first publicly-demoable slice contains. This shapes prototype or
 | OpenSoldat local audit adds control-state, reticle feedback, inherited projectile velocity, and weapon-feel schema lessons for slice A. | [[comparables/opensoldat-local-audit]] | High |
 | OpenLieroX local audit adds rope/tether mastery, material anchor rules, and short destructive arena lessons for a slice-A mobility lane. | [[comparables/openlierox-local-audit]] | High |
 | Slice A now has an implementation-facing prototype requirements page with scope, material set, event hooks, acceptance tests, first tickets, and kill criteria. | [[spec/actor-feel-sandbox-slice-a]] | High |
+| Native BP1 completed the A-side proof: M1 actor control + M1.5 micro breach win/loss with run-bundle evidence, cf-e2e scripts, and T-CAPTURE. | [[prototypes/native-m1-5-micro-breach]], [[spec/prototype-roadmap#Build Points (Roadmap V2)]] | High |
 | Solo-first promise dominates research direction. | [[strategy/best-cortex-like-game-principles]] | High |
 
 ## Current Recommendation
 
 Recommendation: **Sequenced A -> B -> C**, where:
 
-- A is the prototype slice (~2 weeks): single actor, small destructible scene, minimum HUD, basic gun, digger, grenade/charge, repair panel/foam, replay/event hooks, and one mobility tool lane (jetpack/grapple/tether variant) if it does not slow the core gun/dig loop. Detailed requirements live in [[spec/actor-feel-sandbox-slice-a]].
+- A is now represented by the native BP1 proof: single actor + micro breach. The remaining A-side lessons feed BP2's terrain/replay proof rather than reopening the actor lab.
 - B is the demo slice (~6-8 weeks after A): 3-actor squad, command overlay v0, body damage UI, replay recap.
 - C is the public alpha slice (~16-24 weeks after B): bunker breach with reinforcements, AI commander, replay/event scrub.
 
@@ -100,7 +102,7 @@ Reopen this decision when:
 
 - DR-001 (engine) settles; affects prototype velocity.
 - DR-002 (replay) settles; affects acceptance tests.
-- A is complete and B is scoped.
+- M7's Breach Contract either validates or invalidates the A -> B -> C sequencing.
 
 ## Source Trail
 

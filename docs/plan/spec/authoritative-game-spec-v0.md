@@ -304,7 +304,7 @@ Equipment is a shared system contract, not a catalog page.
 | Event envelope | Events use stable ids, run id, tick/time, category/type, actor/source ids, parent cause, and payload. | [[spec/replay-recorder-slice-a]], [[references/prototype-run-bundle-schema]]. |
 | Snapshots/checksums | Use hybrid semantic events plus actor/inventory/terrain snapshots and checksums. | DET-A tests. |
 | Viewer | Start with JSONL export, event tail, filters, parent-chain view, and failure recap before polished replay product. | REC-A-01..07. |
-| Run bundle | Every serious prototype run emits manifest, events, summary, notes, and captures. | `research_tools/prototype_run_check.py`. |
+| Run bundle | Every serious prototype run emits manifest, events, summary, notes, and captures. | Corefall uses `game/tools/prototype_run_check.py`; the vault original remains `research_tools/prototype_run_check.py`. |
 | Determinism | Only deterministic islands proven by checksums/divergence tests can be called deterministic. | [[systems/replay-determinism-and-run-evidence]]. |
 | Networking bridge | Event volume, snapshot size, dirty terrain chunks, hashes, and byte budgets feed multiplayer/backend decisions. | DR-005, DR-013, BACK-SCOPE. |
 
