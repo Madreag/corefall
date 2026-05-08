@@ -12,6 +12,38 @@ Use this file to summarize what changed in the implementation repo. Do not copy 
 
 ## Unreleased
 
+### Added (M1.5 — Micro Breach Fun Slice)
+
+- **Three real crates wired up** (replacing M0 stubs): `cf-mission` (objective state machine + `MissionState` / `MissionView`), `cf-terrain` (soft-breach barrier with M2-compatible event payloads + dig vocabulary `out_of_range` / `material_metal_nohook` / `already_broken` / `unknown_target`), `cf-ai` (DR-008 LEAN reactive guard: scripted job FSM + deterministic utility scoring + scripted aim-settle/miss-roll/burst pacing).
+- **New `act.player.dig` JSON-RPC method + cfctl `act player-dig --target <id>?` subcommand** routed through the same `M0Engine::dispatch` path the cf-app keyboard binding (`G`) uses. Eyes/ears/hands rule preserved.
+- **New `mission.*` / `terrain.*` / `ai.*` recorder event categories** layered on top of M1's existing categories. Layout-stable per DR-002 v1; `prototype-recorder-event.v0.1` envelope unchanged.
+- **`ObserveFrame` extended with `mission`, `breaches`, `enemies` projections** so cfctl + future bots see exactly what the HUD does.
+- **New scenario `content/scenarios/micro_breach.ron`** — 1280×720, 90 s timer, three objectives (breach `outer_wall` → neutralize guard 2 → reach extraction zone). Two breach strips (`outer_wall` concrete_soft, `anchor` metal_nohook). One reactive guard with custom miss_chance/damage/burst tuning.
+- **New cfctl scripts** `scripts/cfctl/micro_breach_win.cfctl.json` (wins in ~430 ticks) and `scripts/cfctl/micro_breach_loss.cfctl.json` (loses by player_dead in ~1015 ticks).
+- **Real `cf-e2e` runner** (was M0 stub). Auto-launches `cf-app --headless-smoke --control-api`, replays a cfctl script, then asserts on `--expect <key>=<value>` pairs. Supports shortcuts: `mission.result`, `mission.loss_reason`, `objective.<id>` → status lookup, `breach.<id>.broken`, `enemy.<actor>.state`. Exit code 0 only when every expectation passes.
+- **`cf-render-2d` extended with breach + extraction-zone sprite systems**. Concrete strips darken as HP drains; metal-nohook stays grey; broken strips fade. Extraction zone renders as a translucent green box (saturates when completed).
+- **`cf-ui` HUD extended** with six new lines (OBJECTIVE / MISSION timer / ENEMY hp+state+tactic / BREACH hp+range / EVENT label) plus 5 new formatter unit tests.
+- **`sim_state_v1` checksum extended** to hash actor world + breach world + reactive-guard state + mission objective statuses. Layout is append-only relative to M1 so the `_v1` suffix stays valid.
+- **JSON Schemas regenerated** to 26 entries (was 25): `act_player_dig_params.schema.json` joins the existing M0 + M1 catalog. Schema-drift CI gate still PASSES.
+- **Per-crate `AGENTS.md`** for `cf-mission`, `cf-terrain`, `cf-ai` updated from M0 stubs to the M1.5 surface.
+
+### Fixed (M1.5 stabilization — tick monotonicity race)
+
+- **`EngineHandle::snapshot` now records `control.observation_sent` BEFORE dropping the read lock.** Pre-fix, snapshot read `tick` under the read lock, dropped the lock, then recorded. With M1.5's ~3-events-per-tick from input/AI/mission, drive_tick (which takes the write lock) could insert higher-tick events between snapshot's read and record, producing non-monotonic `events.jsonl` ordering. M1's lower per-tick event count (1 input event + cadence checksums) hid the race. Fix moves the record into the lock scope so the recorder sees a consistent timeline.
+
+### Fixed (M1.5 stabilization — HUD fabricated enemy state)
+
+- **`cf-app::sync_actor_state_to_render` no longer hardcodes `enemy.state = "active"` / `enemy.last_tactic = "—"`.** Pre-fix, the HUD bridge fabricated these values regardless of the actual reactive guard's runtime state. Added `EnemyHudView` to `ActorRenderSnapshot` so cf-app reads real `state` + `last_tactic` from the engine; fallback labels only fire when no AI controller is attached. Caught during the project-local `/corefall-review` skill loop.
+
+### Acceptance bundles (all PASS via `python3 game/tools/prototype_run_check.py`)
+
+| run_id | mode | tick_rate_hz | ticks | events | result |
+|---|---|---:|---:|---:|---|
+| `m1.5_2026-05-08T01-27-46Z_d0068465` | cf-e2e win script | 60 | ~430 | 1549 | mission.result=won (4/4 expects PASS) |
+| `m1.5_2026-05-08T01-27-55Z_c836bcbd` | cf-e2e loss script | 60 | ~1015 | 4098 | mission.result=lost loss_reason=player_dead (3/3 expects PASS) |
+| `m1.5_2026-05-08T01-28-25Z_4e23570a` | cfctl run inline | 60 | 600 | 1835 | M1.5-SMOKE-01 PASS |
+| `m1.5_2026-05-08T01-28-27Z_f99e5cc2` | cfctl run inline | 120 | 600 | 1835 | tick-rate independence proof |
+
 ### Added (README and dependency hygiene)
 
 - Added `game/tools/dependency_drift_report.py`, a repo-local advisory report for direct workspace dependency drift and transitive duplicate crate versions.

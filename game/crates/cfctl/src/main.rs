@@ -187,6 +187,12 @@ enum ActAction {
     },
     /// `act.player.reset` — return to spawn with full HP / ammo.
     PlayerReset,
+    /// `act.player.dig` — M1.5 soft-breach dig request.
+    PlayerDig {
+        /// Optional explicit breach id; otherwise the engine picks the nearest in-range strip.
+        #[arg(long)]
+        target: Option<String>,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -518,6 +524,13 @@ async fn cmd_act(
                 .await?
         }
         ActAction::PlayerReset => session.send_request("act.player.reset", json!({})).await?,
+        ActAction::PlayerDig { target } => {
+            let mut params = serde_json::Map::new();
+            if let Some(t) = target {
+                params.insert("target".into(), json!(t));
+            }
+            session.send_request("act.player.dig", Value::Object(params)).await?
+        }
     };
     println!("{}", serde_json::to_string(&result).unwrap());
     session.close().await?;

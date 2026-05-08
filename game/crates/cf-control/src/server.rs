@@ -40,9 +40,10 @@ use crate::{
     },
     schemas::SCHEMA_VERSION,
     schemas::{
-        ActPlayerAimParams, ActPlayerFireParams, ActPlayerJumpParams, ActPlayerMoveParams, ActPlayerReloadParams,
-        ActPlayerResetParams, ActPlayerSelectItemParams, ObserveOnceParams, ObserveSubscribeParams,
-        RunBundleWriteParams, RunForTicksParams, ScenarioLoadParams, StepParams, SystemShutdownParams,
+        ActPlayerAimParams, ActPlayerDigParams, ActPlayerFireParams, ActPlayerJumpParams, ActPlayerMoveParams,
+        ActPlayerReloadParams, ActPlayerResetParams, ActPlayerSelectItemParams, ObserveOnceParams,
+        ObserveSubscribeParams, RunBundleWriteParams, RunForTicksParams, ScenarioLoadParams, StepParams,
+        SystemShutdownParams,
     },
     state::{ControlEnvelopeStatus, ObserveFrame, ObserveSettings},
     Settings,
@@ -97,22 +98,62 @@ impl SettingsPatch {
 
 #[derive(Debug, Clone)]
 pub enum ControlCommand {
-    ScenarioLoad { scenario: String, seed: Option<u64> },
+    ScenarioLoad {
+        scenario: String,
+        seed: Option<u64>,
+    },
     ScenarioReset,
     Pause,
     Resume,
-    Step { ticks: u64 },
-    RunForTicks { ticks: u64, write_run_bundle: bool },
-    ActPlayerMove { x: f32, y: f32, source: IntentSource },
-    ActPlayerJump { source: IntentSource },
-    ActPlayerAim { x: f32, y: f32, source: IntentSource },
-    ActPlayerFire { pressed: bool, source: IntentSource },
-    ActPlayerReload { source: IntentSource },
-    ActPlayerSelectItem { slot: u32, source: IntentSource },
-    ActPlayerReset { source: IntentSource },
-    SettingsSet { changes: SettingsPatch },
-    RunBundleWrite { id_override: Option<String> },
-    Shutdown { write_run_bundle: bool },
+    Step {
+        ticks: u64,
+    },
+    RunForTicks {
+        ticks: u64,
+        write_run_bundle: bool,
+    },
+    ActPlayerMove {
+        x: f32,
+        y: f32,
+        source: IntentSource,
+    },
+    ActPlayerJump {
+        source: IntentSource,
+    },
+    ActPlayerAim {
+        x: f32,
+        y: f32,
+        source: IntentSource,
+    },
+    ActPlayerFire {
+        pressed: bool,
+        source: IntentSource,
+    },
+    ActPlayerReload {
+        source: IntentSource,
+    },
+    ActPlayerSelectItem {
+        slot: u32,
+        source: IntentSource,
+    },
+    ActPlayerReset {
+        source: IntentSource,
+    },
+    /// M1.5: dig the soft-breach strip in front of the player. `target` is an
+    /// optional explicit breach id; `None` => pick the nearest in-range strip.
+    ActPlayerDig {
+        target: Option<String>,
+        source: IntentSource,
+    },
+    SettingsSet {
+        changes: SettingsPatch,
+    },
+    RunBundleWrite {
+        id_override: Option<String>,
+    },
+    Shutdown {
+        write_run_bundle: bool,
+    },
 }
 
 /// Trait that the engine implements so the server stays decoupled from `cf-app`.
@@ -545,6 +586,19 @@ async fn process_request<E: EngineHandle>(
                 .await;
             Some(ack_response(request.id, &result))
         }
+        "act.player.dig" => {
+            let p: ActPlayerDigParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerDig {
+                    target: p.target,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
         "act.settings.set" => {
             // Accept either a flat object {schema_version, ui_scale, ...} or a wrapped {schema_version, patch:{...}}.
             let patch_value = if params.get("patch").is_some() {
@@ -764,6 +818,9 @@ mod tests {
                 },
                 actors: vec![],
                 player_actor_id: None,
+                mission: None,
+                breaches: vec![],
+                enemies: vec![],
             }
         }
         async fn settings_snapshot(&self) -> Settings {

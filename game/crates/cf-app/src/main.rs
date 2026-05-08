@@ -21,10 +21,10 @@ use cf_control::{
     server::{ControlCommand, ControlServer, ControlServerConfig},
     EngineHandle, Settings,
 };
-use cf_render_2d::{ActorRenderState, ActorSpritePlugin, CfRenderPlugin};
+use cf_render_2d::{ActorRenderState, ActorSpritePlugin, BreachRender, CfRenderPlugin, ExtractionRender};
 use cf_replay::diagnostics;
 use cf_sim_core::WallClock;
-use cf_ui::{HudRifle, HudState, StatusStripPlugin};
+use cf_ui::{HudBreach, HudEnemy, HudMission, HudRifle, HudState, StatusStripPlugin};
 
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -494,6 +494,16 @@ fn ingest_player_input(
                 })
                 .await;
         }
+        // M1.5: G presses request a dig at the nearest in-range breach strip.
+        if keys.just_pressed(KeyCode::KeyG) {
+            let _ = holder
+                .0
+                .dispatch(ControlCommand::ActPlayerDig {
+                    target: None,
+                    source: IntentSource::Human,
+                })
+                .await;
+        }
         for (slot_key, slot) in [
             (KeyCode::Digit1, 0u32),
             (KeyCode::Digit2, 1u32),
@@ -596,6 +606,93 @@ fn sync_actor_state_to_render(
         reload_remaining_ticks: r.reload_remaining_ticks,
         reload_total_ticks: r.reload_total_ticks,
     });
+
+    // M1.5 — propagate mission, enemy, breach, extraction zone to renderer + HUD.
+    render_state.breaches = snapshot
+        .breaches
+        .iter()
+        .map(|b| BreachRender {
+            id: b.id.clone(),
+            bbox_min: b.bbox_min,
+            bbox_max: b.bbox_max,
+            hp: b.hp,
+            max_hp: b.max_hp,
+            broken: b.broken,
+            refusal_reason: b.refusal_reason.clone(),
+        })
+        .collect();
+    render_state.extraction_zone = snapshot.extraction_zone.as_ref().map(|z| ExtractionRender {
+        min: z.min,
+        max: z.max,
+        completed: z.completed,
+    });
+
+    hud_state.mission = snapshot.mission.as_ref().map(|m| HudMission {
+        result: m.result.clone(),
+        loss_reason: m.loss_reason.clone(),
+        elapsed_ticks: m.elapsed_ticks,
+        time_limit_ticks: m.time_limit_ticks,
+        ticks_remaining: m.ticks_remaining,
+        active_objective: m.active_objective.clone(),
+        last_event_label: m.last_event_label.clone(),
+    });
+    hud_state.last_event = snapshot.mission.as_ref().map(|m| m.last_event_label.clone());
+
+    // Pick the first non-controllable actor as the "enemy" for the HUD. The
+    // engine is the single source of truth — read state + last_tactic from the
+    // matching `EnemyHudView` if one exists (M1.5+), and fall back to neutral
+    // labels only when no AI controller is attached (early prototype scenarios).
+    hud_state.enemy = snapshot.actors.iter().find(|a| !a.controllable).map(|a| {
+        let enemy_view = snapshot.enemies.iter().find(|e| e.actor == a.id);
+        HudEnemy {
+            state: enemy_view.map(|e| e.state.clone()).unwrap_or_else(|| "—".to_string()),
+            last_tactic: enemy_view
+                .map(|e| e.last_tactic.clone())
+                .unwrap_or_else(|| "—".to_string()),
+            hp: a.hp,
+            hp_max: a.hp_max,
+            status: a.status.clone(),
+        }
+    });
+
+    // Pick the nearest breach to the player to surface in the HUD.
+    if let (Some(player), Some(_)) = (hud_state.player.as_ref(), snapshot.breaches.first()) {
+        let px = player.position[0];
+        let py = player.position[1];
+        // Match `cf_terrain::BreachStrip::distance_to`: distance to the nearest
+        // point on the AABB, clamped to zero when the player is inside.
+        let aabb_distance = |b: &cf_control::BreachRenderView| -> f32 {
+            let dx = (b.bbox_min[0] - px).max(0.0).max(px - b.bbox_max[0]);
+            let dy = (b.bbox_min[1] - py).max(0.0).max(py - b.bbox_max[1]);
+            ((dx * dx) + (dy * dy)).sqrt()
+        };
+        let mut best: Option<(&cf_control::BreachRenderView, f32)> = None;
+        for b in &snapshot.breaches {
+            let d = aabb_distance(b);
+            match best {
+                None => best = Some((b, d)),
+                Some((_, prev)) if d < prev => best = Some((b, d)),
+                _ => {}
+            }
+        }
+        if let Some((b, d)) = best {
+            // Mirror the engine's dig contract: a strip is in range when the
+            // AABB-boundary distance is within the strip's own `dig_range`.
+            hud_state.breach = Some(HudBreach {
+                id: b.id.clone(),
+                material: b.material.clone(),
+                hp: b.hp,
+                max_hp: b.max_hp,
+                broken: b.broken,
+                refusal_reason: b.refusal_reason.clone(),
+                in_range: d <= b.dig_range,
+            });
+        } else {
+            hud_state.breach = None;
+        }
+    } else {
+        hud_state.breach = None;
+    }
 }
 
 fn esc_or_close_to_exit(

@@ -11,6 +11,22 @@
         "$ref": "#/$defs/ActorView"
       }
     },
+    "breaches": {
+      "description": "M1.5: breach strips in the scenario. Empty for sandbox scenarios.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/BreachView"
+      }
+    },
+    "enemies": {
+      "description": "M1.5: reactive guards and their last-tick view. Empty for sandbox scenarios.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/EnemyView"
+      }
+    },
     "events": {
       "type": "array",
       "items": true
@@ -19,6 +35,17 @@
       "type": "integer",
       "format": "uint64",
       "minimum": 0
+    },
+    "mission": {
+      "description": "M1.5: mission state machine projection. `None` for sandbox scenarios.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/MissionView"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "player_actor_id": {
       "description": "Convenience pointer to the player actor in `actors` by id, if any.",
@@ -187,6 +214,255 @@
         "hp_max",
         "selected_slot",
         "selected_item"
+      ]
+    },
+    "BreachView": {
+      "type": "object",
+      "properties": {
+        "bbox_max": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "float"
+          },
+          "maxItems": 2,
+          "minItems": 2
+        },
+        "bbox_min": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "float"
+          },
+          "maxItems": 2,
+          "minItems": 2
+        },
+        "broken": {
+          "type": "boolean"
+        },
+        "dig_range": {
+          "type": "number",
+          "format": "float"
+        },
+        "hp": {
+          "type": "number",
+          "format": "float"
+        },
+        "id": {
+          "type": "string"
+        },
+        "material": {
+          "type": "string"
+        },
+        "max_hp": {
+          "type": "number",
+          "format": "float"
+        },
+        "refusal_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "material",
+        "bbox_min",
+        "bbox_max",
+        "hp",
+        "max_hp",
+        "broken",
+        "dig_range"
+      ]
+    },
+    "EnemyView": {
+      "type": "object",
+      "properties": {
+        "actor": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "aim": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "float"
+          },
+          "maxItems": 2,
+          "minItems": 2
+        },
+        "aim_settle_remaining_ticks": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "alert_dwell_remaining_ticks": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "ammo": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "fire_cooldown_ticks": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "last_tactic": {
+          "type": "string"
+        },
+        "mag_capacity": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "reload_remaining_ticks": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "state": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "actor",
+        "state",
+        "last_tactic",
+        "ammo",
+        "mag_capacity",
+        "fire_cooldown_ticks",
+        "reload_remaining_ticks",
+        "aim_settle_remaining_ticks",
+        "alert_dwell_remaining_ticks",
+        "aim"
+      ]
+    },
+    "MissionView": {
+      "description": "M1.5 mission projection (re-exposed via JsonSchema-friendly types).",
+      "type": "object",
+      "properties": {
+        "active_objective": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "elapsed_ticks": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "last_event_label": {
+          "type": "string"
+        },
+        "last_event_tick": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "loss_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "objectives": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ObjectiveView"
+          }
+        },
+        "result": {
+          "type": "string"
+        },
+        "ticks_remaining": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "time_limit_ticks": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "result",
+        "elapsed_ticks",
+        "time_limit_ticks",
+        "objectives",
+        "last_event_tick",
+        "last_event_label"
+      ]
+    },
+    "ObjectiveView": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "optional": {
+          "type": "boolean"
+        },
+        "status": {
+          "type": "string"
+        },
+        "target_actor": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "target_breach": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "zone_max": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "number",
+            "format": "float"
+          },
+          "maxItems": 2,
+          "minItems": 2
+        },
+        "zone_min": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "number",
+            "format": "float"
+          },
+          "maxItems": 2,
+          "minItems": 2
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "status",
+        "optional"
       ]
     },
     "ObserveSettings": {

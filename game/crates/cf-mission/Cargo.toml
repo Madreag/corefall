@@ -10,3 +10,4 @@ publish.workspace = true
 serde = { workspace = true }
 ron = { workspace = true }
 tracing = { workspace = true }
+cf-actor = { path = "../cf-actor" }

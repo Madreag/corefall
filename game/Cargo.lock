@@ -1310,6 +1310,8 @@ dependencies = [
 name = "cf-ai"
 version = "0.0.1"
 dependencies = [
+ "cf-actor",
+ "cf-sim-core",
  "serde",
  "tracing",
 ]
@@ -1381,10 +1383,13 @@ dependencies = [
  "async-trait",
  "blake3",
  "cf-actor",
+ "cf-ai",
  "cf-equipment",
+ "cf-mission",
  "cf-physics",
  "cf-replay",
  "cf-sim-core",
+ "cf-terrain",
  "chrono",
  "futures-util",
  "hex",
@@ -1403,7 +1408,14 @@ name = "cf-e2e"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "cf-control",
+ "cf-replay",
  "clap",
+ "futures-util",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tokio-tungstenite",
  "tracing",
  "tracing-subscriber",
 ]
@@ -1438,6 +1450,7 @@ dependencies = [
 name = "cf-mission"
 version = "0.0.1"
 dependencies = [
+ "cf-actor",
  "ron",
  "serde",
  "tracing",

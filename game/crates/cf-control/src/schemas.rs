@@ -123,6 +123,16 @@ pub struct ActPlayerResetParams {
     pub schema_version: u32,
 }
 
+/// `act.player.dig` — M1.5 soft-breach dig request. `target` picks an explicit
+/// breach id; `None` means dig the nearest in-range strip.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerDigParams {
+    pub schema_version: u32,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub target: Option<String>,
+}
+
 fn default_true() -> bool {
     true
 }
@@ -181,6 +191,7 @@ pub fn dump_v1() -> BTreeMap<String, String> {
         entry::<ActPlayerReloadParams>("act_player_reload_params"),
         entry::<ActPlayerSelectItemParams>("act_player_select_item_params"),
         entry::<ActPlayerResetParams>("act_player_reset_params"),
+        entry::<ActPlayerDigParams>("act_player_dig_params"),
         entry::<RunBundleWriteParams>("run_bundle_write_params"),
         entry::<SystemShutdownParams>("system_shutdown_params"),
         entry::<SettingsPatch>("settings_patch"),

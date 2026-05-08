@@ -67,6 +67,30 @@ pub struct ActorRenderState {
     pub region_anchor_x: f32,
     pub region_anchor_y: f32,
     pub floor_y: f32,
+    /// M1.5 breach strips (id + bbox + hp). Empty for non-breach scenarios.
+    pub breaches: Vec<BreachRender>,
+    /// M1.5 extraction zone if the scenario carries a `ReachZone` objective.
+    pub extraction_zone: Option<ExtractionRender>,
+}
+
+/// M1.5 render-side projection of a breach strip.
+#[derive(Debug, Clone)]
+pub struct BreachRender {
+    pub id: String,
+    pub bbox_min: [f32; 2],
+    pub bbox_max: [f32; 2],
+    pub hp: f32,
+    pub max_hp: f32,
+    pub broken: bool,
+    pub refusal_reason: Option<String>,
+}
+
+/// M1.5 render-side projection of the extraction zone.
+#[derive(Debug, Clone)]
+pub struct ExtractionRender {
+    pub min: [f32; 2],
+    pub max: [f32; 2],
+    pub completed: bool,
 }
 
 /// Spawned per actor; carries the actor id so the render system can update or
@@ -84,6 +108,16 @@ pub struct FloorRenderTag;
 #[derive(Component, Debug)]
 pub struct ReticleRenderTag;
 
+/// Marker for the M1.5 extraction zone sprite (the green goal box).
+#[derive(Component, Debug)]
+pub struct ExtractionZoneTag;
+
+/// Marker for one M1.5 breach strip rendered as a colored block.
+#[derive(Component, Debug, Clone)]
+pub struct BreachRenderTag {
+    pub id: String,
+}
+
 /// Plugin that wires actor / floor / reticle rendering. Call after [`CfRenderPlugin`].
 pub struct ActorSpritePlugin;
 
@@ -91,7 +125,10 @@ impl Plugin for ActorSpritePlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ActorRenderState>()
             .add_systems(Startup, spawn_floor_and_reticle)
-            .add_systems(Update, sync_actor_sprites);
+            .add_systems(
+                Update,
+                (sync_actor_sprites, sync_breach_sprites, sync_extraction_zone).chain(),
+            );
     }
 }
 
@@ -228,6 +265,117 @@ fn sync_actor_sprites(
 
     // Mark the resource clean for the next bridge write.
     state.set_changed();
+}
+
+/// M1.5: spawn / update / despawn breach strip sprites from the engine snapshot.
+fn sync_breach_sprites(
+    mut commands: Commands,
+    state: Res<ActorRenderState>,
+    mut breach_query: Query<(Entity, &BreachRenderTag, &mut Transform, &mut Sprite)>,
+) {
+    use std::collections::HashMap;
+    let mut existing: HashMap<String, Entity> = HashMap::new();
+    for (entity, tag, _, _) in breach_query.iter() {
+        existing.insert(tag.id.clone(), entity);
+    }
+    let mut keep: HashMap<String, ()> = HashMap::new();
+    for breach in &state.breaches {
+        keep.insert(breach.id.clone(), ());
+        let centre = Vec2::new(
+            (breach.bbox_min[0] + breach.bbox_max[0]) * 0.5,
+            (breach.bbox_min[1] + breach.bbox_max[1]) * 0.5,
+        );
+        let size = Vec2::new(
+            (breach.bbox_max[0] - breach.bbox_min[0]).max(1.0),
+            (breach.bbox_max[1] - breach.bbox_min[1]).max(1.0),
+        );
+        let color = breach_color(breach);
+        if let Some(entity) = existing.get(&breach.id) {
+            if let Ok((_, _, mut transform, mut sprite)) = breach_query.get_mut(*entity) {
+                transform.translation = Vec3::new(centre.x, centre.y, -0.25);
+                sprite.color = color;
+                sprite.custom_size = Some(size);
+            }
+        } else {
+            commands.spawn((
+                Sprite {
+                    color,
+                    custom_size: Some(size),
+                    ..default()
+                },
+                Transform::from_translation(Vec3::new(centre.x, centre.y, -0.25)),
+                BreachRenderTag { id: breach.id.clone() },
+                Name::new(format!("cf::render::breach::{}", breach.id)),
+            ));
+        }
+    }
+    for (entity, tag, _, _) in breach_query.iter() {
+        if !keep.contains_key(&tag.id) {
+            commands.entity(entity).despawn();
+        }
+    }
+}
+
+/// M1.5: spawn / update / despawn the extraction-zone sprite.
+fn sync_extraction_zone(
+    mut commands: Commands,
+    state: Res<ActorRenderState>,
+    mut zone_query: Query<(Entity, &mut Transform, &mut Sprite), With<ExtractionZoneTag>>,
+) {
+    match (&state.extraction_zone, zone_query.iter_mut().next()) {
+        (Some(zone), Some((_, mut transform, mut sprite))) => {
+            let centre = Vec2::new((zone.min[0] + zone.max[0]) * 0.5, (zone.min[1] + zone.max[1]) * 0.5);
+            let size = Vec2::new(
+                (zone.max[0] - zone.min[0]).max(1.0),
+                (zone.max[1] - zone.min[1]).max(1.0),
+            );
+            transform.translation = Vec3::new(centre.x, centre.y, -0.4);
+            sprite.color = if zone.completed {
+                Color::srgba(0.30, 0.95, 0.50, 0.40)
+            } else {
+                Color::srgba(0.30, 0.85, 0.30, 0.25)
+            };
+            sprite.custom_size = Some(size);
+        }
+        (Some(zone), None) => {
+            let centre = Vec2::new((zone.min[0] + zone.max[0]) * 0.5, (zone.min[1] + zone.max[1]) * 0.5);
+            let size = Vec2::new(
+                (zone.max[0] - zone.min[0]).max(1.0),
+                (zone.max[1] - zone.min[1]).max(1.0),
+            );
+            commands.spawn((
+                Sprite {
+                    color: Color::srgba(0.30, 0.85, 0.30, 0.25),
+                    custom_size: Some(size),
+                    ..default()
+                },
+                Transform::from_translation(Vec3::new(centre.x, centre.y, -0.4)),
+                ExtractionZoneTag,
+                Name::new("cf::render::extraction_zone"),
+            ));
+        }
+        (None, Some((entity, _, _))) => {
+            commands.entity(entity).despawn();
+        }
+        (None, None) => {}
+    }
+}
+
+fn breach_color(breach: &BreachRender) -> Color {
+    if breach.broken {
+        Color::srgba(0.40, 0.30, 0.20, 0.25)
+    } else if breach.refusal_reason.is_some() {
+        Color::srgb(0.55, 0.55, 0.60)
+    } else {
+        let pct = if breach.max_hp > 0.0 {
+            (breach.hp / breach.max_hp).clamp(0.0, 1.0)
+        } else {
+            1.0
+        };
+        // Solid concrete tone darkens as the strip is dug down.
+        let v = 0.25 + 0.40 * pct;
+        Color::srgb(v, v * 0.85, v * 0.70)
+    }
 }
 
 fn actor_color(actor: &ActorObservation) -> Color {

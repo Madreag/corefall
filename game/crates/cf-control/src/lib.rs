@@ -15,7 +15,10 @@ pub mod server;
 pub mod settings;
 pub mod state;
 
-pub use engine::{run_m0_inline, M0Engine, M0EngineConfig, M0EngineOutcome};
+pub use engine::{
+    run_m0_inline, ActorRenderSnapshot, BreachRenderView, EnemyHudView, ExtractionZoneView, InitialActorWorld,
+    InitialBreachWorld, InitialGuard, M0Engine, M0EngineConfig, M0EngineOutcome, MissionHudView, RifleHudView,
+};
 pub use envelope::{
     error_codes, JsonRpcError, JsonRpcId, JsonRpcMessage, JsonRpcNotification, JsonRpcRequest, JsonRpcResponse,
     METHOD_OBSERVE_FRAME,
@@ -27,4 +30,7 @@ pub use server::{
     async_trait, CommandResult, ControlCommand, ControlServer, ControlServerConfig, EngineHandle, SettingsPatch,
 };
 pub use settings::Settings;
-pub use state::{AccessibilityFlagsView, ControlEnvelopeStatus, EngineState, ObserveFrame, ObserveSettings, RunStatus};
+pub use state::{
+    AccessibilityFlagsView, ActorView, BreachView, ControlEnvelopeStatus, EnemyView, EngineState, MissionView,
+    ObjectiveView, ObserveFrame, ObserveSettings, RunStatus,
+};
