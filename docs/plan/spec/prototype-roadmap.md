@@ -73,6 +73,9 @@ feeds:
 > [!warning] Authority boundary
 > This is a planning anchor. Milestones, ticket counts, and per-feature detail will move as evidence comes in. The structure (M0..M12 + side tracks) is committed. Specific timelines and ticket boundaries will be tuned per milestone.
 
+> [!important] Roadmap V2 (2026-05-08): additive enhancements layered on top
+> The 2026-05-08 V2 pass added a [[#Build Points (Roadmap V2)|Build Points]] layer (BP0..BP12) on top of milestones, three M1.5-shaped micro-fun-slice interludes ([[#M2.5 — Micro Reactor Defense Fun Slice|M2.5]], [[#M5.5.5 — Micro Sabotage Fun Slice|M5.5.5]], [[#M5.9.5 — Micro Pressure Hold Fun Slice|M5.9.5]]), an explicit M3 → **M3A** (event core) + **M3B** (viewer/debrief) split, an explicit M4 → **M4A** (readability + ACC-A floor) + **M4B** (comic-noir polish) split, and four new production side tracks ([[#T-CONTENT-ART — AI-Authored Art, Animation, VFX, And Roster|T-CONTENT-ART]], [[#T-CONTENT-NARRATIVE — Narrative Bible, Codex, And Dialogue|T-CONTENT-NARRATIVE]], [[#T-LOCALIZATION — Strings, Fonts, And Mod-Localization|T-LOCALIZATION]], [[#T-LIVEOPS — Telemetry, Marketing, Launch, And Live-Ops|T-LIVEOPS]]) that explicitly run **off** the gameplay milestone spine and finalize at BP12. **Nothing was renumbered**: M0..M12 + .x sub-milestones, all DR ids, all task-card ids, all run-bundle naming conventions stay stable for backward compat with prior implementation logs / bundles / PRs. The V2 enhancements are additive contracts that workers MUST treat as authoritative going forward.
+
 ---
 
 ## Table Of Contents
@@ -100,6 +103,7 @@ feeds:
 - [[#Bug Log Format|Bug Log Format]]
 - [[#Inter-Milestone Bridges|Inter-Milestone Bridges]]
 - [[#Per-Milestone Kickoff Smoke|Per-Milestone Kickoff Smoke]]
+- [[#Build Points (Roadmap V2)|Build Points (Roadmap V2)]]
 - [[#Milestone Map|Milestone Map]]
 - [[#Side Tracks|Side Tracks]]
 - [[#Milestone Details|Milestone Details]]
@@ -107,23 +111,32 @@ feeds:
   - [[#M1 — Actor Controller And Sim Core|M1 — Actor Controller And Sim Core]]
   - [[#M1.5 — Micro Breach Fun Slice|M1.5 — Micro Breach Fun Slice]]
   - [[#M2 — Pixel Terrain And Materials|M2 — Pixel Terrain And Materials]]
+  - [[#M2.5 — Micro Reactor Defense Fun Slice|M2.5 — Micro Reactor Defense Fun Slice]]
   - [[#M3 — Replay And Event Recorder|M3 — Replay And Event Recorder]]
   - [[#M4 — HUD And Comic-Noir UI|M4 — HUD And Comic-Noir UI]]
   - [[#M5 — Equipment, Chassis, And Damage Grammar|M5 — Equipment, Chassis, And Damage Grammar]]
   - [[#M5.5 — Full Collision Gauntlet|M5.5 — Full Collision Gauntlet]]
+  - [[#M5.5.5 — Micro Sabotage Fun Slice|M5.5.5 — Micro Sabotage Fun Slice]]
   - [[#M5.6 — Material Kernel|M5.6 — Material Kernel]]
   - [[#M5.7 — Hazard Package|M5.7 — Hazard Package]]
+  - [[#M5.8 — Origin Resource & Overclock Pass|M5.8 — Origin Resource & Overclock Pass]]
+  - [[#M5.9 — Atmospherics-Grade Kernel|M5.9 — Atmospherics-Grade Kernel]]
+  - [[#M5.9.5 — Micro Pressure Hold Fun Slice|M5.9.5 — Micro Pressure Hold Fun Slice]]
+  - [[#M5.10 — Environmental Conditions Aggregation|M5.10 — Environmental Conditions Aggregation]]
   - [[#M6 — AI Core And Trust Harness|M6 — AI Core And Trust Harness]]
   - [[#M6.5 — LLM Mind Lab|M6.5 — LLM Mind Lab]]
-  - [[#M6.6 — AI Material Competence|M6.6 — AI Material Competence]]
-  - [[#M7 — Mission Director And Breach Contract Proof Mission|M7 — Mission Director And Breach Contract Proof Mission]]
-  - [[#M7.5 — Base Atmospherics|M7.5 — Base Atmospherics]]
+  - [[#M6.6 — AI Environmental Competence (Promoted From AI Material Competence Per DR-040)|M6.6 — AI Environmental Competence]]
+  - [[#M7 — Mission Director, Breach Contract Proof Mission, And Bunker Defence Proof Mission (Per DR-042)|M7 — Mission Director + Breach Contract + Bunker Defence Proof Missions]]
+  - [[#M7.5 — Base Atmospherics (Extended For Stationeers-Grade Per DR-037)|M7.5 — Base Atmospherics]]
+  - [[#M7.7 — Day/Night, Weather & Dynamic Events (Per DR-039 + DR-040)|M7.7 — Day/Night, Weather & Dynamic Events]]
   - [[#M8 — Scenario Editor And Mod Tools|M8 — Scenario Editor And Mod Tools]]
   - [[#M8.5 — Material Lab|M8.5 — Material Lab]]
+  - [[#M8.6 — Mining And Extraction (Per DR-041)|M8.6 — Mining And Extraction]]
   - [[#M9 — Dedicated Server App + Determinism Islands|M9 — Dedicated Server App + Determinism Islands]]
+  - [[#M9.5 — Voice & Radio Comms (Per DR-043)|M9.5 — Voice & Radio Comms]]
   - [[#M10 — LAN Co-op|M10 — LAN Co-op]]
-  - [[#M11 — Online Co-op (Self-Hosted Dedicated Servers)|M11 — Online Co-op (Self-Hosted Dedicated Servers)]]
-  - [[#M12 — Public PvP Arenas + Persistent MMO Shards|M12 — Public PvP Arenas + Persistent MMO Shards]]
+  - [[#M11 — Online Co-op (Self-Hosted Dedicated Servers) — Extended For Full Match Grammar Per DR-042|M11 — Online Co-op (Self-Hosted Dedicated Servers)]]
+  - [[#M12 — Public PvP Arenas + Persistent MMO Shards — Extended With Bunker Defence Flagship Per DR-042 + Realistic Comms Per DR-043|M12 — Public PvP Arenas + Persistent MMO Shards]]
 - [[#Side Track Details|Side Track Details]]
   - [[#T-LLM — Async LLM Mind Layer|T-LLM — Async LLM Mind Layer]]
   - [[#T-CONTROL — AI Control And Observability|T-CONTROL — AI Control And Observability]]
@@ -137,6 +150,10 @@ feeds:
   - [[#T-SAVE — Save Game System|T-SAVE — Save Game System]]
   - [[#T-ACCESSIBILITY — Accessibility Floor|T-ACCESSIBILITY — Accessibility Floor]]
   - [[#T-PERF — Performance Targets, Multicore CPU, And GPU Budgets|T-PERF — Performance Targets, Multicore CPU, And GPU Budgets]]
+  - [[#T-CONTENT-ART — AI-Authored Art, Animation, VFX, And Roster|T-CONTENT-ART — AI-Authored Art, Animation, VFX, And Roster]]
+  - [[#T-CONTENT-NARRATIVE — Narrative Bible, Codex, And Dialogue|T-CONTENT-NARRATIVE — Narrative Bible, Codex, And Dialogue]]
+  - [[#T-LOCALIZATION — Strings, Fonts, And Mod-Localization|T-LOCALIZATION — Strings, Fonts, And Mod-Localization]]
+  - [[#T-LIVEOPS — Telemetry, Marketing, Launch, And Live-Ops|T-LIVEOPS — Telemetry, Marketing, Launch, And Live-Ops]]
 - [[#Dependency Graph|Dependency Graph]]
 - [[#Feature Index|Feature Index]]
 - [[#Validation Command Matrix|Validation Command Matrix]]
@@ -380,6 +397,8 @@ When a milestone gathers evidence that **invalidates** a still-open lean, the wo
 | Corefall review loop | Every milestone before acceptance. | From `/Users/erol/projects/corefall`, run `/corefall-review <milestone>` in Claude Code, fix every verified issue, then rerun `/corefall-review <milestone>` until the verdict is `Accept` or the user explicitly approves each exact remaining deferral. |
 | Review findings | Every milestone. | Every verified Low/Medium/High/Blocker finding must be fixed before acceptance unless the user explicitly approves deferring that exact finding. Record any approved deferral with issue ID, reason, owner, next checkpoint, and evidence path. |
 | Contract integrity matrix | Every milestone. | Prove app/tool/control/server/replay paths share source-of-truth logic; accepted commands truly mutate or reject; mandatory fields reject missing/malformed inputs; run bundles and checklist rows are source-truthful. |
+| Build Point closure note (Roadmap V2) | Every BP closure (LAST milestone inside the BP). | Vault note `prototypes/build-point-bp<n>-<short-name>.md` per [[#Build Points (Roadmap V2)]] BP completion gate: lists every closed milestone + BP playable artifact (cfctl scripts + bundles for win + loss) + DR closures/refreshes + same-pass index/dashboard updates + known follow-ups. A BP does NOT advance until this note exists. |
+| Human-playtest gate per BP (Roadmap V2) | Every BP that ships a playable artifact (BP1, BP2, BP4, BP5, BP7, BP9, BP10, BP11, BP12). | Project-owner verbal reaction recorded inline in the BP closure note; if unavailable, mark `READY_FOR_HUMAN_PLAYTEST`. Production tracks (T-CONTENT-*, T-LOCALIZATION, T-LIVEOPS) DO NOT require playtest gates per BP — they finalize at BP12 only. |
 
 ---
 
@@ -1490,6 +1509,15 @@ Some milestones produce stubs that later milestones must replace without breakin
 | Bridge | Producer | Consumer | Contract |
 |---|---|---|---|
 | Soft-breach surface → real terrain | M1.5 | M2 | M1.5 emits `terrain_carved` events with the same field shape (`{ tick, bbox, material_before, material_after, count }`) M2 will produce. M1.5 may emit `terrain_breach_stub` events alongside, but `terrain_carved` is the canonical event and must validate against `prototype-recorder-event.schema.json`. |
+| M1.5 mission state machine → M2.5 reactor defense | M1.5 | M2.5 | `cf-mission` types (`Objective`, `MissionState`, `MissionView`, `LossConditions`) reused unchanged. M2.5 adds a `defend_reactor` `ObjectiveKind` variant or reuses `NeutralizeActor` with a non-controllable reactor "actor" id. Mission events stay in the `mission.*` category. |
+| M1.5 reactive guard → M2.5 reactor defender | M1.5 | M2.5 | `cf-ai::ReactiveGuard` reused unchanged. M2.5 may tune `ReactiveGuardParams` per scenario but MUST NOT introduce new `GuardState` or `Tactic` variants without updating `cf-ai` first. |
+| M1.5 soft-breach strip → M2 chunked terrain (BP2 swap) | M1.5 | M2/M2.5 | M2.5 uses M2 chunked terrain directly (not `cf-terrain::BreachWorld`). The M1.5 `BreachWorld` type stays available for backward compat but new scenarios SHOULD use chunked terrain. The `terrain.terrain_breach_stub` event retires at BP2 closure; `terrain.terrain_carved` stays canonical. |
+| M5.5 collision events → M5.5.5 sabotage | M5.5 | M5.5.5 | M5.5.5 reuses `collision.collision_contact_started/persisted/ended`, `collision.contact_impulse_applied`, `collision.collision_damage_applied`. M5.5.5 MUST NOT introduce new collision event types; if a tactic needs a new event, add it to `cf-physics` first and bump M5.5 task cards. |
+| M5.5.5 physics-kill telemetry → M6 AI tactical learning | M5.5.5 | M6 | `mission.physics_kill_count` field becomes a stable mission-state field. M6 AI utility scoring may read it as a "non-rifle kill bias" signal. Field shape: `{ count: u32, last_cause: "crush/debris_impact/momentum/etc" }`. |
+| M5.9 atmospherics + affliction events → M5.9.5 pressure hold | M5.9 | M5.9.5 | M5.9.5 reuses `atmospherics.pressure_changed/gas_mix_changed/ignition/room_vented` and `affliction.suffocation/hyperoxia/hypothermia`. M5.9.5 MUST NOT introduce new atmospherics event types; if a tactic needs a new event, add it to `cf-atmos` first and bump M5.9 task cards. |
+| M5.9.5 atmospheric-kill telemetry → M6.6 AI environmental competence | M5.9.5 | M6.6 | `mission.atmospheric_kill: bool` becomes a stable mission-state field. M6.6 AI environmental competence regression tests assert AI doesn't ignore atmospheric kill opportunities AND doesn't blindly walk into vented rooms. |
+| M3A event taxonomy → M3B viewer | M3A | M3B | M3A locks the event envelope + checksums + headless replay. M3B layers viewer + scrub + cause-chain on top WITHOUT changing the envelope. Event additions during M3B require a fresh DR-002 confirmation pass. |
+| M4A readability HUD → M4B comic-noir polish | M4A | M4B | M4A locks the `cf-ui::HudState` resource shape + ACC-A floor. M4B layers comic-noir styling + DR-019 polish ON TOP of the same `HudState` without renaming fields; new fields require a migration entry per the existing M1.5/M4 mini-HUD bridge. |
 | Reactive enemy → AI core | M1.5 | M6 | M1.5 enemy emits `ai_perception`, `tactic_chosen`, `weapon_fired`, `actor_status_changed` with reason labels. The same event names and reason-label vocabulary are reused by M6. |
 | Mini HUD → comic-noir HUD | M1.5/M4 | M4/M7 | Mini HUD writes status to the same `cf-ui::HudState` resource M4 reads. Adding fields is allowed; renames require a migration entry. |
 | Scenario manifest skeleton → full schema | M0/M1.5 | M7 | Scenario RON files bump `schema_version` only with a registered migration handler. Older scenarios continue to load via migration. |
@@ -1524,25 +1552,101 @@ Before doing any feature work, the agent runs the milestone's kickoff smoke. If 
 | M1.5 | `cargo run -p cfctl -- script run micro_breach_win --write-run-bundle` | Win path completes; bundle validates. |
 | M1.5 | `cargo run -p cfctl -- script run micro_breach_loss --write-run-bundle` | Loss path completes; bundle validates. |
 | M2 | `cargo run -p cf-e2e -- --scenario m2_material_lane --script dig_concrete_refuse_metal --expect win --write-run-bundle` | All 8 materials behave per affordance. |
-| M3 | `cargo run -p cf-headless -- replay prototype_runs/native/<m2_run> --verify-checksums` | Headless replay matches checksums. |
-| M4 | `cargo run -p cf-e2e -- --scenario micro_breach --ui-scale 2.0 --high-contrast --verify-focus --write-run-bundle` | UI passes ACC-A floor. |
+| M2.5 | `cargo run -p cf-e2e -- --scenario micro_reactor_defense --script defend_win --expect mission.result=won --write-run-bundle` | Win path completes using M2 chunked terrain; bundle validates. |
+| M2.5 | `cargo run -p cf-e2e -- --scenario micro_reactor_defense --script reactor_destroyed --expect mission.result=lost --expect mission.loss_reason=reactor_destroyed --write-run-bundle` | Loss path completes; bundle validates. |
+| M3A | `cargo run -p cf-headless -- replay prototype_runs/native/<m2_run> --verify-checksums` | Headless replay matches checksums; event taxonomy locked. |
+| M3B | `cargo run -p cf-tools-replay-viewer -- prototype_runs/native/<m2_5_run>` | Viewer scrubs through events; cause-chain renders for `actor_died` and `mission_resolved`. |
+| M4A | `cargo run -p cf-e2e -- --scenario micro_breach --ui-scale 2.0 --high-contrast --verify-focus --write-run-bundle` | HUD readable; ACC-A floor passes (DR-012 closure). |
+| M4B | `cargo run -p cf-e2e -- --scenario breach_contract --verify-comic-noir --write-run-bundle` | Comic-noir mission cards + status banners + DR-019 polish landed. |
 | M5 | `cargo run -p cf-e2e -- --scenario m5_chassis_wreck_eject --expect pilot_extracted --write-run-bundle` | Chassis grammar end-to-end. |
 | M5.5 | `cargo run -p cf-e2e -- --scenario m5_5_full_collision_gauntlet --suite COLL-001..COLL-012 --write-run-bundle` | Full collision matrix, CCD, projectile-projectile, impulse damage, replay, and perf evidence exist. |
+| M5.5.5 | `cargo run -p cf-e2e -- --scenario micro_sabotage --script physics_kill_win --expect mission.result=won --expect "mission.physics_kill_count>=1" --write-run-bundle` | Win path requires at least one non-rifle physics kill. |
+| M5.5.5 | `cargo run -p cf-e2e -- --scenario micro_sabotage --script timer_loss --expect mission.result=lost --write-run-bundle` | Loss path completes; bundle validates. |
 | M5.6 | `cargo run -p cf-e2e -- --scenario m5_6_material_kernel --suite MAT-01,MAT-02,MAT-03,MAT-06,MAT-13 --write-run-bundle` | Material kernel + reaction table + density layering + replay determinism. |
 | M5.7 | `cargo run -p cf-e2e -- --scenario m5_7_hazard_package --suite MAT-04,MAT-05,MAT-07,MAT-08-stub --write-run-bundle` | Acid/electricity/debris/ingestion damage routes through armor/limbs. |
+| M5.8 | `cargo run -p cf-e2e -- --scenario m5_8_origin_overclock --suite ORIGIN-A-01..ORIGIN-A-12 --write-run-bundle` | Per-origin reaction matrix (human/android/robot) at runtime; G-Force vision blackout HUD with accessibility fallback. |
 | M5.9 | `cargo run -p cf-e2e -- --scenario m5_9_atmospherics_kernel --suite ATMOS-A-01..ATMOS-A-19,GRAV-A-01..GRAV-A-10 --write-run-bundle` | Stationeers-grade-or-better PV=nRT atmospheres, pressure apertures, wind/liquid jets, material heat transfer, thermal tools, gravity/ballistics coupling, replay determinism, and perf evidence. |
+| M5.9.5 | `cargo run -p cf-e2e -- --scenario micro_pressure_hold --script atmospheric_kill_win --expect mission.result=won --expect "mission.atmospheric_kill=true" --write-run-bundle` | Win path requires kill via atmospherics, not direct fire. |
+| M5.9.5 | `cargo run -p cf-e2e -- --scenario micro_pressure_hold --script suffocation_loss --expect mission.result=lost --write-run-bundle` | Loss path completes; bundle validates. |
+| M5.10 | `cargo run -p cf-e2e -- --scenario m5_10_environment_aggregation --suite ENV-A-01..ENV-A-15,ASTRO-A-01..ASTRO-A-05 --write-run-bundle` | EnvironmentSignal aggregator within 5% frame budget; 12 launch worlds; comms light-lag deterministic. |
 | M6 | `cargo run -p cf-ai --bin ai_harness -- --suite AI-H-01..AI-H-06 --write-run-bundle` | Harness suite passes. |
 | M6.5 | `cargo run -p cf-ai --bin mind_lab -- --suite MIND-001..MIND-010 --provider mock --write-run-bundle` | Mind lab suite passes against mock; local AI keeps acting through provider sleep/fail/stale; replay shows mind events. |
 | M6.6 | `cargo run -p cf-ai --bin ai_harness -- --suite AI-MAT-01..AI-MAT-08 --write-run-bundle` | AI material competence suite passes; AI avoids/uses materials with reason labels. |
 | M7 | `cargo run -p cf-e2e -- --scenario breach_contract --script win_path --expect win --write-run-bundle` | Breach Contract win path is real. |
+| M7 | `cargo run -p cf-server -- --mode coop_room --scenario bunker_defence_2v2` | Bunker Defence 2v2 proof mission per DR-042 boots end-to-end. |
 | M7.5 | `cargo run -p cf-e2e -- --scenario m7_5_base_atmospherics --suite MAT-09,MAT-10,ATMOS-A-16..ATMOS-A-19 --write-run-bundle` | Base room/pipe/vent/oxygen/pressure/fire/thermal networks; flooding, breach apertures, pressure/liquid jets, thermal recovery, and repair scenarios pass. |
+| M7.7 | `cargo run -p cf-e2e -- --scenario m7_7_weather_kernel --suite WEATHER-A-01..WEATHER-A-15,DAY-A-01..DAY-A-03,AI-WEATHER-A-01..AI-WEATHER-A-05 --write-run-bundle` | Day/night + weather kernel deterministic per scenario seed; AI weather doctrine. |
 | M8 | `cargo run -p cf-mod -- validate content/ mods/ --strict && cargo run -p cf-e2e -- --scenario sample_mod_breach --expect win --write-run-bundle` | Mod loads + plays. |
+| M8.6 | `cargo run -p cf-e2e -- --scenario m8_6_mining_pipeline --suite DEPOSIT-A,SAMPLE-A,DRILL-A,EXTRACT-A,REFINE-A,SMELT-A,TRADE-A,AI-MINE-A --write-run-bundle` | Full mining pipeline + AI miner doctrine in coop. |
 | M8.5 | `cargo run -p cf-tools-editor -- --mode material_lab --scenario m8_5_acid_trap_puzzle --suite MAT-11,MAT-14 --write-run-bundle && cargo run -p cf-mod -- validate mods/sample_material_pack/ --strict` | Designer authors + exports + reloads a material puzzle; mod pack with new material loads cleanly. |
 | M9 | `cargo run -p cf-server -- --mode coop_room --scenario breach_contract --ticks 36000 --write-run-bundle` then `cargo run -p cf-headless -- replay <m9_run> --verify-checksums` | Dedicated server boots and runs a co-op room; 10-min replay verified. |
 | M9 | `cargo run -p cf-server -- --mode lan_room --auto-discover` (smoke) and `cargo run -p cf-server -- --mode mmo_shard --bootstrap-empty-shard` (smoke). | Each `cf-server` mode boots. |
+| M9.5 | `cargo run -p cf-e2e -- --scenario m9_5_voice_radio_comms --suite VOICE-A-01..VOICE-A-15,RADIO-A-01..RADIO-A-15,TRAUMA-A-01..TRAUMA-A-03,POLICY-A-01..POLICY-A-03 --write-run-bundle` | Voice through atmospheric medium; radio with multipath + bands + jamming + origin gating. |
 | M10 | `cargo run -p cf-server -- --mode lan_room` (host) + 2 `cf-app` clients on LAN, then `cargo run -p cf-headless -- replay-compare <client_a_bundle> <client_b_bundle>` | Per-client bundles align tick-for-tick. |
 | M11 | M10 smoke + `cargo run -p cf-server -- --mode coop_room --public-bind 0.0.0.0:0` reachable through the chosen transport with `lobby_directory` integration. | Self-hosted online co-op with mod hash sync works. |
 | M12 | `cargo run -p cf-server -- --mode pvp_arena` 4-player stress + `cargo run -p cf-server -- --mode mmo_shard --simulate-clients 50 --duration-min 60` + MMO-001..MMO-012 suite. | PvP + MMO architecture is real at launch scale. |
+
+---
+
+## Build Points (Roadmap V2)
+
+> [!important] Build Points are the playable-shippable layer on top of milestones
+> Milestones own the engineering work; **Build Points (BPs)** group milestones into shippable, playable artifacts. Every BP must produce: (1) at least one playable cfctl-driven scenario, (2) a checked run bundle under `prototype_runs/native/`, (3) a `READY_FOR_HUMAN_PLAYTEST` gate (or recorded human reaction note), (4) a published implementation log + `/corefall-review` Accept verdict, and (5) the per-BP DR-closure refresh listed below. BPs are additive: they DO NOT renumber milestones. Existing milestone IDs (M0..M12 + .x sub-milestones) stay stable for backward compat with prior implementation logs, run bundles, and PRs.
+
+> [!warning] BP fun-proof rule (M1.5 lesson)
+> If a BP groups more than two heavy-systems milestones in a row without a playable interlude, insert a **micro-fun slice** sub-milestone (M1.5 was the prototype: M2.5, M5.5.5, M5.9.5 follow the same shape). Workers MUST NOT enter the next heavy-systems milestone until the prior BP has at least one fun-proof scenario the project owner can play in 60-90 s.
+
+> [!info] BP-to-DR mapping
+> Each BP closes (or refreshes) a specific subset of decision records. When a BP is declared complete, the worker MUST update every listed DR file + `decisions/index.md` + `dashboards/decision-tracker.md` + `dashboards/research-readiness.md` in the same pass. DR closures DO NOT re-route across BPs without a vault-pass diff.
+
+### Build Point Map
+
+| BP | Title | Milestones Inside | Closes Or Refreshes | Playable Artifact | Status |
+|---|---|---|---|---|---|
+| **BP0** | Foundation Build | M0 + M1 | DR-001, DR-024, DR-025, DR-026; DR-002 refreshed (envelope locked) | `cfctl run --scenario m1_actor_range` end-to-end at 60+120 Hz | <span class="cc-flag cc-green">CLOSED</span> (M0 + M1 closed; bundles `m0_*` + `m1_*` archived) |
+| **BP1** | Micro Breach Build | M1.5 | DR-002 + DR-004 + DR-007 + DR-008 + DR-009 leans confirmed (no closures attempted) | `cf-e2e --script micro_breach_{win,loss}` end-to-end | <span class="cc-flag cc-green">CLOSED</span> (M1.5 closed; bundles `m1.5_*` archived) |
+| **BP2** | Terrain & Replay Build | M2 + M2.5 + M3A | DR-002 (M3A locks event taxonomy + headless replay); DR-007 launch-material set frozen for the chunked-terrain era | `cf-e2e --script m2_dig_concrete_refuse_metal` + M2.5 micro reactor defense + replay verifier | <span class="cc-flag cc-blue">PLANNED</span> |
+| **BP3** | Combat Readability Build | M3B + M4A + M5 | DR-002 closure; DR-003 closure; DR-012 ACC-A floor closure; DR-014 / DR-021 chassis grammar landing | `cf-e2e --script breach_contract --ui-scale 2.0 --high-contrast` + M5 chassis wreck/eject | <span class="cc-flag cc-blue">PLANNED</span> |
+| **BP4** | Physics Sandbox Alpha | M5.5 + M5.5.5 + M5.6 + M5.7 + M5.8 | DR-033 closure; DR-036 (M5.6/M5.7) implementation slices; DR-007 implementation specifics partial | M5.5.5 micro sabotage + per-milestone gauntlets (COLL-001..012, MAT-01..03) | <span class="cc-flag cc-blue">PLANNED</span> |
+| **BP5** | Atmospherics & Worlds Alpha | M5.9 + M5.9.5 + M5.10 | DR-037 closure (M5.9); DR-038 closure (with M5.5); DR-039 + DR-040 closures (M5.10) | M5.9.5 micro pressure hold + ENV-A/ATMOS-A/GRAV-A/ASTRO-A acceptance suites | <span class="cc-flag cc-blue">PLANNED</span> |
+| **BP6** | AI Combat Alpha | M6 + M6.5 + M6.6 | DR-008 closure (M6); DR-022 humanlike-AI bar (6 of 8 by M6); DR-032 closure (M6.5); DR-036 AI hooks (M6.6) | AI-H-01..06 + MIND-001..010 (mock) + AI-MAT-01..08 acceptance suites | <span class="cc-flag cc-blue">PLANNED</span> |
+| **BP7** | Vertical Slice Alpha | M7 + M7.5 + M7.7 + M4B | DR-004 closure (M7's Breach Contract); DR-027 base-power; DR-019 comic-noir card lock (M4B); DR-039+DR-040 weather/day cycle (M7.7) | Project-owner plays Breach Contract 5× and the Bunker Defence 2v2 proof; A-FEEL gate met | <span class="cc-flag cc-blue">PLANNED</span> |
+| **BP8** | Creator Alpha | M8 + M8.5 + M8.6 | DR-006 closure (M8 modding script-host pick); DR-036 material lab closure (M8.5); DR-041 mining closure (M8.6) | Player authors a Breach Contract variant + sample mod loads; designer authors an acid-trap puzzle in <10 min | <span class="cc-flag cc-blue">PLANNED</span> |
+| **BP9** | Server / LAN Alpha | M9 + M10 | DR-005 server-authority confirmed in production; DR-034 server lifecycle; DR-029 save format roundtrip; networking-transport topic closed at M9/M10 | `cf-server --mode lan_room` survives one Breach Contract; per-client bundles align tick-for-tick | <span class="cc-flag cc-blue">PLANNED</span> |
+| **BP10** | Online Beta | M11 + M9.5 | DR-005 online co-op proven; DR-043 voice/radio comms closed (M9.5); DR-052 network sync direction confirmed | A community member self-hosts `cf-server --mode coop_room`; voice + radio works through the same atmospheric medium | <span class="cc-flag cc-blue">PLANNED</span> |
+| **BP11** | Public Systems Beta | M12 | DR-035 closure (MMO architecture); DR-042 match grammar (Bunker Defence flagship); DR-049 tournament infrastructure activated | `cf-server --mode pvp_arena` runs 4-8 player matches with anti-cheat foundation; `cf-server --mode mmo_shard` MMO-001..012 all pass | <span class="cc-flag cc-blue">PLANNED</span> |
+| **BP12** | Release Candidate | T-CONTENT-ART + T-CONTENT-NARRATIVE + T-LOCALIZATION + T-LIVEOPS finalization | DR-044 / DR-045 / DR-046 / DR-047 / DR-051 closure (final art/audio/narrative/localization/launch ops) | Steam-ready build with full launch-content roster, narrative bible, Tier-A localized strings, telemetry/launch tooling | <span class="cc-flag cc-blue">PLANNED</span> |
+
+### BP completion gate (additive to per-milestone done-criteria)
+
+When the last milestone inside a BP closes, the worker MUST also produce **one extra evidence artifact** (over and above the per-milestone artifacts): a `prototypes/build-point-bp<n>-<short-name>.md` vault note that:
+
+1. Lists every closed milestone inside the BP with its run-bundle ids.
+2. Identifies the BP's playable artifact (cfctl script id + scenario id) and links to the bundle proving win + loss paths (or N/A when the BP has no playable surface, e.g. BP12).
+3. Records the human-playtest reaction (or `READY_FOR_HUMAN_PLAYTEST` when the project owner is unavailable).
+4. Lists every DR closed/refreshed by the BP and confirms the same-pass updates to `decisions/index.md` + `dashboards/decision-tracker.md` + `dashboards/research-readiness.md` happened.
+5. Lists known follow-ups deferred to the next BP (with explicit user approval recorded inline).
+
+This is the ONLY gate that says "the game is now playable / shippable at this maturity level". A milestone closure alone does not advance the BP; the BP advance requires the extra vault note.
+
+### What BP IDs do NOT change
+
+- Milestone IDs (M0..M12 + .x) stay stable.
+- Side-track IDs stay stable (T-CONTROL/T-PHYS/T-MAT/T-SERVER/T-COMMS/T-AUDIO/T-SAVE/T-ACCESSIBILITY/T-PERF/T-PLATFORM/T-MOD/T-LLM) plus four new tracks added in this same pass (T-CONTENT-ART, T-CONTENT-NARRATIVE, T-LOCALIZATION, T-LIVEOPS).
+- Run-bundle naming convention stays `<milestone>_<UTC>_<hash>`. BPs do NOT introduce a new naming scheme; bundles continue to belong to their authoring milestone.
+- DR file names + numbers stay stable. BPs add a "closes/refreshes" mapping but do not rename DRs.
+- `feature-completion-checklist.md` task-card IDs (M*-NNN) stay stable. The checklist gains a new "Build Points Checklist" addendum (one row per BP) without disturbing existing rows.
+
+### Production tracks moved off the milestone spine
+
+Per the V2 reordering rule "things outside gameplay testing should land later", the following content/launch DRs are NOT on the milestone spine — they run as side tracks and do not gate gameplay milestones. They are scheduled to **finalize during BP12** (Release Candidate) but may begin AI-driven authoring in parallel from BP3 onward:
+
+- **T-CONTENT-ART** (DR-044 / DR-045): final art / animation / VFX / lighting / atmospheric effects / decals / music / SFX / launch roster (70+ weapons, 44+ actors, 18+ vehicles, etc.).
+- **T-CONTENT-NARRATIVE** (DR-046): narrative bible (80,000+ words), 8 faction archives, 24+ named NPCs, 600+ codex entries, mission briefing/debrief copy.
+- **T-LOCALIZATION** (DR-046): 11 Tier-A languages + 8 Tier-B UI-only + mod-localization layer.
+- **T-LIVEOPS** (DR-047 / DR-051 / DR-057): telemetry/bug tooling, playtest program, marketing/launch, Steam/platform integration, legal/compliance, post-launch ops.
+
+Workers implementing BP2..BP11 may use **placeholder** narrative/art/audio (AI-generated quick passes; English-only strings; minimal launch roster). Replacing placeholders with final content happens during BP12 and does NOT require re-doing earlier BPs.
 
 ---
 
@@ -1554,22 +1658,31 @@ Before doing any feature work, the agent runs the milestone's kickoff smoke. If 
 | M1 | Actor Controller + Sim Core | One actor playable; control intent + physics + simple weapon | M0 | Yes |
 | M1.5 | Micro Breach Fun Slice | Sterile actor lab becomes a 60-90s playable loop with enemy, soft breach, objective, and replay evidence | M1 | Yes |
 | M2 | Pixel Terrain + Materials | Mutable chunked terrain; GPU-assisted carving; material affordances | M0, M1 | Yes |
-| M3 | Replay + Event Recorder | Event taxonomy + run bundle + snapshot/checksum + headless replay | M0..M2 | Yes |
-| M4 | HUD + Comic-Noir UI | HUD reads sim state; comic-noir cards; accessibility floor | M1, M3 | Yes |
+| M2.5 | Micro Reactor Defense Fun Slice (Roadmap V2) | Tiny scenario PROVES dig + carve + affordance feel before M3 work pulls focus; reuses M1.5 micro-fun pattern | M2 | Yes (V2 fun-proof rule) |
+| M3 | Replay + Event Recorder (split into M3A core + M3B viewer in V2) | Event taxonomy + run bundle + snapshot/checksum + headless replay (M3A); viewer + scrub + cause-chain (M3B) | M0..M2 | Yes |
+| M4 | HUD + Comic-Noir UI (split into M4A readability+ACC-A + M4B comic-noir polish in V2) | HUD reads sim state; comic-noir cards; accessibility floor | M1, M3 | Yes |
 | M5 | Equipment + Chassis + Damage Grammar | Role records; modules; armor layers; jam/eject/repair/salvage events | M1, M3 | Yes |
 | M5.5 | Full Collision Gauntlet | Collision matrix; limb/equipment/body/mech/base/projectile contacts; projectile-projectile; CCD; impulse damage; collision events; replay/perf proof | M2, M3, M5 | Yes |
+| M5.5.5 | Micro Sabotage Fun Slice (Roadmap V2) | Tiny scenario PROVES collision feel before material kernel absorbs everything; reuses M1.5 micro-fun pattern | M5.5 | Yes (V2 fun-proof rule) |
 | M5.6 | Material Kernel | Active material grid (Noita-style) + reaction table + density layering + replay determinism + minimal sand/water/steam/oil/fire baseline (MAT-01..MAT-03, MAT-06, MAT-13 minimal) | M2, M3, M5.5 | Yes (DR-036) |
 | M5.7 | Hazard Package | Acid/toxic/electricity/debris damage routes through armor/limbs/equipment (MAT-04, MAT-05, MAT-07); ingestion/vomit/container loop foundation (MAT-08 stub) | M5, M5.5, M5.6 | Yes (DR-036) |
+| M5.8 | Origin Resource & Overclock Pass | Per-origin reaction matrix runtime: humans concuss/eat/breathe; androids battery-drain/modular; robots overclock/downclock/leak coolant. G-Force vision blackout HUD. | M5, M5.5, M5.6, M5.7 | Yes (DR-027 + DR-038) |
+| M5.9 | Atmospherics-Grade Kernel | DR-037 closure: real PV=nRT, 10 launch gases, 6 combustion reactions, gradual phase change, pipe networks, suit life-support, per-planet ambient, universal gravity ballistic drag | M5.5, M5.6, M5.7, M5.8 | Yes (DR-037) |
+| M5.9.5 | Micro Pressure Hold Fun Slice (Roadmap V2) | Tiny scenario PROVES atmospheric pressure / gas / heat loop is fun before M5.10 env signal aggregation stacks more layers | M5.9 | Yes (V2 fun-proof rule) |
+| M5.10 | Environmental Conditions Aggregation | DR-040 closure: `EnvironmentSignal` aggregator + 15-class hazard taxonomy + cfctl observation surface; DR-039 worlds catalog + simplified Keplerian astrography + comms light-lag | M5.9 | Yes (DR-039 + DR-040) |
 | M6 | AI Core + Trust Harness | Perception/memory/utility/doctrine; reason-label events; AI-H scenario runner | M1, M3, M5.5 | Yes |
 | M6.5 | LLM Mind Lab | Async LLM mind layer with strict schemas, mock provider, validator, policy compiler, replay logging, deterministic fallback; one visible doctrine patch in a controlled breach scenario | M3, M6 | Optional v1; required for DR-032 closure evidence |
-| M6.6 | AI Material Competence | AI hazard perception map + affordance tags + route costs + tactical material use; AI-MAT-01..AI-MAT-08 acceptance suite (MAT-12) | M5.6, M5.7, M6 | Yes (DR-036) |
-| M7 | Mission Director + Breach Contract | Typed manifest; director; command-core minimum; base-system slice; first proof mission playable | M1..M6 plus M5.5 | Yes |
-| M7.5 | Base Atmospherics | Hull/gap/pump/vent/oxygen/pressure network for bases/mechs/sealed chambers (MAT-09, MAT-10); damageable life support; flooding/fire/smoke through rooms | M5.6, M5.7, M7 | Yes (DR-036) |
+| M6.6 | AI Environmental Competence (promoted from AI Material Competence per DR-040) | AI hazard perception map + affordance tags + route costs + tactical material use + EnvironmentSignal-aware doctrine; AI-MAT-01..AI-MAT-08 acceptance suite (MAT-12) | M5.6, M5.7, M5.9, M5.10, M6 | Yes (DR-036 + DR-040) |
+| M7 | Mission Director + Breach Contract Proof Mission + Bunker Defence Proof Mission | Typed manifest; director; command-core minimum; base-system slice; Breach Contract proof mission + Bunker Defence (1v1/2v2/3v3/4v4) proof mission per DR-042 | M1..M6 plus M5.5 | Yes |
+| M7.5 | Base Atmospherics (extended for Stationeers-grade per DR-037) | Hull/gap/pump/vent/oxygen/pressure network for bases/mechs/sealed chambers (MAT-09, MAT-10); damageable life support; flooding/fire/smoke through rooms | M5.6, M5.7, M5.9, M7 | Yes (DR-036 + DR-037) |
+| M7.7 | Day/Night, Weather & Dynamic Events | DR-039 + DR-040 weather + day-night kernel; AI weather doctrine; precursor wiring (M2 lux + M5.7 dust + M5.6 thermal + M5.9 atmosphere) | M5.6, M5.7, M5.9, M5.10, M7 | Yes (DR-039 + DR-040) |
 | M8 | Scenario Editor + Mod Tools | In-engine workbench; same manifest format; mod loader; package builder | M3, M5, M7 | Yes |
 | M8.5 | Material Lab | Material brush/inspect/recipe/stamp/test editor (MAT-11, MAT-14); designer authors a tiny reaction puzzle in minutes; community-shareable material packs | M5.6, M5.7, M8 | Yes (DR-036) |
+| M8.6 | Mining and Extraction (per DR-041) | 12 launch ores + per-world deposits from worlds catalog; sample → drill → extract → refine → smelt → use pipeline; AI miner doctrine; server-authoritative resource ledger | M5.6, M5.7, M5.9, M5.10, M8 | Yes (DR-041) |
 | M9 | Dedicated Server App + Determinism Islands | `cf-server` binary boots in all modes, passes M9 core server lifecycle subset, deterministic islands, replay verification, and reference Docker smoke; PvP/MMO scale tests remain M12 | M3, M7 | **Yes** (server architecture commitment per DR-005 + DR-034) |
+| M9.5 | Voice & Radio Comms (per DR-043) | ACRE2-tier radio + Steam Audio-tier voice through atmospheric medium; HF/VHF/UHF/Microwave bands; origin gating; mission-director comms-policy hooks | M5.9, M5.10, M9 | Yes (DR-043) |
 | M10 | LAN Co-op | 2-4 clients on local network via `cf-server --mode lan_room`; replicated state; survival of one Breach Contract; per-client bundles align tick-for-tick | M9 | **Yes** (evidence-gated full-product target) |
-| M11 | Online Co-op (Self-Hosted Dedicated Servers) | NAT/relay via `cf-server --mode coop_room`; lobby + package hash sync; community member can host a public co-op session friends in different cities can join | M10 | **Yes** (evidence-gated full-product target) |
+| M11 | Online Co-op (Self-Hosted Dedicated Servers) | NAT/relay via `cf-server --mode coop_room`; lobby + package hash sync; community member can host a public co-op session friends in different cities can join | M10, M9.5 | **Yes** (evidence-gated full-product target) |
 | M12 | Public PvP Arenas + Persistent MMO Shards | `cf-server --mode pvp_arena` with anti-cheat foundation; `cf-server --mode mmo_shard` with persistence + interest management + 50-100 concurrent player target; MMO-001..MMO-012 + PvP stress tests | M10, M11 | **Yes** (full-product readiness gate per DR-005 + DR-035) |
 
 ---
@@ -1592,6 +1705,11 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 | T-SAVE | Save game system | M5..M9 primary; lifelong |
 | T-ACCESSIBILITY | Accessibility floor | M4..M8 primary; lifelong |
 | T-PERF | Performance targets, multicore CPU, and GPU budgets | M0..M12 |
+| T-CONTENT-ART | AI-authored art, animation, VFX, decals, lighting, music, SFX, launch roster | BP3+ placeholder generation; **BP12** finalization |
+| T-CONTENT-NARRATIVE | Narrative bible, faction archives, NPC dialogue, codex, mission briefing/debrief copy | BP3+ placeholder generation; **BP12** finalization |
+| T-LOCALIZATION | Strings/fonts/lang packs/mod-localization (Tier-A 11 langs + Tier-B UI-only 8 langs) | BP3+ string-source discipline; **BP12** finalization |
+| T-LIVEOPS | Telemetry, bug tooling, playtest program, marketing, Steam/platform integration, legal/compliance, post-launch ops | BP10+ pre-launch wiring; **BP12** finalization |
+| T-CAPTURE | Frame capture, grid composer, and BP fun-proof automation for AI-agent self-testing | BP2+ primary; lifelong from BP2 |
 
 ---
 
@@ -1718,28 +1836,71 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 ---
 
+### M2.5 — Micro Reactor Defense Fun Slice
+
+> [!summary] Roadmap V2 fun-proof interlude
+> M2.5 is the **M1.5-shaped** micro-fun interlude after M2 chunked terrain lands and BEFORE M3 replay/event work pulls focus. Same anti-scope discipline as M1.5: cheapest possible pressure + goal + enemy + terrain consequence; no full mission director; no full AI doctrine; no comic-noir polish.
+
+**What it proves:** Chunked terrain feels good in the player's hands. The dig + carve + affordance loop produces win/lose stories the project owner wants to keep playing. Confirms the M2 carving pipeline + dirty-region tracker + material overlay + tool-validity feedback are already fun BEFORE the M3 replay machinery wraps them.
+
+**Scope:**
+- One 60-90 second `micro_reactor_defense` scenario: spawn at a generator core, dig a trench around the reactor, hold position while one reactive enemy attacks for 60 seconds, win if the reactor survives / lose if it explodes.
+- Reuse `cf-mission` + `cf-ai::ReactiveGuard` from M1.5 unchanged.
+- Use M2 chunked terrain (concrete + dirt + metal-nohook from the launch material set) instead of M1.5's `cf-terrain::BreachStrip`. Document the migration in the inter-milestone bridge below.
+- Reactor is a single non-player static "actor" with hp; enemy fire damages it through the reactor's aabb hits.
+- HUD additions: reactor hp bar, time-remaining timer.
+- Run bundle captures `terrain.terrain_carved` (real chunked terrain), `combat.projectile_*`, `actor.actor_status_changed` (reactor death), `mission.mission_resolved`, plus M2's perf counters.
+- Two cfctl scripts drive both win + loss paths.
+
+**Done-criteria:**
+- [ ] The micro scenario can be won and lost in 60-90 seconds using M2 chunked terrain.
+- [ ] cf-e2e wins ≥ 4/4 expectations (`mission.result=won`, `objective.defend_reactor=completed`, `terrain.terrain_carved` count ≥ N for the trench).
+- [ ] cf-e2e loses ≥ 3/3 expectations (`mission.result=lost`, `mission.loss_reason=reactor_destroyed`, `terrain.terrain_carved` count > 0).
+- [ ] Run bundles validate via the canonical run-bundle checker (`errors 0`).
+- [ ] M2's perf budget holds during the 60-90 s scenario at the Steam Deck floor.
+- [ ] Project owner playtest reaction recorded (or `READY_FOR_HUMAN_PLAYTEST`).
+
+**Cross-DR:** DR-002, DR-004, DR-007, DR-008, DR-024.
+
+**Open DR gates:** DR-002 (`mission.*` + `terrain.*` events from M1.5 are reused — no new categories), DR-004 (sequenced single-actor → squad → bunker breach lean confirmed; M2.5 is squad-precursor), DR-007 (M2 chunked terrain + DR-007 launch material set both used as-is — confirm material-id stability with user before adding any new material). Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
+
+---
+
 ### M3 — Replay And Event Recorder
 
 **What it proves:** Event taxonomy is complete enough that any prior milestone's run can be replayed headlessly and produce identical state checksums. Determinism islands are real.
 
-**Scope:**
+> [!info] Roadmap V2: M3 splits into M3A (event core) + M3B (viewer/debrief)
+> M3 work is too broad to land in one shippable artifact. The Roadmap V2 split treats event-taxonomy + checksums + headless replay as **M3A** (must land immediately because every later milestone emits events against the contract) and viewer + scrub + cause-chain as **M3B** (polish that can land later). DR-002 closes when M3B done-criteria pass; M3A alone refreshes the lean.
+
+**M3A Scope (event core, must land first):**
 - `cf-replay` event taxonomy expanded to cover every baseline category in [[references/prototype-run-bundle-schema#Event Category Baseline]]: `input`, `control`, `mind`, `collision`, `server`, `anti_cheat`, `mmo`, `material`, `reaction`, `atmospherics`, `affliction`, `combat`, `body`, `terrain`, `ai`, `logistics`, `mission`, `system`, `snapshot`, `determinism`, `ux`, `accessibility`, and `performance`. New event categories must be added to the schema first, then wired into recorder filters, viewer filters, summary counters, and checklist rows.
 - Snapshot writer: full actor/inventory/terrain snapshot at scene start + every objective change.
 - Checksum producer: per-tick or per-snapshot.
 - Headless replay binary: replays a run bundle without rendering and produces matching checksums.
-- Run-bundle viewer: simple egui-based event tail + filter + parent-chain view.
 - Determinism island contract: documents which subsystems are deterministic (sim core, terrain mutation, AI decisions) and which are not (audio, particles cosmetic, render).
+- Recorder backpressure: dropped-event counters and non-blocking recorder path.
 
-**Done-criteria:**
-- [ ] A 5-minute M2 run can be replayed headlessly and produces identical actor/terrain/inventory checksums.
-- [ ] Drift between replay and live run is reported per-tick with diff.
-- [ ] Replay viewer can scrub through events and show context.
-- [ ] Death recap: given an `actor_died` event, the viewer shows the parent cause chain.
+**M3A Done-criteria:**
+- [ ] A 5-minute M2/M2.5 run can be replayed headlessly and produces identical actor/terrain/inventory checksums.
+- [ ] Drift between replay and live run is reported per-tick with diff (`first_divergence` event).
 - [ ] Run bundle includes manifest, events, summary, snapshots, checksums, captures.
+- [ ] `system.run_finished` outcome contract per M3-006 task card enforced by canonical run-bundle checker.
+- [ ] No DR closure attempted at M3A (lean refreshed only).
+
+**M3B Scope (viewer + cause-chain, BP3 polish):**
+- Run-bundle viewer: simple egui-based event tail + filter + parent-chain view.
+- Death recap: given an `actor_died` event, the viewer shows the parent cause chain.
+- Optional: replay-viewer screenshot artifact in the BP3 vault note.
+
+**M3B Done-criteria:**
+- [ ] Replay viewer can scrub through events and show context.
+- [ ] Death recap renders the parent cause chain for `actor_died` and `mission_resolved` events.
+- [ ] DR-002 closure: refresh status from OPEN → CLOSED-DIRECTION-WITH-EVIDENCE; update [[decisions/index]] + [[dashboards/decision-tracker]] + [[dashboards/research-readiness]] in the same pass.
 
 **Cross-DR:** DR-002, DR-005, DR-018, DR-024.
 
-**Open DR gates:** DR-002 (M3 IS the closure milestone for DR-002) — when M3 done-criteria pass, the worker MUST update DR-002 status to CLOSED-DIRECTION, refresh the revisit_trigger, and update [[decisions/index]] + [[dashboards/decision-tracker]] in the same pass. Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
+**Open DR gates:** DR-002 (M3B IS the closure milestone for DR-002) — when M3B done-criteria pass, the worker MUST update DR-002 status to CLOSED-DIRECTION-WITH-EVIDENCE, refresh the revisit_trigger, and update [[decisions/index]] + [[dashboards/decision-tracker]] in the same pass. M3A only refreshes the lean. Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
 
 ---
 
@@ -1747,19 +1908,31 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 
 **What it proves:** Game state is readable from the HUD without text walls. Comic-noir mission card style is established. Accessibility floor (DR-012) is hit.
 
-**Scope:**
+> [!info] Roadmap V2: M4 splits into M4A (readability + ACC-A floor) + M4B (comic-noir polish)
+> M4 work is too broad to land in one shippable artifact. The Roadmap V2 split treats accessibility floor + readability HUD as **M4A** (must land at BP3 because every later milestone reads HUD state) and comic-noir mission cards + DR-019 polish as **M4B** (lands at BP7 alongside the Breach Contract proof mission, where the tone matters most). DR-012 closes when M4A done-criteria pass. DR-019 / DR-009 polish closures land at M4B.
+
+**M4A Scope (readability + ACC-A floor, BP3):**
 - `cf-ui` HUD: body silhouette (DR-003 style); module strip stub; ammo + reload; objective banner; timer; last-important-event ticker.
-- Comic-noir mission card: pre-mission briefing card; post-mission debrief card; both static.
-- Status banners ("ARMOR CRACKED LEFT", "JET FAILED", "EJECT NOW") triggered by chassis events.
+- Status banners ("ARMOR CRACKED LEFT", "JET FAILED", "EJECT NOW") triggered by chassis events (text-only at M4A; comic-noir styling lands at M4B).
 - Material overlay UI integrated; tool-validity color cues.
 - Accessibility floor: 200% text scale + reflow; high-contrast mode; color-independent state labels; controller route through HUD; remap holds; captions.
 - SDF/vector text rendering for clean scaling.
 
-**Done-criteria:**
+**M4A Done-criteria:**
 - [ ] HUD-01..HUD-03 acceptance tests from [[systems/ux-overlay-screen-brief]] pass with 5 playtesters.
-- [ ] ACC-A floor passes for HUD + mission card + material overlay.
-- [ ] Mission card renders pre/post mission with comic-noir style.
+- [ ] ACC-A floor passes for HUD + material overlay (DR-012 closure: refresh status from OPEN → CLOSED-DIRECTION-WITH-EVIDENCE).
 - [ ] 200% text scale doesn't break HUD layout.
+- [ ] DR-003 silhouette + advanced-HUD opt-in lean confirmed (HUD-01..HUD-03 are the closure tests).
+
+**M4B Scope (comic-noir polish, BP7):**
+- Comic-noir mission card: pre-mission briefing card; post-mission debrief card; both static.
+- Comic-noir styling layered on M4A's text-only banners.
+- DR-009 command UX polish: slowdown overlay + optional tactical map.
+
+**M4B Done-criteria:**
+- [ ] Mission card renders pre/post mission with comic-noir style.
+- [ ] DR-019 visual-direction closure: comic-noir aesthetic locked.
+- [ ] DR-009 command UX closure: slowdown ratio + tactical-map opt-in posture confirmed; ORDER-01 acceptance test passes.
 
 **Cross-DR:** DR-003, DR-009, DR-012, DR-019, DR-024.
 
@@ -1826,6 +1999,35 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 **Cross-DR:** DR-002, DR-003, DR-005, DR-007, DR-008, DR-014, DR-018, DR-021, DR-024, DR-028, DR-033.
 
 **Open DR gates:** DR-002, DR-003, DR-007 (terrain/material — M5.5 collision proxies must match M2 material schema), DR-008 (AI architecture — M5.5 collision events feed AI utility scoring). Confirm collision-class registry + matrix + filter-reason vocabulary with user before locking the collision data files; the matrix becomes a contract for M6/M6.6 AI material competence. Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
+
+---
+
+### M5.5.5 — Micro Sabotage Fun Slice
+
+> [!summary] Roadmap V2 fun-proof interlude
+> M5.5.5 is the **M1.5-shaped** micro-fun interlude after M5.5 full-collision lands and BEFORE M5.6 material kernel absorbs everything. Same anti-scope discipline as M1.5 / M2.5: cheapest possible pressure + goal + enemy + collision consequence; no full mission director; no full AI doctrine; no comic-noir polish.
+
+**What it proves:** Full collision (limb-to-limb, projectile-projectile, debris crush, mech foot, shield, terrain seams, etc.) feels like physical consequence in the player's hands. Players can collapse a section of catwalk to drop a guard into a pit, crush a guard with a pushed crate, or use a held weapon to physically block a grenade. Confirms the M5.5 collision pipeline + impulse-to-damage routing + `collision.*` events are already fun BEFORE M5.6 material reactions stack on top.
+
+**Scope:**
+- One 60-90 second `micro_sabotage` scenario: spawn in a small base interior with a collapsible catwalk, a crate that can be pushed, and one reactive enemy holding a position. Player must neutralize the guard using AT LEAST ONE physics-driven kill (drop the catwalk, push the crate, use a held weapon to block + counter) — not just rifle hits. Win = guard dead + player alive; lose = player dead OR 90 s timer expires.
+- Reuse `cf-mission` + `cf-ai::ReactiveGuard` + `cf-chassis` from prior milestones.
+- Use M5.5 collision system: catwalk supports + impulse threshold + `collision_damage_applied` events for crush; pushed crate emits `collision_contact_started/persisted/ended` against the guard.
+- HUD additions: physics-kill counter (M1.5 last-event line variant).
+- Run bundle captures `collision.*` (catwalk drop, crate-vs-guard contact, collision_damage_applied with reason `crush`/`debris_impact`), `chassis.module_state_changed` (guard module damage from collision), `mission.mission_resolved`.
+- Two cfctl scripts drive both win + loss paths.
+
+**Done-criteria:**
+- [ ] The micro scenario can be won and lost in 60-90 seconds using M5.5 full collision.
+- [ ] cf-e2e wins ≥ 4/4 expectations including `mission.physics_kill_count >= 1` proving a non-rifle kill.
+- [ ] cf-e2e loses ≥ 3/3 expectations including `mission.loss_reason=player_dead` OR `mission.loss_reason=timer_expired`.
+- [ ] Run bundles validate via the canonical run-bundle checker (`errors 0`).
+- [ ] M5.5 perf budget holds during the 60-90 s scenario at the Steam Deck floor (no all-pairs collision regression).
+- [ ] Project owner playtest reaction recorded (or `READY_FOR_HUMAN_PLAYTEST`).
+
+**Cross-DR:** DR-002, DR-003, DR-005, DR-007, DR-008, DR-014, DR-018, DR-021, DR-024, DR-028, DR-033.
+
+**Open DR gates:** DR-002 (`collision.*` events from M5.5 are reused — no new categories), DR-008 (AI architecture — confirm reactive guard's collision-aware utility hook before adding any new tactic), DR-033 (full collision direction confirmed; M5.5.5 is the proof-of-feel slice). Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
 
 ---
 
@@ -1955,6 +2157,35 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 **Cross-DR:** DR-002, DR-005, DR-006, DR-007, DR-008, DR-012, DR-013, DR-024, DR-027, DR-029, DR-033, DR-034, DR-035, DR-036, **DR-037** (this milestone IS DR-037 closure), **DR-038** (this milestone is part of DR-038 closure with M5.5).
 
 **Open DR gates:** DR-007 (atmosphere kernel boundary with terrain/material kernel — confirm coupling at M5.6/M5.9 boundary), DR-013 (per-planet ambient as scenario manifest field — confirm storage shape), DR-027 (base atmospheric modules vs combat-base scope — confirm which modules are launch vs M8.5), DR-037 (atmospherics-grade direction is now CLOSED but kernel evidence required to move it from `closed-direction` to `closed-direction-with-evidence`), DR-038 (universal gravity is now CLOSED but per-cell sampling perf evidence required). Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
+
+---
+
+### M5.9.5 — Micro Pressure Hold Fun Slice
+
+> [!summary] Roadmap V2 fun-proof interlude
+> M5.9.5 is the **M1.5-shaped** micro-fun interlude after M5.9 atmospherics-grade kernel lands and BEFORE M5.10 environmental signal aggregation stacks more layers. Same anti-scope discipline as M1.5 / M2.5 / M5.5.5: cheapest possible pressure + goal + enemy + atmospheric consequence; no full mission director; no full AI doctrine; no comic-noir polish.
+
+**What it proves:** Real PV=nRT atmospherics + gradual phase change + pipe networks + suit life-support feel like physical consequence in the player's hands. Players can blow a pressure aperture into an enemy's room (sucking them out via wind), light a flammable atmosphere, vent oxygen to suffocate a guard, or shoot a hot pipe to release a steam jet. Confirms the M5.9 kernel + ATMOS-A acceptance shape produces fun stories BEFORE the M5.10 EnvironmentSignal aggregator wraps it.
+
+**Scope:**
+- One 60-90 second `micro_pressure_hold` scenario: spawn outside a pressurized room with one reactive guard inside. Player must neutralize the guard using AT LEAST ONE atmospheric tactic (vent the room via breach aperture, ignite the atmosphere through an oxidizer leak, freeze the guard by routing coolant through a suit puncture). Direct rifle hits alone count as fail-the-fun-test (the scenario is designed so straight-up rifle-fight is impossible — the guard has cover; the player has limited ammo).
+- Reuse `cf-mission` + `cf-ai::ReactiveGuard` + `cf-chassis` + `cf-atmos` (M5.9) from prior milestones.
+- Use M5.9 atmospherics: pressure aperture from breach event, gas mixing across rooms, suit life-support draining when oxygen falls, ignition from spark + flammable atmosphere.
+- HUD additions: room pressure (kPa), oxygen %, temperature (K), suit oxygen remaining (s).
+- Run bundle captures `atmospherics.*` (pressure_changed, gas_mix_changed, ignition, room_vented), `affliction.*` (suffocation, hyperoxia, hypothermia), `actor.actor_status_changed` (guard death from atmosphere not bullets), `mission.mission_resolved`.
+- Two cfctl scripts drive both win + loss paths.
+
+**Done-criteria:**
+- [ ] The micro scenario can be won and lost in 60-90 seconds using M5.9 atmospherics.
+- [ ] cf-e2e wins ≥ 5/5 expectations including `mission.atmospheric_kill=true` proving the kill came from atmospherics, not direct fire.
+- [ ] cf-e2e loses ≥ 3/3 expectations (timer expiry OR player suffocation OR player ignition).
+- [ ] Run bundles validate via the canonical run-bundle checker (`errors 0`).
+- [ ] M5.9 perf budget holds during the 60-90 s scenario at the Steam Deck floor (M5.9's ATMOS-A perf gate must NOT regress).
+- [ ] Project owner playtest reaction recorded (or `READY_FOR_HUMAN_PLAYTEST`).
+
+**Cross-DR:** DR-002, DR-007, DR-008, DR-024, DR-027, DR-036, DR-037, DR-038.
+
+**Open DR gates:** DR-002 (`atmospherics.*` + `affliction.*` events from M5.9 are reused — no new categories), DR-008 (AI architecture — confirm reactive guard's atmospherics-aware utility hook before adding any new tactic; M6.6 closes the full AI environmental competence pass). Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
 
 ---
 
@@ -2665,6 +2896,60 @@ Per-frame budget at 4K/120: 8.33ms. Sim tick at 60Hz: 16.67ms. AI/terrain async 
 
 **Done-criteria per milestone:** Reference scene meets the three targets where the feature is mature enough to measure; otherwise the milestone records target status, bottleneck, and next perf work. No milestone may ship a new CPU-heavy system without counters and a stated parallelization/GPU-offload posture.
 
+### T-CAPTURE — Frame Capture, Grid Composer, And BP Fun-Proof Automation
+
+> [!info] Roadmap V2 addition (BP2+)
+> This track exists to close the loop on AI-agent self-testing. The Eyes/Ears/Hands rule already gives an AI worker JSON observation + cfctl input + cf-e2e assertions, but JSON cannot prove a projectile *looked* like an arc, a breach strip *visibly* degraded, or an enemy AI *visibly* engaged. T-CAPTURE adds the visual-proof pipeline so a Build Point can close without a human eyeballing every smoke run.
+
+Spans BP2+; **lifelong from BP2** (every fun-proof slice from M2.5 onward emits capture grids).
+
+**Owned surfaces:**
+
+- `cf-capture` crate (Bevy plugin + ImageCopyDriver readback path for headless/CI parity).
+- `cf-app --capture-frames-hz <N> --capture-grid --capture-events` flags.
+- `game/tools/capture_grid.py` composer (per-grid 8×8 PNGs + summary_grid.png with one frame per major event).
+- `cf-e2e --capture-grid` flag + new `--expect capture.<key>=<value>` assertion family.
+- Run-bundle layout extension: `prototype_runs/native/<id>/captures/{frame_<tick>.png, grid_<NNN>.png, summary_grid.png}`.
+- `summary.json.artifacts[]` rows for each grid with type=`capture-grid` and a `frame_count` + `event_count` payload.
+
+**Cadence policy:**
+
+- Default baseline cadence: **10 Hz** (every 6 ticks at 60 Hz / every 12 ticks at 120 Hz). Configurable per run via `--capture-frames-hz`.
+- Default event-triggered keyframes (always-on unless `--no-capture-events` is passed): `mission.objective_started`, `mission.objective_completed`, `mission.objective_failed`, `mission.mission_resolved`, `terrain.terrain_carved`, `combat.projectile_hit`, `actor.actor_status_changed`, `actor.actor_landed`, `equipment.weapon_fired`, `ai.state_changed`, `system.panic`.
+- Per-frame overlay (burned into PNG before grid composition, rendered by cf-ui): `tick`, primary-actor `hp`, mission `state`, mission `loss_reason`, top-of-screen breach `hp_remaining` for visible breaches, current event label if a tick-aligned event fired.
+- Per-grid layout: 8 cols × 8 rows = 64 frames per grid PNG; longer runs produce sequential `grid_001.png`, `grid_002.png`, ...; `summary_grid.png` always present, max 64 frames, one per major event (or evenly sampled if event count > 64).
+
+**LLM-input contract:**
+
+- An AI agent reading the run via the Read tool is expected to load `summary_grid.png` first (single image, ≤1 MB compressed, ≤2560×1440 px) for the high-level "what happened" pass.
+- Per-grid PNGs are loaded only when the agent needs to drill into a specific phase.
+- All output PNGs must stay below 1 MB compressed. The composer downsamples per-frame thumbnails to 320×180 by default; configurable via `capture_grid.py --thumbnail-w 320 --thumbnail-h 180`.
+
+**Determinism contract:**
+
+- Frame capture must NOT change sim behavior. The capture path runs in the render schedule (post-extract) and reads back the swapchain or the offscreen RenderTarget; no sim state may be read or written from the capture path beyond what the ObserveFrame already exposes.
+- Grid composition is deterministic given the same captures + the same composer version + the same overlay schema; the composer records its version + schema rev in `grid.json` next to each grid PNG.
+- Capture runs at any tick rate; the cadence is computed from the active tick rate (e.g., `--capture-frames-hz 10` at 120 Hz tick = capture every 12 ticks).
+
+**BP closure-gate role (from BP2 onward):**
+
+- Every fun-proof scenario in the BP must emit a `summary_grid.png` artifact, recorded in `summary.json.artifacts`.
+- `cf-e2e --capture-grid` must include at least one `--expect capture.non_blank_ratio>=0.95` assertion to catch black-frame regressions (e.g., camera clipping, missing render targets, dropped frames).
+- `/corefall-review <bp>` reads the summary grids when issuing the BP-level Accept verdict.
+- The per-BP human-playtest survey row in `prototype_runs/native/<bp>_*/notes.md` must reference the summary grid path it was answered against.
+
+**Done-criteria (cumulative across BPs):**
+
+- [ ] BP2 closure: T-CAPTURE shipped end-to-end (cf-capture crate + cf-app flags + composer + cf-e2e wiring + summary_grid evidence for every M2.5 fun-proof script).
+- [ ] BP5/BP7 closure: capture grids exist for M5.5.5 + M5.9.5 fun-proof scripts; BP closure gates reject any closure without capture-grid evidence.
+- [ ] BP12 finalization: every shipping scenario in `content/scenarios/` has at least one canonical capture grid checked in alongside its run-bundle evidence under `prototype_runs/native/`.
+
+**Open extensions (post-BP2, not in initial scope):**
+
+- Animated WebP timeline export (alongside PNG grid).
+- Side-by-side diff grid for replay-vs-live regression detection.
+- AI-readable JSON event manifest co-located with the grid (`summary_grid.events.json`) so an agent can pre-filter without parsing PNG overlays.
+
 ---
 
 ## Production, Content, And Launch Milestones (Per DR-044, DR-045, DR-046, DR-047)
@@ -3268,7 +3553,10 @@ Spans M-MUSIC; lifelong from M4.
 
 ### T-CONTENT — Launch Content Roster Authoring
 
-Spans M-CONTENT-* milestones; lifelong from M5.
+> [!info] Roadmap V2 cross-ref
+> The Roadmap V2 art/animation/VFX/decals/lighting/music/SFX pipeline lives at [[#T-CONTENT-ART — AI-Authored Art, Animation, VFX, And Roster|T-CONTENT-ART]] (BP3+ placeholder; BP12 finalization). This section stays for the schema-first roster authoring framing; T-CONTENT-ART is the production-track wiring.
+
+Spans BP3+ (schema-first authoring); BP12 (finalization). Per DR-006 + DR-044 + DR-045.
 - Schema-first per DR-006.
 - AI-driven authoring per DR-044.
 - Modder parity per DR-045.
@@ -3288,7 +3576,10 @@ Spans M-SHELL-* milestones; lifelong from M4.
 
 ### T-NARRATIVE — Setting Bible + Codex + Dialogue
 
-Spans M-CONTENT-NARRATIVE; lifelong from M5.
+> [!info] Roadmap V2 cross-ref
+> See the BP-wired version at [[#T-CONTENT-NARRATIVE — Narrative Bible, Codex, And Dialogue|T-CONTENT-NARRATIVE]] (BP3+ placeholder; BP12 finalization). This section stays for the headline scope; T-CONTENT-NARRATIVE is the production-track wiring.
+
+Spans BP3+ (placeholder); BP12 (finalization). Per DR-046.
 - ~80,000 words AI-authored + human-reviewed.
 - 8 factions + 24 NPCs + 30 missions + ~600 codex entries.
 
@@ -3296,7 +3587,10 @@ Spans M-CONTENT-NARRATIVE; lifelong from M5.
 
 ### T-I18N — Localization
 
-Spans M-LOCALIZATION; lifelong from M4.
+> [!info] Roadmap V2 cross-ref
+> See the BP-wired version at [[#T-LOCALIZATION — Strings, Fonts, And Mod-Localization|T-LOCALIZATION]] (BP3+ string-source discipline; BP12 finalization). This section stays for the headline scope; T-LOCALIZATION is the production-track wiring.
+
+Spans BP3+ (string-source discipline); BP12 (finalization). Per DR-046.
 - Project Fluent.
 - 11 Tier-A + 8 Tier-B + mod-localization.
 - Multi-script font support; RTL audit.
@@ -3328,14 +3622,18 @@ Spans M-LEGAL; pre-launch + post-launch lifelong.
 
 **Done-criteria:** All legal items signed off pre-launch.
 
-### T-LIVEOPS — Live Ops Foundation + Endgame
+### T-RETENTION — Endgame Retention Loops + Cosmetics
 
-Spans M-LIVEOPS; post-launch.
+> [!info] Roadmap V2 rename note
+> This track was previously labeled `T-LIVEOPS` but the V2 pass disambiguated it from the broader [[#T-LIVEOPS — Telemetry, Marketing, Launch, And Live-Ops|T-LIVEOPS]] track (telemetry + launch + Steam integration + legal). This track focuses specifically on endgame retention loops + cosmetics (DR-048 territory). Workers referencing the prior `T-LIVEOPS` ID for retention/cosmetics work should now use `T-RETENTION`.
+
+Spans BP10+ (placeholder); BP12 (finalization). Per [[decisions/dr-048-endgame-retention-and-server-wide-events]] + [[decisions/dr-049-customization-tournament-and-competitive]] + [[decisions/dr-057-optional-gacha-battle-pass-and-private-prototype-license-posture]].
+
 - Cosmetics + DLC + balance hot-patch + seasonal events + community challenges.
 - Endgame: procedural contracts, persistent veterans, mastery, Bunker Defence meta, ranked PvP, MMO, speedrun.com, daily seeds, Workshop endless.
-- NEVER pay-to-win.
+- NEVER pay-to-win (DR-031 + DR-057 dormant default-off).
 
-**Done-criteria:** Cosmetics earnable; DLC infrastructure ready; live-ops foundation deployed.
+**Done-criteria (final at BP12):** Cosmetics earnable; DLC infrastructure ready; live-ops foundation deployed.
 
 ### T-CREATOR — Streaming & Creator Features
 
@@ -3343,6 +3641,105 @@ Spans M-CREATOR; pre-launch + post-launch.
 - Photo mode + replay sharing + auto-highlight reel + OBS overlay + Twitch + spectator + streamer mode + press CRM.
 
 **Done-criteria:** All creator surfaces functional.
+
+---
+
+### T-CONTENT-ART — AI-Authored Art, Animation, VFX, And Roster
+
+> [!important] Roadmap V2 production track — DOES NOT gate gameplay milestones
+> T-CONTENT-ART runs in parallel to BP3..BP11 with placeholder/draft AI passes; final art lands at **BP12 (Release Candidate)**. Workers MUST NOT block a gameplay milestone on art quality.
+
+Spans BP3+ (placeholder); BP12 (finalization). Per [[decisions/dr-044-audiovisual-production-pipeline]] + [[decisions/dr-045-launch-content-roster]].
+
+**Scope:**
+- 3-tier AI-driven asset pipeline per [[spec/art-and-asset-pipeline]]: Tier 1 procedural placeholders (M0..M2), Tier 2 ComfyUI/SDXL/Flux/AnimateDiff/Stable Audio Open generated (M2..M5), Tier 3 AI-agent-polished final pass (M5+).
+- Launch roster per [[spec/launch-content-roster]]: 70+ weapons, 44+ actors, 18+ vehicles, 60+ base objects, 8 factions, 30+ missions, 17 launch materials, 12 ores, 30+ music tracks, 400+ SFX.
+- Animation system per [[spec/animation-system]]: hybrid sprite-sheet + skeletal-rigged + procedural overlays.
+- VFX/particles per [[spec/vfx-and-particles]]: hybrid GPU-instanced cosmetic + CPU-deterministic gameplay particles.
+- Lighting + atmospheric effects + decals per [[spec/lighting-and-shadows]] + [[spec/atmospheric-effects-and-decals]].
+- Music + SFX per [[spec/music-and-soundtrack]] + [[spec/ai-audio-pipeline-realtime-and-generative]].
+
+**Done-criteria (final at BP12):**
+- [ ] Every roster entry has the FUNCTIONALLY-WORKING + AI-READABLE + REPLAY-RECORDED + CAPTION-BOUND + BALANCE-FIXTURED + LOCALIZED + HOT-RELOADABLE + MOD-PARITY contract per DR-045.
+- [ ] All AI-generated assets logged in [[references/usage-ledger]] with regeneration metadata per DR-053.
+- [ ] Cosmetic/deterministic split documented and replay-stable.
+
+**Cross-DR:** DR-044, DR-045, DR-046, DR-047, DR-053, DR-057.
+
+**Open DR gates:** DR-044 (art pipeline tier confirmation), DR-045 (roster scope confirmation), DR-053 (audio pipeline / cloud-AI provider selection). Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
+
+---
+
+### T-CONTENT-NARRATIVE — Narrative Bible, Codex, And Dialogue
+
+> [!important] Roadmap V2 production track — DOES NOT gate gameplay milestones
+> T-CONTENT-NARRATIVE runs in parallel to BP3..BP11 with AI-generated placeholder dialogue; final narrative lands at **BP12 (Release Candidate)**. Workers MUST NOT block a gameplay milestone on writing quality.
+
+Spans BP3+ (placeholder); BP12 (finalization). Per [[decisions/dr-046-player-facing-surfaces-direction]].
+
+**Scope:**
+- Per [[spec/narrative-bible]]: 80,000+ words AI-authored + human-reviewed; 10-page setting bible; 8 faction archives; 24+ named NPCs (bio + portrait + signature + dialogue); 30+ mission briefing+debrief copy; ~600 codex entries; achievement copy.
+- Tutorial implementation per [[spec/tutorial-implementation]]: 12-15min cinematic onboarding mission + 8 modular labs + contextual fading tooltips + adaptive hints.
+- Mission director comms-policy hooks consumed by M9.5.
+
+**Done-criteria (final at BP12):**
+- [ ] Setting bible + faction archives + named NPC bios + dialogue lines (50-100 per NPC) + codex (600+) + briefing/debrief copy + achievement copy all written + reviewed.
+- [ ] All AI-generated narrative logged in [[references/usage-ledger]].
+
+**Cross-DR:** DR-046.
+
+**Open DR gates:** DR-046 (narrative direction + localization plan). Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
+
+---
+
+### T-LOCALIZATION — Strings, Fonts, And Mod-Localization
+
+> [!important] Roadmap V2 production track — string-source discipline starts at BP3
+> T-LOCALIZATION runs in parallel to BP3..BP11 with string-source discipline (no hardcoded English); full localization lands at **BP12 (Release Candidate)**. Per [[decisions/dr-046-player-facing-surfaces-direction]] + [[spec/localization-plan]].
+
+Spans BP3+ (string-source discipline); BP12 (finalization). Per [[decisions/dr-046-player-facing-surfaces-direction]] + [[spec/localization-plan]].
+
+**Scope:**
+- AI translation + community review + first-class moddable layer per [[spec/localization-plan]].
+- 11 Tier-A fully-localized + 8 Tier-B UI-only + mod-localization layer.
+- Project Fluent backend; multi-script font (Noto family); RTL audit.
+
+**Done-criteria (final at BP12):**
+- [ ] All player-facing strings flow through Fluent; no hardcoded English in production code.
+- [ ] Tier-A 11 languages cover 100% of Fluent strings; Tier-B 8 languages cover UI-only subset.
+- [ ] Mod-localization layer documented; sample mod ships with 3-language localization.
+- [ ] Multi-script font + RTL layout audit passes.
+
+**Cross-DR:** DR-046.
+
+**Open DR gates:** Localization plan topic (currently OPEN, no lean) — closes when string-source discipline is enforced via CI lint. Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
+
+---
+
+### T-LIVEOPS — Telemetry, Marketing, Launch, And Live-Ops
+
+> [!important] Roadmap V2 production track — DOES NOT gate gameplay milestones
+> T-LIVEOPS runs in parallel to BP10..BP11 with telemetry/bug-tool wiring; full launch ops land at **BP12 (Release Candidate)**. Workers MUST NOT block a gameplay milestone on launch readiness.
+
+Spans BP10+ (pre-launch wiring); BP12 (finalization). Per [[decisions/dr-047-launch-and-live-operations]] + [[decisions/dr-051-accessibility-sustainability-platform-and-launch-polish]] + [[decisions/dr-057-optional-gacha-battle-pass-and-private-prototype-license-posture]].
+
+**Scope:**
+- Telemetry + bug tooling per [[spec/telemetry-and-bug-tooling]]: Sentry/GlitchTip crash reporting + symbolicated stacks + anonymous opt-in gameplay telemetry (GDPR-clean) + F12 in-game bug tool + AI-driven weekly anomaly analysis.
+- Playtest program per [[spec/playtest-program]]: closed alpha + closed beta + Steam Next Fest demo + soak testing + AI-simulated playtest.
+- Marketing + launch per [[spec/marketing-and-launch]]: Steam page + 3 trailers + presskit() + demo + 50K+ wishlist drive + Discord + AI-driven press outreach.
+- Steam + platform integration per [[spec/steam-and-platform-integration]]: Workshop, Achievements (60-100), Cloud saves, Friends, Input (Deck), Trading Cards, Remote Play Together, Stats, Leaderboards. EOS adapter optional. GOG.com + itch.io post-launch.
+- Legal + compliance per [[spec/legal-and-compliance]]: trademark + LLC + Stripe + EULA/ToS/Privacy Policy + age rating + GDPR/CCPA/LGPD + open-source attribution + AI-asset usage-ledger + accessibility compliance.
+- Live ops + endgame per [[spec/liveops-and-endgame]]: cosmetics earned via play (default); optional cosmetic economy hooks dormant/default-off per DR-057.
+
+**Done-criteria (final at BP12):**
+- [ ] Telemetry + crash reporting in production with opt-in flow.
+- [ ] Steam page live; demo released to Next Fest; trailers published.
+- [ ] All legal docs in place; usage-ledger audit clean; accessibility compliance documented.
+- [ ] Live-ops dashboards operational; community challenges scheduled.
+
+**Cross-DR:** DR-047, DR-051, DR-057.
+
+**Open DR gates:** DR-057 (cosmetic economy activation gate stays default-off unless explicitly activated), DR-031 (no-pay-to-win lean confirmed at every BP). Per [[#Open Decision Gates Protocol|Open Decision Gates Protocol]].
 
 ---
 
@@ -3662,20 +4059,29 @@ For M0..M12, a milestone is done only when all agent-completable items below are
 | M1 | One actor playable for 5 minutes; HTML lab is officially superseded. |
 | M1.5 | Micro Breach can be won/lost in 60-90s, with reactive enemy, soft breach, objective state, and checked run bundle. |
 | M2 | Player digs through 8-material grid; carving replay-recorded; perf budget met. |
-| M3 | Headless replay produces identical checksums to live run. |
-| M4 | HUD-01..HUD-03 + ACC-A floor pass with 5 playtesters. |
+| M2.5 | Micro Reactor Defense can be won/lost in 60-90 s using M2 chunked terrain + M1 actor; cf-e2e proves both paths; reuses M1.5 fun-proof shape. |
+| M3 | Headless replay produces identical checksums to live run (M3A part); viewer + scrub + cause-chain (M3B part) closes DR-002. |
+| M4 | HUD-01..HUD-03 + ACC-A floor pass with 5 playtesters (M4A); comic-noir mission cards + status banners + DR-019 polish (M4B). |
 | M5 | Powered armor + light mech work end-to-end with chassis grammar; pilot eject works. |
 | M5.5 | COLL-001..COLL-012 pass; collision matrix/proxies/CCD/projectile-projectile/impulse damage replay headlessly with perf evidence. |
+| M5.5.5 | Micro Sabotage can be won/lost in 60-90 s using M5.5 collision + M5 chassis; cf-e2e proves both paths; reuses M1.5 fun-proof shape. |
 | M5.6 | MAT-01..MAT-03, MAT-06, MAT-13 minimal pass; active material kernel + reaction table + density layering + replay determinism with `material.*` and `reaction.*` events. |
 | M5.7 | MAT-04, MAT-05, MAT-07 pass + MAT-08 stub; acid/electricity/debris/ingestion damage routes through armor/limbs/equipment; afflictions visible. |
+| M5.8 | Per-origin reaction matrix runtime: human concuss/eat/breathe; android battery-drain/modular; robot overclock/downclock/leak coolant; G-Force vision blackout HUD with `--reduced-g-force-blackout` accessibility fallback. |
+| M5.9 | ATMOS-A-01..ATMOS-A-19 + GRAV-A-01..GRAV-A-10 pass; real PV=nRT, 10 launch gases, 6 combustion reactions, gradual phase change, pipe networks, suit life-support, per-planet ambient, universal gravity ballistic drag; replay-deterministic. |
+| M5.9.5 | Micro Pressure Hold can be won/lost in 60-90 s using M5.9 atmospherics; cf-e2e proves both paths; reuses M1.5 fun-proof shape. |
+| M5.10 | ENV-A-01..ENV-A-15 + ASTRO-A-01..ASTRO-A-05 pass; `EnvironmentSignal` aggregator within 5% frame budget on Steam Deck floor; 15-class hazard taxonomy; 12 launch worlds; comms light-lag deterministic. |
 | M6 | 6 of 8 DR-022 AI criteria demonstrably met; AI-H-01..06 pass. |
 | M6.5 | MIND-001..MIND-010 pass against mock provider; local AI keeps acting through provider sleep/fail/stale; replay shows `mind` events with redacted prompts. |
-| M6.6 | AI-MAT-01..AI-MAT-08 pass; AI material competence with reason labels; AI-H regression still passes. |
-| M7 | Project owner plays Breach Contract 5 times; A-FEEL gate met. |
+| M6.6 | AI-MAT-01..AI-MAT-08 + EnvironmentSignal-aware doctrine pass; AI environmental competence with reason labels; AI-H regression still passes. |
+| M7 | Project owner plays Breach Contract 5 times AND Bunker Defence 2v2 proof mission per DR-042; A-FEEL gate met. |
 | M7.5 | MAT-09, MAT-10 pass; Stationeers-grade room/pipe/vent/oxygen/pressure/fire/thermal networks; breach apertures and pressure/liquid jets work; mission director can author room-state objectives. |
+| M7.7 | DAY-A-01..DAY-A-03 + WEATHER-A-01..WEATHER-A-15 + AI-WEATHER-A-01..AI-WEATHER-A-05 pass; per-world day/night kernel + weather event kernel deterministic per scenario seed. |
 | M8 | Player authors a Breach Contract variant + sample mod loads. |
 | M8.5 | MAT-11, MAT-14 pass; designer authors + exports + reloads a material puzzle in <10 minutes; community mod pack with new material loads cleanly. |
+| M8.6 | DEPOSIT-A + SAMPLE-A + DRILL-A + EXTRACT-A + REFINE-A + SMELT-A + TRADE-A + AI-MINE-A pass; full mining pipeline + AI miner doctrine in coop. |
 | M9 | `cf-server` boots in all 5 modes; M9 server-core subset passes; 10-minute mission replays headlessly bit-identical; reference Docker image runs unchanged. |
+| M9.5 | VOICE-A-01..VOICE-A-15 + RADIO-A-01..RADIO-A-15 + TRAUMA-A-01..TRAUMA-A-03 + POLICY-A-01..POLICY-A-03 pass; voice through atmospheric medium; radio with multipath + bands + jamming + origin gating. |
 | M10 | LAN co-op via `cf-server --mode lan_room` survives one Breach Contract; per-client bundles align tick-for-tick; mod hash sync works. |
 | M11 | A community member self-hosts `cf-server --mode coop_room`; friends in different cities join via NAT/relay; package hash mismatch handled cleanly; anti-cheat `competitive` profile rejects spike-rate clients. |
 | M12 | `cf-server --mode pvp_arena` runs 4-8 player matches with anti-cheat foundation; `cf-server --mode mmo_shard` MMO-001..MMO-012 all pass; 50 simulated clients for 1 hour at ≥30 Hz; persistence + restart proven; no proprietary cloud dependency. |

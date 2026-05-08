@@ -32,7 +32,11 @@ feeds:
 | `events.jsonl` | Ordered recorder events and snapshots from the run. | `prototype-recorder-event.schema.json` per line |
 | `summary.json` | Results, event counts, byte volume, performance counters, artifacts, blockers, and next actions. | `prototype-run-summary.schema.json` |
 | `notes.md` | Human observation layer: assumptions, Good/Bad/Meh moments, evidence links, and next actions. | Heading checks in `prototype_run_check.py` |
-| `screenshots/` or `captures/` | HUD, overlay, event tail, replay viewer, workbench, or failure screenshots. | Listed in `summary.json.artifacts` |
+| `screenshots/` | HUD, overlay, event tail, replay viewer, workbench, or failure screenshots. | Listed in `summary.json.artifacts` |
+| `captures/frame_<tick>.png` | Per-tick frame readbacks at the configured baseline cadence (10 Hz default) + event-triggered keyframes. Optional but required for any BP fun-proof slice from BP2 onward. | T-CAPTURE pipeline (`cf-capture` + `cf-app --capture-frames-hz`); listed individually in `summary.json.artifacts[].type="capture-frame"`. |
+| `captures/grid_<NNN>.png` | 8×8 composite grid of consecutive captures with tick + HP + mission overlays. Composer: `game/tools/capture_grid.py`. | Listed in `summary.json.artifacts[].type="capture-grid"` with `frame_count`, `event_count`, `tick_first`, `tick_last`. |
+| `captures/summary_grid.png` | Single-image high-level "what happened" grid: one frame per major event (`mission_*`, `terrain_carved`, `projectile_hit`, `actor_status_changed`, `weapon_fired`, `ai.state_changed`, `system.panic`), max 64 frames. Mandatory for any BP fun-proof slice. | Listed in `summary.json.artifacts[].type="capture-summary-grid"`. The AI-agent BP closure flow reads this image first. |
+| `captures/grid.json` (alongside each grid PNG) | Composer-version + overlay-schema-rev + tick-frame mapping for deterministic regeneration + agent-readable event filter. | Composer-emitted next to each grid PNG. |
 
 Validation command:
 
