@@ -834,11 +834,8 @@ fn sync_actor_state_to_render(
                 _ => {}
             }
         }
-        if let Some((b, _)) = best {
+        if let Some((b, d2)) = best {
             // Approximate "in range" with a 64-unit pad against the AABB centre.
-            let cx = (b.bbox_min[0] + b.bbox_max[0]) * 0.5;
-            let cy = (b.bbox_min[1] + b.bbox_max[1]) * 0.5;
-            let d2 = (cx - px) * (cx - px) + (cy - py) * (cy - py);
             hud_state.breach = Some(HudBreach {
                 id: b.id.clone(),
                 material: b.material.clone(),
