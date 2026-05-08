@@ -12,6 +12,33 @@ Use this file to summarize what changed in the implementation repo. Do not copy 
 
 ## Unreleased
 
+### Merged into main (2026-05-08)
+
+- **PR #5 squash-merged** ([commit `0d91451`](https://github.com/Madreag/corefall/commit/0d91451)) — M1.5 Micro Breach Fun Slice + Roadmap V2 Build Points + AGENTS.md refresh. 5 commits squashed (8696b6f...3feff29) including 3 Cursor Agent autofixes (HUD breach material source + dig_range field + miss_roll boundary fix + dead-code removal).
+- **PR #6 squash-merged** ([commit `064c0a0`](https://github.com/Madreag/corefall/commit/064c0a0)) — T-CAPTURE side track. 12 commits squashed (068eece...85b0ca9) including 6 Cursor Agent autofixes + 2 of my own Bugbot follow-up fixes + the final merge integration commit pulling in PR #5's autofix layer.
+- **README post-merge refresh** ([commit `5d20a04`](https://github.com/Madreag/corefall/commit/5d20a04)) — drop stale "in CI / in review" PR queue line; surface the merged-state of both PRs in the status banner; bump test count to 204; add T-CAPTURE row to the Project Status table.
+
+**Final post-merge state:**
+
+- 30 crates in workspace (cf-capture added).
+- **204 tests passing** workspace-wide (M0=73 + M1=86 + M1.5=30 + T-CAPTURE=15 including NaN/Inf frames_hz guards, alert_dwell + burst_pause off-by-one regressions, --headless-smoke + --capture-grid rejection, and instant-fire aim_settle).
+- BP1 closed; BP2 (M2 + M2.5) is now the active Build Point.
+- All 3 CI legs (ubuntu, macos, windows) green on both PRs at merge time.
+
+### Fixed (T-CAPTURE Bugbot loop)
+
+The T-CAPTURE PR #6 cycled through three Bugbot autofix iterations PLUS two of my own follow-up commits to address findings the Bugbot 3-iteration cap left unresolved:
+
+- **`baseline_interval_ticks` NaN/Infinity bypass** (cf-capture, Bugbot ID 4dec59f3): `frames_hz <= 0.0` is `false` for NaN under IEEE 754, and Inf would saturate the float-to-int cast to 0 then `.max(1) = 1` → capture every sim tick → disk-fill bug. Fixed via `!self.frames_hz.is_finite() || self.frames_hz <= 0.0`. Four regression tests cover NaN, +Inf, -Inf, negative.
+- **Guard `alert_dwell` + `burst_pause` off-by-one** (cf-ai, Bugbot ID cf33d096): step() decremented timers BEFORE the state-machine + scoring/firing checks read them, so D ticks of configured duration produced D-1 effective ticks. Fixed via pre-decrement capture (`prev_alert_dwell_remaining_ticks`, `prev_burst_pause_remaining_ticks`) threaded through `score_tactics` + `try_fire`. Two regression tests prove full-duration behavior.
+- **`seconds_to_ticks(0.0) = 1` silent delay** (cf-ai, Cursor Agent autofix `74deb29`): the function clamped every input to ≥ 1 tick, so callers passing `aim_settle_seconds = 0.0` got a 1-tick delay instead of instant fire. Fixed: explicit `0.0` returns 0; positive sub-tick still rounds up to 1.
+- **Recorder cursor TOCTOU race** (cf-app, Cursor Agent autofix `dc89630`): `pump_recorder_events_into_capture_keyframes` advanced via `event_log_len()` in a SECOND lock acquisition, allowing a concurrent producer to slip an event in between. Fixed: `cursor.0 += new_events.len()` (single lock, exact). Recorder helper `event_log_len()` was then dropped as dead code (autofix `86d1fa7`).
+- **HudBreach material wired through render projection** (Cursor Agent autofix `fe7804e`): `BreachRenderView` gained a `material` field; cf-app HUD reads strip material directly instead of misusing `refusal_reason` (which was `None` for diggable strips, yielding empty string).
+- **`CaptureSystems` SystemSet ordering** (Cursor Agent autofix `fe7804e`): capture systems now run AFTER `sync_engine_tick_to_capture_clock` and `pump_recorder_events_into_capture_keyframes` so captures observe current-frame tick + same-frame keyframe messages.
+- **Keyframe matching by (category, event_type) tuple** (Cursor Agent autofix `51fe1f6`): `CAPTURE_KEYFRAME_EVENT_TYPES` previously matched only `event_type` (e.g., `"state_changed"`). Future `control.state_changed` would have silently inflated the summary grid. Now matches the full `(category, event_type)` shape per the documented contract.
+- **`--headless-smoke` + `--capture-grid` rejection** (cf-app): the headless paths skip Bevy's render world entirely (no swapchain, no `Screenshot` observer). Silently consuming `--capture-grid` violated AGENTS.md Contract Integrity Gate ("no fake success"). Now hard-rejects at startup with a clear error pointing to the windowed path or the (scope-limited) `--headless-capture` flag.
+- **PR #5 autofixes integrated via merge** (commit `85b0ca9`): brought in PR #5's `BreachRenderView::dig_range` field, drop of `_dig_event_marker` + `mission_started_at_tick` dead state, lift of `cf_mission::step` out of the actor-state guard so missions tick without an actor world, and `miss_roll` high-53-bit projection + `miss_threshold>=1.0` guard so deterministic miss rolls stay strictly in `[0, 1)`.
+
 ### Added (T-CAPTURE — Frame Capture, Grid Composer, And BP Fun-Proof Automation)
 
 - **New `cf-capture` crate** (workspace member 30) layered on top of `cf-render-2d`. Owns `CfCapturePlugin`, `CaptureConfig`, `CaptureState`, `CaptureClock`, `CaptureMode`, `CaptureKeyframeRequested`, `CaptureFrameEntry`, `CaptureManifest`, `CaptureStateHandle`. 6 unit tests (interval math + filename padding + manifest round-trip).

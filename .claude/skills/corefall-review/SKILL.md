@@ -1,13 +1,15 @@
 ---
 name: corefall-review
-description: Deep Corefall code review and bug hunt. Use when asked to review a Corefall milestone, feature, diff, branch, PR, or implementation for bugs, misses, logic gaps, test gaps, roadmap/checklist drift, determinism/replay risk, cfctl coverage, performance, security, or Rust safety.
-when_to_use: Trigger for prompts like review M0, bug hunt this milestone, find gaps, audit the implementation, review my diff, check if this is done, or run a pre-merge review. Always use for Corefall review work before declaring a milestone complete.
-argument-hint: "[milestone-or-git-range]"
+description: Deep Corefall code review and bug hunt. Use when asked to review a Corefall milestone, Build Point (BP0..BP12), feature, diff, branch, PR, or implementation for bugs, misses, logic gaps, test gaps, roadmap/checklist drift, determinism/replay risk, cfctl coverage, T-CAPTURE evidence, performance, security, or Rust safety.
+when_to_use: Trigger for prompts like review M0, review BP1, bug hunt this milestone, find gaps, audit the implementation, review my diff, check if this is done, or run a pre-merge review. Always use for Corefall review work before declaring a milestone or Build Point complete.
+argument-hint: "[milestone-or-bp-or-git-range]"
 ---
 
 # Corefall Review
 
-Run a deep review of Corefall implementation work. Treat `$ARGUMENTS` as the milestone, feature, branch, commit, or diff range to review. If no argument is provided, review the current working tree.
+Run a deep review of Corefall implementation work. Treat `$ARGUMENTS` as the milestone, Build Point (e.g. `BP1`, `BP2`), feature, branch, commit, or diff range to review. If no argument is provided, review the current working tree.
+
+For Build Point arguments (`BP<N>`), the review covers EVERY milestone the BP bundles per the Build Points table in `cortext_command_vault/spec/prototype-roadmap.md` plus the per-BP human-playtest survey row and T-CAPTURE summary-grid evidence.
 
 Use ultrathink. Optimize for true bugs, missed requirements, logic problems, determinism gaps, weak tests, stale docs, and milestone incompleteness. Do not spend review budget on style unless it hides a real defect or maintainability risk.
 
@@ -28,11 +30,12 @@ Green commands are not enough. Prove the contract, not just that the process exi
 Always check:
 
 - **Shared production paths:** `cf-app`, `cfctl`, `cf-control`, scenario loading, metadata generation, schema validation, and run-bundle writing must share the same core logic where they claim the same behavior.
-- **No fake success:** `accepted`, `ok`, or `PASS` must mean the requested state change happened. Unsupported fields must reject or be explicitly documented as ignored.
+- **No fake success:** `accepted`, `ok`, or `PASS` must mean the requested state change happened. Unsupported fields must reject or be explicitly documented as ignored. Silently consuming a flag without producing the side effect (e.g. `--capture-grid` with `--headless-smoke` producing zero PNGs) is a fake-success failure.
 - **Mandatory field enforcement:** missing or malformed required fields must fail in the live protocol and tests.
 - **Source-truthful evidence:** bundles and observations must reflect loaded scenario data, active config, current binary/git state, and actual runtime path.
 - **Checklist truth:** checked rows cannot hide missing required work in notes with "deferred", "follow-up", "reserved", "stub", "fake", "placeholder", "not implemented", or equivalent wording.
 - **Regression proof:** every verified bug fixed by an implementer must include a test or validation command that would have failed before the fix.
+- **T-CAPTURE evidence (BP2 onward):** every fun-proof scenario must emit a `summary_grid.png` + `capture_manifest.json` recorded in `summary.json.artifacts`; the cf-e2e script must include `--expect capture.summary_grid.non_blank_ratio>=0.95` to catch black-frame regressions. See `cortext_command_vault/spec/prototype-roadmap.md` §T-CAPTURE.
 
 If any item above is missing, verdict is `Needs Fixes`.
 
@@ -40,11 +43,12 @@ If any item above is missing, verdict is `Needs Fixes`.
 
 Treat these as Blocker-level issues unless evidence proves a lower severity is more accurate:
 
-- Code does not satisfy the assigned roadmap milestone, native backlog task card, feature checklist row, or open DR gate.
+- Code does not satisfy the assigned roadmap milestone, Build Point bundle, native backlog task card, feature checklist row, or open DR gate.
 - Work is marked complete without run-bundle evidence when the milestone requires it.
 - New player-facing UI/gameplay cannot be observed or controlled through `cfctl`.
 - Sim, replay, physics, AI, material, or networking code introduces nondeterminism without an explicit approved reason.
 - Run-bundle files are missing, invalid, unordered, unversioned, or not checked by the canonical checker.
+- T-CAPTURE evidence (`summary_grid.png` + `capture_manifest.json`) is missing for a BP2+ fun-proof scenario, OR the cf-e2e script lacks the `capture.summary_grid.non_blank_ratio>=0.95` expectation, OR the per-BP human-playtest survey row in `prototype_runs/native/<bp>_*` notes does not reference the summary grid path it was answered against.
 - User-controllable input can panic, corrupt state, access unintended paths, or bind control/server surfaces outside approved local boundaries.
 - Tests are decorative, tautological, nondeterministic, or do not cover the behavior they claim to protect.
 - Implementation changes require vault/checklist/changelog updates and those updates are missing.
@@ -75,13 +79,13 @@ cd /Users/erol/projects/corefall && {
 
 Read these before judging the work:
 
-- `/Users/erol/projects/corefall/AGENTS.md`
-- `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md`
+- `/Users/erol/projects/corefall/AGENTS.md` (especially **Build Point Closure Gate** + **Contract Integrity Gate** + **Cursor Bugbot Loop** sections).
+- `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md` (especially the **Build Points** table BP0..BP12 and the **§T-CAPTURE** side-track section).
 - `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/native-implementation-backlog.md`
-- `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/feature-completion-checklist.md`
+- `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/feature-completion-checklist.md` (per-milestone rows AND the **Build Points Checklist** addendum).
 - `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/ai-control-observability-layer.md`
-- `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/references/prototype-run-bundle-schema.md`
-- Relevant DRs and specs linked from the assigned milestone.
+- `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/references/prototype-run-bundle-schema.md` (especially the `captures/` rows and `summary.json.artifacts[].type` values).
+- Relevant DRs and specs linked from the assigned milestone or Build Point.
 
 If the review is for M0, also read [references/m0-review.md](references/m0-review.md).
 For the full pass definitions, read [references/review-passes.md](references/review-passes.md).
