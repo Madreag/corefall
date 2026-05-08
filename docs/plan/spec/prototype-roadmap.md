@@ -104,6 +104,7 @@ feeds:
 - [[#Inter-Milestone Bridges|Inter-Milestone Bridges]]
 - [[#Per-Milestone Kickoff Smoke|Per-Milestone Kickoff Smoke]]
 - [[#Build Points (Roadmap V2)|Build Points (Roadmap V2)]]
+- [[#Design-Completeness Map|Design-Completeness Map]]
 - [[#Milestone Map|Milestone Map]]
 - [[#Side Tracks|Side Tracks]]
 - [[#Milestone Details|Milestone Details]]
@@ -1700,6 +1701,73 @@ Workers implementing BP2..BP11 may use **placeholder** narrative/art/audio (AI-g
 
 ---
 
+## Design-Completeness Map
+
+> [!important] What "design-complete" means at end of BP12
+> The Roadmap V2 contract is that **by the end of BP12 the game is a complete releasable candidate** — every product surface a Steam buyer touches works, integrates with replay/save/server/modding/accessibility/captions, and is reachable from `cfctl`. Final balance tuning, marketing timing, and explicit post-launch expansions are the only work remaining. This map enumerates every product surface and names the BP+milestone that makes it design-complete. **A worker can use this matrix to verify "yes, after BP12 this is a complete game."** If a row is missing or vague, that's a roadmap bug — open an issue or a DR amendment instead of shipping.
+
+| Product surface | Design-complete owner | BP closure | Notes |
+|---|---|---|---|
+| Engine bootstrap (workspace, fixed-tick, JSON-RPC control, run-bundle writer, panic capture, CI matrix) | M0 | BP0 | Closed. |
+| Actor controller (move/aim/jump/fire/reload/select/reset) + body status state machine + first playable | M1 | BP1 | Closed. |
+| Micro Breach fun proof (60-90s win/loss with enemy + soft breach + objective + replay) | M1.5 | BP1 | Closed. |
+| Frame capture + grid composer + AI-agent self-test loop | T-CAPTURE side track | BP1 (infra) → BP2+ (mandatory) | Closed (infra). |
+| Per-BP cross-platform GitHub Releases + determinism contract | T-RELEASE side track | BP1 (retroactive) → BP2..BP11 → BP12 GA | BP1 retroactive tag still pending. |
+| Chunked pixel terrain + 8-material launch set + GPU-assisted carving + material overlay + tool-validity feedback | M2 | BP2 | Active. |
+| Micro Reactor Defense fun proof (60-90s reactor defense; chunked-terrain-driven win/loss) | M2.5 | BP2 | Active. |
+| Event taxonomy lock + snapshot/checksum + headless replay + recorder backpressure + run-finished outcome contract | M3A | BP2 | Active. |
+| Replay viewer + scrubber + cause-chain + debrief summary + death recap (DR-002 closure) | M3B | BP3 | Planned. |
+| HUD readability (silhouette + module strip + ammo + objective + last event) + ACC-A floor (200% scale, contrast, captions, reduced motion, remap, focus traversal) (DR-012 closure) | M4A | BP3 | Planned. |
+| Equipment role records + chassis grammar + body graph + animation-first locomotion + module damage + damage stages + jam/eject/repair/salvage + tutorial-safety policy | M5 | BP3 | Planned. |
+| Full collision matrix + 16 collision classes + CCD tiers + projectile-projectile + impulse-to-damage + `cfctl observe --collisions` + COLL-001..012 (DR-033 closure) | M5.5 | BP4 | Planned. |
+| Micro Sabotage fun proof (60-90s collision-driven kill via catwalk drop or pushed crate or held-weapon block) | M5.5.5 | BP4 | Planned. |
+| Active material kernel (chunked CA + reaction table + density layering + phase change) + 8-material baseline (MAT-01..03, 06, 13 minimal) | M5.6 | BP4 | Planned. |
+| Hazard package (acid + toxic gas + electricity + pebble/debris + ingestion stub) + affliction layer + material→damage routing | M5.7 | BP4 | Planned. |
+| Per-origin reaction matrix (humans concuss/eat/breathe; androids battery-drain/modular; robots overclock/downclock/leak coolant) + G-Force vision blackout HUD | M5.8 | BP4 | Planned. |
+| Stationeers-grade-or-better atmospherics kernel (PV=nRT + 10 gases + 6 combustion reactions + gradual phase change + pipe networks + suit life-support + per-planet ambient + universal gravity ballistic drag) (DR-037 closure; DR-038 partial) | M5.9 | BP5 | Planned. |
+| Micro Pressure Hold fun proof (60-90s atmospheric kill via venting / ignition / suit puncture) | M5.9.5 | BP5 | Planned. |
+| 12-world catalog + simplified Keplerian astrography + comms light-lag + EnvironmentSignal aggregator + 15-class hazard taxonomy (DR-039 + DR-040 closure) | M5.10 | BP5 | Planned. |
+| AI core (perception + memory + utility + doctrine + reason labels) + AI-H trust harness (8-criteria humanlike bar; 6 of 8 by M6) (DR-008 closure) | M6 | BP6 | Planned. |
+| Async LLM mind layer (provider-trait adapters + mock-default + cost cap + fairness + replay; no API key required) (DR-032 closure) | M6.5 | BP6 | Planned. |
+| AI environmental competence (material/atmosphere/gravity/thermal/radiation/photic/EM/weather/comms-aware doctrine) (AI-MAT-01..08 + AI-ENV-* + AI-MINE-A) | M6.6 | BP6 | Planned. |
+| Mission director + Breach Contract proof mission + Bunker Defence proof mission (DR-004 + DR-027 + DR-042 closure) + comic-noir mission cards (M4B) + DR-019 + DR-009 closure | M7 + M4B | BP7 | Planned. |
+| Base atmospherics (hull/gap/pump/vent/oxygen/pressure/fire/thermal networks; breach apertures; weapon-created holes; thermal modules) | M7.5 | BP7 | Planned. |
+| Day/night + per-world weather kernel + dynamic event hooks + AI weather doctrine | M7.7 | BP7 | Planned. |
+| Scenario editor + mod loader + package builder + script host (mlua vs Rhai locked at M5/M8) (DR-006 closure) | M8 | BP8 | Planned. |
+| Material lab (brush/inspect/recipe/stamp/AI puppet/mod packs) + designer authors acid-trap puzzle in <10 min (DR-036 lab closure) | M8.5 | BP8 | Planned. |
+| Mining and extraction (12 ores + sample → drill → extract → refine → smelt + AI miner doctrine + server-authoritative resource ledger) (DR-041 closure) | M8.6 | BP8 | Planned. |
+| Dedicated server binary (`cf-server` 5 modes + ops + persistence + anti-cheat foundation + admin + Docker image) + determinism islands (DR-005 + DR-013 + DR-029 + DR-034 + networking-transport closure) | M9 | BP9 | Planned. |
+| LAN co-op (auto-discovery + ready-up + replicated state + per-client replay alignment + mod-hash sync) | M10 | BP9 | Planned. |
+| Online co-op (NAT/relay + lobby_directory + package hash sync + latency masking + anti-cheat `competitive` profile + Match grammar per DR-042) | M11 | BP10 | Planned. |
+| Voice + radio comms (ACRE2-tier radio + Steam Audio-tier voice + atmospheric medium + origin gating + mission-director comms-policy + light-lag) (DR-043 closure) | M9.5 | BP10 | Planned. |
+| Public PvP arenas + persistent MMO shards (interest management + 50-200 concurrent + portal/lobby + Bunker Defence flagship) (DR-035 + DR-049 closures + MMO-001..012) | M12 | BP11 | Planned. |
+| AI asset pipeline (3 tiers: Tier 1 SVG placeholder + Tier 2 ComfyUI/SDXL/Flux/AnimateDiff/Stable Audio Open + Tier 3 Aseprite/Spine/FMOD-or-Kira polish) | T-CONTENT-ART (M-ART-0/1/2 + M-LIGHT + M-VFX + M-MUSIC) | BP3+ placeholder → BP12 final | Modder parity required. |
+| Launch content roster (70+ weapons, 44+ actors, 18+ vehicles, 60+ base objects, 8 factions, 30+ missions, 17 materials, 12 ores, 30+ tracks, 400+ SFX) — every entry FUNCTIONAL + AI-readable + replay-recorded + caption-bound + balance-fixtured + localized + hot-reloadable + mod-parity | T-CONTENT-ART (M-CONTENT-ARMORY + M-CONTENT-ACTORS + M-CONTENT-VEHICLES + M-CONTENT-BASE + M-CONTENT-FACTIONS + M-CONTENT-MISSIONS) | BP12 | Tier 1 placeholders may begin BP3+. |
+| Narrative bible + codex + dialogue (~80,000 words; 10-page setting bible; 8 faction archives; 24+ named NPCs with bio + portrait + dialogue; 30+ mission briefing+debrief; ~600 codex entries; achievement copy) | T-CONTENT-NARRATIVE (M-CONTENT-NARRATIVE) | BP3+ placeholder → BP12 final | AI-authored + human-reviewed. |
+| Tutorial implementation (12-15min cinematic onboarding mission + 8 modular labs + contextual fading tooltips + adaptive hints + difficulty/accessibility presets) (DR-023 closure) | M-TUTORIAL | BP10..BP12 | AI-authored. |
+| Localization (11 Tier-A fully-localized + 8 Tier-B UI-only + mod-localization layer + Project Fluent + multi-script font + RTL audit) (DR-046 closure) | T-LOCALIZATION (M-LOCALIZATION) | BP3+ string-source discipline → BP12 final | CI gate: zero hardcoded English. |
+| Shell UI (title + main menu + pause + full settings tree + lobby + workbench + briefing + debrief + map + achievements + replay viewer + codex + photo mode + cosmetic locker + death cam + mod manager) | T-SHELL (M-SHELL-MENU + M-SHELL-LOADOUT + M-SHELL-LOBBY + M-SHELL-DEBRIEF + M-SHELL-MAP + M-SHELL-ACHIEVEMENTS) | BP3..BP12 | All juice rules per DR-046 + DR-055; cfctl parity per T-CONTROL. |
+| Accessibility-plus (cognitive + motor + hearing + reading + sensory presets + 8 color-blind protocols + cinematic accessibility + DR-051 closure) | T-ACC-PLUS (M-ACC-PLUS) | BP9..BP12 | Built on ACC-A floor from M4A. |
+| Telemetry + bug tooling + playtest program + marketing + Steam/platform integration + legal/compliance + live-ops + cosmetic-only economy hooks (default-off) (DR-047 + DR-051 + DR-057) | T-LIVEOPS (M-TELEMETRY + M-PLAYTEST + M-MARKETING + M-STEAM + M-LEGAL + M-LIVEOPS + M-CREATOR) | BP10..BP12 | DR-057 stays dormant unless explicitly activated by future DR. |
+| Endgame modes (10: roguelite + Last Stand + endless + time-attack + NG+ + async PvP / ghost replays + custom rules + bot-tournaments + community jams + daily seeds) + persistent veterans deep loop + bunker meta + cross-shard world events + anti-FOMO archive (DR-048 closure) | T-ENDGAME (M-ENDGAME + M-WORLD-EVENTS) | BP11..BP12 | Persistent veterans drive long-tail retention. |
+| Customization depth (~80 weapon attachments + ~50 salvage crafting recipes + 1-30 mastery + loadout templates + paint/decal + voice packs + vendor economy + item-comparison UI; NEVER pay-to-win per DR-031) (DR-049 closure customization half) | T-CUSTOM (M-CUSTOM) | BP4..BP11 | Workshop sharing built-in. |
+| Tournament + competitive infrastructure (ELO/MMR + 7-tier ranked + tournament admin + observer/commentator + replay analysis + warm-up + coach mode + tournament-grade anti-cheat) (DR-049 closure tournament half) | T-COMP (M-COMP) | BP10..BP12 | Community-hostable per DR-005. |
+| Modding ecosystem extensions (versioning + dependency mgmt + conflict detection + analytics + tip jar + curation + collab + AI-driven test runs + auto-update + auto-docs) (DR-050 closure modding half) | T-MOD-EXT (M-MOD-EXT) | BP8..BP12 | 0% project cut on tip jar. |
+| Social + onboarding-plus + AI quality (guilds + messaging + co-op campaign saves + cross-shard friends + voice party + gifting + mentor system + beginner pool + first-30-min telemetry + AI difficulty visibility + faction personality identifiability + AI mistake narration + AI training mode) (DR-050 closure social half) | T-SOCIAL (M-SOCIAL + M-ONBOARD-PLUS + M-AI-QUALITY) | BP9..BP12 | Discord + Workshop coordination. |
+| Sustainability + sunset plan (5-year content plan + sunset trigger criteria + open-source path + endless content guarantee + server hosting handoff + content archival + key contributor revenue share) (DR-051 closure sustainability half) | T-SUSTAIN (M-SUSTAIN) | BP12 → post-launch lifelong | Documented in advance. |
+| Console + cloud gaming + TV-friendly evaluation (Switch/Switch 2 + PS5 + Xbox Series + Mac App Store + Linux Flathub + cloud + Big Picture + Steam Link / Moonlight) | M-CONSOLE-EVAL | post-launch | Post-launch eval; not BP12 blocker. |
+| Performance polish (network indicator + auto-quality + cold-load benchmark + memory leak detection + save backup + anti-cheat heuristics + server health dashboard + network simulator + crash-recovery flow) | M-PERF-POLISH | BP11..BP12 | T-PERF + DR-051 + DR-054. |
+| Customer support + sales + marketing extras (HelpScout/Zendesk + Stripe + refund + tax + sale calendar + bundle + affiliate + sales reports + ARG + OST + art book + comic + wiki + dev streams + Q&A + roadmap voting + bug bounty + translator credits + schools) | M-CS-OPS + M-MKT-EXTRAS | post-launch | Per DR-013 + DR-051. |
+| Release day (v1.0 ships; launch trailer + press + Discord launch event + first 24h crash + telemetry monitoring + first community Q&A) | M-LAUNCH | BP12 | Pre-release flag drops at v1.0.0. |
+
+> [!important] Verification rule
+> If a worker assigned a milestone cannot point at a row in this map that names their milestone (or a side track that owns the surface), the milestone scope is incomplete or the map is stale. Either way, **stop and ask the user via the active agent's user-input/chat mechanism** before continuing. Do not silently fill the gap with prose; update the map AND the milestone scope in the same pass.
+
+> [!warning] Scope drift detection
+> If a Build Point is being closed but a row in this map that names a milestone INSIDE the BP is unchecked, the BP is NOT closed. The Build Points Checklist in [[spec/feature-completion-checklist]] mirrors this map and must be ticked in the same pass.
+
+---
+
 ## Milestone Map
 
 | ID | Title | What It Proves | Depends On | Critical |
@@ -1765,6 +1833,29 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 ---
 
 ## Milestone Details
+
+> [!important] Universal Enhancement Done-Criteria apply to every M1+ milestone (DR-056)
+> Every milestone from M1 onward inherits the **Universal Enhancement Done-Criteria** in [[spec/milestone-enhancement-pass-m1-plus]] on top of its own scope/done-criteria. The universal rows are NOT optional polish; they are part of the milestone closeout contract:
+>
+> 1. **Per-tier perf gate** — Steam Deck 800p/60 + 1080p/60 + 4K/120 reference scenarios (DR-054).
+> 2. **CI bench regression test** — no >5% regression vs baseline (DR-054).
+> 3. **Memory leak soak** — 24h+ clean (DR-051 / DR-054).
+> 4. **Network sync verified** — `cfctl test sync-drift` (DR-052).
+> 5. **Replay determinism CI matrix** — per platform + per architecture (DR-002 / DR-052).
+> 6. **All player surfaces scriptable via `cfctl`** — Eyes/ears/hands rule (T-CONTROL).
+> 7. **AI-agent-driven validation report** logged (DR-026 / DR-056).
+> 8. **All audio cues generated via DR-053 pipeline** + usage-ledger logged (DR-053).
+> 9. **Game feel / juice rules** — every gameplay event has an authored juice response (DR-055).
+> 10. **Accessibility ACC-A floor** — UI 200% + high contrast + captions + reduced motion (DR-012).
+> 11. **Localization keyed strings** — Tier-A 11 languages CI-checked (DR-046).
+> 12. **Modding parity** — modder can extend; mod-test-run AI agent validates (DR-006 / DR-050).
+> 13. **Anti-FOMO + anti-pay-to-win audit** passes (DR-031 / DR-057).
+> 14. **Captions for ALL audio** (full-subtitle option per DR-051).
+>
+> A milestone is not closed if any Universal row FAILS unless the user explicitly approves deferring that exact row with issue ID, reason, owner, next checkpoint, and evidence path. Per-milestone specifics that strengthen these rows live in [[spec/milestone-enhancement-pass-m1-plus]] (Per-Milestone Enhancement Specifics).
+
+> [!important] BP-level inheritance (Roadmap V2)
+> Build Points (BP0..BP12) bundle related milestones into shippable proof slices. Closing a BP means closing every milestone inside it AND the BP-level closure gate ([[#Build Points (Roadmap V2)|Build Points]]): vault note + per-BP DR closure refresh + run-bundle evidence + T-CAPTURE summary grid (BP2+) + T-RELEASE tagged release (BP1+) + per-BP human-playtest survey + `/corefall-review <bp>` Accept. **Workers MUST treat the assigned milestone as part of its BP and confirm the BP closure gate is reachable as the milestone lands**, not after the fact.
 
 ### M0 — Engine Bootstrap
 
