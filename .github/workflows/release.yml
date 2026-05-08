@@ -38,6 +38,10 @@ jobs:
     steps:
       - uses: actions/checkout@v6.0.2
 
+      - uses: actions/setup-python@v6.2.0
+        with:
+          python-version: "3.x"
+
       - name: Install Linux deps
         if: runner.os == 'Linux'
         run: |
@@ -89,13 +93,18 @@ jobs:
           if [ -f ../LICENSE-MIT ]; then cp ../LICENSE-MIT "../staging/${STAGE}/"; fi
           if [ -f ../LICENSE-APACHE ]; then cp ../LICENSE-APACHE "../staging/${STAGE}/"; fi
 
-          # Latest BP fun-proof run bundle + summary grid (pick the most recent
-          # m1.5_*, m2.5_*, etc. matching the BP under prototype_runs/native/).
-          # If no bundle is checked into the repo we skip silently — the next BP
-          # closure will populate it.
+          # Latest BP fun-proof run bundle + summary grid. Resolve the path via
+          # the same BP-aware logic the release-notes generator uses so the
+          # archived exemplar always matches the determinism contract published
+          # in RELEASE_NOTES.md (BP-tagged bundle first, then the BP's anchor
+          # milestone bundles per BP_SCOPE). If no bundle is checked into the
+          # repo we skip silently — the next BP closure will populate it.
           if [ -d "../prototype_runs/native" ]; then
-            LATEST_BUNDLE=$(ls -dt ../prototype_runs/native/m*_* 2>/dev/null | head -n1 || true)
-            if [ -n "${LATEST_BUNDLE}" ]; then
+            LATEST_BUNDLE=$(python3 tools/generate_release_notes.py \
+              --tag "${TAG}" \
+              --repo-root .. \
+              --print-bp-bundle 2>/dev/null || true)
+            if [ -n "${LATEST_BUNDLE}" ] && [ -d "${LATEST_BUNDLE}" ]; then
               BUNDLE_NAME=$(basename "${LATEST_BUNDLE}")
               mkdir -p "../staging/${STAGE}/run-bundle-exemplar"
               cp -R "${LATEST_BUNDLE}/." "../staging/${STAGE}/run-bundle-exemplar/" || true

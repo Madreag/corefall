@@ -182,7 +182,9 @@ def find_bp_run_bundle(repo_root: Path, bp: str) -> Optional[Path]:
     anchor_milestones = BP_SCOPE.get(bp, ("", [], ""))[1]
     for milestone in reversed(anchor_milestones):
         # M1.5 → m1.5_*, M2.5 → m2.5_*, M5.5.5 → m5.5.5_*, etc.
-        prefix = milestone.lower().replace("-", "_")
+        # Hyphens AND spaces both map to underscore so milestone labels like
+        # "T-CAPTURE infrastructure" become "t_capture_infrastructure_*".
+        prefix = milestone.lower().replace("-", "_").replace(" ", "_")
         candidates = sorted(bundles_root.glob(f"{prefix}_*"))
         if candidates:
             return candidates[-1]
@@ -329,7 +331,8 @@ def install_section() -> str:
         "./cf-app --scenario m1_actor_range\n"
         "```\n"
         "\n"
-        "Verify checksum: `shasum -a 256 -c corefall-linux-x86_64-<tag>.tar.zst.sha256`.\n"
+        "Verify checksum (download `SHA256SUMS.txt` alongside the archive):\n"
+        "`shasum -a 256 --ignore-missing -c SHA256SUMS.txt`.\n"
         "\n"
         "### macOS (`aarch64-apple-darwin` / `x86_64-apple-darwin`)\n"
         "\n"
@@ -365,9 +368,15 @@ def determinism_section(tag: TagInfo, bundle_dir: Optional[Path]) -> str:
     final = summary.get("final_sim_checksum")
     seed = manifest.get("seed")
     scenario = manifest.get("scenario_id") or manifest.get("scenario")
+    perf = summary.get("performance") or {}
     tick_rate = (manifest.get("tick_rate_hz")
-                 or (summary.get("performance") or {}).get("tick_rate_hz")
+                 or perf.get("tick_rate_hz")
                  or 60)
+    # Mirror run_bundle_section: ticks_run can live at summary top level OR
+    # nested under summary["performance"] depending on the run-bundle version.
+    # Falling back silently to a hardcoded 300 would publish a verification
+    # command that cannot reproduce the recorded final_sim_checksum.
+    ticks_run = summary.get("ticks_run") or perf.get("ticks_run") or 300
     if not (final and scenario):
         return ""
     return (
@@ -380,7 +389,7 @@ def determinism_section(tag: TagInfo, bundle_dir: Optional[Path]) -> str:
         "Reproduce locally against this build:\n"
         "\n"
         "```bash\n"
-        f"./cfctl run --scenario {scenario} --ticks {summary.get('ticks_run', 300)} "
+        f"./cfctl run --scenario {scenario} --ticks {ticks_run} "
         f"--tick-rate-hz {tick_rate} --seed {seed if seed is not None else 1} "
         f"--write-run-bundle\n"
         "```\n"
@@ -446,15 +455,25 @@ def main() -> int:
     parser.add_argument(
         "--staging",
         type=Path,
-        required=True,
+        default=None,
         help="Directory containing the release archives + SHA256SUMS.txt",
     )
-    parser.add_argument("--output", type=Path, required=True, help="Output Markdown file")
+    parser.add_argument("--output", type=Path, default=None, help="Output Markdown file")
     parser.add_argument(
         "--repo-root",
         type=Path,
         default=None,
         help="Path to corefall repo root (defaults to the script's grandparent dir)",
+    )
+    parser.add_argument(
+        "--print-bp-bundle",
+        action="store_true",
+        help=(
+            "Resolve the BP run-bundle path for --tag (using the same BP-aware "
+            "search order as the release notes generator) and print it. Prints "
+            "nothing and exits 0 if no bundle is available. Used by the release "
+            "workflow to keep archive-bundling and release-notes selection in lockstep."
+        ),
     )
     args = parser.parse_args()
 
@@ -463,6 +482,19 @@ def main() -> int:
         args.repo_root = Path(__file__).resolve().parents[2]
 
     tag = parse_tag(args.tag)
+
+    if args.print_bp_bundle:
+        bundle = find_bp_run_bundle(args.repo_root, tag.bp)
+        if bundle is not None:
+            print(bundle)
+        return 0
+
+    if args.staging is None or args.output is None:
+        raise SystemExit(
+            "generate_release_notes: --staging and --output are required unless "
+            "--print-bp-bundle is set."
+        )
+
     notes = build_notes(tag, args.repo_root, args.staging)
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(notes)
