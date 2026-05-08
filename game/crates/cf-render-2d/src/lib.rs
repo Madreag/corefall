@@ -166,10 +166,7 @@ impl Plugin for ActorSpritePlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<ActorRenderState>()
             .init_resource::<SolidSpriteImage>()
-            .add_systems(
-                Startup,
-                (build_solid_sprite_image, spawn_floor_and_reticle).chain(),
-            )
+            .add_systems(Startup, (build_solid_sprite_image, spawn_floor_and_reticle).chain())
             .add_systems(
                 Update,
                 (sync_actor_sprites, sync_breach_sprites, sync_extraction_zone).chain(),
