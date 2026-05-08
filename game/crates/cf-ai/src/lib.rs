@@ -384,7 +384,15 @@ pub fn step(guard: &mut ReactiveGuard, inputs: GuardTickInputs<'_>, rng: &mut Rn
         return report;
     }
 
-    // 2) Tick down cooldowns.
+    // 2) Tick down cooldowns. Capture pre-decrement values for `alert_dwell_remaining_ticks`
+    //    and `burst_pause_remaining_ticks` so that the state-machine + tactic checks below
+    //    compare against the value the previous tick LEFT (not the value AFTER decrementing
+    //    on this tick). Without this, `alert_dwell_seconds * tick_rate_hz = D` produces a
+    //    D-1 effective dwell because the SET-tick's value is decremented before any check
+    //    on the following tick. Same fix for burst_pause so the firing/scoring gates honor
+    //    the configured pause duration end-to-end.
+    let prev_alert_dwell_remaining_ticks = guard.alert_dwell_remaining_ticks;
+    let prev_burst_pause_remaining_ticks = guard.burst_pause_remaining_ticks;
     decrement(&mut guard.fire_cooldown_ticks, 1);
     decrement(&mut guard.aim_settle_remaining_ticks, 1);
     decrement(&mut guard.burst_pause_remaining_ticks, 1);
@@ -427,7 +435,7 @@ pub fn step(guard: &mut ReactiveGuard, inputs: GuardTickInputs<'_>, rng: &mut Rn
                     cause: "player_visible",
                 });
             }
-        } else if guard.alert_dwell_remaining_ticks > 0 {
+        } else if prev_alert_dwell_remaining_ticks > 0 {
             let prev = guard.state;
             if guard.state == GuardState::Engaged {
                 guard.state = GuardState::Alerted;
@@ -457,7 +465,7 @@ pub fn step(guard: &mut ReactiveGuard, inputs: GuardTickInputs<'_>, rng: &mut Rn
     // 7) Utility scoring → tactic choice.
     let player_visible = perception.as_ref().is_some_and(|p| p.player_seen);
     let player_distance = perception.as_ref().and_then(|p| p.distance);
-    let scores = score_tactics(guard, player_visible, player_distance);
+    let scores = score_tactics(guard, player_visible, player_distance, prev_burst_pause_remaining_ticks);
     let (tactic, reason) = pick_tactic(guard, &scores, player_visible);
     guard.last_tactic = tactic;
     report.tactic_chosen = Some(TacticRecord {
@@ -481,7 +489,14 @@ pub fn step(guard: &mut ReactiveGuard, inputs: GuardTickInputs<'_>, rng: &mut Rn
             }
         }
         Tactic::Attack => {
-            if let Some(fire) = try_fire(guard, inputs.self_actor, &perception, rng, inputs.tick_rate_hz) {
+            if let Some(fire) = try_fire(
+                guard,
+                inputs.self_actor,
+                &perception,
+                rng,
+                inputs.tick_rate_hz,
+                prev_burst_pause_remaining_ticks,
+            ) {
                 report.fire = Some(fire);
             } else if guard.ammo_in_mag == 0 && guard.reload_remaining_ticks == 0 {
                 report.dry_fire = true;
@@ -583,7 +598,12 @@ struct TacticScores {
     search: f32,
 }
 
-fn score_tactics(guard: &ReactiveGuard, player_visible: bool, player_distance: Option<f32>) -> TacticScores {
+fn score_tactics(
+    guard: &ReactiveGuard,
+    player_visible: bool,
+    player_distance: Option<f32>,
+    prev_burst_pause_remaining_ticks: u32,
+) -> TacticScores {
     let mut scores = TacticScores::default();
     let ammo_ratio = if guard.params.mag_capacity == 0 {
         0.0
@@ -612,7 +632,7 @@ fn score_tactics(guard: &ReactiveGuard, player_visible: bool, player_distance: O
             }
             None => 0.6,
         };
-        let burst_penalty = if guard.burst_pause_remaining_ticks > 0 {
+        let burst_penalty = if prev_burst_pause_remaining_ticks > 0 {
             -0.5
         } else {
             0.0
@@ -663,6 +683,7 @@ fn try_fire(
     perception: &Option<PerceptionRecord>,
     rng: &mut Rng,
     tick_rate_hz: u32,
+    prev_burst_pause_remaining_ticks: u32,
 ) -> Option<FireRecord> {
     if guard.aim_settle_remaining_ticks > 0 {
         return None;
@@ -670,7 +691,7 @@ fn try_fire(
     if guard.fire_cooldown_ticks > 0 {
         return None;
     }
-    if guard.burst_pause_remaining_ticks > 0 {
+    if prev_burst_pause_remaining_ticks > 0 {
         return None;
     }
     if guard.ammo_in_mag == 0 {
@@ -906,5 +927,94 @@ mod tests {
         assert_eq!(guard.state, GuardState::Idle);
         assert_eq!(guard.ammo_in_mag, ReactiveGuardParams::default().mag_capacity);
         assert_eq!(guard.reload_remaining_ticks, 0);
+    }
+
+    /// Regression: prior to this fix, `alert_dwell_remaining_ticks` was decremented
+    /// at the top of `step()` BEFORE the state-machine check, so configuring
+    /// `alert_dwell_seconds * tick_rate_hz = D` produced D-1 ticks of Alerted
+    /// dwell instead of D. Bugbot ID cf33d096-95e2-4104-bfe8-c9127c660223.
+    #[test]
+    fn alert_dwell_lasts_full_configured_duration_after_player_lost() {
+        let mut params = ReactiveGuardParams::default();
+        params.alert_dwell_seconds = 0.05; // 0.05 * 60 = 3 ticks of Alerted.
+        let mut guard = ReactiveGuard::new(ActorId(2), params);
+        let actor = guard_actor();
+        let player_visible = player_actor(700.0, 32.0);
+        // Out-of-cone player so perception still runs (player_seen=false).
+        // Sight radius default is 700 in cf-ai params; place far behind the guard.
+        let player_lost = player_actor(2000.0, 32.0);
+        let mut rng = rng();
+
+        // Tick 1: player visible -> state becomes Engaged, dwell SET to 3.
+        let _ = step(&mut guard, tick_inputs(1, &actor, Some(&player_visible)), &mut rng);
+        assert_eq!(guard.state, GuardState::Engaged);
+        assert_eq!(guard.alert_dwell_remaining_ticks, 3);
+
+        // Tick 2: player out-of-sight -> dwell decrements to 2, prev=3 > 0 keeps Alerted.
+        let _ = step(&mut guard, tick_inputs(2, &actor, Some(&player_lost)), &mut rng);
+        assert_eq!(guard.state, GuardState::Alerted);
+
+        // Tick 3: dwell decrements to 1, prev=2 > 0 keeps Alerted.
+        let _ = step(&mut guard, tick_inputs(3, &actor, Some(&player_lost)), &mut rng);
+        assert_eq!(guard.state, GuardState::Alerted);
+
+        // Tick 4: dwell decrements to 0, prev=1 > 0 keeps Alerted (third tick of dwell).
+        let _ = step(&mut guard, tick_inputs(4, &actor, Some(&player_lost)), &mut rng);
+        assert_eq!(guard.state, GuardState::Alerted);
+
+        // Tick 5: dwell stays at 0, prev=0 fails the > 0 check -> transitions to Idle.
+        let _ = step(&mut guard, tick_inputs(5, &actor, Some(&player_lost)), &mut rng);
+        assert_eq!(guard.state, GuardState::Idle);
+    }
+
+    /// Regression: same off-by-one decrement-before-check pattern affected
+    /// `burst_pause_remaining_ticks` so a configured pause of D ticks gated
+    /// firing for only D-1 ticks. Bugbot ID cf33d096-95e2-4104-bfe8-c9127c660223.
+    ///
+    /// `try_fire` always sets `fire_cooldown_ticks` to `seconds_to_ticks(0.20, 60) = 12`
+    /// after a successful shot. We use `burst_pause_seconds = 0.30` (18 ticks)
+    /// so the pause duration is strictly longer than the fire cooldown — the
+    /// last 6 blocked ticks are isolated to burst_pause alone, which is what
+    /// this test exercises.
+    #[test]
+    fn burst_pause_blocks_fire_for_full_configured_duration() {
+        let mut params = ReactiveGuardParams::default();
+        params.aim_settle_seconds = 0.0;
+        params.miss_chance = 0.0;
+        params.mag_capacity = 10;
+        params.burst_shots = 1;
+        params.burst_pause_seconds = 0.30; // 18 ticks of pause; > 12-tick fire cooldown.
+        let mut guard = ReactiveGuard::new(ActorId(2), params);
+        let actor = guard_actor();
+        let player = player_actor(700.0, 32.0);
+        let mut rng = Rng::from_seed(7);
+
+        // Tick 1: aim-settle SET to 1; no fire yet.
+        let r1 = step(&mut guard, tick_inputs(1, &actor, Some(&player)), &mut rng);
+        assert!(r1.fire.is_none(), "tick 1: aim_settle still active");
+
+        // Tick 2: aim-settle decrements to 0, fires, burst_pause SETS to 18.
+        let r2 = step(&mut guard, tick_inputs(2, &actor, Some(&player)), &mut rng);
+        assert!(r2.fire.is_some(), "tick 2: aim settled, must fire");
+        assert_eq!(guard.burst_pause_remaining_ticks, 18);
+
+        // Ticks 3-20: burst_pause must block for the full 18-tick duration.
+        // (Ticks 3-14 are also blocked by fire_cooldown=12; ticks 15-20 are
+        // blocked by burst_pause alone since fire_cooldown has cleared by then.
+        // Pre-fix, burst_pause cleared at tick 20 so tick 20 would have fired.)
+        for tick in 3..=20 {
+            let r = step(&mut guard, tick_inputs(tick, &actor, Some(&player)), &mut rng);
+            assert!(
+                r.fire.is_none(),
+                "tick {tick}: burst_pause should block fire for the full 18-tick configured duration"
+            );
+        }
+
+        // Tick 21: pause expired (prev=0); fire_cooldown also clear; guard fires again.
+        let r21 = step(&mut guard, tick_inputs(21, &actor, Some(&player)), &mut rng);
+        assert!(
+            r21.fire.is_some(),
+            "tick 21: pause + cooldown expired, fire should resume"
+        );
     }
 }

@@ -33,7 +33,10 @@ pub struct CaptureConfig {
 
 impl CaptureConfig {
     pub fn baseline_interval_ticks(&self) -> u64 {
-        if self.frames_hz <= 0.0 {
+        // Reject non-finite or non-positive cadences. NaN <= 0.0 is `false` in IEEE 754,
+        // and Inf would saturate the float-to-int cast to 0 → .max(1) → capture every tick,
+        // which silently fills the disk with hundreds of PNGs per second.
+        if !self.frames_hz.is_finite() || self.frames_hz <= 0.0 {
             return u64::MAX;
         }
         let raw = (self.runtime_tick_rate_hz as f32 / self.frames_hz).round() as i64;
@@ -343,6 +346,45 @@ mod tests {
     fn baseline_interval_zero_hz_returns_max_to_disable() {
         let cfg = CaptureConfig {
             frames_hz: 0.0,
+            ..CaptureConfig::default()
+        };
+        assert_eq!(cfg.baseline_interval_ticks(), u64::MAX);
+    }
+
+    #[test]
+    fn baseline_interval_negative_hz_returns_max_to_disable() {
+        let cfg = CaptureConfig {
+            frames_hz: -10.0,
+            ..CaptureConfig::default()
+        };
+        assert_eq!(cfg.baseline_interval_ticks(), u64::MAX);
+    }
+
+    #[test]
+    fn baseline_interval_nan_hz_returns_max_to_disable() {
+        // Regression: NaN <= 0.0 is false in IEEE 754, so the prior guard let
+        // NaN pass through; the float-to-int cast then saturated to 0 and
+        // .max(1) yielded a 1-tick interval — capture would fire every sim tick.
+        let cfg = CaptureConfig {
+            frames_hz: f32::NAN,
+            ..CaptureConfig::default()
+        };
+        assert_eq!(cfg.baseline_interval_ticks(), u64::MAX);
+    }
+
+    #[test]
+    fn baseline_interval_positive_infinity_hz_returns_max_to_disable() {
+        let cfg = CaptureConfig {
+            frames_hz: f32::INFINITY,
+            ..CaptureConfig::default()
+        };
+        assert_eq!(cfg.baseline_interval_ticks(), u64::MAX);
+    }
+
+    #[test]
+    fn baseline_interval_negative_infinity_hz_returns_max_to_disable() {
+        let cfg = CaptureConfig {
+            frames_hz: f32::NEG_INFINITY,
             ..CaptureConfig::default()
         };
         assert_eq!(cfg.baseline_interval_ticks(), u64::MAX);
