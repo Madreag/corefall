@@ -622,13 +622,6 @@ impl M0Engine {
         );
     }
 
-    /// M1.5: bundle returned from `cf-terrain::try_dig` plus the dig source.
-    /// Stored locally inside drive_tick so events can be emitted after the
-    /// state guard is dropped.
-    fn _dig_event_marker(&self) {
-        // Existence-only documentation anchor.
-    }
-
     /// Drive a single tick. Emits a `determinism.sim_checksum` and a `system.tick_sample`
     /// every `cadence_ticks` ticks (M0 default = 60). When the engine carries an
     /// [`ActorSimState`], drives the M1 actor pipeline and emits the resulting `input.*`
@@ -641,6 +634,8 @@ impl M0Engine {
         let mut tick_sample_payload: Option<(Tick, f64, TickSampleStats)> = None;
         let mut step_report: Option<(Tick, f64, ControlIntent, StepReport)> = None;
         let mut snapshot_payload: Option<(Tick, f64, ActorWorldSnapshot)> = None;
+        // M1.5: bundle returned from `cf-terrain::try_dig` plus the dig source.
+        // Stored locally so events can be emitted after the state guard is dropped.
         let mut dig_payload: Option<(Tick, f64, DigEvent)> = None;
         let mut ai_payloads: Vec<(Tick, f64, ActorId, cf_ai::EnemyTickReport)> = Vec::new();
         let mut guard_fire_records: Vec<GuardFireRecord> = Vec::new();
