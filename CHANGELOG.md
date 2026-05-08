@@ -19,6 +19,7 @@ Use this file to summarize what changed in the implementation repo. Do not copy 
 - Added explicit BP exemplar bundle prefixes so release archives prefer the BP's fun-proof slice (for example `m2.5_*` for BP2) before falling back to infrastructure bundles such as M3A.
 - Release-note install snippets now use the BP's exemplar smoke scenario (for example `micro_reactor_defense` for BP2) instead of always pointing at the old `m1_actor_range` smoke.
 - Release notes now include the promised linked-evidence section: merged PR numbers are discovered from the release commit range, `gh pr view` pulls PR titles/bodies/URLs when `GH_TOKEN` is available, git-log fallback keeps local runs useful, and `BP_VAULT_NOTES` emits canonical vault notes per Build Point. The release workflow now passes `GH_TOKEN` into the generator.
+- CI cache restore/save is now non-blocking; `Swatinem/rust-cache` outages or Windows cache issues no longer fail the build before Corefall's own validation commands run.
 - README closure gate now includes T-RELEASE evidence, and the status banner calls out the remaining retroactive `v0.1.0-bp1` release debt instead of implying a release exists before a tag is published.
 
 ### Fixed (T-RELEASE rehearsal: Bevy 0.18 features split + non_blank_ratio truth)
