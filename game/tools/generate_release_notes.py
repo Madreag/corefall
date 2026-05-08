@@ -271,13 +271,20 @@ def run_bundle_section(bundle_dir: Optional[Path]) -> str:
     perf = summary.get("performance") or {}
     counts = summary.get("event_counts") or {}
     bundle_rel = bundle_dir.name
+    # Use explicit `is not None` checks because numeric fields like ticks_run
+    # and event totals can legitimately be 0, which is falsy in Python `or`
+    # chains and would otherwise be silently replaced by the "-" placeholder.
+    ticks_run = summary.get("ticks_run")
+    if ticks_run is None:
+        ticks_run = perf.get("ticks_run")
+    total_events = counts.get("total")
     rows = [
         ("Bundle", bundle_rel),
         ("Run id", summary.get("manifest_run_id") or manifest.get("run_id") or "-"),
         ("Tick rate", f"{perf.get('tick_rate_hz', '-')} Hz"),
-        ("Ticks", str(summary.get("ticks_run") or perf.get("ticks_run") or "-")),
+        ("Ticks", str(ticks_run) if ticks_run is not None else "-"),
         ("Wall seconds", f"{perf.get('wall_seconds', '-')}"),
-        ("Events", str(counts.get("total") or "-")),
+        ("Events", str(total_events) if total_events is not None else "-"),
         ("Avg tick ms", f"{perf.get('avg_tick_ms', '-')}"),
         ("p99 tick ms", f"{perf.get('p99_tick_ms', '-')}"),
         ("Final checksum", summary.get("final_sim_checksum") or "-"),
@@ -368,14 +375,22 @@ def determinism_section(tag: TagInfo, bundle_dir: Optional[Path]) -> str:
     seed = manifest.get("seed")
     scenario = manifest.get("scenario_id") or manifest.get("scenario")
     perf = summary.get("performance") or {}
-    tick_rate = (manifest.get("tick_rate_hz")
-                 or perf.get("tick_rate_hz")
-                 or 60)
-    # Mirror run_bundle_section: ticks_run can live at summary top level OR
-    # nested under summary["performance"] depending on the run-bundle version.
-    # Falling back silently to a hardcoded 300 would publish a verification
-    # command that cannot reproduce the recorded final_sim_checksum.
-    ticks_run = summary.get("ticks_run") or perf.get("ticks_run") or 300
+    # Use explicit `is not None` checks because numeric fields can legitimately
+    # be 0 (falsy in Python `or` chains). Silently substituting the hardcoded
+    # default would publish a verification command that cannot reproduce the
+    # recorded final_sim_checksum, violating the determinism contract.
+    tick_rate = manifest.get("tick_rate_hz")
+    if tick_rate is None:
+        tick_rate = perf.get("tick_rate_hz")
+    if tick_rate is None:
+        tick_rate = 60
+    # ticks_run can live at summary top level OR nested under
+    # summary["performance"] depending on the run-bundle version.
+    ticks_run = summary.get("ticks_run")
+    if ticks_run is None:
+        ticks_run = perf.get("ticks_run")
+    if ticks_run is None:
+        ticks_run = 300
     if not (final and scenario):
         return ""
     return (
