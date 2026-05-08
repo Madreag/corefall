@@ -48,12 +48,16 @@ GENERATOR_VERSION = "0.3.0"
 BP_SCOPE = {
     "bp0": (
         "Foundation Build",
-        ["M0 — Engine Bootstrap", "M1 — Actor Controller And Sim Core"],
-        "M1 Actor Range",
+        ["M0 — Engine Bootstrap"],
+        "(kickoff smoke)",
     ),
     "bp1": (
         "Micro Breach Build",
-        ["M1.5 — Micro Breach Fun Slice", "T-CAPTURE infrastructure"],
+        [
+            "M1 — Actor Controller And Sim Core",
+            "M1.5 — Micro Breach Fun Slice",
+            "T-CAPTURE infrastructure",
+        ],
         "M1.5 Micro Breach Fun Slice",
     ),
     "bp2": (
@@ -154,7 +158,7 @@ BP_SCOPE = {
 # the BP's fun-proof slice even when the BP also includes infrastructure
 # milestones such as M3A.
 BP_ANCHOR_PREFIXES = {
-    "bp0": ["m1", "m0"],
+    "bp0": ["m0"],
     "bp1": ["m1.5", "m1"],
     "bp2": ["m2.5", "m3a", "m2"],
     "bp3": ["m5", "m4a", "m3b"],
