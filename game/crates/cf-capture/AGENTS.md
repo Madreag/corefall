@@ -54,9 +54,8 @@
   `CaptureConfig`, mirrors the engine's tick into `CaptureClock` each `Update`,
   and pumps recorder events through `MessageWriter<CaptureKeyframeRequested>`
   for the named M1.5+ event types.
-- **cf-replay** exposes `Recorder::events_since(idx) -> Vec<Event>` and
-  `Recorder::event_log_len() -> usize` so cf-app can drive keyframes without
-  cloning the full event log every frame.
+- **cf-replay** exposes `Recorder::events_since(idx) -> Vec<Event>` so cf-app
+  can drive keyframes without cloning the full event log every frame.
 - **cf-e2e** invokes `python3 game/tools/capture_grid.py <run_dir>` after the
   script run completes, parses the JSON output, and merges it into the
   observation under the `capture` key so `--expect capture.summary_grid.non_blank_ratio>=0.95`

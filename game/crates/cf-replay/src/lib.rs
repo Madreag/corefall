@@ -376,10 +376,6 @@ impl Recorder {
             .unwrap_or_default()
     }
 
-    pub fn event_log_len(&self) -> usize {
-        self.inner.lock().map(|inner| inner.events.len()).unwrap_or(0)
-    }
-
     pub fn counts(&self) -> EventCounts {
         let inner = self
             .inner
