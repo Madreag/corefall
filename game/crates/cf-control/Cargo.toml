@@ -25,6 +25,9 @@ cf-replay = { path = "../cf-replay" }
 cf-actor = { path = "../cf-actor" }
 cf-physics = { path = "../cf-physics" }
 cf-equipment = { path = "../cf-equipment" }
+cf-mission = { path = "../cf-mission" }
+cf-terrain = { path = "../cf-terrain" }
+cf-ai = { path = "../cf-ai" }
 
 [dev-dependencies]
 anyhow = { workspace = true }

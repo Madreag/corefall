@@ -263,6 +263,20 @@ The rule: any pixel a human can interact with on screen, the AI worker must be a
 
 See `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/ai-control-observability-layer.md` for the full observe/inspect/act surface; every new player-facing surface must extend it.
 
+## CPU/GPU Performance Contract
+
+Corefall must scale on modern multi-core CPUs and modern GPUs. Do not add CPU-heavy gameplay, physics, material, terrain, AI, networking, server, replay, or tooling paths without a measured budget and a clear execution posture.
+
+For every new hot path, document one of:
+
+- `single-thread cheap`: benchmarked below budget with headroom.
+- `jobified/parallelized`: split over deterministic chunks, actors, contacts, events, AI jobs, server sessions, or asset batches.
+- `background worker`: bounded queue, deadline/backpressure counters, never blocks fixed tick or render critical path.
+- `GPU-assisted`: render/upload/compute counters exist; replay-authoritative state remains CPU/source-of-truth unless a DR explicitly changes that.
+- `blocked/needs optimization`: milestone cannot be accepted unless the user explicitly approves the exact deferral.
+
+Parallel sim-authoritative code must preserve deterministic ordering and stable reductions. Any milestone touching terrain/materials/atmospheres/physics/AI/server/render must report CPU main-thread ms, worker-thread ms, worker count/utilization where available, render/GPU upload counters where applicable, and T-PERF status.
+
 ## Completion Contract
 
 After implementing any feature, task card, side-track item, or milestone, an agent must leave the project in a state where another agent can see exactly what changed and what remains.
@@ -280,7 +294,7 @@ Required completion actions:
 9. Verify every new player-facing surface is reachable from `cfctl` with assert/inspect coverage.
 10. Report any vault updates that could not be completed, with exact file paths and reasons.
 11. Report the milestone acceptance matrix with every roadmap done-criterion and every backlog task card marked PASS or FAIL.
-12. Report the performance/config audit for the milestone: which tick rates, frame rates, solver rates, network rates, replay cadences, and quality budgets are configurable; which values were validated; and why any fixed constant is allowed.
+12. Report the performance/config audit for the milestone: which tick rates, frame rates, solver rates, network rates, replay cadences, CPU worker counts, thread-pool behavior, GPU upload/render budgets, and quality budgets are configurable; which values were validated; and why any fixed constant or single-thread hot path is allowed.
 13. Run `/corefall-review <milestone>` from `/Users/erol/projects/corefall`, fix every verified finding at every severity, and rerun `/corefall-review <milestone>` until the verdict is `Accept`. If the user explicitly defers a finding, record the deferral ID, reason, owner, next checkpoint, and evidence path.
 14. Report the Contract Integrity Matrix proving shared code paths, required-field rejection, fake-success absence, source-truthful evidence, and checklist truth.
 

@@ -1,0 +1,23 @@
+{
+  "description": "M1.5 loss-path: dig the wall, walk into the guard's sight cone, and stand still while it kills you. Mission emits mission_resolved with reason=player_dead.",
+  "scenario": "micro_breach",
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+    { "method": "act.player.aim", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "act.player.move", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 160 } },
+    { "method": "act.player.move", "params": { "x": 0.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
+    { "method": "act.player.dig", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 4 } },
+    { "method": "act.player.dig", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 4 } },
+    { "method": "act.player.dig", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 4 } },
+    { "method": "act.player.move", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 30 } },
+    { "method": "act.player.move", "params": { "x": 0.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 800 } },
+    { "method": "observe.once", "params": {} }
+  ]
+}

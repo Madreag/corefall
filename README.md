@@ -6,7 +6,7 @@
 
 **Server owns truth. GPU owns richness. Client owns feel.**
 
-A 2D side-view physics sandbox where every gas, grain, bullet, body, world, and transmission is real. Bunker Defence is the flagship mode: attackers breach, defenders hold the command core, and every pressure seal, radio shadow, projectile, wound, fire, and collapsing room is part of the same replayable simulation.
+A 2D side-view physics sandbox where every gas, grain, bullet, body, world, and transmission is real. Bunker Defence is the flagship mode: attackers breach, defenders hold the command core, and every pressure seal, bullet-punched aperture, liquid jet, thermal leak, radio shadow, projectile, wound, fire, and collapsing room is part of the same replayable simulation.
 
 [![Rust 1.95](https://img.shields.io/badge/Rust-1.95.0-CE422B?style=for-the-badge&logo=rust&logoColor=white)](https://www.rust-lang.org)
 [![Bevy 0.18.1](https://img.shields.io/badge/Bevy-0.18.1-232326?style=for-the-badge&logo=bevy&logoColor=white)](https://bevyengine.org)
@@ -20,12 +20,12 @@ A 2D side-view physics sandbox where every gas, grain, bullet, body, world, and 
 [![Windows](https://img.shields.io/badge/Windows-supported-0078D6?style=flat-square&logo=windows&logoColor=white)](#)
 [![Steam Deck](https://img.shields.io/badge/Steam_Deck-floor_target-1A9FFF?style=flat-square&logo=steamdeck&logoColor=white)](#)
 
-[![Status](https://img.shields.io/badge/status-pre--alpha%20%28M0%20%2B%20M1%20closed%2C%20M1.5%20next%29-orange?style=flat-square)](#project-status)
+[![Status](https://img.shields.io/badge/status-pre--alpha%20%28M0%20%2B%20M1%20%2B%20M1.5%20closed%2C%20M2%20next%29-orange?style=flat-square)](#project-status)
 [![Vault](https://img.shields.io/badge/research-research%20vault-purple?style=flat-square)](https://github.com/Madreag/corefall#research-vault)
 
-**Current proof:** M0 + M1 closed. One actor is playable end-to-end through the same fixed-tick sim path that AI/cfctl drives; movement, jump, aim, fire, reload, status state machine, projectile flight, and damage routing all emit deterministic replay events. Run bundles validate under repo-root `prototype_runs/native/` at 60 Hz and 120 Hz, with CI green on Linux + macOS + Windows.<br>
-**Next up:** M1.5 — Micro Breach Fun Slice. First-fun-evidence run before deeper systems land.<br>
-**Roadmap lock:** server-authoritative multiplayer, deterministic replay, AI-only art/audio pipeline, modder-parity tooling, accessibility-plus, Steam Deck floor, and no pay-to-win.
+**Current proof:** M0 + M1 + M1.5 closed. Micro Breach Fun Slice plays end-to-end: the player spawns west, digs through a soft concrete wall (concrete_soft) while a metal-nohook anchor refuses dig, fights one reactive guard with deterministic seeded miss rolls + utility-scored tactics, and reaches the eastern extraction zone within 90 seconds — or dies trying. cf-e2e drives the win script in ~430 ticks (4/4 expectations PASS) and the loss script in ~1015 ticks (3/3 expectations PASS). Mission state machine emits `mission.objective_started/completed/failed/mission_resolved`; reactive enemy emits `ai.ai_perception/tactic_chosen/state_changed`; soft breach emits `terrain.tool_action_started/terrain_carved/tool_refused`. Run bundles validate at 60 Hz and 120 Hz.<br>
+**Next up:** M2 — Pixel Terrain And Materials. Chunked terrain replaces the M1.5 soft-breach strip without breaking replay consumers.<br>
+**Roadmap lock:** server-authoritative multiplayer, deterministic replay, Stationeers-grade-or-better atmospherics/thermal simulation, full physical profiles, AI-only art/audio pipeline, modder-parity tooling, accessibility-plus, Steam Deck floor, and no pay-to-win.
 
 **[Project status](#project-status) · [Roadmap shape](#roadmap-shape) · [Tech stack](#tech-stack) · [Getting started](#getting-started) · [CI](#ci)**
 
@@ -41,12 +41,12 @@ You will:
 
 - **Defend the bunker** as 1-4 humans plus AI guards, or play the attackers and breach it with dropships, explosives, tunneling, pressure sabotage, fire, and misdirection.
 - **Fight across worlds** with different ambient atmospheres, gravity, weather, day length, and hazards: Earth, Mars, Phobos, Deimos, the Moon, Mimas, Europa, Vulcan, Venus, Sol-zone habitats, belt asteroids, and orbital stations.
-- **Use physics as tactics**: vent rooms, overpressure corridors, light flammable atmospheres, cut coolant lines, collapse terrain, redirect gravity, burn oxygen, mine ore, and salvage wreckage.
+- **Use physics as tactics**: vent rooms, overpressure corridors, shoot pressure holes, create liquid/gas jets, light flammable atmospheres, cut coolant lines, heat or cool rooms, collapse terrain, redirect gravity, burn oxygen, mine ore, and salvage wreckage.
 - **Swap between origins**: humans breathe and concuss, androids bridge organic and synthetic failure chains, robots overclock, downclock, short, leak coolant, and ignore hazards that kill flesh.
 - **Coordinate over simulated comms** with radio propagation, interference, EMP failure, captions, accessibility fallbacks, and AI reason labels that explain what bots believe is happening.
 - **Build, capture, or destroy bases** with real rooms, pipes, airlocks, pressure regulators, power, storage, fabrication, doors, platforms, and modder-defined modules.
 
-This is not a Cortex Command remake. It is a **best-of-genre synthesis** that takes Cortex Command's command-core / dropship / chassis / digging fantasy and sets it on top of Stationeers-grade atmospherics, Noita-grade systemic materials, full collision physics, universal gravity, ACRE2-tier voice + radio simulation, and a full astrography of playable worlds. AI bots are first-class teammates and rivals. Replay is deterministic. Modding is data-first. Accessibility is a floor, not an afterthought.
+This is not a Cortex Command remake. It is a **best-of-genre synthesis** that takes Cortex Command's command-core / dropship / chassis / digging fantasy and sets it on top of Stationeers-grade-or-better atmospherics and thermal engineering, Noita-grade systemic materials, full collision physics, universal gravity, ACRE2-tier voice + radio simulation, and a full astrography of playable worlds. AI bots are first-class teammates and rivals. Replay is deterministic. Modding is data-first. Accessibility is a floor, not an afterthought.
 
 ---
 
@@ -83,11 +83,16 @@ Every system reads from one source of truth. Nothing is faked.
         │                                                                   │
         ├───────────────────────────────────────────────────────────────────┤
         │                                                                   │
-        │  Stationeers-grade Atmospherics (real PV = nRT, R = 8314.46)      │
-        │  • 10 launch gases + 6 liquid mixtures, locked specific heats     │
+        │  Stationeers-grade-or-better Atmospherics + Thermal Simulation    │
+        │  • Real PV = nRT, R = 8314.46, per-gas moles + temperature        │
+        │  • 10 launch gases + 6 liquid mixtures, expansion via material lab │
         │  • 6 deterministic combustion reactions with autoignition T       │
         │  • Gradual phase change with latent heat                          │
         │  • Pipe networks with pumps, valves, regulators, filtration       │
+        │  • Door / vent / bullet-hole / blast-breach / pipe-rupture        │
+        │    apertures with liquid/gas pressure jets and wind force         │
+        │  • Heat transfer through materials, coolant loops, heaters,       │
+        │    radiators, insulation, emergency venting, and thermal failure  │
         │  • Room atmospheres + airlock state machines + suit life-support  │
         │  • Per-planet ambient (Earth / Mars / Moon / Mimas / Europa /     │
         │    Vulcan / Venus) and modder-defined planets                     │
@@ -127,7 +132,7 @@ Every layer emits replay events. Every cause chain is reproducible. Every AI age
 
 | Pillar | What It Means |
 |---|---|
-| **Real physics, end to end** | No arcade approximations. PV = nRT for atmospheres. Universal gravity for everything. Full collision by default. Stoichiometric combustion. Gradual phase change. |
+| **Real physics, end to end** | No arcade approximations. Stationeers-grade is the minimum bar: PV = nRT atmospheres, pressure apertures, liquid/gas jets, material heat transfer, universal gravity for everything, full collision by default, stoichiometric combustion, and gradual phase change. |
 | **Origin-aware bodies** | Humans, androids, and robots have **structurally different reaction chains**. Robots take internal-shock damage, leak coolant, and downclock under heat. Androids breathe, bleed, and overclock per installed module. Humans concuss, eat, and need oxygen tanks. |
 | **AI as teammate and rival** | Bots are first-class. They reason, plan, panic, recover, and explain themselves through reason labels. The 8-criteria humanlike-AI bar is testable. An optional async LLM "mind" layer proposes doctrine without ever blocking the local AI. |
 | **Replay determinism** | Same seed + same inputs = byte-identical event stream. Debug with replay scrubbing. Network with confidence. Audit AI behavior with cause chains. |
@@ -148,7 +153,7 @@ Corefall stands on the shoulders of an exceptional set of games that figured out
 |---|---|
 | **[Cortex Command](https://datarealms.com)** by Data Realms | The command-core / dropship / chassis / digging / pixel-actor fantasy. The tone of "every body is physical and damageable". The mod ecosystem grammar. The actor-status / wound-state / inventory-fallout triangle. Deep, deep love. |
 | **[Noita](https://noitagame.com)** by Nolla Games | Per-pixel material simulation as a core feel pillar. Alchemy / reaction / emergence as a retention loop. Hidden chemistry that rewards experimentation. The replay-able cause-chain culture. |
-| **[Stationeers](https://stationeers.com)** by RocketWerkz | Real ideal-gas-law atmospherics. Specific heats, autoignition temperatures, combustion stoichiometry. Pipe networks as first-class atmospheres. Suit life-support with canister + filter + waste-tank slots. Per-planet ambient. |
+| **[Stationeers](https://stationeers.com)** by RocketWerkz | The minimum bar for atmospherics feel: real ideal-gas-law atmospherics, specific heats, autoignition temperatures, combustion stoichiometry, pipe networks as first-class atmospheres, suit life-support with canister + filter + waste-tank slots, and per-planet ambient. Corefall aims beyond that with combat apertures, liquid jets, thermal engineering, and richer material coupling. |
 | **[Barotrauma](https://barotraumagame.com)** by FakeFish + Undertow Games | Rooms-with-state architecture. Breach flooding. Crew dynamics where roles matter. Mission storytelling that emerges from system failure. |
 | **[The Powder Toy](https://powdertoy.co.uk)** | Open-source falling-sand chemistry. The discipline of element-grammar reaction tables. Educational transparency. |
 | **[OpenSoldat](https://opensoldat.org) / [Soldat](https://forums.soldat.pl)** | Side-view multiplayer combat feel. Movement nuance. Map mutability. Community-hosted server culture. |
@@ -170,7 +175,7 @@ We **also** lean on the open Rust gamedev ecosystem: [Bevy](https://bevyengine.o
 |---|---|
 | Language | [Rust](https://www.rust-lang.org) edition 2021, MSRV/toolchain pinned to 1.95.0 |
 | Engine | [Bevy](https://bevyengine.org) 0.18.1 + [wgpu](https://wgpu.rs) for 2D / GPU; custom core crates for sim |
-| Physics | Custom collision + custom material kernel + custom atmospherics kernel + universal gravity field |
+| Physics | Custom collision + custom material kernel + Stationeers-grade-or-better atmospherics/thermal kernel + universal gravity field |
 | Async | [Tokio](https://tokio.rs) for the JSON-RPC control plane and dedicated server |
 | Networking (planned) | TBD between [Lightyear](https://github.com/cBournhonesque/lightyear) / [renet](https://github.com/lucaspoffo/renet) / [quinn](https://github.com/quinn-rs/quinn); decision deferred to M9/M10 |
 | Modding host (planned) | [mlua](https://github.com/khvzak/mlua) (Lua) candidate; deferred to M5 |
@@ -198,7 +203,7 @@ game/crates/
 ├── cf-physics              # collision matrix + CCD + impulse routing + GravityField (post-M5.5)
 ├── cf-terrain              # pixel terrain + chunk grid (post-M2)
 ├── cf-material             # systemic material kernel (post-M5.6)
-├── cf-atmos                # Stationeers-grade atmospherics kernel (post-M5.9)
+├── cf-atmos                # Stationeers-grade-or-better atmospherics + thermal kernel (post-M5.9)
 ├── cf-mission              # mission director + objectives
 ├── cf-ai                   # perception + utility + doctrine + LLM mind hooks
 ├── cf-net                  # client/server transport (post-M9)
@@ -229,7 +234,7 @@ game/crates/
 |---|---|---|
 | **M0 — Engine Bootstrap** | ✅ **Closed** ([PR #1](https://github.com/Madreag/corefall/pull/1) merged) | 29-crate workspace, JSON-RPC control plane, cfctl, replay run-bundle writer, deterministic 60 Hz / 120 Hz sim, panic capture, CI matrix on Linux + macOS + Windows. |
 | **M1 — Actor Controller And Sim Core** | ✅ **Closed** ([PR #2](https://github.com/Madreag/corefall/pull/2) merged) | Single playable actor with movement, jump, aim, rifle fire, reload, status state machine, projectile flight, and damage routing — all through the fixed-tick sim. Seven `act.player.*` JSON-RPC methods route human + cfctl + AI input through one shared dispatch path. Tick-rate-independent rifle timing (10 RPS / 1.5 s reload identical at 60 Hz and 120 Hz). |
-| **M1.5 — Micro Breach Fun Slice** | 🔄 **Active** (next) | First-fun-evidence run: 60-90 s win/loss scenario with one reactive enemy, soft breach surface, objective state machine, and scripted E2E for both paths before deeper systems land. |
+| **M1.5 — Micro Breach Fun Slice** | ✅ **Closed** | 60-90 s win/loss scenario plays end-to-end via cfctl scripts driving the same dispatch path as the keyboard; reactive guard with DR-008 LEAN (jobs + utility + scripted hooks) fires deterministic seeded miss rolls; soft breach emits M2-compatible `terrain_carved` events; mission state machine emits `objective_*` + `mission_resolved`; cf-e2e asserts win=4/4 + loss=3/3 expectations against observe.once snapshots. |
 | M2 — Pixel Terrain And Materials | ⏳ Planned | Deformable terrain + material kernel scaffold. |
 | M3 — Replay And Event Recorder | ⏳ Planned | DR-002 v1 lock — full event recorder + viewer. |
 | M4 — HUD And Comic-Noir UI | ⏳ Planned | Silhouette HUD + module strip + accessibility floor. |
@@ -238,12 +243,12 @@ game/crates/
 | M5.6 — Material Kernel | ⏳ Planned | DR-036 partial closure: chunked CA + reaction table + density layering. |
 | M5.7 — Hazard Package | ⏳ Planned | Acid + electricity + debris + ingestion + affliction layer. |
 | **M5.8 — Origin Resource & Overclock Pass** | 🆕 Proposed | Per-origin reaction matrix runtime: humans concuss, androids battery-drain, robots overclock + leak coolant. G-Force vision blackout HUD. |
-| **M5.9 — Atmospherics-Grade Kernel** | 🆕 Proposed | DR-037 closure: real PV=nRT, 10 launch gases, 6 combustion reactions, pipe networks, suit life-support, per-planet ambient, universal gravity ballistic drag. |
+| **M5.9 — Atmospherics-Grade Kernel** | 🆕 Proposed | DR-037 closure: Stationeers-grade-or-better PV=nRT, 10 launch gases + 6 liquid mixtures, combustion, phase change, pipe networks, suit life-support, pressure apertures, liquid/gas jets, material heat transfer, thermal tools, per-planet ambient, and universal-gravity ballistic drag. |
 | M6 — AI Core And Trust Harness | ⏳ Planned | DR-022 8-criteria humanlike bar testable. |
 | M6.5 — LLM Mind Lab | ⏳ Planned | Async LLM mind layer; local AI never blocks; no API key required. |
 | M6.6 — AI Material Competence | ⏳ Planned | AI hazard perception with reason labels. |
 | M7 — Mission Director And Breach Contract | ⏳ Planned | Proof mission. A-FEEL gate. |
-| M7.5 — Base Atmospherics (extended for Stationeers-grade per DR-037) | ⏳ Planned | Base modules wired into M5.9 kernel. |
+| M7.5 — Base Atmospherics (extended for Stationeers-grade-or-better per DR-037) | ⏳ Planned | Base modules wired into M5.9 kernel: pumps, vents, pressure doors, breach repair, heaters/coolers, radiators, coolant loops, emergency venting, and room-state mission objectives. |
 | M8 — Scenario Editor And Mod Tools | ⏳ Planned | First-class in-engine editor at launch. |
 | M8.5 — Material Lab | ⏳ Planned | Material/reaction lab for promotions to launch set. |
 | M9 — Dedicated Server App | ⏳ Planned | `cf-server` multi-mode binary; SERVER-001..016 acceptance suite begins. |
@@ -264,7 +269,7 @@ Corefall is built from a deliberate, opinionated, evidence-tracked **research va
 The vault contains:
 
 - **Decision records** (DR-001 through DR-057, plus future activation gates) — every major direction choice with pros, cons, evidence, revisit triggers.
-- **55+ spec pages** for product promise, body damage, chassis/armor/mechs/origins, equipment/loadout, atmospherics & chemistry, gravity & ballistics, AI, replay, mission director, full collision physics, accessibility-plus, localization, AI asset/audio production, modding, networking, launch operations, and more.
+- **55+ spec pages** for product promise, body damage, chassis/armor/mechs/origins, equipment/loadout, Stationeers-grade-or-better atmospherics & chemistry, thermal engineering, gravity & ballistics, AI, replay, mission director, full collision physics, accessibility-plus, localization, AI asset/audio production, modding, networking, launch operations, and more.
 - **Production roadmap** covering M0 through launch, side tracks, CLI/control contracts, DR-056 universal enhancement gates, and per-milestone Steam Deck/network/replay/accessibility/modding/testability budgets.
 - **Comparable game audits** — local code audits of Cortex Command (CCCP), OpenSoldat, OpenLieroX, The Powder Toy, plus public-source / public-doc research on Noita, Stationeers, Barotrauma, Oxygen Not Included.
 - **Research log** — chronological record of every research pass with source citations.

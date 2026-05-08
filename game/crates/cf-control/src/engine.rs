@@ -81,6 +81,28 @@ pub struct M0EngineConfig {
     /// Used by the engine to decide whether `act.player.*` commands should be applied
     /// or rejected as `act_player_unavailable_no_actor_world`.
     pub has_actor_world: bool,
+    /// M1.5: initial mission/breach/AI state built from the scenario manifest.
+    /// `None` for sandbox scenarios (m0_blank, m1_actor_range).
+    pub initial_breach_world: Option<InitialBreachWorld>,
+    /// M1.5: initial reactive-guard configurations keyed by actor id.
+    pub initial_guards: Vec<InitialGuard>,
+    /// M1.5: scenario objectives (in declaration order) to feed `cf-mission`.
+    pub initial_objectives: Vec<cf_mission::Objective>,
+    /// M1.5: loss conditions for the mission (timer + player-dead check).
+    pub mission_loss: Option<cf_mission::LossConditions>,
+}
+
+/// M1.5: initial breach world snapshot.
+#[derive(Debug, Clone, PartialEq)]
+pub struct InitialBreachWorld {
+    pub world: cf_terrain::BreachWorld,
+}
+
+/// M1.5: initial reactive-guard config (one per enemy actor).
+#[derive(Debug, Clone, PartialEq)]
+pub struct InitialGuard {
+    pub actor: ActorId,
+    pub params: cf_ai::ReactiveGuardParams,
 }
 
 /// Snapshot of the initial actor world. Held in the engine config so `scenario.reset`
@@ -175,6 +197,10 @@ impl M0EngineConfig {
             debug_inject_panic_at_tick: None,
             initial_actor_world: None,
             has_actor_world: false,
+            initial_breach_world: None,
+            initial_guards: Vec::new(),
+            initial_objectives: Vec::new(),
+            mission_loss: None,
         }
     }
 
@@ -201,6 +227,39 @@ impl M0EngineConfig {
             // Per-actor RifleState is built lazily in M0Engine::new with the configured
             // tick_rate_hz so 60 Hz vs 120 Hz produce identical real-time RPS / reload.
             cfg.milestone = "m1".to_string();
+        }
+        // M1.5: breach world.
+        if !scenario.breaches.is_empty() {
+            let strips: Vec<_> = scenario.breaches.iter().map(|b| b.build_strip()).collect();
+            cfg.initial_breach_world = Some(InitialBreachWorld {
+                world: cf_terrain::BreachWorld::new(strips),
+            });
+        }
+        // M1.5: reactive guards.
+        for actor in &scenario.actors {
+            if let Some(enemy) = &actor.enemy {
+                cfg.initial_guards.push(InitialGuard {
+                    actor: ActorId(actor.id),
+                    params: enemy.build_params(),
+                });
+            }
+        }
+        // M1.5: objectives + mission loss conditions.
+        if scenario.has_mission() {
+            cfg.initial_objectives = scenario
+                .objectives
+                .iter()
+                .cloned()
+                .map(|o| o.into_objective())
+                .collect();
+            cfg.mission_loss = Some(
+                scenario
+                    .mission
+                    .as_ref()
+                    .map(|m| m.loss_conditions())
+                    .unwrap_or_default(),
+            );
+            cfg.milestone = "m1.5".to_string();
         }
         cfg
     }
@@ -364,6 +423,30 @@ struct EngineMutable {
     /// "last sent" trackers are stale and must redispatch held keys, even if
     /// the keyboard state itself has not changed.
     intent_epoch: u64,
+    /// M1.5: breach world (soft-breach strips). `None` when scenario has no breaches.
+    breach_world: Option<cf_terrain::BreachWorld>,
+    /// M1.5: pending dig request consumed at the start of the next tick.
+    /// `Some` only when an `act.player.dig` arrived since the last tick.
+    pending_dig: Option<PendingDig>,
+    /// M1.5: per-actor reactive-guard controllers, keyed by actor id.
+    reactive_guards: BTreeMap<ActorId, cf_ai::ReactiveGuard>,
+    /// M1.5: mission state machine. `None` when the scenario is sandbox-only.
+    mission: Option<cf_mission::MissionState>,
+    /// M1.5: tick the mission was started at (so reset can rewind objective
+    /// timers without rewinding the engine clock).
+    mission_started_at_tick: u64,
+    /// M1.5: monotonic id counter for guard projectiles. We share the actor
+    /// projectile pool but allocate ids from a separate range so guard shots
+    /// don't alias the player's projectile_id space across resets.
+    next_guard_projectile_id: u64,
+}
+
+/// Pending dig request set by `act.player.dig` and consumed at the start of the
+/// next tick.
+#[derive(Debug, Clone)]
+struct PendingDig {
+    target: Option<String>,
+    source: IntentSource,
 }
 
 fn observed_run_status(state: &EngineMutable) -> RunStatus {
@@ -406,6 +489,22 @@ impl M0Engine {
         };
         let pending_intent = ControlIntent::new(player_actor.unwrap_or(ActorId(0)), IntentSource::Cfctl);
 
+        // M1.5: breach world + mission + reactive guards.
+        let breach_world = config.initial_breach_world.as_ref().map(|b| b.world.clone());
+        let mut reactive_guards = BTreeMap::new();
+        for guard in &config.initial_guards {
+            reactive_guards.insert(guard.actor, cf_ai::ReactiveGuard::new(guard.actor, guard.params));
+        }
+        let mission = if config.initial_objectives.is_empty() && config.mission_loss.is_none() {
+            None
+        } else {
+            Some(cf_mission::MissionState::new(
+                config.initial_objectives.clone(),
+                0,
+                config.mission_loss.unwrap_or_default(),
+            ))
+        };
+
         diagnostics::set_panic_reporter({
             let recorder = recorder.clone();
             let tick_snap = current_tick.clone();
@@ -428,6 +527,12 @@ impl M0Engine {
                 actor_state,
                 player_actor,
                 intent_epoch: 0,
+                breach_world,
+                pending_dig: None,
+                reactive_guards,
+                mission,
+                mission_started_at_tick: 0,
+                next_guard_projectile_id: 1_000_000,
             }),
             recorder,
             current_tick,
@@ -521,6 +626,13 @@ impl M0Engine {
         );
     }
 
+    /// M1.5: bundle returned from `cf-terrain::try_dig` plus the dig source.
+    /// Stored locally inside drive_tick so events can be emitted after the
+    /// state guard is dropped.
+    fn _dig_event_marker(&self) {
+        // Existence-only documentation anchor.
+    }
+
     /// Drive a single tick. Emits a `determinism.sim_checksum` and a `system.tick_sample`
     /// every `cadence_ticks` ticks (M0 default = 60). When the engine carries an
     /// [`ActorSimState`], drives the M1 actor pipeline and emits the resulting `input.*`
@@ -533,10 +645,51 @@ impl M0Engine {
         let mut tick_sample_payload: Option<(Tick, f64, TickSampleStats)> = None;
         let mut step_report: Option<(Tick, f64, ControlIntent, StepReport)> = None;
         let mut snapshot_payload: Option<(Tick, f64, ActorWorldSnapshot)> = None;
+        let mut dig_payload: Option<(Tick, f64, DigEvent)> = None;
+        let mut ai_payloads: Vec<(Tick, f64, ActorId, cf_ai::EnemyTickReport)> = Vec::new();
+        let mut guard_fire_records: Vec<GuardFireRecord> = Vec::new();
+        let mut mission_payload: Option<(Tick, f64, cf_mission::MissionTickReport)> = None;
         if let Some(tick) = advanced {
             state.rng.next_u64();
+
+            // M1.5: process pending dig BEFORE the actor step so the breach can
+            // become "broken" inside this tick and the mission state machine sees
+            // it on the same tick the dig landed.
+            if state.pending_dig.is_some() && state.breach_world.is_some() {
+                let pending = state.pending_dig.take().expect("pending dig is_some");
+                let player_pos_aim = state.player_actor.and_then(|pid| {
+                    state
+                        .actor_state
+                        .as_ref()
+                        .and_then(|sim| sim.world.actors.get(&pid))
+                        .map(|a| ((a.position.x, a.position.y), (a.aim.x, a.aim.y)))
+                });
+                if let Some(((px, py), (ax, ay))) = player_pos_aim {
+                    let world = state.breach_world.as_mut().expect("breach world is_some");
+                    let outcome = cf_terrain::try_dig(
+                        world,
+                        cf_terrain::DigRequest {
+                            origin: [px, py],
+                            aim: [ax, ay],
+                            explicit_target: pending.target.clone(),
+                        },
+                    );
+                    dig_payload = Some((
+                        tick,
+                        state.clock.sim_time_ms(),
+                        DigEvent {
+                            outcome,
+                            source: pending.source,
+                            origin: [px, py],
+                        },
+                    ));
+                }
+            }
+
             // M1: step the actor world if present. The pending intent is consumed and
-            // its edge-triggered fields cleared so the next tick starts fresh.
+            // its edge-triggered fields cleared so the next tick starts fresh. M1.5
+            // augments this by running each reactive guard's controller and feeding its
+            // generated intent into the same actor-step pipeline.
             if state.actor_state.is_some() {
                 let intent = state.pending_intent.clone();
                 state.pending_intent.clear_edges();
@@ -554,9 +707,60 @@ impl M0Engine {
                 if let Some(player_id) = player {
                     intents.insert(player_id, intent.clone());
                 }
-                let actor_state = state.actor_state.as_mut().expect("actor state present");
+
+                // M1.5: tick reactive guards. We collect their fire records and apply
+                // them to the actor world AFTER the player step so we don't aliasing
+                // borrow the actor world mutably twice. The temporary `take()` of
+                // each guard releases the BTreeMap borrow so we can mutate state.rng.
+                let sim_time_ms = state.clock.sim_time_ms();
+                let guard_ids: Vec<ActorId> = state.reactive_guards.keys().copied().collect();
+                for guard_id in guard_ids {
+                    let (self_actor, player_actor) = {
+                        let sim = match state.actor_state.as_ref() {
+                            Some(s) => s,
+                            None => break,
+                        };
+                        (
+                            sim.world.actors.get(&guard_id).cloned(),
+                            player.and_then(|pid| sim.world.actors.get(&pid).cloned()),
+                        )
+                    };
+                    let self_actor = match self_actor {
+                        Some(a) => a,
+                        None => continue,
+                    };
+                    let player_ref = player_actor.as_ref();
+                    let mut guard = state
+                        .reactive_guards
+                        .remove(&guard_id)
+                        .expect("guard exists by construction");
+                    let report = cf_ai::step(
+                        &mut guard,
+                        cf_ai::GuardTickInputs {
+                            tick: tick.0,
+                            tick_rate_hz: self.config.tick_rate_hz,
+                            self_actor: &self_actor,
+                            player: player_ref,
+                        },
+                        &mut state.rng,
+                    );
+                    state.reactive_guards.insert(guard_id, guard);
+                    if let Some(fire) = &report.fire {
+                        guard_fire_records.push(GuardFireRecord {
+                            shooter: guard_id,
+                            origin: fire.muzzle_origin,
+                            velocity: fire.velocity,
+                            damage: fire.damage,
+                            lifetime_ticks: fire.lifetime_ticks,
+                            will_miss: fire.will_miss,
+                        });
+                    }
+                    ai_payloads.push((tick, sim_time_ms, guard_id, report));
+                }
+
+                let actor_state_mut = state.actor_state.as_mut().expect("actor state present");
                 let report = actor_step(
-                    actor_state,
+                    actor_state_mut,
                     &mut intents,
                     StepDeps {
                         tick_dt,
@@ -566,15 +770,64 @@ impl M0Engine {
                         auto_reload_when_empty: auto_reload,
                     },
                 );
+
+                // M1.5: spawn guard projectiles into the same projectile pool the
+                // actor step uses so cf-actor's swept hit detection runs against
+                // them on subsequent ticks. We allocate ids from the dedicated
+                // guard range to avoid colliding with player projectile ids.
+                if !guard_fire_records.is_empty() {
+                    for fire in &guard_fire_records {
+                        let id = state.next_guard_projectile_id;
+                        state.next_guard_projectile_id = state.next_guard_projectile_id.wrapping_add(1);
+                        let actor_state_mut = state.actor_state.as_mut().expect("actor state present");
+                        actor_state_mut.projectiles.push(cf_actor::sim::Projectile {
+                            id,
+                            owner: fire.shooter,
+                            origin: cf_actor::Vec2::new(fire.origin[0], fire.origin[1]),
+                            position: cf_actor::Vec2::new(fire.origin[0], fire.origin[1]),
+                            velocity: cf_actor::Vec2::new(fire.velocity[0], fire.velocity[1]),
+                            damage: fire.damage,
+                            remaining_ticks: fire.lifetime_ticks,
+                        });
+                    }
+                }
+
                 step_report = Some((tick, state.clock.sim_time_ms(), intent, report));
+
+                // M1.5: tick the mission state machine after the actor world settles.
+                let sim_time_ms = state.clock.sim_time_ms();
+                if state.mission.is_some() {
+                    // Snapshot inputs so we can drop the actor borrow before we mutate
+                    // the mission slot. The actor world clones cheaply (BTreeMap is
+                    // O(n)); 16-actor scenarios are well within budget.
+                    let breaches_broken = state.breach_world.as_ref().map(|w| w.broken_map()).unwrap_or_default();
+                    let (actors_clone, player_clone) = {
+                        let actor_state_ref = state.actor_state.as_ref().expect("actor state present");
+                        let actors = actor_state_ref.world.actors.clone();
+                        let player_clone = player.and_then(|pid| actors.get(&pid).cloned());
+                        (actors, player_clone)
+                    };
+                    let mission = state.mission.as_mut().expect("mission present");
+                    let inputs = cf_mission::MissionTickInputs {
+                        tick: tick.0,
+                        player: player_clone.as_ref(),
+                        actors: &actors_clone,
+                        breaches_broken: &breaches_broken,
+                    };
+                    let report = cf_mission::step(mission, inputs);
+                    if !report.objective_completed.is_empty()
+                        || !report.objective_started.is_empty()
+                        || !report.objective_failed.is_empty()
+                        || report.final_result.is_some()
+                    {
+                        mission_payload = Some((tick, sim_time_ms, report));
+                    }
+                }
             }
+
             let cadence = ChecksumConfig::m0_default().cadence_ticks;
             if cadence > 0 && tick.0 % cadence == 0 {
-                let actor_bytes = state
-                    .actor_state
-                    .as_ref()
-                    .map(|s| s.checksum_bytes())
-                    .unwrap_or_default();
+                let actor_bytes = build_checksum_bytes(&state);
                 let cs = sim_state_v1(tick, &state.rng, &actor_bytes);
                 let sim_time_ms = state.clock.sim_time_ms();
                 checksum_payload = Some((tick, sim_time_ms, cs.to_hex()));
@@ -654,7 +907,262 @@ impl M0Engine {
                 None,
             );
         }
+
+        // M1.5: emit terrain dig events (always emit `tool_action_started`, then
+        // `terrain_carved` or `tool_refused` based on outcome).
+        if let Some((tick, sim_time_ms, evt)) = dig_payload {
+            let action_id = self.recorder.record(
+                tick,
+                sim_time_ms,
+                "terrain",
+                "tool_action_started",
+                json!({
+                    "tool": "digger",
+                    "source": match evt.source {
+                        IntentSource::Human => "human",
+                        IntentSource::Cfctl => "cfctl",
+                    },
+                    "origin": evt.origin,
+                    "explicit_target": evt.outcome_target_string(),
+                }),
+                None,
+            );
+            match evt.outcome {
+                cf_terrain::DigOutcome::Carved {
+                    strip_id,
+                    material,
+                    bbox_min,
+                    bbox_max,
+                    damage_applied,
+                    hp_remaining,
+                    broken,
+                } => {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "terrain",
+                        "terrain_carved",
+                        json!({
+                            "tick": tick.0,
+                            "bbox": { "min": bbox_min, "max": bbox_max },
+                            "material_before": material.clone(),
+                            "material_after": if broken { "air" } else { &material },
+                            "count": 1u32,
+                            "strip_id": strip_id,
+                            "damage_applied": damage_applied,
+                            "hp_remaining": hp_remaining,
+                            "broken": broken,
+                        }),
+                        Some(action_id.clone()),
+                    );
+                    // Emit a stub event alongside so M1.5 evidence carries both
+                    // names; M2's chunked terrain replaces only the stub.
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "terrain",
+                        "terrain_breach_stub",
+                        json!({
+                            "strip_id": "stub",
+                            "tick": tick.0,
+                            "broken": broken,
+                        }),
+                        Some(action_id),
+                    );
+                }
+                cf_terrain::DigOutcome::Refused {
+                    reason,
+                    strip_id,
+                    material,
+                    bbox_min,
+                    bbox_max,
+                } => {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "terrain",
+                        "tool_refused",
+                        json!({
+                            "reason": reason,
+                            "strip_id": strip_id,
+                            "material": material,
+                            "bbox_min": bbox_min,
+                            "bbox_max": bbox_max,
+                        }),
+                        Some(action_id),
+                    );
+                }
+            }
+        }
+
+        // M1.5: emit AI events for each guard.
+        for (tick, sim_time_ms, guard_id, report) in &ai_payloads {
+            self.emit_guard_events(*tick, *sim_time_ms, *guard_id, report);
+        }
+
+        // M1.5: emit mission events.
+        if let Some((tick, sim_time_ms, report)) = mission_payload {
+            for id in &report.objective_started {
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "mission",
+                    "objective_started",
+                    json!({"objective": id}),
+                    None,
+                );
+            }
+            for id in &report.objective_completed {
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "mission",
+                    "objective_completed",
+                    json!({"objective": id}),
+                    None,
+                );
+            }
+            for id in &report.objective_failed {
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "mission",
+                    "objective_failed",
+                    json!({"objective": id}),
+                    None,
+                );
+            }
+            if let Some(result) = report.final_result {
+                let payload = match result {
+                    cf_mission::MissionResult::Won => json!({"result": "won"}),
+                    cf_mission::MissionResult::Lost { reason } => {
+                        json!({"result": "lost", "reason": reason.as_str()})
+                    }
+                    cf_mission::MissionResult::Active => json!({"result": "active"}),
+                };
+                self.recorder
+                    .record(tick, sim_time_ms, "mission", "mission_resolved", payload, None);
+            }
+        }
+
         advanced
+    }
+
+    /// Translate a `cf_ai::EnemyTickReport` into recorder events.
+    fn emit_guard_events(&self, tick: Tick, sim_time_ms: f64, guard_id: ActorId, report: &cf_ai::EnemyTickReport) {
+        // Always emit ai.perception (even when player_seen=false) so replay
+        // viewers can step through the guard's awareness.
+        if let Some(p) = &report.perception {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "ai",
+                "ai_perception",
+                json!({
+                    "actor": guard_id.0,
+                    "player_seen": p.player_seen,
+                    "distance": p.distance,
+                    "angle_degrees": p.angle_degrees,
+                    "last_seen_position": p.last_seen_position,
+                    "state": p.state.as_str(),
+                }),
+                None,
+            );
+        }
+        if let Some(t) = &report.tactic_chosen {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "ai",
+                "tactic_chosen",
+                json!({
+                    "actor": guard_id.0,
+                    "tactic": t.tactic.as_str(),
+                    "reason": t.reason,
+                    "score_attack": t.score_attack,
+                    "score_reload": t.score_reload,
+                    "score_hold": t.score_hold,
+                    "score_search": t.score_search,
+                }),
+                None,
+            );
+        }
+        if let Some(s) = &report.state_changed {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "ai",
+                "state_changed",
+                json!({
+                    "actor": guard_id.0,
+                    "previous": s.previous.as_str(),
+                    "next": s.next.as_str(),
+                    "cause": s.cause,
+                }),
+                None,
+            );
+        }
+        if report.reload_started {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "equipment",
+                "weapon_reload_started",
+                json!({"actor": guard_id.0}),
+                None,
+            );
+        }
+        if report.reload_completed {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "equipment",
+                "weapon_reloaded",
+                json!({"actor": guard_id.0}),
+                None,
+            );
+        }
+        if report.dry_fire {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "equipment",
+                "weapon_dry_fire",
+                json!({"actor": guard_id.0}),
+                None,
+            );
+        }
+        if let Some(fire) = &report.fire {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "equipment",
+                "weapon_fired",
+                json!({
+                    "actor": guard_id.0,
+                    "muzzle_origin": fire.muzzle_origin,
+                    "miss_threshold": fire.miss_threshold,
+                    "miss_roll": fire.miss_roll,
+                    "will_miss": fire.will_miss,
+                }),
+                None,
+            );
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "combat",
+                "projectile_spawned",
+                json!({
+                    "owner": guard_id.0,
+                    "origin": fire.muzzle_origin,
+                    "velocity": fire.velocity,
+                    "damage": fire.damage,
+                    "lifetime_ticks": fire.lifetime_ticks,
+                    "will_miss": fire.will_miss,
+                }),
+                None,
+            );
+        }
     }
 
     fn emit_actor_events(&self, tick: Tick, sim_time_ms: f64, intent: &ControlIntent, report: &StepReport) {
@@ -883,11 +1391,7 @@ impl M0Engine {
         let state = self.state.read().expect("engine state poisoned");
         let tick = state.clock.tick();
         let sim_time_ms = state.clock.sim_time_ms();
-        let actor_bytes = state
-            .actor_state
-            .as_ref()
-            .map(|s| s.checksum_bytes())
-            .unwrap_or_default();
+        let actor_bytes = build_checksum_bytes(&state);
         let cs = sim_state_v1(tick, &state.rng, &actor_bytes);
         drop(state);
         self.recorder.record(
@@ -980,7 +1484,18 @@ impl M0Engine {
             actors: Vec::new(),
             player_actor_id: None,
             player_rifle: None,
+            breaches: Vec::new(),
+            mission: None,
+            extraction_zone: None,
+            enemies: Vec::new(),
         };
+        for guard in state.reactive_guards.values() {
+            snapshot.enemies.push(EnemyHudView {
+                actor: guard.actor.0,
+                state: guard.state.as_str().to_string(),
+                last_tactic: guard.last_tactic.as_str().to_string(),
+            });
+        }
         if let Some(sim) = state.actor_state.as_ref() {
             snapshot.floor_y = sim.world.floor_y;
             snapshot.player_actor_id = sim.world.player.map(|id| id.0);
@@ -1003,6 +1518,47 @@ impl M0Engine {
                             reload_total_ticks: rifle.reload_ticks(),
                         });
                     }
+                }
+            }
+        }
+        if let Some(world) = state.breach_world.as_ref() {
+            for s in world.iter() {
+                snapshot.breaches.push(BreachRenderView {
+                    id: s.id.clone(),
+                    bbox_min: s.bbox_min,
+                    bbox_max: s.bbox_max,
+                    hp: s.hp,
+                    max_hp: s.max_hp,
+                    broken: s.broken,
+                    refusal_reason: s.refusal_reason.clone(),
+                });
+            }
+        }
+        if let Some(mission) = state.mission.as_ref() {
+            snapshot.mission = Some(MissionHudView {
+                result: mission.result.as_str().to_string(),
+                loss_reason: match mission.result {
+                    cf_mission::MissionResult::Lost { reason } => Some(reason.as_str().to_string()),
+                    _ => None,
+                },
+                elapsed_ticks: mission.elapsed_ticks(tick),
+                time_limit_ticks: mission.time_limit_ticks,
+                ticks_remaining: mission.ticks_remaining(tick),
+                active_objective: mission
+                    .active_objective_index()
+                    .map(|i| mission.objectives[i].id.clone()),
+                last_event_label: mission.last_event_label.clone(),
+            });
+            // Surface the first `ReachZone` so cf-render-2d can draw the extraction zone.
+            for obj in &mission.objectives {
+                if let cf_mission::ObjectiveKind::ReachZone { min, max } = &obj.kind {
+                    snapshot.extraction_zone = Some(ExtractionZoneView {
+                        objective_id: obj.id.clone(),
+                        min: *min,
+                        max: *max,
+                        completed: obj.status == cf_mission::ObjectiveStatus::Completed,
+                    });
+                    break;
                 }
             }
         }
@@ -1157,6 +1713,55 @@ pub struct ActorRenderSnapshot {
     pub actors: Vec<cf_actor::ActorObservation>,
     pub player_actor_id: Option<u64>,
     pub player_rifle: Option<RifleHudView>,
+    /// M1.5: breach strips for the renderer.
+    pub breaches: Vec<BreachRenderView>,
+    /// M1.5: mission HUD bundle. `None` when scenario has no mission.
+    pub mission: Option<MissionHudView>,
+    /// M1.5: extraction zone derived from the first `ReachZone` objective.
+    pub extraction_zone: Option<ExtractionZoneView>,
+    /// M1.5: per-enemy state + tactic projection so the HUD doesn't fabricate values.
+    pub enemies: Vec<EnemyHudView>,
+}
+
+/// M1.5: HUD-side projection of one reactive guard.
+#[derive(Debug, Clone)]
+pub struct EnemyHudView {
+    pub actor: u64,
+    pub state: String,
+    pub last_tactic: String,
+}
+
+/// M1.5: render-side projection of a breach strip.
+#[derive(Debug, Clone)]
+pub struct BreachRenderView {
+    pub id: String,
+    pub bbox_min: [f32; 2],
+    pub bbox_max: [f32; 2],
+    pub hp: f32,
+    pub max_hp: f32,
+    pub broken: bool,
+    pub refusal_reason: Option<String>,
+}
+
+/// M1.5: HUD-side projection of mission state.
+#[derive(Debug, Clone)]
+pub struct MissionHudView {
+    pub result: String,
+    pub loss_reason: Option<String>,
+    pub elapsed_ticks: u64,
+    pub time_limit_ticks: u64,
+    pub ticks_remaining: Option<u64>,
+    pub active_objective: Option<String>,
+    pub last_event_label: String,
+}
+
+/// M1.5: extraction zone for the renderer.
+#[derive(Debug, Clone)]
+pub struct ExtractionZoneView {
+    pub objective_id: String,
+    pub min: [f32; 2],
+    pub max: [f32; 2],
+    pub completed: bool,
 }
 
 /// Rifle ammo / cooldown / reload bundle for the HUD bridge. Mirrors `cf-ui::HudRifle`
@@ -1203,6 +1808,93 @@ impl From<&ActorSimState> for ActorWorldSnapshot {
             player_actor_id: sim.world.player.map(|id| id.0),
         }
     }
+}
+
+/// M1.5: dig outcome packed for cross-thread transport so events can be
+/// emitted after the engine state guard is dropped.
+#[derive(Debug, Clone)]
+struct DigEvent {
+    outcome: cf_terrain::DigOutcome,
+    source: IntentSource,
+    origin: [f32; 2],
+}
+
+impl DigEvent {
+    fn outcome_target_string(&self) -> Option<String> {
+        match &self.outcome {
+            cf_terrain::DigOutcome::Carved { strip_id, .. } => Some(strip_id.clone()),
+            cf_terrain::DigOutcome::Refused { strip_id, .. } => strip_id.clone(),
+        }
+    }
+}
+
+/// M1.5: bundle returned from a guard's [`cf_ai::FireRecord`] so we can spawn
+/// projectiles into the actor pool after the guard step finishes. `will_miss`
+/// is recorded for cause-chain visibility — the projectile velocity is already
+/// drifted at AI step time, so the engine just propagates it.
+#[derive(Debug, Clone)]
+#[allow(dead_code)]
+struct GuardFireRecord {
+    shooter: ActorId,
+    origin: [f32; 2],
+    velocity: [f32; 2],
+    damage: f32,
+    lifetime_ticks: u32,
+    will_miss: bool,
+}
+
+/// Build the JsonSchema-friendly mission view used by the observe envelope.
+fn build_mission_view(state: &cf_mission::MissionState, current_tick: u64) -> crate::state::MissionView {
+    let view = cf_mission::MissionView::from_state(state, current_tick);
+    let objectives = view
+        .objectives
+        .into_iter()
+        .map(|o| crate::state::ObjectiveView {
+            id: o.id,
+            kind: o.kind,
+            status: o.status,
+            optional: o.optional,
+            target_actor: o.target_actor,
+            target_breach: o.target_breach,
+            zone_min: o.zone_min,
+            zone_max: o.zone_max,
+        })
+        .collect();
+    crate::state::MissionView {
+        result: view.result,
+        loss_reason: view.loss_reason,
+        elapsed_ticks: view.elapsed_ticks,
+        time_limit_ticks: view.time_limit_ticks,
+        ticks_remaining: view.ticks_remaining,
+        active_objective: view.active_objective,
+        objectives,
+        last_event_tick: view.last_event_tick,
+        last_event_label: view.last_event_label,
+    }
+}
+
+/// Build the checksum bytes covering every M1.5 sub-state. Layout is
+/// append-only relative to M1 so the `sim_state_v1` suffix stays valid.
+fn build_checksum_bytes(state: &EngineMutable) -> Vec<u8> {
+    let mut out = state
+        .actor_state
+        .as_ref()
+        .map(|s| s.checksum_bytes())
+        .unwrap_or_default();
+    if let Some(world) = state.breach_world.as_ref() {
+        out.extend_from_slice(&world.checksum_bytes());
+    }
+    out.extend_from_slice(&(state.reactive_guards.len() as u64).to_le_bytes());
+    for g in state.reactive_guards.values() {
+        out.extend_from_slice(&g.checksum_bytes());
+    }
+    if let Some(mission) = state.mission.as_ref() {
+        out.extend_from_slice(&(mission.objectives.len() as u64).to_le_bytes());
+        for obj in &mission.objectives {
+            out.push(obj.status as u8);
+        }
+    }
+    out
 }
 
 /// Cause label for `actor.actor_status_changed` events emitted from `step_one_actor`.
@@ -1336,6 +2028,46 @@ impl EngineHandle for M0Engine {
             .actor_state
             .as_ref()
             .and_then(|sim| sim.world.player.map(|id| id.0));
+        let current_tick_value = state.clock.tick().0;
+        let mission = state
+            .mission
+            .as_ref()
+            .map(|m| build_mission_view(m, current_tick_value));
+        let breaches = state
+            .breach_world
+            .as_ref()
+            .map(|w| {
+                w.iter()
+                    .map(|s| crate::state::BreachView {
+                        id: s.id.clone(),
+                        material: s.material.clone(),
+                        bbox_min: s.bbox_min,
+                        bbox_max: s.bbox_max,
+                        hp: s.hp,
+                        max_hp: s.max_hp,
+                        broken: s.broken,
+                        refusal_reason: s.refusal_reason.clone(),
+                        dig_range: s.dig_range,
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+        let enemies: Vec<crate::state::EnemyView> = state
+            .reactive_guards
+            .values()
+            .map(|g| crate::state::EnemyView {
+                actor: g.actor.0,
+                state: g.state.as_str().to_string(),
+                last_tactic: g.last_tactic.as_str().to_string(),
+                ammo: g.ammo_in_mag,
+                mag_capacity: g.params.mag_capacity,
+                fire_cooldown_ticks: g.fire_cooldown_ticks,
+                reload_remaining_ticks: g.reload_remaining_ticks,
+                aim_settle_remaining_ticks: g.aim_settle_remaining_ticks,
+                alert_dwell_remaining_ticks: g.alert_dwell_remaining_ticks,
+                aim: g.aim,
+            })
+            .collect();
         let frame = ObserveFrame {
             schema_version: SCHEMA_VERSION,
             run_id: self.recorder.run_id().to_string(),
@@ -1351,10 +2083,16 @@ impl EngineHandle for M0Engine {
             },
             actors,
             player_actor_id,
+            mission,
+            breaches,
+            enemies,
         };
         let tick = state.clock.tick();
         let sim_time_ms = state.clock.sim_time_ms();
-        drop(state);
+        // Record observation_sent BEFORE dropping the lock so that drive_tick (which
+        // takes the write lock) cannot insert higher-tick events between this read and
+        // the record call. M1.5 emits ~3 events per tick from drive_tick (input/AI/
+        // mission), so any race here produces non-monotonic events.jsonl ordering.
         self.recorder.record(
             tick,
             sim_time_ms,
@@ -1363,6 +2101,7 @@ impl EngineHandle for M0Engine {
             json!({"frame_run_id": frame.run_id, "tick": frame.tick}),
             None,
         );
+        drop(state);
         frame
     }
 
@@ -1463,6 +2202,26 @@ impl EngineHandle for M0Engine {
                     state.pending_intent = ControlIntent::new(initial.player.unwrap_or(ActorId(0)), preserved_source);
                 }
                 state.intent_epoch = state.intent_epoch.wrapping_add(1);
+                state.pending_dig = None;
+                // M1.5: rewind breach world.
+                if let (Some(world), Some(initial)) =
+                    (state.breach_world.as_mut(), self.config.initial_breach_world.as_ref())
+                {
+                    *world = initial.world.clone();
+                }
+                // M1.5: rewind every reactive guard to its initial config so AI
+                // memory + ammo + cooldowns reset cleanly.
+                for guard in &self.config.initial_guards {
+                    if let Some(g) = state.reactive_guards.get_mut(&guard.actor) {
+                        *g = cf_ai::ReactiveGuard::new(guard.actor, guard.params);
+                    }
+                }
+                // M1.5: rewind the mission state machine. Started-at-tick stays at
+                // the live engine tick so the timer measures from reset.
+                if let Some(mission) = state.mission.as_mut() {
+                    mission.reset(tick.0);
+                    state.mission_started_at_tick = tick.0;
+                }
                 drop(state);
                 for (projectile_id, owner, last_position) in &discarded_projectiles {
                     self.recorder.record(
@@ -1811,6 +2570,44 @@ impl EngineHandle for M0Engine {
                 } else {
                     self.reject_actor_command(tick, sim_time_ms, state, "act.player.reset")
                 }
+            }
+            ControlCommand::ActPlayerDig { target, source } => {
+                if !self.config.has_actor_world {
+                    return self.reject_actor_command(tick, sim_time_ms, state, "act.player.dig");
+                }
+                if state.breach_world.is_none() {
+                    drop(state);
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_rejected",
+                        json!({
+                            "method": "act.player.dig",
+                            "reason": "no_breach_world",
+                            "fix_hint": "scenario manifest must declare at least one entry in breaches[]."
+                        }),
+                        None,
+                    );
+                    return CommandResult::rejected("no_breach_world", tick.0);
+                }
+                if state.player_actor.is_none() {
+                    return self.reject_actor_command(tick, sim_time_ms, state, "act.player.dig");
+                }
+                state.pending_dig = Some(PendingDig {
+                    target: target.clone(),
+                    source,
+                });
+                drop(state);
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "control",
+                    "command_accepted",
+                    json!({"method": "act.player.dig", "target": target}),
+                    None,
+                );
+                CommandResult::accepted(tick.0)
             }
             ControlCommand::SettingsSet { changes } => {
                 if changes.is_empty() {

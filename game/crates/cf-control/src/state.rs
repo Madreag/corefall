@@ -42,6 +42,68 @@ pub struct ObserveFrame {
     /// Convenience pointer to the player actor in `actors` by id, if any.
     #[serde(default)]
     pub player_actor_id: Option<u64>,
+    /// M1.5: mission state machine projection. `None` for sandbox scenarios.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mission: Option<MissionView>,
+    /// M1.5: breach strips in the scenario. Empty for sandbox scenarios.
+    #[serde(default)]
+    pub breaches: Vec<BreachView>,
+    /// M1.5: reactive guards and their last-tick view. Empty for sandbox scenarios.
+    #[serde(default)]
+    pub enemies: Vec<EnemyView>,
+}
+
+/// M1.5 mission projection (re-exposed via JsonSchema-friendly types).
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct MissionView {
+    pub result: String,
+    pub loss_reason: Option<String>,
+    pub elapsed_ticks: u64,
+    pub time_limit_ticks: u64,
+    pub ticks_remaining: Option<u64>,
+    pub active_objective: Option<String>,
+    pub objectives: Vec<ObjectiveView>,
+    pub last_event_tick: u64,
+    pub last_event_label: String,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct ObjectiveView {
+    pub id: String,
+    pub kind: String,
+    pub status: String,
+    pub optional: bool,
+    pub target_actor: Option<u64>,
+    pub target_breach: Option<String>,
+    pub zone_min: Option<[f32; 2]>,
+    pub zone_max: Option<[f32; 2]>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct BreachView {
+    pub id: String,
+    pub material: String,
+    pub bbox_min: [f32; 2],
+    pub bbox_max: [f32; 2],
+    pub hp: f32,
+    pub max_hp: f32,
+    pub broken: bool,
+    pub refusal_reason: Option<String>,
+    pub dig_range: f32,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct EnemyView {
+    pub actor: u64,
+    pub state: String,
+    pub last_tactic: String,
+    pub ammo: u32,
+    pub mag_capacity: u32,
+    pub fire_cooldown_ticks: u32,
+    pub reload_remaining_ticks: u32,
+    pub aim_settle_remaining_ticks: u32,
+    pub alert_dwell_remaining_ticks: u32,
+    pub aim: [f32; 2],
 }
 
 /// Public projection of one actor for the observe envelope. Mirrors

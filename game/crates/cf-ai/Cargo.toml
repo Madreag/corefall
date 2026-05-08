@@ -9,3 +9,6 @@ publish.workspace = true
 [dependencies]
 serde = { workspace = true }
 tracing = { workspace = true }
+cf-actor = { path = "../cf-actor" }
+cf-equipment = { path = "../cf-equipment" }
+cf-sim-core = { path = "../cf-sim-core" }
