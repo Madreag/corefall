@@ -1,0 +1,63 @@
+{
+  "schema_version": "cf-grading.v1",
+  "scenario_id": "m2_material_lane",
+  "scope": "BP2",
+  "milestone": "m2",
+  "description": "Per-dimension grading contract for the M2 dig-path scenario (chunked terrain + 8-material launch set proof). Validates that the player can distinguish dirt-fast / concrete-slow / metal_nohook-refused / anchor-refused via captures + events. M2.5 owns mission/reactor; this scenario is sandbox-only.",
+  "rubric": {
+    "score_range": [0, 10],
+    "verdict_mapping": {
+      "9-10": "PASS",
+      "7-8": "PASS_WITH_FUTURE_POLISH",
+      "5-6": "PARTIAL (blocked on a future milestone)",
+      "3-4": "NEEDS_FIXES (current milestone scope)",
+      "0-2": "BLOCKER (current milestone scope)"
+    },
+    "minimum_aggregate_for_pass": 7.0,
+    "minimum_per_dimension_for_pass": 5
+  },
+  "dimensions": [
+    {
+      "id": "look.material_distinctness",
+      "criterion": "Different terrain materials (air, dirt, concrete, metal_nohook, hazard, loose_fill, repair_fill, anchor) are visually distinguishable in the captures.",
+      "evidence_required": ["captures/summary_grid.png — frames where the player's dig hits each material in turn"],
+      "weight": 1.5,
+      "future_owners_if_blocked": ["M4A"]
+    },
+    {
+      "id": "look.juice_and_feedback",
+      "criterion": "terrain_carved + tool_refused HUD labels visible in the captures; refusal_reason should be inferable from the HUD state.",
+      "evidence_required": ["captures/summary_grid.png + events.jsonl"],
+      "weight": 1.0,
+      "future_owners_if_blocked": ["DR-055"]
+    },
+    {
+      "id": "feel.simulation_responsiveness",
+      "criterion": "Dig actions produce terrain_carved or tool_refused within 1-2 ticks of the cfctl command.",
+      "evidence_required": ["events.jsonl"],
+      "weight": 1.0,
+      "future_owners_if_blocked": []
+    },
+    {
+      "id": "feel.dig_progression",
+      "criterion": "Soft materials (dirt) carve fast; medium materials (concrete) carve slow; refused materials (metal_nohook, anchor) emit refusal events without carving. Check with: per-dig hardness budget consumed appropriately + dirty_chunk_count grows for soft, refusal_count grows for refused.",
+      "evidence_required": ["events.jsonl terrain.terrain_carved + terrain.tool_refused tick patterns + observe.once terrain.{carve_count,refusal_count}"],
+      "weight": 1.5,
+      "future_owners_if_blocked": []
+    },
+    {
+      "id": "goal.fun_proof_delivery",
+      "criterion": "M2 systems exercised: ChunkedTerrain.try_carve (soft + medium hits), try_carve refused (metal/anchor), AABB-overlap-solid for projectile collision (if exercised), per-material affordances visible in observe.once.",
+      "evidence_required": ["events.jsonl + observe.once terrain projection"],
+      "weight": 2.0,
+      "future_owners_if_blocked": []
+    },
+    {
+      "id": "agent.evidence_completeness",
+      "criterion": "Bundle contains summary_grid.png + capture_manifest.json + events.jsonl + summary.json + run_manifest.json. M2 cfctl scripts may not produce a run_manifest.json (no --write-run-bundle in self_play_sweep) — note that as PARTIAL.",
+      "evidence_required": ["files in bundle"],
+      "weight": 1.0,
+      "future_owners_if_blocked": []
+    }
+  ]
+}

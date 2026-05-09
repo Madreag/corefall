@@ -1,0 +1,87 @@
+{
+  "schema_version": "cf-grading.v1",
+  "scenario_id": "micro_breach",
+  "scope": "BP1",
+  "milestone": "m1.5",
+  "description": "Per-dimension grading contract for the M1.5 fun-proof scenario (Micro Breach). Same shape as micro_reactor_defense.grading.json — agent reads required evidence per dimension + writes prose-justified scores.",
+  "rubric": {
+    "score_range": [0, 10],
+    "verdict_mapping": {
+      "9-10": "PASS",
+      "7-8": "PASS_WITH_FUTURE_POLISH",
+      "5-6": "PARTIAL (blocked on a future milestone)",
+      "3-4": "NEEDS_FIXES (current milestone scope)",
+      "0-2": "BLOCKER (current milestone scope)"
+    },
+    "minimum_aggregate_for_pass": 7.0,
+    "minimum_per_dimension_for_pass": 5
+  },
+  "dimensions": [
+    {
+      "id": "look.visual_clarity",
+      "criterion": "Agent can distinguish actor + breach strip + guard + extraction zone from background.",
+      "evidence_required": ["captures/summary_grid.png — at least 4 frames"],
+      "weight": 1.0,
+      "future_owners_if_blocked": ["M4A"]
+    },
+    {
+      "id": "look.actor_presentation",
+      "criterion": "Player + reactive guard render as distinct sprites with positional change visible.",
+      "evidence_required": ["captures/summary_grid.png", "observe.once actor positions"],
+      "weight": 1.0,
+      "future_owners_if_blocked": ["M4B"]
+    },
+    {
+      "id": "look.juice_and_feedback",
+      "criterion": "Dig action darkens the breach strip; weapon fire + reload show HUD updates; mission resolve shows result card.",
+      "evidence_required": ["captures/summary_grid.png", "events.jsonl"],
+      "weight": 1.0,
+      "future_owners_if_blocked": ["DR-055"]
+    },
+    {
+      "id": "feel.simulation_responsiveness",
+      "criterion": "Each cfctl-driven action produces a visible engine response within 1-2 ticks.",
+      "evidence_required": ["events.jsonl control.command_accepted vs immediate-next event of matching type"],
+      "weight": 1.0,
+      "future_owners_if_blocked": []
+    },
+    {
+      "id": "feel.combat_pacing",
+      "criterion": "Reactive guard's miss_chance + burst_pause + reload create a believable gunfight pacing (not full-auto, not single-shot/pause).",
+      "evidence_required": ["events.jsonl weapon_fired tick spacing + ai.tactic_chosen rolls"],
+      "weight": 1.0,
+      "future_owners_if_blocked": []
+    },
+    {
+      "id": "goal.fun_proof_delivery",
+      "criterion": "BP1 promise: 60-90s win/loss scenario where player digs through soft concrete, fights one reactive guard with utility-scored tactics, and reaches eastern extraction within time.",
+      "evidence_required": [
+        "win bundle — mission.result=won + objective.extract=completed + breach.outer_wall.broken=true",
+        "loss bundle — mission.result=lost + reasonable loss path"
+      ],
+      "weight": 2.0,
+      "future_owners_if_blocked": []
+    },
+    {
+      "id": "goal.bp_promise_coverage",
+      "criterion": "BP1 systems exercised: M1 actor controller (move/jump/aim/fire/reload/select_item) + M1.5 mission state machine + reactive guard (utility scoring) + soft breach.",
+      "evidence_required": ["events.jsonl categories: actor, combat, equipment, ai, mission, terrain"],
+      "weight": 2.0,
+      "future_owners_if_blocked": []
+    },
+    {
+      "id": "agent.cfctl_full_coverage",
+      "criterion": "Every BP1-scope cfctl action invoked at least once.",
+      "evidence_required": ["events.jsonl control.command_accepted method coverage"],
+      "weight": 1.0,
+      "future_owners_if_blocked": []
+    },
+    {
+      "id": "agent.evidence_completeness",
+      "criterion": "Bundle contains summary_grid.png + capture_manifest.json + events.jsonl + summary.json + run_manifest.json + observe.once. summary.json.artifacts.items[] non-empty.",
+      "evidence_required": ["all of the above"],
+      "weight": 1.0,
+      "future_owners_if_blocked": []
+    }
+  ]
+}

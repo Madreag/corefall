@@ -337,6 +337,44 @@ def validate_run(run_dir: Path) -> list[str]:
                 "system.run_finished nor system.panic"
             )
 
+    # LLM-graded test verdict (optional, gated on grading.json being present).
+    # When the bundle has a grading.json artifact, the AI agent has produced
+    # an LLM-graded verdict per `.claude/skills/corefall-review/SKILL.md`
+    # §LLM-Graded Test Verdicts. We validate the shape so a malformed grading
+    # file is caught at run-bundle time, not at review time. Bundles WITHOUT
+    # grading.json are not flagged here — the gate fires in /corefall-review,
+    # not in the per-bundle checker.
+    grading_path = run_dir / "grading.json"
+    if grading_path.is_file():
+        try:
+            grading = json.loads(grading_path.read_text())
+        except json.JSONDecodeError as exc:
+            errors.append(f"grading.json is not valid JSON: {exc}")
+        else:
+            if grading.get("schema_version") != "cf-grading.v1":
+                errors.append(
+                    f"grading.json schema_version must be 'cf-grading.v1'; "
+                    f"found {grading.get('schema_version')!r}"
+                )
+            for required in ("scenario_id", "agent", "timestamp", "dimensions"):
+                if not grading.get(required):
+                    errors.append(f"grading.json missing required field {required!r}")
+            dims = grading.get("dimensions") or []
+            if not isinstance(dims, list) or not dims:
+                errors.append("grading.json dimensions must be a non-empty list")
+            else:
+                for idx, dim in enumerate(dims):
+                    label = f"grading.json dimensions[{idx}]"
+                    if not isinstance(dim, dict):
+                        errors.append(f"{label} must be an object")
+                        continue
+                    for f in ("id", "criterion", "score", "prose", "verdict"):
+                        if f not in dim:
+                            errors.append(f"{label} missing field {f!r}")
+                    score = dim.get("score")
+                    if score is not None and not isinstance(score, (int, float)):
+                        errors.append(f"{label} score must be numeric or null")
+
     return errors
 
 

@@ -388,6 +388,32 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# LLM grading scaffold — for every fun-proof row that produced a bundle with
+# a known grading-criteria contract, write a grading.json scaffold the agent
+# can fill in during /corefall-review. The scaffold is a non-gating artifact
+# at sweep time (the gate fires in the review skill); having it pre-built
+# saves the agent a round-trip during the review pass.
+# ---------------------------------------------------------------------------
+GRADER="$GAME_DIR/tools/llm_grade_run.py"
+if [[ -f "$GRADER" ]]; then
+    # Devin 3212443754 caught the original `m2.5_*_$(date -u +%Y-%m-%dT%H)`
+    # glob: it required an underscore between the milestone prefix and the
+    # date, but the canonical run-bundle naming is `m2.5_<UTC>_<hash>` (one
+    # underscore — the date follows the prefix immediately). The corrected
+    # glob anchors the date directly after the prefix underscore.
+    for ROW_BUNDLE in "${REPO_ROOT}/prototype_runs/native/m1.5_$(date -u +%Y-%m-%dT%H)"* \
+                       "${REPO_ROOT}/prototype_runs/native/m2.5_$(date -u +%Y-%m-%dT%H)"* \
+                       "${REPO_ROOT}/prototype_runs/native/m2_$(date -u +%Y-%m-%dT%H)"*; do
+        if [[ -d "$ROW_BUNDLE" ]] && [[ -f "$ROW_BUNDLE/run_manifest.json" ]] && [[ ! -f "$ROW_BUNDLE/grading.json" ]]; then
+            python3 "$GRADER" scaffold \
+                --bundle "$ROW_BUNDLE" \
+                --agent "${AGENT_ID:-Droid (sweep-scaffolded)}" \
+                > /dev/null 2>&1 || true
+        fi
+    done
+fi
+
+# ---------------------------------------------------------------------------
 # Aggregate
 # ---------------------------------------------------------------------------
 {

@@ -372,6 +372,9 @@ def main() -> int:
         dry_run=args.dry_run,
     )
 
+    if not args.dry_run:
+        patch_run_bundle_summary(captures_dir, len(frames), grid_results, summary_result)
+
     print(json.dumps(
         {
             "captures_dir": str(captures_dir),
@@ -384,6 +387,104 @@ def main() -> int:
         indent=2,
     ))
     return 0
+
+
+def patch_run_bundle_summary(
+    captures_dir: Path,
+    frame_count: int,
+    grid_results: List[dict],
+    summary_result: dict,
+) -> None:
+    """Post-hoc patch the parent run bundle's summary.json so summary.json.artifacts
+    records the capture grid evidence.
+
+    The cf-control engine writes summary.json at cf-app shutdown with whatever
+    artifacts existed on disk at that moment (capture_manifest.json + frame_*.png).
+    The composer (this script) runs AFTER cf-app exits and writes summary_grid.png
+    + grid_NNN.png + summary_grid.json. This function appends those entries to
+    artifacts.items[] and bumps evidence_links so an offline reviewer reading the
+    bundle sees the full picture without scanning the captures/ dir manually.
+
+    BP closure-gate text from corefall AGENTS.md: "every fun-proof scenario must
+    emit a summary_grid.png + capture_manifest.json (recorded in
+    summary.json.artifacts)". This is the post-hoc half of that contract; the
+    in-process half lives in cf-control engine.rs::discover_run_artifacts.
+
+    Skips silently when summary.json doesn't exist (the bundle wasn't written
+    with --write-run-bundle, e.g. plain --capture-grid runs).
+    """
+    bundle_dir = captures_dir.parent
+    summary_path = bundle_dir / "summary.json"
+    if not summary_path.is_file():
+        return
+    try:
+        with summary_path.open() as f:
+            summary = json.load(f)
+    except (OSError, json.JSONDecodeError):
+        return
+
+    artifacts = summary.get("artifacts")
+    if not isinstance(artifacts, dict):
+        artifacts = {"items": []}
+        summary["artifacts"] = artifacts
+    items = artifacts.get("items")
+    if not isinstance(items, list):
+        items = []
+        artifacts["items"] = items
+
+    existing_paths = {it.get("path") for it in items if isinstance(it, dict)}
+
+    def add(kind: str, path: str) -> None:
+        if path in existing_paths:
+            return
+        items.append({"kind": kind, "path": path})
+        existing_paths.add(path)
+
+    if (captures_dir / "summary_grid.png").is_file():
+        add("summary_grid", "captures/summary_grid.png")
+    if (captures_dir / "summary_grid.json").is_file():
+        add("summary_grid_json", "captures/summary_grid.json")
+    for g in sorted(grid_results, key=lambda r: str(r.get("grid_path", ""))):
+        # `compose_grid` returns dicts with `grid_path` (full path) +
+        # `json_path`, NOT `filename`. Bugbot 3212416394 caught the original
+        # `g.get("filename")` lookup which always returned None, silently
+        # dropping every grid_NNN.png from summary.json.artifacts.items[].
+        grid_path_str = g.get("grid_path")
+        if not grid_path_str:
+            continue
+        name = Path(grid_path_str).name
+        add("capture_grid", f"captures/{name}")
+        json_path_str = g.get("json_path")
+        if json_path_str:
+            json_name = Path(json_path_str).name
+            if (captures_dir / json_name).is_file():
+                add("capture_grid_json", f"captures/{json_name}")
+    if (captures_dir / "capture_manifest.json").is_file():
+        add("capture_manifest", "captures/capture_manifest.json")
+    if frame_count > 0:
+        # Update or insert the frames-summary row. We replace any existing
+        # "capture_frames" entry so the count reflects the post-composer total
+        # (cf-control's in-process discovery may have undercounted if frames
+        # were still flushing to disk).
+        items[:] = [it for it in items if it.get("kind") != "capture_frames"]
+        items.append({"kind": "capture_frames", "path": f"captures/ ({frame_count} frame_*.png)"})
+
+    summary_result_meta = {
+        "frame_count": summary_result.get("frame_count"),
+        "non_blank_ratio": summary_result.get("non_blank_ratio"),
+        "tick_first": summary_result.get("tick_first"),
+        "tick_last": summary_result.get("tick_last"),
+    }
+    capture_section = summary.get("capture") or {}
+    if not isinstance(capture_section, dict):
+        capture_section = {}
+    capture_section["summary_grid"] = summary_result_meta
+    summary["capture"] = capture_section
+
+    try:
+        summary_path.write_text(json.dumps(summary, indent=2) + "\n")
+    except OSError:
+        return
 
 
 if __name__ == "__main__":

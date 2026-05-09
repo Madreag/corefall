@@ -17,8 +17,8 @@ use cf_actor::{
     ActorId, ActorWorld, ControlIntent, IntentSource, ItemSlot, Vec2,
 };
 use cf_replay::{
-    diagnostics, BuildInfo, BundleInputs, CapabilitiesBlock, CaptureConfig, ChecksumConfig, PerfSample, Recorder,
-    RunManifest, SceneInfo, SettingsBlock, TestRecord, CONTROL_SCHEMA_VERSION, EVENT_ENVELOPE_VERSION,
+    diagnostics, ArtifactItem, BuildInfo, BundleInputs, CapabilitiesBlock, CaptureConfig, ChecksumConfig, PerfSample,
+    Recorder, RunManifest, SceneInfo, SettingsBlock, TestRecord, CONTROL_SCHEMA_VERSION, EVENT_ENVELOPE_VERSION,
     MANIFEST_SCHEMA_VERSION, SCENARIO_SCHEMA_VERSION,
 };
 use cf_sim_core::{
@@ -2055,42 +2055,40 @@ impl M0Engine {
         self.emit_final_checksum();
         let manifest = self.build_manifest();
         let perf = self.perf_sample();
+        let result = if exit_code == 0 { "pass" } else { "fail" };
+        let evidence_ids = self.first_and_last_event_ids();
+        let tests = build_test_records(
+            &self.config.expected_tests,
+            &self.config.milestone,
+            result,
+            &evidence_ids,
+        );
+        let (artifacts, capture_evidence_link) = discover_run_artifacts(&self.run_bundle_dir);
+        let mut evidence_links = vec![
+            "events.jsonl".to_string(),
+            "summary.json".to_string(),
+            "run_manifest.json".to_string(),
+        ];
+        if let Some(link) = capture_evidence_link {
+            evidence_links.push(link);
+        }
         let inputs = BundleInputs {
             recorder: &self.recorder,
             manifest,
             started_at: self.started_at,
             ended_at,
             exit_code,
-            result: if exit_code == 0 {
-                "pass".to_string()
-            } else {
-                "fail".to_string()
-            },
+            result: result.to_string(),
             blockers: vec![],
-            next_actions: vec!["Proceed to M1 task cards in spec/native-implementation-backlog.".to_string()],
-            tests: vec![TestRecord {
-                id: "M0-SMOKE-01".to_string(),
-                result: if exit_code == 0 {
-                    "pass".to_string()
-                } else {
-                    "fail".to_string()
-                },
-                evidence_event_ids: self.first_and_last_event_ids(),
-                notes: Some("Fixed-tick smoke + run bundle parity per M0 done-criteria.".to_string()),
-            }],
-            artifacts: vec![],
+            next_actions: next_actions_for_milestone(&self.config.milestone),
+            tests,
+            artifacts,
             assumptions_tested: self.config.assumptions_tested.clone(),
-            good: vec![
-                "Fixed-tick scheduler stable; cfctl/control envelope serializes per DR-002 v1 lock.".to_string(),
-            ],
+            good: vec![],
             bad: vec![],
             meh: vec![],
-            evidence_links: vec![
-                "events.jsonl".to_string(),
-                "summary.json".to_string(),
-                "run_manifest.json".to_string(),
-            ],
-            notes_extra: m0_notes_addendum(),
+            evidence_links,
+            notes_extra: notes_addendum_for_milestone(&self.config.milestone),
             perf: Some(perf),
         };
         cf_replay::write_run_bundle(&self.run_bundle_dir, inputs)?;
@@ -2119,7 +2117,7 @@ impl M0Engine {
         RunManifest {
             schema_version: MANIFEST_SCHEMA_VERSION.to_string(),
             run_id: self.recorder.run_id().to_string(),
-            prototype_slice: "M0".to_string(),
+            prototype_slice: prototype_slice_for_milestone(&self.config.milestone),
             run_mode: self.config.run_mode.clone(),
             milestone: self.config.milestone.clone(),
             build: BuildInfo {
@@ -2439,19 +2437,321 @@ fn status_change_cause(outcome: &ActorTickOutcome) -> &'static str {
     }
 }
 
-fn m0_notes_addendum() -> String {
-    "## DR-002 v1 schema lock\n\n\
-- Event envelope: `{schema_version, run_id, tick, sim_time_ms, event_id, category, event_type, payload, parent_event_id?, dropped_count?}`.\n\
-- M0 categories: `system`, `control`, `determinism`. `snapshot` opens at M3.\n\
-- Checksum: `algorithm=blake3`, `scope=sim_state_v1` (M0 covers `tick_counter || rng_state_bytes`; M1 appends actor/inventory/projectile bytes via `cf_actor::sim::ActorSimState::checksum_bytes()`; M2/M3 will append terrain bytes; all without bumping the suffix; layout-breaking bumps go to `_v2`).\n\
-- Manifest extensions: `checksum.{algorithm,scope,cadence_ticks}`, `settings:{...}` block.\n\
-- Summary extensions: `final_sim_checksum`, `checksum_event_count`, `first_tick`, `last_tick`.\n\
-- M3 picks up replay verification (`first_divergence` event), the `snapshot` category, and full headless replay parity.\n\
-\n## DR-012 floor lock\n\n\
-- Six accessibility flags wired into `cf-control::Settings` and `run_manifest.json.settings`.\n\
-- Settings can be live-updated via `act.settings.set` and re-read via `observe.settings`.\n\
-- Localization deferred to M4 — the discipline rule (no baked English-only player-facing strings) applies.\n"
-        .to_string()
+/// Map a normalized milestone hint (`m0`, `m1`, `m1.5`, `m2`, `m2.5`, ...)
+/// to the upper-case `prototype_slice` label written into `run_manifest.json`.
+/// Falls back to upper-casing the input so future milestones keep working
+/// without an explicit branch here.
+/// Canonical roadmap milestone ordering, used by every per-milestone helper
+/// that needs "is this milestone >= Mx?". Each index is a position in the
+/// canonical Build Points spine — M0=0, M1=1, M1.5=2, M2=3, M2.5=4, M3A=5,
+/// M3B=6, M4A=7, M4B=8, M5=9, M5.5=10, M5.5.5=11, M5.6=12, M5.7=13, M5.8=14,
+/// M5.9=15, M5.9.5=16, M5.10=17, M6=18, M6.5=19, M6.6=20, M7=21, M7.5=22,
+/// M7.7=23, M8=24, M8.5=25, M8.6=26, M9=27, M9.5=28, M10=29, M11=30, M12=31.
+/// Unknown milestones map to `MILESTONE_INDEX_UNKNOWN` (after M12) so they
+/// default to the final-state universe (every category is included, every
+/// addendum fires) — better to over-document a future milestone than
+/// silently skip categories that have been shipping for years.
+///
+/// Append a row when a new milestone lands in the canonical roadmap. The
+/// constants below (`MILESTONE_INDEX_M0`, `_M1`, `_M1_5`, `_M2`, `_M3A`) are
+/// landmark gates the category-layering logic + DR-007 addendum check; only
+/// add new constants here when a new event category or schema is introduced
+/// (the current landmarks cover M0 baseline, M1 actor, M1.5 ai/mission/terrain,
+/// M2 material, M3A snapshot; if M5.6 introduces a new category, add
+/// `MILESTONE_INDEX_M5_6`).
+const MILESTONE_INDEX_M0: u32 = 0;
+const MILESTONE_INDEX_M1: u32 = 1;
+const MILESTONE_INDEX_M1_5: u32 = 2;
+const MILESTONE_INDEX_M2: u32 = 3;
+const MILESTONE_INDEX_M3A: u32 = 5;
+const MILESTONE_INDEX_UNKNOWN: u32 = 999;
+
+fn milestone_order_index(milestone: &str) -> u32 {
+    match milestone.trim().to_lowercase().as_str() {
+        "" | "m0" => MILESTONE_INDEX_M0,
+        "m1" => MILESTONE_INDEX_M1,
+        "m1.5" => MILESTONE_INDEX_M1_5,
+        "m2" => MILESTONE_INDEX_M2,
+        "m2.5" => 4,
+        "m3a" => MILESTONE_INDEX_M3A,
+        "m3b" => 6,
+        "m4a" => 7,
+        "m4b" => 8,
+        "m5" => 9,
+        "m5.5" => 10,
+        "m5.5.5" => 11,
+        "m5.6" => 12,
+        "m5.7" => 13,
+        "m5.8" => 14,
+        "m5.9" => 15,
+        "m5.9.5" => 16,
+        "m5.10" => 17,
+        "m6" => 18,
+        "m6.5" => 19,
+        "m6.6" => 20,
+        "m7" => 21,
+        "m7.5" => 22,
+        "m7.7" => 23,
+        "m8" => 24,
+        "m8.5" => 25,
+        "m8.6" => 26,
+        "m9" => 27,
+        "m9.5" => 28,
+        "m10" => 29,
+        "m11" => 30,
+        "m12" => 31,
+        _ => MILESTONE_INDEX_UNKNOWN,
+    }
+}
+
+fn prototype_slice_for_milestone(milestone: &str) -> String {
+    let normalized = milestone.trim().to_lowercase();
+    if normalized.is_empty() {
+        return "M0".to_string();
+    }
+    // Bugbot 3212491755 + Devin 3212416493 both caught: the prior
+    // `format!("M{rest}")` produced lowercase letter suffixes (`m3a` → `M3a`)
+    // because `rest` retained the lowercased form from `normalized`. Letter-
+    // suffixed milestones (M3A/M3B/M4A/M4B) must produce uppercase suffixes
+    // to match the canonical roadmap naming + the source-truthful evidence
+    // contract in AGENTS.md (run_manifest.json.prototype_slice ↔ roadmap id).
+    if let Some(rest) = normalized.strip_prefix('m') {
+        return format!("M{}", rest.to_uppercase());
+    }
+    normalized.to_uppercase()
+}
+
+/// Per-milestone "what to do next" line written into `summary.json.next_actions`.
+/// Stale "Proceed to M1 task cards" boilerplate masqueraded as M0 metadata in
+/// every bundle through M2.5; the canonical roadmap (Build Points table) is the
+/// source of truth and we pin the next milestone here so an offline reviewer
+/// can read the bundle and immediately see what the implementer was supposed
+/// to ship next.
+fn next_actions_for_milestone(milestone: &str) -> Vec<String> {
+    let normalized = milestone.trim().to_lowercase();
+    let next = match normalized.as_str() {
+        "" | "m0" => "Proceed to M1 task cards in spec/native-implementation-backlog.",
+        "m1" => "Proceed to M1.5 (Micro Breach Fun Slice) per spec/prototype-roadmap.md#BP1.",
+        "m1.5" => "Proceed to BP2 (M2 + M2.5 + M3A) per spec/prototype-roadmap.md#BP2.",
+        "m2" => "Proceed to M2.5 (Micro Reactor Defense Fun Slice) per spec/prototype-roadmap.md#BP2.",
+        "m2.5" => "Proceed to M3A (Event Recorder Core) per spec/prototype-roadmap.md#BP2.",
+        "m3a" => "Proceed to BP3 (M3B + M4A + M5) per spec/prototype-roadmap.md#BP3.",
+        "m3b" => "Proceed to M4A (Readability And ACC-A Floor) per spec/prototype-roadmap.md#BP3.",
+        "m4a" => "Proceed to M5 (Equipment, Chassis, And Damage Grammar) per spec/prototype-roadmap.md#BP3.",
+        "m5" => "Proceed to BP4 (M5.5 + M5.5.5 + M5.6 + M5.7 + M5.8) per spec/prototype-roadmap.md#BP4.",
+        _ => "Proceed to the next assigned milestone per spec/prototype-roadmap.md.",
+    };
+    vec![next.to_string()]
+}
+
+/// Per-milestone notes-addendum prose written into `notes.md` after the
+/// scenario-author rows (Good/Bad/Meh/Evidence). The historical
+/// `m0_notes_addendum` baked the M0 staging story ("M2/M3 will append terrain
+/// bytes; all without bumping the suffix") into every bundle, which became
+/// flat-out wrong once M2 / M2.5 / M3A landed. This helper returns the
+/// up-to-date DR-002 + DR-012 lock prose AND the milestone's own pinned
+/// contract addendum (e.g. material schema for M2+, expected-outcome contract
+/// for M3A+).
+fn notes_addendum_for_milestone(milestone: &str) -> String {
+    let normalized = milestone.trim().to_lowercase();
+    // Devin 3212580450 caught the source-truthful evidence bug here: claiming
+    // ALL 12 event categories ship at every milestone is wrong (M0 only ships
+    // system / control / determinism; terrain / material / mission / ai are
+    // M1.5+; snapshot is M3A+). Build the per-milestone category list so the
+    // notes addendum reflects what actually fired in this run, not the union
+    // across the whole roadmap. Layer is append-only: each milestone inherits
+    // every prior category.
+    //
+    // Devin 3212593186 follow-up: refactor from explicit per-milestone match
+    // arms (which silently broke for M3B / M4A / M4B / M6+ that weren't
+    // enumerated) to an ordering-based comparison via `milestone_order_index`.
+    // The order index is the canonical roadmap progression and any new
+    // milestone is added in one place rather than scattered across 4 match
+    // statements that each had to be kept in sync.
+    let idx = milestone_order_index(&normalized);
+    let mut categories: Vec<&'static str> = vec!["system", "control", "determinism"];
+    if idx >= MILESTONE_INDEX_M1 {
+        categories.extend(["actor", "combat", "equipment", "input"]);
+    }
+    if idx >= MILESTONE_INDEX_M1_5 {
+        categories.extend(["ai", "mission", "terrain"]);
+    }
+    if idx >= MILESTONE_INDEX_M2 {
+        categories.push("material");
+    }
+    if idx >= MILESTONE_INDEX_M3A {
+        categories.push("snapshot");
+    }
+    let categories_inline = categories
+        .iter()
+        .map(|c| format!("`{c}`"))
+        .collect::<Vec<_>>()
+        .join(", ");
+    let mut s = String::new();
+    s.push_str("## DR-002 schema lock\n\n");
+    s.push_str("- Event envelope: `{schema_version, run_id, tick, sim_time_ms, event_id, category, event_type, payload, parent_event_id?, dropped_count?}`.\n");
+    s.push_str(&format!(
+        "- Categories shipped through this milestone: {categories_inline}. Future categories layer in additively without breaking v1 envelope readers.\n"
+    ));
+    s.push_str("- Checksum: `algorithm=blake3`, `scope=sim_state_v1`. Layout is append-only: M0 (`tick_counter || rng_state_bytes`) || M1 (actor / inventory / projectile bytes) || M1.5 (breach + guards + mission bytes) || M2 (chunked-terrain bytes) || M2.5 (reactor-world bytes). Layout-breaking bumps go to `_v2`.\n");
+    s.push_str("- Manifest extensions: `checksum.{algorithm,scope,cadence_ticks}`, `settings:{...}` block, `expected_outcome:{clean|panic|abort}` (M3A).\n");
+    s.push_str("- Summary extensions: `final_sim_checksum`, `checksum_event_count`, `first_tick`, `last_tick`, `artifacts.items[]` populated from `captures/` when present (M2+).\n");
+    s.push_str("- M3A picks up headless replay verification: `cf-headless replay <bundle> --scenario-path <path>` reconstructs commands from `control.command_accepted` and asserts the cadence checksums tick-for-tick.\n");
+    s.push_str("\n## DR-012 floor lock\n\n");
+    s.push_str("- Six accessibility flags wired into `cf-control::Settings` and `run_manifest.json.settings`.\n");
+    s.push_str("- Settings can be live-updated via `act.settings.set` and re-read via `observe.settings`.\n");
+    s.push_str(
+        "- Localization deferred to M4 — the discipline rule (no baked English-only player-facing strings) applies.\n",
+    );
+    // DR-007 launch material set is reference documentation for what the
+    // material system shape is. Every M2+ bundle that has material events
+    // in events.jsonl benefits from seeing it, including milestones that
+    // RUN ON TOP OF chunked terrain (M3B replay viewer, M4A readability)
+    // and milestones that EXTEND it (M5.5 collision + materials, M5.6
+    // material kernel, M6.6 AI material competence, M7.5 base atmospherics,
+    // M8.5 material lab, M8.6 mining + refining).
+    //
+    // Bugbot 3212607793 + Devin 3212623450 caught the prior explicit
+    // allowlist that stopped at M5.10 — when M6.6 / M7.5 / M8.5 / M8.6
+    // (all of which clearly extend or work with materials) ship, they
+    // would have silently missed the addendum. The fix matches the
+    // category-layering pattern: `idx >= MILESTONE_INDEX_M2` so every
+    // milestone past M2 in roadmap order inherits the material reference.
+    // Unknown milestones map to MILESTONE_INDEX_UNKNOWN (post-M12) so
+    // future milestones default to including the addendum.
+    if idx >= MILESTONE_INDEX_M2 {
+        s.push_str("\n## DR-007 launch material set\n\n");
+        s.push_str("- 8 launch materials (ids 0..7): `air`, `dirt`, `concrete`, `metal_nohook`, `hazard`, `loose_fill`, `repair_fill`, `anchor`. `material_schema_version=cf-terrain-launch-v1`.\n");
+        s.push_str("- Per-material affordances cover solid/diggable/hardness/anchorable/hazard/path_cost/overlay_rgba/refusal_reason.\n");
+    }
+    s
+}
+
+/// Build the `summary.json.tests[]` entries from the scenario's
+/// `expected_tests` manifest field. Each entry's `result` is exit-code-driven
+/// (engine-wide pass/fail), `evidence_event_ids` is the run's first+last event
+/// id pair, and `notes` is a stable per-milestone rationale. If the scenario
+/// declares no expected tests we synthesize a single milestone-level smoke
+/// row so the array is never empty.
+fn build_test_records(
+    expected_tests: &[String],
+    milestone: &str,
+    result: &str,
+    evidence_event_ids: &[String],
+) -> Vec<TestRecord> {
+    let normalized = milestone.trim().to_lowercase();
+    let notes = match normalized.as_str() {
+        "" | "m0" => "M0 fixed-tick smoke + run-bundle parity per spec/native-implementation-backlog.",
+        "m1" => "M1 actor controller round-trip (move + jump + aim + fire + reload + select_item).",
+        "m1.5" => "M1.5 micro breach fun slice (dig outer wall, kill guard, reach extraction).",
+        "m2" => "M2 chunked-terrain dig path (dirt fast / concrete slow / metal_nohook + anchor refused).",
+        "m2.5" => {
+            "M2.5 micro reactor defense fun slice (dirt-shield strategic choice; reactor protected or destroyed)."
+        }
+        "m3a" => "M3A event recorder core (snapshot.* + expected_outcome contract + cf-headless replay verifier).",
+        _ => "Milestone-scope acceptance per spec/native-implementation-backlog.",
+    };
+    if expected_tests.is_empty() {
+        let id = match normalized.as_str() {
+            "" | "m0" => "M0-SMOKE-01",
+            "m1" => "M1-SMOKE-01",
+            "m1.5" => "M1.5-SMOKE-01",
+            "m2" => "M2-SMOKE-01",
+            "m2.5" => "M2.5-SMOKE-01",
+            "m3a" => "M3A-SMOKE-01",
+            _ => "MILESTONE-SMOKE-01",
+        };
+        return vec![TestRecord {
+            id: id.to_string(),
+            result: result.to_string(),
+            evidence_event_ids: evidence_event_ids.to_vec(),
+            notes: Some(notes.to_string()),
+        }];
+    }
+    expected_tests
+        .iter()
+        .map(|id| TestRecord {
+            id: id.clone(),
+            result: result.to_string(),
+            evidence_event_ids: evidence_event_ids.to_vec(),
+            notes: Some(notes.to_string()),
+        })
+        .collect()
+}
+
+/// Discover capture artifacts on disk at run-bundle write time. Returns
+/// `(artifacts, evidence_link)` where:
+///
+/// - `artifacts` lists the recordable items inside `<run>/captures/`:
+///   `capture_manifest.json`, `summary_grid.png`, every `grid_NNN.png`, and
+///   one `capture_frames` summary entry counting the frame_*.png files.
+/// - `evidence_link` is `"captures/"` when any capture artifact is present so
+///   `notes.md`'s evidence-link list reflects the on-disk shape.
+///
+/// `summary_grid.png` may not exist at write_run_bundle time (the cf-e2e
+/// composer adds it AFTER cf-app exits); `capture_grid.py` patches
+/// `summary.json.artifacts.items[]` post-hoc to add the grid PNGs in that
+/// case. This helper covers the in-process path (frames + manifest) and is
+/// idempotent with the post-hoc patcher.
+fn discover_run_artifacts(run_bundle_dir: &Path) -> (Vec<ArtifactItem>, Option<String>) {
+    let captures_dir = run_bundle_dir.join("captures");
+    if !captures_dir.is_dir() {
+        return (Vec::new(), None);
+    }
+    let mut items: Vec<ArtifactItem> = Vec::new();
+    let manifest_path = captures_dir.join("capture_manifest.json");
+    if manifest_path.is_file() {
+        items.push(ArtifactItem {
+            kind: "capture_manifest".to_string(),
+            path: "captures/capture_manifest.json".to_string(),
+        });
+    }
+    let summary_grid = captures_dir.join("summary_grid.png");
+    if summary_grid.is_file() {
+        items.push(ArtifactItem {
+            kind: "summary_grid".to_string(),
+            path: "captures/summary_grid.png".to_string(),
+        });
+        let summary_grid_json = captures_dir.join("summary_grid.json");
+        if summary_grid_json.is_file() {
+            items.push(ArtifactItem {
+                kind: "summary_grid_json".to_string(),
+                path: "captures/summary_grid.json".to_string(),
+            });
+        }
+    }
+    let mut grids: Vec<String> = Vec::new();
+    let mut frames: u64 = 0;
+    if let Ok(read_dir) = std::fs::read_dir(&captures_dir) {
+        for entry in read_dir.flatten() {
+            let name = entry.file_name();
+            let name_str = name.to_string_lossy().to_string();
+            if name_str.starts_with("grid_") && name_str.ends_with(".png") {
+                grids.push(name_str);
+            } else if name_str.starts_with("frame_") && name_str.ends_with(".png") {
+                frames += 1;
+            }
+        }
+    }
+    grids.sort();
+    for g in grids {
+        items.push(ArtifactItem {
+            kind: "capture_grid".to_string(),
+            path: format!("captures/{g}"),
+        });
+    }
+    if frames > 0 {
+        items.push(ArtifactItem {
+            kind: "capture_frames".to_string(),
+            path: format!("captures/ ({frames} frame_*.png)"),
+        });
+    }
+    let link = if items.is_empty() {
+        None
+    } else {
+        Some("captures/".to_string())
+    };
+    (items, link)
 }
 
 fn apply_settings_patch(settings: &mut Settings, patch: &SettingsPatch) -> Vec<String> {
@@ -3300,6 +3600,142 @@ mod tests {
     use super::*;
 
     static TEST_SCENARIO_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+    #[test]
+    fn prototype_slice_for_milestone_uppercases_letter_suffix() {
+        // Bugbot 3212491755 + Devin 3212416493 regression: letter-suffixed
+        // milestones (m3a, m3b, m4a, m4b) must produce uppercase prototype
+        // slice strings (M3A, M3B, M4A, M4B). Pre-fix, `format!("M{rest}")`
+        // returned the lowercased rest from `to_lowercase()` and produced
+        // `M3a` / `M3b` / etc.
+        assert_eq!(prototype_slice_for_milestone("m3a"), "M3A");
+        assert_eq!(prototype_slice_for_milestone("M3A"), "M3A");
+        assert_eq!(prototype_slice_for_milestone("m3b"), "M3B");
+        assert_eq!(prototype_slice_for_milestone("m4a"), "M4A");
+        assert_eq!(prototype_slice_for_milestone("m4b"), "M4B");
+    }
+
+    #[test]
+    fn prototype_slice_for_milestone_handles_numeric_and_dotted_milestones() {
+        assert_eq!(prototype_slice_for_milestone("m0"), "M0");
+        assert_eq!(prototype_slice_for_milestone("m1"), "M1");
+        assert_eq!(prototype_slice_for_milestone("m1.5"), "M1.5");
+        assert_eq!(prototype_slice_for_milestone("m2"), "M2");
+        assert_eq!(prototype_slice_for_milestone("m2.5"), "M2.5");
+        assert_eq!(prototype_slice_for_milestone("m5.5.5"), "M5.5.5");
+    }
+
+    #[test]
+    fn prototype_slice_for_milestone_empty_input_falls_back_to_m0() {
+        assert_eq!(prototype_slice_for_milestone(""), "M0");
+        assert_eq!(prototype_slice_for_milestone("   "), "M0");
+    }
+
+    #[test]
+    fn notes_addendum_categories_match_per_milestone_layering() {
+        // Devin 3212580450 regression: notes_addendum_for_milestone must NOT
+        // claim categories that haven't shipped yet at the named milestone.
+        // M0 = system / control / determinism only; M1 adds actor / combat /
+        // equipment / input; M1.5 adds ai / mission / terrain; M2 adds
+        // material; M3A adds snapshot. Layer is append-only.
+        let m0 = notes_addendum_for_milestone("m0");
+        assert!(m0.contains("`system`"));
+        assert!(m0.contains("`control`"));
+        assert!(m0.contains("`determinism`"));
+        assert!(!m0.contains("`actor`"), "M0 must NOT advertise actor category");
+        assert!(!m0.contains("`material`"), "M0 must NOT advertise material category");
+        assert!(!m0.contains("`snapshot`"), "M0 must NOT advertise snapshot category");
+
+        let m1 = notes_addendum_for_milestone("m1");
+        assert!(m1.contains("`actor`"));
+        assert!(m1.contains("`combat`"));
+        assert!(!m1.contains("`material`"), "M1 must NOT advertise material category");
+        assert!(!m1.contains("`mission`"), "M1 must NOT advertise mission category");
+
+        let m1_5 = notes_addendum_for_milestone("m1.5");
+        assert!(m1_5.contains("`ai`"));
+        assert!(m1_5.contains("`mission`"));
+        assert!(m1_5.contains("`terrain`"));
+        assert!(!m1_5.contains("`material`"), "M1.5 must NOT advertise material (M2+)");
+        assert!(!m1_5.contains("`snapshot`"), "M1.5 must NOT advertise snapshot (M3A+)");
+
+        let m2 = notes_addendum_for_milestone("m2");
+        assert!(m2.contains("`material`"));
+        assert!(!m2.contains("`snapshot`"), "M2 must NOT advertise snapshot (M3A+)");
+
+        let m3a = notes_addendum_for_milestone("m3a");
+        assert!(m3a.contains("`snapshot`"));
+        assert!(m3a.contains("`material`"));
+        assert!(m3a.contains("`mission`"));
+    }
+
+    #[test]
+    fn notes_addendum_categories_layer_correctly_for_post_m5_10_milestones() {
+        // Devin 3212593186 regression: the prior explicit-enumeration match
+        // arms stopped at m5.10, so M6/M6.5/M7/M8/etc. silently fell through
+        // to "categories shipped: system, control, determinism" only —
+        // missing the entire append-only layer they should have inherited.
+        // After the milestone_order_index refactor, M6+ correctly inherits
+        // every prior category.
+        for m in [
+            "m6", "m6.5", "m6.6", "m7", "m7.5", "m7.7", "m8", "m8.5", "m8.6", "m9", "m9.5", "m10", "m11", "m12",
+        ] {
+            let body = notes_addendum_for_milestone(m);
+            assert!(body.contains("`actor`"), "{m}: missing actor category");
+            assert!(body.contains("`mission`"), "{m}: missing mission category");
+            assert!(body.contains("`material`"), "{m}: missing material category");
+            assert!(body.contains("`snapshot`"), "{m}: missing snapshot category");
+        }
+    }
+
+    #[test]
+    fn milestone_order_index_orders_canonical_roadmap() {
+        assert!(milestone_order_index("m0") < milestone_order_index("m1"));
+        assert!(milestone_order_index("m1") < milestone_order_index("m1.5"));
+        assert!(milestone_order_index("m1.5") < milestone_order_index("m2"));
+        assert!(milestone_order_index("m2") < milestone_order_index("m2.5"));
+        assert!(milestone_order_index("m2.5") < milestone_order_index("m3a"));
+        assert!(milestone_order_index("m3a") < milestone_order_index("m3b"));
+        assert!(milestone_order_index("m3b") < milestone_order_index("m4a"));
+        assert!(milestone_order_index("m4a") < milestone_order_index("m4b"));
+        assert!(milestone_order_index("m4b") < milestone_order_index("m5"));
+        assert!(milestone_order_index("m5") < milestone_order_index("m5.10"));
+        assert!(milestone_order_index("m5.10") < milestone_order_index("m6"));
+        assert!(milestone_order_index("m6") < milestone_order_index("m12"));
+        // Unknown milestones map to MILESTONE_INDEX_UNKNOWN (after M12) so
+        // future milestones default to the final-state universe rather than
+        // accidentally falling back to M0's empty categories.
+        assert!(milestone_order_index("future-milestone-x") > milestone_order_index("m12"));
+    }
+
+    #[test]
+    fn notes_addendum_includes_dr007_for_every_m2_plus_milestone() {
+        // Bugbot 3212607793 + Devin 3212623450 regression: DR-007 is
+        // reference documentation for the material set shape. Every M2+
+        // bundle has material events in events.jsonl + benefits from the
+        // addendum, regardless of whether the milestone EXTENDS or just
+        // RUNS ON TOP of chunked terrain. The prior explicit allowlist
+        // (M2/M2.5/M3A/M5..M5.10 only) excluded M3B/M4A/M4B + every M6+
+        // milestone — including M6.6 'AI Material Competence', M7.5 'Base
+        // Atmospherics', M8.5 'Material Lab', M8.6 'Mining'. Switched to
+        // `idx >= MILESTONE_INDEX_M2` to match the category-layering
+        // pattern.
+        for m in [
+            "m2", "m2.5", "m3a", "m3b", "m4a", "m4b", "m5", "m5.5", "m5.5.5", "m5.6", "m5.7", "m5.8", "m5.9", "m5.9.5",
+            "m5.10", "m6", "m6.5", "m6.6", "m7", "m7.5", "m7.7", "m8", "m8.5", "m8.6", "m9", "m9.5", "m10", "m11",
+            "m12",
+        ] {
+            assert!(
+                notes_addendum_for_milestone(m).contains("DR-007 launch material set"),
+                "{m} should include DR-007 addendum (idx >= M2)"
+            );
+        }
+        // M0 and M1 are PRE-material — they don't have material events yet,
+        // so the addendum is correctly omitted.
+        assert!(!notes_addendum_for_milestone("m0").contains("DR-007 launch material set"));
+        assert!(!notes_addendum_for_milestone("m1").contains("DR-007 launch material set"));
+        assert!(!notes_addendum_for_milestone("m1.5").contains("DR-007 launch material set"));
+    }
 
     fn temp_run_root() -> PathBuf {
         let mut p = std::env::temp_dir();

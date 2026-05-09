@@ -504,4 +504,57 @@ mod tests {
             );
         }
     }
+
+    /// M3A: the replay verifier must accept every BP2 cfctl method the live
+    /// engine dispatches. This is the regression proof for the parser layer
+    /// the verifier sits behind. (Wrapper-named so
+    /// `bp_test_coverage::cargo_module_missing` finds it under the
+    /// `cf-headless::tests::replay_*` glob declared in
+    /// `game/content/build_points/bp2.test_manifest.json`.)
+    #[test]
+    fn replay_parser_accepts_every_bp2_method() {
+        let payloads = [
+            json!({"method": "scenario.reset"}),
+            json!({"method": "scenario.load", "scenario": "x", "seed": 1}),
+            json!({"method": "sim.pause"}),
+            json!({"method": "sim.resume"}),
+            json!({"method": "sim.step", "ticks": 1}),
+            json!({"method": "sim.run_for_ticks", "ticks": 60}),
+            json!({"method": "act.player.move", "x": 1.0, "y": 0.0}),
+            json!({"method": "act.player.aim", "x": 1.0, "y": 0.0}),
+            json!({"method": "act.player.fire", "pressed": true}),
+            json!({"method": "act.player.reload"}),
+            json!({"method": "act.player.jump"}),
+            json!({"method": "act.player.dig", "target": null}),
+            json!({"method": "act.player.select_item", "slot": 0}),
+            json!({"method": "act.player.reset"}),
+            json!({"method": "act.settings.set", "settings": {"captions": true}}),
+        ];
+        for p in payloads.iter() {
+            let method = p.get("method").and_then(|v| v.as_str()).unwrap_or("?");
+            assert!(
+                parse_command(p).is_some(),
+                "replay verifier failed to parse method={method}"
+            );
+        }
+    }
+
+    /// M3A: the replay verifier must REJECT unknown methods rather than
+    /// silently treat them as no-ops. Negative proof so `replay_*` covers
+    /// both happy + adversarial paths.
+    #[test]
+    fn replay_parser_rejects_unknown_method() {
+        let cases = [
+            json!({"method": "act.player.frobnicate"}),
+            json!({"method": "act.input.key_press"}),
+            json!({"method": ""}),
+            json!({}),
+        ];
+        for p in cases.iter() {
+            assert!(
+                parse_command(p).is_none(),
+                "replay parser accepted an unsupported method {p:?}"
+            );
+        }
+    }
 }

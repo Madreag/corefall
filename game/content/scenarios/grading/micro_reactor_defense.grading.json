@@ -1,0 +1,141 @@
+{
+  "schema_version": "cf-grading.v1",
+  "scenario_id": "micro_reactor_defense",
+  "scope": "BP2",
+  "milestone": "m2.5",
+  "description": "Per-dimension grading contract for the M2.5 fun-proof scenario. The AI agent reads each dimension's required evidence, writes prose justifying a 0-10 score, and emits a verdict (PASS / PARTIAL / NEEDS_FIXES / FUTURE_OWNED). Empty / placeholder / 'looks correct' cells are FAIL by definition.",
+  "rubric": {
+    "score_range": [0, 10],
+    "verdict_mapping": {
+      "9-10": "PASS",
+      "7-8": "PASS_WITH_FUTURE_POLISH",
+      "5-6": "PARTIAL (blocked on a future milestone)",
+      "3-4": "NEEDS_FIXES (current milestone scope)",
+      "0-2": "BLOCKER (current milestone scope)"
+    },
+    "minimum_aggregate_for_pass": 7.0,
+    "minimum_per_dimension_for_pass": 5
+  },
+  "dimensions": [
+    {
+      "id": "look.visual_clarity",
+      "criterion": "The agent can distinguish actors, terrain, projectiles, and HUD from the background by visual inspection of the captures alone (no events.jsonl correlation needed).",
+      "evidence_required": [
+        "captures/summary_grid.png — at least 4 frames spanning the run's tick range",
+        "events.jsonl — confirm the events ARE firing on the ticks the captures sample"
+      ],
+      "weight": 1.0,
+      "future_owners_if_blocked": ["M4A — Readability And ACC-A Floor"]
+    },
+    {
+      "id": "look.material_distinctness",
+      "criterion": "Different terrain materials (dirt, concrete, metal_nohook, anchor) are visually distinguishable in the captures by color or pattern.",
+      "evidence_required": [
+        "captures/summary_grid.png — frames where terrain.terrain_carved fired (carved a dirt/concrete pixel) vs frames where terrain.tool_refused fired (hit metal_nohook or anchor)"
+      ],
+      "weight": 1.0,
+      "future_owners_if_blocked": ["M4A — Readability And ACC-A Floor"]
+    },
+    {
+      "id": "look.actor_presentation",
+      "criterion": "Actors (player + reactive guard) render as distinct sprites with positional change visible across frames; not invisible, not glued in place.",
+      "evidence_required": [
+        "captures/summary_grid.png — frames spanning the player's dig action (~tick 22-130) where actor sprite must be visible at the player spawn coords",
+        "observe.once — actor positions at run start + run end"
+      ],
+      "weight": 1.0,
+      "future_owners_if_blocked": ["M4B — Comic-Noir Polish (animation states)"]
+    },
+    {
+      "id": "look.juice_and_feedback",
+      "criterion": "Player-visible state changes (dig, refuse, projectile fire, projectile hit, mission resolve) have at least HUD-text feedback visible in the captures. Full juice (dust puff, muzzle flash, screen shake, hit sparks) is post-BP2.",
+      "evidence_required": [
+        "captures/summary_grid.png — frames with HUD labels for: terrain_carved, tool_refused, weapon_fired, mission_resolved",
+        "events.jsonl — counts for the above event types"
+      ],
+      "weight": 1.0,
+      "future_owners_if_blocked": ["DR-055 + M5.5 (juice rules + collision gauntlet)"]
+    },
+    {
+      "id": "feel.simulation_responsiveness",
+      "criterion": "cfctl-driven actions produce a visible engine response within 1-2 ticks (16-33 ms at 60 Hz). 'Visible' here = state change in observe.once or HUD label in next captured frame.",
+      "evidence_required": [
+        "events.jsonl — control.command_accepted timestamps + immediate-next event of the matching type (act.player.dig → terrain_carved at the same/next tick)",
+        "captures/summary_grid.png — visual confirmation that the next-tick frame shows the post-action state"
+      ],
+      "weight": 1.0,
+      "future_owners_if_blocked": []
+    },
+    {
+      "id": "feel.weight_and_physicality",
+      "criterion": "When the player digs, the actor's vertical position responds to gravity (drops into the carved hole or stays grounded on a ledge). When the guard fires, projectiles travel at a believable speed (not teleporting to target).",
+      "evidence_required": [
+        "captures/summary_grid.png — frames showing actor vertical position pre + post dig",
+        "events.jsonl — projectile_spawned vs projectile_expired tick deltas (projectiles should take >5 ticks to traverse, not 1)"
+      ],
+      "weight": 1.0,
+      "future_owners_if_blocked": []
+    },
+    {
+      "id": "feel.mission_pacing",
+      "criterion": "The mission's 30-second timer is observable in the HUD; the player has time to make + execute the strategic choice (preserve dirt shield = idle ~28s; breach dirt shield = 12-15s of digging then expose reactor); the resolution feels earned, not abrupt.",
+      "evidence_required": [
+        "captures/summary_grid.png — HUD timer visible across frames; reactor health bar visible",
+        "events.jsonl — mission_resolved tick relative to scenario start (should be ~1799 = 30s @ 60Hz for win path)"
+      ],
+      "weight": 1.0,
+      "future_owners_if_blocked": []
+    },
+    {
+      "id": "feel.strategic_choice_legibility",
+      "criterion": "The win-vs-loss strategic choice (preserve dirt shield = win; breach dirt shield = loss) is observable in the captures: the agent can tell from the visual + HUD state which path the player chose without reading events.jsonl.",
+      "evidence_required": [
+        "win bundle (m2.5_*_win) captures + loss bundle (m2.5_*_loss) captures — compare the dirt shield region across the two runs",
+        "events.jsonl — terrain_carved counts (low for win = ~1; high for loss = 24+)"
+      ],
+      "weight": 1.5,
+      "future_owners_if_blocked": ["M4A — Readability And ACC-A Floor"]
+    },
+    {
+      "id": "goal.fun_proof_delivery",
+      "criterion": "The scenario delivers its roadmap-stated fun-proof claim: 'M2.5 — Micro Reactor Defense Fun Slice: cf-mission Reactor + DefendReactor objective + LossReason::ReactorDestroyed; dirt-shield strategic-choice scenario where the player chooses to preserve the shield (win) or breach it (loss).'",
+      "evidence_required": [
+        "win bundle — mission.result=won + objective.defend_reactor=completed + 0 reactor_damaged events + dirt shield intact",
+        "loss bundle — mission.result=lost + mission.loss_reason=reactor_destroyed + ≥1 reactor_damaged events + dirt shield breached"
+      ],
+      "weight": 2.0,
+      "future_owners_if_blocked": []
+    },
+    {
+      "id": "goal.bp_promise_coverage",
+      "criterion": "The scenario exercises BP2's promised systems end-to-end: chunked terrain (M2), reactor world (M2.5), event recorder + replay verifier (M3A). All three must show up in the run bundle's evidence.",
+      "evidence_required": [
+        "events.jsonl — terrain.terrain_carved (M2), reactor_damaged or reactor preserved (M2.5), snapshot.* events at run_started (M3A)",
+        "cf-headless replay <bundle> exit 0 with 0 divergences (M3A)"
+      ],
+      "weight": 2.0,
+      "future_owners_if_blocked": []
+    },
+    {
+      "id": "agent.cfctl_full_coverage",
+      "criterion": "Every milestone-scope cfctl action that this scenario claims to exercise was actually invoked: scenario.reset, act.settings.set, act.player.aim, act.player.dig, sim.run_for_ticks, runbundle.write, system.shutdown.",
+      "evidence_required": [
+        "events.jsonl — control.command_accepted rows for each method"
+      ],
+      "weight": 1.0,
+      "future_owners_if_blocked": []
+    },
+    {
+      "id": "agent.evidence_completeness",
+      "criterion": "The run bundle contains every artifact the agent needs to grade the other 11 dimensions without re-running the scenario: summary_grid.png + capture_manifest.json + events.jsonl + summary.json + run_manifest.json + observe.once snapshot.",
+      "evidence_required": [
+        "captures/summary_grid.png present + non_blank_ratio>=0.95",
+        "captures/capture_manifest.json present",
+        "events.jsonl + summary.json + run_manifest.json present + checker-valid",
+        "summary.json.artifacts.items[] non-empty (T-CAPTURE evidence recorded)"
+      ],
+      "weight": 1.0,
+      "future_owners_if_blocked": []
+    }
+  ]
+}

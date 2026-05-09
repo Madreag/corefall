@@ -75,6 +75,17 @@ struct Cli {
     capture_frames_hz: f32,
     #[arg(long)]
     no_capture_events: bool,
+    /// AI-Agent Self-Test Report Gate (per `.claude/skills/corefall-review/SKILL.md`):
+    /// force a cf-capture event keyframe at each cfctl action's tick so the agent
+    /// can write per-action visual prose without manually correlating tick → frame
+    /// indices. Implies `--capture-grid`. Each `act.*` / `scenario.*` /
+    /// `runbundle.*` command's `control.command_accepted` event already triggers
+    /// a keyframe via cf-app's `CaptureKeyframeRequested` event hook, so this flag
+    /// is a documentation + enable shortcut: it sets capture-grid AND raises
+    /// capture-frames-hz to 30 Hz so even tightly-spaced commands get distinct
+    /// frames.
+    #[arg(long)]
+    capture_each_action: bool,
     /// Self-Play Validation Rule "make it possible" clause: lets the harness
     /// drive the spawned cf-app at a non-default sim tick rate so the
     /// "60 Hz default + 120 Hz validation" rate-coverage requirement in the
@@ -128,12 +139,21 @@ async fn main() -> Result<()> {
         tracing::warn!(target: "cf::e2e", "script scenario {scenario} overrides --scenario {}", cli.scenario);
     }
 
+    // --capture-each-action implies --capture-grid AND raises the baseline
+    // frames-per-second so per-action keyframes are distinguishable.
+    let effective_capture_grid = cli.capture_grid || cli.capture_each_action;
+    let effective_capture_frames_hz = if cli.capture_each_action && cli.capture_frames_hz < 30.0 {
+        30.0
+    } else {
+        cli.capture_frames_hz
+    };
+
     let mut child = launch_cf_app(LaunchOptions {
         port: cli.control_port,
         scenario: &scenario,
         write_run_bundle: cli.write_run_bundle,
-        capture_grid: cli.capture_grid,
-        capture_frames_hz: cli.capture_frames_hz,
+        capture_grid: effective_capture_grid,
+        capture_frames_hz: effective_capture_frames_hz,
         no_capture_events: cli.no_capture_events,
         tick_rate_hz: cli.tick_rate_hz,
     })?;
@@ -186,7 +206,7 @@ async fn main() -> Result<()> {
         let _ = session.send("runbundle.write", json!({})).await?;
     }
 
-    if cli.capture_grid {
+    if effective_capture_grid {
         // Capture composition needs the engine's run_id; force a final observe.once
         // even if the script never asked for one.
         let final_obs = session.send("observe.once", json!({})).await?;
@@ -202,7 +222,7 @@ async fn main() -> Result<()> {
     // manifest exists and the entire --capture-grid pipeline silently no-ops.
     // Discovered during the T-RELEASE rehearsal (PR #7); the BP1 acceptance bundle
     // was produced by cf-app directly, never through cf-e2e --capture-grid.
-    if cli.capture_grid {
+    if effective_capture_grid {
         let run_id = observation
             .get("run_id")
             .and_then(|v| v.as_str())
