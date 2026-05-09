@@ -58,6 +58,16 @@ pub struct StepOutputs {
 /// actor first contacts the floor this tick.
 #[must_use]
 pub fn step_kinematics(inputs: StepInputs) -> StepOutputs {
+    // Ground-contact tolerance is 1e-3 (1 mm at the canonical scale where
+    // 1 unit = 1 m, world spans ~10-1000 m). At f32 precision and that
+    // scale, 1e-3 sits well above quantization noise (~1.2e-7 relative)
+    // and well below sub-tick fall distance (~9.8 mm/tick at 60 Hz under
+    // Earth gravity), so a "just-landed" actor is reliably detected as
+    // on-ground without false positives during free-fall. When BP4-BP5
+    // expand world scale beyond ~1 km, this constant should become
+    // scale-relative (issue #19 follow-up) — for now the tested 60 Hz +
+    // 120 Hz determinism contract holds at this scale on every CI
+    // platform (Linux x86_64, Windows x86_64, macOS aarch64).
     let was_on_ground =
         (inputs.position_y - (inputs.floor_y + inputs.half_extent_y)).abs() < 1e-3 && inputs.velocity_y <= 0.0;
     let mut velocity_y = inputs.velocity_y + inputs.gravity * inputs.tick_dt;

@@ -140,6 +140,15 @@ impl Vec2 {
             return Vec2::new(1.0, 0.0);
         }
         let len = self.length();
+        // 1e-6 tolerance picked because: at f32 precision, vector lengths
+        // below ~1.2e-38 underflow to zero outright (subnormal); below
+        // ~1e-6 the per-component division `self.x / len` loses ~6
+        // significant digits and the resulting "normalized" vector points
+        // in essentially-arbitrary directions. 1e-6 is safely above that
+        // floor at the canonical aim/muzzle-velocity scale (1 unit = 1 m,
+        // typical aim magnitudes 0.1-1.0). When BP4-BP5 introduce
+        // sub-millimeter precision physics (e.g., particle systems), this
+        // should become scale-relative (issue #19 follow-up).
         if !len.is_finite() || len < 1e-6 {
             Vec2::new(1.0, 0.0)
         } else {

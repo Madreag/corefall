@@ -27,9 +27,17 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio::{
     net::TcpListener,
-    sync::{mpsc, Mutex},
+    select,
+    sync::{mpsc, Mutex, Notify},
 };
 use tokio_tungstenite::{accept_async, tungstenite::Message};
+
+/// Maximum number of pending outbound WebSocket messages per connection. Hit
+/// when a slow client cannot keep up with the observation stream — producers
+/// then `await` on `send()` and the observation loop naturally paces itself
+/// to the client. Avoids the unbounded-memory growth that
+/// `mpsc::unbounded_channel()` would allow under sustained backpressure.
+const OUTBOUND_CHANNEL_CAPACITY: usize = 256;
 
 use cf_actor::IntentSource;
 
@@ -197,18 +205,50 @@ impl ControlServer {
         Self { config }
     }
 
+    /// Bind + serve forever, exiting cleanly on Ctrl-C / SIGINT.
+    ///
+    /// For programmatic shutdown (e.g., from the engine's `system.shutdown`
+    /// command, or from tests) use [`Self::serve_with_shutdown`].
     pub async fn serve<E: EngineHandle>(self, engine: Arc<E>) -> std::io::Result<()> {
+        let shutdown = Arc::new(Notify::new());
+        let shutdown_signal = shutdown.clone();
+        tokio::spawn(async move {
+            if tokio::signal::ctrl_c().await.is_ok() {
+                tracing::info!(target: "cf::ctl", "ctrl-c received; shutting down control server");
+                shutdown_signal.notify_waiters();
+            }
+        });
+        self.serve_with_shutdown(engine, shutdown).await
+    }
+
+    /// Bind + serve until `shutdown` is notified. The accept loop exits
+    /// gracefully and in-flight connections finish their current request
+    /// before being dropped.
+    pub async fn serve_with_shutdown<E: EngineHandle>(
+        self,
+        engine: Arc<E>,
+        shutdown: Arc<Notify>,
+    ) -> std::io::Result<()> {
         let listener = TcpListener::bind(self.config.bind).await?;
         tracing::info!(target: "cf::ctl", bind = %self.config.bind, "control server listening");
         let max_hz = self.config.max_observe_hz;
         loop {
-            let (stream, peer) = listener.accept().await?;
-            let engine = engine.clone();
-            tokio::spawn(async move {
-                if let Err(err) = handle_connection(stream, peer, engine, max_hz).await {
-                    tracing::warn!(target: "cf::ctl", %peer, error = %err, "control connection ended with error");
+            select! {
+                accept = listener.accept() => {
+                    let (stream, peer) = accept?;
+                    let engine = engine.clone();
+                    let connection_shutdown = shutdown.clone();
+                    tokio::spawn(async move {
+                        if let Err(err) = handle_connection(stream, peer, engine, max_hz, connection_shutdown).await {
+                            tracing::warn!(target: "cf::ctl", %peer, error = %err, "control connection ended with error");
+                        }
+                    });
                 }
-            });
+                _ = shutdown.notified() => {
+                    tracing::info!(target: "cf::ctl", "shutdown signal received; control server stopping accept loop");
+                    return Ok(());
+                }
+            }
         }
     }
 
@@ -226,15 +266,33 @@ impl ControlServer {
         engine: Arc<E>,
         max_observe_hz: u32,
     ) -> std::io::Result<()> {
+        let shutdown = Arc::new(Notify::new());
+        Self::serve_listener_with_shutdown(listener, engine, max_observe_hz, shutdown).await
+    }
+
+    pub async fn serve_listener_with_shutdown<E: EngineHandle>(
+        listener: TcpListener,
+        engine: Arc<E>,
+        max_observe_hz: u32,
+        shutdown: Arc<Notify>,
+    ) -> std::io::Result<()> {
         loop {
-            let (stream, peer) = listener.accept().await?;
-            let engine = engine.clone();
-            let max_hz = max_observe_hz;
-            tokio::spawn(async move {
-                if let Err(err) = handle_connection(stream, peer, engine, max_hz).await {
-                    tracing::warn!(target: "cf::ctl", %peer, error = %err, "control connection ended with error");
+            select! {
+                accept = listener.accept() => {
+                    let (stream, peer) = accept?;
+                    let engine = engine.clone();
+                    let max_hz = max_observe_hz;
+                    let connection_shutdown = shutdown.clone();
+                    tokio::spawn(async move {
+                        if let Err(err) = handle_connection(stream, peer, engine, max_hz, connection_shutdown).await {
+                            tracing::warn!(target: "cf::ctl", %peer, error = %err, "control connection ended with error");
+                        }
+                    });
                 }
-            });
+                _ = shutdown.notified() => {
+                    return Ok(());
+                }
+            }
         }
     }
 }
@@ -244,12 +302,24 @@ async fn handle_connection<E: EngineHandle>(
     peer: SocketAddr,
     engine: Arc<E>,
     max_observe_hz: u32,
+    server_shutdown: Arc<Notify>,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let ws_stream = accept_async(stream).await?;
     tracing::info!(target: "cf::ctl", %peer, "control connection accepted");
     let (sink, mut source) = ws_stream.split();
     let sink = Arc::new(Mutex::new(sink));
-    let (out_tx, mut out_rx) = mpsc::unbounded_channel::<Message>();
+    // Bounded channel applies backpressure when the client cannot keep up:
+    // producers `await` on `send()` and the observation loop naturally paces
+    // itself to the slow consumer. Prevents the unbounded-memory growth that
+    // a naive `mpsc::unbounded_channel()` would allow under sustained load.
+    let (out_tx, mut out_rx) = mpsc::channel::<Message>(OUTBOUND_CHANNEL_CAPACITY);
+
+    // Per-connection shutdown notification. Triggered when:
+    //  - the source loop exits (client disconnected or error),
+    //  - the server-wide shutdown notification fires (Ctrl-C, system.shutdown).
+    // Used by the observation loop to break its infinite loop cleanly instead
+    // of waiting indefinitely for a send error to propagate.
+    let connection_shutdown = Arc::new(Notify::new());
 
     let sink_for_writer = sink.clone();
     let writer_handle = tokio::spawn(async move {
@@ -263,32 +333,59 @@ async fn handle_connection<E: EngineHandle>(
 
     let subscribe_hz: Arc<Mutex<Option<u32>>> = Arc::new(Mutex::new(None));
     let subscribe_filter: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
-    spawn_observation_loop(
+    let observation_handle = spawn_observation_loop(
         engine.clone(),
         out_tx.clone(),
         subscribe_hz.clone(),
         subscribe_filter.clone(),
+        connection_shutdown.clone(),
     );
 
-    while let Some(message) = source.next().await {
-        let message = message?;
-        match message {
-            Message::Text(text) => {
-                let response =
-                    process_request(&text, engine.as_ref(), &subscribe_hz, &subscribe_filter, max_observe_hz).await;
-                if let Some(payload) = response {
-                    let _ = out_tx.send(Message::Text(payload.into()));
+    // Inner `if .. is_err() { break }` patterns inside the match arms below
+    // can't be collapsed into pattern guards because `payload` would have to
+    // be moved across the guard boundary (Rust 2021; let-chains require
+    // edition 2024).
+    #[allow(clippy::collapsible_match, clippy::collapsible_if)]
+    loop {
+        select! {
+            maybe_message = source.next() => {
+                let Some(message) = maybe_message else { break; };
+                let message = message?;
+                match message {
+                    Message::Text(text) => {
+                        let response =
+                            process_request(&text, engine.as_ref(), &subscribe_hz, &subscribe_filter, max_observe_hz).await;
+                        if let Some(payload) = response {
+                            // Bounded `send().await` applies backpressure if
+                            // the client is slow; failure means the writer
+                            // task died (sink closed) and the connection
+                            // is over.
+                            if out_tx.send(Message::Text(payload.into())).await.is_err() {
+                                break;
+                            }
+                        }
+                    }
+                    Message::Ping(payload) => {
+                        if out_tx.send(Message::Pong(payload)).await.is_err() {
+                            break;
+                        }
+                    }
+                    Message::Close(_) => break,
+                    _ => {}
                 }
             }
-            Message::Ping(payload) => {
-                let _ = out_tx.send(Message::Pong(payload));
+            _ = server_shutdown.notified() => {
+                tracing::info!(target: "cf::ctl", %peer, "server shutdown notification received; closing connection");
+                break;
             }
-            Message::Close(_) => break,
-            _ => {}
         }
     }
 
+    // Signal observation loop to stop, then drop the producer sender so the
+    // writer task drains and exits.
+    connection_shutdown.notify_waiters();
     drop(out_tx);
+    let _ = observation_handle.await;
     let _ = writer_handle.await;
     tracing::info!(target: "cf::ctl", %peer, "control connection closed");
     Ok(())
@@ -296,17 +393,16 @@ async fn handle_connection<E: EngineHandle>(
 
 fn spawn_observation_loop<E: EngineHandle>(
     engine: Arc<E>,
-    out_tx: mpsc::UnboundedSender<Message>,
+    out_tx: mpsc::Sender<Message>,
     subscribe_hz: Arc<Mutex<Option<u32>>>,
     subscribe_filter: Arc<Mutex<Option<String>>>,
-) {
+    shutdown: Arc<Notify>,
+) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         loop {
             let hz_now = { *subscribe_hz.lock().await };
-            match hz_now {
-                None => {
-                    tokio::time::sleep(Duration::from_millis(50)).await;
-                }
+            let sleep_duration = match hz_now {
+                None => Duration::from_millis(50),
                 Some(hz) => {
                     let hz = hz.max(1);
                     let filter = subscribe_filter.lock().await.clone();
@@ -317,15 +413,27 @@ fn spawn_observation_loop<E: EngineHandle>(
                         params: serde_json::to_value(&frame).unwrap_or(serde_json::Value::Null),
                     };
                     if let Ok(payload) = serde_json::to_string(&notification) {
-                        if out_tx.send(Message::Text(payload.into())).is_err() {
-                            break;
+                        // Bounded `send().await` applies backpressure when the
+                        // client falls behind; if it errors the writer task is
+                        // gone and the connection is over.
+                        if out_tx.send(Message::Text(payload.into())).await.is_err() {
+                            return;
                         }
                     }
-                    tokio::time::sleep(Duration::from_millis(1000 / u64::from(hz))).await;
+                    Duration::from_millis(1000 / u64::from(hz))
                 }
+            };
+            // Race the configured sleep against the connection shutdown
+            // notification so the loop exits within milliseconds when the
+            // connection closes, instead of spinning forever waiting for a
+            // send-error to surface (root cause of the resource leak fixed
+            // by issue #15).
+            select! {
+                _ = tokio::time::sleep(sleep_duration) => {}
+                _ = shutdown.notified() => return,
             }
         }
-    });
+    })
 }
 
 async fn process_request<E: EngineHandle>(
