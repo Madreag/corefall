@@ -26,13 +26,11 @@ A 2D side-view physics sandbox where every gas, grain, bullet, body, world, and 
 [![Releases](https://img.shields.io/github/v/release/Madreag/corefall?include_prereleases&sort=semver&style=flat-square&label=release)](https://github.com/Madreag/corefall/releases)
 [![Vault](https://img.shields.io/badge/research-research%20vault-purple?style=flat-square)](https://github.com/Madreag/corefall#research-vault)
 
-**Current proof:** **BP2 closed.** M2 (Pixel Terrain + Materials) + M2.5 (Micro Reactor Defense) + M3A (Event Recorder Core + headless replay verifier) all PASS the Milestone Acceptance + Contract Integrity gates. Chunked deformable terrain replaces the M1.5 soft-breach strip; M2.5 fun-proof shows the player surviving a 60-90s reactor defense as terrain is dug + debris fields form; cf-headless re-runs any run bundle's events.jsonl deterministically. PR #11 (BP2 closure) + PR #12 (BP2 follow-up: source-truthful run bundles + AI-Agent-Primary Self-Test contract + LLM-graded test verdicts + per-BP test suite + AI-agent self-correcting loop) + PR #13 (planning spine migration into `docs/plan/`) + PR #14 (SemVer prerelease channel versioning) all squash-merged to `main`. **253 tests passing** workspace-wide. **BP1 still closed**: M0 + M1 + M1.5 + T-CAPTURE infrastructure shipped earlier (PRs #1, #2, #5, #6).<br>
-**Next up:** **BP3 — Combat Readability Build.** Anchored at M3B (Replay Viewer + Debrief), M4A (Readability + ACC-A Floor), and M5 (Equipment, Chassis, Damage Grammar). BP3's implementing agent also owns the **Double-Click Playability** engineering for releases — `cf-app` must open a game window with no command-line args, packaged as `.dmg`/`.msi`/`AppImage`, so a friend can double-click and play. Per AGENTS.md § Build Point Closure Gate, no T-RELEASE tag is published unless this gate passes. Retroactive `v0.1.0-prealpha` + `v0.2.0-prealpha` re-publish alongside `v0.3.0-prealpha` once the engineering lands.<br>
-**Recent merges:** [#5 — M1.5 Micro Breach Fun Slice + Roadmap V2](https://github.com/Madreag/corefall/pull/5), [#6 — T-CAPTURE side track](https://github.com/Madreag/corefall/pull/6), and [#7 — T-RELEASE workflow](https://github.com/Madreag/corefall/pull/7) are all squashed into `main`. **204 tests passing** workspace-wide before the T-RELEASE cleanup pass.<br>
-**Releases:** every BP closure publishes a tagged cross-platform release under [github.com/Madreag/corefall/releases](https://github.com/Madreag/corefall/releases) per the **T-RELEASE** side track, **subject to the Double-Click Playability Hard Gate** (AGENTS.md § Build Point Closure Gate): a non-technical friend MUST be able to double-click the file → OS extracts/installs → double-click app → game window opens. No Terminal, no `--scenario` flags, no `brew install zstd`. Per-platform formats: macOS `.dmg` with `Corefall.app`, Windows `.msi` or `.zip` with `Corefall.exe` (default-args launcher), Linux AppImage. If the BP cannot deliver this, NO RELEASE is tagged for that BP — the implementing agent of the next BP picks up the engineering. Versioning uses SemVer prerelease channels (`v0.<N>.0-prealpha` BP0-BP3, `v0.<N>.0-alpha` BP4-BP6, `v0.<N>.0-beta` BP7-BP9, `v0.<N>.0-rc` BP10-BP11, `v1.0.0` BP12 GA); the GitHub `prerelease` flag is intentionally NOT set (channel suffix in the tag carries the quality signal). **Release debt:** `v0.1.0-prealpha` + `v0.2.0-prealpha` were tagged + published on 2026-05-09 then DELETED the same day because the artifacts were `.tar.zst` archives requiring Terminal extraction (failed the gate). Re-publish when BP3 lands the double-click engineering.<br>
-**Roadmap lock:** server-authoritative multiplayer, deterministic replay, Stationeers-grade-or-better atmospherics/thermal simulation, full physical profiles, AI-only art/audio pipeline, modder-parity tooling, accessibility-plus, Steam Deck floor, and no pay-to-win.
+> **Where we are:** badges above are the source of truth — they auto-update on every BP closure. Full milestone matrix in [Project status](#project-status); BP scope table in [Build Points](#build-points); release policy + download-when-ready in [Releases](#releases).
+>
+> **Where to play:** today, build from source via [Getting started](#getting-started). First friend-handoff release (`.dmg` / `.msi` / AppImage — double-click to play, no Terminal) lands at the BP3 closure per the [Double-Click Playability Hard Gate](#releases).
 
-**[Project status](#project-status) · [Build Points](#build-points) · [Roadmap shape](#roadmap-shape) · [Tech stack](#tech-stack) · [Getting started](#getting-started) · [CI](#ci)**
+**[Project status](#project-status) · [Build Points](#build-points) · [Roadmap shape](#roadmap-shape) · [Releases](#releases) · [Tech stack](#tech-stack) · [Getting started](#getting-started) · [CI](#ci)**
 
 </div>
 
@@ -289,7 +287,13 @@ game/crates/
 ## Project Status
 
 > [!warning] Pre-alpha
-> Corefall is in active development. The repo is public so CI can run unrestricted (free GitHub Actions minutes for public repos), but the game is **not** ready to play yet.
+> Corefall is in active development. The repo is public so CI can run unrestricted (free GitHub Actions minutes for public repos), but the game is **not** ready to play yet — first friend-handoff release lands at BP3 closure (see [Releases](#releases)).
+
+**Workspace stats (last update 2026-05-09 / commit `3fe8ac8`):** 253 tests passing across 29 crates; cargo fmt + clippy `-D warnings` clean; `bp_test_coverage bp2` reports CLEAN with 0 gaps; M2.5 LLM-graded verdict 7.86/10 PASS_WITH_FUTURE_POLISH (gameplay 9-10/10, visual layer future-owned by M4A).
+
+**BP2 closure recap (the most recent BP to close):** Chunked deformable terrain (M2) replaced the M1.5 soft-breach strip; M2.5 fun-proof scenario shows the player surviving a 60-90s reactor defense as terrain is dug + debris fields form; cf-headless re-runs any run bundle's `events.jsonl` deterministically (M3A). Closed across PR [#11](https://github.com/Madreag/corefall/pull/11) (BP2 engineering) + PR [#12](https://github.com/Madreag/corefall/pull/12) (BP2 follow-up: source-truthful run bundles + AI-Agent-Primary Self-Test contract + LLM-graded test verdicts + per-BP test suite + AI-agent self-correcting loop) + PR [#13](https://github.com/Madreag/corefall/pull/13) (planning spine migration into `docs/plan/`) + PR [#14](https://github.com/Madreag/corefall/pull/14) (SemVer prerelease channel versioning).
+
+**BP3 (active) ownership:** M3B Replay Viewer + Debrief, M4A Readability + ACC-A Floor, M5 Equipment/Chassis/Damage Grammar, **AND** the Double-Click Playability release engineering (`cf-app` opens a game window with no command-line args; release.yml produces `.dmg` / `.msi` / AppImage). The first friend-handoff `v0.3.0-prealpha` release ships at BP3 closure, alongside retroactive re-publication of `v0.1.0-prealpha` + `v0.2.0-prealpha` (deleted 2026-05-09 for failing the gate; see [Releases](#releases)).
 
 | BP | Milestone | Status | What It Proves |
 |---:|---|---|---|
@@ -300,7 +304,6 @@ game/crates/
 | BP2 | **M2 — Pixel Terrain And Materials** | ✅ **Closed** ([PR #11](https://github.com/Madreag/corefall/pull/11) merged) | Deformable chunked terrain + 8-material launch set + GPU-assisted carving + material overlay + tool-validity feedback. Replaces M1.5 soft-breach strip without breaking replay consumers. |
 | BP2 | **M2.5 — Micro Reactor Defense** | ✅ **Closed** ([PR #11](https://github.com/Madreag/corefall/pull/11) merged) | 60-90s defend-the-reactor scenario; chunked terrain-driven win/loss; cfctl-scripted; same Acceptance + Contract Integrity gates as M1.5; LLM-graded verdict 7.86/10 PASS_WITH_FUTURE_POLISH (gameplay 9-10/10, visual 3-6/10 future-owned by M4A). |
 | BP2 | **M3A — Event Recorder Core + Headless Replay** | ✅ **Closed** ([PR #11](https://github.com/Madreag/corefall/pull/11) merged) | Deterministic event log + cf-headless replay verifier proves end-to-end determinism by re-running any run bundle's events.jsonl. M3B (Replay Viewer + Debrief) lands in BP3. |
-| BP2 | **M3A — Event Recorder Core** | 🆕 V2 split | DR-002 v1 event-taxonomy lock, schema-versioned envelope, snapshots, checksums, headless replay verifier, and recorder backpressure. |
 | BP3 | **M3B — Replay Viewer + Debrief** | 🆕 V2 split | Replay viewer scrubbing, event filters, debrief summary, parent-chain cause view, and death recap. |
 | BP3 | **M4A — Readability + ACC-A Floor** | 🆕 V2 split | Silhouette HUD, module strip, movement/stance readability, material overlay, and accessibility floor. |
 | BP3 | M5 — Equipment, Chassis, And Damage Grammar | ⏳ Planned | Body graph, equipment sockets, armor coverage, limb consequences, per-origin chassis records, damage stages, wreck/eject/salvage. |
@@ -360,6 +363,49 @@ The vault stays separate so it can survive engine changes, language changes, or 
 
 > [!note]
 > The vault is currently a private workspace. If you want to contribute design research or comparable-game audits, open an issue here so we can route the conversation.
+
+---
+
+## Releases
+
+Released artifacts live at [github.com/Madreag/corefall/releases](https://github.com/Madreag/corefall/releases). Every Build Point closure publishes a tagged cross-platform release per the **T-RELEASE** side track.
+
+### Double-Click Playability Hard Gate
+
+A non-technical friend receiving the release file MUST be able to:
+
+1. **Double-click the file** → standard OS extract/install (no Terminal, no `brew install`, no command-line decompression).
+2. **Double-click the resulting app** → a corefall game window opens (no `--scenario` flag, no PowerShell, no command-line args).
+
+If either fails, the platform is omitted from the BP's release matrix; if no platform meets the gate, the BP **skips** its release tag entirely. Skipping is preferred over publishing an opaque archive. The next BP that lands the missing engineering recovers the skipped releases.
+
+| Platform | Format | Friend's experience |
+|---|---|---|
+| **macOS** | `.dmg` containing `Corefall.app` | Mount the `.dmg`. Drag `Corefall.app` to Applications. Double-click → game window. |
+| **Windows** | `.msi` installer OR `.zip` with `Corefall.exe` (default-args launcher) | Run the `.msi` (Start Menu shortcut), or unzip + double-click `Corefall.exe` → game window. |
+| **Linux** | AppImage (single double-click executable) | `chmod +x Corefall.AppImage` + double-click → game window. |
+
+Code signing (Apple notarization + Windows Authenticode) activates at BP10+ via T-LIVEOPS pre-launch wiring; through BP9, expect a one-time platform warning ("right-click → Open" on macOS; "More info → Run anyway" on Windows).
+
+### Versioning
+
+SemVer prerelease channels — the channel suffix in the tag carries the quality signal so external observers (Steam buyers, contributors, package managers) can read it without consulting the BP table:
+
+| Channel | Tag form | BPs |
+|---|---|---|
+| **prealpha** | `v0.<N>.0-prealpha` | BP0..BP3 (engine + first fun slices; major systems still missing) |
+| **alpha** | `v0.<N>.0-alpha` | BP4..BP6 (full collision + atmospherics + AI combat) |
+| **beta** | `v0.<N>.0-beta` | BP7..BP9 (mission director + creator alpha + server/LAN) |
+| **rc** | `v0.<N>.0-rc` | BP10..BP11 (online + public systems beta) |
+| **GA** | `v1.0.0` | BP12 launch |
+
+Boundaries are enforced by `game/tools/generate_release_notes.py::parse_tag` (e.g., `v0.4.0-prealpha` is rejected because BP4 must ship under `alpha`). Legacy `v0.<N>.0-bp<N>` tags from earlier prototyping are still accepted for backward compat. The GitHub `prerelease` flag is intentionally NOT set — it would hide releases from the homepage Releases sidebar widget + `/releases/latest` endpoint, both of which filter out prereleases by GitHub's definition.
+
+### Current release debt
+
+`v0.1.0-prealpha` (BP1) and `v0.2.0-prealpha` (BP2) were tagged + published on 2026-05-09 then **DELETED the same day** because the artifacts were `.tar.zst` archives requiring `brew install zstd` + Terminal extraction (failed the Double-Click Playability Hard Gate). Both releases re-publish when the BP3 implementing agent lands the `.dmg` / `.msi` / AppImage engineering, alongside `v0.3.0-prealpha`.
+
+See [`docs/plan/spec/prototype-roadmap.md` § T-RELEASE](docs/plan/spec/prototype-roadmap.md#t-release--per-bp-cross-platform-github-releases) for the full contract + AGENTS.md § Build Point Closure Gate for the agent's release-engineering responsibilities.
 
 ---
 
@@ -489,7 +535,7 @@ GitHub Actions runs on every push and PR:
 - `cargo fmt --all -- --check` (with `.gitattributes` locking LF line endings cross-OS)
 - `cargo check --workspace --all-targets`
 - `cargo clippy --workspace --all-targets -- -D warnings`
-- `cargo test --workspace` (**204 tests passing**: M0=73 + M1=86 + M1.5=30 + T-CAPTURE=15 including NaN/Inf guards, dwell-pause off-by-one regressions, and `--headless-smoke` + `--capture-grid` rejection)
+- `cargo test --workspace` (**253 tests passing** as of BP2 closure: workspace-wide coverage including NaN/Inf guards, dwell-pause off-by-one regressions, `--headless-smoke` + `--capture-grid` rejection, M2.5 + M3A scenario tests, cf-headless replay-determinism harness, and 8 channel-aware install-section tests)
 - `cargo build --release`
 - Dependency drift report on the Linux leg (`tools/dependency_drift_report.py`) for direct registry deps and transitive duplicate review
 - `cf-mod validate content/` (validates M0 + M1 + M1.5 scenario manifests)
