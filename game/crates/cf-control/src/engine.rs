@@ -2512,20 +2512,18 @@ fn notes_addendum_for_milestone(milestone: &str) -> String {
     // set. Use an explicit allowlist so future milestones must opt in
     // affirmatively and unrelated milestones (M3B, M4A, M4B) don't get the
     // material addendum baked into their notes.md by accident.
+    // Bugbot 3212538008 caught the dead `"m4"` arm: there is no standalone M4
+    // milestone in the canonical roadmap (only M4A + M4B). The test at line
+    // ~3550 asserts m4a/m4b do NOT get the DR-007 addendum (they're
+    // readability + comic-noir polish, not terrain-system milestones), so
+    // `"m4"` was unreachable + misleading. The corrected allowlist is the
+    // milestones that actually own or extend the material system: M2 (chunked
+    // terrain core), M2.5 (reactor world built on chunked terrain), M3A
+    // (event recorder lays material event types), M5+ (full collision +
+    // material kernel + hazard package + atmospherics).
     let material_aware = matches!(
         normalized.as_str(),
-        "m2" | "m2.5"
-            | "m3a"
-            | "m4"
-            | "m5"
-            | "m5.5"
-            | "m5.5.5"
-            | "m5.6"
-            | "m5.7"
-            | "m5.8"
-            | "m5.9"
-            | "m5.9.5"
-            | "m5.10"
+        "m2" | "m2.5" | "m3a" | "m5" | "m5.5" | "m5.5.5" | "m5.6" | "m5.7" | "m5.8" | "m5.9" | "m5.9.5" | "m5.10"
     );
     if material_aware {
         s.push_str("\n## DR-007 launch material set\n\n");
