@@ -1,0 +1,60 @@
+(
+  schema_version: 1,
+  id: "micro_reactor_defense",
+  display_name: "Micro Reactor Defense",
+  description: "M2.5 fun-proof slice per spec/native-implementation-backlog M2.5-001..M2.5-006. Spawn west of the reactor; preserve the dirt shield mound or carve through it using M2 chunked terrain; survive a 30-second wave from one reactive guard who fires at the reactor. Win = reactor survives the timer; loss = reactor destroyed. Mission timer is 1800 ticks at 60 Hz (30 s wall time); the 60-90 s player-feel target lives in the manual-playtest gate. Reuses M1.5 cf-mission + cf-ai unchanged; the M2 chunked-terrain dirt shield is the reason the loop is fun.",
+  seed: 47,
+  duration_ticks: Some(7200),
+  region: (anchor: (0.0, 0.0), width: 1280.0, height: 720.0),
+  gravity: -980.0,
+  floor_y: 16.0,
+  teams: [],
+  actors: [
+    (id: 1, team: "blue", spawn: (200.0, 32.0), controllable: true, hp: 100.0,
+      inventory: (rifle: Some("rifle_m1_default")), half_extents: Some((8.0, 16.0))),
+    (id: 2, team: "red", spawn: (1180.0, 32.0), controllable: false, hp: 80.0,
+      inventory: (rifle: None), aim: Some((-1.0, 0.0)),
+      half_extents: Some((8.0, 16.0)),
+      enemy: Some((
+        kind: Some("reactive_guard"),
+        miss_chance: Some(0.5),
+        damage_per_hit: Some(8.0),
+        burst_pause_seconds: Some(0.55),
+        sight_radius: Some(1200.0),
+        sight_cone_degrees: Some(160.0),
+        burst_shots: Some(3),
+      ))),
+  ],
+  reactors: [
+    (id: "core_reactor", position: (640.0, 32.0), half_extents: (16.0, 16.0), hp: 80.0),
+  ],
+  terrain: Some((
+    width_px: 1280,
+    height_px: 720,
+    anchor: Some((0.0, 0.0)),
+    default_material: "air",
+    stamps: [
+      // floor
+      (kind: "fill_aabb", min: (0.0, 0.0), max: (1280.0, 16.0), material: "concrete"),
+      // dirt shield mound between the guard (east) and the reactor (centre).
+      // While intact this mound STOPS projectiles cold via projectile-vs-terrain
+      // collision; once the player digs through, the reactor is exposed and
+      // dies under sustained guard fire. This is the M2.5 fun-proof core: the
+      // player chooses to dig (carve count > 0 while preserving cover) or to
+      // expose the reactor (loss path).
+      (kind: "fill_aabb", min: (760.0, 16.0), max: (920.0, 96.0), material: "dirt"),
+      // metal-nohook anchor west of the reactor (refusal teaching path).
+      (kind: "fill_aabb", min: (480.0, 16.0), max: (512.0, 96.0), material: "metal_nohook"),
+    ],
+  )),
+  breaches: [],
+  objectives: [
+    (id: "defend_reactor", kind: { "kind": "defend_reactor", "target": "core_reactor" }),
+  ],
+  mission: Some((time_limit_ticks: 1800, player_dead_loses: true)),
+  director: None,
+  capabilities: (debug: false, control_api: true, save_load: false),
+  save_fields: [],
+  expected_tests: ["M2.5-WIN-01", "M2.5-LOSS-01"],
+  notes: "M2.5 micro reactor defense: dig a trench, hold the reactor through the timer. Win = reactor survives the wave; loss = reactor destroyed.",
+)

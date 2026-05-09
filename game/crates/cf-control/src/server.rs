@@ -821,6 +821,8 @@ mod tests {
                 mission: None,
                 breaches: vec![],
                 enemies: vec![],
+                terrain: None,
+                reactors: vec![],
             }
         }
         async fn settings_snapshot(&self) -> Settings {

@@ -149,6 +149,115 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Row 3a: M2 dig + refuse + extract (chunked terrain)
+# ---------------------------------------------------------------------------
+ROW="m2_dig_concrete_refuse_metal"
+if skip_id "$ROW"; then
+    add_row "$ROW" "SKIP" "" "skipped via SELF_PLAY_SWEEP_SKIP"
+else
+    cd "$GAME_DIR"
+    if "$CF_E2E_BIN" \
+        --scenario m2_material_lane \
+        --script m2_dig_concrete_refuse_metal \
+        --capture-grid \
+        --timeout-seconds 120 \
+        --expect "scenario=m2_material_lane" \
+        --expect "capture.summary_grid.non_blank_ratio>=0.95" \
+        > "$OUTDIR/$ROW.stdout.txt" 2> "$OUTDIR/$ROW.stderr.txt"; then
+        BUNDLE="$(ls -dt "$REPO_ROOT/prototype_runs/native/m2_"* 2>/dev/null | head -n1)"
+        add_row "$ROW" "PASS" "${BUNDLE:-?}" "M2 dig path: dirt + concrete carved, metal_nohook + anchor refused, summary_grid>=0.95"
+    else
+        add_row "$ROW" "FAIL" "$OUTDIR/$ROW.stderr.txt" "cf-e2e exit nonzero or expect failed"
+    fi
+    cd "$REPO_ROOT"
+fi
+
+# ---------------------------------------------------------------------------
+# Row 3b: M2.5 micro_reactor_defense WIN (mission timer survives)
+# ---------------------------------------------------------------------------
+ROW="m2_5_micro_reactor_defense_win"
+if skip_id "$ROW"; then
+    add_row "$ROW" "SKIP" "" "skipped via SELF_PLAY_SWEEP_SKIP"
+else
+    cd "$GAME_DIR"
+    if "$CF_E2E_BIN" \
+        --scenario micro_reactor_defense \
+        --script micro_reactor_defense_win \
+        --capture-grid \
+        --write-run-bundle \
+        --timeout-seconds 120 \
+        --expect "mission.result=won" \
+        --expect "objective.defend_reactor=completed" \
+        --expect "capture.summary_grid.non_blank_ratio>=0.95" \
+        > "$OUTDIR/$ROW.stdout.txt" 2> "$OUTDIR/$ROW.stderr.txt"; then
+        BUNDLE="$(ls -dt "$REPO_ROOT/prototype_runs/native/m2.5_"* 2>/dev/null | head -n1)"
+        add_row "$ROW" "PASS" "${BUNDLE:-?}" "M2.5 win path: dirt shield protects reactor, mission timer survived, summary_grid>=0.95"
+    else
+        add_row "$ROW" "FAIL" "$OUTDIR/$ROW.stderr.txt" "cf-e2e exit nonzero or expect failed"
+    fi
+    cd "$REPO_ROOT"
+fi
+
+# ---------------------------------------------------------------------------
+# Row 3c: M2.5 micro_reactor_defense LOSS (reactor destroyed)
+# ---------------------------------------------------------------------------
+ROW="m2_5_micro_reactor_defense_loss"
+if skip_id "$ROW"; then
+    add_row "$ROW" "SKIP" "" "skipped via SELF_PLAY_SWEEP_SKIP"
+else
+    cd "$GAME_DIR"
+    if "$CF_E2E_BIN" \
+        --scenario micro_reactor_defense \
+        --script micro_reactor_defense_loss \
+        --capture-grid \
+        --write-run-bundle \
+        --timeout-seconds 120 \
+        --expect "mission.result=lost" \
+        --expect "mission.loss_reason=reactor_destroyed" \
+        --expect "capture.summary_grid.non_blank_ratio>=0.95" \
+        > "$OUTDIR/$ROW.stdout.txt" 2> "$OUTDIR/$ROW.stderr.txt"; then
+        BUNDLE="$(ls -dt "$REPO_ROOT/prototype_runs/native/m2.5_"* 2>/dev/null | head -n1)"
+        add_row "$ROW" "PASS" "${BUNDLE:-?}" "M2.5 loss path: dirt shield breached, reactor destroyed, summary_grid>=0.95"
+    else
+        add_row "$ROW" "FAIL" "$OUTDIR/$ROW.stderr.txt" "cf-e2e exit nonzero or expect failed"
+    fi
+    cd "$REPO_ROOT"
+fi
+
+# ---------------------------------------------------------------------------
+# Row 3d: M3A headless replay verifier on the M2.5 WIN bundle
+# ---------------------------------------------------------------------------
+ROW="m3a_headless_replay_m2_5_win"
+if skip_id "$ROW"; then
+    add_row "$ROW" "SKIP" "" "skipped via SELF_PLAY_SWEEP_SKIP"
+else
+    # Find the most recent M2.5 bundle that has a manifest (the win row above
+    # should have produced one with --write-run-bundle).
+    BUNDLE=""
+    for D in $(ls -dt "$REPO_ROOT/prototype_runs/native/m2.5_"* 2>/dev/null); do
+        if [[ -f "$D/run_manifest.json" ]]; then
+            BUNDLE="$D"
+            break
+        fi
+    done
+    if [[ -z "$BUNDLE" ]]; then
+        add_row "$ROW" "SKIP" "" "no m2.5 bundle with manifest to replay"
+    else
+        SCENARIO_PATH="$GAME_DIR/content/scenarios/micro_reactor_defense.ron"
+        CF_HEADLESS_BIN="${CF_HEADLESS_BIN:-$GAME_DIR/target/release/cf-headless}"
+        if [[ ! -x "$CF_HEADLESS_BIN" ]]; then
+            (cd "$GAME_DIR" && cargo build --release -p cf-headless 2>&1 | tail -3)
+        fi
+        if "$CF_HEADLESS_BIN" replay "$BUNDLE" --scenario-path "$SCENARIO_PATH" \
+            > "$OUTDIR/$ROW.stdout.txt" 2> "$OUTDIR/$ROW.stderr.txt"; then
+            add_row "$ROW" "PASS" "$OUTDIR/$ROW.stdout.txt" "headless replay matches recorded checksums; commands replayed"
+        else
+            add_row "$ROW" "FAIL" "$OUTDIR/$ROW.stderr.txt" "headless replay diverged"
+        fi
+    fi
+fi
+
+# ---------------------------------------------------------------------------
 # Row 4: M0 settings round-trip (act.settings.set + observe.settings)
 # ---------------------------------------------------------------------------
 ROW="m0_settings_roundtrip"

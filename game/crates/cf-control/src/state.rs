@@ -51,6 +51,13 @@ pub struct ObserveFrame {
     /// M1.5: reactive guards and their last-tick view. Empty for sandbox scenarios.
     #[serde(default)]
     pub enemies: Vec<EnemyView>,
+    /// M2: chunked terrain summary (per-material counts + carve / refusal /
+    /// dirty-chunk counters). `None` when the scenario has no chunked terrain.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub terrain: Option<TerrainView>,
+    /// M2.5: reactor world projection. Empty for scenarios with no reactors.
+    #[serde(default)]
+    pub reactors: Vec<ReactorView>,
 }
 
 /// M1.5 mission projection (re-exposed via JsonSchema-friendly types).
@@ -75,8 +82,37 @@ pub struct ObjectiveView {
     pub optional: bool,
     pub target_actor: Option<u64>,
     pub target_breach: Option<String>,
+    pub target_reactor: Option<String>,
     pub zone_min: Option<[f32; 2]>,
     pub zone_max: Option<[f32; 2]>,
+}
+
+/// M2 chunked terrain projection. Per-material pixel counts let cfctl + AI
+/// hooks query "how much air do we have left?" without pulling the full
+/// snapshot. Carve / refusal / dirty counters expose perf health.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct TerrainView {
+    pub width_px: u32,
+    pub height_px: u32,
+    pub anchor: [f32; 2],
+    pub default_material: String,
+    pub carve_count: u64,
+    pub refusal_count: u64,
+    pub dirty_chunk_count: u32,
+    pub allocated_chunk_count: u32,
+    pub material_counts: std::collections::BTreeMap<String, u64>,
+}
+
+/// M2.5 reactor projection. Drives the HUD reactor-hp bar + the cfctl
+/// `inspect reactor <id>` lookup.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+pub struct ReactorView {
+    pub id: String,
+    pub position: [f32; 2],
+    pub half_extents: [f32; 2],
+    pub hp: f32,
+    pub max_hp: f32,
+    pub destroyed: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]

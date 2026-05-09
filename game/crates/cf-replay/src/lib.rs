@@ -141,6 +141,35 @@ pub struct CapabilitiesBlock {
     pub debug_capabilities: Vec<String>,
 }
 
+/// M3A-005: `run_manifest.json.expected_outcome` constrained enum. The canonical
+/// run-bundle checker (`game/tools/prototype_run_check.py`) enforces this
+/// alongside the `system.run_finished` / `system.panic` event checks:
+///
+/// - `Clean` — bundle MUST contain exactly one `system.run_finished` event, no
+///   `system.panic` event, and `event_counts.by_severity.error` must be zero.
+/// - `Panic` — bundle MUST contain at least one `system.panic` event.
+/// - `Abort` — bundle MAY contain `system.run_finished` but `by_severity.error`
+///   is allowed to be non-zero (e.g., a cfctl-driven shutdown that ran into a
+///   soft failure).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ExpectedOutcome {
+    #[default]
+    Clean,
+    Panic,
+    Abort,
+}
+
+impl ExpectedOutcome {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ExpectedOutcome::Clean => "clean",
+            ExpectedOutcome::Panic => "panic",
+            ExpectedOutcome::Abort => "abort",
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RunManifest {
     pub schema_version: String,
@@ -164,6 +193,11 @@ pub struct RunManifest {
     pub settings: SettingsBlock,
     pub checksum: ChecksumConfig,
     pub tick_rate_hz: u32,
+    /// M3A-005: declared lifecycle outcome (clean | panic | abort).
+    /// Defaults to `clean`; the canonical run-bundle checker enforces the
+    /// per-outcome event-count rules above.
+    #[serde(default)]
+    pub expected_outcome: ExpectedOutcome,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -676,6 +710,7 @@ mod tests {
             settings: SettingsBlock::default(),
             checksum: ChecksumConfig::m0_default(),
             tick_rate_hz: 60,
+            expected_outcome: ExpectedOutcome::Clean,
         }
     }
 

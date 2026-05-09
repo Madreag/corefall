@@ -1,0 +1,58 @@
+(
+  schema_version: 1,
+  id: "m2_material_lane",
+  display_name: "M2 Material Lane",
+  description: "M2 chunked-terrain test scene per spec/native-implementation-backlog M2-001..M2-008. Player spawns west of three material columns: dirt (fast dig), concrete (slow dig), metal_nohook (refused). One reactive guard sits east of the columns to keep the scene non-trivial; the M2 dig contract is independently verifiable via cfctl scripts.",
+  seed: 23,
+  duration_ticks: Some(7200),
+  region: (anchor: (0.0, 0.0), width: 1280.0, height: 720.0),
+  gravity: -980.0,
+  floor_y: 16.0,
+  teams: [],
+  actors: [
+    (id: 1, team: "blue", spawn: (96.0, 32.0), controllable: true, hp: 100.0,
+      inventory: (rifle: Some("rifle_m1_default")), half_extents: Some((8.0, 16.0))),
+    (id: 2, team: "red", spawn: (1100.0, 32.0), controllable: false, hp: 80.0,
+      inventory: (rifle: None), aim: Some((-1.0, 0.0)),
+      half_extents: Some((8.0, 16.0)),
+      enemy: Some((
+        kind: Some("reactive_guard"),
+        miss_chance: Some(0.6),
+        damage_per_hit: Some(8.0),
+        burst_pause_seconds: Some(0.7),
+      ))),
+  ],
+  reactors: [],
+  terrain: Some((
+    width_px: 1280,
+    height_px: 720,
+    anchor: Some((0.0, 0.0)),
+    default_material: "air",
+    stamps: [
+      // floor
+      (kind: "fill_aabb", min: (0.0, 0.0), max: (1280.0, 16.0), material: "concrete"),
+      // dirt column
+      (kind: "fill_aabb", min: (220.0, 16.0), max: (300.0, 96.0), material: "dirt"),
+      // concrete column
+      (kind: "fill_aabb", min: (440.0, 16.0), max: (520.0, 96.0), material: "concrete"),
+      // metal-nohook column (refusal teaching path)
+      (kind: "fill_aabb", min: (660.0, 16.0), max: (740.0, 96.0), material: "metal_nohook"),
+      // anchor pillar (refusal teaching path 2)
+      (kind: "fill_aabb", min: (880.0, 16.0), max: (920.0, 200.0), material: "anchor"),
+      // loose fill patch (deepest column on the right; falls under M2-008 loose-fill scope)
+      (kind: "fill_aabb", min: (980.0, 16.0), max: (1060.0, 96.0), material: "loose_fill"),
+    ],
+  )),
+  breaches: [],
+  objectives: [
+    (id: "dig_dirt", kind: { "kind": "reach_zone", "min": (300.0, 16.0), "max": (440.0, 96.0) }),
+    (id: "dig_concrete", kind: { "kind": "reach_zone", "min": (520.0, 16.0), "max": (660.0, 96.0) }),
+    (id: "extract", kind: { "kind": "reach_zone", "min": (1160.0, 16.0), "max": (1280.0, 96.0) }),
+  ],
+  mission: Some((time_limit_ticks: 7200, player_dead_loses: true)),
+  director: None,
+  capabilities: (debug: false, control_api: true, save_load: false),
+  save_fields: [],
+  expected_tests: ["M2-DIG-01", "M2-REFUSE-01", "M2-EXTRACT-01"],
+  notes: "M2 material lane: dig through dirt fast, concrete slow; metal_nohook + anchor refuse with stable reasons; reach extraction at the east edge.",
+)

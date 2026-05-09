@@ -14,8 +14,8 @@ use serde::{Deserialize, Serialize};
 use cf_actor::{ActorId, ActorState, Inventory, InventoryItem, ItemSlot, Vec2};
 use cf_ai::ReactiveGuardParams;
 use cf_equipment::{rifle_preset, RifleState};
-use cf_mission::{LossConditions, Objective, ObjectiveKind, ObjectiveStatus};
-use cf_terrain::BreachStrip;
+use cf_mission::{LossConditions, Objective, ObjectiveKind, ObjectiveStatus, Reactor};
+use cf_terrain::{material_id_from_name, BreachStrip, ChunkedTerrain, MaterialId, TerrainStamp};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Scenario {
@@ -45,6 +45,15 @@ pub struct Scenario {
     /// M1.5: ordered list of soft-breach strips (M2 will replace with chunked terrain).
     #[serde(default)]
     pub breaches: Vec<ScenarioBreach>,
+    /// M2: optional chunked pixel terrain. When present the engine prefers
+    /// chunked terrain for `act.player.dig`; legacy `breaches[]` still emit
+    /// `terrain.*` events for backward compat with M1.5 evidence.
+    #[serde(default)]
+    pub terrain: Option<ScenarioChunkedTerrain>,
+    /// M2.5: ordered list of reactors. Each reactor is a damageable static
+    /// actor the player must defend.
+    #[serde(default)]
+    pub reactors: Vec<ScenarioReactor>,
     #[serde(default)]
     pub director: Option<serde_json::Value>,
     pub capabilities: ScenarioCapabilities,
@@ -176,6 +185,7 @@ pub enum ScenarioObjectiveKind {
     BreachBarrier { target: String },
     NeutralizeActor { target: u64 },
     ReachZone { min: (f32, f32), max: (f32, f32) },
+    DefendReactor { target: String },
 }
 
 impl ScenarioObjective {
@@ -187,12 +197,141 @@ impl ScenarioObjective {
                 min: [min.0, min.1],
                 max: [max.0, max.1],
             },
+            ScenarioObjectiveKind::DefendReactor { target } => ObjectiveKind::DefendReactor { target },
         };
         Objective {
             id: self.id,
             kind,
             optional: self.optional,
             status: ObjectiveStatus::Pending,
+        }
+    }
+}
+
+/// M2 chunked terrain manifest entry. The terrain is constructed by:
+///
+/// 1. Allocate a `ChunkedTerrain` of size `width_px × height_px`.
+/// 2. Set the default material from `default_material` (string name).
+/// 3. Apply each stamp in declaration order.
+///
+/// Stamps share the discriminator vocabulary with `cf-terrain::TerrainStamp`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScenarioChunkedTerrain {
+    pub width_px: u32,
+    pub height_px: u32,
+    #[serde(default)]
+    pub anchor: Option<(f32, f32)>,
+    #[serde(default = "default_material_air")]
+    pub default_material: String,
+    #[serde(default)]
+    pub stamps: Vec<ScenarioTerrainStamp>,
+}
+
+fn default_material_air() -> String {
+    "air".to_string()
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum ScenarioTerrainStamp {
+    FillAabb {
+        min: (f32, f32),
+        max: (f32, f32),
+        material: String,
+    },
+    FillCircle {
+        center: (f32, f32),
+        radius: f32,
+        material: String,
+    },
+}
+
+impl From<ScenarioTerrainStamp> for TerrainStamp {
+    fn from(s: ScenarioTerrainStamp) -> Self {
+        match s {
+            ScenarioTerrainStamp::FillAabb { min, max, material } => TerrainStamp::FillAabb {
+                min: [min.0, min.1],
+                max: [max.0, max.1],
+                material,
+            },
+            ScenarioTerrainStamp::FillCircle {
+                center,
+                radius,
+                material,
+            } => TerrainStamp::FillCircle {
+                center: [center.0, center.1],
+                radius,
+                material,
+            },
+        }
+    }
+}
+
+impl ScenarioChunkedTerrain {
+    /// Build a runtime [`ChunkedTerrain`] from this manifest. Returns an error
+    /// if `default_material` or any stamp material name is not in the launch
+    /// material set.
+    ///
+    /// `path` is the scenario file path (used in error messages so reviewers
+    /// can find the offending file). Production callers go through
+    /// `Scenario::load_from_file -> validate -> for_loaded_scenario` which
+    /// already validates materials with the correct path; this method's
+    /// strictness exists so direct callers (tests, future tools) never
+    /// silently fall back to AIR for unknown defaults.
+    pub fn build_terrain(&self, path: &str) -> Result<ChunkedTerrain, ScenarioLoadError> {
+        // Devin BUG_pr-review-job 3212186926 (yellow): no `unwrap_or(MATERIAL_AIR)`
+        // — return a structured error if the manifest names an unknown
+        // material. This matches the strict stamp-material check below.
+        let default_id: MaterialId =
+            material_id_from_name(&self.default_material).ok_or_else(|| ScenarioLoadError::UnknownTerrainMaterial {
+                path: path.to_string(),
+                material: self.default_material.clone(),
+            })?;
+        let mut terrain = ChunkedTerrain::new(self.width_px.max(1), self.height_px.max(1), default_id);
+        if let Some((ax, ay)) = self.anchor {
+            terrain.anchor = [ax, ay];
+        }
+        // Validate each stamp's material name first so we fail at load time.
+        for stamp in &self.stamps {
+            let mat_name = match stamp {
+                ScenarioTerrainStamp::FillAabb { material, .. } => material,
+                ScenarioTerrainStamp::FillCircle { material, .. } => material,
+            };
+            if material_id_from_name(mat_name).is_none() {
+                // Devin BUG_pr-review-job 3212186980 (yellow): thread the
+                // scenario path through so the error message names the
+                // offending file instead of producing the previous
+                // "scenario  terrain stamp ..." with a blank path.
+                return Err(ScenarioLoadError::UnknownTerrainMaterial {
+                    path: path.to_string(),
+                    material: mat_name.clone(),
+                });
+            }
+        }
+        let stamps: Vec<TerrainStamp> = self.stamps.iter().cloned().map(Into::into).collect();
+        terrain.apply_stamps(&stamps);
+        Ok(terrain)
+    }
+}
+
+/// M2.5 reactor manifest entry. Becomes a `cf_mission::Reactor` at runtime.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScenarioReactor {
+    pub id: String,
+    pub position: (f32, f32),
+    pub half_extents: (f32, f32),
+    pub hp: f32,
+}
+
+impl ScenarioReactor {
+    pub fn build_reactor(&self) -> Reactor {
+        Reactor {
+            id: self.id.clone(),
+            position: [self.position.0, self.position.1],
+            half_extents: [self.half_extents.0, self.half_extents.1],
+            hp: self.hp.max(0.0),
+            max_hp: self.hp.max(0.0),
+            destroyed: false,
         }
     }
 }
@@ -316,6 +455,18 @@ pub enum ScenarioLoadError {
     },
     #[error("scenario {path} declares duplicate objective id `{objective_id}`")]
     DuplicateObjectiveId { path: String, objective_id: String },
+    #[error("scenario {path} terrain stamp references unknown material `{material}`")]
+    UnknownTerrainMaterial { path: String, material: String },
+    #[error("scenario {path} reactor `{reactor_id}` duplicates another entry")]
+    DuplicateReactorId { path: String, reactor_id: String },
+    #[error("scenario {path} objective {objective_id} references unknown reactor `{reactor_id}`")]
+    ObjectiveUnknownReactor {
+        path: String,
+        objective_id: String,
+        reactor_id: String,
+    },
+    #[error("scenario {path} reactor `{reactor_id}` declares hp={hp} (must be > 0; a destroyed-on-spawn reactor cannot reset)")]
+    ReactorHpNotPositive { path: String, reactor_id: String, hp: f32 },
 }
 
 impl ScenarioActor {
@@ -412,6 +563,29 @@ impl Scenario {
             }
         }
 
+        // M2.5: reactor ids unique + hp positive.
+        let mut reactor_ids = std::collections::HashSet::new();
+        for reactor in &self.reactors {
+            if !reactor_ids.insert(reactor.id.clone()) {
+                return Err(ScenarioLoadError::DuplicateReactorId {
+                    path: path.to_string(),
+                    reactor_id: reactor.id.clone(),
+                });
+            }
+            // Bugbot 3212274163 (Low): a reactor declared with hp <= 0
+            // would start destroyed AND `reset()` would set hp = max_hp = 0
+            // so the reactor stays destroyed forever (since
+            // `is_destroyed` returns `destroyed || hp <= 0`). Reject at
+            // load so scenarios cannot author an unresettable reactor.
+            if !reactor.hp.is_finite() || reactor.hp <= 0.0 {
+                return Err(ScenarioLoadError::ReactorHpNotPositive {
+                    path: path.to_string(),
+                    reactor_id: reactor.id.clone(),
+                    hp: reactor.hp,
+                });
+            }
+        }
+
         // Objectives must reference real targets, with unique ids.
         let mut objective_ids = std::collections::HashSet::new();
         for objective in &self.objectives {
@@ -441,8 +615,40 @@ impl Scenario {
                     }
                 }
                 ScenarioObjectiveKind::ReachZone { .. } => {}
+                ScenarioObjectiveKind::DefendReactor { target } => {
+                    if !reactor_ids.contains(target) {
+                        return Err(ScenarioLoadError::ObjectiveUnknownReactor {
+                            path: path.to_string(),
+                            objective_id: objective.id.clone(),
+                            reactor_id: target.clone(),
+                        });
+                    }
+                }
             }
         }
+
+        // M2: validate terrain stamp material names.
+        if let Some(terrain) = &self.terrain {
+            if material_id_from_name(&terrain.default_material).is_none() {
+                return Err(ScenarioLoadError::UnknownTerrainMaterial {
+                    path: path.to_string(),
+                    material: terrain.default_material.clone(),
+                });
+            }
+            for stamp in &terrain.stamps {
+                let mat_name = match stamp {
+                    ScenarioTerrainStamp::FillAabb { material, .. } => material,
+                    ScenarioTerrainStamp::FillCircle { material, .. } => material,
+                };
+                if material_id_from_name(mat_name).is_none() {
+                    return Err(ScenarioLoadError::UnknownTerrainMaterial {
+                        path: path.to_string(),
+                        material: mat_name.clone(),
+                    });
+                }
+            }
+        }
+
         Ok(())
     }
 
@@ -460,6 +666,16 @@ impl Scenario {
     /// conditions). M0/M1 scenarios are sandbox-only and return false.
     pub fn has_mission(&self) -> bool {
         !self.objectives.is_empty() || self.mission.is_some()
+    }
+
+    /// True if the scenario declares chunked terrain (M2+).
+    pub fn has_chunked_terrain(&self) -> bool {
+        self.terrain.is_some()
+    }
+
+    /// True if the scenario declares any reactor (M2.5+).
+    pub fn has_reactors(&self) -> bool {
+        !self.reactors.is_empty()
     }
 }
 
@@ -622,6 +838,66 @@ mod tests {
         assert!(matches!(
             bad.validate("t.ron"),
             Err(ScenarioLoadError::ObjectiveUnknownActor { .. })
+        ));
+    }
+
+    #[test]
+    fn rejects_reactor_with_zero_or_negative_hp() {
+        // Bugbot 3212274163 (Low) regression: a reactor declared with
+        // hp <= 0 would start destroyed AND can never be reset (since
+        // max_hp = hp = 0 and `is_destroyed` returns `hp <= 0`). The
+        // validator MUST reject the scenario at load.
+        let scenario = Scenario {
+            schema_version: 1,
+            id: "test".to_string(),
+            display_name: "test".to_string(),
+            description: "test".to_string(),
+            seed: 0,
+            duration_ticks: None,
+            region: ScenarioRegion {
+                anchor: (0.0, 0.0),
+                width: 100.0,
+                height: 100.0,
+            },
+            gravity: -980.0,
+            floor_y: 0.0,
+            teams: vec![],
+            actors: vec![],
+            objectives: vec![],
+            mission: None,
+            breaches: vec![],
+            terrain: None,
+            reactors: vec![ScenarioReactor {
+                id: "core".to_string(),
+                position: (50.0, 50.0),
+                half_extents: (10.0, 10.0),
+                hp: 0.0,
+            }],
+            director: None,
+            capabilities: ScenarioCapabilities::default(),
+            save_fields: vec![],
+            expected_tests: vec![],
+            notes: String::new(),
+        };
+        assert!(matches!(
+            scenario.validate("t.ron"),
+            Err(ScenarioLoadError::ReactorHpNotPositive { .. })
+        ));
+
+        // Negative hp also rejected.
+        let mut s2 = scenario.clone();
+        s2.reactors[0].hp = -10.0;
+        assert!(matches!(
+            s2.validate("t.ron"),
+            Err(ScenarioLoadError::ReactorHpNotPositive { .. })
+        ));
+
+        // NaN rejected.
+        let mut s3 = scenario;
+        s3.reactors[0].hp = f32::NAN;
+        assert!(matches!(
+            s3.validate("t.ron"),
+            Err(ScenarioLoadError::ReactorHpNotPositive { .. })
         ));
     }
 }
