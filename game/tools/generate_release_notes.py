@@ -803,13 +803,77 @@ def playtest_section(bundle_dir: Optional[Path]) -> str:
     )
 
 
+def _install_quality_blurb(tag: TagInfo, bp_num: int) -> str:
+    """Return the leading "this is a <channel> release" sentence for the
+    install section, sourced from the tag's channel so the prose tracks
+    the release-notes title instead of hardcoding "pre-alpha".
+    """
+    if tag.is_launch_ga:
+        return "This is the **launch GA** release (`v1.0.0`)."
+    if tag.channel == "prealpha":
+        return "This is a **prealpha** release (engine + early fun slices; major systems still missing)."
+    if tag.channel == "alpha":
+        return "This is an **alpha** release (full collision + atmospherics + AI combat shipped; polish ongoing)."
+    if tag.channel == "beta":
+        return "This is a **beta** release (mission director + creator alpha + server/LAN; feature-complete-ish)."
+    if tag.channel == "rc":
+        return "This is a **release candidate** (online + public PvP/MMO; shippable to public-facing playtests)."
+    # Legacy bp<N> tags fall back to the BP-derived channel description.
+    canonical = channel_for_bp(bp_num)
+    return f"This is a **{canonical}** release (legacy `-bp{bp_num}` tag form)."
+
+
+def _install_signing_blurb(bp_num: int, is_launch_ga: bool) -> str:
+    """Return the signing-status sentence for the install section.
+
+    Per docs/plan/spec/prototype-roadmap.md §T-RELEASE: ad-hoc/unsigned
+    through BP9; T-LIVEOPS activates Apple notarization + Windows
+    Authenticode at BP10+; full code signing at BP12 (v1.0.0 GA).
+    """
+    if is_launch_ga:
+        return "Builds are fully code-signed (Apple notarized + Windows Authenticode); no platform warnings expected."
+    if bp_num >= 10:
+        return "Builds are code-signed via T-LIVEOPS (Apple notarized + Windows Authenticode); minimal platform warnings."
+    return "Builds are unsigned through BP9; expect platform warnings. Code signing activates at BP10+ via T-LIVEOPS pre-launch wiring."
+
+
+def _macos_signing_paragraph(bp_num: int, is_launch_ga: bool) -> str:
+    if is_launch_ga or bp_num >= 10:
+        return (
+            "macOS builds are notarized + stapled, so Gatekeeper opens them without a "
+            "warning. If a download arrives quarantined for any reason, "
+            "`xattr -dr com.apple.quarantine .` clears it."
+        )
+    return (
+        "Gatekeeper will warn that the binary is unsigned. Right-click `cf-app` → Open the "
+        "first time, or run `xattr -dr com.apple.quarantine .` (above) to clear the "
+        "quarantine flag. Code signing arrives at BP10+ via T-LIVEOPS."
+    )
+
+
+def _windows_signing_paragraph(bp_num: int, is_launch_ga: bool) -> str:
+    if is_launch_ga or bp_num >= 10:
+        return (
+            "Windows builds are signed with an Authenticode certificate, so SmartScreen "
+            "should accept them without prompting."
+        )
+    return (
+        "SmartScreen will warn that the binary is unrecognized. Click **More info → Run "
+        "anyway**. Code signing arrives at BP10+ via T-LIVEOPS."
+    )
+
+
 def install_section(tag: TagInfo) -> str:
     scenario = BP_SMOKE_SCENARIOS.get(tag.bp, "m1_actor_range")
+    bp_num = int(tag.bp.removeprefix("bp"))
+    quality = _install_quality_blurb(tag, bp_num)
+    signing = _install_signing_blurb(bp_num, tag.is_launch_ga)
+    macos_paragraph = _macos_signing_paragraph(bp_num, tag.is_launch_ga)
+    windows_paragraph = _windows_signing_paragraph(bp_num, tag.is_launch_ga)
     return (
         "## Install\n"
         "\n"
-        "This is a **pre-alpha** release. Builds are unsigned through BP9; expect platform\n"
-        "warnings. Code signing activates at BP10+ via T-LIVEOPS pre-launch wiring.\n"
+        f"{quality} {signing}\n"
         "\n"
         "### Linux (`x86_64-unknown-linux-gnu`)\n"
         "\n"
@@ -831,9 +895,7 @@ def install_section(tag: TagInfo) -> str:
         f"./cf-app --scenario {scenario}\n"
         "```\n"
         "\n"
-        "Gatekeeper will warn that the binary is unsigned. Right-click `cf-app` → Open the\n"
-        "first time, or run `xattr -dr com.apple.quarantine .` (above) to clear the\n"
-        "quarantine flag. Code signing arrives at BP10+ via T-LIVEOPS.\n"
+        f"{macos_paragraph}\n"
         "\n"
         "### Windows (`x86_64-pc-windows-msvc`)\n"
         "\n"
@@ -843,8 +905,7 @@ def install_section(tag: TagInfo) -> str:
         f".\\cf-app.exe --scenario {scenario}\n"
         "```\n"
         "\n"
-        "SmartScreen will warn that the binary is unrecognized. Click **More info → Run\n"
-        "anyway**. Code signing arrives at BP10+ via T-LIVEOPS.\n"
+        f"{windows_paragraph}\n"
     )
 
 
@@ -979,8 +1040,8 @@ def build_notes(tag: TagInfo, repo_root: Path, staging: Path) -> str:
     channel_label = CHANNEL_LABEL[tag.channel]
     if tag.channel == "bp":
         title = f"# Corefall {tag.raw} ({tag.bp_label})\n"
-    elif tag.channel == "ga":
-        title = f"# Corefall {tag.raw} ({tag.bp_label} — {channel_label})\n"
+    elif tag.is_launch_ga:
+        title = f"# Corefall {tag.raw} — Launch GA ({tag.bp_label})\n"
     else:
         title = f"# Corefall {tag.raw} ({tag.bp_label} — {channel_label})\n"
     sections = [
