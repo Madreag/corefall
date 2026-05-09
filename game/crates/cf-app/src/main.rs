@@ -300,6 +300,11 @@ fn wait_for_capture_pngs_flushed(
 ) {
     let started = std::time::Instant::now();
     let poll_interval = std::time::Duration::from_millis(50);
+    // Mutex poisoning warning is logged at most once per call. Without this
+    // latch the warning would emit on every 50 ms poll iteration up to the
+    // 5 s timeout — 100 warnings for a single underlying condition.
+    // Addresses PR #26 review Devin Info finding (capture flush log spam).
+    let mut poison_warned = false;
     loop {
         // Snapshot the expected PNG paths under the lock, then release it
         // so the capture systems (if any are still flushing into the queue
@@ -311,10 +316,14 @@ fn wait_for_capture_pngs_flushed(
                     .map(|entry| captures_dir.join(&entry.png_relpath))
                     .collect(),
                 Err(poisoned) => {
-                    tracing::warn!(
-                        target: "cf::capture",
-                        "capture events_log mutex poisoned during flush wait; proceeding with manifest write"
-                    );
+                    if !poison_warned {
+                        tracing::warn!(
+                            target: "cf::capture",
+                            "capture events_log mutex poisoned during flush wait; proceeding with manifest write \
+                             (warning suppressed for subsequent poll iterations within this call)"
+                        );
+                        poison_warned = true;
+                    }
                     poisoned
                         .into_inner()
                         .iter()
@@ -409,6 +418,13 @@ struct ControlRuntime {
     _runtime: Arc<tokio::runtime::Runtime>,
     bound_addr: SocketAddr,
     server_handle: Mutex<Option<tokio::task::JoinHandle<std::io::Result<()>>>>,
+    // Sticky shutdown signal sent into `serve_listener_with_shutdown` so
+    // that ControlRuntime::drop can cleanly stop the accept loop + every
+    // per-connection observation loop instead of relying on
+    // `JoinHandle::abort()` (which leaves in-flight WebSocket connections
+    // dangling). Wired in 2026-05-09 as part of the PR #26 review fix
+    // (Devin Info: serve_listener creates a dead Notify).
+    shutdown_tx: cf_control::server::ShutdownSignal,
 }
 
 fn run_bevy(
@@ -1048,16 +1064,24 @@ fn start_control_server(engine: Arc<M0Engine>, port: u16) -> Result<ControlRunti
         .block_on(server.bind())
         .context("failed to bind control listener")?;
     tracing::info!(target: "cf::app", bind = %bound.bind, "control server bound");
-    let handle = runtime.spawn(async move { ControlServer::serve_listener(listener, engine, max_hz).await });
+    let (shutdown_tx, shutdown_rx) = cf_control::server::shutdown_signal();
+    let handle = runtime
+        .spawn(async move { ControlServer::serve_listener_with_shutdown(listener, engine, max_hz, shutdown_rx).await });
     Ok(ControlRuntime {
         _runtime: runtime,
         bound_addr: bound.bind,
         server_handle: Mutex::new(Some(handle)),
+        shutdown_tx,
     })
 }
 
 impl Drop for ControlRuntime {
     fn drop(&mut self) {
+        // Trigger the sticky shutdown signal first so the accept loop +
+        // every in-flight connection's observation loop exit cleanly.
+        // `JoinHandle::abort()` is the fallback if a task wedges past the
+        // shutdown signal.
+        cf_control::server::trigger_shutdown(&self.shutdown_tx);
         if let Some(handle) = self.server_handle.lock().ok().and_then(|mut g| g.take()) {
             handle.abort();
         }
