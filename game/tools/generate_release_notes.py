@@ -496,6 +496,43 @@ def merged_pr_evidence(tag: TagInfo, repo_root: Path) -> list[PullRequestEvidenc
     return evidence
 
 
+def _bundle_is_fun_proof(bundle_dir: Path, bp: str) -> bool:
+    """Return True when the bundle looks like a real fun-proof BP closure run.
+
+    Filters out stale `--headless-smoke` bundles (M0 boilerplate manifests +
+    no captures), bundles missing a manifest entirely, and bundles whose
+    scene.id does not match the BP's expected fun-proof scenario.
+
+    Without this, the BP-anchor sort picks the most-recent `m2.5_*` directory
+    by ISO timestamp regardless of whether it's the actual fun-proof bundle
+    or a developer's manual `cf-app --headless-smoke` smoke run from later
+    that day. The release archive then ships a stale-template bundle as the
+    "BP exemplar".
+    """
+    manifest_path = bundle_dir / "run_manifest.json"
+    if not manifest_path.is_file():
+        return False
+    try:
+        manifest = json.loads(manifest_path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return False
+    run_mode = (manifest.get("run_mode") or "").lower()
+    if run_mode == "headless-smoke":
+        return False
+    expected_scene = BP_SMOKE_SCENARIOS.get(bp)
+    if expected_scene:
+        scene_id = (manifest.get("scene") or {}).get("id")
+        if scene_id and scene_id != expected_scene:
+            # Allow milestone-anchor bundles whose scenario differs from the
+            # BP's headline fun-proof scenario (M2 dig path is BP2 scope but
+            # not the fun-proof slice). Only reject when scene.id matches a
+            # different BP's headline scenario.
+            other_bp_scenes = set(BP_SMOKE_SCENARIOS.values()) - {expected_scene}
+            if scene_id in other_bp_scenes:
+                return False
+    return True
+
+
 def find_bp_run_bundle(repo_root: Path, bp: str) -> Optional[Path]:
     """Find the most recent run bundle that corresponds to the BP closure.
 
@@ -504,18 +541,28 @@ def find_bp_run_bundle(repo_root: Path, bp: str) -> Optional[Path]:
     2. The most recent milestone-tagged bundle that anchors the BP per
        BP_ANCHOR_PREFIXES (e.g., BP1 → newest m1.5_* bundle; BP2 → newest
        m2.5_* before M3A because M2.5 is the fun-proof slice).
+       Stale headless-smoke bundles + cross-BP scenarios are filtered out
+       via `_bundle_is_fun_proof` so a developer's later `cf-app
+       --headless-smoke` smoke run doesn't shadow the actual fun-proof
+       evidence.
     3. Else None — the run-bundle section is skipped.
     """
     bundles_root = repo_root / "prototype_runs" / "native"
     if not bundles_root.is_dir():
         return None
-    # 1) BP-tagged bundle wins if present.
-    bp_bundles = sorted(bundles_root.glob(f"{bp}_*"))
+    # 1) BP-tagged bundle wins if present (still filter to keep contract).
+    bp_bundles = [
+        b for b in sorted(bundles_root.glob(f"{bp}_*"))
+        if b.is_dir() and _bundle_is_fun_proof(b, bp)
+    ]
     if bp_bundles:
         return bp_bundles[-1]
-    # 2) Fall back to the BP's anchor milestone bundle.
+    # 2) Fall back to the BP's anchor milestone bundle, newest fun-proof first.
     for prefix in BP_ANCHOR_PREFIXES.get(bp, []):
-        candidates = sorted(bundles_root.glob(f"{prefix}_*"))
+        candidates = [
+            c for c in sorted(bundles_root.glob(f"{prefix}_*"))
+            if c.is_dir() and _bundle_is_fun_proof(c, bp)
+        ]
         if candidates:
             return candidates[-1]
     return None

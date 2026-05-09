@@ -17,8 +17,8 @@ use cf_actor::{
     ActorId, ActorWorld, ControlIntent, IntentSource, ItemSlot, Vec2,
 };
 use cf_replay::{
-    diagnostics, BuildInfo, BundleInputs, CapabilitiesBlock, CaptureConfig, ChecksumConfig, PerfSample, Recorder,
-    RunManifest, SceneInfo, SettingsBlock, TestRecord, CONTROL_SCHEMA_VERSION, EVENT_ENVELOPE_VERSION,
+    diagnostics, ArtifactItem, BuildInfo, BundleInputs, CapabilitiesBlock, CaptureConfig, ChecksumConfig, PerfSample,
+    Recorder, RunManifest, SceneInfo, SettingsBlock, TestRecord, CONTROL_SCHEMA_VERSION, EVENT_ENVELOPE_VERSION,
     MANIFEST_SCHEMA_VERSION, SCENARIO_SCHEMA_VERSION,
 };
 use cf_sim_core::{
@@ -2055,42 +2055,40 @@ impl M0Engine {
         self.emit_final_checksum();
         let manifest = self.build_manifest();
         let perf = self.perf_sample();
+        let result = if exit_code == 0 { "pass" } else { "fail" };
+        let evidence_ids = self.first_and_last_event_ids();
+        let tests = build_test_records(
+            &self.config.expected_tests,
+            &self.config.milestone,
+            result,
+            &evidence_ids,
+        );
+        let (artifacts, capture_evidence_link) = discover_run_artifacts(&self.run_bundle_dir);
+        let mut evidence_links = vec![
+            "events.jsonl".to_string(),
+            "summary.json".to_string(),
+            "run_manifest.json".to_string(),
+        ];
+        if let Some(link) = capture_evidence_link {
+            evidence_links.push(link);
+        }
         let inputs = BundleInputs {
             recorder: &self.recorder,
             manifest,
             started_at: self.started_at,
             ended_at,
             exit_code,
-            result: if exit_code == 0 {
-                "pass".to_string()
-            } else {
-                "fail".to_string()
-            },
+            result: result.to_string(),
             blockers: vec![],
-            next_actions: vec!["Proceed to M1 task cards in spec/native-implementation-backlog.".to_string()],
-            tests: vec![TestRecord {
-                id: "M0-SMOKE-01".to_string(),
-                result: if exit_code == 0 {
-                    "pass".to_string()
-                } else {
-                    "fail".to_string()
-                },
-                evidence_event_ids: self.first_and_last_event_ids(),
-                notes: Some("Fixed-tick smoke + run bundle parity per M0 done-criteria.".to_string()),
-            }],
-            artifacts: vec![],
+            next_actions: next_actions_for_milestone(&self.config.milestone),
+            tests,
+            artifacts,
             assumptions_tested: self.config.assumptions_tested.clone(),
-            good: vec![
-                "Fixed-tick scheduler stable; cfctl/control envelope serializes per DR-002 v1 lock.".to_string(),
-            ],
+            good: vec![],
             bad: vec![],
             meh: vec![],
-            evidence_links: vec![
-                "events.jsonl".to_string(),
-                "summary.json".to_string(),
-                "run_manifest.json".to_string(),
-            ],
-            notes_extra: m0_notes_addendum(),
+            evidence_links,
+            notes_extra: notes_addendum_for_milestone(&self.config.milestone),
             perf: Some(perf),
         };
         cf_replay::write_run_bundle(&self.run_bundle_dir, inputs)?;
@@ -2119,7 +2117,7 @@ impl M0Engine {
         RunManifest {
             schema_version: MANIFEST_SCHEMA_VERSION.to_string(),
             run_id: self.recorder.run_id().to_string(),
-            prototype_slice: "M0".to_string(),
+            prototype_slice: prototype_slice_for_milestone(&self.config.milestone),
             run_mode: self.config.run_mode.clone(),
             milestone: self.config.milestone.clone(),
             build: BuildInfo {
@@ -2439,19 +2437,204 @@ fn status_change_cause(outcome: &ActorTickOutcome) -> &'static str {
     }
 }
 
-fn m0_notes_addendum() -> String {
-    "## DR-002 v1 schema lock\n\n\
-- Event envelope: `{schema_version, run_id, tick, sim_time_ms, event_id, category, event_type, payload, parent_event_id?, dropped_count?}`.\n\
-- M0 categories: `system`, `control`, `determinism`. `snapshot` opens at M3.\n\
-- Checksum: `algorithm=blake3`, `scope=sim_state_v1` (M0 covers `tick_counter || rng_state_bytes`; M1 appends actor/inventory/projectile bytes via `cf_actor::sim::ActorSimState::checksum_bytes()`; M2/M3 will append terrain bytes; all without bumping the suffix; layout-breaking bumps go to `_v2`).\n\
-- Manifest extensions: `checksum.{algorithm,scope,cadence_ticks}`, `settings:{...}` block.\n\
-- Summary extensions: `final_sim_checksum`, `checksum_event_count`, `first_tick`, `last_tick`.\n\
-- M3 picks up replay verification (`first_divergence` event), the `snapshot` category, and full headless replay parity.\n\
-\n## DR-012 floor lock\n\n\
-- Six accessibility flags wired into `cf-control::Settings` and `run_manifest.json.settings`.\n\
-- Settings can be live-updated via `act.settings.set` and re-read via `observe.settings`.\n\
-- Localization deferred to M4 — the discipline rule (no baked English-only player-facing strings) applies.\n"
-        .to_string()
+/// Map a normalized milestone hint (`m0`, `m1`, `m1.5`, `m2`, `m2.5`, ...)
+/// to the upper-case `prototype_slice` label written into `run_manifest.json`.
+/// Falls back to upper-casing the input so future milestones keep working
+/// without an explicit branch here.
+fn prototype_slice_for_milestone(milestone: &str) -> String {
+    let normalized = milestone.trim().to_lowercase();
+    if normalized.is_empty() {
+        return "M0".to_string();
+    }
+    if let Some(rest) = normalized.strip_prefix('m') {
+        return format!("M{rest}");
+    }
+    normalized.to_uppercase()
+}
+
+/// Per-milestone "what to do next" line written into `summary.json.next_actions`.
+/// Stale "Proceed to M1 task cards" boilerplate masqueraded as M0 metadata in
+/// every bundle through M2.5; the canonical roadmap (Build Points table) is the
+/// source of truth and we pin the next milestone here so an offline reviewer
+/// can read the bundle and immediately see what the implementer was supposed
+/// to ship next.
+fn next_actions_for_milestone(milestone: &str) -> Vec<String> {
+    let normalized = milestone.trim().to_lowercase();
+    let next = match normalized.as_str() {
+        "" | "m0" => "Proceed to M1 task cards in spec/native-implementation-backlog.",
+        "m1" => "Proceed to M1.5 (Micro Breach Fun Slice) per spec/prototype-roadmap.md#BP1.",
+        "m1.5" => "Proceed to BP2 (M2 + M2.5 + M3A) per spec/prototype-roadmap.md#BP2.",
+        "m2" => "Proceed to M2.5 (Micro Reactor Defense Fun Slice) per spec/prototype-roadmap.md#BP2.",
+        "m2.5" => "Proceed to M3A (Event Recorder Core) per spec/prototype-roadmap.md#BP2.",
+        "m3a" => "Proceed to BP3 (M3B + M4A + M5) per spec/prototype-roadmap.md#BP3.",
+        "m3b" => "Proceed to M4A (Readability And ACC-A Floor) per spec/prototype-roadmap.md#BP3.",
+        "m4a" => "Proceed to M5 (Equipment, Chassis, And Damage Grammar) per spec/prototype-roadmap.md#BP3.",
+        "m5" => "Proceed to BP4 (M5.5 + M5.5.5 + M5.6 + M5.7 + M5.8) per spec/prototype-roadmap.md#BP4.",
+        _ => "Proceed to the next assigned milestone per spec/prototype-roadmap.md.",
+    };
+    vec![next.to_string()]
+}
+
+/// Per-milestone notes-addendum prose written into `notes.md` after the
+/// scenario-author rows (Good/Bad/Meh/Evidence). The historical
+/// `m0_notes_addendum` baked the M0 staging story ("M2/M3 will append terrain
+/// bytes; all without bumping the suffix") into every bundle, which became
+/// flat-out wrong once M2 / M2.5 / M3A landed. This helper returns the
+/// up-to-date DR-002 + DR-012 lock prose AND the milestone's own pinned
+/// contract addendum (e.g. material schema for M2+, expected-outcome contract
+/// for M3A+).
+fn notes_addendum_for_milestone(milestone: &str) -> String {
+    let normalized = milestone.trim().to_lowercase();
+    let mut s = String::new();
+    s.push_str("## DR-002 schema lock\n\n");
+    s.push_str("- Event envelope: `{schema_version, run_id, tick, sim_time_ms, event_id, category, event_type, payload, parent_event_id?, dropped_count?}`.\n");
+    s.push_str("- Categories shipped through this milestone: `system`, `control`, `determinism`, `snapshot`, `actor`, `combat`, `equipment`, `ai`, `mission`, `terrain`, `material`, `input`. Future categories layer in additively without breaking v1 envelope readers.\n");
+    s.push_str("- Checksum: `algorithm=blake3`, `scope=sim_state_v1`. Layout is append-only: M0 (`tick_counter || rng_state_bytes`) || M1 (actor / inventory / projectile bytes) || M1.5 (breach + guards + mission bytes) || M2 (chunked-terrain bytes) || M2.5 (reactor-world bytes). Layout-breaking bumps go to `_v2`.\n");
+    s.push_str("- Manifest extensions: `checksum.{algorithm,scope,cadence_ticks}`, `settings:{...}` block, `expected_outcome:{clean|panic|abort}` (M3A).\n");
+    s.push_str("- Summary extensions: `final_sim_checksum`, `checksum_event_count`, `first_tick`, `last_tick`, `artifacts.items[]` populated from `captures/` when present (M2+).\n");
+    s.push_str("- M3A picks up headless replay verification: `cf-headless replay <bundle> --scenario-path <path>` reconstructs commands from `control.command_accepted` and asserts the cadence checksums tick-for-tick.\n");
+    s.push_str("\n## DR-012 floor lock\n\n");
+    s.push_str("- Six accessibility flags wired into `cf-control::Settings` and `run_manifest.json.settings`.\n");
+    s.push_str("- Settings can be live-updated via `act.settings.set` and re-read via `observe.settings`.\n");
+    s.push_str(
+        "- Localization deferred to M4 — the discipline rule (no baked English-only player-facing strings) applies.\n",
+    );
+    if matches!(normalized.as_str(), "m2" | "m2.5" | "m3a")
+        || normalized.starts_with("m2")
+        || normalized.starts_with("m3")
+    {
+        s.push_str("\n## DR-007 launch material set\n\n");
+        s.push_str("- 8 launch materials (ids 0..7): `air`, `dirt`, `concrete`, `metal_nohook`, `hazard`, `loose_fill`, `repair_fill`, `anchor`. `material_schema_version=cf-terrain-launch-v1`.\n");
+        s.push_str("- Per-material affordances cover solid/diggable/hardness/anchorable/hazard/path_cost/overlay_rgba/refusal_reason.\n");
+    }
+    s
+}
+
+/// Build the `summary.json.tests[]` entries from the scenario's
+/// `expected_tests` manifest field. Each entry's `result` is exit-code-driven
+/// (engine-wide pass/fail), `evidence_event_ids` is the run's first+last event
+/// id pair, and `notes` is a stable per-milestone rationale. If the scenario
+/// declares no expected tests we synthesize a single milestone-level smoke
+/// row so the array is never empty.
+fn build_test_records(
+    expected_tests: &[String],
+    milestone: &str,
+    result: &str,
+    evidence_event_ids: &[String],
+) -> Vec<TestRecord> {
+    let normalized = milestone.trim().to_lowercase();
+    let notes = match normalized.as_str() {
+        "" | "m0" => "M0 fixed-tick smoke + run-bundle parity per spec/native-implementation-backlog.",
+        "m1" => "M1 actor controller round-trip (move + jump + aim + fire + reload + select_item).",
+        "m1.5" => "M1.5 micro breach fun slice (dig outer wall, kill guard, reach extraction).",
+        "m2" => "M2 chunked-terrain dig path (dirt fast / concrete slow / metal_nohook + anchor refused).",
+        "m2.5" => {
+            "M2.5 micro reactor defense fun slice (dirt-shield strategic choice; reactor protected or destroyed)."
+        }
+        "m3a" => "M3A event recorder core (snapshot.* + expected_outcome contract + cf-headless replay verifier).",
+        _ => "Milestone-scope acceptance per spec/native-implementation-backlog.",
+    };
+    if expected_tests.is_empty() {
+        let id = match normalized.as_str() {
+            "" | "m0" => "M0-SMOKE-01",
+            "m1" => "M1-SMOKE-01",
+            "m1.5" => "M1.5-SMOKE-01",
+            "m2" => "M2-SMOKE-01",
+            "m2.5" => "M2.5-SMOKE-01",
+            "m3a" => "M3A-SMOKE-01",
+            _ => "MILESTONE-SMOKE-01",
+        };
+        return vec![TestRecord {
+            id: id.to_string(),
+            result: result.to_string(),
+            evidence_event_ids: evidence_event_ids.to_vec(),
+            notes: Some(notes.to_string()),
+        }];
+    }
+    expected_tests
+        .iter()
+        .map(|id| TestRecord {
+            id: id.clone(),
+            result: result.to_string(),
+            evidence_event_ids: evidence_event_ids.to_vec(),
+            notes: Some(notes.to_string()),
+        })
+        .collect()
+}
+
+/// Discover capture artifacts on disk at run-bundle write time. Returns
+/// `(artifacts, evidence_link)` where:
+///
+/// - `artifacts` lists the recordable items inside `<run>/captures/`:
+///   `capture_manifest.json`, `summary_grid.png`, every `grid_NNN.png`, and
+///   one `capture_frames` summary entry counting the frame_*.png files.
+/// - `evidence_link` is `"captures/"` when any capture artifact is present so
+///   `notes.md`'s evidence-link list reflects the on-disk shape.
+///
+/// `summary_grid.png` may not exist at write_run_bundle time (the cf-e2e
+/// composer adds it AFTER cf-app exits); `capture_grid.py` patches
+/// `summary.json.artifacts.items[]` post-hoc to add the grid PNGs in that
+/// case. This helper covers the in-process path (frames + manifest) and is
+/// idempotent with the post-hoc patcher.
+fn discover_run_artifacts(run_bundle_dir: &Path) -> (Vec<ArtifactItem>, Option<String>) {
+    let captures_dir = run_bundle_dir.join("captures");
+    if !captures_dir.is_dir() {
+        return (Vec::new(), None);
+    }
+    let mut items: Vec<ArtifactItem> = Vec::new();
+    let manifest_path = captures_dir.join("capture_manifest.json");
+    if manifest_path.is_file() {
+        items.push(ArtifactItem {
+            kind: "capture_manifest".to_string(),
+            path: "captures/capture_manifest.json".to_string(),
+        });
+    }
+    let summary_grid = captures_dir.join("summary_grid.png");
+    if summary_grid.is_file() {
+        items.push(ArtifactItem {
+            kind: "summary_grid".to_string(),
+            path: "captures/summary_grid.png".to_string(),
+        });
+        let summary_grid_json = captures_dir.join("summary_grid.json");
+        if summary_grid_json.is_file() {
+            items.push(ArtifactItem {
+                kind: "summary_grid_json".to_string(),
+                path: "captures/summary_grid.json".to_string(),
+            });
+        }
+    }
+    let mut grids: Vec<String> = Vec::new();
+    let mut frames: u64 = 0;
+    if let Ok(read_dir) = std::fs::read_dir(&captures_dir) {
+        for entry in read_dir.flatten() {
+            let name = entry.file_name();
+            let name_str = name.to_string_lossy().to_string();
+            if name_str.starts_with("grid_") && name_str.ends_with(".png") {
+                grids.push(name_str);
+            } else if name_str.starts_with("frame_") && name_str.ends_with(".png") {
+                frames += 1;
+            }
+        }
+    }
+    grids.sort();
+    for g in grids {
+        items.push(ArtifactItem {
+            kind: "capture_grid".to_string(),
+            path: format!("captures/{g}"),
+        });
+    }
+    if frames > 0 {
+        items.push(ArtifactItem {
+            kind: "capture_frames".to_string(),
+            path: format!("captures/ ({frames} frame_*.png)"),
+        });
+    }
+    let link = if items.is_empty() {
+        None
+    } else {
+        Some("captures/".to_string())
+    };
+    (items, link)
 }
 
 fn apply_settings_patch(settings: &mut Settings, patch: &SettingsPatch) -> Vec<String> {

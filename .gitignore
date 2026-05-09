@@ -51,6 +51,14 @@ prototype_runs/*
 !prototype_runs/native/
 prototype_runs/native/*
 !prototype_runs/native/README.md
+# BP closure artifacts — the AI-Agent Self-Test Report + BP Goal Coverage Report
+# live inside `bp<N>_<UTC>_<hash>/notes.md` and are the source-of-truth closure
+# evidence per `corefall/AGENTS.md` Build Point Closure Gate. Force-include the
+# notes.md only; the rest of bp<N>_* (events.jsonl, summary.json, captures/)
+# stays gitignored alongside every other bundle.
+!prototype_runs/native/bp[0-9]*_*/
+prototype_runs/native/bp[0-9]*_*/*
+!prototype_runs/native/bp[0-9]*_*/notes.md
 run_bundles/
 captures/
 screenshots/
