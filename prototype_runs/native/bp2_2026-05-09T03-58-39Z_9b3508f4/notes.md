@@ -123,11 +123,37 @@ Recommendation: human playtest is **optional confirmation** for BP2 closure (per
 | `weapon_reload_started` | 8 |
 | `weapon_reloaded` | 7 |
 
+## LLM-Graded Test Verdict
+
+The AI agent ran the LLM grader against the M2.5 win bundle's evidence (frames + events + observe + replay) and produced a structured 12-dimension graded verdict. See `prototype_runs/native/m2.5_2026-05-08T23-52-44Z_e5868b68/grading.json` for the full artifact.
+
+**Aggregate weighted score: 7.86 / 10  →  PASS_WITH_FUTURE_POLISH**
+
+| Dimension | Score | Verdict |
+|---|---|---|
+| `look.visual_clarity` | 5/10 | PARTIAL (FUTURE_OWNED: M4A) |
+| `look.material_distinctness` | 3/10 | PARTIAL (FUTURE_OWNED: M4A) |
+| `look.actor_presentation` | 6/10 | PARTIAL (FUTURE_OWNED: M4A + M4B) |
+| `look.juice_and_feedback` | 8/10 | PASS_WITH_FUTURE_POLISH (DR-055 + M5.5) |
+| `feel.simulation_responsiveness` | 9/10 | PASS |
+| `feel.weight_and_physicality` | 8/10 | PASS |
+| `feel.mission_pacing` | 9/10 | PASS |
+| `feel.strategic_choice_legibility` | 6/10 | PARTIAL (FUTURE_OWNED: M4A — visual half blocked, gameplay half PASS) |
+| `goal.fun_proof_delivery` | 9/10 | PASS |
+| `goal.bp_promise_coverage` | 10/10 | PASS |
+| `agent.cfctl_full_coverage` | 10/10 | PASS |
+| `agent.evidence_completeness` | 9/10 | PASS |
+
+**Summary:** M2.5 micro reactor defense fun-slice delivers its BP2 promise end-to-end. The strategic-choice gameplay (preserve shield = win; breach shield = loss) is real and produces dramatically different end-states (1 vs 24 carves; 0 vs 10 reactor_damaged; mission.result=won vs lost). All BP2 systems (M2 chunked terrain, M2.5 reactor world, M3A snapshot events + replay verifier) are exercised end-to-end and replay verifier shows 0 divergences. Sub-perfect dimensions are all M4A-owned (per-material color overlays + sprite distinctness) or M4B-owned (sprite animation states); the gameplay layer scores 9-10 across the board. BP2 itself is PASS_WITH_FUTURE_POLISH; the polish lands in BP3.
+
+**Validate:** `python3 game/tools/llm_grade_run.py validate --bundle prototype_runs/native/m2.5_2026-05-08T23-52-44Z_e5868b68 --write` → PASS.
+
 ## Human Playtest Survey (optional confirmation)
 
-_This section is OPTIONAL per `corefall/AGENTS.md` Build Point Closure Gate. The AI-Agent Self-Test Report above is the gating contract. The project owner may add a row here after playing the BP._
+_This section is OPTIONAL per `corefall/AGENTS.md` Build Point Closure Gate. The AI-Agent Self-Test Report + LLM-Graded Test Verdict above are the gating contracts. The project owner may add a row here after playing the BP._
 
 - **Question:** Did BP2 make the game more fun than the previous BP?
-- **Reference summary grid:** `see captures/summary_grid.png`
+- **Reference summary grid:** `prototype_runs/native/m2.5_2026-05-08T23-52-44Z_e5868b68/captures/summary_grid.png`
+- **Reference grading.json:** `prototype_runs/native/m2.5_2026-05-08T23-52-44Z_e5868b68/grading.json`
 - **Owner's answer:** _(empty until played)_
 - **Concrete observations:** _(empty until played)_

@@ -40,6 +40,32 @@ Post-merge of PR #11 (BP2 — Terrain & Replay Build, commit `4d8abc7`), an AI-d
 
 **Numbers:** 237 tests pass workspace-wide (no regressions vs the BP2 baseline of 237). `self_play_sweep.sh` 13/13 PASS post-fix. `summary.json.artifacts.items[]` populated with 4-7 entries per bundle (capture_manifest + summary_grid + summary_grid_json + grid_NNN.png + capture_frames count). `summary.json.capture.summary_grid.non_blank_ratio` = 0.9844-1.0 across all BP2 fun-proof scenarios.
 
+### LLM-Graded Test Verdicts (BP2+ closure gate)
+
+Pass/fail is no longer enough for fun-proof scenarios. A binary `PASS` cell hides the difference between "the test exited 0 because the assertion fired" and "the test exited 0 AND the simulation behavior is the right kind of fun". Bugbot/Devin commit-diff review does not catch this; cf-e2e `--expect` does not catch this. The fix is **dimensional LLM grading** by the AI agent driving the corefall-review session.
+
+**New artifacts:**
+
+- `game/content/scenarios/grading/<scenario>.grading.json` — per-scenario grading-criteria contract declaring 6-12 dimensions (look.\* / feel.\* / goal.\* / agent.\*) with: criterion prose, evidence_required pointers, weight, future_owners_if_blocked. Shipped for `micro_reactor_defense`, `micro_breach`, `m2_material_lane`.
+- `game/tools/llm_grade_run.py` — three-subcommand harness: `scaffold` writes a grading.json skeleton inside a run bundle from the scenario's criteria; `validate` enforces every dimension has non-placeholder score + 30+-char prose + non-empty `evidence_read` audit trail + valid verdict, plus aggregate >= `minimum_aggregate_for_pass` (default 7.0/10) and per-dimension scores classified as PARTIAL/FUTURE_OWNED when below `minimum_per_dimension_for_pass`; `report` prints a Markdown summary suitable for embedding in the AI-Agent Self-Test Report or BP closure note.
+- `prototype_runs/native/<bundle>/grading.json` — durable LLM-graded verdict artifact, force-included in git via `.gitignore` exception for `m[0-9]*_*/grading.json` and `bp[0-9]*_*/grading.json` so reviewers can audit the grades offline without re-running the scenario.
+- `game/tools/self_play_sweep.sh` — auto-scaffolds grading.json for fun-proof bundles produced this hour.
+- `game/tools/prototype_run_check.py` — validates `grading.json` shape when present (schema_version, required fields, dimensions[].score type) so a malformed grading file is caught at run-bundle time, not at review time.
+
+**New review-skill enforcement:**
+
+- `.claude/skills/corefall-review/SKILL.md` adds **§LLM-Graded Test Verdicts Gate** with the workflow (scaffold → fill → validate → report), reviewer enforcement rules (aggregate >= 7.0; below-min dims must be FUTURE_OWNED with owning milestone OR flagged NEEDS_FIXES; agent identity + timestamp recorded), and CI vs review enforcement boundary (CI keeps mechanical tests; corefall-review enforces LLM grading).
+- `.claude/skills/corefall-review/SKILL.md` adds **\"LLM-Graded Test Verdict missing or invalid\"** to the Important Findings (Blocker-level) list.
+- `corefall/AGENTS.md` Build Point Closure Gate adds the **LLM-Graded Test Verdict** as a mandatory closure artifact (alongside the AI-Agent Self-Test Report).
+
+**BP2 LLM-graded verdict (proof of concept):**
+
+- `prototype_runs/native/m2.5_2026-05-08T23-52-44Z_e5868b68/grading.json` — agent: `Droid (Sonnet 4.5)`. Aggregate weighted score: **7.86 / 10 → PASS_WITH_FUTURE_POLISH**.
+- Per-dimension verdicts: `feel.simulation_responsiveness` 9/10 PASS; `feel.weight_and_physicality` 8/10 PASS; `feel.mission_pacing` 9/10 PASS; `goal.fun_proof_delivery` 9/10 PASS; `goal.bp_promise_coverage` 10/10 PASS; `agent.cfctl_full_coverage` 10/10 PASS; `agent.evidence_completeness` 9/10 PASS; `look.juice_and_feedback` 8/10 PASS_WITH_FUTURE_POLISH (DR-055 + M5.5); `look.actor_presentation` 6/10 PARTIAL (FUTURE_OWNED: M4A + M4B); `feel.strategic_choice_legibility` 6/10 PARTIAL (FUTURE_OWNED: M4A); `look.visual_clarity` 5/10 PARTIAL (FUTURE_OWNED: M4A); `look.material_distinctness` 3/10 PARTIAL (FUTURE_OWNED: M4A).
+- The grading proves: BP2's gameplay layer (sim responsiveness, weight, pacing, fun-proof delivery, system coverage) is solid (9-10 across the board); the visual layer (clarity, material distinctness, actor presentation) is M4A-blocked and tracked as FUTURE_OWNED. Without the LLM grading, the binary `PASS` from cf-e2e + self_play_sweep would have hidden the M4A-block and BP3 (which owns M4A) would have inherited a poorly-articulated visual debt.
+
+**Why LLM grading matters:** the BP2 PR #11 review-loop ran 7 iterations of Bugbot/Devin commit-diff review and self_play_sweep was 13/13 PASS, yet I just identified 4 substantive contract gaps (source-truthful evidence, T-CAPTURE recording, headless-smoke shadowing, human-playtest-as-mandatory) AND multiple FUTURE_OWNED visual-layer blockers when the LLM grading was applied. The grading is not theater; it is the difference between mechanically-correct tests and gameplay-correct tests.
+
 ### Added (BP2 — Terrain & Replay Build — M2 + M2.5 + M3A engineering-complete)
 
 BP2 closes three milestones bundled under one shippable artifact: chunked pixel terrain (M2), micro reactor defense fun-slice (M2.5), and the event recorder core + headless replay verifier (M3A). 228 tests pass workspace-wide (24 new vs the 204 BP1 baseline), zero clippy warnings under `-D warnings`, zero rustfmt drift, zero JSON-schema drift, and the `self_play_sweep.sh` produces 13/13 PASS rows including the four new BP2 entries (`m2_dig_concrete_refuse_metal`, `m2_5_micro_reactor_defense_win`, `m2_5_micro_reactor_defense_loss`, `m3a_headless_replay_m2_5_win`).

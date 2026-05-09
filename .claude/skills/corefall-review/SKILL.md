@@ -92,6 +92,63 @@ Optional: a **`## Human Playtest Survey (optional confirmation)`** section can s
 
 The reviewer's verdict on the BP IS the verdict on the AI-Agent Self-Test Report. If the report is missing, hand-waved, or has placeholder text where the agent's prose observation should be, the verdict is `Needs Fixes`. The agent does not get to skip writing the prose by saying "the test passed" — the prose IS the test.
 
+## LLM-Graded Test Verdicts Gate
+
+Pass/fail is not enough for fun-proof scenarios. Every BP fun-proof scenario closure must include an **LLM-graded verdict** along multiple dimensions (look / feel / goal / agent), not just `--expect key=value` literal pass/fail. The grading is performed by the AI agent driving the corefall-review session: the agent reads each dimension's evidence (frames, events, observe, replay), writes prose-justified scores, and emits a structured `grading.json` artifact alongside the run bundle.
+
+### Why dimensional grading
+
+A binary `PASS` cell hides the difference between:
+
+- "the test exited 0 because the assertion fired" (mechanical pass)
+- "the test exited 0 AND the simulation behavior is the right kind of fun" (gameplay pass)
+- "the test exited 0 but the visuals are M0-level placeholder squares" (mechanical pass + visual NEEDS_FIXES)
+- "the test exited 0 but the strategic choice the BP claims to deliver is invisible to the player" (mechanical pass + design FAIL)
+
+The `--expect` framework catches bug class 1; LLM grading catches bug classes 2-4. Bugbot/Devin commit-diff review does not catch them either (those reviewers see code, not run behavior). The corefall-review skill IS the loop where this grading is recorded + audited.
+
+### Workflow
+
+1. **Per-scenario grading-criteria contract.** Each fun-proof scenario has a sibling file at `game/content/scenarios/grading/<scenario_id>.grading.json` declaring 8-15 dimensions (look.*, feel.*, goal.*, agent.*), each with: criterion prose, evidence_required pointers, weight, future_owners_if_blocked, score range. The contract is owned by the canonical roadmap; changing it changes the BP's fun-proof definition.
+
+2. **Scaffold.** When self_play_sweep.sh produces a fun-proof bundle, it auto-writes a `grading.json` skeleton inside the bundle dir via `python3 game/tools/llm_grade_run.py scaffold --bundle <dir>`. The skeleton has the contract's dimensions + empty score/prose/verdict cells.
+
+3. **Fill.** During `/corefall-review BP<N>`, the agent reads each dimension's `evidence_required` (summary_grid.png frames, events.jsonl rows, observe.once fields, replay verifier output) AND writes:
+   - `score`: 0-10 numeric score
+   - `evidence_read`: list of files/rows/fields the agent actually read (auditable trail)
+   - `prose`: 30+ char prose justification articulating look / feel / goal observation
+   - `verdict`: PASS / PASS_WITH_FUTURE_POLISH / PARTIAL (FUTURE_OWNED) / NEEDS_FIXES / BLOCKER
+   The agent edits `grading.json` directly via Edit/Create tools.
+
+4. **Validate.** `python3 game/tools/llm_grade_run.py validate --bundle <dir> --write` enforces:
+   - Every dimension has a non-placeholder score in the rubric range.
+   - Every dimension has prose >= 30 chars (no "looks correct" / "PASS" / "I checked the source" cells).
+   - Every dimension has at least one entry in `evidence_read` (the agent must record what it actually read).
+   - Every dimension's verdict is non-empty and non-placeholder.
+   - Every dimension scoring below `minimum_per_dimension_for_pass` is classified as PARTIAL/FUTURE_OWNED with explicit `future_owners_if_blocked` OR flagged as NEEDS_FIXES.
+   - Aggregate weighted score >= `minimum_aggregate_for_pass` (default 7.0/10).
+   - Top-level verdict + summary_prose are non-placeholder.
+   Validator exits 0 on PASS, 1 on FAIL. Aggregate is computed weighted-average across dimensions.
+
+5. **Report.** `python3 game/tools/llm_grade_run.py report --bundle <dir>` prints a Markdown table suitable for embedding in the AI-Agent Self-Test Report or the BP closure note.
+
+### What the reviewer enforces
+
+The reviewer (running `/corefall-review BP<N>`) MUST confirm:
+
+- Every fun-proof bundle for the BP has a `grading.json` artifact (mandatory from BP2 onward; BP1 grading.json is retroactive and recommended).
+- Every grading.json validates: aggregate >= 7.0, no placeholder cells, no "I checked the source" prose, every below-min dimension classified as future-owned or NEEDS_FIXES.
+- The agent identity + timestamp are recorded so multiple agent runs can be compared.
+- Dimensions scoring < `minimum_per_dimension_for_pass` AND not classified as FUTURE_OWNED are surfaced as **`Needs Fixes`** findings in the review report.
+- Dimensions scoring < `minimum_per_dimension_for_pass` AND classified as FUTURE_OWNED contribute to the **Minimum-Bar Design Coverage Matrix** as future-owned items with their owning milestone.
+- The aggregate score AND the per-dimension grades are quoted in the BP Goal Coverage Report (Final Output §7) so the verdict is auditable.
+
+A grading.json with aggregate >= 9.0 is `PASS`. 7.0-8.9 is `PASS_WITH_FUTURE_POLISH` (BP closes; future BP picks up the polish via the future_owners_if_blocked annotations). 5.0-6.9 is `PARTIAL` (BP closes only if every below-min dim has FUTURE_OWNED classification). < 5.0 aggregate or any below-min dim that's NEEDS_FIXES = `Needs Fixes` review verdict.
+
+### CI vs review enforcement
+
+Pure-mechanical tests (cargo test, prototype_run_check.py, schema validation, cf-e2e --expect) stay as gating CI checks because they don't need an LLM. LLM-graded tests run during local validation by the AI agent (Droid) AND during `/corefall-review BP<N>` and are recorded in the bundle as auditable evidence. CI does NOT enforce LLM grading directly because there's no LLM in CI; instead, the corefall-review skill enforces that the LLM grading was done by an agent and recorded — and Bugbot/Devin can be configured at BP3+ to read the grading.json on PR review and flag stale/missing cells.
+
 ## Hands/Eyes/Ears Capability Floor (the agent's responsibility, enforced here)
 
 The AI agent is the playtest mechanism for Corefall. That is only true if the agent has full hands/eyes/ears coverage of the game at the milestone's maturity level. The reviewer must confirm:
@@ -150,6 +207,7 @@ Treat these as Blocker-level issues unless evidence proves a lower severity is m
 - T-CAPTURE evidence (`summary_grid.png` + `capture_manifest.json`) is missing for a BP2+ fun-proof scenario, OR is not recorded in `summary.json.artifacts.items[]`, OR the cf-e2e script lacks the `capture.summary_grid.non_blank_ratio>=0.95` expectation.
 - **BP Goal Coverage Gate failure:** the BP's stated goals from `prototype-roadmap.md` are not all mapped to evidence (cfctl action + frame + event + observe field), OR the agent's prose articulation of look/feel/juice is missing, OR the agent claims a goal is met without reading the relevant `summary_grid.png` frame.
 - **AI-Agent Self-Test Report missing or hand-waved:** the report at `prototype_runs/native/<bp>_*/notes.md` lacks any of Q1..Q7, has placeholder text instead of agent prose, or lacks the agent identity + timestamp.
+- **LLM-Graded Test Verdict missing or invalid:** any BP fun-proof bundle (BP2 onward) lacks a `grading.json` artifact, OR the artifact fails `python3 game/tools/llm_grade_run.py validate`, OR aggregate score is below `minimum_aggregate_for_pass`, OR any per-dimension score is below `minimum_per_dimension_for_pass` AND not classified as FUTURE_OWNED.
 - **Source-truthful evidence violation:** run bundles, summaries, observations, or checklist rows contain hardcoded metadata that does not reflect the loaded scenario, active config, current binary/git state, or actual runtime path. Examples: every bundle's `summary.json.tests[0].id` hardcoded to "M0-SMOKE-01" regardless of milestone; `summary.json.next_actions` hardcoded to "Proceed to M1" for an M2.5 bundle; `summary.json.notes_extra` containing M0-only DR-002 staging prose ("M2/M3 will append terrain bytes") in an M2.5 bundle that already shipped that capability; `summary.json.artifacts.items[]` empty when `captures/summary_grid.png` exists on disk.
 - The implementation meets a narrow task-card wording but misses an obvious inside-scope player-facing affordance, feedback state, `cfctl` observation/action, replay event, failure path, physical profile, or UX expectation implied by the milestone and product promise.
 - User-controllable input can panic, corrupt state, access unintended paths, or bind control/server surfaces outside approved local boundaries.
@@ -214,6 +272,7 @@ Use [templates/review-report.md](templates/review-report.md) for the final repor
 12. Run a **Self-Play Validation Review**: confirm the implementing agent produced the Self-Play Validation Matrix (Hands / Eyes / Ears / Hear rows + mission win/loss + headless smoke + 60+120 Hz determinism rows), confirm `summary_grid.png` was personally read for every `act.*` action exercised, and confirm the harness was extended in-pass when a row could not be filled (the "make it possible" clause).
 13. Run the **BP Goal Coverage Gate**: enumerate the BP's stated goals verbatim from `prototype-roadmap.md` and map each goal to evidence (cfctl action → frame → event → observe field → test). Articulate the look/feel/juice in agent prose. Block on missing prose or hand-waved goals.
 14. Run the **AI-Agent Self-Test Report Gate**: confirm `prototype_runs/native/<bp>_*/notes.md` contains the `## AI-Agent Self-Test Report` section answering Q1..Q7 with concrete evidence, plus the agent identity + timestamp. Human-playtest survey row is optional and does not block when this report is complete.
+14a. Run the **LLM-Graded Test Verdicts Gate** (BP2 onward): confirm every BP fun-proof bundle has a `grading.json` that passes `python3 game/tools/llm_grade_run.py validate`. Confirm aggregate >= 7.0, every per-dimension score >= 5 OR classified as FUTURE_OWNED with an owning milestone, no placeholder cells. Quote the aggregate + per-dimension verdicts in §7 (BP Goal Coverage Report).
 15. Run the **Hands/Eyes/Ears Capability Floor check**: every milestone-scope action has a JSON-RPC method + cfctl script; every fun-proof scenario has summary_grid.png + per-event keyframes recorded in summary.json.artifacts.items[]; every player-visible state is reachable via observe.once and emits a structured event. Missing floor row = milestone bug ("make it possible" clause).
 16. Run a **Universal Enhancement Audit (DR-056)**: confirm every M1+ milestone's universal rows PASS (per-tier perf, CI bench regression, memory-leak soak, network sync, replay determinism CI, cfctl scriptability, AI-agent validation report, AI audio pipeline, juice rules, ACC-A floor, Tier-A localization keyed strings, modding parity, anti-FOMO + anti-pay-to-win audit, captions for ALL audio). Allow staging at BP boundary only when documented.
 17. Run a **Design-Completeness Map cross-check**: locate the milestone in the Design-Completeness Map; if the milestone delivers a row in that map, confirm the row's claim against the implementation. If the map and the implementation diverge, flag as a roadmap drift finding.

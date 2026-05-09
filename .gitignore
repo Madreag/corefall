@@ -59,6 +59,19 @@ prototype_runs/native/*
 !prototype_runs/native/bp[0-9]*_*/
 prototype_runs/native/bp[0-9]*_*/*
 !prototype_runs/native/bp[0-9]*_*/notes.md
+!prototype_runs/native/bp[0-9]*_*/grading.json
+# LLM-graded test verdicts produced for fun-proof bundles (BP2 onward) per
+# `.claude/skills/corefall-review/SKILL.md` §LLM-Graded Test Verdicts Gate.
+# Only the grading.json itself is closure evidence; the rest of the bundle
+# (events.jsonl, summary.json, captures/, frame_*.png) is too large + churns
+# too fast for git. Force-include grading.json in any milestone-prefixed
+# bundle (m1.5_*, m2_*, m2.5_*, m3a_*, etc.) so reviewers can audit the
+# LLM grades offline without re-running the scenario. .gitignore needs the
+# parent dir to be un-ignored first; we whitelist the parent + exclude its
+# contents + re-allow grading.json — same pattern as the bp[0-9]* block above.
+!prototype_runs/native/m[0-9]*_*/
+prototype_runs/native/m[0-9]*_*/*
+!prototype_runs/native/m[0-9]*_*/grading.json
 run_bundles/
 captures/
 screenshots/
