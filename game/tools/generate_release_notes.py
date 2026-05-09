@@ -820,7 +820,8 @@ def _install_quality_blurb(tag: TagInfo, bp_num: int) -> str:
         return "This is a **release candidate** (online + public PvP/MMO; shippable to public-facing playtests)."
     # Legacy bp<N> tags fall back to the BP-derived channel description.
     canonical = channel_for_bp(bp_num)
-    return f"This is a **{canonical}** release (legacy `-bp{bp_num}` tag form)."
+    article = "an" if canonical in ("alpha", "rc") else "a"
+    return f"This is {article} **{canonical}** release (legacy `-bp{bp_num}` tag form)."
 
 
 def _install_signing_blurb(bp_num: int, is_launch_ga: bool) -> str:
