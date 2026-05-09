@@ -465,6 +465,8 @@ pub enum ScenarioLoadError {
         objective_id: String,
         reactor_id: String,
     },
+    #[error("scenario {path} reactor `{reactor_id}` declares hp={hp} (must be > 0; a destroyed-on-spawn reactor cannot reset)")]
+    ReactorHpNotPositive { path: String, reactor_id: String, hp: f32 },
 }
 
 impl ScenarioActor {
@@ -561,13 +563,25 @@ impl Scenario {
             }
         }
 
-        // M2.5: reactor ids unique.
+        // M2.5: reactor ids unique + hp positive.
         let mut reactor_ids = std::collections::HashSet::new();
         for reactor in &self.reactors {
             if !reactor_ids.insert(reactor.id.clone()) {
                 return Err(ScenarioLoadError::DuplicateReactorId {
                     path: path.to_string(),
                     reactor_id: reactor.id.clone(),
+                });
+            }
+            // Bugbot 3212274163 (Low): a reactor declared with hp <= 0
+            // would start destroyed AND `reset()` would set hp = max_hp = 0
+            // so the reactor stays destroyed forever (since
+            // `is_destroyed` returns `destroyed || hp <= 0`). Reject at
+            // load so scenarios cannot author an unresettable reactor.
+            if !reactor.hp.is_finite() || reactor.hp <= 0.0 {
+                return Err(ScenarioLoadError::ReactorHpNotPositive {
+                    path: path.to_string(),
+                    reactor_id: reactor.id.clone(),
+                    hp: reactor.hp,
                 });
             }
         }
@@ -824,6 +838,66 @@ mod tests {
         assert!(matches!(
             bad.validate("t.ron"),
             Err(ScenarioLoadError::ObjectiveUnknownActor { .. })
+        ));
+    }
+
+    #[test]
+    fn rejects_reactor_with_zero_or_negative_hp() {
+        // Bugbot 3212274163 (Low) regression: a reactor declared with
+        // hp <= 0 would start destroyed AND can never be reset (since
+        // max_hp = hp = 0 and `is_destroyed` returns `hp <= 0`). The
+        // validator MUST reject the scenario at load.
+        let scenario = Scenario {
+            schema_version: 1,
+            id: "test".to_string(),
+            display_name: "test".to_string(),
+            description: "test".to_string(),
+            seed: 0,
+            duration_ticks: None,
+            region: ScenarioRegion {
+                anchor: (0.0, 0.0),
+                width: 100.0,
+                height: 100.0,
+            },
+            gravity: -980.0,
+            floor_y: 0.0,
+            teams: vec![],
+            actors: vec![],
+            objectives: vec![],
+            mission: None,
+            breaches: vec![],
+            terrain: None,
+            reactors: vec![ScenarioReactor {
+                id: "core".to_string(),
+                position: (50.0, 50.0),
+                half_extents: (10.0, 10.0),
+                hp: 0.0,
+            }],
+            director: None,
+            capabilities: ScenarioCapabilities::default(),
+            save_fields: vec![],
+            expected_tests: vec![],
+            notes: String::new(),
+        };
+        assert!(matches!(
+            scenario.validate("t.ron"),
+            Err(ScenarioLoadError::ReactorHpNotPositive { .. })
+        ));
+
+        // Negative hp also rejected.
+        let mut s2 = scenario.clone();
+        s2.reactors[0].hp = -10.0;
+        assert!(matches!(
+            s2.validate("t.ron"),
+            Err(ScenarioLoadError::ReactorHpNotPositive { .. })
+        ));
+
+        // NaN rejected.
+        let mut s3 = scenario;
+        s3.reactors[0].hp = f32::NAN;
+        assert!(matches!(
+            s3.validate("t.ron"),
+            Err(ScenarioLoadError::ReactorHpNotPositive { .. })
         ));
     }
 }
