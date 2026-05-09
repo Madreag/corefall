@@ -2444,18 +2444,21 @@ fn status_change_cause(outcome: &ActorTickOutcome) -> &'static str {
 /// Canonical roadmap milestone ordering, used by every per-milestone helper
 /// that needs "is this milestone >= Mx?". Each index is a position in the
 /// canonical Build Points spine — M0=0, M1=1, M1.5=2, M2=3, M2.5=4, M3A=5,
-/// M3B=6, M4A=7, M4B=8, M5=9, ... M12=29. Unknown milestones map to
-/// `MILESTONE_INDEX_UNKNOWN` (after M12) so they default to the final-state
-/// universe (every category is included, every addendum fires) — better to
-/// over-document a future milestone than silently skip categories that have
-/// been shipping for years.
+/// M3B=6, M4A=7, M4B=8, M5=9, M5.5=10, M5.5.5=11, M5.6=12, M5.7=13, M5.8=14,
+/// M5.9=15, M5.9.5=16, M5.10=17, M6=18, M6.5=19, M6.6=20, M7=21, M7.5=22,
+/// M7.7=23, M8=24, M8.5=25, M8.6=26, M9=27, M9.5=28, M10=29, M11=30, M12=31.
+/// Unknown milestones map to `MILESTONE_INDEX_UNKNOWN` (after M12) so they
+/// default to the final-state universe (every category is included, every
+/// addendum fires) — better to over-document a future milestone than
+/// silently skip categories that have been shipping for years.
 ///
 /// Append a row when a new milestone lands in the canonical roadmap. The
-/// constants below (`MILESTONE_INDEX_M1`, `_M1_5`, `_M2`, `_M3A`) are
-/// landmark gates the category-layering logic checks; only add new
-/// constants here when a new event category is introduced (the current
-/// landmarks cover M1 actor, M1.5 ai/mission/terrain, M2 material, M3A
-/// snapshot; if M5.6 introduces a new category, add `MILESTONE_INDEX_M5_6`).
+/// constants below (`MILESTONE_INDEX_M0`, `_M1`, `_M1_5`, `_M2`, `_M3A`) are
+/// landmark gates the category-layering logic + DR-007 addendum check; only
+/// add new constants here when a new event category or schema is introduced
+/// (the current landmarks cover M0 baseline, M1 actor, M1.5 ai/mission/terrain,
+/// M2 material, M3A snapshot; if M5.6 introduces a new category, add
+/// `MILESTONE_INDEX_M5_6`).
 const MILESTONE_INDEX_M0: u32 = 0;
 const MILESTONE_INDEX_M1: u32 = 1;
 const MILESTONE_INDEX_M1_5: u32 = 2;
@@ -2600,27 +2603,23 @@ fn notes_addendum_for_milestone(milestone: &str) -> String {
     s.push_str(
         "- Localization deferred to M4 — the discipline rule (no baked English-only player-facing strings) applies.\n",
     );
-    // DR-007 launch material set is introduced in M2 and inherited by every
-    // milestone that interacts with chunked terrain. Devin 3212416515 caught
-    // the prior `starts_with("m3")` arm which incorrectly bucketed M3B
-    // (Replay Viewer + Debrief, no terrain dependency) into the material-aware
-    // set. Use an explicit allowlist so future milestones must opt in
-    // affirmatively and unrelated milestones (M3B, M4A, M4B) don't get the
-    // material addendum baked into their notes.md by accident.
-    // Bugbot 3212538008 caught the dead `"m4"` arm: there is no standalone M4
-    // milestone in the canonical roadmap (only M4A + M4B). The test at line
-    // ~3550 asserts m4a/m4b do NOT get the DR-007 addendum (they're
-    // readability + comic-noir polish, not terrain-system milestones), so
-    // `"m4"` was unreachable + misleading. The corrected allowlist is the
-    // milestones that actually own or extend the material system: M2 (chunked
-    // terrain core), M2.5 (reactor world built on chunked terrain), M3A
-    // (event recorder lays material event types), M5+ (full collision +
-    // material kernel + hazard package + atmospherics).
-    let material_aware = matches!(
-        normalized.as_str(),
-        "m2" | "m2.5" | "m3a" | "m5" | "m5.5" | "m5.5.5" | "m5.6" | "m5.7" | "m5.8" | "m5.9" | "m5.9.5" | "m5.10"
-    );
-    if material_aware {
+    // DR-007 launch material set is reference documentation for what the
+    // material system shape is. Every M2+ bundle that has material events
+    // in events.jsonl benefits from seeing it, including milestones that
+    // RUN ON TOP OF chunked terrain (M3B replay viewer, M4A readability)
+    // and milestones that EXTEND it (M5.5 collision + materials, M5.6
+    // material kernel, M6.6 AI material competence, M7.5 base atmospherics,
+    // M8.5 material lab, M8.6 mining + refining).
+    //
+    // Bugbot 3212607793 + Devin 3212623450 caught the prior explicit
+    // allowlist that stopped at M5.10 — when M6.6 / M7.5 / M8.5 / M8.6
+    // (all of which clearly extend or work with materials) ship, they
+    // would have silently missed the addendum. The fix matches the
+    // category-layering pattern: `idx >= MILESTONE_INDEX_M2` so every
+    // milestone past M2 in roadmap order inherits the material reference.
+    // Unknown milestones map to MILESTONE_INDEX_UNKNOWN (post-M12) so
+    // future milestones default to including the addendum.
+    if idx >= MILESTONE_INDEX_M2 {
         s.push_str("\n## DR-007 launch material set\n\n");
         s.push_str("- 8 launch materials (ids 0..7): `air`, `dirt`, `concrete`, `metal_nohook`, `hazard`, `loose_fill`, `repair_fill`, `anchor`. `material_schema_version=cf-terrain-launch-v1`.\n");
         s.push_str("- Per-material affordances cover solid/diggable/hardness/anchorable/hazard/path_cost/overlay_rgba/refusal_reason.\n");
@@ -3710,19 +3709,32 @@ mod tests {
     }
 
     #[test]
-    fn notes_addendum_excludes_dr007_for_non_terrain_milestones() {
-        // Devin 3212416515 regression: the prior `starts_with("m3")` arm
-        // bucketed M3B (Replay Viewer, no terrain) into the DR-007 material
-        // set. After the fix, only M2/M2.5/M3A + M4..M5.10 milestones get
-        // the launch-material addendum.
-        assert!(!notes_addendum_for_milestone("m3b").contains("DR-007 launch material set"));
-        assert!(!notes_addendum_for_milestone("m4a").contains("DR-007 launch material set"));
-        assert!(!notes_addendum_for_milestone("m4b").contains("DR-007 launch material set"));
-        assert!(notes_addendum_for_milestone("m2").contains("DR-007 launch material set"));
-        assert!(notes_addendum_for_milestone("m2.5").contains("DR-007 launch material set"));
-        assert!(notes_addendum_for_milestone("m3a").contains("DR-007 launch material set"));
-        assert!(notes_addendum_for_milestone("m5").contains("DR-007 launch material set"));
-        assert!(notes_addendum_for_milestone("m5.5.5").contains("DR-007 launch material set"));
+    fn notes_addendum_includes_dr007_for_every_m2_plus_milestone() {
+        // Bugbot 3212607793 + Devin 3212623450 regression: DR-007 is
+        // reference documentation for the material set shape. Every M2+
+        // bundle has material events in events.jsonl + benefits from the
+        // addendum, regardless of whether the milestone EXTENDS or just
+        // RUNS ON TOP of chunked terrain. The prior explicit allowlist
+        // (M2/M2.5/M3A/M5..M5.10 only) excluded M3B/M4A/M4B + every M6+
+        // milestone — including M6.6 'AI Material Competence', M7.5 'Base
+        // Atmospherics', M8.5 'Material Lab', M8.6 'Mining'. Switched to
+        // `idx >= MILESTONE_INDEX_M2` to match the category-layering
+        // pattern.
+        for m in [
+            "m2", "m2.5", "m3a", "m3b", "m4a", "m4b", "m5", "m5.5", "m5.5.5", "m5.6", "m5.7", "m5.8", "m5.9", "m5.9.5",
+            "m5.10", "m6", "m6.5", "m6.6", "m7", "m7.5", "m7.7", "m8", "m8.5", "m8.6", "m9", "m9.5", "m10", "m11",
+            "m12",
+        ] {
+            assert!(
+                notes_addendum_for_milestone(m).contains("DR-007 launch material set"),
+                "{m} should include DR-007 addendum (idx >= M2)"
+            );
+        }
+        // M0 and M1 are PRE-material — they don't have material events yet,
+        // so the addendum is correctly omitted.
+        assert!(!notes_addendum_for_milestone("m0").contains("DR-007 launch material set"));
+        assert!(!notes_addendum_for_milestone("m1").contains("DR-007 launch material set"));
+        assert!(!notes_addendum_for_milestone("m1.5").contains("DR-007 launch material set"));
     }
 
     fn temp_run_root() -> PathBuf {
