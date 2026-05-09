@@ -214,7 +214,7 @@ impl M0EngineConfig {
     /// and `region` straight out of the loaded `Scenario`. The CLI may still override individual
     /// fields after this call.
     pub fn for_loaded_scenario(scenario: &crate::scenario::Scenario, scenario_path: PathBuf) -> Self {
-        let mut cfg = Self::for_test_scenario_only(&scenario.id, scenario_path);
+        let mut cfg = Self::for_test_scenario_only(&scenario.id, scenario_path.clone());
         cfg.seed = scenario.seed;
         cfg.duration_ticks = scenario.duration_ticks.unwrap_or(0);
         cfg.expected_tests = if scenario.expected_tests.is_empty() {
@@ -273,7 +273,8 @@ impl M0EngineConfig {
             // already rejected unknown materials before this point. If the
             // build still fails (e.g. width 0), we leave terrain empty and
             // record a tracing warning so the milestone bug surfaces.
-            match t.build_terrain() {
+            let scenario_path_str = scenario_path.display().to_string();
+            match t.build_terrain(&scenario_path_str) {
                 Ok(terrain) => {
                     cfg.initial_chunked_terrain = Some(terrain);
                     cfg.milestone = "m2".to_string();

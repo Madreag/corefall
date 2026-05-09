@@ -499,11 +499,16 @@ impl ChunkedTerrain {
         let min = [cx - r, cy - r];
         let max = [cx + r, cy + r];
         let (x0, y0, x1, y1) = self.aabb_to_pixels(min, max);
+        // Bugbot 3212180092: convert center world-space → pixel-space so
+        // the circle test matches the iteration bounds (which are
+        // pixel-space coming out of `aabb_to_pixels`).
+        let center_px_x = cx - self.anchor[0];
+        let center_px_y = cy - self.anchor[1];
         let mut written: u64 = 0;
         for py in y0..y1 {
             for px in x0..x1 {
-                let dx = (px as f32 + 0.5) - cx;
-                let dy = (py as f32 + 0.5) - cy;
+                let dx = (px as f32 + 0.5) - center_px_x;
+                let dy = (py as f32 + 0.5) - center_px_y;
                 if dx * dx + dy * dy <= r2 && self.set_pixel_internal(px, py, mat) {
                     written += 1;
                 }
@@ -551,14 +556,21 @@ impl ChunkedTerrain {
         let min = [origin[0] - r, origin[1] - r];
         let max = [origin[0] + r, origin[1] + r];
         let (x0, y0, x1, y1) = self.aabb_to_pixels(min, max);
+        // Bugbot 3212180092: `aabb_to_pixels` subtracts the terrain anchor
+        // when converting world → pixel space, so `px` / `py` iterate in
+        // pixel-space. `origin` is world-space. Compare in pixel-space by
+        // pre-subtracting the anchor from the origin so the carve circle
+        // isn't off-center for non-zero anchors.
+        let center_px_x = origin[0] - self.anchor[0];
+        let center_px_y = origin[1] - self.anchor[1];
 
         // First pass: probe for refusal-reason materials. A refusal short-circuits
         // the whole carve so the player gets a clean "this won't work" event.
-        let mut probe = [origin[0].round() as i64, origin[1].round() as i64];
+        let mut probe = [center_px_x.round() as i64, center_px_y.round() as i64];
         for py in y0..y1 {
             for px in x0..x1 {
-                let dx = (px as f32 + 0.5) - origin[0];
-                let dy = (py as f32 + 0.5) - origin[1];
+                let dx = (px as f32 + 0.5) - center_px_x;
+                let dy = (py as f32 + 0.5) - center_px_y;
                 if dx * dx + dy * dy > r2 {
                     continue;
                 }
@@ -585,8 +597,8 @@ impl ChunkedTerrain {
         let air = self.default_material;
         for py in y0..y1 {
             for px in x0..x1 {
-                let dx = (px as f32 + 0.5) - origin[0];
-                let dy = (py as f32 + 0.5) - origin[1];
+                let dx = (px as f32 + 0.5) - center_px_x;
+                let dy = (py as f32 + 0.5) - center_px_y;
                 if dx * dx + dy * dy > r2 {
                     continue;
                 }
@@ -635,6 +647,12 @@ impl ChunkedTerrain {
         let min = [origin[0] - r, origin[1] - r];
         let max = [origin[0] + r, origin[1] + r];
         let (x0, y0, x1, y1) = self.aabb_to_pixels(min, max);
+        // Bugbot 3212180092: same world→pixel anchor subtraction as
+        // try_carve. The blast circle test must compare px (pixel-space)
+        // against an anchor-subtracted origin so non-zero anchors don't
+        // off-center the blast.
+        let center_px_x = origin[0] - self.anchor[0];
+        let center_px_y = origin[1] - self.anchor[1];
 
         let mut counts: BTreeMap<MaterialId, u32> = BTreeMap::new();
         let mut count: u32 = 0;
@@ -645,8 +663,8 @@ impl ChunkedTerrain {
         let air = self.default_material;
         for py in y0..y1 {
             for px in x0..x1 {
-                let dx = (px as f32 + 0.5) - origin[0];
-                let dy = (py as f32 + 0.5) - origin[1];
+                let dx = (px as f32 + 0.5) - center_px_x;
+                let dy = (py as f32 + 0.5) - center_px_y;
                 if dx * dx + dy * dy > r2 {
                     continue;
                 }
@@ -685,12 +703,12 @@ impl ChunkedTerrain {
                 self.refusal_count += 1;
                 return ChunkedCarveOutcome::Refused(ChunkedCarveRefusal {
                     reason,
-                    probe_at: [origin[0].round() as i64, origin[1].round() as i64],
+                    probe_at: [center_px_x.round() as i64, center_px_y.round() as i64],
                     material: mat,
                 });
             }
             return ChunkedCarveOutcome::NoOp(ChunkedCarveNoOp {
-                probe_at: [origin[0].round() as i64, origin[1].round() as i64],
+                probe_at: [center_px_x.round() as i64, center_px_y.round() as i64],
             });
         }
         self.carve_count += 1;

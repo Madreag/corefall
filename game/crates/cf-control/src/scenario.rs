@@ -15,7 +15,7 @@ use cf_actor::{ActorId, ActorState, Inventory, InventoryItem, ItemSlot, Vec2};
 use cf_ai::ReactiveGuardParams;
 use cf_equipment::{rifle_preset, RifleState};
 use cf_mission::{LossConditions, Objective, ObjectiveKind, ObjectiveStatus, Reactor};
-use cf_terrain::{material_id_from_name, BreachStrip, ChunkedTerrain, MaterialId, TerrainStamp, MATERIAL_AIR};
+use cf_terrain::{material_id_from_name, BreachStrip, ChunkedTerrain, MaterialId, TerrainStamp};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Scenario {
@@ -271,8 +271,22 @@ impl ScenarioChunkedTerrain {
     /// Build a runtime [`ChunkedTerrain`] from this manifest. Returns an error
     /// if `default_material` or any stamp material name is not in the launch
     /// material set.
-    pub fn build_terrain(&self) -> Result<ChunkedTerrain, ScenarioLoadError> {
-        let default_id: MaterialId = material_id_from_name(&self.default_material).unwrap_or(MATERIAL_AIR);
+    ///
+    /// `path` is the scenario file path (used in error messages so reviewers
+    /// can find the offending file). Production callers go through
+    /// `Scenario::load_from_file -> validate -> for_loaded_scenario` which
+    /// already validates materials with the correct path; this method's
+    /// strictness exists so direct callers (tests, future tools) never
+    /// silently fall back to AIR for unknown defaults.
+    pub fn build_terrain(&self, path: &str) -> Result<ChunkedTerrain, ScenarioLoadError> {
+        // Devin BUG_pr-review-job 3212186926 (yellow): no `unwrap_or(MATERIAL_AIR)`
+        // — return a structured error if the manifest names an unknown
+        // material. This matches the strict stamp-material check below.
+        let default_id: MaterialId =
+            material_id_from_name(&self.default_material).ok_or_else(|| ScenarioLoadError::UnknownTerrainMaterial {
+                path: path.to_string(),
+                material: self.default_material.clone(),
+            })?;
         let mut terrain = ChunkedTerrain::new(self.width_px.max(1), self.height_px.max(1), default_id);
         if let Some((ax, ay)) = self.anchor {
             terrain.anchor = [ax, ay];
@@ -284,8 +298,12 @@ impl ScenarioChunkedTerrain {
                 ScenarioTerrainStamp::FillCircle { material, .. } => material,
             };
             if material_id_from_name(mat_name).is_none() {
+                // Devin BUG_pr-review-job 3212186980 (yellow): thread the
+                // scenario path through so the error message names the
+                // offending file instead of producing the previous
+                // "scenario  terrain stamp ..." with a blank path.
                 return Err(ScenarioLoadError::UnknownTerrainMaterial {
-                    path: String::new(),
+                    path: path.to_string(),
                     material: mat_name.clone(),
                 });
             }
