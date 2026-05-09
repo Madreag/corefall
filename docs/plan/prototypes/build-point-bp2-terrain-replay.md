@@ -47,7 +47,7 @@ last_updated: 2026-05-08
 
 ## T-RELEASE Status
 
-PENDING. Tag `v0.2.0-bp2` to be published after the BP2 PR merges into `main` per AGENTS.md § Cursor Bugbot Loop and § T-RELEASE. The retroactive `v0.1.0-bp1` tag is also still pending; both ship together when the project owner approves merge.
+PENDING. Tag `v0.2.0-prealpha` to be published after the versioning-channel migration PR merges into `main` per AGENTS.md § Cursor Bugbot Loop and § T-RELEASE. The retroactive `v0.1.0-prealpha` tag is also still pending; both ship together when the project owner approves merge. (The previously-planned legacy form `v0.2.0-bp2` is superseded by `v0.2.0-prealpha` per the 2026-05-09 channel migration; BP1+BP2 ship under the prealpha channel because major systems — full collision, atmospherics, AI combat — are still missing.)
 
 ## Human-Playtest Survey
 

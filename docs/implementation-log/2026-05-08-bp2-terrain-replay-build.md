@@ -205,6 +205,6 @@ All produced via `bash game/tools/self_play_sweep.sh` and validated via `python3
 | T-CAPTURE summary grid + capture_manifest.json | PASS — M2 + M2.5 win + M2.5 loss all >=0.95 non_blank_ratio |
 | `/corefall-review BP2` Accept verdict | PENDING — to be run before PR merge per AGENTS.md § Cursor Bugbot Loop |
 | Per-BP human-playtest survey row | READY_FOR_HUMAN_PLAYTEST — recorded in run bundle notes; project owner to fill in pre-merge |
-| T-RELEASE tag `v0.2.0-bp2` | PENDING — published after PR merge into main per AGENTS.md § T-RELEASE |
+| T-RELEASE tag `v0.2.0-prealpha` (was previously planned as `v0.2.0-bp2`; renamed per 2026-05-09 channel migration) | PENDING — published after the versioning-channel migration PR merges into main per AGENTS.md § T-RELEASE |
 
 BP2 is **engineering-complete**. The remaining gates (review skill, human playtest reaction, T-RELEASE tag) require user-driven steps and post-merge actions per the BP closure protocol.

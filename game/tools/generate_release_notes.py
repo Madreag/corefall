@@ -1,10 +1,16 @@
 #!/usr/bin/env python3
 """generate_release_notes.py — T-RELEASE release-notes payload generator.
 
-Reads a Build Point tag (e.g. `v0.1.0-bp1`), the staging directory holding the
-release archives + SHA256SUMS, and the most recent run bundle in
-`prototype_runs/native/`. Emits a Markdown release notes payload to the path
-given by `--output` for the `softprops/action-gh-release` step.
+Reads a Build Point tag (channel-based `v0.<N>.0-prealpha|alpha|beta|rc`,
+GA `v1.0.0`, or legacy `v0.<N>.0-bp<N>`), the staging directory holding
+the release archives + SHA256SUMS, and the most recent run bundle in
+`prototype_runs/native/`. Emits a Markdown release notes payload to the
+path given by `--output` for the `softprops/action-gh-release` step.
+
+Channel boundaries: prealpha BP0-BP3 (engine + first fun slices),
+alpha BP4-BP6 (full collision + atmospherics + AI combat),
+beta BP7-BP9 (mission director + creator alpha + server/LAN),
+rc BP10-BP11 (online + public systems beta), GA BP12 (launch).
 
 The generator is deterministic given the same inputs (commit + tag + bundles
 + tool version). It never invents data: if a section's evidence is missing,
@@ -25,7 +31,7 @@ Sections produced (in order):
 
 Usage:
     python3 game/tools/generate_release_notes.py \\
-        --tag v0.1.0-bp1 \\
+        --tag v0.1.0-prealpha \\
         --staging release-staging \\
         --output release-staging/RELEASE_NOTES.md
 """
@@ -41,7 +47,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
 
-GENERATOR_VERSION = "0.3.0"
+GENERATOR_VERSION = "0.4.0"
 
 # Static BP scope table. Matches the canonical Build Points table in
 # docs/plan/spec/prototype-roadmap.md. Update both in lockstep.
@@ -276,6 +282,28 @@ class TagInfo:
     bp: str
     bp_label: str
     is_launch_ga: bool
+    channel: str  # "prealpha" | "alpha" | "beta" | "rc" | "ga" | "bp" (legacy)
+
+
+# T-RELEASE channel boundaries. Tags whose BP falls outside the
+# channel's allowed range are rejected by parse_tag (with the legacy
+# `-bp<N>` form excluded from the boundary check for backward compat).
+CHANNEL_BP_RANGES = {
+    "prealpha": range(0, 4),   # BP0..BP3
+    "alpha": range(4, 7),      # BP4..BP6
+    "beta": range(7, 10),      # BP7..BP9
+    "rc": range(10, 12),       # BP10..BP11
+    "ga": range(12, 13),       # BP12
+}
+
+CHANNEL_LABEL = {
+    "prealpha": "Prealpha",
+    "alpha": "Alpha",
+    "beta": "Beta",
+    "rc": "Release Candidate",
+    "ga": "Launch GA",
+    "bp": "BP",  # legacy
+}
 
 
 @dataclass
@@ -290,9 +318,17 @@ class PullRequestEvidence:
 
 
 def parse_tag(raw: str) -> TagInfo:
-    """Parse `v0.1.0-bp1` or `v1.0.0` into structured TagInfo.
+    """Parse a T-RELEASE tag into structured TagInfo.
 
-    Tags MUST match the T-RELEASE versioning axis. Anything else fails fast.
+    Accepted shapes:
+    - `v1.0.0` (BP12 launch GA)
+    - `v0.<N>.0-prealpha` (BP0..BP3)
+    - `v0.<N>.0-alpha` (BP4..BP6)
+    - `v0.<N>.0-beta` (BP7..BP9)
+    - `v0.<N>.0-rc` (BP10..BP11)
+    - `v0.<N>.0-bp<N>` (legacy; backward compat with already-published
+      releases — new tags should use the channel-based form)
+    Anything else fails fast.
     """
     if raw == "v1.0.0":
         return TagInfo(
@@ -301,12 +337,49 @@ def parse_tag(raw: str) -> TagInfo:
             bp="bp12",
             bp_label="BP12",
             is_launch_ga=True,
+            channel="ga",
         )
+    # Channel-based form: v0.<N>.0-<channel>
+    m = re.fullmatch(r"v(\d+\.\d+\.\d+)-(prealpha|alpha|beta|rc)", raw)
+    if m:
+        version, channel = m.group(1), m.group(2)
+        major, minor, patch = (int(part) for part in version.split("."))
+        if major != 0 or patch != 0:
+            raise SystemExit(
+                f"generate_release_notes: tag '{raw}' does not match the T-RELEASE "
+                f"version axis. Pre-1.0 tags must use `v0.<N>.0-<channel>`."
+            )
+        bp_num = minor
+        allowed = CHANNEL_BP_RANGES[channel]
+        if bp_num not in allowed:
+            raise SystemExit(
+                f"generate_release_notes: tag '{raw}' uses channel '{channel}' "
+                f"but BP{bp_num} is outside its allowed range "
+                f"BP{allowed.start}..BP{allowed.stop - 1}. Channel boundaries: "
+                f"prealpha BP0-BP3, alpha BP4-BP6, beta BP7-BP9, rc BP10-BP11, "
+                f"GA BP12."
+            )
+        bp = f"bp{bp_num}"
+        if bp not in BP_SCOPE:
+            raise SystemExit(
+                f"generate_release_notes: tag '{raw}' refers to unknown {bp.upper()}. "
+                f"Add it to BP_SCOPE in this file + the canonical Build Points table."
+            )
+        return TagInfo(
+            raw=raw,
+            version=version,
+            bp=bp,
+            bp_label=bp.upper(),
+            is_launch_ga=False,
+            channel=channel,
+        )
+    # Legacy form: v0.<N>.0-bp<N>
     m = re.fullmatch(r"v(\d+\.\d+\.\d+)-bp(\d+)", raw)
     if not m:
         raise SystemExit(
             f"generate_release_notes: tag '{raw}' does not match T-RELEASE versioning "
-            f"axis. Expected `v0.<N>.0-bp<N>` (BP1..BP11) or `v1.0.0` (BP12 launch GA)."
+            f"axis. Expected `v0.<N>.0-(prealpha|alpha|beta|rc)` (BP0..BP11), "
+            f"`v1.0.0` (BP12 launch GA), or legacy `v0.<N>.0-bp<N>`."
         )
     version, bp_num = m.group(1), int(m.group(2))
     major, minor, patch = (int(part) for part in version.split("."))
@@ -327,7 +400,21 @@ def parse_tag(raw: str) -> TagInfo:
         bp=bp,
         bp_label=bp.upper(),
         is_launch_ga=False,
+        channel="bp",
     )
+
+
+def channel_for_bp(bp_num: int) -> str:
+    """Return the canonical channel name for a given BP number.
+
+    Used by previous_bp_tag to construct the predecessor's expected tag
+    when callers don't know whether the previous BP shipped under
+    prealpha/alpha/beta/rc/legacy.
+    """
+    for channel, allowed in CHANNEL_BP_RANGES.items():
+        if bp_num in allowed:
+            return channel
+    raise ValueError(f"BP{bp_num} has no known channel")
 
 
 def run_text(cmd: list[str], cwd: Path, timeout: int = 15) -> Optional[str]:
@@ -350,15 +437,29 @@ def run_text(cmd: list[str], cwd: Path, timeout: int = 15) -> Optional[str]:
 def previous_bp_tag(tag: TagInfo, repo_root: Path) -> Optional[str]:
     if tag.bp == "bp0":
         return None
+    bp_num = int(tag.bp.removeprefix("bp"))
     if tag.is_launch_ga:
-        previous = "v0.11.0-bp11"
+        previous_bp = 11
     else:
-        bp_num = int(tag.bp.removeprefix("bp"))
         if bp_num <= 1:
             return None
-        previous = f"v0.{bp_num - 1}.0-bp{bp_num - 1}"
-    existing = run_text(["git", "tag", "--list", previous], repo_root)
-    return previous if existing == previous else None
+        previous_bp = bp_num - 1
+    # Try every channel form the predecessor could have shipped under.
+    # The first existing tag wins. Channel order matches the BP boundaries
+    # so the "correct" channel for that BP is checked first, with legacy
+    # `-bp<N>` last for backward compat.
+    canonical_channel = channel_for_bp(previous_bp)
+    candidates = [f"v0.{previous_bp}.0-{canonical_channel}"]
+    for channel in ("prealpha", "alpha", "beta", "rc"):
+        if channel == canonical_channel:
+            continue
+        candidates.append(f"v0.{previous_bp}.0-{channel}")
+    candidates.append(f"v0.{previous_bp}.0-bp{previous_bp}")
+    for candidate in candidates:
+        existing = run_text(["git", "tag", "--list", candidate], repo_root)
+        if existing == candidate:
+            return candidate
+    return None
 
 
 def commit_range_for_tag(tag: TagInfo, repo_root: Path) -> str:
@@ -689,11 +790,14 @@ def playtest_section(bundle_dir: Optional[Path]) -> str:
     body = load_notes_human_playtest(bundle_dir)
     if not body:
         return (
-            "## Human-playtest survey\n"
+            "## Human-playtest survey (optional confirmation)\n"
             "\n"
             "_No survey row found in `prototype_runs/native/<bundle>/notes.md`. "
-            "Per AGENTS.md Build Point Closure Gate this row is mandatory; if you are "
-            "publishing this release without one, fix it before merging the next BP._\n"
+            "Per AGENTS.md Build Point Closure Gate the human-playtest survey is "
+            "**optional confirmation** — the AI-Agent Self-Test Report (Q1..Q7) is "
+            "the authoritative closure gate; the human-playtest section may sit "
+            "below it after the project owner playtests, but its absence does not "
+            "block BP closure when the AI report is Accept-verdicted._\n"
         )
     return (
         "## Human-playtest survey (verbatim)\n"
@@ -702,13 +806,78 @@ def playtest_section(bundle_dir: Optional[Path]) -> str:
     )
 
 
+def _install_quality_blurb(tag: TagInfo, bp_num: int) -> str:
+    """Return the leading "this is a <channel> release" sentence for the
+    install section, sourced from the tag's channel so the prose tracks
+    the release-notes title instead of hardcoding "pre-alpha".
+    """
+    if tag.is_launch_ga:
+        return "This is the **launch GA** release (`v1.0.0`)."
+    if tag.channel == "prealpha":
+        return "This is a **prealpha** release (engine + early fun slices; major systems still missing)."
+    if tag.channel == "alpha":
+        return "This is an **alpha** release (full collision + atmospherics + AI combat shipped; polish ongoing)."
+    if tag.channel == "beta":
+        return "This is a **beta** release (mission director + creator alpha + server/LAN; feature-complete-ish)."
+    if tag.channel == "rc":
+        return "This is a **release candidate** (online + public PvP/MMO; shippable to public-facing playtests)."
+    # Legacy bp<N> tags fall back to the BP-derived channel description.
+    canonical = channel_for_bp(bp_num)
+    article = "an" if canonical in ("alpha", "rc") else "a"
+    return f"This is {article} **{canonical}** release (legacy `-bp{bp_num}` tag form)."
+
+
+def _install_signing_blurb(bp_num: int, is_launch_ga: bool) -> str:
+    """Return the signing-status sentence for the install section.
+
+    Per docs/plan/spec/prototype-roadmap.md §T-RELEASE: ad-hoc/unsigned
+    through BP9; T-LIVEOPS activates Apple notarization + Windows
+    Authenticode at BP10+; full code signing at BP12 (v1.0.0 GA).
+    """
+    if is_launch_ga:
+        return "Builds are fully code-signed (Apple notarized + Windows Authenticode); no platform warnings expected."
+    if bp_num >= 10:
+        return "Builds are code-signed via T-LIVEOPS (Apple notarized + Windows Authenticode); minimal platform warnings."
+    return "Builds are unsigned through BP9; expect platform warnings. Code signing activates at BP10+ via T-LIVEOPS pre-launch wiring."
+
+
+def _macos_signing_paragraph(bp_num: int, is_launch_ga: bool) -> str:
+    if is_launch_ga or bp_num >= 10:
+        return (
+            "macOS builds are notarized + stapled, so Gatekeeper opens them without a "
+            "warning. If a download arrives quarantined for any reason, "
+            "`xattr -dr com.apple.quarantine .` clears it."
+        )
+    return (
+        "Gatekeeper will warn that the binary is unsigned. Right-click `cf-app` → Open the "
+        "first time, or run `xattr -dr com.apple.quarantine .` (above) to clear the "
+        "quarantine flag. Code signing arrives at BP10+ via T-LIVEOPS."
+    )
+
+
+def _windows_signing_paragraph(bp_num: int, is_launch_ga: bool) -> str:
+    if is_launch_ga or bp_num >= 10:
+        return (
+            "Windows builds are signed with an Authenticode certificate, so SmartScreen "
+            "should accept them without prompting."
+        )
+    return (
+        "SmartScreen will warn that the binary is unrecognized. Click **More info → Run "
+        "anyway**. Code signing arrives at BP10+ via T-LIVEOPS."
+    )
+
+
 def install_section(tag: TagInfo) -> str:
     scenario = BP_SMOKE_SCENARIOS.get(tag.bp, "m1_actor_range")
+    bp_num = int(tag.bp.removeprefix("bp"))
+    quality = _install_quality_blurb(tag, bp_num)
+    signing = _install_signing_blurb(bp_num, tag.is_launch_ga)
+    macos_paragraph = _macos_signing_paragraph(bp_num, tag.is_launch_ga)
+    windows_paragraph = _windows_signing_paragraph(bp_num, tag.is_launch_ga)
     return (
         "## Install\n"
         "\n"
-        "This is a **pre-alpha** release. Builds are unsigned through BP9; expect platform\n"
-        "warnings. Code signing activates at BP10+ via T-LIVEOPS pre-launch wiring.\n"
+        f"{quality} {signing}\n"
         "\n"
         "### Linux (`x86_64-unknown-linux-gnu`)\n"
         "\n"
@@ -730,9 +899,7 @@ def install_section(tag: TagInfo) -> str:
         f"./cf-app --scenario {scenario}\n"
         "```\n"
         "\n"
-        "Gatekeeper will warn that the binary is unsigned. Right-click `cf-app` → Open the\n"
-        "first time, or run `xattr -dr com.apple.quarantine .` (above) to clear the\n"
-        "quarantine flag. Code signing arrives at BP10+ via T-LIVEOPS.\n"
+        f"{macos_paragraph}\n"
         "\n"
         "### Windows (`x86_64-pc-windows-msvc`)\n"
         "\n"
@@ -742,8 +909,7 @@ def install_section(tag: TagInfo) -> str:
         f".\\cf-app.exe --scenario {scenario}\n"
         "```\n"
         "\n"
-        "SmartScreen will warn that the binary is unrecognized. Click **More info → Run\n"
-        "anyway**. Code signing arrives at BP10+ via T-LIVEOPS.\n"
+        f"{windows_paragraph}\n"
     )
 
 
@@ -875,8 +1041,15 @@ def footer_section(tag: TagInfo) -> str:
 
 def build_notes(tag: TagInfo, repo_root: Path, staging: Path) -> str:
     bundle_dir = find_bp_run_bundle(repo_root, tag.bp)
+    channel_label = CHANNEL_LABEL[tag.channel]
+    if tag.channel == "bp":
+        title = f"# Corefall {tag.raw} ({tag.bp_label})\n"
+    elif tag.is_launch_ga:
+        title = f"# Corefall {tag.raw} — Launch GA ({tag.bp_label})\n"
+    else:
+        title = f"# Corefall {tag.raw} ({tag.bp_label} — {channel_label})\n"
     sections = [
-        f"# Corefall {tag.raw} ({tag.bp_label})\n",
+        title,
         hero_image_section(bundle_dir),
         scope_section(tag),
         run_bundle_section(bundle_dir),
@@ -892,7 +1065,16 @@ def build_notes(tag: TagInfo, repo_root: Path, staging: Path) -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Generate corefall release notes")
-    parser.add_argument("--tag", required=True, help="Release tag (e.g. v0.1.0-bp1 or v1.0.0)")
+    parser.add_argument(
+        "--tag",
+        required=True,
+        help=(
+            "Release tag. Channel-based: v0.<N>.0-prealpha (BP0-BP3), "
+            "v0.<N>.0-alpha (BP4-BP6), v0.<N>.0-beta (BP7-BP9), "
+            "v0.<N>.0-rc (BP10-BP11), v1.0.0 (BP12 GA). "
+            "Legacy v0.<N>.0-bp<N> still accepted for backward compat."
+        ),
+    )
     parser.add_argument(
         "--staging",
         type=Path,

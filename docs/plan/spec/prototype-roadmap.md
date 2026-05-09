@@ -1712,7 +1712,7 @@ Workers implementing BP2..BP11 may use **placeholder** narrative/art/audio (AI-g
 | Actor controller (move/aim/jump/fire/reload/select/reset) + body status state machine + first playable | M1 | BP1 | Closed. |
 | Micro Breach fun proof (60-90s win/loss with enemy + soft breach + objective + replay) | M1.5 | BP1 | Closed. |
 | Frame capture + grid composer + AI-agent self-test loop | T-CAPTURE side track | BP1 (infra) → BP2+ (mandatory) | Closed (infra). |
-| Per-BP cross-platform GitHub Releases + determinism contract | T-RELEASE side track | BP1 (retroactive) → BP2..BP11 → BP12 GA | BP1 retroactive tag still pending. |
+| Per-BP cross-platform GitHub Releases + determinism contract (channel-based: prealpha/alpha/beta/rc/GA) | T-RELEASE side track | BP1+BP2 retroactive (`v0.1.0-prealpha` + `v0.2.0-prealpha`) → BP3..BP11 → BP12 GA `v1.0.0` | Retroactive prealpha tags pending merge of versioning-channel migration. |
 | Chunked pixel terrain + 8-material launch set + GPU-assisted carving + material overlay + tool-validity feedback | M2 | BP2 | Active. |
 | Micro Reactor Defense fun proof (60-90s reactor defense; chunked-terrain-driven win/loss) | M2.5 | BP2 | Active. |
 | Event taxonomy lock + snapshot/checksum + headless replay + recorder backpressure + run-finished outcome contract | M3A | BP2 | Active. |
@@ -3109,27 +3109,41 @@ Spans BP1+; **lifelong from BP1** (every BP closure from BP1 onward emits a tagg
 
 **Owned surfaces:**
 
-- `.github/workflows/release.yml` — GitHub Actions workflow triggered on `v*-bp*` tag push. Build matrix: `x86_64-unknown-linux-gnu`, `x86_64-pc-windows-msvc`, `x86_64-apple-darwin`, `aarch64-apple-darwin`.
-- `game/tools/generate_release_notes.py` — Python helper that reads the latest `prototype_runs/native/<bp>_*` notes + the BP's `summary_grid.png` + the merged-PR bodies for the BP and emits a release notes payload.
+- `.github/workflows/release.yml` — GitHub Actions workflow triggered on the channel-based tag patterns `v*-prealpha`, `v*-alpha`, `v*-beta`, `v*-rc`, `v1.0.0` (plus legacy `v*-bp*` for backward compat with already-published releases). Build matrix: `x86_64-unknown-linux-gnu`, `x86_64-pc-windows-msvc`, `x86_64-apple-darwin`, `aarch64-apple-darwin`.
+- `game/tools/generate_release_notes.py` — Python helper that reads the latest `prototype_runs/native/<bp>_*` notes + the BP's `summary_grid.png` + the merged-PR bodies for the BP and emits a release notes payload. Parser enforces the channel-boundary contract (rejects `v0.4.0-prealpha`, `v0.3.0-alpha`, etc.).
 - Tag convention + version axis (see below).
 
-**Versioning axis:**
+**Versioning axis (channel-based, SemVer prerelease identifiers):**
 
-| Tag | BP | What ships | Pre-release? |
-|---|---:|---|---|
-| `v0.0.0-bp0` | BP0 | (M0 only — pure tooling proof; tag-only, no binaries) | n/a |
-| `v0.1.0-bp1` | BP1 | M0 + M1 + M1.5 + T-CAPTURE infrastructure (first playable) | yes |
-| `v0.2.0-bp2` | BP2 | + M2 chunked terrain + M2.5 micro reactor defense + M3A event core/headless replay | yes |
-| `v0.3.0-bp3` | BP3 | + M3B replay viewer/debrief + M4A readability/ACC-A + M5 equipment/chassis/body graph | yes |
-| `v0.4.0-bp4` | BP4 | + M5.5 collision gauntlet + M5.5.5 micro sabotage + M5.6 material kernel + M5.7 hazards + M5.8 origin pass | yes |
-| `v0.5.0-bp5` | BP5 | + M5.9 atmospherics + M5.9.5 pressure hold + M5.10 worlds/environment aggregation | yes |
-| `v0.6.0-bp6` | BP6 | + M6 AI core + M6.5 LLM mind + M6.6 material/environmental competence | yes |
-| `v0.7.0-bp7` | BP7 | + M7 mission director + M7.5 base atmospherics + M7.7 weather/day-night + M4B comic-noir polish | yes |
-| `v0.8.0-bp8` | BP8 | + M8 editor + M8.5 material lab + M8.6 mining/extraction | yes |
-| `v0.9.0-bp9` | BP9 | + M9 dedicated server + M10 LAN co-op | yes |
-| `v0.10.0-bp10` | BP10 | + M11 online co-op + M9.5 voice/radio comms | yes |
-| `v0.11.0-bp11` | BP11 | + M12 public PvP arenas + persistent MMO shards | yes |
-| **`v1.0.0`** | BP12 | + production T-track finalization: launch art/audio/content, narrative, localization, live-ops, legal/platform readiness. **Pre-release flag drops; this is launch GA.** | NO |
+The tag's prerelease channel communicates quality to external observers (Steam buyers, contributors, package managers) without forcing them to read internal BP numbering. Channel boundaries were chosen at quality inflection points: prealpha covers engine + first fun slices, alpha unlocks once full collision + atmospherics + AI combat shipped, beta unlocks at mission-director + creator-alpha + server/LAN, rc covers online + public systems beta, GA = launch.
+
+| Tag | BP | Channel | What ships | Pre-release? |
+|---|---:|---|---|---|
+| `v0.0.0-prealpha` | BP0 | prealpha | (M0 only — pure tooling proof; tag-only, no binaries) | n/a |
+| `v0.1.0-prealpha` | BP1 | prealpha | M0 + M1 + M1.5 + T-CAPTURE infrastructure (first playable) | yes |
+| `v0.2.0-prealpha` | BP2 | prealpha | + M2 chunked terrain + M2.5 micro reactor defense + M3A event core/headless replay | yes |
+| `v0.3.0-prealpha` | BP3 | prealpha | + M3B replay viewer/debrief + M4A readability/ACC-A + M5 equipment/chassis/body graph | yes |
+| `v0.4.0-alpha` | BP4 | alpha | + M5.5 collision gauntlet + M5.5.5 micro sabotage + M5.6 material kernel + M5.7 hazards + M5.8 origin pass | yes |
+| `v0.5.0-alpha` | BP5 | alpha | + M5.9 atmospherics + M5.9.5 pressure hold + M5.10 worlds/environment aggregation | yes |
+| `v0.6.0-alpha` | BP6 | alpha | + M6 AI core + M6.5 LLM mind + M6.6 material/environmental competence | yes |
+| `v0.7.0-beta` | BP7 | beta | + M7 mission director + M7.5 base atmospherics + M7.7 weather/day-night + M4B comic-noir polish | yes |
+| `v0.8.0-beta` | BP8 | beta | + M8 editor + M8.5 material lab + M8.6 mining/extraction | yes |
+| `v0.9.0-beta` | BP9 | beta | + M9 dedicated server + M10 LAN co-op | yes |
+| `v0.10.0-rc` | BP10 | rc | + M11 online co-op + M9.5 voice/radio comms | yes |
+| `v0.11.0-rc` | BP11 | rc | + M12 public PvP arenas + persistent MMO shards | yes |
+| **`v1.0.0`** | BP12 | GA | + production T-track finalization: launch art/audio/content, narrative, localization, live-ops, legal/platform readiness. **Pre-release flag drops; this is launch GA.** | NO |
+
+**Channel boundary rationale:**
+
+- **prealpha (BP0..BP3):** The game is not yet a "game" — BP0 is engine bootstrap, BP1 is the first 60-90s fun-proof slice, BP2 adds chunked terrain + replay verifier, BP3 adds chassis + readability + accessibility floor. Through BP3 the simulation has no full-collision physics, no atmospherics, no AI combat — most major systems are still missing. Calling this "alpha" would mislead external observers.
+- **alpha (BP4..BP6):** First "alpha" lands at BP4 because that's when full collision + sabotage + material kernel + hazards land — the simulation finally behaves like a physical game world. BP5 adds atmospherics; BP6 adds AI combat. By the end of alpha, the game has the systems baseline that will define BP7+ content.
+- **beta (BP7..BP9):** First "beta" lands at BP7 because that's when the mission director ships + weather/day-night + comic-noir polish — the game now has authored mission flows + visual identity. BP8 ships the creator alpha (editor); BP9 ships dedicated server + LAN. Beta = feature-complete-ish, polish-pending.
+- **rc (BP10..BP11):** Release candidate covers online co-op + voice + public PvP + MMO shards. The game is shippable to public-facing playtests; what remains is launch content + legal/platform readiness.
+- **GA (BP12):** v1.0.0 = "complete game, full price, no pre-release marker." Production T-tracks (T-CONTENT-LAUNCH, T-LIVEOPS, T-PLATFORM, T-NARRATIVE) finalize at this boundary.
+
+**Legacy tags:**
+
+A small number of already-published releases use the older `v0.<N>.0-bp<N>` form (e.g., `v0.1.0-bp1`). The release-notes parser still accepts these for backward compat; new releases SHOULD use the channel-based form. The `release.yml` workflow trigger glob includes both patterns.
 
 **Per-release artifacts:**
 
@@ -3178,8 +3192,10 @@ Spans BP1+; **lifelong from BP1** (every BP closure from BP1 onward emits a tagg
 **Done-criteria (cumulative across BPs):**
 
 - [x] T-RELEASE infrastructure: `release.yml` + `generate_release_notes.py` + versioning axis + release artifact contract exist in `corefall`.
-- [ ] BP1 retroactive release publication: push `v0.1.0-bp1` from main HEAD with M1.5 `summary_grid.png` as hero, all four cross-platform binaries published, release marked pre-release.
-- [ ] BP2..BP11: every BP closure emits a tagged release per the versioning axis. Pre-release flag stays ON.
+- [x] Versioning axis adopts SemVer prerelease channels (prealpha/alpha/beta/rc/GA) with strict BP-boundary enforcement in `parse_tag` (see 2026-05-09 channel migration; legacy `v*-bp*` form still accepted for backward compat).
+- [ ] BP1 retroactive release publication: push `v0.1.0-prealpha` from BP1 closure HEAD with M1.5 `summary_grid.png` as hero, all four cross-platform binaries published, release marked pre-release.
+- [ ] BP2 retroactive release publication: push `v0.2.0-prealpha` from BP2 closure HEAD (post-spine-migration) with M2.5 `summary_grid.png` as hero, all four cross-platform binaries published, release marked pre-release.
+- [ ] BP3..BP11: every BP closure emits a tagged release per the channel-based axis (BP3 prealpha → BP4 first alpha → BP7 first beta → BP10 first rc). Pre-release flag stays ON.
 - [ ] BP10/BP11: code signing infrastructure activated by T-LIVEOPS.
 - [ ] BP12 finalization: `v1.0.0` GA release; pre-release flag DROPPED; full code signing on every artifact; determinism checksum table covers every shipping scenario.
 
