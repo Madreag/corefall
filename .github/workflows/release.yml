@@ -192,25 +192,23 @@ jobs:
             --staging release-staging \
             --output release-staging/RELEASE_NOTES.md
 
-      - name: Determine prerelease flag
-        id: flag
-        shell: bash
-        run: |
-          TAG="${GITHUB_REF##*/}"
-          if [ "$TAG" = "v1.0.0" ]; then
-            echo "prerelease=false" >> "$GITHUB_OUTPUT"
-          else
-            echo "prerelease=true" >> "$GITHUB_OUTPUT"
-          fi
-
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          # The GitHub `prerelease` flag is intentionally not set. Quality
+          # is communicated via the SemVer channel suffix in the tag name
+          # itself (`-prealpha`, `-alpha`, `-beta`, `-rc`, or no suffix
+          # for `v1.0.0` GA). Marking releases as `prerelease: true` would
+          # double-count the quality signal AND hide them from the
+          # `/releases/latest` endpoint + the repo homepage Releases
+          # sidebar widget — both of which filter out prereleases by
+          # GitHub's definition. External observers reading the tag name
+          # know the channel; the prerelease flag adds no information.
           files: |
             release-staging/*.tar.zst
             release-staging/*.zip
             release-staging/SHA256SUMS.txt
           body_path: release-staging/RELEASE_NOTES.md
-          prerelease: ${{ steps.flag.outputs.prerelease == 'true' }}
+          prerelease: false
           draft: false
           fail_on_unmatched_files: true

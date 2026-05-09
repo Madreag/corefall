@@ -3187,7 +3187,7 @@ A small number of already-published releases use the older `v0.<N>.0-bp<N>` form
 - Every BP closure MUST produce a tagged release matching the versioning axis above.
 - The release notes MUST embed the BP's `summary_grid.png` (T-CAPTURE artifact) + the human-playtest survey row.
 - `/corefall-review <bp>` reads the published release URL when issuing the BP-level Accept verdict.
-- Until BP12 the release is `pre-release: true` on GitHub. Drop this flag ONLY at v1.0.0.
+- The GitHub `prerelease` flag is intentionally NOT set on any release. Quality is communicated via the SemVer channel suffix in the tag name itself (`-prealpha`, `-alpha`, `-beta`, `-rc`, or no suffix for `v1.0.0` GA). Marking releases as `prerelease: true` would double-count the quality signal AND hide them from the `/releases/latest` endpoint + the repo homepage Releases sidebar widget, both of which filter out prereleases by GitHub's definition. External observers reading the tag name know the channel; the prerelease flag adds no information.
 
 **Done-criteria (cumulative across BPs):**
 
