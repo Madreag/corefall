@@ -289,32 +289,20 @@ impl ControlServer {
     /// Bind + serve until `shutdown_rx` observes `true`. The accept loop
     /// exits gracefully and in-flight connections receive the same shutdown
     /// signal so their per-connection observation loops can stop cleanly.
+    ///
+    /// Delegates to [`Self::serve_listener_with_shutdown`] after binding to
+    /// keep the accept-loop logic in exactly one place (PR #26 round-4 review
+    /// Bugbot Low: avoid duplicate `select!` accept loops drifting out of
+    /// sync if a future bug fix touches one but not the other).
     pub async fn serve_with_shutdown<E: EngineHandle>(
         self,
         engine: Arc<E>,
-        mut shutdown_rx: ShutdownReceiver,
+        shutdown_rx: ShutdownReceiver,
     ) -> std::io::Result<()> {
         let listener = TcpListener::bind(self.config.bind).await?;
         tracing::info!(target: "cf::ctl", bind = %self.config.bind, "control server listening");
         let max_hz = self.config.max_observe_hz;
-        loop {
-            select! {
-                accept = listener.accept() => {
-                    let (stream, peer) = accept?;
-                    let engine = engine.clone();
-                    let connection_shutdown = shutdown_rx.clone();
-                    tokio::spawn(async move {
-                        if let Err(err) = handle_connection(stream, peer, engine, max_hz, connection_shutdown).await {
-                            tracing::warn!(target: "cf::ctl", %peer, error = %err, "control connection ended with error");
-                        }
-                    });
-                }
-                _ = wait_for_shutdown(&mut shutdown_rx) => {
-                    tracing::info!(target: "cf::ctl", "shutdown signal received; control server stopping accept loop");
-                    return Ok(());
-                }
-            }
-        }
+        Self::serve_listener_with_shutdown(listener, engine, max_hz, shutdown_rx).await
     }
 
     /// Bind without serving so callers can inspect the actual port (useful for
@@ -360,6 +348,7 @@ impl ControlServer {
                     });
                 }
                 _ = wait_for_shutdown(&mut shutdown_rx) => {
+                    tracing::info!(target: "cf::ctl", "shutdown signal received; control server stopping accept loop");
                     return Ok(());
                 }
             }
