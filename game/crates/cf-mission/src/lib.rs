@@ -480,22 +480,35 @@ pub fn step(state: &mut MissionState, inputs: MissionTickInputs<'_>) -> MissionT
     // reactor_destroyed` to be the visible failure label. The check runs BEFORE
     // the timer expiry check so a reactor destroyed exactly at the timer
     // boundary still records as `reactor_destroyed`.
-    for obj in &state.objectives {
-        if obj.status != ObjectiveStatus::Active {
-            continue;
-        }
-        if let ObjectiveKind::DefendReactor { target } = &obj.kind {
-            if inputs.reactors_destroyed.get(target).copied().unwrap_or(false) {
-                state.result = MissionResult::Lost {
-                    reason: LossReason::ReactorDestroyed,
-                };
-                state.last_event_tick = inputs.tick;
-                state.last_event_label = format!("mission_lost_reactor_destroyed:{}", target);
-                report.objective_failed.push(obj.id.clone());
-                report.final_result = Some(state.result);
-                return report;
+    //
+    // The first pass scans for the failing index using an immutable borrow so
+    // we can write `state.last_event_label = format!(...)` afterwards without
+    // aliasing `state.objectives`. The second pass mutates the matched
+    // objective's `status` to `Failed` so `MissionView::from_state` reports
+    // `failed` in the observe envelope (Devin review BUG_pr-review-job
+    // -8dddb0ae78c7456997c4d2dc7aade217_0001).
+    let reactor_destroyed_match: Option<(usize, String, String)> =
+        state.objectives.iter().enumerate().find_map(|(idx, obj)| {
+            if obj.status != ObjectiveStatus::Active {
+                return None;
             }
-        }
+            if let ObjectiveKind::DefendReactor { target } = &obj.kind {
+                if inputs.reactors_destroyed.get(target).copied().unwrap_or(false) {
+                    return Some((idx, obj.id.clone(), target.clone()));
+                }
+            }
+            None
+        });
+    if let Some((idx, obj_id, target)) = reactor_destroyed_match {
+        state.objectives[idx].status = ObjectiveStatus::Failed;
+        state.result = MissionResult::Lost {
+            reason: LossReason::ReactorDestroyed,
+        };
+        state.last_event_tick = inputs.tick;
+        state.last_event_label = format!("mission_lost_reactor_destroyed:{target}");
+        report.objective_failed.push(obj_id);
+        report.final_result = Some(state.result);
+        return report;
     }
 
     let timer_expired = state.time_limit_ticks > 0 && state.elapsed_ticks(inputs.tick) >= state.time_limit_ticks;
@@ -941,6 +954,14 @@ mod tests {
         );
         assert_eq!(report.objective_failed, vec!["defend_reactor".to_string()]);
         assert!(report.final_result.is_some());
+        // Regression for Devin BUG_pr-review-job-8dddb0ae78c7456997c4d2dc7aade217_0001:
+        // the failing objective's `status` field MUST flip to `Failed` so the
+        // observe envelope reports it correctly. Pre-fix, the loop borrowed
+        // `&state.objectives` so `obj.status` could not be mutated.
+        assert_eq!(state.objectives[0].status, ObjectiveStatus::Failed);
+        let view = MissionView::from_state(&state, 100);
+        assert_eq!(view.objectives[0].status, "failed");
+        assert_eq!(view.loss_reason.as_deref(), Some("reactor_destroyed"));
     }
 
     #[test]

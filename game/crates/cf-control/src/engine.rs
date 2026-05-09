@@ -992,9 +992,13 @@ impl M0Engine {
                         // containing the centre defines the collision test;
                         // padding the AABB to ±0.5 was too aggressive and
                         // blocked projectiles flying through carved tunnels.
-                        let px = proj.position.x.floor() as i64;
-                        let py = proj.position.y.floor() as i64;
-                        let mat = terrain.material_at(px, py);
+                        //
+                        // Use `material_at_world` so the terrain anchor offset
+                        // is honored. Calling `material_at` with raw world
+                        // floats would falsely shift the lookup by `anchor`
+                        // for any scenario that authors a non-(0, 0) anchor
+                        // (DR-007 Bugbot finding 864084a2).
+                        let mat = terrain.material_at_world(proj.position.x, proj.position.y);
                         if terrain.registry.is_solid(mat) {
                             terrain_kills.push((proj.id, proj.owner, [proj.position.x, proj.position.y]));
                             false

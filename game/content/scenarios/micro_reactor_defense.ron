@@ -2,7 +2,7 @@
   schema_version: 1,
   id: "micro_reactor_defense",
   display_name: "Micro Reactor Defense",
-  description: "M2.5 fun-proof slice per spec/native-implementation-backlog M2.5-001..M2.5-006. Spawn at the reactor core; dig a trench around it using M2 chunked terrain; survive a 60-second wave from one reactive guard who fires at the reactor. Win = reactor survives the timer; loss = reactor destroyed. Reuses M1.5 cf-mission + cf-ai unchanged; the M2 chunked-terrain trench is the reason the loop is fun.",
+  description: "M2.5 fun-proof slice per spec/native-implementation-backlog M2.5-001..M2.5-006. Spawn west of the reactor; preserve the dirt shield mound or carve through it using M2 chunked terrain; survive a 30-second wave from one reactive guard who fires at the reactor. Win = reactor survives the timer; loss = reactor destroyed. Mission timer is 1800 ticks at 60 Hz (30 s wall time); the 60-90 s player-feel target lives in the manual-playtest gate. Reuses M1.5 cf-mission + cf-ai unchanged; the M2 chunked-terrain dirt shield is the reason the loop is fun.",
   seed: 47,
   duration_ticks: Some(7200),
   region: (anchor: (0.0, 0.0), width: 1280.0, height: 720.0),
