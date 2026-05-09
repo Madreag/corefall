@@ -299,9 +299,19 @@ def validate_run(run_dir: Path) -> list[str]:
             if isinstance(by_severity, dict):
                 error_severity_count = int(by_severity.get("error") or 0)
         if expected_outcome == "clean":
+            # Devin BUG_pr-review-job 0001 (yellow): the documented Clean
+            # contract in cf_replay::ExpectedOutcome says "MUST contain
+            # exactly one system.run_finished event". A double-emit (e.g.
+            # accidental record_run_finished + write_run_bundle finals) is
+            # silent unless the checker enforces the upper bound too.
             if run_finished_count == 0:
                 errors.append(
                     "run_manifest.expected_outcome=clean but events.jsonl has no system.run_finished event"
+                )
+            elif run_finished_count > 1:
+                errors.append(
+                    "run_manifest.expected_outcome=clean but events.jsonl has "
+                    f"{run_finished_count} system.run_finished events; expected exactly one"
                 )
             if panic_count > 0:
                 errors.append(

@@ -40,11 +40,14 @@ enum Cmd {
     /// checksum matches what the live run recorded.
     Replay {
         bundle_dir: PathBuf,
-        /// Verify that every recorded `determinism.sim_checksum` event matches
-        /// the headless replay's checksum at the same tick. Non-zero exit on
-        /// any mismatch.
-        #[arg(long, default_value_t = true)]
-        verify_checksums: bool,
+        /// Skip per-tick checksum verification. Default behavior is to
+        /// verify; pass `--no-verify-checksums` to opt out (Bugbot 2ce56d7e
+        /// flagged the prior `default_value_t = true` boolean: clap v4
+        /// requires an explicit value for `default_value_t` bools, which
+        /// made `--verify-checksums` parse-error without a value. The
+        /// negation flag is the idiomatic clap v4 default-true opt-out).
+        #[arg(long, default_value_t = false)]
+        no_verify_checksums: bool,
         /// Optional override scenario manifest path. Defaults to the path
         /// recorded in `run_manifest.json.scene.source_path`.
         #[arg(long)]
@@ -70,9 +73,9 @@ fn main() -> Result<()> {
     match cli.command {
         Cmd::Replay {
             bundle_dir,
-            verify_checksums,
+            no_verify_checksums,
             scenario_path,
-        } => replay(&bundle_dir, verify_checksums, scenario_path),
+        } => replay(&bundle_dir, !no_verify_checksums, scenario_path),
     }
 }
 
@@ -182,6 +185,13 @@ fn replay(bundle_dir: &Path, verify_checksums: bool, scenario_path: Option<PathB
         let mut chk_idx: usize = 0;
         let mut cmd_idx: usize = 0;
         let mut divergences: Vec<(u64, String, String)> = Vec::new();
+        // Bugbot 2ce56d7e: bound the pause-recovery retry path so a permanently
+        // stalled engine (e.g., shutdown_requested set + drive_tick keeps
+        // returning None despite RunForTicks dispatches) cannot spin forever.
+        // Three consecutive None advances at the same tick is the recovery
+        // budget; beyond that we abort with a structured stall report.
+        let mut consecutive_no_advance: u32 = 0;
+        const MAX_NO_ADVANCE_RETRIES: u32 = 3;
 
         // Replay loop:
         //   1. Dispatch any commands recorded at the engine's CURRENT tick.
@@ -201,6 +211,14 @@ fn replay(bundle_dir: &Path, verify_checksums: bool, scenario_path: Option<PathB
 
             // 2) Drive forward.
             if engine.drive_tick().is_none() {
+                consecutive_no_advance += 1;
+                if consecutive_no_advance >= MAX_NO_ADVANCE_RETRIES {
+                    bail!(
+                        "replay verifier stalled: engine returned None from drive_tick {} times in a row at tick {} (likely shutdown_requested or another terminal state). Aborting to avoid infinite loop.",
+                        consecutive_no_advance,
+                        next_tick
+                    );
+                }
                 // Engine is paused. Force-resume via RunForTicks for the rest
                 // of the budget. This handles bundles that paused but never
                 // resumed in time before drive_tick was called.
@@ -213,6 +231,7 @@ fn replay(bundle_dir: &Path, verify_checksums: bool, scenario_path: Option<PathB
                     .await;
                 continue;
             }
+            consecutive_no_advance = 0;
             next_tick = engine.current_tick().0;
 
             // 3) Verify checksum at this tick if there's a recorded one.

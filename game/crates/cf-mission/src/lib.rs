@@ -542,16 +542,43 @@ pub fn step(state: &mut MissionState, inputs: MissionTickInputs<'_>) -> MissionT
                     }
                 }
             }
-            // Fall through to win-condition evaluation.
-        } else {
-            state.result = MissionResult::Lost {
-                reason: LossReason::TimerExpired,
-            };
-            state.last_event_tick = inputs.tick;
-            state.last_event_label = "mission_lost_timer".to_string();
-            report.final_result = Some(state.result);
+            // Devin BUG_pr-review-job 0001 (flag): if the timer is expired AND
+            // a defend_reactor was just completed by surviving the timer, the
+            // mission MUST resolve on this tick rather than fall through. On
+            // the NEXT tick the timer would still be expired, the
+            // defend_reactor would no longer be active (we just completed
+            // it), and `defend_active_alive` would be false, sending the
+            // mission to TimerExpired loss instead of Won. The latent bug
+            // only matters for hypothetical mixed-objective scenarios
+            // (DefendReactor + ReachZone, etc.), but resolving here is the
+            // robust fix.
+            //
+            // If every required objective is now complete, win immediately.
+            // Otherwise, the player completed defend_reactor at the timer
+            // boundary but still owes other required objectives — that's a
+            // TimerExpired loss because the rest of the mission is not done.
+            if state.outstanding_required() == 0 && state.failed_required() == 0 {
+                state.result = MissionResult::Won;
+                state.last_event_tick = inputs.tick;
+                state.last_event_label = "mission_won".to_string();
+                report.final_result = Some(state.result);
+            } else {
+                state.result = MissionResult::Lost {
+                    reason: LossReason::TimerExpired,
+                };
+                state.last_event_tick = inputs.tick;
+                state.last_event_label = "mission_lost_timer".to_string();
+                report.final_result = Some(state.result);
+            }
             return report;
         }
+        state.result = MissionResult::Lost {
+            reason: LossReason::TimerExpired,
+        };
+        state.last_event_tick = inputs.tick;
+        state.last_event_label = "mission_lost_timer".to_string();
+        report.final_result = Some(state.result);
+        return report;
     }
 
     // 2) Progress objectives in declaration order. We only advance one row at a
@@ -962,6 +989,64 @@ mod tests {
         let view = MissionView::from_state(&state, 100);
         assert_eq!(view.objectives[0].status, "failed");
         assert_eq!(view.loss_reason.as_deref(), Some("reactor_destroyed"));
+    }
+
+    #[test]
+    fn defend_reactor_with_outstanding_objective_loses_at_timer_even_with_reactor_alive() {
+        // Devin BUG_pr-review-job 0001 (flag) regression: a mixed-objective
+        // scenario (DefendReactor + ReachZone where the player is NOT in
+        // the zone at timer expiry) must resolve on the timer-expired tick
+        // as TimerExpired loss, not silently stay Active.
+        let objectives = vec![
+            Objective {
+                id: "defend".to_string(),
+                kind: ObjectiveKind::DefendReactor {
+                    target: "core_reactor".to_string(),
+                },
+                optional: false,
+                status: ObjectiveStatus::Pending,
+            },
+            Objective {
+                id: "reach".to_string(),
+                kind: ObjectiveKind::ReachZone {
+                    min: [1180.0, 16.0],
+                    max: [1280.0, 64.0],
+                },
+                optional: false,
+                status: ObjectiveStatus::Pending,
+            },
+        ];
+        let mut state = MissionState::new(
+            objectives,
+            0,
+            LossConditions {
+                player_dead: true,
+                time_limit_ticks: 60 * 60,
+            },
+        );
+        let actors = mk_actors(player_at(120.0, 32.0), false); // not in extract zone
+        let mut reactors = BTreeMap::new();
+        reactors.insert("core_reactor".to_string(), false);
+        let report = step(
+            &mut state,
+            MissionTickInputs {
+                tick: 60 * 60,
+                player: actors.get(&ActorId(1)),
+                actors: &actors,
+                breaches_broken: &BTreeMap::new(),
+                reactors_destroyed: &reactors,
+            },
+        );
+        // Defend was completed by surviving the timer.
+        assert!(report.objective_completed.contains(&"defend".to_string()));
+        // But the reach zone is still pending → mission must lose on timer.
+        assert!(matches!(
+            state.result,
+            MissionResult::Lost {
+                reason: LossReason::TimerExpired
+            }
+        ));
+        assert!(report.final_result.is_some());
     }
 
     #[test]
