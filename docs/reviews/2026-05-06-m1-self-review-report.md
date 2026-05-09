@@ -91,7 +91,7 @@ All updates landed before the PR was opened:
 
 - `corefall/CHANGELOG.md` § "Added (M1 — Actor Controller And Sim Core)" + § "Fixed (M1 stabilization)".
 - `corefall/docs/implementation-log/2026-05-06-m1-actor-controller.md` (full implementation log + acceptance matrix + Contract Integrity Matrix + No-Compromise Performance Audit).
-- `cortext_command_vault/spec/feature-completion-checklist.md` — M1-P00, M1-S01..S09, M1-D01..D07, M1-001..M1-006 rows updated with PASS evidence + AI self-ratings (3-5/5).
+- `docs/plan/spec/feature-completion-checklist.md` — M1-P00, M1-S01..S09, M1-D01..D07, M1-001..M1-006 rows updated with PASS evidence + AI self-ratings (3-5/5).
 - `cortext_command_vault/prototypes/native-m1-actor-controller.md` — new prototype evidence note.
 - Per-crate AGENTS.md updated for `cf-actor`, `cf-physics`, `cf-equipment`, `cf-control`, `cf-render-2d`, `cf-ui`.
 

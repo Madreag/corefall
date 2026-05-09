@@ -264,7 +264,7 @@ def render_report(bp: str, bundle_dir: Path, agent_id: str) -> str:
         for g in goals:
             out.append(f"- {g}\n")
     else:
-        out.append(f"_Add the verbatim goal statements from `cortext_command_vault/spec/prototype-roadmap.md` for {bp_label}._\n")
+        out.append(f"_Add the verbatim goal statements from `docs/plan/spec/prototype-roadmap.md` for {bp_label}._\n")
     out.append("\n")
 
     # Q2

@@ -61,7 +61,7 @@
   observation under the `capture` key so `--expect capture.summary_grid.non_blank_ratio>=0.95`
   resolves through the same lookup path as `mission.result=won`.
 - **T-CAPTURE** roadmap track in
-  `cortext_command_vault/spec/prototype-roadmap.md` owns the policy: cadence
+  `docs/plan/spec/prototype-roadmap.md` owns the policy: cadence
   defaults, keyframe types, BP closure-gate role, LLM input contract.
 
 ## Common Pitfalls
@@ -90,8 +90,8 @@
 
 ## Source Trail
 
-- `cortext_command_vault/spec/prototype-roadmap.md` §T-CAPTURE — owns the policy.
-- `cortext_command_vault/references/prototype-run-bundle-schema.md` —
+- `docs/plan/spec/prototype-roadmap.md` §T-CAPTURE — owns the policy.
+- `docs/plan/references/prototype-run-bundle-schema.md` —
   `captures/{frame_*.png, grid_NNN.png, summary_grid.png, capture_manifest.json}`
   contract.
 - `game/tools/capture_grid.py` — composer (Python; Pillow-based).

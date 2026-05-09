@@ -1,6 +1,6 @@
 # M0 — Engine Bootstrap (2026-05-05 / 2026-05-06 correction pass)
 
-Repo: `~/projects/corefall` · Worker: AI · Milestone source: `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md` §M0 — Engine Bootstrap.
+Repo: `~/projects/corefall` · Worker: AI · Milestone source: `docs/plan/spec/prototype-roadmap.md` §M0 — Engine Bootstrap.
 
 > [!warning] Why this log was rewritten
 > The first M0 pass on 2026-05-05 was rejected. The user listed nine fixes:
@@ -172,9 +172,9 @@ No `FAIL`, `PARTIAL`, `DEFERRED`, or `READY_FOR_HUMAN` items remain in M0 scope.
 
 ## Vault updates this pass
 
-- `cortext_command_vault/spec/prototype-roadmap.md` §Toolchain — bumped recipe pin 1.84.0 → 1.93.0 with a same-pass note.
-- `cortext_command_vault/references/prototype-run-bundle-schema.md` — added `## DR-002 v1 Lock Extensions` section.
-- `cortext_command_vault/spec/feature-completion-checklist.md` — M0 scope/done/task/VAL/GATE rows updated to PASS with the corrected evidence above.
+- `docs/plan/spec/prototype-roadmap.md` §Toolchain — bumped recipe pin 1.84.0 → 1.93.0 with a same-pass note.
+- `docs/plan/references/prototype-run-bundle-schema.md` — added `## DR-002 v1 Lock Extensions` section.
+- `docs/plan/spec/feature-completion-checklist.md` — M0 scope/done/task/VAL/GATE rows updated to PASS with the corrected evidence above.
 
 ## Commit/handoff posture
 
@@ -194,7 +194,7 @@ After `/corefall-review M0` returned **Accept With Follow-Ups** with 6 verified 
 | **M1** `seed`, `duration_ticks`, `expected_tests`, `region` were hardcoded by `for_scenario` instead of read from the scenario manifest | Medium | New `M0EngineConfig::for_loaded_scenario(&Scenario, PathBuf)` reads them from the loaded RON. `cf-app::build_config` now calls `Scenario::load_from_file` first; CLI flags only override individual fields when explicitly provided. Added `region_width` / `region_height` to engine config and `config_hash_input`. | New test `for_loaded_scenario_pulls_seed_and_expected_tests_from_manifest`. Bundles inherit seed=42, expected_tests=`["M0-SMOKE-01"]`, region=1280×720 from `content/scenarios/m0_blank.ron`. |
 | **M2** `summary.json.final_sim_checksum` was null on short runs that never hit the 60-tick cadence, AND on live `runbundle.write` requests that fired before `record_run_finished` | Medium | New `M0Engine::emit_final_checksum()` is called from BOTH `record_run_finished()` (covers `record_run_finished` exit paths) AND `write_run_bundle()` (covers mid-run `runbundle.write` writes). Both produce one final `determinism.sim_checksum` event regardless of cadence. | New tests `very_short_run_still_has_final_checksum` (1-tick run) AND `mid_run_write_run_bundle_has_final_checksum` (live runbundle.write). All M0.1 acceptance bundles, including the cfctl roundtrip `m0_2026-05-06T03-21-15Z_cb9543db`, report `final_sim_checksum` non-null. |
 | **M3** `runbundle.write` arriving after `target_ticks` on the Bevy path was silently dropped | Medium | New `drain_pending_bundle` helper called in `check_completion` (both shutdown and budget paths) and `finalize_engine`. | Same drain pattern proven by the live roundtrip bundle `m0_2026-05-06T03-11-03Z_21d3bb06`. |
-| **M4** Vault `references/prototype-run-bundle-schema.md` did not document the `summary.performance.tick_rate_hz` / `p99_tick_ms` / `avg_tick_ms` / `wall_seconds` rows already emitted by the engine | Medium (doc) | Added the rows to the DR-002 v1 Lock Extensions table; tightened `final_sim_checksum` row to record the M0.1 invariant ("≥ 1 final checksum on a successful run"); added `run_manifest.json.tick_rate_hz` row. | `cortext_command_vault/references/prototype-run-bundle-schema.md` updated. |
+| **M4** Vault `references/prototype-run-bundle-schema.md` did not document the `summary.performance.tick_rate_hz` / `p99_tick_ms` / `avg_tick_ms` / `wall_seconds` rows already emitted by the engine | Medium (doc) | Added the rows to the DR-002 v1 Lock Extensions table; tightened `final_sim_checksum` row to record the M0.1 invariant ("≥ 1 final checksum on a successful run"); added `run_manifest.json.tick_rate_hz` row. | `docs/plan/references/prototype-run-bundle-schema.md` updated. |
 | **M5** `cfctl observe --inline --stream` silently fell through to the server path | Medium | Added explicit `anyhow::bail!` at the top of `cmd_observe` rejecting the combination with a clear message. | Manual: `./target/release/cfctl observe --inline --stream` exits 1 with `--inline and --stream are mutually exclusive: streaming requires a control server, inline runs a single in-process snapshot`. |
 | **L1** `commit_sha` reported a clean SHA on a dirty working tree | Low | After `git rev-parse --short=12 HEAD`, run `git status --porcelain` and append `-dirty` if non-empty. | All M0.1 bundles record `commit_sha=b97c0b1d14b2-dirty`. |
 | **L2** `SimClock::step(0)` advanced one tick instead of being a no-op | Low | Early-return when `ticks == 0`. | New test `step_zero_is_a_no_op`. |
@@ -236,7 +236,7 @@ After `/corefall-review M0` returned **Accept With Follow-Ups** with 6 verified 
 | **M0.1-M1** scenario manifest drives engine config | PASS | `for_loaded_scenario_pulls_seed_and_expected_tests_from_manifest` + `cf-app::build_config` calls `Scenario::load_from_file`. |
 | **M0.1-M2** every bundle has final checksum | PASS | `very_short_run_still_has_final_checksum` + all 6 M0.1 bundles `checksum_event_count ≥ 6`. |
 | **M0.1-M3** runbundle.write after budget honored | PASS | `drain_pending_bundle` in `check_completion` + `finalize_engine`. Live script bundle `21d3bb06` proves the path. |
-| **M0.1-M4** vault doc updated for performance.* extensions | PASS | `cortext_command_vault/references/prototype-run-bundle-schema.md` DR-002 v1 Lock Extensions section. |
+| **M0.1-M4** vault doc updated for performance.* extensions | PASS | `docs/plan/references/prototype-run-bundle-schema.md` DR-002 v1 Lock Extensions section. |
 | **M0.1-M5** cfctl rejects `--inline --stream` | PASS | Manual exit-1 verification. |
 | **M0.1-L1** commit_sha appends -dirty | PASS | All M0.1 bundles record `b97c0b1d14b2-dirty`. |
 | **M0.1-L2** SimClock::step(0) is a no-op | PASS | `step_zero_is_a_no_op` test. |
@@ -263,7 +263,7 @@ After the M0.1 verdict, an independent reviewer found six verified release-gatin
 | **F3** `scenario.load` with seed override silently accepted but ignored the seed. The `ControlCommand::ScenarioLoad { scenario, .. }` destructure dropped seed on the floor. | High | Engine now: same-scenario+matching-seed = accepted (no-op); same-scenario+mismatched-seed = rejected with `seed_override_not_supported_in_m0` + fix-hint pointing to `scenario.reset` / `cf-app --seed`; different-scenario = rejected with `scenario_swap_not_supported_in_m0`. The recorder logs `control.command_rejected` with `active_seed` + `requested_seed` so the bundle has the evidence. | New tests: 3 engine-level + 3 live WebSocket. Direct cfctl wire trace from `cfctl scenario load m0_blank --seed 7`: `code:-32099, message:"command_rejected", data:{reason:"seed_override_not_supported_in_m0", tick:6}`. |
 | **F4** `system.tick_sample` event was named in the M0-003 evidence column but never emitted. | High | Engine emits `system.tick_sample` every `cadence_ticks` (60) carrying `{tick_rate_hz, window_ticks, avg_tick_ms, max_tick_ms, p99_tick_ms, samples_observed}` computed over the most recent `cadence` ticks of `tick_durations_us`. | New test `tick_sample_event_emitted_at_cadence`. Visible in every M0.2 bundle: 60 Hz/300 ticks → 5 `tick_sample` events; 120 Hz/600 ticks → 10 events. |
 | **F5** M0-008 task card explicitly required "panic test triggers a controlled panic in a sub-thread and verifies the event is emitted; counter assertion." This test did not exist. | High | (a) New unit test `panic_in_sub_thread_emits_system_panic_event_and_increments_severity`: spawns a real sub-thread that calls `panic!`, catches via `JoinHandle::join`, routes the captured payload through the same `report_panic_to_recorder` function the global panic hook drives, asserts `system.panic` event lands AND `event_counts.by_severity.error` increments. (b) New `cf-app --debug-inject-panic-at-tick <n>` flag that spawns a sub-thread that panics at the named tick — the global panic hook routes through the engine's reporter, and a new lock-free `current_tick: AtomicU64` ensures the panic event records at the engine's actual tick (preserving events.jsonl monotonicity). | Bundle `m0_2026-05-06T04-14-03Z_03164834`: panic injected at tick 60, recorded at tick 61, `event_counts.by_severity.error: 1`, `event_counts.by_type.panic: 1`, bundle PASSES `python3 game/tools/prototype_run_check.py` with errors 0. |
-| **F6** Checklist + log + CHANGELOG carried hidden deferrals. | Medium (doc) | M0-001/M0-002 notes purged of "Bevy deferred to M2"; M0-002 row flipped from `[~]` to `[x]`; M0-006 notes purged of "static schemas dump deferred"; M0-007 notes purged of "cf-mod is still a stub binary"; M0-008 row carries M0.2-F5 evidence. CHANGELOG carries this M0.2 section verbatim. | `cortext_command_vault/spec/feature-completion-checklist.md` rows updated; this implementation log appended; `CHANGELOG.md` carries the M0.2 Fixed section. |
+| **F6** Checklist + log + CHANGELOG carried hidden deferrals. | Medium (doc) | M0-001/M0-002 notes purged of "Bevy deferred to M2"; M0-002 row flipped from `[~]` to `[x]`; M0-006 notes purged of "static schemas dump deferred"; M0-007 notes purged of "cf-mod is still a stub binary"; M0-008 row carries M0.2-F5 evidence. CHANGELOG carries this M0.2 section verbatim. | `docs/plan/spec/feature-completion-checklist.md` rows updated; this implementation log appended; `CHANGELOG.md` carries the M0.2 Fixed section. |
 
 ### Architectural change: shared production config path
 
@@ -391,7 +391,7 @@ After the M0.3 verdict, an independent reviewer recommended landing **F7 only**:
 
 ### M3 follow-up captured (NOT implemented in M0.4)
 
-Per the reviewer's separate guidance, the `system.run_finished` checker tightening + `expected_outcome` manifest enum was added as a new task card in `cortext_command_vault/spec/native-implementation-backlog.md`:
+Per the reviewer's separate guidance, the `system.run_finished` checker tightening + `expected_outcome` manifest enum was added as a new task card in `docs/plan/spec/native-implementation-backlog.md`:
 
 > **M3-006 run-finished outcome contract** — owns `cf-replay`, `references/prototype-run-bundle-schema.md`, `tools/prototype_run_check.py`. Adds `expected_outcome` manifest field constrained to `clean | panic | abort` enum. Tightens the canonical run-bundle checker to enforce: `clean` ⇒ `system.run_finished` present + tick equals `last_tick`; `panic` ⇒ `panic` event + `error >= 1`; `abort` ⇒ neither required. Also updates `cf-app`, `cfctl run`, `cfctl script run`, and `--debug-inject-panic-at-tick` to write the right `expected_outcome`. M3 closes DR-002 — this is where the run-finished contract belongs.
 
@@ -423,7 +423,7 @@ This is intentionally NOT implemented in M0.4. M0 stays scoped to engine bootstr
 |---|---|---|
 | **M0.4-F7** cf-replay regression test for repo-root path resolution | PASS | 5 new `bundle_paths::tests` (`default_root_resolves_above_game_when_cwd_is_game`, `default_root_uses_cwd_when_cwd_is_repo_root`, `default_root_walks_up_from_nested_cwd`, `resolve_run_bundle_root_returns_explicit_unchanged`, `resolve_run_bundle_root_falls_back_to_default_when_none`) |
 | **M0.4-F7** CI gate against stray `prototype_runs/` directories | PASS | `.github/workflows/ci.yml` "enforce repo-root prototype_runs path" step; verified locally that `find . -type d -name prototype_runs -not -path './prototype_runs' -not -path './prototype_runs/*' -not -path './target/*' -not -path './.git/*'` returns empty after release build + acceptance run |
-| **M3-006 captured** in backlog | DEFERRED to M3 (per reviewer guidance) | New row in `cortext_command_vault/spec/native-implementation-backlog.md` §M3 |
+| **M3-006 captured** in backlog | DEFERRED to M3 (per reviewer guidance) | New row in `docs/plan/spec/native-implementation-backlog.md` §M3 |
 
 ### Standard Validation (M0.4)
 

@@ -4,15 +4,30 @@ This file is for AI implementation agents working in `~/projects/corefall`.
 
 ## Source Of Truth
 
-This is the implementation repo. Do not duplicate the planning vault here.
-
-The canonical research and planning vault is:
+This is the implementation repo. The implementation-gating planning spine
+(Roadmap V2, native backlog, feature checklist, every DR, milestone
+enhancement spec, AI-coder reading list, ai-control-observability-layer,
+authoritative game spec, prototype-run-bundle-schema, BP closure notes,
+and the 80 linked spec files) lives in this repo at `docs/plan/`. PRs
+that touch the spine are reviewed in-branch by Bugbot + Devin alongside
+the implementation that depends on them.
 
 ```text
-/Users/erol/projects/cortex-command-repos-all/cortext_command_vault
+docs/plan/spec/...           — Roadmap V2, backlog, checklist, milestone-enhancement, ai-coder-reading-list, ai-control-observability, authoritative-game-spec, 74 linked specs
+docs/plan/decisions/...      — every DR + decisions/index.md
+docs/plan/dashboards/...     — decision-tracker.md + research-readiness.md
+docs/plan/references/...     — prototype-run-bundle-schema.md
+docs/plan/prototypes/...     — BP closure notes (build-point-bp1-* / build-point-bp2-*)
 ```
 
-Root planning files live here:
+The research vault at `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault`
+keeps long-form research that informs but does not gate implementation:
+comparables_repos/ (Cortex/Stationeers/Noita analysis), research-log/
+(dated research notes), references/usage-ledger.md (license tracking),
+narrative-seeds/, plus the top-level VAULT_PLAN.md / DIRECTORY.md /
+GAME_DESCRIPTION_FOR_FRIEND.md project-overview docs.
+
+Background project-overview reads (research vault):
 
 ```text
 /Users/erol/projects/cortex-command-repos-all/VAULT_PLAN.md
@@ -21,17 +36,19 @@ Root planning files live here:
 /Users/erol/projects/cortex-command-repos-all/GAME_DESCRIPTION_FOR_FRIEND.md
 ```
 
-Before implementing a milestone, read the canonical vault directly. If any path below is missing, search the canonical vault with `rg --files` and ask the user before making architecture-changing assumptions.
+Before implementing a milestone, read the spine docs in `docs/plan/`
+directly. If a path below is missing, search `docs/plan/` with `rg --files`
+and ask the user before making architecture-changing assumptions.
 
 ## Milestone Authority Stack
 
 For milestone scope and acceptance, documents are not peers. Use this authority order every time:
 
 1. The user's current assignment or explicit correction.
-2. The Roadmap V2 Build Points layer + the assigned milestone section in `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md`. The Build Points table (BP0..BP12) bundles related milestones; if a BP is the assignment, every milestone inside it is in scope.
-3. The assigned milestone task cards in `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/native-implementation-backlog.md`.
+2. The Roadmap V2 Build Points layer + the assigned milestone section in `docs/plan/spec/prototype-roadmap.md`. The Build Points table (BP0..BP12) bundles related milestones; if a BP is the assignment, every milestone inside it is in scope.
+3. The assigned milestone task cards in `docs/plan/spec/native-implementation-backlog.md`.
 4. DRs/spec files that the roadmap or backlog explicitly links for that milestone.
-5. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/feature-completion-checklist.md` (which now contains both per-milestone rows AND a Build Points Checklist addendum) as tracking and evidence only.
+5. `docs/plan/spec/feature-completion-checklist.md` (which now contains both per-milestone rows AND a Build Points Checklist addendum) as tracking and evidence only.
 6. Implementation logs, `CHANGELOG.md`, run bundles, notes, review reports, and handoff summaries as evidence only.
 
 If a lower-authority file says a roadmap/backlog requirement is deferred, partial, unnecessary, or complete, that claim is invalid unless the roadmap/backlog was changed first with explicit user approval. Do not use evidence files to redefine milestone scope.
@@ -50,8 +67,8 @@ A Build Point is complete only when:
 - Every milestone inside the BP PASSES the Milestone Acceptance Gate (ID-by-ID matrix below).
 - Every milestone inside the BP PASSES the Contract Integrity Gate (matrix below) with positive AND negative/adversarial proof.
 - Run-bundle evidence exists for every fun-proof slice inside the BP at multiple tick rates (60 Hz default + 120 Hz validation, more if the BP touches network/server/replay cadence).
-- **T-CAPTURE evidence is mandatory from BP2 onward**: every fun-proof scenario must emit a `summary_grid.png` + `capture_manifest.json` (recorded in `summary.json.artifacts.items[]`), and the cf-e2e script must include `--expect capture.summary_grid.non_blank_ratio>=0.95` to catch black-frame regressions. See `cortext_command_vault/spec/prototype-roadmap.md` §T-CAPTURE for the full contract.
-- **T-RELEASE tag mandatory from BP1 onward**: every BP closure produces a tagged GitHub Release matching `v0.<N>.0-bp<N>` (BP1..BP11) or `v1.0.0` (BP12 launch GA). The release ships cross-platform binaries (Linux, Windows, macOS x86_64, macOS aarch64) plus the BP's exemplar run bundle + `summary_grid.png` + auto-generated release notes (run-bundle stats + AI-Agent Self-Test Report + determinism contract + SHA256SUMS). The tag is pushed AFTER the BP's PR is merged into `main`. Pre-release flag stays ON until v1.0.0. See `cortext_command_vault/spec/prototype-roadmap.md` §T-RELEASE for the full contract.
+- **T-CAPTURE evidence is mandatory from BP2 onward**: every fun-proof scenario must emit a `summary_grid.png` + `capture_manifest.json` (recorded in `summary.json.artifacts.items[]`), and the cf-e2e script must include `--expect capture.summary_grid.non_blank_ratio>=0.95` to catch black-frame regressions. See `docs/plan/spec/prototype-roadmap.md` §T-CAPTURE for the full contract.
+- **T-RELEASE tag mandatory from BP1 onward**: every BP closure produces a tagged GitHub Release matching `v0.<N>.0-bp<N>` (BP1..BP11) or `v1.0.0` (BP12 launch GA). The release ships cross-platform binaries (Linux, Windows, macOS x86_64, macOS aarch64) plus the BP's exemplar run bundle + `summary_grid.png` + auto-generated release notes (run-bundle stats + AI-Agent Self-Test Report + determinism contract + SHA256SUMS). The tag is pushed AFTER the BP's PR is merged into `main`. Pre-release flag stays ON until v1.0.0. See `docs/plan/spec/prototype-roadmap.md` §T-RELEASE for the full contract.
 - `/corefall-review <bp>` verdict is `Accept` for the full BP scope, not just one milestone inside it.
 - **BP Goal Coverage Report** (mandatory): the closure includes a per-BP Goal Coverage Report mapping every goal stated in the canonical roadmap's BP table row + per-milestone done-criteria + fun-proof slice description to evidence (cfctl action → `summary_grid.png` frame the agent personally read → `events.jsonl` event row → `observe.once` field → unit/integration test). The report must include agent prose articulating look + feel + juice — NOT just "the captures look correct" or "the test passed". See `.claude/skills/corefall-review/SKILL.md` §BP Goal Coverage Gate.
 - **AI-Agent Self-Test Report** (mandatory; replaces mandatory human playtest): `prototype_runs/native/<bp>_*/notes.md` contains an `## AI-Agent Self-Test Report` section answering Q1..Q7 (BP claims, end-to-end delivery, visual presentation, simulation feel, missed affordances, regression check, honest disclosure of what a human playtester might catch that the AI missed) with concrete evidence + agent identity + timestamp. See `.claude/skills/corefall-review/SKILL.md` §AI-Agent Self-Test Report Gate.
@@ -104,7 +121,7 @@ If a contract path has no negative/adversarial proof, do not mark it complete.
 
 ## Universal Enhancement Contract (DR-056)
 
-Every milestone from M1 onward inherits the **Universal Enhancement Done-Criteria** from `cortext_command_vault/spec/milestone-enhancement-pass-m1-plus.md` on top of its own scope and done-criteria. The universal rows are non-optional — they are part of the milestone closeout contract and must PASS in addition to the milestone's documented Done-criteria:
+Every milestone from M1 onward inherits the **Universal Enhancement Done-Criteria** from `docs/plan/spec/milestone-enhancement-pass-m1-plus.md` on top of its own scope and done-criteria. The universal rows are non-optional — they are part of the milestone closeout contract and must PASS in addition to the milestone's documented Done-criteria:
 
 ```text
 Universal Enhancement Done-Criteria (per DR-056):
@@ -124,7 +141,7 @@ Universal Enhancement Done-Criteria (per DR-056):
 - [ ] Captions for ALL audio (full-subtitle option) per DR-051.
 ```
 
-Per-milestone specifics (e.g., M2 GPU compute path investigation + SIMD + cold-load benchmark, M2.5 adaptive difficulty toggle + AI difficulty preset visibility, M3A per-tick checksum + replay determinism CI matrix per platform + replay branching) live in `cortext_command_vault/spec/milestone-enhancement-pass-m1-plus.md`. Read both the Universal Enhancement Done-Criteria section AND the milestone's own row in that document before claiming a milestone closed.
+Per-milestone specifics (e.g., M2 GPU compute path investigation + SIMD + cold-load benchmark, M2.5 adaptive difficulty toggle + AI difficulty preset visibility, M3A per-tick checksum + replay determinism CI matrix per platform + replay branching) live in `docs/plan/spec/milestone-enhancement-pass-m1-plus.md`. Read both the Universal Enhancement Done-Criteria section AND the milestone's own row in that document before claiming a milestone closed.
 
 A milestone is not closed if any Universal row FAILS unless the user explicitly approves deferring that exact row with issue ID, reason, owner, next checkpoint, and evidence path. Some Universal rows (e.g., 24h memory-leak soak; modder validation; full Tier-A localization for English-only prototype scope) may be staged at the BP boundary rather than the per-milestone boundary; document the staging plan in the implementation log + checklist row when this happens, and the BP closure gate enforces them collectively.
 
@@ -179,7 +196,7 @@ Hardcoded performance-sensitive constants are a milestone failure unless they ar
 If the user says something short like:
 
 ```text
-Implement M0 from /Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md
+Implement M0 from docs/plan/spec/prototype-roadmap.md
 ```
 
 or:
@@ -207,26 +224,29 @@ For any milestone assignment, the worker must:
 
 ## Mandatory Read Order Before Any Milestone
 
-Read these in order before implementing a roadmap milestone:
+Read these in order before implementing a roadmap milestone. The first
+three are research-vault project-overview reads (background context); the
+rest are spine docs that live in this repo at `docs/plan/` and gate
+implementation:
 
-1. `/Users/erol/projects/cortex-command-repos-all/AGENTS.md`
-2. `/Users/erol/projects/cortex-command-repos-all/VAULT_PLAN.md`
-3. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/index.md` (Planning Docs panel)
-4. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/ai-coder-reading-list.md`
-5. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/authoritative-game-spec-v0.md`
-6. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md` (especially the **Minimum Bar And Enhancement Rule**, the **Universal Enhancement Done-Criteria** callout above the Milestone Details header, the **Design-Completeness Map**, the **Build Points (Roadmap V2)** section, and the assigned milestone's section)
-7. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/native-implementation-backlog.md`
-8. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/feature-completion-checklist.md` (Build Points Checklist + Milestone Scope/Done-Criteria/Native Task Card rows for the assigned milestone)
-9. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/milestone-enhancement-pass-m1-plus.md` — **Universal Enhancement Done-Criteria (DR-056)** + per-milestone enhancement specifics. Mandatory for every M1+ milestone.
-10. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/ai-control-observability-layer.md`
-11. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/references/prototype-run-bundle-schema.md`
-12. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/decisions/index.md`
-13. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/dashboards/decision-tracker.md`
+1. `/Users/erol/projects/cortex-command-repos-all/AGENTS.md` — vault root agent guide (background context).
+2. `/Users/erol/projects/cortex-command-repos-all/VAULT_PLAN.md` — vault directory layout (background context).
+3. `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/index.md` — vault index of long-form research (background context).
+4. `docs/plan/spec/ai-coder-reading-list.md`
+5. `docs/plan/spec/authoritative-game-spec-v0.md`
+6. `docs/plan/spec/prototype-roadmap.md` (especially the **Minimum Bar And Enhancement Rule**, the **Universal Enhancement Done-Criteria** callout above the Milestone Details header, the **Design-Completeness Map**, the **Build Points (Roadmap V2)** section, and the assigned milestone's section)
+7. `docs/plan/spec/native-implementation-backlog.md`
+8. `docs/plan/spec/feature-completion-checklist.md` (Build Points Checklist + Milestone Scope/Done-Criteria/Native Task Card rows for the assigned milestone)
+9. `docs/plan/spec/milestone-enhancement-pass-m1-plus.md` — **Universal Enhancement Done-Criteria (DR-056)** + per-milestone enhancement specifics. Mandatory for every M1+ milestone.
+10. `docs/plan/spec/ai-control-observability-layer.md`
+11. `docs/plan/references/prototype-run-bundle-schema.md`
+12. `docs/plan/decisions/index.md`
+13. `docs/plan/dashboards/decision-tracker.md`
 
 For milestone-specific docs, use the tables in:
 
 ```text
-/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/ai-coder-reading-list.md
+docs/plan/spec/ai-coder-reading-list.md
 ```
 
 If the canonical `spec/ai-coder-reading-list.md` disagrees with the list above, the canonical list wins. Propose a row update there in the same pass and commit the AGENTS.md edit alongside it.
@@ -245,7 +265,7 @@ Repo-specific review behavior is pinned in the skill entrypoint at `.claude/skil
 
 ## Repository Layout
 
-The native game workspace lives at the corefall repo's `game/` directory. This matches the canonical roadmap's `Repository Layout` section in `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md`; no path mapping is needed.
+The native game workspace lives at the corefall repo's `game/` directory. This matches the canonical roadmap's `Repository Layout` section in `docs/plan/spec/prototype-roadmap.md`; no path mapping is needed.
 
 | Canonical (in roadmap) | This repo |
 |---|---|
@@ -268,7 +288,7 @@ Do not put source code in the planning vault. Do not copy the whole vault into t
 
 ## Per-Crate AGENTS.md
 
-Every crate under `game/crates/cf-*/` ships its own `AGENTS.md` per the `Per-Crate AGENTS.md Template` section in `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md`. The crate's `AGENTS.md` is the boundary contract:
+Every crate under `game/crates/cf-*/` ships its own `AGENTS.md` per the `Per-Crate AGENTS.md Template` section in `docs/plan/spec/prototype-roadmap.md`. The crate's `AGENTS.md` is the boundary contract:
 
 - Owns
 - Public API Boundary
@@ -300,11 +320,11 @@ The vendored `game/tools/prototype_run_check.py` is the canonical CI checker (th
 
 Milestones with gameplay/tool UI also require a scripted E2E command (`cargo run -p cf-e2e -- --script <path> --expect <key>=<value>`) and a screenshot/capture artifact listed in `summary.json.artifacts`.
 
-`cfctl` lives at `game/crates/cfctl/`. Invoke as `cargo run -p cfctl -- <subcommand>` until it is installed or added to PATH; once installed, `cfctl <subcommand>` is shorthand. The full CLI surface is pinned in the canonical `CLI Reference` section of `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md`. The currently-shipped subset (M0+M1+M1.5) is mirrored in the corefall `README.md` CLI Reference table.
+`cfctl` lives at `game/crates/cfctl/`. Invoke as `cargo run -p cfctl -- <subcommand>` until it is installed or added to PATH; once installed, `cfctl <subcommand>` is shorthand. The full CLI surface is pinned in the canonical `CLI Reference` section of `docs/plan/spec/prototype-roadmap.md`. The currently-shipped subset (M0+M1+M1.5) is mirrored in the corefall `README.md` CLI Reference table.
 
 ## Run-Bundle Naming
 
-Run bundles live under `prototype_runs/native/` at the corefall repo root. Naming follows the canonical `Run-Bundle Naming Convention` section of `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md`.
+Run bundles live under `prototype_runs/native/` at the corefall repo root. Naming follows the canonical `Run-Bundle Naming Convention` section of `docs/plan/spec/prototype-roadmap.md`.
 
 ```text
 prototype_runs/native/<milestone>_<UTC ISO-8601 with hyphens>_<short_hash>/
@@ -320,7 +340,7 @@ Do not silently assume an open decision is settled.
 
 If a milestone touches an OPEN decision record or topic-level open decision:
 
-- Confirm the current lean from the canonical vault per the `Open Decision Gates Protocol` section of `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md`.
+- Confirm the current lean from the canonical vault per the `Open Decision Gates Protocol` section of `docs/plan/spec/prototype-roadmap.md`.
 - Implement only what the milestone allows.
 - If the lean is contested or would materially change architecture, stop and ask the user through the active agent's available user-input/chat mechanism.
 - When prototype evidence closes a DR, update the canonical vault in the same pass (DR file + decisions/index + decision-tracker + research-readiness + a dated research-log note) or explicitly report that the vault update is still pending.
@@ -331,7 +351,7 @@ Every player-facing surface must be controllable and observable through the plan
 
 The rule: any pixel a human can interact with on screen, the AI worker must be able to drive through `cfctl`. Screenshot-only testing is not enough. A milestone is incomplete if AI agents cannot inspect and drive the new gameplay/UI surface through structured commands.
 
-See `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/ai-control-observability-layer.md` for the full observe/inspect/act surface; every new player-facing surface must extend it.
+See `docs/plan/spec/ai-control-observability-layer.md` for the full observe/inspect/act surface; every new player-facing surface must extend it.
 
 ## Self-Play Validation Rule
 
@@ -441,8 +461,8 @@ Required completion actions:
 1. Update code and tests in `game/`.
 2. Run the Standard Validation commands (above) plus any milestone-specific validation from the assigned roadmap/backlog section.
 3. Emit or update run-bundle evidence when the task includes runnable behavior.
-4. Update `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/feature-completion-checklist.md` rows that correspond to the completed work. Fill evidence, commands, run-bundle paths, and AI self-ratings; leave human rating fields blank unless the user provides them.
-5. Update `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md` if status, scope, dependencies, evidence, commands, risks, or follow-up work changed.
+4. Update `docs/plan/spec/feature-completion-checklist.md` rows that correspond to the completed work. Fill evidence, commands, run-bundle paths, and AI self-ratings; leave human rating fields blank unless the user provides them.
+5. Update `docs/plan/spec/prototype-roadmap.md` if status, scope, dependencies, evidence, commands, risks, or follow-up work changed.
 6. Add or update the milestone implementation note under `docs/implementation-log/`.
 7. Add a concise repo-local entry to `CHANGELOG.md`.
 8. If the milestone closes a DR, update the DR file + `decisions/index.md` + `dashboards/decision-tracker.md` + `dashboards/research-readiness.md` + a dated `research-log/` note in the same pass.
@@ -454,7 +474,7 @@ Required completion actions:
 14. Run `/corefall-review <milestone>` from `/Users/erol/projects/corefall`, fix every verified finding at every severity, and rerun `/corefall-review <milestone>` until the verdict is `Accept`. If the user explicitly defers a finding, record the deferral ID, reason, owner, next checkpoint, and evidence path.
 15. Report the Contract Integrity Matrix proving shared code paths, required-field rejection, fake-success absence, source-truthful evidence, and checklist truth.
 16. If the milestone closes the last open milestone inside an active Build Point, also: rerun `/corefall-review <bp>` for the full BP scope, update the Build Points Checklist row in `feature-completion-checklist.md`, AND produce the **AI-Agent Self-Test Report** at `prototype_runs/native/<bp>_*/notes.md` under heading `## AI-Agent Self-Test Report` — answering Q1..Q7 (BP claims verbatim from roadmap; end-to-end cfctl-driven delivery; visual presentation prose; simulation-feel prose; missed-affordance list; prior-BP regression check; honest disclosure of human-playtester gaps the AI agent might miss). Record the agent identity (Droid + model id) + timestamp. The optional `## Human Playtest Survey (optional confirmation)` section MAY sit below it after the project owner playtests; it does NOT block BP closure when the AI report is complete.
-17. If the milestone closes a BP, also produce the **BP Goal Coverage Report** mapping every roadmap-stated goal to evidence (cfctl action → `summary_grid.png` frame index the agent personally read → `events.jsonl` event row → `observe.once` field → unit/integration test). The report must include agent prose articulating look + feel + juice; "the captures look correct" is not prose. Record this in the implementation log under `docs/implementation-log/<date>-<bp>.md` and reference it from the BP closure note in the canonical vault under `cortext_command_vault/prototypes/build-point-<bp>-*.md`.
+17. If the milestone closes a BP, also produce the **BP Goal Coverage Report** mapping every roadmap-stated goal to evidence (cfctl action → `summary_grid.png` frame index the agent personally read → `events.jsonl` event row → `observe.once` field → unit/integration test). The report must include agent prose articulating look + feel + juice; "the captures look correct" is not prose. Record this in the implementation log under `docs/implementation-log/<date>-<bp>.md` and reference it from the BP closure note in the canonical vault under `docs/plan/prototypes/build-point-<bp>-*.md`.
 18. Run `bash game/tools/self_play_sweep.sh` and record the verdict matrix in the implementation log + commit message. Every row in the Self-Play Validation Matrix (see "Self-Play Validation Rule" section) must be PASS. The agent must read each `summary_grid.png` produced by the sweep and write **per-action prose** describing what each frame shows — NOT "looks correct" or "PASS". If the sweep can't exercise a milestone-scope action because of a harness gap, **fix the harness in the same pass** — this is the "make it possible" clause from the Self-Play Validation Rule.
 
 Do not mark work complete if the checklist/roadmap updates are skipped. Do not mark work complete if any roadmap done-criterion or backlog task card is deferred, partial, or only documented as future work. Do not mark work complete until `/corefall-review <milestone>` has been run and rerun to `Accept`, unless every remaining verified finding has explicit user-approved deferral evidence. Do not mark work complete if the Minimum-Bar Design Coverage Matrix is missing or excuses an inside-scope obvious affordance as "not explicitly requested." Do not mark work complete if the Contract Integrity Matrix is missing positive and negative/adversarial proof for each contract path. Do not mark work complete if a performance-sensitive value is hardcoded without roadmap/backlog authority and a config-path explanation. Do not mark a Build Point closed without the per-BP human-playtest survey row in the run bundle. **Do not mark work complete if `self_play_sweep.sh` was not run, did not PASS every row in the Self-Play Validation Matrix, or did not produce a `summary_grid.png` per scenario that the agent personally read and visually confirmed.** If a task genuinely does not affect the roadmap, record "roadmap update not needed" in the implementation log and explain why.
@@ -548,7 +568,7 @@ Search for this signature when auditing recent PR history. These are NOT human c
 ## Secrets Posture
 
 - Never commit API keys, `.env` files, signing keys, or LLM provider tokens.
-- Use environment variables for any secret per `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/hybrid-llm-ai-plan.md` `MindProviderConfig.api_key_env`.
+- Use environment variables for any secret per `docs/plan/spec/hybrid-llm-ai-plan.md` `MindProviderConfig.api_key_env`.
 - The `.gitignore` already excludes `.env`, `.env.*` (with `!.env.example` exception). Do not weaken this without an explicit user request.
 - LLM live providers are cargo-feature-gated and never required for any test. CI uses the deterministic mock provider only.
 
@@ -557,7 +577,7 @@ Search for this signature when auditing recent PR history. These are NOT human c
 - Don't write source code under `cortext_command_vault/`. The vault is planning, not implementation.
 - Don't edit canonical reference repos under `/Users/erol/projects/cortex-command-repos-all/{Cortex-Command-*,comparables_repos/*}` unless the user explicitly says so.
 - Don't use `rand::thread_rng()` inside sim crates (`cf-sim-core`, `cf-physics`, `cf-material`, `cf-ai`, ...). Sim RNG must be seeded and recorded per the manifest.
-- Don't use `println!` in production code. Use `tracing` per the canonical `Logging, Tracing, And Error Policy` section of `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md`.
+- Don't use `println!` in production code. Use `tracing` per the canonical `Logging, Tracing, And Error Policy` section of `docs/plan/spec/prototype-roadmap.md`.
 - Don't `unwrap()` on user-controllable inputs.
 - Don't skip the Open Decision Gates pre-check before assigning a milestone.
 - Don't commit API keys, `.env` files, signing keys, or LLM provider tokens.

@@ -31,7 +31,7 @@ Review source: `.claude/skills/corefall-review/SKILL.md`.
 |---|---|---|---|---|
 | **M0.4-F7** `cf-replay` unit test for bundle path resolution | independent-review recommendation | 5 new tests in `crates/cf-replay/src/bundle_paths.rs::tests`: `default_root_resolves_above_game_when_cwd_is_game` (cwd=game/ regression), `default_root_uses_cwd_when_cwd_is_repo_root`, `default_root_walks_up_from_nested_cwd`, `resolve_run_bundle_root_returns_explicit_unchanged`, `resolve_run_bundle_root_falls_back_to_default_when_none`. Resolver moved to `cf-replay::bundle_paths` (natural owner); `cf-control::runtime` re-exports for backwards compatibility. | PASS | None |
 | **M0.4-F7** CI assertion: no `prototype_runs/` outside repo root | independent-review recommendation | `.github/workflows/ci.yml` step "enforce repo-root prototype_runs path (M0.4-F7)" runs `find` after the release build + acceptance bundles and fails CI on any stray directory. Verified locally: zero stray dirs after `cf-app --headless-smoke ... --write-run-bundle` (bundle landed at absolute `/Users/erol/projects/corefall/prototype_runs/native/m0_..._8466a407`). | PASS | None |
-| **M3-006** `system.run_finished` checker tightening + `expected_outcome` enum | independent-review recommendation (capture only) | New task card added to `cortext_command_vault/spec/native-implementation-backlog.md` §M3. Owns: `cf-replay`, `references/prototype-run-bundle-schema.md`, `tools/prototype_run_check.py`. Adds `expected_outcome` enum (`clean | panic | abort`) + tighter checker rules. **Intentionally NOT implemented in M0.4** — M3 closes DR-002 and is where the contract belongs. | DEFERRED to M3 (per reviewer guidance) | None — captured in roadmap-authoritative backlog |
+| **M3-006** `system.run_finished` checker tightening + `expected_outcome` enum | independent-review recommendation (capture only) | New task card added to `docs/plan/spec/native-implementation-backlog.md` §M3. Owns: `cf-replay`, `references/prototype-run-bundle-schema.md`, `tools/prototype_run_check.py`. Adds `expected_outcome` enum (`clean | panic | abort`) + tighter checker rules. **Intentionally NOT implemented in M0.4** — M3 closes DR-002 and is where the contract belongs. | DEFERRED to M3 (per reviewer guidance) | None — captured in roadmap-authoritative backlog |
 | All M0.3 contracts (M0-001..008, M0-D01..D08, DR-002 v1, DR-012, eyes/ears/hands, no-compromise perf) | M0.3 review report | Unchanged from M0.3 verdict; M0.4 is additive (path-safety regression coverage, no behavioral changes to engine/server/cfctl). | PASS | None |
 
 ## Validation
@@ -57,9 +57,9 @@ Review source: `.claude/skills/corefall-review/SKILL.md`.
 
 - `corefall/CHANGELOG.md` — `Unreleased > Fixed (M0.4 — F7 path-safety follow-up)` section landed with the bullet list, test-count delta, and acceptance bundle.
 - `corefall/docs/implementation-log/2026-05-05-m0-engine-bootstrap.md` — M0.4 section appended with findings table, architectural diagram (cf-replay owns the resolver), test count delta (68 → 73), ID-by-ID matrix, Standard Validation table.
-- `cortext_command_vault/spec/native-implementation-backlog.md` — new `M3-006 run-finished outcome contract` task card under §M3.
+- `docs/plan/spec/native-implementation-backlog.md` — new `M3-006 run-finished outcome contract` task card under §M3.
 - `corefall/docs/reviews/2026-05-06-m0-m0-4-review-report.md` — this report.
-- `cortext_command_vault/spec/feature-completion-checklist.md` — no row changes required; M0 rows already at `[x]` from M0.3, and the M0.4 regression test + CI gate strengthen evidence under existing rows without changing scope.
+- `docs/plan/spec/feature-completion-checklist.md` — no row changes required; M0 rows already at `[x]` from M0.3, and the M0.4 regression test + CI gate strengthen evidence under existing rows without changing scope.
 
 ## Verdict
 

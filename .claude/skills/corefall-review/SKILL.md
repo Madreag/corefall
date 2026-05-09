@@ -9,7 +9,7 @@ argument-hint: "[milestone-or-bp-or-git-range]"
 
 Run a deep review of Corefall implementation work. Treat `$ARGUMENTS` as the milestone, Build Point (e.g. `BP1`, `BP2`), feature, branch, commit, or diff range to review. If no argument is provided, review the current working tree.
 
-For Build Point arguments (`BP<N>`), the review covers EVERY milestone the BP bundles per the Build Points table in `cortext_command_vault/spec/prototype-roadmap.md` plus the per-BP human-playtest survey row and T-CAPTURE summary-grid evidence.
+For Build Point arguments (`BP<N>`), the review covers EVERY milestone the BP bundles per the Build Points table in `docs/plan/spec/prototype-roadmap.md` plus the per-BP human-playtest survey row and T-CAPTURE summary-grid evidence.
 
 Use ultrathink. Optimize for true bugs, missed requirements, logic problems, determinism gaps, weak tests, stale docs, and milestone incompleteness. Do not spend review budget on style unless it hides a real defect or maintainability risk.
 
@@ -35,7 +35,7 @@ Always check:
 - **Source-truthful evidence:** bundles and observations must reflect loaded scenario data, active config, current binary/git state, and actual runtime path.
 - **Checklist truth:** checked rows cannot hide missing required work in notes with "deferred", "follow-up", "reserved", "stub", "fake", "placeholder", "not implemented", or equivalent wording.
 - **Regression proof:** every verified bug fixed by an implementer must include a test or validation command that would have failed before the fix.
-- **T-CAPTURE evidence (BP2 onward):** every fun-proof scenario must emit a `summary_grid.png` + `capture_manifest.json` recorded in `summary.json.artifacts`; the cf-e2e script must include `--expect capture.summary_grid.non_blank_ratio>=0.95` to catch black-frame regressions. See `cortext_command_vault/spec/prototype-roadmap.md` §T-CAPTURE.
+- **T-CAPTURE evidence (BP2 onward):** every fun-proof scenario must emit a `summary_grid.png` + `capture_manifest.json` recorded in `summary.json.artifacts`; the cf-e2e script must include `--expect capture.summary_grid.non_blank_ratio>=0.95` to catch black-frame regressions. See `docs/plan/spec/prototype-roadmap.md` §T-CAPTURE.
 
 If any item above is missing, verdict is `Needs Fixes`.
 
@@ -60,7 +60,7 @@ The Self-Play Validation Gate proves *every cfctl action works*. The BP Goal Cov
 
 Every BP review must include a **BP Goal Coverage Report** that:
 
-1. **Quotes the BP's stated goals verbatim** from `cortext_command_vault/spec/prototype-roadmap.md` (Build Points table + per-milestone done-criteria + the BP's fun-proof slice description). This is what the project owner signed up to ship.
+1. **Quotes the BP's stated goals verbatim** from `docs/plan/spec/prototype-roadmap.md` (Build Points table + per-milestone done-criteria + the BP's fun-proof slice description). This is what the project owner signed up to ship.
 2. **Maps each goal to evidence** in the closure run bundle:
    - Goal → cfctl action(s) that exercise it → `summary_grid.png` frame the agent personally read → `events.jsonl` event type + count → `observe.once` field that confirms post-state → unit/integration test that locks the contract.
 3. **Articulates the look + feel + juice** the agent observed in the captures. The agent must write prose like "frame 14 shows the dirt shield mound between the guard sprite at x=900 and the reactor sprite at x=600; frame 41 shows the same shield with a horizontal tunnel carved at y=32; frame 58 shows two projectile sprites passing through the tunnel and one impact sprite at the reactor's AABB" — NOT "the captures look correct" or "the summary grid is non-blank".
@@ -259,7 +259,7 @@ If any floor row is missing for a milestone-scope surface, the milestone is inco
 
 ## Universal Enhancement Audit Gate (DR-056)
 
-Per `cortext_command_vault/spec/milestone-enhancement-pass-m1-plus.md`, every M1+ milestone inherits the Universal Enhancement Done-Criteria on top of its own scope. Audit:
+Per `docs/plan/spec/milestone-enhancement-pass-m1-plus.md`, every M1+ milestone inherits the Universal Enhancement Done-Criteria on top of its own scope. Audit:
 
 - **Per-tier perf gate** (Steam Deck 800p/60 + 1080p/60 + 4K/120) recorded in `summary.json.performance` or `cf-bench` report.
 - **CI bench regression** (no >5% regression vs baseline) per DR-054.
@@ -340,12 +340,12 @@ cd /Users/erol/projects/corefall && {
 Read these before judging the work:
 
 - `/Users/erol/projects/corefall/AGENTS.md` (especially **Build Point Closure Gate** + **Contract Integrity Gate** + **Universal Enhancement Contract (DR-056)** + **Minimum Bar And Enhancement Rule** + **Self-Play Validation Rule** + **Cursor Bugbot Loop** sections).
-- `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md` (especially the **Build Points** table BP0..BP12, the Universal Enhancement Done-Criteria callout above the Milestone Details header, the **Design-Completeness Map**, and the **§T-CAPTURE** + **§T-RELEASE** side-track sections).
-- `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/native-implementation-backlog.md`
-- `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/feature-completion-checklist.md` (per-milestone rows AND the **Build Points Checklist** addendum).
-- `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/milestone-enhancement-pass-m1-plus.md` (Universal Enhancement Done-Criteria + per-milestone enhancement specifics for the assigned milestone).
-- `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/ai-control-observability-layer.md`
-- `/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/references/prototype-run-bundle-schema.md` (especially the `captures/` rows and `summary.json.artifacts[].type` values).
+- `docs/plan/spec/prototype-roadmap.md` (especially the **Build Points** table BP0..BP12, the Universal Enhancement Done-Criteria callout above the Milestone Details header, the **Design-Completeness Map**, and the **§T-CAPTURE** + **§T-RELEASE** side-track sections).
+- `docs/plan/spec/native-implementation-backlog.md`
+- `docs/plan/spec/feature-completion-checklist.md` (per-milestone rows AND the **Build Points Checklist** addendum).
+- `docs/plan/spec/milestone-enhancement-pass-m1-plus.md` (Universal Enhancement Done-Criteria + per-milestone enhancement specifics for the assigned milestone).
+- `docs/plan/spec/ai-control-observability-layer.md`
+- `docs/plan/references/prototype-run-bundle-schema.md` (especially the `captures/` rows and `summary.json.artifacts[].type` values).
 - Relevant DRs and specs linked from the assigned milestone or Build Point (including DR-052..057 for the universal contract).
 
 If the review is for M0, also read [references/m0-review.md](references/m0-review.md).

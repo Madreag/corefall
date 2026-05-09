@@ -115,9 +115,9 @@ New helper exposing newly-recorded events without cloning the full event log. Us
 
 ## Vault updates landed in same pass
 
-- `cortext_command_vault/spec/prototype-roadmap.md` — new T-CAPTURE row in side-tracks summary table + new `### T-CAPTURE` section after T-PERF.
-- `cortext_command_vault/references/prototype-run-bundle-schema.md` — `captures/*` row family added with `summary.json.artifacts[].type` values.
-- `cortext_command_vault/spec/feature-completion-checklist.md` — new `### T-CAPTURE` section with 12 rows (5 S, 3 D, 4 O).
+- `docs/plan/spec/prototype-roadmap.md` — new T-CAPTURE row in side-tracks summary table + new `### T-CAPTURE` section after T-PERF.
+- `docs/plan/references/prototype-run-bundle-schema.md` — `captures/*` row family added with `summary.json.artifacts[].type` values.
+- `docs/plan/spec/feature-completion-checklist.md` — new `### T-CAPTURE` section with 12 rows (5 S, 3 D, 4 O).
 - `cortext_command_vault/prototypes/index.md` — new T-CAPTURE row pointing to evidence note.
 - `cortext_command_vault/prototypes/native-tcapture-frame-grid.md` — new evidence note (this file's vault counterpart).
 

@@ -33,6 +33,6 @@ The repo-only changelog lives at:
 The canonical roadmap and checklist live in the vault:
 
 ```text
-/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md
-/Users/erol/projects/cortex-command-repos-all/cortext_command_vault/spec/feature-completion-checklist.md
+docs/plan/spec/prototype-roadmap.md
+docs/plan/spec/feature-completion-checklist.md
 ```

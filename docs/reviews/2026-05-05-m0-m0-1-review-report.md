@@ -77,8 +77,8 @@ Date: 5/5/2026 8:21 PM MST
 
 - `corefall/CHANGELOG.md` — M0.1 stabilization section landed (Fixed: H1 + M1 + M2 + M3 + M5 + L1 + L2 + L3 + L4 + M4 doc + schema-drift CI gate); M2 fix extended for mid-run runbundle.write.
 - `corefall/docs/implementation-log/2026-05-05-m0-engine-bootstrap.md` — appended M0.1 Stabilization Pass section with findings table, M0.1 acceptance bundle table (7 bundles), test count delta (38 → 43), ID-by-ID acceptance matrix.
-- `cortext_command_vault/spec/feature-completion-checklist.md` — M0-001, M0-002, M0-006, M0-007 rows refreshed with M0.1 evidence + Bevy 0.14 / static schemas / `cf-mod validate` / `cfctl observe --inline --stream` rejection / `for_loaded_scenario` notes; D04, D05, D06, D07, D08 rows updated to point at the M0.1 bundles. M0-002 status flipped from `[~]` to `[x]`.
-- `cortext_command_vault/references/prototype-run-bundle-schema.md` — DR-002 v1 Lock Extensions table now enumerates `summary.performance.{tick_rate_hz,p99_tick_ms,avg_tick_ms,wall_seconds}`, `run_manifest.json.tick_rate_hz`, and the M0.1 invariant on `final_sim_checksum` / `checksum_event_count`.
+- `docs/plan/spec/feature-completion-checklist.md` — M0-001, M0-002, M0-006, M0-007 rows refreshed with M0.1 evidence + Bevy 0.14 / static schemas / `cf-mod validate` / `cfctl observe --inline --stream` rejection / `for_loaded_scenario` notes; D04, D05, D06, D07, D08 rows updated to point at the M0.1 bundles. M0-002 status flipped from `[~]` to `[x]`.
+- `docs/plan/references/prototype-run-bundle-schema.md` — DR-002 v1 Lock Extensions table now enumerates `summary.performance.{tick_rate_hz,p99_tick_ms,avg_tick_ms,wall_seconds}`, `run_manifest.json.tick_rate_hz`, and the M0.1 invariant on `final_sim_checksum` / `checksum_event_count`.
 - `corefall/.github/workflows/ci.yml` — replaced the `dump_schemas` + `git diff` check with the simpler `dump_schemas -- --check` invocation that fails fast with a clear message.
 
 ## Verdict

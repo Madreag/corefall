@@ -119,7 +119,7 @@ Every M1+ milestone closeout must include the Self-Play Validation Matrix from `
 
 ## 11. Universal Enhancement Audit (DR-056)
 
-Every M1+ milestone inherits the Universal Enhancement Done-Criteria from `cortext_command_vault/spec/milestone-enhancement-pass-m1-plus.md`. Audit:
+Every M1+ milestone inherits the Universal Enhancement Done-Criteria from `docs/plan/spec/milestone-enhancement-pass-m1-plus.md`. Audit:
 
 - Per-tier perf gate (Steam Deck 800p/60 + 1080p/60 + 4K/120) — recorded in `summary.json.performance` or a `cf-bench` report.
 - CI bench regression (no >5% regression vs baseline) — DR-054.

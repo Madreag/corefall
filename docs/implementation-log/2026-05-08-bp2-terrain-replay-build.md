@@ -2,7 +2,7 @@
 
 **Date:** 2026-05-08
 **Owner:** AI implementation agent (Droid orchestrator)
-**Roadmap:** [`spec/prototype-roadmap.md` § Build Points (Roadmap V2) → BP2](../../../cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md)
+**Roadmap:** [`spec/prototype-roadmap.md` § Build Points (Roadmap V2) → BP2](../plan/spec/prototype-roadmap.md)
 
 ## Build Point Summary
 
@@ -189,9 +189,9 @@ All produced via `bash game/tools/self_play_sweep.sh` and validated via `python3
 
 ## Vault Updates
 
-- `cortext_command_vault/spec/prototype-roadmap.md` — Build Point Map: BP2 row updated CLOSED. Design-Completeness Map: M2 / M2.5 / M3A rows checked. Open Decision Gates Protocol: DR-002 lean refresh recorded, DR-007 launch-set lock recorded.
-- `cortext_command_vault/spec/feature-completion-checklist.md` — Build Points Checklist BP2 row marked complete; per-milestone scope/done/native-task-card rows for M2-001..M2-008 + M2.5-001..M2.5-006 + M3A-001..M3A-006 updated with evidence + AI self-ratings.
-- `cortext_command_vault/prototypes/build-point-bp2-terrain-replay.md` — BP2 closure note (the per-BP vault note required by Build Point Closure Gate).
+- `docs/plan/spec/prototype-roadmap.md` — Build Point Map: BP2 row updated CLOSED. Design-Completeness Map: M2 / M2.5 / M3A rows checked. Open Decision Gates Protocol: DR-002 lean refresh recorded, DR-007 launch-set lock recorded.
+- `docs/plan/spec/feature-completion-checklist.md` — Build Points Checklist BP2 row marked complete; per-milestone scope/done/native-task-card rows for M2-001..M2-008 + M2.5-001..M2.5-006 + M3A-001..M3A-006 updated with evidence + AI self-ratings.
+- `docs/plan/prototypes/build-point-bp2-terrain-replay.md` — BP2 closure note (the per-BP vault note required by Build Point Closure Gate).
 - DR-002: lean refreshed (NOT closed); event taxonomy lock event added with M3A evidence row. DR-007: launch-set lock recorded.
 
 ## Closure Gate Status
