@@ -2491,10 +2491,108 @@ fn next_actions_for_milestone(milestone: &str) -> Vec<String> {
 /// for M3A+).
 fn notes_addendum_for_milestone(milestone: &str) -> String {
     let normalized = milestone.trim().to_lowercase();
+    // Devin 3212580450 caught the source-truthful evidence bug here: claiming
+    // ALL 12 event categories ship at every milestone is wrong (M0 only ships
+    // system / control / determinism; terrain / material / mission / ai are
+    // M1.5+; snapshot is M3A+). Build the per-milestone category list so the
+    // notes addendum reflects what actually fired in this run, not the union
+    // across the whole roadmap. Layer is append-only: each milestone inherits
+    // every prior category.
+    let mut categories: Vec<&'static str> = vec!["system", "control", "determinism"];
+    let m_actor_added = matches!(
+        normalized.as_str(),
+        "m1" | "m1.5"
+            | "m2"
+            | "m2.5"
+            | "m3a"
+            | "m3b"
+            | "m4a"
+            | "m4b"
+            | "m5"
+            | "m5.5"
+            | "m5.5.5"
+            | "m5.6"
+            | "m5.7"
+            | "m5.8"
+            | "m5.9"
+            | "m5.9.5"
+            | "m5.10"
+    );
+    if m_actor_added {
+        categories.extend(["actor", "combat", "equipment", "input"]);
+    }
+    let m_mission_added = matches!(
+        normalized.as_str(),
+        "m1.5"
+            | "m2"
+            | "m2.5"
+            | "m3a"
+            | "m3b"
+            | "m4a"
+            | "m4b"
+            | "m5"
+            | "m5.5"
+            | "m5.5.5"
+            | "m5.6"
+            | "m5.7"
+            | "m5.8"
+            | "m5.9"
+            | "m5.9.5"
+            | "m5.10"
+    );
+    if m_mission_added {
+        categories.extend(["ai", "mission", "terrain"]);
+    }
+    let m_material_added = matches!(
+        normalized.as_str(),
+        "m2" | "m2.5"
+            | "m3a"
+            | "m3b"
+            | "m4a"
+            | "m4b"
+            | "m5"
+            | "m5.5"
+            | "m5.5.5"
+            | "m5.6"
+            | "m5.7"
+            | "m5.8"
+            | "m5.9"
+            | "m5.9.5"
+            | "m5.10"
+    );
+    if m_material_added {
+        categories.push("material");
+    }
+    let m_snapshot_added = matches!(
+        normalized.as_str(),
+        "m3a"
+            | "m3b"
+            | "m4a"
+            | "m4b"
+            | "m5"
+            | "m5.5"
+            | "m5.5.5"
+            | "m5.6"
+            | "m5.7"
+            | "m5.8"
+            | "m5.9"
+            | "m5.9.5"
+            | "m5.10"
+    );
+    if m_snapshot_added {
+        categories.push("snapshot");
+    }
+    let categories_inline = categories
+        .iter()
+        .map(|c| format!("`{c}`"))
+        .collect::<Vec<_>>()
+        .join(", ");
     let mut s = String::new();
     s.push_str("## DR-002 schema lock\n\n");
     s.push_str("- Event envelope: `{schema_version, run_id, tick, sim_time_ms, event_id, category, event_type, payload, parent_event_id?, dropped_count?}`.\n");
-    s.push_str("- Categories shipped through this milestone: `system`, `control`, `determinism`, `snapshot`, `actor`, `combat`, `equipment`, `ai`, `mission`, `terrain`, `material`, `input`. Future categories layer in additively without breaking v1 envelope readers.\n");
+    s.push_str(&format!(
+        "- Categories shipped through this milestone: {categories_inline}. Future categories layer in additively without breaking v1 envelope readers.\n"
+    ));
     s.push_str("- Checksum: `algorithm=blake3`, `scope=sim_state_v1`. Layout is append-only: M0 (`tick_counter || rng_state_bytes`) || M1 (actor / inventory / projectile bytes) || M1.5 (breach + guards + mission bytes) || M2 (chunked-terrain bytes) || M2.5 (reactor-world bytes). Layout-breaking bumps go to `_v2`.\n");
     s.push_str("- Manifest extensions: `checksum.{algorithm,scope,cadence_ticks}`, `settings:{...}` block, `expected_outcome:{clean|panic|abort}` (M3A).\n");
     s.push_str("- Summary extensions: `final_sim_checksum`, `checksum_event_count`, `first_tick`, `last_tick`, `artifacts.items[]` populated from `captures/` when present (M2+).\n");
@@ -3535,6 +3633,44 @@ mod tests {
     fn prototype_slice_for_milestone_empty_input_falls_back_to_m0() {
         assert_eq!(prototype_slice_for_milestone(""), "M0");
         assert_eq!(prototype_slice_for_milestone("   "), "M0");
+    }
+
+    #[test]
+    fn notes_addendum_categories_match_per_milestone_layering() {
+        // Devin 3212580450 regression: notes_addendum_for_milestone must NOT
+        // claim categories that haven't shipped yet at the named milestone.
+        // M0 = system / control / determinism only; M1 adds actor / combat /
+        // equipment / input; M1.5 adds ai / mission / terrain; M2 adds
+        // material; M3A adds snapshot. Layer is append-only.
+        let m0 = notes_addendum_for_milestone("m0");
+        assert!(m0.contains("`system`"));
+        assert!(m0.contains("`control`"));
+        assert!(m0.contains("`determinism`"));
+        assert!(!m0.contains("`actor`"), "M0 must NOT advertise actor category");
+        assert!(!m0.contains("`material`"), "M0 must NOT advertise material category");
+        assert!(!m0.contains("`snapshot`"), "M0 must NOT advertise snapshot category");
+
+        let m1 = notes_addendum_for_milestone("m1");
+        assert!(m1.contains("`actor`"));
+        assert!(m1.contains("`combat`"));
+        assert!(!m1.contains("`material`"), "M1 must NOT advertise material category");
+        assert!(!m1.contains("`mission`"), "M1 must NOT advertise mission category");
+
+        let m1_5 = notes_addendum_for_milestone("m1.5");
+        assert!(m1_5.contains("`ai`"));
+        assert!(m1_5.contains("`mission`"));
+        assert!(m1_5.contains("`terrain`"));
+        assert!(!m1_5.contains("`material`"), "M1.5 must NOT advertise material (M2+)");
+        assert!(!m1_5.contains("`snapshot`"), "M1.5 must NOT advertise snapshot (M3A+)");
+
+        let m2 = notes_addendum_for_milestone("m2");
+        assert!(m2.contains("`material`"));
+        assert!(!m2.contains("`snapshot`"), "M2 must NOT advertise snapshot (M3A+)");
+
+        let m3a = notes_addendum_for_milestone("m3a");
+        assert!(m3a.contains("`snapshot`"));
+        assert!(m3a.contains("`material`"));
+        assert!(m3a.contains("`mission`"));
     }
 
     #[test]

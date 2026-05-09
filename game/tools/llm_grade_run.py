@@ -171,7 +171,21 @@ def validate_filled(grading: dict) -> Tuple[bool, List[str]]:
     (passes, list_of_issues). Empty issues + True = clean PASS."""
     issues: List[str] = []
     rubric = grading.get("rubric") or {}
-    score_lo, score_hi = (rubric.get("score_range") or [0, 10])
+    # Devin 3212580462: defensive read of score_range. The cf-grading.v1
+    # contract guarantees [0, 10] but a hand-edited grading.json could pass
+    # a malformed `score_range` (single-element list, scalar, missing). Crashing
+    # on tuple-unpack would mask the error as a stack trace; reporting it as
+    # a structured validation issue is the same shape as every other rubric
+    # error and lets `cmd_validate` surface it via the normal FAIL path.
+    raw_range = rubric.get("score_range") or [0, 10]
+    if isinstance(raw_range, (list, tuple)) and len(raw_range) >= 2:
+        score_lo, score_hi = raw_range[0], raw_range[1]
+    else:
+        issues.append(
+            f"rubric.score_range must be a 2-element list [low, high]; got {raw_range!r}. "
+            "Falling back to [0, 10] for downstream checks."
+        )
+        score_lo, score_hi = 0, 10
     min_agg = float(rubric.get("minimum_aggregate_for_pass", 7.0))
     min_per = int(rubric.get("minimum_per_dimension_for_pass", 5))
     dims = grading.get("dimensions") or []
