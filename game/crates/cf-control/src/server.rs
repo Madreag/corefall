@@ -252,21 +252,38 @@ impl ControlServer {
     ///
     /// For programmatic shutdown (e.g., from the engine's `system.shutdown`
     /// command, or from tests) use [`Self::serve_with_shutdown`].
+    ///
+    /// Uses `tokio::select!` to race the serve future against `ctrl_c()`
+    /// instead of spawning a dedicated ctrl-c handler task. Spawning a
+    /// task would leak it across `serve()` lifecycles (the spawned task
+    /// holds a `ShutdownSignal` clone that never fires after a programmatic
+    /// shutdown returns), which is benign in a single-shot main() but adds
+    /// up if `serve()` is called repeatedly within one tokio runtime
+    /// (PR #26 review Devin Info).
     pub async fn serve<E: EngineHandle>(self, engine: Arc<E>) -> std::io::Result<()> {
         let (shutdown_tx, shutdown_rx) = shutdown_signal();
-        let shutdown_tx_for_signal = shutdown_tx.clone();
-        tokio::spawn(async move {
-            if tokio::signal::ctrl_c().await.is_ok() {
-                tracing::info!(target: "cf::ctl", "ctrl-c received; shutting down control server");
-                trigger_shutdown(&shutdown_tx_for_signal);
+        let serve_fut = self.serve_with_shutdown(engine, shutdown_rx);
+        tokio::pin!(serve_fut);
+
+        select! {
+            // Branch 1: serve_with_shutdown returns (programmatic shutdown
+            // via system.shutdown or accept-loop error) — propagate result.
+            result = &mut serve_fut => {
+                drop(shutdown_tx);
+                result
             }
-        });
-        // Hold `shutdown_tx` alive for the duration of `serve_with_shutdown`
-        // so the watch channel doesn't get dropped (which would break the
-        // sticky semantics by closing all receivers).
-        let result = self.serve_with_shutdown(engine, shutdown_rx).await;
-        drop(shutdown_tx);
-        result
+            // Branch 2: Ctrl-C / SIGINT received — trigger sticky shutdown
+            // and then poll serve_with_shutdown to completion so in-flight
+            // connections drain cleanly via the per-connection observation
+            // loops' shutdown handlers.
+            _ = tokio::signal::ctrl_c() => {
+                tracing::info!(target: "cf::ctl", "ctrl-c received; shutting down control server");
+                trigger_shutdown(&shutdown_tx);
+                let result = (&mut serve_fut).await;
+                drop(shutdown_tx);
+                result
+            }
+        }
     }
 
     /// Bind + serve until `shutdown_rx` observes `true`. The accept loop
