@@ -171,6 +171,39 @@ A Build Point is complete only when:
 
   **Skipped BP releases are tracked + recovered.** When a BP skips its T-RELEASE due to the double-click gate, the next BP's implementing agent inherits the responsibility to land the missing engineering AND retroactively tag the skipped BP at the new commit (so the version history stays continuous). The BP closure gate does not pass until either (a) the BP has its own release OR (b) the immediate-prior skipped BPs have been retroactively released alongside this one.
 
+### Status-Surface Update Contract (HARD GATE — added 2026-05-09)
+
+BP closure status drifts in user-facing surfaces unless the closing PR updates them in lockstep. The README BP table showed `BP2 — 🟢 Active` for hours after BP2's PR #11 merged, because no contract enforced the README sync. This rule fixes that gap globally.
+
+**The closing PR for any BP MUST update every status surface in the same commit chain that lands the closure:**
+
+1. **`README.md`** — every reference to the closing BP and the next-active BP:
+   - `[![Status](...)]` badge URL: re-encode "BPN ✓ closed, BP{N+1} next".
+   - `[![Build Points](...)]` badge URL: re-encode "BPN closed / BP{N+1} active".
+   - "Current proof:" paragraph: rewrite to reflect the closing BP's evidence + prior BPs' status.
+   - "Next up:" paragraph: rewrite to point at the next BP and its scope.
+   - "Recent merges:" line: add the closing BP's PR number(s).
+   - Build Points table: closing BP cell `🟢 Active` → `✅ **Closed (current)**`; previous "current" cell `✅ **Closed (current)**` → `✅ Closed`; next BP cell `⏳ Planned` → `🟢 Active`.
+   - Per-milestone table: every milestone inside the closing BP gets `✅ **Closed** ([PR #N](url) merged)` with the merged PR cited.
+2. **`docs/plan/spec/feature-completion-checklist.md`**:
+   - The `BP<N>` row's leading checkbox flips `[ ]` → `[x]`.
+   - Every per-milestone row inside the BP gets `[x]` + evidence column populated with PR number + run-bundle path + matrix verdict.
+   - Any T-RELEASE rows referencing the closed BP (e.g., `T-RELEASE-D01` for BP1 retro) update from `Pending` → `Done` (or `Skipped — see double-click gate` if T-RELEASE failed the gate).
+3. **`docs/plan/spec/prototype-roadmap.md`**:
+   - The Build Points (Roadmap V2) table row for the closing BP: status pill flips to `<span class="cc-flag cc-green">CLOSED</span>` with a one-line evidence summary citing the PR + run-bundle path.
+   - The "Active Build Point" callout in the Starting Point / kickoff section moves to the next BP.
+4. **`CHANGELOG.md`**:
+   - New `### BPN Closure — <BP title>` section with the per-milestone matrix outcomes, PR numbers, evidence paths, and any deferrals (with explicit user-approved IDs).
+
+**Enforcement mechanism:**
+
+- The closing PR's review checklist MUST include each of the 4 surfaces above with a literal "updated in this PR" sub-bullet.
+- `/corefall-review <bp>` MUST verify the README BP table cell for the closing BP says `✅ Closed`, the next BP says `🟢 Active`, and the closing BP's badge URL has been re-encoded. If any are stale, verdict is `Reject`.
+- Bugbot + Devin both pattern-match on stale status badges + table cells against the merged commit; staleness is flagged as a verified blocker.
+- A new agent landing a BP MUST run `bash game/tools/check_status_surfaces.sh <bp>` (to be added at BP3) which greps every status surface above + flags any cell still marking the closing BP as `🟢 Active` or `⏳ Planned`. The script is the regression catch.
+
+**Why this rule exists:** BP closures historically updated AGENTS.md / prototype-roadmap.md / CHANGELOG.md prose but did NOT sync the README BP table cell, so the homepage showed the closing BP as `🟢 Active` for hours-to-days after the closing PR merged. No rule enforced the sync; it drifted by default. This contract makes that drift class machine-checkable.
+
   **Existing prealpha releases (`v0.1.0-prealpha`, `v0.2.0-prealpha`) DELETED from GitHub on 2026-05-09 because they failed this gate retroactively.** They shipped `.tar.zst` archives requiring `brew install zstd` + Terminal extraction, and even after extraction the user had to run `./cf-app --scenario X` from Terminal. Any future BP that fixes the double-click flow re-publishes them.
 - `/corefall-review <bp>` verdict is `Accept` for the full BP scope, not just one milestone inside it.
 - **BP Goal Coverage Report** (mandatory): the closure includes a per-BP Goal Coverage Report mapping every goal stated in the canonical roadmap's BP table row + per-milestone done-criteria + fun-proof slice description to evidence (cfctl action → `summary_grid.png` frame the agent personally read → `events.jsonl` event row → `observe.once` field → unit/integration test). The report must include agent prose articulating look + feel + juice — NOT just "the captures look correct" or "the test passed". See `.claude/skills/corefall-review/SKILL.md` §BP Goal Coverage Gate.
@@ -695,16 +728,17 @@ Search for this signature when auditing recent PR history. These are NOT human c
 
 Roadmap V2 (2026-05-08) is now authoritative. The implementation spine progresses through Build Points (BP0..BP12); each BP bundles related milestones and closes only when every milestone inside it PASSES the Acceptance + Contract Integrity Gates AND the per-BP human-playtest gate is recorded in `prototype_runs/native/<bp>_*` notes.
 
-Closed Build Points (do NOT re-implement; treat as reference + regression surface):
+**BP status lives in the spine, not here.** AGENTS.md does not enumerate which BPs are closed vs active — that information drifts the moment a BP merges and creates the same kind of cross-doc staleness the Status-Surface Update Contract above exists to prevent. Instead, read the canonical sources directly at the start of every BP assignment:
 
-- **BP0** — M0 Engine Bootstrap.
-- **BP1** — M1 Actor Controller And Sim Core + M1.5 Micro Breach Fun Slice.
+1. `README.md` § Build Points table — fastest snapshot; cells say `✅ Closed`, `🟢 Active`, or `⏳ Planned`.
+2. `docs/plan/spec/prototype-roadmap.md` § Build Points (Roadmap V2) table — full BP scope with status pills + closure-evidence summaries.
+3. `docs/plan/spec/feature-completion-checklist.md` BP rows (search for `BP<N>`) — `[x]` means closed with evidence columns populated; `[ ]` means active or planned.
+4. `git log --oneline --all` for closing-PR commit subjects (`BP<N>: ...` or `M<X>: ...` pattern) and `gh pr list --state merged --search "BP<N>"` for the merged PR(s).
+5. `prototype_runs/native/bp<N>_*` directories — if the directory exists with notes.md + grading.json, that BP closed.
 
-Active Build Point (default starting target unless the user assigns a different one):
+If those sources disagree, the user's most recent assignment wins; otherwise the canonical roadmap wins (per the Milestone Authority Stack section above). Do not implement against AGENTS.md prose for BP status — that's a stale-by-design surface.
 
-- **BP2** — M2 Pixel Terrain And Materials + M2.5 Micro Reactor Defense + M3A Event Recorder Core.
-
-When BP2 closes, the next default is BP3 (M3B replay viewer/debrief + M4A readability/accessibility + M5 equipment/chassis/body graph).
+The implementing agent for any BP also inherits any unfinished work flagged in the prior BP's closure note (e.g., skipped T-RELEASE tags per the Double-Click Playability Hard Gate, deferred Universal Enhancement rows, follow-up bugs). Read the prior BP's closure note before starting your own.
 
 Do not skip the micro-fun-slice interlude inside any BP that has one (M1.5 in BP1, M2.5 in BP2, M5.5.5 in BP4, M5.9.5 in BP5). Every interlude exists because each major systems milestone needs *fun* evidence before the next BP unlocks; the actor-feel lab alone was too sterile, the terrain kernel alone is just deformation, and so on. The interlude is a 60-90 s scenario driven by `cfctl` scripts + cf-e2e expectations + run-bundle evidence at multiple tick rates, gated by the human-playtest survey for that BP.
 

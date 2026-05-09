@@ -1712,7 +1712,7 @@ Workers implementing BP2..BP11 may use **placeholder** narrative/art/audio (AI-g
 | Actor controller (move/aim/jump/fire/reload/select/reset) + body status state machine + first playable | M1 | BP1 | Closed. |
 | Micro Breach fun proof (60-90s win/loss with enemy + soft breach + objective + replay) | M1.5 | BP1 | Closed. |
 | Frame capture + grid composer + AI-agent self-test loop | T-CAPTURE side track | BP1 (infra) → BP2+ (mandatory) | Closed (infra). |
-| Per-BP cross-platform GitHub Releases + determinism contract (channel-based: prealpha/alpha/beta/rc/GA) | T-RELEASE side track | BP1+BP2 retroactive (`v0.1.0-prealpha` + `v0.2.0-prealpha`) → BP3..BP11 → BP12 GA `v1.0.0` | Retroactive prealpha tags pending merge of versioning-channel migration. |
+| Per-BP cross-platform GitHub Releases + determinism contract (channel-based: prealpha/alpha/beta/rc/GA) + Double-Click Playability Hard Gate | T-RELEASE side track | BP1+BP2 retroactive (`v0.1.0-prealpha` + `v0.2.0-prealpha`) re-publication owned by BP3 implementing agent (deleted 2026-05-09 for failing the gate) → BP3..BP11 → BP12 GA `v1.0.0` | First .dmg/.msi/AppImage release lands at BP3 closure. |
 | Chunked pixel terrain + 8-material launch set + GPU-assisted carving + material overlay + tool-validity feedback | M2 | BP2 | Active. |
 | Micro Reactor Defense fun proof (60-90s reactor defense; chunked-terrain-driven win/loss) | M2.5 | BP2 | Active. |
 | Event taxonomy lock + snapshot/checksum + headless replay + recorder backpressure + run-finished outcome contract | M3A | BP2 | Active. |
@@ -1758,7 +1758,7 @@ Workers implementing BP2..BP11 may use **placeholder** narrative/art/audio (AI-g
 | Console + cloud gaming + TV-friendly evaluation (Switch/Switch 2 + PS5 + Xbox Series + Mac App Store + Linux Flathub + cloud + Big Picture + Steam Link / Moonlight) | M-CONSOLE-EVAL | post-launch | Post-launch eval; not BP12 blocker. |
 | Performance polish (network indicator + auto-quality + cold-load benchmark + memory leak detection + save backup + anti-cheat heuristics + server health dashboard + network simulator + crash-recovery flow) | M-PERF-POLISH | BP11..BP12 | T-PERF + DR-051 + DR-054. |
 | Customer support + sales + marketing extras (HelpScout/Zendesk + Stripe + refund + tax + sale calendar + bundle + affiliate + sales reports + ARG + OST + art book + comic + wiki + dev streams + Q&A + roadmap voting + bug bounty + translator credits + schools) | M-CS-OPS + M-MKT-EXTRAS | post-launch | Per DR-013 + DR-051. |
-| Release day (v1.0 ships; launch trailer + press + Discord launch event + first 24h crash + telemetry monitoring + first community Q&A) | M-LAUNCH | BP12 | Pre-release flag drops at v1.0.0. |
+| Release day (v1.0 ships; launch trailer + press + Discord launch event + first 24h crash + telemetry monitoring + first community Q&A) | M-LAUNCH | BP12 | `v1.0.0` ships with full Apple notarization + Authenticode signing; no platform warnings. |
 
 > [!important] Verification rule
 > If a worker assigned a milestone cannot point at a row in this map that names their milestone (or a side track that owns the surface), the milestone scope is incomplete or the map is stale. Either way, **stop and ask the user via the active agent's user-input/chat mechanism** before continuing. Do not silently fill the gap with prose; update the map AND the milestone scope in the same pass.
@@ -1828,7 +1828,7 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 | T-LOCALIZATION | Strings/fonts/lang packs/mod-localization (Tier-A 11 langs + Tier-B UI-only 8 langs) | BP3+ string-source discipline; **BP12** finalization |
 | T-LIVEOPS | Telemetry, bug tooling, playtest program, marketing, Steam/platform integration, legal/compliance, post-launch ops | BP10+ pre-launch wiring; **BP12** finalization |
 | T-CAPTURE | Frame capture, grid composer, and BP fun-proof automation for AI-agent self-testing | BP2+ primary; lifelong from BP2 |
-| T-RELEASE | Per-BP cross-platform GitHub Releases (Linux + Windows + macOS x86_64/aarch64); pre-release flag stays ON until **BP12** (v1.0.0 GA) | BP1+ primary; lifelong from BP1 |
+| T-RELEASE | Per-BP cross-platform GitHub Releases subject to Double-Click Playability Hard Gate (.dmg with Corefall.app for macOS, .msi/.zip with Corefall.exe for Windows, AppImage for Linux); SemVer prerelease channel suffix carries quality (no GitHub `prerelease` flag set); skipping is preferable to publishing CLI archives | BP1+ primary; lifelong from BP1 |
 
 ---
 
@@ -3102,10 +3102,24 @@ Spans BP2+; **lifelong from BP2** (every fun-proof slice from M2.5 onward emits 
 
 ### T-RELEASE — Per-BP Cross-Platform GitHub Releases
 
-> [!info] Roadmap V2 addition (BP1+)
-> This track exists so every Build Point closure produces a publishable, downloadable, verifiable artifact under [https://github.com/Madreag/corefall/releases](https://github.com/Madreag/corefall/releases). The BP closure gate already produces every artifact a release needs (run-bundle evidence, `summary_grid.png`, cf-e2e win/loss scripts, content scenarios, the human-playtest survey row). T-RELEASE wraps those in a tagged cross-platform release so determinism (DR-002) is verifiable on third-party hardware, the Steam Deck floor (DR-024) is testable per-BP, the per-BP human-playtest gate is easier to fulfill, and the launch-ops infrastructure (DR-047 / T-LIVEOPS) doesn't have to be invented from scratch at BP12.
+> [!warning] DOUBLE-CLICK PLAYABILITY HARD GATE (added 2026-05-09)
+> Every release artifact MUST be a non-technical-friend-handoff format. A friend receiving the file MUST be able to: (1) double-click it → standard OS extract/install affordance fires (no Terminal, no `brew install zstd`, no command-line decompression), and (2) double-click the resulting app/exe → a corefall **game window opens on screen** (no `--scenario` flag, no Terminal, no PowerShell). If the friend has to type ANY command, the release fails this gate.
+>
+> Per-platform format requirements:
+> - **macOS**: `.dmg` containing a proper `Corefall.app` bundle (`Info.plist`, `CFBundleExecutable`, embedded `cf-app`, icon). Double-click `.dmg` → Finder mounts. Drag-to-Applications. Double-click `Corefall.app` → game window opens. Ad-hoc signing through BP9; full Apple notarization at BP10+.
+> - **Windows**: `.msi` installer OR `.zip` with `Corefall.exe` (a launcher wrapping `cf-app.exe` with sensible default args, OR `cf-app.exe` itself if it opens a window with no args). SmartScreen "right-click → Run anyway" acceptable through BP9; Authenticode signing at BP10+.
+> - **Linux**: `AppImage` (universal, double-click executable) OR `.tar.gz` with `.desktop` file + `start-corefall.sh` launcher.
+>
+> **NO RELEASE shall be tagged + published if it does not meet this gate.** If the implementing BP cannot deliver double-click playability for a platform, that platform is OMITTED from the BP's release matrix. If no platform meets the gate, the entire BP SKIPS its T-RELEASE tag (skipping is preferable to publishing an opaque archive). The next BP that lands the missing engineering picks up the release backlog and retroactively tags the skipped BPs.
+>
+> The implementing agent OWNS the release engineering for their BP. Required closeout actions: verify `cf-app` opens a game window with NO command-line args; verify `release.yml` produces double-clickable artifacts; personally test the double-click flow as a friend would; document `## Friend-Handoff Verification` in the BP closure note. See AGENTS.md § Build Point Closure Gate for the full contract.
+>
+> **Existing prealpha releases (`v0.1.0-prealpha`, `v0.2.0-prealpha`) DELETED retroactively on 2026-05-09 because they shipped `.tar.zst` archives requiring `brew install zstd` + Terminal extraction.** Tags removed locally + on remote. The next BP whose implementing agent delivers the double-click flow re-publishes them.
 
-Spans BP1+; **lifelong from BP1** (every BP closure from BP1 onward emits a tagged release).
+> [!info] Roadmap V2 addition (BP1+)
+> This track exists so every Build Point closure produces a publishable, downloadable, verifiable, **friend-handoff-ready** artifact under [https://github.com/Madreag/corefall/releases](https://github.com/Madreag/corefall/releases). The BP closure gate already produces every artifact a release needs (run-bundle evidence, `summary_grid.png`, cf-e2e win/loss scripts, content scenarios). T-RELEASE wraps those in a tagged cross-platform release so determinism (DR-002) is verifiable on third-party hardware, the Steam Deck floor (DR-024) is testable per-BP, friends can play the BP without engineering hand-holding, and the launch-ops infrastructure (DR-047 / T-LIVEOPS) doesn't have to be invented from scratch at BP12.
+
+Spans BP1+; **lifelong from BP1** (every BP closure from BP1 onward emits a tagged release IF the double-click gate passes).
 
 **Owned surfaces:**
 
@@ -3117,21 +3131,23 @@ Spans BP1+; **lifelong from BP1** (every BP closure from BP1 onward emits a tagg
 
 The tag's prerelease channel communicates quality to external observers (Steam buyers, contributors, package managers) without forcing them to read internal BP numbering. Channel boundaries were chosen at quality inflection points: prealpha covers engine + first fun slices, alpha unlocks once full collision + atmospherics + AI combat shipped, beta unlocks at mission-director + creator-alpha + server/LAN, rc covers online + public systems beta, GA = launch.
 
-| Tag | BP | Channel | What ships | Pre-release? |
+The GitHub `prerelease` flag is intentionally NOT set on any release — it would double-count the channel suffix AND hide releases from the homepage Releases sidebar widget + `/releases/latest` endpoint (both filter out prereleases by GitHub's definition).
+
+| Tag | BP | Channel | What ships | Status |
 |---|---:|---|---|---|
 | `v0.0.0-prealpha` | BP0 | prealpha | (M0 only — pure tooling proof; tag-only, no binaries) | n/a |
-| `v0.1.0-prealpha` | BP1 | prealpha | M0 + M1 + M1.5 + T-CAPTURE infrastructure (first playable) | yes |
-| `v0.2.0-prealpha` | BP2 | prealpha | + M2 chunked terrain + M2.5 micro reactor defense + M3A event core/headless replay | yes |
-| `v0.3.0-prealpha` | BP3 | prealpha | + M3B replay viewer/debrief + M4A readability/ACC-A + M5 equipment/chassis/body graph | yes |
-| `v0.4.0-alpha` | BP4 | alpha | + M5.5 collision gauntlet + M5.5.5 micro sabotage + M5.6 material kernel + M5.7 hazards + M5.8 origin pass | yes |
-| `v0.5.0-alpha` | BP5 | alpha | + M5.9 atmospherics + M5.9.5 pressure hold + M5.10 worlds/environment aggregation | yes |
-| `v0.6.0-alpha` | BP6 | alpha | + M6 AI core + M6.5 LLM mind + M6.6 material/environmental competence | yes |
-| `v0.7.0-beta` | BP7 | beta | + M7 mission director + M7.5 base atmospherics + M7.7 weather/day-night + M4B comic-noir polish | yes |
-| `v0.8.0-beta` | BP8 | beta | + M8 editor + M8.5 material lab + M8.6 mining/extraction | yes |
-| `v0.9.0-beta` | BP9 | beta | + M9 dedicated server + M10 LAN co-op | yes |
-| `v0.10.0-rc` | BP10 | rc | + M11 online co-op + M9.5 voice/radio comms | yes |
-| `v0.11.0-rc` | BP11 | rc | + M12 public PvP arenas + persistent MMO shards | yes |
-| **`v1.0.0`** | BP12 | GA | + production T-track finalization: launch art/audio/content, narrative, localization, live-ops, legal/platform readiness. **Pre-release flag drops; this is launch GA.** | NO |
+| `v0.1.0-prealpha` | BP1 | prealpha | M0 + M1 + M1.5 + T-CAPTURE infrastructure | DELETED 2026-05-09 (failed double-click gate) |
+| `v0.2.0-prealpha` | BP2 | prealpha | + M2 chunked terrain + M2.5 micro reactor defense + M3A event core/headless replay | DELETED 2026-05-09 (failed double-click gate) |
+| `v0.3.0-prealpha` | BP3 | prealpha | + M3B replay viewer/debrief + M4A readability/ACC-A + M5 equipment/chassis/body graph + retroactive BP1+BP2 if double-click engineering lands here | pending BP3 |
+| `v0.4.0-alpha` | BP4 | alpha | + M5.5 collision gauntlet + M5.5.5 micro sabotage + M5.6 material kernel + M5.7 hazards + M5.8 origin pass | pending |
+| `v0.5.0-alpha` | BP5 | alpha | + M5.9 atmospherics + M5.9.5 pressure hold + M5.10 worlds/environment aggregation | pending |
+| `v0.6.0-alpha` | BP6 | alpha | + M6 AI core + M6.5 LLM mind + M6.6 material/environmental competence | pending |
+| `v0.7.0-beta` | BP7 | beta | + M7 mission director + M7.5 base atmospherics + M7.7 weather/day-night + M4B comic-noir polish | pending |
+| `v0.8.0-beta` | BP8 | beta | + M8 editor + M8.5 material lab + M8.6 mining/extraction | pending |
+| `v0.9.0-beta` | BP9 | beta | + M9 dedicated server + M10 LAN co-op | pending |
+| `v0.10.0-rc` | BP10 | rc | + M11 online co-op + M9.5 voice/radio comms; **code signing activates** (Apple notarization + Windows Authenticode via T-LIVEOPS) | pending |
+| `v0.11.0-rc` | BP11 | rc | + M12 public PvP arenas + persistent MMO shards | pending |
+| **`v1.0.0`** | BP12 | GA | + production T-track finalization: launch art/audio/content, narrative, localization, live-ops, legal/platform readiness. **Launch GA.** | pending |
 
 **Channel boundary rationale:**
 
@@ -3145,13 +3161,16 @@ The tag's prerelease channel communicates quality to external observers (Steam b
 
 A small number of already-published releases use the older `v0.<N>.0-bp<N>` form (e.g., `v0.1.0-bp1`). The release-notes parser still accepts these for backward compat; new releases SHOULD use the channel-based form. The `release.yml` workflow trigger glob includes both patterns.
 
-**Per-release artifacts:**
+**Per-release artifacts (must satisfy the Double-Click Playability Hard Gate):**
 
-- `corefall-linux-x86_64-v<tag>.tar.zst` — `cf-app`, `cfctl`, `cf-e2e` binaries + `content/` + `scripts/cfctl/` + the BP's `summary_grid.png` + the BP's exemplar run bundle.
-- `corefall-windows-x86_64-v<tag>.zip` — Windows variants of the same.
-- `corefall-macos-x86_64-v<tag>.tar.zst` + `corefall-macos-aarch64-v<tag>.tar.zst` — macOS variants, ad-hoc signed for now.
+- **macOS** (`Corefall-v<tag>-macos-aarch64.dmg` + `Corefall-v<tag>-macos-x86_64.dmg`): each `.dmg` contains a `Corefall.app` bundle (`Info.plist`, `CFBundleExecutable=cf-app`, embedded `cf-app` binary, embedded `content/`, app icon). Mount the `.dmg` via Finder double-click; drag `Corefall.app` to `Applications` (symlink in the `.dmg`); double-click `Corefall.app` to launch a game window with the BP's anchor scenario as default. Ad-hoc signed through BP9; Apple-notarized at BP10+.
+- **Windows** (`Corefall-v<tag>-windows-x86_64.msi` OR `Corefall-v<tag>-windows-x86_64.zip`): `.msi` installer drops `Corefall.exe` + `content/` + Start Menu shortcut. Alternative `.zip` contains `Corefall.exe` (a launcher wrapping `cf-app.exe` with default args, OR `cf-app.exe` itself if it opens a window with no args) + `content/`. Double-click the launcher → game window. SmartScreen "right-click → Run anyway" warning through BP9; Authenticode-signed at BP10+.
+- **Linux** (`Corefall-v<tag>-linux-x86_64.AppImage` OR `Corefall-v<tag>-linux-x86_64.tar.gz`): `AppImage` is a single executable file — `chmod +x` + double-click → game window. Alternative `.tar.gz` contains `Corefall.desktop` file + `start-corefall.sh` launcher + binary + `content/`.
+- `<bp>-run-bundle-exemplar/` — embedded inside each archive; the BP's canonical run bundle (events.jsonl + summary.json + capture grid) for offline determinism verification.
 - `SHA256SUMS.txt` — checksums of every artifact + the bundled `run_manifest.json` so contributors can verify checksum determinism.
 - `summary_grid.png` — the BP's hero capture grid (also embedded in release notes).
+
+If an artifact format above cannot be produced for a given BP (e.g., BP1 ships only CLI binaries because `cf-app` doesn't open a window with no args yet), that platform is OMITTED from the BP's release matrix per the Double-Click Playability Hard Gate. Do not publish a `.dmg` containing CLI tools, a `.zip` containing only raw binaries, or a `.tar.gz` requiring `tar --use-compress-program=zstd` — those formats failed the gate retroactively (see DELETED rows in the versioning table above).
 
 **Release notes contract (auto-generated):**
 
@@ -3166,7 +3185,7 @@ A small number of already-published releases use the older `v0.<N>.0-bp<N>` form
 
 **Steam Deck verification (best-effort, NOT a blocker):**
 
-- The Linux `.tar.zst` is the Deck artifact. No separate build.
+- The Linux AppImage is the Deck artifact. No separate build.
 - Per-BP closure aims for "boots + the fun-proof scenario plays + run bundle PASSES checker on Deck hardware". When no Deck access, mark `READY_FOR_DECK_VERIFICATION` in the release notes and ship the Linux build anyway.
 - T-PLATFORM owns the Deck floor (1080p/60 mid-tier baseline; 800p/60 Deck floor). T-RELEASE just exposes the artifact.
 
@@ -3191,18 +3210,19 @@ A small number of already-published releases use the older `v0.<N>.0-bp<N>` form
 
 **Done-criteria (cumulative across BPs):**
 
-- [x] T-RELEASE infrastructure: `release.yml` + `generate_release_notes.py` + versioning axis + release artifact contract exist in `corefall`.
-- [x] Versioning axis adopts SemVer prerelease channels (prealpha/alpha/beta/rc/GA) with strict BP-boundary enforcement in `parse_tag` (see 2026-05-09 channel migration; legacy `v*-bp*` form still accepted for backward compat).
-- [ ] BP1 retroactive release publication: push `v0.1.0-prealpha` from BP1 closure HEAD with M1.5 `summary_grid.png` as hero, all four cross-platform binaries published, release marked pre-release.
-- [ ] BP2 retroactive release publication: push `v0.2.0-prealpha` from BP2 closure HEAD (post-spine-migration) with M2.5 `summary_grid.png` as hero, all four cross-platform binaries published, release marked pre-release.
-- [ ] BP3..BP11: every BP closure emits a tagged release per the channel-based axis (BP3 prealpha → BP4 first alpha → BP7 first beta → BP10 first rc). Pre-release flag stays ON.
-- [ ] BP10/BP11: code signing infrastructure activated by T-LIVEOPS.
-- [ ] BP12 finalization: `v1.0.0` GA release; pre-release flag DROPPED; full code signing on every artifact; determinism checksum table covers every shipping scenario.
+- [x] T-RELEASE workflow infrastructure: `release.yml` + `generate_release_notes.py` + versioning axis + 4-target build matrix exist in `corefall` (last verified 2026-05-09).
+- [x] Versioning axis adopts SemVer prerelease channels (prealpha/alpha/beta/rc/GA) with strict BP-boundary enforcement in `parse_tag` (legacy `v*-bp*` form still accepted for backward compat). 15/15 positive + 7/7 negative parser cases (2026-05-09).
+- [x] GitHub `prerelease` flag dropped from all releases (channel suffix in tag name carries the quality signal; `prerelease=true` was hiding releases from the homepage Releases sidebar widget + `/releases/latest` endpoint). 2026-05-09.
+- [ ] **BP1 + BP2 retroactive release re-publication** (`v0.1.0-prealpha` + `v0.2.0-prealpha`): both were tagged + published 2026-05-09 then DELETED the same day because the artifacts (`.tar.zst` archives + raw CLI .zip) failed the Double-Click Playability Hard Gate. Re-publish when BP3 lands the .dmg/.msi/AppImage engineering. Recovery is owned by the BP3 implementing agent.
+- [ ] BP3..BP11: every BP closure emits a tagged release per the channel-based axis (BP3 prealpha → BP4 first alpha → BP7 first beta → BP10 first rc), subject to the Double-Click Playability Hard Gate. Skipping is preferable to publishing artifacts that fail the gate; skipped BPs are recovered by the next BP that lands the missing engineering.
+- [ ] BP3: deliver double-click engineering — `cf-app` opens a game window with NO command-line args (default scenario or launcher menu); release.yml produces .dmg (with `Corefall.app` bundle) for macOS, .msi or .zip with `Corefall.exe` for Windows, AppImage for Linux. This is the foundational release engineering work that unblocks T-RELEASE for every subsequent BP.
+- [ ] BP10/BP11: code signing infrastructure activated by T-LIVEOPS — paid Apple Developer Program ($99/year) + Authenticode cert ($200-$400/year) (both Class A escalations).
+- [ ] BP12 finalization: `v1.0.0` GA release; full code signing on every artifact; determinism checksum table covers every shipping scenario; release artifacts open without any platform warnings.
 
 **Open extensions (post-BP1, not in initial scope):**
 
 - Cargo binstall metadata so `cargo binstall corefall-cli` works for `cfctl` + `cf-e2e`.
-- Steam Deck `.flatpak` artifact alongside the `.tar.zst` (post-BP10).
+- Steam Deck `.flatpak` artifact alongside the Linux AppImage (post-BP10).
 - Auto-update check inside `cf-app` that pings the GitHub Releases API and surfaces a "new BP available" toast (post-BP10).
 - Reproducible-builds attestation (sigstore or in-toto provenance) per release.
 

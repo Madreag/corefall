@@ -17,6 +17,42 @@ copy long-form research here; that's what the vault is for.
 
 ## Unreleased
 
+### BP2 Closure — Status surfaces synced across roadmap, checklist, README
+
+Audit pass on 2026-05-09 caught that BP2 was still marked `🟢 Active` in the README BP table + `[ ]` in the feature-completion-checklist BP2 row even though PR #11 (BP2 closure) merged 2026-05-08 and PR #12/#13/#14 followed without ever updating those user-facing status surfaces. Root cause: no contract enforced that closing PRs sync the README + checklist + roadmap status pills.
+
+**Fix:**
+- README BP table cell `BP2 — 🟢 Active` → `BP2 — ✅ **Closed (current)**`; `BP3 — ⏳ Planned` → `BP3 — 🟢 Active`.
+- README per-milestone table: M2 + M2.5 + M3A all flipped to `✅ **Closed** ([PR #11](url) merged)`.
+- README "Current proof:" + "Next up:" + "Releases:" paragraphs rewritten.
+- README status badges re-encoded (`status-prealpha (BP2 ✓ closed, BP3 next)` + `Build_Points-BP2 closed / BP3 active`).
+- feature-completion-checklist BP2 row flipped `[ ] → [x]` with all evidence columns populated (PR numbers + grading verdict + closure date + universal-enhancement status).
+- prototype-roadmap.md Build Points table BP2 status pill flipped to `CLOSED` with PR citation.
+- AGENTS.md "Closed Build Points" section moved BP2 from active to closed; "Active Build Point" section moved BP3 in.
+
+**Systematic prevention (added 2026-05-09 to AGENTS.md):**
+A new **Status-Surface Update Contract** in AGENTS.md § Build Point Closure Gate makes it a HARD GATE that every closing PR updates README + checklist + roadmap + CHANGELOG status surfaces in lockstep. Closing PRs that drift any of these are auto-rejected by `/corefall-review <bp>`. A `bash game/tools/check_status_surfaces.sh <bp>` script (to land at BP3) will be the regression catch.
+
+### T-RELEASE — Double-Click Playability Hard Gate + retroactive deletion of v0.1.0-prealpha + v0.2.0-prealpha
+
+On 2026-05-09 both prealpha releases were tagged + published then DELETED the same day because the artifacts (`.tar.zst` archives requiring `brew install zstd` + Terminal extraction; `.zip` containing only raw CLI binaries) FAILED a usability bar that the project owner explicitly ratified mid-publication: "I dont want to do releases unless I can just hand a non technical friend an exe or dmg or whatever the fuck easy to run file ... if pre-release or whatever the fuck we call it can't do that then no more releases."
+
+**Hard gate added to AGENTS.md § Build Point Closure Gate (T-RELEASE bullet):**
+A non-technical friend receiving the release artifact MUST be able to (1) double-click → standard OS extract/install affordance fires (no Terminal), and (2) double-click the resulting app → a corefall game window opens (no `--scenario` flag, no PowerShell). If either fails, the platform is omitted from the BP's release matrix; if no platform meets the gate, the entire BP SKIPS its T-RELEASE tag.
+
+**Per-platform format requirements:**
+- macOS: `.dmg` containing `Corefall.app` bundle (`Info.plist`, `CFBundleExecutable=cf-app`, embedded `cf-app`, icon).
+- Windows: `.msi` installer OR `.zip` with `Corefall.exe` (default-args launcher).
+- Linux: AppImage (single double-click executable) OR `.tar.gz` with `.desktop` file + launcher script.
+
+**Skipped BPs are tracked + recovered:** when a BP skips T-RELEASE, the next BP's implementing agent inherits the responsibility to land the missing engineering AND retroactively tag the skipped BP at the new commit. The BP3 implementing agent therefore owns: (a) `cf-app` opens a game window with NO command-line args, (b) release.yml produces `.dmg`/`.msi`/AppImage formats, (c) re-publish `v0.1.0-prealpha` + `v0.2.0-prealpha` alongside `v0.3.0-prealpha`.
+
+**Updated docs:**
+- AGENTS.md § Build Point Closure Gate: full Double-Click Playability Hard Gate + per-platform format requirements + skipped-BP recovery contract.
+- docs/plan/spec/prototype-roadmap.md § T-RELEASE: hard-gate callout box at top of section; versioning axis table now shows v0.1.0/v0.2.0 as DELETED with recovery owned by BP3; per-release artifacts section enumerates .dmg/.msi/AppImage requirements.
+- docs/plan/spec/feature-completion-checklist.md: T-RELEASE-S04 reverted from `[x]` to `[ ]` (CLI-archive format failed the gate); T-RELEASE-D01 evidence updated with deletion + BP3 recovery plan; T-RELEASE-D03 + D05 + S03 wording updated.
+- README.md release-debt callout rewritten to explain the deletion + recovery.
+
 ### T-RELEASE — Adopt SemVer prerelease channels (prealpha/alpha/beta/rc/GA)
 
 The release-tag scheme migrated from `v0.<N>.0-bp<N>` to SemVer prerelease channels (`v0.<N>.0-prealpha`, `-alpha`, `-beta`, `-rc`, `v1.0.0` GA) so that external observers (Steam buyers, contributors, package managers) can read quality from the tag without consulting the internal BP table. Channel boundaries were chosen at quality inflection points: prealpha BP0-BP3 (engine + first fun slices, no full collision / no atmospherics / no AI combat yet), alpha BP4-BP6 (full collision + atmospherics + AI combat), beta BP7-BP9 (mission director + creator alpha + server/LAN), rc BP10-BP11 (online + public systems beta), GA BP12 (`v1.0.0`, pre-release flag dropped).
