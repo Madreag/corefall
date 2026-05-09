@@ -444,11 +444,19 @@ def patch_run_bundle_summary(
         add("summary_grid", "captures/summary_grid.png")
     if (captures_dir / "summary_grid.json").is_file():
         add("summary_grid_json", "captures/summary_grid.json")
-    for g in sorted(grid_results, key=lambda r: r.get("filename", "")):
-        name = g.get("filename")
-        if name:
-            add("capture_grid", f"captures/{name}")
-            json_name = name.replace(".png", ".json")
+    for g in sorted(grid_results, key=lambda r: str(r.get("grid_path", ""))):
+        # `compose_grid` returns dicts with `grid_path` (full path) +
+        # `json_path`, NOT `filename`. Bugbot 3212416394 caught the original
+        # `g.get("filename")` lookup which always returned None, silently
+        # dropping every grid_NNN.png from summary.json.artifacts.items[].
+        grid_path_str = g.get("grid_path")
+        if not grid_path_str:
+            continue
+        name = Path(grid_path_str).name
+        add("capture_grid", f"captures/{name}")
+        json_path_str = g.get("json_path")
+        if json_path_str:
+            json_name = Path(json_path_str).name
             if (captures_dir / json_name).is_file():
                 add("capture_grid_json", f"captures/{json_name}")
     if (captures_dir / "capture_manifest.json").is_file():

@@ -30,7 +30,6 @@ fun-proof bundle via the same BP-anchor logic as `generate_release_notes.py`.
 from __future__ import annotations
 
 import argparse
-import hashlib
 import json
 import os
 import sys
@@ -248,7 +247,15 @@ def render_report(bp: str, bundle_dir: Path, agent_id: str) -> str:
     else:
         out.append(f"- **Summary grid:** _not present at `{summary_grid}`_ — Eyes axis cannot be confirmed without it.\n")
     if capture_manifest.is_file():
-        out.append(f"- **Capture manifest:** `{capture_manifest.relative_to(bundle_dir.parent.parent.parent)}`\n")
+        # Bugbot 3212416395 caught the missing is_absolute() guard here that
+        # crashed when --bundle was passed as a relative path. Mirror the
+        # guard from line 246 so the report renders against any path shape.
+        cap_rel = (
+            capture_manifest.relative_to(bundle_dir.parent.parent.parent)
+            if bundle_dir.is_absolute()
+            else capture_manifest
+        )
+        out.append(f"- **Capture manifest:** `{cap_rel}`\n")
     out.append("\n")
 
     # Q1

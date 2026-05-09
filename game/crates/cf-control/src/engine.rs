@@ -2446,8 +2446,14 @@ fn prototype_slice_for_milestone(milestone: &str) -> String {
     if normalized.is_empty() {
         return "M0".to_string();
     }
+    // Bugbot 3212491755 + Devin 3212416493 both caught: the prior
+    // `format!("M{rest}")` produced lowercase letter suffixes (`m3a` → `M3a`)
+    // because `rest` retained the lowercased form from `normalized`. Letter-
+    // suffixed milestones (M3A/M3B/M4A/M4B) must produce uppercase suffixes
+    // to match the canonical roadmap naming + the source-truthful evidence
+    // contract in AGENTS.md (run_manifest.json.prototype_slice ↔ roadmap id).
     if let Some(rest) = normalized.strip_prefix('m') {
-        return format!("M{rest}");
+        return format!("M{}", rest.to_uppercase());
     }
     normalized.to_uppercase()
 }
@@ -2499,10 +2505,29 @@ fn notes_addendum_for_milestone(milestone: &str) -> String {
     s.push_str(
         "- Localization deferred to M4 — the discipline rule (no baked English-only player-facing strings) applies.\n",
     );
-    if matches!(normalized.as_str(), "m2" | "m2.5" | "m3a")
-        || normalized.starts_with("m2")
-        || normalized.starts_with("m3")
-    {
+    // DR-007 launch material set is introduced in M2 and inherited by every
+    // milestone that interacts with chunked terrain. Devin 3212416515 caught
+    // the prior `starts_with("m3")` arm which incorrectly bucketed M3B
+    // (Replay Viewer + Debrief, no terrain dependency) into the material-aware
+    // set. Use an explicit allowlist so future milestones must opt in
+    // affirmatively and unrelated milestones (M3B, M4A, M4B) don't get the
+    // material addendum baked into their notes.md by accident.
+    let material_aware = matches!(
+        normalized.as_str(),
+        "m2" | "m2.5"
+            | "m3a"
+            | "m4"
+            | "m5"
+            | "m5.5"
+            | "m5.5.5"
+            | "m5.6"
+            | "m5.7"
+            | "m5.8"
+            | "m5.9"
+            | "m5.9.5"
+            | "m5.10"
+    );
+    if material_aware {
         s.push_str("\n## DR-007 launch material set\n\n");
         s.push_str("- 8 launch materials (ids 0..7): `air`, `dirt`, `concrete`, `metal_nohook`, `hazard`, `loose_fill`, `repair_fill`, `anchor`. `material_schema_version=cf-terrain-launch-v1`.\n");
         s.push_str("- Per-material affordances cover solid/diggable/hardness/anchorable/hazard/path_cost/overlay_rgba/refusal_reason.\n");
@@ -3483,6 +3508,52 @@ mod tests {
     use super::*;
 
     static TEST_SCENARIO_SEQ: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+    #[test]
+    fn prototype_slice_for_milestone_uppercases_letter_suffix() {
+        // Bugbot 3212491755 + Devin 3212416493 regression: letter-suffixed
+        // milestones (m3a, m3b, m4a, m4b) must produce uppercase prototype
+        // slice strings (M3A, M3B, M4A, M4B). Pre-fix, `format!("M{rest}")`
+        // returned the lowercased rest from `to_lowercase()` and produced
+        // `M3a` / `M3b` / etc.
+        assert_eq!(prototype_slice_for_milestone("m3a"), "M3A");
+        assert_eq!(prototype_slice_for_milestone("M3A"), "M3A");
+        assert_eq!(prototype_slice_for_milestone("m3b"), "M3B");
+        assert_eq!(prototype_slice_for_milestone("m4a"), "M4A");
+        assert_eq!(prototype_slice_for_milestone("m4b"), "M4B");
+    }
+
+    #[test]
+    fn prototype_slice_for_milestone_handles_numeric_and_dotted_milestones() {
+        assert_eq!(prototype_slice_for_milestone("m0"), "M0");
+        assert_eq!(prototype_slice_for_milestone("m1"), "M1");
+        assert_eq!(prototype_slice_for_milestone("m1.5"), "M1.5");
+        assert_eq!(prototype_slice_for_milestone("m2"), "M2");
+        assert_eq!(prototype_slice_for_milestone("m2.5"), "M2.5");
+        assert_eq!(prototype_slice_for_milestone("m5.5.5"), "M5.5.5");
+    }
+
+    #[test]
+    fn prototype_slice_for_milestone_empty_input_falls_back_to_m0() {
+        assert_eq!(prototype_slice_for_milestone(""), "M0");
+        assert_eq!(prototype_slice_for_milestone("   "), "M0");
+    }
+
+    #[test]
+    fn notes_addendum_excludes_dr007_for_non_terrain_milestones() {
+        // Devin 3212416515 regression: the prior `starts_with("m3")` arm
+        // bucketed M3B (Replay Viewer, no terrain) into the DR-007 material
+        // set. After the fix, only M2/M2.5/M3A + M4..M5.10 milestones get
+        // the launch-material addendum.
+        assert!(!notes_addendum_for_milestone("m3b").contains("DR-007 launch material set"));
+        assert!(!notes_addendum_for_milestone("m4a").contains("DR-007 launch material set"));
+        assert!(!notes_addendum_for_milestone("m4b").contains("DR-007 launch material set"));
+        assert!(notes_addendum_for_milestone("m2").contains("DR-007 launch material set"));
+        assert!(notes_addendum_for_milestone("m2.5").contains("DR-007 launch material set"));
+        assert!(notes_addendum_for_milestone("m3a").contains("DR-007 launch material set"));
+        assert!(notes_addendum_for_milestone("m5").contains("DR-007 launch material set"));
+        assert!(notes_addendum_for_milestone("m5.5.5").contains("DR-007 launch material set"));
+    }
 
     fn temp_run_root() -> PathBuf {
         let mut p = std::env::temp_dir();

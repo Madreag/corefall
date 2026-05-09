@@ -396,9 +396,14 @@ fi
 # ---------------------------------------------------------------------------
 GRADER="$GAME_DIR/tools/llm_grade_run.py"
 if [[ -f "$GRADER" ]]; then
-    for ROW_BUNDLE in "${REPO_ROOT}/prototype_runs/native/m1.5_"*"_$(date -u +%Y-%m-%dT%H)"* \
-                       "${REPO_ROOT}/prototype_runs/native/m2.5_"*"_$(date -u +%Y-%m-%dT%H)"* \
-                       "${REPO_ROOT}/prototype_runs/native/m2_"*"_$(date -u +%Y-%m-%dT%H)"*; do
+    # Devin 3212443754 caught the original `m2.5_*_$(date -u +%Y-%m-%dT%H)`
+    # glob: it required an underscore between the milestone prefix and the
+    # date, but the canonical run-bundle naming is `m2.5_<UTC>_<hash>` (one
+    # underscore — the date follows the prefix immediately). The corrected
+    # glob anchors the date directly after the prefix underscore.
+    for ROW_BUNDLE in "${REPO_ROOT}/prototype_runs/native/m1.5_$(date -u +%Y-%m-%dT%H)"* \
+                       "${REPO_ROOT}/prototype_runs/native/m2.5_$(date -u +%Y-%m-%dT%H)"* \
+                       "${REPO_ROOT}/prototype_runs/native/m2_$(date -u +%Y-%m-%dT%H)"*; do
         if [[ -d "$ROW_BUNDLE" ]] && [[ -f "$ROW_BUNDLE/run_manifest.json" ]] && [[ ! -f "$ROW_BUNDLE/grading.json" ]]; then
             python3 "$GRADER" scaffold \
                 --bundle "$ROW_BUNDLE" \
