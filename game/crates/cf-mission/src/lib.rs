@@ -1071,6 +1071,57 @@ mod tests {
     }
 
     #[test]
+    fn reactor_apply_damage_two_partial_hits_then_kill_in_separate_calls() {
+        // Bugbot 2ce56d7e regression cover: simulate two partial hits + one
+        // kill hit with the per-hit hp captured at each step. The cf-control
+        // engine emits per-hit state captured at apply_damage time, not the
+        // post-loop final state, so each event reflects the truthful hp.
+        let mut r = Reactor {
+            id: "r".to_string(),
+            position: [0.0, 0.0],
+            half_extents: [16.0, 16.0],
+            hp: 100.0,
+            max_hp: 100.0,
+            destroyed: false,
+        };
+        let prev_hp_1 = r.hp;
+        let prev_destroyed_1 = r.is_destroyed();
+        r.apply_damage(30.0);
+        assert_eq!(r.hp, 70.0);
+        assert!(!r.is_destroyed());
+        assert!(
+            !prev_destroyed_1 && !r.is_destroyed(),
+            "first hit should not have flipped destroyed"
+        );
+        let _ = prev_hp_1;
+
+        let prev_hp_2 = r.hp;
+        let prev_destroyed_2 = r.is_destroyed();
+        r.apply_damage(40.0);
+        assert_eq!(r.hp, 30.0);
+        assert!(!r.is_destroyed());
+        assert!(
+            !prev_destroyed_2 && !r.is_destroyed(),
+            "second hit should not have flipped destroyed"
+        );
+        let _ = prev_hp_2;
+
+        let prev_destroyed_3 = r.is_destroyed();
+        r.apply_damage(40.0);
+        assert_eq!(r.hp, 0.0);
+        assert!(r.is_destroyed());
+        assert!(
+            !prev_destroyed_3 && r.is_destroyed(),
+            "third hit should have flipped destroyed"
+        );
+
+        // Subsequent damage is a no-op (latched destroyed).
+        let before = r.hp;
+        r.apply_damage(50.0);
+        assert_eq!(r.hp, before);
+    }
+
+    #[test]
     fn reactor_object_apply_damage_drives_destruction() {
         let mut r = Reactor {
             id: "r".to_string(),

@@ -1032,7 +1032,28 @@ impl M0Engine {
             // reactor whose AABB contains the projectile position. Hits emit
             // `combat.projectile_hit` (target=reactor) + `actor.actor_status_changed`
             // (target=reactor) when the reactor reaches zero hp.
-            let mut reactor_hits: Vec<(String, f32, [f32; 2], u64)> = Vec::new();
+            //
+            // Per-hit state (`hp_after`, `hp_max`, `destroyed_after`) is
+            // captured AT THE MOMENT THE HIT IS PROCESSED, not later. The
+            // earlier "read final reactor state in the emit loop" approach
+            // was Bugbot 2ce56d7e: when two projectiles hit the same reactor
+            // in one tick, the first hit's event would falsely report the
+            // post-second-hit hp + destroyed flag, producing duplicate
+            // destruction events.
+            struct ReactorHit {
+                rid: String,
+                damage_applied: f32,
+                position: [f32; 2],
+                projectile_id: u64,
+                hp_after: f32,
+                hp_max: f32,
+                destroyed_after: bool,
+                /// True only on the hit that flipped the reactor to
+                /// destroyed (so we emit `actor_status_changed` exactly
+                /// once per reactor).
+                triggered_destruction: bool,
+            }
+            let mut reactor_hits: Vec<ReactorHit> = Vec::new();
             if state.reactor_world.is_some() && state.actor_state.is_some() {
                 let EngineMutable {
                     actor_state,
@@ -1049,9 +1070,20 @@ impl M0Engine {
                             }
                             if r.aabb_contains(proj.position.x, proj.position.y) {
                                 let prev_hp = r.hp;
+                                let prev_destroyed = r.is_destroyed();
                                 r.apply_damage(proj.damage);
                                 let actual = (prev_hp - r.hp).max(0.0);
-                                reactor_hits.push((r.id.clone(), actual, [proj.position.x, proj.position.y], proj.id));
+                                let now_destroyed = r.is_destroyed();
+                                reactor_hits.push(ReactorHit {
+                                    rid: r.id.clone(),
+                                    damage_applied: actual,
+                                    position: [proj.position.x, proj.position.y],
+                                    projectile_id: proj.id,
+                                    hp_after: r.hp,
+                                    hp_max: r.max_hp,
+                                    destroyed_after: now_destroyed,
+                                    triggered_destruction: now_destroyed && !prev_destroyed,
+                                });
                                 consumed = true;
                                 break;
                             }
@@ -1062,13 +1094,7 @@ impl M0Engine {
             }
             if !reactor_hits.is_empty() {
                 let sim_time_ms = state.clock.sim_time_ms();
-                for (rid, dmg, pos, projectile_id) in reactor_hits {
-                    let (hp, hp_max, destroyed) = state
-                        .reactor_world
-                        .as_ref()
-                        .and_then(|w| w.get(&rid))
-                        .map(|r| (r.hp, r.max_hp, r.is_destroyed()))
-                        .unwrap_or((0.0, 0.0, true));
+                for hit in reactor_hits {
                     let hit_id = self.recorder.record(
                         tick,
                         sim_time_ms,
@@ -1076,10 +1102,10 @@ impl M0Engine {
                         "projectile_hit",
                         json!({
                             "target_kind": "reactor",
-                            "target": rid.clone(),
-                            "position": pos,
-                            "damage": dmg,
-                            "projectile_id": projectile_id,
+                            "target": hit.rid.clone(),
+                            "position": hit.position,
+                            "damage": hit.damage_applied,
+                            "projectile_id": hit.projectile_id,
                         }),
                         None,
                     );
@@ -1089,15 +1115,21 @@ impl M0Engine {
                         "actor",
                         "reactor_damaged",
                         json!({
-                            "reactor": rid.clone(),
-                            "hp": hp,
-                            "hp_max": hp_max,
-                            "destroyed": destroyed,
-                            "damage_applied": dmg,
+                            "reactor": hit.rid.clone(),
+                            "hp": hit.hp_after,
+                            "hp_max": hit.hp_max,
+                            "destroyed": hit.destroyed_after,
+                            "damage_applied": hit.damage_applied,
                         }),
                         Some(hit_id.clone()),
                     );
-                    if destroyed {
+                    // Emit `actor_status_changed` ONLY on the hit that
+                    // flipped the reactor to destroyed. Subsequent same-
+                    // tick hits on the same reactor have
+                    // `destroyed_after == true` but `triggered_destruction
+                    // == false`, so they don't duplicate the transition
+                    // event.
+                    if hit.triggered_destruction {
                         self.recorder.record(
                             tick,
                             sim_time_ms,
@@ -1105,7 +1137,7 @@ impl M0Engine {
                             "actor_status_changed",
                             json!({
                                 "actor_kind": "reactor",
-                                "actor": rid,
+                                "actor": hit.rid,
                                 "previous_status": "active",
                                 "new_status": "destroyed",
                                 "cause": "projectile_hit",
