@@ -1,6 +1,6 @@
 // cf-capture — frame capture pipeline for AI-agent self-testing per BP fun-proof.
 // Owned by T-CAPTURE; spans BP2+ lifelong from BP2.
-// See: cortext_command_vault/spec/prototype-roadmap.md §T-CAPTURE.
+// See: docs/plan/spec/prototype-roadmap.md §T-CAPTURE.
 
 #![allow(clippy::needless_pass_by_value)]
 

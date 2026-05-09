@@ -98,11 +98,11 @@ The Roadmap V2 layer groups gameplay milestones into **13 Build Points (BP0..BP1
 
 **Build Point closure gate:** Every BP closeout requires (a) every milestone inside it PASS in the Acceptance Matrix, (b) the Minimum-Bar Design Coverage Matrix proving the worker handled obvious inside-scope game/UX affordances instead of only narrow task wording, (c) the Contract Integrity Matrix proving shared code paths + negative/adversarial proof, (d) the **Universal Enhancement Done-Criteria (DR-056)** matrix PASSing for every M1+ milestone inside the BP, (e) run-bundle evidence for every fun-proof slice at multiple tick rates, (f) **T-CAPTURE evidence** (each fun-proof script emits a `summary_grid.png` + `capture_manifest.json` recorded in `summary.json.artifacts`; `--expect capture.summary_grid.non_blank_ratio>=0.95` mandatory from BP2 onward), (g) **T-RELEASE evidence** (tagged GitHub pre-release from BP1 onward with the BP exemplar bundle + `summary_grid.png` + SHA256SUMS), (h) `/corefall-review <bp>` verdict = `Accept`, and (i) the per-BP human-playtest gate (Did the new systems make the game more fun than the previous BP? — recorded in `prototype_runs/native/<bp>_*` notes; the answer must reference the summary grid path it was answered against).
 
-**Universal Enhancement Done-Criteria (DR-056) — applies to every M1+ milestone:** per-tier perf gate (Steam Deck 800p/60 + 1080p/60 + 4K/120) + CI bench regression + 24h memory-leak soak + network sync verified + replay determinism CI matrix per platform + every player surface scriptable via cfctl + AI-agent validation report + AI audio pipeline + juice rules per DR-055 + ACC-A floor + Tier-A localization keyed strings + modding parity + anti-FOMO + anti-pay-to-win audit + captions for ALL audio. Universal rows are not optional polish — a milestone is not closed if any Universal row FAILS unless the user explicitly approves that exact deferral. Per-milestone specifics layer on top of the universal contract (see [`cortext_command_vault/spec/milestone-enhancement-pass-m1-plus.md`](https://github.com/Madreag/corefall#research-vault)).
+**Universal Enhancement Done-Criteria (DR-056) — applies to every M1+ milestone:** per-tier perf gate (Steam Deck 800p/60 + 1080p/60 + 4K/120) + CI bench regression + 24h memory-leak soak + network sync verified + replay determinism CI matrix per platform + every player surface scriptable via cfctl + AI-agent validation report + AI audio pipeline + juice rules per DR-055 + ACC-A floor + Tier-A localization keyed strings + modding parity + anti-FOMO + anti-pay-to-win audit + captions for ALL audio. Universal rows are not optional polish — a milestone is not closed if any Universal row FAILS unless the user explicitly approves that exact deferral. Per-milestone specifics layer on top of the universal contract (see [`docs/plan/spec/milestone-enhancement-pass-m1-plus.md`](docs/plan/spec/milestone-enhancement-pass-m1-plus.md)).
 
 **Production-track wiring:** T-CONTENT-ART, T-CONTENT-NARRATIVE, T-LOCALIZATION, and T-LIVEOPS run alongside the BP spine but only finalize at BP12. They begin placeholder generation at BP3+ so the gameplay spine isn't blocked on art/audio/copy/legal.
 
-See [`cortext_command_vault/spec/prototype-roadmap.md`](https://github.com/Madreag/corefall#research-vault) for the full BP table, the **Design-Completeness Map** (every product surface mapped to its owning BP+milestone so you can verify "yes, by BP12 this is a complete game"), the milestone-map gap fills, the done-criteria summary, the kickoff smoke commands, and the inter-milestone bridge contracts.
+See [`docs/plan/spec/prototype-roadmap.md`](docs/plan/spec/prototype-roadmap.md) for the full BP table, the **Design-Completeness Map** (every product surface mapped to its owning BP+milestone so you can verify "yes, by BP12 this is a complete game"), the milestone-map gap fills, the done-criteria summary, the kickoff smoke commands, and the inter-milestone bridge contracts.
 
 ## Design-Completeness Promise
 
@@ -122,7 +122,7 @@ By end of BP12 the game is a complete releasable candidate — every product sur
 | **Audio + AI-authored content** | 30+ adaptive music tracks + 400+ SFX + ACRE2-tier radio + Steam Audio-tier voice + diegetic-first mix; all generated through the AI-only DR-053 pipeline + usage-ledger. |
 | **Release operations** | T-RELEASE GA at v1.0.0 + T-LIVEOPS telemetry/crash/bug-tool + legal/license ledger + platform packaging + code signing + support docs + sustainability/sunset posture. |
 
-If a row above is still missing a core system at BP12 closure time, BP12 cannot close by relabeling it as polish. Either implement it, write a user-approved scope-change DR, or keep BP12 open. See [`cortext_command_vault/spec/prototype-roadmap.md`](https://github.com/Madreag/corefall#research-vault) **Design-Completeness Map** for the full surface-to-milestone matrix.
+If a row above is still missing a core system at BP12 closure time, BP12 cannot close by relabeling it as polish. Either implement it, write a user-approved scope-change DR, or keep BP12 open. See [`docs/plan/spec/prototype-roadmap.md`](docs/plan/spec/prototype-roadmap.md) **Design-Completeness Map** for the full surface-to-milestone matrix.
 
 ---
 
@@ -330,24 +330,32 @@ game/crates/
 
 ---
 
-## Research Vault
+## Planning Spine + Research Vault
 
-Corefall is built from a deliberate, opinionated, evidence-tracked **research vault** that lives outside this repo:
+Corefall splits its plan-of-record across two locations:
 
-```text
-~/projects/cortex-command-repos-all/cortext_command_vault
-```
+### Planning spine — inside this repo at [`docs/plan/`](docs/plan/)
 
-The vault contains:
+The **implementation-gating** planning layer lives in this repo so every PR that changes a roadmap row, checklist row, DR, milestone enhancement spec, or other gating contract is reviewed by Bugbot + Devin alongside the implementation that depends on it. Atomic plan + code PRs.
 
-- **Decision records** (DR-001 through DR-057, plus future activation gates) — every major direction choice with pros, cons, evidence, revisit triggers.
-- **55+ spec pages** for product promise, body damage, chassis/armor/mechs/origins, equipment/loadout, Stationeers-grade-or-better atmospherics & chemistry, thermal engineering, gravity & ballistics, AI, replay, mission director, full collision physics, accessibility-plus, localization, AI asset/audio production, modding, networking, launch operations, and more.
-- **Production roadmap** covering M0 through launch, side tracks, CLI/control contracts, DR-056 universal enhancement gates, and per-milestone Steam Deck/network/replay/accessibility/modding/testability budgets.
-- **Comparable game audits** — local code audits of Cortex Command (CCCP), OpenSoldat, OpenLieroX, The Powder Toy, plus public-source / public-doc research on Noita, Stationeers, Barotrauma, Oxygen Not Included.
-- **Research log** — chronological record of every research pass with source citations.
-- **Prototype evidence** — run bundles + smokes + acceptance test results.
+- **Decision records** (DR-001 through DR-057, plus future activation gates) — every major direction choice with pros, cons, evidence, revisit triggers. Lives at [`docs/plan/decisions/`](docs/plan/decisions/).
+- **80 spec pages** for product promise, body damage, chassis/armor/mechs/origins, equipment/loadout, Stationeers-grade-or-better atmospherics & chemistry, thermal engineering, gravity & ballistics, AI, replay, mission director, full collision physics, accessibility-plus, localization, AI asset/audio production, modding, networking, launch operations, and more. Lives at [`docs/plan/spec/`](docs/plan/spec/).
+- **Production roadmap** covering M0 through launch, side tracks, CLI/control contracts, DR-056 universal enhancement gates, and per-milestone Steam Deck/network/replay/accessibility/modding/testability budgets. Lives at [`docs/plan/spec/prototype-roadmap.md`](docs/plan/spec/prototype-roadmap.md).
+- **Native implementation backlog** + **feature completion checklist** + **milestone enhancement spec** + **AI-coder reading list** + **ai-control-observability-layer** + **authoritative-game-spec** + **prototype-run-bundle-schema** + **decision-tracker dashboard** + **research-readiness dashboard** — all under `docs/plan/spec/`, `docs/plan/dashboards/`, and `docs/plan/references/`.
+- **BP closure notes** at [`docs/plan/prototypes/build-point-bp*.md`](docs/plan/prototypes/) — per-BP narrative + evidence trail.
 
-The vault is the long-term knowledge base. This repo is the implementation. The two are separate by design so the vault can survive engine changes, language changes, or fork events.
+Full file history is preserved via `git filter-repo` from the research vault (every commit before the migration is visible in `git blame` on each spine file).
+
+### Research vault — outside this repo at `~/projects/cortex-command-repos-all/cortext_command_vault`
+
+Long-form research that informs but does not gate implementation:
+
+- **Comparable game audits** — local code audits of Cortex Command (CCCP), OpenSoldat, OpenLieroX, The Powder Toy, plus public-source / public-doc research on Noita, Stationeers, Barotrauma, Oxygen Not Included. Lives at `cortext_command_vault/comparables/`.
+- **Research log** — chronological record of every research pass with source citations. Lives at `cortext_command_vault/research-log/`.
+- **Per-milestone prototype evidence notes** (`prototypes/native-*.md`) — narrative log of what shipped at each milestone, distinct from the in-repo `docs/implementation-log/` which captures what changed in this repo at that milestone.
+- **Narrative seeds**, **comparable repos** (CCCP, OpenSoldat, OpenLieroX), **license usage ledger**, **equipment schema seeds**, **glossary**, **strategy docs**, **systems brainstorms**, **game-overview docs** (`VAULT_PLAN.md`, `GAME_DESCRIPTION_FOR_FRIEND.md`).
+
+The vault stays separate so it can survive engine changes, language changes, or fork events. It's also where exploratory research lives without polluting the implementation repo's PR review surface.
 
 > [!note]
 > The vault is currently a private workspace. If you want to contribute design research or comparable-game audits, open an issue here so we can route the conversation.

@@ -44,7 +44,7 @@ from typing import Optional
 GENERATOR_VERSION = "0.3.0"
 
 # Static BP scope table. Matches the canonical Build Points table in
-# cortext_command_vault/spec/prototype-roadmap.md. Update both in lockstep.
+# docs/plan/spec/prototype-roadmap.md. Update both in lockstep.
 BP_SCOPE = {
     "bp0": (
         "Foundation Build",
@@ -404,7 +404,7 @@ def excerpt(text: str, limit: int = 900) -> str:
 def extract_vault_refs(text: str) -> list[str]:
     refs: list[str] = []
     patterns = [
-        r"cortext_command_vault/[A-Za-z0-9_./#-]+\.md(?:#[A-Za-z0-9_.%+-]+)?",
+        r"(?:docs/plan|cortext_command_vault)/[A-Za-z0-9_./#-]+\.md(?:#[A-Za-z0-9_.%+-]+)?",
         r"(?:spec|decisions|dashboards|prototypes|research-log|references|systems|comparables)/[A-Za-z0-9_./#-]+\.md(?:#[A-Za-z0-9_.%+-]+)?",
         r"\[\[([A-Za-z0-9_./# -]+)\]\]",
     ]
@@ -412,7 +412,9 @@ def extract_vault_refs(text: str) -> list[str]:
         for match in re.finditer(pattern, text or ""):
             ref = match.group(1) if match.groups() else match.group(0)
             ref = ref.strip()
-            if ref.startswith("cortext_command_vault/"):
+            if ref.startswith("docs/plan/"):
+                ref = ref.removeprefix("docs/plan/")
+            elif ref.startswith("cortext_command_vault/"):
                 ref = ref.removeprefix("cortext_command_vault/")
             if ref and ref not in refs:
                 refs.append(ref)

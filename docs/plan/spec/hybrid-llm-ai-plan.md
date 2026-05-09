@@ -561,18 +561,18 @@ AiMindConfig(
 Use this after M6 local AI hooks exist:
 
 ```text
-Implement M6.5 - LLM Mind Lab from cortext_command_vault/spec/hybrid-llm-ai-plan.md.
+Implement M6.5 - LLM Mind Lab from docs/plan/spec/hybrid-llm-ai-plan.md.
 
 Goal:
 Build the async LLM mind layer without making local AI depend on a live model.
 
 Context:
-- Read cortext_command_vault/spec/prototype-roadmap.md
-- Read cortext_command_vault/spec/native-implementation-backlog.md
-- Read cortext_command_vault/spec/ai-control-observability-layer.md
-- Read cortext_command_vault/decisions/dr-008-ai-architecture.md
-- Read cortext_command_vault/decisions/dr-022-ai-humanlike-bar.md
-- Read cortext_command_vault/spec/hybrid-llm-ai-plan.md
+- Read docs/plan/spec/prototype-roadmap.md
+- Read docs/plan/spec/native-implementation-backlog.md
+- Read docs/plan/spec/ai-control-observability-layer.md
+- Read docs/plan/decisions/dr-008-ai-architecture.md
+- Read docs/plan/decisions/dr-022-ai-humanlike-bar.md
+- Read docs/plan/spec/hybrid-llm-ai-plan.md
 
 Scope:
 - Add MindObservationFrame, MindTask, AiMindProposal, MindValidationResult, MindMemoryRecord, and MindProviderConfig schemas.

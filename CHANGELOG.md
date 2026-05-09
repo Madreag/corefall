@@ -2,13 +2,18 @@
 
 Repo-only implementation changelog for Corefall.
 
-The canonical roadmap, checklist, specs, and decision records remain in:
+The canonical roadmap, checklist, specs, and decision records live in this
+repo at [`docs/plan/`](docs/plan/) (migrated 2026-05-09 from the research
+vault to give Bugbot + Devin reviewers visibility into plan-spine changes
+in every PR). Long-form research (comparables, research-log, narrative
+seeds) stays in the research vault at:
 
 ```text
 /Users/erol/projects/cortex-command-repos-all/cortext_command_vault
 ```
 
-Use this file to summarize what changed in the implementation repo. Do not copy the whole vault here.
+Use this file to summarize what changed in the implementation repo. Do not
+copy long-form research here; that's what the vault is for.
 
 ## Unreleased
 
@@ -145,15 +150,15 @@ BP2 closes three milestones bundled under one shippable artifact: chunked pixel 
 
 **Vault updates (canonical)**
 
-- `cortext_command_vault/prototypes/build-point-bp2-terrain-replay.md` — BP2 closure note (the per-BP vault note required by the AGENTS.md Build Point Closure Gate).
-- `cortext_command_vault/spec/prototype-roadmap.md` — Build Point Map row BP2 marked CLOSED; Design-Completeness Map M2 / M2.5 / M3A rows checked.
-- `cortext_command_vault/spec/feature-completion-checklist.md` — Build Points Checklist BP2 row + per-milestone scope/done/native-task-card rows updated with evidence + AI self-ratings.
+- `docs/plan/prototypes/build-point-bp2-terrain-replay.md` — BP2 closure note (the per-BP vault note required by the AGENTS.md Build Point Closure Gate).
+- `docs/plan/spec/prototype-roadmap.md` — Build Point Map row BP2 marked CLOSED; Design-Completeness Map M2 / M2.5 / M3A rows checked.
+- `docs/plan/spec/feature-completion-checklist.md` — Build Points Checklist BP2 row + per-milestone scope/done/native-task-card rows updated with evidence + AI self-ratings.
 
 ### Added (BP2 readiness audit — minimum-bar + design-completeness hardening)
 
 A full audit pass before BP2 callout to ensure the next implementing agent cannot miss a contract row. The user's specific concern: every milestone should be analyzed by the implementor as a minimum bar, not a ceiling, and the implementor must enhance each milestone over time. The roadmap was already explicit about this rule, but the universal contract surface (DR-056 / `milestone-enhancement-pass-m1-plus.md`) was not surfaced in the AI-coder reading list, the AGENTS.md mandatory read order, the SKILL.md required sources, or the per-milestone roadmap sections. Those gaps could let a worker pick up M2/M2.5/M3A and skip the universal perf/network/audio/juice/accessibility/localization/modding/anti-FOMO contract.
 
-- **AGENTS.md** — Added a new **Universal Enhancement Contract (DR-056)** subsection after the Contract Integrity Gate, listing all 14 universal rows that every M1+ milestone closeout must PASS. Added a new **Minimum Bar And Enhancement Rule** subsection making the design-coverage pass + Minimum-Bar Design Coverage Matrix mandatory. Added `cortext_command_vault/spec/milestone-enhancement-pass-m1-plus.md` to the Mandatory Read Order (step 9). The Universal Enhancement rows are non-optional — a milestone is not closed if any Universal row FAILS unless the user explicitly approves that exact deferral.
+- **AGENTS.md** — Added a new **Universal Enhancement Contract (DR-056)** subsection after the Contract Integrity Gate, listing all 14 universal rows that every M1+ milestone closeout must PASS. Added a new **Minimum Bar And Enhancement Rule** subsection making the design-coverage pass + Minimum-Bar Design Coverage Matrix mandatory. Added `docs/plan/spec/milestone-enhancement-pass-m1-plus.md` to the Mandatory Read Order (step 9). The Universal Enhancement rows are non-optional — a milestone is not closed if any Universal row FAILS unless the user explicitly approves that exact deferral.
 - **README.md** — Added a new **Design-Completeness Promise** section right after the Build Points table, summarizing what BP12 must ship (playable game + core promise + content roster + UX/UI + accessibility + multiplayer/server + modding + endgame + narrative + audio + release operations). Build Point closure gate prose now includes the Universal Enhancement Done-Criteria matrix as gate (d).
 - **`.claude/skills/corefall-review/SKILL.md`** — Added two new gates: **Self-Play Validation Gate** (Hands/Eyes/Ears/Hear matrix per `corefall/AGENTS.md` § Self-Play Validation Rule) and **Universal Enhancement Audit Gate** (DR-056 14-row checklist). Required Sources updated to include `milestone-enhancement-pass-m1-plus.md`. Workflow expanded to include Self-Play Validation review (step 12), Universal Enhancement audit (step 13), and Design-Completeness Map cross-check (step 14). Final Output now includes Self-Play Validation Matrix verification + Universal Enhancement Audit + Design-Completeness Map cross-check rows.
 - **`.claude/skills/corefall-review/references/review-passes.md`** — Added pass §10 **Self-Play Validation Audit** + pass §11 **Universal Enhancement Audit (DR-056)** + pass §12 **Design-Completeness Map Cross-Check**. Each lists exact audit items.
@@ -251,8 +256,8 @@ The T-CAPTURE PR #6 cycled through three Bugbot autofix iterations PLUS two of m
 
 **Vault updates** (canonical):
 
-- `cortext_command_vault/spec/prototype-roadmap.md` — new T-CAPTURE row in the side-tracks summary table + new `### T-CAPTURE` section after T-PERF with cadence policy, keyframe types, BP closure-gate role, LLM-input contract, determinism contract, and BP2/BP4/BP5/BP12 done-criteria.
-- `cortext_command_vault/references/prototype-run-bundle-schema.md` — `captures/` rows expanded: `frame_<tick>.png`, `grid_<NNN>.png`, `summary_grid.png`, `grid.json`, with `summary.json.artifacts[].type` values `capture-frame`, `capture-grid`, `capture-summary-grid`.
+- `docs/plan/spec/prototype-roadmap.md` — new T-CAPTURE row in the side-tracks summary table + new `### T-CAPTURE` section after T-PERF with cadence policy, keyframe types, BP closure-gate role, LLM-input contract, determinism contract, and BP2/BP4/BP5/BP12 done-criteria.
+- `docs/plan/references/prototype-run-bundle-schema.md` — `captures/` rows expanded: `frame_<tick>.png`, `grid_<NNN>.png`, `summary_grid.png`, `grid.json`, with `summary.json.artifacts[].type` values `capture-frame`, `capture-grid`, `capture-summary-grid`.
 
 ### Added (M1.5 — Micro Breach Fun Slice)
 
@@ -368,7 +373,7 @@ After the M0.3 verdict, an independent reviewer recommended landing **F7 only**:
   4. Returns the explicit override unchanged when one is supplied.
   5. Falls back to the default when none is supplied.
 - **CI gate against stray `prototype_runs/` directories.** `.github/workflows/ci.yml` adds an "enforce repo-root prototype_runs path (M0.4-F7)" step that runs `find . -type d -name prototype_runs -not -path './prototype_runs' -not -path './prototype_runs/*' -not -path './target/*' -not -path './.git/*'` and fails CI if any stray directory exists. This protects the repo-root contract from future regressions where a binary defaults to a relative path under `game/`.
-- **Captured M3A follow-up.** `system.run_finished` checker tightening + `expected_outcome` manifest enum (`clean | panic | abort`) now lives as task card `M3A-005 run-finished outcome contract` in `cortext_command_vault/spec/native-implementation-backlog.md`. Owns: `cf-replay`, `references/prototype-run-bundle-schema.md`, `tools/prototype_run_check.py`. Not implemented in M0.4 — M3A owns the event core and M3B closes DR-002.
+- **Captured M3A follow-up.** `system.run_finished` checker tightening + `expected_outcome` manifest enum (`clean | panic | abort`) now lives as task card `M3A-005 run-finished outcome contract` in `docs/plan/spec/native-implementation-backlog.md`. Owns: `cf-replay`, `references/prototype-run-bundle-schema.md`, `tools/prototype_run_check.py`. Not implemented in M0.4 — M3A owns the event core and M3B closes DR-002.
 
 **Test count**: 73 tests passing (up from 68 in M0.3; +5 = the 5 new `cf-replay::bundle_paths` regression tests).
 
@@ -450,7 +455,7 @@ After the M0.1 verdict, an independent reviewer found six verified release-gatin
 
 - DR-002 v1 envelope locked under user approval (Open Decision Gates Protocol). Manifest extensions (`checksum.{algorithm,scope,cadence_ticks}` + `settings:{...}`) and summary extensions (`final_sim_checksum`, `checksum_event_count`, `first_tick`, `last_tick`, `performance.tick_rate_hz`, `performance.p99_tick_ms`); `references/prototype-run-bundle-schema.md` updated in the same pass to enumerate them. M0 categories: `system`, `control`, `determinism`. `snapshot` opens at M3.
 - DR-012 surface lock applied AND wired to live engine state. The previous "M0 surfaces flags but no behavior" claim was upgraded to actual mutation via `act.settings.set` over JSON-RPC.
-- Bumped Rust toolchain pin from `1.84.0` to `1.93.0` (strict, no `stable`, no loose minor). Edited `cortext_command_vault/spec/prototype-roadmap.md` §Toolchain And Workspace Bootstrap in the same pass so the recipe matches the implementation.
+- Bumped Rust toolchain pin from `1.84.0` to `1.93.0` (strict, no `stable`, no loose minor). Edited `docs/plan/spec/prototype-roadmap.md` §Toolchain And Workspace Bootstrap in the same pass so the recipe matches the implementation.
 - Bevy 0.14 is now a real workspace dependency, not a deferred placeholder. `cf-app` is a real Bevy app, not an inline-only sim runner.
 - `jsonrpsee` is intentionally NOT a workspace dep; `tokio-tungstenite` + a minimal hand-rolled JSON-RPC envelope keep the dep tree small. Documented in `cf-control/AGENTS.md`.
 - Tightened `AGENTS.md` to reduce repeated evidence/completion text while keeping the short-assignment, validation, vault-update, and handoff rules intact.

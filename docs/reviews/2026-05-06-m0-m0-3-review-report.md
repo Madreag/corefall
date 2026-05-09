@@ -59,8 +59,8 @@ Completed in this pass:
 
 - `CHANGELOG.md` M0.3 section.
 - `docs/implementation-log/2026-05-05-m0-engine-bootstrap.md` M0.3 section.
-- `cortext_command_vault/spec/feature-completion-checklist.md` M0 rows refreshed to M0.3 evidence.
-- `cortext_command_vault/spec/prototype-roadmap.md` M0 done criteria checked with current evidence note.
+- `docs/plan/spec/feature-completion-checklist.md` M0 rows refreshed to M0.3 evidence.
+- `docs/plan/spec/prototype-roadmap.md` M0 done criteria checked with current evidence note.
 
 ## Verdict
 

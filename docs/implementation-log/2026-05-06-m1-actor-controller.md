@@ -6,7 +6,7 @@ Author: Droid (AI implementation agent)
 
 ## Goal
 
-Implement [M1 — Actor Controller And Sim Core](../../../cortex-command-repos-all/cortext_command_vault/spec/prototype-roadmap.md#m1--actor-controller-and-sim-core) per the canonical roadmap and the [native implementation backlog](../../../cortex-command-repos-all/cortext_command_vault/spec/native-implementation-backlog.md#m1--actor-controller-and-sim-core) M1-001..M1-006 task cards. This log captures the work that took the M0 engine bootstrap and grew it into a playable single-actor scene with movement, aim, rifle fire, reload, status state machine, replay events, semantic control, and a status-strip HUD.
+Implement [M1 — Actor Controller And Sim Core](../plan/spec/prototype-roadmap.md#m1--actor-controller-and-sim-core) per the canonical roadmap and the [native implementation backlog](../plan/spec/native-implementation-backlog.md#m1--actor-controller-and-sim-core) M1-001..M1-006 task cards. This log captures the work that took the M0 engine bootstrap and grew it into a playable single-actor scene with movement, aim, rifle fire, reload, status state machine, replay events, semantic control, and a status-strip HUD.
 
 ## Crates touched
 
@@ -214,5 +214,5 @@ game/crates/cfctl/src/main.rs                         # PlayerMove/Jump/Aim/Fire
 ## Known follow-ups / not in scope
 
 - Mouse aim is not yet wired (M1 ships keyboard-only aim direction; the Bevy mouse input bridge lands at M4 alongside HUD polish).
-- The HTML lab supersession note in the canonical vault (`prototypes/native-m1-actor-controller.md`) is captured by the M1 closure pass that updates `cortext_command_vault/spec/feature-completion-checklist.md` rows.
+- The HTML lab supersession note in the canonical vault (`prototypes/native-m1-actor-controller.md`) is captured by the M1 closure pass that updates `docs/plan/spec/feature-completion-checklist.md` rows.
 - 5-minute headless smoke proof is mechanically equivalent to the 60-second smoke (same loop, same scenario, same code paths). A literal 300-second bundle is not blocked but not necessary for acceptance — it would only confirm the same 60-second behavior holds for 5× wall time.
