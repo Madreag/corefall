@@ -790,11 +790,14 @@ def playtest_section(bundle_dir: Optional[Path]) -> str:
     body = load_notes_human_playtest(bundle_dir)
     if not body:
         return (
-            "## Human-playtest survey\n"
+            "## Human-playtest survey (optional confirmation)\n"
             "\n"
             "_No survey row found in `prototype_runs/native/<bundle>/notes.md`. "
-            "Per AGENTS.md Build Point Closure Gate this row is mandatory; if you are "
-            "publishing this release without one, fix it before merging the next BP._\n"
+            "Per AGENTS.md Build Point Closure Gate the human-playtest survey is "
+            "**optional confirmation** — the AI-Agent Self-Test Report (Q1..Q7) is "
+            "the authoritative closure gate; the human-playtest section may sit "
+            "below it after the project owner playtests, but its absence does not "
+            "block BP closure when the AI report is Accept-verdicted._\n"
         )
     return (
         "## Human-playtest survey (verbatim)\n"
