@@ -1034,8 +1034,6 @@ impl M0Engine {
             // (target=reactor) when the reactor reaches zero hp.
             let mut reactor_hits: Vec<(String, f32, [f32; 2], u64)> = Vec::new();
             if state.reactor_world.is_some() && state.actor_state.is_some() {
-                let sim_time_ms_val = state.clock.sim_time_ms();
-                let _ = sim_time_ms_val;
                 let EngineMutable {
                     actor_state,
                     reactor_world,

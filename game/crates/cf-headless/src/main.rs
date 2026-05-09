@@ -325,13 +325,17 @@ fn parse_command(payload: &Value) -> Option<ControlCommand> {
         }
         "sim.run_for_ticks" => {
             let ticks = payload.get("ticks").and_then(Value::as_u64).unwrap_or(0);
-            let write_run_bundle = payload
-                .get("write_run_bundle")
-                .and_then(Value::as_bool)
-                .unwrap_or(false);
+            // Bugbot: hard-code `write_run_bundle: false` for the replay
+            // verifier regardless of what the recorded payload contained.
+            // The replay path's `M0EngineConfig.write_run_bundle` is `false`
+            // (see `build_engine_config` call above with
+            // `write_run_bundle: false`). Replaying the original
+            // `write_run_bundle: true` flag would dispatch a bundle write
+            // to the verifier's recorder — extra disk I/O we never want
+            // during replay.
             Some(ControlCommand::RunForTicks {
                 ticks,
-                write_run_bundle,
+                write_run_bundle: false,
             })
         }
         "act.player.move" => Some(ControlCommand::ActPlayerMove {
@@ -432,4 +436,72 @@ fn collect_checksums(events_text: &str) -> Vec<(u64, String)> {
         out.push((tick, hex));
     }
     out
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    /// Bugbot regression: `parse_command` for `sim.run_for_ticks` MUST hard-
+    /// code `write_run_bundle: false` regardless of what the recorded payload
+    /// contained. The replay verifier never wants to write a bundle even if
+    /// the original run dispatched `RunForTicks { write_run_bundle: true }`.
+    #[test]
+    fn parse_run_for_ticks_forces_write_run_bundle_false() {
+        let payload = json!({
+            "method": "sim.run_for_ticks",
+            "ticks": 60,
+            "write_run_bundle": true,
+        });
+        match parse_command(&payload) {
+            Some(ControlCommand::RunForTicks {
+                ticks,
+                write_run_bundle,
+            }) => {
+                assert_eq!(ticks, 60);
+                assert!(
+                    !write_run_bundle,
+                    "replay verifier MUST NOT pass through write_run_bundle=true from recorded payload"
+                );
+            }
+            other => panic!("expected RunForTicks, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parse_run_for_ticks_default_write_run_bundle_false() {
+        let payload = json!({"method": "sim.run_for_ticks", "ticks": 60});
+        match parse_command(&payload) {
+            Some(ControlCommand::RunForTicks { write_run_bundle, .. }) => {
+                assert!(!write_run_bundle);
+            }
+            other => panic!("expected RunForTicks, got {other:?}"),
+        }
+    }
+
+    /// Verifies the cf-headless replay parser handles every BP2 method
+    /// without panicking and produces the expected variant.
+    #[test]
+    fn parse_bp2_method_catalog_returns_expected_variants() {
+        let cases = [
+            ("scenario.reset", json!({"method": "scenario.reset"})),
+            ("act.player.dig", json!({"method": "act.player.dig", "target": null})),
+            (
+                "act.player.move",
+                json!({"method": "act.player.move", "x": 1.0, "y": 0.0}),
+            ),
+            (
+                "act.player.aim",
+                json!({"method": "act.player.aim", "x": -1.0, "y": 0.0}),
+            ),
+            ("act.player.fire", json!({"method": "act.player.fire", "pressed": true})),
+        ];
+        for (name, payload) in cases {
+            assert!(
+                parse_command(&payload).is_some(),
+                "parse_command returned None for {name}"
+            );
+        }
+    }
 }

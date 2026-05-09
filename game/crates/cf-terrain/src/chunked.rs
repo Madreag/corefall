@@ -135,7 +135,15 @@ const MATERIAL_TABLE: [MaterialAffordance; 8] = [
         name: "hazard",
         solid: false,
         diggable: false,
-        hardness: 0.0,
+        // Devin BUG_pr-review-job (flag): hardness was 0.0 which made
+        // `try_blast` clear hazard pixels with any non-negative force
+        // (since `force >= 0.0` is always true). Hazard is non-diggable +
+        // refusal-only at BP2, mirroring metal_nohook + anchor; until the
+        // M5.6 active material kernel handles hazard dispersal through
+        // the reaction table, hazard MUST resist trivial blasts. Setting
+        // hardness to f32::INFINITY matches the other refusal-only
+        // materials and keeps `try_blast` symmetric with `try_carve`.
+        hardness: f32::INFINITY,
         anchorable: false,
         hazard: true,
         path_cost: 32.0,
@@ -898,7 +906,14 @@ impl ChunkedTerrain {
     }
 
     fn in_bounds(&self, px: i64, py: i64) -> bool {
-        px >= 0 && py >= 0 && (px as u32) < self.width_px && (py as u32) < self.height_px
+        // Devin BUG_pr-review-job (yellow): compare in i64 space so a
+        // pathological caller passing px >= 2^32 doesn't truncate-wrap to a
+        // small u32 and falsely report "in bounds". All current call sites
+        // derive (px, py) from f32 world coords (max ~16M) or
+        // `aabb_to_pixels` which clamps to the terrain extent, so this is
+        // defensive — but the contract is now branch-truthful regardless of
+        // the caller's coordinate source.
+        px >= 0 && py >= 0 && px < (self.width_px as i64) && py < (self.height_px as i64)
     }
 
     fn set_pixel_internal(&mut self, px: i64, py: i64, mat: MaterialId) -> bool {
@@ -1124,6 +1139,44 @@ mod tests {
         let mut t = small_world();
         let outcome = t.try_blast([476.0, 60.0], 16.0, 1.0);
         assert!(matches!(outcome, ChunkedCarveOutcome::Refused(_)));
+    }
+
+    #[test]
+    fn try_blast_refuses_hazard_at_any_finite_force() {
+        // Devin BUG_pr-review-job (flag) regression: hazard hardness was
+        // 0.0 which made `force >= aff.hardness` true for any non-negative
+        // force, causing `try_blast` to clear hazard pixels trivially. The
+        // fix sets hazard hardness to f32::INFINITY so blasts behave
+        // symmetrically with `try_carve` (refusal-only).
+        let mut t = ChunkedTerrain::new(64, 64, MATERIAL_AIR);
+        t.fill_aabb([0.0, 0.0], [32.0, 32.0], MATERIAL_HAZARD);
+        for force in [0.0_f32, 1.0, 100.0, 1_000_000.0] {
+            let outcome = t.try_blast([16.0, 16.0], 8.0, force);
+            assert!(
+                matches!(outcome, ChunkedCarveOutcome::Refused(_)),
+                "expected hazard to refuse blast with force {force}, got {outcome:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn in_bounds_rejects_extreme_i64_coordinates() {
+        // Devin BUG_pr-review-job (yellow) regression: `in_bounds` cast
+        // `px as u32` which truncates for px >= 2^32 (e.g., 4294967296
+        // truncates to 0 and would be reported in-bounds). The fix
+        // compares in i64 space.
+        let t = ChunkedTerrain::new(64, 64, MATERIAL_AIR);
+        // Inside bounds.
+        assert!(t.in_bounds(0, 0));
+        assert!(t.in_bounds(63, 63));
+        // Outside bounds — truncation-prone values.
+        assert!(!t.in_bounds(-1, 0));
+        assert!(!t.in_bounds(64, 0));
+        assert!(!t.in_bounds(64_000_000, 0));
+        // Values that would truncate-wrap on a u32 cast — must remain out.
+        assert!(!t.in_bounds(1_i64 << 32, 0));
+        assert!(!t.in_bounds(0, 1_i64 << 33));
+        assert!(!t.in_bounds(i64::MAX, 0));
     }
 
     #[test]
