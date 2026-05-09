@@ -63,7 +63,7 @@ feeds:
   - DR-056
 ---
 
-← [[spec/index|spec section]] · [[spec/authoritative-game-spec-v0|game spec v0]] · [[spec/native-implementation-backlog|native backlog]] · [[spec/feature-completion-checklist|feature checklist]] · [[spec/server-app-architecture|server app architecture]] · [[spec/persistent-mmo-architecture|persistent MMO architecture]] · [[spec/full-collision-physics-plan|full collision plan]] · [[spec/hybrid-llm-ai-plan|hybrid LLM AI plan]] · [[spec/ai-control-observability-layer|AI control/observability]] · [[comparables/noita-grade-material-simulation-research|systemic material research]] · [[spec/prototype-implementation-backlog-slice-a|historical HTML backlog]] · [[dashboards/research-readiness|readiness]] · [[decisions/index|decisions]] · [VAULT_PLAN.md](../../VAULT_PLAN.md) · [HTML-era snapshot](../research-log/2026-05-04-prototype-roadmap-html-snapshot.md)
+← [[spec/index|spec section]] · [[spec/authoritative-game-spec-v0|game spec v0]] · [[spec/native-implementation-backlog|native backlog]] · [[spec/feature-completion-checklist|feature checklist]] · [[spec/server-app-architecture|server app architecture]] · [[spec/persistent-mmo-architecture|persistent MMO architecture]] · [[spec/full-collision-physics-plan|full collision plan]] · [[spec/hybrid-llm-ai-plan|hybrid LLM AI plan]] · [[spec/ai-control-observability-layer|AI control/observability]] · [[comparables/noita-grade-material-simulation-research|systemic material research]] · [[spec/prototype-implementation-backlog-slice-a|historical HTML backlog]] · [[dashboards/research-readiness|readiness]] · [[decisions/index|decisions]] · `cortex-command-repos-all/VAULT_PLAN.md` (research vault root) · `cortext_command_vault/research-log/2026-05-04-prototype-roadmap-html-snapshot.md` (HTML-era snapshot)
 
 # Native Build Roadmap
 
@@ -4454,4 +4454,4 @@ This roadmap explicitly does NOT include for v1:
 - [[references/usage-ledger]]
 - [[research-log/moonshot-register]]
 - [[research-log/2026-05-04-prototype-roadmap-html-snapshot]] — superseded HTML-era version
-- [VAULT_PLAN.md](../../VAULT_PLAN.md)
+- `cortex-command-repos-all/VAULT_PLAN.md` (research vault root)

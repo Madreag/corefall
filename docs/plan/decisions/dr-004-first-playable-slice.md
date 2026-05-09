@@ -6,7 +6,7 @@ priority: P0
 revisit_trigger: "When DR-001 (engine), DR-002 (replay), and the actor-feel sandbox are scheduled."
 ---
 
-← [[decisions/index|decision records]] · [[spec/actor-feel-sandbox-slice-a|actor-feel Slice A]] · [[strategy/research-to-spec-roadmap|research-to-spec roadmap]] · [[strategy/best-cortex-like-game-principles|best principles]] · [[comparables/openlierox-local-audit|OpenLieroX audit]] · [VAULT_PLAN.md](../../VAULT_PLAN.md)
+← [[decisions/index|decision records]] · [[spec/actor-feel-sandbox-slice-a|actor-feel Slice A]] · [[strategy/research-to-spec-roadmap|research-to-spec roadmap]] · [[strategy/best-cortex-like-game-principles|best principles]] · [[comparables/openlierox-local-audit|OpenLieroX audit]] · `cortex-command-repos-all/VAULT_PLAN.md` (research vault root)
 
 # DR-004: First Playable Slice
 

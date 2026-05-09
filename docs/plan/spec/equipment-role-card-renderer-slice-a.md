@@ -28,11 +28,11 @@ Can the game render every important equipment item as a readable, system-backed 
 
 | Input | Path | Required Use |
 |---|---|---|
-| Role cards JSON | [equipment-role-cards.slice-a.json](../references/equipment-role-cards.slice-a.json) | Canonical Slice A item-card data for renderer tests. Contains 106 cards. |
+| Role cards JSON | `cortext_command_vault/references/equipment-role-cards.slice-a.json` | Canonical Slice A item-card data for renderer tests. Contains 106 cards. |
 | Role cards note | [[references/equipment-role-cards-slice-a]] | Human-readable summary, count tables, sample cards, and generation caveats. |
-| Renderer view JSON | [equipment-role-card-renderer-view.slice-a.json](../references/equipment-role-card-renderer-view.slice-a.json) | Canonical generated LOAD-R fixture: 63 player-catalog rows, 106 workbench rows, 5 detail drawers, 10 overlap rows, and 9 fixture summaries. |
+| Renderer view JSON | `cortext_command_vault/references/equipment-role-card-renderer-view.slice-a.json` | Canonical generated LOAD-R fixture: 63 player-catalog rows, 106 workbench rows, 5 detail drawers, 10 overlap rows, and 9 fixture summaries. |
 | Renderer view note | [[references/equipment-role-card-renderer-view-slice-a]] | Human-readable catalog slice, special detail drawers, overlap renderer rows, fixture summaries, and LOAD-R coverage map. |
-| Overlap audit JSON | [equipment-overlap-audit.slice-a.json](../references/equipment-overlap-audit.slice-a.json) | Canonical Slice A overlap groups. Contains 10 groups and 42 player-catalog items under role-signature pressure. |
+| Overlap audit JSON | `cortext_command_vault/references/equipment-overlap-audit.slice-a.json` | Canonical Slice A overlap groups. Contains 10 groups and 42 player-catalog items under role-signature pressure. |
 | Overlap audit note | [[references/equipment-overlap-audit-slice-a]] | Human-readable high/medium risk groups and required differentiators. |
 | Overlap worksheet | [[references/equipment-overlap-resolution-worksheet-slice-a]] | Candidate role splits, skin/legacy decisions, mission fixture needs, and consumer implications for each overlap group. |
 | Merged overlay | [[references/equipment-overlay-merged-preview]] | Patch-applied item records that feed role cards, fixtures, and package diagnostics. |
@@ -255,13 +255,13 @@ The renderer can use a normalized view assembled from the generated artifacts.
 
 ### Local
 
-- [equipment-role-cards.slice-a.json](../references/equipment-role-cards.slice-a.json)
-- [equipment-role-card-renderer-view.slice-a.json](../references/equipment-role-card-renderer-view.slice-a.json)
-- [equipment-overlap-audit.slice-a.json](../references/equipment-overlap-audit.slice-a.json)
-- [equipment-overlay-merged.preview.json](../references/equipment-overlay-merged.preview.json)
-- [equipment-provenance-workbench-view.slice-a.json](../references/equipment-provenance-workbench-view.slice-a.json)
-- [equipment-loadout-fixtures.slice-a.json](../references/equipment-loadout-fixtures.slice-a.json)
-- [equipment-package-diagnostics.slice-a.json](../references/equipment-package-diagnostics.slice-a.json)
+- `cortext_command_vault/references/equipment-role-cards.slice-a.json`
+- `cortext_command_vault/references/equipment-role-card-renderer-view.slice-a.json`
+- `cortext_command_vault/references/equipment-overlap-audit.slice-a.json`
+- `cortext_command_vault/references/equipment-overlay-merged.preview.json`
+- `cortext_command_vault/references/equipment-provenance-workbench-view.slice-a.json`
+- `cortext_command_vault/references/equipment-loadout-fixtures.slice-a.json`
+- `cortext_command_vault/references/equipment-package-diagnostics.slice-a.json`
 - `../research_tools/equipment_role_cards.py`
 - `../research_tools/equipment_role_card_renderer_view.py`
 - `../research_tools/equipment_provenance_workbench_view.py`

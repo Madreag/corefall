@@ -1,4 +1,4 @@
-← [[index|vault home]] · [[dashboards/navigation-map|navigation map]] · [[spec/index|spec section]] · [root plan](../../VAULT_PLAN.md)
+← [[index|vault home]] · [[dashboards/navigation-map|navigation map]] · [[spec/index|spec section]] · `cortex-command-repos-all/VAULT_PLAN.md` (research vault root) — root plan
 
 # Decision Records
 
@@ -136,4 +136,4 @@ Minimum required sections:
 - [[dashboards/research-readiness]]
 - [[dashboards/system-heatmap]]
 - [[spec/index]]
-- [VAULT_PLAN.md](../../VAULT_PLAN.md)
+- `cortex-command-repos-all/VAULT_PLAN.md` (research vault root)

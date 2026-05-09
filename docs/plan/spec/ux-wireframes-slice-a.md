@@ -200,7 +200,7 @@ Command Overlay over map:
 | Fixture Source | Required Slice A Use |
 |---|---|
 | [[references/equipment-loadout-fixtures-slice-a]] | Use these nine fixtures as the first catalog/cart/actor-column test data for UX-W-06, UX-W-07, BUY-01, and LOAD-A buy/loadout checks. |
-| [equipment-loadout-fixtures.slice-a.json](../references/equipment-loadout-fixtures.slice-a.json) | Render expected warnings and manual badges exactly before adding real prototype validation. |
+| `cortext_command_vault/references/equipment-loadout-fixtures.slice-a.json` | Render expected warnings and manual badges exactly before adding real prototype validation. |
 | [[references/equipment-overlay-review-matrix]] | Explain warning severity and why `Risky` or `Manual Recommended` appears. |
 | [[references/equipment-manual-overlay-patches]] | Preserve replacement/catalog policy and hide internal components/payloads from player-facing catalog rows. |
 | [[references/equipment-schema-and-overlays]] | Use `field_provenance` and `warning_details` in item detail drawers so authors can see whether values are direct, inherited, inferred, missing, or manually patched. |

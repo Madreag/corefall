@@ -10,7 +10,7 @@ feeds:
   - DR-026
 ---
 
-← [[index|vault home]] · [[spec/index|spec section]] · [[spec/prototype-roadmap|native roadmap]] · [[spec/native-implementation-backlog|native backlog]] · [[spec/feature-completion-checklist|feature checklist]] · [[dashboards/decision-tracker|decision tracker]] · [[dashboards/research-readiness|readiness]] · [VAULT_PLAN.md](../../VAULT_PLAN.md)
+← [[index|vault home]] · [[spec/index|spec section]] · [[spec/prototype-roadmap|native roadmap]] · [[spec/native-implementation-backlog|native backlog]] · [[spec/feature-completion-checklist|feature checklist]] · [[dashboards/decision-tracker|decision tracker]] · [[dashboards/research-readiness|readiness]] · `cortex-command-repos-all/VAULT_PLAN.md` (research vault root)
 
 # AI-Coder Reading List
 

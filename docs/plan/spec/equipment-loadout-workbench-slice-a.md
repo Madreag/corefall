@@ -31,21 +31,21 @@ Can a player or designer assemble one small squad from real CCCP-derived item fi
 
 | Input | Source | Prototype Use |
 |---|---|---|
-| Renderer view model | [[references/equipment-role-card-renderer-view-slice-a]], [equipment-role-card-renderer-view.slice-a.json](../references/equipment-role-card-renderer-view.slice-a.json) | Catalog rows, workbench rows, detail drawers, overlap table, fixture summaries, acceptance coverage. |
+| Renderer view model | [[references/equipment-role-card-renderer-view-slice-a]], `cortext_command_vault/references/equipment-role-card-renderer-view.slice-a.json` | Catalog rows, workbench rows, detail drawers, overlap table, fixture summaries, acceptance coverage. |
 | Device/loadout field atlas | [[references/equipment-device-loadout-field-atlas]] | Field drill-downs for held-device, firearm, magazine, round, loadout, delivery-role, and durable external schema references; LOAD-FIELD tests. |
 | Source-anchored device snapshots | [[references/equipment-source-anchored-device-snapshots]] | Literal values for representative devices/loadouts; source-snapshot tab inputs; LOAD-FIELD-SNAPSHOT and scripted-tool reason-label seeds. |
 | Comparable design patterns | [[references/equipment-comparable-design-patterns]] | OpenSoldat feel fields, OpenRA projectile/effect split, Unreal GAS ability/effect state, and Godot/Unity/Factorio authoring/runtime boundaries; LOAD-COMP tests. |
 | Content module loading lifecycle | [[engine/content-module-loading-lifecycle]] | Source/provenance drill-downs for module order, include stack, `CopyOf`, source file, zip import, script reload, and package-mode diagnostics. |
-| Generated loader graph | [[references/content-loader-graph-cccp]], [content-loader-graph-cccp.json](../references/content-loader-graph-cccp.json) | Module browser fixture, include/source jump targets, duplicate preset pressure, script/path diagnostics, and package/source confidence fields. |
-| LOAD-A fixture loadouts | [[references/equipment-loadout-fixtures-slice-a]], [equipment-loadout-fixtures.slice-a.json](../references/equipment-loadout-fixtures.slice-a.json) | Actor columns, slot layout, warning expectations, manual badges, negative loadout checks. |
+| Generated loader graph | [[references/content-loader-graph-cccp]], `cortext_command_vault/references/content-loader-graph-cccp.json` | Module browser fixture, include/source jump targets, duplicate preset pressure, script/path diagnostics, and package/source confidence fields. |
+| LOAD-A fixture loadouts | [[references/equipment-loadout-fixtures-slice-a]], `cortext_command_vault/references/equipment-loadout-fixtures.slice-a.json` | Actor columns, slot layout, warning expectations, manual badges, negative loadout checks. |
 | Capability authoring matrix | [[references/equipment-capability-authoring-matrix]] | Capability chips, authoring tier, AI claim state, required fields, modding gates, balance risk rubric. |
 | AI behavior contract | [[references/equipment-ai-behavior-contract]] | Bot item-choice/refusal labels, "why blocked" panel rows, AI/replay reason events, and bot-claim-state transitions. |
-| AI summary seed | [[references/equipment-ai-summary-seed-slice-a]], [equipment-ai-summary-seed.slice-a.json](../references/equipment-ai-summary-seed.slice-a.json) | Bot trust panel rows, why-blocked labels, blackboard/source-confidence drilldowns, replay/export item decision event previews, package bot-default gates, and AI-H/AI-EQ follow-up queues. |
-| Generated role records | [[references/equipment-role-records-slice-a]], [equipment-role-records.slice-a.json](../references/equipment-role-records.slice-a.json) | LOAD-W-21/22 shared item object: joins role cards, source trace, AI summary, trace-tab rows, package diagnostics, overlap rows, fixture refs, renderer rows, replay/backend events, and mission capability tags. |
+| AI summary seed | [[references/equipment-ai-summary-seed-slice-a]], `cortext_command_vault/references/equipment-ai-summary-seed.slice-a.json` | Bot trust panel rows, why-blocked labels, blackboard/source-confidence drilldowns, replay/export item decision event previews, package bot-default gates, and AI-H/AI-EQ follow-up queues. |
+| Generated role records | [[references/equipment-role-records-slice-a]], `cortext_command_vault/references/equipment-role-records.slice-a.json` | LOAD-W-21/22 shared item object: joins role cards, source trace, AI summary, trace-tab rows, package diagnostics, overlap rows, fixture refs, renderer rows, replay/backend events, and mission capability tags. |
 | Consumer traceability matrix | [[references/equipment-consumer-traceability-matrix]] | Trace tab, consumer-impact badges, schema deltas, replay/backend event contract, and test obligations for LOAD-W/PACK/AI-H/REC consumers. |
-| Generated consumer traceability report | [[references/equipment-consumer-traceability-slice-a]], [equipment-consumer-traceability.slice-a.json](../references/equipment-consumer-traceability.slice-a.json) | Initial trace tab rows, coverage counters, top AI/package/replay/fixture gaps, and LOAD-011 acceptance proof. |
-| Generated trace-tab view | [[references/equipment-trace-tab-view-slice-a]], [equipment-trace-tab-view.slice-a.json](../references/equipment-trace-tab-view.slice-a.json) | LOAD-W-010 UI-ready rows: item trace rows, fixture tabs, package diagnostic trace rows, gap badges, open targets, and acceptance proof. |
-| Generated source trace | [[references/equipment-source-trace-slice-a]], [equipment-source-trace.slice-a.json](../references/equipment-source-trace.slice-a.json) | LOAD-FIELD-SOURCE UI-ready rows: source state, source confidence, loader context, include parents, duplicate source hits, direct/inherited/inferred/missing fields, trace-tab refs, and open targets. |
+| Generated consumer traceability report | [[references/equipment-consumer-traceability-slice-a]], `cortext_command_vault/references/equipment-consumer-traceability.slice-a.json` | Initial trace tab rows, coverage counters, top AI/package/replay/fixture gaps, and LOAD-011 acceptance proof. |
+| Generated trace-tab view | [[references/equipment-trace-tab-view-slice-a]], `cortext_command_vault/references/equipment-trace-tab-view.slice-a.json` | LOAD-W-010 UI-ready rows: item trace rows, fixture tabs, package diagnostic trace rows, gap badges, open targets, and acceptance proof. |
+| Generated source trace | [[references/equipment-source-trace-slice-a]], `cortext_command_vault/references/equipment-source-trace.slice-a.json` | LOAD-FIELD-SOURCE UI-ready rows: source state, source confidence, loader context, include parents, duplicate source hits, direct/inherited/inferred/missing fields, trace-tab refs, and open targets. |
 | Role-card renderer contract | [[spec/equipment-role-card-renderer-slice-a]] | LOAD-R behavior, visibility policy, detail drawers, overlap requirements, accessibility and navigation tests. |
 | Equipment model | [[spec/equipment-loadout]] | Actor role taxonomy, explicit slots, metadata contract, delivery risk model, LOAD-A tests. |
 | Implementation-facing role record | [[spec/equipment-loadout#Implementation-Facing Role Record]], [[research-log/2026-05-04-equipment-role-record-contract]] | Consumer-facing item projection for AI, UI, modding/workbench, balance, replay/debug, backend/session, and mission checks; LOAD-W-21/22 parity tests. |
@@ -270,24 +270,24 @@ The trace tab sits beside the generated [[references/equipment-ai-summary-seed-s
 ## Source Trail
 
 - [[references/equipment-role-card-renderer-view-slice-a]]
-- [equipment-role-card-renderer-view.slice-a.json](../references/equipment-role-card-renderer-view.slice-a.json)
+- `cortext_command_vault/references/equipment-role-card-renderer-view.slice-a.json`
 - [[references/equipment-loadout-fixtures-slice-a]]
-- [equipment-loadout-fixtures.slice-a.json](../references/equipment-loadout-fixtures.slice-a.json)
+- `cortext_command_vault/references/equipment-loadout-fixtures.slice-a.json`
 - [[references/equipment-capability-authoring-matrix]]
 - [[references/equipment-consumer-traceability-matrix]]
 - [[references/equipment-consumer-traceability-slice-a]]
-- [equipment-consumer-traceability.slice-a.json](../references/equipment-consumer-traceability.slice-a.json)
+- `cortext_command_vault/references/equipment-consumer-traceability.slice-a.json`
 - [[references/equipment-trace-tab-view-slice-a]]
-- [equipment-trace-tab-view.slice-a.json](../references/equipment-trace-tab-view.slice-a.json)
+- `cortext_command_vault/references/equipment-trace-tab-view.slice-a.json`
 - [[references/equipment-source-trace-slice-a]]
-- [equipment-source-trace.slice-a.json](../references/equipment-source-trace.slice-a.json)
+- `cortext_command_vault/references/equipment-source-trace.slice-a.json`
 - [[references/equipment-provenance-workbench-view]]
 - [[references/equipment-package-diagnostics-slice-a]]
 - [[references/equipment-ai-scenarios-slice-a]]
 - [[references/equipment-ai-summary-seed-slice-a]]
-- [equipment-ai-summary-seed.slice-a.json](../references/equipment-ai-summary-seed.slice-a.json)
+- `cortext_command_vault/references/equipment-ai-summary-seed.slice-a.json`
 - [[references/equipment-role-records-slice-a]]
-- [equipment-role-records.slice-a.json](../references/equipment-role-records.slice-a.json)
+- `cortext_command_vault/references/equipment-role-records.slice-a.json`
 - [[spec/equipment-role-card-renderer-slice-a]]
 - [[spec/equipment-loadout]]
 - [[research-log/2026-05-04-equipment-role-record-contract]]
