@@ -487,9 +487,15 @@ pub fn step(state: &mut MissionState, inputs: MissionTickInputs<'_>) -> MissionT
     // objective's `status` to `Failed` so `MissionView::from_state` reports
     // `failed` in the observe envelope (Devin review BUG_pr-review-job
     // -8dddb0ae78c7456997c4d2dc7aade217_0001).
+    // Bugbot 3212230553 (Low): scan Active OR Pending defend_reactor
+    // objectives. If a defend_reactor is queued behind another objective
+    // (Pending status) and its reactor is destroyed in the meantime, the
+    // mission MUST resolve as Lost { ReactorDestroyed } immediately rather
+    // than wait for the objective to become Active. Completed/Failed rows
+    // are skipped because they're terminal states.
     let reactor_destroyed_match: Option<(usize, String, String)> =
         state.objectives.iter().enumerate().find_map(|(idx, obj)| {
-            if obj.status != ObjectiveStatus::Active {
+            if matches!(obj.status, ObjectiveStatus::Completed | ObjectiveStatus::Failed) {
                 return None;
             }
             if let ObjectiveKind::DefendReactor { target } = &obj.kind {
@@ -989,6 +995,67 @@ mod tests {
         let view = MissionView::from_state(&state, 100);
         assert_eq!(view.objectives[0].status, "failed");
         assert_eq!(view.loss_reason.as_deref(), Some("reactor_destroyed"));
+    }
+
+    #[test]
+    fn pending_defend_reactor_loses_when_reactor_destroyed_before_objective_activates() {
+        // Bugbot 3212230553 (Low) regression: a `DefendReactor` queued
+        // behind an earlier objective (Pending status) MUST detect its
+        // reactor being destroyed and resolve the mission as
+        // `Lost { ReactorDestroyed }`. Pre-fix the destruction was
+        // ignored until the objective became Active.
+        let objectives = vec![
+            Objective {
+                id: "reach".to_string(),
+                kind: ObjectiveKind::ReachZone {
+                    min: [1180.0, 16.0],
+                    max: [1280.0, 64.0],
+                },
+                optional: false,
+                status: ObjectiveStatus::Pending,
+            },
+            Objective {
+                id: "defend".to_string(),
+                kind: ObjectiveKind::DefendReactor {
+                    target: "core_reactor".to_string(),
+                },
+                optional: false,
+                status: ObjectiveStatus::Pending,
+            },
+        ];
+        let mut state = MissionState::new(
+            objectives,
+            0,
+            LossConditions {
+                player_dead: true,
+                time_limit_ticks: 60 * 60,
+            },
+        );
+        // After construction, `state.objectives[0]` is auto-promoted to
+        // Active so `defend` is the row left at Pending. Sanity-check.
+        assert_eq!(state.objectives[0].status, ObjectiveStatus::Active);
+        assert_eq!(state.objectives[1].status, ObjectiveStatus::Pending);
+        let actors = mk_actors(player_at(120.0, 32.0), false);
+        let mut reactors = BTreeMap::new();
+        reactors.insert("core_reactor".to_string(), true);
+        let report = step(
+            &mut state,
+            MissionTickInputs {
+                tick: 100,
+                player: actors.get(&ActorId(1)),
+                actors: &actors,
+                breaches_broken: &BTreeMap::new(),
+                reactors_destroyed: &reactors,
+            },
+        );
+        assert!(matches!(
+            state.result,
+            MissionResult::Lost {
+                reason: LossReason::ReactorDestroyed
+            }
+        ));
+        assert_eq!(report.objective_failed, vec!["defend".to_string()]);
+        assert_eq!(state.objectives[1].status, ObjectiveStatus::Failed);
     }
 
     #[test]
