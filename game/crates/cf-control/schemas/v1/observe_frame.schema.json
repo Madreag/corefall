@@ -57,6 +57,14 @@
       "default": null,
       "minimum": 0
     },
+    "reactors": {
+      "description": "M2.5: reactor world projection. Empty for scenarios with no reactors.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/ReactorView"
+      }
+    },
     "run_id": {
       "type": "string"
     },
@@ -77,6 +85,17 @@
     "sim_time_ms": {
       "type": "number",
       "format": "double"
+    },
+    "terrain": {
+      "description": "M2: chunked terrain summary (per-material counts + carve / refusal /\ndirty-chunk counters). `None` when the scenario has no chunked terrain.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/TerrainView"
+        },
+        {
+          "type": "null"
+        }
+      ]
     },
     "tick": {
       "type": "integer",
@@ -433,6 +452,12 @@
             "null"
           ]
         },
+        "target_reactor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
         "zone_max": {
           "type": [
             "array",
@@ -482,6 +507,52 @@
         "settings"
       ]
     },
+    "ReactorView": {
+      "description": "M2.5 reactor projection. Drives the HUD reactor-hp bar + the cfctl\n`inspect reactor <id>` lookup.",
+      "type": "object",
+      "properties": {
+        "destroyed": {
+          "type": "boolean"
+        },
+        "half_extents": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "float"
+          },
+          "maxItems": 2,
+          "minItems": 2
+        },
+        "hp": {
+          "type": "number",
+          "format": "float"
+        },
+        "id": {
+          "type": "string"
+        },
+        "max_hp": {
+          "type": "number",
+          "format": "float"
+        },
+        "position": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "float"
+          },
+          "maxItems": 2,
+          "minItems": 2
+        }
+      },
+      "required": [
+        "id",
+        "position",
+        "half_extents",
+        "hp",
+        "max_hp",
+        "destroyed"
+      ]
+    },
     "RunStatus": {
       "type": "string",
       "enum": [
@@ -521,6 +592,73 @@
         "reduced_motion",
         "reduced_shake",
         "reduced_flash"
+      ]
+    },
+    "TerrainView": {
+      "description": "M2 chunked terrain projection. Per-material pixel counts let cfctl + AI\nhooks query \"how much air do we have left?\" without pulling the full\nsnapshot. Carve / refusal / dirty counters expose perf health.",
+      "type": "object",
+      "properties": {
+        "allocated_chunk_count": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "anchor": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "float"
+          },
+          "maxItems": 2,
+          "minItems": 2
+        },
+        "carve_count": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "default_material": {
+          "type": "string"
+        },
+        "dirty_chunk_count": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "height_px": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "material_counts": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0
+          }
+        },
+        "refusal_count": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "width_px": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "width_px",
+        "height_px",
+        "anchor",
+        "default_material",
+        "carve_count",
+        "refusal_count",
+        "dirty_chunk_count",
+        "allocated_chunk_count",
+        "material_counts"
       ]
     }
   }

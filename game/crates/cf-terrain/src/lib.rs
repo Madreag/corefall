@@ -1,20 +1,25 @@
-//! M1.5 soft-breach barrier proxy.
+//! Terrain crate. Owns:
 //!
-//! M1.5 ships a tiny destructible-strip stand-in so the micro breach scenario can
-//! be played end-to-end without depending on the full chunked pixel terrain. The
-//! M2 pipeline replaces the strip with real per-pixel terrain; the event names and
-//! payload shapes here intentionally match what M2 will emit so consumers (replay
-//! viewer, AI hooks, run-bundle checker) don't need migration:
+//! - **M1.5 soft-breach barrier proxy** (`BreachStrip`, `BreachWorld`, `try_dig`,
+//!   `DigRequest`, `DigOutcome`, `BreachView`) — kept alive for the M1.5
+//!   `micro_breach` scenario backward compat. Event names match M2's emit
+//!   shape so replay tooling does not migrate.
+//! - **M2 chunked pixel terrain** (`chunked` module): `ChunkedTerrain`,
+//!   `MaterialId`, `MaterialRegistry`, `MaterialAffordance`, `try_carve`,
+//!   `try_blast`, `fill_aabb`, `fill_circle`, `aabb_overlaps_solid`,
+//!   `column_top_solid_y`, `ChunkedTerrainSnapshot`, `TerrainStamp`,
+//!   plus the DR-007 launch material set (8 ids: air, dirt, concrete,
+//!   metal_nohook, hazard, loose_fill, repair_fill, anchor).
 //!
-//! - `terrain.tool_action_started` — emitted on every dig request.
-//! - `terrain.terrain_carved` — emitted when the strip absorbs damage.
-//! - `terrain.tool_refused` — emitted when a dig is refused (out-of-range,
-//!   metal-nohook material, already broken, etc.).
+//! The two layers coexist for BP2: scenarios that opt into chunked terrain
+//! (`scenario.terrain = Some(...)`) drive `act.player.dig` against
+//! `ChunkedTerrain`; scenarios still using `breaches[]` (e.g. `micro_breach`)
+//! drive `BreachWorld`. The engine prefers chunked terrain when both are
+//! present.
 //!
-//! The launch material set in [DR-007] is `air, dirt, concrete, metal-nohook,
-//! hazard, loose fill, repair-fill, anchor`. M1.5 only ships `concrete_soft`
-//! (alias `concrete`) and `metal_nohook` so the scenario can demonstrate one
-//! diggable barrier and one refusal path. M2 lands the full set.
+//! Anti-scope (lands at M5.6 Material Kernel): active CA / reaction table /
+//! phase change / chemistry. Anti-scope (lands at M5.5): full collision
+//! matrix. Anti-scope (lands at M5.10 / M7.5): atmospherics.
 
 #![deny(unsafe_code)]
 #![warn(clippy::pedantic)]
@@ -25,17 +30,38 @@
     clippy::must_use_candidate,
     clippy::doc_markdown,
     clippy::missing_const_for_fn,
-    clippy::cast_precision_loss,
     clippy::cast_possible_truncation,
     clippy::cast_sign_loss,
+    clippy::cast_possible_wrap,
+    clippy::cast_lossless,
     clippy::float_cmp,
     clippy::redundant_closure,
     clippy::derivable_impls,
     clippy::wildcard_in_or_patterns,
     clippy::needless_pass_by_value,
     clippy::manual_is_multiple_of,
-    clippy::trivially_copy_pass_by_ref
+    clippy::trivially_copy_pass_by_ref,
+    clippy::needless_range_loop,
+    clippy::single_match_else,
+    clippy::needless_continue,
+    clippy::cast_precision_loss,
+    clippy::option_if_let_else,
+    clippy::too_many_lines,
+    clippy::struct_excessive_bools,
+    clippy::unused_self,
+    clippy::map_unwrap_or,
+    clippy::manual_let_else
 )]
+
+pub mod chunked;
+
+pub use chunked::{
+    material_affordance, material_id_from_name, Chunk, ChunkCoord, ChunkedCarveNoOp, ChunkedCarveOutcome,
+    ChunkedCarveRefusal, ChunkedCarveStats, ChunkedTerrain, ChunkedTerrainSnapshot, ChunkedTerrainSnapshotChunk,
+    MaterialAffordance, MaterialId, MaterialRegistry, TerrainStamp, CHUNK_SIZE, MATERIAL_AIR, MATERIAL_ANCHOR,
+    MATERIAL_CONCRETE, MATERIAL_DIRT, MATERIAL_HAZARD, MATERIAL_LOOSE_FILL, MATERIAL_METAL_NOHOOK,
+    MATERIAL_REPAIR_FILL, MATERIAL_SCHEMA_VERSION,
+};
 
 use std::collections::BTreeMap;
 

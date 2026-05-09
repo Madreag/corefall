@@ -56,7 +56,12 @@ struct Cli {
     save_load_roundtrip: bool,
     #[arg(long)]
     verify_checksums: bool,
-    #[arg(long, default_value_t = 60)]
+    /// Wall-clock timeout for the script runner. M0/M1/M1.5 scripts complete
+    /// quickly (mission-win at low ticks); BP2 fun slices (M2.5 micro reactor
+    /// defense) require the engine to run a 60s mission timer at the default
+    /// 60Hz pace, so the default is now 180s. Pass a smaller value via
+    /// `--timeout-seconds` for fast tests if needed.
+    #[arg(long, default_value_t = 180)]
     timeout_seconds: u64,
     #[arg(long, default_value_t = 17900u16)]
     control_port: u16,
@@ -409,10 +414,16 @@ fn launch_cf_app(opts: LaunchOptions<'_>) -> Result<Child> {
         args.push("--run-bundle-dir".into());
         args.push(cf_replay::resolve_run_bundle_root(None).display().to_string());
     }
+    // Inherit stdio from the parent so cf-app's diagnostics (especially the
+    // bevy_render screenshot INFO lines, ~10/sec under --capture-grid) flow
+    // straight to the user's terminal. Piping with Stdio::piped() filled the
+    // 64KB pipe buffer in seconds and deadlocked cf-app's render systems
+    // when nobody was draining the pipe — the BP2 capture-grid freeze the
+    // M2.5 win script kept hitting.
     let child = TokioCommand::new(&bin)
         .args(&args)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
         .spawn()
         .with_context(|| format!("failed to spawn {}", bin.display()))?;
     Ok(child)

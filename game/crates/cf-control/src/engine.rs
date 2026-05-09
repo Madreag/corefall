@@ -90,6 +90,10 @@ pub struct M0EngineConfig {
     pub initial_objectives: Vec<cf_mission::Objective>,
     /// M1.5: loss conditions for the mission (timer + player-dead check).
     pub mission_loss: Option<cf_mission::LossConditions>,
+    /// M2: optional chunked pixel terrain authored by the scenario manifest.
+    pub initial_chunked_terrain: Option<cf_terrain::ChunkedTerrain>,
+    /// M2.5: optional ordered list of reactor world entries.
+    pub initial_reactors: Vec<cf_mission::Reactor>,
 }
 
 /// M1.5: initial breach world snapshot.
@@ -201,6 +205,8 @@ impl M0EngineConfig {
             initial_guards: Vec::new(),
             initial_objectives: Vec::new(),
             mission_loss: None,
+            initial_chunked_terrain: None,
+            initial_reactors: Vec::new(),
         }
     }
 
@@ -260,6 +266,32 @@ impl M0EngineConfig {
                     .unwrap_or_default(),
             );
             cfg.milestone = "m1.5".to_string();
+        }
+        // M2: chunked terrain.
+        if let Some(t) = &scenario.terrain {
+            // We unwrap on the manifest-validated build because validate() has
+            // already rejected unknown materials before this point. If the
+            // build still fails (e.g. width 0), we leave terrain empty and
+            // record a tracing warning so the milestone bug surfaces.
+            match t.build_terrain() {
+                Ok(terrain) => {
+                    cfg.initial_chunked_terrain = Some(terrain);
+                    cfg.milestone = "m2".to_string();
+                }
+                Err(err) => {
+                    tracing::warn!(
+                        target: "cf::control",
+                        error = %err,
+                        scenario_id = %scenario.id,
+                        "scenario chunked terrain failed to build; engine will run without terrain"
+                    );
+                }
+            }
+        }
+        // M2.5: reactor world.
+        if scenario.has_reactors() {
+            cfg.initial_reactors = scenario.reactors.iter().map(|r| r.build_reactor()).collect();
+            cfg.milestone = "m2.5".to_string();
         }
         cfg
     }
@@ -436,6 +468,12 @@ struct EngineMutable {
     /// projectile pool but allocate ids from a separate range so guard shots
     /// don't alias the player's projectile_id space across resets.
     next_guard_projectile_id: u64,
+    /// M2: chunked pixel terrain. `None` for scenarios that have not opted
+    /// into chunked terrain. Coexists with `breach_world`.
+    chunked_terrain: Option<cf_terrain::ChunkedTerrain>,
+    /// M2.5: reactor world (damageable static actors). `None` when no reactor
+    /// is declared.
+    reactor_world: Option<cf_mission::ReactorWorld>,
 }
 
 /// Pending dig request set by `act.player.dig` and consumed at the start of the
@@ -488,6 +526,14 @@ impl M0Engine {
 
         // M1.5: breach world + mission + reactive guards.
         let breach_world = config.initial_breach_world.as_ref().map(|b| b.world.clone());
+        // M2: chunked terrain (cloned from the immutable manifest snapshot).
+        let chunked_terrain = config.initial_chunked_terrain.clone();
+        // M2.5: reactor world.
+        let reactor_world = if config.initial_reactors.is_empty() {
+            None
+        } else {
+            Some(cf_mission::ReactorWorld::new(config.initial_reactors.clone()))
+        };
         let mut reactive_guards = BTreeMap::new();
         for guard in &config.initial_guards {
             reactive_guards.insert(guard.actor, cf_ai::ReactiveGuard::new(guard.actor, guard.params));
@@ -529,6 +575,8 @@ impl M0Engine {
                 reactive_guards,
                 mission,
                 next_guard_projectile_id: 1_000_000,
+                chunked_terrain,
+                reactor_world,
             }),
             recorder,
             current_tick,
@@ -560,7 +608,7 @@ impl M0Engine {
         let sim_time_ms = state.clock.sim_time_ms();
         let settings_value = serde_json::to_value(&state.settings).unwrap_or(serde_json::Value::Null);
         drop(state);
-        self.recorder.record(
+        let started_id = self.recorder.record(
             tick,
             sim_time_ms,
             "system",
@@ -575,7 +623,113 @@ impl M0Engine {
             }),
             None,
         );
+        self.emit_initial_snapshots(tick, sim_time_ms, &started_id);
         self.spawn_debug_panic_if_requested();
+    }
+
+    /// M3A-002: emit `snapshot.snapshot_actor`, `snapshot.snapshot_inventory`,
+    /// and `snapshot.snapshot_terrain_chunk` events at scenario start so the
+    /// cf-headless replay verifier (and any future M3B viewer) can reconstruct
+    /// the world without re-loading the manifest from disk. Snapshots are
+    /// emitted again on every objective change inside `drive_tick`.
+    fn emit_initial_snapshots(&self, tick: Tick, sim_time_ms: f64, parent_event_id: &str) {
+        let state = self.state.read().expect("engine state poisoned");
+        let actor_state = state.actor_state.as_ref().cloned();
+        let chunked_terrain = state.chunked_terrain.as_ref().cloned();
+        let reactor_world = state.reactor_world.as_ref().cloned();
+        drop(state);
+        if let Some(sim) = actor_state {
+            for actor in sim.world.actors.values() {
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "snapshot",
+                    "snapshot_actor",
+                    json!({
+                        "actor": actor.id.0,
+                        "team": actor.team,
+                        "controllable": actor.controllable,
+                        "position": [actor.position.x, actor.position.y],
+                        "velocity": [actor.velocity.x, actor.velocity.y],
+                        "aim": [actor.aim.x, actor.aim.y],
+                        "status": actor.status.as_str(),
+                        "hp": actor.hp,
+                        "hp_max": actor.hp_max,
+                        "selected_slot": actor.inventory.selected.0,
+                        "kind": "actor",
+                    }),
+                    Some(parent_event_id.to_string()),
+                );
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "snapshot",
+                    "snapshot_inventory",
+                    json!({
+                        "actor": actor.id.0,
+                        "selected_slot": actor.inventory.selected.0,
+                        "items": actor.inventory.items.iter().map(|i| i.label()).collect::<Vec<_>>(),
+                    }),
+                    Some(parent_event_id.to_string()),
+                );
+            }
+        }
+        if let Some(reactors) = reactor_world {
+            for r in reactors.iter() {
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "snapshot",
+                    "snapshot_actor",
+                    json!({
+                        "actor": r.id.clone(),
+                        "kind": "reactor",
+                        "position": r.position,
+                        "half_extents": r.half_extents,
+                        "hp": r.hp,
+                        "hp_max": r.max_hp,
+                        "destroyed": r.is_destroyed(),
+                    }),
+                    Some(parent_event_id.to_string()),
+                );
+            }
+        }
+        if let Some(terrain) = chunked_terrain {
+            let snapshot = terrain.snapshot();
+            for chunk in &snapshot.chunks {
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "snapshot",
+                    "snapshot_terrain_chunk",
+                    json!({
+                        "cx": chunk.coord.cx,
+                        "cy": chunk.coord.cy,
+                        "default_material": snapshot.default_material,
+                        "schema": snapshot.schema,
+                        "pixels_len": chunk.pixels.len(),
+                        "pixels_blake3": hex::encode(&blake3::hash(&chunk.pixels).as_bytes()[..16]),
+                    }),
+                    Some(parent_event_id.to_string()),
+                );
+            }
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "snapshot",
+                "snapshot_terrain_summary",
+                json!({
+                    "width_px": snapshot.width_px,
+                    "height_px": snapshot.height_px,
+                    "default_material": snapshot.default_material,
+                    "carve_count": snapshot.carve_count,
+                    "refusal_count": snapshot.refusal_count,
+                    "material_counts": snapshot.material_counts,
+                    "allocated_chunks": snapshot.chunks.len(),
+                }),
+                Some(parent_event_id.to_string()),
+            );
+        }
     }
 
     /// **DEBUG-ONLY**: spawn a worker thread that panics at the requested tick if
@@ -643,10 +797,13 @@ impl M0Engine {
         if let Some(tick) = advanced {
             state.rng.next_u64();
 
-            // M1.5: process pending dig BEFORE the actor step so the breach can
-            // become "broken" inside this tick and the mission state machine sees
-            // it on the same tick the dig landed.
-            if state.pending_dig.is_some() && state.breach_world.is_some() {
+            // BP2 dig path. Chunked terrain takes priority when loaded; legacy
+            // breach strips drive M1.5 backward compatibility. The dig first
+            // probes chunked terrain in front of the player; if that produces a
+            // result (Carved / Refused / NoOp) we consume the dig there. If
+            // chunked terrain is NOT loaded but a breach world is, we fall back
+            // to the M1.5 strip path.
+            if state.pending_dig.is_some() && (state.chunked_terrain.is_some() || state.breach_world.is_some()) {
                 let pending = state.pending_dig.take().expect("pending dig is_some");
                 let player_pos_aim = state.player_actor.and_then(|pid| {
                     state
@@ -656,24 +813,54 @@ impl M0Engine {
                         .map(|a| ((a.position.x, a.position.y), (a.aim.x, a.aim.y)))
                 });
                 if let Some(((px, py), (ax, ay))) = player_pos_aim {
-                    let world = state.breach_world.as_mut().expect("breach world is_some");
-                    let outcome = cf_terrain::try_dig(
-                        world,
-                        cf_terrain::DigRequest {
-                            origin: [px, py],
-                            aim: [ax, ay],
-                            explicit_target: pending.target.clone(),
-                        },
-                    );
-                    dig_payload = Some((
-                        tick,
-                        state.clock.sim_time_ms(),
-                        DigEvent {
-                            outcome,
-                            source: pending.source,
-                            origin: [px, py],
-                        },
-                    ));
+                    if let Some(terrain) = state.chunked_terrain.as_mut() {
+                        // Tool reach + radius: 22-pixel reach along aim, 12-px
+                        // carve radius. The radius is tuned so consecutive
+                        // digs while the player walks (~3-4 px/tick) overlap
+                        // and form a continuous tunnel without leaving micro-
+                        // gaps that would block projectile-vs-terrain checks.
+                        // M2 design intent (tight bites that require many
+                        // digs) is preserved because each dig still only
+                        // clears ~450 pixels out of a typical ~12,800-pixel
+                        // shield mound.
+                        const DIG_REACH: f32 = 22.0;
+                        const DIG_RADIUS: f32 = 12.0;
+                        let aim_len = (ax * ax + ay * ay).sqrt().max(0.001);
+                        let nx = ax / aim_len;
+                        let ny = ay / aim_len;
+                        let target_x = px + nx * DIG_REACH;
+                        let target_y = py + ny * DIG_REACH;
+                        let outcome = terrain.try_carve([target_x, target_y], DIG_RADIUS);
+                        dig_payload = Some((
+                            tick,
+                            state.clock.sim_time_ms(),
+                            DigEvent::Chunked {
+                                outcome,
+                                source: pending.source,
+                                origin: [px, py],
+                                aim: [nx, ny],
+                                target: [target_x, target_y],
+                            },
+                        ));
+                    } else if let Some(world) = state.breach_world.as_mut() {
+                        let outcome = cf_terrain::try_dig(
+                            world,
+                            cf_terrain::DigRequest {
+                                origin: [px, py],
+                                aim: [ax, ay],
+                                explicit_target: pending.target.clone(),
+                            },
+                        );
+                        dig_payload = Some((
+                            tick,
+                            state.clock.sim_time_ms(),
+                            DigEvent::Strip {
+                                outcome,
+                                source: pending.source,
+                                origin: [px, py],
+                            },
+                        ));
+                    }
                 }
             }
 
@@ -786,6 +973,147 @@ impl M0Engine {
                 step_report = Some((tick, state.clock.sim_time_ms(), intent, report));
             }
 
+            // M2: projectile-vs-chunked-terrain collision. Solid terrain
+            // pixels stop projectiles cold; the projectile expires with cause
+            // `terrain_hit`. This is what makes M2.5 micro_reactor_defense
+            // strategic: dirt mounds between the guard and the reactor block
+            // bullets, and the player's dig action exposes the reactor.
+            let mut terrain_kills: Vec<(u64, ActorId, [f32; 2])> = Vec::new();
+            if state.chunked_terrain.is_some() && state.actor_state.is_some() {
+                let EngineMutable {
+                    actor_state,
+                    chunked_terrain,
+                    ..
+                } = &mut *state;
+                let terrain = chunked_terrain.as_ref().expect("chunked terrain present");
+                if let Some(actor_state_mut) = actor_state.as_mut() {
+                    actor_state_mut.projectiles.retain(|proj| {
+                        // Treat each projectile as a point. The pixel-cell
+                        // containing the centre defines the collision test;
+                        // padding the AABB to ±0.5 was too aggressive and
+                        // blocked projectiles flying through carved tunnels.
+                        let px = proj.position.x.floor() as i64;
+                        let py = proj.position.y.floor() as i64;
+                        let mat = terrain.material_at(px, py);
+                        if terrain.registry.is_solid(mat) {
+                            terrain_kills.push((proj.id, proj.owner, [proj.position.x, proj.position.y]));
+                            false
+                        } else {
+                            true
+                        }
+                    });
+                }
+            }
+            if !terrain_kills.is_empty() {
+                let sim_time_ms = state.clock.sim_time_ms();
+                for (projectile_id, owner, pos) in terrain_kills {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "combat",
+                        "projectile_expired",
+                        json!({
+                            "id": projectile_id,
+                            "owner": owner.0,
+                            "last_position": pos,
+                            "cause": "terrain_hit",
+                        }),
+                        None,
+                    );
+                }
+            }
+
+            // M2.5: route projectile hits onto reactor AABBs. We walk every
+            // live projectile after the actor step and damage the first
+            // reactor whose AABB contains the projectile position. Hits emit
+            // `combat.projectile_hit` (target=reactor) + `actor.actor_status_changed`
+            // (target=reactor) when the reactor reaches zero hp.
+            let mut reactor_hits: Vec<(String, f32, [f32; 2], u64)> = Vec::new();
+            if state.reactor_world.is_some() && state.actor_state.is_some() {
+                let sim_time_ms_val = state.clock.sim_time_ms();
+                let _ = sim_time_ms_val;
+                let EngineMutable {
+                    actor_state,
+                    reactor_world,
+                    ..
+                } = &mut *state;
+                let reactors = reactor_world.as_mut().expect("reactor world present");
+                if let Some(actor_state_mut) = actor_state.as_mut() {
+                    actor_state_mut.projectiles.retain(|proj| {
+                        let mut consumed = false;
+                        for r in reactors.iter_mut() {
+                            if r.is_destroyed() {
+                                continue;
+                            }
+                            if r.aabb_contains(proj.position.x, proj.position.y) {
+                                let prev_hp = r.hp;
+                                r.apply_damage(proj.damage);
+                                let actual = (prev_hp - r.hp).max(0.0);
+                                reactor_hits.push((r.id.clone(), actual, [proj.position.x, proj.position.y], proj.id));
+                                consumed = true;
+                                break;
+                            }
+                        }
+                        !consumed
+                    });
+                }
+            }
+            if !reactor_hits.is_empty() {
+                let sim_time_ms = state.clock.sim_time_ms();
+                for (rid, dmg, pos, projectile_id) in reactor_hits {
+                    let (hp, hp_max, destroyed) = state
+                        .reactor_world
+                        .as_ref()
+                        .and_then(|w| w.get(&rid))
+                        .map(|r| (r.hp, r.max_hp, r.is_destroyed()))
+                        .unwrap_or((0.0, 0.0, true));
+                    let hit_id = self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "combat",
+                        "projectile_hit",
+                        json!({
+                            "target_kind": "reactor",
+                            "target": rid.clone(),
+                            "position": pos,
+                            "damage": dmg,
+                            "projectile_id": projectile_id,
+                        }),
+                        None,
+                    );
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "actor",
+                        "reactor_damaged",
+                        json!({
+                            "reactor": rid.clone(),
+                            "hp": hp,
+                            "hp_max": hp_max,
+                            "destroyed": destroyed,
+                            "damage_applied": dmg,
+                        }),
+                        Some(hit_id.clone()),
+                    );
+                    if destroyed {
+                        self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "actor",
+                            "actor_status_changed",
+                            json!({
+                                "actor_kind": "reactor",
+                                "actor": rid,
+                                "previous_status": "active",
+                                "new_status": "destroyed",
+                                "cause": "projectile_hit",
+                            }),
+                            Some(hit_id),
+                        );
+                    }
+                }
+            }
+
             // M1.5: tick the mission state machine after the actor world settles.
             // This runs even when the scenario has no actor world so a breach-only
             // or timer-only scenario still ticks its loss timer and objectives.
@@ -805,12 +1133,18 @@ impl M0Engine {
                     }
                     None => (BTreeMap::new(), None),
                 };
+                let reactors_destroyed = state
+                    .reactor_world
+                    .as_ref()
+                    .map(|w| w.destroyed_map())
+                    .unwrap_or_default();
                 let mission = state.mission.as_mut().expect("mission present");
                 let inputs = cf_mission::MissionTickInputs {
                     tick: tick.0,
                     player: player_clone.as_ref(),
                     actors: &actors_clone,
                     breaches_broken: &breaches_broken,
+                    reactors_destroyed: &reactors_destroyed,
                 };
                 let report = cf_mission::step(mission, inputs);
                 if !report.objective_completed.is_empty()
@@ -904,9 +1238,19 @@ impl M0Engine {
             );
         }
 
-        // M1.5: emit terrain dig events (always emit `tool_action_started`, then
-        // `terrain_carved` or `tool_refused` based on outcome).
+        // M1.5 / M2: emit terrain dig events (always emit `tool_action_started`,
+        // then `terrain_carved` or `tool_refused` based on outcome). The
+        // `source: chunked|strip` field lets replay viewers tell M1.5 strip
+        // digs from M2 chunked-terrain digs.
         if let Some((tick, sim_time_ms, evt)) = dig_payload {
+            let dig_source = match evt.source() {
+                IntentSource::Human => "human",
+                IntentSource::Cfctl => "cfctl",
+            };
+            let mode = match &evt {
+                DigEvent::Strip { .. } => "strip",
+                DigEvent::Chunked { .. } => "chunked",
+            };
             let action_id = self.recorder.record(
                 tick,
                 sim_time_ms,
@@ -914,80 +1258,162 @@ impl M0Engine {
                 "tool_action_started",
                 json!({
                     "tool": "digger",
-                    "source": match evt.source {
-                        IntentSource::Human => "human",
-                        IntentSource::Cfctl => "cfctl",
-                    },
-                    "origin": evt.origin,
+                    "mode": mode,
+                    "source": dig_source,
+                    "origin": evt.origin(),
                     "explicit_target": evt.outcome_target_string(),
                 }),
                 None,
             );
-            match evt.outcome {
-                cf_terrain::DigOutcome::Carved {
-                    strip_id,
-                    material,
-                    bbox_min,
-                    bbox_max,
-                    damage_applied,
-                    hp_remaining,
-                    broken,
-                } => {
-                    self.recorder.record(
-                        tick,
-                        sim_time_ms,
-                        "terrain",
-                        "terrain_carved",
-                        json!({
-                            "tick": tick.0,
-                            "bbox": { "min": bbox_min, "max": bbox_max },
-                            "material_before": material.clone(),
-                            "material_after": if broken { "air" } else { &material },
-                            "count": 1u32,
-                            "strip_id": strip_id,
-                            "damage_applied": damage_applied,
-                            "hp_remaining": hp_remaining,
-                            "broken": broken,
-                        }),
-                        Some(action_id.clone()),
-                    );
-                    // Emit a stub event alongside so M1.5 evidence carries both
-                    // names; M2's chunked terrain replaces only the stub.
-                    self.recorder.record(
-                        tick,
-                        sim_time_ms,
-                        "terrain",
-                        "terrain_breach_stub",
-                        json!({
-                            "strip_id": "stub",
-                            "tick": tick.0,
-                            "broken": broken,
-                        }),
-                        Some(action_id),
-                    );
-                }
-                cf_terrain::DigOutcome::Refused {
-                    reason,
-                    strip_id,
-                    material,
-                    bbox_min,
-                    bbox_max,
-                } => {
-                    self.recorder.record(
-                        tick,
-                        sim_time_ms,
-                        "terrain",
-                        "tool_refused",
-                        json!({
-                            "reason": reason,
-                            "strip_id": strip_id,
-                            "material": material,
-                            "bbox_min": bbox_min,
-                            "bbox_max": bbox_max,
-                        }),
-                        Some(action_id),
-                    );
-                }
+            match evt {
+                DigEvent::Strip { outcome, .. } => match outcome {
+                    cf_terrain::DigOutcome::Carved {
+                        strip_id,
+                        material,
+                        bbox_min,
+                        bbox_max,
+                        damage_applied,
+                        hp_remaining,
+                        broken,
+                    } => {
+                        self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "terrain",
+                            "terrain_carved",
+                            json!({
+                                "tick": tick.0,
+                                "mode": "strip",
+                                "bbox": { "min": bbox_min, "max": bbox_max },
+                                "material_before": material.clone(),
+                                "material_after": if broken { "air" } else { &material },
+                                "count": 1u32,
+                                "strip_id": strip_id,
+                                "damage_applied": damage_applied,
+                                "hp_remaining": hp_remaining,
+                                "broken": broken,
+                            }),
+                            Some(action_id.clone()),
+                        );
+                        self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "terrain",
+                            "terrain_breach_stub",
+                            json!({
+                                "strip_id": "stub",
+                                "tick": tick.0,
+                                "broken": broken,
+                            }),
+                            Some(action_id),
+                        );
+                    }
+                    cf_terrain::DigOutcome::Refused {
+                        reason,
+                        strip_id,
+                        material,
+                        bbox_min,
+                        bbox_max,
+                    } => {
+                        self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "terrain",
+                            "tool_refused",
+                            json!({
+                                "reason": reason,
+                                "mode": "strip",
+                                "strip_id": strip_id,
+                                "material": material,
+                                "bbox_min": bbox_min,
+                                "bbox_max": bbox_max,
+                            }),
+                            Some(action_id),
+                        );
+                    }
+                },
+                DigEvent::Chunked {
+                    outcome, aim, target, ..
+                } => match outcome {
+                    cf_terrain::ChunkedCarveOutcome::Carved(stats) => {
+                        let mat_name = cf_terrain::material_affordance(stats.dominant_material)
+                            .map(|m| m.name)
+                            .unwrap_or("unknown");
+                        let dirty: Vec<serde_json::Value> = stats
+                            .dirty_chunks
+                            .iter()
+                            .map(|c| json!({"cx": c.cx, "cy": c.cy}))
+                            .collect();
+                        let chunk_carved_id = self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "terrain",
+                            "terrain_carved",
+                            json!({
+                                "tick": tick.0,
+                                "mode": "chunked",
+                                "bbox": { "min": stats.bbox_min, "max": stats.bbox_max },
+                                "material": mat_name,
+                                "dominant_material_id": stats.dominant_material,
+                                "count": stats.count,
+                                "aim": aim,
+                                "target": target,
+                                "dirty_chunks": dirty,
+                            }),
+                            Some(action_id.clone()),
+                        );
+                        // M2 also emits a `material.chunk_dirtied` event per
+                        // dirty chunk so the M5.6 active material kernel can
+                        // pick up the same vocabulary later.
+                        for chunk in &stats.dirty_chunks {
+                            self.recorder.record(
+                                tick,
+                                sim_time_ms,
+                                "material",
+                                "chunk_dirtied",
+                                json!({
+                                    "cx": chunk.cx,
+                                    "cy": chunk.cy,
+                                    "cause": "dig",
+                                }),
+                                Some(chunk_carved_id.clone()),
+                            );
+                        }
+                    }
+                    cf_terrain::ChunkedCarveOutcome::Refused(refusal) => {
+                        let mat_name = cf_terrain::material_affordance(refusal.material)
+                            .map(|m| m.name)
+                            .unwrap_or("unknown");
+                        self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "terrain",
+                            "tool_refused",
+                            json!({
+                                "reason": refusal.reason,
+                                "mode": "chunked",
+                                "material": mat_name,
+                                "material_id": refusal.material,
+                                "probe_at": refusal.probe_at,
+                            }),
+                            Some(action_id),
+                        );
+                    }
+                    cf_terrain::ChunkedCarveOutcome::NoOp(noop) => {
+                        self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "terrain",
+                            "tool_refused",
+                            json!({
+                                "reason": "out_of_range",
+                                "mode": "chunked",
+                                "probe_at": noop.probe_at,
+                            }),
+                            Some(action_id),
+                        );
+                    }
+                },
             }
         }
 
@@ -1675,7 +2101,11 @@ impl M0Engine {
             seed: self.config.seed,
             started_at_utc: self.started_at.to_rfc3339(),
             duration_target_sec: self.config.duration_ticks as f64 / f64::from(self.config.tick_rate_hz),
-            material_schema_version: "n/a-m0".to_string(),
+            material_schema_version: if self.config.initial_chunked_terrain.is_some() {
+                cf_terrain::MATERIAL_SCHEMA_VERSION.to_string()
+            } else {
+                "n/a-m0".to_string()
+            },
             config_hash: self.config.config_hash.clone(),
             assumptions_tested: self.config.assumptions_tested.clone(),
             linked_specs: self.config.linked_specs.clone(),
@@ -1698,6 +2128,16 @@ impl M0Engine {
             },
             checksum: ChecksumConfig::m0_default(),
             tick_rate_hz: self.config.tick_rate_hz,
+            // M3A-005: declare lifecycle outcome. cf-app + cfctl + cf-e2e
+            // drive runs that exit cleanly via `system.run_finished`. The
+            // panic-injection debug path (`cf-app --debug-inject-panic-at-tick`)
+            // overrides this to `Panic` so the bundle's expected_outcome
+            // matches the produced events.
+            expected_outcome: if self.config.debug_inject_panic_at_tick.is_some() {
+                cf_replay::ExpectedOutcome::Panic
+            } else {
+                cf_replay::ExpectedOutcome::Clean
+            },
         }
     }
 }
@@ -1814,20 +2254,47 @@ impl From<&ActorSimState> for ActorWorldSnapshot {
     }
 }
 
-/// M1.5: dig outcome packed for cross-thread transport so events can be
-/// emitted after the engine state guard is dropped.
+/// Dig outcome packed for cross-thread transport so events can be emitted
+/// after the engine state guard is dropped. M1.5 ships [`DigEvent::Strip`]
+/// (legacy `BreachStrip` path) and BP2 (M2) adds [`DigEvent::Chunked`] for
+/// chunked-terrain digs. Engine prefers `Chunked` whenever the scenario opts
+/// into chunked terrain.
 #[derive(Debug, Clone)]
-struct DigEvent {
-    outcome: cf_terrain::DigOutcome,
-    source: IntentSource,
-    origin: [f32; 2],
+enum DigEvent {
+    Strip {
+        outcome: cf_terrain::DigOutcome,
+        source: IntentSource,
+        origin: [f32; 2],
+    },
+    Chunked {
+        outcome: cf_terrain::ChunkedCarveOutcome,
+        source: IntentSource,
+        origin: [f32; 2],
+        aim: [f32; 2],
+        target: [f32; 2],
+    },
 }
 
 impl DigEvent {
     fn outcome_target_string(&self) -> Option<String> {
-        match &self.outcome {
-            cf_terrain::DigOutcome::Carved { strip_id, .. } => Some(strip_id.clone()),
-            cf_terrain::DigOutcome::Refused { strip_id, .. } => strip_id.clone(),
+        match self {
+            DigEvent::Strip { outcome, .. } => match outcome {
+                cf_terrain::DigOutcome::Carved { strip_id, .. } => Some(strip_id.clone()),
+                cf_terrain::DigOutcome::Refused { strip_id, .. } => strip_id.clone(),
+            },
+            DigEvent::Chunked { .. } => None,
+        }
+    }
+
+    fn source(&self) -> IntentSource {
+        match self {
+            DigEvent::Strip { source, .. } | DigEvent::Chunked { source, .. } => *source,
+        }
+    }
+
+    fn origin(&self) -> [f32; 2] {
+        match self {
+            DigEvent::Strip { origin, .. } | DigEvent::Chunked { origin, .. } => *origin,
         }
     }
 }
@@ -1860,6 +2327,7 @@ fn build_mission_view(state: &cf_mission::MissionState, current_tick: u64) -> cr
             optional: o.optional,
             target_actor: o.target_actor,
             target_breach: o.target_breach,
+            target_reactor: o.target_reactor,
             zone_min: o.zone_min,
             zone_max: o.zone_max,
         })
@@ -1877,8 +2345,10 @@ fn build_mission_view(state: &cf_mission::MissionState, current_tick: u64) -> cr
     }
 }
 
-/// Build the checksum bytes covering every M1.5 sub-state. Layout is
-/// append-only relative to M1 so the `sim_state_v1` suffix stays valid.
+/// Build the checksum bytes covering every M1.5 + BP2 sub-state. Layout is
+/// append-only relative to M1 so the `sim_state_v1` suffix stays valid:
+/// `(M0 prefix) || (M1 actor bytes) || (M1.5 breach + guards + mission) ||
+/// (M2 chunked terrain) || (M2.5 reactor world)`.
 fn build_checksum_bytes(state: &EngineMutable) -> Vec<u8> {
     let mut out = state
         .actor_state
@@ -1897,6 +2367,12 @@ fn build_checksum_bytes(state: &EngineMutable) -> Vec<u8> {
         for obj in &mission.objectives {
             out.push(obj.status as u8);
         }
+    }
+    if let Some(terrain) = state.chunked_terrain.as_ref() {
+        out.extend_from_slice(&terrain.checksum_bytes());
+    }
+    if let Some(reactors) = state.reactor_world.as_ref() {
+        out.extend_from_slice(&reactors.checksum_bytes());
     }
     out
 }
@@ -2072,6 +2548,35 @@ impl EngineHandle for M0Engine {
                 aim: g.aim,
             })
             .collect();
+        let terrain = state.chunked_terrain.as_ref().map(|t| crate::state::TerrainView {
+            width_px: t.width_px,
+            height_px: t.height_px,
+            anchor: t.anchor,
+            default_material: cf_terrain::material_affordance(t.default_material)
+                .map(|m| m.name.to_string())
+                .unwrap_or_else(|| "unknown".to_string()),
+            carve_count: t.carve_count,
+            refusal_count: t.refusal_count,
+            dirty_chunk_count: t.dirty_chunk_count() as u32,
+            allocated_chunk_count: t.allocated_chunk_count() as u32,
+            material_counts: t.material_counts(),
+        });
+        let reactors: Vec<crate::state::ReactorView> = state
+            .reactor_world
+            .as_ref()
+            .map(|w| {
+                w.iter()
+                    .map(|r| crate::state::ReactorView {
+                        id: r.id.clone(),
+                        position: r.position,
+                        half_extents: r.half_extents,
+                        hp: r.hp,
+                        max_hp: r.max_hp,
+                        destroyed: r.is_destroyed(),
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
         let frame = ObserveFrame {
             schema_version: SCHEMA_VERSION,
             run_id: self.recorder.run_id().to_string(),
@@ -2090,6 +2595,8 @@ impl EngineHandle for M0Engine {
             mission,
             breaches,
             enemies,
+            terrain,
+            reactors,
         };
         let tick = state.clock.tick();
         let sim_time_ms = state.clock.sim_time_ms();
@@ -2224,6 +2731,15 @@ impl EngineHandle for M0Engine {
                 // the live engine tick so the timer measures from reset.
                 if let Some(mission) = state.mission.as_mut() {
                     mission.reset(tick.0);
+                }
+                // M2: rewind chunked terrain to the manifest's authored stamps.
+                if let Some(initial_terrain) = self.config.initial_chunked_terrain.as_ref() {
+                    state.chunked_terrain = Some(initial_terrain.clone());
+                }
+                // M2.5: rewind reactor world to manifest defaults (full hp,
+                // not destroyed).
+                if let Some(reactor_world) = state.reactor_world.as_mut() {
+                    reactor_world.reset();
                 }
                 drop(state);
                 for (projectile_id, owner, last_position) in &discarded_projectiles {
@@ -2578,7 +3094,7 @@ impl EngineHandle for M0Engine {
                 if !self.config.has_actor_world {
                     return self.reject_actor_command(tick, sim_time_ms, state, "act.player.dig");
                 }
-                if state.breach_world.is_none() {
+                if state.breach_world.is_none() && state.chunked_terrain.is_none() {
                     drop(state);
                     self.recorder.record(
                         tick,
@@ -2587,12 +3103,12 @@ impl EngineHandle for M0Engine {
                         "command_rejected",
                         json!({
                             "method": "act.player.dig",
-                            "reason": "no_breach_world",
-                            "fix_hint": "scenario manifest must declare at least one entry in breaches[]."
+                            "reason": "no_terrain_world",
+                            "fix_hint": "scenario manifest must declare either breaches[] (M1.5) or terrain (M2 chunked)."
                         }),
                         None,
                     );
-                    return CommandResult::rejected("no_breach_world", tick.0);
+                    return CommandResult::rejected("no_terrain_world", tick.0);
                 }
                 if state.player_actor.is_none() {
                     return self.reject_actor_command(tick, sim_time_ms, state, "act.player.dig");

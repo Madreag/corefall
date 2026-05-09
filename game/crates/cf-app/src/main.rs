@@ -375,10 +375,11 @@ fn run_bevy(
     }
 
     let mut app = App::new();
+    let title = format!("Corefall — BP2 Terrain & Replay (v{APP_VERSION})");
     let plugins = DefaultPlugins
         .set(WindowPlugin {
             primary_window: Some(Window {
-                title: format!("Corefall — M0 Engine Bootstrap (v{APP_VERSION})"),
+                title,
                 resolution: WindowResolution::new(1280, 720),
                 present_mode: PresentMode::AutoVsync,
                 resizable: true,
@@ -387,6 +388,18 @@ fn run_bevy(
             ..default()
         })
         .disable::<LogPlugin>();
+    // BP2 capture-grid harness: cf-e2e launches cf-app windowed but the OS
+    // may steal focus during the run (especially on macOS where the
+    // foreground terminal keeps focus). Bevy's default `WinitSettings`
+    // throttles unfocused windows to ReactiveLowPower (~60s/frame), which
+    // deadlocks the JSON-RPC server because the schedule barely advances.
+    // Pin both focused + unfocused to `Continuous` so the engine ticks
+    // regardless of focus state.
+    use bevy::winit::{UpdateMode, WinitSettings};
+    app.insert_resource(WinitSettings {
+        focused_mode: UpdateMode::Continuous,
+        unfocused_mode: UpdateMode::Continuous,
+    });
 
     app.add_plugins(plugins)
         .add_plugins(CfRenderPlugin::default())

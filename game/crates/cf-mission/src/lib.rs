@@ -24,13 +24,21 @@
     clippy::doc_markdown,
     clippy::missing_const_for_fn,
     clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_possible_wrap,
+    clippy::cast_lossless,
+    clippy::float_cmp,
     clippy::redundant_closure,
     clippy::derivable_impls,
     clippy::wildcard_in_or_patterns,
     clippy::needless_pass_by_value,
     clippy::ref_option,
     clippy::match_wildcard_for_single_variants,
-    clippy::trivially_copy_pass_by_ref
+    clippy::trivially_copy_pass_by_ref,
+    clippy::too_many_lines,
+    clippy::uninlined_format_args,
+    clippy::single_match_else
 )]
 
 use std::collections::BTreeMap;
@@ -64,9 +72,22 @@ pub struct Objective {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ObjectiveKind {
-    BreachBarrier { target: String },
-    NeutralizeActor { target: u64 },
-    ReachZone { min: [f32; 2], max: [f32; 2] },
+    BreachBarrier {
+        target: String,
+    },
+    NeutralizeActor {
+        target: u64,
+    },
+    ReachZone {
+        min: [f32; 2],
+        max: [f32; 2],
+    },
+    /// M2.5: defend a reactor (named static actor) until either the mission
+    /// timer expires (success) or the reactor's hp reaches zero (failure).
+    /// `target` is the reactor id.
+    DefendReactor {
+        target: String,
+    },
 }
 
 impl ObjectiveKind {
@@ -75,6 +96,7 @@ impl ObjectiveKind {
             ObjectiveKind::BreachBarrier { .. } => "breach_barrier",
             ObjectiveKind::NeutralizeActor { .. } => "neutralize_actor",
             ObjectiveKind::ReachZone { .. } => "reach_zone",
+            ObjectiveKind::DefendReactor { .. } => "defend_reactor",
         }
     }
 }
@@ -116,6 +138,12 @@ impl ObjectiveStatus {
 pub enum LossReason {
     PlayerDead,
     TimerExpired,
+    /// M2.5: a `defend_reactor` objective failed because the reactor was
+    /// destroyed before the mission timer expired.
+    ReactorDestroyed,
+    /// M2.5+: a defend_target objective failed for a generic reason. Not
+    /// emitted in BP2 by default; reserved.
+    ObjectiveFailed,
 }
 
 impl LossReason {
@@ -123,6 +151,8 @@ impl LossReason {
         match self {
             LossReason::PlayerDead => "player_dead",
             LossReason::TimerExpired => "timer_expired",
+            LossReason::ReactorDestroyed => "reactor_destroyed",
+            LossReason::ObjectiveFailed => "objective_failed",
         }
     }
 }
@@ -174,8 +204,136 @@ impl Default for LossConditions {
     }
 }
 
+/// One reactor entry the engine tracks as a damageable static actor. The engine
+/// projects current hp + destroyed flag into [`MissionTickInputs::reactors`] so
+/// `defend_reactor` objectives can detect destruction.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Reactor {
+    pub id: String,
+    pub position: [f32; 2],
+    pub half_extents: [f32; 2],
+    pub hp: f32,
+    pub max_hp: f32,
+    /// True once `hp <= 0.0`. Latched: a reactor cannot un-destroy itself.
+    #[serde(default)]
+    pub destroyed: bool,
+}
+
+impl Reactor {
+    pub fn is_destroyed(&self) -> bool {
+        self.destroyed || self.hp <= 0.0
+    }
+
+    /// True if `(x, y)` is inside the reactor's AABB.
+    pub fn aabb_contains(&self, x: f32, y: f32) -> bool {
+        let min_x = self.position[0] - self.half_extents[0];
+        let max_x = self.position[0] + self.half_extents[0];
+        let min_y = self.position[1] - self.half_extents[1];
+        let max_y = self.position[1] + self.half_extents[1];
+        x >= min_x && x <= max_x && y >= min_y && y <= max_y
+    }
+
+    /// Apply `damage` to this reactor's hp; returns the post-damage view.
+    /// Damage is clamped at zero; `destroyed` flips true when hp hits zero.
+    pub fn apply_damage(&mut self, damage: f32) {
+        if self.is_destroyed() {
+            return;
+        }
+        self.hp = (self.hp - damage.max(0.0)).max(0.0);
+        if self.hp <= 0.0 {
+            self.destroyed = true;
+        }
+    }
+
+    pub fn reset(&mut self) {
+        self.hp = self.max_hp;
+        self.destroyed = false;
+    }
+
+    /// Layout-stable bytes for the determinism checksum.
+    pub fn checksum_bytes(&self) -> Vec<u8> {
+        let mut v = Vec::with_capacity(48 + self.id.len());
+        v.extend_from_slice(&(self.id.len() as u32).to_le_bytes());
+        v.extend_from_slice(self.id.as_bytes());
+        v.extend_from_slice(&quantize(self.position[0]).to_le_bytes());
+        v.extend_from_slice(&quantize(self.position[1]).to_le_bytes());
+        v.extend_from_slice(&quantize(self.half_extents[0]).to_le_bytes());
+        v.extend_from_slice(&quantize(self.half_extents[1]).to_le_bytes());
+        v.extend_from_slice(&quantize(self.hp).to_le_bytes());
+        v.extend_from_slice(&quantize(self.max_hp).to_le_bytes());
+        v.push(u8::from(self.destroyed));
+        v
+    }
+}
+
+fn quantize(value: f32) -> i32 {
+    if !value.is_finite() {
+        return 0;
+    }
+    (value * 1024.0).round() as i32
+}
+
+/// World container of every reactor the engine knows about.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct ReactorWorld {
+    pub reactors: BTreeMap<String, Reactor>,
+}
+
+impl ReactorWorld {
+    pub fn new(reactors: Vec<Reactor>) -> Self {
+        let mut map = BTreeMap::new();
+        for r in reactors {
+            map.insert(r.id.clone(), r);
+        }
+        Self { reactors: map }
+    }
+
+    pub fn get(&self, id: &str) -> Option<&Reactor> {
+        self.reactors.get(id)
+    }
+
+    pub fn get_mut(&mut self, id: &str) -> Option<&mut Reactor> {
+        self.reactors.get_mut(id)
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &Reactor> {
+        self.reactors.values()
+    }
+
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Reactor> {
+        self.reactors.values_mut()
+    }
+
+    pub fn is_destroyed(&self, id: &str) -> bool {
+        self.get(id).is_some_and(Reactor::is_destroyed)
+    }
+
+    pub fn destroyed_map(&self) -> BTreeMap<String, bool> {
+        self.reactors
+            .iter()
+            .map(|(k, v)| (k.clone(), v.is_destroyed()))
+            .collect()
+    }
+
+    pub fn reset(&mut self) {
+        for r in self.reactors.values_mut() {
+            r.reset();
+        }
+    }
+
+    pub fn checksum_bytes(&self) -> Vec<u8> {
+        let mut out = Vec::with_capacity(self.reactors.len() * 32 + 8);
+        out.extend_from_slice(&(self.reactors.len() as u32).to_le_bytes());
+        for r in self.reactors.values() {
+            out.extend_from_slice(&r.checksum_bytes());
+        }
+        out
+    }
+}
+
 /// Per-tick mission inputs. The engine assembles this from its actor world plus the
-/// breach state (broken? in-range? hp_remaining?) before calling [`step`].
+/// breach state (broken? in-range? hp_remaining?) and reactor state before calling
+/// [`step`].
 #[derive(Debug, Clone, Copy)]
 pub struct MissionTickInputs<'a> {
     pub tick: u64,
@@ -183,6 +341,8 @@ pub struct MissionTickInputs<'a> {
     pub actors: &'a BTreeMap<ActorId, ActorState>,
     /// Map of `breach_id -> broken?`. `true` once the breach is fully carved.
     pub breaches_broken: &'a BTreeMap<String, bool>,
+    /// Map of `reactor_id -> destroyed?`. `true` once hp <= 0. Defaults empty.
+    pub reactors_destroyed: &'a BTreeMap<String, bool>,
 }
 
 /// Per-tick report. Every `Vec` carries objective ids; the engine turns each into a
@@ -315,14 +475,70 @@ pub fn step(state: &mut MissionState, inputs: MissionTickInputs<'_>) -> MissionT
             return report;
         }
     }
-    if state.time_limit_ticks > 0 && state.elapsed_ticks(inputs.tick) >= state.time_limit_ticks {
-        state.result = MissionResult::Lost {
-            reason: LossReason::TimerExpired,
-        };
-        state.last_event_tick = inputs.tick;
-        state.last_event_label = "mission_lost_timer".to_string();
-        report.final_result = Some(state.result);
-        return report;
+    // Reactor destruction loses immediately for any active `defend_reactor`
+    // objective. M2.5's micro reactor defense needs `mission.loss_reason =
+    // reactor_destroyed` to be the visible failure label. The check runs BEFORE
+    // the timer expiry check so a reactor destroyed exactly at the timer
+    // boundary still records as `reactor_destroyed`.
+    for obj in &state.objectives {
+        if obj.status != ObjectiveStatus::Active {
+            continue;
+        }
+        if let ObjectiveKind::DefendReactor { target } = &obj.kind {
+            if inputs.reactors_destroyed.get(target).copied().unwrap_or(false) {
+                state.result = MissionResult::Lost {
+                    reason: LossReason::ReactorDestroyed,
+                };
+                state.last_event_tick = inputs.tick;
+                state.last_event_label = format!("mission_lost_reactor_destroyed:{}", target);
+                report.objective_failed.push(obj.id.clone());
+                report.final_result = Some(state.result);
+                return report;
+            }
+        }
+    }
+
+    let timer_expired = state.time_limit_ticks > 0 && state.elapsed_ticks(inputs.tick) >= state.time_limit_ticks;
+    if timer_expired {
+        // Special case: an active `defend_reactor` objective WINS when the
+        // timer expires (the player held the reactor through the wave). We
+        // detect this by looking for an active defend_reactor objective whose
+        // reactor is still alive.
+        let defend_active_alive = state.objectives.iter().any(|obj| {
+            matches!(obj.status, ObjectiveStatus::Active)
+                && match &obj.kind {
+                    ObjectiveKind::DefendReactor { target } => {
+                        !inputs.reactors_destroyed.get(target).copied().unwrap_or(false)
+                    }
+                    _ => false,
+                }
+        });
+        if defend_active_alive {
+            // Mark every active defend_reactor objective complete and check win
+            // condition below.
+            for obj in &mut state.objectives {
+                if obj.status != ObjectiveStatus::Active {
+                    continue;
+                }
+                if let ObjectiveKind::DefendReactor { target } = &obj.kind {
+                    if !inputs.reactors_destroyed.get(target).copied().unwrap_or(false) {
+                        obj.status = ObjectiveStatus::Completed;
+                        report.objective_completed.push(obj.id.clone());
+                        state.last_event_tick = inputs.tick;
+                        state.last_event_label = format!("objective_completed:{}", obj.id);
+                    }
+                }
+            }
+            // Fall through to win-condition evaluation.
+        } else {
+            state.result = MissionResult::Lost {
+                reason: LossReason::TimerExpired,
+            };
+            state.last_event_tick = inputs.tick;
+            state.last_event_label = "mission_lost_timer".to_string();
+            report.final_result = Some(state.result);
+            return report;
+        }
     }
 
     // 2) Progress objectives in declaration order. We only advance one row at a
@@ -342,6 +558,11 @@ pub fn step(state: &mut MissionState, inputs: MissionTickInputs<'_>) -> MissionT
                 Some(p) => point_in_aabb(p.position.x, p.position.y, *min, *max),
                 None => false,
             },
+            ObjectiveKind::DefendReactor { .. } => {
+                // DefendReactor only completes via the timer-expired branch
+                // above; passive ticks never auto-complete it.
+                false
+            }
         };
         if completed {
             obj.status = ObjectiveStatus::Completed;
@@ -409,6 +630,7 @@ pub struct ObjectiveView {
     pub optional: bool,
     pub target_actor: Option<u64>,
     pub target_breach: Option<String>,
+    pub target_reactor: Option<String>,
     pub zone_min: Option<[f32; 2]>,
     pub zone_max: Option<[f32; 2]>,
 }
@@ -434,6 +656,10 @@ impl MissionView {
                 },
                 target_breach: match &o.kind {
                     ObjectiveKind::BreachBarrier { target } => Some(target.clone()),
+                    _ => None,
+                },
+                target_reactor: match &o.kind {
+                    ObjectiveKind::DefendReactor { target } => Some(target.clone()),
                     _ => None,
                 },
                 zone_min: match &o.kind {
@@ -537,6 +763,7 @@ mod tests {
                 player: actors.get(&ActorId(1)),
                 actors: &actors,
                 breaches_broken: &breaches,
+                reactors_destroyed: &BTreeMap::new(),
             },
         );
         assert_eq!(report.objective_completed, vec!["breach".to_string()]);
@@ -560,6 +787,7 @@ mod tests {
                 player: actors.get(&ActorId(1)),
                 actors: &actors,
                 breaches_broken: &breaches,
+                reactors_destroyed: &BTreeMap::new(),
             },
         );
         // Tick 2: neutralize completes.
@@ -570,6 +798,7 @@ mod tests {
                 player: actors.get(&ActorId(1)),
                 actors: &actors,
                 breaches_broken: &breaches,
+                reactors_destroyed: &BTreeMap::new(),
             },
         );
         // Tick 3: extract completes.
@@ -580,6 +809,7 @@ mod tests {
                 player: actors.get(&ActorId(1)),
                 actors: &actors,
                 breaches_broken: &breaches,
+                reactors_destroyed: &BTreeMap::new(),
             },
         );
         assert_eq!(report.objective_completed, vec!["extract".to_string()]);
@@ -601,6 +831,7 @@ mod tests {
                 player: actors.get(&ActorId(1)),
                 actors: &actors,
                 breaches_broken: &BTreeMap::new(),
+                reactors_destroyed: &BTreeMap::new(),
             },
         );
         assert!(matches!(
@@ -623,6 +854,7 @@ mod tests {
                 player: actors.get(&ActorId(1)),
                 actors: &actors,
                 breaches_broken: &BTreeMap::new(),
+                reactors_destroyed: &BTreeMap::new(),
             },
         );
         assert!(matches!(
@@ -646,6 +878,7 @@ mod tests {
                 player: actors.get(&ActorId(1)),
                 actors: &actors,
                 breaches_broken: &BTreeMap::new(),
+                reactors_destroyed: &BTreeMap::new(),
             },
         );
         assert!(report.objective_completed.is_empty());
@@ -663,6 +896,120 @@ mod tests {
         assert_eq!(state.objectives[1].status, ObjectiveStatus::Pending);
         assert_eq!(state.started_at_tick, 100);
         assert!(matches!(state.result, MissionResult::Active));
+    }
+
+    fn build_reactor_defense_state(time_limit_ticks: u64) -> MissionState {
+        let objectives = vec![Objective {
+            id: "defend_reactor".to_string(),
+            kind: ObjectiveKind::DefendReactor {
+                target: "core_reactor".to_string(),
+            },
+            optional: false,
+            status: ObjectiveStatus::Pending,
+        }];
+        MissionState::new(
+            objectives,
+            0,
+            LossConditions {
+                player_dead: true,
+                time_limit_ticks,
+            },
+        )
+    }
+
+    #[test]
+    fn defend_reactor_loses_when_reactor_destroyed() {
+        let mut state = build_reactor_defense_state(60 * 90);
+        let actors = mk_actors(player_at(120.0, 32.0), false);
+        let mut reactors = BTreeMap::new();
+        reactors.insert("core_reactor".to_string(), true);
+        let report = step(
+            &mut state,
+            MissionTickInputs {
+                tick: 100,
+                player: actors.get(&ActorId(1)),
+                actors: &actors,
+                breaches_broken: &BTreeMap::new(),
+                reactors_destroyed: &reactors,
+            },
+        );
+        assert_eq!(
+            state.result,
+            MissionResult::Lost {
+                reason: LossReason::ReactorDestroyed
+            }
+        );
+        assert_eq!(report.objective_failed, vec!["defend_reactor".to_string()]);
+        assert!(report.final_result.is_some());
+    }
+
+    #[test]
+    fn defend_reactor_wins_when_timer_expires_with_reactor_alive() {
+        let mut state = build_reactor_defense_state(60 * 60);
+        let actors = mk_actors(player_at(120.0, 32.0), false);
+        let mut reactors = BTreeMap::new();
+        reactors.insert("core_reactor".to_string(), false);
+        let report = step(
+            &mut state,
+            MissionTickInputs {
+                tick: 60 * 60,
+                player: actors.get(&ActorId(1)),
+                actors: &actors,
+                breaches_broken: &BTreeMap::new(),
+                reactors_destroyed: &reactors,
+            },
+        );
+        assert!(matches!(state.result, MissionResult::Won));
+        assert_eq!(report.objective_completed, vec!["defend_reactor".to_string()]);
+        assert!(report.final_result.is_some());
+    }
+
+    #[test]
+    fn reactor_object_apply_damage_drives_destruction() {
+        let mut r = Reactor {
+            id: "r".to_string(),
+            position: [100.0, 32.0],
+            half_extents: [16.0, 16.0],
+            hp: 30.0,
+            max_hp: 30.0,
+            destroyed: false,
+        };
+        r.apply_damage(10.0);
+        assert!(!r.is_destroyed());
+        r.apply_damage(20.0);
+        assert!(r.is_destroyed());
+        let before = r.hp;
+        r.apply_damage(50.0);
+        assert_eq!(r.hp, before);
+    }
+
+    #[test]
+    fn reactor_world_destroyed_map_round_trip() {
+        let world = ReactorWorld::new(vec![Reactor {
+            id: "alpha".to_string(),
+            position: [0.0, 0.0],
+            half_extents: [8.0, 8.0],
+            hp: 50.0,
+            max_hp: 50.0,
+            destroyed: false,
+        }]);
+        let map = world.destroyed_map();
+        assert_eq!(map.get("alpha"), Some(&false));
+    }
+
+    #[test]
+    fn reactor_aabb_contains_inside_and_outside() {
+        let r = Reactor {
+            id: "r".to_string(),
+            position: [100.0, 100.0],
+            half_extents: [16.0, 16.0],
+            hp: 50.0,
+            max_hp: 50.0,
+            destroyed: false,
+        };
+        assert!(r.aabb_contains(100.0, 100.0));
+        assert!(r.aabb_contains(116.0, 116.0));
+        assert!(!r.aabb_contains(200.0, 100.0));
     }
 
     #[test]

@@ -279,6 +279,54 @@ def validate_run(run_dir: Path) -> list[str]:
         if heading not in notes:
             errors.append(f"notes.md missing heading: {heading}")
 
+    # M3A-005: enforce the run_manifest.expected_outcome contract.
+    expected_outcome = manifest.get("expected_outcome", "clean")
+    if expected_outcome not in ("clean", "panic", "abort"):
+        errors.append(
+            "run_manifest.json expected_outcome must be one of "
+            f"('clean', 'panic', 'abort'); found {expected_outcome!r}"
+        )
+    else:
+        run_finished_count = sum(
+            1 for e in events if e.get("category") == "system" and e.get("event_type") == "run_finished"
+        )
+        panic_count = sum(
+            1 for e in events if e.get("category") == "system" and e.get("event_type") == "panic"
+        )
+        error_severity_count = 0
+        if isinstance(event_counts, dict):
+            by_severity = event_counts.get("by_severity") or {}
+            if isinstance(by_severity, dict):
+                error_severity_count = int(by_severity.get("error") or 0)
+        if expected_outcome == "clean":
+            if run_finished_count == 0:
+                errors.append(
+                    "run_manifest.expected_outcome=clean but events.jsonl has no system.run_finished event"
+                )
+            if panic_count > 0:
+                errors.append(
+                    "run_manifest.expected_outcome=clean but events.jsonl contains "
+                    f"{panic_count} system.panic event(s); declare expected_outcome=panic"
+                )
+            if error_severity_count > 0:
+                errors.append(
+                    "run_manifest.expected_outcome=clean but summary.event_counts.by_severity.error="
+                    f"{error_severity_count}; declare expected_outcome=abort"
+                )
+        elif expected_outcome == "panic":
+            if panic_count == 0:
+                errors.append(
+                    "run_manifest.expected_outcome=panic but events.jsonl has no system.panic event"
+                )
+        # `abort` is intentionally permissive: by_severity.error may be > 0,
+        # run_finished may or may not exist, but at least one must be present
+        # so the bundle isn't silently empty.
+        elif expected_outcome == "abort" and run_finished_count == 0 and panic_count == 0:
+            errors.append(
+                "run_manifest.expected_outcome=abort but events.jsonl has neither "
+                "system.run_finished nor system.panic"
+            )
+
     return errors
 
 

@@ -1539,7 +1539,13 @@ name = "cf-headless"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "cf-actor",
+ "cf-control",
+ "cf-replay",
  "clap",
+ "serde",
+ "serde_json",
+ "tokio",
  "tracing",
  "tracing-subscriber",
 ]
@@ -1685,7 +1691,10 @@ dependencies = [
 name = "cf-terrain"
 version = "0.0.1"
 dependencies = [
+ "blake3",
+ "hex",
  "serde",
+ "serde_json",
  "tracing",
 ]
 
