@@ -92,6 +92,103 @@ Optional: a **`## Human Playtest Survey (optional confirmation)`** section can s
 
 The reviewer's verdict on the BP IS the verdict on the AI-Agent Self-Test Report. If the report is missing, hand-waved, or has placeholder text where the agent's prose observation should be, the verdict is `Needs Fixes`. The agent does not get to skip writing the prose by saying "the test passed" — the prose IS the test.
 
+## Per-BP Test Suite Customization
+
+Every BP ships with its OWN customized test suite, not a generic one. The contract for that suite lives in a per-BP test manifest:
+
+`game/content/build_points/bp<N>.test_manifest.json` (schema_version `cf-bp-test-manifest.v1`)
+
+The manifest declares, for the BP:
+
+- **Fun-proof scenarios** + win/loss cfctl scripts + grading-criteria contract paths.
+- **Supporting scenarios** that exercise inside-scope but non-headline systems (e.g. M2 dig path is BP2 supporting; M2.5 reactor defense is BP2 fun-proof).
+- **Regression scenarios** from prior BPs that must still pass + the tick rates to verify them at + the rationale for the regression check.
+- **Negative scenarios** — adversarial inputs (unknown scenario, NaN aim, mismatched seed, dig-into-metal_nohook refusal, duplicate reactor id, hp<=0 reactor) + the harness that exercises them + the expected rejection event/reason.
+- **Required sweep rows** — every row id `self_play_sweep.sh` must contain for this BP.
+- **Required grading dimensions per scenario** — names of dimensions the BP's grading contracts must declare.
+- **Required events emitted per scenario_key** (with `_win` / `_loss` suffixes so the analyzer picks the right outcome bundle) — every `category.event_type` the run bundle MUST contain in `events.jsonl`.
+- **Required observe fields** — every key the JSON-RPC `observe.once` envelope must surface.
+- **Required cargo test modules** (globs like `cf-mission::tests::reactor_*`) — every cargo test target the BP's contract claims is implemented.
+- **Perf gates** per Steam Deck / 1080p / 4K tier with max p99 tick ms thresholds.
+- **Universal Enhancement (DR-056) gates** — per-row status (verified / staged / N/A) for the 14 universal rows.
+- **Loop thresholds** — max iterations, min aggregate grading, min per-dimension grading, halt-on-cycle-iterations.
+
+The reviewer enforces: **every BP under review MUST have a `bp<N>.test_manifest.json` file** AND running `python3 game/tools/bp_test_coverage.py bp<N>` MUST report `verdict: CLEAN, total gaps: 0`. Missing manifest OR non-zero gaps = `Needs Fixes` review verdict.
+
+## AI-Agent Test-Improvement Loop
+
+The corefall-review skill is INVOKED into a loop that the AI agent (Droid) drives end-to-end. The loop self-corrects: every iteration the agent either closes a gap, fixes a code bug surfaced by a failing test, fills in LLM grading prose, or extends the harness — and re-runs the loop until the BP closure-gate is met.
+
+The mechanical phases are orchestrated by `game/tools/bp_close_loop.sh`. The semantic decisions between iterations are the agent's:
+
+```
+loop:
+  Phase 1. coverage check (bp_test_coverage.py)
+    - If gaps found, agent reads the gap report:
+      - scenario_missing → scaffold the .ron with the BP-scope manifest
+      - script_missing → scaffold the cfctl JSON-RPC drive script
+      - grading_contract_missing → scaffold the grading.json criteria contract
+      - sweep_row_missing → extend self_play_sweep.sh with the row
+      - cargo_module_missing → add the cargo test (or wildcard-matching one)
+      - grading_dimension_missing → extend the grading contract
+      - events_not_emitted → either the engine doesn't emit (CODE GAP — fix engine) OR
+        the cfctl script doesn't exercise the path that triggers it (TEST GAP — fix script)
+      - events_bundle_missing → run the BP fun-proof scenario via cf-e2e + --capture-grid
+      - observe_fields_missing → extend cf-control's observe envelope
+    - Loop back to Phase 1.
+
+  Phase 2. cargo build + clippy -D warnings + cargo test --workspace
+    - If FAIL, agent diagnoses + fixes (compile error / lint / test failure /
+      regression introduced by a Phase 1 fix).
+    - Loop back to Phase 1 so any test-surface change is re-coverage-checked.
+
+  Phase 3. self_play_sweep.sh
+    - If a row FAILs, agent reads the row's stdout/stderr in the sweep dir,
+      diagnoses code vs cfctl-script bug, fixes, loops back to Phase 1.
+
+  Phase 4. LLM grading scaffold (auto)
+    - bp_close_loop.sh writes grading.json skeletons for any bundle this hour
+      that doesn't have one yet. Agent doesn't act here.
+
+  Phase 5. Agent fills grading.json prose for each fun_proof_scenario
+    - For each scaffold, agent reads each dimension's evidence_required:
+      summary_grid.png frames (via Read tool), events.jsonl rows (via grep/python),
+      observe.once fields (via cfctl --once or events log).
+    - Agent writes 0-10 score + 30+-char prose + evidence_read audit trail +
+      verdict per dimension. The prose is the LLM-graded test (binary PASS
+      cells are fail-modes; 'looks correct' is a fail-mode).
+    - Agent edits the grading.json directly via Edit/Create tools.
+
+  Phase 6. validate filled grading.json
+    - At least ONE grading.json per fun_proof_scenario must validate PASS:
+      no placeholder cells, every dimension prose >= 30 chars, every dimension
+      score in rubric range, dimensions below minimum_per_dimension classified
+      FUTURE_OWNED with owning milestone OR flagged NEEDS_FIXES, aggregate
+      weighted score >= minimum_aggregate_for_pass.
+    - If FAIL, agent improves the lowest-scoring dimension:
+      - if it's a code gap (e.g. visual feedback missing): fix code
+      - if it's a test gap (e.g. wrong scenario / wrong dim): fix test
+      - if it's legitimately FUTURE_OWNED: classify it with an owning
+        milestone in `future_owners_if_blocked`
+    - Loop back to Phase 1.
+
+  Phase 7. /corefall-review BP<N> verdict = Accept?
+    - This is the present skill firing on itself. The reviewer (the running
+      skill instance) confirms every gate above + emits Accept.
+    - If Needs_Fixes: agent fixes findings, loops back to Phase 1.
+    - If Accept: DONE.
+
+  Exit conditions (halt the loop):
+    (a) Phase 7 = Accept → DONE, push branch + open PR.
+    (b) Iteration count > MAX_ITERATIONS (default 10 from manifest) → halt + ask user.
+    (c) Same gap set 2+ iterations in a row (oscillation) → halt + ask user.
+    (d) Only out-of-scope gaps remain → batch as out-of-scope, exit clean (per Loop Semantics §Out-Of-Scope Findings).
+```
+
+The loop is the canonical workflow for `/corefall-review BP<N>` from BP2 onward. Earlier BPs (BP0/BP1) didn't have the manifest framework; their reviews use the pre-loop manual workflow but the AGENTS.md Build Point Closure Gate still enforces the same closure artifacts (acceptance + contract integrity + capture + grading + AI self-test report).
+
+The agent does NOT skip phases. The agent does NOT mark a phase PASS based on memory of an earlier loop run; every iteration re-runs every phase. If the agent realizes mid-loop that an earlier phase's PASS was wrong (e.g. a fix in iteration 3 introduces a regression in iteration 1's coverage), the agent restarts the loop from Phase 1 — there's no "skip back" optimization because the loop is cheap.
+
 ## LLM-Graded Test Verdicts Gate
 
 Pass/fail is not enough for fun-proof scenarios. Every BP fun-proof scenario closure must include an **LLM-graded verdict** along multiple dimensions (look / feel / goal / agent), not just `--expect key=value` literal pass/fail. The grading is performed by the AI agent driving the corefall-review session: the agent reads each dimension's evidence (frames, events, observe, replay), writes prose-justified scores, and emits a structured `grading.json` artifact alongside the run bundle.

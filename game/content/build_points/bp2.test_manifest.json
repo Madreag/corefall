@@ -1,0 +1,256 @@
+{
+  "schema_version": "cf-bp-test-manifest.v1",
+  "bp": "bp2",
+  "label": "Terrain & Replay Build",
+  "description": "Per-BP test contract for BP2 (M2 + M2.5 + M3A). Declares the tests + evidence + grading dimensions + observe fields + cargo modules + sweep rows + perf gates required for BP2 closure. Consumed by `game/tools/bp_test_coverage.py` to detect gaps between this contract and the actual artifacts in the repo, and by `game/tools/bp_close_loop.sh` to drive the AI-improvement loop. Customized per BP — bp1.test_manifest.json + bp3.test_manifest.json + ... will exist as siblings, each capturing the BP's own scope.",
+  "milestones": ["M2", "M2.5", "M3A"],
+  "fun_proof_scenarios": [
+    {
+      "id": "micro_reactor_defense",
+      "scenario_path": "game/content/scenarios/micro_reactor_defense.ron",
+      "description": "M2.5 fun-slice: dirt-shield strategic-choice scenario.",
+      "win_script": "game/scripts/cfctl/micro_reactor_defense_win.cfctl.json",
+      "loss_script": "game/scripts/cfctl/micro_reactor_defense_loss.cfctl.json",
+      "grading_contract": "game/content/scenarios/grading/micro_reactor_defense.grading.json",
+      "minimum_grading_aggregate": 7.0,
+      "win_path_expectations": [
+        "mission.result=won",
+        "objective.defend_reactor=completed",
+        "capture.summary_grid.non_blank_ratio>=0.95"
+      ],
+      "loss_path_expectations": [
+        "mission.result=lost",
+        "mission.loss_reason=reactor_destroyed",
+        "capture.summary_grid.non_blank_ratio>=0.95"
+      ],
+      "tick_rates": [60],
+      "headless_smoke_required": false,
+      "replay_verifier_required": true
+    }
+  ],
+  "supporting_scenarios": [
+    {
+      "id": "m2_material_lane",
+      "scenario_path": "game/content/scenarios/m2_material_lane.ron",
+      "description": "M2 dig-path proof: dirt-fast / concrete-slow / metal_nohook-refused / anchor-refused.",
+      "script": "game/scripts/cfctl/m2_dig_concrete_refuse_metal.cfctl.json",
+      "grading_contract": "game/content/scenarios/grading/m2_material_lane.grading.json",
+      "minimum_grading_aggregate": 7.0,
+      "expectations": [
+        "scenario=m2_material_lane",
+        "capture.summary_grid.non_blank_ratio>=0.95"
+      ],
+      "tick_rates": [60]
+    }
+  ],
+  "regression_scenarios": [
+    {
+      "id": "micro_breach",
+      "from_bp": "bp1",
+      "rationale": "BP2 must not regress BP1's M1.5 fun slice. Re-run with the same seed at the same tick rate; final_sim_checksum must match the BP1 exemplar (or the divergence must be roadmap-approved).",
+      "win_script": "game/scripts/cfctl/micro_breach_win.cfctl.json",
+      "loss_script": "game/scripts/cfctl/micro_breach_loss.cfctl.json",
+      "tick_rates": [60, 120]
+    },
+    {
+      "id": "m1_actor_range",
+      "from_bp": "bp1",
+      "rationale": "BP2 must not regress M1 actor controller. Re-run move/jump/aim/fire/reload/select_item; final_sim_checksum stable.",
+      "script": "game/scripts/cfctl/m1_move_jump_fire_reload.cfctl.json",
+      "tick_rates": [60, 120]
+    }
+  ],
+  "negative_scenarios": [
+    {
+      "id": "scenario_load_unknown",
+      "harness": "live_ws_acceptance integration test (cf-control)",
+      "expected_event": "control.command_rejected",
+      "expected_reason_substring": "unknown_scenario"
+    },
+    {
+      "id": "scenario_load_mismatched_seed",
+      "harness": "live_ws_acceptance integration test (cf-control)",
+      "expected_event": "control.command_rejected",
+      "expected_reason_substring": "scenario_seed_mismatch"
+    },
+    {
+      "id": "act_player_aim_nan",
+      "harness": "live_ws_acceptance integration test (cf-control)",
+      "expected_event": "control.command_rejected",
+      "expected_reason_substring": "non_finite"
+    },
+    {
+      "id": "act_player_dig_metal_nohook_refuse",
+      "harness": "cf-e2e against m2_material_lane",
+      "expected_event": "terrain.tool_refused",
+      "expected_reason_substring": "material_metal_nohook"
+    },
+    {
+      "id": "act_player_dig_anchor_refuse",
+      "harness": "cf-e2e against m2_material_lane",
+      "expected_event": "terrain.tool_refused",
+      "expected_reason_substring": "material_anchor"
+    },
+    {
+      "id": "scenario_unknown_terrain_material",
+      "harness": "cf-mod validate",
+      "expected_error_substring": "UnknownTerrainMaterial"
+    },
+    {
+      "id": "scenario_duplicate_reactor_id",
+      "harness": "cf-mission unit test",
+      "expected_error_substring": "DuplicateReactorId"
+    },
+    {
+      "id": "scenario_objective_unknown_reactor",
+      "harness": "cf-mission unit test",
+      "expected_error_substring": "ObjectiveUnknownReactor"
+    },
+    {
+      "id": "scenario_reactor_hp_not_positive",
+      "harness": "cf-mission unit test",
+      "expected_error_substring": "ReactorHpNotPositive"
+    }
+  ],
+  "required_sweep_rows": [
+    "m1_actor_round_trip",
+    "m1_5_micro_breach_win",
+    "m1_5_micro_breach_loss",
+    "m2_dig_concrete_refuse_metal",
+    "m2_5_micro_reactor_defense_win",
+    "m2_5_micro_reactor_defense_loss",
+    "m3a_headless_replay_m2_5_win",
+    "m0_settings_roundtrip",
+    "m1_actor_60hz_determinism",
+    "m1_actor_120hz_determinism",
+    "m0_blank_headless_smoke",
+    "cfctl_observe_once",
+    "cf_mod_validate_content"
+  ],
+  "required_grading_dimensions_per_scenario": {
+    "micro_reactor_defense": [
+      "look.visual_clarity",
+      "look.material_distinctness",
+      "look.actor_presentation",
+      "look.juice_and_feedback",
+      "feel.simulation_responsiveness",
+      "feel.weight_and_physicality",
+      "feel.mission_pacing",
+      "feel.strategic_choice_legibility",
+      "goal.fun_proof_delivery",
+      "goal.bp_promise_coverage",
+      "agent.cfctl_full_coverage",
+      "agent.evidence_completeness"
+    ],
+    "m2_material_lane": [
+      "look.material_distinctness",
+      "look.juice_and_feedback",
+      "feel.simulation_responsiveness",
+      "feel.dig_progression",
+      "goal.fun_proof_delivery",
+      "agent.evidence_completeness"
+    ]
+  },
+  "required_events_emitted": {
+    "micro_reactor_defense_win": [
+      "system.run_started",
+      "system.run_finished",
+      "control.command_accepted",
+      "snapshot.snapshot_terrain_summary",
+      "snapshot.snapshot_actor",
+      "terrain.terrain_carved",
+      "terrain.tool_refused",
+      "ai.ai_perception",
+      "ai.tactic_chosen",
+      "combat.weapon_fired",
+      "combat.projectile_spawned",
+      "combat.projectile_expired",
+      "mission.objective_started",
+      "mission.objective_completed",
+      "mission.mission_resolved",
+      "determinism.sim_checksum"
+    ],
+    "micro_reactor_defense_loss": [
+      "actor.reactor_damaged",
+      "actor.actor_status_changed",
+      "mission.objective_failed",
+      "mission.mission_resolved"
+    ]
+  },
+  "required_observe_fields": [
+    "tick",
+    "settings.captions",
+    "settings.high_contrast",
+    "settings.reduced_motion",
+    "actor.player.x",
+    "actor.player.y",
+    "actor.player.hp",
+    "terrain.width_px",
+    "terrain.height_px",
+    "terrain.carve_count",
+    "terrain.refusal_count",
+    "terrain.dirty_chunk_count",
+    "terrain.allocated_chunk_count",
+    "terrain.material_counts",
+    "reactors",
+    "mission.objectives",
+    "mission.result",
+    "mission.loss_reason"
+  ],
+  "required_cargo_test_modules": [
+    "cf-terrain::chunked::tests::*",
+    "cf-mission::tests::reactor_*",
+    "cf-mission::tests::defend_reactor_*",
+    "cf-mission::tests::pending_defend_reactor_*",
+    "cf-control::live_ws_acceptance::live_ws_scenario_load_*",
+    "cf-control::live_ws_acceptance::live_ws_m1_act_player_aim_nan_rejected",
+    "cf-replay::tests::expected_outcome_*",
+    "cf-headless::tests::replay_*"
+  ],
+  "perf_gates": [
+    {
+      "tier": "steam_deck_800p_60",
+      "scenario": "micro_reactor_defense",
+      "max_p99_tick_ms": 8.33,
+      "rationale": "Steam Deck floor at 800p/60 Hz: 8.33ms = 60Hz frame budget. M2.5 has 1 reactive guard + chunked terrain + 1 reactor; well under budget.",
+      "status": "verified_via_summary_json_performance_block"
+    },
+    {
+      "tier": "1080p_60",
+      "scenario": "micro_reactor_defense",
+      "max_p99_tick_ms": 8.33,
+      "rationale": "Same sim cost as Steam Deck; render scales independently.",
+      "status": "verified_via_summary_json_performance_block"
+    },
+    {
+      "tier": "4k_120",
+      "scenario": "micro_reactor_defense",
+      "max_p99_tick_ms": 4.16,
+      "rationale": "120 Hz target = 4.16ms per tick. Validated separately via tick_rate_hz=120 sweep row.",
+      "status": "validated_at_120hz_via_self_play_sweep"
+    }
+  ],
+  "universal_enhancement_gates": {
+    "per_tier_perf_gate": "see perf_gates above",
+    "ci_bench_regression": "DR-054 — ride existing cargo bench harness; <5% regression vs prior BP baseline",
+    "memory_leak_soak_24h": "STAGED at BP12 boundary per DR-051 + DR-054",
+    "network_sync_verified": "N/A pre-multiplayer (BP9+ owns)",
+    "replay_determinism_ci_matrix": "verified — sweep runs 60+120 Hz on Linux + macOS + Windows in CI",
+    "all_player_surfaces_via_cfctl": "verified — every act.player.* + scenario.* + runbundle.* method exposed; act.input.* forward-looking for BP3+",
+    "ai_agent_validation_report": "AI-Agent Self-Test Report at prototype_runs/native/bp2_*/notes.md",
+    "ai_audio_pipeline": "N/A pre-cf-audio (BP6+ owns)",
+    "juice_rules_dr055": "STAGED at BP3+ (DR-055 + M5.5)",
+    "acca_floor_dr012": "verified — 6 settings flags wired in cf-control + observe.settings",
+    "tier_a_localization": "STAGED at BP12 boundary per DR-046 (English-only prototype)",
+    "modding_parity": "STAGED at BP8 boundary",
+    "anti_fomo_anti_p2w_audit": "N/A pre-monetization",
+    "captions_for_all_audio": "N/A pre-cf-audio"
+  },
+  "loop_thresholds": {
+    "max_iterations": 10,
+    "minimum_grading_aggregate_for_pass": 7.0,
+    "minimum_per_dimension_for_pass": 5,
+    "halt_when_findings_unchanged_iterations": 2,
+    "review_verdict_required": "Accept"
+  }
+}

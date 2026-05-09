@@ -804,4 +804,81 @@ mod tests {
         std::fs::create_dir_all(&p).unwrap();
         p
     }
+
+    #[test]
+    fn expected_outcome_default_is_clean() {
+        let outcome: ExpectedOutcome = Default::default();
+        assert!(matches!(outcome, ExpectedOutcome::Clean));
+        assert_eq!(outcome.as_str(), "clean");
+    }
+
+    #[test]
+    fn expected_outcome_as_str_covers_all_variants() {
+        assert_eq!(ExpectedOutcome::Clean.as_str(), "clean");
+        assert_eq!(ExpectedOutcome::Panic.as_str(), "panic");
+        assert_eq!(ExpectedOutcome::Abort.as_str(), "abort");
+    }
+
+    #[test]
+    fn expected_outcome_serializes_as_snake_case() {
+        for (variant, expected) in [
+            (ExpectedOutcome::Clean, "\"clean\""),
+            (ExpectedOutcome::Panic, "\"panic\""),
+            (ExpectedOutcome::Abort, "\"abort\""),
+        ] {
+            let s = serde_json::to_string(&variant).expect("serialize");
+            assert_eq!(s, expected);
+        }
+    }
+
+    #[test]
+    fn expected_outcome_deserializes_from_snake_case() {
+        let clean: ExpectedOutcome = serde_json::from_str("\"clean\"").expect("deserialize clean");
+        let panic: ExpectedOutcome = serde_json::from_str("\"panic\"").expect("deserialize panic");
+        let abort: ExpectedOutcome = serde_json::from_str("\"abort\"").expect("deserialize abort");
+        assert!(matches!(clean, ExpectedOutcome::Clean));
+        assert!(matches!(panic, ExpectedOutcome::Panic));
+        assert!(matches!(abort, ExpectedOutcome::Abort));
+    }
+
+    #[test]
+    fn expected_outcome_rejects_unknown_string() {
+        let res: Result<ExpectedOutcome, _> = serde_json::from_str("\"weird\"");
+        assert!(res.is_err(), "unknown expected_outcome value must reject");
+    }
+
+    #[test]
+    fn expected_outcome_default_in_run_manifest_when_absent() {
+        // Round-trip a manifest JSON without the expected_outcome field
+        // and confirm the deserializer falls back to Clean (the M3A-005 default).
+        let manifest_no_outcome = serde_json::json!({
+            "schema_version": MANIFEST_SCHEMA_VERSION,
+            "run_id": "m0_test_no_outcome",
+            "prototype_slice": "M0",
+            "run_mode": "test",
+            "milestone": "m0",
+            "build": {"commit_sha": "deadbeef", "rust_version": "rustc 1.95", "bevy_version": "bevy 0.18", "platform": "test"},
+            "scene": {"id": "m0_blank", "display_name": "test", "source_path": "x"},
+            "seed": 42,
+            "started_at_utc": "2026-05-05T00:00:00Z",
+            "duration_target_sec": 5.0,
+            "material_schema_version": "n/a-m0",
+            "config_hash": "deadbeef",
+            "assumptions_tested": [],
+            "linked_specs": [],
+            "expected_tests": [],
+            "capture_config": {"events": true, "screenshots": false, "captures": false},
+            "schemas": {"control": 1, "scenario": 1, "events": 1},
+            "capabilities": {"debug": false, "control_api": true, "save_load": false, "debug_capabilities": []},
+            "settings": {"ui_scale": 1.0, "high_contrast": false, "captions": true, "reduced_motion": false, "reduced_shake": false, "reduced_flash": false},
+            "checksum": {"algorithm": "blake3", "scope": "sim_state_v1", "cadence_ticks": 60},
+            "tick_rate_hz": 60
+        });
+        let parsed: RunManifest =
+            serde_json::from_value(manifest_no_outcome).expect("manifest without expected_outcome must parse");
+        assert!(
+            matches!(parsed.expected_outcome, ExpectedOutcome::Clean),
+            "missing expected_outcome must default to Clean"
+        );
+    }
 }

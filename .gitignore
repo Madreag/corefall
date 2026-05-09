@@ -61,17 +61,14 @@ prototype_runs/native/bp[0-9]*_*/*
 !prototype_runs/native/bp[0-9]*_*/notes.md
 !prototype_runs/native/bp[0-9]*_*/grading.json
 # LLM-graded test verdicts produced for fun-proof bundles (BP2 onward) per
-# `.claude/skills/corefall-review/SKILL.md` §LLM-Graded Test Verdicts Gate.
-# Only the grading.json itself is closure evidence; the rest of the bundle
-# (events.jsonl, summary.json, captures/, frame_*.png) is too large + churns
-# too fast for git. Force-include grading.json in any milestone-prefixed
-# bundle (m1.5_*, m2_*, m2.5_*, m3a_*, etc.) so reviewers can audit the
-# LLM grades offline without re-running the scenario. .gitignore needs the
-# parent dir to be un-ignored first; we whitelist the parent + exclude its
-# contents + re-allow grading.json — same pattern as the bp[0-9]* block above.
-!prototype_runs/native/m[0-9]*_*/
-prototype_runs/native/m[0-9]*_*/*
-!prototype_runs/native/m[0-9]*_*/grading.json
+# `.claude/skills/corefall-review/SKILL.md` §LLM-Graded Test Verdicts Gate
+# live ONLY inside `bp<N>_<UTC>_<hash>/` (the BP closure-exemplar dir)
+# alongside the AI-Agent Self-Test Report notes.md. Sweep-produced
+# `m<milestone>_*` bundles are NOT in git (they churn every sweep run and
+# would clutter the diff with empty scaffolds). The whitelist for
+# `bp[0-9]*_*/grading.json` above is the only exception. Agents that want a
+# graded sweep bundle copy its grading.json into the bp closure dir + commit
+# it there.
 run_bundles/
 captures/
 screenshots/

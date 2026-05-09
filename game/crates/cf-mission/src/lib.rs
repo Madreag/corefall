@@ -369,7 +369,16 @@ pub struct MissionState {
 
 impl MissionState {
     pub fn new(objectives: Vec<Objective>, started_at_tick: u64, loss: LossConditions) -> Self {
-        let mut state = Self {
+        // BP2 fix: leave all objectives Pending. The first call to `step()`
+        // activates the first pending objective AND emits `mission.objective_started`
+        // through the same code path that activates subsequent objectives. Without
+        // this, the FIRST objective transitioned Pending → Active inside `new()`
+        // (with no MissionTickReport in scope), so `mission.objective_started`
+        // never fired for it — the engine only saw the second + later objectives'
+        // started events. The bp2 test-coverage analyzer caught this gap by
+        // cross-referencing the manifest's `required_events_emitted` list against
+        // the M2.5 win bundle's events.jsonl.
+        Self {
             objectives,
             started_at_tick,
             time_limit_ticks: loss.time_limit_ticks,
@@ -377,14 +386,7 @@ impl MissionState {
             result: MissionResult::Active,
             last_event_tick: started_at_tick,
             last_event_label: "mission_started".to_string(),
-        };
-        // First objective starts Pending; the first tick will activate it.
-        if state.objectives.iter().all(|o| o.status == ObjectiveStatus::Pending) {
-            if let Some(first) = state.objectives.first_mut() {
-                first.status = ObjectiveStatus::Active;
-            }
         }
-        state
     }
 
     /// Reset the mission to its starting state. Used by `scenario.reset` so the
@@ -394,9 +396,9 @@ impl MissionState {
         for o in &mut self.objectives {
             o.status = ObjectiveStatus::Pending;
         }
-        if let Some(first) = self.objectives.first_mut() {
-            first.status = ObjectiveStatus::Active;
-        }
+        // Same BP2 fix as `new()`: do NOT activate the first objective here.
+        // step() handles the activation on its next call so the `objective_started`
+        // event for the first objective fires through the same path as later ones.
         self.started_at_tick = started_at_tick;
         self.result = MissionResult::Active;
         self.last_event_tick = started_at_tick;
@@ -455,6 +457,25 @@ pub fn step(state: &mut MissionState, inputs: MissionTickInputs<'_>) -> MissionT
     let mut report = MissionTickReport::default();
     if state.result.is_terminal() {
         return report;
+    }
+
+    // 0) BP2 fix: if no objective is currently Active (e.g. on the FIRST tick
+    //    after `MissionState::new()` or `reset()`), activate the first pending
+    //    objective AND push it to `report.objective_started` so the engine
+    //    emits a `mission.objective_started` event. Without this guard the
+    //    first objective transitioned Pending → Active silently inside new()
+    //    and the started event was lost.
+    if !state.objectives.iter().any(|o| o.status == ObjectiveStatus::Active) {
+        if let Some(first) = state
+            .objectives
+            .iter_mut()
+            .find(|o| o.status == ObjectiveStatus::Pending)
+        {
+            first.status = ObjectiveStatus::Active;
+            report.objective_started.push(first.id.clone());
+            state.last_event_tick = inputs.tick;
+            state.last_event_label = format!("objective_started:{}", first.id);
+        }
     }
 
     // 1) Loss conditions take precedence over objective progress so a fail-state
@@ -790,8 +811,25 @@ mod tests {
     }
 
     #[test]
-    fn first_objective_active_on_construction() {
-        let state = build_state();
+    fn first_objective_starts_pending_then_activates_on_first_step() {
+        // BP2 fix: first objective is Pending after construction; the first
+        // step() activates it AND emits objective_started so the engine emits
+        // a `mission.objective_started` event for objective 0.
+        let mut state = build_state();
+        assert_eq!(state.objectives[0].status, ObjectiveStatus::Pending);
+        assert_eq!(state.objectives[1].status, ObjectiveStatus::Pending);
+        let actors = mk_actors(player_at(120.0, 32.0), false);
+        let report = step(
+            &mut state,
+            MissionTickInputs {
+                tick: 1,
+                player: actors.get(&ActorId(1)),
+                actors: &actors,
+                breaches_broken: &BTreeMap::new(),
+                reactors_destroyed: &BTreeMap::new(),
+            },
+        );
+        assert_eq!(report.objective_started, vec!["breach".to_string()]);
         assert_eq!(state.objectives[0].status, ObjectiveStatus::Active);
         assert_eq!(state.objectives[1].status, ObjectiveStatus::Pending);
     }
@@ -800,6 +838,20 @@ mod tests {
     fn breach_completion_advances_to_neutralize() {
         let mut state = build_state();
         let actors = mk_actors(player_at(120.0, 32.0), false);
+        // BP2 fix: now that the first objective starts Pending, drive one
+        // empty step() first so it activates + emits objective_started.
+        // Then the breach-broken tick completes it + activates "neutralize".
+        let _activation = step(
+            &mut state,
+            MissionTickInputs {
+                tick: 1,
+                player: actors.get(&ActorId(1)),
+                actors: &actors,
+                breaches_broken: &BTreeMap::new(),
+                reactors_destroyed: &BTreeMap::new(),
+            },
+        );
+        assert_eq!(state.objectives[0].status, ObjectiveStatus::Active);
         let mut breaches = BTreeMap::new();
         breaches.insert("outer_wall".to_string(), true);
         let report = step(
@@ -932,16 +984,32 @@ mod tests {
     }
 
     #[test]
-    fn reset_returns_to_pending_with_first_active() {
+    fn reset_returns_to_pending_then_activates_on_first_step() {
+        // BP2 fix: reset() leaves all objectives Pending; the next step()
+        // activates the first one + emits objective_started.
         let mut state = build_state();
         state.objectives[0].status = ObjectiveStatus::Completed;
         state.objectives[1].status = ObjectiveStatus::Active;
         state.result = MissionResult::Won;
         state.reset(100);
-        assert_eq!(state.objectives[0].status, ObjectiveStatus::Active);
+        assert_eq!(state.objectives[0].status, ObjectiveStatus::Pending);
         assert_eq!(state.objectives[1].status, ObjectiveStatus::Pending);
         assert_eq!(state.started_at_tick, 100);
         assert!(matches!(state.result, MissionResult::Active));
+        // Drive one step; first objective activates + objective_started fires.
+        let actors = mk_actors(player_at(120.0, 32.0), false);
+        let report = step(
+            &mut state,
+            MissionTickInputs {
+                tick: 101,
+                player: actors.get(&ActorId(1)),
+                actors: &actors,
+                breaches_broken: &BTreeMap::new(),
+                reactors_destroyed: &BTreeMap::new(),
+            },
+        );
+        assert_eq!(report.objective_started, vec!["breach".to_string()]);
+        assert_eq!(state.objectives[0].status, ObjectiveStatus::Active);
     }
 
     fn build_reactor_defense_state(time_limit_ticks: u64) -> MissionState {
@@ -1031,9 +1099,9 @@ mod tests {
                 time_limit_ticks: 60 * 60,
             },
         );
-        // After construction, `state.objectives[0]` is auto-promoted to
-        // Active so `defend` is the row left at Pending. Sanity-check.
-        assert_eq!(state.objectives[0].status, ObjectiveStatus::Active);
+        // BP2 fix: after construction NO objective is Active yet — step()
+        // activates the first one. `defend` is queued at index 1 = Pending.
+        assert_eq!(state.objectives[0].status, ObjectiveStatus::Pending);
         assert_eq!(state.objectives[1].status, ObjectiveStatus::Pending);
         let actors = mk_actors(player_at(120.0, 32.0), false);
         let mut reactors = BTreeMap::new();
@@ -1238,7 +1306,20 @@ mod tests {
 
     #[test]
     fn mission_view_round_trip() {
-        let state = build_state();
+        // BP2 fix: build_state() returns all objectives Pending; drive one
+        // step() to activate the first one before asserting active_objective.
+        let mut state = build_state();
+        let actors = mk_actors(player_at(120.0, 32.0), false);
+        let _ = step(
+            &mut state,
+            MissionTickInputs {
+                tick: 1,
+                player: actors.get(&ActorId(1)),
+                actors: &actors,
+                breaches_broken: &BTreeMap::new(),
+                reactors_destroyed: &BTreeMap::new(),
+            },
+        );
         let view = MissionView::from_state(&state, 30);
         assert_eq!(view.result, "active");
         assert_eq!(view.active_objective.as_deref(), Some("breach"));
