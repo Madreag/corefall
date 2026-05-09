@@ -17,9 +17,26 @@ copy long-form research here; that's what the vault is for.
 
 ## Unreleased
 
+### T-RELEASE — Adopt SemVer prerelease channels (prealpha/alpha/beta/rc/GA)
+
+The release-tag scheme migrated from `v0.<N>.0-bp<N>` to SemVer prerelease channels (`v0.<N>.0-prealpha`, `-alpha`, `-beta`, `-rc`, `v1.0.0` GA) so that external observers (Steam buyers, contributors, package managers) can read quality from the tag without consulting the internal BP table. Channel boundaries were chosen at quality inflection points: prealpha BP0-BP3 (engine + first fun slices, no full collision / no atmospherics / no AI combat yet), alpha BP4-BP6 (full collision + atmospherics + AI combat), beta BP7-BP9 (mission director + creator alpha + server/LAN), rc BP10-BP11 (online + public systems beta), GA BP12 (`v1.0.0`, pre-release flag dropped).
+
+**What changed mechanically:**
+
+- `game/tools/generate_release_notes.py` parser (bumped to v0.4.0): added `channel` field to `TagInfo`, accepts the four channel patterns + GA + legacy `bp<N>`, enforces the channel-boundary contract (rejects e.g. `v0.4.0-prealpha` because BP4 must ship under `alpha`), `previous_bp_tag()` searches across all channel forms so a `v0.4.0-alpha` can find its `v0.3.0-prealpha` predecessor.
+- `.github/workflows/release.yml` tag-trigger glob extended to fire on `v*-prealpha`, `v*-alpha`, `v*-beta`, `v*-rc`, `v1.0.0` (legacy `v*-bp*` retained for backward compat).
+- `AGENTS.md` § Build Point Closure Gate, `docs/plan/spec/prototype-roadmap.md` § T-RELEASE, `README.md` § release-debt callout updated with the new versioning axis + channel-boundary rationale + retroactive-tag plan for BP1+BP2.
+
+**Retroactive tags published with this entry:**
+
+- `v0.1.0-prealpha` against the BP1 closure HEAD (was previously planned as `v0.1.0-bp1` but never published).
+- `v0.2.0-prealpha` against the BP2 closure HEAD (was previously planned as `v0.2.0-bp2` but never published).
+
+The previously-cancelled `v0.1.0-bp1` and `v0.2.0-bp2` workflow runs are not republished under the legacy form.
+
 ### BP2 follow-up — Source-Truthful Bundle Metadata + AI-Agent-Primary Self-Test Contract
 
-Post-merge of PR #11 (BP2 — Terrain & Replay Build, commit `4d8abc7`), an AI-driven `/corefall-review BP2` audit surfaced four contract gaps that were present pre-merge but not caught by Bugbot/Devin commit-diff review or by the `self_play_sweep.sh` (sweep was 13/13 PASS but does not check bundle-content semantics). This entry covers the follow-up branch + re-tag of `v0.1.0-bp1` and `v0.2.0-bp2` against the post-fix commit.
+Post-merge of PR #11 (BP2 — Terrain & Replay Build, commit `4d8abc7`), an AI-driven `/corefall-review BP2` audit surfaced four contract gaps that were present pre-merge but not caught by Bugbot/Devin commit-diff review or by the `self_play_sweep.sh` (sweep was 13/13 PASS but does not check bundle-content semantics). This entry covers the follow-up branch + re-tag of `v0.1.0-prealpha` and `v0.2.0-prealpha` against the post-fix commit.
 
 **Findings fixed in this entry:**
 

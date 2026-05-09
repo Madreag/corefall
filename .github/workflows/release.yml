@@ -2,8 +2,16 @@ name: release
 on:
   push:
     tags:
-      - 'v*-bp*'
+      # SemVer pre-release channels: prealpha (BP0-BP3), alpha (BP4-BP6),
+      # beta (BP7-BP9), rc (BP10-BP11). v1.0.0 = launch GA (BP12).
+      - 'v*-prealpha'
+      - 'v*-alpha'
+      - 'v*-beta'
+      - 'v*-rc'
       - 'v1.0.0'
+      # Legacy `-bp*` pattern kept for backward compat with already-
+      # published releases. New tags should use the channel-based scheme.
+      - 'v*-bp*'
 
 permissions:
   contents: write
