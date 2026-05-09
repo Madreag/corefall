@@ -2441,6 +2441,66 @@ fn status_change_cause(outcome: &ActorTickOutcome) -> &'static str {
 /// to the upper-case `prototype_slice` label written into `run_manifest.json`.
 /// Falls back to upper-casing the input so future milestones keep working
 /// without an explicit branch here.
+/// Canonical roadmap milestone ordering, used by every per-milestone helper
+/// that needs "is this milestone >= Mx?". Each index is a position in the
+/// canonical Build Points spine — M0=0, M1=1, M1.5=2, M2=3, M2.5=4, M3A=5,
+/// M3B=6, M4A=7, M4B=8, M5=9, ... M12=29. Unknown milestones map to
+/// `MILESTONE_INDEX_UNKNOWN` (after M12) so they default to the final-state
+/// universe (every category is included, every addendum fires) — better to
+/// over-document a future milestone than silently skip categories that have
+/// been shipping for years.
+///
+/// Append a row when a new milestone lands in the canonical roadmap. The
+/// constants below (`MILESTONE_INDEX_M1`, `_M1_5`, `_M2`, `_M3A`) are
+/// landmark gates the category-layering logic checks; only add new
+/// constants here when a new event category is introduced (the current
+/// landmarks cover M1 actor, M1.5 ai/mission/terrain, M2 material, M3A
+/// snapshot; if M5.6 introduces a new category, add `MILESTONE_INDEX_M5_6`).
+const MILESTONE_INDEX_M0: u32 = 0;
+const MILESTONE_INDEX_M1: u32 = 1;
+const MILESTONE_INDEX_M1_5: u32 = 2;
+const MILESTONE_INDEX_M2: u32 = 3;
+const MILESTONE_INDEX_M3A: u32 = 5;
+const MILESTONE_INDEX_UNKNOWN: u32 = 999;
+
+fn milestone_order_index(milestone: &str) -> u32 {
+    match milestone.trim().to_lowercase().as_str() {
+        "" | "m0" => MILESTONE_INDEX_M0,
+        "m1" => MILESTONE_INDEX_M1,
+        "m1.5" => MILESTONE_INDEX_M1_5,
+        "m2" => MILESTONE_INDEX_M2,
+        "m2.5" => 4,
+        "m3a" => MILESTONE_INDEX_M3A,
+        "m3b" => 6,
+        "m4a" => 7,
+        "m4b" => 8,
+        "m5" => 9,
+        "m5.5" => 10,
+        "m5.5.5" => 11,
+        "m5.6" => 12,
+        "m5.7" => 13,
+        "m5.8" => 14,
+        "m5.9" => 15,
+        "m5.9.5" => 16,
+        "m5.10" => 17,
+        "m6" => 18,
+        "m6.5" => 19,
+        "m6.6" => 20,
+        "m7" => 21,
+        "m7.5" => 22,
+        "m7.7" => 23,
+        "m8" => 24,
+        "m8.5" => 25,
+        "m8.6" => 26,
+        "m9" => 27,
+        "m9.5" => 28,
+        "m10" => 29,
+        "m11" => 30,
+        "m12" => 31,
+        _ => MILESTONE_INDEX_UNKNOWN,
+    }
+}
+
 fn prototype_slice_for_milestone(milestone: &str) -> String {
     let normalized = milestone.trim().to_lowercase();
     if normalized.is_empty() {
@@ -2498,88 +2558,25 @@ fn notes_addendum_for_milestone(milestone: &str) -> String {
     // notes addendum reflects what actually fired in this run, not the union
     // across the whole roadmap. Layer is append-only: each milestone inherits
     // every prior category.
+    //
+    // Devin 3212593186 follow-up: refactor from explicit per-milestone match
+    // arms (which silently broke for M3B / M4A / M4B / M6+ that weren't
+    // enumerated) to an ordering-based comparison via `milestone_order_index`.
+    // The order index is the canonical roadmap progression and any new
+    // milestone is added in one place rather than scattered across 4 match
+    // statements that each had to be kept in sync.
+    let idx = milestone_order_index(&normalized);
     let mut categories: Vec<&'static str> = vec!["system", "control", "determinism"];
-    let m_actor_added = matches!(
-        normalized.as_str(),
-        "m1" | "m1.5"
-            | "m2"
-            | "m2.5"
-            | "m3a"
-            | "m3b"
-            | "m4a"
-            | "m4b"
-            | "m5"
-            | "m5.5"
-            | "m5.5.5"
-            | "m5.6"
-            | "m5.7"
-            | "m5.8"
-            | "m5.9"
-            | "m5.9.5"
-            | "m5.10"
-    );
-    if m_actor_added {
+    if idx >= MILESTONE_INDEX_M1 {
         categories.extend(["actor", "combat", "equipment", "input"]);
     }
-    let m_mission_added = matches!(
-        normalized.as_str(),
-        "m1.5"
-            | "m2"
-            | "m2.5"
-            | "m3a"
-            | "m3b"
-            | "m4a"
-            | "m4b"
-            | "m5"
-            | "m5.5"
-            | "m5.5.5"
-            | "m5.6"
-            | "m5.7"
-            | "m5.8"
-            | "m5.9"
-            | "m5.9.5"
-            | "m5.10"
-    );
-    if m_mission_added {
+    if idx >= MILESTONE_INDEX_M1_5 {
         categories.extend(["ai", "mission", "terrain"]);
     }
-    let m_material_added = matches!(
-        normalized.as_str(),
-        "m2" | "m2.5"
-            | "m3a"
-            | "m3b"
-            | "m4a"
-            | "m4b"
-            | "m5"
-            | "m5.5"
-            | "m5.5.5"
-            | "m5.6"
-            | "m5.7"
-            | "m5.8"
-            | "m5.9"
-            | "m5.9.5"
-            | "m5.10"
-    );
-    if m_material_added {
+    if idx >= MILESTONE_INDEX_M2 {
         categories.push("material");
     }
-    let m_snapshot_added = matches!(
-        normalized.as_str(),
-        "m3a"
-            | "m3b"
-            | "m4a"
-            | "m4b"
-            | "m5"
-            | "m5.5"
-            | "m5.5.5"
-            | "m5.6"
-            | "m5.7"
-            | "m5.8"
-            | "m5.9"
-            | "m5.9.5"
-            | "m5.10"
-    );
-    if m_snapshot_added {
+    if idx >= MILESTONE_INDEX_M3A {
         categories.push("snapshot");
     }
     let categories_inline = categories
@@ -3671,6 +3668,45 @@ mod tests {
         assert!(m3a.contains("`snapshot`"));
         assert!(m3a.contains("`material`"));
         assert!(m3a.contains("`mission`"));
+    }
+
+    #[test]
+    fn notes_addendum_categories_layer_correctly_for_post_m5_10_milestones() {
+        // Devin 3212593186 regression: the prior explicit-enumeration match
+        // arms stopped at m5.10, so M6/M6.5/M7/M8/etc. silently fell through
+        // to "categories shipped: system, control, determinism" only —
+        // missing the entire append-only layer they should have inherited.
+        // After the milestone_order_index refactor, M6+ correctly inherits
+        // every prior category.
+        for m in [
+            "m6", "m6.5", "m6.6", "m7", "m7.5", "m7.7", "m8", "m8.5", "m8.6", "m9", "m9.5", "m10", "m11", "m12",
+        ] {
+            let body = notes_addendum_for_milestone(m);
+            assert!(body.contains("`actor`"), "{m}: missing actor category");
+            assert!(body.contains("`mission`"), "{m}: missing mission category");
+            assert!(body.contains("`material`"), "{m}: missing material category");
+            assert!(body.contains("`snapshot`"), "{m}: missing snapshot category");
+        }
+    }
+
+    #[test]
+    fn milestone_order_index_orders_canonical_roadmap() {
+        assert!(milestone_order_index("m0") < milestone_order_index("m1"));
+        assert!(milestone_order_index("m1") < milestone_order_index("m1.5"));
+        assert!(milestone_order_index("m1.5") < milestone_order_index("m2"));
+        assert!(milestone_order_index("m2") < milestone_order_index("m2.5"));
+        assert!(milestone_order_index("m2.5") < milestone_order_index("m3a"));
+        assert!(milestone_order_index("m3a") < milestone_order_index("m3b"));
+        assert!(milestone_order_index("m3b") < milestone_order_index("m4a"));
+        assert!(milestone_order_index("m4a") < milestone_order_index("m4b"));
+        assert!(milestone_order_index("m4b") < milestone_order_index("m5"));
+        assert!(milestone_order_index("m5") < milestone_order_index("m5.10"));
+        assert!(milestone_order_index("m5.10") < milestone_order_index("m6"));
+        assert!(milestone_order_index("m6") < milestone_order_index("m12"));
+        // Unknown milestones map to MILESTONE_INDEX_UNKNOWN (after M12) so
+        // future milestones default to the final-state universe rather than
+        // accidentally falling back to M0's empty categories.
+        assert!(milestone_order_index("future-milestone-x") > milestone_order_index("m12"));
     }
 
     #[test]

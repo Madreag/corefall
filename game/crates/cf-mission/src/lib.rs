@@ -1185,6 +1185,70 @@ mod tests {
     }
 
     #[test]
+    fn timer_expires_on_first_step_with_reachzone_first_defendreactor_pending_yields_timer_loss() {
+        // Bugbot 3212591651 regression: when a multi-objective scenario has
+        // ReachZone listed first (so Phase 0 activates ReachZone, not the
+        // DefendReactor) and the timer happens to be already expired on the
+        // first step() call, the mission must resolve as `Lost { TimerExpired }`
+        // — NOT silently win because the Pending DefendReactor's reactor is
+        // still alive. The win path requires the DefendReactor to actually be
+        // Active, and the reach-zone is still outstanding, so the only correct
+        // resolution is TimerExpired loss.
+        let objectives = vec![
+            Objective {
+                id: "reach".to_string(),
+                kind: ObjectiveKind::ReachZone {
+                    min: [1180.0, 16.0],
+                    max: [1280.0, 64.0],
+                },
+                optional: false,
+                status: ObjectiveStatus::Pending,
+            },
+            Objective {
+                id: "defend".to_string(),
+                kind: ObjectiveKind::DefendReactor {
+                    target: "core_reactor".to_string(),
+                },
+                optional: false,
+                status: ObjectiveStatus::Pending,
+            },
+        ];
+        let mut state = MissionState::new(
+            objectives,
+            0,
+            LossConditions {
+                player_dead: true,
+                time_limit_ticks: 1, // timer expires on the first step()
+            },
+        );
+        let actors = mk_actors(player_at(120.0, 32.0), false); // not in zone
+        let mut reactors = BTreeMap::new();
+        reactors.insert("core_reactor".to_string(), false); // reactor still alive
+        let report = step(
+            &mut state,
+            MissionTickInputs {
+                tick: 1,
+                player: actors.get(&ActorId(1)),
+                actors: &actors,
+                breaches_broken: &BTreeMap::new(),
+                reactors_destroyed: &reactors,
+            },
+        );
+        assert!(matches!(
+            state.result,
+            MissionResult::Lost {
+                reason: LossReason::TimerExpired
+            }
+        ));
+        // Phase 0 still ran first — ReachZone activated.
+        assert_eq!(report.objective_started, vec!["reach".to_string()]);
+        assert_eq!(state.objectives[0].status, ObjectiveStatus::Active);
+        // DefendReactor never got activated — it stays Pending (the player
+        // didn't even get a tick to start defending).
+        assert_eq!(state.objectives[1].status, ObjectiveStatus::Pending);
+    }
+
+    #[test]
     fn defend_reactor_wins_when_timer_expires_with_reactor_alive() {
         let mut state = build_reactor_defense_state(60 * 60);
         let actors = mk_actors(player_at(120.0, 32.0), false);
