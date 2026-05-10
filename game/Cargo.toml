@@ -53,7 +53,7 @@ rand_xoshiro = "0.8.0"
 rand_core = "0.10.1"
 blake3 = "1"
 clap = { version = "4", features = ["derive", "env"] }
-tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "io-util", "sync", "time", "process"] }
+tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "io-util", "sync", "time", "process", "signal"] }
 tokio-tungstenite = "0.29.0"
 schemars = "1.2.1"
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }

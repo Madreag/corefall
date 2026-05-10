@@ -360,61 +360,59 @@ impl Recorder {
             parent_event_id,
             dropped_count: None,
         };
-        if let Ok(mut inner) = self.inner.lock() {
-            *inner.by_category.entry(event.category.clone()).or_insert(0) += 1;
-            *inner.by_type.entry(event.event_type.clone()).or_insert(0) += 1;
-            inner.first_tick.get_or_insert(tick.0);
-            inner.last_tick = Some(tick.0);
-            if event.category == "determinism" && event.event_type == "sim_checksum" {
-                inner.checksum_event_count += 1;
-                if let Some(hex) = event.payload.get("checksum_hex").and_then(|v| v.as_str()) {
-                    inner.final_checksum = Some(hex.to_string());
-                }
+        // Mutex poisoning means a thread panicked while holding the recorder
+        // lock — the run is already in an inconsistent state. We `expect()`
+        // (loud panic) instead of silently logging and returning a phantom
+        // `event_id` for an event that was never recorded (issue #18). All
+        // other recorder methods now use the same `expect()` strategy
+        // (issue #22) so error handling is consistent across the API.
+        let mut inner = self.inner.lock().expect("recorder mutex poisoned; aborting run");
+        *inner.by_category.entry(event.category.clone()).or_insert(0) += 1;
+        *inner.by_type.entry(event.event_type.clone()).or_insert(0) += 1;
+        inner.first_tick.get_or_insert(tick.0);
+        inner.last_tick = Some(tick.0);
+        if event.category == "determinism" && event.event_type == "sim_checksum" {
+            inner.checksum_event_count += 1;
+            if let Some(hex) = event.payload.get("checksum_hex").and_then(|v| v.as_str()) {
+                inner.final_checksum = Some(hex.to_string());
             }
-            inner.events.push(event);
-        } else {
-            // Lock was poisoned; the panic hook will already have logged.
-            // Increment a dropped counter on a freshly poisoned guard via Mutex::clear_poison
-            // is unstable; report via tracing instead.
-            tracing::error!(target: "cf::replay", "recorder mutex poisoned; event dropped");
         }
+        inner.events.push(event);
         event_id
     }
 
     pub fn record_severity(&self, severity: &str) {
-        if let Ok(mut inner) = self.inner.lock() {
-            *inner.by_severity.entry(severity.to_string()).or_insert(0) += 1;
-        }
+        let mut inner = self.inner.lock().expect("recorder mutex poisoned; aborting run");
+        *inner.by_severity.entry(severity.to_string()).or_insert(0) += 1;
     }
 
     pub fn dropped(&self, count: u64) {
-        if let Ok(mut inner) = self.inner.lock() {
-            inner.dropped += count;
+        let mut inner = self.inner.lock().expect("recorder mutex poisoned; aborting run");
+        inner.dropped += count;
+    }
+
+    /// Snapshot the entire event log. Panics on mutex poisoning per the
+    /// consistent recorder error-handling strategy (issue #22): poisoning
+    /// indicates a critical bug, not a transient failure to silently degrade.
+    pub fn snapshot_events(&self) -> Vec<Event> {
+        let inner = self.inner.lock().expect("recorder mutex poisoned; aborting run");
+        inner.events.clone()
+    }
+
+    /// Return events recorded after `after_idx` (i.e., the tail since the
+    /// caller last polled). Panics on mutex poisoning per the consistent
+    /// recorder error-handling strategy (issue #22).
+    pub fn events_since(&self, after_idx: usize) -> Vec<Event> {
+        let inner = self.inner.lock().expect("recorder mutex poisoned; aborting run");
+        if after_idx >= inner.events.len() {
+            Vec::new()
+        } else {
+            inner.events[after_idx..].to_vec()
         }
     }
 
-    pub fn snapshot_events(&self) -> Vec<Event> {
-        self.inner.lock().map(|inner| inner.events.clone()).unwrap_or_default()
-    }
-
-    pub fn events_since(&self, after_idx: usize) -> Vec<Event> {
-        self.inner
-            .lock()
-            .map(|inner| {
-                if after_idx >= inner.events.len() {
-                    Vec::new()
-                } else {
-                    inner.events[after_idx..].to_vec()
-                }
-            })
-            .unwrap_or_default()
-    }
-
     pub fn counts(&self) -> EventCounts {
-        let inner = self
-            .inner
-            .lock()
-            .expect("recorder mutex poisoned; inspect prior tracing::error events");
+        let inner = self.inner.lock().expect("recorder mutex poisoned; aborting run");
         let mut by_severity = inner.by_severity.clone();
         by_severity.entry("error".to_string()).or_insert(0);
         by_severity.entry("warn".to_string()).or_insert(0);
@@ -428,16 +426,18 @@ impl Recorder {
     }
 
     pub fn first_last_tick(&self) -> (Option<u64>, Option<u64>) {
-        let inner = self.inner.lock().expect("recorder mutex poisoned");
+        let inner = self.inner.lock().expect("recorder mutex poisoned; aborting run");
         (inner.first_tick, inner.last_tick)
     }
 
     pub fn final_checksum_hex(&self) -> Option<String> {
-        self.inner.lock().ok().and_then(|i| i.final_checksum.clone())
+        let inner = self.inner.lock().expect("recorder mutex poisoned; aborting run");
+        inner.final_checksum.clone()
     }
 
     pub fn checksum_event_count(&self) -> u64 {
-        self.inner.lock().map(|i| i.checksum_event_count).unwrap_or(0)
+        let inner = self.inner.lock().expect("recorder mutex poisoned; aborting run");
+        inner.checksum_event_count
     }
 }
 
@@ -879,6 +879,39 @@ mod tests {
         assert!(
             matches!(parsed.expected_outcome, ExpectedOutcome::Clean),
             "missing expected_outcome must default to Clean"
+        );
+    }
+
+    #[test]
+    fn recorder_record_panics_on_poisoned_mutex_instead_of_returning_phantom_event_id() {
+        // Issue #18 regression: previously the recorder would silently log
+        // and return an event_id for an event that was never recorded when
+        // the inner mutex was poisoned. Downstream code (events_since,
+        // run-bundle writer, summary aggregator) would then reference an
+        // event id that doesn't exist in the events log. The new behavior
+        // is to panic loudly via `expect()` — mutex poisoning means a
+        // thread panicked while holding the recorder lock, which means the
+        // run is already in an inconsistent state and should abort.
+        use std::sync::Arc;
+        let recorder = Arc::new(Recorder::new("m0_test_poison_e2e".to_string()));
+        // Poison the mutex by panicking inside a thread that holds the lock.
+        let recorder_for_thread = recorder.clone();
+        let _ = std::thread::spawn(move || {
+            let _guard = recorder_for_thread
+                .inner
+                .lock()
+                .expect("first lock acquisition should succeed in setup");
+            panic!("intentional poison for regression test");
+        })
+        .join();
+        // Now any record() call should panic with the documented message.
+        let recorder_for_call = recorder.clone();
+        let panic_result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+            recorder_for_call.record(Tick(0), 0.0, "system", "run_started", serde_json::json!({}), None);
+        }));
+        assert!(
+            panic_result.is_err(),
+            "record() must panic when mutex is poisoned (issue #18); previously it silently returned a phantom event_id"
         );
     }
 }

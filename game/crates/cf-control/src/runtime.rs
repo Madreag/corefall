@@ -120,12 +120,47 @@ pub fn git_commit_sha() -> String {
         .output();
     let head_sha = match head {
         Ok(o) if o.status.success() => String::from_utf8_lossy(&o.stdout).trim().to_string(),
-        _ => return "uncommitted".to_string(),
+        Ok(o) => {
+            tracing::warn!(
+                target: "cf::ctl",
+                stderr = %String::from_utf8_lossy(&o.stderr).trim(),
+                "git rev-parse failed; recording commit_sha as 'uncommitted'. \
+                 Set CF_COMMIT_SHA to override (e.g. in CI)."
+            );
+            return "uncommitted".to_string();
+        }
+        Err(e) => {
+            tracing::warn!(
+                target: "cf::ctl",
+                error = %e,
+                "git binary not available or unreachable; recording commit_sha as 'uncommitted'. \
+                 Set CF_COMMIT_SHA to override (e.g. in CI)."
+            );
+            return "uncommitted".to_string();
+        }
     };
     let status = std::process::Command::new("git")
         .args(["status", "--porcelain"])
         .output();
-    let dirty = matches!(status, Ok(o) if o.status.success() && !o.stdout.is_empty());
+    let dirty = match &status {
+        Ok(o) if o.status.success() => !o.stdout.is_empty(),
+        Ok(o) => {
+            tracing::warn!(
+                target: "cf::ctl",
+                stderr = %String::from_utf8_lossy(&o.stderr).trim(),
+                "git status --porcelain failed; recording commit_sha without -dirty marker (assumed clean)."
+            );
+            false
+        }
+        Err(e) => {
+            tracing::warn!(
+                target: "cf::ctl",
+                error = %e,
+                "git status --porcelain not runnable; recording commit_sha without -dirty marker."
+            );
+            false
+        }
+    };
     if dirty {
         format!("{head_sha}-dirty")
     } else {

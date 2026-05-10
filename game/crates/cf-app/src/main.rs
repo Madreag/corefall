@@ -1,6 +1,6 @@
 use std::{
     net::SocketAddr,
-    path::PathBuf,
+    path::{Path, PathBuf},
     sync::{Arc, Mutex},
 };
 
@@ -217,7 +217,10 @@ fn run_headless_server(config: M0EngineConfig, control_port: u16, _uds: Option<P
             .write_run_bundle(ended, 0)
             .context("final write_run_bundle failed")?;
         tracing::info!(target: "cf::app", run_id = %engine.run_id(), bundle = %bundle.display(), "M0 run bundle written on exit");
-    } else if !config.write_run_bundle {
+    } else {
+        // The outer `if` already gated on `config.write_run_bundle`, so the
+        // remaining branch is unconditionally `!config.write_run_bundle`.
+        // Issue #23: removed redundant `else if !config.write_run_bundle`.
         tracing::info!(target: "cf::app", run_id = %engine.run_id(), ticks = engine.current_tick().0, "M0 headless+control-api exited without --write-run-bundle");
     }
     Ok(())
@@ -231,6 +234,13 @@ fn run_headless_server(config: M0EngineConfig, control_port: u16, _uds: Option<P
 fn run_paced_loop(engine: &Arc<M0Engine>, target_ticks: u64, tick_rate_hz: u32) -> bool {
     let tick_dt = std::time::Duration::from_nanos(1_000_000_000 / u64::from(tick_rate_hz.max(1)));
     let started = engine.started_instant();
+    // SAFETY (issue #24): `next_tick_at += tick_dt` would theoretically
+    // overflow `Instant`'s internal representation after ~584 million years
+    // of continuous operation at 60 Hz (u64 nanoseconds since some
+    // arbitrary monotonic origin). This is acceptable: no realistic game
+    // session will run beyond a few hours; the universe will not last that
+    // long. Using `checked_add` here would add a hot-path branch on every
+    // tick to handle a case that cannot occur in any deployment scenario.
     let mut next_tick_at = started + tick_dt;
     let mut bundle_written = false;
     // Shutdown polling chunk so the loop can respond within ~5 ms even at low tick rates.
@@ -275,6 +285,78 @@ fn flush_pending_runbundle(engine: &Arc<M0Engine>, bundle_written: &mut bool) {
         Err(err) => tracing::error!(target: "cf::app", error = %err, "runbundle.write failed"),
     }
     engine.clear_pending_runbundle();
+}
+
+/// Block until every PNG path the capture handle knows about exists on disk
+/// OR `timeout` elapses. Replaces the earlier fixed 500 ms sleep that raced
+/// Bevy's asynchronous `Screenshot::observe(save_to_disk)` flush queue
+/// (issue #17). Polling cadence is 50 ms — about 10x finer than the 500 ms
+/// the sleep used, while bounding wall-clock cost to the actual flush time
+/// rather than always waiting the worst case.
+fn wait_for_capture_pngs_flushed(
+    handle: &cf_capture::CaptureStateHandle,
+    captures_dir: &Path,
+    timeout: std::time::Duration,
+) {
+    let started = std::time::Instant::now();
+    let poll_interval = std::time::Duration::from_millis(50);
+    // Mutex poisoning warning is logged at most once per call. Without this
+    // latch the warning would emit on every 50 ms poll iteration up to the
+    // 5 s timeout — 100 warnings for a single underlying condition.
+    // Addresses PR #26 review Devin Info finding (capture flush log spam).
+    let mut poison_warned = false;
+    loop {
+        // Snapshot the expected PNG paths under the lock, then release it
+        // so the capture systems (if any are still flushing into the queue
+        // from the very last frame) aren't blocked.
+        let expected_paths: Vec<std::path::PathBuf> = {
+            match handle.events_log.lock() {
+                Ok(events) => events
+                    .iter()
+                    .map(|entry| captures_dir.join(&entry.png_relpath))
+                    .collect(),
+                Err(poisoned) => {
+                    if !poison_warned {
+                        tracing::warn!(
+                            target: "cf::capture",
+                            "capture events_log mutex poisoned during flush wait; proceeding with manifest write \
+                             (warning suppressed for subsequent poll iterations within this call)"
+                        );
+                        poison_warned = true;
+                    }
+                    poisoned
+                        .into_inner()
+                        .iter()
+                        .map(|entry| captures_dir.join(&entry.png_relpath))
+                        .collect()
+                }
+            }
+        };
+        let missing = expected_paths.iter().filter(|p| !p.exists()).count();
+        if missing == 0 {
+            tracing::debug!(
+                target: "cf::capture",
+                expected = expected_paths.len(),
+                elapsed_ms = started.elapsed().as_millis() as u64,
+                "all capture PNGs flushed to disk"
+            );
+            return;
+        }
+        if started.elapsed() >= timeout {
+            tracing::warn!(
+                target: "cf::capture",
+                expected = expected_paths.len(),
+                missing,
+                elapsed_ms = started.elapsed().as_millis() as u64,
+                "capture PNG flush wait timed out; returning to caller — \
+                 the downstream `write_capture_manifest_from_handle` filter \
+                 will defensively skip the {missing} entries whose PNGs \
+                 never landed on disk"
+            );
+            return;
+        }
+        std::thread::sleep(poll_interval);
+    }
 }
 
 fn build_config(cli: &Cli, scenario_path: PathBuf) -> Result<M0EngineConfig> {
@@ -339,6 +421,13 @@ struct ControlRuntime {
     _runtime: Arc<tokio::runtime::Runtime>,
     bound_addr: SocketAddr,
     server_handle: Mutex<Option<tokio::task::JoinHandle<std::io::Result<()>>>>,
+    // Sticky shutdown signal sent into `serve_listener_with_shutdown` so
+    // that ControlRuntime::drop can cleanly stop the accept loop + every
+    // per-connection observation loop instead of relying on
+    // `JoinHandle::abort()` (which leaves in-flight WebSocket connections
+    // dangling). Wired in 2026-05-09 as part of the PR #26 review fix
+    // (Devin Info: serve_listener creates a dead Notify).
+    shutdown_tx: cf_control::server::ShutdownSignal,
 }
 
 fn run_bevy(
@@ -449,13 +538,12 @@ fn run_bevy(
     if capture_enabled {
         // Bevy's `Screenshot::observe(save_to_disk)` is asynchronous: when
         // `app.run()` returns, the observer queue may still hold frames whose
-        // PNGs haven't been flushed to disk yet. Sleep briefly so those land
-        // before we write the manifest — otherwise the manifest will reference
-        // PNG paths that don't exist (failing the grid composer downstream).
-        // 500 ms is empirically enough on macOS Apple Silicon at 10 Hz capture
-        // baseline; for higher cadences or slower disks we still defensively
-        // filter out missing frames below.
-        std::thread::sleep(std::time::Duration::from_millis(500));
+        // PNGs haven't been flushed to disk yet. Issue #17: replace the
+        // earlier fixed 500 ms sleep with active filesystem polling — wait
+        // until every PNG path the capture log knows about actually exists on
+        // disk, OR a generous timeout fires (5 s; well above any plausible
+        // disk-flush latency even on slow hardware or high-cadence capture).
+        wait_for_capture_pngs_flushed(&capture_handle, &captures_dir, std::time::Duration::from_secs(5));
         match write_capture_manifest_from_handle(&capture_config, &capture_handle) {
             Ok(path) => tracing::info!(
                 target: "cf::capture",
@@ -979,16 +1067,24 @@ fn start_control_server(engine: Arc<M0Engine>, port: u16) -> Result<ControlRunti
         .block_on(server.bind())
         .context("failed to bind control listener")?;
     tracing::info!(target: "cf::app", bind = %bound.bind, "control server bound");
-    let handle = runtime.spawn(async move { ControlServer::serve_listener(listener, engine, max_hz).await });
+    let (shutdown_tx, shutdown_rx) = cf_control::server::shutdown_signal();
+    let handle = runtime
+        .spawn(async move { ControlServer::serve_listener_with_shutdown(listener, engine, max_hz, shutdown_rx).await });
     Ok(ControlRuntime {
         _runtime: runtime,
         bound_addr: bound.bind,
         server_handle: Mutex::new(Some(handle)),
+        shutdown_tx,
     })
 }
 
 impl Drop for ControlRuntime {
     fn drop(&mut self) {
+        // Trigger the sticky shutdown signal first so the accept loop +
+        // every in-flight connection's observation loop exit cleanly.
+        // `JoinHandle::abort()` is the fallback if a task wedges past the
+        // shutdown signal.
+        cf_control::server::trigger_shutdown(&self.shutdown_tx);
         if let Some(handle) = self.server_handle.lock().ok().and_then(|mut g| g.take()) {
             handle.abort();
         }

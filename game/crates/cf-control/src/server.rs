@@ -27,9 +27,60 @@ use serde::{Deserialize, Serialize};
 use serde_json::json;
 use tokio::{
     net::TcpListener,
-    sync::{mpsc, Mutex},
+    select,
+    sync::{mpsc, watch, Mutex},
 };
+
+/// Sticky shutdown signal. Use a `watch::<bool>` channel — once set to `true`
+/// the value is sticky (every receiver sees `true` on the next `borrow()` or
+/// `changed().await` regardless of when the signal was set), unlike
+/// `tokio::sync::Notify::notify_waiters()` which is non-sticky and silently
+/// drops the signal if no task is currently `.notified().await`-ing on it.
+///
+/// The non-sticky behavior of `Notify` was the root cause of the observation-
+/// loop hang reported in PR #26 review (Devin 🔴 / Bugbot Medium): when the
+/// observation loop was mid-`engine.snapshot().await` or `out_tx.send().await`
+/// at the moment shutdown fired, the `notify_waiters()` call landed with no
+/// receiver awaiting and was lost forever; the loop returned to its `select!`,
+/// created a fresh `notified()` future, and waited indefinitely for a notify
+/// that would never come. `watch::<bool>` is the standard tokio primitive for
+/// sticky shutdown signals.
+pub type ShutdownSignal = watch::Sender<bool>;
+pub type ShutdownReceiver = watch::Receiver<bool>;
+
+/// Construct a fresh shutdown signal pair.
+pub fn shutdown_signal() -> (ShutdownSignal, ShutdownReceiver) {
+    watch::channel(false)
+}
+
+/// Convenience: trigger shutdown on a sender. No-op if the sender's value is
+/// already `true` (idempotent).
+pub fn trigger_shutdown(tx: &ShutdownSignal) {
+    let _ = tx.send(true);
+}
+
+/// Await the next moment the receiver observes shutdown==true. If the value
+/// was already `true` when called, returns immediately on the next poll.
+async fn wait_for_shutdown(rx: &mut ShutdownReceiver) {
+    if *rx.borrow() {
+        return;
+    }
+    // `changed()` resolves on every value mutation; loop until we observe true.
+    while rx.changed().await.is_ok() {
+        if *rx.borrow() {
+            return;
+        }
+    }
+    // Sender dropped — treat as shutdown so we don't hang forever.
+}
 use tokio_tungstenite::{accept_async, tungstenite::Message};
+
+/// Maximum number of pending outbound WebSocket messages per connection. Hit
+/// when a slow client cannot keep up with the observation stream — producers
+/// then `await` on `send()` and the observation loop naturally paces itself
+/// to the client. Avoids the unbounded-memory growth that
+/// `mpsc::unbounded_channel()` would allow under sustained backpressure.
+const OUTBOUND_CHANNEL_CAPACITY: usize = 256;
 
 use cf_actor::IntentSource;
 
@@ -197,19 +248,61 @@ impl ControlServer {
         Self { config }
     }
 
+    /// Bind + serve forever, exiting cleanly on Ctrl-C / SIGINT.
+    ///
+    /// For programmatic shutdown (e.g., from the engine's `system.shutdown`
+    /// command, or from tests) use [`Self::serve_with_shutdown`].
+    ///
+    /// Uses `tokio::select!` to race the serve future against `ctrl_c()`
+    /// instead of spawning a dedicated ctrl-c handler task. Spawning a
+    /// task would leak it across `serve()` lifecycles (the spawned task
+    /// holds a `ShutdownSignal` clone that never fires after a programmatic
+    /// shutdown returns), which is benign in a single-shot main() but adds
+    /// up if `serve()` is called repeatedly within one tokio runtime
+    /// (PR #26 review Devin Info).
     pub async fn serve<E: EngineHandle>(self, engine: Arc<E>) -> std::io::Result<()> {
+        let (shutdown_tx, shutdown_rx) = shutdown_signal();
+        let serve_fut = self.serve_with_shutdown(engine, shutdown_rx);
+        tokio::pin!(serve_fut);
+
+        select! {
+            // Branch 1: serve_with_shutdown returns (programmatic shutdown
+            // via system.shutdown or accept-loop error) — propagate result.
+            result = &mut serve_fut => {
+                drop(shutdown_tx);
+                result
+            }
+            // Branch 2: Ctrl-C / SIGINT received — trigger sticky shutdown
+            // and then poll serve_with_shutdown to completion so in-flight
+            // connections drain cleanly via the per-connection observation
+            // loops' shutdown handlers.
+            _ = tokio::signal::ctrl_c() => {
+                tracing::info!(target: "cf::ctl", "ctrl-c received; shutting down control server");
+                trigger_shutdown(&shutdown_tx);
+                let result = (&mut serve_fut).await;
+                drop(shutdown_tx);
+                result
+            }
+        }
+    }
+
+    /// Bind + serve until `shutdown_rx` observes `true`. The accept loop
+    /// exits gracefully and in-flight connections receive the same shutdown
+    /// signal so their per-connection observation loops can stop cleanly.
+    ///
+    /// Delegates to [`Self::serve_listener_with_shutdown`] after binding to
+    /// keep the accept-loop logic in exactly one place (PR #26 round-4 review
+    /// Bugbot Low: avoid duplicate `select!` accept loops drifting out of
+    /// sync if a future bug fix touches one but not the other).
+    pub async fn serve_with_shutdown<E: EngineHandle>(
+        self,
+        engine: Arc<E>,
+        shutdown_rx: ShutdownReceiver,
+    ) -> std::io::Result<()> {
         let listener = TcpListener::bind(self.config.bind).await?;
         tracing::info!(target: "cf::ctl", bind = %self.config.bind, "control server listening");
         let max_hz = self.config.max_observe_hz;
-        loop {
-            let (stream, peer) = listener.accept().await?;
-            let engine = engine.clone();
-            tokio::spawn(async move {
-                if let Err(err) = handle_connection(stream, peer, engine, max_hz).await {
-                    tracing::warn!(target: "cf::ctl", %peer, error = %err, "control connection ended with error");
-                }
-            });
-        }
+        Self::serve_listener_with_shutdown(listener, engine, max_hz, shutdown_rx).await
     }
 
     /// Bind without serving so callers can inspect the actual port (useful for
@@ -221,20 +314,44 @@ impl ControlServer {
         Ok((listener, cfg))
     }
 
+    /// Serve on an already-bound listener. Convenience wrapper that creates
+    /// its own shutdown signal but never triggers it; callers wanting real
+    /// shutdown control should use [`Self::serve_listener_with_shutdown`].
     pub async fn serve_listener<E: EngineHandle>(
         listener: TcpListener,
         engine: Arc<E>,
         max_observe_hz: u32,
     ) -> std::io::Result<()> {
+        let (shutdown_tx, shutdown_rx) = shutdown_signal();
+        let result = Self::serve_listener_with_shutdown(listener, engine, max_observe_hz, shutdown_rx).await;
+        drop(shutdown_tx);
+        result
+    }
+
+    pub async fn serve_listener_with_shutdown<E: EngineHandle>(
+        listener: TcpListener,
+        engine: Arc<E>,
+        max_observe_hz: u32,
+        mut shutdown_rx: ShutdownReceiver,
+    ) -> std::io::Result<()> {
         loop {
-            let (stream, peer) = listener.accept().await?;
-            let engine = engine.clone();
-            let max_hz = max_observe_hz;
-            tokio::spawn(async move {
-                if let Err(err) = handle_connection(stream, peer, engine, max_hz).await {
-                    tracing::warn!(target: "cf::ctl", %peer, error = %err, "control connection ended with error");
+            select! {
+                accept = listener.accept() => {
+                    let (stream, peer) = accept?;
+                    let engine = engine.clone();
+                    let max_hz = max_observe_hz;
+                    let connection_shutdown = shutdown_rx.clone();
+                    tokio::spawn(async move {
+                        if let Err(err) = handle_connection(stream, peer, engine, max_hz, connection_shutdown).await {
+                            tracing::warn!(target: "cf::ctl", %peer, error = %err, "control connection ended with error");
+                        }
+                    });
                 }
-            });
+                _ = wait_for_shutdown(&mut shutdown_rx) => {
+                    tracing::info!(target: "cf::ctl", "shutdown signal received; control server stopping accept loop");
+                    return Ok(());
+                }
+            }
         }
     }
 }
@@ -244,12 +361,28 @@ async fn handle_connection<E: EngineHandle>(
     peer: SocketAddr,
     engine: Arc<E>,
     max_observe_hz: u32,
+    server_shutdown: ShutdownReceiver,
 ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let ws_stream = accept_async(stream).await?;
     tracing::info!(target: "cf::ctl", %peer, "control connection accepted");
     let (sink, mut source) = ws_stream.split();
     let sink = Arc::new(Mutex::new(sink));
-    let (out_tx, mut out_rx) = mpsc::unbounded_channel::<Message>();
+    // Bounded channel applies backpressure when the client cannot keep up:
+    // producers `await` on `send()` and the observation loop naturally paces
+    // itself to the slow consumer. Prevents the unbounded-memory growth that
+    // a naive `mpsc::unbounded_channel()` would allow under sustained load.
+    let (out_tx, mut out_rx) = mpsc::channel::<Message>(OUTBOUND_CHANNEL_CAPACITY);
+
+    // Per-connection sticky shutdown signal (watch::<bool>). Triggered when:
+    //  - the source loop exits (client disconnected or error),
+    //  - the server-wide shutdown signal observes `true` (Ctrl-C,
+    //    system.shutdown).
+    // Used by the observation loop to break out of its work cycle even if it
+    // is mid-`engine.snapshot().await` or `out_tx.send().await` when shutdown
+    // fires — `watch::<bool>` is sticky so the signal cannot be lost in a
+    // race window the way `Notify::notify_waiters()` was (PR #26 review
+    // root-cause).
+    let (connection_shutdown_tx, connection_shutdown_rx) = shutdown_signal();
 
     let sink_for_writer = sink.clone();
     let writer_handle = tokio::spawn(async move {
@@ -263,32 +396,69 @@ async fn handle_connection<E: EngineHandle>(
 
     let subscribe_hz: Arc<Mutex<Option<u32>>> = Arc::new(Mutex::new(None));
     let subscribe_filter: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
-    spawn_observation_loop(
+    let observation_handle = spawn_observation_loop(
         engine.clone(),
         out_tx.clone(),
         subscribe_hz.clone(),
         subscribe_filter.clone(),
+        connection_shutdown_rx.clone(),
     );
 
-    while let Some(message) = source.next().await {
-        let message = message?;
-        match message {
-            Message::Text(text) => {
-                let response =
-                    process_request(&text, engine.as_ref(), &subscribe_hz, &subscribe_filter, max_observe_hz).await;
-                if let Some(payload) = response {
-                    let _ = out_tx.send(Message::Text(payload.into()));
+    let mut server_shutdown = server_shutdown;
+    // Inner `if .. is_err() { break }` patterns inside the match arms below
+    // can't be collapsed into pattern guards because `payload` would have to
+    // be moved across the guard boundary (Rust 2021; let-chains require
+    // edition 2024).
+    #[allow(clippy::collapsible_match, clippy::collapsible_if)]
+    loop {
+        select! {
+            maybe_message = source.next() => {
+                let Some(message) = maybe_message else { break; };
+                let message = message?;
+                match message {
+                    Message::Text(text) => {
+                        let response =
+                            process_request(&text, engine.as_ref(), &subscribe_hz, &subscribe_filter, max_observe_hz).await;
+                        if let Some(payload) = response {
+                            // Bounded `send().await` applies backpressure if
+                            // the client is slow. We race the send against the
+                            // shutdown signal so a stalled client cannot wedge
+                            // the connection handler past a shutdown
+                            // (addresses the secondary backpressure-blocks-
+                            // shutdown-detection finding in the PR #26 review).
+                            select! {
+                                send_result = out_tx.send(Message::Text(payload.into())) => {
+                                    if send_result.is_err() { break; }
+                                }
+                                _ = wait_for_shutdown(&mut server_shutdown) => break,
+                            }
+                        }
+                    }
+                    Message::Ping(payload) => {
+                        select! {
+                            send_result = out_tx.send(Message::Pong(payload)) => {
+                                if send_result.is_err() { break; }
+                            }
+                            _ = wait_for_shutdown(&mut server_shutdown) => break,
+                        }
+                    }
+                    Message::Close(_) => break,
+                    _ => {}
                 }
             }
-            Message::Ping(payload) => {
-                let _ = out_tx.send(Message::Pong(payload));
+            _ = wait_for_shutdown(&mut server_shutdown) => {
+                tracing::info!(target: "cf::ctl", %peer, "server shutdown signal received; closing connection");
+                break;
             }
-            Message::Close(_) => break,
-            _ => {}
         }
     }
 
+    // Signal observation loop to stop (sticky watch — even if the loop is
+    // mid-await, the next time it polls the receiver it observes `true`),
+    // then drop the producer sender so the writer task drains and exits.
+    trigger_shutdown(&connection_shutdown_tx);
     drop(out_tx);
+    let _ = observation_handle.await;
     let _ = writer_handle.await;
     tracing::info!(target: "cf::ctl", %peer, "control connection closed");
     Ok(())
@@ -296,36 +466,62 @@ async fn handle_connection<E: EngineHandle>(
 
 fn spawn_observation_loop<E: EngineHandle>(
     engine: Arc<E>,
-    out_tx: mpsc::UnboundedSender<Message>,
+    out_tx: mpsc::Sender<Message>,
     subscribe_hz: Arc<Mutex<Option<u32>>>,
     subscribe_filter: Arc<Mutex<Option<String>>>,
-) {
+    mut shutdown: ShutdownReceiver,
+) -> tokio::task::JoinHandle<()> {
     tokio::spawn(async move {
         loop {
+            // Sticky shutdown check: even if the signal fired mid-iteration
+            // while we were awaiting a snapshot or a send below, the watch
+            // sees it on the very next poll. This is the fix for the
+            // PR #26 review's 🔴 finding — `Notify::notify_waiters()` would
+            // silently drop the signal if no `.notified().await` was active
+            // at notify time, leaving this loop spinning forever.
+            if *shutdown.borrow() {
+                return;
+            }
             let hz_now = { *subscribe_hz.lock().await };
-            match hz_now {
-                None => {
-                    tokio::time::sleep(Duration::from_millis(50)).await;
-                }
+            let sleep_duration = match hz_now {
+                None => Duration::from_millis(50),
                 Some(hz) => {
                     let hz = hz.max(1);
                     let filter = subscribe_filter.lock().await.clone();
-                    let frame = engine.snapshot(filter.as_deref()).await;
+                    // Race the snapshot computation against shutdown so a
+                    // long-running snapshot doesn't hold up exit.
+                    let frame = select! {
+                        f = engine.snapshot(filter.as_deref()) => f,
+                        _ = wait_for_shutdown(&mut shutdown) => return,
+                    };
                     let notification = JsonRpcNotification {
                         jsonrpc: "2.0".to_string(),
                         method: METHOD_OBSERVE_FRAME.to_string(),
                         params: serde_json::to_value(&frame).unwrap_or(serde_json::Value::Null),
                     };
                     if let Ok(payload) = serde_json::to_string(&notification) {
-                        if out_tx.send(Message::Text(payload.into())).is_err() {
-                            break;
+                        // Race the bounded send against shutdown so a slow
+                        // client backpressuring the channel can't keep this
+                        // loop alive past shutdown.
+                        select! {
+                            send_result = out_tx.send(Message::Text(payload.into())) => {
+                                if send_result.is_err() { return; }
+                            }
+                            _ = wait_for_shutdown(&mut shutdown) => return,
                         }
                     }
-                    tokio::time::sleep(Duration::from_millis(1000 / u64::from(hz))).await;
+                    Duration::from_millis(1000 / u64::from(hz))
                 }
+            };
+            // Race the configured sleep against the connection shutdown
+            // signal so the loop exits within milliseconds when the
+            // connection closes.
+            select! {
+                _ = tokio::time::sleep(sleep_duration) => {}
+                _ = wait_for_shutdown(&mut shutdown) => return,
             }
         }
-    });
+    })
 }
 
 async fn process_request<E: EngineHandle>(
@@ -1120,5 +1316,51 @@ mod tests {
                 "{method} wrong reason"
             );
         }
+    }
+
+    /// Regression test for the PR #26 review's 🔴 finding: the original
+    /// implementation used `Notify::notify_waiters()` which is non-sticky —
+    /// if signaled while no `.notified().await` was active, the signal was
+    /// silently lost. This test triggers shutdown BEFORE any receiver
+    /// observes it, then asserts that a receiver created later still
+    /// observes the signal (i.e., `watch::<bool>` is sticky and cannot lose
+    /// the signal in a race window).
+    #[tokio::test]
+    async fn shutdown_signal_is_sticky_across_subscribe_after_trigger() {
+        let (tx, rx) = shutdown_signal();
+        // Trigger shutdown BEFORE anyone awaits — this is the failure mode
+        // of the original Notify-based implementation.
+        trigger_shutdown(&tx);
+        // A new receiver created at any later time observes `true`.
+        let mut late_rx = rx;
+        // `wait_for_shutdown` should resolve essentially immediately because
+        // the value is already `true`. A 100 ms timeout is generous; failure
+        // here means the signal was lost.
+        tokio::time::timeout(std::time::Duration::from_millis(100), wait_for_shutdown(&mut late_rx))
+            .await
+            .expect("wait_for_shutdown must resolve when value is already true (PR #26 sticky-shutdown regression)");
+    }
+
+    /// Regression test for the same root cause but in the snapshot-await
+    /// race window: the observation loop checks `*shutdown.borrow()` at the
+    /// top of every iteration and races every long await against the
+    /// shutdown receiver inside a `select!`. This test simulates the race
+    /// by triggering shutdown WHILE another task is mid-await on
+    /// `wait_for_shutdown` and proves the await resolves cleanly.
+    #[tokio::test]
+    async fn shutdown_signal_unblocks_inflight_wait() {
+        let (tx, rx) = shutdown_signal();
+        let mut rx_for_task = rx.clone();
+        let waiter = tokio::spawn(async move {
+            wait_for_shutdown(&mut rx_for_task).await;
+        });
+        // Give the task a moment to enter the await.
+        tokio::time::sleep(std::time::Duration::from_millis(10)).await;
+        trigger_shutdown(&tx);
+        // The waiter should resolve well within 100 ms.
+        tokio::time::timeout(std::time::Duration::from_millis(100), waiter)
+            .await
+            .expect("in-flight wait_for_shutdown must resolve when signal fires (PR #26 sticky-shutdown regression)")
+            .expect("waiter task should not panic");
     }
 }
