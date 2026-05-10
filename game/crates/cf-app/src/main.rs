@@ -348,7 +348,10 @@ fn wait_for_capture_pngs_flushed(
                 expected = expected_paths.len(),
                 missing,
                 elapsed_ms = started.elapsed().as_millis() as u64,
-                "capture PNG flush timed out; manifest will defensively skip the {missing} missing entries"
+                "capture PNG flush wait timed out; returning to caller — \
+                 the downstream `write_capture_manifest_from_handle` filter \
+                 will defensively skip the {missing} entries whose PNGs \
+                 never landed on disk"
             );
             return;
         }
