@@ -3,6 +3,24 @@
   "title": "ObserveFrame",
   "type": "object",
   "properties": {
+    "accessibility": {
+      "description": "M4A: resolved accessibility surface (UI scale applied, high-contrast\npalette active, captions visible, focusable nodes in z-order).",
+      "$ref": "#/$defs/AccessibilityView",
+      "default": {
+        "captions_visible": true,
+        "focus_cycle": 0,
+        "focusable_nodes": [],
+        "high_contrast_applied": false,
+        "hold_threshold_ms": 250,
+        "hold_to_confirm_applied": false,
+        "key_bindings": {},
+        "key_remap_enabled": false,
+        "reduced_flash_applied": false,
+        "reduced_motion_applied": false,
+        "reduced_shake_applied": false,
+        "ui_scale_applied": 1.0
+      }
+    },
     "actors": {
       "description": "M1: typed projection of every actor in the world. Empty in M0 scenarios.",
       "type": "array",
@@ -11,12 +29,28 @@
         "$ref": "#/$defs/ActorView"
       }
     },
+    "banners": {
+      "description": "M4A: HUD banner queue (status/chassis/mission events that should be\nsurfaced as a top-priority banner). FIFO; HUD draws the most recent N.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/HudBannerView"
+      }
+    },
     "breaches": {
       "description": "M1.5: breach strips in the scenario. Empty for sandbox scenarios.",
       "type": "array",
       "default": [],
       "items": {
         "$ref": "#/$defs/BreachView"
+      }
+    },
+    "captions": {
+      "description": "M4A: captions queue (audio-bound events surfaced as text when\n`Settings.captions == true`). Drained in FIFO order; HUD draws last N.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/CaptionView"
       }
     },
     "enemies": {
@@ -101,6 +135,17 @@
       "type": "integer",
       "format": "uint64",
       "minimum": 0
+    },
+    "tool_validity": {
+      "description": "M4A: tool-validity projection for the HUD TOOL line + AI agents.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ToolValidityView"
+        },
+        {
+          "type": "null"
+        }
+      ]
     }
   },
   "required": [
@@ -115,6 +160,86 @@
     "settings"
   ],
   "$defs": {
+    "AccessibilityView": {
+      "description": "M4A accessibility surface contract. `Settings` already lives on the wire\nvia `observe.settings`; the resolved view in the observe frame says how\nthe HUD has applied each flag at this tick (so consumers can verify a\n200%-scale render or high-contrast palette without a screenshot).",
+      "type": "object",
+      "properties": {
+        "captions_visible": {
+          "type": "boolean"
+        },
+        "focus_cycle": {
+          "description": "M4A: monotonic counter incremented every time focus advances. Lets\ncfctl + cf-e2e detect \"focus has cycled at least once\" without a\ntime-based assertion.",
+          "type": "integer",
+          "format": "uint64",
+          "default": 0,
+          "minimum": 0
+        },
+        "focusable_nodes": {
+          "description": "Stable accessibility ids of every focusable HUD node, in z-order. Used\nby `cfctl ui` and `cf-e2e --verify-focus` to prove the HUD has a\nkeyboard-focusable surface beyond color cues.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "focused_node": {
+          "description": "M4A: id of the currently-focused HUD node (`Some(<id>)` after the\nplayer presses Tab / Shift+Tab / Arrow). `None` when focus is cleared\n(default at scenario load + after Escape). Drives the visible focus\nring in cf-ui + the cf-e2e verify path.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "high_contrast_applied": {
+          "type": "boolean"
+        },
+        "hold_threshold_ms": {
+          "description": "M4A: ACC-A-05 hold threshold in milliseconds.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "hold_to_confirm_applied": {
+          "description": "M4A: ACC-A-05 hold-to-press flag mirror.",
+          "type": "boolean"
+        },
+        "key_bindings": {
+          "description": "M4A: ACC-A-05 active key bindings (action → KeyCode name). When\n`key_remap_enabled` is true, cf-app's keyboard layer consults this\ntable; when false, defaults apply. Surface is observable so cfctl\ncan verify the table round-trip without reading the raw Settings.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "key_remap_enabled": {
+          "description": "M4A: ACC-A-05 remap toggle.",
+          "type": "boolean"
+        },
+        "reduced_flash_applied": {
+          "type": "boolean"
+        },
+        "reduced_motion_applied": {
+          "type": "boolean"
+        },
+        "reduced_shake_applied": {
+          "type": "boolean"
+        },
+        "ui_scale_applied": {
+          "type": "number",
+          "format": "float"
+        }
+      },
+      "required": [
+        "ui_scale_applied",
+        "high_contrast_applied",
+        "captions_visible",
+        "reduced_motion_applied",
+        "reduced_shake_applied",
+        "reduced_flash_applied",
+        "hold_to_confirm_applied",
+        "hold_threshold_ms",
+        "key_remap_enabled",
+        "key_bindings",
+        "focusable_nodes"
+      ]
+    },
     "ActorView": {
       "description": "Public projection of one actor for the observe envelope. Mirrors\n`cf_actor::ActorObservation` with extra fields (rifle ammo / cooldown / reload\nstate) the engine wires through.",
       "type": "object",
@@ -127,6 +252,19 @@
           },
           "maxItems": 2,
           "minItems": 2
+        },
+        "body_silhouette": {
+          "description": "M4A: per-zone body silhouette projection (head/torso/arms/legs hp%).\n`placeholder=true` until M5 lands the real body graph; consumers should\ntreat the LAYOUT as stable but the values as a derived projection.",
+          "$ref": "#/$defs/BodySilhouetteView",
+          "default": {
+            "arm_left_hp_pct": 1.0,
+            "arm_right_hp_pct": 1.0,
+            "head_hp_pct": 1.0,
+            "leg_left_hp_pct": 1.0,
+            "leg_right_hp_pct": 1.0,
+            "placeholder": true,
+            "torso_hp_pct": 1.0
+          }
         },
         "controllable": {
           "type": "boolean"
@@ -143,6 +281,14 @@
           "type": "integer",
           "format": "uint64",
           "minimum": 0
+        },
+        "module_strip": {
+          "description": "M4A: chassis module strip projection. Empty until M5 lands the real\nchassis grammar; M4A populates `weapon_mount` from the selected rifle's\nfire-state so HUD + accessibility tooling have a stable surface.",
+          "$ref": "#/$defs/ModuleStripView",
+          "default": {
+            "modules": [],
+            "placeholder": false
+          }
         },
         "on_ground": {
           "type": "boolean"
@@ -204,6 +350,11 @@
           "format": "uint32",
           "minimum": 0
         },
+        "stance": {
+          "description": "M4A: derived stance label (idle/walking/running/airborne/downed/dead).\n`cfctl observe` consumers + AI agents read this without a screenshot.",
+          "type": "string",
+          "default": "idle"
+        },
         "status": {
           "type": "string"
         },
@@ -233,6 +384,48 @@
         "hp_max",
         "selected_slot",
         "selected_item"
+      ]
+    },
+    "BodySilhouetteView": {
+      "description": "M4A body silhouette projection (mirrors `cf_actor::BodySilhouette`).",
+      "type": "object",
+      "properties": {
+        "arm_left_hp_pct": {
+          "type": "number",
+          "format": "float"
+        },
+        "arm_right_hp_pct": {
+          "type": "number",
+          "format": "float"
+        },
+        "head_hp_pct": {
+          "type": "number",
+          "format": "float"
+        },
+        "leg_left_hp_pct": {
+          "type": "number",
+          "format": "float"
+        },
+        "leg_right_hp_pct": {
+          "type": "number",
+          "format": "float"
+        },
+        "placeholder": {
+          "type": "boolean"
+        },
+        "torso_hp_pct": {
+          "type": "number",
+          "format": "float"
+        }
+      },
+      "required": [
+        "head_hp_pct",
+        "torso_hp_pct",
+        "arm_left_hp_pct",
+        "arm_right_hp_pct",
+        "leg_left_hp_pct",
+        "leg_right_hp_pct",
+        "placeholder"
       ]
     },
     "BreachView": {
@@ -293,6 +486,32 @@
         "max_hp",
         "broken",
         "dig_range"
+      ]
+    },
+    "CaptionView": {
+      "description": "M4A captions queue entry. When `Settings.captions == true`, audio-bound\nevents surface as caption rows. Until cf-audio lands at BP6+ the captions\nqueue carries event-derived placeholders so the contract is testable from\nM4A onward (DR-012 ACC-A floor closure).",
+      "type": "object",
+      "properties": {
+        "accessibility_id": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "raised_at_tick": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "raised_at_tick",
+        "accessibility_id"
       ]
     },
     "EnemyView": {
@@ -362,6 +581,50 @@
         "aim"
       ]
     },
+    "HudBannerView": {
+      "description": "M4A HUD banner queue entry. Surfaced from chassis/status/mission events so\nHUD + `cfctl observe` consumers see the same priority-ordered banner stack.\nThe text-only banner is the M4A floor; M4B layers comic-noir styling on\ntop without changing the queue contract.",
+      "type": "object",
+      "properties": {
+        "accessibility_id": {
+          "description": "Stable accessibility id surfaced for `cfctl ui` (M4A surface; M4B+\nextends to comic-noir card nodes).",
+          "type": "string"
+        },
+        "expires_at_tick": {
+          "description": "Tick the banner expires at (no expiration when `None`).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "id": {
+          "description": "Stable id (e.g., `armor_cracked_left`, `eject_now`, `hp_critical`,\n`ammo_out`, `mission_failed`, `mission_won`).",
+          "type": "string"
+        },
+        "label": {
+          "description": "Player-facing banner text (English at M4A; Tier-A localization keys at\nthe next milestone-enhancement pass).",
+          "type": "string"
+        },
+        "raised_at_tick": {
+          "description": "Tick the banner was raised at; used for FIFO drain priority + replay.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "severity": {
+          "description": "Severity: `critical` (red-equivalent), `warning` (amber-equivalent),\n`info` (neutral). Severity is text + icon, never color-only — HUD MUST\nrender the severity word + icon glyph alongside the label.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "severity",
+        "label",
+        "raised_at_tick",
+        "accessibility_id"
+      ]
+    },
     "MissionView": {
       "description": "M1.5 mission projection (re-exposed via JsonSchema-friendly types).",
       "type": "object",
@@ -421,6 +684,48 @@
         "objectives",
         "last_event_tick",
         "last_event_label"
+      ]
+    },
+    "ModuleStateView": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "state",
+        "kind"
+      ]
+    },
+    "ModuleStripView": {
+      "description": "M4A module strip projection (mirrors `cf_actor::ModuleStrip`).",
+      "type": "object",
+      "properties": {
+        "modules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ModuleStateView"
+          }
+        },
+        "placeholder": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "modules",
+        "placeholder"
       ]
     },
     "ObjectiveView": {
@@ -571,6 +876,31 @@
         "high_contrast": {
           "type": "boolean"
         },
+        "hold_threshold_ms": {
+          "description": "M4A: hold threshold in milliseconds. Default 250 ms; clamped to\n`[50..2000]` by `apply_settings_patch`.",
+          "type": "integer",
+          "format": "uint32",
+          "default": 250,
+          "minimum": 0
+        },
+        "hold_to_confirm": {
+          "description": "M4A: hold-to-press alternative for tap-to-press actions (ACC-A-05).\nWhen `true`, edge-triggered actions (jump / fire / reload / dig /\nreset / select_slot_*) require holding the key/button for\n`hold_threshold_ms` before firing instead of triggering on the press\nedge. Default: off (tap semantics). cf-app's `ingest_player_input`\nhonors this through the `HoldTracker` resource; cfctl-driven\ndispatches bypass the hold gate (control-plane is already explicit\npress/release semantics).",
+          "type": "boolean",
+          "default": false
+        },
+        "key_bindings": {
+          "description": "M4A: per-action key binding overrides. Action names are limited to\n[`SUPPORTED_KEY_BINDING_ACTIONS`]; KeyCode names are limited to\n[`SUPPORTED_KEY_CODE_NAMES`]. Empty by default; `act.settings.set`\nreplaces the table only after validation so unsupported remaps reject\nat the control boundary instead of silently falling back in cf-app.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {}
+        },
+        "key_remap_enabled": {
+          "description": "M4A: when `true`, cf-app's keyboard layer reads its action bindings\nfrom `key_bindings` instead of the built-in defaults. When `false`,\nthe built-in defaults apply (Space=jump, Enter|J=fire, R=reload,\nG=dig, L=reset, 1..4=select_slot_0..3). The remap UI editor lands\nat M8; M4A ships the cfctl-settable surface so the contract is\nbehavior-testable today.",
+          "type": "boolean",
+          "default": false
+        },
         "reduced_flash": {
           "type": "boolean"
         },
@@ -659,6 +989,46 @@
         "dirty_chunk_count",
         "allocated_chunk_count",
         "material_counts"
+      ]
+    },
+    "ToolValidityView": {
+      "description": "M4A tool-validity projection. Mirrors the `terrain.tool_refused` reason\ncode together with the most-recent successful `terrain.terrain_carved`\ntick. Consumed by the HUD `TOOL` line and AI agents that want a one-shot\n\"is this tile diggable right now?\" answer without scanning the event log.",
+      "type": "object",
+      "properties": {
+        "last_carve_tick": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "last_refusal_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "last_refusal_target": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "last_refusal_tick": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "valid": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "valid"
       ]
     }
   }

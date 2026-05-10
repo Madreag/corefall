@@ -70,12 +70,12 @@
 #
 # Optional env:
 #   AGENT_ID            agent identity recorded in grading.json (default: $AGENT_ID or "Droid (model unspecified)")
-#   SKIP_SWEEP          if set, skip the self_play_sweep run (faster local
-#                        coverage check; CI / pre-PR run should NOT skip)
-#   SKIP_GRADE          if set, skip the LLM grading scaffold + validation
-#                        (use only for the very first iteration when no
-#                        bundles exist yet; subsequent iterations must run
-#                        grading)
+#   SKIP_SWEEP          if set, skip the self_play_sweep run for local
+#                        diagnosis only. Any skipped proof phase forces the
+#                        aggregate verdict false.
+#   SKIP_GRADE          if set, skip LLM grading for local diagnosis only.
+#                        Any skipped proof phase forces the aggregate verdict
+#                        false.
 #   MAX_ITERATIONS      cap on loop attempts (default: read from
 #                        bp<N>.test_manifest.json loop_thresholds, fallback 10)
 
@@ -109,6 +109,61 @@ fail_with() { log "FAIL: $*"; exit 1; }
 log "BP $BP closure loop starting"
 log "  manifest: $MANIFEST"
 log "  loop dir: $LOOP_DIR"
+
+# Audit fix round-5 (2026-05-10): Phase 4/5/6 must bind to bundles created
+# DURING THIS loop iteration, not historical bundles. We capture the loop
+# start epoch so subsequent phases can filter `prototype_runs/native/*` down
+# to the fresh bundles produced by Phase 3's sweep + any in-loop cf-app
+# invocations. Historical bundles' gradings cannot launder a fresh bundle's
+# closure verdict.
+LOOP_START_EPOCH=$(date -u +%s)
+FRESH_BUNDLES_FILE="$LOOP_DIR/fresh_bundles.txt"
+REDUNDANT_BUNDLES_FILE="$LOOP_DIR/redundant_fresh_bundles.txt"
+: > "$FRESH_BUNDLES_FILE"
+: > "$REDUNDANT_BUNDLES_FILE"
+log "  loop start epoch: $LOOP_START_EPOCH (Unix UTC seconds)"
+
+HEAD_SHA_FULL=$(git -C "$REPO_ROOT" rev-parse HEAD 2>/dev/null || echo "")
+HEAD_SHA12=${HEAD_SHA_FULL:0:12}
+CURRENT_DIRTY=false
+CURRENT_FINGERPRINT=""
+if [[ -n "$(git -C "$REPO_ROOT" status --porcelain=v1 2>/dev/null || true)" ]]; then
+    CURRENT_DIRTY=true
+    CURRENT_FINGERPRINT=$(cd "$GAME_DIR" && cargo run -q -p cf-control --example worktree_fingerprint 2>>"$LOG" || true)
+    if [[ -z "$CURRENT_FINGERPRINT" ]]; then
+        fail_with "current checkout is dirty but worktree fingerprint could not be computed"
+    fi
+fi
+log "  HEAD commit (12-char): $HEAD_SHA12"
+log "  current worktree dirty: $CURRENT_DIRTY"
+if [[ "$CURRENT_DIRTY" == "true" ]]; then
+    log "  current worktree fingerprint: $CURRENT_FINGERPRINT"
+fi
+
+find_valid_current_proof() {
+    local scenario="$1"
+    local reference="${2:-}"
+    local args=(
+        "$REPO_ROOT/game/tools/current_bundle_proof.py" find
+        --root "$REPO_ROOT/prototype_runs/native"
+        --head-sha12 "$HEAD_SHA12"
+        --current-dirty "$CURRENT_DIRTY"
+        --current-fingerprint "$CURRENT_FINGERPRINT"
+        --scenario "$scenario"
+    )
+    if [[ -n "$reference" ]]; then
+        args+=(--reference "$reference")
+    fi
+    local candidate
+    while IFS= read -r candidate; do
+        [[ -d "$candidate" ]] || continue
+        if python3 "$REPO_ROOT/game/tools/llm_grade_run.py" validate --bundle "$candidate" --write >/dev/null 2>>"$LOG"; then
+            printf '%s\n' "$candidate"
+            return 0
+        fi
+    done < <(python3 "${args[@]}" 2>>"$LOG")
+    return 1
+}
 
 # ---------------------------------------------------------------------------
 # Phase 1 — Coverage check
@@ -155,7 +210,7 @@ if [[ -z "${SKIP_SWEEP:-}" ]]; then
     log "Phase 3: bash game/tools/self_play_sweep.sh"
     if bash "$REPO_ROOT/game/tools/self_play_sweep.sh" >>"$LOG" 2>&1; then
         PHASE3=PASS
-        log "  → 13/13 PASS"
+        log "  → PASS"
     else
         PHASE3=FAIL
         log "  → sweep failed (see $LOG)"
@@ -171,33 +226,120 @@ PHASE4="SKIP"
 PHASE5="PENDING_AGENT"
 PHASE6="SKIP"
 if [[ -z "${SKIP_GRADE:-}" ]]; then
-    log "Phase 4: LLM grading scaffolds for fun-proof bundles produced this hour"
-    SCAFFOLD_COUNT=0
-    for bundle in "$REPO_ROOT/prototype_runs/native"/m*_$(date -u +%Y-%m-%dT%H)*; do
-        if [[ -d "$bundle" ]] && [[ -f "$bundle/run_manifest.json" ]] && [[ ! -f "$bundle/grading.json" ]]; then
-            python3 "$REPO_ROOT/game/tools/llm_grade_run.py" scaffold \
-                --bundle "$bundle" \
-                --agent "${AGENT_ID:-Droid (loop-scaffolded)}" \
-                >>"$LOG" 2>&1 && SCAFFOLD_COUNT=$((SCAFFOLD_COUNT + 1))
+    # Audit fix round-5 (2026-05-10): rebuild the fresh-bundle set from
+    # filesystem mtime against $LOOP_START_EPOCH so subsequent phases never
+    # mistake a historical bundle's grading for proof of THIS iteration's
+    # behavior. The reviewer caught a real failure mode: previously Phase 4
+    # scanned `m*_<hour>*` and Phase 6 scanned every bundle ever produced —
+    # so an old hand-graded bundle could pass Phase 6 even after the loop's
+    # current sweep produced a fresh bundle that NOBODY graded. The fix:
+    # bind every grading phase to the bundles whose run_manifest.json was
+    # written AT OR AFTER LOOP_START_EPOCH.
+    log "Phase 4: identifying fresh fun-proof bundles produced by THIS loop iteration"
+    : > "$FRESH_BUNDLES_FILE"
+    SCEN_LIST=$(python3 -c "
+import json
+m=json.load(open('$MANIFEST'))
+print(' '.join(s['id'] for s in m.get('fun_proof_scenarios',[])))
+")
+    for bundle in "$REPO_ROOT/prototype_runs/native"/m*_*/; do
+        [[ -d "$bundle" ]] || continue
+        manifest_file="${bundle%/}/run_manifest.json"
+        [[ -f "$manifest_file" ]] || continue
+        BUNDLE_EPOCH=$(date -r "$manifest_file" -u +%s 2>/dev/null || stat -f %m "$manifest_file" 2>/dev/null || echo "0")
+        if [[ "$BUNDLE_EPOCH" -ge "$LOOP_START_EPOCH" ]]; then
+            BUNDLE_SCEN=$(python3 -c "import json; print(json.load(open('$manifest_file')).get('scene',{}).get('id',''))" 2>/dev/null || echo "")
+            if [[ -n "$BUNDLE_SCEN" ]] && [[ " $SCEN_LIST " == *" $BUNDLE_SCEN "* ]]; then
+                echo "${bundle%/}" >> "$FRESH_BUNDLES_FILE"
+            fi
         fi
     done
-    log "  → scaffolded $SCAFFOLD_COUNT new grading.json files"
-    PHASE4=PASS
+    FRESH_COUNT=$(wc -l < "$FRESH_BUNDLES_FILE" | tr -d ' ')
+    log "  → identified $FRESH_COUNT fresh fun-proof bundle(s) for grading"
 
-    log "Phase 5: agent fills grading.json prose for each fun-proof bundle"
-    log "  AGENT ACTION REQUIRED:"
-    log "    1. Read each new grading.json under prototype_runs/native/m*_$(date -u +%Y-%m-%d)*"
-    log "    2. For each dimension, read the evidence_required (frames, events, observe fields)"
-    log "    3. Fill in score (0-10) + evidence_read (audit trail) + prose (>=30 chars) + verdict"
-    log "    4. Run: python3 game/tools/llm_grade_run.py validate --bundle <dir> --write"
-    log "    5. When validate exits 0, this phase is complete"
+    if [[ "$FRESH_COUNT" == "0" ]]; then
+        PHASE4=FAIL
+        PHASE5=FAIL
+        log "  → FAIL — no fresh fun-proof bundles were produced by this loop"
+        log "     Closure-quality BP runs must execute the sweep and produce current evidence."
+    else
+        PHASE4=PASS
+    fi
+
+    log "Phase 4: LLM grading scaffolds for THIS loop's fresh fun-proof bundles"
+    SCAFFOLD_COUNT=0
+    REDUNDANT_COUNT=0
+    if [[ "$PHASE4" == "PASS" ]]; then
+        while IFS= read -r bundle; do
+            [[ -d "$bundle" ]] || continue
+            BUNDLE_SCEN=$(python3 -c "import json; print(json.load(open('$bundle/run_manifest.json')).get('scene',{}).get('id',''))" 2>/dev/null || echo "")
+            CANONICAL_PROOF=$(find_valid_current_proof "$BUNDLE_SCEN" "$bundle" || true)
+            if [[ -n "$CANONICAL_PROOF" && "$CANONICAL_PROOF" != "$bundle" ]]; then
+                echo "$bundle|$CANONICAL_PROOF" >> "$REDUNDANT_BUNDLES_FILE"
+                REDUNDANT_COUNT=$((REDUNDANT_COUNT + 1))
+                continue
+            fi
+            if [[ ! -f "$bundle/grading.json" ]]; then
+                python3 "$REPO_ROOT/game/tools/llm_grade_run.py" scaffold \
+                    --bundle "$bundle" \
+                    --agent "${AGENT_ID:-Droid (loop-scaffolded)}" \
+                    >>"$LOG" 2>&1 && SCAFFOLD_COUNT=$((SCAFFOLD_COUNT + 1))
+            fi
+        done < "$FRESH_BUNDLES_FILE"
+    fi
+    log "  → scaffolded $SCAFFOLD_COUNT new grading.json files for THIS loop's fresh bundles"
+    log "  → recognized $REDUNDANT_COUNT fresh bundle(s) already covered by a current-code graded equivalent"
+
+    log "Phase 5: agent fills grading.json prose for THIS loop's fresh bundles"
+    # Phase 5 = every fresh bundle from THIS loop has either (a) its own
+    # filled+valid grading.json, or (b) a same-scenario/same-settings bundle
+    # whose build fingerprint matches the current checkout and whose grading
+    # validates. Case (b) is not laundering: it is exact current-code reuse for
+    # deterministic duplicate sweep rows and avoids creating cloned prose files.
+    PENDING_BUNDLES=()
+    if [[ "$PHASE4" == "PASS" ]]; then
+        PHASE5=PASS
+        while IFS= read -r bundle; do
+            [[ -d "$bundle" ]] || continue
+            if [[ -f "$bundle/grading.json" ]] && python3 "$REPO_ROOT/game/tools/llm_grade_run.py" validate --bundle "$bundle" --write >/dev/null 2>>"$LOG"; then
+                continue
+            fi
+            BUNDLE_SCEN=$(python3 -c "import json; print(json.load(open('$bundle/run_manifest.json')).get('scene',{}).get('id',''))" 2>/dev/null || echo "")
+            CANONICAL_PROOF=$(awk -F'|' -v b="$bundle" '$1 == b {print $2; exit}' "$REDUNDANT_BUNDLES_FILE")
+            if [[ -z "$CANONICAL_PROOF" ]]; then
+                CANONICAL_PROOF=$(find_valid_current_proof "$BUNDLE_SCEN" "$bundle" || true)
+            fi
+            if [[ -n "$CANONICAL_PROOF" ]]; then
+                log "  → $bundle: PASS via current-code equivalent $CANONICAL_PROOF/grading.json"
+                continue
+            fi
+            PENDING_BUNDLES+=("$bundle")
+        done < "$FRESH_BUNDLES_FILE"
+    fi
+    if [[ "$PHASE5" == "FAIL" ]]; then
+        log "  → FAIL (no fresh fun-proof bundles to grade)"
+    elif [[ ${#PENDING_BUNDLES[@]} -gt 0 ]]; then
+        PHASE5=PENDING_AGENT
+        log "  → PENDING_AGENT — ${#PENDING_BUNDLES[@]} fun-proof grading.json files in this iteration are unfilled or invalid:"
+        for b in "${PENDING_BUNDLES[@]}"; do
+            log "      $b/grading.json"
+        done
+        log "  AGENT ACTION REQUIRED for each PENDING bundle:"
+        log "    1. Read each pending grading.json"
+        log "    2. For each dimension, read the evidence_required (frames, events, observe fields)"
+        log "    3. Fill in score (0-10) + evidence_read (audit trail) + prose (>=30 chars) + verdict"
+        log "    4. Run: python3 game/tools/llm_grade_run.py validate --bundle <dir> --write"
+        log "    5. Re-run this loop until all bundles validate"
+    else
+        log "  → PASS (every fun-proof grading.json from this iteration validates)"
+    fi
     log ""
 
-    log "Phase 6: at least one grading.json per fun_proof_scenario must validate PASS"
-    # Read the fun_proof_scenarios from the manifest + check that for each
-    # scenario id, at least one bundle anywhere under prototype_runs/native/
-    # has a passing grading.json. Empty scaffolds are skipped (they're
-    # instructions to the agent, not failures).
+    log "Phase 6: at least one CURRENT-CODE bundle per fun_proof_scenario must validate PASS"
+    # Current proof is either a fresh validating bundle from this loop or an
+    # earlier validating bundle whose build metadata proves the same current
+    # source state. Clean checkouts match HEAD exactly. Dirty checkouts must
+    # match the worktree fingerprint; commit_sha[:12] alone is rejected.
     PHASE6=PASS
     SCENARIOS_JSON=$(python3 -c "
 import json
@@ -208,26 +350,45 @@ print('\n'.join(ids))
     while IFS= read -r SCEN; do
         [[ -z "$SCEN" ]] && continue
         FOUND_PASS=0
-        FOUND_ANY=0
-        for bundle in $(ls -1dt "$REPO_ROOT/prototype_runs/native"/*_*/ 2>/dev/null); do
+        FRESH_FOR_SCEN=0
+
+        # First try: any FRESH bundle with a filled grading.
+        while IFS= read -r bundle; do
             [[ -d "$bundle" ]] || continue
-            [[ -f "$bundle/grading.json" ]] || continue
-            G_SCEN=$(python3 -c "import json; print(json.load(open('${bundle%/}/grading.json')).get('scenario_id',''))" 2>/dev/null || echo "")
+            [[ -f "$bundle/grading.json" ]] || { FRESH_FOR_SCEN=$((FRESH_FOR_SCEN + 1)); continue; }
+            G_SCEN=$(python3 -c "import json; print(json.load(open('$bundle/grading.json')).get('scenario_id',''))" 2>/dev/null || echo "")
             [[ "$G_SCEN" == "$SCEN" ]] || continue
-            FOUND_ANY=$((FOUND_ANY + 1))
-            if python3 "$REPO_ROOT/game/tools/llm_grade_run.py" validate --bundle "${bundle%/}" --write >/dev/null 2>>"$LOG"; then
+            FRESH_FOR_SCEN=$((FRESH_FOR_SCEN + 1))
+            if python3 "$REPO_ROOT/game/tools/llm_grade_run.py" validate --bundle "$bundle" --write >/dev/null 2>>"$LOG"; then
                 FOUND_PASS=$((FOUND_PASS + 1))
-                log "  → $SCEN: PASS via ${bundle%/}/grading.json"
+                log "  → $SCEN: PASS via $bundle/grading.json (fresh, this loop)"
                 break
             fi
-        done
+        done < "$FRESH_BUNDLES_FILE"
+
+        if [[ "$FOUND_PASS" == "0" ]]; then
+            CANONICAL_PROOF=$(find_valid_current_proof "$SCEN" || true)
+            if [[ -n "$CANONICAL_PROOF" ]]; then
+                FOUND_PASS=$((FOUND_PASS + 1))
+                if [[ "$CURRENT_DIRTY" == "true" ]]; then
+                    log "  → $SCEN: PASS via $CANONICAL_PROOF/grading.json (worktree fingerprint matches current checkout)"
+                else
+                    log "  → $SCEN: PASS via $CANONICAL_PROOF/grading.json (clean HEAD $HEAD_SHA12)"
+                fi
+            fi
+        fi
+
         if [[ "$FOUND_PASS" == "0" ]]; then
             PHASE6=FAIL
-            if [[ "$FOUND_ANY" == "0" ]]; then
-                log "  → $SCEN: FAIL — no grading.json scaffolded yet for any bundle of this scenario"
+            if [[ "$FRESH_FOR_SCEN" == "0" ]]; then
+                log "  → $SCEN: FAIL — no fresh OR current-source graded bundle for this scenario"
+                log "     AGENT ACTION: run cf-e2e for this scenario, then fill the freshly-scaffolded grading.json"
+                log "                   from THIS bundle's actual events.jsonl + summary.json + captures (no laundering),"
+                log "                   then run \`python3 game/tools/llm_grade_run.py validate --bundle <dir> --write\`"
             else
-                log "  → $SCEN: FAIL — $FOUND_ANY scaffold(s) exist but none filled in by an agent yet"
-                log "     AGENT ACTION: open one of those scaffolds, fill score/prose/evidence_read/verdict per dimension,"
+                log "  → $SCEN: FAIL — $FRESH_FOR_SCEN fresh bundle(s) for this scenario but none have a filled+validating grading"
+                log "     AGENT ACTION: open the fresh bundle's grading.json, fill score/prose/evidence_read/verdict per dimension"
+                log "                   from THIS bundle's actual events.jsonl + summary.json + captures (do NOT clone older grading),"
                 log "                   then run \`python3 game/tools/llm_grade_run.py validate --bundle <dir> --write\`"
             fi
         fi
@@ -240,8 +401,15 @@ fi
 # ---------------------------------------------------------------------------
 # Aggregate verdict
 # ---------------------------------------------------------------------------
+# Closure quality has no waiver aggregate: SKIP_SWEEP/SKIP_GRADE are useful
+# while iterating, but a BP closeout verdict requires coverage, build/lint/test,
+# sweep, grading scaffold, grading filled, and grading validate all to PASS.
+# This deliberately keeps the legacy JSON key name for downstream parsers while
+# making skipped proof phases non-closing.
 ALL_PASS="false"
-if [[ "$PHASE1" == "PASS" && "$PHASE2" == "PASS" && ( "$PHASE3" == "PASS" || "$PHASE3" == "SKIP" ) && ( "$PHASE6" == "PASS" || "$PHASE6" == "SKIP" ) ]]; then
+if [[ "$PHASE1" == "PASS" && "$PHASE2" == "PASS" \
+      && "$PHASE3" == "PASS" && "$PHASE4" == "PASS" \
+      && "$PHASE5" == "PASS" && "$PHASE6" == "PASS" ]]; then
     ALL_PASS="true"
 fi
 
@@ -260,7 +428,7 @@ cat > "$VERDICT" <<EOF
     "grading_validate": "$PHASE6"
   },
   "all_phases_pass_or_skipped": $ALL_PASS,
-  "next_step": "$([[ "$ALL_PASS" == "true" ]] && echo "Run /corefall-review $BP; if Accept, push branch + open PR" || echo "Agent reads $LOG, fixes findings, re-runs this loop")"
+  "next_step": "$([[ "$ALL_PASS" == "true" ]] && echo "Run /corefall-review $BP; if Accept, push branch + open PR" || echo "Agent reads $LOG, fixes findings, re-runs this loop without skipped proof phases")"
 }
 EOF
 
@@ -270,7 +438,7 @@ log ""
 cat "$VERDICT" | tee -a "$LOG"
 log ""
 if [[ "$ALL_PASS" == "true" ]]; then
-    log "ALL PHASES PASSED OR SKIPPED — agent next: /corefall-review $BP"
+    log "ALL REQUIRED PHASES PASSED — agent next: /corefall-review $BP"
     log "  When the review verdict is Accept, push branch + open PR:"
     log "    git push -u origin \$(git symbolic-ref --short HEAD)"
     log "    gh pr create --title 'BP$BP: ...' --body '...'"

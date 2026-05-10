@@ -19,11 +19,12 @@
 use std::{
     path::{Path, PathBuf},
     process::Stdio,
+    sync::atomic::{AtomicU64, Ordering},
     time::Duration,
 };
 
 use anyhow::{Context, Result};
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use futures_util::{SinkExt, StreamExt};
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -33,6 +34,8 @@ use tracing_subscriber::EnvFilter;
 
 use cf_control::SCHEMA_VERSION;
 use cf_replay::diagnostics;
+
+static CONTROL_PORT_FILE_SEQ: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Parser)]
 #[command(name = "cf-e2e", about = "M1.5 scripted end-to-end runner.")]
@@ -52,6 +55,18 @@ struct Cli {
     high_contrast: bool,
     #[arg(long)]
     verify_focus: bool,
+    /// M4A: ACC-A floor — captions on/off (mirrors cf-app's `--captions on|off`).
+    #[arg(long, value_enum, default_value_t = CaptionsArg::On)]
+    captions: CaptionsArg,
+    /// M4A: ACC-A floor — pass through `--reduced-motion` to the spawned cf-app.
+    #[arg(long)]
+    reduced_motion: bool,
+    /// M4A: ACC-A floor — pass through `--reduced-shake` to the spawned cf-app.
+    #[arg(long)]
+    reduced_shake: bool,
+    /// M4A: ACC-A floor — pass through `--reduced-flash` to the spawned cf-app.
+    #[arg(long)]
+    reduced_flash: bool,
     #[arg(long)]
     save_load_roundtrip: bool,
     #[arg(long)]
@@ -63,7 +78,9 @@ struct Cli {
     /// `--timeout-seconds` for fast tests if needed.
     #[arg(long, default_value_t = 180)]
     timeout_seconds: u64,
-    #[arg(long, default_value_t = 17900u16)]
+    /// Control API port for the spawned cf-app. 0 chooses an ephemeral free
+    /// port so concurrent sweep rows do not collide.
+    #[arg(long, default_value_t = 0u16)]
     control_port: u16,
     /// T-CAPTURE: enable cf-capture frame readback + grid composition.
     /// When set, the spawned cf-app runs in windowed mode (NOT --headless-smoke)
@@ -102,6 +119,18 @@ struct Cli {
     composer_script: Option<PathBuf>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+enum CaptionsArg {
+    On,
+    Off,
+}
+
+impl CaptionsArg {
+    const fn as_bool(self) -> bool {
+        matches!(self, Self::On)
+    }
+}
+
 fn init_diagnostics() {
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info,cf_=debug")))
@@ -115,13 +144,7 @@ async fn main() -> Result<()> {
     init_diagnostics();
     let cli = Cli::parse();
     tracing::info!(target: "cf::e2e", scenario = %cli.scenario, script = ?cli.script, "starting cf-e2e");
-    let _ = (
-        cli.ui_scale,
-        cli.high_contrast,
-        cli.verify_focus,
-        cli.save_load_roundtrip,
-    );
-    let _ = cli.verify_checksums;
+    let _ = (cli.save_load_roundtrip, cli.verify_checksums);
 
     let script_path = match &cli.script {
         Some(name) => locate_script(name)?,
@@ -148,7 +171,7 @@ async fn main() -> Result<()> {
         cli.capture_frames_hz
     };
 
-    let mut child = launch_cf_app(LaunchOptions {
+    let mut launched = launch_cf_app(LaunchOptions {
         port: cli.control_port,
         scenario: &scenario,
         write_run_bundle: cli.write_run_bundle,
@@ -156,16 +179,33 @@ async fn main() -> Result<()> {
         capture_frames_hz: effective_capture_frames_hz,
         no_capture_events: cli.no_capture_events,
         tick_rate_hz: cli.tick_rate_hz,
+        ui_scale: cli.ui_scale,
+        high_contrast: cli.high_contrast,
+        captions: cli.captions.as_bool(),
+        reduced_motion: cli.reduced_motion,
+        reduced_shake: cli.reduced_shake,
+        reduced_flash: cli.reduced_flash,
     })?;
-    let url = format!("ws://127.0.0.1:{}", cli.control_port);
+    let control_port = if let Some(port_file) = launched.control_port_file.as_ref() {
+        match wait_for_control_port_file(port_file, Duration::from_secs(8)).await {
+            Ok(port) => port,
+            Err(e) => {
+                let _ = launched.child.start_kill();
+                anyhow::bail!("cf-app did not report its ephemeral control port: {e}");
+            }
+        }
+    } else {
+        cli.control_port
+    };
+    let url = format!("ws://127.0.0.1:{control_port}");
     let mut session = match wait_for_ws(&url, Duration::from_secs(8)).await {
         Ok(ws) => Session {
             ws,
             next_id: 1,
-            child: Some(child),
+            child: Some(launched.child),
         },
         Err(e) => {
-            let _ = child.start_kill();
+            let _ = launched.child.start_kill();
             anyhow::bail!("ws connect failed: {e}");
         }
     };
@@ -204,6 +244,25 @@ async fn main() -> Result<()> {
     }
     if cli.write_run_bundle {
         let _ = session.send("runbundle.write", json!({})).await?;
+    }
+
+    // M4A: --verify-focus must run BEFORE the cf-app shutdown that
+    // capture-grid composition triggers. Drive a full focus cycle through
+    // act.input.focus + observe.once so the FINAL observation snapshot we
+    // pass to --expect already carries the post-focus state.
+    //
+    // Single source: `cf_control::HUD_FOCUSABLE_NODES` is the canonical
+    // 12-id list; engine + cf-e2e + live_ws_acceptance + cf-app all read
+    // from it. Any regression dropping a node fails all consumers together.
+    if cli.verify_focus {
+        let total_nodes = cf_control::HUD_FOCUSABLE_NODES.len();
+        for _ in 0..total_nodes {
+            let _ = session.send("act.input.focus", json!({"direction": "next"})).await?;
+        }
+        let _ = session.send("act.input.focus", json!({"direction": "clear"})).await?;
+        let _ = session.send("act.input.focus", json!({"direction": "next"})).await?;
+        let post_focus = session.send("observe.once", json!({})).await?;
+        last_observe = Some(post_focus);
     }
 
     if effective_capture_grid {
@@ -252,6 +311,57 @@ async fn main() -> Result<()> {
     }
 
     let mut all_pass = true;
+
+    // M4A: post-run --verify-focus assertion against the snapshot taken above.
+    if cli.verify_focus {
+        let total_nodes = cf_control::HUD_FOCUSABLE_NODES.len();
+
+        let required_focusables: Vec<String> = cf_control::HUD_FOCUSABLE_NODES.iter().map(|s| s.to_string()).collect();
+        let nodes = observation
+            .get("accessibility")
+            .and_then(|v| v.get("focusable_nodes"))
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default();
+        let nodes_str: Vec<String> = nodes.iter().filter_map(|v| v.as_str().map(String::from)).collect();
+        let mut missing: Vec<&str> = Vec::new();
+        for req in &required_focusables {
+            if !nodes_str.iter().any(|s| s == req) {
+                missing.push(req.as_str());
+            }
+        }
+        let focus_cycle = observation
+            .get("accessibility")
+            .and_then(|v| v.get("focus_cycle"))
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
+        let focused_node = observation
+            .get("accessibility")
+            .and_then(|v| v.get("focused_node"))
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        if missing.is_empty() && focus_cycle >= (total_nodes as u64 + 2) && focused_node.is_some() {
+            tracing::info!(
+                target: "cf::e2e",
+                focusable_count = nodes_str.len(),
+                focus_cycle,
+                focused_node = ?focused_node,
+                "verify_focus PASS"
+            );
+        } else {
+            tracing::error!(
+                target: "cf::e2e",
+                missing = ?missing,
+                actual = ?nodes_str,
+                focus_cycle,
+                focused_node = ?focused_node,
+                expected_focus_cycle = (total_nodes as u64 + 2),
+                "verify_focus FAIL"
+            );
+            all_pass = false;
+        }
+    }
+
     for expect in &cli.expect {
         let parsed = match parse_expect(expect) {
             Some(p) => p,
@@ -381,11 +491,26 @@ impl Session {
     /// AND as the pre-composer hook for --capture-grid runs (cf-capture only
     /// writes `capture_manifest.json` when cf-app exits, so the composer
     /// MUST run after this returns). Idempotent: calling twice is safe.
+    ///
+    /// Timeout: 30 s. cf-app's shutdown sequence is:
+    ///
+    ///   1. AppExit fires → Bevy's run loop returns from `app.run()`.
+    ///   2. `wait_for_capture_pngs_flushed` polls the capture log until every
+    ///      enqueued PNG has landed on disk (up to 5 s timeout).
+    ///   3. `write_capture_manifest_from_handle` writes `capture_manifest.json`.
+    ///   4. `finalize_engine` writes the run bundle.
+    ///
+    /// At ~120 frames/s capture cadence, step 2 alone can sit close to its
+    /// 5 s ceiling on slower hardware. The previous 5 s timeout here let cf-e2e
+    /// SIGKILL cf-app mid-step-2, leaving `capture_manifest.json` unwritten and
+    /// the composer fail-closing on the missing file. Audit-flagged BLOCKER
+    /// on 2026-05-09. The 30 s ceiling is comfortably above the 5 + 1 + 1 s
+    /// worst-case shutdown plus margin for slower CI hardware.
     async fn shutdown_app_only(&mut self) {
         let _ = self.send("system.shutdown", json!({})).await;
         let _ = self.ws.close(None).await;
         if let Some(mut child) = self.child.take() {
-            let _ = tokio::time::timeout(Duration::from_secs(5), child.wait()).await;
+            let _ = tokio::time::timeout(Duration::from_secs(30), child.wait()).await;
             let _ = child.start_kill();
         }
     }
@@ -400,10 +525,49 @@ struct LaunchOptions<'a> {
     no_capture_events: bool,
     /// Optional pass-through for `cf-app --tick-rate-hz`. 0 = use cf-app default.
     tick_rate_hz: u32,
+    /// M4A: ACC-A flags forwarded to cf-app's `--ui-scale` / `--high-contrast` /
+    /// `--captions on|off` / `--reduced-*`. Defaults match cf-app defaults so a
+    /// caller that never set them passes the unmodified surface through.
+    ui_scale: f32,
+    high_contrast: bool,
+    captions: bool,
+    reduced_motion: bool,
+    reduced_shake: bool,
+    reduced_flash: bool,
 }
 
-fn launch_cf_app(opts: LaunchOptions<'_>) -> Result<Child> {
+struct LaunchedApp {
+    child: Child,
+    control_port_file: Option<PathBuf>,
+}
+
+fn launch_cf_app(opts: LaunchOptions<'_>) -> Result<LaunchedApp> {
     let bin = locate_cf_app_binary()?;
+    let control_port_file = if opts.port == 0 {
+        Some(unique_control_port_file())
+    } else {
+        None
+    };
+    let args = build_cf_app_args(&opts, control_port_file.as_deref());
+    // Inherit stdio from the parent so cf-app's diagnostics (especially the
+    // bevy_render screenshot INFO lines, ~10/sec under --capture-grid) flow
+    // straight to the user's terminal. Piping with Stdio::piped() filled the
+    // 64KB pipe buffer in seconds and deadlocked cf-app's render systems
+    // when nobody was draining the pipe — the BP2 capture-grid freeze the
+    // M2.5 win script kept hitting.
+    let child = TokioCommand::new(&bin)
+        .args(&args)
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .spawn()
+        .with_context(|| format!("failed to spawn {}", bin.display()))?;
+    Ok(LaunchedApp {
+        child,
+        control_port_file,
+    })
+}
+
+fn build_cf_app_args(opts: &LaunchOptions<'_>, control_port_file: Option<&Path>) -> Vec<String> {
     let mut args: Vec<String> = vec![
         "--scenario".into(),
         opts.scenario.into(),
@@ -413,6 +577,10 @@ fn launch_cf_app(opts: LaunchOptions<'_>) -> Result<Child> {
         "--ticks".into(),
         "0".into(),
     ];
+    if let Some(path) = control_port_file.as_ref() {
+        args.push("--control-port-file".into());
+        args.push(path.display().to_string());
+    }
     if opts.tick_rate_hz != 0 {
         args.push("--tick-rate-hz".into());
         args.push(opts.tick_rate_hz.to_string());
@@ -434,19 +602,67 @@ fn launch_cf_app(opts: LaunchOptions<'_>) -> Result<Child> {
         args.push("--run-bundle-dir".into());
         args.push(cf_replay::resolve_run_bundle_root(None).display().to_string());
     }
-    // Inherit stdio from the parent so cf-app's diagnostics (especially the
-    // bevy_render screenshot INFO lines, ~10/sec under --capture-grid) flow
-    // straight to the user's terminal. Piping with Stdio::piped() filled the
-    // 64KB pipe buffer in seconds and deadlocked cf-app's render systems
-    // when nobody was draining the pipe — the BP2 capture-grid freeze the
-    // M2.5 win script kept hitting.
-    let child = TokioCommand::new(&bin)
-        .args(&args)
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .spawn()
-        .with_context(|| format!("failed to spawn {}", bin.display()))?;
-    Ok(child)
+    // M4A ACC-A floor: forward accessibility flags so the spawned cf-app's
+    // observe.settings + run_manifest.json + cf-ui HUD reflect the harness's
+    // requested posture. cf-app defaults match cf-e2e defaults for ui_scale
+    // (1.0), captions (on), high_contrast (false), and the three reduced-*
+    // flags (false), so emitting only when non-default keeps the spawn line
+    // tight for legacy tests.
+    if (opts.ui_scale - 1.0).abs() > f32::EPSILON {
+        args.push("--ui-scale".into());
+        args.push(format!("{}", opts.ui_scale));
+    }
+    if opts.high_contrast {
+        args.push("--high-contrast".into());
+    }
+    if !opts.captions {
+        args.push("--captions".into());
+        args.push("off".into());
+    }
+    if opts.reduced_motion {
+        args.push("--reduced-motion".into());
+    }
+    if opts.reduced_shake {
+        args.push("--reduced-shake".into());
+    }
+    if opts.reduced_flash {
+        args.push("--reduced-flash".into());
+    }
+    // cf-e2e is the source of truth for scripted actions. Windowed capture
+    // still opens a Bevy window, but it must not ingest ambient keyboard or
+    // gamepad input from the developer machine and corrupt the scenario path.
+    args.push("--disable-local-input".into());
+    args
+}
+
+fn unique_control_port_file() -> PathBuf {
+    let seq = CONTROL_PORT_FILE_SEQ.fetch_add(1, Ordering::Relaxed);
+    std::env::temp_dir().join(format!("cf_e2e_control_port_{}_{}.txt", std::process::id(), seq))
+}
+
+async fn wait_for_control_port_file(path: &Path, timeout: Duration) -> Result<u16> {
+    let deadline = std::time::Instant::now() + timeout;
+    loop {
+        match std::fs::read_to_string(path) {
+            Ok(text) => {
+                let port = text
+                    .trim()
+                    .parse::<u16>()
+                    .with_context(|| format!("parse control port file {}", path.display()))?;
+                if port == 0 {
+                    anyhow::bail!("control port file {} reported port 0", path.display());
+                }
+                let _ = std::fs::remove_file(path);
+                return Ok(port);
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(e).with_context(|| format!("read control port file {}", path.display())),
+        }
+        if std::time::Instant::now() >= deadline {
+            anyhow::bail!("timed out waiting for {}", path.display());
+        }
+        sleep(Duration::from_millis(20)).await;
+    }
 }
 
 fn locate_cf_app_binary() -> Result<PathBuf> {
@@ -648,4 +864,98 @@ fn lookup(value: &Value, key: &str) -> Option<Value> {
         node = node.get(seg)?;
     }
     Some(node.clone())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn captions_arg_accepts_on_and_off_values() {
+        let on = Cli::try_parse_from(["cf-e2e", "--scenario", "m0_blank", "--captions", "on"])
+            .expect("captions on should parse");
+        let off = Cli::try_parse_from(["cf-e2e", "--scenario", "m0_blank", "--captions", "off"])
+            .expect("captions off should parse");
+
+        assert!(on.captions.as_bool());
+        assert!(!off.captions.as_bool());
+    }
+
+    #[test]
+    fn captions_arg_defaults_to_on() {
+        let cli = Cli::try_parse_from(["cf-e2e", "--scenario", "m0_blank"]).expect("default captions should parse");
+
+        assert_eq!(cli.captions, CaptionsArg::On);
+        assert!(cli.captions.as_bool());
+        assert_eq!(cli.control_port, 0);
+    }
+
+    #[tokio::test]
+    async fn wait_for_control_port_file_reads_bound_port() {
+        let path = unique_control_port_file();
+        let _ = std::fs::remove_file(&path);
+        std::fs::write(&path, "41234\n").unwrap();
+
+        let port = wait_for_control_port_file(&path, Duration::from_secs(1)).await.unwrap();
+
+        assert_eq!(port, 41234);
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn cf_app_args_disable_local_input_for_scripted_runs() {
+        let port_path = Path::new("/tmp/cf-e2e-port.txt");
+        let args = build_cf_app_args(
+            &LaunchOptions {
+                port: 0,
+                scenario: "m4a_micro_breach_readability",
+                write_run_bundle: true,
+                capture_grid: true,
+                capture_frames_hz: 30.0,
+                no_capture_events: false,
+                tick_rate_hz: 120,
+                ui_scale: 2.0,
+                high_contrast: true,
+                captions: true,
+                reduced_motion: true,
+                reduced_shake: true,
+                reduced_flash: true,
+            },
+            Some(port_path),
+        );
+
+        assert!(args.contains(&"--disable-local-input".to_string()));
+        assert!(args.contains(&"--control-port-file".to_string()));
+        assert!(!args.contains(&"--headless-smoke".to_string()));
+    }
+
+    #[test]
+    fn cf_app_args_preserve_explicit_control_port() {
+        let args = build_cf_app_args(
+            &LaunchOptions {
+                port: 17900,
+                scenario: "m0_blank",
+                write_run_bundle: false,
+                capture_grid: false,
+                capture_frames_hz: 10.0,
+                no_capture_events: false,
+                tick_rate_hz: 60,
+                ui_scale: 1.0,
+                high_contrast: false,
+                captions: true,
+                reduced_motion: false,
+                reduced_shake: false,
+                reduced_flash: false,
+            },
+            None,
+        );
+
+        let port_arg = args
+            .iter()
+            .position(|arg| arg == "--control-port")
+            .and_then(|idx| args.get(idx + 1))
+            .expect("control port value");
+        assert_eq!(port_arg, "17900");
+        assert!(!args.contains(&"--control-port-file".to_string()));
+    }
 }

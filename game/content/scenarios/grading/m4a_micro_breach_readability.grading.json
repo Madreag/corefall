@@ -1,0 +1,105 @@
+{
+  "schema_version": "cf-grading.v1",
+  "scenario_id": "m4a_micro_breach_readability",
+  "scope": "BP3",
+  "milestone": "m4a",
+  "description": "Per-dimension grading contract for the M4A readability + ACC-A floor scenario. Drives micro_breach at 200% UI scale + high contrast + captions + reduced_* flags through cf-e2e --verify-focus. Agent reads evidence (summary_grid.png + review_grid.png + observe.once/live-WS proof at 200% + events.jsonl + the resolved accessibility surface) and writes prose-justified scores.",
+  "rubric": {
+    "score_range": [0, 10],
+    "verdict_mapping": {
+      "9-10": "PASS",
+      "7-8": "PASS_WITH_FUTURE_POLISH",
+      "5-6": "PARTIAL (blocked on a future milestone)",
+      "3-4": "NEEDS_FIXES (current milestone scope)",
+      "0-2": "BLOCKER (current milestone scope)"
+    },
+    "minimum_aggregate_for_pass": 7.0,
+    "minimum_per_dimension_for_pass": 5
+  },
+  "dimensions": [
+    {
+      "id": "look.hud_readability",
+      "criterion": "Every HUD line (STATUS / ITEM / HP / Reticle / STANCE / BODY / MODS / OBJECTIVE / MISSION / ENEMY / BREACH / TOOL / EVENT) is text-readable in the 200%-scale capture grid without overlap, clipping, missing-glyph boxes, or bottom-play-area obstruction.",
+      "evidence_required": ["captures/summary_grid.png at 200% UI scale", "captures/review_grid.png 4x4 readability sheet"],
+      "weight": 1.5,
+      "future_owners_if_blocked": ["M4B"]
+    },
+    {
+      "id": "look.high_contrast_palette",
+      "criterion": "High-contrast palette swap is visible: strip backgrounds shift to fully opaque pure black + text to pure white. Captions strip honors the same swap.",
+      "evidence_required": ["captures/summary_grid.png with high_contrast=true", "observe.accessibility.high_contrast_applied=true"],
+      "weight": 1.5,
+      "future_owners_if_blocked": []
+    },
+    {
+      "id": "look.silhouette_clarity",
+      "criterion": "BODY silhouette line shows per-zone hp percentages with the placeholder marker `~` (M4A surface; M5 fills the real body graph). Values clamp to [0, 100] and respect HP changes.",
+      "evidence_required": ["captures/summary_grid.png", "observe.once actor.body_silhouette"],
+      "weight": 1.0,
+      "future_owners_if_blocked": ["M5"]
+    },
+    {
+      "id": "look.module_strip_clarity",
+      "criterion": "MODS line shows weapon_mount + jet + shield + sensor placeholder slots. Weapon state reflects READY / RELOADING / EMPTY / NO RIFLE per the rifle bridge.",
+      "evidence_required": ["captures/summary_grid.png", "observe.once actor.module_strip"],
+      "weight": 1.0,
+      "future_owners_if_blocked": ["M5"]
+    },
+    {
+      "id": "look.banner_priority_legibility",
+      "criterion": "Banner stack renders critical > warning > info in priority order with severity word + icon glyph (color-independent). At least one banner should appear during the run (HP_LOW / AMMO_OUT / ARMOR_CRACKED), and banners must use the upper-right lane rather than covering the lower play/action area.",
+      "evidence_required": ["captures/summary_grid.png", "captures/review_grid.png", "observe.once banners[]"],
+      "weight": 1.0,
+      "future_owners_if_blocked": ["M4B (comic-noir card styling)"]
+    },
+    {
+      "id": "look.caption_strip_legibility",
+      "criterion": "Caption strip is visible when captions=true and the queue has entries, hidden when captions=false or empty. Display::None / Display::Flex toggles per the live setting, and visible captions use the upper-right lane rather than covering the lower play/action area.",
+      "evidence_required": ["captures/summary_grid.png with captions toggled", "captures/review_grid.png", "observe.accessibility.captions_visible"],
+      "weight": 1.0,
+      "future_owners_if_blocked": ["BP6 (cf-audio + real captions)"]
+    },
+    {
+      "id": "feel.live_settings_update_responsiveness",
+      "criterion": "act.settings.set updates surface in observe.once + cf-ui within 1-2 ticks. UiScale + palette swap apply on the next frame.",
+      "evidence_required": ["events.jsonl control.settings_changed", "before/after observe.settings comparison"],
+      "weight": 1.0,
+      "future_owners_if_blocked": []
+    },
+    {
+      "id": "feel.ui_scale_reflow",
+      "criterion": "200% UI scale reflows the HUD without overlap, clipping, missing-glyph boxes, bottom-play-area obstruction, or layout collapse. Bevy UiScale handles Val::Px reflow and cf-ui constrains status/banners/captions.",
+      "evidence_required": ["captures/summary_grid.png at 200%", "captures/review_grid.png"],
+      "weight": 1.0,
+      "future_owners_if_blocked": []
+    },
+    {
+      "id": "goal.dr012_acca_floor_closure",
+      "criterion": "DR-012 ACC-A floor closes: 9 settings fields wired, 200% scale + high contrast + captions + reduced_* + hold_to_confirm + hold_threshold_ms + key_remap_enabled honored, color-independent state labels, focusable_nodes contract exposed via observe.accessibility, every status surface readable through cfctl.",
+      "evidence_required": ["bp3.test_manifest.json universal_enhancement_gates.acca_floor_dr012", "observe.accessibility round-trip"],
+      "weight": 1.5,
+      "future_owners_if_blocked": []
+    },
+    {
+      "id": "goal.dr003_silhouette_lean_proof",
+      "criterion": "DR-003 silhouette lean is proven via the BODY hud line + ActorView.body_silhouette projection + HudBodySilhouette resource. Placeholder marker is honest about M5 ownership.",
+      "evidence_required": ["cf-actor::body_silhouette tests", "cf-ui::silhouette_line tests"],
+      "weight": 1.0,
+      "future_owners_if_blocked": ["M5 (real body graph)"]
+    },
+    {
+      "id": "agent.cfctl_observe_completeness",
+      "criterion": "cfctl observe --once exposes every M4A field: stance, body_silhouette, module_strip, banners, captions, tool_validity, accessibility (with focusable_nodes).",
+      "evidence_required": ["observe.once payload schema check"],
+      "weight": 1.0,
+      "future_owners_if_blocked": []
+    },
+    {
+      "id": "agent.evidence_completeness",
+      "criterion": "Run bundle has summary_grid.png + review_grid.png + their JSON companions + capture_manifest.json + events.jsonl + run_manifest.json (with settings reflecting the 200%/high-contrast/captions/reduced/hold/remap posture).",
+      "evidence_required": ["prototype_runs/native/m4a_*/", "summary.json.artifacts.items[]"],
+      "weight": 1.0,
+      "future_owners_if_blocked": []
+    }
+  ]
+}

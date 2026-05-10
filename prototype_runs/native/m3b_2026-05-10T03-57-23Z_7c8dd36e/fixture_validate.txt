@@ -1,0 +1,1 @@
+PASS bundle_dir=/Users/erol/projects/corefall/game/crates/cf-tools-replay-viewer/tests/fixtures/m3b_actor_died_chain run_id=m3b_fixture_actor_died_chain events=13 ticks=0..17

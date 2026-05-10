@@ -13,6 +13,19 @@
       "maxItems": 2,
       "minItems": 2
     },
+    "body_silhouette": {
+      "description": "M4A: per-zone body silhouette projection (head/torso/arms/legs hp%).\n`placeholder=true` until M5 lands the real body graph; consumers should\ntreat the LAYOUT as stable but the values as a derived projection.",
+      "$ref": "#/$defs/BodySilhouetteView",
+      "default": {
+        "arm_left_hp_pct": 1.0,
+        "arm_right_hp_pct": 1.0,
+        "head_hp_pct": 1.0,
+        "leg_left_hp_pct": 1.0,
+        "leg_right_hp_pct": 1.0,
+        "placeholder": true,
+        "torso_hp_pct": 1.0
+      }
+    },
     "controllable": {
       "type": "boolean"
     },
@@ -28,6 +41,14 @@
       "type": "integer",
       "format": "uint64",
       "minimum": 0
+    },
+    "module_strip": {
+      "description": "M4A: chassis module strip projection. Empty until M5 lands the real\nchassis grammar; M4A populates `weapon_mount` from the selected rifle's\nfire-state so HUD + accessibility tooling have a stable surface.",
+      "$ref": "#/$defs/ModuleStripView",
+      "default": {
+        "modules": [],
+        "placeholder": false
+      }
     },
     "on_ground": {
       "type": "boolean"
@@ -89,6 +110,11 @@
       "format": "uint32",
       "minimum": 0
     },
+    "stance": {
+      "description": "M4A: derived stance label (idle/walking/running/airborne/downed/dead).\n`cfctl observe` consumers + AI agents read this without a screenshot.",
+      "type": "string",
+      "default": "idle"
+    },
     "status": {
       "type": "string"
     },
@@ -118,5 +144,91 @@
     "hp_max",
     "selected_slot",
     "selected_item"
-  ]
+  ],
+  "$defs": {
+    "BodySilhouetteView": {
+      "description": "M4A body silhouette projection (mirrors `cf_actor::BodySilhouette`).",
+      "type": "object",
+      "properties": {
+        "arm_left_hp_pct": {
+          "type": "number",
+          "format": "float"
+        },
+        "arm_right_hp_pct": {
+          "type": "number",
+          "format": "float"
+        },
+        "head_hp_pct": {
+          "type": "number",
+          "format": "float"
+        },
+        "leg_left_hp_pct": {
+          "type": "number",
+          "format": "float"
+        },
+        "leg_right_hp_pct": {
+          "type": "number",
+          "format": "float"
+        },
+        "placeholder": {
+          "type": "boolean"
+        },
+        "torso_hp_pct": {
+          "type": "number",
+          "format": "float"
+        }
+      },
+      "required": [
+        "head_hp_pct",
+        "torso_hp_pct",
+        "arm_left_hp_pct",
+        "arm_right_hp_pct",
+        "leg_left_hp_pct",
+        "leg_right_hp_pct",
+        "placeholder"
+      ]
+    },
+    "ModuleStateView": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "state",
+        "kind"
+      ]
+    },
+    "ModuleStripView": {
+      "description": "M4A module strip projection (mirrors `cf_actor::ModuleStrip`).",
+      "type": "object",
+      "properties": {
+        "modules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ModuleStateView"
+          }
+        },
+        "placeholder": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "modules",
+        "placeholder"
+      ]
+    }
+  }
 }

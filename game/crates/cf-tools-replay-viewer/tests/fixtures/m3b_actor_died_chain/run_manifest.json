@@ -1,0 +1,64 @@
+{
+  "schema_version": "prototype-run-manifest.v0.1",
+  "run_id": "m3b_fixture_actor_died_chain",
+  "prototype_slice": "M3B",
+  "run_mode": "fixture",
+  "milestone": "m3b",
+  "build": {
+    "commit_sha": "fixture",
+    "rust_version": "fixture",
+    "bevy_version": "fixture",
+    "platform": "fixture"
+  },
+  "scene": {
+    "id": "actor_died_chain_fixture",
+    "display_name": "M3B Actor Death Cause Chain Fixture",
+    "source_path": "fixture"
+  },
+  "seed": 1,
+  "started_at_utc": "2026-05-09T00:00:00+00:00",
+  "duration_target_sec": 1.0,
+  "material_schema_version": "fixture",
+  "config_hash": "fixture",
+  "assumptions_tested": [
+    "M3B-002 cause-chain renders actor_died → projectile_hit → projectile_spawned → weapon_fired → command_accepted chain"
+  ],
+  "linked_specs": [
+    "spec/prototype-roadmap#M3B",
+    "spec/native-implementation-backlog#M3B-002"
+  ],
+  "expected_tests": [
+    "M3B-002-FIXTURE"
+  ],
+  "capture_config": {
+    "events": true,
+    "screenshots": false,
+    "captures": false
+  },
+  "schemas": {
+    "control": 1,
+    "events": 1,
+    "scenario": 1
+  },
+  "capabilities": {
+    "debug": false,
+    "control_api": true,
+    "save_load": false,
+    "debug_capabilities": []
+  },
+  "settings": {
+    "ui_scale": 1.0,
+    "high_contrast": false,
+    "captions": true,
+    "reduced_motion": false,
+    "reduced_shake": false,
+    "reduced_flash": false
+  },
+  "checksum": {
+    "algorithm": "blake3",
+    "scope": "sim_state_v1",
+    "cadence_ticks": 60
+  },
+  "tick_rate_hz": 60,
+  "expected_outcome": "clean"
+}

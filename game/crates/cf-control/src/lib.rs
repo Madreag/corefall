@@ -16,8 +16,9 @@ pub mod settings;
 pub mod state;
 
 pub use engine::{
-    run_m0_inline, ActorRenderSnapshot, BreachRenderView, EnemyHudView, ExtractionZoneView, InitialActorWorld,
-    InitialBreachWorld, InitialGuard, M0Engine, M0EngineConfig, M0EngineOutcome, MissionHudView, RifleHudView,
+    run_m0_inline, ActorRenderSnapshot, BreachRenderView, EnemyHudView, ExtractionZoneView, HudCachesSnapshot,
+    InitialActorWorld, InitialBreachWorld, InitialGuard, M0Engine, M0EngineConfig, M0EngineOutcome, MissionHudView,
+    RifleHudView, HUD_FOCUSABLE_NODES,
 };
 pub use envelope::{
     error_codes, JsonRpcError, JsonRpcId, JsonRpcMessage, JsonRpcNotification, JsonRpcRequest, JsonRpcResponse,
@@ -27,9 +28,13 @@ pub use runtime::{build_engine_config, locate_scenario, ConfigBuildError, Config
 pub use scenario::{Scenario, ScenarioCapabilities, ScenarioLoadError, ScenarioRegion};
 pub use schemas::SCHEMA_VERSION;
 pub use server::{
-    async_trait, CommandResult, ControlCommand, ControlServer, ControlServerConfig, EngineHandle, SettingsPatch,
+    async_trait, CommandResult, ControlCommand, ControlServer, ControlServerConfig, EngineHandle, FocusDirection,
+    SettingsPatch,
 };
-pub use settings::Settings;
+pub use settings::{
+    default_key_bindings, is_supported_key_binding_action, is_supported_key_code_name, validate_key_bindings, Settings,
+    SUPPORTED_KEY_BINDING_ACTIONS, SUPPORTED_KEY_CODE_NAMES,
+};
 pub use state::{
     AccessibilityFlagsView, ActorView, BreachView, ControlEnvelopeStatus, EnemyView, EngineState, MissionView,
     ObjectiveView, ObserveFrame, ObserveSettings, RunStatus,

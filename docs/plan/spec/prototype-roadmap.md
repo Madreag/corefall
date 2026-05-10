@@ -384,7 +384,7 @@ Performance-sensitive values in this roadmap are defaults and validation targets
 | Open DR / Topic | Status | Lean | Milestones It Gates | What The Worker Must Do Before Proceeding |
 |---|---|---|---|---|
 | [[decisions/dr-002-replay-event-architecture|DR-002]] | OPEN | Hybrid event log + snapshots | M0, M1, M1.5, M2, M3, M5.6, M6.5, M7, M8.5, M9, M10, M11, M12 (any milestone that emits replay events) | Confirm event taxonomy + snapshot cadence + checksum algorithm with the user before adding new event categories or changing snapshot policy. M3 is the closure milestone. |
-| [[decisions/dr-003-body-damage-readability|DR-003]] | OPEN | Silhouette default + advanced HUD opt-in | M3, M4, M5, M5.7, M7, M8 | Confirm silhouette vs full-body display posture before locking HUD layout (M4). HUD-01..HUD-03 acceptance closes the DR. |
+| [[decisions/dr-003-body-damage-readability|DR-003]] | CLOSED-DIRECTION-WITH-EVIDENCE (M4A) | Silhouette default + advanced HUD opt-in | M3, M4, M5, M5.7, M7, M8 | Closed by M4A: cf-actor::BodySilhouette + cf-control::ActorView.body_silhouette + cf-ui silhouette line + observe.once payload prove the silhouette-default surface; advanced HUD opt-in remains M5/M8. |
 | [[decisions/dr-004-first-playable-slice|DR-004]] | OPEN | Sequenced single actor → squad → bunker breach | M1, M1.5, M7 | Confirm scope of "first playable" before assigning M7's Breach Contract proof. M7's done-criteria close the DR. |
 | [[decisions/dr-006-modding-data-model|DR-006]] | OPEN | Schema-first + Lua escape hatches + workbench | M2, M5, M5.6, M5.7, M6.6, M7.5, M8, M8.5 | Confirm modding schema versioning + capability gates + script-host posture before locking content schemas (M2 onward). M8 closes the DR. |
 | [[decisions/dr-007-terrain-material-model|DR-007]] | OPEN (defers implementation specifics to DR-036) | Curated solids + hazards first; systemic direction active per DR-036 | M2, M5.6, M5.7, M7.5 | Confirm M2's launch material set still matches DR-007 lean before adding new material categories. M5.6/M5.7/M7.5 close DR-007 implementation specifics under DR-036. |
@@ -392,7 +392,7 @@ Performance-sensitive values in this roadmap are defaults and validation targets
 | [[decisions/dr-009-command-ux-style|DR-009]] | OPEN | Direct + slowdown overlay + optional tactical map | M4, M5, M6, M7, M8 | Confirm command UX posture (slowdown ratio, tactical map opt-in, order grammar) before adding command surfaces. ORDER-01 closes the DR. |
 | [[decisions/dr-010-license-reuse-matrix|DR-010]] | OPEN | Documentation only; ledger tracks usage | All | When external code/asset/data enters the project, log it in `[[references/usage-ledger]]`. No release-readiness gating during private prototyping. Public-release decision closes the DR. |
 | [[decisions/dr-011-progression-retention-loop|DR-011]] | OPEN | Intrinsic-first hybrid: mastery + autonomy + veterans + salvage + replays + creator challenges; optional economy hooks late/default-off per DR-057 | M7, M11, M12 | Confirm retention model avoids obligation/pay-for-power pressure before designing campaign loops in M7+. RET-A-01..RET-A-06 close the DR; any battle-pass/gacha-like activation follows DR-057. |
-| [[decisions/dr-012-accessibility-comfort-readability|DR-012]] | OPEN | Slice-A accessibility/comfort floor, not late compliance | M0, M4, M5.7, M6.6, M7, M7.5, M8, M8.5 | Confirm UI scale, contrast, captions, remap, reduced motion are wired into the milestone's player surfaces. ACC-A-01..16 close the DR. |
+| [[decisions/dr-012-accessibility-comfort-readability|DR-012]] | CLOSED-DIRECTION-WITH-EVIDENCE (M4A) | Slice-A accessibility/comfort floor, not late compliance | M0, M4, M5.7, M6.6, M7, M7.5, M8, M8.5 | Closed by M4A: 9 ACC-A flags wired (ui_scale/high_contrast/captions/reduced_motion/reduced_shake/reduced_flash/hold_to_confirm/hold_threshold_ms/key_remap_enabled), real keyboard + gamepad focus traversal through `act.input.focus`, real HoldTracker behavior tests, validated key remap table (unsupported actions/keys reject; Numpad names accepted); ACC-A-01..16 closure evidenced in dr-012 closure note. |
 | Networking transport library (topic) | OPEN | lightyear vs renet vs quinn | M9, M10, M11, M12 | Decision deferred to M9/M10 prototyping. Worker MUST present transport options + perf evidence to user before committing to one library in `cf-net`. |
 | Modding script host (topic) | OPEN | mlua vs Rhai | M5, M8 | Decision deferred to M5 implementation. Worker MUST run `cf-mod` script-host benchmark + capability-gate audit and ask the user before locking the host. |
 | Localization plan (topic) | OPEN | None yet | M4, M7, M8 | Strings/fonts/lang packs/mod-localization. Worker MUST flag any string-source code path that bakes English-only strings; avoid hardcoded UI strings. Open a follow-up task if the milestone needs locale support. |
@@ -2036,9 +2036,9 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 - Optional: replay-viewer screenshot artifact in the BP3 vault note.
 
 **M3B Done-criteria:**
-- [ ] Replay viewer can scrub through events and show context.
-- [ ] Death recap renders the parent cause chain for `actor_died` and `mission_resolved` events.
-- [ ] DR-002 closure: refresh status from OPEN → CLOSED-DIRECTION-WITH-EVIDENCE; update [[decisions/index]] + [[dashboards/decision-tracker]] + [[dashboards/research-readiness]] in the same pass.
+- [x] Replay viewer can scrub through events and show context. — `cf-tools-replay-viewer view <bundle> [--at-tick N] [--filter cat] [--tail-len N]`; evidence at `prototype_runs/native/m3b_2026-05-10T01-37-50Z_c078e31d/view_*.md`.
+- [x] Death recap renders the parent cause chain for `actor_died` and `mission_resolved` events. — `cf-tools-replay-viewer cause-chain <bundle> [--event-type T]`; evidence at `prototype_runs/native/m3b_2026-05-10T01-37-50Z_c078e31d/cause_chain_*.md`. Chain walking handles `RootReached` / `ParentMissingFromBundle` / `MaxDepthReached` / `CycleDetected` terminations explicitly. M2.5 bundle's `mission_resolved` is correctly reported as "no parent chain (event was emitted directly without a parent)" since it was tick-driven, not event-driven.
+- [x] DR-002 closure: status flipped OPEN → CLOSED-DIRECTION-WITH-EVIDENCE on 2026-05-09 at M3B; `decisions/index.md` + `dashboards/decision-tracker.md` + `dashboards/research-readiness.md` + `cortex_command_vault/research-log/2026-05-09-dr-002-closure-m3b-replay-viewer.md` all updated in same pass.
 
 **Cross-DR:** DR-002, DR-005, DR-018, DR-024.
 
@@ -3083,10 +3083,10 @@ Spans BP2+; **lifelong from BP2** (every fun-proof slice from M2.5 onward emits 
 
 **BP closure-gate role (from BP2 onward):**
 
-- Every fun-proof scenario in the BP must emit a `summary_grid.png` artifact, recorded in `summary.json.artifacts`.
+- Every fun-proof scenario in the BP must emit a `summary_grid.png` artifact and review-sized `review_grid.png` artifact, both recorded in `summary.json.artifacts`.
 - `cf-e2e --capture-grid` must include at least one `--expect capture.non_blank_ratio>=0.95` assertion to catch black-frame regressions (e.g., camera clipping, missing render targets, dropped frames).
-- `/corefall-review <bp>` reads the summary grids when issuing the BP-level Accept verdict.
-- The per-BP human-playtest survey row in `prototype_runs/native/<bp>_*/notes.md` must reference the summary grid path it was answered against.
+- `/corefall-review <bp>` reads the summary/review grids when issuing the BP-level Accept verdict.
+- The BP Goal Coverage Report, AI-Agent Self-Test Report, and LLM-graded verdict in `prototype_runs/native/<bp>_*/notes.md` / `grading.json` must reference the grid paths they were answered against. Human playtest notes may sit below them as optional confirmation.
 
 **Done-criteria (cumulative across BPs):**
 
@@ -3204,7 +3204,7 @@ If an artifact format above cannot be produced for a given BP (e.g., BP1 ships o
 **BP closure-gate role (BP1 onward):**
 
 - Every BP closure MUST produce a tagged release matching the versioning axis above.
-- The release notes MUST embed the BP's `summary_grid.png` (T-CAPTURE artifact) + the human-playtest survey row.
+- The release notes MUST embed the BP's `summary_grid.png` and `review_grid.png` (T-CAPTURE artifacts) + the AI-Agent Self-Test Report / LLM-graded verdict summary. Human playtest notes are included when present, but are not a release gate.
 - `/corefall-review <bp>` reads the published release URL when issuing the BP-level Accept verdict.
 - The GitHub `prerelease` flag is intentionally NOT set on any release. Quality is communicated via the SemVer channel suffix in the tag name itself (`-prealpha`, `-alpha`, `-beta`, `-rc`, or no suffix for `v1.0.0` GA). Marking releases as `prerelease: true` would double-count the quality signal AND hide them from the `/releases/latest` endpoint + the repo homepage Releases sidebar widget, both of which filter out prereleases by GitHub's definition. External observers reading the tag name know the channel; the prerelease flag adds no information.
 

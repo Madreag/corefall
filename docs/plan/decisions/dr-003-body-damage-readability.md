@@ -1,16 +1,35 @@
 ---
 type: decision
 id: DR-003
-status: open
+status: closed-direction-with-evidence
 priority: P0
-revisit_trigger: "When a damage UX prototype runs HUD-01..HUD-03 acceptance tests."
+closed_at: 2026-05-09
+closed_by: M4A — Readability + ACC-A Floor (BP3 milestone 2/3)
+revisit_trigger: "M5 lands real per-zone wound model + M4B layers comic-noir cards on the M4A surface; reopen if HUD-01..HUD-03 acceptance fails real-player playtests at BP7."
 ---
 
 ← [[decisions/index|decision records]] · [[engine/body-damage-wound-gib-lifecycle|body damage lifecycle]] · [[systems/damage-equipment-and-items|damage/equipment]] · [[systems/ux-overlay-screen-brief|UX overlay brief]]
 
 # DR-003: Body Damage Readability Model
 
-> [!info] Status: OPEN; LEAN: keep wound/gib physical, add status + body silhouette UI
+> [!info] Status: <span class="cc-flag cc-green">CLOSED-DIRECTION-WITH-EVIDENCE</span>; recommendation E (default body silhouette + advanced HUD opt-in) shipped at M4A. M5 lands the real per-zone wound model on top of the same `BodySilhouette` projection without changing the surface contract.
+
+## Closure Note (M4A — 2026-05-09)
+
+M4A landed the Recommendation E surface:
+
+- **Default HUD body silhouette + status pill (HUD-01..HUD-02)**: `cf-actor::BodySilhouette` projection (head / torso / arms / legs hp%) carried on `ActorObservation.body_silhouette`, mirrored to `cf-control::ObserveFrame.actors[].body_silhouette`, rendered as the `BODY` HUD line (`cf-ui::silhouette_line`). `placeholder=true` until M5 lands the real per-zone wound model; HUD/observe contract is stable.
+- **Status pill in HUD strip (HUD-02)**: `cf-actor::Status` (stable / unstable / downed / dead) drives the STATUS line; M4A's banner queue raises `HP_LOW` (warning) / `ARMOR_CRACKED` (critical) / `EJECT_NOW` (critical) banners on status-change diffs with severity word + ASCII icon glyph (color-independent).
+- **Advanced HUD opt-in (HUD-03)**: `cf-actor::Stance` enum + `MODS` module-strip line + `TOOL` validity line + `EVENT` last-event ticker provide the advanced-HUD layered model; M5+ extends `MODS` to real chassis modules without changing the layout.
+- **HUD-01..HUD-03 acceptance**: cf-ui formatter/layout tests + cf-control live_ws_acceptance tests + `summary_grid.png` and 4x4 `review_grid.png` visual proof at 200% UI scale + high contrast (`prototype_runs/native/m4a_2026-05-10T18-19-43Z_5d1a46cc/`). Per AGENTS.md the AI-Agent Self-Test Report replaces mandatory human playtest gating; project owner playtest is optional confirmation.
+
+**Reopen triggers:**
+
+- M5 implementer needs to extend `BodySilhouette` to real per-zone HP rather than placeholder.
+- M4B comic-noir card pass changes the visual layout in a way that breaks the silhouette/module-strip contract.
+- A real-player BP7 playtest reports the HUD is unparseable in combat.
+
+**Single source of truth:** `cf-actor::BodySilhouette` + `cf-control::BodySilhouetteView` + `cf-ui::HudBodySilhouette` + `cf-ui::silhouette_line`. AI agents read the same projection via `cfctl observe.once`. Replay events emit per-actor body state through the existing `actor.actor_status_changed` event (extended to carry stance + body_silhouette payload at M5).
 
 ## Context
 

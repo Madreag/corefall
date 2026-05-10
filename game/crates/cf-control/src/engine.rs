@@ -3,11 +3,44 @@
 //! exposes an `EngineHandle` so the WebSocket server can drive the same engine.
 
 use std::{
-    collections::BTreeMap,
+    collections::{BTreeMap, VecDeque},
     path::{Path, PathBuf},
     sync::{Arc, RwLock},
     time::Instant,
 };
+
+/// M4A HUD banner queue cap. Beyond this many entries the FIFO drains; the
+/// HUD only draws the highest-priority N each tick.
+const M4A_BANNER_BUFFER: usize = 8;
+/// M4A captions queue cap. Mirrors banner buffer.
+const M4A_CAPTION_BUFFER: usize = 8;
+/// M4A banner expiry (ticks). Status banners auto-clear after ~3 seconds at
+/// 60 Hz so the HUD stays readable; mission banners stay until end-of-run.
+const M4A_STATUS_BANNER_EXPIRY_TICKS: u64 = 180;
+/// M4A captions expiry (ticks). Captions auto-clear after ~2 seconds at 60 Hz.
+const M4A_CAPTION_EXPIRY_TICKS: u64 = 120;
+
+/// **M4A canonical focusable HUD node list** (DR-012 ACC-A-04). This is the
+/// single source of truth: cf-control's `observe.accessibility.focusable_nodes`,
+/// cf-app's keyboard focus traversal, cf-e2e's `--verify-focus`, the live-WS
+/// acceptance tests, and any future cfctl `ui assert` tooling all read from
+/// this constant. Changing the list (adding / removing / renaming a node)
+/// MUST update every consumer in the same pass; the cf-e2e + live-WS tests
+/// fail-closed when a node is missing from the observed surface.
+pub const HUD_FOCUSABLE_NODES: &[&str] = &[
+    "hud.status_strip",
+    "hud.silhouette",
+    "hud.module_strip",
+    "hud.stance",
+    "hud.objective",
+    "hud.mission",
+    "hud.enemy",
+    "hud.breach",
+    "hud.tool",
+    "hud.captions",
+    "hud.banners",
+    "hud.last_event",
+];
 
 use chrono::{DateTime, Utc};
 use serde_json::json;
@@ -48,6 +81,12 @@ pub struct M0EngineConfig {
     pub control_api_enabled: bool,
     pub debug_capabilities: Vec<String>,
     pub tick_rate_hz: u32,
+    /// **M4A**: source-truthful `capture_config` flag. cf-app sets this when
+    /// `--capture-grid` is on so the run manifest reports
+    /// `capture_config.{events:true, screenshots:true, captures:true}` instead
+    /// of the historical `screenshots:false / captures:false` lie. Default:
+    /// false (matches the headless / no-capture-grid path).
+    pub capture_grid_enabled: bool,
     /// Region dimensions copied from the scenario manifest (for run-bundle metadata).
     pub region_width: f32,
     pub region_height: f32,
@@ -59,6 +98,17 @@ pub struct M0EngineConfig {
     pub region_anchor_y: f32,
     pub config_hash: String,
     pub commit_sha: String,
+    /// True when the bundle was produced from a dirty checkout. `commit_sha`
+    /// alone is not enough for BP closure evidence because many audit-fix
+    /// iterations can share the same HEAD while running different code.
+    pub worktree_dirty: bool,
+    /// Fingerprint of tracked diffs + untracked file contents when
+    /// `worktree_dirty` is true. Closure tooling uses this to reject stale
+    /// same-commit dirty bundles.
+    pub worktree_fingerprint: Option<String>,
+    /// Dirty paths recorded for reviewer/debug visibility. The fingerprint is
+    /// authoritative; this list is the human-readable trail.
+    pub worktree_dirty_files: Vec<String>,
     pub rust_version: String,
     pub bevy_version: String,
     pub platform: String,
@@ -177,12 +227,16 @@ impl M0EngineConfig {
             control_api_enabled: false,
             debug_capabilities: Vec::new(),
             tick_rate_hz: 60,
+            capture_grid_enabled: false,
             region_width: 0.0,
             region_height: 0.0,
             region_anchor_x: 0.0,
             region_anchor_y: 0.0,
             config_hash: String::new(),
             commit_sha: env!("CARGO_PKG_VERSION").to_string(),
+            worktree_dirty: false,
+            worktree_fingerprint: None,
+            worktree_dirty_files: Vec::new(),
             rust_version: rustc_version_string(),
             bevy_version: bevy_version_string(),
             platform: env_platform(),
@@ -293,6 +347,15 @@ impl M0EngineConfig {
         if scenario.has_reactors() {
             cfg.initial_reactors = scenario.reactors.iter().map(|r| r.build_reactor()).collect();
             cfg.milestone = "m2.5".to_string();
+        }
+        // M4A: explicit milestone override wins over scenario-shape derivation
+        // so a scenario can reuse the M1.5 / M2 / M2.5 world while tagging the
+        // run bundle for the actual milestone being proven.
+        if let Some(override_str) = scenario.milestone_override.as_deref() {
+            let trimmed = override_str.trim();
+            if !trimmed.is_empty() {
+                cfg.milestone = trimmed.to_lowercase();
+            }
         }
         cfg
     }
@@ -475,6 +538,30 @@ struct EngineMutable {
     /// M2.5: reactor world (damageable static actors). `None` when no reactor
     /// is declared.
     reactor_world: Option<cf_mission::ReactorWorld>,
+    /// M4A: HUD banner queue. Latest entries are pushed to the back; FIFO
+    /// drain caps the queue at `M4A_BANNER_BUFFER`. The HUD draws the highest
+    /// `severity` (critical > warning > info) entries first per priority +
+    /// raised_at_tick FIFO. Replay events are NOT re-derived from the queue;
+    /// they live in `events.jsonl`.
+    hud_banners: VecDeque<crate::state::HudBannerView>,
+    /// M4A: captions queue (audio-bound events surfaced as text). Drains FIFO
+    /// at `M4A_CAPTION_BUFFER`. The HUD draws the most recent N entries when
+    /// `Settings.captions == true`.
+    hud_captions: VecDeque<crate::state::CaptionView>,
+    /// M4A: tool-validity tracker (last carve / last refusal). Updated per
+    /// tick by the dig pipeline.
+    hud_tool_validity: crate::state::ToolValidityView,
+    /// M4A: previous tick's per-actor status, used to detect state changes
+    /// that should raise a banner without scanning the full event log.
+    hud_last_status: BTreeMap<ActorId, cf_actor::Status>,
+    /// M4A: previous tick's mission result, used to detect mission_resolved
+    /// transitions for banner emission.
+    hud_last_mission_result: Option<String>,
+    /// M4A: HUD focus state (DR-012 ACC-A-04). The cf-app keyboard layer +
+    /// cfctl `act.input.focus` advance/retreat focus through the canonical
+    /// `HUD_FOCUSABLE_NODES` list; observe.accessibility surfaces it.
+    hud_focus_index: Option<usize>,
+    hud_focus_cycle: u64,
 }
 
 /// Pending dig request set by `act.player.dig` and consumed at the start of the
@@ -578,6 +665,13 @@ impl M0Engine {
                 next_guard_projectile_id: 1_000_000,
                 chunked_terrain,
                 reactor_world,
+                hud_banners: VecDeque::new(),
+                hud_captions: VecDeque::new(),
+                hud_tool_validity: crate::state::ToolValidityView::default(),
+                hud_last_status: BTreeMap::new(),
+                hud_last_mission_result: None,
+                hud_focus_index: None,
+                hud_focus_cycle: 0,
             }),
             recorder,
             current_tick,
@@ -601,6 +695,28 @@ impl M0Engine {
 
     pub fn config(&self) -> &M0EngineConfig {
         &self.config
+    }
+
+    /// M4A: live settings accessor for cf-app's HUD + UiScale bridge. Reflects
+    /// any `act.settings.set` patches applied since startup, NOT the config
+    /// snapshot in `M0EngineConfig.settings`.
+    pub fn current_settings(&self) -> Settings {
+        self.state.read().map(|s| s.settings.clone()).unwrap_or_default()
+    }
+
+    /// M4A: snapshot of the current HUD-state caches (banners, captions,
+    /// tool_validity). cf-app reads this per frame to populate HudState
+    /// without locking the WebSocket observe path. The accessor always
+    /// returns owned clones so cf-app can keep them across frames.
+    pub fn hud_caches_snapshot(&self) -> HudCachesSnapshot {
+        let s = self.state.read().expect("engine state poisoned");
+        HudCachesSnapshot {
+            banners: s.hud_banners.iter().cloned().collect(),
+            captions: s.hud_captions.iter().cloned().collect(),
+            tool_validity: s.hud_tool_validity.clone(),
+            focused_node: s.hud_focus_index.map(|i| HUD_FOCUSABLE_NODES[i].to_string()),
+            focus_cycle: s.hud_focus_cycle,
+        }
     }
 
     pub fn record_run_started(&self) {
@@ -1277,6 +1393,7 @@ impl M0Engine {
         // then `terrain_carved` or `tool_refused` based on outcome). The
         // `source: chunked|strip` field lets replay viewers tell M1.5 strip
         // digs from M2 chunked-terrain digs.
+        let mut dig_validity_update: Option<(u64, ToolValidityUpdate)> = None;
         if let Some((tick, sim_time_ms, evt)) = dig_payload {
             let dig_source = match evt.source() {
                 IntentSource::Human => "human",
@@ -1311,6 +1428,7 @@ impl M0Engine {
                         hp_remaining,
                         broken,
                     } => {
+                        dig_validity_update = Some((tick.0, ToolValidityUpdate::Carve));
                         self.recorder.record(
                             tick,
                             sim_time_ms,
@@ -1350,6 +1468,13 @@ impl M0Engine {
                         bbox_min,
                         bbox_max,
                     } => {
+                        dig_validity_update = Some((
+                            tick.0,
+                            ToolValidityUpdate::Refuse {
+                                reason: reason.clone(),
+                                target: strip_id.clone(),
+                            },
+                        ));
                         self.recorder.record(
                             tick,
                             sim_time_ms,
@@ -1371,6 +1496,7 @@ impl M0Engine {
                     outcome, aim, target, ..
                 } => match outcome {
                     cf_terrain::ChunkedCarveOutcome::Carved(stats) => {
+                        dig_validity_update = Some((tick.0, ToolValidityUpdate::Carve));
                         let mat_name = cf_terrain::material_affordance(stats.dominant_material)
                             .map(|m| m.name)
                             .unwrap_or("unknown");
@@ -1419,6 +1545,13 @@ impl M0Engine {
                         let mat_name = cf_terrain::material_affordance(refusal.material)
                             .map(|m| m.name)
                             .unwrap_or("unknown");
+                        dig_validity_update = Some((
+                            tick.0,
+                            ToolValidityUpdate::Refuse {
+                                reason: refusal.reason.to_string(),
+                                target: Some(format!("chunked:{mat_name}")),
+                            },
+                        ));
                         self.recorder.record(
                             tick,
                             sim_time_ms,
@@ -1435,6 +1568,13 @@ impl M0Engine {
                         );
                     }
                     cf_terrain::ChunkedCarveOutcome::NoOp(noop) => {
+                        dig_validity_update = Some((
+                            tick.0,
+                            ToolValidityUpdate::Refuse {
+                                reason: "out_of_range".to_string(),
+                                target: None,
+                            },
+                        ));
                         self.recorder.record(
                             tick,
                             sim_time_ms,
@@ -1449,6 +1589,22 @@ impl M0Engine {
                         );
                     }
                 },
+            }
+        }
+        // M4A: persist tool-validity update for the HUD + observe consumers.
+        if let Some((update_tick, update)) = dig_validity_update {
+            let mut state = self.state.write().expect("engine state poisoned");
+            match update {
+                ToolValidityUpdate::Carve => {
+                    state.hud_tool_validity.last_carve_tick = Some(update_tick);
+                    state.hud_tool_validity.valid = true;
+                }
+                ToolValidityUpdate::Refuse { reason, target } => {
+                    state.hud_tool_validity.last_refusal_tick = Some(update_tick);
+                    state.hud_tool_validity.last_refusal_reason = Some(reason);
+                    state.hud_tool_validity.last_refusal_target = target;
+                    state.hud_tool_validity.valid = false;
+                }
             }
         }
 
@@ -1502,7 +1658,173 @@ impl M0Engine {
             }
         }
 
+        // M4A: refresh HUD banners + captions + tool_validity caches AFTER all events
+        // have been emitted for this tick. The cache reads world state directly so it
+        // does not have to scan the event log on every observe().
+        if let Some(t) = advanced {
+            let mut state = self.state.write().expect("engine state poisoned");
+            self.refresh_hud_caches(&mut state, t);
+        }
+
         advanced
+    }
+
+    /// M4A HUD cache refresh. Called once per drive_tick after every category's
+    /// events have been emitted. Updates `hud_banners`, `hud_captions`, and the
+    /// `hud_last_*` diffing cursors. The HUD + `cfctl observe` reads the cache
+    /// directly during `snapshot()`.
+    fn refresh_hud_caches(&self, state: &mut EngineMutable, tick: Tick) {
+        // Drain expired banners + captions.
+        let now_tick = tick.0;
+        state.hud_banners.retain(|b| match b.expires_at_tick {
+            Some(exp) => now_tick < exp,
+            None => true,
+        });
+        state
+            .hud_captions
+            .retain(|c| now_tick.saturating_sub(c.raised_at_tick) < M4A_CAPTION_EXPIRY_TICKS);
+
+        // Status-change banners. The previous tick's status is cached in
+        // `hud_last_status`; raise a banner whenever the player's status
+        // worsens (Stable -> Unstable / Unstable -> Downed / any -> Dead).
+        if let Some(sim) = state.actor_state.as_ref() {
+            // Snapshot the status diff out of the borrow so we can push to the
+            // banner queue (which lives on the same `state` borrow).
+            let mut player_dead = false;
+            let mut player_downed = false;
+            let mut player_unstable = false;
+            let mut diffs: Vec<(ActorId, cf_actor::Status)> = Vec::new();
+            for (id, actor) in &sim.world.actors {
+                let prev = state.hud_last_status.get(id).copied();
+                let cur = actor.status;
+                if prev.is_some() && prev != Some(cur) {
+                    diffs.push((*id, cur));
+                    if Some(*id) == sim.world.player {
+                        match cur {
+                            cf_actor::Status::Dead => player_dead = true,
+                            cf_actor::Status::Downed => player_downed = true,
+                            cf_actor::Status::Unstable => player_unstable = true,
+                            cf_actor::Status::Stable => {}
+                        }
+                    }
+                }
+            }
+            if player_dead {
+                push_banner(
+                    &mut state.hud_banners,
+                    crate::state::HudBannerView {
+                        id: "eject_now".to_string(),
+                        severity: "critical".to_string(),
+                        label: "EJECT NOW".to_string(),
+                        raised_at_tick: now_tick,
+                        expires_at_tick: None,
+                        accessibility_id: "hud.banner.eject_now".to_string(),
+                    },
+                );
+            } else if player_downed {
+                push_banner(
+                    &mut state.hud_banners,
+                    crate::state::HudBannerView {
+                        id: "armor_cracked".to_string(),
+                        severity: "critical".to_string(),
+                        label: "ARMOR CRACKED".to_string(),
+                        raised_at_tick: now_tick,
+                        expires_at_tick: Some(now_tick + M4A_STATUS_BANNER_EXPIRY_TICKS),
+                        accessibility_id: "hud.banner.armor_cracked".to_string(),
+                    },
+                );
+            } else if player_unstable {
+                push_banner(
+                    &mut state.hud_banners,
+                    crate::state::HudBannerView {
+                        id: "hp_low".to_string(),
+                        severity: "warning".to_string(),
+                        label: "HP LOW".to_string(),
+                        raised_at_tick: now_tick,
+                        expires_at_tick: Some(now_tick + M4A_STATUS_BANNER_EXPIRY_TICKS),
+                        accessibility_id: "hud.banner.hp_low".to_string(),
+                    },
+                );
+            }
+            // Per-tick caption emission for status changes (audio-bound at BP6+;
+            // the captions surface lands at M4A so the contract is testable).
+            for (id, st) in diffs {
+                let label = format!("actor {} → {}", id.0, st.as_str());
+                push_caption(
+                    &mut state.hud_captions,
+                    crate::state::CaptionView {
+                        id: format!("status_changed.{}", id.0),
+                        label,
+                        raised_at_tick: now_tick,
+                        accessibility_id: format!("hud.caption.status_changed.{}", id.0),
+                    },
+                );
+            }
+
+            // AMMO OUT banner: triggered when the selected rifle hits 0/cap with no reload in progress.
+            if let Some(player_id) = sim.world.player {
+                if let Some(rifle) = sim.rifles.get(&player_id) {
+                    if rifle.spec.mag_capacity > 0 && rifle.ammo_in_mag == 0 && rifle.reload_remaining_ticks == 0 {
+                        push_banner_dedup(
+                            &mut state.hud_banners,
+                            crate::state::HudBannerView {
+                                id: "ammo_out".to_string(),
+                                severity: "warning".to_string(),
+                                label: "AMMO OUT — RELOAD".to_string(),
+                                raised_at_tick: now_tick,
+                                expires_at_tick: Some(now_tick + M4A_STATUS_BANNER_EXPIRY_TICKS),
+                                accessibility_id: "hud.banner.ammo_out".to_string(),
+                            },
+                        );
+                    }
+                }
+            }
+        }
+
+        // Mission resolution banner.
+        let cur_mission_result = state.mission.as_ref().map(|m| match m.result {
+            cf_mission::MissionResult::Won => "won".to_string(),
+            cf_mission::MissionResult::Lost { .. } => "lost".to_string(),
+            cf_mission::MissionResult::Active => "active".to_string(),
+        });
+        if state.hud_last_mission_result != cur_mission_result {
+            if let Some(result) = cur_mission_result.as_deref() {
+                if result == "won" {
+                    push_banner(
+                        &mut state.hud_banners,
+                        crate::state::HudBannerView {
+                            id: "mission_won".to_string(),
+                            severity: "info".to_string(),
+                            label: "MISSION WON".to_string(),
+                            raised_at_tick: now_tick,
+                            expires_at_tick: None,
+                            accessibility_id: "hud.banner.mission_won".to_string(),
+                        },
+                    );
+                } else if result == "lost" {
+                    push_banner(
+                        &mut state.hud_banners,
+                        crate::state::HudBannerView {
+                            id: "mission_failed".to_string(),
+                            severity: "critical".to_string(),
+                            label: "MISSION FAILED".to_string(),
+                            raised_at_tick: now_tick,
+                            expires_at_tick: None,
+                            accessibility_id: "hud.banner.mission_failed".to_string(),
+                        },
+                    );
+                }
+            }
+            state.hud_last_mission_result = cur_mission_result;
+        }
+
+        // Refresh hud_last_status for next tick.
+        state.hud_last_status.clear();
+        if let Some(sim) = state.actor_state.as_ref() {
+            for (id, actor) in &sim.world.actors {
+                state.hud_last_status.insert(*id, actor.status);
+            }
+        }
     }
 
     /// Translate a `cf_ai::EnemyTickReport` into recorder events.
@@ -2122,6 +2444,9 @@ impl M0Engine {
             milestone: self.config.milestone.clone(),
             build: BuildInfo {
                 commit_sha: self.config.commit_sha.clone(),
+                worktree_dirty: self.config.worktree_dirty,
+                worktree_fingerprint: self.config.worktree_fingerprint.clone(),
+                worktree_dirty_files: self.config.worktree_dirty_files.clone(),
                 rust_version: self.config.rust_version.clone(),
                 bevy_version: self.config.bevy_version.clone(),
                 platform: self.config.platform.clone(),
@@ -2143,7 +2468,15 @@ impl M0Engine {
             assumptions_tested: self.config.assumptions_tested.clone(),
             linked_specs: self.config.linked_specs.clone(),
             expected_tests: self.config.expected_tests.clone(),
-            capture_config: CaptureConfig::default(),
+            capture_config: if self.config.capture_grid_enabled {
+                CaptureConfig {
+                    events: true,
+                    screenshots: true,
+                    captures: true,
+                }
+            } else {
+                CaptureConfig::default()
+            },
             schemas,
             capabilities: CapabilitiesBlock {
                 debug: self.config.debug_capabilities.iter().any(|c| c == "debug"),
@@ -2158,6 +2491,10 @@ impl M0Engine {
                 reduced_motion: live_settings.reduced_motion,
                 reduced_shake: live_settings.reduced_shake,
                 reduced_flash: live_settings.reduced_flash,
+                hold_to_confirm: live_settings.hold_to_confirm,
+                hold_threshold_ms: live_settings.hold_threshold_ms,
+                key_remap_enabled: live_settings.key_remap_enabled,
+                key_bindings: live_settings.key_bindings.clone(),
             },
             checksum: ChecksumConfig::m0_default(),
             tick_rate_hz: self.config.tick_rate_hz,
@@ -2173,6 +2510,18 @@ impl M0Engine {
             },
         }
     }
+}
+
+/// M4A HUD-cache snapshot for cf-app. Mirrors `ObserveFrame.banners /
+/// captions / tool_validity / accessibility.focused_node / focus_cycle` so
+/// cf-app does not have to call the async `snapshot()` path every frame.
+#[derive(Debug, Clone, Default)]
+pub struct HudCachesSnapshot {
+    pub banners: Vec<crate::state::HudBannerView>,
+    pub captions: Vec<crate::state::CaptionView>,
+    pub tool_validity: crate::state::ToolValidityView,
+    pub focused_node: Option<String>,
+    pub focus_cycle: u64,
 }
 
 /// Snapshot of the actor world for cf-app's Bevy bridge. Cheap to clone; reuses
@@ -2348,6 +2697,79 @@ struct GuardFireRecord {
 }
 
 /// Build the JsonSchema-friendly mission view used by the observe envelope.
+/// M4A: build the module strip placeholder for a single actor. Until M5 lands
+/// real chassis modules, the strip carries one weapon_mount slot derived from
+/// the actor's selected rifle, plus three `not_present` placeholder slots
+/// (jet, shield, sensor) so HUD + accessibility consumers can rely on stable
+/// ids before the real implementation lands.
+fn build_module_strip_view(
+    rifle: Option<&cf_equipment::RifleState>,
+    has_rifle_selected: bool,
+) -> crate::state::ModuleStripView {
+    let weapon_state = match (rifle, has_rifle_selected) {
+        (Some(r), true) => {
+            let reloading = r.reload_remaining_ticks > 0;
+            let empty = r.spec.mag_capacity > 0 && r.ammo_in_mag == 0;
+            if reloading || empty {
+                "warning"
+            } else {
+                "nominal"
+            }
+        }
+        _ => "not_present",
+    };
+    let weapon_label = match (rifle, has_rifle_selected) {
+        (Some(r), true) => {
+            if r.reload_remaining_ticks > 0 {
+                "RELOADING".to_string()
+            } else if r.spec.mag_capacity > 0 && r.ammo_in_mag == 0 {
+                "EMPTY".to_string()
+            } else {
+                format!("READY {}/{}", r.ammo_in_mag, r.spec.mag_capacity)
+            }
+        }
+        _ => "—".to_string(),
+    };
+    let modules = vec![
+        crate::state::ModuleStateView {
+            id: "weapon_mount".to_string(),
+            label: weapon_label,
+            state: weapon_state.to_string(),
+            kind: "weapon_mount".to_string(),
+        },
+        crate::state::ModuleStateView {
+            id: "jet".to_string(),
+            label: "JET N/A".to_string(),
+            state: "not_present".to_string(),
+            kind: "jet".to_string(),
+        },
+        crate::state::ModuleStateView {
+            id: "shield".to_string(),
+            label: "SHIELD N/A".to_string(),
+            state: "not_present".to_string(),
+            kind: "shield".to_string(),
+        },
+        crate::state::ModuleStateView {
+            id: "sensor".to_string(),
+            label: "SENSOR N/A".to_string(),
+            state: "not_present".to_string(),
+            kind: "sensor".to_string(),
+        },
+    ];
+    crate::state::ModuleStripView {
+        modules,
+        placeholder: true,
+    }
+}
+
+/// M4A: stable accessibility ids for every focusable HUD node, in z-order.
+/// Single source: [`HUD_FOCUSABLE_NODES`]. Consumed by `cfctl ui` (M4B+),
+/// `cf-e2e --verify-focus`, the live-WS acceptance tests, and cf-app's
+/// keyboard focus traversal system.
+fn hud_focusable_nodes() -> Vec<String> {
+    HUD_FOCUSABLE_NODES.iter().map(|s| (*s).to_string()).collect()
+}
+
 fn build_mission_view(state: &cf_mission::MissionState, current_tick: u64) -> crate::state::MissionView {
     let view = cf_mission::MissionView::from_state(state, current_tick);
     let objectives = view
@@ -2408,6 +2830,38 @@ fn build_checksum_bytes(state: &EngineMutable) -> Vec<u8> {
         out.extend_from_slice(&reactors.checksum_bytes());
     }
     out
+}
+
+/// M4A: outcome of one dig used to update the HUD tool-validity cache.
+enum ToolValidityUpdate {
+    Carve,
+    Refuse { reason: String, target: Option<String> },
+}
+
+/// M4A: push a banner to the HUD queue, capping at `M4A_BANNER_BUFFER`.
+fn push_banner(queue: &mut VecDeque<crate::state::HudBannerView>, banner: crate::state::HudBannerView) {
+    queue.push_back(banner);
+    while queue.len() > M4A_BANNER_BUFFER {
+        queue.pop_front();
+    }
+}
+
+/// M4A: push a banner only if no banner with the same `id` is already in the
+/// queue. Used for "sticky" banners (e.g., AMMO OUT) that should not flicker
+/// when conditions persist tick-to-tick.
+fn push_banner_dedup(queue: &mut VecDeque<crate::state::HudBannerView>, banner: crate::state::HudBannerView) {
+    if queue.iter().any(|b| b.id == banner.id) {
+        return;
+    }
+    push_banner(queue, banner);
+}
+
+/// M4A: push a caption to the HUD queue, capping at `M4A_CAPTION_BUFFER`.
+fn push_caption(queue: &mut VecDeque<crate::state::CaptionView>, caption: crate::state::CaptionView) {
+    queue.push_back(caption);
+    while queue.len() > M4A_CAPTION_BUFFER {
+        queue.pop_front();
+    }
 }
 
 /// Cause label for `actor.actor_status_changed` events emitted from `step_one_actor`.
@@ -2757,8 +3211,9 @@ fn discover_run_artifacts(run_bundle_dir: &Path) -> (Vec<ArtifactItem>, Option<S
 fn apply_settings_patch(settings: &mut Settings, patch: &SettingsPatch) -> Vec<String> {
     let mut changed = Vec::new();
     if let Some(v) = patch.ui_scale {
-        if (settings.ui_scale - v).abs() > f32::EPSILON {
-            settings.ui_scale = v;
+        let clamped = v.clamp(crate::settings::UI_SCALE_MIN, crate::settings::UI_SCALE_MAX);
+        if (settings.ui_scale - clamped).abs() > f32::EPSILON {
+            settings.ui_scale = clamped;
             changed.push("ui_scale".to_string());
         }
     }
@@ -2792,6 +3247,31 @@ fn apply_settings_patch(settings: &mut Settings, patch: &SettingsPatch) -> Vec<S
             changed.push("reduced_flash".to_string());
         }
     }
+    if let Some(v) = patch.hold_to_confirm {
+        if settings.hold_to_confirm != v {
+            settings.hold_to_confirm = v;
+            changed.push("hold_to_confirm".to_string());
+        }
+    }
+    if let Some(v) = patch.hold_threshold_ms {
+        let clamped = v.clamp(50, 2000);
+        if settings.hold_threshold_ms != clamped {
+            settings.hold_threshold_ms = clamped;
+            changed.push("hold_threshold_ms".to_string());
+        }
+    }
+    if let Some(v) = patch.key_remap_enabled {
+        if settings.key_remap_enabled != v {
+            settings.key_remap_enabled = v;
+            changed.push("key_remap_enabled".to_string());
+        }
+    }
+    if let Some(ref new_bindings) = patch.key_bindings {
+        if &settings.key_bindings != new_bindings {
+            settings.key_bindings = new_bindings.clone();
+            changed.push("key_bindings".to_string());
+        }
+    }
     changed
 }
 
@@ -2815,6 +3295,8 @@ impl EngineHandle for M0Engine {
                     } else {
                         None
                     };
+                    let silhouette = a.body_silhouette();
+                    let module_strip = build_module_strip_view(rifle, a.inventory.selected_item().is_rifle());
                     ActorView {
                         id: a.id.0,
                         team: a.team.clone(),
@@ -2833,6 +3315,17 @@ impl EngineHandle for M0Engine {
                         rifle_fire_cooldown_ticks: rifle.map(|r| r.fire_cooldown_ticks),
                         rifle_reload_remaining_ticks: rifle.map(|r| r.reload_remaining_ticks),
                         rifle_reload_total_ticks: rifle.map(|r| r.reload_ticks()),
+                        stance: a.stance().as_str().to_string(),
+                        body_silhouette: crate::state::BodySilhouetteView {
+                            head_hp_pct: silhouette.head_hp_pct,
+                            torso_hp_pct: silhouette.torso_hp_pct,
+                            arm_left_hp_pct: silhouette.arm_left_hp_pct,
+                            arm_right_hp_pct: silhouette.arm_right_hp_pct,
+                            leg_left_hp_pct: silhouette.leg_left_hp_pct,
+                            leg_right_hp_pct: silhouette.leg_right_hp_pct,
+                            placeholder: silhouette.placeholder,
+                        },
+                        module_strip,
                     }
                 })
                 .collect()
@@ -2912,6 +3405,37 @@ impl EngineHandle for M0Engine {
                     .collect()
             })
             .unwrap_or_default();
+        // M4A surfaces: banner queue, caption queue, tool-validity, accessibility.
+        let banners: Vec<crate::state::HudBannerView> = state.hud_banners.iter().cloned().collect();
+        let captions_raw: Vec<crate::state::CaptionView> = state.hud_captions.iter().cloned().collect();
+        let captions: Vec<crate::state::CaptionView> = if state.settings.captions {
+            captions_raw
+        } else {
+            // When captions are disabled, the HUD does not render them, but
+            // `cfctl observe` still surfaces a structurally-empty queue so AI
+            // agents and accessibility tooling can verify the contract holds.
+            Vec::new()
+        };
+        let tool_validity = if state.chunked_terrain.is_some() || state.breach_world.is_some() {
+            Some(state.hud_tool_validity.clone())
+        } else {
+            None
+        };
+        let accessibility = crate::state::AccessibilityView {
+            ui_scale_applied: state.settings.ui_scale,
+            high_contrast_applied: state.settings.high_contrast,
+            captions_visible: state.settings.captions,
+            reduced_motion_applied: state.settings.reduced_motion,
+            reduced_shake_applied: state.settings.reduced_shake,
+            reduced_flash_applied: state.settings.reduced_flash,
+            hold_to_confirm_applied: state.settings.hold_to_confirm,
+            hold_threshold_ms: state.settings.hold_threshold_ms,
+            key_remap_enabled: state.settings.key_remap_enabled,
+            key_bindings: state.settings.key_bindings.clone(),
+            focusable_nodes: hud_focusable_nodes(),
+            focused_node: state.hud_focus_index.map(|i| HUD_FOCUSABLE_NODES[i].to_string()),
+            focus_cycle: state.hud_focus_cycle,
+        };
         let frame = ObserveFrame {
             schema_version: SCHEMA_VERSION,
             run_id: self.recorder.run_id().to_string(),
@@ -2932,6 +3456,10 @@ impl EngineHandle for M0Engine {
             enemies,
             terrain,
             reactors,
+            banners,
+            captions,
+            tool_validity,
+            accessibility,
         };
         let tick = state.clock.tick();
         let sim_time_ms = state.clock.sim_time_ms();
@@ -3463,6 +3991,66 @@ impl EngineHandle for M0Engine {
                 );
                 CommandResult::accepted(tick.0)
             }
+            ControlCommand::ActInputFocus { direction, source } => {
+                let _ = source;
+                let n = HUD_FOCUSABLE_NODES.len();
+                let prev_idx = state.hud_focus_index;
+                let new_idx: Option<usize> = match &direction {
+                    crate::server::FocusDirection::Next => Some(match prev_idx {
+                        Some(i) => (i + 1) % n,
+                        None => 0,
+                    }),
+                    crate::server::FocusDirection::Prev => Some(match prev_idx {
+                        Some(i) => (i + n - 1) % n,
+                        None => n - 1,
+                    }),
+                    crate::server::FocusDirection::Set(node) => {
+                        match HUD_FOCUSABLE_NODES.iter().position(|x| *x == node) {
+                            Some(i) => Some(i),
+                            None => {
+                                drop(state);
+                                self.recorder.record(
+                                    tick,
+                                    sim_time_ms,
+                                    "control",
+                                    "command_rejected",
+                                    json!({
+                                        "method": "act.input.focus",
+                                        "reason": "focus_unknown_node",
+                                        "node": node,
+                                    }),
+                                    None,
+                                );
+                                return CommandResult::rejected("focus_unknown_node", tick.0);
+                            }
+                        }
+                    }
+                    crate::server::FocusDirection::Clear => None,
+                };
+                state.hud_focus_index = new_idx;
+                state.hud_focus_cycle = state.hud_focus_cycle.saturating_add(1);
+                let new_node: Option<String> = new_idx.map(|i| HUD_FOCUSABLE_NODES[i].to_string());
+                let direction_str = match &direction {
+                    crate::server::FocusDirection::Next => "next",
+                    crate::server::FocusDirection::Prev => "prev",
+                    crate::server::FocusDirection::Set(_) => "set",
+                    crate::server::FocusDirection::Clear => "clear",
+                };
+                drop(state);
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "control",
+                    "command_accepted",
+                    json!({
+                        "method": "act.input.focus",
+                        "direction": direction_str,
+                        "node": new_node,
+                    }),
+                    None,
+                );
+                CommandResult::accepted(tick.0)
+            }
             ControlCommand::SettingsSet { changes } => {
                 if changes.is_empty() {
                     drop(state);
@@ -3475,6 +4063,18 @@ impl EngineHandle for M0Engine {
                         None,
                     );
                     return CommandResult::rejected("settings_patch_empty", tick.0);
+                }
+                if let Some(reason) = changes.validation_error() {
+                    drop(state);
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_rejected",
+                        json!({"method": "act.settings.set", "reason": reason.clone()}),
+                        None,
+                    );
+                    return CommandResult::rejected(reason, tick.0);
                 }
                 let changed = apply_settings_patch(&mut state.settings, &changes);
                 let new_settings = state.settings.clone();
@@ -3828,6 +4428,30 @@ mod tests {
         ] {
             assert!(notes.contains(h));
         }
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
+    fn run_manifest_records_active_key_bindings() {
+        let root = temp_run_root();
+        let scenario_path = write_test_scenario();
+        let mut config = load_test_scenario_and_config(scenario_path);
+        config.run_bundle_root = root.clone();
+        config.write_run_bundle = true;
+        config.run_mode = "test-remap-manifest".to_string();
+        config.settings.key_remap_enabled = true;
+        config.settings.key_bindings = std::collections::BTreeMap::from([
+            ("aim_up".to_string(), "Numpad8".to_string()),
+            ("fire".to_string(), "KeyF".to_string()),
+        ]);
+
+        let outcome = run_m0_inline(config).unwrap();
+        let bundle = outcome.bundle_dir.unwrap();
+        let manifest: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(bundle.join("run_manifest.json")).unwrap()).unwrap();
+        assert_eq!(manifest["settings"]["key_remap_enabled"], true);
+        assert_eq!(manifest["settings"]["key_bindings"]["aim_up"], "Numpad8");
+        assert_eq!(manifest["settings"]["key_bindings"]["fire"], "KeyF");
         let _ = std::fs::remove_dir_all(root);
     }
 
@@ -4228,6 +4852,39 @@ mod tests {
         let frame = engine.snapshot(None).await;
         assert!((frame.settings.settings.ui_scale - 2.0).abs() < f32::EPSILON);
         assert!(frame.settings.settings.high_contrast);
+    }
+
+    #[tokio::test]
+    async fn settings_set_clamps_ui_scale_before_observe() {
+        let scenario_path = write_test_scenario();
+        let config = load_test_scenario_and_config(scenario_path);
+        let engine = M0Engine::new(config);
+
+        let _ = engine
+            .dispatch(ControlCommand::SettingsSet {
+                changes: SettingsPatch {
+                    ui_scale: Some(0.01),
+                    ..SettingsPatch::default()
+                },
+            })
+            .await;
+        let low_settings = engine.settings_snapshot().await;
+        assert!((low_settings.ui_scale - crate::settings::UI_SCALE_MIN).abs() < f32::EPSILON);
+        let low_frame = engine.snapshot(None).await;
+        assert!((low_frame.accessibility.ui_scale_applied - crate::settings::UI_SCALE_MIN).abs() < f32::EPSILON);
+
+        let _ = engine
+            .dispatch(ControlCommand::SettingsSet {
+                changes: SettingsPatch {
+                    ui_scale: Some(99.0),
+                    ..SettingsPatch::default()
+                },
+            })
+            .await;
+        let high_settings = engine.settings_snapshot().await;
+        assert!((high_settings.ui_scale - crate::settings::UI_SCALE_MAX).abs() < f32::EPSILON);
+        let high_frame = engine.snapshot(None).await;
+        assert!((high_frame.accessibility.ui_scale_applied - crate::settings::UI_SCALE_MAX).abs() < f32::EPSILON);
     }
 
     #[test]

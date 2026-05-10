@@ -115,6 +115,7 @@ async fn spawn_server_with_scenario(
         control_api_enabled: true,
         debug_capabilities: vec![],
         tick_rate_hz: 60,
+        capture_grid_enabled: false,
         paced: false,
         settings: Settings::default(),
         seed_override: Some(seed),
@@ -598,4 +599,547 @@ async fn live_ws_scenario_load_unknown_scenario_rejected() {
         .expect("unknown scenario must produce error envelope");
     assert_eq!(error["message"], "command_rejected");
     assert_eq!(error["data"]["reason"], "scenario_swap_not_supported_in_m0");
+}
+
+// M4A: act.settings.set + observe.settings round-trip + observe.once
+// accessibility surface acceptance tests.
+
+#[tokio::test]
+async fn live_ws_settings_observe_returns_default_block() {
+    let (url, handle) = spawn_server(42).await;
+    let response = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 900,
+            "method": "observe.settings",
+            "params": {"schema_version": 1}
+        }),
+    )
+    .await;
+    handle.abort();
+    let result = response.get("result").expect("observe.settings must return result");
+    let s = result.get("settings").expect("settings block missing");
+    assert!((s["ui_scale"].as_f64().unwrap() - 1.0).abs() < f32::EPSILON.into());
+    assert_eq!(s["high_contrast"], false);
+    assert_eq!(s["captions"], true);
+    assert_eq!(s["reduced_motion"], false);
+    assert_eq!(s["reduced_shake"], false);
+    assert_eq!(s["reduced_flash"], false);
+}
+
+#[tokio::test]
+async fn live_ws_act_settings_set_round_trips_via_observe_settings() {
+    let (url, handle) = spawn_server(42).await;
+    let response = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 901,
+            "method": "act.settings.set",
+            "params": {
+                "schema_version": 1,
+                "ui_scale": 2.0,
+                "high_contrast": true,
+                "captions": false,
+                "reduced_motion": true,
+                "reduced_shake": true,
+                "reduced_flash": true
+            }
+        }),
+    )
+    .await;
+    let _ = response;
+    let observed = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 902,
+            "method": "observe.settings",
+            "params": {"schema_version": 1}
+        }),
+    )
+    .await;
+    handle.abort();
+    let s = observed
+        .get("result")
+        .and_then(|r| r.get("settings"))
+        .expect("settings block");
+    assert!((s["ui_scale"].as_f64().unwrap() - 2.0).abs() < 1e-6);
+    assert_eq!(s["high_contrast"], true);
+    assert_eq!(s["captions"], false);
+    assert_eq!(s["reduced_motion"], true);
+    assert_eq!(s["reduced_shake"], true);
+    assert_eq!(s["reduced_flash"], true);
+}
+
+#[tokio::test]
+async fn live_ws_act_settings_set_empty_patch_rejected() {
+    let (url, handle) = spawn_server(42).await;
+    let response = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 903,
+            "method": "act.settings.set",
+            "params": {"schema_version": 1}
+        }),
+    )
+    .await;
+    handle.abort();
+    let err = response.get("error").expect("empty patch must reject");
+    assert_eq!(err["data"]["reason"], "settings_patch_empty");
+}
+
+#[tokio::test]
+async fn live_ws_observe_once_exposes_m4a_accessibility_surface() {
+    let (url, handle) = spawn_m1_server().await;
+    let response = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 904,
+            "method": "observe.once",
+            "params": {"schema_version": 1}
+        }),
+    )
+    .await;
+    handle.abort();
+    let result = response.get("result").expect("observe.once must return frame");
+    // Banners + captions + accessibility are present (possibly empty).
+    assert!(result.get("banners").is_some(), "banners field present");
+    assert!(result.get("captions").is_some(), "captions field present");
+    let acc = result.get("accessibility").expect("accessibility field present");
+    let nodes = acc
+        .get("focusable_nodes")
+        .and_then(|v| v.as_array())
+        .expect("focusable_nodes array");
+    let names: Vec<&str> = nodes.iter().filter_map(|v| v.as_str()).collect();
+    // M4A: read the canonical list from cf_control::HUD_FOCUSABLE_NODES so
+    // any regression that drops a node from the constant breaks this test.
+    // The previous hardcoded 8-item list let `hud.enemy` + `hud.breach` +
+    // `hud.objective` + `hud.mission` regress silently — audit-flagged HIGH.
+    for required in cf_control::HUD_FOCUSABLE_NODES {
+        assert!(names.contains(required), "missing focusable node {required}");
+    }
+    assert_eq!(
+        names.len(),
+        cf_control::HUD_FOCUSABLE_NODES.len(),
+        "observe.accessibility.focusable_nodes length must match the canonical list exactly"
+    );
+    // ActorView carries the M4A stance + body_silhouette + module_strip.
+    let actors = result.get("actors").and_then(|v| v.as_array()).expect("actors array");
+    let player = &actors[0];
+    assert!(player.get("stance").is_some(), "actor.stance present");
+    let silhouette = player.get("body_silhouette").expect("actor.body_silhouette present");
+    assert!(
+        silhouette.get("placeholder").is_some(),
+        "silhouette.placeholder present"
+    );
+    let modules = player.get("module_strip").expect("actor.module_strip present");
+    let mods = modules.get("modules").and_then(|v| v.as_array()).expect("module list");
+    assert!(mods.iter().any(|m| m.get("kind") == Some(&json!("weapon_mount"))));
+}
+
+#[tokio::test]
+async fn live_ws_act_input_focus_advances_through_canonical_list() {
+    let (url, handle) = spawn_m1_server().await;
+    // Advance one node forward.
+    let _ = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 905,
+            "method": "act.input.focus",
+            "params": {"schema_version": 1, "direction": "next"}
+        }),
+    )
+    .await;
+    let observed = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 906,
+            "method": "observe.once",
+            "params": {"schema_version": 1}
+        }),
+    )
+    .await;
+    let acc = observed
+        .get("result")
+        .and_then(|r| r.get("accessibility"))
+        .expect("accessibility field");
+    assert_eq!(
+        acc.get("focused_node").and_then(|v| v.as_str()),
+        Some(cf_control::HUD_FOCUSABLE_NODES[0])
+    );
+    assert!(acc.get("focus_cycle").and_then(|v| v.as_u64()).unwrap_or(0) >= 1);
+
+    // Advance back to clear ring then set explicitly to a deeper node.
+    let _ = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 907,
+            "method": "act.input.focus",
+            "params": {"schema_version": 1, "direction": "set", "node": "hud.module_strip"}
+        }),
+    )
+    .await;
+    let observed = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 908,
+            "method": "observe.once",
+            "params": {"schema_version": 1}
+        }),
+    )
+    .await;
+    let acc = observed
+        .get("result")
+        .and_then(|r| r.get("accessibility"))
+        .expect("accessibility field");
+    assert_eq!(
+        acc.get("focused_node").and_then(|v| v.as_str()),
+        Some("hud.module_strip")
+    );
+
+    // Unknown node rejects.
+    let unknown = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 909,
+            "method": "act.input.focus",
+            "params": {"schema_version": 1, "direction": "set", "node": "hud.bogus_node"}
+        }),
+    )
+    .await;
+    let err = unknown.get("error").expect("unknown node must reject");
+    assert_eq!(err["data"]["reason"], "focus_unknown_node");
+
+    // Clear path.
+    let _ = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 910,
+            "method": "act.input.focus",
+            "params": {"schema_version": 1, "direction": "clear"}
+        }),
+    )
+    .await;
+    let observed = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 911,
+            "method": "observe.once",
+            "params": {"schema_version": 1}
+        }),
+    )
+    .await;
+    handle.abort();
+    let acc = observed
+        .get("result")
+        .and_then(|r| r.get("accessibility"))
+        .expect("accessibility field");
+    assert!(acc.get("focused_node").map(|v| v.is_null()).unwrap_or(true));
+}
+
+#[tokio::test]
+async fn live_ws_act_settings_set_hold_to_confirm_round_trips() {
+    let (url, handle) = spawn_server(42).await;
+    let _ = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 920,
+            "method": "act.settings.set",
+            "params": {
+                "schema_version": 1,
+                "hold_to_confirm": true,
+                "hold_threshold_ms": 500,
+                "key_remap_enabled": true
+            }
+        }),
+    )
+    .await;
+    let observed = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 921,
+            "method": "observe.settings",
+            "params": {"schema_version": 1}
+        }),
+    )
+    .await;
+    handle.abort();
+    let s = observed
+        .get("result")
+        .and_then(|r| r.get("settings"))
+        .expect("settings block");
+    assert_eq!(s["hold_to_confirm"], true);
+    assert_eq!(s["hold_threshold_ms"], 500);
+    assert_eq!(s["key_remap_enabled"], true);
+}
+
+#[tokio::test]
+async fn live_ws_act_settings_set_key_bindings_round_trip() {
+    let (url, handle) = spawn_server(42).await;
+    let _ = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 930,
+            "method": "act.settings.set",
+            "params": {
+                "schema_version": 1,
+                "key_remap_enabled": true,
+                "key_bindings": {
+                    "fire": "KeyF",
+                    "jump": "ShiftLeft",
+                    "reload": "KeyR",
+                    "aim_up": "Numpad8"
+                }
+            }
+        }),
+    )
+    .await;
+    // observe.settings shows the table on the wire.
+    let observed_settings = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 931,
+            "method": "observe.settings",
+            "params": {"schema_version": 1}
+        }),
+    )
+    .await;
+    let s = observed_settings
+        .get("result")
+        .and_then(|r| r.get("settings"))
+        .expect("settings block");
+    assert_eq!(s["key_remap_enabled"], true);
+    assert_eq!(s["key_bindings"]["fire"], "KeyF");
+    assert_eq!(s["key_bindings"]["jump"], "ShiftLeft");
+    assert_eq!(s["key_bindings"]["reload"], "KeyR");
+    assert_eq!(s["key_bindings"]["aim_up"], "Numpad8");
+    // observe.once.accessibility surfaces the same table for AI agents.
+    let observed_frame = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 932,
+            "method": "observe.once",
+            "params": {"schema_version": 1}
+        }),
+    )
+    .await;
+    handle.abort();
+    let acc = observed_frame
+        .get("result")
+        .and_then(|r| r.get("accessibility"))
+        .expect("accessibility");
+    assert_eq!(acc["key_remap_enabled"], true);
+    assert_eq!(acc["key_bindings"]["fire"], "KeyF");
+}
+
+#[tokio::test]
+async fn live_ws_act_settings_set_ui_scale_clamps_before_observe() {
+    let (url, handle) = spawn_server(42).await;
+    let _ = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 936,
+            "method": "act.settings.set",
+            "params": {"schema_version": 1, "ui_scale": 0.01}
+        }),
+    )
+    .await;
+    let observed_low_settings = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 937,
+            "method": "observe.settings",
+            "params": {"schema_version": 1}
+        }),
+    )
+    .await;
+    let observed_low_frame = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 938,
+            "method": "observe.once",
+            "params": {"schema_version": 1}
+        }),
+    )
+    .await;
+    let low_settings = observed_low_settings
+        .get("result")
+        .and_then(|r| r.get("settings"))
+        .expect("settings");
+    let low_acc = observed_low_frame
+        .get("result")
+        .and_then(|r| r.get("accessibility"))
+        .expect("accessibility");
+    assert_eq!(low_settings["ui_scale"], 0.5);
+    assert_eq!(low_acc["ui_scale_applied"], 0.5);
+
+    let _ = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 939,
+            "method": "act.settings.set",
+            "params": {"schema_version": 1, "ui_scale": 99.0}
+        }),
+    )
+    .await;
+    let observed_high = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 940,
+            "method": "observe.once",
+            "params": {"schema_version": 1}
+        }),
+    )
+    .await;
+    handle.abort();
+    let high = observed_high
+        .get("result")
+        .and_then(|r| r.get("accessibility"))
+        .expect("accessibility");
+    assert_eq!(high["ui_scale_applied"], 4.0);
+}
+
+#[tokio::test]
+async fn live_ws_act_settings_set_rejects_unknown_key_binding_action() {
+    let (url, handle) = spawn_server(42).await;
+    let response = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 933,
+            "method": "act.settings.set",
+            "params": {
+                "schema_version": 1,
+                "key_remap_enabled": true,
+                "key_bindings": {"frie": "KeyF"}
+            }
+        }),
+    )
+    .await;
+    handle.abort();
+    let err = response.get("error").expect("unknown remap action must reject");
+    assert_eq!(err["data"]["reason"], "key_binding_unknown_action:frie");
+}
+
+#[tokio::test]
+async fn live_ws_act_settings_set_rejects_unknown_key_binding_name() {
+    let (url, handle) = spawn_server(42).await;
+    let response = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 934,
+            "method": "act.settings.set",
+            "params": {
+                "schema_version": 1,
+                "key_remap_enabled": true,
+                "key_bindings": {"fire": "BogusKey"}
+            }
+        }),
+    )
+    .await;
+    handle.abort();
+    let err = response.get("error").expect("unknown remap key must reject");
+    assert_eq!(err["data"]["reason"], "key_binding_unknown_key:fire=BogusKey");
+}
+
+#[tokio::test]
+async fn live_ws_act_settings_set_rejects_key_binding_collision_with_default() {
+    let (url, handle) = spawn_server(42).await;
+    let response = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 935,
+            "method": "act.settings.set",
+            "params": {
+                "schema_version": 1,
+                "key_remap_enabled": true,
+                "key_bindings": {"fire": "KeyA"}
+            }
+        }),
+    )
+    .await;
+    handle.abort();
+    let err = response.get("error").expect("duplicate action key must reject");
+    assert_eq!(err["data"]["reason"], "key_binding_duplicate_key:KeyA=fire,move_left");
+}
+
+#[tokio::test]
+async fn live_ws_act_settings_set_hold_threshold_clamped_to_50_2000() {
+    let (url, handle) = spawn_server(42).await;
+    // Below 50 ms — clamps to 50.
+    let _ = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 940,
+            "method": "act.settings.set",
+            "params": {"schema_version": 1, "hold_threshold_ms": 10}
+        }),
+    )
+    .await;
+    let observed = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 941,
+            "method": "observe.settings",
+            "params": {"schema_version": 1}
+        }),
+    )
+    .await;
+    let s = observed
+        .get("result")
+        .and_then(|r| r.get("settings"))
+        .expect("settings");
+    assert_eq!(s["hold_threshold_ms"], 50, "below floor must clamp to 50");
+    // Above 2000 — clamps to 2000.
+    let _ = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 942,
+            "method": "act.settings.set",
+            "params": {"schema_version": 1, "hold_threshold_ms": 9999}
+        }),
+    )
+    .await;
+    let observed = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 943,
+            "method": "observe.settings",
+            "params": {"schema_version": 1}
+        }),
+    )
+    .await;
+    handle.abort();
+    let s = observed
+        .get("result")
+        .and_then(|r| r.get("settings"))
+        .expect("settings");
+    assert_eq!(s["hold_threshold_ms"], 2000, "above ceiling must clamp to 2000");
 }

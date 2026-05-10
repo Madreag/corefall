@@ -129,8 +129,9 @@ def latest_bundle_for_scenario(
         return None
     # Try each known prefix in order.
     prefix_groups = [
+        f"m4a_*", f"m3b_*", f"m3a_*",
         f"m2.5_*", f"m2_*", f"m1.5_*", f"m1_*", f"m0_*",
-        f"m3a_*", f"bp[0-9]*_*",
+        f"bp[0-9]*_*",
     ]
     candidates: List[Path] = []
     for pat in prefix_groups:

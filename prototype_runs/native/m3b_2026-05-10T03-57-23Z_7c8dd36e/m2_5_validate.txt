@@ -1,0 +1,1 @@
+PASS bundle_dir=/Users/erol/projects/corefall/prototype_runs/native/m2.5_2026-05-09T04-47-07Z_e66a7ad6 run_id=m2.5_2026-05-09T04-47-07Z_e66a7ad6 events=7777 ticks=0..1989

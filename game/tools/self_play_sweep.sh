@@ -258,6 +258,127 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Row 3e: M3B replay viewer + cause-chain + debrief on the M2.5 bundle
+# ---------------------------------------------------------------------------
+ROW="m3b_replay_viewer_debrief"
+if skip_id "$ROW"; then
+    add_row "$ROW" "SKIP" "" "skipped via SELF_PLAY_SWEEP_SKIP"
+else
+    BUNDLE=""
+    for D in $(ls -dt "$REPO_ROOT/prototype_runs/native/m2.5_"* 2>/dev/null); do
+        if [[ -f "$D/run_manifest.json" ]]; then
+            BUNDLE="$D"
+            break
+        fi
+    done
+    if [[ -z "$BUNDLE" ]]; then
+        add_row "$ROW" "SKIP" "" "no m2.5 bundle with manifest to view"
+    else
+        CF_VIEWER_BIN="${CF_VIEWER_BIN:-$GAME_DIR/target/release/cf-tools-replay-viewer}"
+        if [[ ! -x "$CF_VIEWER_BIN" ]]; then
+            (cd "$GAME_DIR" && cargo build --release -p cf-tools-replay-viewer 2>&1 | tail -3)
+        fi
+        DEBRIEF_OUT="$OUTDIR/${ROW}_debrief.md"
+        CHAIN_OUT="$OUTDIR/${ROW}_cause_chain.md"
+        VIEW_OUT="$OUTDIR/${ROW}_view.md"
+        VALIDATE_OUT="$OUTDIR/${ROW}_validate.txt"
+        FAILED=0
+        if ! "$CF_VIEWER_BIN" validate "$BUNDLE" > "$VALIDATE_OUT" 2>&1; then
+            FAILED=1
+        fi
+        if ! "$CF_VIEWER_BIN" debrief "$BUNDLE" --output "$DEBRIEF_OUT" 2> "$OUTDIR/$ROW.debrief.stderr.txt"; then
+            FAILED=1
+        fi
+        if ! "$CF_VIEWER_BIN" cause-chain "$BUNDLE" --output "$CHAIN_OUT" 2> "$OUTDIR/$ROW.chain.stderr.txt"; then
+            FAILED=1
+        fi
+        if ! "$CF_VIEWER_BIN" view "$BUNDLE" --filter mission --tail-len 16 --output "$VIEW_OUT" 2> "$OUTDIR/$ROW.view.stderr.txt"; then
+            FAILED=1
+        fi
+        if (( FAILED == 0 )) && [[ -f "$DEBRIEF_OUT" ]] && grep -q "## Outcome" "$DEBRIEF_OUT" && grep -q "## Checksum Status" "$DEBRIEF_OUT"; then
+            BUNDLE_CHECKSUM="$(python3 -c "import json; d=json.load(open('$BUNDLE/summary.json')); print(d.get('final_sim_checksum') or '')" 2>/dev/null)"
+            if [[ -n "$BUNDLE_CHECKSUM" ]] && ! grep -q "$BUNDLE_CHECKSUM" "$DEBRIEF_OUT"; then
+                add_row "$ROW" "FAIL" "$DEBRIEF_OUT" "debrief markdown missing bundle final_sim_checksum"
+            else
+                add_row "$ROW" "PASS" "$DEBRIEF_OUT" "viewer + cause-chain + debrief render against M2.5 bundle"
+            fi
+        else
+            add_row "$ROW" "FAIL" "${DEBRIEF_OUT}" "viewer subcommand exit nonzero or markdown missing required headings"
+        fi
+    fi
+fi
+
+# ---------------------------------------------------------------------------
+# Row 3f: M4A readability + ACC-A floor on the dedicated m4a scenario
+# (200% UI scale + high contrast + reduced_motion/shake/flash + hold_to_confirm
+# + key_remap_enabled + 12-node focus traversal proof)
+# ---------------------------------------------------------------------------
+ROW="m4a_micro_breach_acc_a_floor"
+if skip_id "$ROW"; then
+    add_row "$ROW" "SKIP" "" "skipped via SELF_PLAY_SWEEP_SKIP"
+else
+    cd "$GAME_DIR"
+    if "$CF_E2E_BIN" \
+        --scenario m4a_micro_breach_readability \
+        --script m4a_micro_breach_readability \
+        --capture-grid \
+        --ui-scale 2.0 \
+        --high-contrast \
+        --reduced-motion \
+        --reduced-shake \
+        --reduced-flash \
+        --verify-focus \
+        --write-run-bundle \
+        --timeout-seconds 180 \
+        --expect "scenario=m4a_micro_breach_readability" \
+        --expect "settings.settings.ui_scale>=1.99" \
+        --expect "settings.settings.high_contrast=true" \
+        --expect "settings.settings.captions=true" \
+        --expect "settings.settings.reduced_motion=true" \
+        --expect "settings.settings.reduced_shake=true" \
+        --expect "settings.settings.reduced_flash=true" \
+        --expect "settings.settings.hold_to_confirm=true" \
+        --expect "settings.settings.key_remap_enabled=true" \
+        --expect "accessibility.high_contrast_applied=true" \
+        --expect "accessibility.ui_scale_applied>=1.99" \
+        --expect "accessibility.reduced_motion_applied=true" \
+        --expect "accessibility.reduced_shake_applied=true" \
+        --expect "accessibility.reduced_flash_applied=true" \
+        --expect "accessibility.hold_to_confirm_applied=true" \
+        --expect "accessibility.key_remap_enabled=true" \
+        --expect "capture.summary_grid.non_blank_ratio>=0.95" \
+        > "$OUTDIR/$ROW.stdout.txt" 2> "$OUTDIR/$ROW.stderr.txt"; then
+        BUNDLE="$(ls -dt "$REPO_ROOT/prototype_runs/native/m4a_"* 2>/dev/null | head -n1)"
+        add_row "$ROW" "PASS" "${BUNDLE:-?}" "M4A readable HUD + ACC-A floor: 200% scale + high contrast + reduced_* + hold_to_confirm + 12-node focus traversal + verify-focus PASS"
+    else
+        add_row "$ROW" "FAIL" "$OUTDIR/$ROW.stderr.txt" "cf-e2e exit nonzero or expect failed"
+    fi
+    cd "$REPO_ROOT"
+fi
+
+# ---------------------------------------------------------------------------
+# Row 3g: M4A settings live-update round-trip (drives act.settings.set during the run)
+# ---------------------------------------------------------------------------
+ROW="m4a_settings_live_update"
+if skip_id "$ROW"; then
+    add_row "$ROW" "SKIP" "" "skipped via SELF_PLAY_SWEEP_SKIP"
+else
+    cd "$GAME_DIR"
+    if "$CF_E2E_BIN" \
+        --scenario m1_actor_range \
+        --script m4a_acc_a_floor \
+        --timeout-seconds 60 \
+        --expect "settings.settings.ui_scale=1.0" \
+        --expect "settings.settings.high_contrast=false" \
+        > "$OUTDIR/$ROW.stdout.txt" 2> "$OUTDIR/$ROW.stderr.txt"; then
+        add_row "$ROW" "PASS" "$OUTDIR/$ROW.stdout.txt" "M4A live act.settings.set roundtrip: ui_scale 2.0 then back to 1.0; high_contrast on then off"
+    else
+        add_row "$ROW" "FAIL" "$OUTDIR/$ROW.stderr.txt" "cf-e2e exit nonzero or live settings update mismatch"
+    fi
+    cd "$REPO_ROOT"
+fi
+
+# ---------------------------------------------------------------------------
 # Row 4: M0 settings round-trip (act.settings.set + observe.settings)
 # ---------------------------------------------------------------------------
 ROW="m0_settings_roundtrip"
@@ -429,26 +550,33 @@ fi
 PASS=0
 FAIL=0
 SKIP=0
-{
-    echo "Self-Play Validation Sweep — $UTC"
-    echo "Output: $OUTDIR"
-    echo
-    printf "%-32s %s\n" "ROW" "VERDICT"
-    printf "%-32s %s\n" "---" "-------"
-    for r in "${ROWS[@]}"; do
-        ID="$(printf '%s' "$r" | python3 -c 'import json,sys; print(json.loads(sys.stdin.read())["id"])')"
-        V="$(printf '%s' "$r" | python3 -c 'import json,sys; print(json.loads(sys.stdin.read())["verdict"])')"
-        N="$(printf '%s' "$r" | python3 -c 'import json,sys; print(json.loads(sys.stdin.read())["note"])')"
-        printf "%-32s %s — %s\n" "$ID" "$V" "$N"
-        case "$V" in
-            PASS) PASS=$((PASS+1));;
-            FAIL) FAIL=$((FAIL+1));;
-            SKIP) SKIP=$((SKIP+1));;
-        esac
-    done
-    echo
-    echo "Pass: $PASS  Fail: $FAIL  Skip: $SKIP"
-} | tee "$VERDICT_TXT"
+# IMPORTANT: tally counters in the parent shell (NOT inside the `{ ... } | tee`
+# subshell) so the final `exit 1` reflects real failures. The earlier shape
+# piped the for-loop into `tee` which forked a subshell — `FAIL=$((FAIL+1))`
+# inside the subshell did not propagate to the parent, so any failing rows
+# were silently masked and the script exited 0. Audit-flagged BLOCKER on
+# 2026-05-09. The fix builds the report into a string first, tallies in the
+# parent shell, then writes the report once.
+SWEEP_REPORT=""
+SWEEP_REPORT+="Self-Play Validation Sweep — $UTC"$'\n'
+SWEEP_REPORT+="Output: $OUTDIR"$'\n\n'
+SWEEP_REPORT+="$(printf "%-32s %s\n" "ROW" "VERDICT")"$'\n'
+SWEEP_REPORT+="$(printf "%-32s %s\n" "---" "-------")"$'\n'
+for r in "${ROWS[@]}"; do
+    ID="$(printf '%s' "$r" | python3 -c 'import json,sys; print(json.loads(sys.stdin.read())["id"])')"
+    V="$(printf '%s' "$r" | python3 -c 'import json,sys; print(json.loads(sys.stdin.read())["verdict"])')"
+    N="$(printf '%s' "$r" | python3 -c 'import json,sys; print(json.loads(sys.stdin.read())["note"])')"
+    SWEEP_REPORT+="$(printf "%-32s %s — %s\n" "$ID" "$V" "$N")"$'\n'
+    case "$V" in
+        PASS) PASS=$((PASS+1));;
+        FAIL) FAIL=$((FAIL+1));;
+        SKIP) SKIP=$((SKIP+1));;
+    esac
+done
+SWEEP_REPORT+=$'\n'
+SWEEP_REPORT+="Pass: $PASS  Fail: $FAIL  Skip: $SKIP"$'\n'
+
+printf '%s' "$SWEEP_REPORT" | tee "$VERDICT_TXT"
 
 if (( FAIL > 0 )); then
     exit 1

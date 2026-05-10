@@ -64,6 +64,18 @@ pub struct Event {
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct BuildInfo {
     pub commit_sha: String,
+    /// True when the run was produced from an uncommitted worktree. This is
+    /// distinct from `commit_sha` because many dirty runs can share the same
+    /// HEAD while carrying materially different code/content.
+    #[serde(default)]
+    pub worktree_dirty: bool,
+    /// Fingerprint of the dirty diff + untracked relevant file content. Present
+    /// only when `worktree_dirty` is true.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub worktree_fingerprint: Option<String>,
+    /// Short audit list of files contributing to the dirty fingerprint.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub worktree_dirty_files: Vec<String>,
     pub rust_version: String,
     pub bevy_version: String,
     pub platform: String,
@@ -118,6 +130,25 @@ pub struct SettingsBlock {
     pub reduced_motion: bool,
     pub reduced_shake: bool,
     pub reduced_flash: bool,
+    /// M4A: ACC-A-05 hold-to-press alternative.
+    #[serde(default)]
+    pub hold_to_confirm: bool,
+    /// M4A: ACC-A-05 hold threshold (ms).
+    #[serde(default = "default_hold_threshold_ms")]
+    pub hold_threshold_ms: u32,
+    /// M4A: ACC-A-05 future remap UI surface flag.
+    #[serde(default)]
+    pub key_remap_enabled: bool,
+    /// M4A: ACC-A-05 active key binding overrides (action -> KeyCode name).
+    /// Stored in the run manifest so bundles can reconstruct the actual input
+    /// contract that produced the capture, even though key bindings do not
+    /// affect the deterministic sim checksum directly.
+    #[serde(default)]
+    pub key_bindings: BTreeMap<String, String>,
+}
+
+fn default_hold_threshold_ms() -> u32 {
+    250
 }
 
 impl Default for SettingsBlock {
@@ -129,6 +160,10 @@ impl Default for SettingsBlock {
             reduced_motion: false,
             reduced_shake: false,
             reduced_flash: false,
+            hold_to_confirm: false,
+            hold_threshold_ms: default_hold_threshold_ms(),
+            key_remap_enabled: false,
+            key_bindings: BTreeMap::new(),
         }
     }
 }
@@ -879,6 +914,10 @@ mod tests {
         assert!(
             matches!(parsed.expected_outcome, ExpectedOutcome::Clean),
             "missing expected_outcome must default to Clean"
+        );
+        assert!(
+            parsed.settings.key_bindings.is_empty(),
+            "legacy manifests without key_bindings must deserialize with an empty remap table"
         );
     }
 

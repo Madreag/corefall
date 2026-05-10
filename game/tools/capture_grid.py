@@ -4,13 +4,16 @@
 Reads a run-bundle's `captures/capture_manifest.json` (written by `cf-capture`),
 loads the per-frame PNGs, downsamples them to thumbnail size, composes them into
 8x8 grid PNGs (`grid_NNN.png`) tagged with tick/HP/mission overlays, plus a
-`summary_grid.png` containing one frame per major event (max 64 frames).
+`summary_grid.png` containing one frame per major event (max 64 frames) and a
+human-readable `review_grid.png` capped at 16 representative frames.
 
 Outputs:
     captures/grid_001.png, grid_002.png, ...
     captures/grid_001.json (tick + event mapping for the grid above)
     captures/summary_grid.png
     captures/summary_grid.json
+    captures/review_grid.png
+    captures/review_grid.json
 
 Usage:
     python3 game/tools/capture_grid.py <run_dir>            # composes for one run
@@ -37,6 +40,7 @@ GRID_COLS = 8
 GRID_ROWS = 8
 FRAMES_PER_GRID = GRID_COLS * GRID_ROWS  # 64
 SUMMARY_GRID_MAX_FRAMES = 64
+REVIEW_GRID_MAX_FRAMES = 16
 COMPOSER_VERSION = "0.2.0"
 DEFAULT_THUMB_W = 320
 DEFAULT_THUMB_H = 180
@@ -157,6 +161,7 @@ def compose_grid(
     grid_kind: str,
     runtime_tick_rate_hz: int,
     *,
+    cols: int = GRID_COLS,
     dry_run: bool = False,
 ) -> dict:
     """Compose `frames` into one grid PNG. Returns a stats dict."""
@@ -191,7 +196,6 @@ def compose_grid(
         )
     from PIL import Image, ImageDraw
 
-    cols = GRID_COLS
     rows = (len(frames) + cols - 1) // cols
     canvas = Image.new("RGB", (cols * thumb_w, rows * thumb_h), color=(20, 22, 28))
     draw = ImageDraw.Draw(canvas)
@@ -300,6 +304,38 @@ def select_summary_frames(frames: List[FrameEntry]) -> List[FrameEntry]:
     return picked
 
 
+def select_review_frames(frames: List[FrameEntry]) -> List[FrameEntry]:
+    """Pick a sparse, human-readable contact sheet for closure review.
+
+    `summary_grid.png` intentionally keeps up to 64 cells so automated audit has
+    broad event coverage. That is too dense for milestone visual review, so this
+    sheet keeps first/last plus evenly-spaced event keyframes and baseline frames.
+    """
+    if len(frames) <= REVIEW_GRID_MAX_FRAMES:
+        return frames
+    keyframes = [f for f in frames if f.is_event_keyframe]
+    selected = [frames[0], frames[-1]]
+    budget = REVIEW_GRID_MAX_FRAMES - len(selected)
+
+    if keyframes:
+        step = max(1, len(keyframes) // max(1, min(len(keyframes), budget)))
+        for frame in keyframes[::step]:
+            if frame not in selected and len(selected) < REVIEW_GRID_MAX_FRAMES:
+                selected.append(frame)
+
+    if len(selected) < REVIEW_GRID_MAX_FRAMES:
+        remaining = REVIEW_GRID_MAX_FRAMES - len(selected)
+        baselines = [f for f in frames if f not in selected and not f.is_event_keyframe]
+        step = max(1, len(baselines) // max(1, remaining))
+        for frame in baselines[::step]:
+            if len(selected) >= REVIEW_GRID_MAX_FRAMES:
+                break
+            selected.append(frame)
+
+    selected.sort(key=lambda f: f.frame_index)
+    return selected
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Compose cf-capture frames into grids")
     parser.add_argument(
@@ -371,9 +407,22 @@ def main() -> int:
         runtime_tick_rate_hz=runtime_tick_rate_hz,
         dry_run=args.dry_run,
     )
+    review_frames = select_review_frames(frames)
+    review_result = compose_grid(
+        captures_dir,
+        review_frames,
+        args.thumbnail_w,
+        args.thumbnail_h,
+        "review_grid.png",
+        "review_grid.json",
+        grid_kind="review",
+        runtime_tick_rate_hz=runtime_tick_rate_hz,
+        cols=4,
+        dry_run=args.dry_run,
+    )
 
     if not args.dry_run:
-        patch_run_bundle_summary(captures_dir, len(frames), grid_results, summary_result)
+        patch_run_bundle_summary(captures_dir, len(frames), grid_results, summary_result, review_result)
 
     print(json.dumps(
         {
@@ -382,6 +431,7 @@ def main() -> int:
             "event_keyframe_count": sum(1 for f in frames if f.is_event_keyframe),
             "grids": grid_results,
             "summary_grid": summary_result,
+            "review_grid": review_result,
             "dry_run": args.dry_run,
         },
         indent=2,
@@ -394,6 +444,7 @@ def patch_run_bundle_summary(
     frame_count: int,
     grid_results: List[dict],
     summary_result: dict,
+    review_result: dict,
 ) -> None:
     """Post-hoc patch the parent run bundle's summary.json so summary.json.artifacts
     records the capture grid evidence.
@@ -444,6 +495,10 @@ def patch_run_bundle_summary(
         add("summary_grid", "captures/summary_grid.png")
     if (captures_dir / "summary_grid.json").is_file():
         add("summary_grid_json", "captures/summary_grid.json")
+    if (captures_dir / "review_grid.png").is_file():
+        add("review_grid", "captures/review_grid.png")
+    if (captures_dir / "review_grid.json").is_file():
+        add("review_grid_json", "captures/review_grid.json")
     for g in sorted(grid_results, key=lambda r: str(r.get("grid_path", ""))):
         # `compose_grid` returns dicts with `grid_path` (full path) +
         # `json_path`, NOT `filename`. Bugbot 3212416394 caught the original
@@ -479,6 +534,12 @@ def patch_run_bundle_summary(
     if not isinstance(capture_section, dict):
         capture_section = {}
     capture_section["summary_grid"] = summary_result_meta
+    capture_section["review_grid"] = {
+        "frame_count": review_result.get("frame_count"),
+        "non_blank_ratio": review_result.get("non_blank_ratio"),
+        "tick_first": review_result.get("tick_first"),
+        "tick_last": review_result.get("tick_last"),
+    }
     summary["capture"] = capture_section
 
     try:

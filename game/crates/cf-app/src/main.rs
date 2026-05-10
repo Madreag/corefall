@@ -1,4 +1,5 @@
 use std::{
+    collections::{HashMap, HashSet},
     net::SocketAddr,
     path::{Path, PathBuf},
     sync::{Arc, Mutex},
@@ -7,7 +8,10 @@ use std::{
 use anyhow::{Context, Result};
 use bevy::{
     app::AppExit,
-    input::keyboard::KeyCode,
+    input::{
+        gamepad::{Gamepad, GamepadAxis, GamepadButton, GamepadInput},
+        keyboard::KeyCode,
+    },
     log::LogPlugin,
     prelude::*,
     window::{PresentMode, WindowCloseRequested, WindowResolution},
@@ -28,7 +32,10 @@ use cf_control::{
 use cf_render_2d::{ActorRenderState, ActorSpritePlugin, BreachRender, CfRenderPlugin, ExtractionRender};
 use cf_replay::diagnostics;
 use cf_sim_core::WallClock;
-use cf_ui::{HudBreach, HudEnemy, HudMission, HudRifle, HudState, StatusStripPlugin};
+use cf_ui::{
+    HudBanner, HudBodySilhouette, HudBreach, HudCaption, HudEnemy, HudMission, HudModule, HudModuleStrip, HudRifle,
+    HudSettings, HudState, HudToolValidity, StatusStripPlugin,
+};
 
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -70,6 +77,11 @@ struct Cli {
     control_port: u16,
     #[arg(long)]
     control_uds: Option<PathBuf>,
+    /// Write the actual bound control API port to this file after the listener
+    /// is live. Used by cf-e2e with `--control-port 0` so the OS, not the
+    /// harness, owns ephemeral port allocation.
+    #[arg(long)]
+    control_port_file: Option<PathBuf>,
     /// Skip window creation; runs the sim loop only. Useful for CI/scripted smoke.
     #[arg(long)]
     headless_smoke: bool,
@@ -87,6 +99,20 @@ struct Cli {
     reduced_shake: bool,
     #[arg(long)]
     reduced_flash: bool,
+    /// Automation mode for cf-e2e/cfctl-driven captures. When set, the Bevy
+    /// window still renders, but keyboard/gamepad/escape input from the local
+    /// desktop cannot inject player/focus commands into the control script.
+    #[arg(long)]
+    disable_local_input: bool,
+    /// M4A: ACC-A-05 hold-to-press alternative for tap-to-press actions.
+    #[arg(long)]
+    hold_to_confirm: bool,
+    /// M4A: ACC-A-05 hold threshold in milliseconds (50..2000).
+    #[arg(long, default_value_t = 250)]
+    hold_threshold_ms: u32,
+    /// M4A: ACC-A-05 future remap UI surface flag (M8 ships the table editor).
+    #[arg(long)]
+    key_remap_enabled: bool,
     /// **DEBUG-ONLY**: spawn a sub-thread that panics at the configured tick. Used to
     /// capture `system.panic` evidence in a real run bundle (M0-008 / M0.2-F5).
     /// Production runs should never set this.
@@ -159,13 +185,20 @@ fn main() -> Result<()> {
     tracing::info!(target: "cf::app", scenario = %cli.scenario, headless_smoke = cli.headless_smoke, control_api = cli.control_api, tick_rate_hz = cli.tick_rate_hz, capture_grid = cli.capture_grid, "cf-app M0 starting");
 
     match (cli.headless_smoke, cli.control_api) {
-        (true, true) => run_headless_server(config, cli.control_port, cli.control_uds.clone()),
+        (true, true) => run_headless_server(
+            config,
+            cli.control_port,
+            cli.control_uds.clone(),
+            cli.control_port_file.clone(),
+        ),
         (true, false) => run_headless(config),
         (false, _) => run_bevy(
             config,
             cli.control_api,
             cli.control_port,
             cli.control_uds.clone(),
+            cli.control_port_file.clone(),
+            !cli.disable_local_input,
             capture_opts,
         ),
     }
@@ -199,12 +232,19 @@ fn reject_capture_grid_with_headless_smoke(cli: &Cli) -> Result<()> {
 /// `--tick-rate-hz` against the wall clock, drain `runbundle.write` requests, and exit when
 /// shutdown is requested OR the configured tick budget is hit (a budget of `0` means "run
 /// until shutdown").
-fn run_headless_server(config: M0EngineConfig, control_port: u16, _uds: Option<PathBuf>) -> Result<()> {
+fn run_headless_server(
+    config: M0EngineConfig,
+    control_port: u16,
+    _uds: Option<PathBuf>,
+    control_port_file: Option<PathBuf>,
+) -> Result<()> {
     let engine = Arc::new(M0Engine::new(config.clone()));
     engine.record_run_started();
     engine.record_setting_snapshot();
 
-    let _control_rt = start_control_server(engine.clone(), control_port)?;
+    let control_rt = start_control_server(engine.clone(), control_port)?;
+    write_control_port_file(control_port_file.as_deref(), control_rt.bound_addr)?;
+    let _control_rt = control_rt;
     let bundle_written = run_paced_loop(&engine, config.duration_ticks, config.tick_rate_hz);
 
     // Final bundle drain BEFORE finalize so `system.shutdown {write_run_bundle: true}` is honored.
@@ -377,6 +417,7 @@ fn build_config(cli: &Cli, scenario_path: PathBuf) -> Result<M0EngineConfig> {
         control_api_enabled: cli.control_api,
         debug_capabilities: cli.debug_capabilities.clone(),
         tick_rate_hz: cli.tick_rate_hz,
+        capture_grid_enabled: cli.capture_grid,
         // cf-app paces only when an explicit budget was set on the CLI; an unbounded
         // headless+control-api run sleeps via `run_paced_loop` itself.
         paced: cli_duration > 0,
@@ -387,6 +428,10 @@ fn build_config(cli: &Cli, scenario_path: PathBuf) -> Result<M0EngineConfig> {
             reduced_motion: cli.reduced_motion,
             reduced_shake: cli.reduced_shake,
             reduced_flash: cli.reduced_flash,
+            hold_to_confirm: cli.hold_to_confirm,
+            hold_threshold_ms: cli.hold_threshold_ms,
+            key_remap_enabled: cli.key_remap_enabled,
+            key_bindings: std::collections::BTreeMap::new(),
         },
         seed_override: cli.seed,
         duration_ticks_override: if cli_duration > 0 { Some(cli_duration) } else { None },
@@ -430,11 +475,16 @@ struct ControlRuntime {
     shutdown_tx: cf_control::server::ShutdownSignal,
 }
 
+#[derive(Resource, Debug, Clone, Copy)]
+struct LocalInputEnabled(bool);
+
 fn run_bevy(
     config: M0EngineConfig,
     control_api: bool,
     control_port: u16,
     _uds: Option<PathBuf>,
+    control_port_file: Option<PathBuf>,
+    local_input_enabled: bool,
     capture_opts: CaptureOptions,
 ) -> Result<()> {
     let engine = Arc::new(M0Engine::new(config.clone()));
@@ -442,8 +492,16 @@ fn run_bevy(
     engine.record_setting_snapshot();
 
     let control_rt = if control_api {
-        Some(start_control_server(engine.clone(), control_port)?)
+        let rt = start_control_server(engine.clone(), control_port)?;
+        write_control_port_file(control_port_file.as_deref(), rt.bound_addr)?;
+        Some(rt)
     } else {
+        if let Some(path) = control_port_file {
+            anyhow::bail!(
+                "--control-port-file={} requires --control-api so there is a bound port to report",
+                path.display()
+            );
+        }
         None
     };
 
@@ -494,6 +552,7 @@ fn run_bevy(
         .add_plugins(CfRenderPlugin::default())
         .add_plugins(ActorSpritePlugin)
         .add_plugins(StatusStripPlugin);
+    app.init_resource::<HoldTracker>();
     let capture_handle = CaptureStateHandle::default();
     app.add_plugins(CfCapturePlugin {
         config: capture_config.clone(),
@@ -502,6 +561,7 @@ fn run_bevy(
     app.insert_resource(CaptureRecorderCursor::default());
     app.insert_resource(Time::<Fixed>::from_hz(f64::from(config.tick_rate_hz)));
     app.insert_resource(EngineHolder(engine.clone()));
+    app.insert_resource(LocalInputEnabled(local_input_enabled));
     app.insert_resource(AppRuntime {
         duration_ticks: config.duration_ticks,
         last_announced_tick: 0,
@@ -517,6 +577,7 @@ fn run_bevy(
             check_completion,
             log_tick_progress,
             ingest_player_input,
+            ingest_focus_input,
             sync_actor_state_to_render,
             sync_engine_tick_to_capture_clock,
             pump_recorder_events_into_capture_keyframes,
@@ -654,6 +715,695 @@ fn log_tick_progress(holder: Res<EngineHolder>, mut runtime: ResMut<AppRuntime>)
     }
 }
 
+/// M4A canonical action ids that drive `ingest_player_input`. Stable strings
+/// shared with `Settings.key_bindings` so the cfctl + observe surface can
+/// remap them by name. `fire_alt` mirrors `fire` (Enter + KeyJ are both fire
+/// keys by default; remapping replaces both with the configured KeyCode).
+pub const ACTION_JUMP: &str = "jump";
+pub const ACTION_FIRE: &str = "fire";
+pub const ACTION_FIRE_ALT: &str = "fire_alt";
+pub const ACTION_RELOAD: &str = "reload";
+pub const ACTION_DIG: &str = "dig";
+pub const ACTION_RESET: &str = "reset";
+pub const ACTION_SELECT_SLOT_0: &str = "select_slot_0";
+pub const ACTION_SELECT_SLOT_1: &str = "select_slot_1";
+pub const ACTION_SELECT_SLOT_2: &str = "select_slot_2";
+pub const ACTION_SELECT_SLOT_3: &str = "select_slot_3";
+// Audit fix round-5 (2026-05-10): continuous actions (held-key → analog
+// axis) now part of the remap surface so movement + aim honor live
+// `Settings.key_bindings`. Defaults preserve the historical WASD-move +
+// Arrow-aim feel.
+pub const ACTION_MOVE_LEFT: &str = "move_left";
+pub const ACTION_MOVE_RIGHT: &str = "move_right";
+pub const ACTION_MOVE_UP: &str = "move_up";
+pub const ACTION_MOVE_DOWN: &str = "move_down";
+pub const ACTION_AIM_LEFT: &str = "aim_left";
+pub const ACTION_AIM_RIGHT: &str = "aim_right";
+pub const ACTION_AIM_UP: &str = "aim_up";
+pub const ACTION_AIM_DOWN: &str = "aim_down";
+
+/// M4A: parse a KeyCode by stable name. Returns `None` only for defensive
+/// in-memory fallbacks; live settings patches validate names before dispatch.
+fn parse_key_code(name: &str) -> Option<KeyCode> {
+    match name {
+        "Space" => Some(KeyCode::Space),
+        "Enter" => Some(KeyCode::Enter),
+        "Tab" => Some(KeyCode::Tab),
+        "Escape" => Some(KeyCode::Escape),
+        "Backspace" => Some(KeyCode::Backspace),
+        "ArrowUp" => Some(KeyCode::ArrowUp),
+        "ArrowDown" => Some(KeyCode::ArrowDown),
+        "ArrowLeft" => Some(KeyCode::ArrowLeft),
+        "ArrowRight" => Some(KeyCode::ArrowRight),
+        "ShiftLeft" => Some(KeyCode::ShiftLeft),
+        "ShiftRight" => Some(KeyCode::ShiftRight),
+        "ControlLeft" => Some(KeyCode::ControlLeft),
+        "ControlRight" => Some(KeyCode::ControlRight),
+        "KeyA" => Some(KeyCode::KeyA),
+        "KeyB" => Some(KeyCode::KeyB),
+        "KeyC" => Some(KeyCode::KeyC),
+        "KeyD" => Some(KeyCode::KeyD),
+        "KeyE" => Some(KeyCode::KeyE),
+        "KeyF" => Some(KeyCode::KeyF),
+        "KeyG" => Some(KeyCode::KeyG),
+        "KeyH" => Some(KeyCode::KeyH),
+        "KeyI" => Some(KeyCode::KeyI),
+        "KeyJ" => Some(KeyCode::KeyJ),
+        "KeyK" => Some(KeyCode::KeyK),
+        "KeyL" => Some(KeyCode::KeyL),
+        "KeyM" => Some(KeyCode::KeyM),
+        "KeyN" => Some(KeyCode::KeyN),
+        "KeyO" => Some(KeyCode::KeyO),
+        "KeyP" => Some(KeyCode::KeyP),
+        "KeyQ" => Some(KeyCode::KeyQ),
+        "KeyR" => Some(KeyCode::KeyR),
+        "KeyS" => Some(KeyCode::KeyS),
+        "KeyT" => Some(KeyCode::KeyT),
+        "KeyU" => Some(KeyCode::KeyU),
+        "KeyV" => Some(KeyCode::KeyV),
+        "KeyW" => Some(KeyCode::KeyW),
+        "KeyX" => Some(KeyCode::KeyX),
+        "KeyY" => Some(KeyCode::KeyY),
+        "KeyZ" => Some(KeyCode::KeyZ),
+        "Digit0" => Some(KeyCode::Digit0),
+        "Digit1" => Some(KeyCode::Digit1),
+        "Digit2" => Some(KeyCode::Digit2),
+        "Digit3" => Some(KeyCode::Digit3),
+        "Digit4" => Some(KeyCode::Digit4),
+        "Digit5" => Some(KeyCode::Digit5),
+        "Digit6" => Some(KeyCode::Digit6),
+        "Digit7" => Some(KeyCode::Digit7),
+        "Digit8" => Some(KeyCode::Digit8),
+        "Digit9" => Some(KeyCode::Digit9),
+        "Numpad0" => Some(KeyCode::Numpad0),
+        "Numpad1" => Some(KeyCode::Numpad1),
+        "Numpad2" => Some(KeyCode::Numpad2),
+        "Numpad3" => Some(KeyCode::Numpad3),
+        "Numpad4" => Some(KeyCode::Numpad4),
+        "Numpad5" => Some(KeyCode::Numpad5),
+        "Numpad6" => Some(KeyCode::Numpad6),
+        "Numpad7" => Some(KeyCode::Numpad7),
+        "Numpad8" => Some(KeyCode::Numpad8),
+        "Numpad9" => Some(KeyCode::Numpad9),
+        _ => None,
+    }
+}
+
+/// M4A: resolve the active KeyCode for an action by reading
+/// `Settings.key_bindings` (when `key_remap_enabled = true`) and falling
+/// back to the hard-coded default only as a defensive in-memory fallback.
+/// Live cfctl/JSON-RPC patches validate action + key names before they enter
+/// Settings, so unsupported remaps reject instead of silently succeeding.
+fn key_for_action(settings: &cf_control::Settings, action: &str) -> Option<KeyCode> {
+    if settings.key_remap_enabled {
+        if let Some(name) = settings.key_bindings.get(action) {
+            if let Some(k) = parse_key_code(name) {
+                return Some(k);
+            }
+            tracing::warn!(target: "cf::app", action = %action, binding = %name, "unknown key binding name; falling back to default");
+        }
+    }
+    match action {
+        ACTION_JUMP => Some(KeyCode::Space),
+        ACTION_FIRE => Some(KeyCode::Enter),
+        ACTION_FIRE_ALT => Some(KeyCode::KeyJ),
+        ACTION_RELOAD => Some(KeyCode::KeyR),
+        ACTION_DIG => Some(KeyCode::KeyG),
+        ACTION_RESET => Some(KeyCode::KeyL),
+        ACTION_SELECT_SLOT_0 => Some(KeyCode::Digit1),
+        ACTION_SELECT_SLOT_1 => Some(KeyCode::Digit2),
+        ACTION_SELECT_SLOT_2 => Some(KeyCode::Digit3),
+        ACTION_SELECT_SLOT_3 => Some(KeyCode::Digit4),
+        ACTION_MOVE_LEFT => Some(KeyCode::KeyA),
+        ACTION_MOVE_RIGHT => Some(KeyCode::KeyD),
+        ACTION_MOVE_UP => Some(KeyCode::KeyW),
+        ACTION_MOVE_DOWN => Some(KeyCode::KeyS),
+        ACTION_AIM_LEFT => Some(KeyCode::ArrowLeft),
+        ACTION_AIM_RIGHT => Some(KeyCode::ArrowRight),
+        ACTION_AIM_UP => Some(KeyCode::ArrowUp),
+        ACTION_AIM_DOWN => Some(KeyCode::ArrowDown),
+        _ => None,
+    }
+}
+
+fn focus_owns_keyboard_key(key: KeyCode, focus_active: bool) -> bool {
+    focus_active && matches!(key, KeyCode::ArrowUp | KeyCode::ArrowDown)
+}
+
+fn gameplay_key_pressed(keys: &ButtonInput<KeyCode>, key: KeyCode, focus_active: bool) -> bool {
+    keys.pressed(key) && !focus_owns_keyboard_key(key, focus_active)
+}
+
+fn gameplay_key_just_released(keys: &ButtonInput<KeyCode>, key: KeyCode, focus_active: bool) -> bool {
+    keys.just_released(key) && !focus_owns_keyboard_key(key, focus_active)
+}
+
+/// M4A: hold-to-confirm tracker. Pure-Rust state; cf-app's
+/// `ingest_player_input` calls `update` once per frame with the live key
+/// state + Settings flags + an Instant; the tracker returns the set of
+/// actions that fired this frame.
+///
+/// Behavior contract (DR-012 ACC-A-05):
+///
+/// - When `hold_to_confirm = false`, every action fires on the first frame
+///   the action's KeyCode transitions from `released` to `pressed` (tap).
+/// - When `hold_to_confirm = true`, the action key must be held continuously
+///   for `hold_threshold_ms` before the action fires; releasing before the
+///   threshold cancels the hold; the action fires AT MOST ONCE per hold.
+///
+/// The tracker is unit-testable without Bevy via `tick_with_state`.
+#[derive(Resource, Debug, Default)]
+pub struct HoldTracker {
+    holds: std::collections::HashMap<String, HoldEntry>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct HoldEntry {
+    started_at: std::time::Instant,
+    fired: bool,
+}
+
+impl HoldTracker {
+    /// Per-frame update. Returns the set of action ids that fired THIS frame.
+    /// `pressed_actions` is the set of action ids whose KeyCode is currently
+    /// down; `now` is the wall-clock instant for the frame.
+    pub fn tick_with_state(
+        &mut self,
+        pressed_actions: &std::collections::HashSet<String>,
+        hold_to_confirm: bool,
+        hold_threshold: std::time::Duration,
+        now: std::time::Instant,
+    ) -> std::collections::HashSet<String> {
+        let mut fired: std::collections::HashSet<String> = std::collections::HashSet::new();
+        // Drop holds whose action keys were released this frame.
+        self.holds.retain(|action, _| pressed_actions.contains(action));
+        for action in pressed_actions {
+            let entry = self.holds.entry(action.clone()).or_insert(HoldEntry {
+                started_at: now,
+                fired: false,
+            });
+            if !hold_to_confirm {
+                // Tap mode: fire on the FIRST frame the key was seen pressed
+                // (i.e., when we just inserted the entry). The `started_at`
+                // instant is the press tick; if the entry's `fired` is false
+                // it means we haven't fired yet for this hold session.
+                if !entry.fired {
+                    entry.fired = true;
+                    fired.insert(action.clone());
+                }
+            } else if !entry.fired && now.saturating_duration_since(entry.started_at) >= hold_threshold {
+                entry.fired = true;
+                fired.insert(action.clone());
+            }
+        }
+        fired
+    }
+
+    /// Test-only convenience: clear the tracker. Equivalent to a fresh frame
+    /// after a settings change.
+    #[cfg(test)]
+    pub fn clear(&mut self) {
+        self.holds.clear();
+    }
+}
+
+#[cfg(test)]
+mod hold_tracker_tests {
+    use super::*;
+    use std::collections::HashSet;
+    use std::time::{Duration, Instant};
+
+    fn pressed_set(actions: &[&str]) -> HashSet<String> {
+        actions.iter().map(|s| (*s).to_string()).collect()
+    }
+
+    #[test]
+    fn tap_fires_on_first_pressed_frame_then_stays_silent() {
+        let mut t = HoldTracker::default();
+        let now = Instant::now();
+        let fired = t.tick_with_state(&pressed_set(&["jump"]), false, Duration::from_millis(250), now);
+        assert!(fired.contains("jump"));
+        let fired_next = t.tick_with_state(
+            &pressed_set(&["jump"]),
+            false,
+            Duration::from_millis(250),
+            now + Duration::from_millis(16),
+        );
+        assert!(!fired_next.contains("jump"), "tap should fire only once per hold");
+    }
+
+    #[test]
+    fn tap_fires_again_after_release_then_press() {
+        let mut t = HoldTracker::default();
+        let now = Instant::now();
+        let _ = t.tick_with_state(&pressed_set(&["fire"]), false, Duration::from_millis(250), now);
+        let _ = t.tick_with_state(
+            &pressed_set(&[]),
+            false,
+            Duration::from_millis(250),
+            now + Duration::from_millis(16),
+        );
+        let fired = t.tick_with_state(
+            &pressed_set(&["fire"]),
+            false,
+            Duration::from_millis(250),
+            now + Duration::from_millis(32),
+        );
+        assert!(fired.contains("fire"), "post-release press fires again");
+    }
+
+    #[test]
+    fn hold_does_not_fire_before_threshold() {
+        let mut t = HoldTracker::default();
+        let now = Instant::now();
+        let fired = t.tick_with_state(&pressed_set(&["jump"]), true, Duration::from_millis(250), now);
+        assert!(!fired.contains("jump"), "hold mode must NOT fire on tap");
+        // 100ms in, still below threshold.
+        let fired = t.tick_with_state(
+            &pressed_set(&["jump"]),
+            true,
+            Duration::from_millis(250),
+            now + Duration::from_millis(100),
+        );
+        assert!(!fired.contains("jump"), "still below threshold");
+    }
+
+    #[test]
+    fn hold_fires_once_at_threshold() {
+        let mut t = HoldTracker::default();
+        let now = Instant::now();
+        let _ = t.tick_with_state(&pressed_set(&["jump"]), true, Duration::from_millis(250), now);
+        let fired = t.tick_with_state(
+            &pressed_set(&["jump"]),
+            true,
+            Duration::from_millis(250),
+            now + Duration::from_millis(260),
+        );
+        assert!(fired.contains("jump"), "fires exactly when threshold reached");
+        // Continued hold: no further fires.
+        let fired_next = t.tick_with_state(
+            &pressed_set(&["jump"]),
+            true,
+            Duration::from_millis(250),
+            now + Duration::from_millis(500),
+        );
+        assert!(!fired_next.contains("jump"), "fires at most once per hold");
+    }
+
+    #[test]
+    fn hold_release_before_threshold_cancels() {
+        let mut t = HoldTracker::default();
+        let now = Instant::now();
+        let _ = t.tick_with_state(&pressed_set(&["fire"]), true, Duration::from_millis(250), now);
+        // Release before threshold.
+        let fired = t.tick_with_state(
+            &pressed_set(&[]),
+            true,
+            Duration::from_millis(250),
+            now + Duration::from_millis(100),
+        );
+        assert!(!fired.contains("fire"), "no fire if released before threshold");
+        // Press again; must restart the hold timer.
+        let fired = t.tick_with_state(
+            &pressed_set(&["fire"]),
+            true,
+            Duration::from_millis(250),
+            now + Duration::from_millis(120),
+        );
+        assert!(!fired.contains("fire"), "new hold session, threshold not reached");
+        let fired = t.tick_with_state(
+            &pressed_set(&["fire"]),
+            true,
+            Duration::from_millis(250),
+            now + Duration::from_millis(380),
+        );
+        assert!(fired.contains("fire"), "second hold completes after a fresh threshold");
+    }
+
+    #[test]
+    fn key_for_action_honors_remap_when_enabled() {
+        use std::collections::BTreeMap;
+        let baseline = cf_control::Settings::default();
+        assert_eq!(
+            key_for_action(&baseline, ACTION_FIRE),
+            Some(KeyCode::Enter),
+            "default fire is Enter"
+        );
+        let mut bindings = BTreeMap::new();
+        bindings.insert("fire".to_string(), "KeyF".to_string());
+        bindings.insert("jump".to_string(), "ShiftLeft".to_string());
+        let s = cf_control::Settings {
+            key_remap_enabled: true,
+            key_bindings: bindings,
+            ..cf_control::Settings::default()
+        };
+        assert_eq!(key_for_action(&s, ACTION_FIRE), Some(KeyCode::KeyF));
+        assert_eq!(key_for_action(&s, ACTION_JUMP), Some(KeyCode::ShiftLeft));
+        assert_eq!(key_for_action(&s, ACTION_RELOAD), Some(KeyCode::KeyR));
+    }
+
+    #[test]
+    fn key_for_action_ignores_remap_when_disabled() {
+        use std::collections::BTreeMap;
+        let mut bindings = BTreeMap::new();
+        bindings.insert("fire".to_string(), "KeyF".to_string());
+        let s = cf_control::Settings {
+            key_remap_enabled: false,
+            key_bindings: bindings,
+            ..cf_control::Settings::default()
+        };
+        assert_eq!(
+            key_for_action(&s, ACTION_FIRE),
+            Some(KeyCode::Enter),
+            "remap ignored when disabled"
+        );
+    }
+
+    #[test]
+    fn key_for_action_warns_on_unknown_binding_name_and_falls_back() {
+        use std::collections::BTreeMap;
+        let mut bindings = BTreeMap::new();
+        bindings.insert("fire".to_string(), "BogusKey".to_string());
+        let s = cf_control::Settings {
+            key_remap_enabled: true,
+            key_bindings: bindings,
+            ..cf_control::Settings::default()
+        };
+        assert_eq!(key_for_action(&s, ACTION_FIRE), Some(KeyCode::Enter));
+    }
+
+    #[test]
+    fn keyboard_focus_tab_enters_focus_mode_without_arrow_stealing() {
+        use cf_control::server::FocusDirection;
+        assert!(matches!(
+            keyboard_focus_direction(true, false, false, false, false, false),
+            Some(FocusDirection::Next)
+        ));
+        assert!(matches!(
+            keyboard_focus_direction(true, true, false, false, false, false),
+            Some(FocusDirection::Prev)
+        ));
+    }
+
+    #[test]
+    fn keyboard_focus_arrows_only_navigate_after_focus_is_active() {
+        use cf_control::server::FocusDirection;
+        assert!(
+            keyboard_focus_direction(false, false, true, false, false, false).is_none(),
+            "ArrowDown must remain aim-only before Tab enters focus mode"
+        );
+        assert!(
+            keyboard_focus_direction(false, false, false, true, false, false).is_none(),
+            "ArrowUp must remain aim-only before Tab enters focus mode"
+        );
+        assert!(matches!(
+            keyboard_focus_direction(false, false, true, false, false, true),
+            Some(FocusDirection::Next)
+        ));
+        assert!(matches!(
+            keyboard_focus_direction(false, false, false, true, false, true),
+            Some(FocusDirection::Prev)
+        ));
+    }
+
+    #[test]
+    fn focus_mode_owns_arrow_keys_but_not_remapped_aim_keys() {
+        let mut arrows = ButtonInput::<KeyCode>::default();
+        arrows.press(KeyCode::ArrowDown);
+        assert_eq!(
+            keyboard_axis_gameplay(
+                &arrows,
+                KeyCode::KeyW,
+                KeyCode::KeyS,
+                KeyCode::ArrowUp,
+                KeyCode::ArrowDown,
+                false,
+            ),
+            -1.0,
+            "without active focus ArrowDown remains default aim-down"
+        );
+        assert_eq!(
+            keyboard_axis_gameplay(
+                &arrows,
+                KeyCode::KeyW,
+                KeyCode::KeyS,
+                KeyCode::ArrowUp,
+                KeyCode::ArrowDown,
+                true,
+            ),
+            0.0,
+            "with active focus ArrowDown belongs to HUD traversal"
+        );
+        assert!(!gameplay_key_pressed(&arrows, KeyCode::ArrowDown, true));
+
+        let mut remapped = ButtonInput::<KeyCode>::default();
+        remapped.press(KeyCode::Numpad2);
+        assert_eq!(
+            keyboard_axis_gameplay(
+                &remapped,
+                KeyCode::KeyW,
+                KeyCode::KeyS,
+                KeyCode::Numpad8,
+                KeyCode::Numpad2,
+                true,
+            ),
+            -1.0,
+            "focus mode only owns the physical arrow keys, not a remapped numpad aim key"
+        );
+    }
+
+    fn make_gamepad_with_press(button: GamepadButton) -> Gamepad {
+        let mut gp = Gamepad::default();
+        gp.digital_mut().press(button);
+        gp
+    }
+
+    fn make_gamepad_with_axis(axis: GamepadAxis, value: f32) -> Gamepad {
+        let mut gp = Gamepad::default();
+        gp.analog_mut().set(GamepadInput::Axis(axis), value);
+        gp
+    }
+
+    #[test]
+    fn gamepad_focus_input_dpad_down_dispatches_next() {
+        use cf_control::server::FocusDirection;
+        let gp = make_gamepad_with_press(GamepadButton::DPadDown);
+        let mut prev_y = 0.0;
+        assert!(matches!(
+            gamepad_focus_direction(&gp, &mut prev_y, 0.5),
+            Some(FocusDirection::Next)
+        ));
+    }
+
+    #[test]
+    fn gamepad_focus_input_dpad_up_dispatches_prev() {
+        use cf_control::server::FocusDirection;
+        let gp = make_gamepad_with_press(GamepadButton::DPadUp);
+        let mut prev_y = 0.0;
+        assert!(matches!(
+            gamepad_focus_direction(&gp, &mut prev_y, 0.5),
+            Some(FocusDirection::Prev)
+        ));
+    }
+
+    #[test]
+    fn gamepad_focus_input_dpad_right_dispatches_next() {
+        use cf_control::server::FocusDirection;
+        let gp = make_gamepad_with_press(GamepadButton::DPadRight);
+        let mut prev_y = 0.0;
+        assert!(matches!(
+            gamepad_focus_direction(&gp, &mut prev_y, 0.5),
+            Some(FocusDirection::Next)
+        ));
+    }
+
+    #[test]
+    fn gamepad_focus_input_dpad_left_dispatches_prev() {
+        use cf_control::server::FocusDirection;
+        let gp = make_gamepad_with_press(GamepadButton::DPadLeft);
+        let mut prev_y = 0.0;
+        assert!(matches!(
+            gamepad_focus_direction(&gp, &mut prev_y, 0.5),
+            Some(FocusDirection::Prev)
+        ));
+    }
+
+    #[test]
+    fn gamepad_focus_input_east_button_clears_focus() {
+        use cf_control::server::FocusDirection;
+        let gp = make_gamepad_with_press(GamepadButton::East);
+        let mut prev_y = 0.0;
+        assert!(matches!(
+            gamepad_focus_direction(&gp, &mut prev_y, 0.5),
+            Some(FocusDirection::Clear)
+        ));
+    }
+
+    #[test]
+    fn gamepad_focus_input_south_button_is_reserved_for_activation_no_focus_dispatch() {
+        // South (Xbox A / PS Cross) is the standard "confirm / activate"
+        // button on consoles. M4A does NOT own activation semantics (M5 + M8
+        // own that), so the focus translator MUST NOT dispatch a focus
+        // change when South is pressed — the button is reserved for a future
+        // activation event. Returning None here is the honest behavior; the
+        // earlier hard-coded `Set("hud.silhouette")` jump was source-
+        // untruthful and was removed.
+        let gp = make_gamepad_with_press(GamepadButton::South);
+        let mut prev_y = 0.0;
+        assert!(
+            gamepad_focus_direction(&gp, &mut prev_y, 0.5).is_none(),
+            "South must be a no-op for focus traversal"
+        );
+    }
+
+    #[test]
+    fn gamepad_focus_input_left_bumper_dispatches_prev() {
+        use cf_control::server::FocusDirection;
+        let gp = make_gamepad_with_press(GamepadButton::LeftTrigger);
+        let mut prev_y = 0.0;
+        assert!(matches!(
+            gamepad_focus_direction(&gp, &mut prev_y, 0.5),
+            Some(FocusDirection::Prev)
+        ));
+    }
+
+    #[test]
+    fn gamepad_focus_input_right_bumper_dispatches_next() {
+        use cf_control::server::FocusDirection;
+        let gp = make_gamepad_with_press(GamepadButton::RightTrigger);
+        let mut prev_y = 0.0;
+        assert!(matches!(
+            gamepad_focus_direction(&gp, &mut prev_y, 0.5),
+            Some(FocusDirection::Next)
+        ));
+    }
+
+    #[test]
+    fn gamepad_focus_input_right_stick_down_rising_edge_dispatches_next() {
+        use cf_control::server::FocusDirection;
+        let gp = make_gamepad_with_axis(GamepadAxis::RightStickY, -0.8);
+        let mut prev_y = 0.0;
+        assert!(matches!(
+            gamepad_focus_direction(&gp, &mut prev_y, 0.5),
+            Some(FocusDirection::Next)
+        ));
+        assert!((prev_y - (-0.8)).abs() < 1e-6);
+    }
+
+    #[test]
+    fn gamepad_focus_input_right_stick_up_rising_edge_dispatches_prev() {
+        use cf_control::server::FocusDirection;
+        let gp = make_gamepad_with_axis(GamepadAxis::RightStickY, 0.9);
+        let mut prev_y = 0.0;
+        assert!(matches!(
+            gamepad_focus_direction(&gp, &mut prev_y, 0.5),
+            Some(FocusDirection::Prev)
+        ));
+    }
+
+    #[test]
+    fn gamepad_focus_input_right_stick_held_only_fires_on_rising_edge() {
+        let gp = make_gamepad_with_axis(GamepadAxis::RightStickY, -0.8);
+        let mut prev_y = -0.7;
+        assert!(
+            gamepad_focus_direction(&gp, &mut prev_y, 0.5).is_none(),
+            "stick already past threshold last frame; should not refire"
+        );
+    }
+
+    #[test]
+    fn gamepad_focus_input_right_stick_below_threshold_does_not_fire() {
+        let gp = make_gamepad_with_axis(GamepadAxis::RightStickY, -0.3);
+        let mut prev_y = 0.0;
+        assert!(gamepad_focus_direction(&gp, &mut prev_y, 0.5).is_none());
+    }
+
+    #[test]
+    fn gamepad_focus_input_no_button_no_axis_returns_none() {
+        let gp = Gamepad::default();
+        let mut prev_y = 0.0;
+        assert!(gamepad_focus_direction(&gp, &mut prev_y, 0.5).is_none());
+    }
+
+    #[test]
+    fn gamepad_focus_input_per_gamepad_debounce_isolates_idle_pad_from_active_pad() {
+        // Audit fix round-5 (2026-05-10): regression test for the global-
+        // Local<f32> bug — when two pads are connected and pad A holds the
+        // stick down (analog Y at -0.8) while pad B is idle (analog Y at 0),
+        // an idle pad B's zero-Y must NOT reset pad A's debounce state.
+        // The fix in `ingest_focus_input` keeps a per-Entity HashMap, but
+        // the underlying helper is correct as long as the caller passes a
+        // SEPARATE `&mut f32` per gamepad. This test exercises that
+        // contract: with two separate per-pad histories, pad A fires once
+        // on the rising edge then stays silent + pad B never fires.
+        use cf_control::server::FocusDirection;
+
+        let pad_a = make_gamepad_with_axis(GamepadAxis::RightStickY, -0.8);
+        let pad_b = Gamepad::default(); // idle
+        let mut history_a = 0.0_f32;
+        let mut history_b = 0.0_f32;
+
+        // Frame 1: pad A's stick crosses the threshold; pad B idle.
+        let dir_a = gamepad_focus_direction(&pad_a, &mut history_a, 0.5);
+        assert!(matches!(dir_a, Some(FocusDirection::Next)));
+        let dir_b = gamepad_focus_direction(&pad_b, &mut history_b, 0.5);
+        assert!(dir_b.is_none(), "idle pad B must not fire");
+        assert!((history_a - (-0.8)).abs() < 1e-6);
+        assert!(history_b.abs() < 1e-6, "pad B history untouched by pad A");
+
+        // Frame 2: pad A's stick still held down; with per-pad history
+        // preserved, no rising edge → no refire. Pad B still idle.
+        let dir_a2 = gamepad_focus_direction(&pad_a, &mut history_a, 0.5);
+        assert!(
+            dir_a2.is_none(),
+            "pad A held stick must not refire — per-pad history preserved"
+        );
+        let dir_b2 = gamepad_focus_direction(&pad_b, &mut history_b, 0.5);
+        assert!(dir_b2.is_none());
+
+        // Critical regression assertion: if the previous global-Local<f32>
+        // implementation were still in place, pad B's idle Y of 0.0 would
+        // overwrite pad A's history to 0, and a subsequent frame with pad A
+        // still at -0.8 would FIRE again (because 0.0 → -0.8 is a rising
+        // edge). With per-pad histories, that cannot happen.
+    }
+
+    #[test]
+    fn settings_default_key_bindings_includes_movement_and_aim_actions() {
+        // Audit fix round-5 (2026-05-10): movement + aim are part of the
+        // remap surface so left-handed users + numpad-aim users can rebind
+        // without code changes.
+        let bindings = cf_control::default_key_bindings();
+        assert_eq!(bindings.get("move_left").map(String::as_str), Some("KeyA"));
+        assert_eq!(bindings.get("move_right").map(String::as_str), Some("KeyD"));
+        assert_eq!(bindings.get("move_up").map(String::as_str), Some("KeyW"));
+        assert_eq!(bindings.get("move_down").map(String::as_str), Some("KeyS"));
+        assert_eq!(bindings.get("aim_left").map(String::as_str), Some("ArrowLeft"));
+        assert_eq!(bindings.get("aim_right").map(String::as_str), Some("ArrowRight"));
+        assert_eq!(bindings.get("aim_up").map(String::as_str), Some("ArrowUp"));
+        assert_eq!(bindings.get("aim_down").map(String::as_str), Some("ArrowDown"));
+    }
+
+    #[test]
+    fn key_for_action_honors_movement_remap_when_enabled() {
+        use std::collections::BTreeMap;
+        let mut bindings = BTreeMap::new();
+        bindings.insert("move_left".into(), "KeyH".into());
+        bindings.insert("move_right".into(), "KeyL".into());
+        bindings.insert("aim_up".into(), "Numpad8".into());
+        let s = cf_control::Settings {
+            key_remap_enabled: true,
+            key_bindings: bindings,
+            ..cf_control::Settings::default()
+        };
+        assert_eq!(key_for_action(&s, ACTION_MOVE_LEFT), Some(KeyCode::KeyH));
+        assert_eq!(key_for_action(&s, ACTION_MOVE_RIGHT), Some(KeyCode::KeyL));
+        assert_eq!(key_for_action(&s, ACTION_AIM_UP), Some(KeyCode::Numpad8));
+        // Unrebound action → default.
+        assert_eq!(key_for_action(&s, ACTION_MOVE_UP), Some(KeyCode::KeyW));
+    }
+}
+
 /// Sample the keyboard each frame and fold it into the engine's pending
 /// `ControlIntent` so human input runs through exactly the same path as
 /// `cfctl act.player.*` commands. Movement is continuous (held keys); jump /
@@ -662,27 +1412,40 @@ fn ingest_player_input(
     holder: Res<EngineHolder>,
     keys: Res<ButtonInput<KeyCode>>,
     rt: Option<Res<ControlRuntime>>,
+    local_input_enabled: Res<LocalInputEnabled>,
+    mut hold_tracker: ResMut<HoldTracker>,
     mut last_move_x: Local<f32>,
     mut last_aim: Local<(f32, f32)>,
     mut last_intent_epoch: Local<u64>,
 ) {
     let _ = rt; // Reserved; ControlRuntime presence does not gate human input.
+    if !local_input_enabled.0 {
+        return;
+    }
     if !holder.0.config().has_actor_world {
         return;
     }
-    // WASD letters drive movement; arrow keys drive aim. Decoupling the two
-    // axes lets the player strafe (e.g. move left while aiming right), which
-    // the previous `aim_x = move_x.signum()` shortcut made impossible. W/S
-    // remain on aim_y as alternative bindings to Up/Down for ergonomic reach.
-    let move_x = keyboard_axis_pair(&keys, KeyCode::KeyD, KeyCode::KeyA);
-    let aim_x = keyboard_axis_pair(&keys, KeyCode::ArrowRight, KeyCode::ArrowLeft);
-    let aim_y = keyboard_axis(
-        &keys,
-        KeyCode::KeyW,
-        KeyCode::KeyS,
-        KeyCode::ArrowUp,
-        KeyCode::ArrowDown,
-    );
+    // Audit fix round-5 (2026-05-10): movement + aim now honor the live
+    // `Settings.key_bindings` remap table when `key_remap_enabled=true`. The
+    // defaults preserve the historical WASD-move + Arrow-aim feel; W/S still
+    // double on aim_y as a built-in alternative when arrows aren't reachable
+    // (e.g. left-handed keyboard layouts). When remap is disabled, the
+    // hardcoded WASD/Arrow defaults take over via `key_for_action`'s
+    // fallback path.
+    let settings = holder.0.current_settings();
+    let focus_active = holder.0.hud_caches_snapshot().focused_node.is_some();
+    let key_or = |action: &str, fallback: KeyCode| key_for_action(&settings, action).unwrap_or(fallback);
+    let move_left = key_or(ACTION_MOVE_LEFT, KeyCode::KeyA);
+    let move_right = key_or(ACTION_MOVE_RIGHT, KeyCode::KeyD);
+    let move_up = key_or(ACTION_MOVE_UP, KeyCode::KeyW);
+    let move_down = key_or(ACTION_MOVE_DOWN, KeyCode::KeyS);
+    let aim_left = key_or(ACTION_AIM_LEFT, KeyCode::ArrowLeft);
+    let aim_right = key_or(ACTION_AIM_RIGHT, KeyCode::ArrowRight);
+    let aim_up = key_or(ACTION_AIM_UP, KeyCode::ArrowUp);
+    let aim_down = key_or(ACTION_AIM_DOWN, KeyCode::ArrowDown);
+    let move_x = keyboard_axis_pair_gameplay(&keys, move_right, move_left, focus_active);
+    let aim_x = keyboard_axis_pair_gameplay(&keys, aim_right, aim_left, focus_active);
+    let aim_y = keyboard_axis_gameplay(&keys, move_up, move_down, aim_up, aim_down, focus_active);
     // `scenario.reset` (and any future op that zeroes `pending_intent` out
     // from under us) bumps the engine's `intent_epoch`. When that happens we
     // must redispatch any currently-held keys: the engine has forgotten the
@@ -752,7 +1515,34 @@ fn ingest_player_input(
                 })
                 .await;
         }
-        if keys.just_pressed(KeyCode::Space) {
+        // M4A action dispatch goes through the HoldTracker, which honors
+        // `Settings.hold_to_confirm` + `hold_threshold_ms` + `key_remap_enabled` +
+        // `key_bindings`. The set of actions whose CURRENT key is pressed this
+        // frame is computed via `key_for_action(settings, action)`.
+        let live_settings = holder.0.current_settings();
+        let mut pressed: HashSet<String> = HashSet::new();
+        for action in [
+            ACTION_JUMP,
+            ACTION_FIRE,
+            ACTION_FIRE_ALT,
+            ACTION_RELOAD,
+            ACTION_DIG,
+            ACTION_RESET,
+            ACTION_SELECT_SLOT_0,
+            ACTION_SELECT_SLOT_1,
+            ACTION_SELECT_SLOT_2,
+            ACTION_SELECT_SLOT_3,
+        ] {
+            if let Some(k) = key_for_action(&live_settings, action) {
+                if gameplay_key_pressed(&keys, k, focus_active) {
+                    pressed.insert(action.to_string());
+                }
+            }
+        }
+        let now = std::time::Instant::now();
+        let threshold = std::time::Duration::from_millis(u64::from(live_settings.hold_threshold_ms));
+        let fired = hold_tracker.tick_with_state(&pressed, live_settings.hold_to_confirm, threshold, now);
+        if fired.contains(ACTION_JUMP) {
             let _ = holder
                 .0
                 .dispatch(ControlCommand::ActPlayerJump {
@@ -760,7 +1550,7 @@ fn ingest_player_input(
                 })
                 .await;
         }
-        if keys.just_pressed(KeyCode::Enter) || keys.just_pressed(KeyCode::KeyJ) {
+        if fired.contains(ACTION_FIRE) || fired.contains(ACTION_FIRE_ALT) {
             let _ = holder
                 .0
                 .dispatch(ControlCommand::ActPlayerFire {
@@ -769,14 +1559,18 @@ fn ingest_player_input(
                 })
                 .await;
         }
-        // Mirror the press with an explicit release so the keyboard bridge
-        // honors the `ActPlayerFireParams.pressed` contract: the schema
-        // documents `false` as "explicit release for future hold-to-fire
-        // weapons." M1's single-press rifle treats fire as an edge that
-        // `clear_edges()` resets each tick, so this is a no-op today, but
-        // omitting it leaves a latent contract gap that would silently break
-        // future hold-to-fire weapons routed through this bridge.
-        if keys.just_released(KeyCode::Enter) || keys.just_released(KeyCode::KeyJ) {
+        // Released-fire dispatch keeps the `ActPlayerFireParams.pressed=false`
+        // contract live for future hold-to-fire weapons. We emit it when the
+        // primary OR alt fire key transitioned just_released this frame.
+        let fire_primary = key_for_action(&live_settings, ACTION_FIRE);
+        let fire_alt = key_for_action(&live_settings, ACTION_FIRE_ALT);
+        let fire_released = fire_primary
+            .map(|k| gameplay_key_just_released(&keys, k, focus_active))
+            .unwrap_or(false)
+            || fire_alt
+                .map(|k| gameplay_key_just_released(&keys, k, focus_active))
+                .unwrap_or(false);
+        if fire_released {
             let _ = holder
                 .0
                 .dispatch(ControlCommand::ActPlayerFire {
@@ -785,7 +1579,7 @@ fn ingest_player_input(
                 })
                 .await;
         }
-        if keys.just_pressed(KeyCode::KeyR) {
+        if fired.contains(ACTION_RELOAD) {
             let _ = holder
                 .0
                 .dispatch(ControlCommand::ActPlayerReload {
@@ -793,7 +1587,7 @@ fn ingest_player_input(
                 })
                 .await;
         }
-        if keys.just_pressed(KeyCode::KeyL) {
+        if fired.contains(ACTION_RESET) {
             let _ = holder
                 .0
                 .dispatch(ControlCommand::ActPlayerReset {
@@ -801,8 +1595,7 @@ fn ingest_player_input(
                 })
                 .await;
         }
-        // M1.5: G presses request a dig at the nearest in-range breach strip.
-        if keys.just_pressed(KeyCode::KeyG) {
+        if fired.contains(ACTION_DIG) {
             let _ = holder
                 .0
                 .dispatch(ControlCommand::ActPlayerDig {
@@ -811,13 +1604,13 @@ fn ingest_player_input(
                 })
                 .await;
         }
-        for (slot_key, slot) in [
-            (KeyCode::Digit1, 0u32),
-            (KeyCode::Digit2, 1u32),
-            (KeyCode::Digit3, 2u32),
-            (KeyCode::Digit4, 3u32),
+        for (action_id, slot) in [
+            (ACTION_SELECT_SLOT_0, 0u32),
+            (ACTION_SELECT_SLOT_1, 1u32),
+            (ACTION_SELECT_SLOT_2, 2u32),
+            (ACTION_SELECT_SLOT_3, 3u32),
         ] {
-            if keys.just_pressed(slot_key) {
+            if fired.contains(action_id) {
                 let _ = holder
                     .0
                     .dispatch(ControlCommand::ActPlayerSelectItem {
@@ -830,9 +1623,20 @@ fn ingest_player_input(
     });
 }
 
-fn keyboard_axis(keys: &ButtonInput<KeyCode>, pos_a: KeyCode, neg_a: KeyCode, pos_b: KeyCode, neg_b: KeyCode) -> f32 {
-    let pos = keys.pressed(pos_a) || keys.pressed(pos_b);
-    let neg = keys.pressed(neg_a) || keys.pressed(neg_b);
+fn keyboard_axis_gameplay(
+    keys: &ButtonInput<KeyCode>,
+    pos_a: KeyCode,
+    neg_a: KeyCode,
+    pos_b: KeyCode,
+    neg_b: KeyCode,
+    focus_active: bool,
+) -> f32 {
+    let pos = gameplay_key_pressed(keys, pos_a, focus_active) || gameplay_key_pressed(keys, pos_b, focus_active);
+    let neg = gameplay_key_pressed(keys, neg_a, focus_active) || gameplay_key_pressed(keys, neg_b, focus_active);
+    axis_from_pressed(pos, neg)
+}
+
+fn axis_from_pressed(pos: bool, neg: bool) -> f32 {
     match (pos, neg) {
         (true, false) => 1.0,
         (false, true) => -1.0,
@@ -840,12 +1644,11 @@ fn keyboard_axis(keys: &ButtonInput<KeyCode>, pos_a: KeyCode, neg_a: KeyCode, po
     }
 }
 
-fn keyboard_axis_pair(keys: &ButtonInput<KeyCode>, pos: KeyCode, neg: KeyCode) -> f32 {
-    match (keys.pressed(pos), keys.pressed(neg)) {
-        (true, false) => 1.0,
-        (false, true) => -1.0,
-        _ => 0.0,
-    }
+fn keyboard_axis_pair_gameplay(keys: &ButtonInput<KeyCode>, pos: KeyCode, neg: KeyCode, focus_active: bool) -> f32 {
+    axis_from_pressed(
+        gameplay_key_pressed(keys, pos, focus_active),
+        gameplay_key_pressed(keys, neg, focus_active),
+    )
 }
 
 /// Block on a single async dispatch. The control engine is used through async traits
@@ -884,6 +1687,65 @@ where
     }
 }
 
+/// M4A: rebuild the HUD module-strip placeholder from the player's filtered
+/// rifle view. Mirrors `cf-control::engine::build_module_strip_view` so the
+/// HUD + the `cfctl observe` ActorView agree on every tick.
+fn build_hud_module_strip(rifle: Option<&cf_control::RifleHudView>) -> HudModuleStrip {
+    let weapon_state = match rifle {
+        Some(r) => {
+            let reloading = r.reload_remaining_ticks > 0;
+            let empty = r.capacity > 0 && r.ammo == 0;
+            if reloading || empty {
+                "warning"
+            } else {
+                "nominal"
+            }
+        }
+        _ => "not_present",
+    };
+    let weapon_label = match rifle {
+        Some(r) => {
+            if r.reload_remaining_ticks > 0 {
+                "RELOADING".to_string()
+            } else if r.capacity > 0 && r.ammo == 0 {
+                "EMPTY".to_string()
+            } else {
+                format!("READY {}/{}", r.ammo, r.capacity)
+            }
+        }
+        _ => "—".to_string(),
+    };
+    HudModuleStrip {
+        modules: vec![
+            HudModule {
+                id: "weapon_mount".into(),
+                label: weapon_label,
+                state: weapon_state.into(),
+                kind: "weapon_mount".into(),
+            },
+            HudModule {
+                id: "jet".into(),
+                label: "JET N/A".into(),
+                state: "not_present".into(),
+                kind: "jet".into(),
+            },
+            HudModule {
+                id: "shield".into(),
+                label: "SHIELD N/A".into(),
+                state: "not_present".into(),
+                kind: "shield".into(),
+            },
+            HudModule {
+                id: "sensor".into(),
+                label: "SENSOR N/A".into(),
+                state: "not_present".into(),
+                kind: "sensor".into(),
+            },
+        ],
+        placeholder: true,
+    }
+}
+
 /// Copy the engine's actor world + rifle state into the Bevy render + HUD
 /// resources every frame. The engine is the single source of truth; render +
 /// HUD never own authoritative state.
@@ -891,8 +1753,11 @@ fn sync_actor_state_to_render(
     holder: Res<EngineHolder>,
     mut render_state: ResMut<ActorRenderState>,
     mut hud_state: ResMut<HudState>,
+    mut hud_settings: ResMut<HudSettings>,
 ) {
     let snapshot = holder.0.actor_render_snapshot();
+    let hud_caches = holder.0.hud_caches_snapshot();
+    let live_settings = holder.0.current_settings();
     render_state.actors = snapshot.actors.clone();
     render_state.player_actor_id = snapshot.player_actor_id;
     render_state.region_width = holder.0.config().region_width;
@@ -900,6 +1765,34 @@ fn sync_actor_state_to_render(
     render_state.region_anchor_x = holder.0.config().region_anchor_x;
     render_state.region_anchor_y = holder.0.config().region_anchor_y;
     render_state.floor_y = snapshot.floor_y;
+
+    // M4A: mirror cf-control::Settings into HudSettings so cf-ui's UiScale +
+    // high-contrast palette systems pick up live `act.settings.set` patches.
+    let next_settings = HudSettings {
+        ui_scale: live_settings.ui_scale,
+        high_contrast: live_settings.high_contrast,
+        captions: live_settings.captions,
+        reduced_motion: live_settings.reduced_motion,
+        reduced_shake: live_settings.reduced_shake,
+        reduced_flash: live_settings.reduced_flash,
+        hold_to_confirm: live_settings.hold_to_confirm,
+        hold_threshold_ms: live_settings.hold_threshold_ms,
+        key_remap_enabled: live_settings.key_remap_enabled,
+        focused_node: hud_caches.focused_node.clone(),
+    };
+    if (hud_settings.ui_scale - next_settings.ui_scale).abs() > f32::EPSILON
+        || hud_settings.high_contrast != next_settings.high_contrast
+        || hud_settings.captions != next_settings.captions
+        || hud_settings.reduced_motion != next_settings.reduced_motion
+        || hud_settings.reduced_shake != next_settings.reduced_shake
+        || hud_settings.reduced_flash != next_settings.reduced_flash
+        || hud_settings.hold_to_confirm != next_settings.hold_to_confirm
+        || hud_settings.hold_threshold_ms != next_settings.hold_threshold_ms
+        || hud_settings.key_remap_enabled != next_settings.key_remap_enabled
+        || hud_settings.focused_node != next_settings.focused_node
+    {
+        *hud_settings = next_settings;
+    }
 
     hud_state.tick = snapshot.tick;
     hud_state.tick_rate_hz = holder.0.config().tick_rate_hz;
@@ -913,6 +1806,65 @@ fn sync_actor_state_to_render(
         reload_remaining_ticks: r.reload_remaining_ticks,
         reload_total_ticks: r.reload_total_ticks,
     });
+
+    // M4A: project per-actor stance + body silhouette + module strip from the
+    // engine's authoritative observation. Player-anchored; non-player actors
+    // are exposed via cfctl observe but not the cf-app HUD.
+    let (stance, silhouette) = match hud_state.player.as_ref() {
+        Some(p) => (
+            p.stance.clone(),
+            HudBodySilhouette {
+                head_hp_pct: p.body_silhouette.head_hp_pct,
+                torso_hp_pct: p.body_silhouette.torso_hp_pct,
+                arm_left_hp_pct: p.body_silhouette.arm_left_hp_pct,
+                arm_right_hp_pct: p.body_silhouette.arm_right_hp_pct,
+                leg_left_hp_pct: p.body_silhouette.leg_left_hp_pct,
+                leg_right_hp_pct: p.body_silhouette.leg_right_hp_pct,
+                placeholder: p.body_silhouette.placeholder,
+            },
+        ),
+        None => (String::new(), HudBodySilhouette::default()),
+    };
+    hud_state.stance = stance;
+    hud_state.body_silhouette = silhouette;
+    // Reuse the engine's module-strip projection by re-deriving the same
+    // placeholder rules used in `build_module_strip_view`. cf-app does NOT
+    // depend on cf-control's internal helpers, so we recompute from the rifle
+    // bridge HUD view (which is already filtered by selected slot).
+    hud_state.modules = build_hud_module_strip(snapshot.player_rifle.as_ref());
+
+    // M4A: banners + captions + tool_validity from the engine's HUD-cache snapshot.
+    hud_state.banners = hud_caches
+        .banners
+        .iter()
+        .map(|b| HudBanner {
+            id: b.id.clone(),
+            severity: b.severity.clone(),
+            label: b.label.clone(),
+            raised_at_tick: b.raised_at_tick,
+        })
+        .collect();
+    hud_state.captions = hud_caches
+        .captions
+        .iter()
+        .map(|c| HudCaption {
+            id: c.id.clone(),
+            label: c.label.clone(),
+            raised_at_tick: c.raised_at_tick,
+        })
+        .collect();
+    hud_state.tool_validity =
+        if hud_caches.tool_validity.last_carve_tick.is_some() || hud_caches.tool_validity.last_refusal_tick.is_some() {
+            Some(HudToolValidity {
+                last_carve_tick: hud_caches.tool_validity.last_carve_tick,
+                last_refusal_tick: hud_caches.tool_validity.last_refusal_tick,
+                last_refusal_reason: hud_caches.tool_validity.last_refusal_reason.clone(),
+                last_refusal_target: hud_caches.tool_validity.last_refusal_target.clone(),
+                valid: hud_caches.tool_validity.valid,
+            })
+        } else {
+            None
+        };
 
     // M1.5 — propagate mission, enemy, breach, extraction zone to renderer + HUD.
     render_state.breaches = snapshot
@@ -1002,14 +1954,199 @@ fn sync_actor_state_to_render(
     }
 }
 
+/// M4A keyboard + controller focus traversal.
+///
+/// Closes DR-012 ACC-A-04 + the roadmap M4A "controller route through HUD" +
+/// ACC-A "controller/keyboard/mouse parity" requirements.
+///
+/// Keyboard: Tab enters/advances focus through the canonical
+/// `HUD_FOCUSABLE_NODES` list; Shift+Tab retreats; once focus is active,
+/// ArrowDown / ArrowUp navigate within the focus ring. F1 clears focus.
+/// Until Tab has entered focus mode, ArrowDown / ArrowUp remain gameplay aim
+/// keys so aiming never also cycles HUD focus.
+///
+/// Controller (gamepad): D-Pad Down / Right advances focus; D-Pad Up /
+/// Left retreats; the right-stick analog Y axis (deadzone 0.5) drives the
+/// same Next / Prev dispatch on rising edge so a thumb stick is as good as
+/// the D-Pad. The East face button (Xbox B / PlayStation Circle) clears
+/// focus (the standard "back / cancel" convention on consoles). LeftTrigger
+/// (L1) / RightTrigger (R1) also drive Prev / Next as a thumb-friendly
+/// fallback for users who can't reach the D-Pad. The South face button
+/// (Xbox A / PS Cross) is RESERVED for activation of the currently focused
+/// node — M4A does NOT own activation semantics (M5 + M8 own that), so
+/// pressing South emits no focus dispatch (deliberate no-op rather than a
+/// dishonest hard-coded `set("hud.silhouette")` jump).
+///
+/// All routes dispatch through `act.input.focus` so the cfctl, cf-e2e,
+/// keyboard, and gamepad consumers share the same code path. The visible
+/// focus ring lives in cf-ui. Tested via `gamepad_focus_input_*` unit
+/// tests below.
+fn ingest_focus_input(
+    holder: Res<EngineHolder>,
+    keys: Res<ButtonInput<KeyCode>>,
+    gamepads: Query<(Entity, &Gamepad)>,
+    local_input_enabled: Res<LocalInputEnabled>,
+    mut last_stick_y: Local<HashMap<Entity, f32>>,
+) {
+    if !local_input_enabled.0 {
+        return;
+    }
+    let block_on = futures_block_on;
+    let shift_held = keys.pressed(KeyCode::ShiftLeft) || keys.pressed(KeyCode::ShiftRight);
+    let dispatch_focus = |direction: cf_control::server::FocusDirection| {
+        block_on(async {
+            let _ = holder
+                .0
+                .dispatch(cf_control::ControlCommand::ActInputFocus {
+                    direction,
+                    source: IntentSource::Human,
+                })
+                .await;
+        });
+    };
+
+    let focus_active = holder.0.hud_caches_snapshot().focused_node.is_some();
+    let keyboard_dir = keyboard_focus_direction(
+        keys.just_pressed(KeyCode::Tab),
+        shift_held,
+        keys.just_pressed(KeyCode::ArrowDown),
+        keys.just_pressed(KeyCode::ArrowUp),
+        keys.just_pressed(KeyCode::F1),
+        focus_active,
+    );
+    let sent_keyboard = keyboard_dir.is_some();
+    if let Some(direction) = keyboard_dir {
+        dispatch_focus(direction);
+    }
+
+    if sent_keyboard {
+        return;
+    }
+
+    // Audit fix round-5 (2026-05-10): per-gamepad stick history (was a single
+    // shared `Local<f32>` previously, which let an idle pad's zero-Y wipe an
+    // active pad's history + cause repeated focus moves on the active pad).
+    // Now each gamepad's previous-frame stick Y is keyed by Entity so an
+    // idle pad can never clobber an active pad's debounce state.
+    let stick_threshold = 0.5_f32;
+    for (entity, gp) in gamepads.iter() {
+        let prev_y = last_stick_y.entry(entity).or_insert(0.0);
+        if let Some(dir) = gamepad_focus_direction(gp, prev_y, stick_threshold) {
+            dispatch_focus(dir);
+            return;
+        }
+    }
+}
+
+/// Translate one frame of gamepad input into an optional focus dispatch.
+///
+/// Pulled out so the tests below can drive synthetic `Gamepad` instances
+/// without a Bevy app + window. Returns the resolved `FocusDirection` to
+/// dispatch this frame, or `None` when no edge fired. `last_stick_y` carries
+/// the previous frame's right-stick Y so analog motion only fires on rising
+/// edge (crossing the threshold), not every frame the stick is held.
+fn gamepad_focus_direction(
+    gp: &Gamepad,
+    last_stick_y: &mut f32,
+    stick_threshold: f32,
+) -> Option<cf_control::server::FocusDirection> {
+    use cf_control::server::FocusDirection;
+    if gp.just_pressed(GamepadButton::DPadDown)
+        || gp.just_pressed(GamepadButton::DPadRight)
+        || gp.just_pressed(GamepadButton::RightTrigger)
+    {
+        return Some(FocusDirection::Next);
+    }
+    if gp.just_pressed(GamepadButton::DPadUp)
+        || gp.just_pressed(GamepadButton::DPadLeft)
+        || gp.just_pressed(GamepadButton::LeftTrigger)
+    {
+        return Some(FocusDirection::Prev);
+    }
+    if gp.just_pressed(GamepadButton::East) {
+        return Some(FocusDirection::Clear);
+    }
+    // South (Xbox A / PS Cross) is reserved for activation of the currently
+    // focused node. M4A does NOT own activation semantics (that lands at M5
+    // + M8). Returning None here is the honest behavior: the button is wired
+    // to be a no-op for focus traversal, NOT a hard-coded jump to a single
+    // node. The activation path will be added at M5/M8 alongside the real
+    // commit-on-confirm UX.
+    let _reserved_for_activation = GamepadButton::South;
+    let stick_y = gp
+        .get(GamepadInput::Axis(GamepadAxis::RightStickY))
+        .or_else(|| gp.get(GamepadInput::Axis(GamepadAxis::LeftStickY)))
+        .unwrap_or(0.0);
+    let prev_y = *last_stick_y;
+    *last_stick_y = stick_y;
+    if stick_y <= -stick_threshold && prev_y > -stick_threshold {
+        return Some(FocusDirection::Next);
+    }
+    if stick_y >= stick_threshold && prev_y < stick_threshold {
+        return Some(FocusDirection::Prev);
+    }
+    None
+}
+
+fn keyboard_focus_direction(
+    tab_pressed: bool,
+    shift_held: bool,
+    arrow_down_pressed: bool,
+    arrow_up_pressed: bool,
+    f1_pressed: bool,
+    focus_active: bool,
+) -> Option<cf_control::server::FocusDirection> {
+    use cf_control::server::FocusDirection;
+    if tab_pressed {
+        return Some(if shift_held {
+            FocusDirection::Prev
+        } else {
+            FocusDirection::Next
+        });
+    }
+    if focus_active && arrow_down_pressed {
+        return Some(FocusDirection::Next);
+    }
+    if focus_active && arrow_up_pressed {
+        return Some(FocusDirection::Prev);
+    }
+    if f1_pressed {
+        return Some(FocusDirection::Clear);
+    }
+    None
+}
+
+/// DR-012 ACC-A-04 contract: Escape clears HUD focus when a focus ring is
+/// active; only when there is NO focused node does Escape exit the app.
+/// This matches the standard "Esc closes the active overlay; Esc on the
+/// root exits" pattern from desktop games + most platform UI guidelines.
+/// F1 is preserved as a fast-clear shortcut for users who want to drop
+/// focus without leaving the focus traversal mode.
 fn esc_or_close_to_exit(
     keys: Res<ButtonInput<KeyCode>>,
+    holder: Res<EngineHolder>,
+    local_input_enabled: Res<LocalInputEnabled>,
     mut close_events: MessageReader<WindowCloseRequested>,
     mut events: MessageWriter<AppExit>,
 ) {
-    if keys.just_pressed(KeyCode::Escape) {
-        tracing::info!(target: "cf::app", "ESC pressed; exiting");
-        events.write(AppExit::Success);
+    if local_input_enabled.0 && keys.just_pressed(KeyCode::Escape) {
+        let focused = holder.0.hud_caches_snapshot().focused_node;
+        if focused.is_some() {
+            // ACC-A-04: Esc clears active focus, does NOT exit.
+            futures_block_on(async {
+                let _ = holder
+                    .0
+                    .dispatch(cf_control::ControlCommand::ActInputFocus {
+                        direction: cf_control::server::FocusDirection::Clear,
+                        source: IntentSource::Human,
+                    })
+                    .await;
+            });
+            tracing::info!(target: "cf::app", "ESC pressed; cleared HUD focus (was {:?})", focused);
+        } else {
+            tracing::info!(target: "cf::app", "ESC pressed; no HUD focus active; exiting");
+            events.write(AppExit::Success);
+        }
     }
     if close_events.read().next().is_some() {
         tracing::info!(target: "cf::app", "window close requested; exiting");
@@ -1076,6 +2213,19 @@ fn start_control_server(engine: Arc<M0Engine>, port: u16) -> Result<ControlRunti
         server_handle: Mutex::new(Some(handle)),
         shutdown_tx,
     })
+}
+
+fn write_control_port_file(path: Option<&Path>, bound_addr: SocketAddr) -> Result<()> {
+    let Some(path) = path else {
+        return Ok(());
+    };
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent)
+            .with_context(|| format!("create control port file dir {}", parent.display()))?;
+    }
+    std::fs::write(path, format!("{}\n", bound_addr.port()))
+        .with_context(|| format!("write control port file {}", path.display()))?;
+    Ok(())
 }
 
 impl Drop for ControlRuntime {
@@ -1192,6 +2342,8 @@ mod tests {
             "--control-api",
             "--control-port",
             "17890",
+            "--control-port-file",
+            "/tmp/cf-control-port",
             "--headless-smoke",
             "--debug-capabilities",
             "debug",
@@ -1203,6 +2355,7 @@ mod tests {
             "--reduced-motion",
             "--reduced-shake",
             "--reduced-flash",
+            "--disable-local-input",
         ])
         .expect("CLI must accept all M0 flags");
         assert_eq!(cli.scenario, "m0_blank");
@@ -1213,6 +2366,7 @@ mod tests {
         assert_eq!(cli.run_bundle_dir, Some(PathBuf::from("/tmp/run")));
         assert!(cli.control_api);
         assert_eq!(cli.control_port, 17890);
+        assert_eq!(cli.control_port_file, Some(PathBuf::from("/tmp/cf-control-port")));
         assert!(cli.headless_smoke);
         assert_eq!(cli.debug_capabilities, vec!["debug".to_string()]);
         assert!((cli.ui_scale - 2.0).abs() < f32::EPSILON);
@@ -1221,6 +2375,7 @@ mod tests {
         assert!(cli.reduced_motion);
         assert!(cli.reduced_shake);
         assert!(cli.reduced_flash);
+        assert!(cli.disable_local_input);
     }
 
     #[test]
@@ -1229,6 +2384,20 @@ mod tests {
         assert_eq!(compute_duration(None, Some(2.0), 60), 120);
         assert_eq!(compute_duration(None, Some(2.0), 120), 240);
         assert_eq!(compute_duration(None, None, 60), 0);
+    }
+
+    #[test]
+    fn write_control_port_file_records_bound_port() {
+        let mut path = std::env::temp_dir();
+        path.push(format!("cf_app_control_port_{}_test.txt", std::process::id()));
+        let _ = std::fs::remove_file(&path);
+        let addr: SocketAddr = "127.0.0.1:43210".parse().unwrap();
+
+        write_control_port_file(Some(&path), addr).unwrap();
+
+        let text = std::fs::read_to_string(&path).unwrap();
+        assert_eq!(text, "43210\n");
+        let _ = std::fs::remove_file(&path);
     }
 
     /// Regression: headless-smoke + capture-grid must reject at startup, not

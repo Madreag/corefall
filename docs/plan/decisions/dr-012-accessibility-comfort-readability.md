@@ -1,16 +1,49 @@
 ---
 type: decision
 id: DR-012
-status: open
+status: closed-direction-with-evidence
 priority: P1
-revisit_trigger: "Slice A HUD, loadout/workbench, replay/death recap, hub, or package-builder screens fail accessibility/comfort tests at 200 percent text scale, keyboard/controller navigation, caption coverage, contrast, no-color-only state, reduced motion, or flash-safety checks."
+closed_at: 2026-05-09
+closed_by: M4A — Readability + ACC-A Floor (BP3 milestone 2/3)
+revisit_trigger: "Reopen if a real-player playtest at BP7+ shows the ACC-A floor is too weak (e.g. screen-reader path missing for a critical surface) or platform certification requires a stronger floor than what M4A locked. T-ACC-PLUS (BP9..BP12) extends the floor with cognitive + motor + hearing + reading + sensory presets without changing the M4A surface."
 ---
 
 ← [[decisions/index|decision records]] · [[dashboards/decision-tracker|decision tracker]] · [[dashboards/research-readiness|readiness]] · [[spec/accessibility-comfort-slice-a|accessibility/comfort Slice A]] · [[spec/ux-wireframes-slice-a|UX wireframes Slice A]]
 
 # DR-012: Accessibility, Comfort, And Readability Floor
 
-> [!info] Status: OPEN; LEAN: accessibility is a Slice A design floor, not a late compliance pass.
+> [!info] Status: <span class="cc-flag cc-green">CLOSED-DIRECTION-WITH-EVIDENCE</span>; Recommendation B (Slice A accessibility/comfort floor) shipped at M4A. T-ACC-PLUS (M-ACC-PLUS, BP9..BP12) layers cognitive + motor + hearing + reading + sensory presets on top without renaming any of the M4A surface.
+
+## Closure Note (M4A — 2026-05-09)
+
+M4A landed the full ACC-A-01..ACC-A-10 surface for the HUD + run-bundle evidence path. Surfaces gated behind not-yet-built UI (loadout/workbench at M8, replay viewer at M3B already shipped, hub/package-builder at M8) inherit the M4A floor automatically because the `Settings` resource + `HudSettings` mirror + Bevy `UiScale` + palette swap + caption strip + `observe.accessibility` surface are workspace-wide.
+
+**Per ACC-A test:**
+
+- **ACC-A-01 Text scale**: Bevy `UiScale` resource driven by `apply_ui_scale_from_settings` in cf-ui; Val::Px reflows natively; `summary_grid.png` and 4x4 `review_grid.png` at 200% show every HUD line readable without overlap, two-axis scrolling, or bottom-play-area obstruction. The core status strip is compact/content-sized; banners and captions occupy the upper-right lane and hide when empty.
+- **ACC-A-02 Contrast**: `palette_text` / `palette_strip_bg` / `palette_banner_bg` helpers swap to pure white text on solid black backgrounds when `Settings.high_contrast = true`; observable via `observe.accessibility.high_contrast_applied`.
+- **ACC-A-03 No color-only states**: every banner carries severity word + ASCII icon glyph (`[!!]` critical / `[!]` warning / `[*]` info) so monochrome captures still identify state. Stance / module / tool-validity lines are text-first.
+- **ACC-A-04 Same-input navigation**: M4A landed real keyboard focus traversal (Tab / Shift+Tab + Arrow keys advance/retreat across the 12 focusable HUD nodes; Escape clears focus when a focus is active, otherwise exits the app — the standard "Esc closes the active overlay; Esc on the root exits" pattern; F1 is preserved as a fast-clear shortcut). M4A also wired the controller route via `cf-app::gamepad_focus_direction` (D-Pad + Left/Right Triggers + right-stick analog Y, deadzone 0.5, rising-edge debounced per-gamepad; East clears focus; South is deliberately reserved for future activation and dispatches no focus traversal). Visible focus ring in cf-ui. `observe.accessibility.focused_node` exposes the current focus to AI agents + cfctl. Mouse-only traps are absent at M4A scope (HUD is read-only).
+- **ACC-A-05 Remapping and holds**: M4A added `Settings.hold_to_confirm` (default off) + `Settings.hold_threshold_ms` (default 250) + `Settings.key_remap_enabled` (default off) + `Settings.key_bindings` BTreeMap covering 18 actions (10 discrete: jump/fire/fire_alt/reload/dig/reset/select_slot_0..3 + 8 continuous: move_left/move_right/move_up/move_down/aim_left/aim_right/aim_up/aim_down). cf-app's `ingest_player_input` consults `key_for_action` for both held-key movement/aim AND edge-triggered discrete actions every frame. Hold-to-confirm is implemented via `cf-app::HoldTracker.tick_with_state` with 5 behavior tests covering tap/hold/release scenarios at the configured threshold. `act.settings.set` and `cfctl act settings-set --key-binding action=KeyName` validate both sides of the binding before accepting the patch; unsupported actions/keys reject with `key_binding_unknown_*` instead of silently falling back. Key names include Numpad0..9 for aim/movement remaps. Full remap UI surface is M8/`cf-tools-editor` scope; the data plane + dispatch path is shipped at M4A.
+- **ACC-A-06 Motion, shake, and flash**: `Settings.reduced_motion` / `reduced_shake` / `reduced_flash` flags read + recorded through cf-control → observe.accessibility → cf-app HudSettings. M2.5 / M5 / M5.5 own the actual motion/shake/flash effects; their gates already require honoring these flags.
+- **ACC-A-07 Captions**: M4A captions queue surfaces audio-bound events as text; `cf-ui` caption strip toggles `Display::Flex` / `Display::None` per `Settings.captions` and hides when the queue is empty; `observe.captions` exposes the text queue for AI agents. Captions render in the upper-right lane instead of the lower play/action area. cf-audio + real audio captions land at BP6.
+- **ACC-A-08 Equipment workbench density**: workbench UI is M8 scope; the `Settings.ui_scale` + `high_contrast` surface from M4A is the architectural foundation. M8 inherits the floor by reading the same `HudSettings` resource.
+- **ACC-A-09 Replay/death recap**: M3B (closed 2026-05-09) cf-tools-replay-viewer renders cause-chain + debrief in markdown; PNG companions via `markdown_to_png.py`. Color-independent; non-color-only tags.
+- **ACC-A-10 Run-bundle evidence**: `run_manifest.json.settings` carries the 9 M4A ACC-A flags; `summary.json.event_counts.by_type` reflects `control.settings_observed` + `control.settings_changed` round-trips; `observe.accessibility` surface is the live read.
+
+**Authoritative implementation evidence:**
+
+- **Run-bundle evidence**: `prototype_runs/native/m4a_2026-05-10T18-19-43Z_5d1a46cc/` — source-truthful M4A bundle (`run_manifest.scene.id = "m4a_micro_breach_readability"`, milestone tagged "m4a", expected_tests = `["M4A-D01", "M4A-D02", "M4A-D03", "M4A-D04"]`, all 9 ACC-A settings driven through cf-e2e, `summary_grid.png` + `review_grid.png` populated, bottom play lane unobstructed at 200% high contrast).
+- **Close-loop verdict**: `prototype_runs/native/bp3_loop_2026-05-10T18-16-49Z_525df038/verdict.json` — coverage, build/lint/test, self-play sweep, grading scaffold, grading filled, and grading validate all PASS against the matching dirty-worktree fingerprint.
+- **Self-play sweep**: 18/18 PASS (post-M4A audit closure adds m4a_focus_traversal + m4a_hold_remap_settings rows).
+- **LLM-graded verdict**: `prototype_runs/native/m4a_*/grading.json` PASS aggregate ≥ 7.0 with prose-justified scores per dimension.
+- **Single-source focusable_nodes**: `cf_control::engine::HUD_FOCUSABLE_NODES` is the canonical 12-id list; cf-e2e `--verify-focus` + cf-control live_ws_acceptance test + cf-app focus traversal all read from it. Regression in any one node is caught by the shared list.
+
+**Reopen triggers:**
+
+- BP7 real-player playtest fails ACC-A-01..ACC-A-10.
+- T-ACC-PLUS (M-ACC-PLUS) at BP9..BP12 surfaces a stronger preset that requires renaming the M4A surface.
+- Platform cert (Steam / Xbox / PlayStation) at BP12 requires a feature M4A does not yet expose.
 
 ## Context
 

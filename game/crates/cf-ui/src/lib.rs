@@ -1,20 +1,28 @@
-//! M1 status strip: the minimum HUD per spec/native-implementation-backlog M1-004.
+//! cf-ui — comic-noir HUD presentation surface.
 //!
-//! Renders four short text rows pinned to the top-left corner:
-//! - Status (`stable / unstable / downed / dead`).
-//! - Selected slot + item label.
-//! - HP (`X / 100`).
-//! - Reticle / fire state (`READY`, `RELOADING NN%`, `EMPTY`, `COOLDOWN Nt`, or `NO RIFLE`).
+//! Layered across milestones:
 //!
-//! Comic-noir typography, mission cards, and accessibility floor land at M4. M1 only
-//! needs a readable status surface so manual playtests can confirm fire/reload/status
-//! behaviour without staring at the recorder.
+//! - **M1 status strip** (M1-004): four short text rows pinned to the top-left corner —
+//!   STATUS / ITEM / HP / Reticle.
+//! - **M1.5 mission strip** (M1.5-004): adds OBJECTIVE / MISSION / ENEMY / BREACH /
+//!   EVENT lines so the reactive-guard scenario is readable from the HUD.
+//! - **M4A readability + ACC-A floor** (M4A-001 / M4A-003 / M4A-004 / DR-012 closure):
+//!   adds the body silhouette panel, the module strip, the stance line, the chassis
+//!   banner stack, the tool-validity line, and the captions strip.  All HUD nodes
+//!   carry stable accessibility ids so `cfctl observe` + AI agents see the same
+//!   surface a sighted player does. Honors live `Settings.ui_scale` (200% scale +
+//!   reflow), `Settings.high_contrast` (palette swap), `Settings.captions`
+//!   (caption strip visibility), and `Settings.reduced_motion / reduced_shake /
+//!   reduced_flash` (recorded in observe.accessibility).
+//! - **M4B comic-noir polish** (BP7): layers slide/skew/cards on top of M4A's
+//!   text-only banner stack without changing the HudState shape.
 
 #![deny(unsafe_code)]
 #![allow(
     clippy::module_name_repetitions,
     clippy::type_complexity,
-    clippy::needless_pass_by_value
+    clippy::needless_pass_by_value,
+    clippy::too_many_arguments
 )]
 
 use bevy::prelude::*;
@@ -41,6 +49,123 @@ pub struct HudState {
     pub breach: Option<HudBreach>,
     /// M1.5: last important event label (mission/objective/state-change).
     pub last_event: Option<String>,
+    /// M4A: derived stance label (idle/walking/running/airborne/downed/dead).
+    pub stance: String,
+    /// M4A: per-zone body silhouette (head/torso/arms/legs hp%, 0..1).
+    pub body_silhouette: HudBodySilhouette,
+    /// M4A: chassis module strip placeholders (M5 fills with real chassis).
+    pub modules: HudModuleStrip,
+    /// M4A: priority-ordered banner stack (latest first).
+    pub banners: Vec<HudBanner>,
+    /// M4A: captions queue (audio-bound events; visible iff `captions=true`).
+    pub captions: Vec<HudCaption>,
+    /// M4A: tool-validity projection for the HUD TOOL line.
+    pub tool_validity: Option<HudToolValidity>,
+}
+
+/// M4A accessibility/settings mirror. cf-ui depends on `cf-actor` + `bevy` only;
+/// the cf-app bridge writes this resource each frame from `cf-control::Settings`
+/// (the live, mutable copy patched by `act.settings.set`) plus the engine's
+/// HUD-cache snapshot (focus state).
+#[derive(Resource, Debug, Clone, PartialEq)]
+pub struct HudSettings {
+    pub ui_scale: f32,
+    pub high_contrast: bool,
+    pub captions: bool,
+    pub reduced_motion: bool,
+    pub reduced_shake: bool,
+    pub reduced_flash: bool,
+    pub hold_to_confirm: bool,
+    pub hold_threshold_ms: u32,
+    pub key_remap_enabled: bool,
+    /// M4A: id of the currently-focused HUD node (drives the visible focus
+    /// ring). `None` when focus is cleared (default + after F1).
+    pub focused_node: Option<String>,
+}
+
+impl Default for HudSettings {
+    fn default() -> Self {
+        Self {
+            ui_scale: 1.0,
+            high_contrast: false,
+            captions: true,
+            reduced_motion: false,
+            reduced_shake: false,
+            reduced_flash: false,
+            hold_to_confirm: false,
+            hold_threshold_ms: 250,
+            key_remap_enabled: false,
+            focused_node: None,
+        }
+    }
+}
+
+/// M4A body silhouette per-zone hp percentages (clamped to `[0.0, 1.0]`).
+#[derive(Debug, Clone, PartialEq)]
+pub struct HudBodySilhouette {
+    pub head_hp_pct: f32,
+    pub torso_hp_pct: f32,
+    pub arm_left_hp_pct: f32,
+    pub arm_right_hp_pct: f32,
+    pub leg_left_hp_pct: f32,
+    pub leg_right_hp_pct: f32,
+    pub placeholder: bool,
+}
+
+impl Default for HudBodySilhouette {
+    fn default() -> Self {
+        Self {
+            head_hp_pct: 1.0,
+            torso_hp_pct: 1.0,
+            arm_left_hp_pct: 1.0,
+            arm_right_hp_pct: 1.0,
+            leg_left_hp_pct: 1.0,
+            leg_right_hp_pct: 1.0,
+            placeholder: true,
+        }
+    }
+}
+
+/// M4A module strip projection (placeholder until M5 owns chassis modules).
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct HudModuleStrip {
+    pub modules: Vec<HudModule>,
+    pub placeholder: bool,
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct HudModule {
+    pub id: String,
+    pub label: String,
+    pub state: String,
+    pub kind: String,
+}
+
+/// M4A HUD banner — surfaced from chassis/status/mission events.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HudBanner {
+    pub id: String,
+    pub severity: String,
+    pub label: String,
+    pub raised_at_tick: u64,
+}
+
+/// M4A HUD caption — surfaced from audio-bound events when captions are on.
+#[derive(Debug, Clone, PartialEq)]
+pub struct HudCaption {
+    pub id: String,
+    pub label: String,
+    pub raised_at_tick: u64,
+}
+
+/// M4A HUD tool-validity projection for the TOOL line.
+#[derive(Debug, Clone, Default, PartialEq)]
+pub struct HudToolValidity {
+    pub last_carve_tick: Option<u64>,
+    pub last_refusal_tick: Option<u64>,
+    pub last_refusal_reason: Option<String>,
+    pub last_refusal_target: Option<String>,
+    pub valid: bool,
 }
 
 /// M1.5 mission HUD bundle.
@@ -118,59 +243,474 @@ pub struct BreachStripText;
 #[derive(Component, Debug)]
 pub struct LastEventStripText;
 
+#[derive(Component, Debug)]
+pub struct StanceStripText;
+
+#[derive(Component, Debug)]
+pub struct SilhouetteStripText;
+
+#[derive(Component, Debug)]
+pub struct ModuleStripText;
+
+#[derive(Component, Debug)]
+pub struct ToolStripText;
+
+#[derive(Component, Debug)]
+pub struct CaptionStripText;
+
+#[derive(Component, Debug)]
+pub struct CaptionStripRoot;
+
+#[derive(Component, Debug)]
+pub struct BannerStripRoot;
+
+#[derive(Component, Debug)]
+pub struct BannerStripText;
+
 pub struct StatusStripPlugin;
 
 impl Plugin for StatusStripPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<HudState>()
-            .add_systems(Startup, spawn_status_strip)
-            .add_systems(Update, update_status_strip);
+            .init_resource::<HudSettings>()
+            .add_systems(Startup, (spawn_status_strip, spawn_banner_strip, spawn_caption_strip))
+            .add_systems(
+                Update,
+                (
+                    apply_ui_scale_from_settings,
+                    update_status_strip,
+                    update_palette_for_high_contrast,
+                    update_banner_strip,
+                    update_caption_strip,
+                    update_focus_ring,
+                ),
+            );
     }
 }
+
+/// M4A: stable accessibility id for a HUD node. Drives the focus ring map +
+/// `cfctl ui` lookups. Mirrors the per-component canonical ids in the cf-control
+/// `HUD_FOCUSABLE_NODES` constant.
+#[derive(Component, Debug, Clone)]
+pub struct HudAccessibilityId(pub &'static str);
 
 fn spawn_status_strip(mut commands: Commands) {
     let root_node = Node {
         position_type: PositionType::Absolute,
         top: Val::Px(12.0),
         left: Val::Px(12.0),
+        max_width: Val::Percent(96.0),
         flex_direction: FlexDirection::Column,
-        row_gap: Val::Px(2.0),
+        flex_wrap: FlexWrap::NoWrap,
+        align_content: AlignContent::FlexStart,
+        row_gap: Val::Px(1.0),
+        column_gap: Val::Px(12.0),
         padding: UiRect::all(Val::Px(8.0)),
         ..default()
     };
     let text_font = TextFont {
-        font_size: 18.0,
+        font_size: 11.0,
         ..default()
     };
-    let text_color = TextColor(Color::srgb(0.96, 0.96, 0.92));
+    let text_color = TextColor(palette_text(false));
+    let line_node = || Node {
+        padding: UiRect::all(Val::Px(1.0)),
+        border: UiRect::all(Val::Px(2.0)),
+        flex_direction: FlexDirection::Row,
+        ..default()
+    };
     commands
         .spawn((
             root_node,
-            BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 0.45)),
+            BackgroundColor(palette_strip_bg(false)),
             StatusStripRoot,
             Name::new("cf::ui::status_strip"),
         ))
         .with_children(|parent| {
-            parent.spawn((Text::new("STATUS: --"), text_font.clone(), text_color, StatusStripText));
+            parent
+                .spawn((
+                    line_node(),
+                    BorderColor::all(palette_focus_ring_clear()),
+                    HudAccessibilityId("hud.status_strip"),
+                ))
+                .with_children(|p| {
+                    p.spawn((Text::new("STATUS: --"), text_font.clone(), text_color, StatusStripText));
+                });
             parent.spawn((Text::new("ITEM: --"), text_font.clone(), text_color, ItemStripText));
             parent.spawn((Text::new("HP: --"), text_font.clone(), text_color, AmmoStripText));
             parent.spawn((Text::new("NO RIFLE"), text_font.clone(), text_color, ReticleStripText));
-            parent.spawn((
-                Text::new("OBJECTIVE: --"),
-                text_font.clone(),
-                text_color,
-                ObjectiveStripText,
-            ));
-            parent.spawn((
-                Text::new("MISSION: --"),
-                text_font.clone(),
-                text_color,
-                MissionStripText,
-            ));
-            parent.spawn((Text::new("ENEMY: --"), text_font.clone(), text_color, EnemyStripText));
-            parent.spawn((Text::new("BREACH: --"), text_font.clone(), text_color, BreachStripText));
-            parent.spawn((Text::new("EVENT: --"), text_font, text_color, LastEventStripText));
+            parent
+                .spawn((
+                    line_node(),
+                    BorderColor::all(palette_focus_ring_clear()),
+                    HudAccessibilityId("hud.stance"),
+                ))
+                .with_children(|p| {
+                    p.spawn((Text::new("STANCE: --"), text_font.clone(), text_color, StanceStripText));
+                });
+            parent
+                .spawn((
+                    line_node(),
+                    BorderColor::all(palette_focus_ring_clear()),
+                    HudAccessibilityId("hud.silhouette"),
+                ))
+                .with_children(|p| {
+                    p.spawn((
+                        Text::new("BODY: --"),
+                        text_font.clone(),
+                        text_color,
+                        SilhouetteStripText,
+                    ));
+                });
+            parent
+                .spawn((
+                    line_node(),
+                    BorderColor::all(palette_focus_ring_clear()),
+                    HudAccessibilityId("hud.module_strip"),
+                ))
+                .with_children(|p| {
+                    p.spawn((Text::new("MODS: --"), text_font.clone(), text_color, ModuleStripText));
+                });
+            parent
+                .spawn((
+                    line_node(),
+                    BorderColor::all(palette_focus_ring_clear()),
+                    HudAccessibilityId("hud.objective"),
+                ))
+                .with_children(|p| {
+                    p.spawn((
+                        Text::new("OBJECTIVE: --"),
+                        text_font.clone(),
+                        text_color,
+                        ObjectiveStripText,
+                    ));
+                });
+            parent
+                .spawn((
+                    line_node(),
+                    BorderColor::all(palette_focus_ring_clear()),
+                    HudAccessibilityId("hud.mission"),
+                ))
+                .with_children(|p| {
+                    p.spawn((
+                        Text::new("MISSION: --"),
+                        text_font.clone(),
+                        text_color,
+                        MissionStripText,
+                    ));
+                });
+            parent
+                .spawn((
+                    line_node(),
+                    BorderColor::all(palette_focus_ring_clear()),
+                    HudAccessibilityId("hud.enemy"),
+                ))
+                .with_children(|p| {
+                    p.spawn((Text::new("ENEMY: --"), text_font.clone(), text_color, EnemyStripText));
+                });
+            parent
+                .spawn((
+                    line_node(),
+                    BorderColor::all(palette_focus_ring_clear()),
+                    HudAccessibilityId("hud.breach"),
+                ))
+                .with_children(|p| {
+                    p.spawn((Text::new("BREACH: --"), text_font.clone(), text_color, BreachStripText));
+                });
+            parent
+                .spawn((
+                    line_node(),
+                    BorderColor::all(palette_focus_ring_clear()),
+                    HudAccessibilityId("hud.tool"),
+                ))
+                .with_children(|p| {
+                    p.spawn((Text::new("TOOL: --"), text_font.clone(), text_color, ToolStripText));
+                });
+            parent
+                .spawn((
+                    line_node(),
+                    BorderColor::all(palette_focus_ring_clear()),
+                    HudAccessibilityId("hud.last_event"),
+                ))
+                .with_children(|p| {
+                    p.spawn((Text::new("EVENT: --"), text_font, text_color, LastEventStripText));
+                });
         });
+}
+
+/// M4A: focus ring color when no focus is set (transparent).
+fn palette_focus_ring_clear() -> Color {
+    Color::srgba(0.0, 0.0, 0.0, 0.0)
+}
+
+/// M4A: focus ring color when focus is set. High contrast = pure white;
+/// otherwise a high-saturation amber that reads against the dark strip
+/// background per WCAG 2.2 contrast guidance.
+fn palette_focus_ring(high_contrast: bool) -> Color {
+    if high_contrast {
+        Color::srgb(1.0, 1.0, 1.0)
+    } else {
+        Color::srgb(1.0, 0.85, 0.0)
+    }
+}
+
+/// M4A focus-ring update system: toggles the border color of each focusable
+/// HUD wrapper based on `HudSettings.focused_node`. Reads from a single
+/// shared source: the `HudAccessibilityId(&'static str)` component on each
+/// wrapper. Each wrapper carries the canonical accessibility id from the
+/// cf-control `HUD_FOCUSABLE_NODES` constant.
+fn update_focus_ring(settings: Res<HudSettings>, mut targets: Query<(&HudAccessibilityId, &mut BorderColor)>) {
+    if !settings.is_changed() {
+        return;
+    }
+    let focused = settings.focused_node.as_deref();
+    let ring_color = palette_focus_ring(settings.high_contrast);
+    let clear_color = palette_focus_ring_clear();
+    for (id, mut border) in targets.iter_mut() {
+        let next = if focused == Some(id.0) { ring_color } else { clear_color };
+        *border = BorderColor::all(next);
+    }
+}
+
+/// M4A: extend the banner + caption strip roots with accessibility ids so the
+/// focus ring can highlight them.
+#[derive(Component, Debug)]
+pub struct BannerFocusWrapper;
+
+fn spawn_banner_strip(mut commands: Commands) {
+    let root_node = Node {
+        position_type: PositionType::Absolute,
+        top: Val::Px(12.0),
+        left: Val::Percent(54.0),
+        right: Val::Px(12.0),
+        flex_direction: FlexDirection::Column,
+        row_gap: Val::Px(2.0),
+        padding: UiRect::all(Val::Px(8.0)),
+        border: UiRect::all(Val::Px(2.0)),
+        ..default()
+    };
+    let text_font = TextFont {
+        font_size: 11.0,
+        ..default()
+    };
+    let text_color = TextColor(palette_text(false));
+    commands
+        .spawn((
+            root_node,
+            BackgroundColor(palette_banner_bg(false, "info")),
+            BorderColor::all(palette_focus_ring_clear()),
+            BannerStripRoot,
+            HudAccessibilityId("hud.banners"),
+            Name::new("cf::ui::banner_strip"),
+        ))
+        .with_children(|parent| {
+            // 4 placeholder slots; we update text + visibility based on HudState.
+            for _ in 0..4 {
+                parent.spawn((Text::new(""), text_font.clone(), text_color, BannerStripText));
+            }
+        });
+}
+
+fn spawn_caption_strip(mut commands: Commands) {
+    let root_node = Node {
+        position_type: PositionType::Absolute,
+        top: Val::Px(112.0),
+        left: Val::Percent(54.0),
+        right: Val::Px(12.0),
+        flex_direction: FlexDirection::Column,
+        row_gap: Val::Px(2.0),
+        padding: UiRect::all(Val::Px(8.0)),
+        border: UiRect::all(Val::Px(2.0)),
+        ..default()
+    };
+    let text_font = TextFont {
+        font_size: 10.0,
+        ..default()
+    };
+    let text_color = TextColor(palette_text(false));
+    commands
+        .spawn((
+            root_node,
+            BackgroundColor(palette_strip_bg(false)),
+            BorderColor::all(palette_focus_ring_clear()),
+            CaptionStripRoot,
+            HudAccessibilityId("hud.captions"),
+            Name::new("cf::ui::caption_strip"),
+        ))
+        .with_children(|parent| {
+            for _ in 0..3 {
+                parent.spawn((Text::new(""), text_font.clone(), text_color, CaptionStripText));
+            }
+        });
+}
+
+/// M4A: high-contrast palette swap. Honors `HudSettings.high_contrast` per
+/// DR-012 closure (200% scale + contrast). The accessibility floor requires
+/// every state label to remain readable in high contrast, so this swaps the
+/// strip background to fully opaque pure-black + text to pure white.
+fn palette_text(high_contrast: bool) -> Color {
+    if high_contrast {
+        Color::srgb(1.0, 1.0, 1.0)
+    } else {
+        Color::srgb(0.96, 0.96, 0.92)
+    }
+}
+
+fn palette_strip_bg(high_contrast: bool) -> Color {
+    if high_contrast {
+        Color::srgba(0.0, 0.0, 0.0, 1.0)
+    } else {
+        Color::srgba(0.0, 0.0, 0.0, 0.45)
+    }
+}
+
+fn palette_banner_bg(high_contrast: bool, severity: &str) -> Color {
+    if high_contrast {
+        // High-contrast: solid black + text-only severity (no color cue).
+        Color::srgba(0.0, 0.0, 0.0, 1.0)
+    } else {
+        match severity {
+            "critical" => Color::srgba(0.7, 0.05, 0.05, 0.85),
+            "warning" => Color::srgba(0.7, 0.5, 0.0, 0.85),
+            _ => Color::srgba(0.0, 0.0, 0.0, 0.6),
+        }
+    }
+}
+
+/// M4A: apply UI scale from `HudSettings` to Bevy's `UiScale` resource. Bevy
+/// scales every Px value, so ACC-A reflow depends on bounded percent-height
+/// HUD bands plus flex wrapping rather than unbounded absolute columns.
+fn apply_ui_scale_from_settings(settings: Res<HudSettings>, mut ui_scale: ResMut<UiScale>) {
+    if !settings.is_changed() {
+        return;
+    }
+    let clamped = settings.ui_scale.clamp(0.5, 4.0);
+    if (ui_scale.0 - clamped).abs() > f32::EPSILON {
+        ui_scale.0 = clamped;
+    }
+}
+
+fn update_palette_for_high_contrast(
+    settings: Res<HudSettings>,
+    mut strip_bg: Query<
+        &mut BackgroundColor,
+        (
+            With<StatusStripRoot>,
+            Without<BannerStripRoot>,
+            Without<CaptionStripRoot>,
+        ),
+    >,
+    mut caption_bg: Query<&mut BackgroundColor, (With<CaptionStripRoot>, Without<StatusStripRoot>)>,
+    mut texts: Query<
+        &mut TextColor,
+        Or<(
+            With<StatusStripText>,
+            With<ItemStripText>,
+            With<AmmoStripText>,
+            With<ReticleStripText>,
+            With<StanceStripText>,
+            With<SilhouetteStripText>,
+            With<ModuleStripText>,
+            With<ObjectiveStripText>,
+            With<MissionStripText>,
+            With<EnemyStripText>,
+            With<BreachStripText>,
+            With<ToolStripText>,
+            With<LastEventStripText>,
+            With<CaptionStripText>,
+        )>,
+    >,
+) {
+    if !settings.is_changed() {
+        return;
+    }
+    if let Some(mut bg) = strip_bg.iter_mut().next() {
+        *bg = BackgroundColor(palette_strip_bg(settings.high_contrast));
+    }
+    if let Some(mut bg) = caption_bg.iter_mut().next() {
+        *bg = BackgroundColor(palette_strip_bg(settings.high_contrast));
+    }
+    let new_color = palette_text(settings.high_contrast);
+    for mut tc in texts.iter_mut() {
+        *tc = TextColor(new_color);
+    }
+}
+
+fn update_banner_strip(
+    state: Res<HudState>,
+    settings: Res<HudSettings>,
+    mut root: Query<(&mut BackgroundColor, &mut Node), With<BannerStripRoot>>,
+    mut texts: Query<&mut Text, With<BannerStripText>>,
+) {
+    let mut entries: Vec<&HudBanner> = state.banners.iter().collect();
+    // Show critical first, then warning, then info; preserve raised-at-tick order within.
+    entries.sort_by_key(|b| match b.severity.as_str() {
+        "critical" => 0,
+        "warning" => 1,
+        _ => 2,
+    });
+    let top_severity = entries.first().map(|b| b.severity.as_str()).unwrap_or("info");
+    if let Some((mut bg, mut node)) = root.iter_mut().next() {
+        node.display = if entries.is_empty() {
+            Display::None
+        } else {
+            Display::Flex
+        };
+        *bg = BackgroundColor(palette_banner_bg(settings.high_contrast, top_severity));
+    }
+    let mut iter = entries.into_iter();
+    for mut t in texts.iter_mut() {
+        match iter.next() {
+            Some(b) => **t = banner_line(b),
+            None => **t = String::new(),
+        }
+    }
+}
+
+fn update_caption_strip(
+    state: Res<HudState>,
+    settings: Res<HudSettings>,
+    mut texts: Query<&mut Text, With<CaptionStripText>>,
+    mut root: Query<&mut Node, With<CaptionStripRoot>>,
+) {
+    let has_captions = settings.captions && !state.captions.is_empty();
+    if let Some(mut node) = root.iter_mut().next() {
+        node.display = if has_captions { Display::Flex } else { Display::None };
+    }
+    let visible_captions: Vec<&HudCaption> = if has_captions {
+        state.captions.iter().rev().take(3).collect()
+    } else {
+        Vec::new()
+    };
+    let mut iter = visible_captions.into_iter();
+    for mut t in texts.iter_mut() {
+        match iter.next() {
+            Some(c) => **t = format!("[{}t] {}", c.raised_at_tick, sanitize_hud_text(&c.label)),
+            None => **t = String::new(),
+        }
+    }
+}
+
+fn sanitize_hud_text(value: &str) -> String {
+    value.chars().map(|c| if c.is_ascii() { c } else { ' ' }).collect()
+}
+
+/// Format the banner line. Severity and an icon glyph are rendered alongside
+/// the label so the HUD never communicates state with color alone (DR-012
+/// ACC-A floor: color-independent state labels). The icon glyph uses ASCII
+/// punctuation so it renders even when the configured TTF lacks emoji glyphs.
+pub fn banner_line(banner: &HudBanner) -> String {
+    let icon = match banner.severity.as_str() {
+        "critical" => "[!!]",
+        "warning" => "[!]",
+        _ => "[*]",
+    };
+    format!(
+        "{icon} {sev} {label}",
+        icon = icon,
+        sev = banner.severity.to_uppercase(),
+        label = banner.label
+    )
 }
 
 #[allow(clippy::type_complexity, clippy::too_many_arguments)]
@@ -300,6 +840,82 @@ fn update_status_strip(
             Without<ObjectiveStripText>,
             Without<EnemyStripText>,
             Without<BreachStripText>,
+            Without<StanceStripText>,
+            Without<SilhouetteStripText>,
+            Without<ModuleStripText>,
+            Without<ToolStripText>,
+        ),
+    >,
+    mut stance_query: Query<
+        &mut Text,
+        (
+            With<StanceStripText>,
+            Without<StatusStripText>,
+            Without<AmmoStripText>,
+            Without<ItemStripText>,
+            Without<ReticleStripText>,
+            Without<MissionStripText>,
+            Without<ObjectiveStripText>,
+            Without<EnemyStripText>,
+            Without<BreachStripText>,
+            Without<LastEventStripText>,
+            Without<SilhouetteStripText>,
+            Without<ModuleStripText>,
+            Without<ToolStripText>,
+        ),
+    >,
+    mut silhouette_query: Query<
+        &mut Text,
+        (
+            With<SilhouetteStripText>,
+            Without<StatusStripText>,
+            Without<AmmoStripText>,
+            Without<ItemStripText>,
+            Without<ReticleStripText>,
+            Without<MissionStripText>,
+            Without<ObjectiveStripText>,
+            Without<EnemyStripText>,
+            Without<BreachStripText>,
+            Without<LastEventStripText>,
+            Without<StanceStripText>,
+            Without<ModuleStripText>,
+            Without<ToolStripText>,
+        ),
+    >,
+    mut module_query: Query<
+        &mut Text,
+        (
+            With<ModuleStripText>,
+            Without<StatusStripText>,
+            Without<AmmoStripText>,
+            Without<ItemStripText>,
+            Without<ReticleStripText>,
+            Without<MissionStripText>,
+            Without<ObjectiveStripText>,
+            Without<EnemyStripText>,
+            Without<BreachStripText>,
+            Without<LastEventStripText>,
+            Without<StanceStripText>,
+            Without<SilhouetteStripText>,
+            Without<ToolStripText>,
+        ),
+    >,
+    mut tool_query: Query<
+        &mut Text,
+        (
+            With<ToolStripText>,
+            Without<StatusStripText>,
+            Without<AmmoStripText>,
+            Without<ItemStripText>,
+            Without<ReticleStripText>,
+            Without<MissionStripText>,
+            Without<ObjectiveStripText>,
+            Without<EnemyStripText>,
+            Without<BreachStripText>,
+            Without<LastEventStripText>,
+            Without<StanceStripText>,
+            Without<SilhouetteStripText>,
+            Without<ModuleStripText>,
         ),
     >,
 ) {
@@ -349,6 +965,98 @@ fn update_status_strip(
             "EVENT: {}",
             state.last_event.clone().unwrap_or_else(|| "--".to_string())
         );
+    }
+    if let Some(mut text) = stance_query.iter_mut().next() {
+        **text = stance_line(&state.stance, player);
+    }
+    if let Some(mut text) = silhouette_query.iter_mut().next() {
+        **text = silhouette_line(&state.body_silhouette);
+    }
+    if let Some(mut text) = module_query.iter_mut().next() {
+        **text = module_line(&state.modules);
+    }
+    if let Some(mut text) = tool_query.iter_mut().next() {
+        **text = tool_line(state.tool_validity.as_ref());
+    }
+}
+
+/// Format the stance HUD line. The stance label IS the readable signal — color
+/// is not used as the only cue. When a player observation is present and the
+/// actor is in the air, the line tags `(airborne)` redundantly so screen
+/// readers still describe the kinematic state when the stance string is e.g.
+/// `WALKING` mid-jump.
+pub fn stance_line(stance: &str, player: Option<&ActorObservation>) -> String {
+    if stance.is_empty() {
+        return "STANCE: --".to_string();
+    }
+    let air_marker = match player {
+        Some(p) if !p.on_ground => " (airborne)",
+        _ => "",
+    };
+    format!("STANCE: {}{}", stance.to_uppercase(), air_marker)
+}
+
+/// Format the silhouette HUD line. Renders six per-zone bars as ASCII so the
+/// readability does not depend on color.
+pub fn silhouette_line(body: &HudBodySilhouette) -> String {
+    let placeholder_marker = if body.placeholder { "~" } else { "" };
+    format!(
+        "BODY{ph}: H{h:>3} T{t:>3} A{al:>3}/{ar:>3} L{ll:>3}/{lr:>3}",
+        ph = placeholder_marker,
+        h = (body.head_hp_pct * 100.0).round() as i32,
+        t = (body.torso_hp_pct * 100.0).round() as i32,
+        al = (body.arm_left_hp_pct * 100.0).round() as i32,
+        ar = (body.arm_right_hp_pct * 100.0).round() as i32,
+        ll = (body.leg_left_hp_pct * 100.0).round() as i32,
+        lr = (body.leg_right_hp_pct * 100.0).round() as i32,
+    )
+}
+
+/// Format the module strip HUD line. Color-independent: each module's state
+/// label is text (`nominal` / `warning` / `failed` / `not_present`).
+pub fn module_line(modules: &HudModuleStrip) -> String {
+    if modules.modules.is_empty() {
+        return "MODS: --".to_string();
+    }
+    let placeholder_marker = if modules.placeholder { "~" } else { "" };
+    let mut s = format!("MODS{}:", placeholder_marker);
+    for m in &modules.modules {
+        s.push(' ');
+        if m.state == "not_present" {
+            s.push_str(&format!("{}:N/A", compact_module_name(&m.kind)));
+        } else {
+            s.push_str(&m.label.replace('—', "-"));
+        }
+    }
+    s
+}
+
+fn compact_module_name(kind: &str) -> &'static str {
+    match kind {
+        "weapon_mount" => "WEAPON",
+        "jet" => "JET",
+        "shield" => "SHIELD",
+        "sensor" => "SENSOR",
+        _ => "MOD",
+    }
+}
+
+/// Format the tool-validity HUD line.
+pub fn tool_line(validity: Option<&HudToolValidity>) -> String {
+    let Some(v) = validity else {
+        return "TOOL: --".to_string();
+    };
+    if v.valid {
+        match v.last_carve_tick {
+            Some(t) => format!("TOOL: VALID (last carve @ {t}t)"),
+            None => "TOOL: VALID".to_string(),
+        }
+    } else {
+        let reason = v.last_refusal_reason.as_deref().unwrap_or("unknown");
+        match v.last_refusal_target.as_deref() {
+            Some(target) => format!("TOOL: REFUSED | {reason} ({target})"),
+            None => format!("TOOL: REFUSED | {reason}"),
+        }
     }
 }
 
@@ -549,6 +1257,130 @@ mod tests {
             ..HudMission::default()
         };
         assert_eq!(objective_line(Some(&m)), "OBJECTIVE: extract");
+    }
+
+    #[test]
+    fn stance_line_uppercases_and_appends_airborne_marker() {
+        assert_eq!(stance_line("idle", None), "STANCE: IDLE");
+        let player = ActorObservation {
+            id: 1,
+            team: "blue".into(),
+            controllable: true,
+            position: [0.0, 10.0],
+            velocity: [0.0, 0.0],
+            aim: [1.0, 0.0],
+            on_ground: false,
+            status: "stable".into(),
+            hp: 100.0,
+            hp_max: 100.0,
+            selected_slot: 0,
+            selected_item: "rifle".into(),
+            stance: "airborne".into(),
+            body_silhouette: cf_actor::BodySilhouette::default(),
+        };
+        let line = stance_line("airborne", Some(&player));
+        assert!(line.contains("AIRBORNE"));
+        assert!(line.contains("(airborne)"));
+    }
+
+    #[test]
+    fn silhouette_line_renders_per_zone_pct_with_placeholder_marker() {
+        let body = HudBodySilhouette {
+            head_hp_pct: 0.6,
+            torso_hp_pct: 0.6,
+            arm_left_hp_pct: 0.6,
+            arm_right_hp_pct: 0.6,
+            leg_left_hp_pct: 0.6,
+            leg_right_hp_pct: 0.6,
+            placeholder: true,
+        };
+        let line = silhouette_line(&body);
+        assert!(line.starts_with("BODY~:"));
+        assert!(line.contains("H 60"));
+        assert!(line.contains("T 60"));
+        assert!(line.contains("A 60/ 60"));
+        assert!(line.contains("L 60/ 60"));
+    }
+
+    #[test]
+    fn module_line_aggregates_module_labels_with_placeholder_marker() {
+        let mods = HudModuleStrip {
+            modules: vec![HudModule {
+                id: "weapon_mount".into(),
+                label: "READY 30/30".into(),
+                state: "nominal".into(),
+                kind: "weapon_mount".into(),
+            }],
+            placeholder: true,
+        };
+        let s = module_line(&mods);
+        assert!(s.starts_with("MODS~:"));
+        assert!(s.contains("READY 30/30"));
+        assert!(s.is_ascii());
+    }
+
+    #[test]
+    fn sanitize_hud_text_replaces_missing_glyph_candidates() {
+        assert_eq!(sanitize_hud_text("actor 1 → unstable"), "actor 1   unstable");
+    }
+
+    #[test]
+    fn tool_line_handles_valid_and_refused_states() {
+        let valid = HudToolValidity {
+            valid: true,
+            last_carve_tick: Some(120),
+            ..HudToolValidity::default()
+        };
+        assert_eq!(tool_line(Some(&valid)), "TOOL: VALID (last carve @ 120t)");
+        let refused = HudToolValidity {
+            valid: false,
+            last_refusal_reason: Some("material_metal_nohook".into()),
+            last_refusal_target: Some("anchor_post".into()),
+            ..HudToolValidity::default()
+        };
+        let s = tool_line(Some(&refused));
+        assert!(s.contains("REFUSED"));
+        assert!(s.contains("material_metal_nohook"));
+        assert!(s.contains("anchor_post"));
+        assert_eq!(tool_line(None), "TOOL: --");
+    }
+
+    #[test]
+    fn banner_line_includes_severity_word_and_icon() {
+        let critical = HudBanner {
+            id: "eject_now".into(),
+            severity: "critical".into(),
+            label: "EJECT NOW".into(),
+            raised_at_tick: 90,
+        };
+        let s = banner_line(&critical);
+        assert!(s.contains("[!!]"));
+        assert!(s.contains("CRITICAL"));
+        assert!(s.contains("EJECT NOW"));
+
+        let warning = HudBanner {
+            id: "ammo_out".into(),
+            severity: "warning".into(),
+            label: "AMMO OUT".into(),
+            raised_at_tick: 200,
+        };
+        let s = banner_line(&warning);
+        assert!(s.contains("[!]"));
+        assert!(s.contains("WARNING"));
+    }
+
+    #[test]
+    fn palette_helpers_swap_for_high_contrast() {
+        let normal = palette_text(false);
+        let hc = palette_text(true);
+        assert_ne!(normal, hc);
+        let normal_bg = palette_strip_bg(false);
+        let hc_bg = palette_strip_bg(true);
+        assert_ne!(normal_bg, hc_bg);
+        // High-contrast critical banner falls back to solid black (no color cue).
+        let hc_critical = palette_banner_bg(true, "critical");
+        let normal_critical = palette_banner_bg(false, "critical");
+        assert_ne!(hc_critical, normal_critical);
     }
 
     #[test]

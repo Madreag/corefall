@@ -24,6 +24,7 @@ members = [
   "crates/cf-audio",
   "crates/cf-mod",
   "crates/cf-tools-editor",
+  "crates/cf-tools-replay-viewer",
   "crates/cf-headless",
   "crates/cf-server",
   "crates/cf-server-ops",

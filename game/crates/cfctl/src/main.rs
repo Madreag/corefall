@@ -14,7 +14,7 @@ use std::{
     time::Duration,
 };
 
-use anyhow::{Context, Result};
+use anyhow::{bail, Context, Result};
 use clap::{Parser, Subcommand};
 use futures_util::{SinkExt, StreamExt};
 use serde::Deserialize;
@@ -28,6 +28,7 @@ use tokio_tungstenite::{connect_async, tungstenite::Message, MaybeTlsStream, Web
 
 use cf_control::{
     engine::{run_m0_inline, M0Engine},
+    is_supported_key_binding_action, is_supported_key_code_name,
     runtime::{build_engine_config, resolve_run_bundle_root, ConfigInputs},
     EngineHandle, Settings, SCHEMA_VERSION,
 };
@@ -128,6 +129,15 @@ enum Cmd {
         #[command(subcommand)]
         action: ScriptAction,
     },
+    /// M3B replay viewer / cause-chain / debrief / validate over a run bundle.
+    /// Proxies to `cf-tools-replay-viewer` so AI agents and dev scripts can
+    /// drive every replay-viewer surface through the canonical cfctl entry
+    /// point. Audit-flagged MEDIUM on 2026-05-09 (the docs reference
+    /// `cfctl replay scrub` but the original CLI lacked it).
+    Replay {
+        #[command(subcommand)]
+        action: ReplayAction,
+    },
     Version,
 }
 
@@ -156,6 +166,22 @@ enum ActAction {
         reduced_shake: Option<bool>,
         #[arg(long)]
         reduced_flash: Option<bool>,
+        /// M4A: enable hold-to-confirm on discrete actions.
+        #[arg(long)]
+        hold_to_confirm: Option<bool>,
+        /// M4A: hold-to-confirm threshold in milliseconds (clamped to [50, 2000] server-side).
+        #[arg(long)]
+        hold_threshold_ms: Option<u32>,
+        /// M4A: enable the live key remap table.
+        #[arg(long)]
+        key_remap_enabled: Option<bool>,
+        /// M4A: rebind a single action -> KeyCode-name pair via `--key-binding action=KeyName`
+        /// (e.g. `--key-binding fire=KeyF --key-binding move_left=KeyH`). Repeatable.
+        #[arg(long = "key-binding", value_parser = parse_key_binding_kv)]
+        key_bindings: Vec<(String, String)>,
+        /// M4A: clear all key bindings (overrides any --key-binding flags in the same call).
+        #[arg(long)]
+        clear_key_bindings: bool,
     },
     /// `act.player.move x=<-1..1>` — M1+ scenarios only.
     PlayerMove {
@@ -193,6 +219,15 @@ enum ActAction {
         #[arg(long)]
         target: Option<String>,
     },
+    /// `act.input.focus` — M4A keyboard/controller focus traversal (DR-012 ACC-A-04).
+    InputFocus {
+        /// Direction to advance focus: `next`, `prev`, `set`, or `clear`.
+        #[arg(long)]
+        direction: String,
+        /// Required when `direction=set`: the canonical HUD focusable-node id (e.g. `hud.silhouette`).
+        #[arg(long)]
+        node: Option<String>,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -204,6 +239,104 @@ enum ScriptAction {
         #[arg(long, default_value_t = 30)]
         timeout_seconds: u64,
     },
+}
+
+/// `cfctl replay <action>` proxies to `cf-tools-replay-viewer` so all
+/// replay-tooling surfaces are reachable through cfctl. Pass-through args
+/// after `--` for advanced flags.
+#[derive(Debug, Subcommand)]
+enum ReplayAction {
+    /// Render the viewer at a tick anchor. `cfctl replay view <bundle>` ≡
+    /// `cf-tools-replay-viewer view <bundle>`.
+    View {
+        bundle_dir: PathBuf,
+        #[arg(long)]
+        at_tick: Option<u64>,
+        #[arg(long, default_value = "")]
+        filter: String,
+        #[arg(long, default_value_t = 32)]
+        tail_len: usize,
+        #[arg(long)]
+        since_event_id: Option<String>,
+        #[arg(long)]
+        paused: bool,
+        #[arg(long)]
+        output: Option<PathBuf>,
+        #[arg(long)]
+        png: Option<PathBuf>,
+    },
+    /// Alias for `view` to match the CLI Reference's "scrub" naming.
+    /// Identical semantics; rendering is anchored at the tick the user
+    /// asks for, so re-invoking with a different `--at-tick` is the
+    /// "scrub" affordance.
+    Scrub {
+        bundle_dir: PathBuf,
+        #[arg(long)]
+        at_tick: Option<u64>,
+        #[arg(long, default_value = "")]
+        filter: String,
+        #[arg(long, default_value_t = 32)]
+        tail_len: usize,
+        #[arg(long)]
+        since_event_id: Option<String>,
+        #[arg(long)]
+        paused: bool,
+        #[arg(long)]
+        output: Option<PathBuf>,
+        #[arg(long)]
+        png: Option<PathBuf>,
+    },
+    /// Walk the parent_event_id chain. `cfctl replay cause-chain <bundle>`.
+    CauseChain {
+        bundle_dir: PathBuf,
+        #[arg(long, conflicts_with = "event_type")]
+        event_id: Option<String>,
+        #[arg(long, conflicts_with = "event_id")]
+        event_type: Option<String>,
+        #[arg(long, default_value_t = 64)]
+        max_depth: usize,
+        #[arg(long, default_value_t = false)]
+        json: bool,
+        #[arg(long)]
+        output: Option<PathBuf>,
+        #[arg(long, conflicts_with = "json")]
+        png: Option<PathBuf>,
+    },
+    /// Render the debrief. `cfctl replay debrief <bundle>`.
+    Debrief {
+        bundle_dir: PathBuf,
+        #[arg(long, default_value_t = false)]
+        json: bool,
+        #[arg(long)]
+        output: Option<PathBuf>,
+        #[arg(long, conflicts_with = "json")]
+        png: Option<PathBuf>,
+    },
+    /// Validate a bundle. `cfctl replay validate <bundle>`.
+    Validate { bundle_dir: PathBuf },
+}
+
+/// Parser for `--key-binding action=KeyName` flags on `cfctl act settings-set`.
+/// M4A: lets a CLI invocation rebind individual actions in the
+/// `Settings.key_bindings` table without writing JSON-RPC params by hand.
+fn parse_key_binding_kv(s: &str) -> std::result::Result<(String, String), String> {
+    let (k, v) = s
+        .split_once('=')
+        .ok_or_else(|| format!("expected `action=KeyName`, got {s:?}"))?;
+    if k.is_empty() || v.is_empty() {
+        return Err(format!("expected `action=KeyName`, got {s:?}"));
+    }
+    if !is_supported_key_binding_action(k) {
+        return Err(format!(
+            "unsupported action {k:?}; run `cfctl act settings-set --help` for supported actions"
+        ));
+    }
+    if !is_supported_key_code_name(v) {
+        return Err(format!(
+            "unsupported key name {v:?}; use a stable KeyCode name such as KeyF or Numpad8"
+        ));
+    }
+    Ok((k.to_string(), v.to_string()))
 }
 
 fn main() -> Result<()> {
@@ -289,8 +422,136 @@ async fn dispatch(cli: Cli) -> Result<()> {
         }
         Cmd::Act { action } => cmd_act(&cli.connect, cli.auto_launch_port, cli.no_auto_launch, action).await,
         Cmd::Script { action } => cmd_script(&cli.connect, cli.auto_launch_port, cli.no_auto_launch, action).await,
+        Cmd::Replay { action } => cmd_replay(action),
         Cmd::Version => cmd_version(),
     }
+}
+
+/// Proxy to `cf-tools-replay-viewer`. Resolves the binary via `CF_REPLAY_VIEWER_BIN`
+/// env, then `current_exe.parent` (release / debug colocated build), then a
+/// `cargo run -p cf-tools-replay-viewer --` fallback.
+fn cmd_replay(action: ReplayAction) -> Result<()> {
+    let bin = locate_replay_viewer_binary();
+    let mut cmd = match bin {
+        Some(path) => std::process::Command::new(path),
+        None => {
+            // Fallback: cargo run.
+            let mut c = std::process::Command::new("cargo");
+            c.args(["run", "--quiet", "-p", "cf-tools-replay-viewer", "--"]);
+            c
+        }
+    };
+    match action {
+        ReplayAction::View {
+            bundle_dir,
+            at_tick,
+            filter,
+            tail_len,
+            since_event_id,
+            paused,
+            output,
+            png,
+        }
+        | ReplayAction::Scrub {
+            bundle_dir,
+            at_tick,
+            filter,
+            tail_len,
+            since_event_id,
+            paused,
+            output,
+            png,
+        } => {
+            cmd.arg("view").arg(&bundle_dir);
+            if let Some(t) = at_tick {
+                cmd.arg("--at-tick").arg(t.to_string());
+            }
+            if !filter.is_empty() {
+                cmd.arg("--filter").arg(&filter);
+            }
+            cmd.arg("--tail-len").arg(tail_len.to_string());
+            if let Some(s) = &since_event_id {
+                cmd.arg("--since-event-id").arg(s);
+            }
+            if paused {
+                cmd.arg("--paused");
+            }
+            if let Some(p) = &output {
+                cmd.arg("--output").arg(p);
+            }
+            if let Some(p) = &png {
+                cmd.arg("--png").arg(p);
+            }
+        }
+        ReplayAction::CauseChain {
+            bundle_dir,
+            event_id,
+            event_type,
+            max_depth,
+            json,
+            output,
+            png,
+        } => {
+            cmd.arg("cause-chain").arg(&bundle_dir);
+            if let Some(id) = &event_id {
+                cmd.arg("--event-id").arg(id);
+            }
+            if let Some(ty) = &event_type {
+                cmd.arg("--event-type").arg(ty);
+            }
+            cmd.arg("--max-depth").arg(max_depth.to_string());
+            if json {
+                cmd.arg("--json");
+            }
+            if let Some(p) = &output {
+                cmd.arg("--output").arg(p);
+            }
+            if let Some(p) = &png {
+                cmd.arg("--png").arg(p);
+            }
+        }
+        ReplayAction::Debrief {
+            bundle_dir,
+            json,
+            output,
+            png,
+        } => {
+            cmd.arg("debrief").arg(&bundle_dir);
+            if json {
+                cmd.arg("--json");
+            }
+            if let Some(p) = &output {
+                cmd.arg("--output").arg(p);
+            }
+            if let Some(p) = &png {
+                cmd.arg("--png").arg(p);
+            }
+        }
+        ReplayAction::Validate { bundle_dir } => {
+            cmd.arg("validate").arg(&bundle_dir);
+        }
+    }
+    let status = cmd.status().context("spawn cf-tools-replay-viewer")?;
+    if !status.success() {
+        bail!("cf-tools-replay-viewer exited {status}");
+    }
+    Ok(())
+}
+
+fn locate_replay_viewer_binary() -> Option<PathBuf> {
+    if let Ok(p) = std::env::var("CF_REPLAY_VIEWER_BIN") {
+        let pb = PathBuf::from(p);
+        if pb.exists() {
+            return Some(pb);
+        }
+    }
+    let exe = std::env::current_exe().ok()?;
+    let dir = exe.parent()?;
+    let candidates = [
+        dir.join("cf-tools-replay-viewer"),
+        dir.join("cf-tools-replay-viewer.exe"),
+    ];
+    candidates.into_iter().find(|c| c.exists())
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -330,6 +591,7 @@ async fn cmd_observe(
             control_api_enabled: false,
             debug_capabilities: Vec::new(),
             tick_rate_hz: tick_rate_hz.max(1),
+            capture_grid_enabled: false,
             paced: false,
             settings: Settings::default(),
             seed_override: seed,
@@ -411,6 +673,7 @@ fn cmd_run(
         control_api_enabled: false,
         debug_capabilities: Vec::new(),
         tick_rate_hz: tick_rate_hz.max(1),
+        capture_grid_enabled: false,
         paced,
         settings: Settings {
             ui_scale,
@@ -487,6 +750,11 @@ async fn cmd_act(
             reduced_motion,
             reduced_shake,
             reduced_flash,
+            hold_to_confirm,
+            hold_threshold_ms,
+            key_remap_enabled,
+            key_bindings,
+            clear_key_bindings,
         } => {
             let mut params = serde_json::Map::new();
             if let Some(v) = ui_scale {
@@ -506,6 +774,24 @@ async fn cmd_act(
             }
             if let Some(v) = reduced_flash {
                 params.insert("reduced_flash".into(), json!(v));
+            }
+            if let Some(v) = hold_to_confirm {
+                params.insert("hold_to_confirm".into(), json!(v));
+            }
+            if let Some(v) = hold_threshold_ms {
+                params.insert("hold_threshold_ms".into(), json!(v));
+            }
+            if let Some(v) = key_remap_enabled {
+                params.insert("key_remap_enabled".into(), json!(v));
+            }
+            if clear_key_bindings {
+                params.insert("key_bindings".into(), json!({}));
+            } else if !key_bindings.is_empty() {
+                let mut bindings = serde_json::Map::new();
+                for (action, key) in key_bindings {
+                    bindings.insert(action, json!(key));
+                }
+                params.insert("key_bindings".into(), Value::Object(bindings));
             }
             session.send_request("act.settings.set", Value::Object(params)).await?
         }
@@ -530,6 +816,14 @@ async fn cmd_act(
                 params.insert("target".into(), json!(t));
             }
             session.send_request("act.player.dig", Value::Object(params)).await?
+        }
+        ActAction::InputFocus { direction, node } => {
+            let mut params = serde_json::Map::new();
+            params.insert("direction".into(), json!(direction));
+            if let Some(n) = node {
+                params.insert("node".into(), json!(n));
+            }
+            session.send_request("act.input.focus", Value::Object(params)).await?
         }
     };
     println!("{}", serde_json::to_string(&result).unwrap());

@@ -63,6 +63,15 @@ pub struct Scenario {
     pub expected_tests: Vec<String>,
     #[serde(default)]
     pub notes: String,
+    /// M4A: optional milestone tag override. When `None` the engine derives
+    /// the milestone string from the scenario shape (actor world → m1, mission
+    /// → m1.5, terrain → m2, reactors → m2.5). When `Some`, the scenario takes
+    /// authoritative control of the milestone tag — e.g. `m4a_micro_breach_readability`
+    /// reuses the m1.5 micro_breach world but tags the run bundle as M4A so the
+    /// `expected_tests` + `notes_addendum_for_milestone` + `next_actions_for_milestone`
+    /// chain reflects the actual milestone being proven.
+    #[serde(default)]
+    pub milestone_override: Option<String>,
 }
 
 /// One actor entry in `Scenario.actors`. M1 only models the player + simple dummies
@@ -878,6 +887,7 @@ mod tests {
             save_fields: vec![],
             expected_tests: vec![],
             notes: String::new(),
+            milestone_override: None,
         };
         assert!(matches!(
             scenario.validate("t.ron"),
