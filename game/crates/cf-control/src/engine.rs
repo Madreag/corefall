@@ -2494,6 +2494,7 @@ impl M0Engine {
                 hold_to_confirm: live_settings.hold_to_confirm,
                 hold_threshold_ms: live_settings.hold_threshold_ms,
                 key_remap_enabled: live_settings.key_remap_enabled,
+                key_bindings: live_settings.key_bindings.clone(),
             },
             checksum: ChecksumConfig::m0_default(),
             tick_rate_hz: self.config.tick_rate_hz,
@@ -3210,8 +3211,9 @@ fn discover_run_artifacts(run_bundle_dir: &Path) -> (Vec<ArtifactItem>, Option<S
 fn apply_settings_patch(settings: &mut Settings, patch: &SettingsPatch) -> Vec<String> {
     let mut changed = Vec::new();
     if let Some(v) = patch.ui_scale {
-        if (settings.ui_scale - v).abs() > f32::EPSILON {
-            settings.ui_scale = v;
+        let clamped = v.clamp(crate::settings::UI_SCALE_MIN, crate::settings::UI_SCALE_MAX);
+        if (settings.ui_scale - clamped).abs() > f32::EPSILON {
+            settings.ui_scale = clamped;
             changed.push("ui_scale".to_string());
         }
     }
@@ -4430,6 +4432,30 @@ mod tests {
     }
 
     #[test]
+    fn run_manifest_records_active_key_bindings() {
+        let root = temp_run_root();
+        let scenario_path = write_test_scenario();
+        let mut config = load_test_scenario_and_config(scenario_path);
+        config.run_bundle_root = root.clone();
+        config.write_run_bundle = true;
+        config.run_mode = "test-remap-manifest".to_string();
+        config.settings.key_remap_enabled = true;
+        config.settings.key_bindings = std::collections::BTreeMap::from([
+            ("aim_up".to_string(), "Numpad8".to_string()),
+            ("fire".to_string(), "KeyF".to_string()),
+        ]);
+
+        let outcome = run_m0_inline(config).unwrap();
+        let bundle = outcome.bundle_dir.unwrap();
+        let manifest: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(bundle.join("run_manifest.json")).unwrap()).unwrap();
+        assert_eq!(manifest["settings"]["key_remap_enabled"], true);
+        assert_eq!(manifest["settings"]["key_bindings"]["aim_up"], "Numpad8");
+        assert_eq!(manifest["settings"]["key_bindings"]["fire"], "KeyF");
+        let _ = std::fs::remove_dir_all(root);
+    }
+
+    #[test]
     fn for_loaded_scenario_pulls_seed_and_expected_tests_from_manifest() {
         let scenario_path = write_test_scenario();
         let scenario = crate::scenario::Scenario::load_from_file(&scenario_path).unwrap();
@@ -4826,6 +4852,39 @@ mod tests {
         let frame = engine.snapshot(None).await;
         assert!((frame.settings.settings.ui_scale - 2.0).abs() < f32::EPSILON);
         assert!(frame.settings.settings.high_contrast);
+    }
+
+    #[tokio::test]
+    async fn settings_set_clamps_ui_scale_before_observe() {
+        let scenario_path = write_test_scenario();
+        let config = load_test_scenario_and_config(scenario_path);
+        let engine = M0Engine::new(config);
+
+        let _ = engine
+            .dispatch(ControlCommand::SettingsSet {
+                changes: SettingsPatch {
+                    ui_scale: Some(0.01),
+                    ..SettingsPatch::default()
+                },
+            })
+            .await;
+        let low_settings = engine.settings_snapshot().await;
+        assert!((low_settings.ui_scale - crate::settings::UI_SCALE_MIN).abs() < f32::EPSILON);
+        let low_frame = engine.snapshot(None).await;
+        assert!((low_frame.accessibility.ui_scale_applied - crate::settings::UI_SCALE_MIN).abs() < f32::EPSILON);
+
+        let _ = engine
+            .dispatch(ControlCommand::SettingsSet {
+                changes: SettingsPatch {
+                    ui_scale: Some(99.0),
+                    ..SettingsPatch::default()
+                },
+            })
+            .await;
+        let high_settings = engine.settings_snapshot().await;
+        assert!((high_settings.ui_scale - crate::settings::UI_SCALE_MAX).abs() < f32::EPSILON);
+        let high_frame = engine.snapshot(None).await;
+        assert!((high_frame.accessibility.ui_scale_applied - crate::settings::UI_SCALE_MAX).abs() < f32::EPSILON);
     }
 
     #[test]

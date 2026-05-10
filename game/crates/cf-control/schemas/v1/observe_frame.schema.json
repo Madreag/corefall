@@ -7,18 +7,18 @@
       "description": "M4A: resolved accessibility surface (UI scale applied, high-contrast\npalette active, captions visible, focusable nodes in z-order).",
       "$ref": "#/$defs/AccessibilityView",
       "default": {
-        "captions_visible": false,
+        "captions_visible": true,
         "focus_cycle": 0,
         "focusable_nodes": [],
         "high_contrast_applied": false,
-        "hold_threshold_ms": 0,
+        "hold_threshold_ms": 250,
         "hold_to_confirm_applied": false,
         "key_bindings": {},
         "key_remap_enabled": false,
         "reduced_flash_applied": false,
         "reduced_motion_applied": false,
         "reduced_shake_applied": false,
-        "ui_scale_applied": 0.0
+        "ui_scale_applied": 1.0
       }
     },
     "actors": {

@@ -138,6 +138,13 @@ fn default_hold_threshold_ms() -> u32 {
     250
 }
 
+/// ACC-A UI scale floor. Values entering `Settings` through `act.settings.set`
+/// are clamped to this bound so `observe.settings`, `observe.accessibility`,
+/// and cf-ui render state all report the same applied scale.
+pub const UI_SCALE_MIN: f32 = 0.5;
+/// ACC-A UI scale ceiling. See [`UI_SCALE_MIN`].
+pub const UI_SCALE_MAX: f32 = 4.0;
+
 /// M4A: built-in default action → KeyCode bindings. Action names are stable
 /// strings the cfctl + replay surface refers to; values are KeyCode variant
 /// names (e.g. `Space`, `Enter`, `KeyJ`, `KeyR`). cf-app maps the names back
@@ -194,6 +201,16 @@ pub fn validate_key_bindings(bindings: &BTreeMap<String, String>) -> Result<(), 
         }
         if !is_supported_key_code_name(key) {
             return Err(format!("key_binding_unknown_key:{action}={key}"));
+        }
+    }
+    let mut effective = default_key_bindings();
+    for (action, key) in bindings {
+        effective.insert(action.clone(), key.clone());
+    }
+    let mut key_owner: BTreeMap<String, String> = BTreeMap::new();
+    for (action, key) in effective {
+        if let Some(first_action) = key_owner.insert(key.clone(), action.clone()) {
+            return Err(format!("key_binding_duplicate_key:{key}={first_action},{action}"));
         }
     }
     Ok(())
@@ -299,6 +316,24 @@ mod tests {
     fn validate_key_bindings_accepts_numpad_remap() {
         let mut b = BTreeMap::new();
         b.insert("aim_up".to_string(), "Numpad8".to_string());
+        validate_key_bindings(&b).unwrap();
+    }
+
+    #[test]
+    fn validate_key_bindings_rejects_collisions_with_default_bindings() {
+        let mut b = BTreeMap::new();
+        b.insert("fire".to_string(), "KeyA".to_string());
+        assert_eq!(
+            validate_key_bindings(&b).unwrap_err(),
+            "key_binding_duplicate_key:KeyA=fire,move_left"
+        );
+    }
+
+    #[test]
+    fn validate_key_bindings_accepts_full_swap_without_collision() {
+        let mut b = BTreeMap::new();
+        b.insert("fire".to_string(), "KeyA".to_string());
+        b.insert("move_left".to_string(), "Enter".to_string());
         validate_key_bindings(&b).unwrap();
     }
 }

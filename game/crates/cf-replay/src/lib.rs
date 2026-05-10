@@ -139,6 +139,12 @@ pub struct SettingsBlock {
     /// M4A: ACC-A-05 future remap UI surface flag.
     #[serde(default)]
     pub key_remap_enabled: bool,
+    /// M4A: ACC-A-05 active key binding overrides (action -> KeyCode name).
+    /// Stored in the run manifest so bundles can reconstruct the actual input
+    /// contract that produced the capture, even though key bindings do not
+    /// affect the deterministic sim checksum directly.
+    #[serde(default)]
+    pub key_bindings: BTreeMap<String, String>,
 }
 
 fn default_hold_threshold_ms() -> u32 {
@@ -157,6 +163,7 @@ impl Default for SettingsBlock {
             hold_to_confirm: false,
             hold_threshold_ms: default_hold_threshold_ms(),
             key_remap_enabled: false,
+            key_bindings: BTreeMap::new(),
         }
     }
 }
@@ -907,6 +914,10 @@ mod tests {
         assert!(
             matches!(parsed.expected_outcome, ExpectedOutcome::Clean),
             "missing expected_outcome must default to Clean"
+        );
+        assert!(
+            parsed.settings.key_bindings.is_empty(),
+            "legacy manifests without key_bindings must deserialize with an empty remap table"
         );
     }
 

@@ -294,7 +294,7 @@ pub struct ToolValidityView {
 /// via `observe.settings`; the resolved view in the observe frame says how
 /// the HUD has applied each flag at this tick (so consumers can verify a
 /// 200%-scale render or high-contrast palette without a screenshot).
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
 pub struct AccessibilityView {
     pub ui_scale_applied: f32,
     pub high_contrast_applied: bool,
@@ -330,6 +330,27 @@ pub struct AccessibilityView {
     pub focus_cycle: u64,
 }
 
+impl Default for AccessibilityView {
+    fn default() -> Self {
+        let settings = Settings::default();
+        Self {
+            ui_scale_applied: settings.ui_scale,
+            high_contrast_applied: settings.high_contrast,
+            captions_visible: settings.captions,
+            reduced_motion_applied: settings.reduced_motion,
+            reduced_shake_applied: settings.reduced_shake,
+            reduced_flash_applied: settings.reduced_flash,
+            hold_to_confirm_applied: settings.hold_to_confirm,
+            hold_threshold_ms: settings.hold_threshold_ms,
+            key_remap_enabled: settings.key_remap_enabled,
+            key_bindings: settings.key_bindings,
+            focusable_nodes: Vec::new(),
+            focused_node: None,
+            focus_cycle: 0,
+        }
+    }
+}
+
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct ObserveSettings {
     pub schema_version: u32,
@@ -345,6 +366,22 @@ pub struct AccessibilityFlagsView {
     pub reduced_motion: bool,
     pub reduced_shake: bool,
     pub reduced_flash: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn accessibility_view_default_matches_settings_default() {
+        let view = AccessibilityView::default();
+        let settings = Settings::default();
+        assert!((view.ui_scale_applied - settings.ui_scale).abs() < f32::EPSILON);
+        assert_eq!(view.high_contrast_applied, settings.high_contrast);
+        assert_eq!(view.captions_visible, settings.captions);
+        assert_eq!(view.hold_threshold_ms, settings.hold_threshold_ms);
+        assert_eq!(view.key_remap_enabled, settings.key_remap_enabled);
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, JsonSchema)]

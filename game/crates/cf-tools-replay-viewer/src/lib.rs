@@ -15,6 +15,7 @@
 pub mod bundle;
 pub mod cause_chain;
 pub mod debrief;
+mod text;
 pub mod viewer;
 
 pub use bundle::{Bundle, BundleError};

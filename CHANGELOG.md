@@ -17,6 +17,10 @@ copy long-form research here; that's what the vault is for.
 
 ## Unreleased
 
+### M4A PR review hardening — settings source truth and manifest remap evidence
+
+The latest PR review found two remaining source-truth gaps in the M4A closure surface. `act.settings.set` now clamps `ui_scale` at the shared settings mutation boundary (`0.5..4.0`), so `observe.settings`, `observe.accessibility.ui_scale_applied`, `run_manifest.json.settings.ui_scale`, and cf-ui's rendered `UiScale` agree instead of reporting a raw out-of-range value while rendering a clamped one. `cf-replay::SettingsBlock` and the run-manifest writer now persist `settings.key_bindings`, so M4A bundles record the actual remap table used by the cfctl script (`aim_up=Numpad8`, `fire=KeyF`, etc.) rather than only the `key_remap_enabled` flag.
+
 ### M4A audit closure round 6 — root-cause hardening for closure truth, ports, remap validation, and HUD readability
 
 Round 5 still left five root-cause risks: dirty same-commit bundles could satisfy the close loop without proving they came from the current worktree, `cf-e2e` defaulted every spawned `cf-app` to fixed port 17900 (causing stale-listener/self-play failures), `act.settings.set` accepted unsupported remap actions/keys that cf-app would silently fall back from, the 8x8 capture sheet was too dense for fast human/agent readability review, and 200% HUD status/banners/captions could crowd the playable area instead of reflowing around it. The fixes landed in the shared paths:

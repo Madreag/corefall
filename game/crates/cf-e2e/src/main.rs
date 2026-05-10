@@ -19,6 +19,7 @@
 use std::{
     path::{Path, PathBuf},
     process::Stdio,
+    sync::atomic::{AtomicU64, Ordering},
     time::Duration,
 };
 
@@ -33,6 +34,8 @@ use tracing_subscriber::EnvFilter;
 
 use cf_control::SCHEMA_VERSION;
 use cf_replay::diagnostics;
+
+static CONTROL_PORT_FILE_SEQ: AtomicU64 = AtomicU64::new(0);
 
 #[derive(Debug, Parser)]
 #[command(name = "cf-e2e", about = "M1.5 scripted end-to-end runner.")]
@@ -142,7 +145,6 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
     tracing::info!(target: "cf::e2e", scenario = %cli.scenario, script = ?cli.script, "starting cf-e2e");
     let _ = (cli.save_load_roundtrip, cli.verify_checksums);
-    let control_port = choose_control_port(cli.control_port)?;
 
     let script_path = match &cli.script {
         Some(name) => locate_script(name)?,
@@ -169,8 +171,8 @@ async fn main() -> Result<()> {
         cli.capture_frames_hz
     };
 
-    let mut child = launch_cf_app(LaunchOptions {
-        port: control_port,
+    let mut launched = launch_cf_app(LaunchOptions {
+        port: cli.control_port,
         scenario: &scenario,
         write_run_bundle: cli.write_run_bundle,
         capture_grid: effective_capture_grid,
@@ -184,15 +186,26 @@ async fn main() -> Result<()> {
         reduced_shake: cli.reduced_shake,
         reduced_flash: cli.reduced_flash,
     })?;
+    let control_port = if let Some(port_file) = launched.control_port_file.as_ref() {
+        match wait_for_control_port_file(port_file, Duration::from_secs(8)).await {
+            Ok(port) => port,
+            Err(e) => {
+                let _ = launched.child.start_kill();
+                anyhow::bail!("cf-app did not report its ephemeral control port: {e}");
+            }
+        }
+    } else {
+        cli.control_port
+    };
     let url = format!("ws://127.0.0.1:{control_port}");
     let mut session = match wait_for_ws(&url, Duration::from_secs(8)).await {
         Ok(ws) => Session {
             ws,
             next_id: 1,
-            child: Some(child),
+            child: Some(launched.child),
         },
         Err(e) => {
-            let _ = child.start_kill();
+            let _ = launched.child.start_kill();
             anyhow::bail!("ws connect failed: {e}");
         }
     };
@@ -402,19 +415,6 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-fn choose_control_port(requested: u16) -> Result<u16> {
-    if requested != 0 {
-        return Ok(requested);
-    }
-    let listener = std::net::TcpListener::bind("127.0.0.1:0").context("bind ephemeral cf-e2e control port")?;
-    let port = listener
-        .local_addr()
-        .context("read ephemeral cf-e2e control port")?
-        .port();
-    drop(listener);
-    Ok(port)
-}
-
 fn ticks_to_wait_for(method: &str, params: &Value) -> Option<u64> {
     match method {
         "sim.step" | "sim.run_for_ticks" => params.get("ticks").and_then(|t| t.as_u64()),
@@ -536,8 +536,38 @@ struct LaunchOptions<'a> {
     reduced_flash: bool,
 }
 
-fn launch_cf_app(opts: LaunchOptions<'_>) -> Result<Child> {
+struct LaunchedApp {
+    child: Child,
+    control_port_file: Option<PathBuf>,
+}
+
+fn launch_cf_app(opts: LaunchOptions<'_>) -> Result<LaunchedApp> {
     let bin = locate_cf_app_binary()?;
+    let control_port_file = if opts.port == 0 {
+        Some(unique_control_port_file())
+    } else {
+        None
+    };
+    let args = build_cf_app_args(&opts, control_port_file.as_deref());
+    // Inherit stdio from the parent so cf-app's diagnostics (especially the
+    // bevy_render screenshot INFO lines, ~10/sec under --capture-grid) flow
+    // straight to the user's terminal. Piping with Stdio::piped() filled the
+    // 64KB pipe buffer in seconds and deadlocked cf-app's render systems
+    // when nobody was draining the pipe — the BP2 capture-grid freeze the
+    // M2.5 win script kept hitting.
+    let child = TokioCommand::new(&bin)
+        .args(&args)
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
+        .spawn()
+        .with_context(|| format!("failed to spawn {}", bin.display()))?;
+    Ok(LaunchedApp {
+        child,
+        control_port_file,
+    })
+}
+
+fn build_cf_app_args(opts: &LaunchOptions<'_>, control_port_file: Option<&Path>) -> Vec<String> {
     let mut args: Vec<String> = vec![
         "--scenario".into(),
         opts.scenario.into(),
@@ -547,6 +577,10 @@ fn launch_cf_app(opts: LaunchOptions<'_>) -> Result<Child> {
         "--ticks".into(),
         "0".into(),
     ];
+    if let Some(path) = control_port_file.as_ref() {
+        args.push("--control-port-file".into());
+        args.push(path.display().to_string());
+    }
     if opts.tick_rate_hz != 0 {
         args.push("--tick-rate-hz".into());
         args.push(opts.tick_rate_hz.to_string());
@@ -594,19 +628,41 @@ fn launch_cf_app(opts: LaunchOptions<'_>) -> Result<Child> {
     if opts.reduced_flash {
         args.push("--reduced-flash".into());
     }
-    // Inherit stdio from the parent so cf-app's diagnostics (especially the
-    // bevy_render screenshot INFO lines, ~10/sec under --capture-grid) flow
-    // straight to the user's terminal. Piping with Stdio::piped() filled the
-    // 64KB pipe buffer in seconds and deadlocked cf-app's render systems
-    // when nobody was draining the pipe — the BP2 capture-grid freeze the
-    // M2.5 win script kept hitting.
-    let child = TokioCommand::new(&bin)
-        .args(&args)
-        .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .spawn()
-        .with_context(|| format!("failed to spawn {}", bin.display()))?;
-    Ok(child)
+    // cf-e2e is the source of truth for scripted actions. Windowed capture
+    // still opens a Bevy window, but it must not ingest ambient keyboard or
+    // gamepad input from the developer machine and corrupt the scenario path.
+    args.push("--disable-local-input".into());
+    args
+}
+
+fn unique_control_port_file() -> PathBuf {
+    let seq = CONTROL_PORT_FILE_SEQ.fetch_add(1, Ordering::Relaxed);
+    std::env::temp_dir().join(format!("cf_e2e_control_port_{}_{}.txt", std::process::id(), seq))
+}
+
+async fn wait_for_control_port_file(path: &Path, timeout: Duration) -> Result<u16> {
+    let deadline = std::time::Instant::now() + timeout;
+    loop {
+        match std::fs::read_to_string(path) {
+            Ok(text) => {
+                let port = text
+                    .trim()
+                    .parse::<u16>()
+                    .with_context(|| format!("parse control port file {}", path.display()))?;
+                if port == 0 {
+                    anyhow::bail!("control port file {} reported port 0", path.display());
+                }
+                let _ = std::fs::remove_file(path);
+                return Ok(port);
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => {}
+            Err(e) => return Err(e).with_context(|| format!("read control port file {}", path.display())),
+        }
+        if std::time::Instant::now() >= deadline {
+            anyhow::bail!("timed out waiting for {}", path.display());
+        }
+        sleep(Duration::from_millis(20)).await;
+    }
 }
 
 fn locate_cf_app_binary() -> Result<PathBuf> {
@@ -831,5 +887,75 @@ mod tests {
 
         assert_eq!(cli.captions, CaptionsArg::On);
         assert!(cli.captions.as_bool());
+        assert_eq!(cli.control_port, 0);
+    }
+
+    #[tokio::test]
+    async fn wait_for_control_port_file_reads_bound_port() {
+        let path = unique_control_port_file();
+        let _ = std::fs::remove_file(&path);
+        std::fs::write(&path, "41234\n").unwrap();
+
+        let port = wait_for_control_port_file(&path, Duration::from_secs(1)).await.unwrap();
+
+        assert_eq!(port, 41234);
+        assert!(!path.exists());
+    }
+
+    #[test]
+    fn cf_app_args_disable_local_input_for_scripted_runs() {
+        let port_path = Path::new("/tmp/cf-e2e-port.txt");
+        let args = build_cf_app_args(
+            &LaunchOptions {
+                port: 0,
+                scenario: "m4a_micro_breach_readability",
+                write_run_bundle: true,
+                capture_grid: true,
+                capture_frames_hz: 30.0,
+                no_capture_events: false,
+                tick_rate_hz: 120,
+                ui_scale: 2.0,
+                high_contrast: true,
+                captions: true,
+                reduced_motion: true,
+                reduced_shake: true,
+                reduced_flash: true,
+            },
+            Some(port_path),
+        );
+
+        assert!(args.contains(&"--disable-local-input".to_string()));
+        assert!(args.contains(&"--control-port-file".to_string()));
+        assert!(!args.contains(&"--headless-smoke".to_string()));
+    }
+
+    #[test]
+    fn cf_app_args_preserve_explicit_control_port() {
+        let args = build_cf_app_args(
+            &LaunchOptions {
+                port: 17900,
+                scenario: "m0_blank",
+                write_run_bundle: false,
+                capture_grid: false,
+                capture_frames_hz: 10.0,
+                no_capture_events: false,
+                tick_rate_hz: 60,
+                ui_scale: 1.0,
+                high_contrast: false,
+                captions: true,
+                reduced_motion: false,
+                reduced_shake: false,
+                reduced_flash: false,
+            },
+            None,
+        );
+
+        let port_arg = args
+            .iter()
+            .position(|arg| arg == "--control-port")
+            .and_then(|idx| args.get(idx + 1))
+            .expect("control port value");
+        assert_eq!(port_arg, "17900");
+        assert!(!args.contains(&"--control-port-file".to_string()));
     }
 }

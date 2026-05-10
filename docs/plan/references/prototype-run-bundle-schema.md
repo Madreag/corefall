@@ -126,7 +126,7 @@ The DR-002 hybrid event-log + snapshots lean was confirmed during M0 implementat
 | `checksum.scope` | string | Named state scope hashed. M0 ships `"sim_state_v1"` covering `tick_counter || rng_state_bytes`. M2 appends terrain chunk material grid; M3 appends actor/inventory state; layout-breaking changes bump to `_v2` and register a migration. |
 | `checksum.cadence_ticks` | u64 | Ticks between automatic checksum emits (M0: 60). |
 | `tick_rate_hz` | u32 | Configured fixed-tick rate the run was executed at (M0 defaults to 60; 120 Hz is a first-class option). Run bundles MUST record the rate that was actually used; the engine MUST NOT hardcode a rate that disagrees with this field. |
-| `settings` | object | Flat KV block of the six DR-012 accessibility flags active at run start: `ui_scale`, `high_contrast`, `captions`, `reduced_motion`, `reduced_shake`, `reduced_flash`. |
+| `settings` | object | Flat KV block of the DR-012/M4A accessibility and input settings active for the run: `ui_scale`, `high_contrast`, `captions`, `reduced_motion`, `reduced_shake`, `reduced_flash`, `hold_to_confirm`, `hold_threshold_ms`, `key_remap_enabled`, and `key_bindings` (action -> KeyCode overrides). `ui_scale` is stored after the control boundary clamp (`0.5..4.0`) so manifest, observe, and rendered HUD evidence agree. |
 
 ### `summary.json` extensions
 

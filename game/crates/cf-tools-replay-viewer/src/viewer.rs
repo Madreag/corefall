@@ -211,17 +211,7 @@ pub fn render_markdown(bundle: &Bundle, state: &ViewerState) -> String {
 }
 
 fn compact_payload(value: &serde_json::Value) -> String {
-    match serde_json::to_string(value) {
-        Ok(s) => {
-            // Markdown table cells render best when the payload is short.
-            if s.len() > 96 {
-                format!("{}…", &s[..95])
-            } else {
-                s
-            }
-        }
-        Err(_) => "<unserializable>".to_string(),
-    }
+    crate::text::compact_json_payload(value)
 }
 
 /// Parse an `event_id` string of the form `<run_id>:<tick>:<seq>` into the

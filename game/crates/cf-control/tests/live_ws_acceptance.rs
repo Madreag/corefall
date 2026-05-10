@@ -949,6 +949,78 @@ async fn live_ws_act_settings_set_key_bindings_round_trip() {
 }
 
 #[tokio::test]
+async fn live_ws_act_settings_set_ui_scale_clamps_before_observe() {
+    let (url, handle) = spawn_server(42).await;
+    let _ = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 936,
+            "method": "act.settings.set",
+            "params": {"schema_version": 1, "ui_scale": 0.01}
+        }),
+    )
+    .await;
+    let observed_low_settings = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 937,
+            "method": "observe.settings",
+            "params": {"schema_version": 1}
+        }),
+    )
+    .await;
+    let observed_low_frame = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 938,
+            "method": "observe.once",
+            "params": {"schema_version": 1}
+        }),
+    )
+    .await;
+    let low_settings = observed_low_settings
+        .get("result")
+        .and_then(|r| r.get("settings"))
+        .expect("settings");
+    let low_acc = observed_low_frame
+        .get("result")
+        .and_then(|r| r.get("accessibility"))
+        .expect("accessibility");
+    assert_eq!(low_settings["ui_scale"], 0.5);
+    assert_eq!(low_acc["ui_scale_applied"], 0.5);
+
+    let _ = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 939,
+            "method": "act.settings.set",
+            "params": {"schema_version": 1, "ui_scale": 99.0}
+        }),
+    )
+    .await;
+    let observed_high = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 940,
+            "method": "observe.once",
+            "params": {"schema_version": 1}
+        }),
+    )
+    .await;
+    handle.abort();
+    let high = observed_high
+        .get("result")
+        .and_then(|r| r.get("accessibility"))
+        .expect("accessibility");
+    assert_eq!(high["ui_scale_applied"], 4.0);
+}
+
+#[tokio::test]
 async fn live_ws_act_settings_set_rejects_unknown_key_binding_action() {
     let (url, handle) = spawn_server(42).await;
     let response = send_and_recv(
@@ -990,6 +1062,28 @@ async fn live_ws_act_settings_set_rejects_unknown_key_binding_name() {
     handle.abort();
     let err = response.get("error").expect("unknown remap key must reject");
     assert_eq!(err["data"]["reason"], "key_binding_unknown_key:fire=BogusKey");
+}
+
+#[tokio::test]
+async fn live_ws_act_settings_set_rejects_key_binding_collision_with_default() {
+    let (url, handle) = spawn_server(42).await;
+    let response = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 935,
+            "method": "act.settings.set",
+            "params": {
+                "schema_version": 1,
+                "key_remap_enabled": true,
+                "key_bindings": {"fire": "KeyA"}
+            }
+        }),
+    )
+    .await;
+    handle.abort();
+    let err = response.get("error").expect("duplicate action key must reject");
+    assert_eq!(err["data"]["reason"], "key_binding_duplicate_key:KeyA=fire,move_left");
 }
 
 #[tokio::test]

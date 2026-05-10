@@ -9,7 +9,7 @@ argument-hint: "[milestone-or-bp-or-git-range]"
 
 Run a deep review of Corefall implementation work. Treat `$ARGUMENTS` as the milestone, Build Point (e.g. `BP1`, `BP2`), feature, branch, commit, or diff range to review. If no argument is provided, review the current working tree.
 
-For Build Point arguments (`BP<N>`), the review covers EVERY milestone the BP bundles per the Build Points table in `docs/plan/spec/prototype-roadmap.md` plus the per-BP human-playtest survey row and T-CAPTURE summary-grid evidence.
+For Build Point arguments (`BP<N>`), the review covers EVERY milestone the BP bundles per the Build Points table in `docs/plan/spec/prototype-roadmap.md` plus the BP Goal Coverage Report, AI-Agent Self-Test Report, LLM-graded verdicts, and T-CAPTURE summary/review-grid evidence. Human playtest notes are optional confirmation, not a closure gate.
 
 Use ultrathink. Optimize for true bugs, missed requirements, logic problems, determinism gaps, weak tests, stale docs, and milestone incompleteness. Do not spend review budget on style unless it hides a real defect or maintainability risk.
 
@@ -33,6 +33,7 @@ Always check:
 - **No fake success:** `accepted`, `ok`, or `PASS` must mean the requested state change happened. Unsupported fields must reject or be explicitly documented as ignored. Silently consuming a flag without producing the side effect (e.g. `--capture-grid` with `--headless-smoke` producing zero PNGs) is a fake-success failure.
 - **Mandatory field enforcement:** missing or malformed required fields must fail in the live protocol and tests.
 - **Source-truthful evidence:** bundles and observations must reflect loaded scenario data, active config, current binary/git state, and actual runtime path.
+- **Current-source evidence:** dirty run bundles must carry `build.worktree_dirty=true` and a `build.worktree_fingerprint` matching the checkout under review. `commit_sha[:12]` is only sufficient for a clean checkout. Same-commit dirty bundles without a matching fingerprint are stale evidence.
 - **Checklist truth:** checked rows cannot hide missing required work in notes with "deferred", "follow-up", "reserved", "stub", "fake", "placeholder", "not implemented", or equivalent wording.
 - **Regression proof:** every verified bug fixed by an implementer must include a test or validation command that would have failed before the fix.
 - **T-CAPTURE evidence (BP2 onward):** every fun-proof scenario must emit a `summary_grid.png` + `capture_manifest.json` recorded in `summary.json.artifacts`; the cf-e2e script must include `--expect capture.summary_grid.non_blank_ratio>=0.95` to catch black-frame regressions. See `docs/plan/spec/prototype-roadmap.md` §T-CAPTURE.
@@ -86,7 +87,7 @@ The AI-Agent Self-Test Report must answer, per BP, with concrete evidence:
 | **Q6.** Did the BP regress any prior-BP feel/feature? | Run prior-BP scenarios under the new build; confirm summary_grid.png + final_sim_checksum still match the prior-BP exemplar (or the new behavior is documented as intentional). |
 | **Q7.** What would a human playtester see in the first 30 seconds that the AI agent missed? | Honest disclosure section. If the agent can't think of anything, write "no candidate gaps identified by AI agent — human playtest still recommended for novelty signal but not gating". |
 
-The report is written into `prototype_runs/native/<bp>_*/notes.md` under the heading **`## AI-Agent Self-Test Report`**. The agent's identity (Droid + the model used, e.g. `Droid (claude-sonnet-4.5-20250522)`) and timestamp must be recorded so future reviewers can see which agent run produced the report.
+The report is written into `prototype_runs/native/<bp>_*/notes.md` under the heading **`## AI-Agent Self-Test Report`**. The agent's identity (Droid + the model used, e.g. `Droid (Codex-sonnet-4.5-20250522)`) and timestamp must be recorded so future reviewers can see which agent run produced the report.
 
 Optional: a **`## Human Playtest Survey (optional confirmation)`** section can sit below it with the project owner's notes after they actually play the BP. The owner's row is **non-gating**; its absence does NOT block BP closure when the AI-Agent Self-Test Report is complete and Accept-verdicted.
 
@@ -147,8 +148,9 @@ loop:
       diagnoses code vs cfctl-script bug, fixes, loops back to Phase 1.
 
   Phase 4. LLM grading scaffold (auto)
-    - bp_close_loop.sh writes grading.json skeletons for any bundle this hour
-      that doesn't have one yet. Agent doesn't act here.
+    - bp_close_loop.sh writes grading.json skeletons for fresh current-source
+      bundles that lack one. Fresh deterministic duplicates may point at an
+      already filled current-source equivalent; the loop must not clone prose.
 
   Phase 5. Agent fills grading.json prose for each fun_proof_scenario
     - For each scaffold, agent reads each dimension's evidence_required:
@@ -160,7 +162,7 @@ loop:
     - Agent edits the grading.json directly via Edit/Create tools.
 
   Phase 6. validate filled grading.json
-    - At least ONE grading.json per fun_proof_scenario must validate PASS:
+    - At least ONE current-source grading.json per fun_proof_scenario must validate PASS:
       no placeholder cells, every dimension prose >= 30 chars, every dimension
       score in rubric range, dimensions below minimum_per_dimension classified
       FUTURE_OWNED with owning milestone OR flagged NEEDS_FIXES, aggregate
@@ -187,7 +189,11 @@ loop:
 
 The loop is the canonical workflow for `/corefall-review BP<N>` from BP2 onward. Earlier BPs (BP0/BP1) didn't have the manifest framework; their reviews use the pre-loop manual workflow but the AGENTS.md Build Point Closure Gate still enforces the same closure artifacts (acceptance + contract integrity + capture + grading + AI self-test report).
 
-The agent does NOT skip phases. The agent does NOT mark a phase PASS based on memory of an earlier loop run; every iteration re-runs every phase. If the agent realizes mid-loop that an earlier phase's PASS was wrong (e.g. a fix in iteration 3 introduces a regression in iteration 1's coverage), the agent restarts the loop from Phase 1 — there's no "skip back" optimization because the loop is cheap.
+The agent does NOT skip phases. `SKIP_SWEEP` and `SKIP_GRADE` are diagnostic shortcuts only; a skipped proof phase is a non-closing verdict. The agent does NOT mark a phase PASS based on memory of an earlier loop run; every iteration re-runs every phase. If the agent realizes mid-loop that an earlier phase's PASS was wrong (e.g. a fix in iteration 3 introduces a regression in iteration 1's coverage), the agent restarts the loop from Phase 1 — there's no "skip back" optimization because the loop is cheap.
+
+## Closure Summary Honesty Check
+
+Before writing "landed", "closed", "all findings fixed", or "ready for PR", the agent must cite the latest non-waived `bp_close_loop.sh` `verdict.json`, show all six mechanical phases as `PASS`, and name the current-source graded bundle path(s). If the checkout was dirty during capture, the cited bundle must expose a matching `run_manifest.json.build.worktree_fingerprint`. Summaries that only address the last reviewer bullet, accept skipped phases, clone grading prose, or rely on same-commit dirty evidence are themselves review findings.
 
 ## LLM-Graded Test Verdicts Gate
 

@@ -216,16 +216,7 @@ pub fn render_markdown_multi(bundle: &Bundle, chains: &[CauseChain<'_>]) -> Stri
 }
 
 fn compact_payload(value: &serde_json::Value) -> String {
-    match serde_json::to_string(value) {
-        Ok(s) => {
-            if s.len() > 96 {
-                format!("{}…", &s[..95])
-            } else {
-                s
-            }
-        }
-        Err(_) => "<unserializable>".to_string(),
-    }
+    crate::text::compact_json_payload(value)
 }
 
 #[cfg(test)]

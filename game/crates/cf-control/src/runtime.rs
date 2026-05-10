@@ -251,15 +251,7 @@ pub fn git_worktree_info() -> GitWorktreeInfo {
     hasher.update(&diff);
     hasher.update(b"\0untracked\0");
 
-    let mut dirty_files: Vec<String> = Vec::new();
-    for entry in status.split(|b| *b == 0).filter(|s| !s.is_empty()) {
-        let text = String::from_utf8_lossy(entry);
-        if text.len() >= 4 {
-            dirty_files.push(text[3..].to_string());
-        }
-    }
-    dirty_files.sort();
-    dirty_files.dedup();
+    let dirty_files = parse_porcelain_dirty_files(&status);
 
     let mut untracked_files: Vec<PathBuf> = untracked
         .split(|b| *b == 0)
@@ -281,6 +273,39 @@ pub fn git_worktree_info() -> GitWorktreeInfo {
         fingerprint: Some(hasher.finalize().to_hex().to_string()),
         dirty_files,
     }
+}
+
+fn has_porcelain_status_prefix(entry: &[u8]) -> bool {
+    entry.len() >= 4 && entry[2] == b' '
+}
+
+fn parse_porcelain_dirty_files(status: &[u8]) -> Vec<String> {
+    let mut dirty_files: Vec<String> = Vec::new();
+    let mut entries = status.split(|b| *b == 0).filter(|s| !s.is_empty()).peekable();
+    while let Some(entry) = entries.next() {
+        if !has_porcelain_status_prefix(entry) {
+            continue;
+        }
+        let text = String::from_utf8_lossy(entry);
+        let first_path = text[3..].to_string();
+        let is_rename_or_copy = matches!(entry[0], b'R' | b'C') || matches!(entry[1], b'R' | b'C');
+        if is_rename_or_copy {
+            if let Some(next_entry) = entries.peek() {
+                if !has_porcelain_status_prefix(next_entry) {
+                    let second_path = String::from_utf8_lossy(next_entry).to_string();
+                    // Porcelain v1 with -z emits rename/copy paths as
+                    // destination NUL source. Display the human direction.
+                    dirty_files.push(format!("{second_path} -> {first_path}"));
+                    entries.next();
+                    continue;
+                }
+            }
+        }
+        dirty_files.push(first_path);
+    }
+    dirty_files.sort();
+    dirty_files.dedup();
+    dirty_files
 }
 
 /// Real `rust_version` for a run bundle. Calls `$RUSTC --version` (falling back to `rustc`).
@@ -331,6 +356,22 @@ mod tests {
             !root.ends_with("game/prototype_runs/native"),
             "default run bundle root must not nest under game/: {}",
             root.display()
+        );
+    }
+
+    #[test]
+    fn parse_porcelain_dirty_files_skips_bare_rename_destination_segment() {
+        let status = b" M game/Cargo.toml\0R  new/path.rs\0old/path.rs\0?? notes.md\0";
+
+        let files = parse_porcelain_dirty_files(status);
+
+        assert_eq!(
+            files,
+            vec![
+                "game/Cargo.toml".to_string(),
+                "notes.md".to_string(),
+                "old/path.rs -> new/path.rs".to_string()
+            ]
         );
     }
 }

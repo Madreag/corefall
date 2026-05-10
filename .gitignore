@@ -74,7 +74,8 @@ prototype_runs/native/m3b_*/*
 !prototype_runs/native/m3b_*/*.json
 !prototype_runs/native/m3b_*/*.txt
 # LLM-graded test verdicts produced for fun-proof bundles (BP2 onward) per
-# `.claude/skills/corefall-review/SKILL.md` §LLM-Graded Test Verdicts Gate
+# `.claude/skills/corefall-review/SKILL.md` / `.agents/skills/corefall-review/SKILL.md`
+# §LLM-Graded Test Verdicts Gate
 # live ONLY inside `bp<N>_<UTC>_<hash>/` (the BP closure-exemplar dir)
 # alongside the AI-Agent Self-Test Report notes.md. Sweep-produced
 # `m<milestone>_*` bundles are NOT in git (they churn every sweep run and

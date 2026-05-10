@@ -396,9 +396,17 @@ Claude Code has a project-local review skill installed at:
 .claude/skills/corefall-review/SKILL.md
 ```
 
+Codex/OpenClaw agents use the mirrored entrypoint at:
+
+```text
+.agents/skills/corefall-review/SKILL.md
+```
+
+Keep both directories byte-for-byte synced whenever the review contract changes.
+
 Use `/corefall-review <milestone-or-range>` for deep milestone reviews, bug hunts, gap finding, and pre-merge audits. The skill runs a separate diff review, full affected-code review, contract gap review, edge-case hunt, test audit, Rust/determinism/security/performance review, `cfctl` observability review, and vault coherence pass.
 
-Repo-specific review behavior is pinned in the skill entrypoint at `.claude/skills/corefall-review/SKILL.md`. If the user asks "review M0", "bug hunt this", "find misses", or "is this done?", treat that as enough context to invoke the review skill and review the current working tree or supplied commit/range. If the review finds any verified issue at any severity, the next action is a fix/stabilization pass, not milestone acceptance, unless the user explicitly approves deferring that exact issue.
+Repo-specific review behavior is pinned in the mirrored skill entrypoints above. If the user asks "review M0", "bug hunt this", "find misses", or "is this done?", treat that as enough context to invoke the review skill and review the current working tree or supplied commit/range. If the review finds any verified issue at any severity, the next action is a fix/stabilization pass, not milestone acceptance, unless the user explicitly approves deferring that exact issue.
 
 ## Repository Layout
 
@@ -720,7 +728,7 @@ Search for this signature when auditing recent PR history. These are NOT human c
 - Don't commit API keys, `.env` files, signing keys, or LLM provider tokens.
 - Don't push directly to `main` without local Standard Validation.
 - Don't mark work complete if the canonical checklist/roadmap updates are skipped.
-- Don't create root review instruction/report files. Standing review rules live in `.claude/skills/corefall-review/SKILL.md`; review reports belong under `docs/reviews/`.
+- Don't create root review instruction/report files. Standing review rules live in `.claude/skills/corefall-review/SKILL.md` and `.agents/skills/corefall-review/SKILL.md`; review reports belong under `docs/reviews/`.
 - Don't add cloud-save dependencies during T-SAVE work; cloud-save backend decision is post-launch.
 - Don't introduce a UI surface without a matching `cf-control` / `cfctl` path. Eyes/ears/hands rule.
 - Don't ship visible actor movement as a static sliding pawn once the milestone owns actor/body presentation. Controlled actors are animation-first while responsive, physics-first while disrupted, and always replay/event-visible.
