@@ -1,16 +1,24 @@
 ---
 type: decision
 id: DR-002
-status: open
+status: closed-direction-with-evidence
 priority: P0
-revisit_trigger: "When the recorder + viewer prototype runs against a 5-minute battle and reproduces death/breach causes."
+revisit_trigger: "When BP3+ adds a polished GUI replay browser (egui/TUI on top of `cf-tools-replay-viewer` library) OR when an event-volume regression is reported in a BP4+ run-bundle (snapshots / coalescing posture may need re-tuning at full-collision scale)."
+closed_at: 2026-05-09
+closed_by_milestone: M3B
+closed_evidence:
+  - "M3A: cf-replay event recorder + DR-002 v1 envelope (`prototype-recorder-event.v0.1`) + run-bundle writer producing manifest/events/summary/notes (M0 + M1 + M1.5 + M2 + M2.5 evidence)."
+  - "M3A: cf-headless replay verifier replays BP2 run bundles tick-for-tick and matches per-tick `determinism.sim_checksum` (`blake3` over `sim_state_v1`) — proven against the M2.5 micro-reactor-defense bundle in `self_play_sweep.sh` row `m3a_headless_replay_m2_5_win`."
+  - "M3B: cf-tools-replay-viewer library + binary loads any BP2+ run bundle, validates corrupt-bundle invariants (manifest+summary run_id match, monotonic ticks, event-count match, parent_event_id resolves), renders viewer shell (event tail / category filter / tick scrubber / pause-step), walks cause chains for terminal events, and composes outcome / objectives / damage / terrain / checksum debrief."
+  - "M3B evidence bundle: `prototype_runs/native/m3b_2026-05-10T01-37-50Z_c078e31d/` — debrief.md + cause_chain_default.md + cause_chain_mission_resolved.md + cause_chain_reactor_damaged.md + view_*.md against the M2.5 loss bundle."
+  - "Self-play sweep row `m3b_replay_viewer_debrief` PASS: viewer subcommands run against the M2.5 win bundle, debrief markdown contains `## Outcome` + `## Checksum Status`, final_sim_checksum hex matches the bundle."
 ---
 
 ← [[decisions/index|decision records]] · [[systems/replay-event-architecture|replay/event architecture]] · [[spec/replay-recorder-slice-a|recorder Slice A]] · [[systems/ai-trust-test-suite|AI trust]] · [[engine/network-terrain-replication-lifecycle|terrain replication]]
 
 # DR-002: Replay And Event Architecture
 
-> [!info] Status: OPEN; LEAN: event log + snapshots; defer deterministic replay
+> [!info] Status: CLOSED-DIRECTION-WITH-EVIDENCE (2026-05-09 at M3B); LEAN: event log + snapshots; deterministic replay through cf-headless replay verifier; viewer + cause-chain + debrief through cf-tools-replay-viewer.
 
 ## Context
 
@@ -96,10 +104,23 @@ Why:
 
 Reopen this decision when:
 
-- Recorder/viewer prototype is benchmarked against a 5-minute battle.
-- AI trust suite is running; we know whether deterministic AI scenarios are feasible.
-- Multiplayer DR (DR-005) chooses an authority model.
-- Mod community emits events that conflict with reserved namespaces.
+- BP3+ adds a polished GUI replay browser (egui/TUI layered on top of the `cf-tools-replay-viewer` library) — the markdown-output viewer that closes DR-002 today is anti-scope-bounded ("No polished replay browser"); a future GUI is additive but its UX/keybinding/scrub-cadence contract may want a fresh DR pass.
+- An event-volume regression is reported at BP4+ scale (full-collision + atmospherics + AI combat) where coalescing / snapshot cadence needs re-tuning beyond the BP2-locked `events.jsonl + 60-tick checksum cadence + scenario-start snapshot` shape.
+- A multiplayer DR (DR-005) chooses an authority model that requires a different replay channel (e.g., lockstep input traces for online co-op vs server-authoritative event mirroring).
+- A mod community emits events that conflict with reserved namespaces (current contract: mod-namespaced custom events with mod_id prefix; revisit if conflicts surface in production).
+
+## Closure Summary (2026-05-09 — M3B)
+
+DR-002 closed with the hybrid event-log + snapshots architecture from option C, plus a scoped deterministic-replay channel via cf-headless. Evidence:
+
+- The DR-002 v1 event envelope shipped at M0 (`prototype-recorder-event.v0.1`); 23 categories now active across M0..M3A bundles (system / control / determinism / mind / collision / server / anti_cheat / mmo / material / reaction / atmospherics / affliction / combat / body / terrain / ai / logistics / mission / system / snapshot / determinism / ux / accessibility / performance / input / actor / equipment / capture).
+- Snapshots fire at scenario start + every objective change (`snapshot_actor` / `snapshot_inventory` / `snapshot_terrain_chunk` / `snapshot_terrain_summary`).
+- Per-tick checksums (`determinism.sim_checksum`, `blake3` over `sim_state_v1`, default cadence 60 ticks) anchor the deterministic-replay channel.
+- `cf-headless replay <bundle>` (M3A-003) replays any BP2 bundle by re-dispatching every recorded `control.command_accepted` against a fresh M0Engine + matching scenario, and verifies every cadence checksum tick-for-tick. First-divergence reporting is `{tick, recorded, live}`.
+- `cf-tools-replay-viewer` (M3B-001/002/003) renders viewer shell + cause-chain + debrief markdown over any BP2+ bundle. Bundle loader rejects 7 distinct corruption modes with typed `BundleError` variants. Cause-chain handles `RootReached` / `ParentMissingFromBundle` / `MaxDepthReached` / `CycleDetected` terminations explicitly.
+- Self-play sweep row `m3b_replay_viewer_debrief` PASS proves the viewer + cause-chain + debrief work end-to-end against a real BP2 fun-proof bundle.
+
+The deferred determinism scope (option A) remains intentionally OUT — full sim determinism with Lua/physics/RNG is unrealistic at BP4+ scale. The scoped channel (replay verifier + per-tick checksums) IS deterministic and gates BP closure today; broader determinism waits for evidence at BP4+ collision/atmospherics/AI scale.
 
 ## Source Trail
 

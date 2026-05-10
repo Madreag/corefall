@@ -1,0 +1,75 @@
+{
+  "schema_version": "prototype-run-summary.v0.1",
+  "run_id": "m3b_fixture_actor_died_chain",
+  "manifest_run_id": "m3b_fixture_actor_died_chain",
+  "duration_sec": 0.3,
+  "result": "pass",
+  "ended_at_utc": "2026-05-09T00:00:00.300+00:00",
+  "exit_code": 0,
+  "event_counts": {
+    "total": 13,
+    "by_category": {
+      "actor": 1,
+      "combat": 3,
+      "control": 1,
+      "determinism": 1,
+      "mission": 3,
+      "snapshot": 2,
+      "system": 2
+    },
+    "by_type": {
+      "actor_died": 1,
+      "command_accepted": 1,
+      "mission_resolved": 1,
+      "objective_completed": 1,
+      "objective_started": 1,
+      "projectile_hit": 1,
+      "projectile_spawned": 1,
+      "run_finished": 1,
+      "run_started": 1,
+      "sim_checksum": 1,
+      "snapshot_actor": 2,
+      "weapon_fired": 1
+    },
+    "by_severity": {
+      "error": 0,
+      "warn": 0
+    },
+    "dropped_total": 0
+  },
+  "volume": {
+    "events_jsonl_bytes": 0,
+    "event_lines": 13
+  },
+  "performance": {
+    "avg_frame_ms": 0.0,
+    "p99_frame_ms": 0.0,
+    "avg_tick_ms": 0.0,
+    "p99_tick_ms": 0.0,
+    "ticks_run": 17,
+    "wall_seconds": 0.3,
+    "tick_rate_hz": 60
+  },
+  "artifacts": {
+    "items": []
+  },
+  "blockers": [],
+  "next_actions": [
+    "Use as M3B-002 cause-chain golden evidence; verify actor_died walk hits projectile_hit → projectile_spawned → weapon_fired → command_accepted → run_started."
+  ],
+  "tests": [
+    {
+      "id": "M3B-002-FIXTURE",
+      "result": "pass",
+      "evidence_event_ids": [
+        "m3b_fixture_actor_died_chain:15:8",
+        "m3b_fixture_actor_died_chain:16:10"
+      ],
+      "notes": "Synthetic fixture exercising the full actor_died → mission_resolved cause chain."
+    }
+  ],
+  "final_sim_checksum": "abcdef0123456789fedcba9876543210abcdef0123456789fedcba9876543210",
+  "checksum_event_count": 1,
+  "first_tick": 0,
+  "last_tick": 17
+}

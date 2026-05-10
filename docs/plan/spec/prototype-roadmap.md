@@ -2036,9 +2036,9 @@ Side tracks run alongside milestones, not as separate gates. They have their own
 - Optional: replay-viewer screenshot artifact in the BP3 vault note.
 
 **M3B Done-criteria:**
-- [ ] Replay viewer can scrub through events and show context.
-- [ ] Death recap renders the parent cause chain for `actor_died` and `mission_resolved` events.
-- [ ] DR-002 closure: refresh status from OPEN → CLOSED-DIRECTION-WITH-EVIDENCE; update [[decisions/index]] + [[dashboards/decision-tracker]] + [[dashboards/research-readiness]] in the same pass.
+- [x] Replay viewer can scrub through events and show context. — `cf-tools-replay-viewer view <bundle> [--at-tick N] [--filter cat] [--tail-len N]`; evidence at `prototype_runs/native/m3b_2026-05-10T01-37-50Z_c078e31d/view_*.md`.
+- [x] Death recap renders the parent cause chain for `actor_died` and `mission_resolved` events. — `cf-tools-replay-viewer cause-chain <bundle> [--event-type T]`; evidence at `prototype_runs/native/m3b_2026-05-10T01-37-50Z_c078e31d/cause_chain_*.md`. Chain walking handles `RootReached` / `ParentMissingFromBundle` / `MaxDepthReached` / `CycleDetected` terminations explicitly. M2.5 bundle's `mission_resolved` is correctly reported as "no parent chain (event was emitted directly without a parent)" since it was tick-driven, not event-driven.
+- [x] DR-002 closure: status flipped OPEN → CLOSED-DIRECTION-WITH-EVIDENCE on 2026-05-09 at M3B; `decisions/index.md` + `dashboards/decision-tracker.md` + `dashboards/research-readiness.md` + `cortex_command_vault/research-log/2026-05-09-dr-002-closure-m3b-replay-viewer.md` all updated in same pass.
 
 **Cross-DR:** DR-002, DR-005, DR-018, DR-024.
 

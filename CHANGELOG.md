@@ -17,6 +17,71 @@ copy long-form research here; that's what the vault is for.
 
 ## Unreleased
 
+### M3B audit closure — 8 findings fixed in-pass (Needs Fixes → Accept)
+
+The first M3B drop received `/corefall-review M3B` verdict **Needs Fixes** with 8 findings. Every finding fixed in-pass. Fix-by-finding:
+
+1. **BLOCKER — `self_play_sweep.sh` exits 0 even with FAIL rows.** The pass/fail counters were mutated inside `{ ... } | tee "$VERDICT_TXT"` which forks a subshell; counter increments were lost when the subshell returned. Fix: tally counters in the parent shell, build the report into a string variable, then `printf '%s' "$SWEEP_REPORT" | tee` once at the end. Verified: `CF_MOD_BIN=/bin/false bash self_play_sweep.sh` → `Pass: 0  Fail: 1  Skip: 13` → `EXIT: 1`.
+2. **BLOCKER — Roadmap requires viewer/death-recap/debrief screenshot evidence; CLI emitted markdown only.** Added `--png` flag on `cf-tools-replay-viewer view / cause-chain / debrief`. New `game/tools/markdown_to_png.py` renders the markdown output via Pillow as a fixed-width text PNG. `--png` works alongside `--output` so reviewers get both formats. Same pattern as `capture_grid.py` (Python+Pillow for image work).
+3. **BLOCKER — `Bundle::load` PASSed corrupt bundles.** Probes showed PASS for: bad manifest/summary/event schema_version strings, duplicate event_ids, non-object payloads, stale `summary.event_counts.by_category` / `by_type` maps, `dropped_total` < sum of per-event `dropped_count`. Fix: 8 new `BundleError` variants; raw `serde_json::Value` pre-parse pass before typed deserialize so we can enforce these invariants without weakening the typed `Event` struct. 9 new probe tests pass.
+4. **HIGH — `external:` parent_event_id prefix rejected by viewer (allowed by `prototype_run_check.py`).** Added `EXTERNAL_PARENT_PREFIX` const; cause-chain walker skips resolve when prefix matches. Test: `accepts_external_parent_prefix`.
+5. **HIGH — M3B-D02 overclaimed (no real run bundle has `actor_died`).** Real BP2 bundles have no actor death because the player survives every fun-proof scenario. Synthetic fixture `crates/cf-tools-replay-viewer/tests/fixtures/m3b_actor_died_chain/` ships a hand-crafted 13-event bundle exercising the full death-driven cause chain: `actor_died` → `projectile_hit` → `projectile_spawned` → `weapon_fired` → `command_accepted` → `run_started` (6-link, root reached); `mission_resolved` chains through `actor_died` for the 7-link "death → mission outcome" shape. 4 integration tests in `tests/fixtures_integration.rs` validate the chain.
+6. **HIGH — `cargo run -p cf-tools-replay-viewer -- <bundle>` exited 2.** The roadmap + backlog's authoritative E2E command uses bare-bundle invocation, but clap required a subcommand. Fix: optional bundle path + optional subcommand on the top-level CLI; bare-bundle invocation routes to `Cmd::Debrief`. Conflicting "both bare and subcommand" inputs reject with a useful error.
+7. **MEDIUM — `--since-event-id` ordering used lexicographic compare.** Tick `10` was sorting BEFORE tick `9` in event_id string compare. Fix: new `parse_event_id_tick_seq()` parses the trailing `:tick:seq` and compares as a numeric `(u64, u64)` tuple. `rsplitn(3, ':')` correctly handles run_ids that themselves contain colons (e.g., timestamps like `m2.5_2026-05-09T04:47:07Z_e66a7ad6`).
+8. **MEDIUM — `cfctl replay scrub` documented but absent.** New `cfctl replay {view,scrub,cause-chain,debrief,validate}` subcommand proxies every flag through to `cf-tools-replay-viewer`. `scrub` is an alias for `view` (same semantics; re-running with different `--at-tick` IS the scrub affordance). Binary resolution: `CF_REPLAY_VIEWER_BIN` env → `current_exe.parent` → `cargo run -p cf-tools-replay-viewer --` fallback.
+
+**Side-fix discovered during BLOCKER #1 closure:** Once the sweep correctly reported 5 failing cf-e2e rows (the capture_grid composer was fail-closing on missing `capture_manifest.json`), root-cause traced to a 5s SIGKILL race in `cf-e2e::Session::shutdown_app_only`. cf-app's shutdown does (1) Bevy AppExit, (2) up to 5s PNG-flush wait, (3) write `capture_manifest.json`, (4) finalize bundle. cf-e2e's 5s outer timeout was racing the inner 5s wait, killing cf-app mid-step-2 and leaving the manifest unwritten. Bumped cf-e2e timeout to 30s. After the fix, the self-play sweep is 14/14 PASS (was 9 PASS / 5 FAIL pre-fix).
+
+**Test counts after audit closure:** 41 tests pass (was 26 pre-audit). 8 new probe tests in `bundle.rs` + 2 in `viewer.rs` + 4 integration tests against the committed actor_died fixture. `cargo fmt --all --check`, `cargo clippy --workspace --all-targets -- -D warnings`, `cargo test --workspace`, `cargo run -p cf-control --example dump_schemas -- --check`, `cargo run -p cf-mod -- validate content/`, `cargo run -p cfctl -- observe --once`, `bash game/tools/self_play_sweep.sh` all green.
+
+**Re-rendered evidence directory:** `prototype_runs/native/m3b_2026-05-10T03-57-23Z_7c8dd36e/` replaces the prior evidence dir. Every `.md` has a `.png` companion (debrief, 3 cause-chain variants, 4 view variants × M2.5 bundle, plus 4 fixture artifacts). `.gitignore` whitelist updated to force-include `*.md` / `*.png` / `*.json` / `*.txt` under `m3b_*/`.
+
+### M3B — Replay Viewer + Cause-Chain + Debrief (BP3 milestone 1; DR-002 closes)
+
+First milestone of BP3 (Combat Readability Build). M3B closes DR-002 (replay/event architecture) by layering a viewer + cause-chain + debrief library on top of the M3A event taxonomy + headless replay verifier — without changing the DR-002 v1 event envelope.
+
+**New crate `game/crates/cf-tools-replay-viewer/`:**
+
+- Library: `Bundle::load` + `viewer::ViewerState`/`render_markdown` + `cause_chain::trace`/`render_markdown(_multi)` + `debrief::compose`/`render_markdown`/`render_json`. All outputs deterministic.
+- Binary: `cf-tools-replay-viewer` with `view` / `cause-chain` / `debrief` / `validate` subcommands. Markdown is the canonical output; `--json` exposed on `debrief` and `cause-chain` for tooling. `--output <path>` writes to file; default stdout.
+- Workspace registration only — no edits to any existing crate.
+- 26 unit tests pass: 8 bundle (load + 7 corrupt-bundle rejection variants), 4 viewer (filter parsing + tail/at-tick/filter/tail-len rendering), 7 cause-chain (synthetic 6-link chain walk, default-trigger discovery, max-depth cap, no-trigger empty bundle), 5 debrief (won, lost-with-reason, full damage/terrain/checksum aggregation, unresolved-mission graceful, JSON round-trip).
+
+**Self-play sweep integration:** `game/tools/self_play_sweep.sh` row 3e `m3b_replay_viewer_debrief` runs validate + debrief + cause-chain + view against the latest M2.5 bundle and PASSes when all four subcommands exit 0, debrief.md contains `## Outcome` + `## Checksum Status`, and the bundle's `final_sim_checksum` hex appears in debrief.md.
+
+**M3B done-criteria (all PASS):**
+
+- M3B-P00 milestone proof: agent can scrub a run, filter events, understand why death/loss/destruction happened.
+- M3B-S01 viewer shell: event tail / category filter / tick scrubber / pause-step / bundle loader.
+- M3B-S02 cause-chain view: parent-chain walk for actor_died / mission_resolved / objective_failed / reactor_damaged-with-destroyed / reactor_destroyed / terrain_carved (first only) / projectile_hit.
+- M3B-S03 debrief summary: outcome / objectives / key events / damage-and-death / terrain / checksum status.
+- M3B-D01 viewer can scrub through events and show context.
+- M3B-D02 death/mission/reactor recap shows parent cause chain from event ids.
+- M3B-D03 DR-002 closes with viewer + headless replay + deterministic checksum evidence.
+
+**M3B backlog cards (all PASS):** M3B-001 viewer shell + M3B-002 cause-chain view + M3B-003 debrief summary.
+
+**Evidence:**
+
+- `prototype_runs/native/m3b_2026-05-10T01-37-50Z_c078e31d/` — debrief.md + debrief.json + cause_chain_default.md + cause_chain_default.json + cause_chain_mission_resolved.md + cause_chain_reactor_damaged.md + view_mission_tail.md + view_combat_tail.md + view_terrain_tail.md + view_at_loss_tick.md + validate.txt + notes.md (full Self-Play Validation Matrix + done-criteria coverage).
+- Self-play sweep row `m3b_replay_viewer_debrief` PASS in `prototype_runs/native/self_play_sweep_2026-05-10T01-30-57Z_0cfc7963/`.
+
+**DR-002 closure (CLOSED-DIRECTION-WITH-EVIDENCE):**
+
+- `docs/plan/decisions/dr-002-replay-event-architecture.md` status flipped OPEN → CLOSED-DIRECTION-WITH-EVIDENCE; full Closure Summary + revised Revisit Trigger + closed_by_milestone + closed_evidence frontmatter all updated.
+- `docs/plan/decisions/index.md` row updated with closure status + evidence summary.
+- `docs/plan/dashboards/decision-tracker.md` DR-002 row updated.
+- `docs/plan/dashboards/research-readiness.md` Replay/event recorder prototype row updated to CLOSED at M3B.
+- `cortex_command_vault/research-log/2026-05-09-dr-002-closure-m3b-replay-viewer.md` dated research-log note records closure context + cross-doc updates + remaining deferred scope.
+
+**Architectural posture:**
+
+- Hybrid event log + scenario-start snapshot + per-tick blake3 checksum architecture (option C from the original DR-002 options list) shipped end-to-end through M0 → M1 → M1.5 → M2 → M2.5 → M3A → M3B.
+- Full sim determinism (option A) intentionally OUT — unrealistic with Lua + physics + RNG at BP4+ scale. The deterministic-replay channel (cf-headless replay verifier + per-tick checksums) is the scoped subset.
+- Polished GUI replay browser (egui / TUI) intentionally OUT per M3B anti-scope ("No polished replay browser"). The markdown-output binary IS the viewer; future BPs can layer a GUI on top of the same library API.
+
+**Known pre-existing finding surfaced (not introduced by M3B):** 5 of 14 self-play-sweep rows FAIL the `capture.summary_grid.non_blank_ratio>=0.95` expectation because `captures/capture_manifest.json` isn't being written by cf-app on shutdown in cfctl-driven control mode. The cf-e2e GAMEPLAY expectations (`mission.result=won`, `objective.extract=completed`, `breach.outer_wall.broken=true`) all PASS in the failing rows — only the capture-composer assertion fails. This is a regression from PR #26's BP2 follow-up commits (27a31c0 + 4bf7c6d) that touched cf-app shutdown / capture-finalization wiring; M3B's diff is workspace-registration + new-crate + one sweep-row + docs only, with zero changes to cf-app / cf-capture / cf-control / cf-e2e. Surfacing as a BP3 follow-up for the M4A / M5 implementing agent.
+
 ### BP2 Closure — Status surfaces synced across roadmap, checklist, README
 
 Audit pass on 2026-05-09 caught that BP2 was still marked `🟢 Active` in the README BP table + `[ ]` in the feature-completion-checklist BP2 row even though PR #11 (BP2 closure) merged 2026-05-08 and PR #12/#13/#14 followed without ever updating those user-facing status surfaces. Root cause: no contract enforced that closing PRs sync the README + checklist + roadmap status pills.

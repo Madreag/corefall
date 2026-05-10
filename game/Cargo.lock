@@ -1709,6 +1709,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "cf-tools-replay-viewer"
+version = "0.0.1"
+dependencies = [
+ "anyhow",
+ "cf-replay",
+ "clap",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "cf-ui"
 version = "0.0.1"
 dependencies = [

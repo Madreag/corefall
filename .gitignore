@@ -60,6 +60,19 @@ prototype_runs/native/*
 prototype_runs/native/bp[0-9]*_*/*
 !prototype_runs/native/bp[0-9]*_*/notes.md
 !prototype_runs/native/bp[0-9]*_*/grading.json
+# M3B (replay viewer + cause-chain + debrief) — closure evidence dir mirrors
+# the BP-closure pattern: `prototype_runs/native/m3b_<UTC>_<hash>/` is force-
+# included via its notes.md + the markdown / PNG / JSON outputs the viewer
+# produces. Other milestone-prefixed dirs stay gitignored (they are sim-run
+# bundles and churn every sweep). M3B is a tooling milestone — its outputs
+# are stable review artifacts, not sim runs.
+!prototype_runs/native/m3b_*/
+prototype_runs/native/m3b_*/*
+!prototype_runs/native/m3b_*/notes.md
+!prototype_runs/native/m3b_*/*.md
+!prototype_runs/native/m3b_*/*.png
+!prototype_runs/native/m3b_*/*.json
+!prototype_runs/native/m3b_*/*.txt
 # LLM-graded test verdicts produced for fun-proof bundles (BP2 onward) per
 # `.claude/skills/corefall-review/SKILL.md` §LLM-Graded Test Verdicts Gate
 # live ONLY inside `bp<N>_<UTC>_<hash>/` (the BP closure-exemplar dir)

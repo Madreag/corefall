@@ -381,11 +381,26 @@ impl Session {
     /// AND as the pre-composer hook for --capture-grid runs (cf-capture only
     /// writes `capture_manifest.json` when cf-app exits, so the composer
     /// MUST run after this returns). Idempotent: calling twice is safe.
+    ///
+    /// Timeout: 30 s. cf-app's shutdown sequence is:
+    ///
+    ///   1. AppExit fires → Bevy's run loop returns from `app.run()`.
+    ///   2. `wait_for_capture_pngs_flushed` polls the capture log until every
+    ///      enqueued PNG has landed on disk (up to 5 s timeout).
+    ///   3. `write_capture_manifest_from_handle` writes `capture_manifest.json`.
+    ///   4. `finalize_engine` writes the run bundle.
+    ///
+    /// At ~120 frames/s capture cadence, step 2 alone can sit close to its
+    /// 5 s ceiling on slower hardware. The previous 5 s timeout here let cf-e2e
+    /// SIGKILL cf-app mid-step-2, leaving `capture_manifest.json` unwritten and
+    /// the composer fail-closing on the missing file. Audit-flagged BLOCKER
+    /// on 2026-05-09. The 30 s ceiling is comfortably above the 5 + 1 + 1 s
+    /// worst-case shutdown plus margin for slower CI hardware.
     async fn shutdown_app_only(&mut self) {
         let _ = self.send("system.shutdown", json!({})).await;
         let _ = self.ws.close(None).await;
         if let Some(mut child) = self.child.take() {
-            let _ = tokio::time::timeout(Duration::from_secs(5), child.wait()).await;
+            let _ = tokio::time::timeout(Duration::from_secs(30), child.wait()).await;
             let _ = child.start_kill();
         }
     }
