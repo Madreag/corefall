@@ -31,6 +31,11 @@ pub struct ConfigInputs {
     pub control_api_enabled: bool,
     pub debug_capabilities: Vec<String>,
     pub tick_rate_hz: u32,
+    /// M4A: cf-app sets this to `true` when `--capture-grid` is on so the run
+    /// manifest's `capture_config.{screenshots,captures}` reflects what's
+    /// actually emitted to disk. Default false.
+    #[allow(dead_code)] // pub field; consumed by build_engine_config below.
+    pub capture_grid_enabled: bool,
     pub paced: bool,
     pub settings: Settings,
     /// CLI seed override. `None` = use the scenario manifest seed.
@@ -84,6 +89,7 @@ pub fn build_engine_config(inputs: ConfigInputs) -> Result<M0EngineConfig, Confi
     config.debug_capabilities = inputs.debug_capabilities;
     config.paced = inputs.paced;
     config.settings = inputs.settings;
+    config.capture_grid_enabled = inputs.capture_grid_enabled;
     if let Some(seed) = inputs.seed_override {
         config.seed = seed;
     }
@@ -94,6 +100,10 @@ pub fn build_engine_config(inputs: ConfigInputs) -> Result<M0EngineConfig, Confi
     }
     config.debug_inject_panic_at_tick = inputs.debug_inject_panic_at_tick;
     config.commit_sha = git_commit_sha();
+    let worktree = git_worktree_info();
+    config.worktree_dirty = worktree.dirty;
+    config.worktree_fingerprint = worktree.fingerprint;
+    config.worktree_dirty_files = worktree.dirty_files;
     config.rust_version = rustc_version();
     config.bevy_version = format!("bevy {}", bevy_version());
     config.fill_config_hash();
@@ -165,6 +175,111 @@ pub fn git_commit_sha() -> String {
         format!("{head_sha}-dirty")
     } else {
         head_sha
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct GitWorktreeInfo {
+    pub dirty: bool,
+    pub fingerprint: Option<String>,
+    pub dirty_files: Vec<String>,
+}
+
+/// Fingerprint the exact dirty worktree state used to build run evidence.
+///
+/// A `commit_sha` with a `-dirty` suffix is not enough for closure gates: every
+/// audit-fix iteration before commit shares the same HEAD, even though the code
+/// and scenario content differ. This hash covers tracked diffs plus untracked
+/// file contents so BP close-loop fallback can distinguish "same commit, old
+/// dirty evidence" from "same commit, same current dirty worktree".
+pub fn git_worktree_info() -> GitWorktreeInfo {
+    if let Ok(env_fp) = std::env::var("CF_WORKTREE_FINGERPRINT") {
+        if !env_fp.is_empty() {
+            return GitWorktreeInfo {
+                dirty: true,
+                fingerprint: Some(env_fp),
+                dirty_files: Vec::new(),
+            };
+        }
+    }
+
+    let status = std::process::Command::new("git")
+        .args(["status", "--porcelain=v1", "-z"])
+        .output();
+    let status = match status {
+        Ok(o) if o.status.success() => o.stdout,
+        Ok(o) => {
+            tracing::warn!(
+                target: "cf::ctl",
+                stderr = %String::from_utf8_lossy(&o.stderr).trim(),
+                "git status --porcelain failed; worktree fingerprint unavailable."
+            );
+            return GitWorktreeInfo::default();
+        }
+        Err(e) => {
+            tracing::warn!(
+                target: "cf::ctl",
+                error = %e,
+                "git status --porcelain not runnable; worktree fingerprint unavailable."
+            );
+            return GitWorktreeInfo::default();
+        }
+    };
+    if status.is_empty() {
+        return GitWorktreeInfo::default();
+    }
+
+    let diff = std::process::Command::new("git")
+        .args(["diff", "--binary", "--no-ext-diff", "HEAD", "--"])
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| o.stdout)
+        .unwrap_or_default();
+    let untracked = std::process::Command::new("git")
+        .args(["ls-files", "--others", "--exclude-standard", "-z"])
+        .output()
+        .ok()
+        .filter(|o| o.status.success())
+        .map(|o| o.stdout)
+        .unwrap_or_default();
+
+    let mut hasher = blake3::Hasher::new();
+    hasher.update(b"cf-worktree-fingerprint-v1\0status\0");
+    hasher.update(&status);
+    hasher.update(b"\0diff\0");
+    hasher.update(&diff);
+    hasher.update(b"\0untracked\0");
+
+    let mut dirty_files: Vec<String> = Vec::new();
+    for entry in status.split(|b| *b == 0).filter(|s| !s.is_empty()) {
+        let text = String::from_utf8_lossy(entry);
+        if text.len() >= 4 {
+            dirty_files.push(text[3..].to_string());
+        }
+    }
+    dirty_files.sort();
+    dirty_files.dedup();
+
+    let mut untracked_files: Vec<PathBuf> = untracked
+        .split(|b| *b == 0)
+        .filter(|s| !s.is_empty())
+        .map(|s| PathBuf::from(String::from_utf8_lossy(s).to_string()))
+        .collect();
+    untracked_files.sort();
+    for path in &untracked_files {
+        hasher.update(path.to_string_lossy().as_bytes());
+        hasher.update(b"\0");
+        if let Ok(bytes) = std::fs::read(path) {
+            hasher.update(blake3::hash(&bytes).as_bytes());
+        }
+        hasher.update(b"\0");
+    }
+
+    GitWorktreeInfo {
+        dirty: true,
+        fingerprint: Some(hasher.finalize().to_hex().to_string()),
+        dirty_files,
     }
 }
 

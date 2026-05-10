@@ -2,11 +2,12 @@
 
 ## Owns
 - M1 actor primitives: `ActorId`, `Status`, `Inventory`, `InventoryItem`, `ItemSlot`, `Vec2`, `IntentSource`, `ControlIntent`, `ActorState`, `ActorWorld`, `ActorObservation`.
+- **M4A readability surface**: `Stance` enum (Idle / Walking / Running / Airborne / Downed / Dead) derived via `Stance::from_state(velocity, on_ground, status)`; `BodySilhouette` per-zone hp% projection (placeholder=true until M5); `ModuleStrip` placeholder (placeholder=true until M5); `ActorState::stance()` + `ActorState::body_silhouette()` accessors. `ActorObservation` extended with `stance: String` + `body_silhouette: BodySilhouette` so cfctl observe + cf-ui see the same projection.
 - `sim` module: per-tick `step` function that consumes a `BTreeMap<ActorId, ControlIntent>`, drives `cf-physics::{step_kinematics, apply_horizontal_motion, apply_jump, apply_recoil}`, ticks `cf-equipment::RifleState` per actor, spawns + flies projectiles, and emits a `StepReport`.
 - `ActorSimState`: actor world + per-actor rifle state + projectile pool. Cloned cheaply into `cf-control`'s engine.
 
 ## Public API Boundary
-- Types: `ActorId`, `Status`, `Inventory`, `InventoryItem`, `ItemSlot`, `Vec2`, `IntentSource`, `ControlIntent`, `ActorState`, `ActorWorld`, `ActorObservation`.
+- Types: `ActorId`, `Status`, `Stance`, `Inventory`, `InventoryItem`, `ItemSlot`, `Vec2`, `IntentSource`, `ControlIntent`, `ActorState`, `ActorWorld`, `ActorObservation`, `BodySilhouette`, `ModuleStrip`, `ModuleState`.
 - Module: `sim::{ActorSimState, ActorTickOutcome, ActorTuning, ExpiredProjectile, HitOutcome, Projectile, RifleStates, SpawnedProjectile, StepDeps, StepReport, step}`.
 
 ## Does NOT Own

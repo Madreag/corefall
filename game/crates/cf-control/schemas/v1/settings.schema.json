@@ -9,6 +9,31 @@
     "high_contrast": {
       "type": "boolean"
     },
+    "hold_threshold_ms": {
+      "description": "M4A: hold threshold in milliseconds. Default 250 ms; clamped to\n`[50..2000]` by `apply_settings_patch`.",
+      "type": "integer",
+      "format": "uint32",
+      "default": 250,
+      "minimum": 0
+    },
+    "hold_to_confirm": {
+      "description": "M4A: hold-to-press alternative for tap-to-press actions (ACC-A-05).\nWhen `true`, edge-triggered actions (jump / fire / reload / dig /\nreset / select_slot_*) require holding the key/button for\n`hold_threshold_ms` before firing instead of triggering on the press\nedge. Default: off (tap semantics). cf-app's `ingest_player_input`\nhonors this through the `HoldTracker` resource; cfctl-driven\ndispatches bypass the hold gate (control-plane is already explicit\npress/release semantics).",
+      "type": "boolean",
+      "default": false
+    },
+    "key_bindings": {
+      "description": "M4A: per-action key binding overrides. Action names are limited to\n[`SUPPORTED_KEY_BINDING_ACTIONS`]; KeyCode names are limited to\n[`SUPPORTED_KEY_CODE_NAMES`]. Empty by default; `act.settings.set`\nreplaces the table only after validation so unsupported remaps reject\nat the control boundary instead of silently falling back in cf-app.",
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "default": {}
+    },
+    "key_remap_enabled": {
+      "description": "M4A: when `true`, cf-app's keyboard layer reads its action bindings\nfrom `key_bindings` instead of the built-in defaults. When `false`,\nthe built-in defaults apply (Space=jump, Enter|J=fire, R=reload,\nG=dig, L=reset, 1..4=select_slot_0..3). The remap UI editor lands\nat M8; M4A ships the cfctl-settable surface so the contract is\nbehavior-testable today.",
+      "type": "boolean",
+      "default": false
+    },
     "reduced_flash": {
       "type": "boolean"
     },

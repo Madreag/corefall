@@ -309,6 +309,76 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Row 3f: M4A readability + ACC-A floor on the dedicated m4a scenario
+# (200% UI scale + high contrast + reduced_motion/shake/flash + hold_to_confirm
+# + key_remap_enabled + 12-node focus traversal proof)
+# ---------------------------------------------------------------------------
+ROW="m4a_micro_breach_acc_a_floor"
+if skip_id "$ROW"; then
+    add_row "$ROW" "SKIP" "" "skipped via SELF_PLAY_SWEEP_SKIP"
+else
+    cd "$GAME_DIR"
+    if "$CF_E2E_BIN" \
+        --scenario m4a_micro_breach_readability \
+        --script m4a_micro_breach_readability \
+        --capture-grid \
+        --ui-scale 2.0 \
+        --high-contrast \
+        --reduced-motion \
+        --reduced-shake \
+        --reduced-flash \
+        --verify-focus \
+        --write-run-bundle \
+        --timeout-seconds 180 \
+        --expect "scenario=m4a_micro_breach_readability" \
+        --expect "settings.settings.ui_scale>=1.99" \
+        --expect "settings.settings.high_contrast=true" \
+        --expect "settings.settings.captions=true" \
+        --expect "settings.settings.reduced_motion=true" \
+        --expect "settings.settings.reduced_shake=true" \
+        --expect "settings.settings.reduced_flash=true" \
+        --expect "settings.settings.hold_to_confirm=true" \
+        --expect "settings.settings.key_remap_enabled=true" \
+        --expect "accessibility.high_contrast_applied=true" \
+        --expect "accessibility.ui_scale_applied>=1.99" \
+        --expect "accessibility.reduced_motion_applied=true" \
+        --expect "accessibility.reduced_shake_applied=true" \
+        --expect "accessibility.reduced_flash_applied=true" \
+        --expect "accessibility.hold_to_confirm_applied=true" \
+        --expect "accessibility.key_remap_enabled=true" \
+        --expect "capture.summary_grid.non_blank_ratio>=0.95" \
+        > "$OUTDIR/$ROW.stdout.txt" 2> "$OUTDIR/$ROW.stderr.txt"; then
+        BUNDLE="$(ls -dt "$REPO_ROOT/prototype_runs/native/m4a_"* 2>/dev/null | head -n1)"
+        add_row "$ROW" "PASS" "${BUNDLE:-?}" "M4A readable HUD + ACC-A floor: 200% scale + high contrast + reduced_* + hold_to_confirm + 12-node focus traversal + verify-focus PASS"
+    else
+        add_row "$ROW" "FAIL" "$OUTDIR/$ROW.stderr.txt" "cf-e2e exit nonzero or expect failed"
+    fi
+    cd "$REPO_ROOT"
+fi
+
+# ---------------------------------------------------------------------------
+# Row 3g: M4A settings live-update round-trip (drives act.settings.set during the run)
+# ---------------------------------------------------------------------------
+ROW="m4a_settings_live_update"
+if skip_id "$ROW"; then
+    add_row "$ROW" "SKIP" "" "skipped via SELF_PLAY_SWEEP_SKIP"
+else
+    cd "$GAME_DIR"
+    if "$CF_E2E_BIN" \
+        --scenario m1_actor_range \
+        --script m4a_acc_a_floor \
+        --timeout-seconds 60 \
+        --expect "settings.settings.ui_scale=1.0" \
+        --expect "settings.settings.high_contrast=false" \
+        > "$OUTDIR/$ROW.stdout.txt" 2> "$OUTDIR/$ROW.stderr.txt"; then
+        add_row "$ROW" "PASS" "$OUTDIR/$ROW.stdout.txt" "M4A live act.settings.set roundtrip: ui_scale 2.0 then back to 1.0; high_contrast on then off"
+    else
+        add_row "$ROW" "FAIL" "$OUTDIR/$ROW.stderr.txt" "cf-e2e exit nonzero or live settings update mismatch"
+    fi
+    cd "$REPO_ROOT"
+fi
+
+# ---------------------------------------------------------------------------
 # Row 4: M0 settings round-trip (act.settings.set + observe.settings)
 # ---------------------------------------------------------------------------
 ROW="m0_settings_roundtrip"

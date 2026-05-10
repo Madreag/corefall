@@ -1,0 +1,15 @@
+{
+  "description": "M4A DR-012 ACC-A floor closure: live-update settings (ui_scale 2.0 + high_contrast on + captions off + reduced_motion + reduced_shake + reduced_flash), confirm round-trip via observe.settings + observe.once, then run a short sim window to capture the resolved accessibility surface.",
+  "scenario": "m1_actor_range",
+  "steps": [
+    { "method": "observe.settings", "params": {} },
+    { "method": "observe.once", "params": {} },
+    { "method": "act.settings.set", "params": { "ui_scale": 2.0, "high_contrast": true, "captions": false, "reduced_motion": true, "reduced_shake": true, "reduced_flash": true } },
+    { "method": "observe.settings", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 60 } },
+    { "method": "observe.once", "params": {} },
+    { "method": "act.settings.set", "params": { "captions": true, "high_contrast": false, "ui_scale": 1.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 30 } },
+    { "method": "observe.once", "params": {} }
+  ]
+}

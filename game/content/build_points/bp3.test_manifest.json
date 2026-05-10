@@ -1,0 +1,234 @@
+{
+  "schema_version": "cf-bp-test-manifest.v1",
+  "bp": "bp3",
+  "label": "Combat Readability Build",
+  "description": "Per-BP test contract for BP3 (M3B + M4A + M5 + Double-Click Release Engineering). Declares the tests + evidence + grading dimensions + observe fields + cargo modules + sweep rows + perf gates required for BP3 closure. M3B (replay viewer + debrief) closed in PR #15. M4A (readability + ACC-A floor) lands in this BP per the Roadmap V2 split. M5 (equipment/chassis/damage grammar) closes BP3.",
+  "milestones": ["M3B", "M4A", "M5"],
+  "fun_proof_scenarios": [
+    {
+      "id": "m4a_micro_breach_readability",
+      "scenario_path": "game/content/scenarios/m4a_micro_breach_readability.ron",
+      "description": "M4A readability proof on the dedicated m4a_micro_breach_readability scenario (reuses the M1.5 micro_breach world via milestone_override) at 200% UI scale + high contrast + reduced_motion + reduced_shake + reduced_flash + hold_to_confirm + key_remap_enabled. Drives walk → refused dig (out of range) → break wall → fire → reload → take damage so every HUD line (silhouette + module strip + stance + banner stack + tool-validity + captions) carries meaningful values.",
+      "win_script": "game/scripts/cfctl/m4a_micro_breach_readability.cfctl.json",
+      "grading_contract": "game/content/scenarios/grading/m4a_micro_breach_readability.grading.json",
+      "minimum_grading_aggregate": 7.0,
+      "win_path_expectations": [
+        "scenario=m4a_micro_breach_readability",
+        "settings.settings.ui_scale>=1.99",
+        "settings.settings.high_contrast=true",
+        "settings.settings.captions=true",
+        "settings.settings.reduced_motion=true",
+        "settings.settings.reduced_shake=true",
+        "settings.settings.reduced_flash=true",
+        "settings.settings.hold_to_confirm=true",
+        "settings.settings.hold_threshold_ms=350",
+        "settings.settings.key_remap_enabled=true",
+        "settings.settings.key_bindings.aim_up=Numpad8",
+        "accessibility.high_contrast_applied=true",
+        "accessibility.ui_scale_applied>=1.99",
+        "accessibility.reduced_motion_applied=true",
+        "accessibility.reduced_shake_applied=true",
+        "accessibility.reduced_flash_applied=true",
+        "accessibility.hold_to_confirm_applied=true",
+        "accessibility.hold_threshold_ms=350",
+        "accessibility.key_remap_enabled=true",
+        "accessibility.key_bindings.aim_up=Numpad8",
+        "capture.summary_grid.non_blank_ratio>=0.95"
+      ],
+      "loss_path_expectations": [],
+      "tick_rates": [60, 120],
+      "headless_smoke_required": false,
+      "replay_verifier_required": false
+    }
+  ],
+  "supporting_scenarios": [
+    {
+      "id": "m4a_settings_live_update",
+      "scenario_path": "game/content/scenarios/m1_actor_range.ron",
+      "description": "M4A act.settings.set live-update round-trip: drives ui_scale + high_contrast + captions + reduced_* on then off again to prove the engine's Settings can be patched mid-run and re-observed.",
+      "script": "game/scripts/cfctl/m4a_acc_a_floor.cfctl.json",
+      "expectations": [
+        "settings.settings.ui_scale=1.0",
+        "settings.settings.high_contrast=false"
+      ],
+      "tick_rates": [60]
+    }
+  ],
+  "regression_scenarios": [
+    {
+      "id": "micro_breach",
+      "from_bp": "bp1",
+      "rationale": "BP3 must not regress BP1's M1.5 fun slice. Re-run with the same seed at the same tick rate; final_sim_checksum must match the BP1 exemplar.",
+      "win_script": "game/scripts/cfctl/micro_breach_win.cfctl.json",
+      "loss_script": "game/scripts/cfctl/micro_breach_loss.cfctl.json",
+      "tick_rates": [60, 120]
+    },
+    {
+      "id": "micro_reactor_defense",
+      "from_bp": "bp2",
+      "rationale": "BP3 must not regress BP2's M2.5 fun slice. Re-run with the same seed at the same tick rate; final_sim_checksum must match the BP2 exemplar.",
+      "win_script": "game/scripts/cfctl/micro_reactor_defense_win.cfctl.json",
+      "loss_script": "game/scripts/cfctl/micro_reactor_defense_loss.cfctl.json",
+      "tick_rates": [60]
+    }
+  ],
+  "negative_scenarios": [
+    {
+      "id": "settings_patch_empty",
+      "harness": "live_ws_acceptance integration test (cf-control)",
+      "expected_event": "control.command_rejected",
+      "expected_reason_substring": "settings_patch_empty"
+    },
+    {
+      "id": "act_player_aim_nan",
+      "harness": "live_ws_acceptance integration test (cf-control)",
+      "expected_event": "control.command_rejected",
+      "expected_reason_substring": "non_finite"
+    }
+  ],
+  "required_sweep_rows": [
+    "m1_actor_round_trip",
+    "m1_5_micro_breach_win",
+    "m1_5_micro_breach_loss",
+    "m2_dig_concrete_refuse_metal",
+    "m2_5_micro_reactor_defense_win",
+    "m2_5_micro_reactor_defense_loss",
+    "m3a_headless_replay_m2_5_win",
+    "m3b_replay_viewer_debrief",
+    "m4a_micro_breach_acc_a_floor",
+    "m4a_settings_live_update",
+    "m0_settings_roundtrip",
+    "m1_actor_60hz_determinism",
+    "m1_actor_120hz_determinism",
+    "m0_blank_headless_smoke",
+    "cfctl_observe_once",
+    "cf_mod_validate_content"
+  ],
+  "required_grading_dimensions_per_scenario": {
+    "m4a_micro_breach_readability": [
+      "look.hud_readability",
+      "look.high_contrast_palette",
+      "look.silhouette_clarity",
+      "look.module_strip_clarity",
+      "look.banner_priority_legibility",
+      "look.caption_strip_legibility",
+      "feel.live_settings_update_responsiveness",
+      "feel.ui_scale_reflow",
+      "goal.dr012_acca_floor_closure",
+      "goal.dr003_silhouette_lean_proof",
+      "agent.cfctl_observe_completeness",
+      "agent.evidence_completeness"
+    ]
+  },
+  "required_events_emitted": {
+    "m4a_micro_breach_readability": [
+      "system.run_started",
+      "system.run_finished",
+      "control.command_accepted",
+      "control.settings_changed",
+      "control.settings_observed",
+      "actor.actor_status_changed",
+      "terrain.tool_action_started",
+      "terrain.terrain_carved",
+      "terrain.tool_refused"
+    ]
+  },
+  "required_observe_fields": [
+    "tick",
+    "settings.captions",
+    "settings.high_contrast",
+    "settings.ui_scale",
+    "settings.reduced_motion",
+    "settings.reduced_shake",
+    "settings.reduced_flash",
+    "actor.player.x",
+    "actor.player.y",
+    "actor.player.hp",
+    "actor.player.stance",
+    "actor.player.body_silhouette.head_hp_pct",
+    "actor.player.body_silhouette.placeholder",
+    "actor.player.module_strip.modules",
+    "actor.player.module_strip.placeholder",
+    "banners",
+    "captions",
+    "tool_validity",
+    "accessibility.ui_scale_applied",
+    "accessibility.high_contrast_applied",
+    "accessibility.captions_visible",
+    "accessibility.reduced_motion_applied",
+    "accessibility.reduced_shake_applied",
+    "accessibility.reduced_flash_applied",
+    "accessibility.focusable_nodes"
+  ],
+  "required_cargo_test_modules": [
+    "cf-actor::tests::stance_*",
+    "cf-actor::tests::body_silhouette_*",
+    "cf-actor::tests::actor_observation_carries_stance_and_silhouette",
+    "cf-control::live_ws_acceptance::live_ws_settings_*",
+    "cf-control::live_ws_acceptance::live_ws_act_settings_set_*",
+    "cf-ui::tests::stance_line_*",
+    "cf-ui::tests::silhouette_line_*",
+    "cf-ui::tests::module_line_*",
+    "cf-ui::tests::tool_line_*",
+    "cf-ui::tests::banner_line_*",
+    "cf-ui::tests::palette_helpers_*",
+    "cf-tools-replay-viewer::tests::*"
+  ],
+  "perf_gates": [
+    {
+      "tier": "tick_60hz_at_1280x720",
+      "scenario": "m4a_micro_breach_readability",
+      "max_p99_tick_ms": 8.33,
+      "rationale": "60 Hz tick budget = 16.67 ms/tick frame budget; conservative gate at 8.33 ms (50% of frame). M4A is a HUD-only milestone — no new sim path. Banner + caption queues are O(buffer_size).",
+      "status": "verified_via_m4a_60hz_bundle_summary_json_performance",
+      "verified_evidence": "prototype_runs/native/m4a_2026-05-10T05-57-39Z_43f1fb59/summary.json.performance.p99_tick_ms = 0.178 ms (≪ 8.33 ms) at tick_rate_hz=60, window 1280x720"
+    },
+    {
+      "tier": "tick_120hz_at_1280x720",
+      "scenario": "m4a_micro_breach_readability",
+      "max_p99_tick_ms": 4.16,
+      "rationale": "120 Hz tick budget = 8.33 ms/tick frame budget; conservative gate at 4.16 ms (50% of frame). Validated via dedicated --tick-rate-hz 120 cf-app run on the m4a scenario.",
+      "status": "verified_via_dedicated_m4a_120hz_bundle",
+      "verified_evidence": "prototype_runs/native/m4a_2026-05-10T06-01-45Z_e5015700/summary.json.performance.p99_tick_ms = 0.042 ms (≪ 4.16 ms) at tick_rate_hz=120, window 1280x720"
+    },
+    {
+      "tier": "regression_60hz_120hz_legacy_m1",
+      "scenario": "m1_actor_range",
+      "max_p99_tick_ms": 4.16,
+      "rationale": "BP1 regression baseline: m1_actor_range at 60Hz + 120Hz must not regress vs prior BP closures.",
+      "status": "verified_via_self_play_sweep_rows_m1_actor_60hz_determinism_AND_m1_actor_120hz_determinism"
+    },
+    {
+      "tier": "render_resolution_coverage",
+      "scenario": "m4a_micro_breach_readability",
+      "max_p99_tick_ms": "n/a",
+      "rationale": "Honest down-scope (audit fix 2026-05-10): the M4A perf gates verify the SIM tick budget at 60Hz + 120Hz on a 1280x720 window only. The roadmap's Steam Deck 800p/60, 1080p/60, and 4K/120 RENDER perf tiers are NOT directly verified by the M4A scenario because cf-app does not yet expose a `--window-resolution` flag and the render cost of cf-render-2d is dominated by Bevy/wgpu's per-fragment overhead at the configured window dimensions, not by M4A sim cost. The previous bp3.test_manifest.json overclaimed all three render tiers from a single 1280x720 run; this is the honest version.",
+      "status": "deferred_to_t_perf_render_resolution_matrix",
+      "owning_milestone": "T-PERF (BP4+ when M5.5 / M5.6 introduce render-cost-sensitive systems)",
+      "verified_evidence": "Sim tick perf at 60Hz + 120Hz is verified above; resolution-tier render perf is the open work."
+    }
+  ],
+  "universal_enhancement_gates": {
+    "per_tier_perf_gate": "see perf_gates above",
+    "ci_bench_regression": "DR-054 — ride existing cargo bench harness; <5% regression vs prior BP baseline",
+    "memory_leak_soak_24h": "STAGED at BP12 boundary per DR-051 + DR-054",
+    "network_sync_verified": "N/A pre-multiplayer (BP9+ owns)",
+    "replay_determinism_ci_matrix": "verified — sweep runs 60+120 Hz on Linux + macOS + Windows in CI",
+    "all_player_surfaces_via_cfctl": "verified — settings + HUD surfaces (banners + captions + silhouette + module_strip + stance + tool_validity + focusable_nodes) reachable through observe.once + observe.settings + act.settings.set",
+    "ai_agent_validation_report": "AI-Agent Self-Test Report at prototype_runs/native/bp3_*/notes.md",
+    "ai_audio_pipeline": "N/A pre-cf-audio (BP6+ owns)",
+    "juice_rules_dr055": "STAGED at BP4 (DR-055 + M5.5)",
+    "acca_floor_dr012": "CLOSED at M4A — UI scale 200% reflows HUD, high-contrast palette swap, captions toggle, color-independent state labels (icon + text), focus traversal through keyboard/controller surfaced via observe.accessibility, hold-to-confirm behavior tests, validated key remap table (unsupported actions/keys reject; Numpad names accepted), reduced-* flags read + recorded",
+    "tier_a_localization": "STAGED at BP12 boundary per DR-046 (English-only prototype)",
+    "modding_parity": "STAGED at BP8 boundary",
+    "anti_fomo_anti_p2w_audit": "N/A pre-monetization",
+    "captions_for_all_audio": "STAGED at BP6 (cf-audio); M4A surfaces captions queue contract"
+  },
+  "loop_thresholds": {
+    "max_iterations": 10,
+    "minimum_grading_aggregate_for_pass": 7.0,
+    "minimum_per_dimension_for_pass": 5,
+    "halt_when_findings_unchanged_iterations": 2,
+    "review_verdict_required": "Accept"
+  }
+}

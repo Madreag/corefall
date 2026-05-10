@@ -149,6 +149,7 @@ fn replay(bundle_dir: &Path, verify_checksums: bool, scenario_path: Option<PathB
         write_run_bundle: false,
         control_api_enabled: false,
         debug_capabilities: vec!["headless-replay".to_string()],
+        capture_grid_enabled: false,
         paced: false,
         settings: Settings::default(),
         debug_inject_panic_at_tick: None,

@@ -15,6 +15,39 @@
         "null"
       ]
     },
+    "hold_threshold_ms": {
+      "description": "M4A: hold threshold in milliseconds (50..2000).",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint32",
+      "minimum": 0
+    },
+    "hold_to_confirm": {
+      "description": "M4A: ACC-A-05 hold-to-press alternative.",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "key_bindings": {
+      "description": "M4A: ACC-A-05 per-action key binding overrides. When `Some(...)` the\npatch REPLACES the entire table (not merged) so a remap UI clearing\nevery binding can ship the empty map. When `None`, the existing\ntable is preserved.",
+      "type": [
+        "object",
+        "null"
+      ],
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
+    "key_remap_enabled": {
+      "description": "M4A: ACC-A-05 remap toggle.",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
     "reduced_flash": {
       "type": [
         "boolean",

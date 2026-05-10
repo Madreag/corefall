@@ -99,6 +99,74 @@ impl Status {
     }
 }
 
+/// M4A readable stance/locomotion state derived from per-tick actor state.
+///
+/// Until M5 introduces real chassis, body graph, and animation events, the M4A
+/// stance is a derivation of `velocity`, `on_ground`, and `Status` that gives
+/// the HUD, `cfctl observe`, and AI agents a non-color-only readable signal
+/// of what the body is doing (per `spec/animation-system` and DR-003).
+/// M5 replaces the derivation with explicit animation-state and chassis-stage
+/// tags but the HUD/observe surface contract stays stable.
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Stance {
+    /// On ground, stationary, accepting input.
+    Idle = 0,
+    /// On ground, horizontal velocity > walk threshold and < run threshold.
+    Walking = 1,
+    /// On ground, horizontal velocity >= run threshold.
+    Running = 2,
+    /// Off ground (jumping, falling, jetting).
+    Airborne = 3,
+    /// Status::Downed but still alive.
+    Downed = 4,
+    /// Status::Dead.
+    Dead = 5,
+}
+
+impl Stance {
+    /// Threshold below which horizontal velocity counts as `Idle` (world units / s).
+    /// Mirrors `cf-physics::WALK_SPEED_FLOOR` in spirit; we keep the literal here so
+    /// `cf-actor` does not depend on physics constants.
+    pub const WALK_THRESHOLD: f32 = 8.0;
+    /// Threshold at/above which horizontal velocity counts as `Running`.
+    pub const RUN_THRESHOLD: f32 = 60.0;
+
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Stance::Idle => "idle",
+            Stance::Walking => "walking",
+            Stance::Running => "running",
+            Stance::Airborne => "airborne",
+            Stance::Downed => "downed",
+            Stance::Dead => "dead",
+        }
+    }
+
+    /// Derive stance from kinematic + status state. Pure; no clock reads.
+    pub fn from_state(velocity: Vec2, on_ground: bool, status: Status) -> Stance {
+        match status {
+            Status::Dead => Stance::Dead,
+            Status::Downed => Stance::Downed,
+            Status::Stable | Status::Unstable => {
+                if !on_ground {
+                    Stance::Airborne
+                } else {
+                    let speed = velocity.x.abs();
+                    if speed >= Self::RUN_THRESHOLD {
+                        Stance::Running
+                    } else if speed >= Self::WALK_THRESHOLD {
+                        Stance::Walking
+                    } else {
+                        Stance::Idle
+                    }
+                }
+            }
+        }
+    }
+}
+
 /// Item id used by the M1 inventory. Maps 1:1 to a slot index in [`Inventory::items`].
 /// Resolved against per-actor item presets (`cf-equipment::RIFLE_M1_DEFAULT_ID`, etc.).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
@@ -409,6 +477,34 @@ impl ActorState {
         }
     }
 
+    /// Derived M4A stance for HUD + `cfctl observe`. See [`Stance::from_state`].
+    pub fn stance(&self) -> Stance {
+        Stance::from_state(self.velocity, self.on_ground, self.status)
+    }
+
+    /// M4A body silhouette per-zone hp percentage. At M4A there is no real body
+    /// graph (M5 owns that); we project the actor's total HP onto a four-zone
+    /// silhouette so the HUD silhouette and `cfctl observe.body_silhouette`
+    /// render a non-color-only damage map. M5 replaces this with the real
+    /// per-zone wound model from `spec/body-damage-model` without changing
+    /// the surface contract.
+    pub fn body_silhouette(&self) -> BodySilhouette {
+        let pct = if self.hp_max > 0.0 {
+            (self.hp / self.hp_max).clamp(0.0, 1.0)
+        } else {
+            0.0
+        };
+        BodySilhouette {
+            head_hp_pct: pct,
+            torso_hp_pct: pct,
+            arm_left_hp_pct: pct,
+            arm_right_hp_pct: pct,
+            leg_left_hp_pct: pct,
+            leg_right_hp_pct: pct,
+            placeholder: true,
+        }
+    }
+
     /// Hash bytes for the M1 deterministic checksum extension. Layout-stable; future
     /// milestones append fields without bumping the schema. Field encodings are picked
     /// to round-trip the full source domain — the inventory slot writes its full `u32`
@@ -490,6 +586,69 @@ impl ActorWorld {
     }
 }
 
+/// M4A body silhouette projection. Per-zone hp percentages clamped to `[0, 1]`.
+/// `placeholder = true` until M5 lands the real body graph; HUD + AI consumers
+/// must treat the layout as stable but the per-zone values as derived (not
+/// individually targetable yet).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct BodySilhouette {
+    pub head_hp_pct: f32,
+    pub torso_hp_pct: f32,
+    pub arm_left_hp_pct: f32,
+    pub arm_right_hp_pct: f32,
+    pub leg_left_hp_pct: f32,
+    pub leg_right_hp_pct: f32,
+    pub placeholder: bool,
+}
+
+impl Default for BodySilhouette {
+    fn default() -> Self {
+        Self {
+            head_hp_pct: 1.0,
+            torso_hp_pct: 1.0,
+            arm_left_hp_pct: 1.0,
+            arm_right_hp_pct: 1.0,
+            leg_left_hp_pct: 1.0,
+            leg_right_hp_pct: 1.0,
+            placeholder: true,
+        }
+    }
+}
+
+/// M4A module strip placeholder. M5's chassis grammar replaces this with real
+/// per-module state (see [[spec/chassis-armor-mechs-and-origins]]); M4A ships
+/// the surface so HUD + `cfctl observe` consumers + accessibility tooling can
+/// rely on the contract early.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ModuleStrip {
+    /// Module slots, each with a stable id + textual state. Empty when no
+    /// chassis is bound. M4A populates `weapon_mount` from the selected
+    /// rifle's status (READY / RELOADING / EMPTY / NO RIFLE) and stubs
+    /// `jet`, `shield`, and `sensor` as `not_present` so consumers can
+    /// distinguish "no module" from "module destroyed".
+    pub modules: Vec<ModuleState>,
+    pub placeholder: bool,
+}
+
+impl Default for ModuleStrip {
+    fn default() -> Self {
+        Self {
+            modules: Vec::new(),
+            placeholder: true,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ModuleState {
+    pub id: String,
+    pub label: String,
+    /// One of: `nominal`, `degraded`, `warning`, `failed`, `not_present`.
+    pub state: String,
+    /// One of: `weapon_mount`, `jet`, `shield`, `sensor`, `repair_drone`.
+    pub kind: String,
+}
+
 /// Public projection of an actor for the cf-control observe envelope.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ActorObservation {
@@ -505,6 +664,10 @@ pub struct ActorObservation {
     pub hp_max: f32,
     pub selected_slot: u32,
     pub selected_item: String,
+    /// M4A: derived stance label (idle/walking/running/airborne/downed/dead).
+    pub stance: String,
+    /// M4A: per-zone body silhouette projection (placeholder until M5).
+    pub body_silhouette: BodySilhouette,
 }
 
 impl From<&ActorState> for ActorObservation {
@@ -522,6 +685,8 @@ impl From<&ActorState> for ActorObservation {
             hp_max: actor.hp_max,
             selected_slot: actor.inventory.selected.0,
             selected_item: actor.inventory.selected_item().label().to_string(),
+            stance: actor.stance().as_str().to_string(),
+            body_silhouette: actor.body_silhouette(),
         }
     }
 }
@@ -637,6 +802,67 @@ mod tests {
         // 8 (id u64) + 4*7 (position.x/y, velocity.x/y, aim.x/y, hp as i32) + 1 (status u8)
         // + 1 (on_ground u8) + 4 (selected slot u32) = 42 bytes.
         assert_eq!(bytes.len(), 42);
+    }
+
+    #[test]
+    fn stance_derives_idle_when_grounded_and_still() {
+        let inv = Inventory::with_rifle("rifle_m1_default");
+        let mut actor = ActorState::player(ActorId(1), "blue", Vec2::ZERO, 100.0, inv);
+        actor.on_ground = true;
+        actor.velocity = Vec2::new(0.0, 0.0);
+        assert_eq!(actor.stance(), Stance::Idle);
+    }
+
+    #[test]
+    fn stance_derives_walking_running_airborne() {
+        let inv = Inventory::with_rifle("rifle_m1_default");
+        let mut actor = ActorState::player(ActorId(1), "blue", Vec2::ZERO, 100.0, inv);
+        actor.on_ground = true;
+        actor.velocity = Vec2::new(20.0, 0.0);
+        assert_eq!(actor.stance(), Stance::Walking);
+        actor.velocity = Vec2::new(80.0, 0.0);
+        assert_eq!(actor.stance(), Stance::Running);
+        actor.on_ground = false;
+        actor.velocity = Vec2::new(20.0, 100.0);
+        assert_eq!(actor.stance(), Stance::Airborne);
+    }
+
+    #[test]
+    fn stance_derives_downed_and_dead_from_status() {
+        let inv = Inventory::with_rifle("rifle_m1_default");
+        let mut actor = ActorState::player(ActorId(1), "blue", Vec2::ZERO, 100.0, inv);
+        actor.apply_damage(95.0);
+        assert!(matches!(actor.stance(), Stance::Downed | Stance::Dead));
+        actor.apply_damage(100.0);
+        assert_eq!(actor.stance(), Stance::Dead);
+    }
+
+    #[test]
+    fn body_silhouette_clamps_hp_to_unit_range() {
+        let inv = Inventory::with_rifle("rifle_m1_default");
+        let mut actor = ActorState::player(ActorId(1), "blue", Vec2::ZERO, 100.0, inv);
+        actor.hp = 60.0;
+        let s = actor.body_silhouette();
+        assert!((s.head_hp_pct - 0.6).abs() < 1e-6);
+        assert!(s.placeholder);
+        actor.hp = -50.0;
+        let s = actor.body_silhouette();
+        assert!(s.head_hp_pct >= 0.0);
+        actor.hp = 200.0;
+        let s = actor.body_silhouette();
+        assert!(s.head_hp_pct <= 1.0);
+    }
+
+    #[test]
+    fn actor_observation_carries_stance_and_silhouette() {
+        let inv = Inventory::with_rifle("rifle_m1_default");
+        let mut actor = ActorState::player(ActorId(1), "blue", Vec2::ZERO, 100.0, inv);
+        actor.on_ground = true;
+        actor.velocity = Vec2::new(80.0, 0.0);
+        let obs = ActorObservation::from(&actor);
+        assert_eq!(obs.stance, "running");
+        assert!(obs.body_silhouette.placeholder);
+        assert!((obs.body_silhouette.torso_hp_pct - 1.0).abs() < 1e-6);
     }
 
     #[test]

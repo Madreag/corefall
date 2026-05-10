@@ -119,6 +119,15 @@ impl Default for ControlServerConfig {
     }
 }
 
+/// M4A focus traversal direction. Drives `act.input.focus`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FocusDirection {
+    Next,
+    Prev,
+    Set(String),
+    Clear,
+}
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct SettingsPatch {
@@ -134,6 +143,21 @@ pub struct SettingsPatch {
     pub reduced_shake: Option<bool>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reduced_flash: Option<bool>,
+    /// M4A: ACC-A-05 hold-to-press alternative.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hold_to_confirm: Option<bool>,
+    /// M4A: hold threshold in milliseconds (50..2000).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hold_threshold_ms: Option<u32>,
+    /// M4A: ACC-A-05 remap toggle.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub key_remap_enabled: Option<bool>,
+    /// M4A: ACC-A-05 per-action key binding overrides. When `Some(...)` the
+    /// patch REPLACES the entire table (not merged) so a remap UI clearing
+    /// every binding can ship the empty map. When `None`, the existing
+    /// table is preserved.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub key_bindings: Option<std::collections::BTreeMap<String, String>>,
 }
 
 impl SettingsPatch {
@@ -144,6 +168,16 @@ impl SettingsPatch {
             && self.reduced_motion.is_none()
             && self.reduced_shake.is_none()
             && self.reduced_flash.is_none()
+            && self.hold_to_confirm.is_none()
+            && self.hold_threshold_ms.is_none()
+            && self.key_remap_enabled.is_none()
+            && self.key_bindings.is_none()
+    }
+
+    pub fn validation_error(&self) -> Option<String> {
+        self.key_bindings
+            .as_ref()
+            .and_then(|bindings| crate::settings::validate_key_bindings(bindings).err())
     }
 }
 
@@ -194,6 +228,16 @@ pub enum ControlCommand {
     /// optional explicit breach id; `None` => pick the nearest in-range strip.
     ActPlayerDig {
         target: Option<String>,
+        source: IntentSource,
+    },
+    /// M4A: ACC-A-04 keyboard/controller focus traversal.
+    /// `direction = "next" | "prev" | "set:<node_id>" | "clear"`.
+    /// Drives the canonical `HUD_FOCUSABLE_NODES` cursor in the engine; the
+    /// new focus state surfaces in `observe.accessibility.focused_node` +
+    /// `focus_cycle`. cf-app's keyboard layer + cfctl + cf-e2e all dispatch
+    /// through this same path.
+    ActInputFocus {
+        direction: FocusDirection,
         source: IntentSource,
     },
     SettingsSet {
@@ -795,6 +839,41 @@ async fn process_request<E: EngineHandle>(
                 .await;
             Some(ack_response(request.id, &result))
         }
+        "act.input.focus" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct FocusParams {
+                schema_version: u32,
+                direction: String,
+                #[serde(default, skip_serializing_if = "Option::is_none")]
+                node: Option<String>,
+            }
+            let p: FocusParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            let direction = match p.direction.as_str() {
+                "next" => FocusDirection::Next,
+                "prev" => FocusDirection::Prev,
+                "clear" => FocusDirection::Clear,
+                "set" => match p.node {
+                    Some(n) if !n.is_empty() => FocusDirection::Set(n),
+                    _ => return Some(invalid_param_reason(request.id, "focus_set_requires_node")),
+                },
+                other => {
+                    let reason = format!("focus_unknown_direction:{other}");
+                    return Some(invalid_param_reason(request.id, &reason));
+                }
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActInputFocus {
+                    direction,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
         "act.settings.set" => {
             // Accept either a flat object {schema_version, ui_scale, ...} or a wrapped {schema_version, patch:{...}}.
             let patch_value = if params.get("patch").is_some() {
@@ -823,6 +902,9 @@ async fn process_request<E: EngineHandle>(
             };
             if patch.is_empty() {
                 return Some(invalid_param_reason(request.id, "settings_patch_empty"));
+            }
+            if let Some(reason) = patch.validation_error() {
+                return Some(invalid_param_reason(request.id, &reason));
             }
             let result = engine.dispatch(ControlCommand::SettingsSet { changes: patch }).await;
             Some(ack_response(request.id, &result))
@@ -1019,6 +1101,10 @@ mod tests {
                 enemies: vec![],
                 terrain: None,
                 reactors: vec![],
+                banners: vec![],
+                captions: vec![],
+                tool_validity: None,
+                accessibility: crate::state::AccessibilityView::default(),
             }
         }
         async fn settings_snapshot(&self) -> Settings {

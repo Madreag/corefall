@@ -23,7 +23,7 @@ use std::{
 };
 
 use anyhow::{Context, Result};
-use clap::Parser;
+use clap::{Parser, ValueEnum};
 use futures_util::{SinkExt, StreamExt};
 use serde::Deserialize;
 use serde_json::{json, Value};
@@ -52,6 +52,18 @@ struct Cli {
     high_contrast: bool,
     #[arg(long)]
     verify_focus: bool,
+    /// M4A: ACC-A floor — captions on/off (mirrors cf-app's `--captions on|off`).
+    #[arg(long, value_enum, default_value_t = CaptionsArg::On)]
+    captions: CaptionsArg,
+    /// M4A: ACC-A floor — pass through `--reduced-motion` to the spawned cf-app.
+    #[arg(long)]
+    reduced_motion: bool,
+    /// M4A: ACC-A floor — pass through `--reduced-shake` to the spawned cf-app.
+    #[arg(long)]
+    reduced_shake: bool,
+    /// M4A: ACC-A floor — pass through `--reduced-flash` to the spawned cf-app.
+    #[arg(long)]
+    reduced_flash: bool,
     #[arg(long)]
     save_load_roundtrip: bool,
     #[arg(long)]
@@ -63,7 +75,9 @@ struct Cli {
     /// `--timeout-seconds` for fast tests if needed.
     #[arg(long, default_value_t = 180)]
     timeout_seconds: u64,
-    #[arg(long, default_value_t = 17900u16)]
+    /// Control API port for the spawned cf-app. 0 chooses an ephemeral free
+    /// port so concurrent sweep rows do not collide.
+    #[arg(long, default_value_t = 0u16)]
     control_port: u16,
     /// T-CAPTURE: enable cf-capture frame readback + grid composition.
     /// When set, the spawned cf-app runs in windowed mode (NOT --headless-smoke)
@@ -102,6 +116,18 @@ struct Cli {
     composer_script: Option<PathBuf>,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+enum CaptionsArg {
+    On,
+    Off,
+}
+
+impl CaptionsArg {
+    const fn as_bool(self) -> bool {
+        matches!(self, Self::On)
+    }
+}
+
 fn init_diagnostics() {
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info,cf_=debug")))
@@ -115,13 +141,8 @@ async fn main() -> Result<()> {
     init_diagnostics();
     let cli = Cli::parse();
     tracing::info!(target: "cf::e2e", scenario = %cli.scenario, script = ?cli.script, "starting cf-e2e");
-    let _ = (
-        cli.ui_scale,
-        cli.high_contrast,
-        cli.verify_focus,
-        cli.save_load_roundtrip,
-    );
-    let _ = cli.verify_checksums;
+    let _ = (cli.save_load_roundtrip, cli.verify_checksums);
+    let control_port = choose_control_port(cli.control_port)?;
 
     let script_path = match &cli.script {
         Some(name) => locate_script(name)?,
@@ -149,15 +170,21 @@ async fn main() -> Result<()> {
     };
 
     let mut child = launch_cf_app(LaunchOptions {
-        port: cli.control_port,
+        port: control_port,
         scenario: &scenario,
         write_run_bundle: cli.write_run_bundle,
         capture_grid: effective_capture_grid,
         capture_frames_hz: effective_capture_frames_hz,
         no_capture_events: cli.no_capture_events,
         tick_rate_hz: cli.tick_rate_hz,
+        ui_scale: cli.ui_scale,
+        high_contrast: cli.high_contrast,
+        captions: cli.captions.as_bool(),
+        reduced_motion: cli.reduced_motion,
+        reduced_shake: cli.reduced_shake,
+        reduced_flash: cli.reduced_flash,
     })?;
-    let url = format!("ws://127.0.0.1:{}", cli.control_port);
+    let url = format!("ws://127.0.0.1:{control_port}");
     let mut session = match wait_for_ws(&url, Duration::from_secs(8)).await {
         Ok(ws) => Session {
             ws,
@@ -206,6 +233,25 @@ async fn main() -> Result<()> {
         let _ = session.send("runbundle.write", json!({})).await?;
     }
 
+    // M4A: --verify-focus must run BEFORE the cf-app shutdown that
+    // capture-grid composition triggers. Drive a full focus cycle through
+    // act.input.focus + observe.once so the FINAL observation snapshot we
+    // pass to --expect already carries the post-focus state.
+    //
+    // Single source: `cf_control::HUD_FOCUSABLE_NODES` is the canonical
+    // 12-id list; engine + cf-e2e + live_ws_acceptance + cf-app all read
+    // from it. Any regression dropping a node fails all consumers together.
+    if cli.verify_focus {
+        let total_nodes = cf_control::HUD_FOCUSABLE_NODES.len();
+        for _ in 0..total_nodes {
+            let _ = session.send("act.input.focus", json!({"direction": "next"})).await?;
+        }
+        let _ = session.send("act.input.focus", json!({"direction": "clear"})).await?;
+        let _ = session.send("act.input.focus", json!({"direction": "next"})).await?;
+        let post_focus = session.send("observe.once", json!({})).await?;
+        last_observe = Some(post_focus);
+    }
+
     if effective_capture_grid {
         // Capture composition needs the engine's run_id; force a final observe.once
         // even if the script never asked for one.
@@ -252,6 +298,57 @@ async fn main() -> Result<()> {
     }
 
     let mut all_pass = true;
+
+    // M4A: post-run --verify-focus assertion against the snapshot taken above.
+    if cli.verify_focus {
+        let total_nodes = cf_control::HUD_FOCUSABLE_NODES.len();
+
+        let required_focusables: Vec<String> = cf_control::HUD_FOCUSABLE_NODES.iter().map(|s| s.to_string()).collect();
+        let nodes = observation
+            .get("accessibility")
+            .and_then(|v| v.get("focusable_nodes"))
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default();
+        let nodes_str: Vec<String> = nodes.iter().filter_map(|v| v.as_str().map(String::from)).collect();
+        let mut missing: Vec<&str> = Vec::new();
+        for req in &required_focusables {
+            if !nodes_str.iter().any(|s| s == req) {
+                missing.push(req.as_str());
+            }
+        }
+        let focus_cycle = observation
+            .get("accessibility")
+            .and_then(|v| v.get("focus_cycle"))
+            .and_then(|v| v.as_u64())
+            .unwrap_or(0);
+        let focused_node = observation
+            .get("accessibility")
+            .and_then(|v| v.get("focused_node"))
+            .and_then(|v| v.as_str())
+            .map(|s| s.to_string());
+        if missing.is_empty() && focus_cycle >= (total_nodes as u64 + 2) && focused_node.is_some() {
+            tracing::info!(
+                target: "cf::e2e",
+                focusable_count = nodes_str.len(),
+                focus_cycle,
+                focused_node = ?focused_node,
+                "verify_focus PASS"
+            );
+        } else {
+            tracing::error!(
+                target: "cf::e2e",
+                missing = ?missing,
+                actual = ?nodes_str,
+                focus_cycle,
+                focused_node = ?focused_node,
+                expected_focus_cycle = (total_nodes as u64 + 2),
+                "verify_focus FAIL"
+            );
+            all_pass = false;
+        }
+    }
+
     for expect in &cli.expect {
         let parsed = match parse_expect(expect) {
             Some(p) => p,
@@ -303,6 +400,19 @@ async fn main() -> Result<()> {
         .unwrap()
     );
     Ok(())
+}
+
+fn choose_control_port(requested: u16) -> Result<u16> {
+    if requested != 0 {
+        return Ok(requested);
+    }
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").context("bind ephemeral cf-e2e control port")?;
+    let port = listener
+        .local_addr()
+        .context("read ephemeral cf-e2e control port")?
+        .port();
+    drop(listener);
+    Ok(port)
 }
 
 fn ticks_to_wait_for(method: &str, params: &Value) -> Option<u64> {
@@ -415,6 +525,15 @@ struct LaunchOptions<'a> {
     no_capture_events: bool,
     /// Optional pass-through for `cf-app --tick-rate-hz`. 0 = use cf-app default.
     tick_rate_hz: u32,
+    /// M4A: ACC-A flags forwarded to cf-app's `--ui-scale` / `--high-contrast` /
+    /// `--captions on|off` / `--reduced-*`. Defaults match cf-app defaults so a
+    /// caller that never set them passes the unmodified surface through.
+    ui_scale: f32,
+    high_contrast: bool,
+    captions: bool,
+    reduced_motion: bool,
+    reduced_shake: bool,
+    reduced_flash: bool,
 }
 
 fn launch_cf_app(opts: LaunchOptions<'_>) -> Result<Child> {
@@ -448,6 +567,32 @@ fn launch_cf_app(opts: LaunchOptions<'_>) -> Result<Child> {
         args.push("--write-run-bundle".into());
         args.push("--run-bundle-dir".into());
         args.push(cf_replay::resolve_run_bundle_root(None).display().to_string());
+    }
+    // M4A ACC-A floor: forward accessibility flags so the spawned cf-app's
+    // observe.settings + run_manifest.json + cf-ui HUD reflect the harness's
+    // requested posture. cf-app defaults match cf-e2e defaults for ui_scale
+    // (1.0), captions (on), high_contrast (false), and the three reduced-*
+    // flags (false), so emitting only when non-default keeps the spawn line
+    // tight for legacy tests.
+    if (opts.ui_scale - 1.0).abs() > f32::EPSILON {
+        args.push("--ui-scale".into());
+        args.push(format!("{}", opts.ui_scale));
+    }
+    if opts.high_contrast {
+        args.push("--high-contrast".into());
+    }
+    if !opts.captions {
+        args.push("--captions".into());
+        args.push("off".into());
+    }
+    if opts.reduced_motion {
+        args.push("--reduced-motion".into());
+    }
+    if opts.reduced_shake {
+        args.push("--reduced-shake".into());
+    }
+    if opts.reduced_flash {
+        args.push("--reduced-flash".into());
     }
     // Inherit stdio from the parent so cf-app's diagnostics (especially the
     // bevy_render screenshot INFO lines, ~10/sec under --capture-grid) flow
@@ -663,4 +808,28 @@ fn lookup(value: &Value, key: &str) -> Option<Value> {
         node = node.get(seg)?;
     }
     Some(node.clone())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn captions_arg_accepts_on_and_off_values() {
+        let on = Cli::try_parse_from(["cf-e2e", "--scenario", "m0_blank", "--captions", "on"])
+            .expect("captions on should parse");
+        let off = Cli::try_parse_from(["cf-e2e", "--scenario", "m0_blank", "--captions", "off"])
+            .expect("captions off should parse");
+
+        assert!(on.captions.as_bool());
+        assert!(!off.captions.as_bool());
+    }
+
+    #[test]
+    fn captions_arg_defaults_to_on() {
+        let cli = Cli::try_parse_from(["cf-e2e", "--scenario", "m0_blank"]).expect("default captions should parse");
+
+        assert_eq!(cli.captions, CaptionsArg::On);
+        assert!(cli.captions.as_bool());
+    }
 }
