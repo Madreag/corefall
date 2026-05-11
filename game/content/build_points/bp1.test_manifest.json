@@ -1,0 +1,38 @@
+{
+  "bp": "BP1",
+  "description": "Actor controller + breach fun proof (M1 + M1.5)",
+  "scenarios": ["m1_actor_range", "micro_breach"],
+  "required_cargo_tests": ["cf-actor", "cf-equipment", "cf-physics", "cf-mission", "cf-ai", "cf-e2e"],
+  "required_events": [
+    "actor.actor_status_changed",
+    "equipment.weapon_fired",
+    "equipment.weapon_reload_started",
+    "terrain.terrain_carved",
+    "mission.objective_completed",
+    "mission.mission_resolved"
+  ],
+  "grading_dimensions": ["gameplay", "actor_feel", "mission_flow", "replay_determinism"],
+  "sweep_rows": [
+    {
+      "name": "m1_move_jump_fire_reload",
+      "script": "m1_move_jump_fire_reload.cfctl.json",
+      "scenario": "m1_actor_range",
+      "tick_rate_hz": 60,
+      "expects": []
+    },
+    {
+      "name": "micro_breach_win",
+      "script": "micro_breach_win.cfctl.json",
+      "scenario": "micro_breach",
+      "tick_rate_hz": 60,
+      "expects": ["mission.result=won"]
+    },
+    {
+      "name": "micro_breach_loss",
+      "script": "micro_breach_loss.cfctl.json",
+      "scenario": "micro_breach",
+      "tick_rate_hz": 60,
+      "expects": ["mission.result=lost"]
+    }
+  ]
+}

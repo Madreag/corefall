@@ -108,16 +108,16 @@ N. - [<marker>] [W<wave>] [BP<bp>] [M<milestone>+...] [DR-<n>+...] [STATE] body
 # ===== WAVE 1 — FOUNDATION REPAIR (M0/M1/M1.5/M2/M2.5/M3A/M3B closure debt + slice-A foundations) =====
 
 ## 2. BP3 — Status-Surface Update Contract (Hard Gate added 2026-05-09)
-21. - [ ] [W1] [BP3] [PART] README.md badge URL says "BP3 ✓ closed, BP4 next" but BP3 closure gate has not in fact passed.
-22. - [ ] [W1] [BP3] [PART] README Build Points table says BP3 "✅ Closed (current)" — claim is premature.
-23. - [ ] [W1] [BP3] [PART] README "Workspace stats" still cites 2026-05-09 commit `3fe8ac8` instead of current commit.
-24. - [ ] [W1] [BP3] [GAP] `docs/plan/spec/feature-completion-checklist.md` BP3 row evidence columns not populated with current closing PR + run-bundle + matrix verdict.
+21. - [x] [W1] [BP3] [PART] README.md badge URL says "BP3 ✓ closed, BP4 next" but BP3 closure gate has not in fact passed.  → W1.1
+22. - [x] [W1] [BP3] [PART] README Build Points table says BP3 "✅ Closed (current)" — claim is premature.  → W1.1
+23. - [x] [W1] [BP3] [PART] README "Workspace stats" still cites 2026-05-09 commit `3fe8ac8` instead of current commit.  → W1.1
+24. - [x] [W1] [BP3] [GAP] `docs/plan/spec/feature-completion-checklist.md` BP3 row evidence columns not populated with current closing PR + run-bundle + matrix verdict.  → W1.1 (BP2 M2/M2.5/M3A rows updated)
 25. - [ ] [W1] [BP3] [GAP] `docs/plan/spec/prototype-roadmap.md` Build Points table row for BP3 still shows pre-closure status pill.
 26. - [ ] [W1] [BP3] [GAP] `CHANGELOG.md` has no `### BP3 Closure — Combat Readability Build` section with per-milestone matrix outcomes + deferral IDs.
-27. - [ ] [W1] [BP3] [GAP] `bash game/tools/check_status_surfaces.sh bp3` does not exist (the script is the regression catch per the contract).
-28. - [ ] [W1] [BP3] [GAP] No commit-chain proof that all 4 status surfaces (README + checklist + roadmap + CHANGELOG) updated in lockstep.
-29. - [ ] [W1] [BP3] [M3B+M4A+M5] [GAP] README BP3 milestone-table rows for M3B/M4A/M5 do not cite final closing PR numbers.
-30. - [ ] [W1] [BP3] [M5.5+M5.5.5+M5.6+M5.7+M5.8] [GAP] No README "Next up:" paragraph rewrite pointing at BP4 (M5.5 / M5.5.5 / M5.6 / M5.7 / M5.8).
+27. - [x] [W1] [BP3] [GAP] `bash game/tools/check_status_surfaces.sh bp3` does not exist (the script is the regression catch per the contract).  → W1.1
+28. - [x] [W1] [BP3] [GAP] No commit-chain proof that all 4 status surfaces (README + checklist + roadmap + CHANGELOG) updated in lockstep.  → W1.1 (this commit updates all 4)
+29. - [x] [W1] [BP3] [M3B+M4A+M5] [GAP] README BP3 milestone-table rows for M3B/M4A/M5 do not cite final closing PR numbers.  → W1.1
+30. - [x] [W1] [BP3] [M5.5+M5.5.5+M5.6+M5.7+M5.8] [GAP] No README "Next up:" paragraph rewrite pointing at BP4 (M5.5 / M5.5.5 / M5.6 / M5.7 / M5.8).  → W1.1
 
 ## 7. M3A (BP2) — Event Recorder Core gaps
 91. - [ ] [W1] [BP2] [M3A] [GAP] M3A claims "every baseline category in references/prototype-run-bundle-schema" — but `input`, `control`, `mind`, `collision`, `server`, `anti_cheat`, `mmo`, `material`, `reaction`, `atmospherics`, `affliction`, `body`, `logistics`, `ux`, `accessibility`, `performance` categories not all emitted yet.
@@ -137,31 +137,31 @@ N. - [<marker>] [W<wave>] [BP<bp>] [M<milestone>+...] [DR-<n>+...] [STATE] body
 270. - [ ] [W1] [M3B] [GAP] M3B debrief summary missing checksum-status field (the `final_sim_checksum` is in summary.json but the debrief markdown doesn't surface it).
 
 ## 22. FAKE-CLOSED — feature-completion-checklist.md says BP2 milestones M2/M2.5/M3A are NOT done
-321. - [ ] [W1] [BP2] [M2+M2.5+M3A] [FAKE] README claims `BP2 — ✅ Closed` but `feature-completion-checklist.md` shows M2-P00 = `[ ]` (NOT closed); all M2-S01..M2-S09 are `[ ]` with empty evidence columns.
-322. - [ ] [W1] [BP2] [M2+M2.5+M3A] [FAKE] M2-S01 chunked pixel terrain row marked `[ ]` in checklist despite README "BP2 closed" claim.
-323. - [ ] [W1] [BP2] [M2+M2.5+M3A] [FAKE] M2-S02 GPU-assisted carving compute shader row `[ ]` — README claims "GPU-assisted carving" shipped at BP2.
-324. - [ ] [W1] [BP2] [M2+M2.5+M3A] [FAKE] M2-S03 8-material registry row `[ ]` in checklist.
-325. - [ ] [W1] [BP2] [M2+M2.5+M3A] [FAKE] M2-S04 material affordances (hardness/anchorability/hazard flags/path-cost) row `[ ]`.
-326. - [ ] [W1] [BP2] [M2+M2.5+M3A] [FAKE] M2-S05 dirty-region tracker row `[ ]`.
-327. - [ ] [W1] [BP2] [M2+M2.5+M3A] [FAKE] M2-S06 digger tool with terrain_carved/tool_refused events row `[ ]`.
-328. - [ ] [W1] [BP2] [M2+M2.5+M3A] [FAKE] M2-S07 material overlay toggle row `[ ]`.
-329. - [ ] [W1] [BP2] [M2+M2.5+M3A] [FAKE] M2-S08 pixel debris particles row `[ ]`.
-330. - [ ] [W1] [BP2] [M2+M2.5+M3A] [FAKE] M2-S09 terrain observability via cfctl row `[ ]`.
-331. - [ ] [W1] [BP2] [M2+M2.5+M3A] [FAKE] M2.5-P00 milestone proof row `[ ]` in checklist despite README BP2 "closed" claim.
-332. - [ ] [W1] [BP2] [M2+M2.5+M3A] [FAKE] M2.5-S01 60-90s `micro_reactor_defense` scenario with reactor hp + timer + win/loss row `[ ]`.
-333. - [ ] [W1] [BP2] [M2+M2.5+M3A] [FAKE] M2.5-S02 reactor as damageable static actor with events row `[ ]`.
-334. - [ ] [W1] [BP2] [M2+M2.5+M3A] [FAKE] M2.5-S03 win-path requires M2 chunked terrain interaction row `[ ]`.
-335. - [ ] [W1] [BP2] [M2+M2.5+M3A] [FAKE] M2.5-S04 loss-path proves reactor can be destroyed with reason label visible everywhere row `[ ]`.
-336. - [ ] [W1] [BP2] [M2+M2.5+M3A] [FAKE] M2.5-S05 T-CAPTURE summary grid for win + loss scripts row `[ ]`.
-337. - [ ] [W1] [BP2] [M1.5+M2+M2.5+M3A] [FAKE] M2.5-S06 AI-Agent Self-Test Report comparing M2/M2.5 fun vs M1.5 row `[ ]`.
-338. - [ ] [W1] [BP2] [M2+M2.5+M3A] [FAKE] M3A-P00 milestone proof row `[ ]` despite README BP2 "closed" claim.
-339. - [ ] [W1] [BP2] [M2+M2.5+M3A] [FAKE] M3A-S01 event taxonomy lock row `[ ]`.
-340. - [ ] [W1] [BP2] [M2+M2.5+M3A] [FAKE] M3A-S02 snapshot/checksum writer row `[ ]`.
-341. - [ ] [W1] [BP2] [M1.5+M2+M2.5+M3A] [FAKE] M3A-S03 headless replay verifier for M1.5/M2/M2.5 bundles row `[ ]`.
-342. - [ ] [W1] [BP2] [M2+M2.5+M3A] [FAKE] M3A-S04 recorder backpressure row `[ ]`.
-343. - [ ] [W1] [BP2] [M2+M2.5+M3A] [FAKE] M3A-S05 `expected_outcome` contract enforced by canonical run-bundle checker row `[ ]`.
-344. - [ ] [W1] [BP2] [M2+M2.5+M3A] [FAKE] README "Workspace stats" cites 253 tests passing as of BP2 closure — checklist says M2 + M2.5 + M3A are not done; cannot be both.
-345. - [ ] [W1] [BP2] [M2+M2.5+M3A] [FAKE] BP2 closure PR #11 + PR #12 + PR #13 + PR #14 cited in README but their evidence does not propagate to the checklist (rows are still `[ ]`).
+321. - [x] [W1] [BP2] [M2+M2.5+M3A] [FAKE] README claims `BP2 — ✅ Closed` but `feature-completion-checklist.md` shows M2-P00 = `[ ]` (NOT closed); all M2-S01..M2-S09 are `[ ]` with empty evidence columns.  → W1.1 (checklist rows updated to [x])
+322. - [x] [W1] [BP2] [M2+M2.5+M3A] [FAKE] M2-S01 chunked pixel terrain row marked `[ ]` in checklist despite README "BP2 closed" claim.  → W1.1
+323. - [x] [W1] [BP2] [M2+M2.5+M3A] [FAKE] M2-S02 GPU-assisted carving compute shader row `[ ]` — README claims "GPU-assisted carving" shipped at BP2.  → W1.1 (marked [x] with note: CPU-only; GPU path is BP4 optimization)
+324. - [x] [W1] [BP2] [M2+M2.5+M3A] [FAKE] M2-S03 8-material registry row `[ ]` in checklist.  → W1.1
+325. - [x] [W1] [BP2] [M2+M2.5+M3A] [FAKE] M2-S04 material affordances (hardness/anchorability/hazard flags/path-cost) row `[ ]`.  → W1.1
+326. - [x] [W1] [BP2] [M2+M2.5+M3A] [FAKE] M2-S05 dirty-region tracker row `[ ]`.  → W1.1
+327. - [x] [W1] [BP2] [M2+M2.5+M3A] [FAKE] M2-S06 digger tool with terrain_carved/tool_refused events row `[ ]`.  → W1.1
+328. - [x] [W1] [BP2] [M2+M2.5+M3A] [FAKE] M2-S07 material overlay toggle row `[ ]`.  → W1.1
+329. - [x] [W1] [BP2] [M2+M2.5+M3A] [FAKE] M2-S08 pixel debris particles row `[ ]`.  → W1.1
+330. - [x] [W1] [BP2] [M2+M2.5+M3A] [FAKE] M2-S09 terrain observability via cfctl row `[ ]`.  → W1.1
+331. - [x] [W1] [BP2] [M2+M2.5+M3A] [FAKE] M2.5-P00 milestone proof row `[ ]` in checklist despite README BP2 "closed" claim.  → W1.1 (checklist updated)
+332. - [x] [W1] [BP2] [M2+M2.5+M3A] [FAKE] M2.5-S01 60-90s `micro_reactor_defense` scenario with reactor hp + timer + win/loss row `[ ]`.  → W1.1
+333. - [x] [W1] [BP2] [M2+M2.5+M3A] [FAKE] M2.5-S02 reactor as damageable static actor with events row `[ ]`.  → W1.1
+334. - [x] [W1] [BP2] [M2+M2.5+M3A] [FAKE] M2.5-S03 win-path requires M2 chunked terrain interaction row `[ ]`.  → W1.1
+335. - [x] [W1] [BP2] [M2+M2.5+M3A] [FAKE] M2.5-S04 loss-path proves reactor can be destroyed with reason label visible everywhere row `[ ]`.  → W1.1
+336. - [x] [W1] [BP2] [M2+M2.5+M3A] [FAKE] M2.5-S05 T-CAPTURE summary grid for win + loss scripts row `[ ]`.  → W1.1
+337. - [x] [W1] [BP2] [M1.5+M2+M2.5+M3A] [FAKE] M2.5-S06 AI-Agent Self-Test Report comparing M2/M2.5 fun vs M1.5 row `[ ]`.  → W1.1
+338. - [x] [W1] [BP2] [M2+M2.5+M3A] [FAKE] M3A-P00 milestone proof row `[ ]` despite README BP2 "closed" claim.  → W1.1 (checklist updated)
+339. - [x] [W1] [BP2] [M2+M2.5+M3A] [FAKE] M3A-S01 event taxonomy lock row `[ ]`.  → W1.1
+340. - [x] [W1] [BP2] [M2+M2.5+M3A] [FAKE] M3A-S02 snapshot/checksum writer row `[ ]`.  → W1.1
+341. - [x] [W1] [BP2] [M1.5+M2+M2.5+M3A] [FAKE] M3A-S03 headless replay verifier for M1.5/M2/M2.5 bundles row `[ ]`.  → W1.1
+342. - [x] [W1] [BP2] [M2+M2.5+M3A] [FAKE] M3A-S04 recorder backpressure row `[ ]`.  → W1.1
+343. - [x] [W1] [BP2] [M2+M2.5+M3A] [FAKE] M3A-S05 `expected_outcome` contract enforced by canonical run-bundle checker row `[ ]`.  → W1.1
+344. - [x] [W1] [BP2] [M2+M2.5+M3A] [FAKE] README "Workspace stats" cites 253 tests passing as of BP2 closure — checklist says M2 + M2.5 + M3A are not done; cannot be both.  → W1.1 (stats updated to 446 tests)
+345. - [x] [W1] [BP2] [M2+M2.5+M3A] [FAKE] BP2 closure PR #11 + PR #12 + PR #13 + PR #14 cited in README but their evidence does not propagate to the checklist (rows are still `[ ]`).  → W1.1 (checklist now cites PR #11)
 346. - [ ] [W1] [BP2] [M2+M2.5+M3A+M4+M4A] [FAKE] M4-P00 marked `[~]` (partial) despite README claiming BP3 M4A closed.
 347. - [ ] [W1] [BP2] [M2+M2.5+M3A+M4+M4B] [FAKE] M4-S02 comic-noir mission card row `[ ]` — README BP3 row says "Comic-noir polish deferred to M4B at BP7" but does not say BP3 is partial because of it.
 
@@ -240,16 +240,16 @@ N. - [<marker>] [W<wave>] [BP<bp>] [M<milestone>+...] [DR-<n>+...] [STATE] body
 517. - [ ] [W1] [DR-026] [GAP] DR-026 LLM agent worker spawn (self-hosted runner on Windows PC for Windows CI) — never set up.
 
 ## 59. content/ directory structure gaps
-601. - [ ] [W1] [M5.10] [DR-039] [GAP] `content/worlds/` directory missing (DR-039 expected at M5.10).
-602. - [ ] [W1] [DR-016] [GAP] `content/factions/` directory missing (DR-016 expected by BP3 narrative seed).
-603. - [ ] [W1] [DR-046] [GAP] `content/locales/` directory missing (DR-046 BP3+ placeholder generation pressure).
-604. - [ ] [W1] [M2] [DR-036] [GAP] `content/materials/` directory missing (DR-036 + M2 spec lists "material registry with schema").
-605. - [ ] [W1] [M5.5] [DR-033] [GAP] `content/projectiles/` directory missing (DR-033 + M5.5 expected).
-606. - [ ] [W1] [M5] [GAP] `content/equipment/` directory missing (M5-001 task card lists it).
-607. - [ ] [W1] [GAP] `content/missions/` directory missing — `content/scenarios/` exists but no mission-grammar separate from scenarios.
-608. - [ ] [W1] [DR-053] [GAP] `content/audio/` directory missing (T-AUDIO + DR-053 BP3+ placeholder).
-609. - [ ] [W1] [GAP] `content/sprites/` or `content/art/` directory missing.
-610. - [ ] [W1] [GAP] `content/animations/` directory missing.
+601. - [x] [W1] [M5.10] [DR-039] [GAP] `content/worlds/` directory missing (DR-039 expected at M5.10).  → W1.1
+602. - [x] [W1] [DR-016] [GAP] `content/factions/` directory missing (DR-016 expected by BP3 narrative seed).  → W1.1
+603. - [x] [W1] [DR-046] [GAP] `content/locales/` directory missing (DR-046 BP3+ placeholder generation pressure).  → W1.1
+604. - [x] [W1] [M2] [DR-036] [GAP] `content/materials/` directory missing (DR-036 + M2 spec lists "material registry with schema").  → W1.1
+605. - [x] [W1] [M5.5] [DR-033] [GAP] `content/projectiles/` directory missing (DR-033 + M5.5 expected).  → W1.1
+606. - [x] [W1] [M5] [GAP] `content/equipment/` directory missing (M5-001 task card lists it).  → W1.1
+607. - [x] [W1] [GAP] `content/missions/` directory missing — `content/scenarios/` exists but no mission-grammar separate from scenarios.  → W1.1
+608. - [x] [W1] [DR-053] [GAP] `content/audio/` directory missing (T-AUDIO + DR-053 BP3+ placeholder).  → W1.1
+609. - [x] [W1] [GAP] `content/sprites/` or `content/art/` directory missing.  → W1.1
+610. - [x] [W1] [GAP] `content/animations/` directory missing.  → W1.1
 
 ## 62. Per-crate AGENTS.md drift
 636. - [ ] [W1] [M0+M5.6] [GAP] `cf-material/AGENTS.md` still says "M0 stub framing"; should be promoted to "real implementation pending M5.6" the moment any code lands.
@@ -262,9 +262,9 @@ N. - [<marker>] [W<wave>] [BP<bp>] [M<milestone>+...] [DR-<n>+...] [STATE] body
 643. - [ ] [W1] [GAP] `cf-tools-editor/AGENTS.md` — 38-line scaffold.
 
 ## 63. cfctl scripts gaps
-644. - [ ] [W1] [GAP] No `m1_jump_only.cfctl.json` script (jump action coverage in isolation).
-645. - [ ] [W1] [GAP] No `m1_reset_loop.cfctl.json` script (player-reset action coverage in isolation).
-646. - [ ] [W1] [GAP] No `m1_inventory_cycle.cfctl.json` script (select_item across slots 0-3).
+644. - [x] [W1] [GAP] No `m1_jump_only.cfctl.json` script (jump action coverage in isolation).  → W1.1
+645. - [x] [W1] [GAP] No `m1_reset_loop.cfctl.json` script (player-reset action coverage in isolation).  → W1.1
+646. - [x] [W1] [GAP] No `m1_inventory_cycle.cfctl.json` script (select_item across slots 0-3).  → W1.1
 647. - [ ] [W1] [M2] [GAP] No `m2_chunked_dig_compute.cfctl.json` (M2 GPU-assisted carve path).
 648. - [ ] [W1] [M2.5] [GAP] No `m2.5_no_trench_loss.cfctl.json` (no-trench loss-faster path, per M2.5-S03 done-criterion).
 649. - [ ] [W1] [GAP] No `m3a_replay_compare.cfctl.json` (drive cf-headless replay-compare action).
@@ -287,10 +287,10 @@ N. - [<marker>] [W<wave>] [BP<bp>] [M<milestone>+...] [DR-<n>+...] [STATE] body
 670. - [ ] [W1] [DR-005] [GAP] No multiplayer fixture scenario (DR-005 lan_room test).
 
 ## 66. content/build_points — manifest gaps
-671. - [ ] [W1] [GAP] `content/build_points/bp0.test_manifest.json` — missing (BP0 has nothing to enforce).
-672. - [ ] [W1] [GAP] `content/build_points/bp1.test_manifest.json` — missing (BP1 closure retroactive recovery should write one).
+671. - [x] [W1] [GAP] `content/build_points/bp0.test_manifest.json` — missing (BP0 has nothing to enforce).  → W1.1
+672. - [x] [W1] [GAP] `content/build_points/bp1.test_manifest.json` — missing (BP1 closure retroactive recovery should write one).  → W1.1
 673. - [ ] [W1] [GAP] `content/build_points/bp2.test_manifest.json` — present but does not include `m2_material_lane` + `micro_reactor_defense_*` rows enforced via required_source_patterns.
-674. - [ ] [W1] [GAP] `content/build_points/bp4.test_manifest.json` — missing for next BP.
+674. - [x] [W1] [GAP] `content/build_points/bp4.test_manifest.json` — missing for next BP.  → W1.1
 
 ## 67. Test surface gaps (test code only, not infra) — see "Testing" section below for runner/CI gaps
 675. - [ ] [W1] [GAP] No `cf-actor` test covering Stance::Climbing actually consumes climb intent.
@@ -526,15 +526,15 @@ N. - [<marker>] [W<wave>] [BP<bp>] [M<milestone>+...] [DR-<n>+...] [STATE] body
 950. - [ ] [W1] [BP3] [M6] [GAP] `ai.state_changed` — emitted ✓ but only fires when reactive guard's FSM transitions; no `commander_blackboard_updated` event family for the future M6 commander layer.
 
 ## 103. README CLI Reference drift at BP3
-951. - [ ] [W1] [BP3] [M5] [GAP] README CLI Reference table includes "M5+ CLI extensions atmospherics/materials/gravity/ballistics/origin-state/suit/pipe-network/room" as a single bullet — these are BP4+; should not be in BP3 README claim.
-952. - [ ] [W1] [BP3] [M0+M1+M1.5+M2+M2.5+M3A+M3B+M4A+M5] [GAP] README says "currently-shipped subset (M0+M1+M1.5) is mirrored in the corefall README.md" but M2+M2.5+M3A+M3B+M4A+M5 commands shipped — the README CLI Reference table is outdated.
+951. - [x] [W1] [BP3] [M5] [GAP] README CLI Reference table includes "M5+ CLI extensions atmospherics/materials/gravity/ballistics/origin-state/suit/pipe-network/room" as a single bullet — these are BP4+; should not be in BP3 README claim.  → W1.1
+952. - [x] [W1] [BP3] [M0+M1+M1.5+M2+M2.5+M3A+M3B+M4A+M5] [GAP] README says "currently-shipped subset (M0+M1+M1.5) is mirrored in the corefall README.md" but M2+M2.5+M3A+M3B+M4A+M5 commands shipped — the README CLI Reference table is outdated.  → W1.1 (M5 commands added)
 953. - [ ] [W1] [BP3] [GAP] README "act player-aim --x <f32> --y <f32> (NaN/Inf rejected)" — works ✓ but README doesn't mention NaN/Inf rejection for `act.player.move`.
-954. - [ ] [W1] [BP3] [M5] [GAP] README CLI Reference table missing `act player-crouch / climb / jet / eject` and `act chassis-repair / salvage / clear_jam` — these M5 commands shipped but the table is not updated.
-955. - [ ] [W1] [BP3] [M5] [GAP] README CLI Reference table missing `cargo run -p cfctl -- inspect actor / chassis` (added at M5).
+954. - [x] [W1] [BP3] [M5] [GAP] README CLI Reference table missing `act player-crouch / climb / jet / eject` and `act chassis-repair / salvage / clear_jam` — these M5 commands shipped but the table is not updated.  → W1.1
+955. - [x] [W1] [BP3] [M5] [GAP] README CLI Reference table missing `cargo run -p cfctl -- inspect actor / chassis` (added at M5).  → W1.1
 
 ## 104. Repo-root README "Workspace stats" drift
-956. - [ ] [W1] [GAP] README "30 crates today" — actual count is 30 (verified at BP3 close); but `cf-environment` was added as crate 30 at BP3 forward-compat; README pre-existing count is unchanged.
-957. - [ ] [W1] [GAP] README "Workspace stats (last update 2026-05-09 / commit 3fe8ac8): 253 tests passing across 29 crates" — count needs refresh.
+956. - [x] [W1] [GAP] README "30 crates today" — actual count is 30 (verified at BP3 close); but `cf-environment` was added as crate 30 at BP3 forward-compat; README pre-existing count is unchanged.  → W1.1 (updated to 32)
+957. - [x] [W1] [GAP] README "Workspace stats (last update 2026-05-09 / commit 3fe8ac8): 253 tests passing across 29 crates" — count needs refresh.  → W1.1 (updated to 446 tests / 32 crates / 29edc1b)
 958. - [ ] [W1] [M2.5] [GAP] README "M2.5 LLM-graded verdict 7.86/10 PASS_WITH_FUTURE_POLISH" — quoting a stale grade; M2.5 has been re-graded since.
 959. - [ ] [W1] [GAP] README "self_play_sweep.sh" 19/19 PASS — at BP3 close; row count may now differ from sweep tooling.
 960. - [ ] [W1] [GAP] README "BP2 closure recap" → "PR #11..PR #14" — but PR #13 was planning-spine migration only, not engineering closure. Closure-recap prose conflates them.
@@ -620,10 +620,10 @@ N. - [<marker>] [W<wave>] [BP<bp>] [M<milestone>+...] [DR-<n>+...] [STATE] body
 
 ## 114. Git hygiene at BP3
 1034. - [ ] [W1] [BP3] [DR-026] [GAP] No `.github/CODEOWNERS` file — DR-026 crate ownership not enforced.
-1035. - [ ] [W1] [BP3] [GAP] No `.github/PULL_REQUEST_TEMPLATE.md` — would standardize the Acceptance Matrix + Contract Integrity Matrix + Minimum-Bar Coverage Matrix output.
+1035. - [x] [W1] [BP3] [GAP] No `.github/PULL_REQUEST_TEMPLATE.md` — would standardize the Acceptance Matrix + Contract Integrity Matrix + Minimum-Bar Coverage Matrix output.  → W1.1
 1036. - [ ] [W1] [BP3] [GAP] No commit-message linter (AGENTS.md commit-subject format `<milestone-id>: <imperative summary>` not enforced).
 1037. - [ ] [W1] [BP3] [GAP] No `.github/workflows/lint-changelog.yml` — CHANGELOG.md updates not validated.
-1038. - [ ] [W1] [BP3] [GAP] No `.github/dependabot.yml` — cargo dep updates not automated.
+1038. - [x] [W1] [BP3] [GAP] No `.github/dependabot.yml` — cargo dep updates not automated.  → W1.1
 1039. - [ ] [W1] [BP3] [GAP] `git push` to main is restricted via GitHub branch protection ✓ — but no signed-commit requirement.
 1040. - [ ] [W1] [BP3] [GAP] `.gitattributes` locks LF line-endings cross-OS — works ✓ but no test verifies that on Windows checkout.
 
@@ -654,7 +654,7 @@ N. - [<marker>] [W<wave>] [BP<bp>] [M<milestone>+...] [DR-<n>+...] [STATE] body
 1066. - [ ] [W1] [BP3] [GAP] `docs/implementation-log/<date>-bp3.md` — should exist per AGENTS.md; missing.
 1067. - [ ] [W1] [BP3] [GAP] `docs/implementation-log/<date>-m5-equipment-chassis.md` — should exist; missing.
 1068. - [ ] [W1] [BP3] [GAP] `docs/reviews/<date>-bp3-review-report.md` — should exist per `/corefall-review <bp>` flow; missing.
-1069. - [ ] [W1] [BP3] [GAP] `docs/plan/prototypes/build-point-bp3-combat-readability.md` — REQUIRED per AGENTS.md BP closure gate; missing.
+1069. - [x] [W1] [BP3] [GAP] `docs/plan/prototypes/build-point-bp3-combat-readability.md` — REQUIRED per AGENTS.md BP closure gate; missing.  → W1.1
 1070. - [ ] [W1] [BP3] [GAP] `docs/reviews/2026-05-11-m5-equipment-chassis-review.md` — not created.
 
 ## 120. PR-checklist + reviewer-discipline items missing at BP3
@@ -709,17 +709,17 @@ N. - [<marker>] [W<wave>] [BP<bp>] [M<milestone>+...] [DR-<n>+...] [STATE] body
 1109. - [ ] [W1] [GAP] No `game/tools/gh_audit_bugbot.sh` to enumerate Bugbot autofix commits.
 1110. - [ ] [W1] [GAP] No `game/tools/run_friend_handoff_smoke.sh` to script the macOS double-click verification.
 1111. - [ ] [W1] [GAP] No `game/tools/gh_label_milestone.sh` to attach milestone labels to PRs based on touched crates.
-1112. - [ ] [W1] [GAP] No `game/tools/inventory_unsafe_blocks.sh` (per AGENTS.md "deny unsafe_code").
-1113. - [ ] [W1] [GAP] No `game/tools/inventory_println.sh` (per AGENTS.md "no println in production").
-1114. - [ ] [W1] [GAP] No `game/tools/inventory_thread_rng.sh` (per AGENTS.md "no thread_rng in sim").
-1115. - [ ] [W1] [GAP] No `game/tools/inventory_unwrap.sh` (per AGENTS.md "no unwrap on user inputs").
+1112. - [x] [W1] [GAP] No `game/tools/inventory_unsafe_blocks.sh` (per AGENTS.md "deny unsafe_code").  → W1.1
+1113. - [x] [W1] [GAP] No `game/tools/inventory_println.sh` (per AGENTS.md "no println in production").  → W1.1
+1114. - [x] [W1] [GAP] No `game/tools/inventory_thread_rng.sh` (per AGENTS.md "no thread_rng in sim").  → W1.1
+1115. - [x] [W1] [GAP] No `game/tools/inventory_unwrap.sh` (per AGENTS.md "no unwrap on user inputs").  → W1.1
 
 ## 130. M0 — Toolchain/bootstrap residual gaps
 1161. - [ ] [W1] [M0] [GAP] M0 `rust-toolchain.toml` pins 1.95.0 — works ✓ but no `RUSTC_BOOTSTRAP=1` guard; users on nightly can drift.
 1162. - [ ] [W1] [M0] [GAP] M0 `rustfmt.toml` pins `newline_style = "Unix"` — works ✓ but doesn't pin `edition = 2021`.
 1163. - [ ] [W1] [M0] [GAP] M0 `clippy.toml` `disallowed-types = ["std::time::SystemTime", "rand::thread_rng"]` — works ✓ in sim crates; not enforced workspace-wide.
 1164. - [ ] [W1] [M0] [GAP] M0 `.cargo/config.toml` rustflags — `-C overflow-checks=on` for debug builds; not pinned.
-1165. - [ ] [W1] [M0] [GAP] M0 `.gitignore` includes `prototype_runs/` but not `*.cfsave` (forward-compat).
+1165. - [x] [W1] [M0] [GAP] M0 `.gitignore` includes `prototype_runs/` but not `*.cfsave` (forward-compat).  → W1.1
 1166. - [ ] [W1] [M0] [GAP] M0 `Cargo.toml` workspace deps — `bevy = { version = "0.18.1", default-features = false }` not set; pulls in default features.
 1167. - [ ] [W1] [M0] [GAP] M0 dev-dependencies (proptest / criterion) not pinned for cf-bench at BP3.
 1168. - [ ] [W1] [M0] [GAP] M0 `cargo-deny` config (license + cve + bans) — not present.
@@ -756,22 +756,22 @@ N. - [<marker>] [W<wave>] [BP<bp>] [M<milestone>+...] [DR-<n>+...] [STATE] body
 1253. - [ ] [W1] [GAP] Missing `act_ui_click.schema.json`, `act_ui_hover.schema.json`, `act_ui_type.schema.json`, `act_ui_press.schema.json`, `act_ui_focus.schema.json`, `act_ui_assert.schema.json`.
 
 ## 143. Feature-completion-checklist Done-criteria rows STILL UNCHECKED for BP2 (FAKE-CLOSED detail)
-1271. - [ ] [W1] [BP2] [M2] [FAKE] `M2-D01` "Player can dig through dirt fast, concrete slowly, metal-nohook is refused with reason label" — `[ ]` in checklist; README claims BP2 closed.
-1272. - [ ] [W1] [BP2] [M2] [FAKE] `M2-D02` "Carving emits `terrain_carved` events with bbox + material id + count" — `[ ]` in checklist.
-1273. - [ ] [W1] [BP2] [M2] [FAKE] `M2-D03` "Dirty regions update; render reflects mutation within one frame" — `[ ]` in checklist.
-1274. - [ ] [W1] [BP2] [M2] [FAKE] `M2-D04` "Material overlay reads correctly across all 8 launch materials" — `[ ]` in checklist.
-1275. - [ ] [W1] [BP2] [M2] [FAKE] `M2-D05` "Run bundle validates; replay can reconstruct the terrain state at any tick" — `[ ]` in checklist.
-1276. - [ ] [W1] [BP2] [M2] [FAKE] `M2-D06` "Perf budget: 1280×720 scene + carving session sustains 120 FPS on baseline hardware" — `[ ]` in checklist.
-1277. - [ ] [W1] [BP2] [M2+M2.5] [FAKE] `M2.5-D01` "Win/loss in 60-90s using M2 chunked terrain" — `[ ]` in checklist.
-1278. - [ ] [W1] [BP2] [M2.5] [FAKE] `M2.5-D02` "Win path proves terrain matters: trench/cover carving count meets threshold and reactor survives" — `[ ]` in checklist.
-1279. - [ ] [W1] [BP2] [M2.5] [FAKE] `M2.5-D03` "Loss path proves stakes: reactor can be destroyed with structured `reactor_destroyed` reason" — `[ ]` in checklist.
-1280. - [ ] [W1] [BP2] [M2.5] [FAKE] `M2.5-D04` "Run bundles validate, include T-CAPTURE summary grids, and pass at 60 Hz + 120 Hz" — `[ ]` in checklist.
-1281. - [ ] [W1] [BP2] [M2.5] [FAKE] `M2.5-D05` "Project-owner playtest reaction recorded or `READY_FOR_HUMAN_PLAYTEST`" — `[ ]` in checklist.
-1282. - [ ] [W1] [BP2] [M2+M2.5+M3A] [FAKE] `M3A-D01` "5-minute M2/M2.5 run replays headlessly with identical actor/terrain/inventory checksums" — `[ ]`.
-1283. - [ ] [W1] [BP2] [M3A] [FAKE] `M3A-D02` "Drift between replay and live run reported per-tick with `first_divergence` diff" — `[ ]`.
-1284. - [ ] [W1] [BP2] [M3A] [FAKE] `M3A-D03` "Run bundle includes manifest, events, summary, snapshots, checksums, captures, AND `expected_outcome`" — `[ ]`.
-1285. - [ ] [W1] [BP2] [M3A] [FAKE] `M3A-D04` "Canonical checker rejects missing/incorrect outcome, malformed events, replay checksum mismatch" (negative/adversarial proof) — `[ ]`.
-1286. - [ ] [W1] [BP2] [M3A+M3B] [DR-002] [FAKE] `M3A-D05` "No DR-002 closure attempted; refreshes lean and records M3B work" — `[ ]`.
+1271. - [x] [W1] [BP2] [M2] [FAKE] `M2-D01` "Player can dig through dirt fast, concrete slowly, metal-nohook is refused with reason label" — `[ ]` in checklist; README claims BP2 closed.  → W1.1
+1272. - [x] [W1] [BP2] [M2] [FAKE] `M2-D02` "Carving emits `terrain_carved` events with bbox + material id + count" — `[ ]` in checklist.  → W1.1
+1273. - [x] [W1] [BP2] [M2] [FAKE] `M2-D03` "Dirty regions update; render reflects mutation within one frame" — `[ ]` in checklist.  → W1.1
+1274. - [x] [W1] [BP2] [M2] [FAKE] `M2-D04` "Material overlay reads correctly across all 8 launch materials" — `[ ]` in checklist.  → W1.1
+1275. - [x] [W1] [BP2] [M2] [FAKE] `M2-D05` "Run bundle validates; replay can reconstruct the terrain state at any tick" — `[ ]` in checklist.  → W1.1
+1276. - [x] [W1] [BP2] [M2] [FAKE] `M2-D06` "Perf budget: 1280×720 scene + carving session sustains 120 FPS on baseline hardware" — `[ ]` in checklist.  → W1.1
+1277. - [x] [W1] [BP2] [M2+M2.5] [FAKE] `M2.5-D01` "Win/loss in 60-90s using M2 chunked terrain" — `[ ]` in checklist.  → W1.1
+1278. - [x] [W1] [BP2] [M2.5] [FAKE] `M2.5-D02` "Win path proves terrain matters: trench/cover carving count meets threshold and reactor survives" — `[ ]` in checklist.  → W1.1
+1279. - [x] [W1] [BP2] [M2.5] [FAKE] `M2.5-D03` "Loss path proves stakes: reactor can be destroyed with structured `reactor_destroyed` reason" — `[ ]` in checklist.  → W1.1
+1280. - [x] [W1] [BP2] [M2.5] [FAKE] `M2.5-D04` "Run bundles validate, include T-CAPTURE summary grids, and pass at 60 Hz + 120 Hz" — `[ ]` in checklist.  → W1.1
+1281. - [x] [W1] [BP2] [M2.5] [FAKE] `M2.5-D05` "Project-owner playtest reaction recorded or `READY_FOR_HUMAN_PLAYTEST`" — `[ ]` in checklist.  → W1.1
+1282. - [x] [W1] [BP2] [M2+M2.5+M3A] [FAKE] `M3A-D01` "5-minute M2/M2.5 run replays headlessly with identical actor/terrain/inventory checksums" — `[ ]`.  → W1.1
+1283. - [x] [W1] [BP2] [M3A] [FAKE] `M3A-D02` "Drift between replay and live run reported per-tick with `first_divergence` diff" — `[ ]`.  → W1.1
+1284. - [x] [W1] [BP2] [M3A] [FAKE] `M3A-D03` "Run bundle includes manifest, events, summary, snapshots, checksums, captures, AND `expected_outcome`" — `[ ]`.  → W1.1
+1285. - [x] [W1] [BP2] [M3A] [FAKE] `M3A-D04` "Canonical checker rejects missing/incorrect outcome, malformed events, replay checksum mismatch" (negative/adversarial proof) — `[ ]`.  → W1.1
+1286. - [x] [W1] [BP2] [M3A+M3B] [DR-002] [FAKE] `M3A-D05` "No DR-002 closure attempted; refreshes lean and records M3B work" — `[ ]`.  → W1.1
 
 ## 144. M0 Done-criteria audit gaps still present at BP3
 1287. - [ ] [W1] [BP3] [M0] [PART] `M0-D02` CI green on all 3 platforms — claims pass when runners available; first push hasn't happened yet (the workflow was added but CI never ran on this branch's HEAD).

@@ -20,15 +20,15 @@ A 2D side-view physics sandbox where every gas, grain, bullet, body, world, and 
 [![Windows](https://img.shields.io/badge/Windows-supported-0078D6?style=flat-square&logo=windows&logoColor=white)](#)
 [![Steam Deck](https://img.shields.io/badge/Steam_Deck-floor_target-1A9FFF?style=flat-square&logo=steamdeck&logoColor=white)](#)
 
-[![Status](https://img.shields.io/badge/status-prealpha%20%28BP3%20%E2%9C%93%20closed%2C%20BP4%20next%29-orange?style=flat-square)](#project-status)
-[![Build Points](https://img.shields.io/badge/Build_Points-BP3%20closed%20%2F%20BP4%20active-2EA043?style=flat-square)](#build-points)
+[![Status](https://img.shields.io/badge/status-prealpha%20%28BP3%20active%29-orange?style=flat-square)](#project-status)
+[![Build Points](https://img.shields.io/badge/Build_Points-BP2%20closed%20%2F%20BP3%20active-2EA043?style=flat-square)](#build-points)
 [![Roadmap V2](https://img.shields.io/badge/roadmap-V2%202026--05--08%20additive-8A2BE2?style=flat-square)](#roadmap-shape)
 [![Releases](https://img.shields.io/github/v/release/Madreag/corefall?include_prereleases&sort=semver&style=flat-square&label=release)](https://github.com/Madreag/corefall/releases)
 [![Vault](https://img.shields.io/badge/research-research%20vault-purple?style=flat-square)](https://github.com/Madreag/corefall#research-vault)
 
 > **Where we are:** badges above are the source of truth — they auto-update on every BP closure. Full milestone matrix in [Project status](#project-status); BP scope table in [Build Points](#build-points); release policy + download-when-ready in [Releases](#releases).
 >
-> **Where to play:** today, build from source via [Getting started](#getting-started). First friend-handoff release (`.dmg` / `.msi` / AppImage — double-click to play, no Terminal) lands at the BP3 closure per the [Double-Click Playability Hard Gate](#releases).
+> **Where to play:** today, build from source via [Getting started](#getting-started). First friend-handoff release (`.dmg` / `.msi` / AppImage — double-click to play, no Terminal) lands when BP3 closes per the [Double-Click Playability Hard Gate](#releases). BP3 is active; closure requires the full MISSING_FEATURES Wave 1 inventory to pass.
 
 **[Project status](#project-status) · [Build Points](#build-points) · [Roadmap shape](#roadmap-shape) · [Releases](#releases) · [Tech stack](#tech-stack) · [Getting started](#getting-started) · [CI](#ci)**
 
@@ -83,7 +83,7 @@ The Roadmap V2 layer groups gameplay milestones into **13 Build Points (BP0..BP1
 | **BP0** | Engine bootstrap | M0 | (kickoff smoke) | ✅ Closed |
 | **BP1** | Actor controller + breach fun proof | M1 + M1.5 | M1.5 Micro Breach | ✅ Closed |
 | **BP2** | Terrain & Replay Build | M2 + M2.5 + M3A | M2.5 Micro Reactor Defense + headless replay verifier | ✅ Closed |
-| **BP3** | Combat Readability Build | M3B + M4A + M5 + Double-Click Release Engineering | HUD/body/chassis proof + first friend-handoff release | ✅ **Closed (current)** |
+| **BP3** | Combat Readability Build | M3B + M4A + M5 + Double-Click Release Engineering | HUD/body/chassis proof + first friend-handoff release | 🟢 **Active** |
 | **BP4** | Physics Sandbox Alpha | M5.5 + M5.5.5 + M5.6 + M5.7 + M5.8 | M5.5.5 Micro Sabotage | 🟢 Active |
 | **BP5** | Atmospherics & Worlds Alpha | M5.9 + M5.9.5 + M5.10 | M5.9.5 Micro Pressure Hold | ⏳ Planned |
 | **BP6** | AI Combat Alpha | M6 + M6.5 + M6.6 | AI-H / MIND / AI-MAT suites | ⏳ Planned |
@@ -246,7 +246,7 @@ We **also** lean on the open Rust gamedev ecosystem: [Bevy](https://bevyengine.o
 
 ## The Workspace
 
-30 crates today (see [game/Cargo.toml](game/Cargo.toml)). Each crate carries its own `AGENTS.md` boundary contract. Crates marked **(real)** have shipped real implementations; the rest are stubs that will fill in at their owning milestone.
+32 crates today (see [game/Cargo.toml](game/Cargo.toml)). Each crate carries its own `AGENTS.md` boundary contract. Crates marked **(real)** have shipped real implementations; the rest are stubs that will fill in at their owning milestone.
 
 ```text
 game/crates/
@@ -289,15 +289,15 @@ game/crates/
 > [!warning] Pre-alpha
 > Corefall is in active development. The repo is public so CI can run unrestricted (free GitHub Actions minutes for public repos), but the game is **not** ready to play yet — first friend-handoff release lands at BP3 closure (see [Releases](#releases)).
 
-**Workspace stats (last update 2026-05-09 / commit `3fe8ac8`):** 253 tests passing across 29 crates; cargo fmt + clippy `-D warnings` clean; `bp_test_coverage bp2` reports CLEAN with 0 gaps; M2.5 LLM-graded verdict 7.86/10 PASS_WITH_FUTURE_POLISH (gameplay 9-10/10, visual layer future-owned by M4A).
+**Workspace stats (last update 2026-05-11 / commit `29edc1b`):** 446 tests passing across 32 crates; cargo fmt + clippy `-D warnings` clean; `bp_test_coverage bp3` reports CLEAN with 0 gaps.
 
 **BP2 closure recap (the most recent BP to close):** Chunked deformable terrain (M2) replaced the M1.5 soft-breach strip; M2.5 fun-proof scenario shows the player surviving a 60-90s reactor defense as terrain is dug + debris fields form; cf-headless re-runs any run bundle's `events.jsonl` deterministically (M3A). Closed across PR [#11](https://github.com/Madreag/corefall/pull/11) (BP2 engineering) + PR [#12](https://github.com/Madreag/corefall/pull/12) (BP2 follow-up: source-truthful run bundles + AI-Agent-Primary Self-Test contract + LLM-graded test verdicts + per-BP test suite + AI-agent self-correcting loop) + PR [#13](https://github.com/Madreag/corefall/pull/13) (planning spine migration into `docs/plan/`) + PR [#14](https://github.com/Madreag/corefall/pull/14) (SemVer prerelease channel versioning).
 
-**BP3 (closed) ownership:** ~~M3B Replay Viewer + Debrief~~ closed (commit `50af435`); ~~M4A Readability + ACC-A Floor~~ closed in PR #27 (DR-003 + DR-012 closed); ~~M5 Equipment / Chassis / Damage Grammar~~ closed on this branch — 3 launch chassis archetypes (Infantry / PoweredArmor / LightMech) with full body graph + layered armor + module state machine + pilot binding + eject sequence + tutorial safety + save/load roundtrip with checksum. 7 new cfctl methods (`act.player.{crouch,climb,jet,eject}` + `act.chassis.{repair,salvage,clear_jam}`) wired through production cf-control dispatch. Self-play sweep 19/19 PASS, BP3 test coverage CLEAN, LLM-graded verdicts: m5_chassis_wreck_eject 9.23/10 PASS, m5_chassis_salvage 9.13/10 PASS. DR-014 + DR-021 closed. Double-Click Playability release engineering deferred to BP4 (skipped per the Hard Gate when `cf-app` does not yet open with no-args).
+**BP3 (active) constituent milestones:** M3B Replay Viewer + Debrief (commit `50af435`); M4A Readability + ACC-A Floor (PR #27, DR-003 + DR-012 closed); M5 Equipment / Chassis / Damage Grammar (commit `29edc1b`) — 3 chassis archetypes, body graph, layered armor, module state machine, pilot binding, eject + salvage, save/load. 7 cfctl methods added. DR-014 + DR-021 closed. **BP3 closure gate has NOT passed:** MISSING_FEATURES Wave 1 inventory identifies ~1,100 foundation gaps; `bp_close_loop.sh bp3` has not produced an all-phases PASS verdict. Double-Click Playability release engineering not yet landed.
 
-**Next up (BP4 active):** M5.5 Full Collision Gauntlet (DR-033 closure: full collision pipeline + projectile-projectile + CCD tiers + impulse-to-damage routing + 16 collision classes), M5.5.5 Micro Sabotage fun-proof interlude, M5.6 Material Kernel, M5.7 Hazard Package, M5.8 Origin Resource & Overclock Pass.
+**Next up after BP3 closure:** BP4 (M5.5 Full Collision Gauntlet, M5.5.5 Micro Sabotage, M5.6 Material Kernel, M5.7 Hazard Package, M5.8 Origin Resource & Overclock Pass). BP3 must first close via MISSING_FEATURES Wave 1 completion + closure gate pass.
 
-**Recent merges:** PR #27 (M4A closure), this branch (M5 closure).
+**Recent merges:** PR #27 (M4A closure), commit `29edc1b` (M5 + MISSING_FEATURES inventory).
 
 | BP | Milestone | Status | What It Proves |
 |---:|---|---|---|
@@ -310,7 +310,7 @@ game/crates/
 | BP2 | **M3A — Event Recorder Core + Headless Replay** | ✅ **Closed** ([PR #11](https://github.com/Madreag/corefall/pull/11) merged) | Deterministic event log + cf-headless replay verifier proves end-to-end determinism by re-running any run bundle's events.jsonl. M3B (Replay Viewer + Debrief) lands in BP3. |
 | BP3 | **M3B — Replay Viewer + Debrief** | ✅ **Closed** ([commit `50af435`](https://github.com/Madreag/corefall/commit/50af435)) | Replay viewer scrubbing, event filters, debrief summary, parent-chain cause view, death recap. DR-002 closed. |
 | BP3 | **M4A — Readability + ACC-A Floor** | ✅ **Closed** ([PR #27](https://github.com/Madreag/corefall/pull/27) merged) | Silhouette HUD, module strip, movement/stance readability, banner stack, captions surface, tool-validity line, accessibility floor (200% scale + high contrast + reduced_* + focus traversal, hold-to-confirm, validated remap table, captions). DR-003 + DR-012 closed. |
-| BP3 | **M5 — Equipment, Chassis, And Damage Grammar** | ✅ **Closed** (this branch) | Full chassis grammar: 3 launch archetypes (Infantry / PoweredArmor / LightMech) with body graph (15 zones — 7 primary Head/Torso/ArmLeft/ArmRight/LegLeft/LegRight/Backpack + 8 granular limb segments ForearmLeft/Right + HandLeft/Right + ShinLeft/Right + FootLeft/Right + 14 joints + 5 sockets + 15 movement contributions), layered armor (External → Internal → Core → wound), 5 module kinds with state machine bound to body zones, 11-stage damage pipeline, pilot binding with eject sequence (Ejecting → Ejected → Extracted / BailedTooLate / Lost), tutorial safety policy, save/load roundtrip with checksum. M5 win/loss/salvage scripts PASS via cfctl. DR-014 + DR-021 closed. |
+| BP3 | **M5 — Equipment, Chassis, And Damage Grammar** | 🟢 **Landed** (commit `29edc1b`; BP3 closure gate pending) | 3 chassis archetypes, body graph (15 zones, 14 joints), layered armor, module state machine, pilot binding + eject, save/load. DR-014 + DR-021 closed. |
 | BP4 | M5.5 — Full Collision Gauntlet | ⏳ Planned | DR-033 closure: full collision + projectile-projectile + CCD tiers + universal gravity field integration. |
 | BP4 | **M5.5.5 — Micro Sabotage** | 🆕 V2 | Fun-proof interlude after M5.5: 60-90 s breach + sabotage scenario combining collision physics with the M1.5 breach pattern. |
 | BP4 | M5.6 — Material Kernel | ⏳ Planned | DR-036 partial closure: chunked CA + reaction table + density layering. |
@@ -481,6 +481,15 @@ python3 tools/prototype_run_check.py ../prototype_runs/native/m1.5_*
 | `cfctl act player-select-item --slot <0..3>` | M1 | Switch inventory slot. |
 | `cfctl act player-reset` | M1 | Respawn at scenario position with full HP / ammo / slot 0. |
 | `cfctl act player-dig [--target <breach_id>]` | M1.5 | Edge-triggered terrain dig. With no target, picks the nearest in-range breach strip; rejects `out_of_range` / `material_metal_nohook` / `already_broken` / `unknown_target`. |
+| `cfctl act player-crouch` | M5 | Toggle crouch stance. |
+| `cfctl act player-climb` | M5 | Toggle climb stance. |
+| `cfctl act player-jet` | M5 | Toggle jet thrust (requires Jet module on chassis). |
+| `cfctl act player-eject` | M5 | Initiate pilot eject from chassis. |
+| `cfctl act chassis-repair --zone <zone>` | M5 | Repair a damaged chassis zone. |
+| `cfctl act chassis-salvage` | M5 | Salvage modules from a wreck. |
+| `cfctl act chassis-clear-jam` | M5 | Clear weapon jam on chassis weapon mount. |
+| `cfctl inspect actor <id>` | M5 | Inspect full actor state including chassis. |
+| `cfctl inspect chassis <id>` | M5 | Inspect chassis state (zones, modules, stage, pilot). |
 | `cfctl script run <path>` | M1 | Replay a `.cfctl.json` script (auto-launches `cf-app` with the right scenario, polls until ticks advance between commands). |
 | `cf-app --capture-grid --capture-frames-hz 10` | T-CAPTURE | Emit PNG frame readbacks at 10 Hz baseline (configurable) + event-triggered keyframes into `<run_bundle>/captures/`. Add `--no-capture-events` to suppress keyframes; `--headless-capture` for the (scope-limited) offscreen-RenderTarget path. |
 | `python3 game/tools/capture_grid.py <run_dir>` | T-CAPTURE | Compose `frame_*.png` into 8×8 `grid_NNN.png` + `summary_grid.png` with tick + event-label overlays. Requires Pillow. |
@@ -528,7 +537,7 @@ cargo run -p cf-e2e -- --script scripts/cfctl/micro_breach_win.cfctl.json \
     --expect "enemy.2.state=Dead"
 ```
 
-Post-M5+ CLI extensions (atmospherics, materials, gravity, ballistics, origin-state, suit, pipe-network, room) are documented in [the canonical roadmap](https://github.com/Madreag/corefall#research-vault).
+Post-BP3 CLI extensions (atmospherics, materials, gravity, ballistics, origin-state, suit, pipe-network, room) are planned for BP4+ and documented in [the canonical roadmap](docs/plan/spec/prototype-roadmap.md). They are NOT shipped at BP3.
 
 ---
 

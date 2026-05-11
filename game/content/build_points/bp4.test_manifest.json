@@ -1,0 +1,10 @@
+{
+  "bp": "BP4",
+  "description": "Physics Sandbox Alpha (M5.5 + M5.5.5 + M5.6 + M5.7 + M5.8)",
+  "scenarios": [],
+  "required_cargo_tests": [],
+  "required_events": [],
+  "grading_dimensions": [],
+  "sweep_rows": [],
+  "_note": "Populated when BP4 milestones land"
+}

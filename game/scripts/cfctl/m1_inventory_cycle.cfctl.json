@@ -1,0 +1,19 @@
+{
+  "scenario": "m1_actor_range",
+  "tick_rate_hz": 60,
+  "description": "Select_item across slots 0-3",
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 30 } },
+    { "method": "act.player.select_item", "params": { "slot": 0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 15 } },
+    { "method": "act.player.select_item", "params": { "slot": 1 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 15 } },
+    { "method": "act.player.select_item", "params": { "slot": 2 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 15 } },
+    { "method": "act.player.select_item", "params": { "slot": 3 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 15 } },
+    { "method": "act.player.select_item", "params": { "slot": 0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 30 } }
+  ]
+}

@@ -1,0 +1,15 @@
+{
+  "scenario": "m1_actor_range",
+  "tick_rate_hz": 60,
+  "description": "Jump action coverage in isolation",
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 30 } },
+    { "method": "act.player.jump", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 60 } },
+    { "method": "act.player.jump", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 60 } },
+    { "method": "act.player.jump", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 90 } }
+  ]
+}

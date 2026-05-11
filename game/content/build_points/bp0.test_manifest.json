@@ -1,0 +1,17 @@
+{
+  "bp": "BP0",
+  "description": "Engine bootstrap — kickoff smoke",
+  "scenarios": ["m0_blank"],
+  "required_cargo_tests": ["cf-sim-core", "cf-control", "cf-replay"],
+  "required_events": [],
+  "grading_dimensions": [],
+  "sweep_rows": [
+    {
+      "name": "m0_blank_smoke",
+      "script": null,
+      "scenario": "m0_blank",
+      "tick_rate_hz": 60,
+      "expects": []
+    }
+  ]
+}

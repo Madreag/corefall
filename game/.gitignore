@@ -20,6 +20,9 @@ flamegraph.svg
 perf.data
 perf.data.old
 
+# Save files (forward-compat for cf-save)
+*.cfsave
+
 # OS
 .DS_Store
 ._*
