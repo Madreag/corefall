@@ -32,6 +32,7 @@ pub const SAVE_BLOB_VERSION: u32 = 1;
 /// remaining ammo) + actor identity. Later milestones (T-SAVE) extend with
 /// world state.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[allow(clippy::struct_excessive_bools)]
 pub struct SaveBlob {
     pub schema_version: u32,
     pub actor_id: u64,
@@ -54,6 +55,21 @@ pub struct SaveBlob {
     pub rifle_reload_remaining_ticks: Option<u32>,
     /// Chassis state when one is attached.
     pub chassis: Option<ChassisState>,
+    /// M5 W1: flags for gear dropped by limb loss + chassis detached state.
+    #[serde(default)]
+    pub gear_dropped_by_limb_loss: bool,
+    #[serde(default)]
+    pub chassis_detached: bool,
+    /// M5 W1: active afflictions on this actor (empty until BP4 affliction producers exist).
+    #[serde(default)]
+    pub afflictions: Vec<String>,
+    /// M5 W1: crouch/climb/jet movement-intent flags.
+    #[serde(default)]
+    pub crouch_active: bool,
+    #[serde(default)]
+    pub climb_active: bool,
+    #[serde(default)]
+    pub jet_active: bool,
 }
 
 impl SaveBlob {
@@ -142,6 +158,12 @@ mod tests {
             rifle_ammo: Some(20),
             rifle_reload_remaining_ticks: None,
             chassis,
+            gear_dropped_by_limb_loss: false,
+            chassis_detached: false,
+            afflictions: vec![],
+            crouch_active: false,
+            climb_active: false,
+            jet_active: false,
         }
     }
 
