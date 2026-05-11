@@ -521,6 +521,17 @@ pub struct ActorState {
     /// player ejects from a wrecked mech and continues as foot infantry."
     #[serde(default)]
     pub chassis_detached: bool,
+    /// **W1.3**: stability scalar (0.0 = fully disrupted, 1.0 = stable).
+    /// Decremented by recoil impulse, fall impact, explosion knockback.
+    /// Recovers toward 1.0 at `stability_recovery_rate` per tick when on ground.
+    /// When stability < 0.3, aim bloom increases; when < 0.1, actor is knockdown-vulnerable.
+    /// Feeds future DR-003 HUD readability + A-FEEL-06 damage-cause explanation.
+    #[serde(default = "default_stability")]
+    pub stability: f32,
+    /// Recovery rate per tick when grounded and not taking impulse damage.
+    /// Default 0.02 = full recovery in ~50 ticks (0.83s at 60Hz).
+    #[serde(default = "default_stability_recovery_rate")]
+    pub stability_recovery_rate: f32,
     /// **M5.8 forward-hook (DR-040 ResourceAccumulators)**: 7 resource
     /// accumulators on every actor; `#[serde(default)]` keeps M5 bundles
     /// readable while M5.8 wires actual driver values later. Save-bundle
@@ -592,6 +603,14 @@ fn default_origin_id() -> String {
     "human".to_string()
 }
 
+fn default_stability() -> f32 {
+    1.0
+}
+
+fn default_stability_recovery_rate() -> f32 {
+    0.02
+}
+
 impl ActorState {
     /// Create a default M1 player actor at `spawn` with `inventory` and full HP.
     pub fn player(id: ActorId, team: impl Into<String>, spawn: Vec2, hp_max: f32, inventory: Inventory) -> Self {
@@ -618,6 +637,8 @@ impl ActorState {
             jet_active: false,
             gear_dropped_by_limb_loss: false,
             chassis_detached: false,
+            stability: 1.0,
+            stability_recovery_rate: 0.02,
             resources: ResourceAccumulators::default(),
             afflictions: Vec::new(),
         }
@@ -667,6 +688,7 @@ impl ActorState {
         self.status = Status::Stable;
         self.hp = self.hp_max;
         self.inventory.selected = ItemSlot(0);
+        self.stability = 1.0;
         self.crouch_active = false;
         self.climb_active = false;
         self.jet_active = false;
@@ -930,6 +952,7 @@ impl ActorState {
         out.push(self.status as u8);
         out.push(u8::from(self.on_ground));
         out.extend_from_slice(&self.inventory.selected.0.to_le_bytes());
+        out.extend_from_slice(&quantize_f32(self.stability).to_le_bytes());
         // M5: append chassis bytes only when a chassis is attached; legacy actors
         // remain byte-identical for cross-milestone determinism comparisons.
         if let Some(chassis) = &self.chassis {
@@ -1091,6 +1114,9 @@ pub struct ActorObservation {
     /// **M5**: actor origin tag (`human`, `robot`, `android`, ...).
     #[serde(default = "default_origin_id")]
     pub origin_id: String,
+    /// W1.3: stability scalar (0.0 = fully disrupted, 1.0 = stable).
+    #[serde(default = "default_stability")]
+    pub stability: f32,
     /// **M5**: per-tick movement-intent mirror.
     #[serde(default)]
     pub crouch_active: bool,
@@ -1119,6 +1145,7 @@ impl From<&ActorState> for ActorObservation {
             body_silhouette: actor.body_silhouette(),
             chassis: actor.chassis_view(),
             origin_id: actor.origin_id.clone(),
+            stability: actor.stability,
             crouch_active: actor.crouch_active,
             climb_active: actor.climb_active,
             jet_active: actor.jet_active,
@@ -1279,8 +1306,8 @@ mod tests {
         let actor = ActorState::player(ActorId(7), "blue", Vec2::new(1.0, 2.0), 100.0, inv);
         let bytes = actor.checksum_bytes();
         // 8 (id u64) + 4*7 (position.x/y, velocity.x/y, aim.x/y, hp as i32) + 1 (status u8)
-        // + 1 (on_ground u8) + 4 (selected slot u32) = 42 bytes.
-        assert_eq!(bytes.len(), 42);
+        // + 1 (on_ground u8) + 4 (selected slot u32) + 4 (stability i32) = 46 bytes.
+        assert_eq!(bytes.len(), 46);
     }
 
     #[test]

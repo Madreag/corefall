@@ -1289,6 +1289,7 @@ mod tests {
             body_silhouette: cf_actor::BodySilhouette::default(),
             chassis: None,
             origin_id: "human".into(),
+            stability: 1.0,
             crouch_active: false,
             climb_active: false,
             jet_active: false,
