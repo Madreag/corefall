@@ -307,7 +307,7 @@ jobs:
       # Upload all artifacts produced for this matrix row.
       # ----------------------------------------------------------------
       - name: Upload artifact (legacy CLI archive + checksum)
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: corefall-cli-${{ matrix.artifact_name }}
           path: |
@@ -317,7 +317,7 @@ jobs:
 
       - name: Upload friend-handoff artifact (macOS .dmg)
         if: runner.os == 'macOS'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: corefall-friend-macos-${{ matrix.friend_arch }}
           path: |
@@ -327,7 +327,7 @@ jobs:
 
       - name: Upload friend-handoff artifact (Windows .zip)
         if: runner.os == 'Windows'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: corefall-friend-windows-${{ matrix.friend_arch }}
           path: |
@@ -337,7 +337,7 @@ jobs:
 
       - name: Upload friend-handoff artifact (Linux .AppImage)
         if: runner.os == 'Linux'
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: corefall-friend-linux-${{ matrix.friend_arch }}
           path: |
