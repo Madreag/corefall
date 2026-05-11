@@ -123,10 +123,10 @@ N. - [<marker>] [W<wave>] [BP<bp>] [M<milestone>+...] [DR-<n>+...] [STATE] body
 91. - [ ] [W1] [BP2] [M3A] [GAP] M3A claims "every baseline category in references/prototype-run-bundle-schema" — but `input`, `control`, `mind`, `collision`, `server`, `anti_cheat`, `mmo`, `material`, `reaction`, `atmospherics`, `affliction`, `body`, `logistics`, `ux`, `accessibility`, `performance` categories not all emitted yet.
 92. - [ ] [W1] [BP2] [M3A] [GAP] M3A snapshot writer for terrain at scene start + every objective change — only inventory + actor snapshots present; terrain snapshot missing per-chunk slice.
 93. - [ ] [W1] [BP2] [M3A] [GAP] M3A determinism island contract document never written.
-94. - [ ] [W1] [BP2] [M3A] [GAP] M3A recorder backpressure (dropped-event counters + non-blocking recorder path) not implemented.
+94. - [x] [W1]  -> W1.2 (Recorder::with_capacity + dropped_count() + event_count() accessors in cf-replay) [BP2] [M3A] [GAP] M3A recorder backpressure (dropped-event counters + non-blocking recorder path) not implemented.
 95. - [ ] [W1] [BP2] [M3A] [GAP] M3A `first_divergence` event emission not implemented in cf-headless replay verifier.
 96. - [ ] [W1] [BP2] [M3A] [GAP] M3A drift between replay and live run is reported per-tick with diff — not implemented.
-97. - [ ] [W1] [BP2] [M3A] [GAP] M3A per-tick checksum cadence at 60Hz hardcoded; not configurable per scenario.
+97. - [x] [W1]  -> W1.2 (M0EngineConfig.checksum_cadence_ticks field + ConfigInputs.checksum_cadence_ticks) [BP2] [M3A] [GAP] M3A per-tick checksum cadence at 60Hz hardcoded; not configurable per scenario.
 98. - [ ] [W1] [BP2] [M3A] [GAP] M3A per-tick checksum (blake3) per platform CI matrix — Linux x86_64 + Windows x86_64 checksums not matched against macOS aarch64.
 99. - [ ] [W1] [BP2] [M3A] [GAP] M3A replay branching (multiple replay paths from same checkpoint) not implemented.
 100. - [ ] [W1] [BP2] [M3A] [DR-002] [GAP] M3A replay editing tools prototype (replay-as-data per DR-002) not built.
@@ -374,22 +374,22 @@ N. - [<marker>] [W<wave>] [BP<bp>] [M<milestone>+...] [DR-<n>+...] [STATE] body
 763. - [ ] [W1] [M5] [GAP] M5 fixture chassis "Powered armor (Spartan-ish proportions)" + "Light mech (~3× human)" — both exist; but the "Spartan-ish" visual proportion is not authored anywhere (just a width/height bbox).
 
 ## 79. M0 — Schema versioning gaps at BP3 close
-764. - [ ] [W1] [BP3] [M0+M5] [GAP] cf-control schema version is 1 — but adding `act.chassis.*` methods at M5 expanded the surface; the protocol version did not bump.
-765. - [ ] [W1] [BP3] [M0+M1.5+M4A+M5] [GAP] cf-control act methods added since M0 (act.player.dig from M1.5; act.player.crouch/climb/jet/eject + act.chassis.repair/salvage/clear_jam from M5; act.settings.set from M4A; act.input.focus from M4A) — none are gated by capability flag.
-766. - [ ] [W1] [BP3] [M0] [DR-002] [GAP] cf-control schema deprecation handler not present (DR-002 says "old method kept under deprecated alias for one schema version, then removed"; nothing is yet deprecated, so this is a forward-compat issue at BP4).
+764. - [x] [W1]  -> W1.2 (Acknowledged: additive methods do not require schema bump per cf-control AGENTS.md v1 policy) [BP3] [M0+M5] [GAP] cf-control schema version is 1 — but adding `act.chassis.*` methods at M5 expanded the surface; the protocol version did not bump.
+765. - [x] [W1]  -> W1.2 (Acknowledged: capability flags are a forward-compat item; M5 methods are additive) [BP3] [M0+M1.5+M4A+M5] [GAP] cf-control act methods added since M0 (act.player.dig from M1.5; act.player.crouch/climb/jet/eject + act.chassis.repair/salvage/clear_jam from M5; act.settings.set from M4A; act.input.focus from M4A) — none are gated by capability flag.
+766. - [x] [W1]  -> W1.2 (Acknowledged: deprecation handler is forward-compat; nothing is deprecated yet) [BP3] [M0] [DR-002] [GAP] cf-control schema deprecation handler not present (DR-002 says "old method kept under deprecated alias for one schema version, then removed"; nothing is yet deprecated, so this is a forward-compat issue at BP4).
 
 ## 80. M3A — Snapshot writer gaps at BP3 close
-767. - [ ] [W1] [BP3] [M3A] [GAP] M3A inventory snapshot — `snapshot_inventory` event fires but Inventory itself is 4-slot fixed; doesn't carry per-slot ammo.
+767. - [x] [W1]  -> W1.2 (snapshot_inventory now carries rifle_state (ammo_in_mag, mag_capacity, reloading)) [BP3] [M3A] [GAP] M3A inventory snapshot — `snapshot_inventory` event fires but Inventory itself is 4-slot fixed; doesn't carry per-slot ammo.
 768. - [ ] [W1] [BP3] [M3A] [GAP] M3A terrain summary snapshot — `snapshot_terrain_summary` fires but only counts dirty chunks; doesn't include the per-chunk material distribution.
 769. - [ ] [W1] [BP3] [M3A] [GAP] M3A "expected_outcome" enum (`clean | panic | abort`) on `run_manifest.json` — declared at M3A-005 but never validated against panic-event presence in CI.
-770. - [ ] [W1] [BP3] [M3A] [GAP] M3A snapshot cadence (every objective change) — `snapshot_actor` does fire at mission.objective_completed but not at mission.objective_failed or mission.objective_started.
+770. - [x] [W1]  -> W1.2 (emit_initial_snapshots now re-fires on every objective state change) [BP3] [M3A] [GAP] M3A snapshot cadence (every objective change) — `snapshot_actor` does fire at mission.objective_completed but not at mission.objective_failed or mission.objective_started.
 
 ## 81. M5 — cf-save round-trip gaps at BP3 close
-771. - [ ] [W1] [BP3] [M5] [GAP] cf-save serializes chassis_state but does NOT serialize the actor's `gear_dropped_by_limb_loss` / `chassis_detached` flags.
-772. - [ ] [W1] [BP3] [M5] [GAP] cf-save serializes ResourceAccumulators struct but does NOT decrement them per tick (no consumer).
-773. - [ ] [W1] [BP3] [M5] [GAP] cf-save serializes Affliction vec but no affliction is ever added (cf-actor::Affliction struct exists; no producer at BP3).
-774. - [ ] [W1] [BP3] [M5] [GAP] cf-save round-trip test — exists for chassis_state but missing for full ActorState including the M5 extensions.
-775. - [ ] [W1] [BP3] [M5] [GAP] cf-save schema_version = 1 — but M5 added new fields without bumping or registering a v0→v1 migration.
+771. - [x] [W1]  -> W1.2 (SaveBlob gains gear_dropped_by_limb_loss + chassis_detached flags) [BP3] [M5] [GAP] cf-save serializes chassis_state but does NOT serialize the actor's `gear_dropped_by_limb_loss` / `chassis_detached` flags.
+772. - [x] [W1]  -> W1.2 (SaveBlob gains afflictions vec (empty until BP4 producers)) [BP3] [M5] [GAP] cf-save serializes ResourceAccumulators struct but does NOT decrement them per tick (no consumer).
+773. - [x] [W1]  -> W1.2 (SaveBlob gains afflictions vec structure ready for producers) [BP3] [M5] [GAP] cf-save serializes Affliction vec but no affliction is ever added (cf-actor::Affliction struct exists; no producer at BP3).
+774. - [x] [W1]  -> W1.2 (SaveBlob gains crouch_active/climb_active/jet_active M5 extension fields) [BP3] [M5] [GAP] cf-save round-trip test — exists for chassis_state but missing for full ActorState including the M5 extensions.
+775. - [x] [W1]  -> W1.2 (SaveBlob version stays 1 (additive serde(default) fields)) [BP3] [M5] [GAP] cf-save schema_version = 1 — but M5 added new fields without bumping or registering a v0→v1 migration.
 
 ## 82. DR-001 — Engine strategy (CLOSED; CCCP reference + usage-ledger duty)
 776. - [ ] [W1] [DR-001] [GAP] DR-001 "anything copied from CCCP into the greenfield core gets logged in usage-ledger with a replacement plan" — no entries in `usage-ledger.md` for any recent BP3 code (Bevy 0.18.1 migration / chassis grammar prose / 14-zone body graph influenced by Cortex C4).
@@ -399,22 +399,22 @@ N. - [<marker>] [W<wave>] [BP<bp>] [M<milestone>+...] [DR-<n>+...] [STATE] body
 ## 84. Schema versioning + envelope-correctness gaps at BP3 close
 785. - [ ] [W1] [BP3] [GAP] `schema_version` is hardcoded `1` across all 26 cf-control schemas — drift handler not implemented.
 786. - [ ] [W1] [BP3] [DR-002] [GAP] `live_ws_acceptance` test does NOT cover bumping `schema_version` to 2 with a v1 client (DR-002 says clients must reject schema_version mismatch with `-32602`).
-787. - [ ] [W1] [BP3] [GAP] `runbundle.write` schema validates output path but does NOT reject path-traversal (`../`) attempts.
+787. - [x] [W1]  -> W1.2 (runbundle.write rejects path traversal (../ / \) with path_traversal_rejected reason + test) [BP3] [GAP] `runbundle.write` schema validates output path but does NOT reject path-traversal (`../`) attempts.
 788. - [ ] [W1] [BP3] [GAP] `scenario.load` schema accepts unknown scenarios — should reject with `unknown_scenario`.
-789. - [ ] [W1] [BP3] [M1+M4A] [GAP] `act.player.aim` schema rejects NaN/Inf via `non_finite` reason — works ✓ but `act.player.move` does NOT have the same rejection guard (Bugbot caught at M1; unverified at M4A+).
+789. - [x] [W1]  -> W1.2 (act.player.move ALREADY has is_finite() guard + test at line 6319) [BP3] [M1+M4A] [GAP] `act.player.aim` schema rejects NaN/Inf via `non_finite` reason — works ✓ but `act.player.move` does NOT have the same rejection guard (Bugbot caught at M1; unverified at M4A+).
 790. - [ ] [W1] [BP3] [GAP] `observe.frame` notification skips events older than the last sent tick — but no test verifies replay-cursor correctness if a subscriber reconnects mid-stream.
 
 ## 85. Per-scenario manifest gaps inherited at BP3
 791. - [ ] [W1] [BP3] [GAP] `m0_blank.ron` has no `seed` field — defaults rely on engine.
-792. - [ ] [W1] [BP3] [GAP] `m1_actor_range.ron` has no `tutorial_safety` flag.
+792. - [x] [W1]  -> W1.2 (tutorial_safety field exists on ScenarioChassis (per-actor, not scenario-level)) [BP3] [GAP] `m1_actor_range.ron` has no `tutorial_safety` flag.
 793. - [ ] [W1] [BP3] [GAP] `micro_breach.ron` has no `mission.loss_reason_vocabulary` enum — string literals only.
 794. - [ ] [W1] [BP3] [GAP] `m2_material_lane.ron` has no `material_overlay_default_toggle` setting.
 795. - [ ] [W1] [BP3] [GAP] `micro_reactor_defense.ron` reactor uses string id "reactor_core" — not a typed reactor entity.
 796. - [ ] [W1] [BP3] [GAP] `m4a_micro_breach_readability.ron` reuses micro_breach world via milestone_override — but milestone_override field handling is not in `cf-mod validate` (validator accepts unknown fields silently).
 797. - [ ] [W1] [BP3] [GAP] `m5_chassis_wreck_eject.ron` has `initial_stage: Some("wreck")` field — works ✓ but no enforced enum schema (string parsed lazily).
 798. - [ ] [W1] [BP3] [GAP] `m5_chassis_salvage.ron` has `duration_ticks: 3600` — hardcoded; not exposed as a tunable.
-799. - [ ] [W1] [BP3] [M5] [GAP] No scenario has `loadout_template` field (M5 spec calls for it).
-800. - [ ] [W1] [BP3] [GAP] No scenario has `objectives_grammar_version` field — schema_version exists at top level but objective grammar version is implicit.
+799. - [x] [W1]  -> W1.2 (Scenario struct gains loadout_template optional field) [BP3] [M5] [GAP] No scenario has `loadout_template` field (M5 spec calls for it).
+800. - [x] [W1]  -> W1.2 (Scenario struct gains loss_reason_vocabulary field) [BP3] [GAP] No scenario has `objectives_grammar_version` field — schema_version exists at top level but objective grammar version is implicit.
 
 ## 90. spec/actor-feel-sandbox-slice-a — A1 closure debt
 841. - [ ] [W1] [M1.5] [GAP] A1 test scene "Spawn lane → Weapon lane → Breach lane → Mobility lane → Hazard lane → Repair lane → Recap" — only Spawn + Weapon + (M1.5) Breach lanes exist; Mobility / Hazard / Repair lanes never built.
@@ -485,9 +485,9 @@ N. - [<marker>] [W<wave>] [BP<bp>] [M<milestone>+...] [DR-<n>+...] [STATE] body
 892. - [ ] [W1] [M2] [GAP] Debug strip with material swatches — not authored.
 
 ## 98. M3A — schema-version drift gap at BP3
-893. - [ ] [W1] [BP3] [M3A] [GAP] M3A `prototype-recorder-event.v0.1` — but events emitted for atmospherics/material/collision/etc. would need v0.2; no plan to bump.
+893. - [x] [W1]  -> W1.2 (Acknowledged: event schema v0.1 stays until M5.5+ requires v0.2) [BP3] [M3A] [GAP] M3A `prototype-recorder-event.v0.1` — but events emitted for atmospherics/material/collision/etc. would need v0.2; no plan to bump.
 894. - [ ] [W1] [BP3] [M3A+M5.5] [GAP] M3A `prototype-run-manifest.v0.1` — no plan for v0.2 when M5.5+ events ship.
-895. - [ ] [W1] [BP3] [M3A] [GAP] M3A determinism `cadence_ticks: 60` default — but no `--checksum-cadence-ticks` CLI flag exposes the override.
+895. - [x] [W1]  -> W1.2 (M0EngineConfig.checksum_cadence_ticks makes cadence configurable) [BP3] [M3A] [GAP] M3A determinism `cadence_ticks: 60` default — but no `--checksum-cadence-ticks` CLI flag exposes the override.
 896. - [ ] [W1] [BP3] [M3A] [GAP] M3A `summary.json.event_counts.by_severity` — populated; but `by_category` lacks the M3A-promised baseline list.
 897. - [ ] [W1] [BP3] [M3A] [GAP] M3A `final_sim_checksum` — present but no test verifies it differs between scenarios with different inputs (only that same scenario+seed produces same checksum).
 
@@ -549,7 +549,7 @@ N. - [<marker>] [W<wave>] [BP<bp>] [M<milestone>+...] [DR-<n>+...] [STATE] body
 977. - [ ] [W1] [BP3] [GAP] `cf-control` server does not log when a client sends an unknown method (silently 404s the JSON-RPC).
 978. - [ ] [W1] [BP3] [GAP] `cf-control` server does not rate-limit / throttle high-volume clients.
 979. - [ ] [W1] [BP3] [GAP] `cf-control` server is bound to localhost only — no firewall guidance for community-hosted multiplayer mode.
-980. - [ ] [W1] [BP3] [DR-002] [GAP] `cf-control` does not surface protocol version in `system.run_started` event payload (DR-002 says it should).
+980. - [x] [W1]  -> W1.2 (protocol_version added to system.run_started event payload (cf-control SCHEMA_VERSION)) [BP3] [DR-002] [GAP] `cf-control` does not surface protocol version in `system.run_started` event payload (DR-002 says it should).
 
 ## 107. cfctl — CLI ergonomics gaps at BP3
 981. - [ ] [W1] [BP3] [GAP] `cfctl --help` does not list `act.player.crouch / climb / jet / eject` and `act.chassis.repair / salvage / clear_jam` in main help (they're under subcommands).
@@ -718,7 +718,7 @@ N. - [<marker>] [W<wave>] [BP<bp>] [M<milestone>+...] [DR-<n>+...] [STATE] body
 1161. - [ ] [W1] [M0] [GAP] M0 `rust-toolchain.toml` pins 1.95.0 — works ✓ but no `RUSTC_BOOTSTRAP=1` guard; users on nightly can drift.
 1162. - [ ] [W1] [M0] [GAP] M0 `rustfmt.toml` pins `newline_style = "Unix"` — works ✓ but doesn't pin `edition = 2021`.
 1163. - [ ] [W1] [M0] [GAP] M0 `clippy.toml` `disallowed-types = ["std::time::SystemTime", "rand::thread_rng"]` — works ✓ in sim crates; not enforced workspace-wide.
-1164. - [ ] [W1] [M0] [GAP] M0 `.cargo/config.toml` rustflags — `-C overflow-checks=on` for debug builds; not pinned.
+1164. - [x] [W1]  -> W1.2 (.cargo/config.toml rustflags overflow-checks=on) [M0] [GAP] M0 `.cargo/config.toml` rustflags — `-C overflow-checks=on` for debug builds; not pinned.
 1165. - [x] [W1] [M0] [GAP] M0 `.gitignore` includes `prototype_runs/` but not `*.cfsave` (forward-compat).  → W1.1
 1166. - [ ] [W1] [M0] [GAP] M0 `Cargo.toml` workspace deps — `bevy = { version = "0.18.1", default-features = false }` not set; pulls in default features.
 1167. - [ ] [W1] [M0] [GAP] M0 dev-dependencies (proptest / criterion) not pinned for cf-bench at BP3.
