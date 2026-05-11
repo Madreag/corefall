@@ -1,11 +1,24 @@
 # cf-server — AGENTS.md
 
 ## Owns
-- (M0 stub) Will own the dedicated server binary (`--mode coop_room|pvp_arena|lan_room|mmo_shard|lobby_directory`).
+- Multi-mode dedicated server binary (real implementation pending M9).
+- Modes: `coop_room`, `pvp_arena`, `lan_room`, `mmo_shard`, `lobby_directory`.
+- Server-authoritative fixed-tick simulation.
+- Community-hostable single binary.
 
-## Common Pitfalls
-- Same Rust workspace as the client; do NOT fork sim logic for server vs client (DR-034 anti-goal).
+## Public API Boundary
+- (Stub until M9.)
+
+## Does NOT Own
+- Transport → `cf-net`.
+- Persistence → `cf-server-persistence`.
+- Anti-cheat → `cf-server-anti-cheat`.
+- Admin tooling → `cf-server-admin`.
+- Ops dashboards → `cf-server-ops`.
+
+## Test Surface
+- (Stub.) SERVER-001..016 acceptance suite begins at M9.
 
 ## Source Trail
-- spec/server-app-architecture.
-- DR-034 (CLOSED-DIRECTION) / DR-005 (CLOSED-DIRECTION).
+- DR-005 (multiplayer posture).
+- DR-034 (dedicated server).

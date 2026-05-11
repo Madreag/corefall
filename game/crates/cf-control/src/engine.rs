@@ -772,6 +772,7 @@ impl M0Engine {
                 "tick_rate_hz": self.config.tick_rate_hz,
                 "run_mode": self.config.run_mode,
                 "control_api": self.config.control_api_enabled,
+                "protocol_version": crate::SCHEMA_VERSION,
                 "settings": settings_value,
             }),
             None,
@@ -1434,6 +1435,8 @@ impl M0Engine {
             let dig_source = match evt.source() {
                 IntentSource::Human => "human",
                 IntentSource::Cfctl => "cfctl",
+                IntentSource::Ai => "ai",
+                IntentSource::Replay => "replay",
             };
             let mode = match &evt {
                 DigEvent::Strip { .. } => "strip",
@@ -1715,6 +1718,7 @@ impl M0Engine {
                         json!({"result": "lost", "reason": reason.as_str()})
                     }
                     cf_mission::MissionResult::Active => json!({"result": "active"}),
+                    cf_mission::MissionResult::Aborted => json!({"result": "aborted"}),
                 };
                 self.recorder
                     .record(tick, sim_time_ms, "mission", "mission_resolved", payload, None);
@@ -1915,6 +1919,7 @@ impl M0Engine {
             cf_mission::MissionResult::Won => "won".to_string(),
             cf_mission::MissionResult::Lost { .. } => "lost".to_string(),
             cf_mission::MissionResult::Active => "active".to_string(),
+            cf_mission::MissionResult::Aborted => "aborted".to_string(),
         });
         if state.hud_last_mission_result != cur_mission_result {
             if let Some(result) = cur_mission_result.as_deref() {
@@ -2081,6 +2086,8 @@ impl M0Engine {
             "source": match intent.source {
                 IntentSource::Human => "human",
                 IntentSource::Cfctl => "cfctl",
+                IntentSource::Ai => "ai",
+                IntentSource::Replay => "replay",
             },
             "move_x": intent.move_x,
             "aim_x": intent.aim.x,

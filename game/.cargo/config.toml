@@ -1,4 +1,5 @@
 [build]
+rustflags = ["-C", "overflow-checks=on"]
 
 [alias]
 ci-fmt = "fmt --all -- --check"

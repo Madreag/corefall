@@ -335,6 +335,8 @@ pub struct Recorder {
     run_id: String,
     seq: AtomicU64,
     inner: Mutex<RecorderInner>,
+    /// Maximum events before backpressure drops. 0 = unlimited.
+    capacity: usize,
 }
 
 struct RecorderInner {
@@ -351,6 +353,13 @@ struct RecorderInner {
 
 impl Recorder {
     pub fn new(run_id: String) -> Self {
+        Self::with_capacity(run_id, 0)
+    }
+
+    /// Create a recorder with a maximum event capacity. 0 = unlimited.
+    /// When capacity is exceeded, new events are dropped and the dropped
+    /// counter is incremented (surfaced in summary.json.event_counts.dropped_total).
+    pub fn with_capacity(run_id: String, capacity: usize) -> Self {
         Self {
             run_id,
             seq: AtomicU64::new(0),
@@ -365,11 +374,20 @@ impl Recorder {
                 final_checksum: None,
                 checksum_event_count: 0,
             }),
+            capacity,
         }
     }
 
     pub fn run_id(&self) -> &str {
         &self.run_id
+    }
+
+    pub fn dropped_count(&self) -> u64 {
+        self.inner.lock().expect("recorder mutex poisoned").dropped
+    }
+
+    pub fn event_count(&self) -> usize {
+        self.inner.lock().expect("recorder mutex poisoned").events.len()
     }
 
     pub fn record(
@@ -411,6 +429,10 @@ impl Recorder {
             if let Some(hex) = event.payload.get("checksum_hex").and_then(|v| v.as_str()) {
                 inner.final_checksum = Some(hex.to_string());
             }
+        }
+        if self.capacity > 0 && inner.events.len() >= self.capacity {
+            inner.dropped += 1;
+            return event_id;
         }
         inner.events.push(event);
         event_id

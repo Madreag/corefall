@@ -386,6 +386,10 @@ pub enum IntentSource {
     Human,
     /// JSON-RPC `act.player.*` calls coming from `cfctl` / scripted E2E / future bots.
     Cfctl,
+    /// AI-driven intent from `cf-ai` reactive guard or future commander layer.
+    Ai,
+    /// Replay-driven intent from `cf-headless` replay verifier.
+    Replay,
 }
 
 /// One tick's worth of player input. Produced by `cf-control` and applied by
@@ -405,6 +409,18 @@ pub struct ControlIntent {
     pub reload: bool,
     pub selected_item: Option<ItemSlot>,
     pub reset: bool,
+    /// Edge-triggered interact (door/lever/panel). BP4+ implementation.
+    #[serde(default)]
+    pub interact: bool,
+    /// Edge-triggered use-tool (medkit/repair). BP4+ implementation.
+    #[serde(default)]
+    pub use_tool: bool,
+    /// Toggle crouch stance. M5 added via separate method; unified here.
+    #[serde(default)]
+    pub crouch: bool,
+    /// Toggle prone stance. BP4+ implementation.
+    #[serde(default)]
+    pub prone: bool,
 }
 
 impl Default for IntentSource {
@@ -429,6 +445,10 @@ impl ControlIntent {
         self.reload = false;
         self.selected_item = None;
         self.reset = false;
+        self.interact = false;
+        self.use_tool = false;
+        self.crouch = false;
+        self.prone = false;
     }
 
     /// Returns true when no actively-driven input is present. `aim` is a
@@ -443,6 +463,10 @@ impl ControlIntent {
             && !self.reload
             && self.selected_item.is_none()
             && !self.reset
+            && !self.interact
+            && !self.use_tool
+            && !self.crouch
+            && !self.prone
     }
 }
 

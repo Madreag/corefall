@@ -1,0 +1,22 @@
+# CODEOWNERS — Per-crate ownership (DR-026 enforcement)
+# See game/crates/*/AGENTS.md for detailed boundary contracts.
+
+# Default owner for everything
+* @Madreag
+
+# Planning spine requires extra review
+docs/plan/ @Madreag
+
+# Per-crate ownership (all owned by single engineer for now)
+game/crates/cf-actor/ @Madreag
+game/crates/cf-ai/ @Madreag
+game/crates/cf-app/ @Madreag
+game/crates/cf-chassis/ @Madreag
+game/crates/cf-control/ @Madreag
+game/crates/cf-equipment/ @Madreag
+game/crates/cf-mission/ @Madreag
+game/crates/cf-physics/ @Madreag
+game/crates/cf-render-2d/ @Madreag
+game/crates/cf-replay/ @Madreag
+game/crates/cf-terrain/ @Madreag
+game/crates/cf-ui/ @Madreag

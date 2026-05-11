@@ -1,0 +1,15 @@
+{
+  "scenario": "m2_material_lane",
+  "tick_rate_hz": 60,
+  "description": "M2 chunked terrain carve path (CPU; GPU-assisted is BP4)",
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 30 } },
+    { "method": "act.player.dig", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 30 } },
+    { "method": "act.player.move", "params": { "x": 1.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 60 } },
+    { "method": "act.player.dig", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 60 } }
+  ]
+}

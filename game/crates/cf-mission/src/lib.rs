@@ -163,6 +163,8 @@ pub enum MissionResult {
     Active,
     Won,
     Lost { reason: LossReason },
+    /// Player-initiated mission abandonment. BP4+ implementation.
+    Aborted,
 }
 
 impl MissionResult {
@@ -171,6 +173,7 @@ impl MissionResult {
             MissionResult::Active => "active",
             MissionResult::Won => "won",
             MissionResult::Lost { .. } => "lost",
+            MissionResult::Aborted => "aborted",
         }
     }
 
@@ -365,6 +368,13 @@ pub struct MissionState {
     pub result: MissionResult,
     pub last_event_tick: u64,
     pub last_event_label: String,
+    /// Tick of the most recent objective or result state transition.
+    #[serde(default)]
+    pub last_transition_tick: u64,
+    /// Typed loss reason vocabulary for stable replay/analytics. Populated from
+    /// `LossReason::as_str()` when the mission resolves as Lost.
+    #[serde(default)]
+    pub loss_reason_label: Option<String>,
 }
 
 impl MissionState {
@@ -386,6 +396,8 @@ impl MissionState {
             result: MissionResult::Active,
             last_event_tick: started_at_tick,
             last_event_label: "mission_started".to_string(),
+            last_transition_tick: started_at_tick,
+            loss_reason_label: None,
         }
     }
 
@@ -403,6 +415,8 @@ impl MissionState {
         self.result = MissionResult::Active;
         self.last_event_tick = started_at_tick;
         self.last_event_label = "mission_started".to_string();
+        self.last_transition_tick = started_at_tick;
+        self.loss_reason_label = None;
     }
 
     /// Number of required objectives still in `Pending` or `Active` status.
@@ -665,6 +679,18 @@ pub fn step(state: &mut MissionState, inputs: MissionTickInputs<'_>) -> MissionT
         state.last_event_tick = inputs.tick;
         state.last_event_label = "mission_won".to_string();
         report.final_result = Some(state.result);
+    }
+
+    // Track transition timing for analytics (W1 item 866).
+    if report.final_result.is_some()
+        || !report.objective_started.is_empty()
+        || !report.objective_completed.is_empty()
+        || !report.objective_failed.is_empty()
+    {
+        state.last_transition_tick = inputs.tick;
+    }
+    if let Some(MissionResult::Lost { reason }) = report.final_result {
+        state.loss_reason_label = Some(reason.as_str().to_string());
     }
 
     report

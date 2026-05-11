@@ -1,12 +1,26 @@
 # cf-net — AGENTS.md
 
 ## Owns
-- (M0 stub) Will own authority, snapshot/event hybrid replication, transport adapter for the dedicated server.
+- Client/server transport (real implementation pending M9 / DR-005).
+- Transport library selection (Lightyear / renet / quinn — deferred to M9/M10).
+- Client prediction + server reconciliation.
+- Network event serialization for co-op and PvP.
 
-## Common Pitfalls
-- Networking transport library (lightyear vs renet vs quinn) is OPEN. Do NOT pick one before M9/M10 prototyping; confirm with user before locking.
+## Public API Boundary
+- (Stub until M9.)
+
+## Does NOT Own
+- Server logic → `cf-server`.
+- Game state → `cf-sim-core`, `cf-actor`, `cf-terrain`, etc.
+- Replay/event recording → `cf-replay`.
+
+## Test Surface
+- (Stub.) Real coverage lands at M9.
+
+## Cross-Crate Contracts
+- Will depend on: `cf-sim-core`, `cf-replay`.
+- Will be depended on by: `cf-server`, `cf-app`.
 
 ## Source Trail
-- spec/server-app-architecture.
-- spec/persistent-mmo-architecture.
-- DR-005 / DR-013 / DR-034 / DR-035.
+- DR-005 (multiplayer posture; CLOSED direction).
+- DR-052 (network sync / rollback; CLOSED direction).

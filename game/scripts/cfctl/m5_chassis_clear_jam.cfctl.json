@@ -1,0 +1,11 @@
+{
+  "scenario": "m5_chassis_salvage",
+  "tick_rate_hz": 60,
+  "description": "Isolated weapon-jam clear scenario",
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 30 } },
+    { "method": "act.chassis.clear_jam", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 60 } }
+  ]
+}

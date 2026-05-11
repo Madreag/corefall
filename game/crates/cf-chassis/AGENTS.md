@@ -13,7 +13,7 @@
 
 ## Public API Boundary
 - Types: `ChassisKind`, `ChassisSpec`, `ChassisState`, `BodyGraph`, `BodyZone`, `ArmorLayer`, `ArmorLayerKind`, `ZoneState`, `ChassisModule`, `ModuleKind`, `ModuleStateKind`, `ChassisStage`, `PilotState`, `EjectWindow`, `EjectAccepted`, `EjectProgress`, `Joint`, `EquipmentSocket`, `MovementContribution`, `ZoneDamageOutcome`, `RepairOutcome`, `SalvageOutcome`, `LayerDamage`, `LayerGlance`, `ModuleTransition`.
-- Functions: `infantry_spec()`, `powered_armor_spec()`, `light_mech_spec()`, `chassis_specs()`, `chassis_spec(id)`.
+- Functions: `infantry_spec()`, `powered_armor_spec()`, `light_mech_spec()`, `chassis_specs()`, `chassis_spec(id)`, `ChassisState::force_stage(stage)` (test-only stage override).
 - Constants: `INFANTRY_ID`, `POWERED_ARMOR_ID`, `LIGHT_MECH_ID`, `SOCKET_HAND_RIGHT`, `SOCKET_HAND_LEFT`, `SOCKET_BACK_MOUNT`, `SOCKET_HEAD_MOUNT`, `SOCKET_TORSO_HARDPOINT`.
 
 ## Does NOT Own

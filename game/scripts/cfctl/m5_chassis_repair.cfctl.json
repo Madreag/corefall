@@ -1,0 +1,13 @@
+{
+  "scenario": "m5_chassis_salvage",
+  "tick_rate_hz": 60,
+  "description": "Isolated repair-zone scenario: damage chassis, then repair a zone",
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 30 } },
+    { "method": "act.chassis.repair", "params": { "zone": "torso" } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 60 } },
+    { "method": "act.chassis.repair", "params": { "zone": "head" } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 60 } }
+  ]
+}
