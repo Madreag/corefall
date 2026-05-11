@@ -1838,6 +1838,7 @@ fn sync_actor_state_to_render(
     };
     hud_state.stance = stance;
     hud_state.body_silhouette = silhouette;
+    hud_state.stability = hud_state.player.as_ref().map(|p| p.stability).unwrap_or(1.0);
     // **M5**: prefer the chassis module strip when a chassis is attached;
     // otherwise fall back to the M4A weapon-mount placeholder.
     hud_state.modules = match hud_state.player.as_ref().and_then(|p| p.chassis.as_ref()) {

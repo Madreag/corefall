@@ -61,6 +61,8 @@ pub struct HudState {
     pub captions: Vec<HudCaption>,
     /// M4A: tool-validity projection for the HUD TOOL line.
     pub tool_validity: Option<HudToolValidity>,
+    /// W1.3: stability scalar (0.0=disrupted, 1.0=stable) from actor state.
+    pub stability: f32,
 }
 
 /// M4A accessibility/settings mirror. cf-ui depends on `cf-actor` + `bevy` only;
@@ -245,6 +247,9 @@ pub struct LastEventStripText;
 
 #[derive(Component, Debug)]
 pub struct StanceStripText;
+
+#[derive(Component, Debug)]
+pub struct StabilityStripText;
 
 #[derive(Component, Debug)]
 pub struct SilhouetteStripText;
@@ -993,7 +998,42 @@ pub fn stance_line(stance: &str, player: Option<&ActorObservation>) -> String {
         Some(p) if !p.on_ground => " (airborne)",
         _ => "",
     };
-    format!("STANCE: {}{}", stance.to_uppercase(), air_marker)
+    let stability_tag = match player {
+        Some(p) if p.stability < 0.9 => {
+            let pct = (p.stability * 100.0).round() as i32;
+            let label = if pct >= 60 {
+                "SHAKEN"
+            } else if pct >= 30 {
+                "UNSTABLE"
+            } else if pct > 0 {
+                "CRITICAL"
+            } else {
+                "DISRUPTED"
+            };
+            format!(" | STABILITY {pct}% {label}")
+        }
+        _ => String::new(),
+    };
+    format!("STANCE: {}{}{}", stance.to_uppercase(), air_marker, stability_tag)
+}
+
+/// Format the stability HUD line. Shows the stability scalar as a percentage
+/// with a readable label so the player knows WHY they feel sluggish, inaccurate,
+/// or vulnerable. This is the A-FEEL-06 "damage cause explanation" surface.
+pub fn stability_line(stability: f32) -> String {
+    let pct = (stability * 100.0).round() as i32;
+    let label = if pct >= 90 {
+        "SOLID"
+    } else if pct >= 60 {
+        "SHAKEN"
+    } else if pct >= 30 {
+        "UNSTABLE"
+    } else if pct > 0 {
+        "CRITICAL"
+    } else {
+        "DISRUPTED"
+    };
+    format!("STABILITY: {pct}% {label}")
 }
 
 /// Format the silhouette HUD line. Renders six per-zone bars as ASCII so the
