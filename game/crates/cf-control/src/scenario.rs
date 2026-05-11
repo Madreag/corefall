@@ -63,6 +63,18 @@ pub struct Scenario {
     pub expected_tests: Vec<String>,
     #[serde(default)]
     pub notes: String,
+    /// Optional scenario tags for grouping/filtering (lab/tutorial/mission).
+    #[serde(default)]
+    pub scenario_tags: Vec<String>,
+    /// Optional difficulty preset (e.g. "cakewalk", "tough_crowd", "veteran").
+    #[serde(default)]
+    pub difficulty_preset: Option<String>,
+    /// Optional loadout template reference (M5 spec).
+    #[serde(default)]
+    pub loadout_template: Option<String>,
+    /// Optional loss reason vocabulary for typed loss reasons.
+    #[serde(default)]
+    pub loss_reason_vocabulary: Vec<String>,
     /// M4A: optional milestone tag override. When `None` the engine derives
     /// the milestone string from the scenario shape (actor world → m1, mission
     /// → m1.5, terrain → m2, reactors → m2.5). When `Some`, the scenario takes
@@ -955,6 +967,10 @@ mod tests {
             save_fields: vec![],
             expected_tests: vec![],
             notes: String::new(),
+            scenario_tags: vec![],
+            difficulty_preset: None,
+            loadout_template: None,
+            loss_reason_vocabulary: vec![],
             milestone_override: None,
         };
         assert!(matches!(

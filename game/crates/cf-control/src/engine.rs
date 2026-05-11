@@ -818,6 +818,11 @@ impl M0Engine {
                     }),
                     Some(parent_event_id.to_string()),
                 );
+                let rifle_ammo = sim
+                    .rifles
+                    .get(&actor.id)
+                    .map(|r| json!({"ammo_in_mag": r.ammo_in_mag, "mag_capacity": r.spec.mag_capacity, "reloading": r.is_reloading()}))
+                    .unwrap_or(json!(null));
                 self.recorder.record(
                     tick,
                     sim_time_ms,
@@ -827,6 +832,7 @@ impl M0Engine {
                         "actor": actor.id.0,
                         "selected_slot": actor.inventory.selected.0,
                         "items": actor.inventory.items.iter().map(|i| i.label()).collect::<Vec<_>>(),
+                        "rifle_state": rifle_ammo,
                     }),
                     Some(parent_event_id.to_string()),
                 );
@@ -1727,6 +1733,9 @@ impl M0Engine {
                 self.recorder
                     .record(tick, sim_time_ms, "mission", "mission_resolved", payload, None);
             }
+            // W1 item 770: re-emit snapshots on any objective state change so
+            // the replay verifier and viewer can reconstruct mid-mission state.
+            self.emit_initial_snapshots(tick, sim_time_ms, "objective_change");
         }
 
         // **M5**: tick the chassis eject sequence for every actor + emit progress events.
