@@ -661,6 +661,7 @@ async fn cmd_observe(
             seed_override: seed,
             duration_ticks_override: Some(1),
             debug_inject_panic_at_tick: None,
+            checksum_cadence_ticks: None,
         };
         let config = build_engine_config(inputs).context("cfctl observe inline: build_engine_config failed")?;
         let engine = M0Engine::new(config);
@@ -747,6 +748,7 @@ fn cmd_run(
         seed_override: seed,
         duration_ticks_override: if ticks > 0 { Some(ticks) } else { None },
         debug_inject_panic_at_tick: None,
+        checksum_cadence_ticks: None,
     };
     let config = build_engine_config(inputs).context("cfctl run: build_engine_config failed")?;
     let outcome = run_m0_inline(config).context("inline run failed")?;

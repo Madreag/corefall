@@ -112,8 +112,8 @@ N. - [<marker>] [W<wave>] [BP<bp>] [M<milestone>+...] [DR-<n>+...] [STATE] body
 22. - [x] [W1] [BP3] [PART] README Build Points table says BP3 "✅ Closed (current)" — claim is premature.  → W1.1
 23. - [x] [W1] [BP3] [PART] README "Workspace stats" still cites 2026-05-09 commit `3fe8ac8` instead of current commit.  → W1.1
 24. - [x] [W1] [BP3] [GAP] `docs/plan/spec/feature-completion-checklist.md` BP3 row evidence columns not populated with current closing PR + run-bundle + matrix verdict.  → W1.1 (BP2 M2/M2.5/M3A rows updated)
-25. - [ ] [W1] [BP3] [GAP] `docs/plan/spec/prototype-roadmap.md` Build Points table row for BP3 still shows pre-closure status pill.
-26. - [ ] [W1] [BP3] [GAP] `CHANGELOG.md` has no `### BP3 Closure — Combat Readability Build` section with per-milestone matrix outcomes + deferral IDs.
+25. - [x] [W1] [BP3] [GAP] `docs/plan/spec/prototype-roadmap.md` Build Points table row for BP3 still shows pre-closure status pill.  → W1.1 (changed CLOSED → ACTIVE)
+26. - [x] [W1] [BP3] [GAP] `CHANGELOG.md` has no `### BP3 Closure — Combat Readability Build` section with per-milestone matrix outcomes + deferral IDs.  → W1.1 (section updated to honest ACTIVE status)
 27. - [x] [W1] [BP3] [GAP] `bash game/tools/check_status_surfaces.sh bp3` does not exist (the script is the regression catch per the contract).  → W1.1
 28. - [x] [W1] [BP3] [GAP] No commit-chain proof that all 4 status surfaces (README + checklist + roadmap + CHANGELOG) updated in lockstep.  → W1.1 (this commit updates all 4)
 29. - [x] [W1] [BP3] [M3B+M4A+M5] [GAP] README BP3 milestone-table rows for M3B/M4A/M5 do not cite final closing PR numbers.  → W1.1

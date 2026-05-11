@@ -144,6 +144,9 @@ pub struct M0EngineConfig {
     pub initial_chunked_terrain: Option<cf_terrain::ChunkedTerrain>,
     /// M2.5: optional ordered list of reactor world entries.
     pub initial_reactors: Vec<cf_mission::Reactor>,
+    /// M3A: configurable checksum cadence. 0 = disabled. Default from
+    /// `ChecksumConfig::m0_default().cadence_ticks` (60).
+    pub checksum_cadence_ticks: u64,
 }
 
 /// M1.5: initial breach world snapshot.
@@ -268,6 +271,7 @@ impl M0EngineConfig {
             mission_loss: None,
             initial_chunked_terrain: None,
             initial_reactors: Vec::new(),
+            checksum_cadence_ticks: ChecksumConfig::m0_default().cadence_ticks,
         }
     }
 
@@ -1343,7 +1347,7 @@ impl M0Engine {
                     mission_payload = Some((tick, sim_time_ms, report));
                 }
             }
-            let cadence = ChecksumConfig::m0_default().cadence_ticks;
+            let cadence = self.config.checksum_cadence_ticks;
             if cadence > 0 && tick.0 % cadence == 0 {
                 let actor_bytes = build_checksum_bytes(&state);
                 let cs = sim_state_v1(tick, &state.rng, &actor_bytes);
@@ -1388,7 +1392,7 @@ impl M0Engine {
                     "checksum_hex": hex,
                     "algorithm": CHECKSUM_ALGORITHM,
                     "scope": CHECKSUM_SCOPE,
-                    "cadence_ticks": ChecksumConfig::m0_default().cadence_ticks,
+                    "cadence_ticks": self.config.checksum_cadence_ticks,
                     "tick_rate_hz": self.config.tick_rate_hz,
                     "seed": self.config.seed,
                 }),
@@ -2496,7 +2500,7 @@ impl M0Engine {
                 "checksum_hex": cs.to_hex(),
                 "algorithm": CHECKSUM_ALGORITHM,
                 "scope": CHECKSUM_SCOPE,
-                "cadence_ticks": ChecksumConfig::m0_default().cadence_ticks,
+                "cadence_ticks": self.config.checksum_cadence_ticks,
                 "tick_rate_hz": self.config.tick_rate_hz,
                 "seed": self.config.seed,
                 "kind": "final",

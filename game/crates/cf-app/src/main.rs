@@ -441,6 +441,7 @@ fn build_config(cli: &Cli, scenario_path: PathBuf) -> Result<M0EngineConfig> {
         seed_override: cli.seed,
         duration_ticks_override: if cli_duration > 0 { Some(cli_duration) } else { None },
         debug_inject_panic_at_tick: cli.debug_inject_panic_at_tick,
+        checksum_cadence_ticks: None,
     };
     build_engine_config(inputs).context("build_engine_config failed for cf-app")
 }

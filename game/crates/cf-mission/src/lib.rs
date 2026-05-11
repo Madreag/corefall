@@ -162,7 +162,9 @@ impl LossReason {
 pub enum MissionResult {
     Active,
     Won,
-    Lost { reason: LossReason },
+    Lost {
+        reason: LossReason,
+    },
     /// Player-initiated mission abandonment. BP4+ implementation.
     Aborted,
 }

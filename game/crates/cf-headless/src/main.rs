@@ -153,6 +153,7 @@ fn replay(bundle_dir: &Path, verify_checksums: bool, scenario_path: Option<PathB
         paced: false,
         settings: Settings::default(),
         debug_inject_panic_at_tick: None,
+        checksum_cadence_ticks: None,
     })?;
     config.run_mode = "headless-replay".to_string();
     config.write_run_bundle = false;
@@ -370,6 +371,55 @@ fn parse_command(payload: &Value) -> Option<ControlCommand> {
         "act.player.reset" => Some(ControlCommand::ActPlayerReset {
             source: IntentSource::Cfctl,
         }),
+        "act.player.crouch" => Some(ControlCommand::ActPlayerCrouch {
+            active: payload.get("active").and_then(Value::as_bool).unwrap_or(true),
+            source: IntentSource::Replay,
+        }),
+        "act.player.climb" => Some(ControlCommand::ActPlayerClimb {
+            active: payload.get("active").and_then(Value::as_bool).unwrap_or(true),
+            source: IntentSource::Replay,
+        }),
+        "act.player.jet" => Some(ControlCommand::ActPlayerJet {
+            active: payload.get("active").and_then(Value::as_bool).unwrap_or(true),
+            source: IntentSource::Replay,
+        }),
+        "act.player.eject" => Some(ControlCommand::ActPlayerEject {
+            source: IntentSource::Replay,
+        }),
+        "act.chassis.repair" => Some(ControlCommand::ActChassisRepair {
+            zone: payload.get("zone").and_then(Value::as_str).map(str::to_string),
+            module_id: payload.get("module_id").and_then(Value::as_str).map(str::to_string),
+            reason: payload
+                .get("reason")
+                .and_then(Value::as_str)
+                .unwrap_or("replay")
+                .to_string(),
+            source: IntentSource::Replay,
+        }),
+        "act.chassis.salvage" => Some(ControlCommand::ActChassisSalvage {
+            reason: payload
+                .get("reason")
+                .and_then(Value::as_str)
+                .unwrap_or("replay")
+                .to_string(),
+            source: IntentSource::Replay,
+        }),
+        "act.chassis.clear_jam" => Some(ControlCommand::ActChassisClearJam {
+            source: IntentSource::Replay,
+        }),
+        "act.input.focus" => {
+            let dir_str = payload.get("direction").and_then(Value::as_str).unwrap_or("clear");
+            let direction = match dir_str {
+                "next" => cf_control::FocusDirection::Next,
+                "prev" => cf_control::FocusDirection::Prev,
+                "clear" => cf_control::FocusDirection::Clear,
+                other => cf_control::FocusDirection::Set(other.to_string()),
+            };
+            Some(ControlCommand::ActInputFocus {
+                direction,
+                source: IntentSource::Replay,
+            })
+        }
         "act.settings.set" => {
             // Settings patches are not replayed because the recorded
             // command_accepted payload does not carry the patch contents

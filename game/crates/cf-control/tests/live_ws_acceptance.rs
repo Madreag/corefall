@@ -121,6 +121,7 @@ async fn spawn_server_with_scenario(
         seed_override: Some(seed),
         duration_ticks_override: None,
         debug_inject_panic_at_tick: None,
+        checksum_cadence_ticks: None,
     };
     let config = build_engine_config(inputs).expect("build_engine_config");
     let engine = Arc::new(M0Engine::new(config));

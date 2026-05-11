@@ -46,6 +46,9 @@ pub struct ConfigInputs {
     /// **DEBUG-ONLY**: spawn a thread that panics at the named tick to capture
     /// `system.panic` evidence in a real run bundle. Production callers leave this `None`.
     pub debug_inject_panic_at_tick: Option<u64>,
+    /// M3A: override checksum cadence (ticks between sim_checksum events).
+    /// `None` = use default from `ChecksumConfig::m0_default().cadence_ticks` (60).
+    pub checksum_cadence_ticks: Option<u64>,
 }
 
 /// Locate `<root>/content/scenarios/<id>.ron`. Searches a few well-known prefixes so
@@ -99,6 +102,9 @@ pub fn build_engine_config(inputs: ConfigInputs) -> Result<M0EngineConfig, Confi
         }
     }
     config.debug_inject_panic_at_tick = inputs.debug_inject_panic_at_tick;
+    if let Some(cadence) = inputs.checksum_cadence_ticks {
+        config.checksum_cadence_ticks = cadence;
+    }
     config.commit_sha = git_commit_sha();
     let worktree = git_worktree_info();
     config.worktree_dirty = worktree.dirty;

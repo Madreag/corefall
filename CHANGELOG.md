@@ -17,9 +17,9 @@ copy long-form research here; that's what the vault is for.
 
 ## Unreleased
 
-### BP3 Closure — Combat Readability Build (M3B + M4A + M5)
+### BP3 — Combat Readability Build (M3B + M4A + M5)
 
-**BP3 closed 2026-05-11.** Final milestone M5 landed on this branch with the full chassis grammar from DR-014 + DR-021. The Build Point closure rolls in M3B (Replay Viewer + Debrief), M4A (Readability + ACC-A Floor), and M5 (Equipment / Chassis / Damage Grammar).
+**BP3 active.** All constituent milestones landed (M3B commit 50af435, M4A PR #27, M5 commit 29edc1b). BP3 closure gate has NOT passed — MISSING_FEATURES Wave 1 foundation repair in progress. Final closure requires bp_close_loop.sh bp3 all-phases PASS.
 
 **M5 — Equipment, Chassis, And Damage Grammar (CLOSED):**
 
