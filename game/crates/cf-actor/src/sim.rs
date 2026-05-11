@@ -303,7 +303,7 @@ fn step_one_actor(
             .expect("actor id exists by construction");
 
         let previous_status = actor.status;
-        let accepted_input = actor.status.accepts_input();
+        let accepted_input = actor.status.accepts_input() && actor.knockdown_ticks_remaining == 0;
         let mut outcome = ActorTickOutcome {
             actor: actor_id,
             source: intent.source,
@@ -586,6 +586,27 @@ fn step_one_actor(
         // Recovery toward 1.0 when on ground and no disruption this tick.
         if actor.on_ground && outcome.recoil_applied == 0.0 && outcome.landed_impulse == 0.0 {
             actor.stability = (actor.stability + actor.stability_recovery_rate).min(1.0);
+        }
+
+        // Knockdown: when stability is critically low and the actor just took
+        // a destabilizing event, trigger a knockdown stun. The actor cannot act
+        // for knockdown_ticks_remaining ticks (similar to Downed but recoverable).
+        // At 60Hz, 18 ticks = 0.3s stun — enough to feel the impact without
+        // being frustrating. Only triggers once per knockdown (ticks_remaining == 0).
+        const KNOCKDOWN_STABILITY_THRESHOLD: f32 = 0.1;
+        const KNOCKDOWN_DURATION_TICKS: u32 = 18;
+        let took_hit = outcome.recoil_applied > 0.0 || outcome.landed_impulse > 100.0;
+        if actor.stability < KNOCKDOWN_STABILITY_THRESHOLD
+            && took_hit
+            && actor.knockdown_ticks_remaining == 0
+            && actor.status.accepts_input()
+        {
+            actor.knockdown_ticks_remaining = KNOCKDOWN_DURATION_TICKS;
+        }
+
+        // Tick down knockdown recovery.
+        if actor.knockdown_ticks_remaining > 0 {
+            actor.knockdown_ticks_remaining -= 1;
         }
     }
 

@@ -130,6 +130,9 @@ pub enum Stance {
     Jetting = 8,
     /// M5: pilot is mid-eject sequence (ChassisState.eject_window active).
     Ejecting = 9,
+    /// W1.3: temporarily stunned by stability loss. Actor cannot accept input
+    /// but is not Downed (will recover in knockdown_ticks_remaining ticks).
+    KnockedDown = 10,
 }
 
 impl Stance {
@@ -152,6 +155,7 @@ impl Stance {
             Stance::Climbing => "climbing",
             Stance::Jetting => "jetting",
             Stance::Ejecting => "ejecting",
+            Stance::KnockedDown => "knocked_down",
         }
     }
 
@@ -509,6 +513,12 @@ pub struct ActorState {
     pub climb_active: bool,
     #[serde(default)]
     pub jet_active: bool,
+    /// W1.3: knockdown recovery ticks remaining. When > 0, actor cannot accept
+    /// input (same as Downed) but status stays Stable/Unstable. Decrements each
+    /// tick; at zero the actor regains control. Triggered when stability < 0.1
+    /// and the actor takes a destabilizing event (landing, recoil, damage).
+    #[serde(default)]
+    pub knockdown_ticks_remaining: u32,
     /// **M5**: latched flag set on first tick when destroyed-zone movement
     /// contribution returns `drop_gear=true`. Used to gate single-shot
     /// `actor.gear_dropped` event emission + clear the rifle/inventory slot
@@ -639,6 +649,7 @@ impl ActorState {
             chassis_detached: false,
             stability: 1.0,
             stability_recovery_rate: 0.02,
+            knockdown_ticks_remaining: 0,
             resources: ResourceAccumulators::default(),
             afflictions: Vec::new(),
         }
@@ -689,6 +700,7 @@ impl ActorState {
         self.hp = self.hp_max;
         self.inventory.selected = ItemSlot(0);
         self.stability = 1.0;
+        self.knockdown_ticks_remaining = 0;
         self.crouch_active = false;
         self.climb_active = false;
         self.jet_active = false;
@@ -807,6 +819,9 @@ impl ActorState {
     /// Derived stance for HUD + `cfctl observe`. M5 routes through
     /// [`Stance::from_chassis`] so crouch / climb / jet / eject signals propagate.
     pub fn stance(&self) -> Stance {
+        if self.knockdown_ticks_remaining > 0 {
+            return Stance::KnockedDown;
+        }
         let ejecting = self
             .chassis
             .as_ref()
@@ -953,6 +968,7 @@ impl ActorState {
         out.push(u8::from(self.on_ground));
         out.extend_from_slice(&self.inventory.selected.0.to_le_bytes());
         out.extend_from_slice(&quantize_f32(self.stability).to_le_bytes());
+        out.extend_from_slice(&self.knockdown_ticks_remaining.to_le_bytes());
         // M5: append chassis bytes only when a chassis is attached; legacy actors
         // remain byte-identical for cross-milestone determinism comparisons.
         if let Some(chassis) = &self.chassis {
@@ -1306,8 +1322,9 @@ mod tests {
         let actor = ActorState::player(ActorId(7), "blue", Vec2::new(1.0, 2.0), 100.0, inv);
         let bytes = actor.checksum_bytes();
         // 8 (id u64) + 4*7 (position.x/y, velocity.x/y, aim.x/y, hp as i32) + 1 (status u8)
-        // + 1 (on_ground u8) + 4 (selected slot u32) + 4 (stability i32) = 46 bytes.
-        assert_eq!(bytes.len(), 46);
+        // + 1 (on_ground u8) + 4 (selected slot u32) + 4 (stability i32)
+        // + 4 (knockdown_ticks_remaining u32) = 50 bytes.
+        assert_eq!(bytes.len(), 50);
     }
 
     #[test]
