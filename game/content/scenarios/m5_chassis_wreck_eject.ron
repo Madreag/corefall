@@ -1,0 +1,63 @@
+(
+  schema_version: 1,
+  id: "m5_chassis_wreck_eject",
+  display_name: "M5 Chassis Wreck & Eject",
+  description: "M5 acceptance proof per spec/native-implementation-backlog M5-001..M5-004 + roadmap done-criteria. Player is a Powered Armor pilot facing one Light Mech adversary. The mech's heavy autocannon will wreck the player's chassis through layered armor (External → Internal → Core → wound) emitting `chassis.armor_layer_damaged` / `armor_zone_destroyed` / `module_state_changed` / `stage_changed` events along the way. WIN path: pilot ejects before the chassis hits Wreck stage, runs to the extraction zone as foot infantry — emits `chassis.pilot_ejected` + `pilot_separated` + `mission.mission_resolved {result: won}`. LOSS path: pilot waits too long → `chassis.pilot_bailed_too_late` + `mission.mission_resolved {result: lost, reason: player_dead}`. Reuses M1.5 cf-mission + cf-ai unchanged.",
+  seed: 53,
+  duration_ticks: Some(7200),
+  region: (anchor: (0.0, 0.0), width: 1280.0, height: 720.0),
+  gravity: -980.0,
+  floor_y: 16.0,
+  teams: [],
+  actors: [
+    (id: 1, team: "blue", spawn: (400.0, 32.0), controllable: true, hp: 100.0,
+      inventory: (rifle: Some("carbine_m5_powered")), aim: Some((1.0, 0.0)),
+      chassis: Some((spec_id: "powered_armor_v1", tutorial_safety: false)),
+      origin_id: Some("human")),
+    (id: 2, team: "red", spawn: (1100.0, 32.0), controllable: false, hp: 200.0,
+      inventory: (rifle: Some("rifle_m5_mech_heavy")), aim: Some((-1.0, 0.0)),
+      chassis: Some((spec_id: "light_mech_v1", tutorial_safety: false)),
+      origin_id: Some("human"),
+      enemy: Some((
+        kind: Some("reactive_guard"),
+        miss_chance: Some(0.1),
+        damage_per_hit: Some(40.0),
+        burst_pause_seconds: Some(0.4),
+        sight_radius: Some(2400.0),
+        sight_cone_degrees: Some(140.0),
+        burst_shots: Some(3),
+        mag_capacity: Some(15),
+        reload_seconds: Some(2.5),
+        muzzle_forward_offset: Some(22.0),
+        muzzle_vertical_offset: Some(4.0),
+        projectile_speed: Some(1100.0),
+        projectile_lifetime_seconds: Some(2.0),
+      ))),
+  ],
+  terrain: Some((
+    width_px: 1280,
+    height_px: 720,
+    anchor: Some((0.0, 0.0)),
+    default_material: "air",
+    stamps: [
+      (kind: "fill_aabb", min: (0.0, 0.0), max: (1280.0, 16.0), material: "concrete"),
+      // Extraction cover wall — between extraction zone (x=[40,180]) and the
+      // player spawn (x=400). After eject, the pilot moves west past x=240
+      // and the wall blocks the mech's autocannon (concrete terrain stops
+      // projectiles), allowing the pilot to extract. The pilot's spawn at
+      // x=400 is east of cover, so the chassis takes damage while exposed.
+      (kind: "fill_aabb", min: (220.0, 16.0), max: (244.0, 80.0), material: "concrete"),
+    ],
+  )),
+  breaches: [],
+  reactors: [],
+  objectives: [
+    (id: "eject_to_safety", kind: { "kind": "reach_zone", "min": (40.0, 16.0), "max": (180.0, 80.0) }),
+  ],
+  mission: Some((time_limit_ticks: 5400, player_dead_loses: true)),
+  director: None,
+  capabilities: (debug: false, control_api: true, save_load: true),
+  save_fields: ["chassis", "equipment", "actor_state"],
+  expected_tests: ["M5-WRECK-01", "M5-EJECT-01", "M5-LOSS-01"],
+  notes: "M5 chassis wreck + eject + extraction. Heavy mech autocannon shreds powered-armor layers; pilot ejects before wreck and runs to the extraction zone in the west. Loss = pilot dead before extraction.",
+)

@@ -179,20 +179,126 @@ pub struct ActorView {
     pub rifle_fire_cooldown_ticks: Option<u32>,
     pub rifle_reload_remaining_ticks: Option<u32>,
     pub rifle_reload_total_ticks: Option<u32>,
-    /// M4A: derived stance label (idle/walking/running/airborne/downed/dead).
+    /// M4A: derived stance label (idle/walking/running/airborne/downed/dead/...).
     /// `cfctl observe` consumers + AI agents read this without a screenshot.
     #[serde(default = "default_stance")]
     pub stance: String,
     /// M4A: per-zone body silhouette projection (head/torso/arms/legs hp%).
-    /// `placeholder=true` until M5 lands the real body graph; consumers should
-    /// treat the LAYOUT as stable but the values as a derived projection.
+    /// **M5**: `placeholder=false` when sourced from a real chassis body graph;
+    /// `placeholder=true` for legacy actors without a chassis.
     #[serde(default)]
     pub body_silhouette: BodySilhouetteView,
-    /// M4A: chassis module strip projection. Empty until M5 lands the real
-    /// chassis grammar; M4A populates `weapon_mount` from the selected rifle's
-    /// fire-state so HUD + accessibility tooling have a stable surface.
+    /// M4A: chassis module strip projection. **M5**: `placeholder=false` when
+    /// sourced from a real chassis; `placeholder=true` for the M4A flat-rifle
+    /// derivation.
     #[serde(default)]
     pub module_strip: ModuleStripView,
+    /// **M5**: full chassis projection (per-zone integrity, modules, stage,
+    /// pilot state, eject window). `None` for legacy actors without a chassis.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chassis: Option<ChassisView>,
+    /// **M5**: actor origin tag (`human`, `robot`, `android`).
+    #[serde(default = "default_origin_id")]
+    pub origin_id: String,
+    /// **M5**: per-tick movement-intent flags surfaced to AI / HUD.
+    #[serde(default)]
+    pub crouch_active: bool,
+    #[serde(default)]
+    pub climb_active: bool,
+    #[serde(default)]
+    pub jet_active: bool,
+}
+
+fn default_origin_id() -> String {
+    "human".to_string()
+}
+
+/// **M5**: chassis projection for `cfctl observe` / `inspect`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ChassisView {
+    pub spec_id: String,
+    pub kind: String,
+    pub stage: String,
+    pub pilot_state: String,
+    pub weapon_jammed: bool,
+    pub tutorial_safety: bool,
+    pub mass_kg: f32,
+    pub zones: Vec<ChassisZoneView>,
+    pub modules: Vec<ChassisModuleView>,
+    pub integrity: f32,
+    pub eject_ticks_remaining: u32,
+    pub eject_ticks_total: u32,
+    pub destroyed_zones: Vec<String>,
+    pub salvaged_module_ids: Vec<String>,
+}
+
+impl From<&cf_actor::ChassisView> for ChassisView {
+    fn from(v: &cf_actor::ChassisView) -> Self {
+        Self {
+            spec_id: v.spec_id.clone(),
+            kind: v.kind.clone(),
+            stage: v.stage.clone(),
+            pilot_state: v.pilot_state.clone(),
+            weapon_jammed: v.weapon_jammed,
+            tutorial_safety: v.tutorial_safety,
+            mass_kg: v.mass_kg,
+            zones: v.zones.iter().map(ChassisZoneView::from).collect(),
+            modules: v.modules.iter().map(ChassisModuleView::from).collect(),
+            integrity: v.integrity,
+            eject_ticks_remaining: v.eject_ticks_remaining,
+            eject_ticks_total: v.eject_ticks_total,
+            destroyed_zones: v.destroyed_zones.clone(),
+            salvaged_module_ids: v.salvaged_module_ids.clone(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ChassisZoneView {
+    pub zone: String,
+    pub external_integrity: f32,
+    pub internal_integrity: f32,
+    pub core_integrity: f32,
+    pub wound_integrity: f32,
+    pub destroyed: bool,
+    pub zone_integrity: f32,
+}
+
+impl From<&cf_actor::ChassisZoneView> for ChassisZoneView {
+    fn from(v: &cf_actor::ChassisZoneView) -> Self {
+        Self {
+            zone: v.zone.clone(),
+            external_integrity: v.external_integrity,
+            internal_integrity: v.internal_integrity,
+            core_integrity: v.core_integrity,
+            wound_integrity: v.wound_integrity,
+            destroyed: v.destroyed,
+            zone_integrity: v.zone_integrity,
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ChassisModuleView {
+    pub id: String,
+    pub kind: String,
+    pub state: String,
+    pub bound_zone: String,
+    pub integrity: f32,
+    pub last_reason: String,
+}
+
+impl From<&cf_actor::ChassisModuleView> for ChassisModuleView {
+    fn from(v: &cf_actor::ChassisModuleView) -> Self {
+        Self {
+            id: v.id.clone(),
+            kind: v.kind.clone(),
+            state: v.state.clone(),
+            bound_zone: v.bound_zone.clone(),
+            integrity: v.integrity,
+            last_reason: v.last_reason.clone(),
+        }
+    }
 }
 
 fn default_stance() -> String {

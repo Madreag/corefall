@@ -76,7 +76,8 @@ pub struct Scenario {
 
 /// One actor entry in `Scenario.actors`. M1 only models the player + simple dummies
 /// (target practice, friendlies). M1.5 adds an optional `enemy` block that turns
-/// the actor into a reactive guard. Chassis-grade actors land in M5.
+/// the actor into a reactive guard. **M5** adds an optional `chassis` block that
+/// attaches a full chassis grammar to the actor.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ScenarioActor {
     pub id: u64,
@@ -88,6 +89,8 @@ pub struct ScenarioActor {
     #[serde(default)]
     pub inventory: ScenarioInventory,
     /// Half-extents (width, height) of the actor's collision proxy. Defaults to 8x16.
+    /// When `chassis` is set, the chassis kind overrides these defaults to fit
+    /// the actor silhouette.
     #[serde(default)]
     pub half_extents: Option<(f32, f32)>,
     /// M1.5: optional initial aim direction (defaults to `(1.0, 0.0)`). Reactive
@@ -98,6 +101,56 @@ pub struct ScenarioActor {
     /// drives this actor through `cf-ai::ReactiveGuard`.
     #[serde(default)]
     pub enemy: Option<ScenarioEnemy>,
+    /// **M5**: optional chassis attachment (`infantry`, `powered_armor`,
+    /// `light_mech` or a mod-supplied spec id).
+    #[serde(default)]
+    pub chassis: Option<ScenarioChassis>,
+    /// **M5**: optional origin tag (`human`, `robot`, `android`).
+    #[serde(default)]
+    pub origin_id: Option<String>,
+}
+
+/// **M5** scenario manifest entry for chassis attachment. Resolves to a
+/// runtime [`cf_chassis::ChassisState`].
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScenarioChassis {
+    pub spec_id: String,
+    #[serde(default)]
+    pub tutorial_safety: bool,
+    /// Optional initial stage override. Accepts `"nominal" | "degraded" |
+    /// "critical" | "wreck" | "disabled" | "salvaged"`. When set to `"wreck"`
+    /// or `"disabled"`, `act.chassis.salvage` becomes immediately valid against
+    /// the spawned chassis. Default = scenario seeds a Nominal chassis.
+    #[serde(default)]
+    pub initial_stage: Option<String>,
+}
+
+impl ScenarioChassis {
+    pub fn build_state(&self, tick_rate_hz: u32) -> Option<cf_chassis::ChassisState> {
+        let mut state = cf_chassis::chassis_spec(&self.spec_id)
+            .map(|spec| cf_chassis::ChassisState::from_spec(&spec, tick_rate_hz, self.tutorial_safety))?;
+        if let Some(stage) = self.initial_stage.as_deref() {
+            let target = match stage.to_ascii_lowercase().as_str() {
+                "nominal" => Some(cf_chassis::ChassisStage::Nominal),
+                "degraded" => Some(cf_chassis::ChassisStage::Degraded),
+                "module_warning" => Some(cf_chassis::ChassisStage::ModuleWarning),
+                "module_failed" => Some(cf_chassis::ChassisStage::ModuleFailed),
+                "weapon_jammed" => Some(cf_chassis::ChassisStage::WeaponJammed),
+                "armor_cracked" => Some(cf_chassis::ChassisStage::ArmorCracked),
+                "disabled" => Some(cf_chassis::ChassisStage::Disabled),
+                "pilot_injured" => Some(cf_chassis::ChassisStage::PilotInjured),
+                "eject" => Some(cf_chassis::ChassisStage::Eject),
+                "bail_too_late" => Some(cf_chassis::ChassisStage::BailTooLate),
+                "wreck" | "wrecked" => Some(cf_chassis::ChassisStage::Wreck),
+                "gibbed" => Some(cf_chassis::ChassisStage::Gibbed),
+                _ => None,
+            };
+            if let Some(target_stage) = target {
+                state.force_stage(target_stage);
+            }
+        }
+        Some(state)
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -480,6 +533,13 @@ pub enum ScenarioLoadError {
 
 impl ScenarioActor {
     pub fn build_state(&self) -> ActorState {
+        self.build_state_with_tick_rate(60)
+    }
+
+    /// **M5**: build the actor state including chassis attachment, using the
+    /// engine's configured `tick_rate_hz` so the chassis eject window is
+    /// real-time stable across 60 Hz / 120 Hz scenarios.
+    pub fn build_state_with_tick_rate(&self, tick_rate_hz: u32) -> ActorState {
         let inv = match &self.inventory.rifle {
             Some(preset) => Inventory {
                 items: vec![
@@ -505,6 +565,14 @@ impl ScenarioActor {
         }
         if let Some((ax, ay)) = self.aim {
             actor.aim = Vec2::new(ax, ay);
+        }
+        if let Some(origin) = &self.origin_id {
+            actor.origin_id = origin.clone();
+        }
+        if let Some(chassis_def) = &self.chassis {
+            if let Some(chassis_state) = chassis_def.build_state(tick_rate_hz) {
+                actor.attach_chassis(chassis_state);
+            }
         }
         actor
     }

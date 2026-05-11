@@ -83,7 +83,6 @@ import argparse
 import json
 import re
 import sys
-import subprocess
 from pathlib import Path
 from typing import Iterable, List, Optional, Tuple
 
@@ -103,6 +102,41 @@ def load_manifest(path: Path) -> dict:
 def resolve(repo_root: Path, p: str) -> Path:
     pp = Path(p)
     return pp if pp.is_absolute() else repo_root / pp
+
+
+def bp_number(bp: object) -> Optional[int]:
+    m = re.fullmatch(r"bp(\d+)", str(bp or "").lower())
+    if not m:
+        return None
+    return int(m.group(1))
+
+
+def file_text(repo_root: Path, path: str) -> str:
+    p = resolve(repo_root, path)
+    try:
+        return p.read_text(errors="ignore")
+    except OSError:
+        return ""
+
+
+def regex_present(repo_root: Path, path: str, pattern: str) -> bool:
+    try:
+        return re.search(pattern, file_text(repo_root, path), flags=re.MULTILINE | re.DOTALL) is not None
+    except re.error:
+        return pattern in file_text(repo_root, path)
+
+
+def cfctl_script_methods(repo_root: Path, path: str) -> List[str]:
+    p = resolve(repo_root, path)
+    try:
+        data = json.loads(p.read_text())
+    except (OSError, json.JSONDecodeError):
+        return []
+    methods: List[str] = []
+    for step in data.get("steps") or []:
+        if isinstance(step, dict) and isinstance(step.get("method"), str):
+            methods.append(step["method"])
+    return methods
 
 
 def latest_bundle_for_scenario(
@@ -129,7 +163,7 @@ def latest_bundle_for_scenario(
         return None
     # Try each known prefix in order.
     prefix_groups = [
-        f"m4a_*", f"m3b_*", f"m3a_*",
+        f"m5_*", f"m4a_*", f"m3b_*", f"m3a_*",
         f"m2.5_*", f"m2_*", f"m1.5_*", f"m1_*", f"m0_*",
         f"bp[0-9]*_*",
     ]
@@ -155,7 +189,11 @@ def latest_bundle_for_scenario(
             failed = counts.get("objective_failed", 0)
             if outcome == "won" and not (resolved >= 1 and completed >= 1 and failed == 0):
                 continue
-            if outcome == "lost" and not (resolved >= 1 and failed >= 1):
+            # `lost` triggers via objective_failed (mission-objective path) OR
+            # via mission_resolved without objective_completed (player_dead /
+            # timer_expired path; cf-mission resolves lost without firing an
+            # objective_failed event).
+            if outcome == "lost" and not (resolved >= 1 and (failed >= 1 or completed == 0)):
                 continue
         return c
     return None
@@ -269,6 +307,7 @@ def grading_contract_dimensions(repo_root: Path, contract_path: str) -> List[str
 def collect_gaps(manifest: dict, repo_root: Path, bundle_dir: Path) -> List[dict]:
     gaps: List[dict] = []
     bp = manifest.get("bp", "?")
+    bp_n = bp_number(bp)
 
     # 1. Scenarios + scripts on disk.
     for s in manifest.get("fun_proof_scenarios", []):
@@ -299,6 +338,26 @@ def collect_gaps(manifest: dict, repo_root: Path, bundle_dir: Path) -> List[dict
                     "expected_path": str(gp),
                     "owner_hint": "scaffold game/content/scenarios/grading/<scenario>.grading.json with per-dimension criteria + evidence + weights",
                 })
+
+        # BP2+ T-CAPTURE is not optional for fun-proof evidence. If a fun-proof
+        # path launches through cf-e2e, the manifest must require the same
+        # non-blank capture threshold the roadmap calls out. This prevents a
+        # scenario from passing mechanically while the agent never actually sees
+        # the feature it claims to close.
+        if bp_n is not None and bp_n >= 2 and not s.get("headless_smoke_required", False):
+            capture_expect = "capture.summary_grid.non_blank_ratio>=0.95"
+            for expectation_key, script_key in (("win_path_expectations", "win_script"), ("loss_path_expectations", "loss_script")):
+                if script_key not in s:
+                    continue
+                expectations = s.get(expectation_key) or []
+                if capture_expect not in expectations:
+                    gaps.append({
+                        "category": "capture_expectation_missing",
+                        "scenario": s["id"],
+                        "expectation_key": expectation_key,
+                        "missing_expectation": capture_expect,
+                        "owner_hint": "add the capture non-blank expectation to the manifest and the matching cf-e2e row in self_play_sweep.sh",
+                    })
 
     for s in manifest.get("supporting_scenarios", []):
         sp = resolve(repo_root, s["scenario_path"])
@@ -397,6 +456,72 @@ def collect_gaps(manifest: dict, repo_root: Path, bundle_dir: Path) -> List[dict
                 "missing_events": missing_events,
                 "owner_hint": "either the engine doesn't emit this event yet (code gap) or the cfctl script doesn't exercise the path that triggers it (test gap)",
             })
+
+    # 6. Main-feature semantic probes. These are deliberately BP-owned and
+    # manifest-declared so the canonical roadmap's headline promise becomes
+    # machine-checkable. They catch the systematic failure mode where an agent
+    # implements adjacent scaffolding, updates docs, and passes generic harness
+    # checks without touching the milestone's central feature.
+    for contract in manifest.get("main_feature_contracts") or []:
+        cid = contract.get("id", "<unnamed>")
+        for req in contract.get("required_source_patterns") or []:
+            path = req.get("path")
+            pattern = req.get("pattern")
+            if not path or not pattern:
+                continue
+            if not regex_present(repo_root, path, pattern):
+                gaps.append({
+                    "category": "main_feature_source_missing",
+                    "contract": cid,
+                    "path": path,
+                    "missing_pattern": pattern,
+                    "description": req.get("description", ""),
+                    "owner_hint": "implement the roadmap's main feature in production code, not only in docs/tests",
+                })
+        for req in contract.get("forbidden_source_patterns") or []:
+            path = req.get("path")
+            pattern = req.get("pattern")
+            if not path or not pattern:
+                continue
+            if regex_present(repo_root, path, pattern):
+                gaps.append({
+                    "category": "main_feature_forbidden_source_present",
+                    "contract": cid,
+                    "path": path,
+                    "forbidden_pattern": pattern,
+                    "description": req.get("description", ""),
+                    "owner_hint": "remove the old shortcut or static path instead of layering evidence around it",
+                })
+        for req in contract.get("required_script_methods") or []:
+            script = req.get("script")
+            method = req.get("method")
+            if not script or not method:
+                continue
+            methods = cfctl_script_methods(repo_root, script)
+            if method not in methods:
+                gaps.append({
+                    "category": "main_feature_script_method_missing",
+                    "contract": cid,
+                    "script": script,
+                    "missing_method": method,
+                    "methods_present": methods,
+                    "description": req.get("description", ""),
+                    "owner_hint": "drive the feature through the production cf-control/cfctl script path",
+                })
+        for req in contract.get("required_cli_patterns") or []:
+            path = req.get("path", "game/crates/cfctl/src/main.rs")
+            pattern = req.get("pattern")
+            if not pattern:
+                continue
+            if not regex_present(repo_root, path, pattern):
+                gaps.append({
+                    "category": "main_feature_cli_surface_missing",
+                    "contract": cid,
+                    "path": path,
+                    "missing_pattern": pattern,
+                    "description": req.get("description", ""),
+                    "owner_hint": "expose the production behavior through cfctl, not only raw JSON-RPC scripts",
+                })
 
     return gaps
 

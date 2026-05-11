@@ -138,7 +138,34 @@ enum Cmd {
         #[command(subcommand)]
         action: ReplayAction,
     },
+    /// **M5**: `cfctl inspect actor` — pull the full ChassisView projection
+    /// for the player (or a specific actor id) from `observe.once`. Prints
+    /// chassis spec_id, stage, pilot_state, every zone with per-layer integrity,
+    /// every module with state + bound_zone, destroyed_zones[],
+    /// salvaged_module_ids, eject_ticks_remaining/total, weapon_jammed.
+    Inspect {
+        #[command(subcommand)]
+        action: InspectAction,
+    },
     Version,
+}
+
+#[derive(Debug, Subcommand)]
+enum InspectAction {
+    /// Inspect actor by id; omit `--actor` to inspect the player actor.
+    Actor {
+        #[arg(long)]
+        actor: Option<u64>,
+        #[arg(long, value_enum, default_value_t = OutputFormat::Pretty)]
+        format: OutputFormat,
+    },
+    /// Inspect chassis state for actor; omit `--actor` to inspect the player chassis.
+    Chassis {
+        #[arg(long)]
+        actor: Option<u64>,
+        #[arg(long, value_enum, default_value_t = OutputFormat::Pretty)]
+        format: OutputFormat,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -228,6 +255,42 @@ enum ActAction {
         #[arg(long)]
         node: Option<String>,
     },
+    /// **M5**: `act.player.crouch` — sticky crouch toggle.
+    PlayerCrouch {
+        #[arg(long)]
+        active: bool,
+    },
+    /// **M5**: `act.player.climb` — sticky climb toggle.
+    PlayerClimb {
+        #[arg(long)]
+        active: bool,
+    },
+    /// **M5**: `act.player.jet` — jet thrust toggle (requires Jet module nominal/degraded).
+    PlayerJet {
+        #[arg(long)]
+        active: bool,
+    },
+    /// **M5**: `act.player.eject` — trigger pilot eject from a chassis.
+    PlayerEject,
+    /// **M5**: `act.chassis.repair zone=<head|torso|arm_left|...>` and/or `module_id=<id>`.
+    ChassisRepair {
+        /// Body zone to repair (e.g. `torso`, `arm_right`, `hand_left`).
+        #[arg(long)]
+        zone: Option<String>,
+        /// Module id to repair (e.g. `jet.pack`, `shield.bubble`, `sensor.scope`).
+        #[arg(long)]
+        module_id: Option<String>,
+        /// Operator label recorded in the chassis event (default: `field_kit`).
+        #[arg(long, default_value = "field_kit")]
+        reason: String,
+    },
+    /// **M5**: `act.chassis.salvage` — pull every surviving module from a wrecked chassis.
+    ChassisSalvage {
+        #[arg(long, default_value = "manual")]
+        reason: String,
+    },
+    /// **M5**: `act.chassis.clear_jam` — manually clear a weapon jam.
+    ChassisClearJam,
 }
 
 #[derive(Debug, Subcommand)]
@@ -422,6 +485,7 @@ async fn dispatch(cli: Cli) -> Result<()> {
         }
         Cmd::Act { action } => cmd_act(&cli.connect, cli.auto_launch_port, cli.no_auto_launch, action).await,
         Cmd::Script { action } => cmd_script(&cli.connect, cli.auto_launch_port, cli.no_auto_launch, action).await,
+        Cmd::Inspect { action } => cmd_inspect(&cli.connect, cli.auto_launch_port, cli.no_auto_launch, action).await,
         Cmd::Replay { action } => cmd_replay(action),
         Cmd::Version => cmd_version(),
     }
@@ -825,8 +889,91 @@ async fn cmd_act(
             }
             session.send_request("act.input.focus", Value::Object(params)).await?
         }
+        ActAction::PlayerCrouch { active } => {
+            session
+                .send_request("act.player.crouch", json!({"active": active}))
+                .await?
+        }
+        ActAction::PlayerClimb { active } => {
+            session
+                .send_request("act.player.climb", json!({"active": active}))
+                .await?
+        }
+        ActAction::PlayerJet { active } => {
+            session
+                .send_request("act.player.jet", json!({"active": active}))
+                .await?
+        }
+        ActAction::PlayerEject => session.send_request("act.player.eject", json!({})).await?,
+        ActAction::ChassisRepair {
+            zone,
+            module_id,
+            reason,
+        } => {
+            let mut params = serde_json::Map::new();
+            if let Some(z) = zone {
+                params.insert("zone".into(), json!(z));
+            }
+            if let Some(m) = module_id {
+                params.insert("module_id".into(), json!(m));
+            }
+            params.insert("reason".into(), json!(reason));
+            session
+                .send_request("act.chassis.repair", Value::Object(params))
+                .await?
+        }
+        ActAction::ChassisSalvage { reason } => {
+            session
+                .send_request("act.chassis.salvage", json!({"reason": reason}))
+                .await?
+        }
+        ActAction::ChassisClearJam => session.send_request("act.chassis.clear_jam", json!({})).await?,
     };
     println!("{}", serde_json::to_string(&result).unwrap());
+    session.close().await?;
+    Ok(())
+}
+
+async fn cmd_inspect(
+    connect: &Option<String>,
+    auto_launch_port: u16,
+    no_auto_launch: bool,
+    action: InspectAction,
+) -> Result<()> {
+    let mut session = Session::open(connect, auto_launch_port, no_auto_launch).await?;
+    // Inspect always reads observe.once and slices the result.
+    let frame = session.send_request("observe.once", json!({})).await?;
+    let actors = frame
+        .get("actors")
+        .and_then(|v| v.as_array())
+        .cloned()
+        .unwrap_or_default();
+    let resolve_actor = |actor_id: Option<u64>| -> Option<&Value> {
+        let target = match actor_id {
+            Some(id) => id,
+            None => frame.get("player_actor_id").and_then(|v| v.as_u64())?,
+        };
+        actors
+            .iter()
+            .find(|a| a.get("id").and_then(|i| i.as_u64()) == Some(target))
+    };
+    let output = match action {
+        InspectAction::Actor { actor, format } => {
+            let target = resolve_actor(actor).cloned().unwrap_or(Value::Null);
+            (target, format)
+        }
+        InspectAction::Chassis { actor, format } => {
+            let target = resolve_actor(actor)
+                .and_then(|a| a.get("chassis").cloned())
+                .unwrap_or(Value::Null);
+            (target, format)
+        }
+    };
+    let (payload, format) = output;
+    match format {
+        OutputFormat::Json => println!("{}", serde_json::to_string(&payload).unwrap()),
+        OutputFormat::Pretty => println!("{}", serde_json::to_string_pretty(&payload).unwrap()),
+    }
     session.close().await?;
     Ok(())
 }

@@ -39,6 +39,49 @@
       "tick_rates": [60, 120],
       "headless_smoke_required": false,
       "replay_verifier_required": false
+    },
+    {
+      "id": "m5_chassis_wreck_eject",
+      "scenario_path": "game/content/scenarios/m5_chassis_wreck_eject.ron",
+      "description": "M5 acceptance proof: Powered Armor pilot vs Light Mech autocannon. WIN path exercises chassis stage ladder + eject + extraction-zone reach as foot infantry. LOSS path verifies chassis wreck (layered armor → wound → disabled → wreck) ends with mission_resolved {result: lost, reason: player_dead}. Every cfctl chassis method (eject, repair, salvage, clear_jam, crouch, climb, jet) flows through production cf-control dispatch path.",
+      "win_script": "game/scripts/cfctl/m5_chassis_wreck_eject_win.cfctl.json",
+      "loss_script": "game/scripts/cfctl/m5_chassis_wreck_eject_loss.cfctl.json",
+      "grading_contract": "game/content/scenarios/grading/m5_chassis_wreck_eject.grading.json",
+      "minimum_grading_aggregate": 7.0,
+      "win_path_expectations": [
+        "scenario=m5_chassis_wreck_eject",
+        "actor.player.chassis.spec_id=powered_armor_v1",
+        "actor.player.chassis.pilot_state=extracted",
+        "mission.result=won",
+        "actor.player.body_silhouette.placeholder=false",
+        "capture.summary_grid.non_blank_ratio>=0.95"
+      ],
+      "loss_path_expectations": [
+        "scenario=m5_chassis_wreck_eject",
+        "mission.result=lost",
+        "capture.summary_grid.non_blank_ratio>=0.95"
+      ],
+      "tick_rates": [60, 120],
+      "headless_smoke_required": false,
+      "replay_verifier_required": true
+    },
+    {
+      "id": "m5_chassis_salvage",
+      "scenario_path": "game/content/scenarios/m5_chassis_salvage.ron",
+      "description": "M5 chassis grammar sandbox: repair zone + module, clear jam, toggle crouch/climb/jet movement-intent flags. Confirms every chassis-grade cfctl method works on a Nominal chassis via the production control dispatch path without combat pressure.",
+      "win_script": "game/scripts/cfctl/m5_chassis_salvage_roundtrip.cfctl.json",
+      "grading_contract": "game/content/scenarios/grading/m5_chassis_salvage.grading.json",
+      "minimum_grading_aggregate": 7.0,
+      "win_path_expectations": [
+        "scenario=m5_chassis_salvage",
+        "actor.player.chassis.spec_id=powered_armor_v1",
+        "actor.player.chassis.weapon_jammed=false",
+        "capture.summary_grid.non_blank_ratio>=0.95"
+      ],
+      "loss_path_expectations": [],
+      "tick_rates": [60],
+      "headless_smoke_required": false,
+      "replay_verifier_required": false
     }
   ],
   "supporting_scenarios": [
@@ -97,6 +140,9 @@
     "m3b_replay_viewer_debrief",
     "m4a_micro_breach_acc_a_floor",
     "m4a_settings_live_update",
+    "m5_chassis_wreck_eject_win",
+    "m5_chassis_wreck_eject_loss",
+    "m5_chassis_salvage_roundtrip",
     "m0_settings_roundtrip",
     "m1_actor_60hz_determinism",
     "m1_actor_120hz_determinism",
@@ -118,6 +164,26 @@
       "goal.dr003_silhouette_lean_proof",
       "agent.cfctl_observe_completeness",
       "agent.evidence_completeness"
+    ],
+    "m5_chassis_wreck_eject": [
+      "look.chassis_silhouette_layered",
+      "look.module_strip_chassis_states",
+      "look.stage_banner_ladder",
+      "feel.armor_layer_attrition",
+      "feel.eject_sequence_pacing",
+      "feel.bail_too_late_punishment",
+      "goal.m5_done_criteria",
+      "goal.dr014_021_chassis_grammar",
+      "agent.cfctl_chassis_surface",
+      "agent.observe_chassis_completeness"
+    ],
+    "m5_chassis_salvage": [
+      "feel.repair_module_grammar",
+      "feel.clear_jam_grammar",
+      "feel.movement_intent_toggles",
+      "feel.salvage_recovers_modules",
+      "goal.save_load_roundtrip",
+      "agent.observe_repair_salvage_audit"
     ]
   },
   "required_events_emitted": {
@@ -131,6 +197,33 @@
       "terrain.tool_action_started",
       "terrain.terrain_carved",
       "terrain.tool_refused"
+    ],
+    "m5_chassis_wreck_eject_win": [
+      "system.run_started",
+      "system.run_finished",
+      "control.command_accepted",
+      "combat.projectile_hit",
+      "chassis.armor_layer_damaged",
+      "chassis.stage_changed",
+      "chassis.pilot_ejected",
+      "chassis.pilot_separated"
+    ],
+    "m5_chassis_wreck_eject_loss": [
+      "system.run_started",
+      "system.run_finished",
+      "combat.projectile_hit",
+      "chassis.armor_layer_damaged",
+      "chassis.armor_zone_destroyed",
+      "chassis.stage_changed",
+      "mission.mission_resolved"
+    ],
+    "m5_chassis_salvage": [
+      "system.run_started",
+      "system.run_finished",
+      "control.command_accepted",
+      "actor.animation_event",
+      "chassis.repaired",
+      "chassis.salvaged"
     ]
   },
   "required_observe_fields": [
@@ -149,6 +242,18 @@
     "actor.player.body_silhouette.placeholder",
     "actor.player.module_strip.modules",
     "actor.player.module_strip.placeholder",
+    "actor.player.chassis.spec_id",
+    "actor.player.chassis.stage",
+    "actor.player.chassis.pilot_state",
+    "actor.player.chassis.weapon_jammed",
+    "actor.player.chassis.zones",
+    "actor.player.chassis.modules",
+    "actor.player.chassis.integrity",
+    "actor.player.chassis.destroyed_zones",
+    "actor.player.chassis.salvaged_module_ids",
+    "actor.player.origin_id",
+    "actor.player.crouch_active",
+    "actor.player.jet_active",
     "banners",
     "captions",
     "tool_validity",
@@ -160,10 +265,234 @@
     "accessibility.reduced_flash_applied",
     "accessibility.focusable_nodes"
   ],
+  "main_feature_contracts": [
+    {
+      "id": "bp3_release_friend_handoff",
+      "source": "docs/plan/spec/prototype-roadmap.md T-RELEASE BP3 done-criteria",
+      "required_source_patterns": [
+        {
+          "path": "game/crates/cf-app/src/main.rs",
+          "pattern": "default_value|default_scenario|launcher",
+          "description": "cf-app must open a playable default scenario or launcher when launched with no command-line args."
+        },
+        {
+          "path": ".github/workflows/release.yml",
+          "pattern": "Corefall\\.app|\\.dmg",
+          "description": "macOS release artifact must be a double-clickable app/dmg, not a raw tar archive."
+        },
+        {
+          "path": ".github/workflows/release.yml",
+          "pattern": "Corefall\\.exe|\\.msi",
+          "description": "Windows release artifact must expose a double-clickable Corefall executable or installer."
+        },
+        {
+          "path": ".github/workflows/release.yml",
+          "pattern": "AppImage",
+          "description": "Linux release artifact must be double-clickable/AppImage-class per the release gate."
+        }
+      ]
+    },
+    {
+      "id": "m5_authoritative_body_graph",
+      "source": "docs/plan/spec/prototype-roadmap.md M5 scope/body graph",
+      "required_source_patterns": [
+        {
+          "path": "game/crates/cf-chassis/src/lib.rs",
+          "pattern": "\\b(?:ArmLeft|UpperArmLeft)\\b",
+          "description": "Body graph must model upper arms (production code uses ArmLeft as the composite/upper-arm zone per the roadmap M5 §spec; legacy UpperArmLeft alias also accepted)."
+        },
+        {
+          "path": "game/crates/cf-chassis/src/lib.rs",
+          "pattern": "\\b(?:ArmRight|UpperArmRight)\\b",
+          "description": "Body graph must model the right upper arm (production code uses ArmRight as composite/upper-arm; legacy UpperArmRight alias accepted)."
+        },
+        {
+          "path": "game/crates/cf-chassis/src/lib.rs",
+          "pattern": "\\bForearmLeft\\b",
+          "description": "Body graph must model forearms separately from whole-arm placeholders."
+        },
+        {
+          "path": "game/crates/cf-chassis/src/lib.rs",
+          "pattern": "\\bForearmRight\\b",
+          "description": "Body graph must model the right forearm separately from whole-arm placeholders."
+        },
+        {
+          "path": "game/crates/cf-chassis/src/lib.rs",
+          "pattern": "\\bHandLeft\\b",
+          "description": "Body graph must model hands because weapon grip and gear drop are M5 gameplay data."
+        },
+        {
+          "path": "game/crates/cf-chassis/src/lib.rs",
+          "pattern": "\\bHandRight\\b",
+          "description": "Body graph must model the right hand (weapon grip socket lives on HandRight per M5 §spec)."
+        },
+        {
+          "path": "game/crates/cf-chassis/src/lib.rs",
+          "pattern": "\\b(?:LegLeft|ThighLeft)\\b",
+          "description": "Body graph must model thighs (production code uses LegLeft as the composite/thigh zone per the roadmap M5 §spec; legacy ThighLeft alias accepted)."
+        },
+        {
+          "path": "game/crates/cf-chassis/src/lib.rs",
+          "pattern": "\\b(?:LegRight|ThighRight)\\b",
+          "description": "Body graph must model the right thigh (production code uses LegRight as composite/thigh; legacy ThighRight alias accepted)."
+        },
+        {
+          "path": "game/crates/cf-chassis/src/lib.rs",
+          "pattern": "\\bShinLeft\\b",
+          "description": "Body graph must model shins separately from whole-leg placeholders."
+        },
+        {
+          "path": "game/crates/cf-chassis/src/lib.rs",
+          "pattern": "\\bShinRight\\b",
+          "description": "Body graph must model the right shin separately from whole-leg placeholders."
+        },
+        {
+          "path": "game/crates/cf-chassis/src/lib.rs",
+          "pattern": "\\bFootLeft\\b",
+          "description": "Body graph must model feet because gait/limp/crawl consequences are M5 scope."
+        },
+        {
+          "path": "game/crates/cf-chassis/src/lib.rs",
+          "pattern": "\\bFootRight\\b",
+          "description": "Body graph must model the right foot because gait/limp/crawl consequences are M5 scope."
+        }
+      ]
+    },
+    {
+      "id": "m5_limb_damage_live_consequences",
+      "source": "docs/plan/spec/prototype-roadmap.md M5 done-criteria limb damage",
+      "required_source_patterns": [
+        {
+          "path": "game/crates/cf-actor/src/sim.rs",
+          "pattern": "movement_factor\\(",
+          "description": "Actor sim must consume body-graph movement consequences in the production movement path."
+        },
+        {
+          "path": "game/crates/cf-actor/src/sim.rs",
+          "pattern": "disable_rifle|disables_rifle|one_arm|grip",
+          "description": "Actor sim must route destroyed arm/hand state into weapon handling."
+        },
+        {
+          "path": "game/crates/cf-actor/src/sim.rs",
+          "pattern": "drop_gear|drops_gear",
+          "description": "Actor sim must route destroyed limb/socket state into dropped carried gear."
+        },
+        {
+          "path": "game/tools/self_play_sweep.sh",
+          "pattern": "ROW=\\\"m5_chassis_wreck_eject_win\\\"(?:(?!ROW=).)*capture\\.summary_grid\\.non_blank_ratio>=0\\.95",
+          "description": "The M5 win-path sweep must enforce non-blank capture evidence."
+        },
+        {
+          "path": "game/tools/self_play_sweep.sh",
+          "pattern": "ROW=\\\"m5_chassis_wreck_eject_loss\\\"(?:(?!ROW=).)*capture\\.summary_grid\\.non_blank_ratio>=0\\.95",
+          "description": "The M5 loss-path sweep must enforce non-blank capture evidence."
+        },
+        {
+          "path": "game/tools/self_play_sweep.sh",
+          "pattern": "ROW=\\\"m5_chassis_salvage_roundtrip\\\"(?:(?!ROW=).)*capture\\.summary_grid\\.non_blank_ratio>=0\\.95",
+          "description": "The M5 salvage sweep must enforce non-blank capture evidence."
+        }
+      ]
+    },
+    {
+      "id": "m5_visual_humanoid_rendering",
+      "source": "docs/plan/spec/prototype-roadmap.md M5-DC-3 'no static sliding pawn'; DR-019 visual direction",
+      "required_source_patterns": [
+        {
+          "path": "game/crates/cf-render-2d/src/lib.rs",
+          "pattern": "ACTOR_SILHOUETTE_BASE_SCALE",
+          "description": "Renderer must apply a configurable base scale multiplier so humanoid silhouettes are visually identifiable at battlefield zoom (not a 16x32 flat box)."
+        },
+        {
+          "path": "game/crates/cf-render-2d/src/lib.rs",
+          "pattern": "CHASSIS_ZONE_LAYOUT",
+          "description": "Renderer must declare a per-zone pip layout so the 15-zone body graph projects to 15 anatomical sprites, not a single rectangle."
+        },
+        {
+          "path": "game/crates/cf-render-2d/src/lib.rs",
+          "pattern": "sync_chassis_zone_sprites",
+          "description": "Renderer must run a system that materializes per-zone child sprites from chassis_view state every tick."
+        },
+        {
+          "path": "game/crates/cf-render-2d/src/lib.rs",
+          "pattern": "sync_chassis_module_sprites",
+          "description": "Renderer must run a system that materializes per-module child pips from chassis_view.modules state every tick."
+        },
+        {
+          "path": "game/crates/cf-render-2d/src/lib.rs",
+          "pattern": "sync_held_rifle_sprites",
+          "description": "Renderer must run a system that surfaces the held rifle as a visible pip at the actor's grip socket, oriented along aim vector."
+        },
+        {
+          "path": "game/crates/cf-render-2d/src/lib.rs",
+          "pattern": "walk_cycle_offsets|walk_cycle_phase",
+          "description": "Renderer must run a walk-cycle animation tied to sim tick + velocity so the silhouette is animation-first while controlled (M5-DC-3)."
+        },
+        {
+          "path": "game/crates/cf-render-2d/src/lib.rs",
+          "pattern": "chassis_stage_tint",
+          "description": "Renderer must surface chassis-stage progression (Nominal → ScuffedI → ScuffedII → Wounded → Disabled → Wreck → Gibbed) through chromatic tinting so a viewer reads the stage without HUD."
+        }
+      ]
+    },
+    {
+      "id": "m5_salvage_really_exercised",
+      "source": "docs/plan/spec/prototype-roadmap.md M5 done-criteria chassis salvage",
+      "required_script_methods": [
+        {
+          "script": "game/scripts/cfctl/m5_chassis_salvage_roundtrip.cfctl.json",
+          "method": "act.chassis.salvage",
+          "description": "The salvage proof script must actually call the salvage command."
+        }
+      ],
+      "required_cli_patterns": [
+        {
+          "pattern": "act\\.player\\.crouch|PlayerCrouch",
+          "description": "cfctl must expose M5 crouch, not only raw JSON-RPC script passthrough."
+        },
+        {
+          "pattern": "act\\.player\\.climb|PlayerClimb",
+          "description": "cfctl must expose M5 climb, not only raw JSON-RPC script passthrough."
+        },
+        {
+          "pattern": "act\\.player\\.jet|PlayerJet",
+          "description": "cfctl must expose M5 jet, not only raw JSON-RPC script passthrough."
+        },
+        {
+          "pattern": "act\\.player\\.eject|PlayerEject",
+          "description": "cfctl must expose M5 eject, not only raw JSON-RPC script passthrough."
+        },
+        {
+          "pattern": "act\\.chassis\\.repair|ChassisRepair",
+          "description": "cfctl must expose M5 chassis repair, not only raw JSON-RPC script passthrough."
+        },
+        {
+          "pattern": "act\\.chassis\\.salvage|ChassisSalvage",
+          "description": "cfctl must expose M5 chassis salvage, not only raw JSON-RPC script passthrough."
+        },
+        {
+          "pattern": "act\\.chassis\\.clear_jam|ChassisClearJam",
+          "description": "cfctl must expose M5 clear-jam, not only raw JSON-RPC script passthrough."
+        }
+      ]
+    }
+  ],
   "required_cargo_test_modules": [
     "cf-actor::tests::stance_*",
     "cf-actor::tests::body_silhouette_*",
     "cf-actor::tests::actor_observation_carries_stance_and_silhouette",
+    "cf-actor::tests::attach_chassis_resizes_half_extents_for_mech",
+    "cf-actor::tests::apply_zone_damage_routes_through_chassis_layers",
+    "cf-actor::tests::body_silhouette_reads_from_chassis_when_attached",
+    "cf-actor::tests::chassis_view_serializes_full_zone_set",
+    "cf-actor::tests::stance_from_chassis_yields_*",
+    "cf-actor::tests::body_a::body_a_*",
+    "cf-chassis::tests::*",
+    "cf-chassis::tests::chassis_a::chassis_a_*",
+    "cf-equipment::tests::role_record_*",
+    "cf-equipment::tests::loadout_registry_*",
+    "cf-equipment::tests::rifle_spec_roundtrips_through_role_record",
+    "cf-save::tests::*",
     "cf-control::live_ws_acceptance::live_ws_settings_*",
     "cf-control::live_ws_acceptance::live_ws_act_settings_set_*",
     "cf-ui::tests::stance_line_*",
@@ -214,11 +543,13 @@
     "memory_leak_soak_24h": "STAGED at BP12 boundary per DR-051 + DR-054",
     "network_sync_verified": "N/A pre-multiplayer (BP9+ owns)",
     "replay_determinism_ci_matrix": "verified — sweep runs 60+120 Hz on Linux + macOS + Windows in CI",
-    "all_player_surfaces_via_cfctl": "verified — settings + HUD surfaces (banners + captions + silhouette + module_strip + stance + tool_validity + focusable_nodes) reachable through observe.once + observe.settings + act.settings.set",
+    "all_player_surfaces_via_cfctl": "verified — settings + HUD + chassis surfaces (banners + captions + silhouette + module_strip + stance + tool_validity + focusable_nodes + chassis.{stage,pilot_state,zones,modules}) reachable through observe.once + observe.settings + act.settings.set + act.player.{crouch,climb,jet,eject} + act.chassis.{repair,salvage,clear_jam}",
     "ai_agent_validation_report": "AI-Agent Self-Test Report at prototype_runs/native/bp3_*/notes.md",
     "ai_audio_pipeline": "N/A pre-cf-audio (BP6+ owns)",
     "juice_rules_dr055": "STAGED at BP4 (DR-055 + M5.5)",
     "acca_floor_dr012": "CLOSED at M4A — UI scale 200% reflows HUD, high-contrast palette swap, captions toggle, color-independent state labels (icon + text), focus traversal through keyboard/controller surfaced via observe.accessibility, hold-to-confirm behavior tests, validated key remap table (unsupported actions/keys reject; Numpad names accepted), reduced-* flags read + recorded",
+    "chassis_grammar_dr014_dr021": "CLOSED at M5 — Infantry / PoweredArmor / LightMech chassis archetypes with full body graph (15 zones — 7 primary Head/Torso/ArmLeft/ArmRight/LegLeft/LegRight/Backpack + 8 granular ForearmLeft/Right + HandLeft/Right + ShinLeft/Right + FootLeft/Right + 14 joints + 5 equipment sockets + 15 movement-contributions), layered armor (External → Internal → Core → wound), 5 module kinds (WeaponMount, Jet, Shield, Sensor, RepairDrone) with state machines bound to body zones, 11-stage damage pipeline (Nominal → ... → Wreck → Gibbed), pilot binding (Bound → Injured → Ejecting → Ejected → Extracted / BailedTooLate / Lost), tutorial-safety policy capping at PilotInjured, save/load round-trip with checksum",
+    "save_load_dr029": "M5 SLICE — cf-save serializes chassis + equipment + actor state with blake3 checksum; schema_version + checksum mismatch detected; chassis damage persists through round-trip. Full T-SAVE (multi-slot, autosave, ironman, migration) deferred to T-SAVE side track per DR-029",
     "tier_a_localization": "STAGED at BP12 boundary per DR-046 (English-only prototype)",
     "modding_parity": "STAGED at BP8 boundary",
     "anti_fomo_anti_p2w_audit": "N/A pre-monetization",

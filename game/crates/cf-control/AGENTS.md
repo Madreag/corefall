@@ -51,3 +51,26 @@
 - DR-012 (accessibility floor; OPEN — closes at M4).
 - docs/implementation-log/2026-05-05-m0-engine-bootstrap.md §DR-012 floor lock.
 - docs/implementation-log/2026-05-06-m1-actor-controller.md.
+
+## Schema Versioning (v1 → v2 migration policy)
+
+Current state: `SCHEMA_VERSION: u32 = 1` is the global cf-control schema version. Path-versioned schemas live under `schemas/v1/`.
+
+**Additive changes at v1 (no schema bump):**
+- Adding a NEW field to an existing params struct that defaults via `#[serde(default)]`.
+- Adding a NEW optional field that can be omitted.
+- Adding a NEW JSON-RPC method (not modifying an existing one's params shape).
+
+**Breaking changes that require `SCHEMA_VERSION = 2` + `schemas/v2/`:**
+- Renaming a field on an existing params struct.
+- Changing a field's type (e.g., `move_x: f32` → `move: Vec2`).
+- Removing a field.
+- Making an existing optional field required.
+- Changing the semantics of a method without renaming it.
+
+**Migration procedure when v2 is needed:**
+1. Bump `SCHEMA_VERSION` to 2 in `schemas.rs`.
+2. Create `schemas/v2/` with the new schema JSON files.
+3. Keep `schemas/v1/` for backward compat. The dispatcher reads `params.schema_version` and routes to v1 or v2 handlers.
+4. Add a per-method migration helper that converts v1 params to v2 params where semantically possible.
+5. Document the migration in CHANGELOG.md under "Schema Migration v1 → v2".

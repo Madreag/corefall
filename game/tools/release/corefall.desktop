@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Corefall
+GenericName=Corefall
+Comment=Corefall — destructible 2D combat sandbox
+Exec=AppRun
+Icon=corefall
+Terminal=false
+Categories=Game;ActionGame;
+StartupNotify=true
+StartupWMClass=cf-app

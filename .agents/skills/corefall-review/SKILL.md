@@ -110,11 +110,14 @@ The manifest declares, for the BP:
 - **Required events emitted per scenario_key** (with `_win` / `_loss` suffixes so the analyzer picks the right outcome bundle) — every `category.event_type` the run bundle MUST contain in `events.jsonl`.
 - **Required observe fields** — every key the JSON-RPC `observe.once` envelope must surface.
 - **Required cargo test modules** (globs like `cf-mission::tests::reactor_*`) — every cargo test target the BP's contract claims is implemented.
+- **Main-feature contracts** — BP-owned semantic probes for the milestone's headline promise. These are not generic harness checks; they assert the exact production-code paths, cfctl commands, script methods, release artifacts, capture assertions, and events that prove the BP's main feature was actually built.
 - **Perf gates** per Steam Deck / 1080p / 4K tier with max p99 tick ms thresholds.
 - **Universal Enhancement (DR-056) gates** — per-row status (verified / staged / N/A) for the 14 universal rows.
 - **Loop thresholds** — max iterations, min aggregate grading, min per-dimension grading, halt-on-cycle-iterations.
 
 The reviewer enforces: **every BP under review MUST have a `bp<N>.test_manifest.json` file** AND running `python3 game/tools/bp_test_coverage.py bp<N>` MUST report `verdict: CLEAN, total gaps: 0`. Missing manifest OR non-zero gaps = `Needs Fixes` review verdict.
+
+If a BP manifest lacks `main_feature_contracts` for the BP's headline roadmap row and every milestone inside it, the review verdict is `Needs Fixes`. The contract must fail closed when an agent implements adjacent scaffolding but misses the core behavior. Examples: a chassis milestone must assert authoritative limb/body graph production code plus live movement/weapon consequences, not merely a `BodyGraph` struct; a release milestone must assert friend-handoff artifacts and no-args launch, not merely release-note text; a salvage milestone must assert the cfctl script actually calls salvage and the bundle emits the salvage event.
 
 ## AI-Agent Test-Improvement Loop
 

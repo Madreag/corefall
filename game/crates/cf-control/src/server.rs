@@ -91,10 +91,11 @@ use crate::{
     },
     schemas::SCHEMA_VERSION,
     schemas::{
-        ActPlayerAimParams, ActPlayerDigParams, ActPlayerFireParams, ActPlayerJumpParams, ActPlayerMoveParams,
-        ActPlayerReloadParams, ActPlayerResetParams, ActPlayerSelectItemParams, ObserveOnceParams,
-        ObserveSubscribeParams, RunBundleWriteParams, RunForTicksParams, ScenarioLoadParams, StepParams,
-        SystemShutdownParams,
+        ActChassisClearJamParams, ActChassisRepairParams, ActChassisSalvageParams, ActPlayerAimParams,
+        ActPlayerClimbParams, ActPlayerCrouchParams, ActPlayerDigParams, ActPlayerEjectParams, ActPlayerFireParams,
+        ActPlayerJetParams, ActPlayerJumpParams, ActPlayerMoveParams, ActPlayerReloadParams, ActPlayerResetParams,
+        ActPlayerSelectItemParams, ObserveOnceParams, ObserveSubscribeParams, RunBundleWriteParams, RunForTicksParams,
+        ScenarioLoadParams, StepParams, SystemShutdownParams,
     },
     state::{ControlEnvelopeStatus, ObserveFrame, ObserveSettings},
     Settings,
@@ -238,6 +239,45 @@ pub enum ControlCommand {
     /// through this same path.
     ActInputFocus {
         direction: FocusDirection,
+        source: IntentSource,
+    },
+    /// **M5**: toggle the player actor's crouch stance.
+    ActPlayerCrouch {
+        active: bool,
+        source: IntentSource,
+    },
+    /// **M5**: toggle the player actor's climb intent (placeholder cue; M5.5
+    /// owns physical climb resolution).
+    ActPlayerClimb {
+        active: bool,
+        source: IntentSource,
+    },
+    /// **M5**: toggle the player actor's jet thrust (requires Jet module
+    /// nominal/degraded — Warning + Failed reject).
+    ActPlayerJet {
+        active: bool,
+        source: IntentSource,
+    },
+    /// **M5**: trigger the chassis eject sequence.
+    ActPlayerEject {
+        source: IntentSource,
+    },
+    /// **M5**: repair a chassis zone (`zone` is `head | torso | arm_left | ...`).
+    /// `reason` carries the operator label (`field_kit`, `repair_drone`, etc.).
+    ActChassisRepair {
+        zone: Option<String>,
+        module_id: Option<String>,
+        reason: String,
+        source: IntentSource,
+    },
+    /// **M5**: salvage a wrecked chassis. Pulls surviving modules into
+    /// `chassis.salvaged_modules`.
+    ActChassisSalvage {
+        reason: String,
+        source: IntentSource,
+    },
+    /// **M5**: manually clear a weapon jam.
+    ActChassisClearJam {
         source: IntentSource,
     },
     SettingsSet {
@@ -834,6 +874,103 @@ async fn process_request<E: EngineHandle>(
             let result = engine
                 .dispatch(ControlCommand::ActPlayerDig {
                     target: p.target,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.crouch" => {
+            let p: ActPlayerCrouchParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerCrouch {
+                    active: p.active,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.climb" => {
+            let p: ActPlayerClimbParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerClimb {
+                    active: p.active,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.jet" => {
+            let p: ActPlayerJetParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerJet {
+                    active: p.active,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.eject" => {
+            let _p: ActPlayerEjectParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerEject {
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.chassis.repair" => {
+            let p: ActChassisRepairParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            if p.zone.is_none() && p.module_id.is_none() {
+                return Some(invalid_param_reason(
+                    request.id,
+                    "chassis_repair_requires_zone_or_module_id",
+                ));
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActChassisRepair {
+                    zone: p.zone,
+                    module_id: p.module_id,
+                    reason: p.reason,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.chassis.salvage" => {
+            let p: ActChassisSalvageParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActChassisSalvage {
+                    reason: p.reason,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.chassis.clear_jam" => {
+            let _p: ActChassisClearJamParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActChassisClearJam {
                     source: IntentSource::Cfctl,
                 })
                 .await;

@@ -1,0 +1,20 @@
+{
+  "description": "M5 win-path: pilot in Powered Armor takes mech autocannon hits, observes the chassis stage ladder advance through Degraded/ArmorCracked/Disabled, ejects BEFORE Wreck stage fires, then runs west to the extraction zone as foot infantry. Runs the production cf-control dispatch path used by every UI/AI consumer.",
+  "scenario": "m5_chassis_wreck_eject",
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+    { "method": "act.player.aim", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 20 } },
+    { "method": "act.player.fire", "params": { "pressed": true } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 40 } },
+    { "method": "act.player.fire", "params": { "pressed": true } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 40 } },
+    { "method": "act.player.eject", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 60 } },
+    { "method": "act.player.move", "params": { "x": -1.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 400 } },
+    { "method": "act.player.move", "params": { "x": 0.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 30 } },
+    { "method": "observe.once", "params": {} }
+  ]
+}

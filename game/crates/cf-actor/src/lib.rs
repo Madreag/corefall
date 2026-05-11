@@ -99,14 +99,13 @@ impl Status {
     }
 }
 
-/// M4A readable stance/locomotion state derived from per-tick actor state.
+/// Readable stance/locomotion state derived from per-tick actor state.
 ///
-/// Until M5 introduces real chassis, body graph, and animation events, the M4A
-/// stance is a derivation of `velocity`, `on_ground`, and `Status` that gives
-/// the HUD, `cfctl observe`, and AI agents a non-color-only readable signal
-/// of what the body is doing (per `spec/animation-system` and DR-003).
-/// M5 replaces the derivation with explicit animation-state and chassis-stage
-/// tags but the HUD/observe surface contract stays stable.
+/// M4A introduced the derivation surface; **M5 extends it with explicit
+/// chassis-aware stances** (Crouching, Climbing, Jetting, Ejecting) so the
+/// HUD + animation events + AI doctrine speak the same vocabulary.
+/// `Stance::from_state` still derives the core six from velocity/grounded/status;
+/// the chassis-aware extensions are surfaced via `Stance::from_chassis_state`.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -117,12 +116,20 @@ pub enum Stance {
     Walking = 1,
     /// On ground, horizontal velocity >= run threshold.
     Running = 2,
-    /// Off ground (jumping, falling, jetting).
+    /// Off ground (jumping, falling).
     Airborne = 3,
     /// Status::Downed but still alive.
     Downed = 4,
     /// Status::Dead.
     Dead = 5,
+    /// M5: ducked/crouching (set by `act.player.crouch`).
+    Crouching = 6,
+    /// M5: scaling a vertical surface (set by climb intent; placeholder cue).
+    Climbing = 7,
+    /// M5: airborne with jet thrust active (set by jet intent when module nominal).
+    Jetting = 8,
+    /// M5: pilot is mid-eject sequence (ChassisState.eject_window active).
+    Ejecting = 9,
 }
 
 impl Stance {
@@ -141,6 +148,10 @@ impl Stance {
             Stance::Airborne => "airborne",
             Stance::Downed => "downed",
             Stance::Dead => "dead",
+            Stance::Crouching => "crouching",
+            Stance::Climbing => "climbing",
+            Stance::Jetting => "jetting",
+            Stance::Ejecting => "ejecting",
         }
     }
 
@@ -161,6 +172,50 @@ impl Stance {
                     } else {
                         Stance::Idle
                     }
+                }
+            }
+        }
+    }
+
+    /// M5: derive stance from kinematic + status + chassis cues. Overrides the
+    /// base stance with `Crouching` / `Climbing` / `Jetting` / `Ejecting` when
+    /// the actor's chassis or movement-intent flags say so.
+    #[allow(clippy::fn_params_excessive_bools)]
+    pub fn from_chassis(
+        velocity: Vec2,
+        on_ground: bool,
+        status: Status,
+        crouch_active: bool,
+        climb_active: bool,
+        jet_active: bool,
+        ejecting: bool,
+    ) -> Stance {
+        if ejecting {
+            return Stance::Ejecting;
+        }
+        match status {
+            Status::Dead => Stance::Dead,
+            Status::Downed => Stance::Downed,
+            Status::Stable | Status::Unstable => {
+                if jet_active {
+                    return Stance::Jetting;
+                }
+                if climb_active {
+                    return Stance::Climbing;
+                }
+                if !on_ground {
+                    return Stance::Airborne;
+                }
+                if crouch_active {
+                    return Stance::Crouching;
+                }
+                let speed = velocity.x.abs();
+                if speed >= Self::RUN_THRESHOLD {
+                    Stance::Running
+                } else if speed >= Self::WALK_THRESHOLD {
+                    Stance::Walking
+                } else {
+                    Stance::Idle
                 }
             }
         }
@@ -410,8 +465,107 @@ pub struct ActorState {
     /// True if this actor accepts player intent (only one in M1 scenarios).
     pub controllable: bool,
     /// Half-extents of the AABB used for ground collision + future limb proxies.
-    /// M1 uses a chunky 8x16 actor footprint; M5 will replace this with chassis zones.
+    /// M1 uses a chunky 8x16 actor footprint; M5 replaces this with chassis half-extents.
     pub half_extents: Vec2,
+    /// **M5**: full chassis state (body graph + armor zones + modules + pilot binding).
+    /// `None` for legacy M1 / M1.5 actors that haven't been promoted; `Some` for
+    /// M5+ chassis-grade actors (infantry / powered_armor / light_mech).
+    #[serde(default)]
+    pub chassis: Option<cf_chassis::ChassisState>,
+    /// **M5**: opaque origin-id tag for DR-014 / M5.8 origin-gated equipment.
+    /// Defaults to `"human"`.
+    #[serde(default = "default_origin_id")]
+    pub origin_id: String,
+    /// **M5**: actor-level movement-intent flags surfaced for HUD + animation
+    /// events. `crouch_active` is sticky (toggle by act.player.crouch); the
+    /// others are edge-driven and cleared after consumption.
+    #[serde(default)]
+    pub crouch_active: bool,
+    #[serde(default)]
+    pub climb_active: bool,
+    #[serde(default)]
+    pub jet_active: bool,
+    /// **M5**: latched flag set on first tick when destroyed-zone movement
+    /// contribution returns `drop_gear=true`. Used to gate single-shot
+    /// `actor.gear_dropped` event emission + clear the rifle/inventory slot
+    /// the next tick. Roadmap §M5 done-criterion: "dropped gear".
+    #[serde(default)]
+    pub gear_dropped_by_limb_loss: bool,
+    /// **M5**: latched flag set when the chassis transitions through
+    /// `PilotState::Ejected` (post-eject) so the engine knows to call
+    /// `detach_chassis` once. Roadmap §M5 done-criterion: "Pilot eject works:
+    /// player ejects from a wrecked mech and continues as foot infantry."
+    #[serde(default)]
+    pub chassis_detached: bool,
+    /// **M5.8 forward-hook (DR-040 ResourceAccumulators)**: 7 resource
+    /// accumulators on every actor; `#[serde(default)]` keeps M5 bundles
+    /// readable while M5.8 wires actual driver values later. Save-bundle
+    /// checksum layout is stable from M5 onward — M5.8 will fill these without
+    /// a schema bump.
+    #[serde(default)]
+    pub resources: ResourceAccumulators,
+    /// **M5.7/M5.8 forward-hook (DR-036 AfflictionKind)**: per-actor systemic
+    /// state set populated by hazards (M5.7) + origin reactions (M5.8). Empty
+    /// at M5 baseline; serde-default preserves backward compat.
+    #[serde(default)]
+    pub afflictions: Vec<Affliction>,
+}
+
+/// **M5.8 forward-hook (DR-040 ResourceAccumulators)**: per-actor resource
+/// values driven by origin reaction matrix at M5.8. Reserved layout slot at
+/// M5 so save bundles + observe frames serialize the slot now and M5.8 can
+/// fill values without a checksum byte-layout shift.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ResourceAccumulators {
+    pub caloric_energy: f32,
+    pub battery_charge: f32,
+    pub power: f32,
+    pub heat: f32,
+    pub oxygen_supply: f32,
+    pub g_load_dose: f32,
+    pub concussion_dose: f32,
+}
+
+/// **M5.7/M5.8 forward-hook (DR-036 affliction layer)**: per-actor systemic
+/// state. Spec-locked enum prevents typos across BP4 milestones. Carried as
+/// `Vec<Affliction>` on `ActorState` so multiple afflictions can stack.
+#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AfflictionKind {
+    Wetness,
+    Burning,
+    Corroded,
+    Electrified,
+    Poisoned,
+    Asphyxiating,
+    Suffocating,
+    Drowning,
+    Depressurizing,
+    InternalShock,
+    CoolantLeaking,
+    OilLeaking,
+    Overheating,
+    LowBattery,
+    PowerStarved,
+    Weak,
+    Exhausted,
+    Hypoxia,
+    Downclocked,
+    HeatExhaustion,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Affliction {
+    pub kind: AfflictionKind,
+    #[serde(default)]
+    pub intensity: f32,
+    #[serde(default)]
+    pub expires_tick: Option<u64>,
+}
+
+fn default_origin_id() -> String {
+    "human".to_string()
 }
 
 impl ActorState {
@@ -433,13 +587,54 @@ impl ActorState {
             inventory,
             controllable: true,
             half_extents: Vec2::new(8.0, 16.0),
+            chassis: None,
+            origin_id: default_origin_id(),
+            crouch_active: false,
+            climb_active: false,
+            jet_active: false,
+            gear_dropped_by_limb_loss: false,
+            chassis_detached: false,
+            resources: ResourceAccumulators::default(),
+            afflictions: Vec::new(),
         }
+    }
+
+    /// **M5**: detach the chassis from this actor and return it as a Wreck so
+    /// callers (cf-control engine) can spawn a `Wreck` static actor on the
+    /// battlefield for `act.chassis.salvage` to operate on. Resets
+    /// `half_extents` to the infantry baseline so the now-foot-infantry pilot
+    /// uses the right collision proxy. Closes M5-DC-6 ("continues as foot
+    /// infantry") and DR-014 ("Pilot rescue / ejection: Pilots/operators can
+    /// survive a chassis loss. Eject, crawl out, get carried.").
+    pub fn detach_chassis(&mut self) -> Option<cf_chassis::ChassisState> {
+        let chassis = self.chassis.take()?;
+        self.half_extents = Vec2::new(8.0, 16.0);
+        // Reset movement flags since the now-foot pilot doesn't have jet/climb anymore.
+        self.jet_active = false;
+        self.climb_active = false;
+        // Mark the detach so cf-control can emit `actor.chassis_detached` once.
+        self.chassis_detached = true;
+        Some(chassis)
+    }
+
+    /// M5: attach a chassis to this actor. Resizes the half_extents to fit the
+    /// chassis silhouette for the given chassis kind so M5.5 collision proxies
+    /// match the visible silhouette.
+    pub fn attach_chassis(&mut self, chassis: cf_chassis::ChassisState) {
+        let half_extents = match chassis.kind {
+            cf_chassis::ChassisKind::Infantry => Vec2::new(8.0, 16.0),
+            cf_chassis::ChassisKind::PoweredArmor => Vec2::new(10.0, 20.0),
+            cf_chassis::ChassisKind::LightMech => Vec2::new(18.0, 36.0),
+        };
+        self.half_extents = half_extents;
+        self.chassis = Some(chassis);
     }
 
     /// Reset the actor back to its spawn state. Position, velocity, aim, on-ground,
     /// status, and HP all return to defaults; the selected inventory slot is cleared
     /// to `0` so the actor can fire its rifle again after `act.player.reset`.
     /// Inventory items themselves are not rewound (slot contents are immutable in M1).
+    /// **M5**: chassis state (zones / modules / pilot binding) also resets.
     pub fn reset(&mut self) {
         self.position = self.spawn;
         self.velocity = Vec2::ZERO;
@@ -448,9 +643,20 @@ impl ActorState {
         self.status = Status::Stable;
         self.hp = self.hp_max;
         self.inventory.selected = ItemSlot(0);
+        self.crouch_active = false;
+        self.climb_active = false;
+        self.jet_active = false;
+        if let Some(chassis) = self.chassis.as_mut() {
+            chassis.reset();
+        }
     }
 
     /// Apply damage with a cause string. Returns the new status if it changed.
+    ///
+    /// **M5**: when the actor has a chassis attached, damage is routed through
+    /// the chassis pipeline (armor layers → wound → actor HP) via
+    /// [`ActorState::apply_zone_damage`]. The legacy direct-HP path is preserved
+    /// for actors without a chassis.
     pub fn apply_damage(&mut self, amount: f32) -> Option<Status> {
         if amount <= 0.0 || self.status.is_dead() {
             return None;
@@ -462,6 +668,81 @@ impl ActorState {
             Some(new_status)
         } else {
             None
+        }
+    }
+
+    /// M5: apply damage routed through a specific body zone (chassis grammar).
+    /// Returns `(new_status_if_changed, zone_damage_outcome)`. The outcome
+    /// describes every layer/module transition so the engine emits replay events.
+    pub fn apply_zone_damage(
+        &mut self,
+        zone: cf_chassis::BodyZone,
+        amount: f32,
+        cause: &str,
+    ) -> (Option<Status>, cf_chassis::ZoneDamageOutcome) {
+        if amount <= 0.0 || !amount.is_finite() || self.status.is_dead() {
+            return (None, cf_chassis::ZoneDamageOutcome::default());
+        }
+        // **M5**: pilot lifecycle vs damage routing.
+        //   - Bound / Injured (still inside chassis): damage routes through
+        //     the chassis layered armor.
+        //   - Ejecting: pilot is mid-bail in a sealed eject capsule; damage
+        //     is heavily reduced (10%) to give the player a tactical window
+        //     to escape without instantly dying mid-eject.
+        //   - Ejected: pilot is mid-air infantry, briefly under fire from
+        //     the wreck. Damage routes to actor HP at quarter rate (the
+        //     parachute drop offers some concealment / fall trajectory).
+        //   - Extracted: pilot is in safety zone, no damage.
+        //   - BailedTooLate / Lost: chassis is gone; damage routes to actor
+        //     HP directly.
+        let pilot_state = self.chassis.as_ref().map(|c| c.pilot_state);
+        let route_through_chassis = matches!(
+            pilot_state,
+            Some(cf_chassis::PilotState::Bound | cf_chassis::PilotState::Injured | cf_chassis::PilotState::Ejecting)
+        );
+        let damage_scale = match pilot_state {
+            Some(cf_chassis::PilotState::Extracted) => 0.0,
+            Some(cf_chassis::PilotState::Ejecting) => 0.1,
+            Some(cf_chassis::PilotState::Ejected) => 0.25,
+            _ => 1.0,
+        };
+        let effective_amount = amount * damage_scale;
+        if effective_amount <= 0.0 {
+            return (None, cf_chassis::ZoneDamageOutcome::default());
+        }
+        let outcome = if route_through_chassis {
+            self.chassis
+                .as_mut()
+                .map(|c| c.apply_zone_damage(zone, effective_amount, cause))
+                .unwrap_or_default()
+        } else {
+            // No chassis OR pilot is outside the chassis: damage routes to
+            // actor HP directly (at the scaled amount).
+            cf_chassis::ZoneDamageOutcome {
+                zone: Some(zone),
+                cause: cause.to_string(),
+                actor_hp_damage: effective_amount,
+                ..Default::default()
+            }
+        };
+        // Spill actor_hp_damage (overflow past every chassis layer + wound) to
+        // actor.hp. Wound damage absorbed by the chassis does NOT spill to
+        // actor.hp — the chassis IS the armor, and the wound container is the
+        // last buffer before the pilot is hit. This keeps powered armor /
+        // light mech chassis a meaningful HP buffer (220 hp torso = ~6 mech
+        // autocannon hits before any actor.hp loss).
+        let spill = outcome.actor_hp_damage;
+        let prev = self.status;
+        if spill > 0.0 {
+            self.hp = (self.hp - spill).max(0.0);
+        }
+        // Re-derive status.
+        let new_status = self.derived_status();
+        if new_status != prev {
+            self.status = new_status;
+            (Some(new_status), outcome)
+        } else {
+            (None, outcome)
         }
     }
 
@@ -477,32 +758,131 @@ impl ActorState {
         }
     }
 
-    /// Derived M4A stance for HUD + `cfctl observe`. See [`Stance::from_state`].
+    /// Derived stance for HUD + `cfctl observe`. M5 routes through
+    /// [`Stance::from_chassis`] so crouch / climb / jet / eject signals propagate.
     pub fn stance(&self) -> Stance {
-        Stance::from_state(self.velocity, self.on_ground, self.status)
+        let ejecting = self
+            .chassis
+            .as_ref()
+            .is_some_and(|c| matches!(c.pilot_state, cf_chassis::PilotState::Ejecting));
+        Stance::from_chassis(
+            self.velocity,
+            self.on_ground,
+            self.status,
+            self.crouch_active,
+            self.climb_active,
+            self.jet_active,
+            ejecting,
+        )
     }
 
-    /// M4A body silhouette per-zone hp percentage. At M4A there is no real body
-    /// graph (M5 owns that); we project the actor's total HP onto a four-zone
-    /// silhouette so the HUD silhouette and `cfctl observe.body_silhouette`
-    /// render a non-color-only damage map. M5 replaces this with the real
-    /// per-zone wound model from `spec/body-damage-model` without changing
-    /// the surface contract.
+    /// Body silhouette per-zone hp percentage. M5 reads from the chassis when
+    /// present; otherwise falls back to the M4A flat-HP projection.
+    /// `placeholder = false` when sourced from a real chassis body graph.
     pub fn body_silhouette(&self) -> BodySilhouette {
-        let pct = if self.hp_max > 0.0 {
-            (self.hp / self.hp_max).clamp(0.0, 1.0)
+        if let Some(chassis) = self.chassis.as_ref() {
+            let pct = |zone: cf_chassis::BodyZone| -> f32 {
+                chassis.zone(zone).map_or(0.0, cf_chassis::ZoneState::zone_integrity)
+            };
+            BodySilhouette {
+                head_hp_pct: pct(cf_chassis::BodyZone::Head),
+                torso_hp_pct: pct(cf_chassis::BodyZone::Torso),
+                arm_left_hp_pct: pct(cf_chassis::BodyZone::ArmLeft),
+                arm_right_hp_pct: pct(cf_chassis::BodyZone::ArmRight),
+                leg_left_hp_pct: pct(cf_chassis::BodyZone::LegLeft),
+                leg_right_hp_pct: pct(cf_chassis::BodyZone::LegRight),
+                placeholder: false,
+            }
         } else {
-            0.0
-        };
-        BodySilhouette {
-            head_hp_pct: pct,
-            torso_hp_pct: pct,
-            arm_left_hp_pct: pct,
-            arm_right_hp_pct: pct,
-            leg_left_hp_pct: pct,
-            leg_right_hp_pct: pct,
-            placeholder: true,
+            let pct = if self.hp_max > 0.0 {
+                (self.hp / self.hp_max).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
+            BodySilhouette {
+                head_hp_pct: pct,
+                torso_hp_pct: pct,
+                arm_left_hp_pct: pct,
+                arm_right_hp_pct: pct,
+                leg_left_hp_pct: pct,
+                leg_right_hp_pct: pct,
+                placeholder: true,
+            }
         }
+    }
+
+    /// **M5**: real chassis module strip when a chassis is attached. Returns
+    /// a `ModuleStrip` with `placeholder=false`. For chassis-less actors
+    /// callers should fall back to the M4A placeholder strip.
+    pub fn chassis_module_strip(&self) -> Option<ModuleStrip> {
+        let chassis = self.chassis.as_ref()?;
+        let modules = chassis
+            .modules
+            .iter()
+            .map(|m| ModuleState {
+                id: m.id.clone(),
+                label: match m.kind {
+                    cf_chassis::ModuleKind::WeaponMount => "WEAPON".to_string(),
+                    cf_chassis::ModuleKind::Jet => "JET".to_string(),
+                    cf_chassis::ModuleKind::Shield => "SHIELD".to_string(),
+                    cf_chassis::ModuleKind::Sensor => "SENSOR".to_string(),
+                    cf_chassis::ModuleKind::RepairDrone => "REPAIR".to_string(),
+                },
+                state: m.state.as_str().to_string(),
+                kind: m.kind.as_str().to_string(),
+            })
+            .collect();
+        Some(ModuleStrip {
+            modules,
+            placeholder: false,
+        })
+    }
+
+    /// **M5**: chassis projection (per-zone integrity + stage + pilot state + modules).
+    /// Returns `None` if no chassis is attached.
+    pub fn chassis_view(&self) -> Option<ChassisView> {
+        let c = self.chassis.as_ref()?;
+        let zones = c
+            .zones
+            .iter()
+            .map(|z| ChassisZoneView {
+                zone: z.zone.as_str().to_string(),
+                external_integrity: z.external_integrity(),
+                internal_integrity: z.internal_integrity(),
+                core_integrity: z.core_integrity(),
+                wound_integrity: z.wound_integrity(),
+                destroyed: z.destroyed,
+                zone_integrity: z.zone_integrity(),
+            })
+            .collect();
+        let modules = c
+            .modules
+            .iter()
+            .map(|m| ChassisModuleView {
+                id: m.id.clone(),
+                kind: m.kind.as_str().to_string(),
+                state: m.state.as_str().to_string(),
+                bound_zone: m.bound_zone.as_str().to_string(),
+                integrity: m.integrity(),
+                last_reason: m.last_reason.clone(),
+            })
+            .collect();
+        Some(ChassisView {
+            spec_id: c.spec_id.clone(),
+            kind: c.kind.as_str().to_string(),
+            stage: c.stage.as_str().to_string(),
+            pilot_state: c.pilot_state.as_str().to_string(),
+            weapon_jammed: c.weapon_jammed,
+            tutorial_safety: c.tutorial_safety,
+            mass_kg: c.mass_kg,
+            zones,
+            modules,
+            integrity: c.integrity(),
+            eject_ticks_remaining: c.eject_window.ticks_remaining,
+            eject_ticks_total: c.eject_window.ticks_total,
+            destroyed_zones: c.destroyed_zones().iter().map(|z| z.as_str().to_string()).collect(),
+            salvaged_module_ids: c.salvaged_modules.iter().map(|m| m.id.clone()).collect(),
+        })
     }
 
     /// Hash bytes for the M1 deterministic checksum extension. Layout-stable; future
@@ -510,6 +890,9 @@ impl ActorState {
     /// to round-trip the full source domain — the inventory slot writes its full `u32`
     /// (`ItemSlot.0.to_le_bytes()`) so growing the inventory beyond 255 slots in a
     /// future milestone cannot silently collide divergent states into the same hash.
+    /// **M5**: chassis state (zones / modules / pilot state) is appended after the
+    /// M1 bytes so existing checksums stay byte-stable for chassis-less actors;
+    /// chassis-grade actors get a richer checksum.
     pub fn checksum_bytes(&self) -> Vec<u8> {
         let mut out = Vec::with_capacity(96);
         out.extend_from_slice(&self.id.0.to_le_bytes());
@@ -523,6 +906,15 @@ impl ActorState {
         out.push(self.status as u8);
         out.push(u8::from(self.on_ground));
         out.extend_from_slice(&self.inventory.selected.0.to_le_bytes());
+        // M5: append chassis bytes only when a chassis is attached; legacy actors
+        // remain byte-identical for cross-milestone determinism comparisons.
+        if let Some(chassis) = &self.chassis {
+            out.push(1);
+            out.extend_from_slice(&chassis.checksum_bytes());
+            out.push(u8::from(self.crouch_active));
+            out.push(u8::from(self.climb_active));
+            out.push(u8::from(self.jet_active));
+        }
         out
     }
 }
@@ -664,10 +1056,24 @@ pub struct ActorObservation {
     pub hp_max: f32,
     pub selected_slot: u32,
     pub selected_item: String,
-    /// M4A: derived stance label (idle/walking/running/airborne/downed/dead).
+    /// M4A: derived stance label (idle/walking/running/airborne/downed/dead/crouching/...).
     pub stance: String,
-    /// M4A: per-zone body silhouette projection (placeholder until M5).
+    /// M4A: per-zone body silhouette projection. `placeholder=false` when sourced
+    /// from a real M5 chassis body graph.
     pub body_silhouette: BodySilhouette,
+    /// **M5**: full chassis projection when the actor has a chassis attached.
+    #[serde(default)]
+    pub chassis: Option<ChassisView>,
+    /// **M5**: actor origin tag (`human`, `robot`, `android`, ...).
+    #[serde(default = "default_origin_id")]
+    pub origin_id: String,
+    /// **M5**: per-tick movement-intent mirror.
+    #[serde(default)]
+    pub crouch_active: bool,
+    #[serde(default)]
+    pub climb_active: bool,
+    #[serde(default)]
+    pub jet_active: bool,
 }
 
 impl From<&ActorState> for ActorObservation {
@@ -687,13 +1093,62 @@ impl From<&ActorState> for ActorObservation {
             selected_item: actor.inventory.selected_item().label().to_string(),
             stance: actor.stance().as_str().to_string(),
             body_silhouette: actor.body_silhouette(),
+            chassis: actor.chassis_view(),
+            origin_id: actor.origin_id.clone(),
+            crouch_active: actor.crouch_active,
+            climb_active: actor.climb_active,
+            jet_active: actor.jet_active,
         }
     }
+}
+
+/// **M5**: chassis projection for `cfctl observe` / `cfctl inspect chassis`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ChassisView {
+    pub spec_id: String,
+    pub kind: String,
+    pub stage: String,
+    pub pilot_state: String,
+    pub weapon_jammed: bool,
+    pub tutorial_safety: bool,
+    pub mass_kg: f32,
+    pub zones: Vec<ChassisZoneView>,
+    pub modules: Vec<ChassisModuleView>,
+    pub integrity: f32,
+    pub eject_ticks_remaining: u32,
+    pub eject_ticks_total: u32,
+    pub destroyed_zones: Vec<String>,
+    pub salvaged_module_ids: Vec<String>,
+}
+
+/// Per-zone chassis view.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ChassisZoneView {
+    pub zone: String,
+    pub external_integrity: f32,
+    pub internal_integrity: f32,
+    pub core_integrity: f32,
+    pub wound_integrity: f32,
+    pub destroyed: bool,
+    pub zone_integrity: f32,
+}
+
+/// Per-module chassis view.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ChassisModuleView {
+    pub id: String,
+    pub kind: String,
+    pub state: String,
+    pub bound_zone: String,
+    pub integrity: f32,
+    pub last_reason: String,
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    mod body_a;
 
     #[test]
     fn status_thresholds() {
@@ -863,6 +1318,83 @@ mod tests {
         assert_eq!(obs.stance, "running");
         assert!(obs.body_silhouette.placeholder);
         assert!((obs.body_silhouette.torso_hp_pct - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn attach_chassis_resizes_half_extents_for_mech() {
+        let inv = Inventory::with_rifle("rifle_m1_default");
+        let mut actor = ActorState::player(ActorId(1), "blue", Vec2::ZERO, 100.0, inv);
+        let spec = cf_chassis::light_mech_spec();
+        let chassis = cf_chassis::ChassisState::from_spec(&spec, 60, false);
+        actor.attach_chassis(chassis);
+        assert!(actor.half_extents.x > 10.0, "mech should be wider than infantry");
+        assert!(actor.half_extents.y > 20.0, "mech should be taller than infantry");
+    }
+
+    #[test]
+    fn apply_zone_damage_routes_through_chassis_layers() {
+        let inv = Inventory::with_rifle("rifle_m1_default");
+        let mut actor = ActorState::player(ActorId(1), "blue", Vec2::ZERO, 100.0, inv);
+        let spec = cf_chassis::powered_armor_spec();
+        let chassis = cf_chassis::ChassisState::from_spec(&spec, 60, false);
+        actor.attach_chassis(chassis);
+        let (status_change, outcome) = actor.apply_zone_damage(cf_chassis::BodyZone::Torso, 20.0, "test");
+        assert!(status_change.is_none(), "small hit shouldn't change status");
+        assert!(
+            !outcome.layer_damage.is_empty() || !outcome.glances.is_empty(),
+            "expected layer damage or glance"
+        );
+    }
+
+    #[test]
+    fn body_silhouette_reads_from_chassis_when_attached() {
+        let inv = Inventory::with_rifle("rifle_m1_default");
+        let mut actor = ActorState::player(ActorId(1), "blue", Vec2::ZERO, 100.0, inv);
+        let spec = cf_chassis::powered_armor_spec();
+        let chassis = cf_chassis::ChassisState::from_spec(&spec, 60, false);
+        actor.attach_chassis(chassis);
+        // Heavy damage to right arm so silhouette zones diverge.
+        let _ = actor.apply_zone_damage(cf_chassis::BodyZone::ArmRight, 500.0, "test");
+        let s = actor.body_silhouette();
+        assert!(!s.placeholder, "silhouette must be sourced from chassis");
+        assert!(
+            s.arm_right_hp_pct < s.head_hp_pct,
+            "right arm should be lower than head"
+        );
+    }
+
+    #[test]
+    fn chassis_view_serializes_full_zone_set() {
+        let inv = Inventory::with_rifle("rifle_m1_default");
+        let mut actor = ActorState::player(ActorId(1), "blue", Vec2::ZERO, 100.0, inv);
+        let spec = cf_chassis::powered_armor_spec();
+        let chassis = cf_chassis::ChassisState::from_spec(&spec, 60, false);
+        actor.attach_chassis(chassis);
+        let view = actor.chassis_view().unwrap();
+        // M5 full body graph: 15 zones (head/torso/arms/legs/backpack + granular forearms/hands + shins/feet).
+        assert_eq!(view.zones.len(), 15);
+        assert_eq!(view.modules.len(), 5);
+        assert_eq!(view.stage, "nominal");
+    }
+
+    #[test]
+    fn stance_from_chassis_yields_ejecting_when_pilot_ejecting() {
+        let inv = Inventory::with_rifle("rifle_m1_default");
+        let mut actor = ActorState::player(ActorId(1), "blue", Vec2::ZERO, 100.0, inv);
+        let spec = cf_chassis::powered_armor_spec();
+        let mut chassis = cf_chassis::ChassisState::from_spec(&spec, 60, false);
+        chassis.pilot_state = cf_chassis::PilotState::Ejecting;
+        actor.attach_chassis(chassis);
+        assert_eq!(actor.stance(), Stance::Ejecting);
+    }
+
+    #[test]
+    fn stance_from_chassis_yields_jetting_when_active() {
+        let inv = Inventory::with_rifle("rifle_m1_default");
+        let mut actor = ActorState::player(ActorId(1), "blue", Vec2::ZERO, 100.0, inv);
+        actor.jet_active = true;
+        actor.on_ground = false;
+        assert_eq!(actor.stance(), Stance::Jetting);
     }
 
     #[test]

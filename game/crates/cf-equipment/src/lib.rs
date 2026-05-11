@@ -1,13 +1,18 @@
-//! M1: minimal weapon presets and per-actor weapon state.
+//! M1+M5: weapon presets, per-actor weapon state, and the M5 role-record schema.
 //!
-//! Owns one canonical preset (id [`RIFLE_M1_DEFAULT_ID`], built via [`rifle_preset`]),
-//! plus the [`RifleState`] machine that
-//! the engine ticks each fixed step. The state machine emits structured outcomes
-//! (`fired`, `reloaded`, `dry_fire`) that the caller turns into `weapon.*` events.
+//! - M1 owns the [`RifleSpec`] preset + [`RifleState`] state machine. The engine
+//!   ticks one rifle per actor each fixed step; the state machine emits structured
+//!   outcomes (`fired`, `reloaded`, `dry_fire`) that the caller turns into
+//!   `weapon.*` events.
+//! - **M5** lands the full **role-record** schema ([`RoleRecord`]) + the [`Loadout`]
+//!   registry + AI policy hints + jam-chance / origin-compatibility metadata.
+//!   The M1 rifle still works as before; under the hood every rifle preset is now
+//!   ALSO exposed through [`role_record`]/[`loadouts()`] so chassis sockets, AI
+//!   doctrine, and modding tools all see the same role-record contract.
 //!
-//! Anti-scope (see crate AGENTS.md): no full role-record system here yet — that lands in
-//! M5. M1 only needs a single rifle that fires, reloads, applies recoil, and reports
-//! ammo / cooldown state to the HUD.
+//! The M5 contract is the **minimum bar** per AGENTS.md: a `RoleRecord` carries
+//! every field the chassis grammar (cf-chassis), AI (cf-ai), and HUD/inspect
+//! (cfctl) need to reason about a piece of equipment without a screenshot.
 
 #![deny(unsafe_code)]
 #![warn(clippy::pedantic)]
@@ -94,6 +99,229 @@ impl RifleSpec {
 /// Stable id for the M1 default rifle preset. Use [`rifle_preset`] to materialize the
 /// owned [`RifleSpec`].
 pub const RIFLE_M1_DEFAULT_ID: &str = "rifle_m1_default";
+/// Stable id for the M5 heavy mech rifle preset (slower, more damage). Used by
+/// the LightMech chassis reference loadout.
+pub const RIFLE_M5_MECH_HEAVY_ID: &str = "rifle_m5_mech_heavy";
+/// Stable id for the M5 powered-armor combat carbine preset (faster, lower damage).
+/// Used by the PoweredArmor chassis reference loadout.
+pub const CARBINE_M5_POWERED_ID: &str = "carbine_m5_powered";
+
+/// Role kind for the M5 role-record schema. Every equippable item is one of
+/// these top-level kinds; modders can add new kinds via the `Other` opaque
+/// payload after BP8 modding lands.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RoleKind {
+    Rifle,
+    Carbine,
+    Sidearm,
+    HeavyWeapon,
+    MeleeTool,
+    Grenade,
+    Medkit,
+    RepairKit,
+    Shield,
+    SensorPack,
+    UtilityModule,
+}
+
+impl RoleKind {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            RoleKind::Rifle => "rifle",
+            RoleKind::Carbine => "carbine",
+            RoleKind::Sidearm => "sidearm",
+            RoleKind::HeavyWeapon => "heavy_weapon",
+            RoleKind::MeleeTool => "melee_tool",
+            RoleKind::Grenade => "grenade",
+            RoleKind::Medkit => "medkit",
+            RoleKind::RepairKit => "repair_kit",
+            RoleKind::Shield => "shield",
+            RoleKind::SensorPack => "sensor_pack",
+            RoleKind::UtilityModule => "utility_module",
+        }
+    }
+}
+
+/// AI policy hint declared by the role record. Lets the AI doctrine choose
+/// equipment for the right role without per-item special-casing. See
+/// `spec/equipment-loadout` (the M5 role-record fixture).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AiPolicyHint {
+    /// Default firing role (rifle/carbine).
+    Primary,
+    /// Backup / close-range role.
+    Sidearm,
+    /// Area-effect / breaching role.
+    AreaDenial,
+    /// Sensor / scouting / spotter role.
+    Recon,
+    /// Healing/repair role.
+    Support,
+    /// Defensive role (shield / mobility).
+    Defense,
+}
+
+impl AiPolicyHint {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AiPolicyHint::Primary => "primary",
+            AiPolicyHint::Sidearm => "sidearm",
+            AiPolicyHint::AreaDenial => "area_denial",
+            AiPolicyHint::Recon => "recon",
+            AiPolicyHint::Support => "support",
+            AiPolicyHint::Defense => "defense",
+        }
+    }
+}
+
+/// Compatibility tag for origin-gated equipment (DR-014 / M5.8). M5 ships a
+/// permissive default (compatible with every origin); M5.8 layers per-origin
+/// rejection on top.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum OriginCompatibility {
+    Universal,
+    HumanOnly,
+    RobotOnly,
+    AndroidOnly,
+    BiologicalOnly,
+}
+
+impl OriginCompatibility {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            OriginCompatibility::Universal => "universal",
+            OriginCompatibility::HumanOnly => "human_only",
+            OriginCompatibility::RobotOnly => "robot_only",
+            OriginCompatibility::AndroidOnly => "android_only",
+            OriginCompatibility::BiologicalOnly => "biological_only",
+        }
+    }
+}
+
+/// **M5 role-record**: the canonical data model for one piece of equipment.
+/// Drives chassis socket binding, AI doctrine, HUD inspect, modding, and replay.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct RoleRecord {
+    /// Stable id (`rifle_m1_default`, `carbine_m5_powered`, etc.).
+    pub id: String,
+    /// Localized display label (English-only at M5; localized at BP12).
+    pub display_name: String,
+    /// Top-level role kind.
+    pub kind: RoleKind,
+    /// AI doctrine hint.
+    pub ai_policy_hint: AiPolicyHint,
+    /// Per-origin compatibility tag (DR-014 / M5.8 hook).
+    pub origin_compatibility: OriginCompatibility,
+    /// Probability per shot that the weapon jams (0..1). 0 = never jams; 0.01 = 1%.
+    pub jam_chance_per_shot: f32,
+    /// Probability per shot that a jam clears on its own (0..1). 0 = manual clear required.
+    pub jam_clear_chance_per_shot: f32,
+    /// Optional rifle-style firing data. `None` for melee/medkit/shield roles.
+    pub firing: Option<FiringProfile>,
+    /// Mass in kg (drives M5.5 impulse-to-damage routing).
+    pub mass_kg: f32,
+    /// Provenance string (`spec/equipment-loadout` slice id or mod author).
+    pub provenance: String,
+    /// Tutorial-safety toggle: when true, weapon may be issued in tutorials.
+    pub tutorial_safe: bool,
+}
+
+impl RoleRecord {
+    /// Build a role record from a [`RifleSpec`] preset + supplemental metadata.
+    pub fn from_rifle_spec(
+        spec: &RifleSpec,
+        kind: RoleKind,
+        ai_policy_hint: AiPolicyHint,
+        display_name: &str,
+        provenance: &str,
+        jam_chance_per_shot: f32,
+        mass_kg: f32,
+    ) -> Self {
+        let firing = FiringProfile {
+            fire_interval_seconds: spec.fire_interval_seconds,
+            mag_capacity: spec.mag_capacity,
+            reload_seconds: spec.reload_seconds,
+            recoil_impulse: spec.recoil_impulse,
+            muzzle_forward_offset: spec.muzzle_forward_offset,
+            muzzle_vertical_offset: spec.muzzle_vertical_offset,
+            projectile_speed: spec.projectile_speed,
+            damage_per_hit: spec.damage_per_hit,
+            projectile_lifetime_seconds: spec.projectile_lifetime_seconds,
+        };
+        Self {
+            id: spec.preset_id.clone(),
+            display_name: display_name.to_string(),
+            kind,
+            ai_policy_hint,
+            origin_compatibility: OriginCompatibility::Universal,
+            jam_chance_per_shot: jam_chance_per_shot.clamp(0.0, 1.0),
+            jam_clear_chance_per_shot: 0.0,
+            firing: Some(firing),
+            mass_kg: mass_kg.max(0.0),
+            provenance: provenance.to_string(),
+            tutorial_safe: true,
+        }
+    }
+
+    /// Returns true when the role can be mounted by an actor of the given origin tag.
+    pub fn compatible_with_origin(&self, origin_id: &str) -> bool {
+        match self.origin_compatibility {
+            OriginCompatibility::Universal => true,
+            OriginCompatibility::HumanOnly => origin_id == "human",
+            OriginCompatibility::RobotOnly => origin_id == "robot",
+            OriginCompatibility::AndroidOnly => origin_id == "android",
+            OriginCompatibility::BiologicalOnly => matches!(origin_id, "human" | "biological"),
+        }
+    }
+}
+
+/// Per-shot firing profile carried by ranged role records. Mirrors [`RifleSpec`]
+/// for backward compat — the rifle preset registry now delegates to this.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct FiringProfile {
+    pub fire_interval_seconds: f32,
+    pub mag_capacity: u32,
+    pub reload_seconds: f32,
+    pub recoil_impulse: f32,
+    pub muzzle_forward_offset: f32,
+    pub muzzle_vertical_offset: f32,
+    pub projectile_speed: f32,
+    pub damage_per_hit: f32,
+    pub projectile_lifetime_seconds: f32,
+}
+
+impl FiringProfile {
+    pub fn into_rifle_spec(self, preset_id: String) -> RifleSpec {
+        RifleSpec {
+            preset_id,
+            fire_interval_seconds: self.fire_interval_seconds,
+            mag_capacity: self.mag_capacity,
+            reload_seconds: self.reload_seconds,
+            recoil_impulse: self.recoil_impulse,
+            muzzle_forward_offset: self.muzzle_forward_offset,
+            muzzle_vertical_offset: self.muzzle_vertical_offset,
+            projectile_speed: self.projectile_speed,
+            damage_per_hit: self.damage_per_hit,
+            projectile_lifetime_seconds: self.projectile_lifetime_seconds,
+        }
+    }
+}
+
+/// A loadout is a named set of role records (e.g., "infantry default" = rifle +
+/// medkit). M5 ships LOAD-A (Loadout A) fixture stubs; M8+ owns mod-loadable
+/// loadouts.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Loadout {
+    pub id: String,
+    pub display_name: String,
+    /// Ordered list of role-record ids. The first entry is treated as the
+    /// primary weapon by AI doctrine.
+    pub role_ids: Vec<String>,
+    pub provenance: String,
+}
 
 fn rifle_m1_default() -> RifleSpec {
     RifleSpec {
@@ -110,12 +338,137 @@ fn rifle_m1_default() -> RifleSpec {
     }
 }
 
+/// M5 powered-armor carbine: 12 RPS, 25-round magazine, slightly less damage
+/// per shot, faster reload. AI policy hint = Primary.
+fn carbine_m5_powered() -> RifleSpec {
+    RifleSpec {
+        preset_id: CARBINE_M5_POWERED_ID.to_string(),
+        fire_interval_seconds: 0.083,
+        mag_capacity: 25,
+        reload_seconds: 1.2,
+        recoil_impulse: 20.0,
+        muzzle_forward_offset: 14.0,
+        muzzle_vertical_offset: 6.0,
+        projectile_speed: 1400.0,
+        damage_per_hit: 9.0,
+        projectile_lifetime_seconds: 1.5,
+    }
+}
+
+/// M5 mech-heavy rifle: 4 RPS, 15-round magazine, much higher damage per
+/// shot, slower reload. AI policy hint = Primary.
+fn rifle_m5_mech_heavy() -> RifleSpec {
+    RifleSpec {
+        preset_id: RIFLE_M5_MECH_HEAVY_ID.to_string(),
+        fire_interval_seconds: 0.25,
+        mag_capacity: 15,
+        reload_seconds: 2.5,
+        recoil_impulse: 60.0,
+        muzzle_forward_offset: 22.0,
+        muzzle_vertical_offset: 8.0,
+        projectile_speed: 1100.0,
+        damage_per_hit: 40.0,
+        projectile_lifetime_seconds: 2.0,
+    }
+}
+
 /// All known presets. Keyed by `preset_id` for scenario lookup.
 #[must_use]
 pub fn rifle_presets() -> BTreeMap<&'static str, RifleSpec> {
     let mut m = BTreeMap::new();
     m.insert(RIFLE_M1_DEFAULT_ID, rifle_m1_default());
+    m.insert(CARBINE_M5_POWERED_ID, carbine_m5_powered());
+    m.insert(RIFLE_M5_MECH_HEAVY_ID, rifle_m5_mech_heavy());
     m
+}
+
+/// Stable role-record registry. Every rifle preset is also a role record so
+/// chassis sockets + AI doctrine + HUD inspect can speak in role-record terms.
+#[must_use]
+pub fn role_records() -> BTreeMap<&'static str, RoleRecord> {
+    let mut m = BTreeMap::new();
+    m.insert(
+        RIFLE_M1_DEFAULT_ID,
+        RoleRecord::from_rifle_spec(
+            &rifle_m1_default(),
+            RoleKind::Rifle,
+            AiPolicyHint::Primary,
+            "Service Rifle",
+            "spec/equipment-loadout#LOAD-A.rifle_m1_default",
+            0.0,
+            3.5,
+        ),
+    );
+    m.insert(
+        CARBINE_M5_POWERED_ID,
+        RoleRecord::from_rifle_spec(
+            &carbine_m5_powered(),
+            RoleKind::Carbine,
+            AiPolicyHint::Primary,
+            "Powered Carbine",
+            "spec/equipment-loadout#LOAD-A.carbine_m5_powered",
+            0.005,
+            4.2,
+        ),
+    );
+    m.insert(
+        RIFLE_M5_MECH_HEAVY_ID,
+        RoleRecord::from_rifle_spec(
+            &rifle_m5_mech_heavy(),
+            RoleKind::HeavyWeapon,
+            AiPolicyHint::Primary,
+            "Mech Autocannon",
+            "spec/equipment-loadout#LOAD-A.rifle_m5_mech_heavy",
+            0.015,
+            48.0,
+        ),
+    );
+    m
+}
+
+#[must_use]
+pub fn role_record(role_id: &str) -> Option<RoleRecord> {
+    role_records().get(role_id).cloned()
+}
+
+/// Stable loadout registry (LOAD-A fixtures). Used by scenarios to spawn an
+/// actor with a typed loadout.
+#[must_use]
+pub fn loadouts() -> BTreeMap<&'static str, Loadout> {
+    let mut m = BTreeMap::new();
+    m.insert(
+        "load_a_infantry",
+        Loadout {
+            id: "load_a_infantry".to_string(),
+            display_name: "Infantry Standard".to_string(),
+            role_ids: vec![RIFLE_M1_DEFAULT_ID.to_string()],
+            provenance: "spec/equipment-loadout#LOAD-A.infantry".to_string(),
+        },
+    );
+    m.insert(
+        "load_a_powered_armor",
+        Loadout {
+            id: "load_a_powered_armor".to_string(),
+            display_name: "Powered Armor Combat".to_string(),
+            role_ids: vec![CARBINE_M5_POWERED_ID.to_string()],
+            provenance: "spec/equipment-loadout#LOAD-A.powered_armor".to_string(),
+        },
+    );
+    m.insert(
+        "load_a_light_mech",
+        Loadout {
+            id: "load_a_light_mech".to_string(),
+            display_name: "Light Mech Strike".to_string(),
+            role_ids: vec![RIFLE_M5_MECH_HEAVY_ID.to_string()],
+            provenance: "spec/equipment-loadout#LOAD-A.light_mech".to_string(),
+        },
+    );
+    m
+}
+
+#[must_use]
+pub fn loadout(loadout_id: &str) -> Option<Loadout> {
+    loadouts().get(loadout_id).cloned()
 }
 
 /// Look up a preset by id; returns `None` if unknown so the engine can reject the
@@ -427,7 +780,58 @@ mod tests {
     #[test]
     fn rifle_preset_lookup() {
         assert!(rifle_preset(RIFLE_M1_DEFAULT_ID).is_some());
+        assert!(rifle_preset(CARBINE_M5_POWERED_ID).is_some());
+        assert!(rifle_preset(RIFLE_M5_MECH_HEAVY_ID).is_some());
         assert!(rifle_preset("nonexistent").is_none());
+    }
+
+    #[test]
+    fn role_record_registry_covers_every_rifle_preset() {
+        for preset_id in [RIFLE_M1_DEFAULT_ID, CARBINE_M5_POWERED_ID, RIFLE_M5_MECH_HEAVY_ID] {
+            let r = role_record(preset_id).unwrap_or_else(|| panic!("role record for {preset_id}"));
+            assert_eq!(r.id, preset_id);
+            assert!(r.firing.is_some(), "role {preset_id} must carry firing data");
+            assert!(r.tutorial_safe, "M5 LOAD-A roles default to tutorial-safe");
+        }
+    }
+
+    #[test]
+    fn role_record_origin_compatibility_default_is_universal() {
+        let r = role_record(RIFLE_M1_DEFAULT_ID).unwrap();
+        assert!(r.compatible_with_origin("human"));
+        assert!(r.compatible_with_origin("robot"));
+        assert!(r.compatible_with_origin("android"));
+    }
+
+    #[test]
+    fn loadout_registry_resolves_canonical_load_a_ids() {
+        assert!(loadout("load_a_infantry").is_some());
+        assert!(loadout("load_a_powered_armor").is_some());
+        assert!(loadout("load_a_light_mech").is_some());
+        assert!(loadout("missing").is_none());
+    }
+
+    #[test]
+    fn rifle_spec_roundtrips_through_role_record() {
+        let r = role_record(CARBINE_M5_POWERED_ID).unwrap();
+        let firing = r.firing.clone().unwrap();
+        let spec = firing.into_rifle_spec(r.id.clone());
+        assert!((spec.fire_interval_seconds - 0.083).abs() < 1e-6);
+        assert_eq!(spec.mag_capacity, 25);
+    }
+
+    #[test]
+    fn jam_chance_clamped_to_unit_range() {
+        let r = RoleRecord::from_rifle_spec(
+            &rifle_m1_default(),
+            RoleKind::Rifle,
+            AiPolicyHint::Primary,
+            "Test",
+            "test",
+            5.0,
+            3.5,
+        );
+        assert!((r.jam_chance_per_shot - 1.0).abs() < 1e-6);
     }
 
     #[test]

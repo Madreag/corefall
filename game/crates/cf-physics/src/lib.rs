@@ -26,6 +26,196 @@
 
 use serde::{Deserialize, Serialize};
 
+/// **DR-038 forward-hook**: universal gravity field. `Uniform(f32)` is the
+/// only variant used through BP3 (matches M0..M3A `gravity: -980.0`
+/// scenario manifest scalar). M5.5 + M5.9 will extend with `Layered { ambient,
+/// regions, cells }` for per-cell overrides (gravity wells, low-g labs,
+/// magnetic boots). `#[serde(untagged)]` keeps the on-disk `.ron` shape
+/// compatible with the existing `gravity: -980.0` scalar form.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[serde(untagged)]
+pub enum GravityField {
+    Uniform(f32),
+}
+
+impl GravityField {
+    /// Sample the gravity vector at a world position. Today returns the
+    /// uniform scalar; M5.9 will sample per-cell layered overrides.
+    pub fn sample(self, _pos_x: f32, _pos_y: f32) -> f32 {
+        let GravityField::Uniform(g) = self;
+        g
+    }
+    /// Convenience accessor for callers that need a scalar fallback (e.g.
+    /// the M1/M2 actor controller). Always returns the same value as `sample()`
+    /// for `Uniform`; will be replaced with `sample(pos)` at M5.9.
+    pub fn scalar(self) -> f32 {
+        let GravityField::Uniform(g) = self;
+        g
+    }
+}
+
+impl Default for GravityField {
+    fn default() -> Self {
+        GravityField::Uniform(-980.0)
+    }
+}
+
+/// **DR-033 forward-hook (M5.5)**: 16 collision classes per
+/// `spec/full-collision-physics-plan`. Reserved at M5 with the 4 currently-
+/// in-use classes; M5.5 fills in the matrix.
+#[derive(Debug, Clone, Copy, Eq, Hash, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CollisionClass {
+    ActorCore,
+    ActorLimb,
+    ArmorZone,
+    HeldWeapon,
+    LooseItem,
+    ProjectileKinetic,
+    ProjectileExplosive,
+    BeamOrTrace,
+    TerrainPixel,
+    TerrainProxy,
+    DebrisChunk,
+    MechPart,
+    BaseObject,
+    ForceField,
+    SensorTrigger,
+    CosmeticParticle,
+}
+
+/// Returns the entry parameter `t` in `[0, 1]` for the segment `start -> end` against the
+/// AABB centred on `centre` with `half_extents`, or `None` if the segment misses. A point
+/// already inside the AABB at `start` returns `Some(0.0)`.
+///
+/// **DR-033 forward-hook**: the swept segment-vs-AABB primitive lives here so M5.5's
+/// full broadphase + narrowphase can build on it without reaching into `cf-actor::sim`.
+/// `cf-actor::sim::segment_hits_aabb` is a thin `Vec2` adapter that delegates to this.
+#[must_use]
+pub fn segment_hits_aabb(
+    start: (f32, f32),
+    end: (f32, f32),
+    centre: (f32, f32),
+    half_extents: (f32, f32),
+) -> Option<f32> {
+    let (start_x, start_y) = start;
+    let (end_x, end_y) = end;
+    let (centre_x, centre_y) = centre;
+    let (half_w, half_h) = half_extents;
+    let min_x = centre_x - half_w;
+    let max_x = centre_x + half_w;
+    let min_y = centre_y - half_h;
+    let max_y = centre_y + half_h;
+    let dx = end_x - start_x;
+    let dy = end_y - start_y;
+    let mut t_near = f32::NEG_INFINITY;
+    let mut t_far = f32::INFINITY;
+    if dx.abs() <= f32::EPSILON {
+        if start_x < min_x || start_x > max_x {
+            return None;
+        }
+    } else {
+        let t1 = (min_x - start_x) / dx;
+        let t2 = (max_x - start_x) / dx;
+        let (lo, hi) = if t1 <= t2 { (t1, t2) } else { (t2, t1) };
+        t_near = t_near.max(lo);
+        t_far = t_far.min(hi);
+    }
+    if dy.abs() <= f32::EPSILON {
+        if start_y < min_y || start_y > max_y {
+            return None;
+        }
+    } else {
+        let t1 = (min_y - start_y) / dy;
+        let t2 = (max_y - start_y) / dy;
+        let (lo, hi) = if t1 <= t2 { (t1, t2) } else { (t2, t1) };
+        t_near = t_near.max(lo);
+        t_far = t_far.min(hi);
+    }
+    if t_near > t_far || t_far < 0.0 || t_near > 1.0 {
+        return None;
+    }
+    Some(t_near.clamp(0.0, 1.0))
+}
+
+/// Derive a body zone from a hit position relative to the target AABB. Maps the
+/// AABB into five vertical bands (head / upper torso+arms / mid forearms /
+/// lower hands+thighs / shins / feet) and three lateral lanes (left chain,
+/// torso/center, right chain) so chassis hits route to the granular M5 body
+/// graph zone.
+///
+/// **DR-033 forward-hook**: the zone-from-hit resolver lives here so M5.5's
+/// per-zone collision routing can call into it from broadphase results.
+/// `cf-actor::sim::zone_from_hit` is a thin `Vec2` adapter that delegates to this.
+#[must_use]
+pub fn zone_from_hit(
+    target_position: (f32, f32),
+    half_extents: (f32, f32),
+    hit_position: (f32, f32),
+) -> cf_chassis::BodyZone {
+    let (target_x, target_y) = target_position;
+    let (half_w, half_h) = half_extents;
+    let (hit_x, hit_y) = hit_position;
+    let dy = hit_y - target_y;
+    let dx = hit_x - target_x;
+    let h = half_h.max(1.0);
+    let w = half_w.max(1.0);
+    let rel_y = dy / h;
+    let rel_x = dx / w;
+    let lateral_arm = rel_x.abs() >= 0.55;
+    let lateral_side_right = rel_x >= 0.0;
+    if rel_y >= 0.7 {
+        return cf_chassis::BodyZone::Head;
+    }
+    if rel_y >= 0.25 {
+        return if lateral_arm {
+            if lateral_side_right {
+                cf_chassis::BodyZone::ArmRight
+            } else {
+                cf_chassis::BodyZone::ArmLeft
+            }
+        } else {
+            cf_chassis::BodyZone::Torso
+        };
+    }
+    if rel_y >= -0.1 {
+        return if lateral_arm {
+            if lateral_side_right {
+                cf_chassis::BodyZone::ForearmRight
+            } else {
+                cf_chassis::BodyZone::ForearmLeft
+            }
+        } else {
+            cf_chassis::BodyZone::Torso
+        };
+    }
+    if rel_y >= -0.4 {
+        return if lateral_arm {
+            if lateral_side_right {
+                cf_chassis::BodyZone::HandRight
+            } else {
+                cf_chassis::BodyZone::HandLeft
+            }
+        } else if lateral_side_right {
+            cf_chassis::BodyZone::LegRight
+        } else {
+            cf_chassis::BodyZone::LegLeft
+        };
+    }
+    if rel_y >= -0.75 {
+        return if lateral_side_right {
+            cf_chassis::BodyZone::ShinRight
+        } else {
+            cf_chassis::BodyZone::ShinLeft
+        };
+    }
+    if lateral_side_right {
+        cf_chassis::BodyZone::FootRight
+    } else {
+        cf_chassis::BodyZone::FootLeft
+    }
+}
+
 /// Inputs to [`step_kinematics`].
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct StepInputs {
@@ -296,5 +486,144 @@ mod tests {
         // No NaN when aim_x is zero.
         let v = apply_recoil(0.0, 0.0, 25.0);
         assert!(v.is_finite());
+    }
+
+    #[test]
+    fn gravity_field_uniform_round_trips_serde() {
+        let g = GravityField::Uniform(-980.0);
+        let json = serde_json::to_string(&g).unwrap();
+        // Untagged serialization writes just the scalar.
+        assert_eq!(json, "-980.0");
+        let back: GravityField = serde_json::from_str(&json).unwrap();
+        assert_eq!(g, back);
+    }
+
+    #[test]
+    fn gravity_field_uniform_deserializes_from_legacy_scalar() {
+        // Legacy .ron files have `gravity: -980.0` as a bare f32; untagged
+        // serde reads it into Uniform variant.
+        let scenario_fragment = "-980.0";
+        let back: GravityField = serde_json::from_str(scenario_fragment).unwrap();
+        assert!((back.scalar() - -980.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn gravity_field_default_is_earth_pixel_scale() {
+        let g = GravityField::default();
+        assert!((g.scalar() - -980.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn gravity_field_sample_matches_scalar_for_uniform() {
+        let g = GravityField::Uniform(-500.0);
+        assert!((g.sample(0.0, 0.0) - g.scalar()).abs() < f32::EPSILON);
+        assert!((g.sample(1234.5, -6789.0) - -500.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn collision_class_serializes_as_snake_case() {
+        assert_eq!(
+            serde_json::to_string(&CollisionClass::ProjectileKinetic).unwrap(),
+            "\"projectile_kinetic\""
+        );
+    }
+
+    #[test]
+    fn collision_class_round_trips_through_serde() {
+        for variant in [
+            CollisionClass::ActorCore,
+            CollisionClass::ActorLimb,
+            CollisionClass::ArmorZone,
+            CollisionClass::HeldWeapon,
+            CollisionClass::LooseItem,
+            CollisionClass::ProjectileKinetic,
+            CollisionClass::ProjectileExplosive,
+            CollisionClass::BeamOrTrace,
+            CollisionClass::TerrainPixel,
+            CollisionClass::TerrainProxy,
+            CollisionClass::DebrisChunk,
+            CollisionClass::MechPart,
+            CollisionClass::BaseObject,
+            CollisionClass::ForceField,
+            CollisionClass::SensorTrigger,
+            CollisionClass::CosmeticParticle,
+        ] {
+            let json = serde_json::to_string(&variant).unwrap();
+            let back: CollisionClass = serde_json::from_str(&json).unwrap();
+            assert_eq!(variant, back);
+        }
+    }
+
+    #[test]
+    fn segment_hits_aabb_detects_direct_hit() {
+        // Segment from (-10, 0) to (10, 0) passes through AABB centred at (0,0)
+        // with half-extents (1, 1).
+        let t = segment_hits_aabb((-10.0, 0.0), (10.0, 0.0), (0.0, 0.0), (1.0, 1.0));
+        assert!(t.is_some());
+        let t = t.unwrap();
+        // Entry parameter should be near 0.45 (segment enters at x=-1, length=20).
+        assert!((t - 0.45).abs() < 1e-3, "expected ~0.45, got {t}");
+    }
+
+    #[test]
+    fn segment_hits_aabb_misses_when_offset() {
+        // Segment from (-10, 5) to (10, 5) passes above an AABB at (0,0) with hh=1.
+        let t = segment_hits_aabb((-10.0, 5.0), (10.0, 5.0), (0.0, 0.0), (1.0, 1.0));
+        assert!(t.is_none());
+    }
+
+    #[test]
+    fn segment_hits_aabb_point_already_inside_returns_zero() {
+        let t = segment_hits_aabb((0.0, 0.0), (10.0, 0.0), (0.0, 0.0), (1.0, 1.0));
+        assert_eq!(t, Some(0.0));
+    }
+
+    #[test]
+    fn segment_hits_aabb_swept_catches_tunneling_shot() {
+        // Mirrors the cf-actor sim regression: at 20-units/tick, two sampled
+        // points can step over an AABB. The swept test catches the crossing.
+        let centre_x = 391.0;
+        let start = (centre_x - 9.0, 16.0); // x=382, sampled point left of AABB
+        let end = (centre_x + 11.0, 16.0); // x=402, sampled point right of AABB
+        let half = (8.0, 16.0); // AABB spans [383..399]
+        let t = segment_hits_aabb(start, end, (centre_x, 16.0), half);
+        assert!(t.is_some(), "swept segment must catch tunneling shot");
+    }
+
+    #[test]
+    fn zone_from_hit_routes_head_band() {
+        // rel_y = 0.8 (above 0.7 threshold) → Head
+        let z = zone_from_hit((0.0, 0.0), (8.0, 16.0), (0.0, 12.8));
+        assert_eq!(z, cf_chassis::BodyZone::Head);
+    }
+
+    #[test]
+    fn zone_from_hit_routes_torso_center_band() {
+        // rel_y = 0.4, lateral_arm = false → Torso
+        let z = zone_from_hit((0.0, 0.0), (8.0, 16.0), (0.0, 6.4));
+        assert_eq!(z, cf_chassis::BodyZone::Torso);
+    }
+
+    #[test]
+    fn zone_from_hit_routes_arm_right_when_lateral() {
+        // rel_y = 0.4, rel_x = 0.6 → ArmRight
+        let z = zone_from_hit((0.0, 0.0), (8.0, 16.0), (4.8, 6.4));
+        assert_eq!(z, cf_chassis::BodyZone::ArmRight);
+    }
+
+    #[test]
+    fn zone_from_hit_routes_arm_left_when_negative_lateral() {
+        // rel_y = 0.4, rel_x = -0.6 → ArmLeft
+        let z = zone_from_hit((0.0, 0.0), (8.0, 16.0), (-4.8, 6.4));
+        assert_eq!(z, cf_chassis::BodyZone::ArmLeft);
+    }
+
+    #[test]
+    fn zone_from_hit_routes_foot_band_at_bottom() {
+        // rel_y < -0.75, lateral_side_right via rel_x >= 0
+        let z = zone_from_hit((0.0, 0.0), (8.0, 16.0), (1.0, -14.0));
+        assert_eq!(z, cf_chassis::BodyZone::FootRight);
+        let z = zone_from_hit((0.0, 0.0), (8.0, 16.0), (-1.0, -14.0));
+        assert_eq!(z, cf_chassis::BodyZone::FootLeft);
     }
 }

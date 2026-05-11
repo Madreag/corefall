@@ -1,0 +1,91 @@
+{
+  "schema_version": "cf-grading.v1",
+  "scenario_id": "m5_chassis_wreck_eject",
+  "scope": "BP3",
+  "milestone": "m5",
+  "description": "Per-dimension grading contract for the M5 chassis wreck + eject + extraction scenario. Drives a Powered Armor pilot against a Light Mech autocannon adversary. Agent reads evidence (summary_grid.png + events.jsonl chassis events + observe.once chassis projection + run-bundle replay) and writes prose-justified scores along look + feel + goal + agent dimensions.",
+  "rubric": {
+    "score_range": [0, 10],
+    "verdict_mapping": {
+      "9-10": "PASS",
+      "7-8": "PASS_WITH_FUTURE_POLISH",
+      "5-6": "PARTIAL (blocked on a future milestone)",
+      "3-4": "NEEDS_FIXES (current milestone scope)",
+      "0-2": "BLOCKER (current milestone scope)"
+    },
+    "minimum_aggregate_for_pass": 7.0,
+    "minimum_per_dimension_for_pass": 5
+  },
+  "dimensions": [
+    {
+      "id": "look.chassis_silhouette_layered",
+      "criterion": "BODY silhouette line shows per-zone hp percentages sourced from the real chassis body graph (placeholder=false). Zones diverge as autocannon hits land (torso < head, arm_right < arm_left when right-side hits dominate). Numbers stay clamped to [0, 100].",
+      "evidence_required": ["captures/summary_grid.png", "observe.once actor.player.body_silhouette.placeholder=false", "observe.once actor.player.chassis.zones[]"],
+      "weight": 1.5,
+      "future_owners_if_blocked": ["M5.5"]
+    },
+    {
+      "id": "look.module_strip_chassis_states",
+      "criterion": "MODS line shows real chassis module names (WEAPON / JET / SHIELD / SENSOR) plus state tag (OK / DEG / WARN / FAIL / N/A) sourced from the chassis state machine. State tag transitions visible as autocannon hits propagate through bound zones.",
+      "evidence_required": ["captures/summary_grid.png", "observe.once actor.player.chassis.modules[]"],
+      "weight": 1.0,
+      "future_owners_if_blocked": []
+    },
+    {
+      "id": "look.stage_banner_ladder",
+      "criterion": "HUD banner stack surfaces chassis stage transitions (MODULE WARNING / ARMOR CRACKED / EJECT NOW / CHASSIS WRECKED) with severity word + icon glyph; transitions cite zone + cause in events.jsonl.",
+      "evidence_required": ["captures/summary_grid.png banner pane", "events.jsonl chassis.stage_changed sequence"],
+      "weight": 1.0,
+      "future_owners_if_blocked": ["M4B (comic-noir cards)"]
+    },
+    {
+      "id": "feel.armor_layer_attrition",
+      "criterion": "Layered armor attrition feels physical: External → Internal → Core → wound emits `chassis.armor_layer_damaged` events with hp_after + breached fields per hit. Hardness glances absorb low-energy hits via `chassis.armor_layer_glanced`.",
+      "evidence_required": ["events.jsonl chassis.armor_layer_damaged rows", "events.jsonl chassis.armor_layer_glanced rows"],
+      "weight": 1.5,
+      "future_owners_if_blocked": []
+    },
+    {
+      "id": "feel.eject_sequence_pacing",
+      "criterion": "Eject sequence has real-time texture: `chassis.pilot_ejected` fires with ticks_total, then a multi-tick window emits `chassis.pilot_separated` at completion, EJECTING banner counts down, pilot then controls foot infantry with reduced silhouette + animation.",
+      "evidence_required": ["events.jsonl chassis.pilot_ejected + pilot_separated rows", "observe.once actor.player.chassis.pilot_state=ejected"],
+      "weight": 1.5,
+      "future_owners_if_blocked": []
+    },
+    {
+      "id": "feel.bail_too_late_punishment",
+      "criterion": "Loss path emits `chassis.pilot_bailed_too_late` when eject is triggered after chassis wreck, OR mission resolves with `player_dead` when the pilot stays inside through stage Wreck.",
+      "evidence_required": ["events.jsonl mission.mission_resolved with reason=player_dead OR pilot_bailed_too_late", "observe.once mission.loss_reason"],
+      "weight": 1.0,
+      "future_owners_if_blocked": []
+    },
+    {
+      "id": "goal.m5_done_criteria",
+      "criterion": "M5 done-criteria pass: body graph w/ limbs+armor+sockets+wounds, damage stages with HUD parity, module damage with reason labels, pilot eject works end-to-end, chassis salvage emits `chassis.salvaged` with recoverable modules, BODY-A + CHASSIS-A acceptance tests pass.",
+      "evidence_required": ["events.jsonl chassis.* full ladder", "M5 cargo tests for cf-chassis + cf-actor + cf-control"],
+      "weight": 2.0,
+      "future_owners_if_blocked": ["M5.5"]
+    },
+    {
+      "id": "goal.dr014_021_chassis_grammar",
+      "criterion": "DR-014 + DR-021 chassis grammar closes: launch chassis archetypes (Infantry, PoweredArmor, LightMech) registered with body graph + modules + mass; LOAD-A role records carry firing profile + AI policy hint + origin compatibility + mass.",
+      "evidence_required": ["cf-chassis::chassis_specs() returns 3 archetypes", "cf-equipment::role_records() returns 3 launch roles + 3 LOAD-A loadouts"],
+      "weight": 1.5,
+      "future_owners_if_blocked": []
+    },
+    {
+      "id": "agent.cfctl_chassis_surface",
+      "criterion": "Every chassis-grade cfctl method is reachable + recorded: act.player.crouch / climb / jet / eject + act.chassis.repair / salvage / clear_jam. Each emits structured event with parent-link to control.command_accepted.",
+      "evidence_required": ["events.jsonl control.command_accepted rows for every chassis method", "events.jsonl chassis.* events for repair/salvage/eject"],
+      "weight": 1.0,
+      "future_owners_if_blocked": []
+    },
+    {
+      "id": "agent.observe_chassis_completeness",
+      "criterion": "observe.once exposes the full chassis projection: spec_id, kind, stage, pilot_state, weapon_jammed, modules[], zones[] with per-layer integrity, destroyed_zones, eject_ticks_remaining/total, salvaged_module_ids.",
+      "evidence_required": ["observe.once actor.player.chassis with non-null zones[] + modules[]"],
+      "weight": 1.0,
+      "future_owners_if_blocked": []
+    }
+  ]
+}

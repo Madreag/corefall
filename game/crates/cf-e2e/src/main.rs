@@ -859,11 +859,45 @@ fn lookup(value: &Value, key: &str) -> Option<Value> {
         }
         return Some(node.clone());
     }
-    let mut node = value;
-    for seg in &parts {
-        node = node.get(seg)?;
+    // M5: `actor.<id>.foo.bar` lookup against `actors[]` by id (`actor.player.*` also accepted).
+    if parts.len() >= 2 && parts[0] == "actor" {
+        let arr = value.get("actors")?.as_array()?;
+        let actor_match = if parts[1] == "player" {
+            let pid = value.get("player_actor_id").and_then(|i| i.as_u64())?;
+            arr.iter().find(|a| a.get("id").and_then(|i| i.as_u64()) == Some(pid))?
+        } else {
+            let pid: u64 = parts[1].parse().ok()?;
+            arr.iter().find(|a| a.get("id").and_then(|i| i.as_u64()) == Some(pid))?
+        };
+        if parts.len() == 2 {
+            return Some(actor_match.clone());
+        }
+        let mut current: Value = actor_match.clone();
+        for seg in &parts[2..] {
+            if *seg == "count" {
+                if let Some(arr) = current.as_array() {
+                    current = Value::from(arr.len() as u64);
+                    continue;
+                }
+                return None;
+            }
+            current = current.get(*seg)?.clone();
+        }
+        return Some(current);
     }
-    Some(node.clone())
+    let mut current: Value = value.clone();
+    for seg in &parts {
+        if *seg == "count" {
+            if let Some(arr) = current.as_array() {
+                current = Value::from(arr.len() as u64);
+                continue;
+            }
+            return None;
+        }
+        let next = current.get(*seg)?.clone();
+        current = next;
+    }
+    Some(current)
 }
 
 #[cfg(test)]

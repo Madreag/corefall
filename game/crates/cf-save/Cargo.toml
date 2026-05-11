@@ -8,4 +8,10 @@ publish.workspace = true
 
 [dependencies]
 serde = { workspace = true }
+serde_json = { workspace = true }
+thiserror = { workspace = true }
 tracing = { workspace = true }
+blake3 = { workspace = true }
+hex = { workspace = true }
+cf-chassis = { path = "../cf-chassis" }
+cf-equipment = { path = "../cf-equipment" }

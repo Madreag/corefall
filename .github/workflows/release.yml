@@ -27,18 +27,26 @@ jobs:
             target: x86_64-unknown-linux-gnu
             artifact_name: corefall-linux-x86_64
             archive_ext: tar.zst
+            friend_artifact: AppImage
+            friend_arch: x86_64
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             artifact_name: corefall-windows-x86_64
             archive_ext: zip
+            friend_artifact: zip
+            friend_arch: x86_64
           - os: macos-15-intel
             target: x86_64-apple-darwin
             artifact_name: corefall-macos-x86_64
             archive_ext: tar.zst
+            friend_artifact: dmg
+            friend_arch: x86_64
           - os: macos-latest
             target: aarch64-apple-darwin
             artifact_name: corefall-macos-aarch64
             archive_ext: tar.zst
+            friend_artifact: dmg
+            friend_arch: aarch64
     runs-on: ${{ matrix.os }}
     defaults:
       run:
@@ -54,7 +62,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update
-          sudo apt-get install -y libasound2-dev libudev-dev libxkbcommon-dev libwayland-dev pkg-config zstd
+          sudo apt-get install -y libasound2-dev libudev-dev libxkbcommon-dev libwayland-dev pkg-config zstd file desktop-file-utils
 
       - name: Install zstd (macOS)
         if: runner.os == 'macOS'
@@ -72,8 +80,8 @@ jobs:
           workspaces: game -> target
           key: release-${{ matrix.target }}
 
-      - name: cargo build release (cf-app + cfctl + cf-e2e)
-        run: cargo build --release --target ${{ matrix.target }} -p cf-app -p cfctl -p cf-e2e
+      - name: cargo build release (cf-app + cfctl + cf-e2e + cf-tools-replay-viewer)
+        run: cargo build --release --target ${{ matrix.target }} -p cf-app -p cfctl -p cf-e2e -p cf-tools-replay-viewer
 
       - name: Stage release artifacts
         shell: bash
@@ -86,9 +94,9 @@ jobs:
           # Binaries
           BIN_DIR="target/${{ matrix.target }}/release"
           if [ "${{ runner.os }}" = "Windows" ]; then
-            cp "${BIN_DIR}/cf-app.exe" "${BIN_DIR}/cfctl.exe" "${BIN_DIR}/cf-e2e.exe" "../staging/${STAGE}/"
+            cp "${BIN_DIR}/cf-app.exe" "${BIN_DIR}/cfctl.exe" "${BIN_DIR}/cf-e2e.exe" "${BIN_DIR}/cf-tools-replay-viewer.exe" "../staging/${STAGE}/"
           else
-            cp "${BIN_DIR}/cf-app" "${BIN_DIR}/cfctl" "${BIN_DIR}/cf-e2e" "../staging/${STAGE}/"
+            cp "${BIN_DIR}/cf-app" "${BIN_DIR}/cfctl" "${BIN_DIR}/cf-e2e" "${BIN_DIR}/cf-tools-replay-viewer" "../staging/${STAGE}/"
           fi
 
           # Content + scripts (relative to corefall repo root, so step out of game/)
@@ -123,7 +131,12 @@ jobs:
             fi
           fi
 
-      - name: Pack archive (Linux/macOS tar.zst)
+      # ----------------------------------------------------------------
+      # Legacy developer archives (`corefall-cli-*`). Kept for internal
+      # tooling that still consumes the raw archives. The double-click-
+      # playable artifacts below are the user-facing release assets.
+      # ----------------------------------------------------------------
+      - name: Pack legacy CLI archive (Linux/macOS tar.zst)
         if: runner.os != 'Windows'
         shell: bash
         run: |
@@ -134,7 +147,7 @@ jobs:
           tar --use-compress-program='zstd -19' -cf "${STAGE}.tar.zst" "${STAGE}"
           shasum -a 256 "${STAGE}.tar.zst" > "${STAGE}.tar.zst.sha256"
 
-      - name: Pack archive (Windows zip)
+      - name: Pack legacy CLI archive (Windows zip)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
@@ -146,13 +159,190 @@ jobs:
           Set-Content -Path "$stage.zip.sha256" -Value "$hash *$stage.zip"
           Pop-Location
 
-      - name: Upload artifact (archive + checksum)
+      # ----------------------------------------------------------------
+      # macOS — Corefall.app + .dmg (Double-Click Playability Hard Gate)
+      # ----------------------------------------------------------------
+      - name: Build Corefall.app + .dmg (macOS)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF##*/}"
+          ARCH="${{ matrix.friend_arch }}"
+          APP_DMG="../staging/Corefall-${TAG}-macos-${ARCH}.dmg"
+          mkdir -p ../staging
+          BIN_DIR="$(pwd)/target/${{ matrix.target }}/release"
+          bash tools/release/build_macos_app.sh \
+            --target-dir "${BIN_DIR}" \
+            --output "${APP_DMG}" \
+            --version "${TAG}" \
+            --repo-root ".."
+          ls -la "${APP_DMG}" "${APP_DMG}.sha256"
+
+      # ----------------------------------------------------------------
+      # Windows — Corefall.exe + .zip (Double-Click Playability Hard Gate)
+      # ----------------------------------------------------------------
+      - name: Build Corefall.exe friend zip (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $tag = "${env:GITHUB_REF}".Split("/")[-1]
+          $arch = "${{ matrix.friend_arch }}"
+          $stageDir = "Corefall-$tag"
+          $stagePath = "../staging/$stageDir"
+          if (Test-Path $stagePath) { Remove-Item -Recurse -Force $stagePath }
+          New-Item -ItemType Directory -Path $stagePath | Out-Null
+          $binDir = "target/${{ matrix.target }}/release"
+
+          # Corefall.exe is cf-app.exe renamed in place. cf-app already
+          # defaults to --scenario m1_actor_range so a no-arg double-click
+          # opens a game window per the AGENTS.md Hard Gate.
+          Copy-Item "$binDir/cf-app.exe" "$stagePath/Corefall.exe"
+          # Bundled CLI helpers stay alongside the launcher so power users
+          # can run cfctl / cf-e2e / replay-viewer from the same dir.
+          Copy-Item "$binDir/cf-app.exe" "$stagePath/cf-app.exe"
+          Copy-Item "$binDir/cfctl.exe" "$stagePath/cfctl.exe"
+          Copy-Item "$binDir/cf-e2e.exe" "$stagePath/cf-e2e.exe"
+          Copy-Item "$binDir/cf-tools-replay-viewer.exe" "$stagePath/cf-tools-replay-viewer.exe"
+
+          Copy-Item -Recurse "content" "$stagePath/content"
+          New-Item -ItemType Directory -Path "$stagePath/scripts" | Out-Null
+          Copy-Item -Recurse "scripts/cfctl" "$stagePath/scripts/cfctl"
+
+          foreach ($doc in @("../README.md", "../CHANGELOG.md", "../AGENTS.md", "../LICENSE", "../LICENSE-MIT", "../LICENSE-APACHE")) {
+            if (Test-Path $doc) {
+              Copy-Item $doc "$stagePath/"
+            }
+          }
+
+          # Friend-handoff README. Plain text so it opens in Notepad on a
+          # double-click without any third-party viewer.
+          $readme = @(
+            "Corefall $tag",
+            "================",
+            "",
+            "Double-click Corefall.exe to launch the game.",
+            "",
+            "Windows SmartScreen will warn ""Windows protected your PC"" because the build is",
+            "not Authenticode-signed yet (signing arrives at the BP10 release-candidate channel).",
+            "Click ""More info"" then ""Run anyway"" to launch.",
+            "",
+            "Power-user tools (cfctl.exe, cf-e2e.exe, cf-tools-replay-viewer.exe) live alongside",
+            "Corefall.exe in this folder. Open a PowerShell or cmd.exe in this folder and run them",
+            "directly if you want the scripted control / replay surfaces.",
+            "",
+            "Source + docs: https://github.com/Madreag/corefall"
+          ) -join "`r`n"
+          Set-Content -Path "$stagePath/README.txt" -Value $readme -Encoding ASCII
+
+          $friendZip = "../staging/Corefall-$tag-windows-$arch.zip"
+          if (Test-Path $friendZip) { Remove-Item -Force $friendZip }
+          Push-Location ../staging
+          Compress-Archive -Path $stageDir -DestinationPath "Corefall-$tag-windows-$arch.zip" -CompressionLevel Optimal
+          $hash = (Get-FileHash -Algorithm SHA256 "Corefall-$tag-windows-$arch.zip").Hash.ToLower()
+          Set-Content -Path "Corefall-$tag-windows-$arch.zip.sha256" -Value "$hash *Corefall-$tag-windows-$arch.zip"
+          Pop-Location
+
+      # ----------------------------------------------------------------
+      # Linux — Corefall.AppImage (Double-Click Playability Hard Gate)
+      # ----------------------------------------------------------------
+      - name: Build Corefall.AppImage (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF##*/}"
+          ARCH="${{ matrix.friend_arch }}"
+          APPDIR="$(pwd)/../staging/corefall.AppDir"
+          rm -rf "${APPDIR}"
+          mkdir -p \
+            "${APPDIR}/usr/bin" \
+            "${APPDIR}/usr/share/applications" \
+            "${APPDIR}/usr/share/icons/hicolor/256x256/apps" \
+            "${APPDIR}/usr/share/corefall"
+
+          BIN_DIR="$(pwd)/target/${{ matrix.target }}/release"
+          for bin in cf-app cfctl cf-e2e cf-tools-replay-viewer; do
+            cp "${BIN_DIR}/${bin}" "${APPDIR}/usr/bin/${bin}"
+            chmod +x "${APPDIR}/usr/bin/${bin}"
+          done
+
+          cp -R content "${APPDIR}/usr/share/corefall/content"
+          mkdir -p "${APPDIR}/usr/share/corefall/scripts"
+          cp -R scripts/cfctl "${APPDIR}/usr/share/corefall/scripts/cfctl"
+
+          cp tools/release/AppRun.sh "${APPDIR}/AppRun"
+          chmod +x "${APPDIR}/AppRun"
+
+          cp tools/release/corefall.desktop "${APPDIR}/corefall.desktop"
+          cp tools/release/corefall.desktop "${APPDIR}/usr/share/applications/corefall.desktop"
+          cp tools/release/corefall.png "${APPDIR}/corefall.png"
+          cp tools/release/corefall.png "${APPDIR}/usr/share/icons/hicolor/256x256/apps/corefall.png"
+          if [ -f tools/release/corefall_256.png ]; then
+            cp tools/release/corefall_256.png "${APPDIR}/usr/share/icons/hicolor/256x256/apps/corefall.png"
+          fi
+
+          if [ ! -x "$(pwd)/../staging/appimagetool" ]; then
+            curl -fL --retry 5 \
+              -o "$(pwd)/../staging/appimagetool" \
+              "https://github.com/AppImage/AppImageKit/releases/download/continuous/appimagetool-x86_64.AppImage"
+            chmod +x "$(pwd)/../staging/appimagetool"
+          fi
+
+          OUTPUT="$(pwd)/../staging/Corefall-${TAG}-linux-${ARCH}.AppImage"
+          # appimagetool needs FUSE; use --appimage-extract-and-run when the
+          # GitHub runner doesn't have FUSE available (it usually doesn't
+          # under containers but ubuntu-latest GA runners do; pass it
+          # unconditionally for safety).
+          ARCH=x86_64 "$(pwd)/../staging/appimagetool" \
+            --appimage-extract-and-run \
+            "${APPDIR}" \
+            "${OUTPUT}"
+          chmod +x "${OUTPUT}"
+
+          shasum -a 256 "${OUTPUT}" > "${OUTPUT}.sha256"
+          ls -la "${OUTPUT}" "${OUTPUT}.sha256"
+
+      # ----------------------------------------------------------------
+      # Upload all artifacts produced for this matrix row.
+      # ----------------------------------------------------------------
+      - name: Upload artifact (legacy CLI archive + checksum)
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
+          name: corefall-cli-${{ matrix.artifact_name }}
           path: |
             staging/${{ matrix.artifact_name }}-*.${{ matrix.archive_ext }}
             staging/${{ matrix.artifact_name }}-*.${{ matrix.archive_ext }}.sha256
+          retention-days: 14
+
+      - name: Upload friend-handoff artifact (macOS .dmg)
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: corefall-friend-macos-${{ matrix.friend_arch }}
+          path: |
+            staging/Corefall-*-macos-${{ matrix.friend_arch }}.dmg
+            staging/Corefall-*-macos-${{ matrix.friend_arch }}.dmg.sha256
+          retention-days: 14
+
+      - name: Upload friend-handoff artifact (Windows .zip)
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: corefall-friend-windows-${{ matrix.friend_arch }}
+          path: |
+            staging/Corefall-*-windows-${{ matrix.friend_arch }}.zip
+            staging/Corefall-*-windows-${{ matrix.friend_arch }}.zip.sha256
+          retention-days: 14
+
+      - name: Upload friend-handoff artifact (Linux .AppImage)
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: corefall-friend-linux-${{ matrix.friend_arch }}
+          path: |
+            staging/Corefall-*-linux-${{ matrix.friend_arch }}.AppImage
+            staging/Corefall-*-linux-${{ matrix.friend_arch }}.AppImage.sha256
           retention-days: 14
 
   release:
@@ -182,8 +372,15 @@ jobs:
           set -euo pipefail
           TAG="${GITHUB_REF##*/}"
           mkdir -p release-staging
-          # Move all archives + checksums into one flat dir.
-          find release-artifacts -type f \( -name '*.tar.zst' -o -name '*.zip' -o -name '*.sha256' \) -exec cp {} release-staging/ \;
+          # Move all archives + checksums into one flat dir (legacy CLI
+          # archives + friend-handoff artifacts).
+          find release-artifacts -type f \( \
+              -name '*.tar.zst' -o \
+              -name '*.zip' -o \
+              -name '*.dmg' -o \
+              -name '*.AppImage' -o \
+              -name '*.sha256' \
+            \) -exec cp {} release-staging/ \;
           # Aggregate SHA256SUMS.txt
           (cd release-staging && cat *.sha256 | sed 's| \*|  |g' | sort > SHA256SUMS.txt && rm -f *.sha256)
           # Generate release notes
@@ -191,6 +388,29 @@ jobs:
             --tag "$TAG" \
             --staging release-staging \
             --output release-staging/RELEASE_NOTES.md
+
+      - name: Verify Double-Click Playability Hard Gate artifacts present
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="${GITHUB_REF##*/}"
+          missing=0
+          for required in \
+              "release-staging/Corefall-${TAG}-macos-aarch64.dmg" \
+              "release-staging/Corefall-${TAG}-macos-x86_64.dmg" \
+              "release-staging/Corefall-${TAG}-windows-x86_64.zip" \
+              "release-staging/Corefall-${TAG}-linux-x86_64.AppImage"; do
+            if [ ! -f "${required}" ]; then
+              echo "::error::missing required friend-handoff artifact: ${required}"
+              missing=1
+            fi
+          done
+          if [ "${missing}" -ne 0 ]; then
+            echo "::error::Double-Click Playability Hard Gate failed; refusing to publish release."
+            echo "::error::See AGENTS.md §DOUBLE-CLICK PLAYABILITY CONTRACT for the per-platform contract."
+            exit 1
+          fi
+          ls -la release-staging/
 
       - name: Publish GitHub Release
         uses: softprops/action-gh-release@v2
@@ -205,8 +425,11 @@ jobs:
           # GitHub's definition. External observers reading the tag name
           # know the channel; the prerelease flag adds no information.
           files: |
-            release-staging/*.tar.zst
-            release-staging/*.zip
+            release-staging/Corefall-*.dmg
+            release-staging/Corefall-*-windows-*.zip
+            release-staging/Corefall-*.AppImage
+            release-staging/corefall-*.tar.zst
+            release-staging/corefall-windows-*.zip
             release-staging/SHA256SUMS.txt
           body_path: release-staging/RELEASE_NOTES.md
           prerelease: false

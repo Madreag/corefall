@@ -254,7 +254,7 @@
           "minItems": 2
         },
         "body_silhouette": {
-          "description": "M4A: per-zone body silhouette projection (head/torso/arms/legs hp%).\n`placeholder=true` until M5 lands the real body graph; consumers should\ntreat the LAYOUT as stable but the values as a derived projection.",
+          "description": "M4A: per-zone body silhouette projection (head/torso/arms/legs hp%).\n**M5**: `placeholder=false` when sourced from a real chassis body graph;\n`placeholder=true` for legacy actors without a chassis.",
           "$ref": "#/$defs/BodySilhouetteView",
           "default": {
             "arm_left_hp_pct": 1.0,
@@ -266,8 +266,28 @@
             "torso_hp_pct": 1.0
           }
         },
+        "chassis": {
+          "description": "**M5**: full chassis projection (per-zone integrity, modules, stage,\npilot state, eject window). `None` for legacy actors without a chassis.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ChassisView"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "climb_active": {
+          "type": "boolean",
+          "default": false
+        },
         "controllable": {
           "type": "boolean"
+        },
+        "crouch_active": {
+          "description": "**M5**: per-tick movement-intent flags surfaced to AI / HUD.",
+          "type": "boolean",
+          "default": false
         },
         "hp": {
           "type": "number",
@@ -282,8 +302,12 @@
           "format": "uint64",
           "minimum": 0
         },
+        "jet_active": {
+          "type": "boolean",
+          "default": false
+        },
         "module_strip": {
-          "description": "M4A: chassis module strip projection. Empty until M5 lands the real\nchassis grammar; M4A populates `weapon_mount` from the selected rifle's\nfire-state so HUD + accessibility tooling have a stable surface.",
+          "description": "M4A: chassis module strip projection. **M5**: `placeholder=false` when\nsourced from a real chassis; `placeholder=true` for the M4A flat-rifle\nderivation.",
           "$ref": "#/$defs/ModuleStripView",
           "default": {
             "modules": [],
@@ -292,6 +316,11 @@
         },
         "on_ground": {
           "type": "boolean"
+        },
+        "origin_id": {
+          "description": "**M5**: actor origin tag (`human`, `robot`, `android`).",
+          "type": "string",
+          "default": "human"
         },
         "position": {
           "type": "array",
@@ -351,7 +380,7 @@
           "minimum": 0
         },
         "stance": {
-          "description": "M4A: derived stance label (idle/walking/running/airborne/downed/dead).\n`cfctl observe` consumers + AI agents read this without a screenshot.",
+          "description": "M4A: derived stance label (idle/walking/running/airborne/downed/dead/...).\n`cfctl observe` consumers + AI agents read this without a screenshot.",
           "type": "string",
           "default": "idle"
         },
@@ -512,6 +541,160 @@
         "label",
         "raised_at_tick",
         "accessibility_id"
+      ]
+    },
+    "ChassisModuleView": {
+      "type": "object",
+      "properties": {
+        "bound_zone": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "integrity": {
+          "type": "number",
+          "format": "float"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "last_reason": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "state",
+        "bound_zone",
+        "integrity",
+        "last_reason"
+      ]
+    },
+    "ChassisView": {
+      "description": "**M5**: chassis projection for `cfctl observe` / `inspect`.",
+      "type": "object",
+      "properties": {
+        "destroyed_zones": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "eject_ticks_remaining": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "eject_ticks_total": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "integrity": {
+          "type": "number",
+          "format": "float"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "mass_kg": {
+          "type": "number",
+          "format": "float"
+        },
+        "modules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ChassisModuleView"
+          }
+        },
+        "pilot_state": {
+          "type": "string"
+        },
+        "salvaged_module_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "spec_id": {
+          "type": "string"
+        },
+        "stage": {
+          "type": "string"
+        },
+        "tutorial_safety": {
+          "type": "boolean"
+        },
+        "weapon_jammed": {
+          "type": "boolean"
+        },
+        "zones": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ChassisZoneView"
+          }
+        }
+      },
+      "required": [
+        "spec_id",
+        "kind",
+        "stage",
+        "pilot_state",
+        "weapon_jammed",
+        "tutorial_safety",
+        "mass_kg",
+        "zones",
+        "modules",
+        "integrity",
+        "eject_ticks_remaining",
+        "eject_ticks_total",
+        "destroyed_zones",
+        "salvaged_module_ids"
+      ]
+    },
+    "ChassisZoneView": {
+      "type": "object",
+      "properties": {
+        "core_integrity": {
+          "type": "number",
+          "format": "float"
+        },
+        "destroyed": {
+          "type": "boolean"
+        },
+        "external_integrity": {
+          "type": "number",
+          "format": "float"
+        },
+        "internal_integrity": {
+          "type": "number",
+          "format": "float"
+        },
+        "wound_integrity": {
+          "type": "number",
+          "format": "float"
+        },
+        "zone": {
+          "type": "string"
+        },
+        "zone_integrity": {
+          "type": "number",
+          "format": "float"
+        }
+      },
+      "required": [
+        "zone",
+        "external_integrity",
+        "internal_integrity",
+        "core_integrity",
+        "wound_integrity",
+        "destroyed",
+        "zone_integrity"
       ]
     },
     "EnemyView": {

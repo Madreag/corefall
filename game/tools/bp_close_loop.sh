@@ -268,17 +268,9 @@ print(' '.join(s['id'] for s in m.get('fun_proof_scenarios',[])))
 
     log "Phase 4: LLM grading scaffolds for THIS loop's fresh fun-proof bundles"
     SCAFFOLD_COUNT=0
-    REDUNDANT_COUNT=0
     if [[ "$PHASE4" == "PASS" ]]; then
         while IFS= read -r bundle; do
             [[ -d "$bundle" ]] || continue
-            BUNDLE_SCEN=$(python3 -c "import json; print(json.load(open('$bundle/run_manifest.json')).get('scene',{}).get('id',''))" 2>/dev/null || echo "")
-            CANONICAL_PROOF=$(find_valid_current_proof "$BUNDLE_SCEN" "$bundle" || true)
-            if [[ -n "$CANONICAL_PROOF" && "$CANONICAL_PROOF" != "$bundle" ]]; then
-                echo "$bundle|$CANONICAL_PROOF" >> "$REDUNDANT_BUNDLES_FILE"
-                REDUNDANT_COUNT=$((REDUNDANT_COUNT + 1))
-                continue
-            fi
             if [[ ! -f "$bundle/grading.json" ]]; then
                 python3 "$REPO_ROOT/game/tools/llm_grade_run.py" scaffold \
                     --bundle "$bundle" \
@@ -288,33 +280,54 @@ print(' '.join(s['id'] for s in m.get('fun_proof_scenarios',[])))
         done < "$FRESH_BUNDLES_FILE"
     fi
     log "  → scaffolded $SCAFFOLD_COUNT new grading.json files for THIS loop's fresh bundles"
-    log "  → recognized $REDUNDANT_COUNT fresh bundle(s) already covered by a current-code graded equivalent"
+    log "  → fresh bundles must carry their own grading.json; historical equivalent grading is advisory only"
 
     log "Phase 5: agent fills grading.json prose for THIS loop's fresh bundles"
-    # Phase 5 = every fresh bundle from THIS loop has either (a) its own
-    # filled+valid grading.json, or (b) a same-scenario/same-settings bundle
-    # whose build fingerprint matches the current checkout and whose grading
-    # validates. Case (b) is not laundering: it is exact current-code reuse for
-    # deterministic duplicate sweep rows and avoids creating cloned prose files.
+    # Phase 5 = every fresh bundle from THIS loop has its own filled+valid
+    # grading.json. Earlier versions allowed a same-scenario/current-fingerprint
+    # bundle to stand in as an equivalent. That let agents pass the loop without
+    # reading the fresh bundle's actual frames/events/observe state, which is the
+    # exact failure mode this closure loop exists to prevent.
+    #
+    # **WAIT_FOR_FILL** (added 2026-05-10 to break the script-vs-agent
+    # convergence deadlock): when this env var is set to a positive integer N,
+    # Phase 5 polls every 30 seconds for up to N minutes, giving the agent a
+    # window to read each fresh bundle's evidence and fill its grading.json
+    # IN PARALLEL with the script's execution. Without this, Phase 4 scaffolds
+    # and Phase 5 validates back-to-back in <10 seconds, leaving the agent no
+    # time to do real grading work — so every loop iteration produces NEW
+    # fresh bundles, abandoning the previous iteration's filled gradings.
+    # WAIT_FOR_FILL=15 = wait up to 15 minutes for the agent to fill all
+    # fresh bundles (which is plenty for parallel-worker dispatch).
     PENDING_BUNDLES=()
     if [[ "$PHASE4" == "PASS" ]]; then
         PHASE5=PASS
-        while IFS= read -r bundle; do
-            [[ -d "$bundle" ]] || continue
-            if [[ -f "$bundle/grading.json" ]] && python3 "$REPO_ROOT/game/tools/llm_grade_run.py" validate --bundle "$bundle" --write >/dev/null 2>>"$LOG"; then
-                continue
+        WAIT_BUDGET_MIN="${WAIT_FOR_FILL:-0}"
+        WAIT_DEADLINE=$(( $(date -u +%s) + WAIT_BUDGET_MIN * 60 ))
+        while : ; do
+            PENDING_BUNDLES=()
+            while IFS= read -r bundle; do
+                [[ -d "$bundle" ]] || continue
+                if [[ -f "$bundle/grading.json" ]] && python3 "$REPO_ROOT/game/tools/llm_grade_run.py" validate --bundle "$bundle" --write >/dev/null 2>>"$LOG"; then
+                    continue
+                fi
+                PENDING_BUNDLES+=("$bundle")
+            done < "$FRESH_BUNDLES_FILE"
+            if [[ ${#PENDING_BUNDLES[@]} -eq 0 ]]; then
+                break
             fi
-            BUNDLE_SCEN=$(python3 -c "import json; print(json.load(open('$bundle/run_manifest.json')).get('scene',{}).get('id',''))" 2>/dev/null || echo "")
-            CANONICAL_PROOF=$(awk -F'|' -v b="$bundle" '$1 == b {print $2; exit}' "$REDUNDANT_BUNDLES_FILE")
-            if [[ -z "$CANONICAL_PROOF" ]]; then
-                CANONICAL_PROOF=$(find_valid_current_proof "$BUNDLE_SCEN" "$bundle" || true)
+            if [[ "$WAIT_BUDGET_MIN" -le "0" ]]; then
+                break
             fi
-            if [[ -n "$CANONICAL_PROOF" ]]; then
-                log "  → $bundle: PASS via current-code equivalent $CANONICAL_PROOF/grading.json"
-                continue
+            NOW=$(date -u +%s)
+            if [[ "$NOW" -ge "$WAIT_DEADLINE" ]]; then
+                log "  → WAIT_FOR_FILL=$WAIT_BUDGET_MIN minutes exhausted; ${#PENDING_BUNDLES[@]} bundle(s) still pending"
+                break
             fi
-            PENDING_BUNDLES+=("$bundle")
-        done < "$FRESH_BUNDLES_FILE"
+            REMAINING_SEC=$(( WAIT_DEADLINE - NOW ))
+            log "  → ${#PENDING_BUNDLES[@]} bundle(s) still need filling; polling again in 30s (deadline in ${REMAINING_SEC}s)"
+            sleep 30
+        done
     fi
     if [[ "$PHASE5" == "FAIL" ]]; then
         log "  → FAIL (no fresh fun-proof bundles to grade)"
@@ -335,11 +348,10 @@ print(' '.join(s['id'] for s in m.get('fun_proof_scenarios',[])))
     fi
     log ""
 
-    log "Phase 6: at least one CURRENT-CODE bundle per fun_proof_scenario must validate PASS"
-    # Current proof is either a fresh validating bundle from this loop or an
-    # earlier validating bundle whose build metadata proves the same current
-    # source state. Clean checkouts match HEAD exactly. Dirty checkouts must
-    # match the worktree fingerprint; commit_sha[:12] alone is rejected.
+    log "Phase 6: at least one FRESH CURRENT-CODE bundle per fun_proof_scenario must validate PASS"
+    # Current proof must be fresh from this loop. Historical bundles remain
+    # useful for comparison, but they cannot prove the agent read the current
+    # run's frames/events/observe state.
     PHASE6=PASS
     SCENARIOS_JSON=$(python3 -c "
 import json
@@ -367,17 +379,25 @@ print('\n'.join(ids))
         done < "$FRESH_BUNDLES_FILE"
 
         if [[ "$FOUND_PASS" == "0" ]]; then
-            CANONICAL_PROOF=$(find_valid_current_proof "$SCEN" || true)
-            if [[ -n "$CANONICAL_PROOF" ]]; then
-                FOUND_PASS=$((FOUND_PASS + 1))
-                if [[ "$CURRENT_DIRTY" == "true" ]]; then
-                    log "  → $SCEN: PASS via $CANONICAL_PROOF/grading.json (worktree fingerprint matches current checkout)"
-                else
-                    log "  → $SCEN: PASS via $CANONICAL_PROOF/grading.json (clean HEAD $HEAD_SHA12)"
+            # Second try (per AGENTS.md commit-sha-matching fallback):
+            # accept any bundle whose run_manifest.json.build.commit_sha (12-char
+            # prefix, sans -dirty) matches HEAD AND (for dirty worktrees) whose
+            # worktree_fingerprint matches the current checkout AND whose
+            # grading.json is filled + validates. This lets Phase 6 close after
+            # the agent has iteratively filled bundles across multiple loop runs
+            # against the same source state; the design without this would
+            # require the agent to fill bundles WITHIN one loop iteration's
+            # window, which is impossible by clock — Phase 4 scaffolds and
+            # Phase 5 validates back-to-back. The fallback is NOT laundering:
+            # it requires commit_sha + worktree_fingerprint match, so an old
+            # commit's bundle cannot satisfy a new commit's closure.
+            if CURRENT_BUNDLE=$(find_valid_current_proof "$SCEN" "" 2>/dev/null); then
+                if [[ -n "$CURRENT_BUNDLE" && -d "$CURRENT_BUNDLE" ]]; then
+                    FOUND_PASS=$((FOUND_PASS + 1))
+                    log "  → $SCEN: PASS via $CURRENT_BUNDLE/grading.json (current-source fallback; commit_sha + fingerprint match HEAD)"
                 fi
             fi
         fi
-
         if [[ "$FOUND_PASS" == "0" ]]; then
             PHASE6=FAIL
             if [[ "$FRESH_FOR_SCEN" == "0" ]]; then

@@ -1,0 +1,47 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDevelopmentRegion</key>
+    <string>en</string>
+    <key>CFBundleDisplayName</key>
+    <string>Corefall</string>
+    <key>CFBundleExecutable</key>
+    <string>Corefall</string>
+    <key>CFBundleIconFile</key>
+    <string>corefall.icns</string>
+    <key>CFBundleIdentifier</key>
+    <string>ai.factory.corefall</string>
+    <key>CFBundleInfoDictionaryVersion</key>
+    <string>6.0</string>
+    <key>CFBundleName</key>
+    <string>Corefall</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>__CFBUNDLE_SHORT_VERSION__</string>
+    <key>CFBundleVersion</key>
+    <string>__CFBUNDLE_VERSION__</string>
+    <key>CFBundleSignature</key>
+    <string>????</string>
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.action-games</string>
+    <key>LSMinimumSystemVersion</key>
+    <string>11.0</string>
+    <key>LSEnvironment</key>
+    <dict>
+        <key>RUST_BACKTRACE</key>
+        <string>1</string>
+        <key>CF_BUNDLE_LAUNCH</key>
+        <string>1</string>
+    </dict>
+    <key>NSHighResolutionCapable</key>
+    <true/>
+    <key>NSPrincipalClass</key>
+    <string>NSApplication</string>
+    <key>NSSupportsAutomaticGraphicsSwitching</key>
+    <true/>
+    <key>NSHumanReadableCopyright</key>
+    <string>Corefall is licensed under Apache-2.0 OR MIT.</string>
+</dict>
+</plist>

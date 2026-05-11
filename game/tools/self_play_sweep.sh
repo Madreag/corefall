@@ -357,6 +357,89 @@ else
 fi
 
 # ---------------------------------------------------------------------------
+# Row 3g.1: M5 chassis wreck + eject win path (Powered Armor vs Light Mech, pilot ejects + extracts)
+# ---------------------------------------------------------------------------
+ROW="m5_chassis_wreck_eject_win"
+if skip_id "$ROW"; then
+    add_row "$ROW" "SKIP" "" "skipped via SELF_PLAY_SWEEP_SKIP"
+else
+    cd "$GAME_DIR"
+    if "$CF_E2E_BIN" \
+        --scenario m5_chassis_wreck_eject \
+        --script m5_chassis_wreck_eject_win \
+        --capture-grid \
+        --write-run-bundle \
+        --timeout-seconds 90 \
+        --expect "scenario=m5_chassis_wreck_eject" \
+        --expect "actor.player.chassis.spec_id=powered_armor_v1" \
+        --expect "actor.player.chassis.pilot_state=extracted" \
+        --expect "mission.result=won" \
+        --expect "actor.player.body_silhouette.placeholder=false" \
+        --expect "capture.summary_grid.non_blank_ratio>=0.95" \
+        > "$OUTDIR/$ROW.stdout.txt" 2> "$OUTDIR/$ROW.stderr.txt"; then
+        BUNDLE="$(ls -dt "$REPO_ROOT/prototype_runs/native/m5_"* 2>/dev/null | head -n1)"
+        add_row "$ROW" "PASS" "${BUNDLE:-?}" "M5 chassis wreck + eject win: layered armor attrition → eject → extracted, mission won"
+    else
+        add_row "$ROW" "FAIL" "$OUTDIR/$ROW.stderr.txt" "cf-e2e exit nonzero or chassis state mismatch"
+    fi
+    cd "$REPO_ROOT"
+fi
+
+# ---------------------------------------------------------------------------
+# Row 3g.2: M5 chassis wreck + eject loss path (pilot stays inside the chassis → mission lost)
+# ---------------------------------------------------------------------------
+ROW="m5_chassis_wreck_eject_loss"
+if skip_id "$ROW"; then
+    add_row "$ROW" "SKIP" "" "skipped via SELF_PLAY_SWEEP_SKIP"
+else
+    cd "$GAME_DIR"
+    if "$CF_E2E_BIN" \
+        --scenario m5_chassis_wreck_eject \
+        --script m5_chassis_wreck_eject_loss \
+        --capture-grid \
+        --write-run-bundle \
+        --timeout-seconds 120 \
+        --expect "scenario=m5_chassis_wreck_eject" \
+        --expect "mission.result=lost" \
+        --expect "capture.summary_grid.non_blank_ratio>=0.95" \
+        > "$OUTDIR/$ROW.stdout.txt" 2> "$OUTDIR/$ROW.stderr.txt"; then
+        BUNDLE="$(ls -dt "$REPO_ROOT/prototype_runs/native/m5_"* 2>/dev/null | head -n1)"
+        add_row "$ROW" "PASS" "${BUNDLE:-?}" "M5 chassis wreck loss: pilot inside chassis on wreck → mission_resolved=lost"
+    else
+        add_row "$ROW" "FAIL" "$OUTDIR/$ROW.stderr.txt" "cf-e2e exit nonzero or mission did not resolve to lost"
+    fi
+    cd "$REPO_ROOT"
+fi
+
+# ---------------------------------------------------------------------------
+# Row 3g.3: M5 chassis salvage + repair + movement-intent sandbox roundtrip
+# ---------------------------------------------------------------------------
+ROW="m5_chassis_salvage_roundtrip"
+if skip_id "$ROW"; then
+    add_row "$ROW" "SKIP" "" "skipped via SELF_PLAY_SWEEP_SKIP"
+else
+    cd "$GAME_DIR"
+    if "$CF_E2E_BIN" \
+        --scenario m5_chassis_salvage \
+        --script m5_chassis_salvage_roundtrip \
+        --capture-grid \
+        --write-run-bundle \
+        --timeout-seconds 60 \
+        --expect "scenario=m5_chassis_salvage" \
+        --expect "actor.player.chassis.spec_id=powered_armor_v1" \
+        --expect "actor.player.chassis.weapon_jammed=false" \
+        --expect "actor.player.chassis.salvaged_module_ids.count>=1" \
+        --expect "capture.summary_grid.non_blank_ratio>=0.95" \
+        > "$OUTDIR/$ROW.stdout.txt" 2> "$OUTDIR/$ROW.stderr.txt"; then
+        BUNDLE="$(ls -dt "$REPO_ROOT/prototype_runs/native/m5_"* 2>/dev/null | head -n1)"
+        add_row "$ROW" "PASS" "${BUNDLE:-?}" "M5 chassis repair + clear_jam + movement-intent toggles round-trip via production cf-control dispatch"
+    else
+        add_row "$ROW" "FAIL" "$OUTDIR/$ROW.stderr.txt" "cf-e2e exit nonzero or chassis state mismatch"
+    fi
+    cd "$REPO_ROOT"
+fi
+
+# ---------------------------------------------------------------------------
 # Row 3g: M4A settings live-update round-trip (drives act.settings.set during the run)
 # ---------------------------------------------------------------------------
 ROW="m4a_settings_live_update"

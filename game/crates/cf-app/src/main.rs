@@ -57,7 +57,12 @@ impl Captions {
     about = "Corefall native app shell. Bevy app + cf-render-2d clear-screen + fixed-tick sim + cf-control loopback API."
 )]
 struct Cli {
-    #[arg(long)]
+    /// Scenario id. **Defaults to `m1_actor_range`** when the binary is launched
+    /// with no `--scenario` flag — enables Finder/Explorer/Files double-click
+    /// playability per the AGENTS.md Double-Click Playability Hard Gate. The
+    /// default ships an actor + rifle + ground floor so the player sees a live
+    /// game on launch; pass `--scenario m0_blank` for headless tests.
+    #[arg(long, default_value = "m1_actor_range")]
     scenario: String,
     #[arg(long)]
     seed: Option<u64>,
@@ -1765,6 +1770,11 @@ fn sync_actor_state_to_render(
     render_state.region_anchor_x = holder.0.config().region_anchor_x;
     render_state.region_anchor_y = holder.0.config().region_anchor_y;
     render_state.floor_y = snapshot.floor_y;
+    // **M5**: feed the current sim tick to cf-render-2d so the chassis
+    // pip walk-cycle has a phase. Without this, legs stand still while
+    // the actor's position moves — the M5-DC-3 "static sliding pawn" gap
+    // the per-zone chassis rendering exists to close.
+    render_state.tick = snapshot.tick;
 
     // M4A: mirror cf-control::Settings into HudSettings so cf-ui's UiScale +
     // high-contrast palette systems pick up live `act.settings.set` patches.
@@ -1827,11 +1837,31 @@ fn sync_actor_state_to_render(
     };
     hud_state.stance = stance;
     hud_state.body_silhouette = silhouette;
-    // Reuse the engine's module-strip projection by re-deriving the same
-    // placeholder rules used in `build_module_strip_view`. cf-app does NOT
-    // depend on cf-control's internal helpers, so we recompute from the rifle
-    // bridge HUD view (which is already filtered by selected slot).
-    hud_state.modules = build_hud_module_strip(snapshot.player_rifle.as_ref());
+    // **M5**: prefer the chassis module strip when a chassis is attached;
+    // otherwise fall back to the M4A weapon-mount placeholder.
+    hud_state.modules = match hud_state.player.as_ref().and_then(|p| p.chassis.as_ref()) {
+        Some(chassis) => HudModuleStrip {
+            modules: chassis
+                .modules
+                .iter()
+                .map(|m| HudModule {
+                    id: m.id.clone(),
+                    label: match m.kind.as_str() {
+                        "weapon_mount" => "WEAPON".to_string(),
+                        "jet" => "JET".to_string(),
+                        "shield" => "SHIELD".to_string(),
+                        "sensor" => "SENSOR".to_string(),
+                        "repair_drone" => "REPAIR".to_string(),
+                        _ => m.kind.to_uppercase(),
+                    },
+                    state: m.state.clone(),
+                    kind: m.kind.clone(),
+                })
+                .collect(),
+            placeholder: false,
+        },
+        None => build_hud_module_strip(snapshot.player_rifle.as_ref()),
+    };
 
     // M4A: banners + captions + tool_validity from the engine's HUD-cache snapshot.
     hud_state.banners = hud_caches

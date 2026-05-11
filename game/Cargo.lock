@@ -1393,6 +1393,7 @@ dependencies = [
 name = "cf-actor"
 version = "0.0.1"
 dependencies = [
+ "cf-chassis",
  "cf-equipment",
  "cf-physics",
  "serde",
@@ -1477,6 +1478,7 @@ dependencies = [
 name = "cf-chassis"
 version = "0.0.1"
 dependencies = [
+ "cf-equipment",
  "serde",
  "tracing",
 ]
@@ -1490,6 +1492,7 @@ dependencies = [
  "blake3",
  "cf-actor",
  "cf-ai",
+ "cf-chassis",
  "cf-equipment",
  "cf-mission",
  "cf-physics",
@@ -1524,6 +1527,16 @@ dependencies = [
  "tokio-tungstenite",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "cf-environment"
+version = "0.0.1"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tracing",
 ]
 
 [[package]]
@@ -1594,7 +1607,9 @@ dependencies = [
 name = "cf-physics"
 version = "0.0.1"
 dependencies = [
+ "cf-chassis",
  "serde",
+ "serde_json",
  "tracing",
 ]
 
@@ -1627,7 +1642,13 @@ dependencies = [
 name = "cf-save"
 version = "0.0.1"
 dependencies = [
+ "blake3",
+ "cf-chassis",
+ "cf-equipment",
+ "hex",
  "serde",
+ "serde_json",
+ "thiserror 2.0.18",
  "tracing",
 ]
 

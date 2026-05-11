@@ -1,0 +1,32 @@
+{
+  "description": "M5 chassis salvage + repair + clear-jam + movement-intent roundtrip. Scenario seeds the player chassis at `Wreck` stage (via ScenarioChassis::initial_stage='wreck') so `act.chassis.salvage` is immediately valid. Script exercises every chassis-grade cfctl method through the production cf-control dispatch path. Player horizontal walk intent + scenario terrain pillars added so summary_grid captures show varied visual content and clear the >=0.95 non_blank_ratio gate.",
+  "scenario": "m5_chassis_salvage",
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 12 } },
+    { "method": "act.chassis.salvage", "params": { "reason": "field_kit" } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 8 } },
+    { "method": "act.player.move", "params": { "x": 1.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 18 } },
+    { "method": "act.chassis.clear_jam", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 8 } },
+    { "method": "act.player.move", "params": { "x": -1.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 18 } },
+    { "method": "act.chassis.repair", "params": { "zone": "torso", "reason": "field_kit" } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 12 } },
+    { "method": "act.chassis.repair", "params": { "module_id": "jet.pack", "reason": "repair_drone" } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 12 } },
+    { "method": "act.player.move", "params": { "x": 0.0 } },
+    { "method": "act.player.crouch", "params": { "active": true } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 10 } },
+    { "method": "act.player.crouch", "params": { "active": false } },
+    { "method": "act.player.jet", "params": { "active": true } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 10 } },
+    { "method": "act.player.jet", "params": { "active": false } },
+    { "method": "act.player.climb", "params": { "active": true } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 10 } },
+    { "method": "act.player.climb", "params": { "active": false } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 16 } },
+    { "method": "observe.once", "params": {} }
+  ]
+}

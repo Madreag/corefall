@@ -141,6 +141,19 @@ fn walk(dir: &Path, report: &mut ValidationReport) {
     }
 }
 
+/// BP4 + BP5 content surfaces. Paths under any of these directories must FAIL
+/// validation (not WARN) because the content owners will start landing real
+/// manifests as the listed milestones ship, and a silent WARN would let
+/// half-broken or schema-drifted manifests sneak into run-bundle evidence.
+/// (path-component, owning_milestone).
+const STRICT_FAIL_CONTENT_CATEGORIES: &[(&str, &str)] = &[
+    ("materials", "M5.6"),
+    ("chassis", "M5"),
+    ("atmospheres", "M5.9 / M7.5"),
+    ("worlds", "M5.10"),
+    ("origins", "M5"),
+];
+
 fn validate_one(path: &Path, report: &mut ValidationReport) {
     if path.parent().and_then(|p| p.file_name()).and_then(|s| s.to_str()) == Some("scenarios")
         || path
@@ -148,13 +161,29 @@ fn validate_one(path: &Path, report: &mut ValidationReport) {
             .any(|c| c.as_os_str().to_string_lossy().contains("scenarios"))
     {
         validate_scenario(path, report);
-    } else {
-        // Non-scenario RON files are skipped politely with a WARN so missing future schemas show up.
-        report.add_warn(
-            path.to_path_buf(),
-            "no validator wired for this content type yet (M0 only validates content/scenarios/*.ron)".to_string(),
-        );
+        return;
     }
+    let path_components: Vec<String> = path
+        .components()
+        .map(|c| c.as_os_str().to_string_lossy().to_string())
+        .collect();
+    if let Some((category, milestone)) = STRICT_FAIL_CONTENT_CATEGORIES
+        .iter()
+        .find(|(cat, _)| path_components.iter().any(|c| c == cat))
+    {
+        report.add_error(
+            path.to_path_buf(),
+            format!(
+                "cf-mod validator does not yet support {category}/* content — owning milestone is {milestone}. \
+                 Until that lands, content/{category}/ files cannot be validated. Move them out or remove them."
+            ),
+        );
+        return;
+    }
+    report.add_warn(
+        path.to_path_buf(),
+        "no validator wired for this content type yet (M0 only validates content/scenarios/*.ron)".to_string(),
+    );
 }
 
 fn validate_scenario(path: &Path, report: &mut ValidationReport) {

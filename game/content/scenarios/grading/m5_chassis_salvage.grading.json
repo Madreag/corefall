@@ -1,0 +1,63 @@
+{
+  "schema_version": "cf-grading.v1",
+  "scenario_id": "m5_chassis_salvage",
+  "scope": "BP3",
+  "milestone": "m5",
+  "description": "Per-dimension grading contract for the M5 chassis repair + salvage + clear-jam sandbox. Drives every chassis-grade cfctl method through the production cf-control dispatch path without combat pressure. Agent reads evidence (events.jsonl + observe.once + cargo tests) and writes prose-justified scores.",
+  "rubric": {
+    "score_range": [0, 10],
+    "verdict_mapping": {
+      "9-10": "PASS",
+      "7-8": "PASS_WITH_FUTURE_POLISH",
+      "5-6": "PARTIAL (blocked on a future milestone)",
+      "3-4": "NEEDS_FIXES (current milestone scope)",
+      "0-2": "BLOCKER (current milestone scope)"
+    },
+    "minimum_aggregate_for_pass": 7.0,
+    "minimum_per_dimension_for_pass": 5
+  },
+  "dimensions": [
+    {
+      "id": "feel.repair_module_grammar",
+      "criterion": "act.chassis.repair restores module HP + transitions module state back to Nominal; emits `chassis.module_state_changed` with reason `repaired:<reason>`. Repair zone restores every bound module + mends joints.",
+      "evidence_required": ["events.jsonl chassis.module_state_changed with reason repaired:* rows", "observe.once actor.player.chassis.modules[].state=nominal"],
+      "weight": 1.5,
+      "future_owners_if_blocked": []
+    },
+    {
+      "id": "feel.clear_jam_grammar",
+      "criterion": "act.chassis.clear_jam clears the weapon_jammed flag on the chassis and emits `chassis.weapon_cleared {via: manual}`. Returns CommandResult::accepted regardless of whether a jam existed (idempotent).",
+      "evidence_required": ["events.jsonl control.command_accepted for act.chassis.clear_jam", "events.jsonl chassis.weapon_cleared (when jam existed)"],
+      "weight": 1.0,
+      "future_owners_if_blocked": []
+    },
+    {
+      "id": "feel.movement_intent_toggles",
+      "criterion": "act.player.crouch / climb / jet toggles update actor.crouch_active / climb_active / jet_active in observe.once. Stance derives Crouching / Climbing / Jetting / Ejecting accordingly. Jet requires Jet module nominal/degraded — Warning + Failed reject with `jet_module_unavailable`.",
+      "evidence_required": ["events.jsonl actor.animation_event rows for crouch_started/ended + jet_thrust_started/ended", "observe.once actor.player.stance"],
+      "weight": 1.0,
+      "future_owners_if_blocked": []
+    },
+    {
+      "id": "feel.salvage_recovers_modules",
+      "criterion": "act.chassis.salvage on a wrecked chassis pulls every non-Failed + >=25%-integrity module into chassis.salvaged_modules, emits `chassis.salvaged` with salvaged_module_ids[]. Non-wrecked chassis reject with `chassis_not_wreck_or_disabled`.",
+      "evidence_required": ["events.jsonl chassis.salvaged with salvaged_module_ids[]", "observe.once actor.player.chassis.salvaged_module_ids[]"],
+      "weight": 1.5,
+      "future_owners_if_blocked": []
+    },
+    {
+      "id": "goal.save_load_roundtrip",
+      "criterion": "cf-save round-trips chassis state (zones + modules + pilot binding + stage + weapon_jammed) through JSON serialization with blake3 checksum. Damage applied before save is preserved across load.",
+      "evidence_required": ["cargo test -p cf-save passes save_blob_round_trips_with_chassis + chassis_damage_persists_through_roundtrip + checksum_mismatch_is_detected"],
+      "weight": 1.5,
+      "future_owners_if_blocked": []
+    },
+    {
+      "id": "agent.observe_repair_salvage_audit",
+      "criterion": "observe.once exposes the post-repair / post-salvage chassis state changes. Repair restores zone integrity > 0.99 + modules to Nominal. Salvage populates salvaged_module_ids in the chassis projection.",
+      "evidence_required": ["observe.once before + after each repair/salvage step"],
+      "weight": 1.0,
+      "future_owners_if_blocked": []
+    }
+  ]
+}

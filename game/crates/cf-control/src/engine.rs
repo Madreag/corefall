@@ -172,9 +172,16 @@ pub struct InitialActorWorld {
 
 impl InitialActorWorld {
     pub fn from_scenario(scenario: &Scenario) -> Self {
+        Self::from_scenario_with_tick_rate(scenario, 60)
+    }
+
+    /// **M5**: build initial actor world with chassis attachment using the
+    /// engine's configured tick_rate_hz so chassis eject windows are real-time
+    /// stable.
+    pub fn from_scenario_with_tick_rate(scenario: &Scenario, tick_rate_hz: u32) -> Self {
         let mut world = ActorWorld::new(scenario.floor_y, scenario.gravity);
         for actor in &scenario.actors {
-            let state = actor.build_state();
+            let state = actor.build_state_with_tick_rate(tick_rate_hz);
             world.insert(state);
         }
         let player = world.player;
@@ -347,6 +354,12 @@ impl M0EngineConfig {
         if scenario.has_reactors() {
             cfg.initial_reactors = scenario.reactors.iter().map(|r| r.build_reactor()).collect();
             cfg.milestone = "m2.5".to_string();
+        }
+        // **M5**: any actor with a chassis attached bumps the milestone tag to m5
+        // so run bundles produced by chassis scenarios route into the m5_* slot
+        // under prototype_runs/native/.
+        if scenario.actors.iter().any(|a| a.chassis.is_some()) {
+            cfg.milestone = "m5".to_string();
         }
         // M4A: explicit milestone override wins over scenario-shape derivation
         // so a scenario can reuse the M1.5 / M2 / M2.5 world while tagging the
@@ -562,6 +575,11 @@ struct EngineMutable {
     /// `HUD_FOCUSABLE_NODES` list; observe.accessibility surfaces it.
     hud_focus_index: Option<usize>,
     hud_focus_cycle: u64,
+    /// **M5**: previous tick's chassis stage on the player actor (used to
+    /// raise stage-change banners without scanning the event log).
+    hud_last_chassis_stage: Option<cf_chassis::ChassisStage>,
+    /// **M5**: previous tick's pilot state.
+    hud_last_pilot_state: Option<cf_chassis::PilotState>,
 }
 
 /// Pending dig request set by `act.player.dig` and consumed at the start of the
@@ -602,8 +620,24 @@ impl M0Engine {
         let current_tick = Arc::new(std::sync::atomic::AtomicU64::new(0));
         let tick_dt_ms = 1000.0 / f64::from(config.tick_rate_hz.max(1));
         let (actor_state, player_actor) = if let Some(initial) = &config.initial_actor_world {
-            let mut sim_state = ActorSimState::new(initial.world.clone());
-            for (id, rifle) in build_rifles_for_world(&initial.world, config.tick_rate_hz) {
+            let mut world = initial.world.clone();
+            // **M5**: ensure chassis eject windows are sized for the engine's
+            // configured tick_rate_hz so 60 Hz vs 120 Hz produce identical
+            // real-time eject windows. The InitialActorWorld is built at
+            // 60 Hz default; we adjust each chassis's ticks_total here when
+            // the engine ticks at a different rate.
+            if config.tick_rate_hz != 60 {
+                let scale = config.tick_rate_hz as f32 / 60.0;
+                for actor in world.actors.values_mut() {
+                    if let Some(chassis) = actor.chassis.as_mut() {
+                        chassis.tick_rate_hz = config.tick_rate_hz;
+                        let new_ticks = ((chassis.eject_window.ticks_total as f32) * scale).round() as u32;
+                        chassis.eject_window.ticks_total = new_ticks.max(1);
+                    }
+                }
+            }
+            let mut sim_state = ActorSimState::new(world.clone());
+            for (id, rifle) in build_rifles_for_world(&world, config.tick_rate_hz) {
                 sim_state.ensure_rifle_for(id, rifle);
             }
             (Some(sim_state), initial.player)
@@ -672,6 +706,8 @@ impl M0Engine {
                 hud_last_mission_result: None,
                 hud_focus_index: None,
                 hud_focus_cycle: 0,
+                hud_last_chassis_stage: None,
+                hud_last_pilot_state: None,
             }),
             recorder,
             current_tick,
@@ -1634,6 +1670,33 @@ impl M0Engine {
                     json!({"objective": id}),
                     None,
                 );
+                // **M5**: when an objective completes AND the player has
+                // ejected (Ejected pilot reached the extraction zone),
+                // promote the chassis pilot_state to Extracted so further
+                // damage is fully suppressed.
+                if let Ok(mut s) = self.state.write() {
+                    let player_id = s.player_actor;
+                    if let Some(pid) = player_id {
+                        if let Some(sim) = s.actor_state.as_mut() {
+                            if let Some(actor) = sim.world.actors.get_mut(&pid) {
+                                if let Some(chassis) = actor.chassis.as_mut() {
+                                    if chassis.mark_pilot_extracted() {
+                                        let actor_id = pid.0;
+                                        drop(s);
+                                        self.recorder.record(
+                                            tick,
+                                            sim_time_ms,
+                                            "chassis",
+                                            "pilot_extracted",
+                                            json!({"actor": actor_id, "via": "reach_zone"}),
+                                            None,
+                                        );
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
             }
             for id in &report.objective_failed {
                 self.recorder.record(
@@ -1658,15 +1721,81 @@ impl M0Engine {
             }
         }
 
+        // **M5**: tick the chassis eject sequence for every actor + emit progress events.
+        if let Some(t) = advanced {
+            let sim_time_ms = self.state.read().map(|s| s.clock.sim_time_ms()).unwrap_or(0.0);
+            self.tick_chassis_eject_for_all(t, sim_time_ms);
+        }
+
         // M4A: refresh HUD banners + captions + tool_validity caches AFTER all events
         // have been emitted for this tick. The cache reads world state directly so it
         // does not have to scan the event log on every observe().
         if let Some(t) = advanced {
             let mut state = self.state.write().expect("engine state poisoned");
             self.refresh_hud_caches(&mut state, t);
+            self.refresh_hud_chassis_banners(&mut state, t);
         }
 
         advanced
+    }
+
+    /// **M5**: raise HUD banners for chassis stage transitions (armor cracked,
+    /// weapon jammed, eject window, pilot lost) and refresh the per-player
+    /// stage cache. Mirrors `refresh_hud_caches` but reads chassis state.
+    fn refresh_hud_chassis_banners(&self, state: &mut EngineMutable, tick: Tick) {
+        let now_tick = tick.0;
+        let player_id = state.player_actor;
+        let Some(sim) = state.actor_state.as_ref() else { return };
+        let Some(pid) = player_id else { return };
+        let Some(actor) = sim.world.actors.get(&pid) else {
+            return;
+        };
+        let Some(chassis) = actor.chassis.as_ref() else { return };
+        let prev_stage = state.hud_last_chassis_stage;
+        let prev_pilot = state.hud_last_pilot_state;
+        let cur_stage = chassis.stage;
+        let cur_pilot = chassis.pilot_state;
+        // Stage transition banner.
+        if Some(cur_stage) != prev_stage {
+            if let Some(banner) = chassis_stage_banner(cur_stage, now_tick) {
+                push_banner(&mut state.hud_banners, banner);
+            }
+        }
+        // Pilot eject banner (during the active eject window).
+        if matches!(cur_pilot, cf_chassis::PilotState::Ejecting) {
+            push_banner_dedup(
+                &mut state.hud_banners,
+                crate::state::HudBannerView {
+                    id: "eject_active".to_string(),
+                    severity: "critical".to_string(),
+                    label: format!("EJECTING — {} TICKS", chassis.eject_window.ticks_remaining),
+                    raised_at_tick: now_tick,
+                    expires_at_tick: Some(now_tick + 30),
+                    accessibility_id: "hud.banner.eject_active".to_string(),
+                },
+            );
+        }
+        if Some(cur_pilot) != prev_pilot {
+            if let Some(banner) = chassis_pilot_banner(cur_pilot, now_tick) {
+                push_banner(&mut state.hud_banners, banner);
+            }
+        }
+        // Weapon jam banner.
+        if chassis.weapon_jammed {
+            push_banner_dedup(
+                &mut state.hud_banners,
+                crate::state::HudBannerView {
+                    id: "weapon_jammed".to_string(),
+                    severity: "warning".to_string(),
+                    label: "WEAPON JAMMED — CLEAR".to_string(),
+                    raised_at_tick: now_tick,
+                    expires_at_tick: Some(now_tick + M4A_STATUS_BANNER_EXPIRY_TICKS),
+                    accessibility_id: "hud.banner.weapon_jammed".to_string(),
+                },
+            );
+        }
+        state.hud_last_chassis_stage = Some(cur_stage);
+        state.hud_last_pilot_state = Some(cur_pilot);
     }
 
     /// M4A HUD cache refresh. Called once per drive_tick after every category's
@@ -2109,6 +2238,7 @@ impl M0Engine {
                     "target": hit.target.0,
                     "hit_position": [hit.hit_position.x, hit.hit_position.y],
                     "damage": hit.damage,
+                    "zone": hit.zone,
                 }),
                 Some(intent_event_id.clone()),
             );
@@ -2128,6 +2258,16 @@ impl M0Engine {
                     Some(projectile_hit_event_id.clone()),
                 );
             }
+            // **M5**: emit chassis-grade events from the hit outcome.
+            if let Some(outcome) = &hit.chassis_outcome {
+                self.emit_chassis_events(
+                    tick,
+                    sim_time_ms,
+                    hit.target,
+                    outcome,
+                    Some(projectile_hit_event_id.clone()),
+                );
+            }
         }
         for expired in &report.expired_projectiles {
             self.recorder.record(
@@ -2141,6 +2281,173 @@ impl M0Engine {
                     "last_position": [expired.last_position.x, expired.last_position.y],
                 }),
                 Some(intent_event_id.clone()),
+            );
+        }
+    }
+
+    /// **M5**: emit chassis-related events from a [`cf_chassis::ZoneDamageOutcome`].
+    /// Also recomputes the chassis stage and emits `chassis.stage_changed` when it
+    /// advances. `parent` is the parent-link id for the event (usually the
+    /// `combat.projectile_hit` event id).
+    fn emit_chassis_events(
+        &self,
+        tick: Tick,
+        sim_time_ms: f64,
+        actor: ActorId,
+        outcome: &cf_chassis::ZoneDamageOutcome,
+        parent: Option<String>,
+    ) {
+        let zone = outcome.zone.map(|z| z.as_str().to_string()).unwrap_or_default();
+        for ld in &outcome.layer_damage {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "chassis",
+                "armor_layer_damaged",
+                json!({
+                    "actor": actor.0,
+                    "zone": zone,
+                    "layer": ld.layer.as_str(),
+                    "damage": ld.damage,
+                    "hp_after": ld.hp_after,
+                    "breached": ld.breached,
+                    "cause": outcome.cause,
+                }),
+                parent.clone(),
+            );
+        }
+        for glance in &outcome.glances {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "chassis",
+                "armor_layer_glanced",
+                json!({
+                    "actor": actor.0,
+                    "zone": zone,
+                    "layer": glance.layer.as_str(),
+                    "absorbed": glance.absorbed,
+                    "cause": outcome.cause,
+                }),
+                parent.clone(),
+            );
+        }
+        if outcome.zone_destroyed {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "chassis",
+                "armor_zone_destroyed",
+                json!({
+                    "actor": actor.0,
+                    "zone": zone,
+                    "cause": outcome.cause,
+                }),
+                parent.clone(),
+            );
+        }
+        for j in &outcome.joints_severed {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "chassis",
+                "joint_severed",
+                json!({
+                    "actor": actor.0,
+                    "joint": j,
+                    "cause": outcome.cause,
+                }),
+                parent.clone(),
+            );
+        }
+        for mt in &outcome.module_transitions {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "chassis",
+                "module_state_changed",
+                json!({
+                    "actor": actor.0,
+                    "module_id": mt.id,
+                    "state": mt.state.as_str(),
+                    "reason": mt.reason,
+                }),
+                parent.clone(),
+            );
+        }
+        // Recompute stage + emit transition event if advanced.
+        if let Ok(mut state) = self.state.write() {
+            if let Some(sim) = state.actor_state.as_mut() {
+                if let Some(target_actor) = sim.world.actors.get_mut(&actor) {
+                    if let Some(chassis) = target_actor.chassis.as_mut() {
+                        let prev = chassis.stage;
+                        if let Some(next) = chassis.recompute_stage() {
+                            if next != prev {
+                                let kind = chassis.kind.as_str().to_string();
+                                let spec_id = chassis.spec_id.clone();
+                                drop(state);
+                                self.recorder.record(
+                                    tick,
+                                    sim_time_ms,
+                                    "chassis",
+                                    "stage_changed",
+                                    json!({
+                                        "actor": actor.0,
+                                        "spec_id": spec_id,
+                                        "kind": kind,
+                                        "previous_stage": prev.as_str(),
+                                        "new_stage": next.as_str(),
+                                        "cause": outcome.cause,
+                                    }),
+                                    parent,
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// **M5**: tick the chassis eject sequence on every actor. Emits
+    /// `chassis.pilot_ejected` / `chassis.pilot_bailed_too_late` /
+    /// `chassis.pilot_lost` based on the tick result, plus the matching
+    /// stage transition.
+    fn tick_chassis_eject_for_all(&self, tick: Tick, sim_time_ms: f64) {
+        let mut emits: Vec<(ActorId, &'static str, String)> = Vec::new();
+        if let Ok(mut state) = self.state.write() {
+            if let Some(sim) = state.actor_state.as_mut() {
+                let ids: Vec<ActorId> = sim.world.actors.keys().copied().collect();
+                for id in ids {
+                    let Some(actor) = sim.world.actors.get_mut(&id) else {
+                        continue;
+                    };
+                    let Some(chassis) = actor.chassis.as_mut() else {
+                        continue;
+                    };
+                    if let Some(progress) = chassis.tick_eject() {
+                        let stage_after = chassis.stage.as_str().to_string();
+                        match progress {
+                            cf_chassis::EjectProgress::Ejected => {
+                                emits.push((id, "pilot_state_changed", stage_after.clone()));
+                                emits.push((id, "pilot_separated", stage_after));
+                            }
+                            cf_chassis::EjectProgress::BailedTooLate => {
+                                emits.push((id, "pilot_bailed_too_late", stage_after));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        for (id, kind, stage) in emits {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "chassis",
+                kind,
+                json!({"actor": id.0, "stage": stage}),
+                None,
             );
         }
     }
@@ -2804,6 +3111,20 @@ fn build_mission_view(state: &cf_mission::MissionState, current_tick: u64) -> cr
 /// append-only relative to M1 so the `sim_state_v1` suffix stays valid:
 /// `(M0 prefix) || (M1 actor bytes) || (M1.5 breach + guards + mission) ||
 /// (M2 chunked terrain) || (M2.5 reactor world)`.
+/// **M5**: parse a body zone name (`head`, `torso`, ...) into a `cf_chassis::BodyZone`.
+fn parse_body_zone(s: &str) -> Option<cf_chassis::BodyZone> {
+    match s {
+        "head" => Some(cf_chassis::BodyZone::Head),
+        "torso" => Some(cf_chassis::BodyZone::Torso),
+        "arm_left" => Some(cf_chassis::BodyZone::ArmLeft),
+        "arm_right" => Some(cf_chassis::BodyZone::ArmRight),
+        "leg_left" => Some(cf_chassis::BodyZone::LegLeft),
+        "leg_right" => Some(cf_chassis::BodyZone::LegRight),
+        "backpack" => Some(cf_chassis::BodyZone::Backpack),
+        _ => None,
+    }
+}
+
 fn build_checksum_bytes(state: &EngineMutable) -> Vec<u8> {
     let mut out = state
         .actor_state
@@ -2864,6 +3185,53 @@ fn push_caption(queue: &mut VecDeque<crate::state::CaptionView>, caption: crate:
     }
 }
 
+/// **M5**: build a HUD banner for a chassis stage transition.
+fn chassis_stage_banner(stage: cf_chassis::ChassisStage, now_tick: u64) -> Option<crate::state::HudBannerView> {
+    let (id, severity, label) = match stage {
+        cf_chassis::ChassisStage::Nominal => return None,
+        cf_chassis::ChassisStage::Degraded => return None,
+        cf_chassis::ChassisStage::ModuleWarning => ("chassis_module_warning", "warning", "MODULE WARNING"),
+        cf_chassis::ChassisStage::ModuleFailed => ("chassis_module_failed", "warning", "MODULE FAILED"),
+        cf_chassis::ChassisStage::WeaponJammed => return None, // handled separately
+        cf_chassis::ChassisStage::ArmorCracked => ("chassis_armor_cracked", "critical", "ARMOR CRACKED"),
+        cf_chassis::ChassisStage::Disabled => ("chassis_disabled", "critical", "CHASSIS DISABLED"),
+        cf_chassis::ChassisStage::PilotInjured => ("chassis_pilot_injured", "critical", "PILOT INJURED"),
+        cf_chassis::ChassisStage::Eject => ("chassis_eject_now", "critical", "EJECT NOW"),
+        cf_chassis::ChassisStage::BailTooLate => ("chassis_bail_too_late", "critical", "BAILED TOO LATE"),
+        cf_chassis::ChassisStage::Wreck => ("chassis_wreck", "critical", "CHASSIS WRECKED"),
+        cf_chassis::ChassisStage::Gibbed => ("chassis_gibbed", "critical", "CHASSIS DESTROYED"),
+    };
+    Some(crate::state::HudBannerView {
+        id: id.to_string(),
+        severity: severity.to_string(),
+        label: label.to_string(),
+        raised_at_tick: now_tick,
+        expires_at_tick: Some(now_tick + M4A_STATUS_BANNER_EXPIRY_TICKS * 2),
+        accessibility_id: format!("hud.banner.{id}"),
+    })
+}
+
+/// **M5**: build a HUD banner for a pilot-state transition (eject/extract/lost).
+fn chassis_pilot_banner(state: cf_chassis::PilotState, now_tick: u64) -> Option<crate::state::HudBannerView> {
+    let (id, severity, label) = match state {
+        cf_chassis::PilotState::Bound => return None,
+        cf_chassis::PilotState::Injured => ("pilot_injured", "warning", "PILOT INJURED"),
+        cf_chassis::PilotState::Ejecting => ("pilot_ejecting", "critical", "EJECTING"),
+        cf_chassis::PilotState::Ejected => ("pilot_ejected", "info", "PILOT EJECTED"),
+        cf_chassis::PilotState::Extracted => ("pilot_extracted", "info", "PILOT EXTRACTED"),
+        cf_chassis::PilotState::BailedTooLate => ("pilot_bailed_too_late", "critical", "BAILED TOO LATE"),
+        cf_chassis::PilotState::Lost => ("pilot_lost", "critical", "PILOT LOST"),
+    };
+    Some(crate::state::HudBannerView {
+        id: id.to_string(),
+        severity: severity.to_string(),
+        label: label.to_string(),
+        raised_at_tick: now_tick,
+        expires_at_tick: Some(now_tick + M4A_STATUS_BANNER_EXPIRY_TICKS * 2),
+        accessibility_id: format!("hud.banner.{id}"),
+    })
+}
+
 /// Cause label for `actor.actor_status_changed` events emitted from `step_one_actor`.
 ///
 /// In M1 the only mutator inside `step_one_actor` that touches `actor.status` is
@@ -2919,6 +3287,49 @@ const MILESTONE_INDEX_M1_5: u32 = 2;
 const MILESTONE_INDEX_M2: u32 = 3;
 const MILESTONE_INDEX_M3A: u32 = 5;
 const MILESTONE_INDEX_UNKNOWN: u32 = 999;
+
+/// BP4 + BP5 forward-compat event-category reservation.
+///
+/// The recorder accepts arbitrary category strings (see
+/// `cf_replay::Recorder::record`); there is no central whitelist that rejects
+/// unknown categories. This const documents the categories that BP4 + BP5
+/// milestones will start emitting so:
+///
+/// 1. Tooling (replay viewer, run-bundle checker, summary aggregators) can
+///    bake forward-compat handling now instead of being rewritten when each
+///    milestone lands.
+/// 2. The per-milestone `notes_addendum_for_milestone` category list below
+///    has an authoritative reference for which categories are "reserved
+///    (no emitters yet)" vs "shipped at this milestone".
+/// 3. AI agents auditing the codebase can grep for the category name and
+///    find the owning milestone without scanning the roadmap.
+///
+/// Each entry is `(category, owning_milestone, note)`. No category in this
+/// list should be emitted by any code path until its owning milestone ships
+/// the producing system. `chassis` is already emitted by M5 chassis-stage
+/// hooks (see `emit_chassis_events`) — it's listed here for completeness so
+/// the BP4/BP5 reservation table is canonical.
+#[allow(dead_code)]
+const RESERVED_EVENT_CATEGORIES: &[(&str, &str, &str)] = &[
+    ("collision", "M5.5", "full-collision + body-pixel impact events"),
+    ("reaction", "M5.6", "material reaction-table priority resolution"),
+    ("affliction", "M5.7 + M5.8", "wound/affliction status grammar"),
+    ("atmospherics", "M5.9", "hull/gap/pump/vent/oxygen/pressure/fire"),
+    ("environment", "M5.10", "DR-040 EnvironmentSignal aggregator"),
+    ("gravity", "M5.5 / M5.9 — DR-038", "per-actor + global gravity field"),
+    ("ballistics", "M5.5 / M5.9 — DR-038", "projectile aerodynamics + drag"),
+    ("mind", "M6.5", "AI mind/intent telemetry"),
+    (
+        "body_force_feedback",
+        "M5",
+        "cf-actor body_force_feedback hit-hook stub event type",
+    ),
+    (
+        "chassis",
+        "M5 (already shipped)",
+        "chassis-stage transitions emitted via emit_chassis_events",
+    ),
+];
 
 fn milestone_order_index(milestone: &str) -> u32 {
     match milestone.trim().to_lowercase().as_str() {
@@ -3296,7 +3707,26 @@ impl EngineHandle for M0Engine {
                         None
                     };
                     let silhouette = a.body_silhouette();
-                    let module_strip = build_module_strip_view(rifle, a.inventory.selected_item().is_rifle());
+                    // **M5**: when a chassis is attached, the module strip comes
+                    // straight from the chassis (placeholder=false). Without a
+                    // chassis we fall back to the M4A weapon-mount derivation.
+                    let module_strip = match a.chassis_module_strip() {
+                        Some(strip) => crate::state::ModuleStripView {
+                            modules: strip
+                                .modules
+                                .iter()
+                                .map(|m| crate::state::ModuleStateView {
+                                    id: m.id.clone(),
+                                    label: m.label.clone(),
+                                    state: m.state.clone(),
+                                    kind: m.kind.clone(),
+                                })
+                                .collect(),
+                            placeholder: strip.placeholder,
+                        },
+                        None => build_module_strip_view(rifle, a.inventory.selected_item().is_rifle()),
+                    };
+                    let chassis_view = a.chassis_view().as_ref().map(crate::state::ChassisView::from);
                     ActorView {
                         id: a.id.0,
                         team: a.team.clone(),
@@ -3326,6 +3756,11 @@ impl EngineHandle for M0Engine {
                             placeholder: silhouette.placeholder,
                         },
                         module_strip,
+                        chassis: chassis_view,
+                        origin_id: a.origin_id.clone(),
+                        crouch_active: a.crouch_active,
+                        climb_active: a.climb_active,
+                        jet_active: a.jet_active,
                     }
                 })
                 .collect()
@@ -4049,6 +4484,412 @@ impl EngineHandle for M0Engine {
                     }),
                     None,
                 );
+                CommandResult::accepted(tick.0)
+            }
+            ControlCommand::ActPlayerCrouch { active, source } => {
+                if !self.config.has_actor_world {
+                    return self.reject_actor_command(tick, sim_time_ms, state, "act.player.crouch");
+                }
+                let player_id = state.player_actor.expect("player actor present");
+                let _ = source;
+                if let Some(sim) = state.actor_state.as_mut() {
+                    if let Some(actor) = sim.world.actors.get_mut(&player_id) {
+                        actor.crouch_active = active;
+                    }
+                }
+                drop(state);
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "control",
+                    "command_accepted",
+                    json!({"method": "act.player.crouch", "actor": player_id.0, "active": active}),
+                    None,
+                );
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "actor",
+                    "animation_event",
+                    json!({
+                        "actor": player_id.0,
+                        "kind": if active { "crouch_started" } else { "crouch_ended" },
+                    }),
+                    None,
+                );
+                CommandResult::accepted(tick.0)
+            }
+            ControlCommand::ActPlayerClimb { active, source } => {
+                if !self.config.has_actor_world {
+                    return self.reject_actor_command(tick, sim_time_ms, state, "act.player.climb");
+                }
+                let player_id = state.player_actor.expect("player actor present");
+                let _ = source;
+                if let Some(sim) = state.actor_state.as_mut() {
+                    if let Some(actor) = sim.world.actors.get_mut(&player_id) {
+                        actor.climb_active = active;
+                    }
+                }
+                drop(state);
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "control",
+                    "command_accepted",
+                    json!({"method": "act.player.climb", "actor": player_id.0, "active": active}),
+                    None,
+                );
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "actor",
+                    "animation_event",
+                    json!({
+                        "actor": player_id.0,
+                        "kind": if active { "climb_started" } else { "climb_ended" },
+                    }),
+                    None,
+                );
+                CommandResult::accepted(tick.0)
+            }
+            ControlCommand::ActPlayerJet { active, source } => {
+                if !self.config.has_actor_world {
+                    return self.reject_actor_command(tick, sim_time_ms, state, "act.player.jet");
+                }
+                let player_id = state.player_actor.expect("player actor present");
+                let _ = source;
+                let mut jet_ok = false;
+                let mut reject_reason: Option<String> = None;
+                if let Some(sim) = state.actor_state.as_mut() {
+                    if let Some(actor) = sim.world.actors.get_mut(&player_id) {
+                        if active {
+                            let module_ok = actor
+                                .chassis
+                                .as_ref()
+                                .and_then(|c| c.module_by_kind(cf_chassis::ModuleKind::Jet))
+                                .map(|m| {
+                                    matches!(
+                                        m.state,
+                                        cf_chassis::ModuleStateKind::Nominal | cf_chassis::ModuleStateKind::Degraded
+                                    )
+                                })
+                                .unwrap_or(true); // no chassis = treat as no jet, but allow toggle
+                            if module_ok {
+                                actor.jet_active = true;
+                                jet_ok = true;
+                            } else {
+                                reject_reason = Some("jet_module_unavailable".to_string());
+                            }
+                        } else {
+                            actor.jet_active = false;
+                            jet_ok = true;
+                        }
+                    }
+                }
+                drop(state);
+                if let Some(reason) = reject_reason {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_rejected",
+                        json!({"method": "act.player.jet", "reason": reason.clone(), "actor": player_id.0}),
+                        None,
+                    );
+                    return CommandResult::rejected(reason, tick.0);
+                }
+                let _ = jet_ok;
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "control",
+                    "command_accepted",
+                    json!({"method": "act.player.jet", "actor": player_id.0, "active": active}),
+                    None,
+                );
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "actor",
+                    "animation_event",
+                    json!({
+                        "actor": player_id.0,
+                        "kind": if active { "jet_thrust_started" } else { "jet_thrust_ended" },
+                    }),
+                    None,
+                );
+                CommandResult::accepted(tick.0)
+            }
+            ControlCommand::ActPlayerEject { source } => {
+                if !self.config.has_actor_world {
+                    return self.reject_actor_command(tick, sim_time_ms, state, "act.player.eject");
+                }
+                let player_id = state.player_actor.expect("player actor present");
+                let _ = source;
+                let mut emit: Option<(String, String, u32, bool)> = None;
+                let mut reject_reason: Option<String> = None;
+                if let Some(sim) = state.actor_state.as_mut() {
+                    if let Some(actor) = sim.world.actors.get_mut(&player_id) {
+                        if let Some(chassis) = actor.chassis.as_mut() {
+                            if let Some(accepted) = chassis.attempt_eject(tick.0) {
+                                emit = Some((
+                                    chassis.spec_id.clone(),
+                                    chassis.pilot_state.as_str().to_string(),
+                                    accepted.ticks_total,
+                                    accepted.tutorial_extract,
+                                ));
+                            } else {
+                                reject_reason = Some("pilot_not_in_chassis".to_string());
+                            }
+                        } else {
+                            reject_reason = Some("no_chassis_attached".to_string());
+                        }
+                    }
+                }
+                drop(state);
+                if let Some(reason) = reject_reason {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_rejected",
+                        json!({"method": "act.player.eject", "reason": reason.clone(), "actor": player_id.0}),
+                        None,
+                    );
+                    return CommandResult::rejected(reason, tick.0);
+                }
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "control",
+                    "command_accepted",
+                    json!({"method": "act.player.eject", "actor": player_id.0}),
+                    None,
+                );
+                if let Some((spec_id, pilot_state, ticks_total, tutorial_extract)) = emit {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "chassis",
+                        "pilot_ejected",
+                        json!({
+                            "actor": player_id.0,
+                            "spec_id": spec_id,
+                            "pilot_state": pilot_state,
+                            "eject_ticks_total": ticks_total,
+                            "tutorial_extract": tutorial_extract,
+                        }),
+                        None,
+                    );
+                    if tutorial_extract {
+                        // Tutorial extract jumps straight to extracted.
+                        self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "chassis",
+                            "pilot_extracted",
+                            json!({"actor": player_id.0, "via": "tutorial_safety"}),
+                            None,
+                        );
+                    }
+                }
+                CommandResult::accepted(tick.0)
+            }
+            ControlCommand::ActChassisRepair {
+                zone,
+                module_id,
+                reason,
+                source,
+            } => {
+                if !self.config.has_actor_world {
+                    return self.reject_actor_command(tick, sim_time_ms, state, "act.chassis.repair");
+                }
+                let player_id = state.player_actor.expect("player actor present");
+                let _ = source;
+                let mut zone_result: Option<cf_chassis::RepairOutcome> = None;
+                let mut module_result: Option<cf_chassis::ModuleTransition> = None;
+                let mut reject_reason: Option<String> = None;
+                // **M5**: `act.chassis.repair` is idempotent — a repair on an already-Nominal
+                // module/zone returns None (no transition) but the COMMAND succeeds. Only an
+                // unknown zone string or an unknown module id rejects; calling repair on a
+                // healthy chassis is a no-op accept.
+                if let Some(sim) = state.actor_state.as_mut() {
+                    if let Some(actor) = sim.world.actors.get_mut(&player_id) {
+                        if let Some(chassis) = actor.chassis.as_mut() {
+                            if let Some(zone_str) = &zone {
+                                if let Some(zone_kind) = parse_body_zone(zone_str) {
+                                    zone_result = chassis.repair_zone(zone_kind, &reason);
+                                } else {
+                                    reject_reason = Some(format!("chassis_repair_unknown_zone:{zone_str}"));
+                                }
+                            }
+                            if reject_reason.is_none() {
+                                if let Some(mid) = &module_id {
+                                    // Validate the module id exists on the chassis BEFORE repairing.
+                                    // If the module is already Nominal, repair_module returns None
+                                    // but the command should still accept (idempotent no-op).
+                                    if chassis.module(mid).is_none() {
+                                        reject_reason = Some(format!("chassis_repair_unknown_module:{mid}"));
+                                    } else {
+                                        module_result = chassis.repair_module(mid, &reason);
+                                    }
+                                }
+                            }
+                        } else {
+                            reject_reason = Some("no_chassis_attached".to_string());
+                        }
+                    }
+                }
+                drop(state);
+                if let Some(r) = reject_reason {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_rejected",
+                        json!({"method": "act.chassis.repair", "reason": r.clone(), "actor": player_id.0}),
+                        None,
+                    );
+                    return CommandResult::rejected(r, tick.0);
+                }
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "control",
+                    "command_accepted",
+                    json!({
+                        "method": "act.chassis.repair",
+                        "actor": player_id.0,
+                        "zone": zone,
+                        "module_id": module_id,
+                        "reason": reason,
+                    }),
+                    None,
+                );
+                if let Some(out) = zone_result {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "chassis",
+                        "repaired",
+                        json!({
+                            "actor": player_id.0,
+                            "zone": out.zone.as_str(),
+                            "was_destroyed": out.was_destroyed,
+                            "modules_restored": out.modules_restored,
+                            "prev_stage": out.prev_stage.as_str(),
+                            "new_stage": out.new_stage.as_str(),
+                            "reason": out.reason,
+                        }),
+                        None,
+                    );
+                }
+                if let Some(t) = module_result {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "chassis",
+                        "module_state_changed",
+                        json!({
+                            "actor": player_id.0,
+                            "module_id": t.id,
+                            "state": t.state.as_str(),
+                            "reason": t.reason,
+                        }),
+                        None,
+                    );
+                }
+                CommandResult::accepted(tick.0)
+            }
+            ControlCommand::ActChassisSalvage { reason, source } => {
+                if !self.config.has_actor_world {
+                    return self.reject_actor_command(tick, sim_time_ms, state, "act.chassis.salvage");
+                }
+                let player_id = state.player_actor.expect("player actor present");
+                let _ = source;
+                let mut salvage_out: Option<cf_chassis::SalvageOutcome> = None;
+                let mut reject_reason: Option<String> = None;
+                if let Some(sim) = state.actor_state.as_mut() {
+                    if let Some(actor) = sim.world.actors.get_mut(&player_id) {
+                        if let Some(chassis) = actor.chassis.as_mut() {
+                            salvage_out = chassis.salvage(&reason);
+                            if salvage_out.is_none() {
+                                reject_reason = Some("chassis_not_wreck_or_disabled".to_string());
+                            }
+                        } else {
+                            reject_reason = Some("no_chassis_attached".to_string());
+                        }
+                    }
+                }
+                drop(state);
+                if let Some(r) = reject_reason {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_rejected",
+                        json!({"method": "act.chassis.salvage", "reason": r.clone(), "actor": player_id.0}),
+                        None,
+                    );
+                    return CommandResult::rejected(r, tick.0);
+                }
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "control",
+                    "command_accepted",
+                    json!({"method": "act.chassis.salvage", "actor": player_id.0, "reason": reason}),
+                    None,
+                );
+                if let Some(out) = salvage_out {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "chassis",
+                        "salvaged",
+                        json!({
+                            "actor": player_id.0,
+                            "salvaged_module_ids": out.salvaged_module_ids,
+                            "reason": out.reason,
+                        }),
+                        None,
+                    );
+                }
+                CommandResult::accepted(tick.0)
+            }
+            ControlCommand::ActChassisClearJam { source } => {
+                if !self.config.has_actor_world {
+                    return self.reject_actor_command(tick, sim_time_ms, state, "act.chassis.clear_jam");
+                }
+                let player_id = state.player_actor.expect("player actor present");
+                let _ = source;
+                let mut cleared = false;
+                if let Some(sim) = state.actor_state.as_mut() {
+                    if let Some(actor) = sim.world.actors.get_mut(&player_id) {
+                        if let Some(chassis) = actor.chassis.as_mut() {
+                            cleared = chassis.clear_jam();
+                        }
+                    }
+                }
+                drop(state);
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "control",
+                    "command_accepted",
+                    json!({"method": "act.chassis.clear_jam", "actor": player_id.0, "cleared": cleared}),
+                    None,
+                );
+                if cleared {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "chassis",
+                        "weapon_cleared",
+                        json!({"actor": player_id.0, "via": "manual"}),
+                        None,
+                    );
+                }
                 CommandResult::accepted(tick.0)
             }
             ControlCommand::SettingsSet { changes } => {

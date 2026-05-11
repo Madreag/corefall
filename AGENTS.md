@@ -137,150 +137,21 @@ When files conflict:
 - Checklist/log/changelog/run-bundle claims must be corrected to match the roadmap/backlog, not the other way around.
 - If the roadmap and backlog disagree on a material requirement, stop and ask the user before implementing or marking completion.
 
-### Build Point Closure Gate
+### Build Point Closure Gate, Milestone Acceptance, Contract Integrity, Universal Enhancement, Status-Surface
 
-A Build Point is complete only when:
+These contracts are defined ONCE in the canonical sources. AGENTS.md does NOT restate them; agents must read them at the source before closing anything:
 
-- Every milestone inside the BP PASSES the Milestone Acceptance Gate (ID-by-ID matrix below).
-- Every milestone inside the BP PASSES the Contract Integrity Gate (matrix below) with positive AND negative/adversarial proof.
-- Run-bundle evidence exists for every fun-proof slice inside the BP at multiple tick rates (60 Hz default + 120 Hz validation, more if the BP touches network/server/replay cadence).
-- **T-CAPTURE evidence is mandatory from BP2 onward**: every fun-proof scenario must emit a `summary_grid.png` + `capture_manifest.json` (recorded in `summary.json.artifacts.items[]`), and the cf-e2e script must include `--expect capture.summary_grid.non_blank_ratio>=0.95` to catch black-frame regressions. See `docs/plan/spec/prototype-roadmap.md` §T-CAPTURE for the full contract.
-- **T-RELEASE tag mandatory from BP1 onward**: every BP closure produces a tagged GitHub Release using the SemVer prerelease channel scheme:
-  - `v0.<N>.0-prealpha` for BP0..BP3 (engine + first fun slices; major systems still missing)
-  - `v0.<N>.0-alpha` for BP4..BP6 (full collision + atmospherics + AI combat)
-  - `v0.<N>.0-beta` for BP7..BP9 (mission director + creator alpha + server/LAN)
-  - `v0.<N>.0-rc` for BP10..BP11 (online + public systems beta)
-  - `v1.0.0` for BP12 (launch GA — pre-release flag dropped)
-  The release ships cross-platform binaries plus the BP's exemplar run bundle + `summary_grid.png` + auto-generated release notes. Quality is communicated via the SemVer channel suffix in the tag name itself (`-prealpha`, `-alpha`, `-beta`, `-rc`, or no suffix for `v1.0.0` GA); the GitHub `prerelease` flag is intentionally NOT set. The `generate_release_notes.py` parser enforces the channel-boundary contract. The legacy `v0.<N>.0-bp<N>` form is still accepted for backward compat. See `docs/plan/spec/prototype-roadmap.md` §T-RELEASE for the full contract.
+| Contract | Canonical source |
+|---|---|
+| BP closure gate (constituent milestones + T-CAPTURE + T-RELEASE + Double-Click Playability + BP Goal Coverage Report + AI-Agent Self-Test + LLM-Graded Verdict + Per-BP Test Suite + Main-Feature Contract Gate + Closure Summary Honesty Gate) | `docs/plan/spec/prototype-roadmap.md` §Build Point Closure Gate, §T-CAPTURE, §T-RELEASE |
+| Status-Surface Update Contract (README BP table + checklist + roadmap + CHANGELOG sync) | `docs/plan/spec/prototype-roadmap.md` §Status-Surface Update Contract; regression script `game/tools/check_status_surfaces.sh` |
+| Milestone Acceptance Gate (ID-by-ID matrix per done-criterion + no laundered deferrals) | `docs/plan/spec/prototype-roadmap.md` §Milestone Acceptance Gate |
+| Contract Integrity Gate (shared production paths + no fake success + positive AND adversarial proof + Contract Integrity Matrix) | `docs/plan/spec/prototype-roadmap.md` §Contract Integrity Gate |
+| Universal Enhancement Done-Criteria (DR-056; 14 rows every M1+ milestone inherits) | `docs/plan/spec/milestone-enhancement-pass-m1-plus.md` + DR-056 |
+| BP test suite + close loop | `game/content/build_points/bp<N>.test_manifest.json` + `game/tools/bp_test_coverage.py` + `game/tools/bp_close_loop.sh` + `game/tools/llm_grade_run.py validate` |
+| Review skill (gates + matrices invocation) | `.claude/skills/corefall-review/SKILL.md` (mirrored in `.agents/skills/...`) |
 
-  **DOUBLE-CLICK PLAYABILITY CONTRACT (HARD GATE — non-negotiable from BP1 onward):** Every release artifact MUST be a non-technical-friend-handoff format. A non-technical friend receiving the file MUST be able to: (1) double-click the file → standard OS extract/install affordance fires (no Terminal, no `brew install`, no command-line decompression), (2) double-click the resulting app/executable → a corefall **game window opens on screen**. No `--scenario` flags, no Terminal, no PowerShell, no install-zstd-first, no "right-click → Open" workaround for unsigned binaries (use ad-hoc signing + clear stapled instructions if needed). If the friend has to type ANY command, the release fails this gate.
-
-  **Per-platform format requirements:**
-  - **macOS**: ship a `.dmg` containing a proper `Corefall.app` bundle (`Info.plist`, `CFBundleExecutable`, embedded `cf-app` binary, icon, `LSEnvironment` for runtime args). Double-click the `.dmg` → Finder mounts it. Drag `Corefall.app` to Applications (or run in place). Double-click `Corefall.app` → game window. The `.app` MUST handle Bevy/wgpu's window creation as the default behavior when launched with no args (no `--scenario` arg required; default to the BP's anchor scenario or a launcher menu).
-  - **Windows**: ship either an `.msi` installer OR a `.zip` containing `Corefall.exe` (a launcher .exe that wraps `cf-app.exe` with default args set OR `cf-app.exe` itself if it already opens a window with no args). Double-click `Corefall.exe` → game window. SmartScreen "right-click → Run anyway" is acceptable through BP9; BP10+ requires Authenticode-signed binaries (Class A escalation for the cert).
-  - **Linux**: ship an `AppImage` (universal, double-click executable, no install required) OR a `.tar.gz` with a `Corefall.desktop` file + a `start-corefall.sh` launcher. Distro-specific `.deb` / `.rpm` are nice-to-haves, not requirements.
-
-  **NO RELEASE shall be tagged + published if it does not meet this contract.** If the implementing BP cannot deliver double-click playability for any of the 3 platforms, the BP closure SKIPS the T-RELEASE tag for that BP. Skipping is acceptable (skipping a BP release is better than publishing an opaque archive). The next BP that lands the missing engineering picks up the release backlog.
-
-  **The implementing agent OWNS the release engineering for their BP.** This is not a "later" task or an out-of-scope deferral. When a BP closes, the agent must:
-  1. Verify `cf-app` (or a launcher wrapper) opens a game window when launched with NO command-line args from a Finder/Explorer/Files double-click. If not, fix `cf-app` (add a default scenario, add a launcher menu, whatever is required).
-  2. Verify the `release.yml` workflow produces double-clickable artifacts in the formats above. If the workflow still ships `.tar.zst` or raw CLI archives, fix the workflow in the same PR as the BP closure.
-  3. Verify by downloading the published artifact to a clean state (or via a self-hosted runner with a friend-emulating profile) and running through the double-click flow themselves.
-  4. Document the friend-handoff verification in the BP closure note (`prototype_runs/native/<bp>_*/notes.md`) under a `## Friend-Handoff Verification` section: which platforms tested, what the user-facing experience was, screenshots of the double-click flow.
-  5. If a platform's double-click flow is broken or impossible at this BP's scope, document WHY in the closure note + omit that platform from the release matrix for this BP. Do not publish a partial release that pretends to support a platform whose artifact cannot be opened.
-
-  **Skipped BP releases are tracked + recovered.** When a BP skips its T-RELEASE due to the double-click gate, the next BP's implementing agent inherits the responsibility to land the missing engineering AND retroactively tag the skipped BP at the new commit (so the version history stays continuous). The BP closure gate does not pass until either (a) the BP has its own release OR (b) the immediate-prior skipped BPs have been retroactively released alongside this one.
-
-### Status-Surface Update Contract (HARD GATE — added 2026-05-09)
-
-BP closure status drifts in user-facing surfaces unless the closing PR updates them in lockstep. The README BP table showed `BP2 — 🟢 Active` for hours after BP2's PR #11 merged, because no contract enforced the README sync. This rule fixes that gap globally.
-
-**The closing PR for any BP MUST update every status surface in the same commit chain that lands the closure:**
-
-1. **`README.md`** — every reference to the closing BP and the next-active BP:
-   - `[![Status](...)]` badge URL: re-encode "BPN ✓ closed, BP{N+1} next".
-   - `[![Build Points](...)]` badge URL: re-encode "BPN closed / BP{N+1} active".
-   - "Current proof:" paragraph: rewrite to reflect the closing BP's evidence + prior BPs' status.
-   - "Next up:" paragraph: rewrite to point at the next BP and its scope.
-   - "Recent merges:" line: add the closing BP's PR number(s).
-   - Build Points table: closing BP cell `🟢 Active` → `✅ **Closed (current)**`; previous "current" cell `✅ **Closed (current)**` → `✅ Closed`; next BP cell `⏳ Planned` → `🟢 Active`.
-   - Per-milestone table: every milestone inside the closing BP gets `✅ **Closed** ([PR #N](url) merged)` with the merged PR cited.
-2. **`docs/plan/spec/feature-completion-checklist.md`**:
-   - The `BP<N>` row's leading checkbox flips `[ ]` → `[x]`.
-   - Every per-milestone row inside the BP gets `[x]` + evidence column populated with PR number + run-bundle path + matrix verdict.
-   - Any T-RELEASE rows referencing the closed BP (e.g., `T-RELEASE-D01` for BP1 retro) update from `Pending` → `Done` (or `Skipped — see double-click gate` if T-RELEASE failed the gate).
-3. **`docs/plan/spec/prototype-roadmap.md`**:
-   - The Build Points (Roadmap V2) table row for the closing BP: status pill flips to `<span class="cc-flag cc-green">CLOSED</span>` with a one-line evidence summary citing the PR + run-bundle path.
-   - The "Active Build Point" callout in the Starting Point / kickoff section moves to the next BP.
-4. **`CHANGELOG.md`**:
-   - New `### BPN Closure — <BP title>` section with the per-milestone matrix outcomes, PR numbers, evidence paths, and any deferrals (with explicit user-approved IDs).
-
-**Enforcement mechanism:**
-
-- The closing PR's review checklist MUST include each of the 4 surfaces above with a literal "updated in this PR" sub-bullet.
-- `/corefall-review <bp>` MUST verify the README BP table cell for the closing BP says `✅ Closed`, the next BP says `🟢 Active`, and the closing BP's badge URL has been re-encoded. If any are stale, verdict is `Reject`.
-- Bugbot + Devin both pattern-match on stale status badges + table cells against the merged commit; staleness is flagged as a verified blocker.
-- A new agent landing a BP MUST run `bash game/tools/check_status_surfaces.sh <bp>` (to be added at BP3) which greps every status surface above + flags any cell still marking the closing BP as `🟢 Active` or `⏳ Planned`. The script is the regression catch.
-
-**Why this rule exists:** BP closures historically updated AGENTS.md / prototype-roadmap.md / CHANGELOG.md prose but did NOT sync the README BP table cell, so the homepage showed the closing BP as `🟢 Active` for hours-to-days after the closing PR merged. No rule enforced the sync; it drifted by default. This contract makes that drift class machine-checkable.
-
-  **Existing prealpha releases (`v0.1.0-prealpha`, `v0.2.0-prealpha`) DELETED from GitHub on 2026-05-09 because they failed this gate retroactively.** They shipped `.tar.zst` archives requiring `brew install zstd` + Terminal extraction, and even after extraction the user had to run `./cf-app --scenario X` from Terminal. Any future BP that fixes the double-click flow re-publishes them.
-- `/corefall-review <bp>` verdict is `Accept` for the full BP scope, not just one milestone inside it.
-- **BP Goal Coverage Report** (mandatory): the closure includes a per-BP Goal Coverage Report mapping every goal stated in the canonical roadmap's BP table row + per-milestone done-criteria + fun-proof slice description to evidence (cfctl action → `summary_grid.png` frame the agent personally read → `events.jsonl` event row → `observe.once` field → unit/integration test). The report must include agent prose articulating look + feel + juice — NOT just "the captures look correct" or "the test passed". See `.claude/skills/corefall-review/SKILL.md` §BP Goal Coverage Gate.
-- **AI-Agent Self-Test Report** (mandatory; replaces mandatory human playtest): `prototype_runs/native/<bp>_*/notes.md` contains an `## AI-Agent Self-Test Report` section answering Q1..Q7 (BP claims, end-to-end delivery, visual presentation, simulation feel, missed affordances, regression check, honest disclosure of what a human playtester might catch that the AI missed) with concrete evidence + agent identity + timestamp. See `.claude/skills/corefall-review/SKILL.md` §AI-Agent Self-Test Report Gate.
-- **LLM-Graded Test Verdict** (mandatory from BP2 onward): every fun-proof scenario's run bundle contains a `grading.json` artifact produced by the AI agent reading the bundle's evidence (frames, events, observe, replay) and emitting prose-justified scores along multiple dimensions (look / feel / goal / agent). The grading must pass `python3 game/tools/llm_grade_run.py validate` (aggregate weighted score >= `minimum_aggregate_for_pass`, every per-dimension score >= `minimum_per_dimension_for_pass` OR classified as FUTURE_OWNED with an owning milestone, no placeholder cells, every dimension has prose >= 30 chars + an `evidence_read` audit trail). Pass/fail alone is not enough; binary `PASS` cells hide the difference between "the test exited 0" and "the simulation behavior is the right kind of fun". The grading.json is the durable evidence of the LLM-graded verdict, auditable by future reviewers / Bugbot / Devin / human playtest. See `.claude/skills/corefall-review/SKILL.md` §LLM-Graded Test Verdicts Gate.
-- **Per-BP Test Suite + AI-Agent Test-Improvement Loop** (mandatory from BP2 onward): every BP ships a `game/content/build_points/bp<N>.test_manifest.json` declaring scenarios + cfctl scripts + grading contracts + required events + required observe fields + required cargo test modules + sweep rows + perf gates + universal-enhancement (DR-056) row statuses + loop thresholds. `python3 game/tools/bp_test_coverage.py bp<N>` MUST report `verdict: CLEAN, total gaps: 0` before BP closure. `bash game/tools/bp_close_loop.sh bp<N>` MUST exit 0 with all phases (coverage, build/lint/test, sweep, grading scaffold, grading filled, grading validate) PASS. `SKIP_SWEEP` / `SKIP_GRADE` are local diagnostic shortcuts only; if either is set, the aggregate verdict is non-closing even if other phases pass. Dirty worktree evidence MUST match `run_manifest.json.build.worktree_fingerprint`; `commit_sha[:12]` alone is never enough for dirty evidence. The loop is self-correcting: when a phase FAILs the AI agent diagnoses (code gap vs test gap vs harness gap vs grading gap), fixes in-pass, and re-runs the loop until clean. See `.claude/skills/corefall-review/SKILL.md` §Per-BP Test Suite Customization + §AI-Agent Test-Improvement Loop.
-- **Closure Summary Honesty Gate**: an agent may not write "landed", "closed", "all findings fixed", or "BP complete" until it has pasted or cited the latest non-waived `bp_close_loop.sh` `verdict.json` path, the exact phase table, and the current-code bundle path(s) used for grading. If the agent only fixed the reviewer's latest sentence, changed docs without a production-path test, accepted a skipped phase, cloned grading prose, or used stale same-commit dirty evidence, the summary is false and the milestone remains open. Reviewers must reject confident prose that is not backed by the current source fingerprint + fresh/current bundle proof.
-- **Human-playtest survey** is **OPTIONAL confirmation**, not a Blocker. When the project owner playtests the BP they may add a `## Human Playtest Survey (optional confirmation)` section under the AI report; its absence does NOT block closure when the AI report is complete and Accept-verdicted. The AI agent IS the playtest mechanism (mechanical test harness + LLM-graded verdict).
-
-Do not call a BP closed from prose. Closure is the per-milestone Acceptance + Contract Integrity matrices PLUS the T-CAPTURE summary grid (recorded in `summary.json.artifacts.items[]`) PLUS the T-RELEASE tagged GitHub Release PLUS the BP Goal Coverage Report PLUS the AI-Agent Self-Test Report PLUS the BP-level review verdict.
-
-## Milestone Acceptance Gate
-
-A milestone is complete only when every roadmap done-criterion and every backlog task card for that milestone is PASS with evidence. Every handoff, review, or completion report must include an ID-by-ID acceptance matrix:
-
-```text
-M<id>-001: PASS/FAIL - evidence
-M<id>-002: PASS/FAIL - evidence
-...
-```
-
-Any `FAIL`, `PARTIAL`, `DEFERRED`, `READY_FOR_HUMAN`, or "lands later" item in roadmap/backlog scope means the milestone is not complete. The only exception is when the roadmap/backlog itself marks the item as human-gated or future scope.
-
-No verified review finding may be carried forward by default. Low, Medium, High, and Blocker findings must all be fixed before the milestone is called complete. The only exception is an explicit user-approved deferral for that exact finding; the deferral must record the issue ID, reason, owner, next milestone/checkpoint, and evidence path in the implementation log, `CHANGELOG.md`, checklist row, and roadmap/DR docs if scope or risk changed.
-
-Do not summarize a milestone as complete from prose. Completion is the acceptance matrix plus validation evidence.
-
-## Contract Integrity Gate
-
-Passing commands are not enough. Every milestone must prove that implementation behavior matches the roadmap/backlog contract through the same code paths users, tools, CI, and future milestones will rely on.
-
-Hard rules:
-
-- No parallel production paths. `cf-app`, `cfctl`, `cf-control`, `cf-replay`, scenario loading, metadata generation, schema validation, and run-bundle writing must share the same core contract code whenever they claim the same behavior. If a helper bypasses production behavior, name it `*_test_*`, keep it test-only where possible, and never call it from binaries.
-- No fake success. A command returning `accepted`, `ok`, or `PASS` must either perform the requested state change or reject the request with a specific error. Ignoring unsupported fields, silently defaulting malformed params, or accepting no-op command semantics is a milestone failure.
-- Required fields are required. If a spec says a field is mandatory, missing or malformed input must fail in both tests and live `cfctl`/JSON-RPC validation. Do not treat absence as compatible unless the spec explicitly allows it.
-- Evidence must be source-truthful. Run bundles, summaries, observations, and checklist rows must reflect the loaded scenario, active config, current binary/git state, and actual runtime path. Hardcoded metadata must not masquerade as loaded manifest/build data.
-- Checklist rows cannot launder deferrals. If a checked row's notes contain `deferred`, `follow-up`, `not implemented`, `reserved`, `fake`, `stub`, `placeholder`, or equivalent wording for required roadmap/backlog scope, the row is not complete unless the user explicitly approved that exact deferral.
-- Every reviewed bug needs a regression proof. For each verified finding, add a test or validation command that would have failed before the fix and now passes. If a test is impossible, document why and provide the strongest equivalent live validation.
-
-Every milestone closeout must include a **Contract Integrity Matrix**:
-
-```text
-Contract path: <cf-app/cfctl/server/replay/etc>
-Shared source of truth: <module/function/schema>
-Positive proof: <test/command/bundle>
-Negative/adversarial proof: <test/command/error>
-Checklist truth: <rows updated, no hidden deferrals>
-```
-
-If a contract path has no negative/adversarial proof, do not mark it complete.
-
-## Universal Enhancement Contract (DR-056)
-
-Every milestone from M1 onward inherits the **Universal Enhancement Done-Criteria** from `docs/plan/spec/milestone-enhancement-pass-m1-plus.md` on top of its own scope and done-criteria. The universal rows are non-optional — they are part of the milestone closeout contract and must PASS in addition to the milestone's documented Done-criteria:
-
-```text
-Universal Enhancement Done-Criteria (per DR-056):
-- [ ] Per-tier perf gate: Steam Deck 800p/60 + 1080p/60 + 4K/120 reference scenarios.
-- [ ] CI bench regression test (no >5% regression vs baseline) per DR-054.
-- [ ] Memory leak soak (24h+) clean per DR-051 + DR-054.
-- [ ] Network sync verified via cfctl test sync-drift per DR-052.
-- [ ] Replay determinism CI matrix passes (per platform + per architecture) per DR-002 + DR-052.
-- [ ] All player surfaces scriptable via cfctl per T-CONTROL.
-- [ ] AI agent-driven validation report logged per DR-026 + DR-056.
-- [ ] All audio cues generated via DR-053 pipeline + usage-ledger logged.
-- [ ] All gameplay events have juice rules per DR-055.
-- [ ] Accessibility ACC-A floor verified (UI 200% + high contrast + captions + reduced motion) per DR-012.
-- [ ] Localization keyed strings (Tier-A 11 languages) verified per DR-046.
-- [ ] Modding parity verified (mod-author can extend; mod-test-run AI agent validates) per DR-006 + DR-050.
-- [ ] Anti-FOMO + anti-pay-to-win audit passes per DR-031.
-- [ ] Captions for ALL audio (full-subtitle option) per DR-051.
-```
-
-Per-milestone specifics (e.g., M2 GPU compute path investigation + SIMD + cold-load benchmark, M2.5 adaptive difficulty toggle + AI difficulty preset visibility, M3A per-tick checksum + replay determinism CI matrix per platform + replay branching) live in `docs/plan/spec/milestone-enhancement-pass-m1-plus.md`. Read both the Universal Enhancement Done-Criteria section AND the milestone's own row in that document before claiming a milestone closed.
-
-A milestone is not closed if any Universal row FAILS unless the user explicitly approves deferring that exact row with issue ID, reason, owner, next checkpoint, and evidence path. Some Universal rows (e.g., 24h memory-leak soak; modder validation; full Tier-A localization for English-only prototype scope) may be staged at the BP boundary rather than the per-milestone boundary; document the staging plan in the implementation log + checklist row when this happens, and the BP closure gate enforces them collectively.
+Hard rule: do not summarize work as "closed" / "landed" / "complete" from prose. Closure is the acceptance + contract-integrity matrices PLUS the canonical-source gates above PLUS the BP-level review verdict.
 
 ## Minimum Bar And Enhancement Rule
 

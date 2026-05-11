@@ -133,6 +133,74 @@ pub struct ActPlayerDigParams {
     pub target: Option<String>,
 }
 
+/// **M5**: `act.player.crouch` — sticky crouch toggle.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerCrouchParams {
+    pub schema_version: u32,
+    pub active: bool,
+}
+
+/// **M5**: `act.player.climb` — sticky climb toggle (placeholder cue).
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerClimbParams {
+    pub schema_version: u32,
+    pub active: bool,
+}
+
+/// **M5**: `act.player.jet` — jet thrust toggle.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerJetParams {
+    pub schema_version: u32,
+    pub active: bool,
+}
+
+/// **M5**: `act.player.eject` — trigger pilot eject from a chassis.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerEjectParams {
+    pub schema_version: u32,
+}
+
+/// **M5**: `act.chassis.repair` — repair a chassis zone or specific module.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActChassisRepairParams {
+    pub schema_version: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub zone: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub module_id: Option<String>,
+    #[serde(default = "default_repair_reason")]
+    pub reason: String,
+}
+
+fn default_repair_reason() -> String {
+    "field_kit".to_string()
+}
+
+/// **M5**: `act.chassis.salvage` — salvage modules from a wrecked chassis.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActChassisSalvageParams {
+    pub schema_version: u32,
+    #[serde(default = "default_salvage_reason")]
+    pub reason: String,
+}
+
+fn default_salvage_reason() -> String {
+    "manual".to_string()
+}
+
+/// **M5**: `act.chassis.clear_jam` — manually clear a weapon jam.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActChassisClearJamParams {
+    pub schema_version: u32,
+}
+
 fn default_true() -> bool {
     true
 }
@@ -192,6 +260,13 @@ pub fn dump_v1() -> BTreeMap<String, String> {
         entry::<ActPlayerSelectItemParams>("act_player_select_item_params"),
         entry::<ActPlayerResetParams>("act_player_reset_params"),
         entry::<ActPlayerDigParams>("act_player_dig_params"),
+        entry::<ActPlayerCrouchParams>("act_player_crouch_params"),
+        entry::<ActPlayerClimbParams>("act_player_climb_params"),
+        entry::<ActPlayerJetParams>("act_player_jet_params"),
+        entry::<ActPlayerEjectParams>("act_player_eject_params"),
+        entry::<ActChassisRepairParams>("act_chassis_repair_params"),
+        entry::<ActChassisSalvageParams>("act_chassis_salvage_params"),
+        entry::<ActChassisClearJamParams>("act_chassis_clear_jam_params"),
         entry::<RunBundleWriteParams>("run_bundle_write_params"),
         entry::<SystemShutdownParams>("system_shutdown_params"),
         entry::<SettingsPatch>("settings_patch"),

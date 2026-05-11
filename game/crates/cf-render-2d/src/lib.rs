@@ -112,6 +112,13 @@ pub struct ActorRenderState {
     pub breaches: Vec<BreachRender>,
     /// M1.5 extraction zone if the scenario carries a `ReachZone` objective.
     pub extraction_zone: Option<ExtractionRender>,
+    /// **M5**: current sim tick. Drives the walk-cycle phase for chassis-
+    /// attached actors (legs alternate at ~8-tick cadence during Walking /
+    /// Running stances). Without this, the silhouette stands still even
+    /// while the position moves — which would re-introduce the
+    /// "static sliding pawn" M5-DC-3 failure mode the chassis pips exist
+    /// to close.
+    pub tick: u64,
 }
 
 /// M1.5 render-side projection of a breach strip.
@@ -159,6 +166,269 @@ pub struct BreachRenderTag {
     pub id: String,
 }
 
+/// **M5**: per-chassis-zone overlay pip. cf-render-2d spawns 15 of these per
+/// chassis-attached actor, one per body zone (Head / Torso / ArmLeft / ArmRight
+/// / ForearmLeft / ForearmRight / HandLeft / HandRight / LegLeft / LegRight /
+/// ShinLeft / ShinRight / FootLeft / FootRight / Backpack). Each pip's color
+/// reflects the zone's external_integrity + destroyed flag so a player watching
+/// a wreck_eject scenario can SEE the right forearm pip turn black when the
+/// chassis zone gets destroyed — the visible-limb proof for M5-DC-3 that
+/// closes the "static sliding pawn" gap from the audit. The pip's position
+/// follows the actor's transform + stance offset.
+#[derive(Component, Debug, Clone)]
+pub struct ChassisZoneRenderTag {
+    pub actor_id: u64,
+    pub zone: String,
+}
+
+/// **M5** per-chassis-module overlay pip. Spawns 1 per `ChassisView.modules`
+/// entry per chassis-attached actor (jet, shield, sensor, weapon_mount,
+/// repair_drone). Color reflects module state (Nominal → green, Degraded
+/// → yellow, Warning → orange, Failed → red, NotPresent → not rendered).
+/// Position follows the bound zone + kind-specific offset. Surfaces sim
+/// depth Cortex doesn't have: every chassis carries 5 damageable modules
+/// whose health drives gameplay (jet failure grounds the actor, sensor
+/// failure blanks the HUD radar, weapon-mount failure jams the rifle).
+#[derive(Component, Debug, Clone)]
+pub struct ChassisModuleRenderTag {
+    pub actor_id: u64,
+    pub module_id: String,
+}
+
+/// **M5** held rifle sprite. Spawns 1 per actor whose `actor.selected_item`
+/// resolves to a rifle. Position follows the right-hand zone (or torso for
+/// chassis-less actors) + aim vector; rotation matches aim direction so the
+/// rifle visibly points where the player aims. Without this, the actor has
+/// NO visible weapon despite firing (only projectiles + muzzle flash hint
+/// at the rifle's existence).
+#[derive(Component, Debug, Clone)]
+pub struct HeldRifleRenderTag {
+    pub actor_id: u64,
+}
+
+/// **M5** canonical body-zone layout in actor-local coordinates. Each entry is
+/// `(zone_name, dx, dy, width, height)` describing a small rect anchored at the
+/// actor's center. The layout assembles a 14-pip humanoid silhouette inside the
+/// actor's ~16×32 sprite bounds (PoweredArmor scale); LightMech scales 2.25× via
+/// the chassis kind multiplier in `chassis_scale_multiplier`. The Backpack pip
+/// sits behind the torso at slightly negative z so it renders underneath.
+const CHASSIS_ZONE_LAYOUT: &[(&str, f32, f32, f32, f32)] = &[
+    // (zone, dx, dy, width, height)
+    ("head", 0.0, 12.0, 6.0, 4.0),
+    ("torso", 0.0, 4.0, 8.0, 10.0),
+    ("arm_left", -6.0, 6.0, 3.0, 5.0),
+    ("arm_right", 6.0, 6.0, 3.0, 5.0),
+    ("forearm_left", -7.0, 1.0, 3.0, 4.0),
+    ("forearm_right", 7.0, 1.0, 3.0, 4.0),
+    ("hand_left", -7.0, -3.0, 3.0, 3.0),
+    ("hand_right", 7.0, -3.0, 3.0, 3.0),
+    ("leg_left", -2.0, -3.0, 3.0, 5.0),
+    ("leg_right", 2.0, -3.0, 3.0, 5.0),
+    ("shin_left", -2.0, -8.0, 3.0, 4.0),
+    ("shin_right", 2.0, -8.0, 3.0, 4.0),
+    ("foot_left", -2.0, -12.0, 4.0, 3.0),
+    ("foot_right", 2.0, -12.0, 4.0, 3.0),
+    ("backpack", 0.0, 5.0, 6.0, 8.0),
+];
+
+/// **M5** scale multiplier per chassis kind. Powered Armor = 1.0 (baseline,
+/// scaled by `ACTOR_SILHOUETTE_BASE_SCALE` so the silhouette is visible at
+/// battlefield zoom); LightMech = 2.25× (matches the sim's `attach_chassis`
+/// half_extents: LightMech 18×36 vs PoweredArmor 10×20). Infantry default
+/// = 0.9× (slightly smaller than PoweredArmor).
+fn chassis_scale_multiplier(kind: &str) -> f32 {
+    match kind {
+        "light_mech" => 2.25,
+        "powered_armor" => 1.0,
+        _ => 0.9,
+    }
+}
+
+/// **M5** base actor silhouette scale multiplier applied to every chassis
+/// pip (and to chassis-less actors via `infantry_default_silhouette`). The
+/// CHASSIS_ZONE_LAYOUT geometry is authored at ~16×28 px bounds (PoweredArmor
+/// baseline); scaling by 2.0 produces a ~32×56 px on-screen silhouette that
+/// reads clearly at 1280×720 capture resolution. Without this multiplier the
+/// limbs are sub-pixel-thin and visual review tools (humans + AI agents
+/// reading capture frames) can't verify destroyed-limb / stance / module
+/// state at-a-glance — defeating the M5-DC-3 / M5-DC-4 visual closure goal.
+pub const ACTOR_SILHOUETTE_BASE_SCALE: f32 = 2.0;
+
+/// **M5** stance offset applied to the entire chassis silhouette. Moves the
+/// 15 pips together so the player can SEE crouch/climb/jet/eject states.
+fn stance_offset(stance: &str) -> (f32, f32, f32) {
+    match stance {
+        "crouching" => (0.0, -4.0, 0.65),
+        "climbing" => (3.0, 2.0, 1.0),
+        "jetting" => (0.0, 6.0, 1.0),
+        "ejecting" => (0.0, 8.0, 0.9),
+        "downed" => (0.0, -8.0, 1.0),
+        "dead" => (0.0, -10.0, 1.0),
+        _ => (0.0, 0.0, 1.0),
+    }
+}
+
+/// **M5** stage tint applied to every zone pip. Stage transitions become
+/// instantly visible: Nominal=untinted; Degraded=slight yellow; Disabled=orange;
+/// Wreck=red; Gibbed=very-dark-red.
+fn chassis_stage_tint(stage: &str) -> Color {
+    match stage {
+        "nominal" => Color::srgb(1.0, 1.0, 1.0),
+        "degraded" | "module_warning" | "module_failed" | "weapon_jammed" => Color::srgb(1.0, 0.95, 0.55),
+        "armor_cracked" | "disabled" | "pilot_injured" => Color::srgb(1.0, 0.65, 0.30),
+        "eject" => Color::srgb(0.95, 0.40, 0.20),
+        "bail_too_late" | "wreck" => Color::srgb(0.85, 0.20, 0.20),
+        "gibbed" => Color::srgb(0.50, 0.10, 0.10),
+        _ => Color::srgb(1.0, 1.0, 1.0),
+    }
+}
+
+/// **M5** per-zone anatomical tint. Pixel-sim battlefield per DR-019 wants the
+/// silhouette to read as a humanoid at-a-glance — head/helmet darker, chest
+/// armor plate brighter (Cortex's ChestPlateA overlay pattern), arms/legs at
+/// muted shade so they recede behind the torso, hands/feet at the brightest
+/// tip of the limb so silhouette reads as a clear armored figure, backpack
+/// distinct so jetpack is visible. Returns a per-zone (r_mul, g_mul, b_mul)
+/// triple applied on top of the team base color.
+fn zone_anatomical_tint(zone: &str) -> (f32, f32, f32) {
+    match zone {
+        // Head + helmet: darker shade so the silhouette has a recognizable
+        // helmet contrast against the brighter torso.
+        "head" => (0.55, 0.55, 0.65),
+        // Torso = primary chest armor; brightest of the limbs.
+        "torso" => (1.05, 1.05, 1.10),
+        // Upper arms: thinner muted shade so they recede behind torso.
+        "arm_left" | "arm_right" => (0.80, 0.80, 0.85),
+        // Forearms: slightly brighter than upper arm so the elbow joint reads.
+        "forearm_left" | "forearm_right" => (0.85, 0.85, 0.90),
+        // Hands: bright tip; carries weapon visibility for the rifle-hand side.
+        "hand_left" | "hand_right" => (0.95, 0.90, 0.75),
+        // Thighs: same shade as upper arms.
+        "leg_left" | "leg_right" => (0.80, 0.80, 0.85),
+        // Shins: slightly brighter than thigh.
+        "shin_left" | "shin_right" => (0.85, 0.85, 0.90),
+        // Boots: dark contrast so footing is readable at battlefield zoom.
+        "foot_left" | "foot_right" => (0.45, 0.45, 0.50),
+        // Backpack/jetpack: distinct cool shade so the silhouette has a
+        // visible pack behind the torso when the actor faces the camera.
+        "backpack" => (0.40, 0.55, 0.75),
+        _ => (1.0, 1.0, 1.0),
+    }
+}
+
+/// **M5** per-zone color: encodes the 3-layer armor state (External →
+/// Internal → Core → wound) through color. Corefall surfaces simulation
+/// depth Cortex/Soldat/Noita don't have: every zone has 3 stacked armor
+/// layers + a wound container, and the silhouette must show which deepest
+/// layer is still intact at a glance.
+///
+/// Color progression as armor degrades:
+///   External fully intact (>=0.66 hp)   → bright team color + anatomical tint
+///   External breached, Internal intact  → mid-shade (60% brightness, cooler)
+///   Internal breached, Core intact      → dark + warning tint
+///   Core breached, wound bleeding       → red wound color
+///   Wound drained → zone destroyed      → transparent (visible limb-loss gap)
+///
+/// Stage tint multiplies on top so a Disabled chassis renders orange-tinted
+/// even if individual zones are healthy.
+fn zone_color(base: Color, zone: &ActorChassisZoneView, stage_tint: Color) -> Color {
+    if zone.destroyed {
+        // Destroyed zone: transparent void where the limb used to be.
+        // Matches M5-DC-4 ("limb damage has visible/mechanical consequences:
+        // limp, crawl, one-arm handling, dropped gear, disabled grip").
+        return Color::srgba(0.0, 0.0, 0.0, 0.0);
+    }
+    let (br, bg, bb, _) = base.to_srgba().to_f32_array().into();
+    let (tr, tg, tb, _) = stage_tint.to_srgba().to_f32_array().into();
+    let (ar, ag, ab) = zone_anatomical_tint(zone.zone.as_str());
+
+    // Find the deepest-intact layer; its hp% drives the visible brightness.
+    // Below 0.05 we treat the layer as breached and progress to the next.
+    let (layer_bright, layer_warm_shift) = if zone.external_integrity > 0.05 {
+        // External layer intact: full brightness, no warm shift.
+        (zone.external_integrity.clamp(0.0, 1.0).max(0.40), 0.0)
+    } else if zone.internal_integrity > 0.05 {
+        // External breached, Internal intact: ~60% brightness + slight warm.
+        (zone.internal_integrity.clamp(0.0, 1.0).max(0.30) * 0.65, 0.15)
+    } else if zone.core_integrity > 0.05 {
+        // Internal breached, Core intact: ~40% brightness + strong warm.
+        (zone.core_integrity.clamp(0.0, 1.0).max(0.25) * 0.45, 0.35)
+    } else {
+        // Core breached, wound bleeding: red wound color regardless of base.
+        let wound = zone.wound_integrity.clamp(0.0, 1.0);
+        return Color::srgb(0.85 * wound.max(0.30), 0.10, 0.10);
+    };
+
+    // Apply warm shift: bias red up, blue down as armor degrades.
+    let warm_r = 1.0 + layer_warm_shift;
+    let warm_b = 1.0 - layer_warm_shift * 0.8;
+    Color::srgb(
+        (br * tr * ar * layer_bright * warm_r).clamp(0.0, 1.0),
+        (bg * tg * ag * layer_bright).clamp(0.0, 1.0),
+        (bb * tb * ab * layer_bright * warm_b).clamp(0.0, 1.0),
+    )
+}
+
+/// **M5** module pip color by module state. Module pips render as small
+/// overlay sprites on the chassis at their bound zone, so a player watching
+/// a wreck_eject scenario can SEE the jet module turn red when the backpack
+/// zone takes damage. This is a Corefall-only feature — Cortex actors don't
+/// surface module state at all.
+fn module_pip_color(state: &str) -> Option<Color> {
+    match state {
+        "nominal" => Some(Color::srgb(0.30, 0.95, 0.40)),
+        "degraded" => Some(Color::srgb(0.95, 0.85, 0.30)),
+        "warning" => Some(Color::srgb(0.95, 0.60, 0.20)),
+        "failed" => Some(Color::srgb(0.85, 0.20, 0.20)),
+        _ => None, // NotPresent or unknown — don't render
+    }
+}
+
+/// **M5** module → bound-zone offset. Returns the (dx, dy) offset relative to
+/// the zone's center where the module pip should render. Multiple modules
+/// can be bound to the same zone (e.g., shield + sensor on torso); the
+/// caller cycles through positions.
+fn module_pip_offset(kind: &str) -> (f32, f32, f32) {
+    // (dx, dy, size). Position relative to the bound zone's center.
+    match kind {
+        "jet" => (0.0, 2.0, 3.0),           // jet pip slightly above backpack center
+        "shield" => (0.0, 0.0, 2.0),        // shield emitter in front of torso
+        "sensor" => (0.0, 2.0, 2.0),        // sensor antenna above head
+        "weapon_mount" => (2.0, 0.0, 2.5),  // weapon mount on hand side
+        "repair_drone" => (0.0, -2.0, 2.5), // repair drone below backpack
+        _ => (0.0, 0.0, 2.0),
+    }
+}
+
+/// **M5** walk-cycle phase for leg/shin/foot pips. Driven by tick number +
+/// horizontal velocity sign so the legs visibly alternate during locomotion.
+/// Returns (left_leg_dy, right_leg_dy) — opposite phase between legs.
+fn walk_cycle_offsets(tick: u64, stance: &str, velocity_x: f32) -> (f32, f32) {
+    // Only animate during locomotion stances; static stances hold pose.
+    let moving = matches!(stance, "walking" | "running") && velocity_x.abs() > 1.0;
+    if !moving {
+        return (0.0, 0.0);
+    }
+    // ~8-tick walk cycle (4 ticks per step at 60Hz = ~133ms cadence; ~6Hz
+    // step rate, matches infantry walk feel without looking jittery).
+    let phase = (tick % 8) as f32;
+    let amplitude = if stance == "running" { 2.5 } else { 1.5 };
+    let cycle = ((phase / 8.0) * std::f32::consts::TAU).sin();
+    (cycle * amplitude, -cycle * amplitude)
+}
+
+/// **M5** local proxy type so `zone_color` can take the chassis zone view
+/// without depending on cf-actor's exact struct. Matches the field set we
+/// read from `ActorObservation.chassis.zones[]`.
+pub(crate) struct ActorChassisZoneView {
+    pub zone: String,
+    pub external_integrity: f32,
+    pub internal_integrity: f32,
+    pub core_integrity: f32,
+    pub wound_integrity: f32,
+    pub destroyed: bool,
+}
+
 /// Plugin that wires actor / floor / reticle rendering. Call after [`CfRenderPlugin`].
 pub struct ActorSpritePlugin;
 
@@ -169,7 +439,15 @@ impl Plugin for ActorSpritePlugin {
             .add_systems(Startup, (build_solid_sprite_image, spawn_floor_and_reticle).chain())
             .add_systems(
                 Update,
-                (sync_actor_sprites, sync_breach_sprites, sync_extraction_zone).chain(),
+                (
+                    sync_actor_sprites,
+                    sync_chassis_zone_sprites,
+                    sync_chassis_module_sprites,
+                    sync_held_rifle_sprites,
+                    sync_breach_sprites,
+                    sync_extraction_zone,
+                )
+                    .chain(),
             );
     }
 }
@@ -247,15 +525,21 @@ fn sync_actor_sprites(
     for actor in &state.actors {
         keep.insert(actor.id, ());
         let pos = Vec2::new(actor.position[0], actor.position[1]);
-        let color = actor_color(actor);
+        // **M5**: every actor renders via the 15 per-zone pips (see
+        // `sync_chassis_zone_sprites`). Chassis-attached actors use real
+        // per-zone hp; chassis-less actors use a synthetic intact body
+        // derived from HP. Either way, the parent rectangle is transparent
+        // so the pips ARE the visible silhouette — no flat colored box
+        // hiding behind them, no static sliding pawn.
+        let parent_color = Color::srgba(0.0, 0.0, 0.0, 0.0);
         if let Some(entity) = existing.get(&actor.id) {
             if let Ok((_, _, mut transform, mut sprite)) = actor_query.get_mut(*entity) {
                 transform.translation = Vec3::new(pos.x, pos.y, 0.5);
-                sprite.color = color;
+                sprite.color = parent_color;
             }
         } else {
             let mut entity_commands = commands.spawn((
-                solid_sprite(&solid, color, Vec2::new(16.0, 32.0)),
+                solid_sprite(&solid, parent_color, Vec2::new(16.0, 32.0)),
                 Transform::from_translation(Vec3::new(pos.x, pos.y, 0.5)),
                 ActorRenderTag { id: actor.id },
                 Name::new(format!("cf::render::actor::{}", actor.id)),
@@ -296,6 +580,357 @@ fn sync_actor_sprites(
 
     // Mark the resource clean for the next bridge write.
     state.set_changed();
+}
+
+/// **M5**: spawn / update / despawn the 15 chassis-zone pips per chassis-attached
+/// actor. Each pip is a small colored rect anchored at the zone's anatomical
+/// offset (Head at top, Hand-Right on the right side, Foot-Left at the bottom-
+/// left, etc.) inside the actor's silhouette. The pip color reflects the zone's
+/// external_integrity + destroyed flag + chassis stage tint, so a player
+/// watching the wreck_eject scenario can SEE the right forearm pip turn black
+/// when that zone is destroyed, and the whole silhouette turn red when the
+/// chassis transitions to Wreck stage. This closes the M5-DC-3 gap from the
+/// audit ("static sliding pawn" / "visible actor is still a M1 rectangle").
+#[allow(clippy::too_many_arguments)]
+fn sync_chassis_zone_sprites(
+    mut commands: Commands,
+    state: Res<ActorRenderState>,
+    solid: Res<SolidSpriteImage>,
+    mut zone_query: Query<(
+        Entity,
+        &ChassisZoneRenderTag,
+        &mut Transform,
+        &mut Sprite,
+        &mut Visibility,
+    )>,
+) {
+    use std::collections::{HashMap, HashSet};
+
+    // Map every existing zone-pip entity by (actor_id, zone) so we can update,
+    // hide, or despawn per-frame.
+    let mut existing: HashMap<(u64, String), Entity> = HashMap::new();
+    for (entity, tag, _, _, _) in zone_query.iter() {
+        existing.insert((tag.actor_id, tag.zone.clone()), entity);
+    }
+
+    let mut keep: HashSet<(u64, String)> = HashSet::new();
+
+    for actor in &state.actors {
+        // **M5**: every actor renders as a humanoid silhouette via the
+        // CHASSIS_ZONE_LAYOUT — chassis-attached actors use real per-zone
+        // hp from `chassis.zones[]`; chassis-less actors (M1 baseline,
+        // micro_breach, m2/m2.5/m4a scenarios) use a synthetic intact
+        // chassis-view derived from the actor's HP so the visible body
+        // STILL renders as a body, not a flat colored rectangle. This
+        // closes the M5-DC-3 "static sliding pawn" gap for ALL scenarios,
+        // not just M5.
+        let (chassis_kind, chassis_stage) = if let Some(c) = actor.chassis.as_ref() {
+            (c.kind.as_str(), c.stage.as_str())
+        } else {
+            ("infantry", "nominal")
+        };
+        let base_color = actor_color(actor);
+        let stage_tint = chassis_stage_tint(chassis_stage);
+        // Apply BOTH the chassis kind multiplier AND the global base scale
+        // (`ACTOR_SILHOUETTE_BASE_SCALE`) so the on-screen silhouette is
+        // visible at battlefield zoom.
+        let scale = chassis_scale_multiplier(chassis_kind) * ACTOR_SILHOUETTE_BASE_SCALE;
+        let (off_x, off_y, height_scale) = stance_offset(&actor.stance);
+        let actor_pos = Vec2::new(actor.position[0], actor.position[1]);
+
+        // Build a zone-data lookup so the 15-pip layout can pull
+        // per-zone external/internal/core/wound integrity + destroyed flag.
+        // For chassis-attached actors, populate from `chassis.zones[]`. For
+        // chassis-less actors (M1 baseline, micro_breach, etc.), synthesize
+        // from actor HP so the silhouette dims as the actor takes damage —
+        // a fallback that keeps M1+ scenarios humanoid-looking without
+        // requiring a real chassis grammar at those scenes.
+        let mut zone_lookup: HashMap<&str, ActorChassisZoneView> = HashMap::new();
+        if let Some(c) = actor.chassis.as_ref() {
+            for z in &c.zones {
+                zone_lookup.insert(
+                    z.zone.as_str(),
+                    ActorChassisZoneView {
+                        zone: z.zone.clone(),
+                        external_integrity: z.external_integrity,
+                        internal_integrity: z.internal_integrity,
+                        core_integrity: z.core_integrity,
+                        wound_integrity: z.wound_integrity,
+                        destroyed: z.destroyed,
+                    },
+                );
+            }
+        } else {
+            // M1 baseline fallback: derive a synthetic intact body from
+            // actor HP. The whole body dims uniformly as HP drops — no
+            // per-zone damage, just enough to make the silhouette visible
+            // and react to overall actor health.
+            let hp_pct = if actor.hp_max > 0.0 {
+                (actor.hp / actor.hp_max).clamp(0.0, 1.0)
+            } else {
+                1.0
+            };
+            for (zone_name, _, _, _, _) in CHASSIS_ZONE_LAYOUT {
+                zone_lookup.insert(
+                    zone_name,
+                    ActorChassisZoneView {
+                        zone: (*zone_name).to_string(),
+                        external_integrity: hp_pct,
+                        internal_integrity: hp_pct,
+                        core_integrity: hp_pct,
+                        wound_integrity: hp_pct,
+                        destroyed: false,
+                    },
+                );
+            }
+        }
+
+        // Walk-cycle leg offsets when stance is locomotive (Walking/Running).
+        // Velocity sign is mirrored so legs cycle correctly when running L/R.
+        let velocity_x = actor.velocity[0];
+        let (left_leg_dy, right_leg_dy) = walk_cycle_offsets(state.tick, &actor.stance, velocity_x);
+
+        for (zone_name, dx, dy, w, h) in CHASSIS_ZONE_LAYOUT {
+            let default_view = ActorChassisZoneView {
+                zone: (*zone_name).to_string(),
+                external_integrity: 1.0,
+                internal_integrity: 1.0,
+                core_integrity: 1.0,
+                wound_integrity: 1.0,
+                destroyed: false,
+            };
+            let view = zone_lookup.get(zone_name).unwrap_or(&default_view);
+            let color = zone_color(base_color, view, stage_tint);
+
+            // Per-zone walk-cycle Y offset: shins+feet on each side bounce in
+            // opposite phase so legs visibly alternate during locomotion.
+            let walk_dy = match *zone_name {
+                "leg_left" | "shin_left" | "foot_left" => left_leg_dy * 0.6,
+                "leg_right" | "shin_right" | "foot_right" => right_leg_dy * 0.6,
+                _ => 0.0,
+            };
+
+            // Apply stance offset + chassis kind scale + walk cycle.
+            let pip_x = actor_pos.x + (dx * scale) + off_x;
+            let pip_y = actor_pos.y + (dy * scale * height_scale) + off_y + walk_dy;
+            let pip_w = w * scale;
+            let pip_h = h * scale * height_scale;
+
+            // Backpack renders behind torso (z = 0.45 vs 0.55 for others).
+            let z = if *zone_name == "backpack" { 0.45 } else { 0.55 };
+
+            let key = (actor.id, zone_name.to_string());
+            keep.insert(key.clone());
+
+            if let Some(entity) = existing.get(&key) {
+                if let Ok((_, _, mut transform, mut sprite, mut visibility)) = zone_query.get_mut(*entity) {
+                    transform.translation = Vec3::new(pip_x, pip_y, z);
+                    sprite.color = color;
+                    sprite.custom_size = Some(Vec2::new(pip_w, pip_h));
+                    *visibility = Visibility::Inherited;
+                }
+            } else {
+                commands.spawn((
+                    solid_sprite(&solid, color, Vec2::new(pip_w, pip_h)),
+                    Transform::from_translation(Vec3::new(pip_x, pip_y, z)),
+                    ChassisZoneRenderTag {
+                        actor_id: actor.id,
+                        zone: zone_name.to_string(),
+                    },
+                    Name::new(format!("cf::render::chassis_zone::{}::{}", actor.id, zone_name)),
+                ));
+            }
+        }
+    }
+
+    // Despawn pips whose owning actor + zone is no longer present (actor left
+    // the world, chassis detached on eject, etc.).
+    for (entity, tag, _, _, _) in zone_query.iter() {
+        if !keep.contains(&(tag.actor_id, tag.zone.clone())) {
+            commands.entity(entity).despawn();
+        }
+    }
+}
+
+/// **M5**: spawn / update / despawn module overlay pips (jet / shield /
+/// sensor / weapon_mount / repair_drone) per chassis-attached actor. The pip
+/// color reflects the module state and position follows the bound zone. This
+/// surfaces simulation depth Cortex doesn't have — the silhouette visibly
+/// shows which modules are still healthy, which are degraded, which failed.
+#[allow(clippy::too_many_arguments)]
+fn sync_chassis_module_sprites(
+    mut commands: Commands,
+    state: Res<ActorRenderState>,
+    solid: Res<SolidSpriteImage>,
+    mut module_query: Query<(
+        Entity,
+        &ChassisModuleRenderTag,
+        &mut Transform,
+        &mut Sprite,
+        &mut Visibility,
+    )>,
+) {
+    use std::collections::{HashMap, HashSet};
+
+    let mut existing: HashMap<(u64, String), Entity> = HashMap::new();
+    for (entity, tag, _, _, _) in module_query.iter() {
+        existing.insert((tag.actor_id, tag.module_id.clone()), entity);
+    }
+    let mut keep: HashSet<(u64, String)> = HashSet::new();
+
+    for actor in &state.actors {
+        let Some(chassis) = actor.chassis.as_ref() else {
+            continue;
+        };
+        let actor_pos = Vec2::new(actor.position[0], actor.position[1]);
+        let scale = chassis_scale_multiplier(&chassis.kind) * ACTOR_SILHOUETTE_BASE_SCALE;
+        let (off_x, off_y, _height_scale) = stance_offset(&actor.stance);
+
+        // Build zone position lookup so each module renders at its bound
+        // zone's offset.
+        let zone_offset = |zone: &str| -> (f32, f32) {
+            for (zname, dx, dy, _, _) in CHASSIS_ZONE_LAYOUT {
+                if *zname == zone {
+                    return (*dx, *dy);
+                }
+            }
+            (0.0, 0.0)
+        };
+
+        for module in &chassis.modules {
+            let Some(color) = module_pip_color(&module.state) else {
+                continue;
+            };
+            let (zdx, zdy) = zone_offset(&module.bound_zone);
+            let (mdx, mdy, msize) = module_pip_offset(&module.kind);
+            let pip_x = actor_pos.x + (zdx + mdx) * scale + off_x;
+            let pip_y = actor_pos.y + (zdy + mdy) * scale + off_y;
+            let pip_size = msize * scale;
+            let z = 0.65; // Modules render in FRONT of zone pips.
+
+            let key = (actor.id, module.id.clone());
+            keep.insert(key.clone());
+
+            if let Some(entity) = existing.get(&key) {
+                if let Ok((_, _, mut transform, mut sprite, mut visibility)) = module_query.get_mut(*entity) {
+                    transform.translation = Vec3::new(pip_x, pip_y, z);
+                    sprite.color = color;
+                    sprite.custom_size = Some(Vec2::new(pip_size, pip_size));
+                    *visibility = Visibility::Inherited;
+                }
+            } else {
+                commands.spawn((
+                    solid_sprite(&solid, color, Vec2::new(pip_size, pip_size)),
+                    Transform::from_translation(Vec3::new(pip_x, pip_y, z)),
+                    ChassisModuleRenderTag {
+                        actor_id: actor.id,
+                        module_id: module.id.clone(),
+                    },
+                    Name::new(format!("cf::render::chassis_module::{}::{}", actor.id, module.id)),
+                ));
+            }
+        }
+    }
+
+    for (entity, tag, _, _, _) in module_query.iter() {
+        if !keep.contains(&(tag.actor_id, tag.module_id.clone())) {
+            commands.entity(entity).despawn();
+        }
+    }
+}
+
+/// **M5**: spawn / update / despawn the held rifle sprite per actor whose
+/// inventory carries a rifle. The rifle pip is a 12×3 rectangle anchored at
+/// the right-hand zone (or torso for chassis-less actors), rotated to point
+/// along the actor's aim vector. Without this, the actor has NO visible
+/// weapon despite firing — only the projectile + muzzle flash hint at it.
+fn sync_held_rifle_sprites(
+    mut commands: Commands,
+    state: Res<ActorRenderState>,
+    solid: Res<SolidSpriteImage>,
+    mut rifle_query: Query<(
+        Entity,
+        &HeldRifleRenderTag,
+        &mut Transform,
+        &mut Sprite,
+        &mut Visibility,
+    )>,
+) {
+    use std::collections::{HashMap, HashSet};
+
+    let mut existing: HashMap<u64, Entity> = HashMap::new();
+    for (entity, tag, _, _, _) in rifle_query.iter() {
+        existing.insert(tag.actor_id, entity);
+    }
+    let mut keep: HashSet<u64> = HashSet::new();
+
+    for actor in &state.actors {
+        // Only actors holding a rifle render a held weapon. `selected_item`
+        // is the label produced by `InventoryItem::label()` — "rifle" for the
+        // Rifle variant. Future melee/sidearm items follow the same pattern.
+        if actor.selected_item != "rifle" {
+            continue;
+        }
+        let actor_pos = Vec2::new(actor.position[0], actor.position[1]);
+        let aim = Vec2::new(actor.aim[0], actor.aim[1]);
+        let aim_unit = if aim.length_squared() > 1e-6 {
+            aim.normalize()
+        } else {
+            Vec2::new(1.0, 0.0)
+        };
+
+        // Anchor at right-hand zone for every actor (chassis-attached uses
+        // its kind multiplier; chassis-less uses Infantry default 0.9). Both
+        // multiply by ACTOR_SILHOUETTE_BASE_SCALE so the rifle pip stays
+        // proportional to the silhouette.
+        let chassis_kind = actor.chassis.as_ref().map(|c| c.kind.as_str()).unwrap_or("infantry");
+        let scale = chassis_scale_multiplier(chassis_kind) * ACTOR_SILHOUETTE_BASE_SCALE;
+        let anchor_dx = 7.0 * scale;
+        let anchor_dy = -3.0 * scale;
+        let (off_x, off_y, _height_scale) = stance_offset(&actor.stance);
+        // Rifle extends 8 px forward from the hand along aim direction.
+        let muzzle_extend = 8.0 * scale;
+        let rifle_center_x = actor_pos.x + anchor_dx + off_x + aim_unit.x * muzzle_extend * 0.5;
+        let rifle_center_y = actor_pos.y + anchor_dy + off_y + aim_unit.y * muzzle_extend * 0.5;
+
+        let rifle_color = if matches!(actor.team.as_str(), "blue") {
+            Color::srgb(0.18, 0.20, 0.24)
+        } else if matches!(actor.team.as_str(), "red") {
+            Color::srgb(0.24, 0.18, 0.18)
+        } else {
+            Color::srgb(0.20, 0.20, 0.20)
+        };
+        let rifle_w = (12.0 * scale).max(8.0);
+        let rifle_h = (2.5 * scale).max(2.0);
+        let angle = aim_unit.y.atan2(aim_unit.x);
+
+        keep.insert(actor.id);
+
+        if let Some(entity) = existing.get(&actor.id) {
+            if let Ok((_, _, mut transform, mut sprite, mut visibility)) = rifle_query.get_mut(*entity) {
+                transform.translation = Vec3::new(rifle_center_x, rifle_center_y, 0.70);
+                transform.rotation = Quat::from_rotation_z(angle);
+                sprite.color = rifle_color;
+                sprite.custom_size = Some(Vec2::new(rifle_w, rifle_h));
+                *visibility = Visibility::Inherited;
+            }
+        } else {
+            let mut transform = Transform::from_translation(Vec3::new(rifle_center_x, rifle_center_y, 0.70));
+            transform.rotation = Quat::from_rotation_z(angle);
+            commands.spawn((
+                solid_sprite(&solid, rifle_color, Vec2::new(rifle_w, rifle_h)),
+                transform,
+                HeldRifleRenderTag { actor_id: actor.id },
+                Name::new(format!("cf::render::held_rifle::{}", actor.id)),
+            ));
+        }
+    }
+
+    for (entity, tag, _, _, _) in rifle_query.iter() {
+        if !keep.contains(&tag.actor_id) {
+            commands.entity(entity).despawn();
+        }
+    }
 }
 
 /// M1.5: spawn / update / despawn breach strip sprites from the engine snapshot.

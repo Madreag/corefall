@@ -117,3 +117,8 @@ Desktop.ini
 # Linux
 .Trash-*
 .directory
+
+# Release packaging build intermediates. The committed icons + .icns are the
+# canonical artifacts — the iconset/ dir is a multi-size PNG set we hand to
+# `iconutil -c icns` and is regenerated on demand by `generate_icons.py`.
+game/tools/release/icon.iconset/

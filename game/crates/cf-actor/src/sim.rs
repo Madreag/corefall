@@ -169,6 +169,14 @@ pub struct ActorTickOutcome {
     pub selection_changed: Option<ItemSlot>,
     pub reset: bool,
     pub landed_impulse: f32,
+    /// **M5**: set to true on the tick a destroyed `Backpack`/`Jet`-bound zone
+    /// disables the jet stance. Engine emits `chassis.jet_failed_due_to_limb_loss`.
+    #[serde(default)]
+    pub jet_disabled_by_limb_loss: bool,
+    /// **M5**: set to true on the tick a destroyed grip-side zone forces gear
+    /// drop. Engine emits `actor.gear_dropped` and clears the rifle slot.
+    #[serde(default)]
+    pub gear_dropped_by_limb_loss: bool,
 }
 
 /// Hit applied to an actor by a projectile this tick.
@@ -181,6 +189,40 @@ pub struct HitOutcome {
     pub damage: f32,
     pub previous_status: Status,
     pub new_status: Status,
+    /// **M5**: body zone resolved from `hit_position` relative to the target's
+    /// AABB. Engine consumers route chassis-grade hits through
+    /// `cf_chassis::ChassisState::apply_zone_damage` using this zone label.
+    #[serde(default = "default_hit_zone")]
+    pub zone: String,
+    /// **M5**: chassis zone damage outcome when the target had a chassis attached.
+    /// `None` when the target has no chassis. The engine reads this to emit
+    /// `chassis.armor_layer_damaged` / `module_state_changed` events.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub chassis_outcome: Option<cf_chassis::ZoneDamageOutcome>,
+}
+
+fn default_hit_zone() -> String {
+    "torso".to_string()
+}
+
+/// **M5**: derive a body zone from a hit position relative to the target AABB.
+/// Used by both projectile and explicit damage paths so every chassis hit
+/// carries a zone label without engine-side guessing.
+///
+/// The 14-zone resolution maps the actor's AABB into five horizontal bands
+/// (head / upper torso+arms / mid forearms / lower hands+thighs / shins / feet)
+/// and three lateral lanes (left arm/leg, torso/center, right arm/leg) so the
+/// granular M5 body graph receives meaningful per-hit damage.
+///
+/// **DR-033 forward-hook**: thin `Vec2` adapter that delegates to
+/// `cf_physics::zone_from_hit` so M5.5's per-zone collision routing can reach
+/// the resolver from the physics crate without depending on `cf-actor`.
+pub fn zone_from_hit(target_position: Vec2, half_extents: Vec2, hit_position: Vec2) -> cf_chassis::BodyZone {
+    cf_physics::zone_from_hit(
+        (target_position.x, target_position.y),
+        (half_extents.x, half_extents.y),
+        (hit_position.x, hit_position.y),
+    )
 }
 
 /// Spawned projectile metadata for the recorder.
@@ -279,6 +321,8 @@ fn step_one_actor(
             selection_changed: None,
             reset: false,
             landed_impulse: 0.0,
+            jet_disabled_by_limb_loss: false,
+            gear_dropped_by_limb_loss: false,
         };
 
         if intent.reset {
@@ -316,12 +360,38 @@ fn step_one_actor(
             // Tuning is read once and shared across jump/horizontal-motion/kinematics so
             // any change to ActorTuning (e.g. M5 chassis grammar) propagates uniformly
             // instead of leaving stale hardcoded values in jump-impulse space.
+            //
+            // **M5**: when a chassis is attached, the BodyGraph's destroyed-zone
+            // movement-contribution multipliers scale max_speed + jump impulse,
+            // and the `disables_rifle_when_destroyed` flag gates fire/reload.
+            // The `forces_crawl_when_destroyed` and `disables_jet_when_destroyed`
+            // flags route through stance derivation + jet command rejection.
             let tuning = ActorTuning::default();
+            let (move_factor, jump_factor, _disable_rifle, force_crawl, drop_gear, disable_jet) =
+                if let Some(chassis) = actor.chassis.as_ref() {
+                    chassis.body_graph.movement_factor(&chassis.destroyed_zones())
+                } else {
+                    (1.0_f32, 1.0_f32, false, false, false, false)
+                };
+            if disable_jet && actor.jet_active {
+                actor.jet_active = false;
+                outcome.jet_disabled_by_limb_loss = true;
+            }
+            if drop_gear && !actor.gear_dropped_by_limb_loss {
+                actor.gear_dropped_by_limb_loss = true;
+                outcome.gear_dropped_by_limb_loss = true;
+            }
+            let effective_jump_impulse = tuning.jump_impulse * jump_factor;
+            let effective_max_speed = if force_crawl {
+                tuning.max_speed * 0.25
+            } else {
+                tuning.max_speed * move_factor
+            };
             if accepted_input && intent.jump {
                 let (new_vy, accepted) = apply_jump(JumpInputs {
                     velocity_y: actor.velocity.y,
                     on_ground: actor.on_ground,
-                    jump_impulse: tuning.jump_impulse,
+                    jump_impulse: effective_jump_impulse,
                 });
                 actor.velocity.y = new_vy;
                 if accepted {
@@ -336,7 +406,7 @@ fn step_one_actor(
                 position_x: actor.position.x,
                 velocity_x: actor.velocity.x,
                 move_x: move_x_input,
-                max_speed: tuning.max_speed,
+                max_speed: effective_max_speed,
                 ground_acceleration: tuning.ground_acceleration,
                 air_acceleration: tuning.air_acceleration,
                 ground_friction: tuning.ground_friction,
@@ -404,18 +474,28 @@ fn step_one_actor(
     }
 
     // Tick the rifle (separate borrow from the actor world). Fire/reload intent only
-    // applies when the actor's currently selected inventory slot is the rifle; otherwise
+    // applies when the actor's currently selected inventory slot is the rifle AND the
+    // chassis grammar still permits weapon handling (right arm chain intact); otherwise
     // the rifle still ticks (so cooldowns advance) but ignores the pressed edges.
-    let rifle_selected = state
-        .world
-        .actors
-        .get(&actor_id)
-        .is_some_and(|a| a.inventory.selected_item().is_rifle());
+    //
+    // **M5**: a destroyed `HandRight` / `ForearmRight` / `ArmRight` zone with
+    // `disables_rifle_when_destroyed=true` in the BodyGraph movement contribution
+    // gates the fire path so a player with a blown-off rifle arm cannot keep shooting.
+    let (rifle_selected, rifle_disabled_by_limb_loss, weapon_jammed) = {
+        let actor = state.world.actors.get(&actor_id);
+        let selected = actor.is_some_and(|a| a.inventory.selected_item().is_rifle());
+        let (rifle_off, jammed) = actor.and_then(|a| a.chassis.as_ref()).map_or((false, false), |c| {
+            let (_, _, disable_rifle, _, _, _) = c.body_graph.movement_factor(&c.destroyed_zones());
+            (disable_rifle, c.weapon_jammed)
+        });
+        (selected, rifle_off, jammed)
+    };
+    let can_fire = rifle_selected && !rifle_disabled_by_limb_loss && !weapon_jammed;
     let rifle_outcomes = if let Some(rifle) = state.rifles.get_mut(&actor_id) {
         let inputs = RifleTickInputs {
-            fire_pressed: intent.fire && rifle_selected,
-            reload_pressed: intent.reload && rifle_selected,
-            auto_reload_when_empty: deps.auto_reload_when_empty && rifle_selected,
+            fire_pressed: intent.fire && can_fire,
+            reload_pressed: intent.reload && can_fire,
+            auto_reload_when_empty: deps.auto_reload_when_empty && can_fire,
         };
         tick_rifle(rifle, inputs)
     } else {
@@ -521,7 +601,17 @@ fn step_projectiles(state: &mut ActorSimState, deps: StepDeps, report: &mut Step
                 .get_mut(&target_id)
                 .expect("hit target must exist by construction");
             let previous_status = target.status;
-            let _ = target.apply_damage(damage);
+            // **M5**: when the target has a chassis, route through layered armor;
+            // otherwise fall back to the legacy flat-HP path so M1.5 and pre-M5
+            // scenarios keep their hit semantics.
+            let (chassis_outcome, zone_label) = if target.chassis.is_some() {
+                let zone = zone_from_hit(target.position, target.half_extents, hit_pos);
+                let (_, outcome) = target.apply_zone_damage(zone, damage, "projectile_hit");
+                (Some(outcome), zone.as_str().to_string())
+            } else {
+                let _ = target.apply_damage(damage);
+                (None, "torso".to_string())
+            };
             let new_status = target.status;
             report.hits.push(HitOutcome {
                 projectile_id: projectile.id,
@@ -531,6 +621,8 @@ fn step_projectiles(state: &mut ActorSimState, deps: StepDeps, report: &mut Step
                 damage,
                 previous_status,
                 new_status,
+                zone: zone_label,
+                chassis_outcome,
             });
             continue;
         }
@@ -554,41 +646,17 @@ fn step_projectiles(state: &mut ActorSimState, deps: StepDeps, report: &mut Step
 /// Returns the entry parameter `t` in `[0, 1]` for the segment `start -> end` against the
 /// AABB centred on `centre` with `half_extents`, or `None` if the segment misses. A point
 /// already inside the AABB at `start` returns `Some(0.0)`.
+///
+/// **DR-033 forward-hook**: thin `Vec2` adapter that delegates to
+/// `cf_physics::segment_hits_aabb` so M5.5's broadphase/narrowphase can build on
+/// the shared swept primitive without depending on `cf-actor`.
 fn segment_hits_aabb(start: Vec2, end: Vec2, centre: Vec2, half_extents: Vec2) -> Option<f32> {
-    let min_x = centre.x - half_extents.x;
-    let max_x = centre.x + half_extents.x;
-    let min_y = centre.y - half_extents.y;
-    let max_y = centre.y + half_extents.y;
-    let dx = end.x - start.x;
-    let dy = end.y - start.y;
-    let mut t_near = f32::NEG_INFINITY;
-    let mut t_far = f32::INFINITY;
-    if dx.abs() <= f32::EPSILON {
-        if start.x < min_x || start.x > max_x {
-            return None;
-        }
-    } else {
-        let t1 = (min_x - start.x) / dx;
-        let t2 = (max_x - start.x) / dx;
-        let (lo, hi) = if t1 <= t2 { (t1, t2) } else { (t2, t1) };
-        t_near = t_near.max(lo);
-        t_far = t_far.min(hi);
-    }
-    if dy.abs() <= f32::EPSILON {
-        if start.y < min_y || start.y > max_y {
-            return None;
-        }
-    } else {
-        let t1 = (min_y - start.y) / dy;
-        let t2 = (max_y - start.y) / dy;
-        let (lo, hi) = if t1 <= t2 { (t1, t2) } else { (t2, t1) };
-        t_near = t_near.max(lo);
-        t_far = t_far.min(hi);
-    }
-    if t_near > t_far || t_far < 0.0 || t_near > 1.0 {
-        return None;
-    }
-    Some(t_near.clamp(0.0, 1.0))
+    cf_physics::segment_hits_aabb(
+        (start.x, start.y),
+        (end.x, end.y),
+        (centre.x, centre.y),
+        (half_extents.x, half_extents.y),
+    )
 }
 
 #[cfg(test)]

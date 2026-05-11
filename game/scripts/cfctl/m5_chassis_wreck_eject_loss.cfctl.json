@@ -1,0 +1,10 @@
+{
+  "description": "M5 loss-path: pilot stands in the open without ejecting, the mech autocannon wrecks the chassis (External → Internal → Core → wound → Disabled → Wreck) and the pilot dies inside. Verifies `chassis.armor_zone_destroyed`, `chassis.stage_changed` advancing through the ladder, `mission.mission_resolved {result: lost, reason: player_dead}`.",
+  "scenario": "m5_chassis_wreck_eject",
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+    { "method": "act.player.aim", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 1800 } },
+    { "method": "observe.once", "params": {} }
+  ]
+}

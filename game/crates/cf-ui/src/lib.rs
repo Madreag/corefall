@@ -1013,7 +1013,7 @@ pub fn silhouette_line(body: &HudBodySilhouette) -> String {
 }
 
 /// Format the module strip HUD line. Color-independent: each module's state
-/// label is text (`nominal` / `warning` / `failed` / `not_present`).
+/// label is text (`nominal` / `degraded` / `warning` / `failed` / `not_present`).
 pub fn module_line(modules: &HudModuleStrip) -> String {
     if modules.modules.is_empty() {
         return "MODS: --".to_string();
@@ -1024,8 +1024,17 @@ pub fn module_line(modules: &HudModuleStrip) -> String {
         s.push(' ');
         if m.state == "not_present" {
             s.push_str(&format!("{}:N/A", compact_module_name(&m.kind)));
-        } else {
+        } else if modules.placeholder {
             s.push_str(&m.label.replace('—', "-"));
+        } else {
+            let state_tag = match m.state.as_str() {
+                "nominal" => "OK",
+                "degraded" => "DEG",
+                "warning" => "WARN",
+                "failed" => "FAIL",
+                other => other,
+            };
+            s.push_str(&format!("{}:{}", compact_module_name(&m.kind), state_tag));
         }
     }
     s
@@ -1037,6 +1046,7 @@ fn compact_module_name(kind: &str) -> &'static str {
         "jet" => "JET",
         "shield" => "SHIELD",
         "sensor" => "SENSOR",
+        "repair_drone" => "REPAIR",
         _ => "MOD",
     }
 }
@@ -1277,6 +1287,11 @@ mod tests {
             selected_item: "rifle".into(),
             stance: "airborne".into(),
             body_silhouette: cf_actor::BodySilhouette::default(),
+            chassis: None,
+            origin_id: "human".into(),
+            crouch_active: false,
+            climb_active: false,
+            jet_active: false,
         };
         let line = stance_line("airborne", Some(&player));
         assert!(line.contains("AIRBORNE"));

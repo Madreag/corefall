@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ActPlayerJetParams",
+  "description": "**M5**: `act.player.jet` — jet thrust toggle.",
+  "type": "object",
+  "properties": {
+    "active": {
+      "type": "boolean"
+    },
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "active"
+  ]
+}
