@@ -1,22 +1,22 @@
 {
-  "description": "M2 anchor refusal: walk the player up to the metal_nohook column and dig (refused with material_metal_nohook), then walk to the anchor pillar and dig (refused with material_anchor). Both refusals carry the structured refusal reason in terrain.tool_refused.",
+  "description": "M2 anchor + metal_nohook refusal teaching path. Walk to metal_nohook column (x=660-740), dig → refused with material_metal_nohook. Continue east to the anchor pillar (x=880-920), dig → refused with material_anchor. Player position model: 80-tick walk ≈ 289 units traveled from rest. Each column-to-column walk sized for ~220 units.",
   "scenario": "m2_material_lane",
   "tick_rate_hz": 60,
   "steps": [
     { "method": "scenario.reset", "params": {} },
     { "method": "act.player.aim", "params": { "x": 1.0, "y": 0.0 } },
     { "method": "act.player.move", "params": { "x": 1.0, "y": 0.0 } },
-    { "method": "sim.run_for_ticks", "params": { "ticks": 280 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 168 } },
     { "method": "act.player.move", "params": { "x": 0.0, "y": 0.0 } },
     { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
     { "method": "act.player.dig", "params": {} },
-    { "method": "sim.run_for_ticks", "params": { "ticks": 12 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 8 } },
     { "method": "act.player.move", "params": { "x": 1.0, "y": 0.0 } },
-    { "method": "sim.run_for_ticks", "params": { "ticks": 200 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 46 } },
     { "method": "act.player.move", "params": { "x": 0.0, "y": 0.0 } },
     { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
     { "method": "act.player.dig", "params": {} },
-    { "method": "sim.run_for_ticks", "params": { "ticks": 12 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 8 } },
     { "method": "observe.once", "params": {} }
   ]
 }

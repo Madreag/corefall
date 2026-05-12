@@ -1,11 +1,11 @@
 {
-  "description": "M2 chunked-terrain demo. Player digs into the dirt column, then concrete column, then probes metal_nohook (refused), then walks east to extraction. Drives every M2 path through cfctl: act.player.dig (Carved + Refused + NoOp outcomes), act.player.move, observe.once.",
+  "description": "M2 chunked-terrain demo. Player walks east, digs into the dirt column at x=220-300 (Carved), continues east, digs into the concrete column at x=440-520 (Carved, slower), continues east, digs at the metal_nohook column at x=660-740 (Refused with material_metal_nohook). Empirical position model: 80-tick walk = ~289 units (8-tick ramp + 72 ticks @ 220 u/s ≈ 280, observed bundle puts probe at x=407 ≈ player 385). Walk budgets sized for each column's distance from the previous one.",
   "scenario": "m2_material_lane",
   "steps": [
     { "method": "scenario.reset", "params": {} },
     { "method": "act.player.aim", "params": { "x": 1.0, "y": 0.0 } },
     { "method": "act.player.move", "params": { "x": 1.0, "y": 0.0 } },
-    { "method": "sim.run_for_ticks", "params": { "ticks": 80 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 32 } },
     { "method": "act.player.move", "params": { "x": 0.0, "y": 0.0 } },
     { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
     { "method": "act.player.dig", "params": {} },
@@ -15,7 +15,7 @@
     { "method": "act.player.dig", "params": {} },
     { "method": "sim.run_for_ticks", "params": { "ticks": 4 } },
     { "method": "act.player.move", "params": { "x": 1.0, "y": 0.0 } },
-    { "method": "sim.run_for_ticks", "params": { "ticks": 90 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 65 } },
     { "method": "act.player.move", "params": { "x": 0.0, "y": 0.0 } },
     { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
     { "method": "act.player.dig", "params": {} },
@@ -29,17 +29,13 @@
     { "method": "act.player.dig", "params": {} },
     { "method": "sim.run_for_ticks", "params": { "ticks": 4 } },
     { "method": "act.player.move", "params": { "x": 1.0, "y": 0.0 } },
-    { "method": "sim.run_for_ticks", "params": { "ticks": 80 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 65 } },
     { "method": "act.player.move", "params": { "x": 0.0, "y": 0.0 } },
     { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
     { "method": "act.player.dig", "params": {} },
     { "method": "sim.run_for_ticks", "params": { "ticks": 4 } },
     { "method": "act.player.dig", "params": {} },
     { "method": "sim.run_for_ticks", "params": { "ticks": 4 } },
-    { "method": "act.player.move", "params": { "x": 1.0, "y": 0.0 } },
-    { "method": "sim.run_for_ticks", "params": { "ticks": 200 } },
-    { "method": "act.player.move", "params": { "x": 0.0, "y": 0.0 } },
-    { "method": "sim.run_for_ticks", "params": { "ticks": 8 } },
     { "method": "observe.once", "params": {} }
   ]
 }

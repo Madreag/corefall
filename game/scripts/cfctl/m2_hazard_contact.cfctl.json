@@ -1,11 +1,11 @@
 {
-  "description": "M2 hazard contact: spawn the player on a hazard tile in m2_debug_strip and verify terrain.hazard_contact_or_avoidance fires with damage_applied > 0 and actor HP drops.",
+  "description": "M2 hazard contact: spawn (48, 32), walk east until the player overlaps the hazard column at x=420-500 in m2_debug_strip. Verify terrain.hazard_contact_or_avoidance fires with damage_applied > 0 and actor HP drops. 110-tick walk lands player center at ~440 (inside hazard); 30-tick settle covers the 6-tick event debounce.",
   "scenario": "m2_debug_strip",
   "tick_rate_hz": 60,
   "steps": [
     { "method": "scenario.reset", "params": {} },
     { "method": "act.player.move", "params": { "x": 1.0, "y": 0.0 } },
-    { "method": "sim.run_for_ticks", "params": { "ticks": 320 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 110 } },
     { "method": "act.player.move", "params": { "x": 0.0, "y": 0.0 } },
     { "method": "sim.run_for_ticks", "params": { "ticks": 30 } },
     { "method": "observe.once", "params": {} }

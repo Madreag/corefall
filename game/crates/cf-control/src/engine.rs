@@ -1634,41 +1634,47 @@ impl M0Engine {
             if !hazard_hits.is_empty() {
                 let sim_time_ms = state.clock.sim_time_ms();
                 let current_tick = tick.0;
-                for hit in hazard_hits {
-                    // Debounce: only emit the event when the actor's last
-                    // hazard tick is more than 1 tick ago (avoids spamming
-                    // 60 events per second for stationary actors). We
-                    // still apply per-tick damage above so the actor
-                    // dies on continuous contact.
-                    let should_emit = {
-                        let s = self.state.read().expect("engine state poisoned");
-                        !matches!(
-                            s.hazard_last_contact_tick.get(&hit.actor),
-                            Some(prev) if current_tick.saturating_sub(*prev) < 6,
-                        )
-                    };
-                    if should_emit {
-                        self.recorder.record(
-                            tick,
-                            sim_time_ms,
-                            "terrain",
-                            "hazard_contact_or_avoidance",
-                            json!({
-                                "actor_id": hit.actor.0,
-                                "hazard_material": "hazard",
-                                "hazard_material_id": cf_terrain::MATERIAL_HAZARD,
-                                "contact": true,
-                                "damage_applied": hit.damage,
-                                "pixel_overlap": hit.pixel_count,
-                                "cause_label": "actor_in_hazard_tile",
-                            }),
-                            None,
-                        );
-                        if let Ok(mut s) = self.state.write() {
-                            s.hazard_last_contact_tick.insert(hit.actor, current_tick);
-                        }
+                // Build the per-hit emit decision FIRST, while we still hold
+                // the write guard from drive_tick. Re-entrant locking on the
+                // same RwLock from inside drive_tick deadlocks — std::sync
+                // RwLock has no re-entrant read support. Resolve all reads
+                // against the in-scope `state` guard.
+                let mut emits: Vec<HazardHit> = Vec::new();
+                for hit in &hazard_hits {
+                    let recent = state
+                        .hazard_last_contact_tick
+                        .get(&hit.actor)
+                        .map(|prev| current_tick.saturating_sub(*prev) < 6)
+                        .unwrap_or(false);
+                    if !recent {
+                        emits.push(HazardHit {
+                            actor: hit.actor,
+                            pixel_count: hit.pixel_count,
+                            damage: hit.damage,
+                        });
+                        state.hazard_last_contact_tick.insert(hit.actor, current_tick);
                     }
                 }
+                drop(state);
+                for hit in emits {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "terrain",
+                        "hazard_contact_or_avoidance",
+                        json!({
+                            "actor_id": hit.actor.0,
+                            "hazard_material": "hazard",
+                            "hazard_material_id": cf_terrain::MATERIAL_HAZARD,
+                            "contact": true,
+                            "damage_applied": hit.damage,
+                            "pixel_overlap": hit.pixel_count,
+                            "cause_label": "actor_in_hazard_tile",
+                        }),
+                        None,
+                    );
+                }
+                state = self.state.write().expect("engine state poisoned");
             }
 
             // M2.5: route projectile hits onto reactor AABBs. We walk every
