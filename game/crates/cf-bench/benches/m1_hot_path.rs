@@ -50,6 +50,7 @@ fn bench_sim_step(c: &mut Criterion) {
         region_max_y: 720.0,
         auto_reload_when_empty: false,
         tuning: None,
+        tutorial_safety: false,
     };
     c.bench_function("sim_step_50_actors", |b| {
         b.iter(|| {
