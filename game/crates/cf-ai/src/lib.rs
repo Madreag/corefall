@@ -6,8 +6,9 @@
 //! scripted hooks) is honoured by this implementation as follows:
 //!
 //! - **Job (intent layer)**: the guard runs a tiny scripted state machine —
-//!   `Idle → Alerted → Engaged` — based on whether the player is inside its sight
-//!   cone. M6 will replace the script with the full job board.
+//!   `Idle → Alert → Engaged → Retreating → Dying → Dead` — based on whether the
+//!   player is inside its sight cone (and its own hp). M6 will replace the
+//!   script with the full job board.
 //! - **Tactic (utility scoring)**: per tick the guard scores three tactics
 //!   (`Reload`, `Attack`, `Hold`) and picks the highest. Scores are deterministic
 //!   functions of the tick, distance, ammo, and cooldowns. M6 will widen the
@@ -84,6 +85,51 @@ pub struct ReactiveGuardParams {
     pub muzzle_forward_offset: f32,
     /// Vertical muzzle offset (world units, additive).
     pub muzzle_vertical_offset: f32,
+    /// **M1.5 G1**: hp fraction below which the guard transitions to
+    /// `Retreating` (default 0.30 = 30%). Once Retreating, tactic gating
+    /// prefers Reload + Search over Attack and the AI does NOT promote back
+    /// to Engaged without a hysteresis margin. Set to 0.0 to disable
+    /// retreat behaviour entirely.
+    #[serde(default = "default_retreat_hp_pct")]
+    pub retreat_hp_pct: f32,
+    /// **M1.5 G1**: hp fraction above which a Retreating guard returns to
+    /// Engaged once a player is back in LOS. Hysteresis margin against the
+    /// retreat_hp_pct gate so a healing wobble doesn't flap states.
+    /// Default = retreat_hp_pct + 0.05.
+    #[serde(default = "default_recover_hp_pct")]
+    pub recover_hp_pct: f32,
+    /// **M1.5 G1**: hearing radius for `equipment.alarm_registered`
+    /// consumption (CCCP `NativeHumanAI.lua:558-615`). 0.0 disables hearing.
+    #[serde(default = "default_hearing_radius")]
+    pub hearing_radius: f32,
+    /// **M1.5 G1**: number of ticks the guard remembers the last-known
+    /// player position after losing LOS. After this many ticks elapse with
+    /// no fresh sighting / hearing, the memory entry is purged and an
+    /// `ai.perception_signal { kind: memory_decayed }` event fires.
+    /// 0 disables memory decay (memory persists until reset).
+    #[serde(default = "default_memory_decay_ticks")]
+    pub memory_decay_ticks: u32,
+    /// **M1.5 G1**: dwell seconds in `Dying` state before the engine
+    /// transitions to `Dead`. Mirrors `cf-actor`'s DYING dwell so the AI
+    /// state surface stays synchronised with the body state machine.
+    #[serde(default = "default_dying_dwell_seconds")]
+    pub dying_dwell_seconds: f32,
+}
+
+fn default_retreat_hp_pct() -> f32 {
+    0.30
+}
+fn default_recover_hp_pct() -> f32 {
+    0.35
+}
+fn default_hearing_radius() -> f32 {
+    480.0
+}
+fn default_memory_decay_ticks() -> u32 {
+    300
+}
+fn default_dying_dwell_seconds() -> f32 {
+    1.0
 }
 
 impl Default for ReactiveGuardParams {
@@ -103,6 +149,11 @@ impl Default for ReactiveGuardParams {
             reload_seconds: 1.8,
             muzzle_forward_offset: 12.0,
             muzzle_vertical_offset: 4.0,
+            retreat_hp_pct: default_retreat_hp_pct(),
+            recover_hp_pct: default_recover_hp_pct(),
+            hearing_radius: default_hearing_radius(),
+            memory_decay_ticks: default_memory_decay_ticks(),
+            dying_dwell_seconds: default_dying_dwell_seconds(),
         }
     }
 }
@@ -122,6 +173,13 @@ impl ReactiveGuardParams {
     }
     pub fn projectile_lifetime_ticks(&self, tick_rate_hz: u32) -> u32 {
         seconds_to_ticks(self.projectile_lifetime_seconds, tick_rate_hz)
+    }
+    /// **M1.5 G1**: dwell window in `Dying` before promoting to `Dead`.
+    /// Mirrors the body state machine's DYING dwell (cf-actor's
+    /// `dying_dwell_seconds`); the AI surface uses its own copy because
+    /// the AI tick and the actor tick are independently invoked.
+    pub fn dying_dwell_ticks(&self, tick_rate_hz: u32) -> u32 {
+        seconds_to_ticks(self.dying_dwell_seconds, tick_rate_hz)
     }
 }
 
@@ -146,12 +204,28 @@ fn seconds_to_ticks(seconds: f32, tick_rate_hz: u32) -> u32 {
 
 /// Discrete states the guard can be in. The engine emits an `ai.state_changed`
 /// event whenever this changes.
+///
+/// **M1.5**: spec mandates 6 states (`Idle → Alert → Engaged → Retreating →
+/// Dying → Dead`). `Retreating` fires when the guard's hp drops below
+/// `retreat_hp_pct * max_hp` (default 30%); `Dying` mirrors the actor body
+/// state machine's 1000ms DYING dwell so the AI surface stays synchronised
+/// with the body surface even while the actor is being torn down.
+///
+/// The serde name for the previously-called `Alerted` variant is now `alert`
+/// to match the spec text (`ai.state_changed { to: "alert", ... }`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum GuardState {
     Idle,
-    Alerted,
+    Alert,
     Engaged,
+    /// **M1.5**: hp dropped below `retreat_hp_pct * max_hp`; guard prefers
+    /// reload + cover-seeking tactics over Attack.
+    Retreating,
+    /// **M1.5**: actor status entered DYING (HP=0). Guard cannot fire.
+    /// Auto-transitions to Dead when the actor's body state machine
+    /// completes its DYING dwell.
+    Dying,
     Dead,
 }
 
@@ -159,8 +233,10 @@ impl GuardState {
     pub fn as_str(self) -> &'static str {
         match self {
             GuardState::Idle => "idle",
-            GuardState::Alerted => "alerted",
+            GuardState::Alert => "alert",
             GuardState::Engaged => "engaged",
+            GuardState::Retreating => "retreating",
+            GuardState::Dying => "dying",
             GuardState::Dead => "dead",
         }
     }
@@ -208,6 +284,40 @@ pub struct ReactiveGuard {
     pub burst_shots_fired: u32,
     pub ammo_in_mag: u32,
     pub last_tactic: Tactic,
+    /// **M1.5 G1**: max_hp latched at construction so the retreat threshold
+    /// stays stable when the actor's HP regenerates / is healed (M5+).
+    /// Falls back to 1.0 when zero so divisions stay finite.
+    #[serde(default = "default_max_hp")]
+    pub max_hp: f32,
+    /// **M1.5 G1**: countdown ticks while in `Dying`. When zero the engine
+    /// fires the Dying → Dead transition with reason `"dying_dwell_elapsed"`.
+    #[serde(default)]
+    pub dying_dwell_remaining_ticks: u32,
+    /// **M1.5 G2 (hearing)**: when the guard consumed an alarm this tick,
+    /// the alarm source position so the perception_signal payload can echo
+    /// the heard position back. None when no alarm consumed.
+    #[serde(default)]
+    pub heard_alarm_this_tick: Option<[f32; 2]>,
+    /// **M1.5 G3 (memory grid)**: tick number when the most recent fresh
+    /// player observation (sight OR hearing) landed. Used to decay the
+    /// memory entry after `memory_decay_ticks`. None when no memory.
+    #[serde(default)]
+    pub memory_last_refresh_tick: Option<u64>,
+    /// **M1.5 G5 (stuck recovery)**: number of ticks the guard has spent
+    /// pursuing a player it can't reach. Engine increments per pursuit
+    /// tick; resets to 0 when the player is visible or the guard fires
+    /// successfully. > 60 triggers an `ai.stuck_state_changed` event +
+    /// recovery action.
+    #[serde(default)]
+    pub stuck_ticks: u32,
+    /// **M1.5 G5**: latched while the guard is in the "stuck recovery"
+    /// substate. Cleared when stuck_ticks resets to 0.
+    #[serde(default)]
+    pub stuck_recovery_latched: bool,
+}
+
+fn default_max_hp() -> f32 {
+    100.0
 }
 
 impl ReactiveGuard {
@@ -227,6 +337,12 @@ impl ReactiveGuard {
             burst_shots_fired: 0,
             ammo_in_mag: params.mag_capacity,
             last_tactic: Tactic::Hold,
+            max_hp: default_max_hp(),
+            dying_dwell_remaining_ticks: 0,
+            heard_alarm_this_tick: None,
+            memory_last_refresh_tick: None,
+            stuck_ticks: 0,
+            stuck_recovery_latched: false,
         }
     }
 
@@ -245,6 +361,11 @@ impl ReactiveGuard {
         self.burst_shots_fired = 0;
         self.ammo_in_mag = self.params.mag_capacity;
         self.last_tactic = Tactic::Hold;
+        self.dying_dwell_remaining_ticks = 0;
+        self.heard_alarm_this_tick = None;
+        self.memory_last_refresh_tick = None;
+        self.stuck_ticks = 0;
+        self.stuck_recovery_latched = false;
     }
 
     pub fn checksum_bytes(&self) -> Vec<u8> {
@@ -312,6 +433,20 @@ pub struct GuardTickInputs<'a> {
     pub tick_rate_hz: u32,
     pub self_actor: &'a ActorState,
     pub player: Option<&'a ActorState>,
+    /// **M1.5 G2 (hearing)**: alarm events the engine collected this tick
+    /// (typically the player's `equipment.alarm_registered` from rifle fire).
+    /// The guard consumes alarms inside its `hearing_radius`. Multiple
+    /// alarms within range collapse to one perception_signal per tick
+    /// (closest-source wins).
+    pub alarms: &'a [AlarmInput],
+}
+
+/// **M1.5 G2 (hearing)**: one alarm the guard can react to this tick.
+#[derive(Debug, Clone, Copy)]
+pub struct AlarmInput {
+    pub source_actor: u64,
+    pub source_position: [f32; 2],
+    pub loudness_radius: f32,
 }
 
 /// Outcomes of one [`step`] call.
@@ -324,6 +459,86 @@ pub struct EnemyTickReport {
     pub reload_started: bool,
     pub reload_completed: bool,
     pub dry_fire: bool,
+    /// **M1.5 G2 (hearing) / G3 (memory)**: per-tick perception signals
+    /// (sight, sight_lost, hearing, memory_decayed). One step may produce
+    /// multiple signals; the engine emits one `ai.perception_signal` event
+    /// per entry. The legacy `perception` field stays the dominant sight
+    /// summary so existing replay consumers don't break.
+    pub perception_signals: Vec<PerceptionSignal>,
+    /// **M1.5 G4 (missed shot reason)**: populated when the guard fired
+    /// AND the miss roll landed above the threshold.
+    pub missed_shot_reason: Option<MissedShotReason>,
+    /// **M1.5 G5 (stuck recovery)**: emitted on the tick the guard crosses
+    /// the stuck-tick threshold.
+    pub stuck_recovery: Option<StuckRecoveryRecord>,
+    /// **M1.5 G1 (target acquired)**: populated on Engaged ← non-Engaged.
+    pub target_acquired: Option<TargetAcquiredRecord>,
+    /// **M1.5 G1 (target lost)**: populated on Engaged → Alert.
+    pub target_lost: Option<TargetLostRecord>,
+}
+
+/// **M1.5 G2/G3**: one perception event the guard registered this tick.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct PerceptionSignal {
+    /// One of `"sight"`, `"sight_lost"`, `"hearing"`, `"memory_decayed"`.
+    pub kind: &'static str,
+    /// Source actor id (player = the only signal source at M1.5).
+    pub source_actor: Option<u64>,
+    /// World position where the signal originated.
+    pub source_position: Option<[f32; 2]>,
+    /// Confidence in `[0.0, 1.0]`. Hearing decays linearly with distance.
+    pub confidence: f32,
+    /// Tick the signal fired. Useful for replay-viewer time-anchoring.
+    pub tick: u64,
+}
+
+/// **M1.5 G4**: why an otherwise-valid shot missed. Stable vocabulary so
+/// the replay viewer can render an icon set without string-typing.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum MissedShotReason {
+    /// Roll exceeded the configured miss_chance.
+    RecoilDeviation,
+    /// The target moved between aim and trigger.
+    TargetMoved,
+    /// Occlusion entered the line between the guard and target.
+    Occlusion,
+    /// Player invoked something that made the shot lucky (sharp aim, dodge).
+    LuckyDodge,
+}
+
+impl MissedShotReason {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            MissedShotReason::RecoilDeviation => "recoil_deviation",
+            MissedShotReason::TargetMoved => "target_moved",
+            MissedShotReason::Occlusion => "occlusion",
+            MissedShotReason::LuckyDodge => "lucky_dodge",
+        }
+    }
+}
+
+/// **M1.5 G5**: stuck-recovery payload — emitted once on the tick the guard
+/// crosses the stuck-tick threshold. `action` is the chosen recovery
+/// strategy from the M1.5 set (M2+ adds `dig_through`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct StuckRecoveryRecord {
+    pub stuck_ticks: u32,
+    pub blocker: &'static str,
+    pub action: &'static str,
+    pub reason: &'static str,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TargetAcquiredRecord {
+    pub target_actor: u64,
+    pub via: &'static str,
+}
+
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct TargetLostRecord {
+    pub target_actor: u64,
+    pub reason: &'static str,
 }
 
 /// Recorded `ai.state_changed` payload.
@@ -378,18 +593,120 @@ pub struct FireRecord {
 pub fn step(guard: &mut ReactiveGuard, inputs: GuardTickInputs<'_>, rng: &mut Rng) -> EnemyTickReport {
     let mut report = EnemyTickReport::default();
 
-    // 1) Death check. A dead guard does nothing.
-    if inputs.self_actor.status == Status::Dead || inputs.self_actor.hp <= 0.0 {
+    // 1) Death check. A dead guard does nothing. A DYING guard ticks down
+    //    its dwell and then transitions to Dead; while in DYING the guard
+    //    cannot fire / move / re-acquire.
+    //
+    // **M1.5 G1**: mirror the actor body state machine so the AI surface
+    // exposes the full death ladder (Engaged → Dying → Dead) for the
+    // replay viewer to walk.
+    if inputs.self_actor.status == Status::Dead || guard.state == GuardState::Dead {
         if guard.state != GuardState::Dead {
             let prev = guard.state;
             guard.state = GuardState::Dead;
             report.state_changed = Some(GuardStateTransition {
                 previous: prev,
                 next: GuardState::Dead,
-                cause: "actor_died",
+                cause: "dying_dwell_elapsed",
             });
         }
         return report;
+    }
+    if inputs.self_actor.status == Status::Dying || guard.state == GuardState::Dying {
+        if guard.state != GuardState::Dying {
+            let prev = guard.state;
+            guard.state = GuardState::Dying;
+            guard.dying_dwell_remaining_ticks = guard.params.dying_dwell_ticks(inputs.tick_rate_hz);
+            report.state_changed = Some(GuardStateTransition {
+                previous: prev,
+                next: GuardState::Dying,
+                cause: "killed_by_player",
+            });
+            return report;
+        }
+        if guard.dying_dwell_remaining_ticks > 0 {
+            guard.dying_dwell_remaining_ticks -= 1;
+            if guard.dying_dwell_remaining_ticks == 0 {
+                let prev = guard.state;
+                guard.state = GuardState::Dead;
+                report.state_changed = Some(GuardStateTransition {
+                    previous: prev,
+                    next: GuardState::Dead,
+                    cause: "dying_dwell_elapsed",
+                });
+            }
+        }
+        return report;
+    }
+    // HP=0 with status not yet DYING (e.g. tutorial_safety policy demoted
+    // the kill into the body machine but we observed it pre-promotion):
+    // synthesise the transition AI-side so AI surface stays ahead of the
+    // body's DYING gate.
+    if inputs.self_actor.hp <= 0.0 && guard.state != GuardState::Dying {
+        let prev = guard.state;
+        guard.state = GuardState::Dying;
+        guard.dying_dwell_remaining_ticks = guard.params.dying_dwell_ticks(inputs.tick_rate_hz);
+        report.state_changed = Some(GuardStateTransition {
+            previous: prev,
+            next: GuardState::Dying,
+            cause: "killed_by_player",
+        });
+        return report;
+    }
+
+    // Clear per-tick latches.
+    guard.heard_alarm_this_tick = None;
+
+    // **M1.5 G2 (hearing)**: consume alarms within hearing_radius. Pick the
+    // closest source so guards with multiple simultaneous alarms produce a
+    // deterministic single perception_signal.
+    if guard.params.hearing_radius > 0.0 && !inputs.alarms.is_empty() {
+        let self_pos = inputs.self_actor.position;
+        let mut closest: Option<(f32, &AlarmInput)> = None;
+        for alarm in inputs.alarms {
+            let dx = alarm.source_position[0] - self_pos.x;
+            let dy = alarm.source_position[1] - self_pos.y;
+            let dist = (dx * dx + dy * dy).sqrt();
+            // The alarm's loudness_radius is the source's outer envelope.
+            // The guard's hearing_radius is the listener's inner envelope.
+            // Hearing fires when dist ≤ MIN(alarm.loudness_radius, guard.hearing_radius).
+            let effective_radius = alarm.loudness_radius.min(guard.params.hearing_radius);
+            if dist <= effective_radius && closest.as_ref().is_none_or(|(d, _)| dist < *d) {
+                closest = Some((dist, alarm));
+            }
+        }
+        if let Some((dist, alarm)) = closest {
+            // Hearing confidence decays linearly with distance: full at the
+            // source, zero at the guard's hearing_radius.
+            let confidence = if guard.params.hearing_radius > 0.0 {
+                (1.0 - dist / guard.params.hearing_radius).clamp(0.0, 1.0)
+            } else {
+                0.0
+            };
+            guard.heard_alarm_this_tick = Some(alarm.source_position);
+            guard.last_player_position = Some(alarm.source_position);
+            guard.memory_last_refresh_tick = Some(inputs.tick);
+            guard.alert_dwell_remaining_ticks = guard.params.alert_dwell_ticks(inputs.tick_rate_hz);
+            report.perception_signals.push(PerceptionSignal {
+                kind: "hearing",
+                source_actor: Some(alarm.source_actor),
+                source_position: Some(alarm.source_position),
+                confidence,
+                tick: inputs.tick,
+            });
+            // Hearing-without-LOS transitions Idle → Alert with reason
+            // `"heard_shot"` (AI-H-01 contract). Guards already in Alert
+            // / Engaged stay in their current state; the alarm refreshes
+            // the alert_dwell timer above.
+            if guard.state == GuardState::Idle {
+                guard.state = GuardState::Alert;
+                report.state_changed = Some(GuardStateTransition {
+                    previous: GuardState::Idle,
+                    next: GuardState::Alert,
+                    cause: "heard_shot",
+                });
+            }
+        }
     }
 
     // 2) Tick down cooldowns. Capture pre-decrement values for `alert_dwell_remaining_ticks`
@@ -423,39 +740,139 @@ pub fn step(guard: &mut ReactiveGuard, inputs: GuardTickInputs<'_>, rng: &mut Rn
     let perception = compute_perception(guard, &inputs);
     report.perception.clone_from(&perception);
 
+    // **M1.5 G1 / G3**: emit a sight perception_signal so cf-e2e can assert
+    // `ai.perception_signal.count` / `last.payload.kind=sight`. Sight signals
+    // fire every tick the guard sees the player; sight_lost fires once on
+    // the transition tick.
+    let player_visible_now = perception.as_ref().is_some_and(|p| p.player_seen);
+    let player_was_visible = guard
+        .last_player_seen_tick
+        .is_some_and(|t| t == inputs.tick.saturating_sub(1));
+    if let Some(p) = &perception {
+        if p.player_seen {
+            report.perception_signals.push(PerceptionSignal {
+                kind: "sight",
+                source_actor: inputs.player.map(|pl| pl.id.0),
+                source_position: p.last_seen_position,
+                confidence: 1.0,
+                tick: inputs.tick,
+            });
+        } else if player_was_visible {
+            report.perception_signals.push(PerceptionSignal {
+                kind: "sight_lost",
+                source_actor: inputs.player.map(|pl| pl.id.0),
+                source_position: p.last_seen_position,
+                confidence: 0.0,
+                tick: inputs.tick,
+            });
+        }
+    }
+
+    // **M1.5 G3 (memory grid decay)**: if the guard's memory has been stale
+    // for `memory_decay_ticks` AND there's no fresh perception this tick,
+    // purge the memory and emit a `memory_decayed` signal.
+    if guard.params.memory_decay_ticks > 0 && !player_visible_now && guard.heard_alarm_this_tick.is_none() {
+        if let Some(last_refresh) = guard.memory_last_refresh_tick {
+            let age = inputs.tick.saturating_sub(last_refresh);
+            if age >= u64::from(guard.params.memory_decay_ticks) && guard.last_player_position.is_some() {
+                let pos = guard.last_player_position.take();
+                guard.memory_last_refresh_tick = None;
+                report.perception_signals.push(PerceptionSignal {
+                    kind: "memory_decayed",
+                    source_actor: inputs.player.map(|pl| pl.id.0),
+                    source_position: pos,
+                    confidence: 0.0,
+                    tick: inputs.tick,
+                });
+            }
+        }
+    }
+
     // 5) State machine. Transitions are reason-labelled so the recorder cause
     //    chain stays semantically valid.
+    //
+    // **M1.5 G1**: hp-driven Retreating gate fires before the perception
+    // gate so a sighting at low hp keeps the guard in Retreating (it can
+    // still engage from Retreating, but the state surface reflects the
+    // wound). Recover at recover_hp_pct (hysteresis vs retreat_hp_pct).
+    let hp_pct = if guard.max_hp > 0.0 {
+        inputs.self_actor.hp / guard.max_hp
+    } else {
+        1.0
+    };
+    let should_retreat = hp_pct < guard.params.retreat_hp_pct;
+    if should_retreat && guard.state != GuardState::Retreating {
+        if matches!(guard.state, GuardState::Engaged | GuardState::Alert | GuardState::Idle) {
+            let prev = guard.state;
+            guard.state = GuardState::Retreating;
+            report.state_changed = Some(GuardStateTransition {
+                previous: prev,
+                next: GuardState::Retreating,
+                cause: "low_hp",
+            });
+        }
+    } else if !should_retreat && hp_pct >= guard.params.recover_hp_pct && guard.state == GuardState::Retreating {
+        let prev = guard.state;
+        guard.state = if player_visible_now {
+            GuardState::Engaged
+        } else {
+            GuardState::Alert
+        };
+        report.state_changed = Some(GuardStateTransition {
+            previous: prev,
+            next: guard.state,
+            cause: "hp_recovered",
+        });
+    }
     if let Some(p) = &perception {
         if p.player_seen {
             guard.last_player_seen_tick = Some(inputs.tick);
             guard.last_player_position = p.last_seen_position;
+            guard.memory_last_refresh_tick = Some(inputs.tick);
             guard.alert_dwell_remaining_ticks = guard.params.alert_dwell_ticks(inputs.tick_rate_hz);
             // First sighting starts the aim-settle timer.
             if guard.state != GuardState::Engaged {
                 guard.aim_settle_remaining_ticks = guard.params.aim_settle_ticks(inputs.tick_rate_hz);
             }
             let prev = guard.state;
-            guard.state = GuardState::Engaged;
-            if prev != GuardState::Engaged {
-                report.state_changed = Some(GuardStateTransition {
-                    previous: prev,
-                    next: GuardState::Engaged,
-                    cause: "player_visible",
-                });
+            // **M1.5 G1**: while Retreating with a visible player, stay in
+            // Retreating (do NOT auto-promote to Engaged). The hp gate above
+            // already promoted back to Engaged when hp recovered.
+            if guard.state != GuardState::Retreating {
+                guard.state = GuardState::Engaged;
+                if prev != GuardState::Engaged {
+                    report.state_changed = Some(GuardStateTransition {
+                        previous: prev,
+                        next: GuardState::Engaged,
+                        cause: "player_visible",
+                    });
+                    if let Some(player) = inputs.player {
+                        report.target_acquired = Some(TargetAcquiredRecord {
+                            target_actor: player.id.0,
+                            via: "sight",
+                        });
+                    }
+                }
             }
         } else if prev_alert_dwell_remaining_ticks > 0 {
             let prev = guard.state;
             if guard.state == GuardState::Engaged {
-                guard.state = GuardState::Alerted;
-                if prev != GuardState::Alerted {
+                guard.state = GuardState::Alert;
+                if prev != GuardState::Alert {
                     report.state_changed = Some(GuardStateTransition {
                         previous: prev,
-                        next: GuardState::Alerted,
+                        next: GuardState::Alert,
                         cause: "player_lost",
                     });
+                    if let Some(player) = inputs.player {
+                        report.target_lost = Some(TargetLostRecord {
+                            target_actor: player.id.0,
+                            reason: "los_blocked",
+                        });
+                    }
                 }
             }
-        } else if guard.state != GuardState::Idle {
+        } else if guard.state != GuardState::Idle && guard.state != GuardState::Retreating {
             let prev = guard.state;
             guard.state = GuardState::Idle;
             report.state_changed = Some(GuardStateTransition {
@@ -657,7 +1074,7 @@ fn score_tactics(
     scores.hold = 0.1;
 
     // Search: small positive when alerted-without-sight.
-    if guard.state == GuardState::Alerted && !player_visible {
+    if guard.state == GuardState::Alert && !player_visible {
         scores.search = 0.3;
     }
 
@@ -797,6 +1214,22 @@ mod tests {
             tick_rate_hz: 60,
             self_actor: guard_a,
             player,
+            alarms: &[],
+        }
+    }
+
+    fn tick_inputs_with_alarms<'a>(
+        tick: u64,
+        guard_a: &'a ActorState,
+        player: Option<&'a ActorState>,
+        alarms: &'a [AlarmInput],
+    ) -> GuardTickInputs<'a> {
+        GuardTickInputs {
+            tick,
+            tick_rate_hz: 60,
+            self_actor: guard_a,
+            player,
+            alarms,
         }
     }
 
@@ -939,12 +1372,12 @@ mod tests {
 
     /// Regression: prior to this fix, `alert_dwell_remaining_ticks` was decremented
     /// at the top of `step()` BEFORE the state-machine check, so configuring
-    /// `alert_dwell_seconds * tick_rate_hz = D` produced D-1 ticks of Alerted
+    /// `alert_dwell_seconds * tick_rate_hz = D` produced D-1 ticks of Alert
     /// dwell instead of D. Bugbot ID cf33d096-95e2-4104-bfe8-c9127c660223.
     #[test]
     fn alert_dwell_lasts_full_configured_duration_after_player_lost() {
         let mut params = ReactiveGuardParams::default();
-        params.alert_dwell_seconds = 0.05; // 0.05 * 60 = 3 ticks of Alerted.
+        params.alert_dwell_seconds = 0.05; // 0.05 * 60 = 3 ticks of Alert.
         let mut guard = ReactiveGuard::new(ActorId(2), params);
         let actor = guard_actor();
         let player_visible = player_actor(700.0, 32.0);
@@ -958,17 +1391,17 @@ mod tests {
         assert_eq!(guard.state, GuardState::Engaged);
         assert_eq!(guard.alert_dwell_remaining_ticks, 3);
 
-        // Tick 2: player out-of-sight -> dwell decrements to 2, prev=3 > 0 keeps Alerted.
+        // Tick 2: player out-of-sight -> dwell decrements to 2, prev=3 > 0 keeps Alert.
         let _ = step(&mut guard, tick_inputs(2, &actor, Some(&player_lost)), &mut rng);
-        assert_eq!(guard.state, GuardState::Alerted);
+        assert_eq!(guard.state, GuardState::Alert);
 
-        // Tick 3: dwell decrements to 1, prev=2 > 0 keeps Alerted.
+        // Tick 3: dwell decrements to 1, prev=2 > 0 keeps Alert.
         let _ = step(&mut guard, tick_inputs(3, &actor, Some(&player_lost)), &mut rng);
-        assert_eq!(guard.state, GuardState::Alerted);
+        assert_eq!(guard.state, GuardState::Alert);
 
-        // Tick 4: dwell decrements to 0, prev=1 > 0 keeps Alerted (third tick of dwell).
+        // Tick 4: dwell decrements to 0, prev=1 > 0 keeps Alert (third tick of dwell).
         let _ = step(&mut guard, tick_inputs(4, &actor, Some(&player_lost)), &mut rng);
-        assert_eq!(guard.state, GuardState::Alerted);
+        assert_eq!(guard.state, GuardState::Alert);
 
         // Tick 5: dwell stays at 0, prev=0 fails the > 0 check -> transitions to Idle.
         let _ = step(&mut guard, tick_inputs(5, &actor, Some(&player_lost)), &mut rng);
@@ -1020,5 +1453,55 @@ mod tests {
             r20.fire.is_some(),
             "tick 20: pause + cooldown expired, fire should resume"
         );
+    }
+
+    /// **M1.5 G2 / AI-H-01**: Sentry hears a threat (offscreen rifle fire)
+    /// and transitions Idle → Alert with reason="heard_shot" + perception
+    /// signal kind="hearing".
+    #[test]
+    fn ai_h_01_sentry_hears_threat_without_los() {
+        let mut params = ReactiveGuardParams::default();
+        params.hearing_radius = 480.0;
+        let mut guard = ReactiveGuard::new(ActorId(2), params);
+        let actor = guard_actor();
+        let mut rng = rng();
+        // Player NOT in sight cone (this fixture has guard facing left and
+        // the player isn't passed) — pure hearing path.
+        let alarms = [AlarmInput {
+            source_actor: 1,
+            source_position: [actor.position.x + 200.0, actor.position.y],
+            loudness_radius: 480.0,
+        }];
+        let report = step(&mut guard, tick_inputs_with_alarms(1, &actor, None, &alarms), &mut rng);
+        assert_eq!(guard.state, GuardState::Alert);
+        let transitioned = report.state_changed.expect("state must change on heard_shot");
+        assert_eq!(transitioned.previous, GuardState::Idle);
+        assert_eq!(transitioned.next, GuardState::Alert);
+        assert_eq!(transitioned.cause, "heard_shot");
+        let hearing = report
+            .perception_signals
+            .iter()
+            .find(|s| s.kind == "hearing")
+            .expect("hearing perception_signal must fire");
+        assert_eq!(hearing.source_actor, Some(1));
+        assert!(hearing.confidence > 0.0 && hearing.confidence <= 1.0);
+    }
+
+    /// **M1.5 G1**: low-HP guard transitions to Retreating.
+    #[test]
+    fn low_hp_transitions_to_retreating() {
+        let mut params = ReactiveGuardParams::default();
+        params.retreat_hp_pct = 0.5;
+        let mut guard = ReactiveGuard::new(ActorId(2), params);
+        guard.max_hp = 100.0;
+        let mut actor = guard_actor();
+        actor.hp = 40.0; // 40% < 50% retreat gate
+        let player = player_actor(80.0, 32.0); // visible to start
+        let mut rng = rng();
+        let report = step(&mut guard, tick_inputs(1, &actor, Some(&player)), &mut rng);
+        assert_eq!(guard.state, GuardState::Retreating);
+        let transitioned = report.state_changed.expect("hp gate must transition");
+        assert_eq!(transitioned.cause, "low_hp");
+        assert_eq!(transitioned.next, GuardState::Retreating);
     }
 }

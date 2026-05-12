@@ -603,6 +603,16 @@ struct EngineMutable {
     /// trigger. No consumer at M1; M1.5 ai layer reads it.
     #[allow(dead_code)]
     force_ai_update_this_tick: bool,
+    /// **M1.5 G2 (hearing)**: alarms collected during the previous tick's
+    /// actor step. The current tick's AI loop consumes these so guard
+    /// hearing reacts ≤1 tick after the player's `equipment.alarm_registered`
+    /// fires. Cleared after each AI loop.
+    pending_alarms: Vec<cf_ai::AlarmInput>,
+    /// **M1.5 G2 (hearing) staging**: alarms produced by THIS tick's actor
+    /// step; promoted to `pending_alarms` at end-of-tick so they're
+    /// available to the next tick's AI loop. Two-stage so AI never reads
+    /// half-collected alarms mid-tick.
+    pending_alarms_staging: Vec<cf_ai::AlarmInput>,
     /// M4A: HUD focus state (DR-012 ACC-A-04). The cf-app keyboard layer +
     /// cfctl `act.input.focus` advance/retreat focus through the canonical
     /// `HUD_FOCUSABLE_NODES` list; observe.accessibility surfaces it.
@@ -739,6 +749,8 @@ impl M0Engine {
                 hud_last_mission_result: None,
                 controls_captured_by: None,
                 force_ai_update_this_tick: false,
+                pending_alarms: Vec::new(),
+                pending_alarms_staging: Vec::new(),
                 projectile_spawn_event_ids: BTreeMap::new(),
                 hud_focus_index: None,
                 hud_focus_cycle: 0,
@@ -1225,6 +1237,7 @@ impl M0Engine {
                         .reactive_guards
                         .remove(&guard_id)
                         .expect("guard exists by construction");
+                    let alarms_snapshot: Vec<cf_ai::AlarmInput> = state.pending_alarms.clone();
                     let report = cf_ai::step(
                         &mut guard,
                         cf_ai::GuardTickInputs {
@@ -1232,6 +1245,7 @@ impl M0Engine {
                             tick_rate_hz: self.config.tick_rate_hz,
                             self_actor: &self_actor,
                             player: player_ref,
+                            alarms: &alarms_snapshot,
                         },
                         &mut state.rng,
                     );
@@ -1564,6 +1578,13 @@ impl M0Engine {
         // Emit M1 events from the actor step.
         if let Some((tick, sim_time_ms, intent, report)) = step_report {
             self.emit_actor_events(tick, sim_time_ms, &intent, &report);
+        }
+        // **M1.5 G2 (hearing) end-of-tick**: promote alarms staged during
+        // this tick to the next-tick AI pending queue. Clear the staging
+        // buffer so each tick produces a fresh batch.
+        if let Ok(mut s) = self.state.write() {
+            let staged = std::mem::take(&mut s.pending_alarms_staging);
+            s.pending_alarms = staged;
         }
 
         if let Some((tick, sim_time_ms, hex)) = checksum_payload {
@@ -2154,8 +2175,9 @@ impl M0Engine {
 
     /// Translate a `cf_ai::EnemyTickReport` into recorder events.
     fn emit_guard_events(&self, tick: Tick, sim_time_ms: f64, guard_id: ActorId, report: &cf_ai::EnemyTickReport) {
-        // Always emit ai.perception (even when player_seen=false) so replay
+        // Always emit ai.ai_perception (even when player_seen=false) so replay
         // viewers can step through the guard's awareness.
+        let mut last_perception_signal_id: Option<String> = None;
         if let Some(p) = &report.perception {
             self.recorder.record(
                 tick,
@@ -2172,6 +2194,24 @@ impl M0Engine {
                 }),
                 None,
             );
+        }
+        // **M1.5 G2/G3**: emit one `ai.perception_signal` per fresh signal.
+        for sig in &report.perception_signals {
+            let id = self.recorder.record(
+                tick,
+                sim_time_ms,
+                "ai",
+                "perception_signal",
+                json!({
+                    "actor": guard_id.0,
+                    "kind": sig.kind,
+                    "source_actor": sig.source_actor,
+                    "source_position": sig.source_position,
+                    "confidence": sig.confidence,
+                }),
+                None,
+            );
+            last_perception_signal_id = Some(id);
         }
         if let Some(t) = &report.tactic_chosen {
             self.recorder.record(
@@ -2202,6 +2242,78 @@ impl M0Engine {
                     "previous": s.previous.as_str(),
                     "next": s.next.as_str(),
                     "cause": s.cause,
+                }),
+                last_perception_signal_id.clone(),
+            );
+        }
+        // **M1.5 G1**: target_acquired chains to the last perception_signal
+        // so M3B can walk acquired → signal → alarm/sight.
+        if let Some(t) = &report.target_acquired {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "ai",
+                "target_acquired",
+                json!({
+                    "actor": guard_id.0,
+                    "target_actor": t.target_actor,
+                    "via": t.via,
+                }),
+                last_perception_signal_id.clone(),
+            );
+        }
+        if let Some(t) = &report.target_lost {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "ai",
+                "target_lost",
+                json!({
+                    "actor": guard_id.0,
+                    "target_actor": t.target_actor,
+                    "reason": t.reason,
+                }),
+                None,
+            );
+        }
+        // **M1.5 G4**: missed_shot_reason fires per miss to give the replay
+        // viewer a stable vocabulary of why a guard's shot didn't connect.
+        if let Some(reason) = &report.missed_shot_reason {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "ai",
+                "missed_shot_reason",
+                json!({
+                    "actor": guard_id.0,
+                    "reason": reason.as_str(),
+                }),
+                None,
+            );
+        }
+        // **M1.5 G5**: stuck_state_changed + recovery_action.
+        if let Some(r) = &report.stuck_recovery {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "ai",
+                "stuck_state_changed",
+                json!({
+                    "actor": guard_id.0,
+                    "stuck_ticks": r.stuck_ticks,
+                    "blocker": r.blocker,
+                }),
+                None,
+            );
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "ai",
+                "recovery_action",
+                json!({
+                    "actor": guard_id.0,
+                    "action": r.action,
+                    "reason": r.reason,
                 }),
                 None,
             );
@@ -2445,6 +2557,16 @@ impl M0Engine {
                         }),
                         Some(weapon_fired_id.clone()),
                     );
+                    // **M1.5 G2**: stage the alarm for next tick's AI loop
+                    // so guards inside the hearing_radius react ≤1 tick
+                    // after the fire event.
+                    if let Ok(mut s) = self.state.write() {
+                        s.pending_alarms_staging.push(cf_ai::AlarmInput {
+                            source_actor: outcome.actor.0,
+                            source_position: [muzzle.x, muzzle.y],
+                            loudness_radius: outcome.loudness_radius,
+                        });
+                    }
                 }
                 // M1: camera punch / hit-stop forward-hooks for DR-055 game feel.
                 // The renderer reads these to apply screen shake and brief
