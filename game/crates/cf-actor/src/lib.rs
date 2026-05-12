@@ -59,12 +59,18 @@ impl ActorId {
     }
 }
 
-/// Body status state machine (M1 minimum surface; M3/M4/M5 expand wounds + chassis layers).
+/// Body status state machine (M1 surface; M3/M4/M5 expand wounds + chassis layers).
+///
+/// Lifecycle per CCCP `Actor.h:33`:
+/// `Stable → Unstable → Downed → Dying → Dead` with `Inactive` as the
+/// tutorial/cutscene escape hatch that pauses the state machine entirely.
 ///
 /// `#[repr(u8)]` with explicit discriminants pins the layout used by
-/// [`ActorState::checksum_bytes`] so future milestones can append new variants
-/// (after `Dead`) without silently shifting determinism checksums. Inserting a
-/// variant in the middle would require bumping the checksum schema.
+/// [`ActorState::checksum_bytes`]. New variants (`Inactive=4`, `Dying=5`) are
+/// **appended after `Dead=3`** to preserve existing checksum byte layout —
+/// inserting them between `Downed` and `Dead` would silently shift every
+/// pre-M1 bundle's checksum. Order in the enum body is for readability; the
+/// numeric tag is what `checksum_bytes` records.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -73,18 +79,28 @@ pub enum Status {
     Stable = 0,
     /// Below `hp_unstable_threshold`; movement still works but HUD warns.
     Unstable = 1,
-    /// At/below `hp_downed_threshold`; player loses control but is not yet dead.
+    /// At/below `hp_downed_threshold`; player loses control but is not yet dying.
     Downed = 2,
     /// HP at zero; cannot recover this run.
     Dead = 3,
+    /// Tutorial/cutscene pause. Inputs ignored; state machine frozen.
+    /// Per CCCP `Actor.h:33` INACTIVE branch.
+    Inactive = 4,
+    /// HP reached zero; entering the DYING dwell window before transitioning
+    /// to DEAD (CCCP `Actor.cpp:1229`; default 1000 ms / 60 ticks at 60 Hz).
+    /// Inventory drop fires on entry to DYING.
+    Dying = 5,
 }
 
 impl Status {
+    /// True for the terminal "no more sim involvement" state.
     pub fn is_dead(self) -> bool {
         matches!(self, Status::Dead)
     }
 
     /// True if the actor can accept new control input (move / aim / fire / reload).
+    /// `Dying` ignores input (death animation playing); `Inactive` ignores input
+    /// (cutscene / tutorial pause).
     pub fn accepts_input(self) -> bool {
         matches!(self, Status::Stable | Status::Unstable)
     }
@@ -94,7 +110,9 @@ impl Status {
             Status::Stable => "stable",
             Status::Unstable => "unstable",
             Status::Downed => "downed",
+            Status::Dying => "dying",
             Status::Dead => "dead",
+            Status::Inactive => "inactive",
         }
     }
 }
@@ -163,7 +181,8 @@ impl Stance {
     pub fn from_state(velocity: Vec2, on_ground: bool, status: Status) -> Stance {
         match status {
             Status::Dead => Stance::Dead,
-            Status::Downed => Stance::Downed,
+            Status::Dying | Status::Downed => Stance::Downed,
+            Status::Inactive => Stance::Idle,
             Status::Stable | Status::Unstable => {
                 if !on_ground {
                     Stance::Airborne
@@ -199,7 +218,8 @@ impl Stance {
         }
         match status {
             Status::Dead => Stance::Dead,
-            Status::Downed => Stance::Downed,
+            Status::Dying | Status::Downed => Stance::Downed,
+            Status::Inactive => Stance::Idle,
             Status::Stable | Status::Unstable => {
                 if jet_active {
                     return Stance::Jetting;
@@ -425,6 +445,12 @@ pub struct ControlIntent {
     /// Toggle prone stance. BP4+ implementation.
     #[serde(default)]
     pub prone: bool,
+    /// **M1**: continuous sharp-aim hold (per CCCP `AHuman.cpp:1779`). Sticky;
+    /// sim consumes this every tick to advance `sharp_aim_progress`. Edge-
+    /// trigger semantics live in the engine (the press/release events convert
+    /// to a continuous bool here).
+    #[serde(default)]
+    pub sharp_aim: bool,
 }
 
 impl Default for IntentSource {
@@ -459,7 +485,8 @@ impl ControlIntent {
     /// continuous field that persists across ticks (not cleared by
     /// [`clear_edges`](Self::clear_edges)), so it is intentionally excluded
     /// here — a sticky aim direction does not indicate the player is
-    /// currently providing input.
+    /// currently providing input. `sharp_aim` is also sticky/continuous; it
+    /// is not treated as active input pressure for idle detection.
     pub fn is_idle(&self) -> bool {
         self.move_x.abs() < f32::EPSILON
             && !self.jump
@@ -547,6 +574,60 @@ pub struct ActorState {
     /// Default 0.02 = full recovery in ~50 ticks (0.83s at 60Hz).
     #[serde(default = "default_stability_recovery_rate")]
     pub stability_recovery_rate: f32,
+    /// **M1**: DYING dwell countdown (CCCP `Actor.cpp:1229`). 0 when not dying.
+    /// Decrements each tick after status enters DYING; at zero the status
+    /// transitions to DEAD. Default 60 ticks (1000 ms at 60Hz).
+    #[serde(default)]
+    pub dying_dwell_ticks_remaining: u32,
+    /// Default value used when seeding `dying_dwell_ticks_remaining` on the
+    /// DYING transition. Configurable per-scenario for tutorial / iron-man modes.
+    #[serde(default = "default_dying_dwell_ticks")]
+    pub dying_dwell_ticks_default: u32,
+    /// **M1**: sharp-aim progress scalar (0..1). Builds when the player holds
+    /// `act.player.sharp_aim` while STABLE, slow, and equipped (CCCP
+    /// `AHuman.cpp:1779`). Snaps to 0 on jump/reload/swap/knockdown/over-walk.
+    #[serde(default)]
+    pub sharp_aim_progress: f32,
+    /// True while the player holds the sharp-aim input. Sticky; consumed every tick.
+    #[serde(default)]
+    pub sharp_aim_active: bool,
+    /// Number of ticks to fully build sharp aim from 0 → 1.0. Default 30 ticks (0.5s @ 60Hz).
+    #[serde(default = "default_sharp_aim_build_ticks")]
+    pub sharp_aim_build_ticks: u32,
+    /// **M1**: recoil accumulator (CCCP `HDFirearm.cpp:891`). Tracks angular
+    /// recoil drift over multiple shots; decays per tick. Positive / negative
+    /// values alternate so the muzzle climbs predictably rather than chaotically.
+    #[serde(default)]
+    pub recoil_accumulator: f32,
+    /// Recoil accumulator decay per tick. Default 0.05 (subtract 0.05 per tick
+    /// toward zero).
+    #[serde(default = "default_recoil_decay_rate")]
+    pub recoil_decay_rate: f32,
+    /// Alternates sign of the next recoil contribution (so the muzzle climbs
+    /// in a tight zig-zag rather than always biasing one way).
+    #[serde(default)]
+    pub recoil_alternation_sign: i8,
+    /// **M1**: mission-critical actor cap. When true, `derived_status` caps
+    /// at DYING (does NOT transition to DEAD via dwell). The mission director
+    /// (M1.5+) reacts to "critical actor downed" before final loss.
+    #[serde(default)]
+    pub mission_critical: bool,
+    /// **M1**: latched flag set on the tick the actor enters DYING so the
+    /// engine fires a one-shot `actor.inventory_dropped` event + clears the
+    /// rifle slot. Cleared on `reset()`.
+    #[serde(default)]
+    pub inventory_dropped_on_dying: bool,
+    /// **M1**: horizontal-speed threshold (world units / s) below which the
+    /// actor counts as "slow enough" for sharp aim to keep building.
+    /// Default 1.5 (essentially "barely moving" — see OpenSoldat
+    /// `Sprites.pas:4870` for the calibration anchor).
+    #[serde(default = "default_walk_threshold")]
+    pub walk_threshold: f32,
+    /// **M1**: most-recent computed bloom multiplier. Latched here so HUD,
+    /// reticle renderer, and AI consumers all read the same value the sim
+    /// computed this tick (rather than each duplicating the formula).
+    #[serde(default = "default_bloom_factor")]
+    pub bloom_factor: f32,
     /// **M5.8 forward-hook (DR-040 ResourceAccumulators)**: 7 resource
     /// accumulators on every actor; `#[serde(default)]` keeps M5 bundles
     /// readable while M5.8 wires actual driver values later. Save-bundle
@@ -630,6 +711,26 @@ fn default_mass_kg() -> f32 {
     80.0 // human infantry default
 }
 
+fn default_dying_dwell_ticks() -> u32 {
+    60 // CCCP Actor.cpp:1229 — 1000 ms at 60 Hz
+}
+
+fn default_sharp_aim_build_ticks() -> u32 {
+    30 // ~0.5 s at 60 Hz to fully build sharp aim
+}
+
+fn default_recoil_decay_rate() -> f32 {
+    0.05
+}
+
+fn default_walk_threshold() -> f32 {
+    1.5
+}
+
+fn default_bloom_factor() -> f32 {
+    1.0
+}
+
 impl ActorState {
     /// Create a default M1 player actor at `spawn` with `inventory` and full HP.
     pub fn player(id: ActorId, team: impl Into<String>, spawn: Vec2, hp_max: f32, inventory: Inventory) -> Self {
@@ -660,6 +761,18 @@ impl ActorState {
             stability: 1.0,
             stability_recovery_rate: 0.02,
             knockdown_ticks_remaining: 0,
+            dying_dwell_ticks_remaining: 0,
+            dying_dwell_ticks_default: default_dying_dwell_ticks(),
+            sharp_aim_progress: 0.0,
+            sharp_aim_active: false,
+            sharp_aim_build_ticks: default_sharp_aim_build_ticks(),
+            recoil_accumulator: 0.0,
+            recoil_decay_rate: default_recoil_decay_rate(),
+            recoil_alternation_sign: 1,
+            mission_critical: false,
+            inventory_dropped_on_dying: false,
+            walk_threshold: default_walk_threshold(),
+            bloom_factor: default_bloom_factor(),
             resources: ResourceAccumulators::default(),
             afflictions: Vec::new(),
         }
@@ -712,6 +825,13 @@ impl ActorState {
         self.inventory.selected = ItemSlot(0);
         self.stability = 1.0;
         self.knockdown_ticks_remaining = 0;
+        self.dying_dwell_ticks_remaining = 0;
+        self.sharp_aim_progress = 0.0;
+        self.sharp_aim_active = false;
+        self.recoil_accumulator = 0.0;
+        self.recoil_alternation_sign = 1;
+        self.inventory_dropped_on_dying = false;
+        self.bloom_factor = default_bloom_factor();
         self.crouch_active = false;
         self.climb_active = false;
         self.jet_active = false;
@@ -726,15 +846,51 @@ impl ActorState {
     /// the chassis pipeline (armor layers → wound → actor HP) via
     /// [`ActorState::apply_zone_damage`]. The legacy direct-HP path is preserved
     /// for actors without a chassis.
+    ///
+    /// **M1**: `Dying` and `Dead` reject further damage; `Inactive` also rejects
+    /// (cutscene safety). Mission-critical actors clamp HP at `0.01` to keep
+    /// them in DOWNED (they cannot reach DYING).
     pub fn apply_damage(&mut self, amount: f32) -> Option<Status> {
-        if amount <= 0.0 || self.status.is_dead() {
+        if amount <= 0.0
+            || self.status.is_dead()
+            || matches!(self.status, Status::Dying | Status::Inactive)
+        {
             return None;
         }
         self.hp = (self.hp - amount).max(0.0);
+        if self.mission_critical && self.hp <= 0.0 {
+            // Mission-critical actors cap above zero so derived_status returns
+            // Downed (not Dying); they cannot be killed by damage alone. The
+            // mission director (M1.5+) can still mark them dead via scripts.
+            self.hp = self.hp_downed_threshold.max(0.01);
+        }
         let new_status = self.derived_status();
         if new_status != self.status {
             self.status = new_status;
+            // Seed DYING dwell on first entry.
+            if matches!(new_status, Status::Dying) {
+                self.dying_dwell_ticks_remaining = self.dying_dwell_ticks_default;
+            }
             Some(new_status)
+        } else {
+            None
+        }
+    }
+
+    /// **M1**: set INACTIVE state explicitly (tutorial / cutscene). Pure setter;
+    /// callers consume the return for event emission.
+    pub fn set_inactive(&mut self, inactive: bool) -> Option<Status> {
+        if inactive && !matches!(self.status, Status::Inactive) {
+            self.status = Status::Inactive;
+            Some(Status::Inactive)
+        } else if !inactive && matches!(self.status, Status::Inactive) {
+            // Reactivate using the derived status from HP.
+            self.status = if self.hp <= 0.0 {
+                Status::Dying
+            } else {
+                Status::Stable
+            };
+            Some(self.status)
         } else {
             None
         }
@@ -816,8 +972,21 @@ impl ActorState {
     }
 
     fn derived_status(&self) -> Status {
+        // Inactive is a sticky external state — never derive into it from HP.
+        if matches!(self.status, Status::Inactive) {
+            return Status::Inactive;
+        }
+        // Dying / Dead are sticky once entered: the DYING dwell tick logic owns
+        // the DYING→DEAD transition; status-from-hp must not snap back to alive
+        // if HP somehow rises during dwell.
+        if matches!(self.status, Status::Dying | Status::Dead) {
+            return self.status;
+        }
         if self.hp <= 0.0 {
-            Status::Dead
+            // CCCP Actor.cpp:1229 — HP=0 enters DYING, NOT DEAD directly.
+            // Mission-critical actors cap here so the mission director (M1.5+)
+            // can react before final loss.
+            Status::Dying
         } else if self.hp <= self.hp_downed_threshold {
             Status::Downed
         } else if self.hp <= self.hp_unstable_threshold {
@@ -1144,6 +1313,9 @@ pub struct ActorObservation {
     /// W1.3: stability scalar (0.0 = fully disrupted, 1.0 = stable).
     #[serde(default = "default_stability")]
     pub stability: f32,
+    /// W1.3: stability recovery rate per tick when grounded.
+    #[serde(default = "default_stability_recovery_rate")]
+    pub stability_recovery_rate: f32,
     /// Physical mass in kg. Affects movement feel, stability resistance, knockdown.
     #[serde(default = "default_mass_kg")]
     pub mass_kg: f32,
@@ -1154,6 +1326,25 @@ pub struct ActorObservation {
     pub climb_active: bool,
     #[serde(default)]
     pub jet_active: bool,
+    /// **M1**: sharp-aim progress scalar (0..1) — CCCP `AHuman.cpp:1779`.
+    #[serde(default)]
+    pub sharp_aim_progress: f32,
+    /// **M1**: most-recent recoil accumulator value (CCCP `HDFirearm.cpp:891`).
+    #[serde(default)]
+    pub recoil_accumulator: f32,
+    /// **M1**: knockdown recovery ticks remaining. Zero when not in knockdown.
+    #[serde(default)]
+    pub knockdown_ticks_remaining: u32,
+    /// **M1**: DYING dwell countdown ticks remaining (CCCP `Actor.cpp:1229`).
+    #[serde(default)]
+    pub dying_dwell_ticks_remaining: u32,
+    /// **M1**: mission-critical flag (caps damage at DOWNED).
+    #[serde(default)]
+    pub mission_critical: bool,
+    /// **M1**: most-recent computed reticle bloom multiplier (Soldat `Sprites.pas:4870`).
+    /// 1.0 = standing/walking; >1 = movement / airborne / sharp-aim breakup.
+    #[serde(default = "default_bloom_factor")]
+    pub bloom_factor: f32,
 }
 
 impl From<&ActorState> for ActorObservation {
@@ -1176,10 +1367,17 @@ impl From<&ActorState> for ActorObservation {
             chassis: actor.chassis_view(),
             origin_id: actor.origin_id.clone(),
             stability: actor.stability,
+            stability_recovery_rate: actor.stability_recovery_rate,
             mass_kg: actor.mass_kg,
             crouch_active: actor.crouch_active,
             climb_active: actor.climb_active,
             jet_active: actor.jet_active,
+            sharp_aim_progress: actor.sharp_aim_progress,
+            recoil_accumulator: actor.recoil_accumulator,
+            knockdown_ticks_remaining: actor.knockdown_ticks_remaining,
+            dying_dwell_ticks_remaining: actor.dying_dwell_ticks_remaining,
+            mission_critical: actor.mission_critical,
+            bloom_factor: actor.bloom_factor,
         }
     }
 }
@@ -1242,10 +1440,35 @@ mod tests {
         actor.apply_damage(35.0);
         assert_eq!(actor.status, Status::Downed);
         actor.apply_damage(10.0);
-        assert_eq!(actor.status, Status::Dead);
-        // Damage after death is a no-op.
+        // HP=0 enters DYING first (CCCP Actor.cpp:1229); DEAD only after dwell.
+        assert_eq!(actor.status, Status::Dying);
+        assert!(actor.dying_dwell_ticks_remaining > 0);
+        // Damage during DYING is a no-op.
         let no_change = actor.apply_damage(10.0);
         assert!(no_change.is_none());
+    }
+
+    #[test]
+    fn mission_critical_caps_at_downed() {
+        let inv = Inventory::with_rifle("rifle_m1_default");
+        let mut actor = ActorState::player(ActorId(1), "blue", Vec2::ZERO, 100.0, inv);
+        actor.mission_critical = true;
+        actor.apply_damage(1000.0);
+        // Lethal damage cannot push a mission-critical actor past Downed.
+        assert_eq!(actor.status, Status::Downed);
+        assert!(actor.hp > 0.0);
+    }
+
+    #[test]
+    fn inactive_pauses_state_machine() {
+        let inv = Inventory::with_rifle("rifle_m1_default");
+        let mut actor = ActorState::player(ActorId(1), "blue", Vec2::ZERO, 100.0, inv);
+        actor.set_inactive(true);
+        assert_eq!(actor.status, Status::Inactive);
+        // Damage during INACTIVE is a no-op (cutscene safety).
+        let change = actor.apply_damage(200.0);
+        assert!(change.is_none());
+        assert_eq!(actor.status, Status::Inactive);
     }
 
     #[test]
@@ -1370,8 +1593,12 @@ mod tests {
         let inv = Inventory::with_rifle("rifle_m1_default");
         let mut actor = ActorState::player(ActorId(1), "blue", Vec2::ZERO, 100.0, inv);
         actor.apply_damage(95.0);
-        assert!(matches!(actor.stance(), Stance::Downed | Stance::Dead));
+        assert!(matches!(actor.stance(), Stance::Downed));
         actor.apply_damage(100.0);
+        // HP=0 lands at DYING which projects to Stance::Downed (death animation).
+        assert!(matches!(actor.status, Status::Dying));
+        // Force dwell expiry → DEAD.
+        actor.status = Status::Dead;
         assert_eq!(actor.stance(), Stance::Dead);
     }
 

@@ -47,10 +47,22 @@ fn body_a_status_state_machine_transitions_through_stable_unstable_downed_dead()
     assert!(!actor.status.accepts_input());
     assert_eq!(ActorObservation::from(&actor).status, "downed");
 
-    // Downed → Dead.
+    // Downed → Dying (HP=0 enters DYING dwell first, per CCCP Actor.cpp:1229).
     let change = actor.apply_damage(20.0);
-    assert_eq!(change, Some(Status::Dead));
-    assert_eq!(actor.status, Status::Dead);
+    assert_eq!(change, Some(Status::Dying));
+    assert_eq!(actor.status, Status::Dying);
+    assert!(!actor.status.accepts_input());
+    assert!(actor.dying_dwell_ticks_remaining > 0);
+    assert_eq!(ActorObservation::from(&actor).status, "dying");
+
+    // Damage during DYING is a no-op (death animation playing).
+    let no_change = actor.apply_damage(100.0);
+    assert!(no_change.is_none());
+    assert_eq!(actor.status, Status::Dying);
+
+    // Force dwell elapsed → DEAD (engine clock owns the dying dwell tick in
+    // production; in this synthetic test we set the field directly).
+    actor.status = Status::Dead;
     assert!(actor.status.is_dead());
     assert_eq!(ActorObservation::from(&actor).status, "dead");
 

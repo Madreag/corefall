@@ -1330,10 +1330,17 @@ mod tests {
             chassis: None,
             origin_id: "human".into(),
             stability: 1.0,
+            stability_recovery_rate: 0.02,
             mass_kg: 80.0,
             crouch_active: false,
             climb_active: false,
             jet_active: false,
+            sharp_aim_progress: 0.0,
+            recoil_accumulator: 0.0,
+            knockdown_ticks_remaining: 0,
+            dying_dwell_ticks_remaining: 0,
+            mission_critical: false,
+            bloom_factor: 1.0,
         };
         let line = stance_line("airborne", Some(&player));
         assert!(line.contains("AIRBORNE"));

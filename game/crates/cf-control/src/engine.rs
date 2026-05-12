@@ -1898,10 +1898,10 @@ impl M0Engine {
                     diffs.push((*id, cur));
                     if Some(*id) == sim.world.player {
                         match cur {
-                            cf_actor::Status::Dead => player_dead = true,
+                            cf_actor::Status::Dead | cf_actor::Status::Dying => player_dead = true,
                             cf_actor::Status::Downed => player_downed = true,
                             cf_actor::Status::Unstable => player_unstable = true,
-                            cf_actor::Status::Stable => {}
+                            cf_actor::Status::Stable | cf_actor::Status::Inactive => {}
                         }
                     }
                 }
@@ -6255,14 +6255,20 @@ mod tests {
             })
             .await;
         engine.drive_tick();
-        // Actor should not have moved (status::Dead refuses input).
+        // Actor should not accept input. CCCP Actor.cpp:1229 — HP=0 enters
+        // DYING (the death animation dwell window). Either DYING or DEAD
+        // refuses input.
         let frame = engine.snapshot(None).await;
         let player = frame
             .actors
             .iter()
             .find(|a| Some(a.id) == frame.player_actor_id)
             .unwrap();
-        assert_eq!(player.status, "dead");
+        assert!(
+            player.status == "dying" || player.status == "dead",
+            "expected dying or dead, got {}",
+            player.status
+        );
     }
 
     #[tokio::test]
@@ -6459,15 +6465,18 @@ mod tests {
             }
         }
         let events = engine.recorder().snapshot_events();
+        // CCCP Actor.cpp:1229 — HP=0 enters DYING (not DEAD); the DEAD
+        // transition fires later when the dwell elapses. Accept either as
+        // proof the projectile_hit cause-chain reached the terminal status.
         let kill_event = events.iter().find(|e| {
             e.category == "actor"
                 && e.event_type == "actor_status_changed"
-                && e.payload["new_status"] == "dead"
+                && (e.payload["new_status"] == "dying" || e.payload["new_status"] == "dead")
                 && e.payload["cause"] == "projectile_hit"
         });
         assert!(
             kill_event.is_some(),
-            "expected a projectile_hit-caused dead status transition; got events: {:?}",
+            "expected a projectile_hit-caused dying/dead status transition; got events: {:?}",
             events
                 .iter()
                 .filter(|e| e.event_type == "actor_status_changed")

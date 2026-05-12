@@ -23,7 +23,7 @@ use cf_physics::{
     apply_horizontal_motion, apply_jump, apply_recoil, step_kinematics, HorizontalInputs, JumpInputs, StepInputs,
 };
 
-use crate::{quantize_f32, ActorId, ActorWorld, ControlIntent, IntentSource, ItemSlot, Status, Vec2};
+use crate::{quantize_f32, ActorId, ActorWorld, ControlIntent, IntentSource, InventoryItem, ItemSlot, Stance, Status, Vec2};
 
 /// Per-actor rifle state tracked alongside the actor world. Keyed by [`ActorId`]; only
 /// actors carrying a rifle in their inventory get an entry.
@@ -177,6 +177,49 @@ pub struct ActorTickOutcome {
     /// drop. Engine emits `actor.gear_dropped` and clears the rifle slot.
     #[serde(default)]
     pub gear_dropped_by_limb_loss: bool,
+    /// **M1**: latched when the actor entered DYING this tick. Engine emits
+    /// `actor.inventory_dropped` once per DYING entry with the rifle preset id
+    /// and hand position.
+    #[serde(default)]
+    pub entered_dying: bool,
+    /// **M1**: position used as the inventory drop hand origin (latched at the
+    /// time of DYING entry).
+    #[serde(default)]
+    pub inventory_drop_position: Option<Vec2>,
+    /// **M1**: hand-position toss velocity at DYING entry.
+    #[serde(default)]
+    pub inventory_drop_velocity: Option<Vec2>,
+    /// **M1**: dropped item label (e.g. "rifle"), populated when the dying
+    /// actor was carrying a rifle.
+    #[serde(default)]
+    pub inventory_drop_label: Option<String>,
+    /// **M1**: latched when DYING dwell elapsed this tick and the actor
+    /// transitioned to DEAD. Engine emits `actor.actor_status_changed` with
+    /// from=dying, to=dead and cause="dying_dwell_elapsed".
+    #[serde(default)]
+    pub dying_dwell_elapsed: bool,
+    /// **M1**: latched when sharp aim was invalidated this tick. Engine emits
+    /// `actor.sharp_aim_invalidated` with this reason.
+    #[serde(default)]
+    pub sharp_aim_invalidation_reason: Option<String>,
+    /// **M1**: latched when knockdown began this tick. Engine emits
+    /// `physics.authority_changed` with from=animation, to=ragdoll.
+    #[serde(default)]
+    pub knockdown_started: bool,
+    /// **M1**: latched when knockdown recovered this tick. Engine emits
+    /// `physics.authority_changed` with from=ragdoll, to=animation.
+    #[serde(default)]
+    pub knockdown_recovered: bool,
+    /// **M1**: noise/alarm radius emitted by a fire event. Zero when not
+    /// firing; non-zero only when `fired=true`. Engine consumes this to
+    /// emit `equipment.alarm_registered`.
+    #[serde(default)]
+    pub loudness_radius: f32,
+    /// **M1**: most-recent bloom factor (mirrored from
+    /// `ActorState::bloom_factor`). Engine writes this into events the HUD
+    /// reticle widget reads.
+    #[serde(default)]
+    pub bloom_factor: f32,
 }
 
 /// Hit applied to an actor by a projectile this tick.
@@ -326,6 +369,16 @@ fn step_one_actor(
             landed_impulse: 0.0,
             jet_disabled_by_limb_loss: false,
             gear_dropped_by_limb_loss: false,
+            entered_dying: false,
+            inventory_drop_position: None,
+            inventory_drop_velocity: None,
+            inventory_drop_label: None,
+            dying_dwell_elapsed: false,
+            sharp_aim_invalidation_reason: None,
+            knockdown_started: false,
+            knockdown_recovered: false,
+            loudness_radius: 0.0,
+            bloom_factor: actor.bloom_factor,
         };
 
         if intent.reset {
@@ -572,6 +625,7 @@ fn step_one_actor(
         // Loudness radius: rifles are loud. Scale with damage as a proxy for
         // weapon size. Base 480 units = default sight_radius of the reactive guard.
         let loudness_radius = 480.0_f32 * (damage / 10.0).max(1.0).min(3.0);
+        outcome.loudness_radius = loudness_radius;
         report.spawned_projectiles.push(SpawnedProjectile {
             id: projectile_id,
             owner: actor_id,
@@ -580,11 +634,31 @@ fn step_one_actor(
             damage,
             loudness_radius,
         });
+        // M1: alternating recoil accumulator (CCCP HDFirearm.cpp:891) — each
+        // shot pushes the muzzle drift toward the opposite sign of the last
+        // one so the climb pattern feels predictable, not chaotic.
+        {
+            let actor = state
+                .world
+                .actors
+                .get_mut(&actor_id)
+                .expect("actor id exists by construction");
+            let sign = if actor.recoil_alternation_sign >= 0 {
+                1.0
+            } else {
+                -1.0
+            };
+            let contribution = rifle_outcomes.recoil_impulse_applied / 100.0;
+            actor.recoil_accumulator += sign * contribution;
+            actor.recoil_alternation_sign = -actor.recoil_alternation_sign;
+            if actor.recoil_alternation_sign == 0 {
+                actor.recoil_alternation_sign = 1;
+            }
+        }
     }
 
-    // W1.3: stability tracking — recoil and landing impact destabilize; ground
-    // contact with no impulse recovers. This feeds aim bloom, knockdown
-    // vulnerability, and the A-FEEL-06 "why am I weak/unstable" HUD explanation.
+    // W1.3 + M1: stability tracking, knockdown, sharp aim, recoil decay,
+    // bloom factor, DYING dwell, travel-impulse damage.
     {
         let actor = state
             .world
@@ -613,6 +687,107 @@ fn step_one_actor(
             actor.stability = (actor.stability + actor.stability_recovery_rate).min(1.0);
         }
 
+        // M1: recoil accumulator decay (CCCP HDFirearm.cpp:891) — angular drift
+        // exponentially decays toward zero each tick the actor isn't firing.
+        if outcome.recoil_applied == 0.0 && actor.recoil_accumulator.abs() > 1e-4 {
+            let decay = actor.recoil_decay_rate * actor.recoil_accumulator.signum();
+            let next = actor.recoil_accumulator - decay;
+            if next.signum() != actor.recoil_accumulator.signum() {
+                actor.recoil_accumulator = 0.0;
+            } else {
+                actor.recoil_accumulator = next;
+            }
+        }
+
+        // M1: sharp aim build / invalidation (CCCP AHuman.cpp:1779).
+        // Build only when ALL conditions hold: STABLE status (not Unstable, not
+        // knockdown), grounded, slow, equipped (rifle selected), and player
+        // holds the sharp_aim sticky input.
+        let rifle_equipped_for_sharp = actor.inventory.selected_item().is_rifle();
+        let horizontal_speed = actor.velocity.x.abs();
+        let walk_threshold = actor.walk_threshold;
+        let prior_sharp = actor.sharp_aim_progress;
+        let mut invalidation: Option<&'static str> = None;
+        let mut invalidation_reason: Option<String> = None;
+        if outcome.fired {
+            // Firing doesn't invalidate by itself; the reticle bloom handles it.
+        }
+        if outcome.reload_started {
+            invalidation = Some("reloading");
+        }
+        if outcome.jump_accepted {
+            invalidation = Some("jumped");
+        }
+        if outcome.selection_changed.is_some() {
+            invalidation = Some("item_swap");
+        }
+        if !rifle_equipped_for_sharp && prior_sharp > 0.0 {
+            invalidation = invalidation.or(Some("unequipped"));
+        }
+        if horizontal_speed > walk_threshold && prior_sharp > 0.0 {
+            invalidation = invalidation.or(Some("moved"));
+        }
+        if !matches!(actor.status, Status::Stable) && prior_sharp > 0.0 {
+            invalidation = invalidation.or(Some("unstable"));
+        }
+        if actor.knockdown_ticks_remaining > 0 && prior_sharp > 0.0 {
+            invalidation = invalidation.or(Some("knockdown"));
+        }
+        if invalidation.is_some() {
+            actor.sharp_aim_progress = 0.0;
+            actor.sharp_aim_active = false;
+        } else if intent.sharp_aim
+            && rifle_equipped_for_sharp
+            && actor.on_ground
+            && horizontal_speed <= walk_threshold
+            && matches!(actor.status, Status::Stable)
+            && actor.knockdown_ticks_remaining == 0
+        {
+            let build_step = if actor.sharp_aim_build_ticks > 0 {
+                1.0 / (actor.sharp_aim_build_ticks as f32)
+            } else {
+                1.0
+            };
+            actor.sharp_aim_progress = (actor.sharp_aim_progress + build_step).min(1.0);
+            actor.sharp_aim_active = true;
+        } else if !intent.sharp_aim {
+            actor.sharp_aim_active = false;
+            // Releasing the hold without an invalidation cause decays sharp aim.
+            actor.sharp_aim_progress = (actor.sharp_aim_progress - 0.05).max(0.0);
+        }
+        if let Some(reason) = invalidation {
+            invalidation_reason = Some(reason.to_string());
+        }
+        outcome.sharp_aim_invalidation_reason = invalidation_reason;
+
+        // M1: movement accuracy bloom (OpenSoldat Sprites.pas:4870).
+        // standing/walking = 1.0×; running/jumping/jetting = 7.0×;
+        // airborne/prone-transition = 3.0×. Sharp aim multiplies the bloom by
+        // (1 - 0.6 * sharp_aim_progress) so a full sharp aim cuts the reticle
+        // down to 40% of its baseline.
+        let speed = actor.velocity.x.abs();
+        let mut bloom: f32 = if !actor.on_ground {
+            3.0
+        } else if speed >= Stance::RUN_THRESHOLD {
+            7.0
+        } else {
+            1.0
+        };
+        if actor.jet_active {
+            bloom = bloom.max(7.0);
+        }
+        if outcome.recoil_applied > 0.0 {
+            bloom *= 1.5;
+        }
+        if outcome.reload_started || rifle_outcomes.reload_completed {
+            bloom *= 1.2;
+        }
+        // Sharp aim tightens the reticle (scaled by progress).
+        let sharp_tighten = 1.0 - 0.6 * actor.sharp_aim_progress;
+        bloom *= sharp_tighten.max(0.4);
+        actor.bloom_factor = bloom;
+        outcome.bloom_factor = bloom;
+
         // Knockdown: when stability is critically low and the actor just took
         // a destabilizing event, trigger a knockdown stun. The actor cannot act
         // for knockdown_ticks_remaining ticks (similar to Downed but recoverable).
@@ -621,17 +796,69 @@ fn step_one_actor(
         const KNOCKDOWN_STABILITY_THRESHOLD: f32 = 0.1;
         const KNOCKDOWN_DURATION_TICKS: u32 = 18;
         let took_hit = outcome.recoil_applied > 0.0 || outcome.landed_impulse > 100.0;
+        let was_in_knockdown = actor.knockdown_ticks_remaining > 0;
         if actor.stability < KNOCKDOWN_STABILITY_THRESHOLD
             && took_hit
             && actor.knockdown_ticks_remaining == 0
             && actor.status.accepts_input()
         {
             actor.knockdown_ticks_remaining = KNOCKDOWN_DURATION_TICKS;
+            outcome.knockdown_started = true;
+        }
+        // M1: travel-impulse damage on UNSTABLE actor (CCCP Actor.cpp:1199).
+        // STABLE actors do NOT take travel-impulse damage — they only become
+        // UNSTABLE first via the stability scalar.
+        if matches!(actor.status, Status::Unstable) {
+            const TRAVEL_IMPULSE_THRESHOLD: f32 = 100.0;
+            const GIB_IMPULSE_LIMIT: f32 = 1000.0;
+            let impulse = outcome.landed_impulse.max(outcome.recoil_applied);
+            if impulse > TRAVEL_IMPULSE_THRESHOLD {
+                let raw = (impulse - TRAVEL_IMPULSE_THRESHOLD)
+                    / (GIB_IMPULSE_LIMIT - TRAVEL_IMPULSE_THRESHOLD);
+                let damage = (raw * actor.hp_max).max(0.0).min(actor.hp_max);
+                let _ = actor.apply_damage(damage);
+            }
         }
 
         // Tick down knockdown recovery.
         if actor.knockdown_ticks_remaining > 0 {
             actor.knockdown_ticks_remaining -= 1;
+            if actor.knockdown_ticks_remaining == 0 && was_in_knockdown {
+                outcome.knockdown_recovered = true;
+            }
+        }
+
+        // M1: DYING dwell countdown (CCCP Actor.cpp:1229). When dwell expires,
+        // transition to DEAD (unless mission_critical, which caps at Downed).
+        if matches!(actor.status, Status::Dying) && actor.dying_dwell_ticks_remaining > 0 {
+            actor.dying_dwell_ticks_remaining -= 1;
+            if actor.dying_dwell_ticks_remaining == 0 && !actor.mission_critical {
+                actor.status = Status::Dead;
+                outcome.dying_dwell_elapsed = true;
+                outcome.new_status = Status::Dead;
+            }
+        }
+
+        // M1: one-shot inventory drop on DYING entry. Captures hand position
+        // and an outward toss velocity for the engine to emit on the recorder.
+        if matches!(actor.status, Status::Dying) && !actor.inventory_dropped_on_dying {
+            let label = actor.inventory.selected_item().label().to_string();
+            let drop_pos = Vec2::new(
+                actor.position.x + actor.aim.x * actor.half_extents.x,
+                actor.position.y + actor.half_extents.y * 0.5,
+            );
+            let toss_vel = Vec2::new(actor.aim.x * 30.0 + actor.velocity.x * 0.25, 60.0);
+            outcome.entered_dying = true;
+            outcome.inventory_drop_position = Some(drop_pos);
+            outcome.inventory_drop_velocity = Some(toss_vel);
+            outcome.inventory_drop_label = Some(label);
+            // Replace inventory slots with Empty so subsequent fire intent is
+            // rejected ("no weapon"). We retain the slot count so observation
+            // shapes remain stable.
+            for slot in &mut actor.inventory.items {
+                *slot = InventoryItem::Empty;
+            }
+            actor.inventory_dropped_on_dying = true;
         }
     }
 
@@ -874,7 +1101,14 @@ mod tests {
         }
         assert!(hits >= 9, "all 9 shots must connect; got {hits}");
         let dummy = state.world.actors.get(&ActorId(2)).unwrap();
-        assert!(dummy.status.is_dead(), "dummy hp should drop to zero");
+        // CCCP Actor.cpp:1229 — HP=0 enters DYING dwell first. After the
+        // 60-tick dwell at 60Hz the status advances to DEAD; the loop above
+        // runs 240 ticks, well past the dwell.
+        assert!(
+            matches!(dummy.status, Status::Dying | Status::Dead),
+            "dummy must enter DYING (or DEAD after dwell); got {:?}",
+            dummy.status
+        );
     }
 
     #[test]
