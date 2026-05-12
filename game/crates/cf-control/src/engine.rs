@@ -3776,44 +3776,75 @@ impl M0Engine {
         snapshot
     }
 
-    /// **M2**: build the render-side terrain snapshot. Drains dirty chunks
-    /// from `ChunkedTerrain::dirty_chunks` and clears them so the next
-    /// frame only re-uploads new edits. Also probes the dig-preview point
-    /// at the player's aim and surfaces the active overlay mode.
+    /// **M2**: build the render-side terrain snapshot. Two-phase lock to
+    /// avoid contending with cfctl `observe.once` polls (which take read
+    /// locks at 15 ms cadence): phase 1 reads overlay mode + dig preview +
+    /// anchor under a read lock and detects whether the dirty set is
+    /// empty; phase 2 only acquires the write lock when there's at least
+    /// one dirty chunk to drain. Without this split, paced 60 Hz scripts
+    /// with no active carves were starving cfctl polls because every Bevy
+    /// frame was taking a write lock just to read the empty dirty set.
     pub fn terrain_render_snapshot(&self) -> TerrainRenderSnapshot {
+        let needs_drain;
+        let active;
+        let anchor;
+        let overlay_mode;
+        let dig_preview;
+        {
+            let read = self.state.read().expect("engine state poisoned");
+            overlay_mode = read.material_overlay_mode.clone();
+            dig_preview = read.player_actor.and_then(|pid| {
+                let actor = read.actor_state.as_ref()?.world.actors.get(&pid)?;
+                let terrain = read.chunked_terrain.as_ref()?;
+                const DIG_REACH: f32 = 22.0;
+                const DIG_RADIUS: f32 = 12.0;
+                let aim_x = actor.aim.x;
+                let aim_y = actor.aim.y;
+                let aim_len = ((aim_x * aim_x) + (aim_y * aim_y)).sqrt().max(0.001);
+                let nx = aim_x / aim_len;
+                let ny = aim_y / aim_len;
+                let probe_x = actor.position.x + nx * DIG_REACH;
+                let probe_y = actor.position.y + ny * DIG_REACH;
+                let material_id = terrain.material_at_world(probe_x, probe_y);
+                let valid = terrain.registry.is_diggable(material_id);
+                Some(TerrainDigPreview {
+                    position: [probe_x, probe_y],
+                    radius: DIG_RADIUS,
+                    valid,
+                    material_id,
+                })
+            });
+            active = read.chunked_terrain.is_some();
+            anchor = read
+                .chunked_terrain
+                .as_ref()
+                .map(|t| t.anchor)
+                .unwrap_or([0.0, 0.0]);
+            needs_drain = read
+                .chunked_terrain
+                .as_ref()
+                .map(|t| t.dirty_chunk_count() > 0)
+                .unwrap_or(false);
+        }
+        if !needs_drain {
+            return TerrainRenderSnapshot {
+                active,
+                anchor,
+                overlay_mode,
+                dirty_updates: Vec::new(),
+                dig_preview,
+            };
+        }
         let mut state = self.state.write().expect("engine state poisoned");
-        let overlay_mode = state.material_overlay_mode.clone();
-        let dig_preview = state.player_actor.and_then(|pid| {
-            let actor = state.actor_state.as_ref()?.world.actors.get(&pid)?;
-            let terrain = state.chunked_terrain.as_ref()?;
-            const DIG_REACH: f32 = 22.0;
-            const DIG_RADIUS: f32 = 12.0;
-            let aim_x = actor.aim.x;
-            let aim_y = actor.aim.y;
-            let aim_len = ((aim_x * aim_x) + (aim_y * aim_y)).sqrt().max(0.001);
-            let nx = aim_x / aim_len;
-            let ny = aim_y / aim_len;
-            let probe_x = actor.position.x + nx * DIG_REACH;
-            let probe_y = actor.position.y + ny * DIG_REACH;
-            let material_id = terrain.material_at_world(probe_x, probe_y);
-            let valid = terrain.registry.is_diggable(material_id);
-            Some(TerrainDigPreview {
-                position: [probe_x, probe_y],
-                radius: DIG_RADIUS,
-                valid,
-                material_id,
-            })
-        });
         let Some(terrain) = state.chunked_terrain.as_mut() else {
             return TerrainRenderSnapshot {
-                active: false,
-                anchor: [0.0, 0.0],
+                active,
+                anchor,
                 overlay_mode,
                 dirty_updates: Vec::new(),
                 dig_preview,
             };
         };
-        let anchor = terrain.anchor;
         let dirty: Vec<cf_terrain::ChunkCoord> = terrain.dirty_chunks().collect();
         let mut updates = Vec::with_capacity(dirty.len());
         for coord in &dirty {
@@ -3821,20 +3852,13 @@ impl M0Engine {
             updates.push(TerrainChunkUpdate {
                 cx: coord.cx,
                 cy: coord.cy,
-                // M2 ships the conservative "full-chunk" dirty rect; the
-                // M5.6 active material kernel will refine this to a tight
-                // sub-rect per coalesced dirty area. The renderer accepts
-                // both equally.
                 dirty_rect: [0, 0, cf_terrain::CHUNK_SIZE - 1, cf_terrain::CHUNK_SIZE - 1],
                 pixels,
             });
         }
-        // Per the M2 contract — clear the dirty set AFTER the renderer
-        // pulls the updates so the next frame doesn't re-upload chunks
-        // that haven't changed.
         terrain.clear_dirty();
         TerrainRenderSnapshot {
-            active: true,
+            active,
             anchor,
             overlay_mode,
             dirty_updates: updates,

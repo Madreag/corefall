@@ -743,18 +743,30 @@ fn sync_engine_tick_to_capture_clock(holder: Res<EngineHolder>, mut clock: ResMu
     clock.current_tick = holder.0.current_tick().0;
 }
 
-/// **M2**: bridge the engine's chunked terrain into cf-render-2d each
-/// frame. Drains every dirty chunk into `ChunkedTerrainSnapshot.updates`,
-/// mirrors the active overlay mode into `OverlayModeState`, and probes
-/// the dig-preview point at the player's aim into `DigPreviewGhost`.
-/// `ChunkedTerrain::clear_dirty()` is called inside the engine's
-/// `terrain_render_snapshot()` so the next frame sees a fresh dirty set.
+/// **M2**: bridge the engine's chunked terrain into cf-render-2d. Gated on
+/// engine tick advance so we don't take an extra read lock every render
+/// frame (the cfctl `observe.once` poll path needs the same read lock at
+/// 15 ms cadence; under paced 60 Hz with long `sim.run_for_ticks(N)`
+/// windows, lock contention starved cfctl observe polls).
+#[derive(Resource, Default)]
+struct TerrainBridgeCursor {
+    last_tick: u64,
+    initialized: bool,
+}
+
 fn sync_terrain_state_to_render(
     holder: Res<EngineHolder>,
     mut terrain_snapshot: ResMut<ChunkedTerrainSnapshot>,
     mut overlay_state: ResMut<OverlayModeState>,
     mut dig_ghost: ResMut<DigPreviewGhost>,
+    mut cursor: ResMut<TerrainBridgeCursor>,
 ) {
+    let tick_now = holder.0.current_tick().0;
+    if cursor.initialized && cursor.last_tick == tick_now {
+        return;
+    }
+    cursor.initialized = true;
+    cursor.last_tick = tick_now;
     let snap = holder.0.terrain_render_snapshot();
     terrain_snapshot.active = snap.active;
     terrain_snapshot.anchor = snap.anchor;
