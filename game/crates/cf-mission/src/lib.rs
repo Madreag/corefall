@@ -1424,6 +1424,18 @@ mod tests {
     #[test]
     fn objective_failed_emitted_on_reactor_destroyed() {
         // Item 679: test objective_failed event path.
+        //
+        // **Hardening regression fix (M1 R2)**: the production code at
+        // `reactor_destroyed_match` was hardened per Bugbot 3212230553 (Low) to
+        // scan Active OR Pending defend_reactor objectives so a destroyed
+        // reactor on a queued objective still produces an immediate loss.
+        // That means the destruction now resolves on tick 1 (when the first-
+        // pending guard activates the objective and the reactor-destroyed
+        // check runs in the same tick). The original test discarded tick 1
+        // and asserted on tick 2 (which returns an empty report because the
+        // mission is already terminal). Updated to assert on tick 1's report
+        // — same intent (objective_failed fires when reactor destroyed),
+        // correct lifecycle.
         let objectives = vec![Objective {
             id: "defend".to_string(),
             kind: ObjectiveKind::DefendReactor {
@@ -1446,8 +1458,7 @@ mod tests {
             destroyed: true,
         }]);
         let actors = mk_actors(player_at(100.0, 32.0), false);
-        // Activate the objective first.
-        let _ = step(
+        let report = step(
             &mut state,
             MissionTickInputs {
                 tick: 1,
@@ -1457,8 +1468,23 @@ mod tests {
                 reactors_destroyed: &reactors.destroyed_map(),
             },
         );
-        // Now the reactor is destroyed — step again to get objective_failed.
-        let report = step(
+        assert!(
+            !report.objective_failed.is_empty(),
+            "objective_failed must be emitted when reactor is destroyed (tick 1 report = {report:?})"
+        );
+        assert_eq!(report.objective_failed[0], "defend");
+        assert!(
+            matches!(
+                state.result,
+                MissionResult::Lost {
+                    reason: LossReason::ReactorDestroyed
+                }
+            ),
+            "state.result must be Lost(ReactorDestroyed), got {:?}",
+            state.result
+        );
+        // Subsequent ticks are no-ops because the mission is terminal.
+        let report_after = step(
             &mut state,
             MissionTickInputs {
                 tick: 2,
@@ -1468,10 +1494,6 @@ mod tests {
                 reactors_destroyed: &reactors.destroyed_map(),
             },
         );
-        assert!(
-            !report.objective_failed.is_empty(),
-            "objective_failed must be emitted when reactor is destroyed"
-        );
-        assert_eq!(report.objective_failed[0], "defend");
+        assert!(report_after.objective_failed.is_empty(), "terminal step must be empty");
     }
 }
