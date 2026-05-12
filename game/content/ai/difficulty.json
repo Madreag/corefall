@@ -1,0 +1,45 @@
+{
+  "schema": 1,
+  "_doc": "M1.5 G6: AI difficulty preset registry. cf-ai::DifficultyPreset::lookup(name) reads this file. Three presets: cakewalk (forgiving onboarding), tough_crowd (M1.5 default per DR-050), veteran (harder than tough_crowd, proves a loss path). Fields map 1:1 to ReactiveGuardParams (hp → max_hp; reload_ms → reload_seconds / 1000.0; etc). Adding presets is additive: cf-mod's validator accepts new entries as long as required fields are present.",
+  "presets": [
+    {
+      "id": "cakewalk",
+      "display_name": "Cakewalk",
+      "hp": 60.0,
+      "aim_settle_ticks": 24,
+      "miss_chance": 0.3,
+      "sight_range": 240.0,
+      "sight_fov_degrees": 90.0,
+      "hearing_radius": 320.0,
+      "memory_decay_ticks": 180,
+      "reload_ms": 2400,
+      "retreat_hp_pct": 0.5
+    },
+    {
+      "id": "tough_crowd",
+      "display_name": "Tough Crowd",
+      "hp": 80.0,
+      "aim_settle_ticks": 12,
+      "miss_chance": 0.1,
+      "sight_range": 320.0,
+      "sight_fov_degrees": 120.0,
+      "hearing_radius": 480.0,
+      "memory_decay_ticks": 300,
+      "reload_ms": 1800,
+      "retreat_hp_pct": 0.3
+    },
+    {
+      "id": "veteran",
+      "display_name": "Veteran",
+      "hp": 120.0,
+      "aim_settle_ticks": 6,
+      "miss_chance": 0.05,
+      "sight_range": 480.0,
+      "sight_fov_degrees": 140.0,
+      "hearing_radius": 600.0,
+      "memory_decay_ticks": 600,
+      "reload_ms": 1200,
+      "retreat_hp_pct": 0.2
+    }
+  ]
+}

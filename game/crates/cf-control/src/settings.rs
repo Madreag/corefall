@@ -171,6 +171,15 @@ pub struct Settings {
     /// actor counts as "slow enough" to keep building sharp aim. Default 1.5.
     #[serde(default = "default_walk_threshold")]
     pub walk_threshold: f32,
+    /// **M1.5 G6**: active AI difficulty preset id. Engine applies the
+    /// matching `cf-ai::DifficultyPreset` to every `ReactiveGuard` whenever
+    /// this changes.
+    #[serde(default = "default_ai_difficulty")]
+    pub ai_difficulty: String,
+}
+
+fn default_ai_difficulty() -> String {
+    "tough_crowd".to_string()
 }
 
 fn default_tick_rate_hz() -> u32 {
@@ -309,6 +318,7 @@ impl Default for Settings {
             recoil_decay_per_tick: default_recoil_decay_per_tick(),
             sharp_aim_build_ticks: default_sharp_aim_build_ticks(),
             walk_threshold: default_walk_threshold(),
+            ai_difficulty: default_ai_difficulty(),
         }
     }
 }

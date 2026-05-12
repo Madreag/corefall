@@ -26,6 +26,11 @@
           "format": "float",
           "default": 1500.0
         },
+        "ai_difficulty": {
+          "description": "**M1.5 G6**: active AI difficulty preset id. Engine applies the\nmatching `cf-ai::DifficultyPreset` to every `ReactiveGuard` whenever\nthis changes.",
+          "type": "string",
+          "default": "tough_crowd"
+        },
         "captions": {
           "type": "boolean"
         },

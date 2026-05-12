@@ -508,6 +508,7 @@ fn build_config(cli: &Cli, scenario_path: PathBuf) -> Result<M0EngineConfig> {
             recoil_decay_per_tick: 0.05,
             sharp_aim_build_ticks: 30,
             walk_threshold: 1.5,
+            ai_difficulty: "tough_crowd".to_string(),
         },
         seed_override: cli.seed,
         duration_ticks_override: if cli_duration > 0 { Some(cli_duration) } else { None },

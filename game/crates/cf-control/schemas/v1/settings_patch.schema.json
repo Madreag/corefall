@@ -11,6 +11,13 @@
       ],
       "format": "float"
     },
+    "ai_difficulty": {
+      "description": "**M1.5 G6**: AI difficulty preset id. Valid values:\n`\"cakewalk\" | \"tough_crowd\" | \"veteran\"`. The engine looks up the\npreset in `cf-ai::DifficultyPreset::builtin(id)` and applies it to\nevery `ReactiveGuard` in the world.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "captions": {
       "type": [
         "boolean",

@@ -152,6 +152,10 @@ pub struct M0EngineConfig {
     /// M3A: configurable checksum cadence. 0 = disabled. Default from
     /// `ChecksumConfig::m0_default().cadence_ticks` (60).
     pub checksum_cadence_ticks: u64,
+    /// **M1.5 G6**: optional difficulty preset id from the scenario
+    /// manifest. Applied to each reactive guard at engine construction.
+    /// `None` keeps each guard's params as authored.
+    pub difficulty_preset: Option<String>,
 }
 
 /// M1.5: initial breach world snapshot.
@@ -278,6 +282,7 @@ impl M0EngineConfig {
             initial_chunked_terrain: None,
             initial_reactors: Vec::new(),
             checksum_cadence_ticks: ChecksumConfig::m0_default().cadence_ticks,
+            difficulty_preset: None,
         }
     }
 
@@ -290,6 +295,9 @@ impl M0EngineConfig {
         cfg.duration_ticks = scenario.duration_ticks.unwrap_or(0);
         // M1 Seam S2: forward scenario.tutorial_safety into the engine config.
         cfg.tutorial_safety = scenario.tutorial_safety;
+        // **M1.5 G6**: forward the scenario's difficulty preset id into the
+        // engine config so the engine can apply the preset at spawn time.
+        cfg.difficulty_preset = scenario.difficulty_preset.clone();
         cfg.expected_tests = if scenario.expected_tests.is_empty() {
             vec!["M0-SMOKE-01".to_string()]
         } else {
@@ -700,8 +708,30 @@ impl M0Engine {
             Some(cf_mission::ReactorWorld::new(config.initial_reactors.clone()))
         };
         let mut reactive_guards = BTreeMap::new();
+        // **M1.5 G6**: when the scenario carries a difficulty_preset id,
+        // overlay the preset onto each guard's params at spawn time so the
+        // preset's miss_chance / aim_settle / hearing_radius / etc. are
+        // already active by the first AI tick. The preset gracefully
+        // falls back to the per-guard params from the scenario manifest
+        // when the id is unknown.
+        let preset = config
+            .difficulty_preset
+            .as_deref()
+            .and_then(cf_ai::DifficultyPreset::builtin);
         for guard in &config.initial_guards {
-            reactive_guards.insert(guard.actor, cf_ai::ReactiveGuard::new(guard.actor, guard.params));
+            let mut params = guard.params;
+            if let Some(p) = &preset {
+                p.apply_to(&mut params, config.tick_rate_hz);
+            }
+            let mut rg = cf_ai::ReactiveGuard::new(guard.actor, params);
+            // Latch max_hp from the actor world the engine just built so
+            // the retreat-hp gate has a real denominator.
+            if let Some(sim) = &actor_state {
+                if let Some(actor) = sim.world.actors.get(&guard.actor) {
+                    rg.max_hp = actor.hp.max(1.0);
+                }
+            }
+            reactive_guards.insert(guard.actor, rg);
         }
         let mission = if config.initial_objectives.is_empty() && config.mission_loss.is_none() {
             None
@@ -4377,6 +4407,12 @@ fn apply_settings_patch(settings: &mut Settings, patch: &SettingsPatch) -> Vec<S
             changed.push("walk_threshold".to_string());
         }
     }
+    if let Some(ref id) = patch.ai_difficulty {
+        if settings.ai_difficulty != *id {
+            settings.ai_difficulty = id.clone();
+            changed.push("ai_difficulty".to_string());
+        }
+    }
     changed
 }
 
@@ -5819,6 +5855,17 @@ impl EngineHandle for M0Engine {
                 }
                 let prev_settings = state.settings.clone();
                 let changed = apply_settings_patch(&mut state.settings, &changes);
+                // **M1.5 G6**: when ai_difficulty changed, re-apply the
+                // preset to every live ReactiveGuard so the new params take
+                // effect on the next AI tick.
+                if changed.iter().any(|f| f == "ai_difficulty") {
+                    if let Some(preset) = cf_ai::DifficultyPreset::builtin(&state.settings.ai_difficulty) {
+                        let tick_rate_hz = self.config.tick_rate_hz;
+                        for guard in state.reactive_guards.values_mut() {
+                            preset.apply_to(&mut guard.params, tick_rate_hz);
+                        }
+                    }
+                }
                 let new_settings = state.settings.clone();
                 drop(state);
                 let value = serde_json::to_value(&new_settings).unwrap_or(serde_json::Value::Null);

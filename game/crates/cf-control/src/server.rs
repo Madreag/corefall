@@ -186,6 +186,12 @@ pub struct SettingsPatch {
     pub sharp_aim_build_ticks: Option<u32>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub walk_threshold: Option<f32>,
+    /// **M1.5 G6**: AI difficulty preset id. Valid values:
+    /// `"cakewalk" | "tough_crowd" | "veteran"`. The engine looks up the
+    /// preset in `cf-ai::DifficultyPreset::builtin(id)` and applies it to
+    /// every `ReactiveGuard` in the world.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ai_difficulty: Option<String>,
 }
 
 impl SettingsPatch {
@@ -209,6 +215,7 @@ impl SettingsPatch {
             && self.recoil_decay_per_tick.is_none()
             && self.sharp_aim_build_ticks.is_none()
             && self.walk_threshold.is_none()
+            && self.ai_difficulty.is_none()
     }
 
     pub fn validation_error(&self) -> Option<String> {
@@ -254,6 +261,11 @@ impl SettingsPatch {
         if let Some(v) = self.reduce_camera_shake_pct {
             if !v.is_finite() {
                 return Some("reduce_camera_shake_pct_must_be_finite".to_string());
+            }
+        }
+        if let Some(id) = self.ai_difficulty.as_deref() {
+            if cf_ai::DifficultyPreset::builtin(id).is_none() {
+                return Some(format!("ai_difficulty_unknown: {id}"));
             }
         }
         self.key_bindings
