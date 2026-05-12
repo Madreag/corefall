@@ -42,6 +42,9 @@ impl Default for CfRenderPlugin {
 impl Plugin for CfRenderPlugin {
     fn build(&self, app: &mut App) {
         app.insert_resource(ClearColor(self.clear_color))
+            .insert_resource(CameraShake::default())
+            .insert_resource(CameraFollow::default())
+            .insert_resource(HitStop::default())
             .add_systems(Startup, spawn_camera);
     }
 }
@@ -89,6 +92,132 @@ fn spawn_camera(mut commands: Commands) {
 }
 
 // ---------------------------------------------------------------------------
+// M1 Gap E1-E3: camera shake / hit-stop / follow-with-deadzone resources
+// ---------------------------------------------------------------------------
+
+/// **M1 Gap E1**: camera shake state. cf-app writes `pending_magnitude` (in
+/// pixels) when an `ux.camera_punch_requested` event fires; the
+/// `apply_camera_effects` system decays the magnitude by ~exp(-dt/0.2s) and
+/// applies a per-frame random offset to the Camera2d. Setting
+/// `reduce_camera_shake_pct=1.0` zeroes the magnitude on intake so the
+/// camera never moves (accessibility floor).
+#[derive(Resource, Debug, Clone, Default)]
+pub struct CameraShake {
+    pub magnitude_px: f32,
+    pub reduce_pct: f32,
+    /// 64-bit xorshift state for the per-frame jitter. Seeded by cf-app from
+    /// the engine RNG at startup so the visual is deterministic given the
+    /// same input event stream.
+    pub rng_state: u64,
+}
+
+impl CameraShake {
+    fn next_jitter(&mut self) -> (f32, f32) {
+        // xorshift64* — deterministic and cheap.
+        let mut s = if self.rng_state == 0 {
+            0x9E3779B97F4A7C15
+        } else {
+            self.rng_state
+        };
+        s ^= s << 13;
+        s ^= s >> 7;
+        s ^= s << 17;
+        self.rng_state = s;
+        let x = (s as f32) / (u32::MAX as f32 * 2.0) - 0.5;
+        let y = ((s >> 32) as f32) / (u32::MAX as f32 * 2.0) - 0.5;
+        (x, y)
+    }
+}
+
+/// **M1 Gap E2**: camera-follow-with-deadzone target + tuning. cf-app updates
+/// `target` each frame from the player actor position. The render system
+/// lerps the camera position toward the target whenever the target leaves
+/// the deadzone rectangle.
+#[derive(Resource, Debug, Clone)]
+pub struct CameraFollow {
+    pub target: Option<Vec2>,
+    pub deadzone_half_width_px: f32,
+    pub deadzone_half_height_px: f32,
+    /// Per-frame lerp factor (0..1) applied when target is outside the
+    /// deadzone. 0.18 = ~5-frame catch-up at 60Hz; tweak in cvars when E2
+    /// promoted to a settings cvar.
+    pub lerp_factor: f32,
+}
+
+impl Default for CameraFollow {
+    fn default() -> Self {
+        Self {
+            target: None,
+            deadzone_half_width_px: 40.0,
+            deadzone_half_height_px: 30.0,
+            lerp_factor: 0.18,
+        }
+    }
+}
+
+/// **M1 Gap E3**: hit-stop state. cf-app writes `remaining_ms` when an
+/// `ux.hit_stop_requested` event fires. The `apply_camera_effects` system
+/// uses Bevy's `Time::set_relative_speed` to slow the world during the
+/// freeze window. M1 ships even a single-tick pause as proof of life.
+#[derive(Resource, Debug, Clone, Default)]
+pub struct HitStop {
+    pub remaining_ms: f32,
+}
+
+/// Drive camera shake + camera follow + hit-stop per frame. cf-app populates
+/// the input resources; the render system applies effects to the Camera2d
+/// transform and the global Bevy `Time` resource.
+pub fn apply_camera_effects(
+    time: Res<Time>,
+    mut camera_query: Query<&mut Transform, With<Camera2d>>,
+    mut shake: ResMut<CameraShake>,
+    follow: Res<CameraFollow>,
+    mut hit_stop: ResMut<HitStop>,
+    mut time_speed: ResMut<Time<Virtual>>,
+) {
+    if let Some(mut camera_transform) = camera_query.iter_mut().next() {
+        // Camera follow: lerp toward target when outside the deadzone.
+        if let Some(target) = follow.target {
+            let cam = camera_transform.translation.truncate();
+            let dx = target.x - cam.x;
+            let dy = target.y - cam.y;
+            let target_x = if dx.abs() > follow.deadzone_half_width_px {
+                cam.x + dx * follow.lerp_factor.clamp(0.0, 1.0)
+            } else {
+                cam.x
+            };
+            let target_y = if dy.abs() > follow.deadzone_half_height_px {
+                cam.y + dy * follow.lerp_factor.clamp(0.0, 1.0)
+            } else {
+                cam.y
+            };
+            camera_transform.translation.x = target_x;
+            camera_transform.translation.y = target_y;
+        }
+        // Camera shake: decay magnitude then apply random offset.
+        let dt = time.delta_secs();
+        // Tau ~0.2s exponential decay (shake ends within ~200ms).
+        let decay = (-dt / 0.2).exp();
+        shake.magnitude_px *= decay;
+        if shake.magnitude_px > 0.05 {
+            let (jx, jy) = shake.next_jitter();
+            let scale = (1.0 - shake.reduce_pct.clamp(0.0, 1.0)).max(0.0);
+            camera_transform.translation.x += jx * shake.magnitude_px * scale;
+            camera_transform.translation.y += jy * shake.magnitude_px * scale;
+        } else {
+            shake.magnitude_px = 0.0;
+        }
+    }
+    // Hit-stop: freeze the virtual clock for the requested window.
+    if hit_stop.remaining_ms > 0.0 {
+        time_speed.set_relative_speed(0.05);
+        hit_stop.remaining_ms = (hit_stop.remaining_ms - time.delta_secs() * 1000.0).max(0.0);
+    } else if time_speed.relative_speed() < 0.99 {
+        time_speed.set_relative_speed(1.0);
+    }
+}
+
+// ---------------------------------------------------------------------------
 // M1: actor sprite rendering
 // ---------------------------------------------------------------------------
 
@@ -119,6 +248,21 @@ pub struct ActorRenderState {
     /// "static sliding pawn" M5-DC-3 failure mode the chassis pips exist
     /// to close.
     pub tick: u64,
+    /// **M1 Gap E4**: tool-validity flag mirrored from
+    /// `ObserveFrame::tool_validity::valid`. Drives the reticle color (red
+    /// when false). `None` = no tool-validity tracking active (default).
+    pub tool_valid: Option<bool>,
+    /// **M1 Gap J2**: most recent muzzle-flash payload (origin + decay).
+    /// cf-app writes this when `equipment.weapon_fired` fires; cleared each
+    /// frame after rendering.
+    pub muzzle_flash: Option<MuzzleFlashRender>,
+}
+
+/// **M1 Gap J2**: muzzle-flash projection.
+#[derive(Debug, Clone)]
+pub struct MuzzleFlashRender {
+    pub origin: Vec2,
+    pub remaining_ticks: u32,
 }
 
 /// M1.5 render-side projection of a breach strip.
@@ -446,11 +590,65 @@ impl Plugin for ActorSpritePlugin {
                     sync_held_rifle_sprites,
                     sync_breach_sprites,
                     sync_extraction_zone,
+                    // Gap E1-E3: camera punch / hit-stop / follow runs AFTER the
+                    // chain so the player position is already up to date and the
+                    // camera lerp catches the same frame.
+                    apply_camera_effects,
+                    update_reticle_color,
+                    update_muzzle_flash,
                 )
                     .chain(),
             );
     }
 }
+
+/// **M1 Gap E4**: tint the reticle red when `ActorRenderState::tool_valid ==
+/// Some(false)`, otherwise restore the canonical white tint. Friendly-fire
+/// color hook lands at M1.5 when teams ship.
+fn update_reticle_color(
+    state: Res<ActorRenderState>,
+    mut q: Query<&mut Sprite, With<ReticleRenderTag>>,
+) {
+    let color = match state.tool_valid {
+        Some(false) => Color::srgb(1.0, 0.25, 0.25),
+        _ => Color::srgb(1.0, 1.0, 1.0),
+    };
+    for mut sprite in &mut q {
+        if sprite.color != color {
+            sprite.color = color;
+        }
+    }
+}
+
+/// **M1 Gap J2**: render the muzzle-flash sprite for a couple of ticks after
+/// every `equipment.weapon_fired`. cf-app populates
+/// `ActorRenderState::muzzle_flash`; this system spawns a transient sprite
+/// at the muzzle origin and decays it.
+fn update_muzzle_flash(
+    mut commands: Commands,
+    mut state: ResMut<ActorRenderState>,
+    solid: Res<SolidSpriteImage>,
+    existing: Query<Entity, With<MuzzleFlashTag>>,
+) {
+    // Despawn any existing flash entity each frame; we re-spawn fresh
+    // whenever `muzzle_flash` is `Some`. Cheap because flashes live <= 3
+    // ticks at 60 Hz.
+    for e in existing.iter() {
+        commands.entity(e).despawn();
+    }
+    if let Some(flash) = state.muzzle_flash.take() {
+        let alpha = (flash.remaining_ticks as f32 / 3.0).clamp(0.0, 1.0);
+        commands.spawn((
+            solid_sprite(&solid, Color::srgba(1.0, 0.9, 0.4, alpha), Vec2::new(10.0, 6.0)),
+            Transform::from_translation(Vec3::new(flash.origin.x, flash.origin.y, 1.5)),
+            MuzzleFlashTag,
+            Name::new("cf::render::muzzle_flash"),
+        ));
+    }
+}
+
+#[derive(Component, Debug)]
+pub struct MuzzleFlashTag;
 
 fn spawn_floor_and_reticle(mut commands: Commands, solid: Res<SolidSpriteImage>) {
     // Floor (placeholder; real chunked terrain lands at M2).
@@ -503,13 +701,15 @@ fn sync_actor_sprites(
             transform.translation = Vec3::new(region_center_x, state.floor_y - 4.0, -0.5);
             sprite.custom_size = Some(Vec2::new(state.region_width, 8.0));
         }
-        // Centre the 2D camera on the play region so authored scenarios in
-        // bottom-left coordinates (e.g. M1's 1280x720 with target at x=900) stay
-        // on-screen. The default Bevy 2D camera sits at the world origin, which
-        // would clip everything past x = window_width / 2.
+        // M1 Gap E2: the CameraFollow system owns camera positioning during
+        // gameplay. We only seed the camera once at startup (when the camera
+        // is still at the world origin) so the very first frame doesn't show
+        // a half-empty viewport. Any subsequent frame, CameraFollow lerps.
         if let Some(mut camera_transform) = camera_query.iter_mut().next() {
-            camera_transform.translation.x = region_center_x;
-            camera_transform.translation.y = region_center_y;
+            if camera_transform.translation.x.abs() < 0.5 && camera_transform.translation.y.abs() < 0.5 {
+                camera_transform.translation.x = region_center_x;
+                camera_transform.translation.y = region_center_y;
+            }
         }
     }
 
@@ -563,7 +763,12 @@ fn sync_actor_sprites(
         }
     }
 
-    // Reticle follows the player's aim.
+    // Reticle follows the player's aim. M1 Gap E4: scale by bloom factor
+    // (with sharp-aim tightening) and tint red when tool_validity says the
+    // current action would refuse.
+    let player_actor_ref = state
+        .player_actor_id
+        .and_then(|id| state.actors.iter().find(|a| a.id == id));
     if let (Some(pos), Some(aim)) = (player_position, player_aim) {
         if let Some((mut transform, mut visibility)) = reticle_query.iter_mut().next() {
             let aim_unit = if aim.length_squared() > 1e-6 {
@@ -572,7 +777,17 @@ fn sync_actor_sprites(
                 Vec2::new(1.0, 0.0)
             };
             transform.translation = Vec3::new(pos.x + aim_unit.x * 32.0, pos.y + aim_unit.y * 32.0, 1.0);
+            let bloom = player_actor_ref.map(|p| p.bloom_factor).unwrap_or(1.0);
+            let sharp = player_actor_ref.map(|p| p.sharp_aim_progress).unwrap_or(0.0);
+            let final_scale = (bloom * (1.0 - 0.6 * sharp)).clamp(0.4, 10.0);
+            transform.scale = Vec3::new(final_scale, final_scale, 1.0);
             *visibility = Visibility::Visible;
+        }
+        // Reticle color: red when tool refused, white otherwise.
+        if let Some((_, _)) = reticle_query.iter_mut().next() {
+            // ReticleRenderTag entity has Sprite; we don't carry it in this
+            // query. The Sprite query is one block above (mut_query). We
+            // separately update color in `update_reticle_color` below.
         }
     } else if let Some((_, mut visibility)) = reticle_query.iter_mut().next() {
         *visibility = Visibility::Hidden;

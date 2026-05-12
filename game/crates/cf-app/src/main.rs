@@ -29,7 +29,10 @@ use cf_control::{
     server::{ControlCommand, ControlServer, ControlServerConfig},
     EngineHandle, Settings,
 };
-use cf_render_2d::{ActorRenderState, ActorSpritePlugin, BreachRender, CfRenderPlugin, ExtractionRender};
+use cf_render_2d::{
+    ActorRenderState, ActorSpritePlugin, BreachRender, CameraFollow, CameraShake, CfRenderPlugin, ExtractionRender,
+    HitStop, MuzzleFlashRender,
+};
 use cf_replay::diagnostics;
 use cf_sim_core::WallClock;
 use cf_ui::{
@@ -571,6 +574,7 @@ fn run_bevy(
         state_handle: capture_handle.clone(),
     });
     app.insert_resource(CaptureRecorderCursor::default());
+    app.insert_resource(RenderEffectsCursor::default());
     app.insert_resource(Time::<Fixed>::from_hz(f64::from(config.tick_rate_hz)));
     app.insert_resource(EngineHolder(engine.clone()));
     app.insert_resource(LocalInputEnabled(local_input_enabled));
@@ -594,6 +598,7 @@ fn run_bevy(
             sync_actor_state_to_render,
             sync_engine_tick_to_capture_clock,
             pump_recorder_events_into_capture_keyframes,
+            pump_recorder_events_into_render_effects,
         )
             .chain(),
     );
@@ -685,6 +690,57 @@ fn pump_recorder_events_into_capture_keyframes(
                 event_type: format!("{}.{}", ev.category, ev.event_type),
                 label,
             });
+        }
+    }
+}
+
+/// **M1 Gap E**: drain the recorder's ux.* + equipment.weapon_fired events
+/// since the last frame and translate them into render-layer effects
+/// (CameraShake, HitStop, MuzzleFlash). Uses a per-frame cursor so each
+/// event is consumed exactly once.
+#[derive(Resource, Default)]
+struct RenderEffectsCursor(usize);
+
+fn pump_recorder_events_into_render_effects(
+    holder: Res<EngineHolder>,
+    mut shake: ResMut<CameraShake>,
+    mut hit_stop: ResMut<HitStop>,
+    mut state: ResMut<ActorRenderState>,
+    mut cursor: ResMut<RenderEffectsCursor>,
+) {
+    let settings = futures_block_on(async { holder.0.settings_snapshot().await });
+    shake.reduce_pct = settings.reduce_camera_shake_pct;
+    let recorder = holder.0.recorder();
+    let new_events = recorder.events_since(cursor.0);
+    cursor.0 += new_events.len();
+    for ev in new_events {
+        match (ev.category.as_str(), ev.event_type.as_str()) {
+            ("ux", "camera_punch_requested") => {
+                let magnitude = ev.payload.get("magnitude").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+                shake.magnitude_px = (shake.magnitude_px + magnitude * 0.05).clamp(0.0, 40.0);
+            }
+            ("ux", "hit_stop_requested") => {
+                let dur_ms = ev.payload.get("duration_ms").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+                hit_stop.remaining_ms = hit_stop.remaining_ms.max(dur_ms);
+            }
+            ("equipment", "weapon_fired") => {
+                let origin = ev
+                    .payload
+                    .get("muzzle_origin")
+                    .and_then(|v| v.as_array())
+                    .map(|arr| {
+                        let x = arr.first().and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+                        let y = arr.get(1).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+                        bevy::math::Vec2::new(x, y)
+                    });
+                if let Some(o) = origin {
+                    state.muzzle_flash = Some(MuzzleFlashRender {
+                        origin: o,
+                        remaining_ticks: 3,
+                    });
+                }
+            }
+            _ => {}
         }
     }
 }
@@ -1767,6 +1823,7 @@ fn sync_actor_state_to_render(
     mut render_state: ResMut<ActorRenderState>,
     mut hud_state: ResMut<HudState>,
     mut hud_settings: ResMut<HudSettings>,
+    mut camera_follow: ResMut<CameraFollow>,
 ) {
     let snapshot = holder.0.actor_render_snapshot();
     let hud_caches = holder.0.hud_caches_snapshot();
@@ -1906,6 +1963,12 @@ fn sync_actor_state_to_render(
         };
     // M1 Gap D3: surface the CONTROLS CAPTURED state to the HUD.
     hud_state.controls_captured_by = hud_caches.controls_captured_by.clone();
+
+    // M1 Gap E2 + E4: feed CameraFollow + tool-validity to the renderer.
+    if let Some(player) = hud_state.player.as_ref() {
+        camera_follow.target = Some(bevy::math::Vec2::new(player.position[0], player.position[1]));
+    }
+    render_state.tool_valid = hud_caches.tool_validity.last_refusal_tick.map(|_| hud_caches.tool_validity.valid);
 
     // M1.5 — propagate mission, enemy, breach, extraction zone to renderer + HUD.
     render_state.breaches = snapshot
