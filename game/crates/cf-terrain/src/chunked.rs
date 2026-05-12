@@ -50,6 +50,12 @@ const CHUNK_PIXELS: usize = (CHUNK_SIZE as usize) * (CHUNK_SIZE as usize);
 /// The canonical roadmap (M2 scope) names this as: hardness, anchorability,
 /// hazard flags, path-cost contribution, plus a tool-validity refusal reason
 /// for the (intentionally non-diggable) `metal_nohook` and `anchor` materials.
+///
+/// Extended at M2 with the full OpenLieroX / CCCP affordance flag taxonomy
+/// (drillable, blastable, beam_cuttable, projectile_passable, actor_passable,
+/// blocks_line_of_sight, damage_on_touch). Future-compat fields read by
+/// M5.6 active material kernel ride on `MaterialDef` in `cf-material`; the
+/// runtime affordance table here stays Copy-friendly.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct MaterialAffordance {
     pub id: MaterialId,
@@ -59,12 +65,49 @@ pub struct MaterialAffordance {
     /// True if a digger tool can carve through it.
     pub diggable: bool,
     /// HP per pixel for diggable materials. Engine deducts `tool_strength`
-    /// from this per dig call against pixels in the carve mask.
+    /// from this per dig call against pixels in the carve mask. Also used
+    /// by the projectile penetration formula as the per-pixel integrity
+    /// (`impulse_squared > integrity_squared` per CCCP `SceneMan.cpp:571`).
     pub hardness: f32,
     /// True if the material can support an anchor / climbing tool.
     pub anchorable: bool,
     /// True if the material damages actors that touch / occupy it.
     pub hazard: bool,
+    /// Damage applied per tick of contact when `hazard == true`.
+    pub damage_per_tick: f32,
+    /// True if a drill tool can carve through it (mirrors OpenLieroX
+    /// `material.h:17` flag). At M2 mirrors `diggable`; future drill
+    /// presets may diverge.
+    pub drillable: bool,
+    /// True if an explosive blast can clear it given `force >= hardness`.
+    pub blastable: bool,
+    /// True if a beam / laser cutter can carve it (M5+ tool).
+    pub beam_cuttable: bool,
+    /// True if a projectile can pass through this material without stopping.
+    /// At M2 mirrors `!solid` (air = passable, solids = block); future
+    /// presets may set this for one-way breakables.
+    pub projectile_passable: bool,
+    /// True if an actor can walk / climb through this material (mirrors
+    /// CCCP `Material.h` flag). At M2 mirrors `!solid`.
+    pub actor_passable: bool,
+    /// True if this material blocks line-of-sight raycasts for AI vision +
+    /// future fog-of-war. M2 ships solids=true, air=false.
+    pub blocks_line_of_sight: bool,
+    /// Per-pixel stickiness chance (0..=1). When a projectile fails to
+    /// penetrate, a roll < stickiness draws it into the terrain instead of
+    /// bouncing (CCCP `Material.Stickiness`). M2 uses engine RNG.
+    pub stickiness: f32,
+    /// Restitution coefficient for bouncing projectiles (0..=1). M2 wires
+    /// this into `try_penetrate` for ricochets.
+    pub restitution: f32,
+    /// Friction coefficient (0..=1). Pairs with `restitution` for bounce
+    /// physics; M5.5 collision matrix consumes it.
+    pub friction: f32,
+    /// Density (kg / pixel). Drives spawn-debris mass.
+    pub density: f32,
+    /// Optional debris material spawned when a projectile penetrates (CCCP
+    /// `Material.SpawnMaterial`). `None` = no debris.
+    pub spawn_material: Option<MaterialId>,
     /// AI path-cost contribution (1.0 = nominal floor; >1.0 = expensive).
     pub path_cost: f32,
     /// Material-overlay color (sRGB, alpha 0xFF). Pure black `[0,0,0,0]` for
@@ -90,6 +133,18 @@ const MATERIAL_TABLE: [MaterialAffordance; 8] = [
         hardness: 0.0,
         anchorable: false,
         hazard: false,
+        damage_per_tick: 0.0,
+        drillable: false,
+        blastable: false,
+        beam_cuttable: false,
+        projectile_passable: true,
+        actor_passable: true,
+        blocks_line_of_sight: false,
+        stickiness: 0.0,
+        restitution: 0.0,
+        friction: 0.0,
+        density: 0.0,
+        spawn_material: None,
         path_cost: 1.0,
         overlay_rgba: [0, 0, 0, 0],
         refusal_reason: None,
@@ -99,10 +154,23 @@ const MATERIAL_TABLE: [MaterialAffordance; 8] = [
         name: "dirt",
         solid: true,
         diggable: true,
-        hardness: 8.0,
+        // CCCP earth normalized; spec M2 baseline = 10.
+        hardness: 10.0,
         anchorable: true,
         hazard: false,
-        path_cost: 2.0,
+        damage_per_tick: 0.0,
+        drillable: true,
+        blastable: true,
+        beam_cuttable: true,
+        projectile_passable: false,
+        actor_passable: false,
+        blocks_line_of_sight: true,
+        stickiness: 0.05,
+        restitution: 0.05,
+        friction: 0.6,
+        density: 1.5,
+        spawn_material: Some(MATERIAL_LOOSE_FILL),
+        path_cost: 1.0,
         overlay_rgba: [120, 80, 50, 0xFF],
         refusal_reason: None,
     },
@@ -111,10 +179,23 @@ const MATERIAL_TABLE: [MaterialAffordance; 8] = [
         name: "concrete",
         solid: true,
         diggable: true,
-        hardness: 32.0,
+        // CCCP concrete=200 normalized; spec M2 baseline = 40 (5-10x dirt).
+        hardness: 40.0,
         anchorable: true,
         hazard: false,
-        path_cost: 4.0,
+        damage_per_tick: 0.0,
+        drillable: true,
+        blastable: true,
+        beam_cuttable: true,
+        projectile_passable: false,
+        actor_passable: false,
+        blocks_line_of_sight: true,
+        stickiness: 0.0,
+        restitution: 0.30,
+        friction: 0.7,
+        density: 2.3,
+        spawn_material: Some(MATERIAL_LOOSE_FILL),
+        path_cost: 1.0,
         overlay_rgba: [180, 180, 180, 0xFF],
         refusal_reason: None,
     },
@@ -123,30 +204,57 @@ const MATERIAL_TABLE: [MaterialAffordance; 8] = [
         name: "metal_nohook",
         solid: true,
         diggable: false,
-        hardness: f32::INFINITY,
+        // Spec: hardness=100 (CCCP metal=400 normalized; refuse-by-default
+        // high integrity). The digger refuses regardless of hardness via
+        // `diggable=false`; the value is used by projectile penetration +
+        // blast force gate. M5.6 may add a drill-strength override.
+        hardness: 100.0,
         anchorable: false,
         hazard: false,
-        path_cost: 16.0,
+        damage_per_tick: 0.0,
+        drillable: false,
+        blastable: true,
+        beam_cuttable: false,
+        projectile_passable: false,
+        actor_passable: false,
+        blocks_line_of_sight: true,
+        stickiness: 0.70,
+        restitution: 0.40,
+        friction: 0.5,
+        density: 7.8,
+        spawn_material: None,
+        path_cost: 999.0,
         overlay_rgba: [80, 100, 140, 0xFF],
         refusal_reason: Some("material_metal_nohook"),
     },
     MaterialAffordance {
         id: MATERIAL_HAZARD,
         name: "hazard",
-        solid: false,
+        // Spec: hazard is solid + damage_on_touch=true. M2 treats hazard as
+        // refusal-only for the digger (diggable=false), still a hazard
+        // surface for the actor (damage_per_tick=2.0), and blastable when
+        // `force >= 50`. The previous "f32::INFINITY for refusal-only at
+        // BP2" decision is superseded by the M2 spec — hazard hardness=50
+        // and blastable=true so explosives can clear it (the M5.6 active
+        // material kernel will later add a dispersal/reaction path).
+        solid: true,
         diggable: false,
-        // Devin BUG_pr-review-job (flag): hardness was 0.0 which made
-        // `try_blast` clear hazard pixels with any non-negative force
-        // (since `force >= 0.0` is always true). Hazard is non-diggable +
-        // refusal-only at BP2, mirroring metal_nohook + anchor; until the
-        // M5.6 active material kernel handles hazard dispersal through
-        // the reaction table, hazard MUST resist trivial blasts. Setting
-        // hardness to f32::INFINITY matches the other refusal-only
-        // materials and keeps `try_blast` symmetric with `try_carve`.
-        hardness: f32::INFINITY,
+        hardness: 50.0,
         anchorable: false,
         hazard: true,
-        path_cost: 32.0,
+        damage_per_tick: 2.0,
+        drillable: false,
+        blastable: true,
+        beam_cuttable: false,
+        projectile_passable: false,
+        actor_passable: false,
+        blocks_line_of_sight: false,
+        stickiness: 0.0,
+        restitution: 0.10,
+        friction: 0.5,
+        density: 3.0,
+        spawn_material: Some(MATERIAL_LOOSE_FILL),
+        path_cost: 10.0,
         overlay_rgba: [200, 60, 60, 0xFF],
         refusal_reason: Some("material_hazard"),
     },
@@ -155,10 +263,23 @@ const MATERIAL_TABLE: [MaterialAffordance; 8] = [
         name: "loose_fill",
         solid: true,
         diggable: true,
-        hardness: 4.0,
+        // Spec: hardness=5 (CCCP earth_rubble=25 normalized; soft fill).
+        hardness: 5.0,
         anchorable: false,
         hazard: false,
-        path_cost: 3.0,
+        damage_per_tick: 0.0,
+        drillable: true,
+        blastable: true,
+        beam_cuttable: true,
+        projectile_passable: false,
+        actor_passable: false,
+        blocks_line_of_sight: true,
+        stickiness: 0.10,
+        restitution: 0.0,
+        friction: 0.4,
+        density: 1.2,
+        spawn_material: None,
+        path_cost: 2.0,
         overlay_rgba: [200, 170, 90, 0xFF],
         refusal_reason: None,
     },
@@ -167,10 +288,23 @@ const MATERIAL_TABLE: [MaterialAffordance; 8] = [
         name: "repair_fill",
         solid: true,
         diggable: true,
-        hardness: 6.0,
+        // Spec: hardness=15 (player-placed repair foam; medium).
+        hardness: 15.0,
         anchorable: true,
         hazard: false,
-        path_cost: 2.0,
+        damage_per_tick: 0.0,
+        drillable: true,
+        blastable: true,
+        beam_cuttable: true,
+        projectile_passable: false,
+        actor_passable: false,
+        blocks_line_of_sight: true,
+        stickiness: 0.20,
+        restitution: 0.15,
+        friction: 0.6,
+        density: 0.8,
+        spawn_material: Some(MATERIAL_LOOSE_FILL),
+        path_cost: 1.0,
         overlay_rgba: [120, 200, 140, 0xFF],
         refusal_reason: None,
     },
@@ -179,10 +313,25 @@ const MATERIAL_TABLE: [MaterialAffordance; 8] = [
         name: "anchor",
         solid: true,
         diggable: false,
-        hardness: f32::INFINITY,
+        // Spec: hardness=60 (CCCP stone=140 normalized; harder than dirt,
+        // anchorable). Digger refuses via `diggable=false`; blast clears
+        // at force >= 60.
+        hardness: 60.0,
         anchorable: true,
         hazard: false,
-        path_cost: 8.0,
+        damage_per_tick: 0.0,
+        drillable: false,
+        blastable: true,
+        beam_cuttable: false,
+        projectile_passable: false,
+        actor_passable: false,
+        blocks_line_of_sight: true,
+        stickiness: 0.50,
+        restitution: 0.30,
+        friction: 0.7,
+        density: 2.6,
+        spawn_material: Some(MATERIAL_LOOSE_FILL),
+        path_cost: 1.0,
         overlay_rgba: [60, 60, 200, 0xFF],
         refusal_reason: Some("material_anchor"),
     },
@@ -193,6 +342,13 @@ const MATERIAL_TABLE: [MaterialAffordance; 8] = [
 #[must_use]
 pub fn material_affordance(id: MaterialId) -> Option<&'static MaterialAffordance> {
     MATERIAL_TABLE.iter().find(|m| m.id == id)
+}
+
+/// Resolve the canonical material name for a `MaterialId`. Returns `"unknown"`
+/// for ids outside the launch set (callers should treat as `air`).
+#[must_use]
+pub fn material_name_from_id(id: MaterialId) -> &'static str {
+    material_affordance(id).map(|m| m.name).unwrap_or("unknown")
 }
 
 /// Resolve a material name (case-sensitive) from a scenario manifest. Names
@@ -314,6 +470,30 @@ impl MaterialRegistry {
 
     pub fn hardness(&self, id: MaterialId) -> f32 {
         self.affordance(id).map(|m| m.hardness).unwrap_or(0.0)
+    }
+
+    pub fn is_hazard(&self, id: MaterialId) -> bool {
+        self.affordance(id).is_some_and(|m| m.hazard)
+    }
+
+    pub fn damage_per_tick(&self, id: MaterialId) -> f32 {
+        self.affordance(id).map(|m| m.damage_per_tick).unwrap_or(0.0)
+    }
+
+    pub fn is_anchorable(&self, id: MaterialId) -> bool {
+        self.affordance(id).is_some_and(|m| m.anchorable)
+    }
+
+    pub fn path_cost(&self, id: MaterialId) -> f32 {
+        self.affordance(id).map(|m| m.path_cost).unwrap_or(1.0)
+    }
+
+    pub fn stickiness(&self, id: MaterialId) -> f32 {
+        self.affordance(id).map(|m| m.stickiness).unwrap_or(0.0)
+    }
+
+    pub fn spawn_material(&self, id: MaterialId) -> Option<MaterialId> {
+        self.affordance(id).and_then(|m| m.spawn_material)
     }
 }
 
@@ -774,6 +954,139 @@ impl ChunkedTerrain {
         self.dirty_chunks.clear();
     }
 
+    /// **M2 contract**: mark every chunk whose pixels intersect the closed
+    /// pixel-space AABB as dirty. This is the canonical "I just touched the
+    /// terrain at this region" path — any caller that mutates pixels via a
+    /// shortcut (door stamp, fluid kernel, future repair tool that doesn't
+    /// route through `try_carve` / `try_fill_or_repair` / `try_blast`) MUST
+    /// call this so the renderer + AI pathfinder + replay see the edit.
+    /// Per CCCP `SLTerrain.cpp:397-481` lesson: raw `set_material_pixel`
+    /// without `add_updated_material_area` causes stale pathfinding —
+    /// we will not repeat that mistake.
+    ///
+    /// The AABB is clamped to the terrain extent; out-of-bounds calls
+    /// are silently no-op.
+    pub fn add_updated_material_area(&mut self, min: [f32; 2], max: [f32; 2]) {
+        let (x0, y0, x1, y1) = self.aabb_to_pixels(min, max);
+        if x1 <= x0 || y1 <= y0 {
+            return;
+        }
+        let cs = CHUNK_SIZE as i64;
+        let cx0 = x0.div_euclid(cs);
+        let cy0 = y0.div_euclid(cs);
+        let cx1 = (x1 - 1).div_euclid(cs);
+        let cy1 = (y1 - 1).div_euclid(cs);
+        for cy in cy0..=cy1 {
+            for cx in cx0..=cx1 {
+                self.dirty_chunks.insert(ChunkCoord::new(cx as i32, cy as i32));
+            }
+        }
+    }
+
+    /// Per-chunk blake3 checksum (forward-compat for M3A determinism feed).
+    /// Returns `None` for unallocated chunks; callers should treat that as
+    /// "uniform default_material" and hash the default id instead.
+    pub fn chunk_checksum(&self, cx: i32, cy: i32) -> Option<String> {
+        let coord = ChunkCoord::new(cx, cy);
+        let chunk = self.chunks.get(&coord)?;
+        let mut hasher = blake3::Hasher::new();
+        hasher.update(&cx.to_le_bytes());
+        hasher.update(&cy.to_le_bytes());
+        hasher.update(&chunk.pixels);
+        Some(hex::encode(hasher.finalize().as_bytes()))
+    }
+
+    /// Per-chunk material grid copy. Used by `inspect.terrain.chunk` so
+    /// cfctl + AI consumers can read the exact pixel layout.
+    pub fn chunk_pixels(&self, cx: i32, cy: i32) -> Vec<MaterialId> {
+        let coord = ChunkCoord::new(cx, cy);
+        match self.chunks.get(&coord) {
+            Some(c) => c.pixels.clone(),
+            None => vec![self.default_material; CHUNK_PIXELS],
+        }
+    }
+
+    /// Try to fill / repair a circular region with `material`. Mirrors
+    /// `try_carve` semantics: the operation refuses when the mask overlaps a
+    /// refusal-reason material (e.g., metal_nohook — can't repaint over
+    /// undiggable metal). Used by future repair-fill tools and the M2 spec
+    /// `try_fill_or_repair` surface.
+    pub fn try_fill_or_repair(&mut self, origin: [f32; 2], radius: f32, material: MaterialId) -> ChunkedCarveOutcome {
+        let r = radius.max(0.0);
+        let r2 = r * r;
+        let min = [origin[0] - r, origin[1] - r];
+        let max = [origin[0] + r, origin[1] + r];
+        let (x0, y0, x1, y1) = self.aabb_to_pixels(min, max);
+        let center_px_x = origin[0] - self.anchor[0];
+        let center_px_y = origin[1] - self.anchor[1];
+        let mut probe = [center_px_x.round() as i64, center_px_y.round() as i64];
+
+        // Refusal probe: if the target overlaps a refusal-only material
+        // (metal_nohook / anchor) we cannot overpaint without consent.
+        for py in y0..y1 {
+            for px in x0..x1 {
+                let dx = (px as f32 + 0.5) - center_px_x;
+                let dy = (py as f32 + 0.5) - center_px_y;
+                if dx * dx + dy * dy > r2 {
+                    continue;
+                }
+                let mat = self.material_at(px, py);
+                if let Some(reason) = self.registry.refusal_reason(mat) {
+                    self.refusal_count += 1;
+                    return ChunkedCarveOutcome::Refused(ChunkedCarveRefusal {
+                        reason,
+                        probe_at: [px, py],
+                        material: mat,
+                    });
+                }
+                probe = [px, py];
+            }
+        }
+
+        let mut counts: BTreeMap<MaterialId, u32> = BTreeMap::new();
+        let mut count: u32 = 0;
+        let mut bbox_min = [i64::MAX, i64::MAX];
+        let mut bbox_max = [i64::MIN, i64::MIN];
+        let mut dirty: BTreeSet<ChunkCoord> = BTreeSet::new();
+        for py in y0..y1 {
+            for px in x0..x1 {
+                let dx = (px as f32 + 0.5) - center_px_x;
+                let dy = (py as f32 + 0.5) - center_px_y;
+                if dx * dx + dy * dy > r2 {
+                    continue;
+                }
+                let prev = self.material_at(px, py);
+                if self.set_pixel_internal(px, py, material) {
+                    *counts.entry(prev).or_insert(0) += 1;
+                    count += 1;
+                    bbox_min[0] = bbox_min[0].min(px);
+                    bbox_min[1] = bbox_min[1].min(py);
+                    bbox_max[0] = bbox_max[0].max(px);
+                    bbox_max[1] = bbox_max[1].max(py);
+                    let (coord, _, _) = chunk_split(px, py);
+                    dirty.insert(coord);
+                }
+            }
+        }
+        if count == 0 {
+            return ChunkedCarveOutcome::NoOp(ChunkedCarveNoOp { probe_at: probe });
+        }
+        self.carve_count += 1;
+        let dominant_source = counts
+            .iter()
+            .max_by_key(|(_, n)| **n)
+            .map(|(m, _)| *m)
+            .unwrap_or(self.default_material);
+        ChunkedCarveOutcome::Carved(ChunkedCarveStats {
+            bbox_min,
+            bbox_max,
+            count,
+            dominant_material: dominant_source,
+            dirty_chunks: dirty.into_iter().collect(),
+            refusal_reason: None,
+        })
+    }
+
     /// True if the terrain has any allocated chunks; cheap to check before
     /// emitting an empty checksum.
     pub fn is_empty(&self) -> bool {
@@ -1160,19 +1473,97 @@ mod tests {
     }
 
     #[test]
-    fn try_blast_refuses_hazard_at_any_finite_force() {
-        // Devin BUG_pr-review-job (flag) regression: hazard hardness was
-        // 0.0 which made `force >= aff.hardness` true for any non-negative
-        // force, causing `try_blast` to clear hazard pixels trivially. The
-        // fix sets hazard hardness to f32::INFINITY so blasts behave
-        // symmetrically with `try_carve` (refusal-only).
+    fn try_blast_against_hazard_obeys_spec_hardness_gate() {
+        // M2 spec: hazard.hardness=50. Blasts below 50 refuse; blasts at or
+        // above 50 clear (M5.6 active material kernel will later add a
+        // dispersal/reaction path; M2 ships the basic force-gate symmetry
+        // with `try_blast` against any blastable material).
         let mut t = ChunkedTerrain::new(64, 64, MATERIAL_AIR);
         t.fill_aabb([0.0, 0.0], [32.0, 32.0], MATERIAL_HAZARD);
-        for force in [0.0_f32, 1.0, 100.0, 1_000_000.0] {
-            let outcome = t.try_blast([16.0, 16.0], 8.0, force);
+        // Force below hardness must refuse.
+        let outcome = t.try_blast([16.0, 16.0], 8.0, 10.0);
+        assert!(
+            matches!(outcome, ChunkedCarveOutcome::Refused(_)),
+            "expected hazard to refuse blast with force 10, got {outcome:?}"
+        );
+        // Force at hardness clears.
+        let outcome = t.try_blast([16.0, 16.0], 8.0, 50.0);
+        assert!(
+            matches!(outcome, ChunkedCarveOutcome::Carved(_)),
+            "expected hazard to yield to blast with force 50, got {outcome:?}"
+        );
+    }
+
+    #[test]
+    fn try_fill_or_repair_paints_into_air() {
+        let mut t = ChunkedTerrain::new(64, 64, MATERIAL_AIR);
+        let outcome = t.try_fill_or_repair([32.0, 32.0], 6.0, MATERIAL_REPAIR_FILL);
+        assert!(matches!(outcome, ChunkedCarveOutcome::Carved(_)));
+        assert_eq!(t.material_at(32, 32), MATERIAL_REPAIR_FILL);
+    }
+
+    #[test]
+    fn try_fill_or_repair_refuses_over_metal_nohook() {
+        let mut t = ChunkedTerrain::new(64, 64, MATERIAL_AIR);
+        t.fill_aabb([0.0, 0.0], [32.0, 32.0], MATERIAL_METAL_NOHOOK);
+        let outcome = t.try_fill_or_repair([16.0, 16.0], 6.0, MATERIAL_REPAIR_FILL);
+        match outcome {
+            ChunkedCarveOutcome::Refused(refusal) => {
+                assert_eq!(refusal.reason, "material_metal_nohook");
+            }
+            other => panic!("expected refusal, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn add_updated_material_area_marks_chunks_dirty() {
+        let mut t = ChunkedTerrain::new(1024, 512, MATERIAL_AIR);
+        t.clear_dirty();
+        t.add_updated_material_area([100.0, 100.0], [200.0, 200.0]);
+        assert!(t.dirty_chunk_count() > 0);
+    }
+
+    #[test]
+    fn chunk_checksum_changes_with_pixel_edit() {
+        let mut t = small_world();
+        let before = t.chunk_checksum(1, 0);
+        let _ = t.try_carve([300.0, 60.0], 8.0);
+        let after = t.chunk_checksum(1, 0);
+        assert!(before.is_some());
+        assert!(after.is_some());
+        assert_ne!(before, after);
+    }
+
+    #[test]
+    fn dirt_to_concrete_hardness_ratio_matches_spec() {
+        // Spec: concrete carves in 5-10x dirt time (hardness=40 vs hardness=10).
+        let dirt = material_affordance(MATERIAL_DIRT).unwrap();
+        let concrete = material_affordance(MATERIAL_CONCRETE).unwrap();
+        assert_eq!(dirt.hardness, 10.0);
+        assert_eq!(concrete.hardness, 40.0);
+        assert!(concrete.hardness >= 4.0 * dirt.hardness);
+        assert!(concrete.hardness <= 10.0 * dirt.hardness);
+    }
+
+    #[test]
+    fn launch_set_baseline_hardness_matches_spec() {
+        for (id, expected) in [
+            (MATERIAL_AIR, 0.0_f32),
+            (MATERIAL_DIRT, 10.0),
+            (MATERIAL_LOOSE_FILL, 5.0),
+            (MATERIAL_CONCRETE, 40.0),
+            (MATERIAL_METAL_NOHOOK, 100.0),
+            (MATERIAL_ANCHOR, 60.0),
+            (MATERIAL_HAZARD, 50.0),
+            (MATERIAL_REPAIR_FILL, 15.0),
+        ] {
+            let aff = material_affordance(id).unwrap_or_else(|| panic!("id {id} present"));
             assert!(
-                matches!(outcome, ChunkedCarveOutcome::Refused(_)),
-                "expected hazard to refuse blast with force {force}, got {outcome:?}"
+                (aff.hardness - expected).abs() < 1e-3,
+                "{} hardness expected {} got {}",
+                aff.name,
+                expected,
+                aff.hardness
             );
         }
     }

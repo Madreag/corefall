@@ -56,11 +56,11 @@
 pub mod chunked;
 
 pub use chunked::{
-    material_affordance, material_id_from_name, Chunk, ChunkCoord, ChunkedCarveNoOp, ChunkedCarveOutcome,
-    ChunkedCarveRefusal, ChunkedCarveStats, ChunkedTerrain, ChunkedTerrainSnapshot, ChunkedTerrainSnapshotChunk,
-    MaterialAffordance, MaterialId, MaterialRegistry, TerrainStamp, CHUNK_SIZE, MATERIAL_AIR, MATERIAL_ANCHOR,
-    MATERIAL_CONCRETE, MATERIAL_DIRT, MATERIAL_HAZARD, MATERIAL_LOOSE_FILL, MATERIAL_METAL_NOHOOK,
-    MATERIAL_REPAIR_FILL, MATERIAL_SCHEMA_VERSION,
+    material_affordance, material_id_from_name, material_name_from_id, Chunk, ChunkCoord, ChunkedCarveNoOp,
+    ChunkedCarveOutcome, ChunkedCarveRefusal, ChunkedCarveStats, ChunkedTerrain, ChunkedTerrainSnapshot,
+    ChunkedTerrainSnapshotChunk, MaterialAffordance, MaterialId, MaterialRegistry, TerrainStamp, CHUNK_SIZE,
+    MATERIAL_AIR, MATERIAL_ANCHOR, MATERIAL_CONCRETE, MATERIAL_DIRT, MATERIAL_HAZARD, MATERIAL_LOOSE_FILL,
+    MATERIAL_METAL_NOHOOK, MATERIAL_REPAIR_FILL, MATERIAL_SCHEMA_VERSION,
 };
 
 use std::collections::BTreeMap;
