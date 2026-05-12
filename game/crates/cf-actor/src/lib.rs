@@ -873,10 +873,7 @@ impl ActorState {
     /// (cutscene safety). Mission-critical actors clamp HP at `0.01` to keep
     /// them in DOWNED (they cannot reach DYING).
     pub fn apply_damage(&mut self, amount: f32) -> Option<Status> {
-        if amount <= 0.0
-            || self.status.is_dead()
-            || matches!(self.status, Status::Dying | Status::Inactive)
-        {
+        if amount <= 0.0 || self.status.is_dead() || matches!(self.status, Status::Dying | Status::Inactive) {
             return None;
         }
         self.hp = (self.hp - amount).max(0.0);
@@ -907,11 +904,7 @@ impl ActorState {
             Some(Status::Inactive)
         } else if !inactive && matches!(self.status, Status::Inactive) {
             // Reactivate using the derived status from HP.
-            self.status = if self.hp <= 0.0 {
-                Status::Dying
-            } else {
-                Status::Stable
-            };
+            self.status = if self.hp <= 0.0 { Status::Dying } else { Status::Stable };
             Some(self.status)
         } else {
             None

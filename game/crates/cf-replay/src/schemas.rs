@@ -82,16 +82,14 @@ pub fn validate_event_payload(category: &str, event_type: &str, payload: &Value)
     let Some(raw) = event_schema_for(category, event_type) else {
         return Ok(());
     };
-    let schema: RawSchema = serde_json::from_str(raw)
-        .map_err(|e| format!("schema parse error for {category}.{event_type}: {e}"))?;
+    let schema: RawSchema =
+        serde_json::from_str(raw).map_err(|e| format!("schema parse error for {category}.{event_type}: {e}"))?;
     let obj = payload
         .as_object()
         .ok_or_else(|| format!("payload for {category}.{event_type} must be an object"))?;
     for req in &schema.required {
         if !obj.contains_key(req) {
-            return Err(format!(
-                "{category}.{event_type}: required field `{req}` missing"
-            ));
+            return Err(format!("{category}.{event_type}: required field `{req}` missing"));
         }
     }
     for (key, raw_constraint) in &schema.properties {
@@ -135,9 +133,7 @@ pub fn validate_event_payload(category: &str, event_type: &str, payload: &Value)
         if let Some(min) = constraint.minimum {
             if let Some(n) = value.as_f64() {
                 if n < min {
-                    return Err(format!(
-                        "{category}.{event_type}::{key} value {n} < minimum {min}"
-                    ));
+                    return Err(format!("{category}.{event_type}::{key} value {n} < minimum {min}"));
                 }
             }
         }
@@ -185,8 +181,8 @@ mod tests {
             ("equipment", "alarm_registered"),
         ] {
             let raw = event_schema_for(cat, ty).unwrap_or_else(|| panic!("no schema for {cat}.{ty}"));
-            let _parsed: RawSchema = serde_json::from_str(raw)
-                .unwrap_or_else(|e| panic!("schema parse error for {cat}.{ty}: {e}"));
+            let _parsed: RawSchema =
+                serde_json::from_str(raw).unwrap_or_else(|e| panic!("schema parse error for {cat}.{ty}: {e}"));
         }
     }
 

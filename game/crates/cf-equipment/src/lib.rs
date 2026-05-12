@@ -749,7 +749,7 @@ impl RifleState {
         // Tracer falls on every Nth shot starting at index `ratio - 1` so a
         // ratio of 4 produces tracers at shots 3, 7, 11, ... (one per group
         // of 4). Matches CCCP `Magazine::RTTRatio` cycling.
-        (self.shot_index_in_mag + 1) % ratio == 0
+        (self.shot_index_in_mag + 1).is_multiple_of(ratio)
     }
 }
 

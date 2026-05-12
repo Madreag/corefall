@@ -23,7 +23,9 @@ use cf_physics::{
     apply_horizontal_motion, apply_jump, apply_recoil, step_kinematics, HorizontalInputs, JumpInputs, StepInputs,
 };
 
-use crate::{quantize_f32, ActorId, ActorWorld, ControlIntent, IntentSource, InventoryItem, ItemSlot, Stance, Status, Vec2};
+use crate::{
+    quantize_f32, ActorId, ActorWorld, ControlIntent, IntentSource, InventoryItem, ItemSlot, Stance, Status, Vec2,
+};
 
 /// Per-actor rifle state tracked alongside the actor world. Keyed by [`ActorId`]; only
 /// actors carrying a rifle in their inventory get an entry.
@@ -396,9 +398,11 @@ pub fn step_no_rng(
     intents: &mut BTreeMap<ActorId, ControlIntent>,
     deps: StepDeps,
 ) -> StepReport {
-    let mut counter: u64 = 0x6b67c9_8a7f_3d1ad9_u64;
+    let mut counter: u64 = 0x6b67_c98a_7f3d_1ad9_u64;
     step(state, intents, deps, &mut || {
-        counter = counter.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        counter = counter
+            .wrapping_mul(6_364_136_223_846_793_005)
+            .wrapping_add(1_442_695_040_888_963_407);
         counter
     })
 }
@@ -703,7 +707,7 @@ fn step_one_actor<R: FnMut() -> u64>(
         };
         outcome.muzzle_origin = Some(muzzle);
         // Loudness radius (CCCP HDFirearm.cpp:948): scaled by spec.loudness too.
-        let loudness_radius = 480.0_f32 * (damage / 10.0).max(1.0).min(3.0) * spec.loudness.max(0.1);
+        let loudness_radius = 480.0_f32 * (damage / 10.0).clamp(1.0, 3.0) * spec.loudness.max(0.1);
         outcome.loudness_radius = loudness_radius;
 
         // Per-particle spawn loop. Particle count >= 1; >1 produces a spread
@@ -722,8 +726,7 @@ fn step_one_actor<R: FnMut() -> u64>(
             .world
             .actors
             .get(&actor_id)
-            .map(|a| a.velocity)
-            .unwrap_or(Vec2::ZERO);
+            .map_or(Vec2::ZERO, |a| a.velocity);
         for particle_idx in 0..particle_count {
             // Deterministic in-cone offset for particles 2..N. The first
             // particle always flies on the base aim line so single-particle
@@ -739,7 +742,11 @@ fn step_one_actor<R: FnMut() -> u64>(
             let projectile_id = state.allocate_projectile_id();
             // Speed mirrors the base projectile speed (no per-particle inherit
             // skew so all pellets follow the spec'd muzzle profile).
-            let speed = if base_speed > 0.0 { base_speed } else { spec.projectile_speed };
+            let speed = if base_speed > 0.0 {
+                base_speed
+            } else {
+                spec.projectile_speed
+            };
             // Decompose: pure muzzle vector along the angle plus inherited actor velocity.
             let dir = Vec2::new(angle.cos(), angle.sin());
             let velocity = Vec2::new(
@@ -777,11 +784,7 @@ fn step_one_actor<R: FnMut() -> u64>(
                 .actors
                 .get_mut(&actor_id)
                 .expect("actor id exists by construction");
-            let sign = if actor.recoil_alternation_sign >= 0 {
-                1.0
-            } else {
-                -1.0
-            };
+            let sign = if actor.recoil_alternation_sign >= 0 { 1.0 } else { -1.0 };
             let contribution = rifle_outcomes.recoil_impulse_applied / 100.0;
             actor.recoil_accumulator += sign * contribution;
             actor.recoil_alternation_sign = -actor.recoil_alternation_sign;
@@ -828,8 +831,7 @@ fn step_one_actor<R: FnMut() -> u64>(
         // takes effect immediately without per-actor patching.
         let decay_rate = deps
             .tuning
-            .map(|t| t.recoil_decay_per_tick)
-            .unwrap_or(actor.recoil_decay_rate);
+            .map_or(actor.recoil_decay_rate, |t| t.recoil_decay_per_tick);
         if outcome.recoil_applied == 0.0 && actor.recoil_accumulator.abs() > 1e-4 {
             let decay = decay_rate * actor.recoil_accumulator.signum();
             let next = actor.recoil_accumulator - decay;
@@ -847,11 +849,10 @@ fn step_one_actor<R: FnMut() -> u64>(
         // Gap F3: prefer engine-supplied tuning when present.
         let rifle_equipped_for_sharp = actor.inventory.selected_item().is_rifle();
         let horizontal_speed = actor.velocity.x.abs();
-        let walk_threshold = deps.tuning.map(|t| t.walk_threshold).unwrap_or(actor.walk_threshold);
+        let walk_threshold = deps.tuning.map_or(actor.walk_threshold, |t| t.walk_threshold);
         let sharp_aim_build_ticks_eff = deps
             .tuning
-            .map(|t| t.sharp_aim_build_ticks)
-            .unwrap_or(actor.sharp_aim_build_ticks);
+            .map_or(actor.sharp_aim_build_ticks, |t| t.sharp_aim_build_ticks);
         let prior_sharp = actor.sharp_aim_progress;
         let mut invalidation: Option<&'static str> = None;
         let mut invalidation_reason: Option<String> = None;
@@ -959,8 +960,7 @@ fn step_one_actor<R: FnMut() -> u64>(
             const GIB_IMPULSE_LIMIT: f32 = 1000.0;
             let impulse = outcome.landed_impulse.max(outcome.recoil_applied);
             if impulse > TRAVEL_IMPULSE_THRESHOLD {
-                let raw = (impulse - TRAVEL_IMPULSE_THRESHOLD)
-                    / (GIB_IMPULSE_LIMIT - TRAVEL_IMPULSE_THRESHOLD);
+                let raw = (impulse - TRAVEL_IMPULSE_THRESHOLD) / (GIB_IMPULSE_LIMIT - TRAVEL_IMPULSE_THRESHOLD);
                 let damage = (raw * actor.hp_max).max(0.0).min(actor.hp_max);
                 let _ = actor.apply_damage(damage);
             }
@@ -985,7 +985,9 @@ fn step_one_actor<R: FnMut() -> u64>(
                 // Surface the lethal cause so the engine can parent the
                 // dwell-elapsed DEAD event to the projectile_hit even though
                 // the kill happened ticks earlier (Gap C3).
-                outcome.lethal_cause_event_id = actor.last_lethal_cause_event_id.clone();
+                outcome
+                    .lethal_cause_event_id
+                    .clone_from(&actor.last_lethal_cause_event_id);
             }
         }
 
@@ -1006,7 +1008,9 @@ fn step_one_actor<R: FnMut() -> u64>(
             // inventory_dropped + actor_status_changed(DYING) with the right
             // parent_event_id chain.
             if outcome.lethal_cause_event_id.is_none() {
-                outcome.lethal_cause_event_id = actor.last_lethal_cause_event_id.clone();
+                outcome
+                    .lethal_cause_event_id
+                    .clone_from(&actor.last_lethal_cause_event_id);
             }
             // Replace inventory slots with Empty so subsequent fire intent is
             // rejected ("no weapon"). We retain the slot count so observation
@@ -1688,10 +1692,7 @@ mod tests {
             },
         );
         let report = step_no_rng(&mut state, &mut intents, deps());
-        assert!(
-            report.actor_outcomes.iter().any(|o| o.fired),
-            "must fire a projectile"
-        );
+        assert!(report.actor_outcomes.iter().any(|o| o.fired), "must fire a projectile");
         // Run many ticks: the projectile should never hit the actor who fired it.
         for _ in 0..120 {
             let r = step_no_rng(&mut state, &mut intents, deps());

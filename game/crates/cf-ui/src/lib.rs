@@ -308,10 +308,7 @@ impl Plugin for StatusStripPlugin {
 /// the line visually because the BorderColor stays transparent and the row
 /// renders zero-content). When `Some(name)`, the text reads
 /// `CONTROLS CAPTURED: <name>`.
-fn update_captured_strip(
-    state: Res<HudState>,
-    mut query: Query<&mut Text, With<CapturedStripText>>,
-) {
+fn update_captured_strip(state: Res<HudState>, mut query: Query<&mut Text, With<CapturedStripText>>) {
     let desired = match &state.controls_captured_by {
         Some(label) if !label.is_empty() => format!("CONTROLS CAPTURED: {}", label.to_uppercase()),
         Some(_) => "CONTROLS CAPTURED".to_string(),
@@ -469,7 +466,12 @@ fn spawn_status_strip(mut commands: Commands) {
                     HudAccessibilityId("hud.last_event"),
                 ))
                 .with_children(|p| {
-                    p.spawn((Text::new("EVENT: --"), text_font.clone(), text_color, LastEventStripText));
+                    p.spawn((
+                        Text::new("EVENT: --"),
+                        text_font.clone(),
+                        text_color,
+                        LastEventStripText,
+                    ));
                 });
             // M1 Gap D3: CONTROLS CAPTURED zone — invisible by default.
             // cf-app's `sync_hud_text` system updates the text to `CONTROLS

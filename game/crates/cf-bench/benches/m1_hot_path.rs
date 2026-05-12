@@ -93,5 +93,10 @@ fn bench_observe_frame_serialize(c: &mut Criterion) {
     });
 }
 
-criterion_group!(benches, bench_sim_step, bench_checksum_world, bench_observe_frame_serialize);
+criterion_group!(
+    benches,
+    bench_sim_step,
+    bench_checksum_world,
+    bench_observe_frame_serialize
+);
 criterion_main!(benches);

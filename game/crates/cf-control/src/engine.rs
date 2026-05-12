@@ -5031,14 +5031,8 @@ impl EngineHandle for M0Engine {
                         );
                     }
                     (Some(_), None) => {
-                        self.recorder.record(
-                            tick,
-                            sim_time_ms,
-                            "ux",
-                            "controls_released",
-                            json!({}),
-                            None,
-                        );
+                        self.recorder
+                            .record(tick, sim_time_ms, "ux", "controls_released", json!({}), None);
                     }
                     _ => {}
                 }
@@ -7219,25 +7213,21 @@ mod tests {
         let by_id: std::collections::BTreeMap<String, &cf_replay::Event> =
             events.iter().map(|e| (e.event_id.clone(), e)).collect();
         // Find the inventory_dropped for the dummy (actor_id 2).
-        let drop_event = events
-            .iter()
-            .find(|e| {
-                e.category == "actor"
-                    && e.event_type == "inventory_dropped"
-                    && e.payload.get("actor").and_then(|v| v.as_u64()) == Some(2)
-            });
+        let drop_event = events.iter().find(|e| {
+            e.category == "actor"
+                && e.event_type == "inventory_dropped"
+                && e.payload.get("actor").and_then(|v| v.as_u64()) == Some(2)
+        });
         // The dummy carries no rifle in m1_actor_range (its inventory.rifle: None),
         // so the inventory_dropped event may not fire (label="empty"). In that
         // case the chain test still has value via status_changed(DYING).
         let chain_root = drop_event.or_else(|| {
-            events
-                .iter()
-                .find(|e| {
-                    e.category == "actor"
-                        && e.event_type == "actor_status_changed"
-                        && e.payload.get("new_status").and_then(|v| v.as_str()) == Some("dying")
-                        && e.payload.get("actor").and_then(|v| v.as_u64()) == Some(2)
-                })
+            events.iter().find(|e| {
+                e.category == "actor"
+                    && e.event_type == "actor_status_changed"
+                    && e.payload.get("new_status").and_then(|v| v.as_str()) == Some("dying")
+                    && e.payload.get("actor").and_then(|v| v.as_u64()) == Some(2)
+            })
         });
         let chain_root = chain_root.expect("must find inventory_dropped OR status_changed(DYING) for actor 2");
         // Walk the parent_event_id chain.
@@ -7247,11 +7237,7 @@ mod tests {
         let mut walked = 0;
         while let Some(parent_id) = current.parent_event_id.clone() {
             walked += 1;
-            assert!(
-                walked < 50,
-                "chain walk runaway (events={:?})",
-                chain_types
-            );
+            assert!(walked < 50, "chain walk runaway (events={:?})", chain_types);
             let parent = by_id
                 .get(&parent_id)
                 .unwrap_or_else(|| panic!("ParentMissingFromBundle: parent_id={parent_id} not in run"));
@@ -7259,10 +7245,7 @@ mod tests {
             current = parent;
         }
         // The walk must terminate at an input.intent_received root.
-        let terminal = chain_types
-            .last()
-            .expect("chain must have at least one link")
-            .clone();
+        let terminal = chain_types.last().expect("chain must have at least one link").clone();
         assert!(
             terminal == "input.intent_received",
             "cause chain must terminate at input.intent_received; got chain: {:?}",

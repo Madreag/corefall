@@ -9,8 +9,8 @@ use schemars::{schema_for, JsonSchema};
 use serde::{Deserialize, Serialize};
 
 /// Protocol schema version. Bumped from 1→2 at BP3 when M5 added
-/// `act.player.crouch/climb/jet/eject` + `act.chassis.repair/salvage/clear_jam`
-/// + `act.input.focus`. Clients sending `schema_version: 1` still work because
+/// `act.player.crouch/climb/jet/eject` plus `act.chassis.repair/salvage/clear_jam`
+/// plus `act.input.focus`. Clients sending `schema_version: 1` still work because
 /// all new methods are additive (no field renames or type changes on v1 methods).
 /// The dispatcher rejects `schema_version > SCHEMA_VERSION` with `-32602`.
 pub const SCHEMA_VERSION: u32 = 2;

@@ -77,11 +77,11 @@ fn main() -> Result<()> {
 /// `cf_replay::schemas::validate_event_payload`. Returns non-zero exit on
 /// any schema violation. Outputs JSON when `--json` is set so CI can parse
 /// the report.
-fn run_validate_bundle(bundle_dir: &PathBuf, json_output: bool) -> Result<()> {
+fn run_validate_bundle(bundle_dir: &std::path::Path, json_output: bool) -> Result<()> {
     use std::io::BufRead;
     let events_path = bundle_dir.join("events.jsonl");
-    let file = std::fs::File::open(&events_path)
-        .map_err(|e| anyhow::anyhow!("open {}: {}", events_path.display(), e))?;
+    let file =
+        std::fs::File::open(&events_path).map_err(|e| anyhow::anyhow!("open {}: {}", events_path.display(), e))?;
     let reader = std::io::BufReader::new(file);
     let mut failures: Vec<serde_json::Value> = Vec::new();
     let mut checked: u64 = 0;
@@ -109,11 +109,7 @@ fn run_validate_bundle(bundle_dir: &PathBuf, json_output: bool) -> Result<()> {
         let payload = event.get("payload").cloned().unwrap_or(serde_json::Value::Null);
         checked += 1;
         if let Err(reason) = cf_replay::schemas::validate_event_payload(cat, ty, &payload) {
-            let event_id = event
-                .get("event_id")
-                .and_then(|v| v.as_str())
-                .unwrap_or("")
-                .to_string();
+            let event_id = event.get("event_id").and_then(|v| v.as_str()).unwrap_or("").to_string();
             failures.push(serde_json::json!({
                 "event_id": event_id,
                 "category": cat,

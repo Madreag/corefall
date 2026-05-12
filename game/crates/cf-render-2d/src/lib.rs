@@ -578,8 +578,14 @@ pub struct ActorSpritePlugin;
 
 impl Plugin for ActorSpritePlugin {
     fn build(&self, app: &mut App) {
+        // M1 Gap E: defensively init the camera-effect resources so unit
+        // tests that load ActorSpritePlugin without the parent CfRenderPlugin
+        // still have working defaults.
         app.init_resource::<ActorRenderState>()
             .init_resource::<SolidSpriteImage>()
+            .init_resource::<CameraShake>()
+            .init_resource::<CameraFollow>()
+            .init_resource::<HitStop>()
             .add_systems(Startup, (build_solid_sprite_image, spawn_floor_and_reticle).chain())
             .add_systems(
                 Update,
@@ -605,10 +611,7 @@ impl Plugin for ActorSpritePlugin {
 /// **M1 Gap E4**: tint the reticle red when `ActorRenderState::tool_valid ==
 /// Some(false)`, otherwise restore the canonical white tint. Friendly-fire
 /// color hook lands at M1.5 when teams ship.
-fn update_reticle_color(
-    state: Res<ActorRenderState>,
-    mut q: Query<&mut Sprite, With<ReticleRenderTag>>,
-) {
+fn update_reticle_color(state: Res<ActorRenderState>, mut q: Query<&mut Sprite, With<ReticleRenderTag>>) {
     let color = match state.tool_valid {
         Some(false) => Color::srgb(1.0, 0.25, 0.25),
         _ => Color::srgb(1.0, 1.0, 1.0),

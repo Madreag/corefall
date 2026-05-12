@@ -732,15 +732,11 @@ fn pump_recorder_events_into_render_effects(
                 hit_stop.remaining_ms = hit_stop.remaining_ms.max(dur_ms);
             }
             ("equipment", "weapon_fired") => {
-                let origin = ev
-                    .payload
-                    .get("muzzle_origin")
-                    .and_then(|v| v.as_array())
-                    .map(|arr| {
-                        let x = arr.first().and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
-                        let y = arr.get(1).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
-                        bevy::math::Vec2::new(x, y)
-                    });
+                let origin = ev.payload.get("muzzle_origin").and_then(|v| v.as_array()).map(|arr| {
+                    let x = arr.first().and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+                    let y = arr.get(1).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+                    bevy::math::Vec2::new(x, y)
+                });
                 if let Some(o) = origin {
                     state.muzzle_flash = Some(MuzzleFlashRender {
                         origin: o,
@@ -1976,7 +1972,10 @@ fn sync_actor_state_to_render(
     if let Some(player) = hud_state.player.as_ref() {
         camera_follow.target = Some(bevy::math::Vec2::new(player.position[0], player.position[1]));
     }
-    render_state.tool_valid = hud_caches.tool_validity.last_refusal_tick.map(|_| hud_caches.tool_validity.valid);
+    render_state.tool_valid = hud_caches
+        .tool_validity
+        .last_refusal_tick
+        .map(|_| hud_caches.tool_validity.valid);
 
     // M1.5 — propagate mission, enemy, breach, extraction zone to renderer + HUD.
     render_state.breaches = snapshot
