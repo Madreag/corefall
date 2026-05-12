@@ -1296,7 +1296,10 @@ mod tests {
         assert_eq!(error.code, error_codes::INVALID_PARAMS);
         let data = error.data.unwrap();
         assert_eq!(data.get("reason").unwrap(), "schema_version_mismatch");
-        assert_eq!(data.get("server_version").unwrap(), 1);
+        // The error reports the current server SCHEMA_VERSION; future M5+ bumps
+        // must update through the constant, not a literal — keeps the contract
+        // consistent across the test surface.
+        assert_eq!(data.get("server_version").unwrap(), SCHEMA_VERSION);
         assert_eq!(data.get("client_version").unwrap(), 99);
     }
 
@@ -1395,7 +1398,7 @@ mod tests {
             "jsonrpc": "2.0",
             "id": 1,
             "method": "observe.once",
-            "params": {"schema_version": 1}
+            "params": {"schema_version": SCHEMA_VERSION}
         });
         let resp = process_request(&req.to_string(), &engine, &hz, &filter, 240)
             .await
@@ -1403,7 +1406,10 @@ mod tests {
         let parsed: JsonRpcResponse = serde_json::from_str(&resp).unwrap();
         let result = parsed.result.expect("observe.once returns success");
         assert_eq!(result.get("scenario").unwrap(), "m0_blank");
-        assert_eq!(result.get("schema_version").unwrap(), 1);
+        // observe.once returns an ObserveFrame whose schema_version field equals
+        // the current server SCHEMA_VERSION constant; the test reads through the
+        // constant so a future M5+ bump cannot silently drift the contract.
+        assert_eq!(result.get("schema_version").unwrap(), SCHEMA_VERSION);
     }
 
     #[tokio::test]

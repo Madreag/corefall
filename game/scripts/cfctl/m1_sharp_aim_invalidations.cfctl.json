@@ -1,0 +1,45 @@
+{
+  "scenario": "m1_actor_range",
+  "tick_rate_hz": 60,
+  "description": "M1 sharp aim build + invalidation cause coverage. Per CCCP AHuman.cpp:1779 sharp aim builds when STABLE/slow/equipped, and snaps to zero on jump/reload/swap/movement/knockdown/unstable. This script exercises each invalidation cause so cf-replay captures the full grammar.",
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+    { "method": "act.player.aim", "params": { "x": 1.0, "y": 0.0 } },
+
+    { "_comment": "Build sharp aim from STABLE/idle/equipped." },
+    { "method": "act.player.sharp_aim", "params": { "active": true } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 60 } },
+    { "method": "observe.once", "params": {} },
+
+    { "_comment": "Invalidate via JUMP." },
+    { "method": "act.player.jump", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 60 } },
+
+    { "_comment": "Re-build, then invalidate via RELOAD." },
+    { "method": "act.player.sharp_aim", "params": { "active": true } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 60 } },
+    { "method": "act.player.reload", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 120 } },
+
+    { "_comment": "Re-build, then invalidate via SLOT SWAP." },
+    { "method": "act.player.sharp_aim", "params": { "active": true } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 60 } },
+    { "method": "act.player.select_item", "params": { "slot": 1 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
+    { "method": "act.player.select_item", "params": { "slot": 0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 30 } },
+
+    { "_comment": "Re-build, then invalidate via MOVEMENT (run). Run threshold > 60 u/s." },
+    { "method": "act.player.sharp_aim", "params": { "active": true } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 60 } },
+    { "method": "act.player.move", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 60 } },
+    { "method": "act.player.move", "params": { "x": 0.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 60 } },
+
+    { "_comment": "Release sharp_aim to confirm idle decay." },
+    { "method": "act.player.sharp_aim", "params": { "active": false } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 60 } },
+    { "method": "observe.once", "params": {} }
+  ]
+}

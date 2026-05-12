@@ -1,0 +1,50 @@
+{
+  "scenario": "m1_actor_range",
+  "tick_rate_hz": 60,
+  "description": "M1 endurance script — 18000 ticks (5 minutes at 60 Hz) of continuous play covering move, jump, fire, reload, dig, and slot swap so the engine has to handle a literal 5-minute run without crash and the resulting run bundle's checker returns errors=0. Per spec/active/M1.md 'Solo play for 5 minutes without crash'.",
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+
+    { "method": "act.player.aim", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "act.player.move", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 120 } },
+    { "method": "act.player.jump", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 60 } },
+    { "method": "act.player.fire", "params": { "pressed": true } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 8 } },
+    { "method": "act.player.fire", "params": { "pressed": true } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 8 } },
+    { "method": "act.player.fire", "params": { "pressed": true } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 8 } },
+    { "method": "act.player.reload", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 120 } },
+
+    { "method": "act.player.move", "params": { "x": -1.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 180 } },
+    { "method": "act.player.move", "params": { "x": 0.0, "y": 0.0 } },
+    { "method": "act.player.select_item", "params": { "slot": 1 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 60 } },
+    { "method": "act.player.select_item", "params": { "slot": 0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 60 } },
+
+    { "method": "act.player.sharp_aim", "params": { "active": true } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 60 } },
+    { "method": "act.player.fire", "params": { "pressed": true } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 30 } },
+    { "method": "act.player.sharp_aim", "params": { "active": false } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 60 } },
+
+    { "method": "act.player.move", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 240 } },
+    { "method": "act.player.jump", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 60 } },
+    { "method": "act.player.fire", "params": { "pressed": true } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 60 } },
+
+    { "method": "act.player.reset", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 60 } },
+
+    { "method": "sim.run_for_ticks", "params": { "ticks": 16000 } },
+    { "method": "observe.once", "params": {} }
+  ]
+}

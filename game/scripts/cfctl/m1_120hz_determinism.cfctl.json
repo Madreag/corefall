@@ -1,0 +1,27 @@
+{
+  "scenario": "m1_actor_range",
+  "tick_rate_hz": 120,
+  "description": "M1 determinism at 120 Hz. The same M1 sweep at twice the tick rate must produce a stable checksum (replay determinism is per-tick-rate, not cross-rate). Real-time fire cadence and reload duration stay constant because cf-equipment times in seconds, not ticks.",
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+    { "method": "act.player.aim", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "act.player.move", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 240 } },
+    { "method": "act.player.jump", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 120 } },
+    { "method": "act.player.fire", "params": { "pressed": true } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 16 } },
+    { "method": "act.player.fire", "params": { "pressed": true } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 16 } },
+    { "method": "act.player.fire", "params": { "pressed": true } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 16 } },
+    { "method": "act.player.reload", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 240 } },
+    { "method": "act.player.move", "params": { "x": -1.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 120 } },
+    { "method": "act.player.move", "params": { "x": 0.0, "y": 0.0 } },
+    { "method": "act.player.reset", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 60 } },
+    { "method": "observe.once", "params": {} }
+  ]
+}
