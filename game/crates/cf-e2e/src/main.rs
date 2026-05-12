@@ -905,7 +905,12 @@ fn lookup(value: &Value, key: &str) -> Option<Value> {
         return Some(node.clone());
     }
     // M5: `actor.<id>.foo.bar` lookup against `actors[]` by id (`actor.player.*` also accepted).
-    if parts.len() >= 2 && parts[0] == "actor" {
+    // **M1.5 fix**: the actor resolver only fires when the second segment is
+    // either the literal "player" or a parseable u64 id. Otherwise the path
+    // looks like `actor.<event_type>.count` (a bare event-stream expectation,
+    // per the spec text) and we fall through to the event-stream passthrough
+    // below. Same reasoning for `breach.<event_type>` and `enemy.<event_type>`.
+    if parts.len() >= 2 && parts[0] == "actor" && (parts[1] == "player" || parts[1].parse::<u64>().is_ok()) {
         let arr = value.get("actors")?.as_array()?;
         let actor_match = if parts[1] == "player" {
             let pid = value.get("player_actor_id").and_then(|i| i.as_u64())?;
@@ -929,6 +934,43 @@ fn lookup(value: &Value, key: &str) -> Option<Value> {
             current = current.get(*seg)?.clone();
         }
         return Some(current);
+    }
+    // **M1.5 / 10-line parser passthrough**: the M1.5 spec writes bare
+    // `ai.state_changed.count>=N`, `terrain.terrain_carved.count>=N`,
+    // `mission.objective_completed.count>=N` etc. (no `events.` prefix). If
+    // the first segment matches a known event category AND the path's
+    // intent is clearly event-stream (last segment ∈ {count, first, last}
+    // OR contains a `.last.payload.` / `.first.payload.` drill-down), route
+    // through the event-stream resolver. This keeps the spec text honest
+    // without colliding with the existing `mission.result` / `mission.loss_reason`
+    // /  `mission.objective.<id>.status` / `mission.timer_remaining_ticks`
+    // shorthand paths the lookup walker resolves elsewhere.
+    const KNOWN_EVENT_CATEGORIES: &[&str] = &[
+        "accessibility",
+        "actor",
+        "ai",
+        "chassis",
+        "combat",
+        "control",
+        "determinism",
+        "equipment",
+        "input",
+        "mission",
+        "physics",
+        "system",
+        "terrain",
+        "ux",
+    ];
+    let looks_like_event_stream = parts.last().is_some_and(|seg| {
+        matches!(*seg, "count" | "first" | "last")
+            || parts
+                .windows(2)
+                .any(|w| (w[0] == "first" || w[0] == "last") && (w[1] == "payload" || w[1] == "event_id"))
+    });
+    if parts.len() >= 2 && KNOWN_EVENT_CATEGORIES.contains(&parts[0]) && looks_like_event_stream {
+        if let Some(v) = lookup_events_dotted(value, key) {
+            return Some(v);
+        }
     }
     let mut current: Value = value.clone();
     for seg in &parts {
@@ -1273,6 +1315,50 @@ mod tests {
         assert_eq!(
             lookup(&obs, "events.where(category=unknown).count"),
             Some(Value::from(0u64))
+        );
+    }
+
+    /// **M1.5 P1**: bare-prefix passthrough so the M1.5 spec's
+    /// `ai.state_changed.count>=N` / `terrain.terrain_carved.count>=N`
+    /// syntax resolves without an explicit `events.` prefix.
+    #[test]
+    fn bare_prefix_routes_to_event_stream_when_count_terminator() {
+        let obs = fixture_observation();
+        assert_eq!(lookup(&obs, "equipment.weapon_fired.count"), Some(Value::from(2u64)));
+        assert_eq!(lookup(&obs, "combat.projectile_hit.count"), Some(Value::from(2u64)));
+        assert_eq!(lookup(&obs, "actor.inventory_settled.count"), Some(Value::from(1u64)));
+    }
+
+    #[test]
+    fn bare_prefix_preserves_actor_by_id_resolver() {
+        let obs = serde_json::json!({
+            "actors": [{"id": 7, "hp": 80}],
+            "player_actor_id": 7,
+            "events": [],
+        });
+        assert_eq!(lookup(&obs, "actor.7.hp"), Some(Value::from(80)));
+        assert_eq!(lookup(&obs, "actor.player.hp"), Some(Value::from(80)));
+    }
+
+    #[test]
+    fn bare_prefix_preserves_mission_field_paths() {
+        let obs = serde_json::json!({
+            "mission": {"result": "won", "loss_reason": null},
+            "events": [],
+        });
+        assert_eq!(lookup(&obs, "mission.result"), Some(Value::String("won".into())));
+    }
+
+    #[test]
+    fn bare_prefix_last_payload_drill_down() {
+        let obs = fixture_observation();
+        assert_eq!(
+            lookup(&obs, "combat.projectile_hit.last.payload.zone"),
+            Some(Value::String("head".into()))
+        );
+        assert_eq!(
+            lookup(&obs, "actor.inventory_settled.last.payload.item_label"),
+            Some(Value::String("rifle".into()))
         );
     }
 }
