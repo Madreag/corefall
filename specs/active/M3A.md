@@ -12,13 +12,35 @@ The event taxonomy, snapshot writer, and headless replay verifier are complete e
 
 (M3A is infrastructure, not directly player-facing — but it underpins every visible feature: death recap, debug, AI trust, grading, future networking.)
 
-- **Every player action emits a typed event** into a deterministic stream. The event taxonomy (27 categories) is the single source of truth for what the sim did.
+- **Every player action emits a typed event** into a deterministic stream. The event taxonomy (**36 categories** — 27 from baseline + 9 added at M2.5: `hazard`, `shield`, `thermal`, `environment`, `armor`, `internal`, `concussion`, `fluid`, `origin`) is the single source of truth for what the sim did.
 - **`cf-headless replay <bundle>`** replays a run off-line and prints `result=ok` (matching) or `result=divergence` with structured `first_divergence` (tick, recorded, live checksums). Non-zero exit on divergence.
-- **`cfctl observe --once`** returns a snapshot of current sim state — actor, inventory, mission, terrain summary.
+- **`cfctl observe --once`** returns a snapshot of current sim state — actor, inventory, mission, terrain summary, hazards, afflictions, armor layers, atmospherics.
 - The **run bundle directory** under `prototype_runs/native/<run-id>/` is the offline-review contract: `run_manifest.json`, `events.jsonl`, `summary.json`, `notes.md`, `screenshots/`, `captures/` (per-tick keyframes + 8×8 grids + `summary_grid.png`), `expected_outcome` enforced.
 - **Replay reproducibility**: the same manifest + seed + inputs reproduces the same final state byte-for-byte. Per-tick `blake3` checksum (`determinism.sim_checksum`) anchors this contract.
 - **Death recap, AI debug, mission grading** all read from the run bundle — never from live state.
 - **Backpressure is visible**: if the recorder drops events under combat density, the `dropped_count` is exported and the canonical checker flags it.
+
+### M2.5 firehose surface — what M3A MUST handle without renaming
+
+M2.5 introduces a high-density firehose of damage/destructible-terrain/hazard/affliction/atmospheric/shield/thermal/environment events. M3A LOCKS the schemas for every M2.5 event family so M5+M5.5+M5.7+M5.9+M5.10 ladder up additively. The locked surfaces are:
+
+| Family | Active producers at M2.5 | Registered producers (later milestones) |
+|---|---|---|
+| `terrain.*` | terrain_carved, material_state_changed (5-tier), pixel_removed, debris_spawned, cascade_triggered, terrain_dirty_region_batch | terrain_penetration_threshold (M5.5), terrain_repaired (M5+) |
+| `body.*` / `combat.*` | actor_status_changed, weapon_fired, projectile_spawned, projectile_hit_mo (full expanded payload — ap_factor / armor_effective_hardness / armor_absorbed_dmg / passthrough_dmg / surface_kind / layer_struck / organ_damaged_id / circuit_damaged_id), projectile_hit_terrain, wound_added (scalar M2.5), reactor.armor_layer_hp_changed, reactor.armor_layer_cracked, reactor.armor_layer_destroyed | wound_added (per-zone M5), attachable_detached (M5), gib_created (M5), gib_cascade (M5) |
+| `hazard.*` | hazard.spawned, hazard.spread, hazard.tick (cosmetic batched), hazard.dissipated, hazard.actor_contact | (M2.5 producer-active; M5.7+ ladders advanced rules) |
+| `affliction.*` | affliction.applied, affliction.tick (cosmetic batched), affliction.cleared, affliction.escalated | (M2.5 producer-active for cfctl-injected; M5.7+ ladders environmental sources) |
+| `atmos.*` | atmos.pressure_changed, atmos.gas_released, atmos.breach_detected, atmos.temperature_changed (placeholder values) | (M5.9 fills real kernel) |
+| `shield.*` | (schemas only; no producer at M2.5) | shield.hit, shield.depleted, shield.regen_started, shield.regen_completed, shield.disrupted (M5+) |
+| `thermal.*` | thermal.signature_changed | thermal.conduction_event (M5.7+), thermal.phase_change (M5.9+) |
+| `environment.*` | environment.signal_delta (M5.10 surface; placeholder payload at M2.5) | (M5.10 fills aggregator) |
+| `armor.*` (NEW @ M2.5) | armor.layer_hp_changed, armor.layer_critical, armor.layer_destroyed, armor.all_layers_destroyed, armor.chunked_off, armor.debris_spawned, armor.repaired | (M5+ chassis armor producer fills with per-zone × per-layer state) |
+| `internal.*` (NEW @ M2.5) | internal.organ_damaged, internal.organ_destroyed, internal.organ_failure_cascade, internal.circuit_damaged, internal.circuit_destroyed, internal.circuit_failure_cascade (schemas locked; cfctl can inject for testing) | (M5+ chassis/origin model fills producers) |
+| `concussion.*` (NEW @ M2.5) | concussion.dose_changed, concussion.band_changed, concussion.ko_threshold_crossed, concussion.recovered, internal_shock.dose_changed (robot equivalent), internal_shock.module_damaged | (M5.8 origin reaction model fills producer at scale) |
+| `fluid.*` (NEW @ M2.5) | fluid.leak_started, fluid.leak_rate_changed, fluid.reservoir_warning, fluid.reservoir_critical, fluid.reservoir_empty, fluid.ignition, fluid.ground_splatter_spawned (cosmetic), fluid.leak_stopped, fluid.refilled | (M5+ chassis fluid producer fills with per-reservoir state) |
+| `origin.*` (NEW @ M2.5) | origin.shot_force_feedback (g_load_delta + concussion_dose_delta + internal_shock_module_id + leak_channel + screen_kick_intensity), origin.g_load_dose_changed, origin.helmet_breach, origin.oxygen_supply_changed | (M5.8 origin reaction model fills full producer; M2.5 schemas locked) |
+| `ability.*` | (registered, no producer at M2.5) | (M5+ chassis abilities) |
+| `chassis.*` | (registered) | armor_layer_hp_changed, armor_layer_cracked, armor_layer_destroyed, module_state_changed, fuel_state, heat_state, eject_window_open, pilot_bailed_too_late, salvage_finished, etc. (M5+) |
 
 ## Crates / modules touched
 
@@ -87,7 +109,7 @@ Scripts:
 ### Event taxonomy (27 categories)
 
 ```gherkin
-Scenario: 27-category baseline declared at run start with producer status
+Scenario: 36-category baseline declared at run start with producer status
   Given any cf-app run
   When the run starts
   Then system.category_baseline event fires once at tick 0 with payload:
@@ -103,8 +125,17 @@ Scenario: 27-category baseline declared at run start with producer status
         { "name": "mmo",           "status": "registered", "ladder_at": "M12" },
         { "name": "material",      "status": "registered", "ladder_at": "M5.6" },
         { "name": "reaction",      "status": "registered", "ladder_at": "M5.6" },
-        { "name": "atmospherics",  "status": "registered", "ladder_at": "M5.9" },
-        { "name": "affliction",    "status": "registered", "ladder_at": "M5.7" },
+        { "name": "atmospherics",  "status": "active",     "first_event_type": "atmos.pressure_changed" },
+        { "name": "affliction",    "status": "active",     "first_event_type": "affliction.applied" },
+        { "name": "hazard",        "status": "active",     "first_event_type": "hazard.spawned" },
+        { "name": "shield",        "status": "registered", "ladder_at": "M5+" },
+        { "name": "thermal",       "status": "active",     "first_event_type": "thermal.signature_changed" },
+        { "name": "environment",   "status": "active",     "first_event_type": "environment.signal_delta" },
+        { "name": "armor",         "status": "active",     "first_event_type": "armor.layer_hp_changed" },
+        { "name": "internal",      "status": "active",     "first_event_type": "internal.organ_damaged" },
+        { "name": "concussion",    "status": "active",     "first_event_type": "concussion.dose_changed" },
+        { "name": "fluid",         "status": "active",     "first_event_type": "fluid.leak_started" },
+        { "name": "origin",        "status": "active",     "first_event_type": "origin.shot_force_feedback" },
         { "name": "combat",        "status": "active",     "first_event_type": "combat.weapon_fired" },
         { "name": "body",          "status": "active",     "first_event_type": "actor.actor_status_changed" },
         { "name": "terrain",       "status": "active",     "first_event_type": "terrain.terrain_carved" },
@@ -124,6 +155,43 @@ Scenario: 27-category baseline declared at run start with producer status
       ]
     }
   And the payload exactly matches docs/plan/references/prototype-run-bundle-schema.md § Event Category Baseline
+  (Categories `hazard`, `shield`, `thermal`, `environment`, `armor`, `internal`, `concussion`, `fluid`, `origin` are NEW at M2.5; `atmospherics` and `affliction` upgrade from `registered` to `active` because M2.5 fires placeholder events. Total: 36 categories = 27 baseline + 9 M2.5 deep-damage additions.)
+
+Scenario: Locked event-type taxonomy per category (M2.5 active surfaces)
+  Given the system.category_baseline event fires
+  And the per-category event-type schema list is loaded
+  Then the `terrain.*` category accepts these event types (M2.5 locked):
+    terrain_carved, terrain_dirty_region_batch, material_state_changed, pixel_removed, debris_spawned, cascade_triggered, tool_refused
+  And the `combat.*` category accepts (M2.5 locked):
+    weapon_fired, projectile_spawned, projectile_hit_mo, projectile_hit_terrain, wound_added, kill, reactor.armor_layer_hp_changed, reactor.armor_layer_cracked, reactor.armor_layer_destroyed
+  And the `hazard.*` category accepts (M2.5 locked):
+    spawned, spread, tick (cosmetic), dissipated, actor_contact
+  And the `affliction.*` category accepts (M2.5 locked):
+    applied, tick (cosmetic), cleared, escalated
+  And the `atmos.*` (atmospherics) category accepts (M2.5 locked placeholder, M5.9 fills):
+    pressure_changed, gas_released, breach_detected, temperature_changed, phase_change (M5.9), combustion_ignition (M5.9), pipe_flow (M5.9+)
+  And the `shield.*` category accepts (M2.5 locked, M5+ fills):
+    hit, depleted, regen_started, regen_completed, disrupted
+  And the `thermal.*` category accepts (M2.5 locked):
+    signature_changed, conduction_event (M5.7+), phase_change (M5.9+)
+  And the `environment.*` category accepts (M2.5 locked):
+    signal_delta (M5.10 fills payload), hazard_band_changed (M5.7+)
+  And the `ai.*` category accepts (M2.5 locked):
+    state_changed, target_acquired, target_lost, target_scored, perception_signal, tactic_chosen, path_invalidated, recovery_action
+  And the `mission.*` category accepts:
+    mission_started, objective_started, objective_updated, objective_completed, objective_failed, objective_paused, objective_resumed, mission_resolved, reactor_hp_changed, reactor_destroyed, reactor_pressure_state_changed, timer_warning_threshold, objective_progress_updated, director_phase_change
+  And the `armor.*` category accepts (M2.5 locked):
+    layer_hp_changed, layer_critical, layer_destroyed, all_layers_destroyed, chunked_off, debris_spawned, repaired
+  And the `internal.*` category accepts (M2.5 locked):
+    organ_damaged, organ_destroyed, organ_failure_cascade, circuit_damaged, circuit_destroyed, circuit_failure_cascade
+  And the `concussion.*` category accepts (M2.5 locked):
+    dose_changed, band_changed, ko_threshold_crossed, recovered, internal_shock.dose_changed (robot equivalent under same category), internal_shock.module_damaged
+  And the `fluid.*` category accepts (M2.5 locked):
+    leak_started, leak_rate_changed, reservoir_warning, reservoir_critical, reservoir_empty, ignition, ground_splatter_spawned (cosmetic), leak_stopped, refilled
+  And the `origin.*` category accepts (M2.5 locked):
+    shot_force_feedback, g_load_dose_changed, helmet_breach, oxygen_supply_changed
+  And cf-mod validates the registry against the locked v0.1 schema
+  And M3B's plain-language renderer ships templates for every type listed
 
 Scenario: Event envelope schema v0.1 is locked
   Given any event written to events.jsonl
@@ -267,12 +335,43 @@ Scenario: Per-scenario checksum cadence
   And run_manifest.json.checksum.cadence_ticks=30
   And cf-headless replay verifies at the same cadence
 
-Scenario: Checksum scope sim_state_v1
+Scenario: Checksum scope sim_state_v1 (M3A canonical)
   Given the default checksum scope at M3A
   Then the scope name "sim_state_v1" is canonical
-  And the bytes hashed are: tick_counter || rng_state_bytes || actor_state_quantized || inventory_state || terrain_chunk_grid (per chunk)
+  And the bytes hashed are (in fixed order, big-endian where applicable):
+    1. tick_counter (u64)
+    2. rng_state_bytes (engine seeded RNG state)
+    3. actor_state_quantized (per actor: id, pos_q16, vel_q16, hp_i16, status_u8, stance_u8, stability_q16, sharp_aim_q16, mass_q16, origin_id_u8)
+    4. inventory_state (per actor: slots with item_id + state-quantized)
+    5. terrain_chunk_grid (per dirty chunk: material_grid bytes)
+    6. terrain_integrity_grid (per dirty chunk: integrity grid f32-quantized to u8) (M2.5)
+    7. hazard_grid (per (chunk_id, local_pos) cell: kind_u8 + intensity_q16) (M2.5)
+    8. affliction_state (per actor: sorted Vec<(kind_u8, severity_q16, expected_clear_tick_u64)>) (M2.5)
+    9. armor_layer_state — per actor: per-zone armor_item_id + per-layer (kind_u8, hp_i16, hardness_q16, status_u8); per-zone occupant ("equipped armor" or "none") sorted (M2.5 NEW)
+    10. internal_organ_state — per actor (humans/androids): sorted Vec<(organ_id_u8, hp_i16, condition_u8)>; per actor (robots): sorted Vec<(circuit_id_u8, hp_i16, condition_u8)> (M2.5 NEW)
+    11. concussion_dose_state — per actor: (concussion_dose_q16, band_u8, internal_shock_dose_q16) where applicable per origin (M2.5 NEW)
+    12. fluid_reservoir_state — per actor: sorted Vec<(fluid_kind_u8, current_q16, leak_rate_q16, leak_active_u8)> (M2.5 NEW)
+    13. origin_state — per actor: (origin_id_u8, g_load_dose_q16, oxygen_supply_s_q16 [if applicable]) (M2.5 NEW)
+    14. reactor_state (hp_i16, max_hp_i16, pressure_state_u8, heat_signature_k_q16) (M2.5)
+    15. atmospherics_state (per atm_id: moles_per_gas_q16 + temperature_k_q16 + total_pressure_q16) (M2.5 placeholder; M5.9 fills)
+    16. environment_signal_state (per actor: per-slice band enums) (M5.10 placeholder)
+    17. mission_state (current_phase, timer_remaining_ticks, objective_states[])
+    18. chassis_state (None at M3A; M5 fills with stance + module states + bound zones)
   And bumping the scope to "sim_state_v2" requires a migration shim
-  (M2 adds terrain chunk; M3A adds actor + inventory; M5 adds chassis)
+  (M2 adds terrain chunk; M3A adds actor + inventory + M2.5 deep damage firehose; M5 fills chassis_state)
+
+Scenario: Cosmetic event types excluded from determinism scope
+  Given the cosmetic-event list (per the determinism-island-contract)
+  Then events with `cosmetic=true` are excluded from sim_state_v1 hashing
+  And these event types are flagged cosmetic by default:
+    - terrain.debris_spawned (visual particle)
+    - hazard.tick (batched per-tick visualization)
+    - affliction.tick (batched per-tick damage application)
+    - ux.banner_raised / ux.banner_dismissed (UI visual)
+    - shield.hit ripple (M5+ visual cosmetic; the shield.hit GAMEPLAY event is non-cosmetic)
+    - render-2d particle, spark, dust events
+  And the underlying STATE changes (terrain integrity, affliction severity, hazard intensity) ARE included in the checksum
+  (rule: cosmetic events DESCRIBE the change; the state itself is hashed)
 
 Scenario: Checksum differs across scenarios with same/different seed
   Given two runs of m1_actor_range with seed=1234
@@ -332,14 +431,118 @@ Scenario: snapshot_terrain_chunk payload contract
 
 Scenario: snapshot_terrain_summary payload contract
   Given a fired snapshot_terrain_summary event
-  Then the payload contains: tick, total_chunks, dirty_chunk_count, material_counts (BTreeMap<material_id, pixel_count>), total_carve_events, total_debris_spawned
+  Then the payload contains: tick, total_chunks, dirty_chunk_count, material_counts (BTreeMap<material_id, pixel_count>), total_carve_events, total_debris_spawned, integrity_distribution (BTreeMap<integrity_band, pixel_count> where band ∈ {Pristine, Scratched, Cracked, Critical, Destroyed}), hazard_tile_count, average_integrity
 
-Scenario: Stable record_id layer (no raw pointers)
-  Given any event with actor_id, source_id, or chunk_id
+Scenario: snapshot_hazard_grid payload contract (M2.5)
+  Given a fired snapshot_hazard_grid event
+  Then the payload contains: tick, dirty_hazard_cell_count, hazard_cells: Vec<{ chunk_id, local_pos, kind, intensity, dissipation_rate, spawned_at_tick }>, summary_per_kind (BTreeMap<kind, count>)
+  And the snapshot fires at scenario start and on every objective transition (same cadence as snapshot_terrain_*)
+
+Scenario: snapshot_affliction payload contract (M2.5)
+  Given a fired snapshot_affliction event
+  Then the payload contains: tick, total_active_afflictions, by_actor: Vec<{ actor_id, afflictions: Vec<{ kind, severity, applied_at_tick, expected_clear_tick }> }>, by_kind (BTreeMap<kind, count>)
+
+Scenario: snapshot_armor_layer payload contract (M2.5)
+  Given a fired snapshot_armor_layer event
+  Then the payload contains: tick, actors_with_layers: Vec<{ actor_id, layers: Vec<{ kind: External|Internal|Core, hp, max_hp, hardness, status: Pristine|Scratched|Cracked|Critical|Destroyed }> }>
+
+Scenario: snapshot_atmospherics payload contract (M2.5 placeholder; M5.9 fills)
+  Given a fired snapshot_atmospherics event
+  Then the payload contains: tick, atm_ids: Vec<{ atm_id, kind: RoomCell|PipeNetwork|Suit|Canister|Lung|DeviceInternal, volume_l, moles_per_gas, temperature_k, total_pressure_pa, flags }>
+  (At M2.5: empty for default scenarios; M5.9 fills with real atm states)
+
+Scenario: snapshot_environment_signal payload contract (M5.10 placeholder)
+  Given a fired snapshot_environment_signal event
+  Then the payload contains: tick, by_actor: Vec<{ actor_id, slice_bands: BTreeMap<slice_name, band_enum> }>
+  (M2.5: empty; M5.10 fills with real aggregator data)
+
+Scenario: snapshot_armor payload contract (M2.5 deep damage)
+  Given a fired snapshot_armor event
+  Then the payload contains: tick, actors_with_armor: Vec<{
+    actor_id,
+    per_zone: Vec<{
+      zone,                              // head | torso | arm_left | arm_right | forearm_left | forearm_right | hand_left | hand_right | leg_left | leg_right | shin_left | shin_right | foot_left | foot_right | backpack
+      armor_item_id: Option<ItemId>,     // None = un-armored
+      material_id,
+      mass_kg,
+      coverage_zones: Vec<BodyZone>,
+      damage_resist: BTreeMap<DamageKind, f32>,
+      absorption_factor,
+      ap_resistance,
+      chunkable,
+      layers: Vec<{ kind: External|Internal|Core, hp, max_hp, hardness, condition: Pristine|Scratched|Cracked|Critical|Destroyed|ChunkedOff }>
+    }>
+  }>
+
+Scenario: snapshot_internal payload contract (M2.5 deep damage)
+  Given a fired snapshot_internal event
+  Then the payload contains: tick, actors_with_internal: Vec<{
+    actor_id,
+    origin_id,                            // discriminator: humans/androids get organ list; robots get circuit list
+    organs: Vec<{ organ_id, organ_kind, hp, max_hp, located_in_zone, condition, applied_afflictions }> (humans/androids only),
+    circuits: Vec<{ circuit_id, circuit_kind, hp, max_hp, located_in_zone, condition, applied_afflictions }> (robots only)
+  }>
+  And the snapshot fires at scenario start + every objective transition (same cadence)
+
+Scenario: snapshot_concussion payload contract (M2.5 deep damage)
+  Given a fired snapshot_concussion event
+  Then the payload contains: tick, by_actor: Vec<{
+    actor_id, origin_id,
+    concussion_dose, band: Clear|Mild|Moderate|Severe|KO_Imminent|KO, recovery_rate_per_s,
+    internal_shock_dose (robots only),
+    g_load_dose (humans + androids only)
+  }>
+
+Scenario: snapshot_fluid payload contract (M2.5 deep damage)
+  Given a fired snapshot_fluid event
+  Then the payload contains: tick, actors_with_fluids: Vec<{
+    actor_id,
+    reservoirs: Vec<{ fluid_kind: oil|coolant|fuel|electrolyte, current_l, capacity_l, leak_rate_per_s, leak_position, leak_active, ignition_risk_0_1 }>
+  }>
+
+Scenario: snapshot_origin payload contract (M2.5 deep damage)
+  Given a fired snapshot_origin event
+  Then the payload contains: tick, by_actor: Vec<{
+    actor_id, origin_id: Human|Android|Robot|PoweredOrganic|Construct|HeavyBioMech,
+    g_load_dose, oxygen_supply_s (humans + androids), helmet_seal_intact (humans + androids)
+  }>
+
+Scenario: Stable record_id layer (no raw pointers) — M2.5 firehose entities
+  Given any event with an id field
   Then the id is a stable RecordId(u64) from the cf-replay registry
   And the registry emits lifecycle events when an entity is created / destroyed / pooled
   And raw MOID or pointer values are NEVER serialized
   (per CCCP MovableMan.cpp:126-143 warning about stale pointers after pooled allocation)
+  And the registry tracks lifecycles for these entity kinds (M3A-locked taxonomy):
+    - actor_id (Actor in MovableMan)
+    - item_id (Item / weapon / equipment in inventory; INCLUDES armor items)
+    - projectile_id (in-flight projectile)
+    - chunk_id (terrain chunk)
+    - hazard_cell_id (M2.5: hazard tile instance)
+    - affliction_instance_id (M2.5: per (actor_id, kind, applied_at_tick) instance)
+    - shield_instance_id (M5+: per actor shield)
+    - armor_layer_id (M2.5: per (actor_id, zone, layer_kind) instance)
+    - armor_item_id (M2.5: per (actor_id, zone) armor item slot)
+    - armor_debris_record_id (M2.5: per chunked-off armor piece on the ground)
+    - organ_id (M2.5: per (actor_id, organ_kind) organ instance for humans/androids)
+    - circuit_id (M2.5: per (actor_id, circuit_kind) circuit instance for robots)
+    - fluid_reservoir_id (M2.5: per (actor_id, fluid_kind) reservoir instance)
+    - fluid_leak_id (M2.5: per active leak instance)
+    - atm_id (M2.5 placeholder; M5.9 fills atm units)
+    - environment_signal_id (M5.10 placeholder)
+    - module_id (M5+: chassis module instance)
+  And every entity_id has a `<kind>.entity_created` and `<kind>.entity_destroyed` event with parent_event_id linking to the cause
+
+Scenario: High-density firehose backpressure handling
+  Given a scenario with 50+ actors + dense terrain carving + 20+ hazard tiles + multiple afflictions per actor
+  When per-tick event rate exceeds the recorder ring buffer capacity
+  Then dropped_count surfaces are populated on the dropped event
+  And summary.json.event_counts.dropped_total >= sum of all dropped_count fields
+  And priority threshold ensures these are NEVER dropped (gameplay-critical):
+    combat.*, mission.*, reactor.armor_layer_*, terrain.material_state_changed (band crossing), terrain.pixel_removed, hazard.spawned / .dissipated, affliction.applied / .cleared / .escalated, shield.depleted, atmos.breach_detected, determinism.sim_checksum, system.*, snapshot.*
+  And these MAY be dropped under pressure (cosmetic):
+    terrain.debris_spawned, hazard.tick, affliction.tick, ux.banner_raised (info), shield ripple cosmetic
+  And the canonical checker (prototype_run_check.py) verifies the priority discipline (CRITICAL kinds never appear in dropped_count > 0 bundle without a `system.critical_drop` event explaining why)
 ```
 
 ### Recorder backpressure + reentrancy guard

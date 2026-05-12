@@ -88,12 +88,48 @@ Scenario: Filter by tick centers the output
   Then the output shows 20 events on either side of tick 1800 (40 events total)
   And no events outside the [tick 1800-N, tick 1800+N] window are emitted
 
-Scenario: Filter by event category
+Scenario: Filter by event category — all 31 categories supported
   Given a bundle with mixed events
   When `view <bundle> --filter mission` runs
   Then the output contains only mission.* events
   When `--filter ai,combat` runs (comma-separated)
   Then the output contains only ai.* and combat.* events
+  When `--filter hazard,affliction,atmos,shield,thermal,environment` runs (M2.5 new categories)
+  Then the output filters to the M2.5 firehose categories
+  When `--filter terrain.material_state_changed` runs (event-type level filter)
+  Then the output contains only terrain.material_state_changed events
+  When `--exclude cosmetic` runs
+  Then the output excludes events with cosmetic=true (terrain.debris_spawned, hazard.tick, affliction.tick, etc.)
+  When `--include cosmetic` runs (default)
+  Then the output includes everything (default behavior)
+
+Scenario: Filter combinations for damage analysis
+  Given a bundle from M2.5
+  When `view <bundle> --filter combat.projectile_hit_mo --actor <shooter_id>` runs
+  Then the output is every projectile-hit by that shooter with full payload rendered
+  When `view <bundle> --filter reactor.armor_layer_destroyed` runs
+  Then only the 3 layer breach events show
+  When `view <bundle> --filter terrain.material_state_changed --pos 100,200 --radius 10` runs
+  Then only material state changes within 10 pixels of (100, 200) show
+
+Scenario: Filter by damage kind / surface kind / layer struck
+  Given a bundle from M2.5
+  When `view <bundle> --filter combat --damage-kind kinetic` runs
+  Then only kinetic-damage events show
+  When `--damage-kind thermal` runs
+  Then only thermal-damage events show
+  When `--surface-kind core --damage-kind thermal` runs
+  Then only thermal damage to Core layers show
+
+Scenario: Filter by affliction kind
+  Given a bundle with affliction events
+  When `view <bundle> --filter affliction --affliction-kind burning` runs
+  Then only burning-affliction events show
+
+Scenario: Filter by hazard kind
+  Given a bundle with hazard events
+  When `view <bundle> --filter hazard --hazard-kind fire` runs
+  Then only fire-hazard events show
 
 Scenario: Filter by actor + event type
   Given a bundle with actor_id=42 firing weapons
@@ -171,22 +207,339 @@ Scenario: Render cause chain as PNG (for documentation / debrief embed)
   (Optional polish; M3B ships markdown first, PNG as nice-to-have)
 ```
 
-### Debrief markdown (8 required sections)
+### Plain-language renderer — full template coverage per event family
+
+Per `docs/plan/spec/death-recap-ux-contract.md`, every event type that may appear in a cause chain or debrief renders as a plain English sentence, NEVER as raw JSON. M3B ships templates for the full M2.5 firehose (and reserves placeholders for M5+ producer events that haven't fired yet).
 
 ```gherkin
-Scenario: Debrief markdown has 8 required sections
+Scenario: terrain.* event rendering templates
+  Given a terrain.terrain_carved event
+  Then the renderer outputs: "Player carved through <material> at (X, Y), removing <pixel_count> pixels (<tool_kind>)"
+  Given a terrain.material_state_changed event
+  Then: "<material> at (X, Y) degraded from <from_band> to <to_band> (integrity <pct>%); cause: <cause>"
+  Given a terrain.pixel_removed event
+  Then: "<material> at (X, Y) destroyed (cause: <cause> or 'cascade from neighbor')"
+  Given a terrain.cascade_triggered event
+  Then: "Damage cascaded from (X1, Y1) to (X2, Y2): <reason>"
+  Given a terrain.tool_refused event
+  Then: "Tool <tool> refused at (X, Y): <reason> (e.g. 'cannot dig metal')"
+
+Scenario: combat.* + reactor.* event rendering templates
+  Given a combat.projectile_hit_mo event with M2.5 expanded payload
+  Then: "<shooter name>'s <weapon name> hit <target name>'s <surface_kind> for <damage> <damage_kind> damage (impact at <material> point, <impulse_J> J, layer struck: <layer> or N/A, pierced: <bool>)"
+  Given a reactor.armor_layer_hp_changed event
+  Then: "Reactor <layer> armor: HP <from> → <to> (<pct>% remaining); cause: <cause>"
+  Given a reactor.armor_layer_cracked event
+  Then: "Reactor <layer> armor cracked (HP=0); subsequent damage routes to <next_layer>"
+  Given a reactor.armor_layer_destroyed event
+  Then: "Reactor <layer> armor breached (<breach_kind>: punctured/shattered/melted); cause: <cause>"
+
+Scenario: hazard.* event rendering templates
+  Given a hazard.spawned event
+  Then: "<kind> hazard spawned at (X, Y) with intensity <0.0-1.0> (source: <source_event_id>)"
+  Given a hazard.spread event
+  Then: "<kind> spread from (X1, Y1) to (X2, Y2)"
+  Given a hazard.actor_contact event
+  Then: "<actor name> contacted <kind> hazard at (X, Y); intensity <0.0-1.0>"
+  Given a hazard.dissipated event
+  Then: "<kind> at (X, Y) dissipated (reason: <reason> — time/doused/spread-out)"
+
+Scenario: affliction.* event rendering templates
+  Given an affliction.applied event
+  Then: "<actor name> was afflicted with <kind> (severity <0.0-1.0>); expected to clear at tick <N>; cause: <source_event_id>"
+  Given an affliction.escalated event
+  Then: "<actor name>'s <kind> affliction escalated from severity <from> to <to>"
+  Given an affliction.cleared event
+  Then: "<actor name>'s <kind> affliction cleared (reason: <reason> — time/medikit/environment/death)"
+  Given an affliction.tick event (cosmetic, batched)
+  Then: "<actor name> took <hp_delta> HP from <kind> (batched over N ticks)" (only shown when --include-cosmetic flag is set)
+
+Scenario: atmos.* event rendering templates (M5.9 placeholder; M2.5 surface)
+  Given an atmos.pressure_changed event
+  Then: "Atmosphere <atm_id> pressure: <from_pa> → <to_pa> Pa (source: <source>)"
+  Given an atmos.gas_released event
+  Then: "<moles> mol of <gas> released into atmosphere <atm_id> (ignition_risk: <0.0-1.0>)"
+  Given an atmos.breach_detected event
+  Then: "Breach detected at atmosphere <atm_id>: size <breach_size_m2> m², decompression rate <Pa/s>"
+  Given an atmos.temperature_changed event
+  Then: "Atmosphere <atm_id> temperature: <from_k> K → <to_k> K"
+
+Scenario: shield.* event rendering templates (M5+ placeholder)
+  Given a shield.hit event
+  Then: "<actor name>'s shield absorbed hit: HP <from> → <to>; cause: <cause>"
+  Given a shield.depleted event
+  Then: "<actor name>'s shield depleted (HP=0)"
+  Given a shield.regen_started / completed
+  Then: "Shield regen started/completed for <actor name>"
+  Given a shield.disrupted event
+  Then: "<actor name>'s shield disrupted for <duration_s>s (cause: <cause>)"
+
+Scenario: thermal.* event rendering templates
+  Given a thermal.signature_changed event
+  Then: "<actor name>'s heat signature: <from_k> K → <to_k> K"
+
+Scenario: environment.* event rendering templates (M5.10 placeholder)
+  Given an environment.signal_delta event
+  Then: "<actor name>'s environment <slice> shifted: <from> → <to>"
+
+Scenario: chassis.* + body.* event rendering templates (M5+ placeholder)
+  Given chassis.armor_layer_destroyed event (M5+)
+  Then: "<actor name>'s chassis <bound_zone> <layer> armor breached (<breach_kind>): <cause>"
+  Given body.attachable_detached event (M5+)
+  Then: "<actor name>'s <limb_name> detached (cause: <cause>) — limb lost"
+  Given body.gib_created event (M5+)
+  Then: "<actor name> gibbed at (X, Y) (cause: <cause>)"
+
+Scenario: armor.* event rendering templates (M2.5 NEW)
+  Given armor.layer_hp_changed event
+  Then: "<actor name>'s <zone> <layer> armor HP: <from> → <to> (<material> armor); cause: <ap_round_tier> round at AP factor <ap_factor>"
+  Given armor.layer_critical event
+  Then: "<actor name>'s <zone> <layer> armor critical (HP <pct>%; near-destroyed)"
+  Given armor.layer_destroyed event
+  Then: "<actor name>'s <zone> <layer> armor destroyed (<breach_kind>: punctured/shattered/melted/chemically_corroded)"
+  Given armor.all_layers_destroyed event
+  Then: "<actor name>'s <zone> armor completely destroyed — subsequent hits go straight to limb/internal"
+  Given armor.chunked_off event
+  Then: "<actor name>'s <zone> armor chunked off (<debris_kind>) — fell to ground at (X, Y) as physical debris"
+  Given armor.debris_spawned event
+  Then: "Armor debris spawned at (X, Y): <kind> from <material>; can be picked up: <bool>"
+  Given armor.repaired event
+  Then: "<actor name>'s <zone> <layer> armor repaired (+<restored_hp> HP) by <repaired_by_actor_id>"
+
+Scenario: internal.* event rendering templates (M2.5 NEW)
+  Given internal.organ_damaged event
+  Then: "<actor name>'s <organ_kind> took <damage> damage (HP <from> → <to>); cause: <source_hit>"
+  Given internal.organ_destroyed event
+  Then: "<actor name>'s <organ_kind> DESTROYED — failure cascade: <applied_afflictions>"
+  Given internal.organ_failure_cascade event
+  Then: "<actor name>'s <organ_kind> failure cascade: applied <afflictions>; HP drain <rate>/s"
+  Given internal.circuit_damaged event
+  Then: "<actor name>'s <circuit_kind> circuit damaged (HP <from> → <to>); cause: <source_hit>"
+  Given internal.circuit_destroyed event
+  Then: "<actor name>'s <circuit_kind> circuit destroyed — failure cascade: <applied_afflictions>"
+  Given internal.circuit_failure_cascade event
+  Then: "<actor name>'s <circuit_kind> cascade: applied <afflictions>"
+
+Scenario: concussion.* event rendering templates (M2.5 NEW)
+  Given concussion.dose_changed event
+  Then: "<actor name>'s concussion dose: <from> → <to>; origin: <origin_id>"
+  Given concussion.band_changed event
+  Then: "<actor name> concussion band: <from> → <to> (dose=<dose>)"
+  Given concussion.ko_threshold_crossed event
+  Then: "<actor name> KNOCKED OUT for <ko_duration_s>s"
+  Given concussion.recovered event
+  Then: "<actor name> concussion recovered (reason: <recovery_reason>)"
+  Given internal_shock.dose_changed event (robot equivalent)
+  Then: "<actor name>'s internal shock dose: <from> → <to>"
+  Given internal_shock.module_damaged event
+  Then: "<actor name>'s <module_id> module took internal shock damage: <damage>; hit zone: <hit_zone>"
+
+Scenario: fluid.* event rendering templates (M2.5 NEW)
+  Given fluid.leak_started event
+  Then: "<actor name>'s <fluid_kind> leak STARTED at <source_module>; rate: <leak_rate> L/s; position: (X, Y)"
+  Given fluid.leak_rate_changed event
+  Then: "<actor name>'s <fluid_kind> leak rate: <from> L/s → <to> L/s (reason: <reason>)"
+  Given fluid.reservoir_warning event
+  Then: "<actor name>'s <fluid_kind> reservoir LOW (<level_pct>%)"
+  Given fluid.reservoir_critical event
+  Then: "<actor name>'s <fluid_kind> reservoir CRITICAL (<level_pct>%)"
+  Given fluid.reservoir_empty event
+  Then: "<actor name>'s <fluid_kind> reservoir EMPTY — cascade: <cascade_effects>"
+  Given fluid.ignition event
+  Then: "<actor name>'s <fluid_kind> IGNITED — chassis fire"
+  Given fluid.ground_splatter_spawned event (cosmetic)
+  Then: "<fluid_kind> splatter at (X, Y) — <volume_l> L; spawned terrain hazard: <terrain_hazard_kind>"
+  Given fluid.leak_stopped event
+  Then: "<actor name>'s <fluid_kind> leak stopped (reason: <reason>)"
+  Given fluid.refilled event
+  Then: "<actor name>'s <fluid_kind> refilled: +<amount> L (by <source_actor_id>)"
+
+Scenario: origin.* event rendering templates (M2.5 NEW)
+  Given origin.shot_force_feedback event
+  Then: "<actor name> took force feedback: <impulse_magnitude> N (<feedback_kind>); g_load: +<g_load_delta>; concussion: +<concussion_dose_delta>; <leak_channel: blood/oil/coolant>"
+  Given origin.g_load_dose_changed event
+  Then: "<actor name>'s g-load dose: <from> → <to> (source: <source>)"
+  Given origin.helmet_breach event
+  Then: "<actor name>'s helmet breached at <breach_pos>; oxygen draining at <oxygen_loss_rate> L/s"
+  Given origin.oxygen_supply_changed event
+  Then: "<actor name>'s oxygen supply: <from_s>s → <to_s>s"
+
+Scenario: combat.projectile_hit_mo expanded payload renders all details (M2.5 deep damage)
+  Given a combat.projectile_hit_mo event with full M2.5 payload
+  Then: "<shooter name>'s <weapon> (<ap_round_tier>, AP=<ap_factor>) hit <target name>'s <surface_kind> at <hit_zone>; impact <impulse>N <energy>J; armor absorbed <armor_absorbed_dmg> (effective hardness <armor_effective_hardness>); passthrough <passthrough_dmg> <damage_kind>; HP <hp_before> → <hp_after>; layer struck: <layer_struck>; pierced: <pierced_armor>; organ damaged: <organ_damaged_id or 'none'>; circuit damaged: <circuit_damaged_id or 'none'>"
+  (Renders the full damage chain in a single readable line)
+
+Scenario: All template gaps surface explicitly
+  Given the renderer encounters an event_type without a template
+  Then the renderer outputs: "[NO_TEMPLATE: <event_type>] payload=<hex_or_truncated>" to stderr
+  And the validate command flags missing templates as `warning`
+  And tests/renderer_template_coverage_test.rs verifies every M3A-active event type has a template
+```
+
+### Cause chain handling for M2.5 firehose
+
+```gherkin
+Scenario: Cause chain for reactor_destroyed walks armor layers + projectile chain
+  Given a lost bundle (reactor destroyed)
+  When `cause-chain <bundle> --event-type reactor_destroyed` runs
+  Then the walker produces:
+    "Reactor destroyed at tick 4521 (Core armor breached). Cause chain:
+     - Tick 4521: reactor.armor_layer_destroyed (Core, punctured) ← caused by
+     - Tick 4521: reactor.armor_layer_hp_changed (Core: 5 → 0) ← caused by
+     - Tick 4521: combat.projectile_hit_mo (guard's rifle, Core surface, 5 kinetic dmg, metal impact, layer struck: Core, pierced) ← caused by
+     - Tick 4498: reactor.armor_layer_destroyed (Internal, punctured) ← (earlier root cause)
+     - Tick 4321: reactor.armor_layer_destroyed (External, punctured) ← (even earlier root cause)
+     - Each above: caused by guard's projectile chain ← weapon_fired ← ai.tactic_chosen (target: reactor)"
+  And the resulting plain-language is debrief-ready
+
+Scenario: Cause chain for affliction-driven death (M5.7+)
+  Given an actor who died from affliction.bleeding_out
+  When cause-chain runs
+  Then the walker resolves: actor_died ← affliction.cleared (kind=bleeding, reason=death) ← affliction.applied (kind=bleeding, source: combat.wound_added) ← combat.projectile_hit_mo ← weapon_fired
+  And renders the full chain in plain language
+
+Scenario: Cause chain for hazard-contact death
+  Given an actor who died from electric hazard
+  When cause-chain runs
+  Then chain: actor_died ← hazard.actor_contact ← hazard.spawned ← (source event, e.g. terrain.terrain_destroyed exposed live wire)
+  And renders plain language
+
+Scenario: Cause chain for atmospheric breach death (M5.9 forward-compat)
+  Given the surface fires (M5.9 producers)
+  When cause-chain runs
+  Then chain: actor_died ← atmos.breach_detected ← atmos.gas_released (volatiles, ignition_risk > 0.5) ← atmos.combustion_ignition (M5.9) ← reactor.armor_layer_destroyed
+  And the chain is rendered without raw JSON
+
+Scenario: Cause chain handles cascade attribution (terrain.cascade_triggered)
+  Given a player dug a critical wall + cascade triggered destruction of adjacent reactor wall
+  When cause-chain runs on the reactor.armor_layer_destroyed
+  Then chain: armor_layer_destroyed ← terrain.cascade_triggered (from neighbor) ← terrain.pixel_removed (player's carve) ← terrain.terrain_carved (player input) ← act.player.dig
+  And captures the player-caused cascade attribution clearly
+```
+
+### Death recap modal templates per cause family
+
+```gherkin
+Scenario: Death recap by kinetic projectile
+  Given a player died from kinetic projectile (rifle)
+  Then the death recap reads:
+    "You were killed by <enemy name>'s <weapon>.
+     - Final hit: <damage> kinetic damage to <body zone>, through <material> surface
+     - Total armor stages: External cracked (HP 60%) → Internal destroyed (HP 30%) → Core hit (HP 0%)
+     - Lead-up: you were spotted at tick <N>, took <N> hits over <s> seconds"
+
+Scenario: Death recap by hazard (electric)
+  Given a player died from electric hazard
+  Then the recap reads:
+    "You were killed by electric hazard.
+     - Affliction: electrified for <s>s (-mobility, -HP/s)
+     - Lead-up: <electrified intensity> at (X, Y); spread from <source>"
+
+Scenario: Death recap by atmospheric breach (M5.9+ forward-compat)
+  Given a player died from atmospheric breach
+  Then the recap reads:
+    "You were killed by atmospheric breach.
+     - Cause: <gas> exposure + decompression in atmosphere <atm_id>
+     - Final pressure: <Pa>; final O2: <Pa>"
+
+Scenario: Death recap by limb loss (M5+ forward-compat)
+  Given a player died from limb loss (no head OR no arms+legs)
+  Then the recap reads:
+    "You were killed by limb loss.
+     - Cause: <head_destroyed OR limbs_destroyed_bleed_out>
+     - Lead-up: <which limbs were lost when>"
+
+Scenario: Death recap by AP round → armor pierce → organ destruction (M2.5 deep damage)
+  Given a human actor died from an AP round + heart destruction
+  Then the recap reads:
+    "You were killed by <enemy>'s <weapon> (hardened_AP round, AP=0.7).
+     - Hit: torso (chest_armor, metal_plate)
+     - Armor cascade: External cracked at HP 65% (round 1 of 4) → Internal destroyed at HP 35% (round 3) → Core breached at HP 5% (round 4)
+     - Passthrough damage: 16 HP kinetic
+     - Internal damage: heart took 14 HP → DESTROYED
+     - Failure cascade: bleeding_severe + dying_30s_timer
+     - Final status: dead at tick 4521"
+  And the recap explains WHY the AP factor mattered ("70% bypass; standard armor was insufficient")
+
+Scenario: Death recap by repetitive small arms + concussion + KO
+  Given a human actor died from KO + finishing shot
+  Then the recap reads:
+    "You were killed by sustained small arms fire.
+     - Lead-up: 12 hits to chest armor over 8 seconds; armor held but concussion accumulated
+     - Concussion bands: Clear → Mild (tick 100) → Moderate (tick 250) → Severe (tick 400) → KO_Imminent (tick 460) → KO (tick 520)
+     - KO duration: 8 seconds (vulnerable state)
+     - Final shot: <enemy>'s rifle to head while KO'd; brain destroyed
+     - Player can read: even un-pierced armor can KILL through cumulative concussion"
+
+Scenario: Death recap by robot fluid ignition cascade (M2.5 deep damage)
+  Given a robot died from fuel leak → ignition → chassis fire
+  Then the recap reads:
+    "You (robot) were killed by chassis fire ignition.
+     - Hit: torso armor pierced by AP round (External → Internal → Core all destroyed)
+     - Internal damage: fuel_tank punctured → fluid.leak_started (kind=fuel, rate=2 L/s)
+     - Environmental: leak position contacted fire hazard tile
+     - Cascade: fluid.ignition → chassis fire → affliction.burning (severity=1.0)
+     - Internal cascade: cpu damaged from heat → all action speeds × 0.3 → unable to escape
+     - Final: power_core destroyed by heat → robot inert"
+
+Scenario: Death recap by coolant leak + overheating cascade (robot)
+  Given a robot died from sustained overheating
+  Then the recap reads:
+    "You (robot) were killed by overheating cascade.
+     - Lead-up: coolant_pump damaged (HP 15%); coolant leak started (rate=1.2 L/s)
+     - Reservoir empty at tick 800; heat accumulated rapidly
+     - Internal cascade: motor_controller_left_leg damaged at tick 850 (-mobility)
+     - Internal cascade: power_core damaged at tick 900 (-power); cpu damaged at tick 920
+     - Final: power_core destroyed; robot inert"
+
+Scenario: Death recap by oxygen depletion (helmet breach in vacuum)
+  Given a human actor died from hypoxia after helmet breach
+  Then the recap reads:
+    "You were killed by hypoxia in vacuum.
+     - Helmet breached at tick 100 by <weapon>; oxygen draining at 3× normal rate
+     - oxygen_supply: 120s at tick 100 → 80s at tick 200 → 40s at tick 300 → 0s at tick 500
+     - affliction.hypoxic escalated: Mild → Moderate → Severe → Lethal
+     - HP drained at -2 HP/s for 30s before death"
+
+Scenario: Death recap respects DR-012 accessibility
+  Given any death recap
+  Then no color-only state encoding (text + glyph for each band)
+  And the recap fits at 200% UI scale
+  And `caption_mode` controls how much detail surfaces
+
+Scenario: Death recap variants by origin
+  Given a human died → recap focuses on organ damage + concussion + bleed
+  Given an android died → recap focuses on hybrid organ/circuit damage + reduced concussion
+  Given a robot died → recap focuses on circuit damage + fluid leaks + internal_shock + heat cascade
+  And the recap NEVER uses human-only language (e.g. "concussed") for a robot
+  And NEVER uses robot-only language (e.g. "internal_shock") for a human
+```
+
+### Debrief markdown (12 required sections — expanded from 8)
+
+```gherkin
+Scenario: Debrief markdown has 17 required sections (M2.5 deep damage expansion)
   Given a completed run bundle
   When `debrief <bundle>` runs
   Then debrief.md is written to <bundle>/debrief.md
-  And the markdown contains these 8 ## sections in order:
+  And the markdown contains these 17 ## sections in order:
     1. ## Outcome
     2. ## Mission state
     3. ## Key events
     4. ## Cause chain (for losses only)
-    5. ## Checksum status
-    6. ## Captures
-    7. ## Accessibility surface
-    8. ## Recorder health
+    5. ## Damage breakdown (NEW M2.5: by source actor + by weapon + by surface kind + by damage kind + by ap_round_tier)
+    6. ## Armor durability (NEW M2.5 deep: per actor per zone — layer states, breach kinds, chunked-off events, debris collected)
+    7. ## Internal damage breakdown (NEW M2.5 deep: per actor — organs damaged/destroyed [humans/androids] OR circuits damaged/destroyed [robots], failure cascades applied)
+    8. ## Concussion timeline (NEW M2.5 deep: per actor — concussion bands over time, KO events, recovery events; robot equivalent: internal_shock timeline)
+    9. ## Fluid drain timeline (NEW M2.5 deep: per actor — leaks started, rates, reservoir empties, ignitions, refills)
+    10. ## Origin force feedback summary (NEW M2.5 deep: per origin — pain_jolt vs servo_jolt vs frame_ring counts, g_load summary, helmet breaches, oxygen depletion)
+    11. ## Terrain damage summary (M2.5: integrity-band distribution + pixels-removed + cascades + tool refusals)
+    12. ## Hazard summary (M2.5: spawned/spread/dissipated counts per kind)
+    13. ## Affliction summary (M2.5: applied/escalated/cleared per kind + actor)
+    14. ## Atmospheric events (M2.5: M5.9 placeholder counts)
+    15. ## Checksum status
+    16. ## Captures
+    17. ## Accessibility surface + recorder health
 
 Scenario: Outcome section
   Given a won bundle
@@ -246,18 +599,123 @@ Scenario: Accessibility surface section
 
 Scenario: Recorder health section
   Given any bundle
-  Then ## Recorder health lists:
+  Then ## Accessibility surface + recorder health lists:
+    - ui_scale, contrast_mode, captions, reduced_motion/shake/flash, hold_to_confirm settings
     - Total events: N
     - Dropped events: M (or "0 — recorder under capacity")
     - Peak buffer depth: K
     - Categories active vs registered (from system.category_baseline)
-  And flags any anomalies (dropped_total > 0 = WARNING)
+    - Critical-priority drops (must be 0 unless system.critical_drop event explains)
+  And flags any anomalies (dropped_total > 0 = WARNING; critical-priority drop = ERROR)
+
+Scenario: Damage breakdown section (M2.5)
+  Given a bundle with combat events
+  Then ## Damage breakdown lists:
+    - Total damage dealt: <HP sum>
+    - By source actor: each shooter + total damage they dealt + kill count
+    - By weapon: each weapon used + total damage + shot count + hit rate
+    - By surface_kind struck: armor_external/internal/core/terrain/flesh/unarmored (count + dmg per surface)
+    - By damage_kind: kinetic/thermal/electric/chemical/radiation/atmospheric (count + dmg per kind)
+    - By layer_struck: External/Internal/Core (for chassis/reactor)
+    - Pierced count: how many shots pierced armor vs absorbed
+
+Scenario: Terrain damage summary section (M2.5)
+  Given a bundle with terrain events
+  Then ## Terrain damage summary lists:
+    - Pixels carved: <total>
+    - Pixels removed (cascade + direct): <total>
+    - Material state transitions: <table of from_band → to_band counts>
+    - Final integrity distribution: per-band pixel counts (Pristine/Scratched/Cracked/Critical/Destroyed)
+    - Tool refusals: <count> (e.g. "5x cannot dig metal")
+    - Cascades triggered: <count>
+    - Debris spawned: <count>
+
+Scenario: Hazard summary section (M2.5)
+  Given a bundle (with or without hazards)
+  Then ## Hazard summary lists:
+    - Hazards spawned by kind: fire/smoke/electric/wet/hot-cold counts
+    - Spread events: count
+    - Actor contacts: count by (actor, kind)
+    - Dissipations: count by (kind, reason)
+  If no hazards spawned: section says "No hazards in this run"
+
+Scenario: Affliction summary section (M2.5)
+  Given a bundle (with or without afflictions)
+  Then ## Affliction summary lists:
+    - Afflictions applied by kind: 18-kind table
+    - Escalations: <count by (kind, from_severity → to_severity)>
+    - Clearances: <count by (kind, reason: time/medikit/environment/death)>
+    - Per-actor active afflictions at end-of-run
+  If no afflictions: "No afflictions in this run"
+
+Scenario: Atmospheric events section (M2.5 placeholder; M5.9 fills)
+  Given a bundle with atmos events (placeholders or real)
+  Then ## Atmospheric events lists:
+    - Pressure changes: <count> (M2.5 fires when reactor pressure_state changes)
+    - Gas releases: <count by gas type>
+    - Breach detections: <count> + total breach size
+    - Temperature changes: <count> + final atmosphere temperatures
+  If M5.9 atmos kernel inactive: section labels values as "placeholder (M5.9 forward-compat)"
+
+Scenario: Armor durability section (M2.5 deep damage)
+  Given a bundle with armor events
+  Then ## Armor durability lists per actor:
+    - Per zone (head/torso/arm_left/arm_right/...): 
+      - Armor item equipped (or "none")
+      - Material + mass
+      - Layers state at end-of-run: External/Internal/Core HP + condition
+      - Layer-destroyed events (with breach_kind)
+      - Chunked-off events (with debris RecordId, ground position)
+      - Layer-repaired events (with restored HP, repaired by)
+    - Total armor mass at start vs end (-X kg from chunking)
+    - Damage absorbed by armor: <total HP> vs damage that passed through: <total HP>
+
+Scenario: Internal damage breakdown section (M2.5 deep damage)
+  Given a bundle with internal events
+  Then ## Internal damage breakdown lists per actor:
+    - Origin (human/android/robot — discriminator for organ vs circuit)
+    - Per organ/circuit:
+      - Final HP / max HP / condition
+      - Damage taken (by cause)
+      - Destroyed events (with failure_cascade)
+      - Failure cascade afflictions applied
+    - Internal damage hit rates: how many heavy-damage hits routed to internal vs only-armor
+
+Scenario: Concussion timeline section (M2.5 deep damage)
+  Given a bundle with concussion or internal_shock events
+  Then ## Concussion timeline lists per actor (per origin):
+    - Origin-relevant dose accumulator: concussion_dose (humans/androids) OR internal_shock_dose (robots)
+    - Band transitions over time: Clear → Mild → Moderate → Severe → KO_Imminent → KO
+    - KO events: count + duration per
+    - Recovery events: count + reason (time/medikit/environment)
+    - Final state at end-of-run
+
+Scenario: Fluid drain timeline section (M2.5 deep damage)
+  Given a bundle with fluid events
+  Then ## Fluid drain timeline lists per actor (robots / mechs / power-suits):
+    - Per reservoir (oil/coolant/fuel/electrolyte):
+      - Starting capacity / final capacity
+      - Leaks started: count + rates + sources
+      - Reservoir warnings / criticals / empties events
+      - Ignitions: count + ignition source
+      - Refills: count + amount + source actor
+    - Cascade effects: which afflictions / module failures were caused by fluid loss
+
+Scenario: Origin force feedback summary section (M2.5 deep damage)
+  Given a bundle with origin events
+  Then ## Origin force feedback summary lists:
+    - Total origin.shot_force_feedback events
+    - Distribution by feedback_kind: pain_jolt / servo_jolt / frame_ring
+    - G-load summary: total dose accumulated per actor (humans + androids)
+    - Helmet breach events: count + actors
+    - Oxygen supply events: per actor remaining supply at end-of-run
+  And the section labels which subsystems are scaled per origin (e.g. "Humans full force; androids 0.5×; robots 0× concussion")
 ```
 
 ### Validate subcommand
 
 ```gherkin
-Scenario: validate runs all 7 BundleError checks + cross-file rules
+Scenario: validate runs all 7 BundleError checks + cross-file rules + M2.5 firehose rules
   Given a bundle
   When `validate <bundle>` runs
   Then the viewer runs:
@@ -265,6 +723,15 @@ Scenario: validate runs all 7 BundleError checks + cross-file rules
     - 12 cross-file rules from M3A (parent_event_id resolves, event_counts.by_category matches, dropped_total ≥ sum, etc.)
     - 6 required notes.md headings (Assumptions Tested / Good / Bad / Meh / Evidence Links / Next Actions)
     - expected_outcome matches system.run_finished.outcome
+  Plus M2.5 firehose rules:
+    - Every terrain.material_state_changed has from_band < to_band band-order (or explicit reverse repair label)
+    - Every reactor.armor_layer_destroyed has a preceding armor_layer_hp_changed event
+    - Every hazard.spread fires only after its source hazard.spawned
+    - Every affliction.cleared has a preceding affliction.applied
+    - Every affliction.escalated has from_severity < to_severity
+    - No critical-priority event appears in dropped_count > 0 without system.critical_drop explanation
+    - Every cause-chain leaf (mission_resolved / actor_died) resolves to RootReached (NOT ParentMissingFromBundle for default scenarios)
+    - Every event_type has a registered plain-language template (warning if missing)
   And writes validation.json with `{ status: "pass" | "fail", errors: [...], warnings: [...] }`
   And exits 0 on pass, non-zero on fail (with structured error JSON on stderr)
 
