@@ -402,10 +402,36 @@ impl Recorder {
     ) -> String {
         let seq = self.seq.fetch_add(1, Ordering::Relaxed);
         let event_id = make_event_id(&self.run_id, tick.0, seq);
+        // Mutex poisoning means a thread panicked while holding the recorder
+        // lock — the run is already in an inconsistent state. We `expect()`
+        // (loud panic) instead of silently logging and returning a phantom
+        // `event_id` for an event that was never recorded (issue #18). All
+        // other recorder methods now use the same `expect()` strategy
+        // (issue #22) so error handling is consistent across the API.
+        let mut inner = self.inner.lock().expect("recorder mutex poisoned; aborting run");
+        // **M1 R2 fix**: monotonically clamp the recorded tick to >= the
+        // previous record's tick. Multi-threaded dispatch can read a stale
+        // `clock.tick()` value (the dispatch path captures tick under the
+        // state lock, drops it, THEN calls recorder.record — meanwhile
+        // drive_tick advances the clock). The cfctl JSON-RPC path is the
+        // common offender: a high-frequency unpaced engine can advance many
+        // ticks between dispatch's tick-read and dispatch's record-write,
+        // producing a "tick=N command_accepted" event recorded AFTER
+        // higher-tick sim events. The bundle event log must stay monotonic
+        // (prototype_run_check.py enforces this). Clamping here keeps the
+        // contract WITHOUT moving the dispatch handlers' 53 `drop(state)`
+        // sites into a hold-through-record pattern — a refactor too risky
+        // for a small fix. The clamp is at most +1 in steady-state for the
+        // unpaced loop.
+        let effective_tick = if let Some(last) = inner.last_tick {
+            tick.0.max(last)
+        } else {
+            tick.0
+        };
         let event = Event {
             schema_version: EVENT_SCHEMA_VERSION.to_string(),
             run_id: self.run_id.clone(),
-            tick: tick.0,
+            tick: effective_tick,
             sim_time_ms,
             event_id: event_id.clone(),
             category: category.to_string(),
@@ -414,17 +440,10 @@ impl Recorder {
             parent_event_id,
             dropped_count: None,
         };
-        // Mutex poisoning means a thread panicked while holding the recorder
-        // lock — the run is already in an inconsistent state. We `expect()`
-        // (loud panic) instead of silently logging and returning a phantom
-        // `event_id` for an event that was never recorded (issue #18). All
-        // other recorder methods now use the same `expect()` strategy
-        // (issue #22) so error handling is consistent across the API.
-        let mut inner = self.inner.lock().expect("recorder mutex poisoned; aborting run");
         *inner.by_category.entry(event.category.clone()).or_insert(0) += 1;
         *inner.by_type.entry(event.event_type.clone()).or_insert(0) += 1;
-        inner.first_tick.get_or_insert(tick.0);
-        inner.last_tick = Some(tick.0);
+        inner.first_tick.get_or_insert(effective_tick);
+        inner.last_tick = Some(effective_tick);
         if event.category == "determinism" && event.event_type == "sim_checksum" {
             inner.checksum_event_count += 1;
             if let Some(hex) = event.payload.get("checksum_hex").and_then(|v| v.as_str()) {

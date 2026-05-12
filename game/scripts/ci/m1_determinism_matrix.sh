@@ -120,11 +120,17 @@ PY
     fi
     # cf-e2e writes the bundle into the configured run-bundle root, which
     # defaults to prototype_runs/native. Locate the most recent matching
-    # bundle dir by reading the cf-app stdout (cf-e2e tee'd both streams).
-    bundle_dir=$(grep -oE 'bundle=[^[:space:]]+' "$bundle_root/cf-e2e.stderr" 2>/dev/null \
+    # bundle dir by reading the cf-app log lines that tracing fmt routes to
+    # stdout (and stderr as a fallback). tracing-subscriber emits ANSI color
+    # escapes even when stdout is redirected, so we strip ESC[...m sequences
+    # before greping. `|| true` keeps `set -e` from tripping on grep no-match.
+    strip_ansi='s/\x1B\[[0-9;]*[A-Za-z]//g'
+    bundle_dir=$( (sed -e "$strip_ansi" "$bundle_root/cf-e2e.stdout" \
+        | grep -oE 'bundle=[^[:space:]]+' || true) \
         | tail -n 1 | sed 's/^bundle=//')
     if [[ -z "$bundle_dir" ]]; then
-      bundle_dir=$(grep -oE 'bundle=[^[:space:]]+' "$bundle_root/cf-e2e.stdout" 2>/dev/null \
+      bundle_dir=$( (sed -e "$strip_ansi" "$bundle_root/cf-e2e.stderr" \
+          | grep -oE 'bundle=[^[:space:]]+' || true) \
           | tail -n 1 | sed 's/^bundle=//')
     fi
     if [[ -z "$bundle_dir" || ! -f "$bundle_dir/events.jsonl" ]]; then
@@ -142,7 +148,7 @@ PY
       FAILED_LIST+=("$script@${hz}hz: run_check non-zero exit")
       continue
     fi
-    errors=$(grep -E '^errors ' "$bundle_root/run_check.stdout" | awk '{print $2}')
+    errors=$( (grep -E '^errors ' "$bundle_root/run_check.stdout" || true) | awk '{print $2}')
     if [[ "$errors" != "0" ]]; then
       echo "    errors=$errors > 0 for $script @ ${hz}Hz" >&2
       FAILURES=$((FAILURES + 1))
