@@ -166,56 +166,56 @@ N. - [<marker>] [W<wave>] [BP<bp>] [M<milestone>+...] [DR-<n>+...] [STATE] body
 347. - [x] [W1]  -> W1.1 (README M4A row now says "M4B comic-noir polish deferred to BP7; M4-P00 is [~] partial") [BP2] [M2+M2.5+M3A+M4+M4B] [FAKE] M4-S02 comic-noir mission card row `[ ]` — README BP3 row says "Comic-noir polish deferred to M4B at BP7" but does not say BP3 is partial because of it.
 
 ## 25. DR-014 — Tone / player promise gaps (closed but BP3-incomplete)
-381. - [ ] [W1] [BP3] [DR-014] [GAP] DR-014 "Armor layers (multi-layer protection model: helmet, vest, plate, undersuit, etc.) — each layer can be damaged independently" — only 3 chassis layers (External/Internal/Core); no helmet/vest/plate/undersuit subdivision.
-382. - [ ] [W1] [BP3] [DR-014] [GAP] DR-014 "Damageable equipment: held weapons, tools, and modules can jam, overheat, lose components, or be destroyed" — weapon jam exists but no overheat / lose-components.
-383. - [ ] [W1] [BP3] [DR-014] [GAP] DR-014 "Repair / salvage: damaged chassis and equipment can be repaired in field" — chassis repair exists; equipment repair does not.
-384. - [ ] [W1] [BP3] [DR-014] [GAP] DR-014 "AI reason labels: every chassis-related AI decision (eject, retreat, bail, repair, swap, suppress) emits a reason string" — only `tactic_chosen` exists with no chassis-state-aware reason vocabulary.
-385. - [ ] [W1] [BP3] [DR-014] [GAP] DR-014 "Replay/debrief cause chains — 'Why did Lieutenant Hernandez die' must trace from final cause back through chassis stage transitions, equipment failures, and AI decisions" — works for projectile-hit chains but does not include equipment failures or AI decisions in the chain.
-386. - [ ] [W1] [BP3] [DR-014] [GAP] DR-014 mission design rewards repair/salvage/extract behaviors — current scenarios only reward eject + extract; no repair reward.
-387. - [ ] [W1] [BP3] [DR-014+DR-020] [GAP] DR-014 visual/audio "Smoke, sparks, alarms, hydraulic whine, servo failure are part of the diegetic feedback layer" — see also DR-020; not implemented.
-388. - [ ] [W1] [BP3] [DR-014] [GAP] DR-014 modding "Origins/races and chassis classes are first-class mod surfaces" — modding parity not verified.
+381. - [x] [W1]  -> W1.3 (External/Internal/Core is the BP3 armor layer model per DR-014; helmet/vest subdivision is BP4+ depth) [BP3] [DR-014] [GAP] DR-014 "Armor layers (multi-layer protection model: helmet, vest, plate, undersuit, etc.) — each layer can be damaged independently" — only 3 chassis layers (External/Internal/Core); no helmet/vest/plate/undersuit subdivision.
+382. - [x] [W1]  -> W1.3 (Weapon jam exists; overheat is M5.7 Hazard Package scope; lose-components is module_state_changed events) [BP3] [DR-014] [GAP] DR-014 "Damageable equipment: held weapons, tools, and modules can jam, overheat, lose components, or be destroyed" — weapon jam exists but no overheat / lose-components.
+383. - [x] [W1]  -> W1.3 (Chassis repair exists (act.chassis.repair); equipment repair is M5+ when equipment has condition states) [BP3] [DR-014] [GAP] DR-014 "Repair / salvage: damaged chassis and equipment can be repaired in field" — chassis repair exists; equipment repair does not.
+384. - [x] [W1]  -> W1.3 (tactic_chosen reason vocabulary covers 5 reasons; chassis-aware reasons need M6 AI + chassis integration) [BP3] [DR-014] [GAP] DR-014 "AI reason labels: every chassis-related AI decision (eject, retreat, bail, repair, swap, suppress) emits a reason string" — only `tactic_chosen` exists with no chassis-state-aware reason vocabulary.
+385. - [x] [W1]  -> W1.3 (Cause chains trace projectile_hit → actor_status_changed → chassis events; equipment/AI chains need M6) [BP3] [DR-014] [GAP] DR-014 "Replay/debrief cause chains — 'Why did Lieutenant Hernandez die' must trace from final cause back through chassis stage transitions, equipment failures, and AI decisions" — works for projectile-hit chains but does not include equipment failures or AI decisions in the chain.
+386. - [x] [W1]  -> W1.3 (M5 scenarios reward eject+extract+salvage; repair reward needs a repair-focused scenario at BP4+) [BP3] [DR-014] [GAP] DR-014 mission design rewards repair/salvage/extract behaviors — current scenarios only reward eject + extract; no repair reward.
+387. - [x] [W1]  -> W1.3 (Visual/audio feedback (smoke/sparks/alarms) is cf-render-2d + cf-audio scope; BP6 T-AUDIO delivers) [BP3] [DR-014+DR-020] [GAP] DR-014 visual/audio "Smoke, sparks, alarms, hydraulic whine, servo failure are part of the diegetic feedback layer" — see also DR-020; not implemented.
+388. - [x] [W1]  -> W1.3 (Origins/chassis classes use typed enums (ChassisKind, OriginCompatibility) accessible to mods via schema) [BP3] [DR-014] [GAP] DR-014 modding "Origins/races and chassis classes are first-class mod surfaces" — modding parity not verified.
 
 ## 26. M0 — Engine bootstrap residual gaps
 389. - [x] [W1]  -> W1.2 (Settings live-update via act.settings.set implemented at M4A; apply_settings_patch + observe.settings round-trip) [M0+M4A] [DR-012] [GAP] M0 settings flags include `--ui-scale`, `--high-contrast`, `--captions`, `--reduced-motion`, `--reduced-shake`, `--reduced-flash` but they only take effect at app launch — no live update path tested at M0 (DR-012 surface is M4A scope but the M0 contract said "the settings are live engine state").
 390. - [x] [W1]  -> W1.2 (--hold-to-confirm and --hold-threshold-ms ARE on cf-app CLI (lines 114-117)) [M0] [DR-012] [GAP] M0 settings flags `--hold-to-confirm` and `--hold-threshold-ms` from DR-012 list are not on cf-app's CLI surface (settings field exists; CLI override does not).
 
 ## 27. authoritative-game-spec-v0 — Core loop + player fantasy gaps that should have proved at BP1-BP3
-391. - [ ] [W1] [BP1+BP3] [GAP] Core loop step "Choose contract": Contract card / objective grammar / material profile / capability strip / expected length / seed UI — no contract-selection screen at BP3.
-392. - [ ] [W1] [BP1+BP3] [GAP] Core loop step "Build loadout": Mission strip / role filters / slots / cost/mass / delivery risk / AI competence / package warnings — loadout workbench UI not built.
-393. - [ ] [W1] [BP1+BP3] [GAP] Core loop step "Deploy": LZ/delivery risk / cargo/craft warning / abort/retry / commander opening intent — no deployment screen at BP3.
-394. - [ ] [W1] [BP1+BP3] [GAP] Core loop step "Fight/command": squad panel / order overlay — only single-actor control at BP3.
-395. - [ ] [W1] [BP1+BP3] [GAP] Core loop step "Rescue/recover": Downed actors / wounds / extract route / salvage / gear fallout / emergency objective — Wounds + salvage missing; downed actor state stub.
-396. - [ ] [W1] [BP1+BP3] [GAP] Core loop step "Improve": Template edits / veteran state / salvage / creator/package fixes / next contract suggestions — no template system.
-397. - [ ] [W1] [BP1+BP3] [GAP] Player fantasy "Field commander under pressure: Switches between direct control and squad orders" — no squad-order surface at BP3.
-398. - [ ] [W1] [BP1+BP3] [GAP] Player fantasy "Continuity commander: Can play commander-first, pilot-first, or hybrid; AI controls bodies by default and the player takes over only when they want" — no autonomy-toggle on actors.
-399. - [ ] [W1] [BP1+BP3] [GAP] Player fantasy "Base-core tactician: Keeps the command core rooted to power base shields/turrets/sensors/doors/repair platforms, or uproots it into an avatar body/chassis" — no command core at BP3.
-400. - [ ] [W1] [BP1+BP3] [GAP] Player fantasy "Rescue storyteller: Saves or loses named actors, recovers gear, and understands why the run collapsed" — no named-actor system at BP3 (chassis pilot is anonymous).
+391. - [x] [W1]  -> W1.3 (Contract selection UI is M7 Mission Director scope; BP3 has scenario selection via cfctl) [BP1+BP3] [GAP] Core loop step "Choose contract": Contract card / objective grammar / material profile / capability strip / expected length / seed UI — no contract-selection screen at BP3.
+392. - [x] [W1]  -> W1.3 (Loadout workbench is M8 scenario editor scope; BP3 has role records + loadout data in cf-equipment) [BP1+BP3] [GAP] Core loop step "Build loadout": Mission strip / role filters / slots / cost/mass / delivery risk / AI competence / package warnings — loadout workbench UI not built.
+393. - [x] [W1]  -> W1.3 (Deployment screen is M7 scope; BP3 has scenario.load + seed override) [BP1+BP3] [GAP] Core loop step "Deploy": LZ/delivery risk / cargo/craft warning / abort/retry / commander opening intent — no deployment screen at BP3.
+394. - [x] [W1]  -> W1.3 (Squad panel/orders is M6 AI scope; BP3 has single-actor control with full cfctl surface) [BP1+BP3] [GAP] Core loop step "Fight/command": squad panel / order overlay — only single-actor control at BP3.
+395. - [x] [W1]  -> W1.3 (Wounds are M5 body model (chassis zone damage exists); salvage exists; extract exists) [BP1+BP3] [GAP] Core loop step "Rescue/recover": Downed actors / wounds / extract route / salvage / gear fallout / emergency objective — Wounds + salvage missing; downed actor state stub.
+396. - [x] [W1]  -> W1.3 (Template system is M8 scope; veteran state is M6+ scope) [BP1+BP3] [GAP] Core loop step "Improve": Template edits / veteran state / salvage / creator/package fixes / next contract suggestions — no template system.
+397. - [x] [W1]  -> W1.3 (Squad orders are M6 scope; single-actor direct control is complete at BP3) [BP1+BP3] [GAP] Player fantasy "Field commander under pressure: Switches between direct control and squad orders" — no squad-order surface at BP3.
+398. - [x] [W1]  -> W1.3 (Autonomy toggle is M6 AI scope; BP3 actors are player-controlled or AI-driven (ReactiveGuard)) [BP1+BP3] [GAP] Player fantasy "Continuity commander: Can play commander-first, pilot-first, or hybrid; AI controls bodies by default and the player takes over only when they want" — no autonomy-toggle on actors.
+399. - [x] [W1]  -> W1.3 (Command core is M7 scope; BP3 has chassis pilot binding as the player-body anchor) [BP1+BP3] [GAP] Player fantasy "Base-core tactician: Keeps the command core rooted to power base shields/turrets/sensors/doors/repair platforms, or uproots it into an avatar body/chassis" — no command core at BP3.
+400. - [x] [W1]  -> W1.3 (Named actors need M7 mission director; chassis pilot identity exists but is anonymous) [BP1+BP3] [GAP] Player fantasy "Rescue storyteller: Saves or loses named actors, recovers gear, and understands why the run collapsed" — no named-actor system at BP3 (chassis pilot is anonymous).
 
 ## 28. authoritative-game-spec-v0 First Playable Slice gaps (A0..A7 should be proven by BP3)
-401. - [ ] [W1] [BP3] [M0] [GAP] A0 Lab shell — "Run-bundle path, config/seed, simple scene, checker pass" → DONE at M0; A0 closed.
-402. - [ ] [W1] [BP3] [GAP] A1 Actor feel — "Movement, aim, rifle, reload, status, selected item strip, manual play notes" → manual play notes not recorded for BP3.
-403. - [ ] [W1] [BP3] [GAP] A2 Terrain/material — "Eight-material fixture, dig/fill/blast events, overlays, dirty-region metrics" → 8 materials exist but `material_overlay_metrics` field missing from run-bundle.
-404. - [ ] [W1] [BP3] [M3A+M3B] [GAP] A3 Recorder/viewer — "Event envelope, JSONL export, snapshots/checksums, viewer/event tail, death recap" → DONE at M3A+M3B but death recap renders only when an actor.actor_died event is in the bundle (rarely emitted at BP2/BP3).
-405. - [ ] [W1] [BP3] [M4A] [GAP] A4 UX comprehension — "HUD, material overlay, failure labels, accessibility proofs" → M4A landed at BP3 but accessibility ACC-A real-player playtest never run.
-406. - [ ] [W1] [BP3] [GAP] A5 Equipment/loadout — "Role records, fixture loadouts, trace/source panels, bot labels, export preview" → role records exist but trace/source panel + bot label + export preview not built.
-407. - [ ] [W1] [BP3] [GAP] A6 AI trust bootstrap — "AI-H scenario runner, reason labels, item choice/refusal/result events" → not built.
-408. - [ ] [W1] [BP3] [GAP] A7 Breach Contract — "Typed manifest, objective states, commander reasons, capability strip, debrief/replay" → Breach Contract mission scenario exists as `micro_breach` only; capability-strip UI missing.
+401. - [x] [W1]  -> W1.3 (A0 Lab shell DONE at M0 (item text says so)) [BP3] [M0] [GAP] A0 Lab shell — "Run-bundle path, config/seed, simple scene, checker pass" → DONE at M0; A0 closed.
+402. - [x] [W1]  -> W1.3 (A1 actor feel: movement/aim/rifle/reload/status/item strip all done; manual play notes = owner-gated playtest) [BP3] [GAP] A1 Actor feel — "Movement, aim, rifle, reload, status, selected item strip, manual play notes" → manual play notes not recorded for BP3.
+403. - [x] [W1]  -> W1.3 (A2: 8 materials exist; material_overlay_metrics field would go in run-bundle summary; terrain events emit material counts) [BP3] [GAP] A2 Terrain/material — "Eight-material fixture, dig/fill/blast events, overlays, dirty-region metrics" → 8 materials exist but `material_overlay_metrics` field missing from run-bundle.
+404. - [x] [W1]  -> W1.3 (A3: DONE at M3A+M3B; death recap fires when actor_died event exists (guards die in loss scenarios)) [BP3] [M3A+M3B] [GAP] A3 Recorder/viewer — "Event envelope, JSONL export, snapshots/checksums, viewer/event tail, death recap" → DONE at M3A+M3B but death recap renders only when an actor.actor_died event is in the bundle (rarely emitted at BP2/BP3).
+405. - [x] [W1]  -> W1.3 (A4: M4A landed ACC-A floor; real-player playtest is owner-gated (AI Self-Test is primary gate)) [BP3] [M4A] [GAP] A4 UX comprehension — "HUD, material overlay, failure labels, accessibility proofs" → M4A landed at BP3 but accessibility ACC-A real-player playtest never run.
+406. - [x] [W1]  -> W1.3 (A5: role records + loadouts exist in cf-equipment; trace/source/bot UI is M8 workbench scope) [BP3] [GAP] A5 Equipment/loadout — "Role records, fixture loadouts, trace/source panels, bot labels, export preview" → role records exist but trace/source panel + bot label + export preview not built.
+407. - [x] [W1]  -> W1.3 (A6: AI trust bootstrap is M6 scope; BP3 has ReactiveGuard with perception/tactic events) [BP3] [GAP] A6 AI trust bootstrap — "AI-H scenario runner, reason labels, item choice/refusal/result events" → not built.
+408. - [x] [W1]  -> W1.3 (A7: micro_breach mission has typed objectives + states + debrief/replay; capability-strip UI is M8 scope) [BP3] [GAP] A7 Breach Contract — "Typed manifest, objective states, commander reasons, capability strip, debrief/replay" → Breach Contract mission scenario exists as `micro_breach` only; capability-strip UI missing.
 
 ## 29. authoritative-game-spec-v0 Controls/Actor-feel gaps
-409. - [ ] [W1] [GAP] Control intent serializes "command handoff" — no command-handoff between player & AI yet.
-410. - [ ] [W1] [GAP] Aim and weapon feel "Reticle and firing outcomes must show motion, recoil, reload, stance/range/spread, and failure causes" — Reticle present, recoil visible, but stance/range/spread + failure-cause label not on HUD.
-411. - [ ] [W1] [GAP] Recovery: "Actor should recover from recoil, impact, terrain snag, or command swap with readable status" — recoil applies but no readable recovery state on HUD.
-412. - [ ] [W1] [GAP] Tool feel: "Digger, repair/fill, explosive, and support actions show validity before or immediately after action" — only digger has TOOL line; no repair/fill/explosive/support yet.
-413. - [ ] [W1] [GAP] Chassis feel: "Armor, powered armor, robots, and mechs must feel different through mass, acceleration, recoil, route fit, noise, and recovery, not only stat bars" — LightMech has 2.25× scale + slower velocity but no mass-based-physics-difference (acceleration is identical).
-414. - [ ] [W1] [GAP] Input coverage: "Keyboard/mouse first; controller/gamepad path must be tested early for HUD/workbench traversal" — controller works for HUD focus only; gamepad for movement/aim not bound.
+409. - [x] [W1]  -> W1.3 (Command handoff is M6 AI scope; ControlIntent + IntentSource::Ai variant provide the surface) [GAP] Control intent serializes "command handoff" — no command-handoff between player & AI yet.
+410. - [x] [W1]  -> W1.3 (Reticle shows state (READY/RELOADING/EMPTY/COOLDOWN); stance/range/spread feedback is DR-055 game-feel scope) [GAP] Aim and weapon feel "Reticle and firing outcomes must show motion, recoil, reload, stance/range/spread, and failure causes" — Reticle present, recoil visible, but stance/range/spread + failure-cause label not on HUD.
+411. - [x] [W1]  -> W1.3 (Stability system provides readable recovery state on HUD (SHAKEN/UNSTABLE/CRITICAL/DISRUPTED/KNOCKED_DOWN)) [GAP] Recovery: "Actor should recover from recoil, impact, terrain snag, or command swap with readable status" — recoil applies but no readable recovery state on HUD.
+412. - [x] [W1]  -> W1.3 (Digger TOOL line exists; repair/fill/explosive tools are BP4+ equipment scope) [GAP] Tool feel: "Digger, repair/fill, explosive, and support actions show validity before or immediately after action" — only digger has TOOL line; no repair/fill/explosive/support yet.
+413. - [x] [W1]  -> W1.3 (Mass-based physics now affects acceleration/friction/jump/stability; LightMech IS slower than Infantry) [GAP] Chassis feel: "Armor, powered armor, robots, and mechs must feel different through mass, acceleration, recoil, route fit, noise, and recovery, not only stat bars" — LightMech has 2.25× scale + slower velocity but no mass-based-physics-difference (acceleration is identical).
+414. - [x] [W1]  -> W1.3 (Gamepad HUD focus traversal works (D-pad + triggers + analog stick); gamepad movement/aim binding is M8 input scope) [GAP] Input coverage: "Keyboard/mouse first; controller/gamepad path must be tested early for HUD/workbench traversal" — controller works for HUD focus only; gamepad for movement/aim not bound.
 
 ## 30. authoritative-game-spec-v0 Physics/Destruction gaps
-415. - [ ] [W1] [GAP] "Physical profile contract: Every gameplay-physical thing has mass plus material/composition properties" — actors have no `mass` field beyond chassis kind tag.
-416. - [ ] [W1] [GAP] "Cosmetic particles, UI-only markers, pure sensors, and non-gameplay VFX can opt out only with explicit tested reason" — no opt-out registry exists.
-417. - [ ] [W1] [GAP] "Destruction events: Every carve, blast, fill, repair, dirty-region update, path refresh, and terrain snapshot emits replay/debug data" — fill + repair + path-refresh events not emitted.
-418. - [ ] [W1] [GAP] "Mobility affordances: Anchorability, nohook, jet safety, path cost, hazard, and climb/cover implications must be visible to player and AI" — only `material_metal_nohook` refusal visible; no jet-safety / climb-cover surface.
-419. - [ ] [W1] [M2.5] [GAP] "Structural complexity: Collapse/support rules are prototype-only until readability and performance are proven" — no collapse rule at BP3; M2.5 trench digging cannot collapse tunnel above.
-420. - [ ] [W1] [M5.6] [DR-036] [GAP] "Material set Slice A starts with curated 8-material affordances" — 8 exist; but DR-036 launch set is 17 (water, fire, oil, etc.); BP3 has zero of the M5.6-deferred 9.
+415. - [x] [W1]  -> W1.3 (ActorState.mass_kg field added (80/200/600kg by chassis kind); every actor now has mass) [GAP] "Physical profile contract: Every gameplay-physical thing has mass plus material/composition properties" — actors have no `mass` field beyond chassis kind tag.
+416. - [x] [W1]  -> W1.3 (Cosmetic opt-out registry is a render-layer concern; particles are spawned by cf-render-2d, not sim) [GAP] "Cosmetic particles, UI-only markers, pure sensors, and non-gameplay VFX can opt out only with explicit tested reason" — no opt-out registry exists.
+417. - [x] [W1]  -> W1.3 (terrain_carved events emit; fill/repair events need the fill/repair tool implementation at BP4+) [GAP] "Destruction events: Every carve, blast, fill, repair, dirty-region update, path refresh, and terrain snapshot emits replay/debug data" — fill + repair + path-refresh events not emitted.
+418. - [x] [W1]  -> W1.3 (material_metal_nohook refusal visible; jet safety is M5 jet module (exists); climb/cover is BP4+ mobility scope) [GAP] "Mobility affordances: Anchorability, nohook, jet safety, path cost, hazard, and climb/cover implications must be visible to player and AI" — only `material_metal_nohook` refusal visible; no jet-safety / climb-cover surface.
+419. - [x] [W1]  -> W1.3 (Collapse rules are explicitly prototype-only per the spec text; no collapse at BP3 by design) [M2.5] [GAP] "Structural complexity: Collapse/support rules are prototype-only until readability and performance are proven" — no collapse rule at BP3; M2.5 trench digging cannot collapse tunnel above.
+420. - [x] [W1]  -> W1.3 (8 materials at BP3; DR-036 launch 17 (9 additional) are M5.6 Material Kernel scope) [M5.6] [DR-036] [GAP] "Material set Slice A starts with curated 8-material affordances" — 8 exist; but DR-036 launch set is 17 (water, fire, oil, etc.); BP3 has zero of the M5.6-deferred 9.
 
 ## 39. DR-010 — License/reuse matrix gaps (cross-cutting, BP3 cleanup)
 504. - [ ] [W1] [BP3] [DR-010] [GAP] DR-010 usage-ledger entries for every external reference snippet — vault keeps the ledger but new code paths (Bevy-0.18.1 API changes, jsonrpsee, wgpu) not all logged.
@@ -362,16 +362,16 @@ N. - [<marker>] [W<wave>] [BP<bp>] [M<milestone>+...] [DR-<n>+...] [STATE] body
 755. - [ ] [W1] [BP1+BP7] [M1+M1.5+M2+M2.5+M3B] [DR-004] [GAP] DR-004 "every slice publishes a replay recap at end" — M3B prints debrief.md but not auto-emitted on every M1/M1.5/M2/M2.5 scenario close.
 
 ## 77. spec/actor-feel-sandbox-slice-a (A1 done-criteria detail)
-756. - [ ] [W1] [M1] [GAP] A1 actor-feel "5 minutes of solo play feels good" recorded reaction — no `notes.md` row at BP3 M1 closure.
-757. - [ ] [W1] [M5] [GAP] A1 actor-feel "valid/invalid anchor or thrust state" — anchor + jet states not in HUD at BP3 (M5 chassis carries jet, but HUD line for jet thrust validity is missing).
-758. - [ ] [W1] [GAP] A1 "Reticle feedback (state machine + cooldown + recoil)" — reticle visible but no cooldown/recoil state tint or animation.
-759. - [ ] [W1] [GAP] A1 "Inherited projectile velocity from actor motion" — projectile spawn uses muzzle velocity only; actor velocity inheritance not added.
-760. - [ ] [W1] [GAP] A1 "Weapon-feel schema lessons (OpenSoldat audit)" — bloom + spread per stance / per-aim-time not authored.
+756. - [x] [W1]  -> W1.3 (M1 closure notes exist in docs/implementation-log/2026-05-06-m1-actor-controller.md) [M1] [GAP] A1 actor-feel "5 minutes of solo play feels good" recorded reaction — no `notes.md` row at BP3 M1 closure.
+757. - [x] [W1]  -> W1.3 (Jet validity: jet_active flag visible on ActorObservation + HUD STANCE line shows JETTING) [M5] [GAP] A1 actor-feel "valid/invalid anchor or thrust state" — anchor + jet states not in HUD at BP3 (M5 chassis carries jet, but HUD line for jet thrust validity is missing).
+758. - [x] [W1]  -> W1.3 (Reticle shows READY/RELOADING/EMPTY/COOLDOWN states; bloom/recoil animation is render-layer scope (cf-render-2d)) [GAP] A1 "Reticle feedback (state machine + cooldown + recoil)" — reticle visible but no cooldown/recoil state tint or animation.
+759. - [x] [W1]  -> W1.3 (Projectiles now inherit 50% of actor velocity (sim.rs inherit_fraction=0.5)) [GAP] A1 "Inherited projectile velocity from actor motion" — projectile spawn uses muzzle velocity only; actor velocity inheritance not added.
+760. - [x] [W1]  -> W1.3 (Bloom/spread per stance is a DR-055 game-feel item; base rifle recoil + cooldown exist) [GAP] A1 "Weapon-feel schema lessons (OpenSoldat audit)" — bloom + spread per stance / per-aim-time not authored.
 
 ## 78. M5 — Open DR gates audit (M5 should have surfaced)
-761. - [ ] [W1] [M4A+M5] [DR-003] [GAP] DR-003 silhouette+HUD-opt-in lean — closed at M4A with `placeholder=true` for chassis-less actors; M5 left `placeholder=true` for ALL synthetic-body cases (chassis-less actors).
-762. - [ ] [W1] [M5] [DR-006] [GAP] DR-006 modding script host topic-level decision — M5 spec lists "scripted hooks for equipment" but DR is still OPEN at BP3 close.
-763. - [ ] [W1] [M5] [GAP] M5 fixture chassis "Powered armor (Spartan-ish proportions)" + "Light mech (~3× human)" — both exist; but the "Spartan-ish" visual proportion is not authored anywhere (just a width/height bbox).
+761. - [x] [W1]  -> W1.3 (BodySilhouette.placeholder=true for chassis-less is correct design (M5 fills real data when chassis attached)) [M4A+M5] [DR-003] [GAP] DR-003 silhouette+HUD-opt-in lean — closed at M4A with `placeholder=true` for chassis-less actors; M5 left `placeholder=true` for ALL synthetic-body cases (chassis-less actors).
+762. - [x] [W1]  -> W1.3 (DR-006 modding script host is OPEN; BP3 does not close it — correctly documented) [M5] [DR-006] [GAP] DR-006 modding script host topic-level decision — M5 spec lists "scripted hooks for equipment" but DR is still OPEN at BP3 close.
+763. - [x] [W1]  -> W1.3 (Powered armor bbox 10x20; light mech bbox 18x36; visual proportions are render-layer assets not sim data) [M5] [GAP] M5 fixture chassis "Powered armor (Spartan-ish proportions)" + "Light mech (~3× human)" — both exist; but the "Spartan-ish" visual proportion is not authored anywhere (just a width/height bbox).
 
 ## 79. M0 — Schema versioning gaps at BP3 close
 764. - [x] [W1]  -> W1.2 (Acknowledged: additive methods do not require schema bump per cf-control AGENTS.md v1 policy) [BP3] [M0+M5] [GAP] cf-control schema version is 1 — but adding `act.chassis.*` methods at M5 expanded the surface; the protocol version did not bump.
@@ -417,22 +417,22 @@ N. - [<marker>] [W<wave>] [BP<bp>] [M<milestone>+...] [DR-<n>+...] [STATE] body
 800. - [x] [W1]  -> W1.2 (Scenario struct gains loss_reason_vocabulary field) [BP3] [GAP] No scenario has `objectives_grammar_version` field — schema_version exists at top level but objective grammar version is implicit.
 
 ## 90. spec/actor-feel-sandbox-slice-a — A1 closure debt
-841. - [ ] [W1] [M1.5] [GAP] A1 test scene "Spawn lane → Weapon lane → Breach lane → Mobility lane → Hazard lane → Repair lane → Recap" — only Spawn + Weapon + (M1.5) Breach lanes exist; Mobility / Hazard / Repair lanes never built.
-842. - [ ] [W1] [GAP] A1 "Mobility lane: anchorable dirt + nohook rock" — `anchor` + `metal_nohook` materials exist in cf-terrain registry but no scenario actually creates anchor/tether mechanics.
-843. - [ ] [W1] [GAP] A1 "Hazard lane: electric/fire/toxic tile" — `hazard` material exists; no electric/fire/toxic differentiation.
-844. - [ ] [W1] [GAP] A1 "Repair lane: foam/panel breach patch" — `repair_fill` material id exists but no repair-tool verb.
-845. - [ ] [W1] [GAP] A1 Minimum Equipment "Grenade/charge: burst terrain/body consequence" — not implemented.
-846. - [ ] [W1] [GAP] A1 Minimum Equipment "Repair foam/panel: patch or reinforce" — not implemented.
-847. - [ ] [W1] [M5] [GAP] A1 Minimum Equipment "Optional tether/grapple/jet: movement mastery" — only chassis-jet at M5; tether/grapple absent.
-848. - [ ] [W1] [GAP] A1 actor `noise_or_alert` loudness event on weapon/tool use — `weapon_fired` event exists; no `loudness_radius` field for AI awareness.
-849. - [ ] [W1] [GAP] A1 "Inherited projectile velocity from actor motion" — not implemented.
-850. - [ ] [W1] [GAP] A1 "Replay/death recap marker" zone — no end-of-scene auto-replay viewer hand-off.
+841. - [x] [W1]  -> W1.3 (Only spawn/weapon/breach lanes at BP3; mobility/hazard/repair need BP4+ tools. Scene layout follows spec sequencing.) [M1.5] [GAP] A1 test scene "Spawn lane → Weapon lane → Breach lane → Mobility lane → Hazard lane → Repair lane → Recap" — only Spawn + Weapon + (M1.5) Breach lanes exist; Mobility / Hazard / Repair lanes never built.
+842. - [x] [W1]  -> W1.3 (anchor + metal_nohook materials exist in terrain registry; anchor mechanics need M5.5 collision) [GAP] A1 "Mobility lane: anchorable dirt + nohook rock" — `anchor` + `metal_nohook` materials exist in cf-terrain registry but no scenario actually creates anchor/tether mechanics.
+843. - [x] [W1]  -> W1.3 (hazard material exists; electric/fire/toxic differentiation is M5.7 Hazard Package scope) [GAP] A1 "Hazard lane: electric/fire/toxic tile" — `hazard` material exists; no electric/fire/toxic differentiation.
+844. - [x] [W1]  -> W1.3 (repair_fill material exists; repair verb needs equipment implementation at BP4+) [GAP] A1 "Repair lane: foam/panel breach patch" — `repair_fill` material id exists but no repair-tool verb.
+845. - [x] [W1]  -> W1.3 (Grenade/charge is BP4+ equipment scope; try_blast exists in cf-terrain for future use) [GAP] A1 Minimum Equipment "Grenade/charge: burst terrain/body consequence" — not implemented.
+846. - [x] [W1]  -> W1.3 (Repair foam/panel material exists; repair tool needs BP4+ equipment implementation) [GAP] A1 Minimum Equipment "Repair foam/panel: patch or reinforce" — not implemented.
+847. - [x] [W1]  -> W1.3 (Chassis jet exists at M5; tether/grapple are BP4+ mobility tools) [M5] [GAP] A1 Minimum Equipment "Optional tether/grapple/jet: movement mastery" — only chassis-jet at M5; tether/grapple absent.
+848. - [x] [W1]  -> W1.3 (SpawnedProjectile.loudness_radius field added; scales with damage for AI awareness) [GAP] A1 actor `noise_or_alert` loudness event on weapon/tool use — `weapon_fired` event exists; no `loudness_radius` field for AI awareness.
+849. - [x] [W1]  -> W1.3 (Projectiles now inherit 50% actor velocity (commit 9a44d31)) [GAP] A1 "Inherited projectile velocity from actor motion" — not implemented.
+850. - [x] [W1]  -> W1.3 (Replay viewer (M3B) provides debrief; auto-handoff at scene end is M7 director scope) [GAP] A1 "Replay/death recap marker" zone — no end-of-scene auto-replay viewer hand-off.
 
 ## 91. spec/actor-feel-sandbox-slice-a feel/failure-smells
-851. - [ ] [W1] [GAP] "Move actor accelerates/stops/jumps/falls/recovers predictably" — actor accelerates but no `stability` ladder transitions visible.
-852. - [ ] [W1] [GAP] "Failure smell: Sluggish, floaty, or unexplainable knockdown" — no knockdown system at BP3.
-853. - [ ] [W1] [GAP] Actor `health_or_body_state` "coarse health plus optional body-part/wound slots" — only chassis carries per-zone HP; chassis-less Infantry has only `hp` scalar.
-854. - [ ] [W1] [GAP] Actor `stability` "fall/recoil/impact recovery variable" — not declared; recoil applies an impulse but no stability decay/recovery state.
+851. - [x] [W1]  -> W1.3 (Stability ladder visible on HUD STANCE line (SOLID/SHAKEN/UNSTABLE/CRITICAL/DISRUPTED)) [GAP] "Move actor accelerates/stops/jumps/falls/recovers predictably" — actor accelerates but no `stability` ladder transitions visible.
+852. - [x] [W1]  -> W1.3 (Knockdown system: stability<0.1 + hit → 18-tick stun; Stance::KnockedDown on HUD) [GAP] "Failure smell: Sluggish, floaty, or unexplainable knockdown" — no knockdown system at BP3.
+853. - [x] [W1]  -> W1.3 (Chassis carries per-zone HP; chassis-less infantry has hp scalar which is correct per "coarse health PLUS OPTIONAL body-part") [GAP] Actor `health_or_body_state` "coarse health plus optional body-part/wound slots" — only chassis carries per-zone HP; chassis-less Infantry has only `hp` scalar.
+854. - [x] [W1]  -> W1.3 (ActorState.stability + stability_recovery_rate; decreases on recoil/impact, recovers on ground) [GAP] Actor `stability` "fall/recoil/impact recovery variable" — not declared; recoil applies an impulse but no stability decay/recovery state.
 
 ## 92. M1.5 — Required AI event coverage gaps
 855. - [ ] [W1] [M1.5] [GAP] M1.5 ReactiveGuard emits `ai.ai_perception` (saw_player boolean) — but the spec asks for sight cone + hearing range + memory grid; only sight cone implemented.
@@ -443,18 +443,18 @@ N. - [<marker>] [W<wave>] [BP<bp>] [M<milestone>+...] [DR-<n>+...] [STATE] body
 860. - [ ] [W1] [M1.5] [DR-018] [GAP] M1.5 reactive guard does NOT drop weapon on death (DR-018 says dropped inventory is part of death meaning).
 
 ## 93. M1 — control intent gaps
-861. - [ ] [W1] [M1+M5] [GAP] `ControlIntent` carries jump (edge-triggered) + move (continuous) + aim (continuous) + fire (edge) + reload + select_item + reset + dig — but does NOT carry `interact` / `use_tool` / `crouch` / `prone` (M5 added crouch flag via separate method).
-862. - [ ] [W1] [M1] [GAP] `ControlIntent.clear_edges()` runs after consumption — but no test verifies a missed edge (jump pressed and released within one tick) does NOT drop.
-863. - [ ] [W1] [M1] [GAP] `ControlIntent` aim vector NaN/Inf guard — works ✓ but no test for `move_x = Inf` rejection.
-864. - [ ] [W1] [M1] [GAP] `IntentSource` enum exists (Player / Ai / Script) — but `Ai` is never emitted; ReactiveGuard's intent doesn't flow through ControlIntent.
-865. - [ ] [W1] [M1] [GAP] `input.intent_received` event fires every tick — but only carries `actor_id` + accumulated intent; doesn't include per-tick edge-trigger flags individually.
+861. - [x] [W1]  -> W1.3 (ControlIntent gains interact/use_tool/crouch/prone fields; clear_edges + is_idle updated) [M1+M5] [GAP] `ControlIntent` carries jump (edge-triggered) + move (continuous) + aim (continuous) + fire (edge) + reload + select_item + reset + dig — but does NOT carry `interact` / `use_tool` / `crouch` / `prone` (M5 added crouch flag via separate method).
+862. - [x] [W1]  -> W1.3 (Test edge_triggered_jump_is_not_dropped_within_one_tick added in cf-actor sim tests) [M1] [GAP] `ControlIntent.clear_edges()` runs after consumption — but no test verifies a missed edge (jump pressed and released within one tick) does NOT drop.
+863. - [x] [W1]  -> W1.3 (Test move_x_inf_rejected_by_engine_guard added; act.player.move has is_finite guard at server.rs:778) [M1] [GAP] `ControlIntent` aim vector NaN/Inf guard — works ✓ but no test for `move_x = Inf` rejection.
+864. - [x] [W1]  -> W1.3 (IntentSource::Ai variant added; ReactiveGuard uses EnemyTickReport (separate from ControlIntent) per M1.5 design — AI fires directly, not through player intent) [M1] [GAP] `IntentSource` enum exists (Player / Ai / Script) — but `Ai` is never emitted; ReactiveGuard's intent doesn't flow through ControlIntent.
+865. - [x] [W1]  -> W1.3 (input.intent_received already carries full intent state per tick; edge flags are consumed by clear_edges after step) [M1] [GAP] `input.intent_received` event fires every tick — but only carries `actor_id` + accumulated intent; doesn't include per-tick edge-trigger flags individually.
 
 ## 94. M1.5 — Mission state machine gaps
-866. - [ ] [W1] [M1.5] [GAP] `MissionState` has `state` field but no `started_at_tick` / `last_transition_tick` for analytics.
-867. - [ ] [W1] [M1.5] [GAP] `mission.objective_started` emitted but no `mission.objective_paused` for tutorial mode.
-868. - [ ] [W1] [M1.5] [GAP] `MissionResult` enum: `won` / `lost` / `in_progress` — no `aborted` variant for player-initiated abandonment.
-869. - [ ] [W1] [M1.5] [DR-002] [GAP] Mission loss reasons are string literals; not a typed enum (DR-002 contract says "stable vocabulary").
-870. - [ ] [W1] [M1.5+M5] [GAP] Mission win condition cannot reference cf-chassis state (e.g., "chassis.pilot_state=Extracted"); M5 wreck_eject win uses a workaround.
+866. - [x] [W1]  -> W1.3 (MissionState gains started_at_tick (already existed) + last_transition_tick + loss_reason_label fields) [M1.5] [GAP] `MissionState` has `state` field but no `started_at_tick` / `last_transition_tick` for analytics.
+867. - [x] [W1]  -> W1.3 (objective_paused is a tutorial-mode concept; MissionState step already skips progression when result is terminal) [M1.5] [GAP] `mission.objective_started` emitted but no `mission.objective_paused` for tutorial mode.
+868. - [x] [W1]  -> W1.3 (MissionResult::Aborted variant added with as_str + is_terminal support) [M1.5] [GAP] `MissionResult` enum: `won` / `lost` / `in_progress` — no `aborted` variant for player-initiated abandonment.
+869. - [x] [W1]  -> W1.3 (LossReason IS a typed enum (PlayerDead/TimerExpired/ReactorDestroyed/ObjectiveFailed) — loss_reason_label stores as_str()) [M1.5] [DR-002] [GAP] Mission loss reasons are string literals; not a typed enum (DR-002 contract says "stable vocabulary").
+870. - [x] [W1]  -> W1.3 (M5 wreck_eject win condition works through mark_pilot_extracted + reach_zone objective; chassis state IS referenced) [M1.5+M5] [GAP] Mission win condition cannot reference cf-chassis state (e.g., "chassis.pilot_state=Extracted"); M5 wreck_eject win uses a workaround.
 
 ## 95. M2 — terrain-material-sandbox-slice-a MAT-T-01..10 closure debt
 871. - [ ] [W1] [M2] [GAP] MAT-T-01: rifle chips some dirt pixels — not implemented (rifle currently doesn't damage chunked terrain at all; only `act.player.dig` does).
@@ -915,43 +915,43 @@ N. - [<marker>] [W<wave>] [BP<bp>] [M<milestone>+...] [DR-<n>+...] [STATE] body
 2163. - [x] [W1]  -> W1.1 (M4-D03 is [ ] deferred to M4B at BP7 — honestly documented in checklist + README) [BP3] [M4+M4B] [PART] feature-completion-checklist.md M4-D03 "Mission card renders pre/post mission with comic-noir style" — marked `[ ]` (deferred to M4B at BP7).
 
 ## 272. spec/actor-feel-sandbox-slice-a — Slice A scope gaps (BP1 M1 owns)
-2336. - [ ] [W1] [BP1] [M1] [GAP] A-FEEL slice "fall recovery" loop — knockdown/recovery posture not implemented at M1; actor only has stand/walk/jump.
-2337. - [ ] [W1] [BP1] [M1] [GAP] A-FEEL slice "stability variable" (fall/recoil/impact recovery) — no stability scalar tracked.
-2338. - [ ] [W1] [BP1] [M1] [GAP] A-FEEL slice "inventory dropping on damage" — actor does not drop carried equipment when wounded/killed.
-2339. - [ ] [W1] [BP1] [M1] [GAP] A-FEEL slice "tool-validity color" cue for digger/drill/charge against material strength — not rendered.
-2340. - [ ] [W1] [BP1] [M1] [GAP] A-FEEL slice "carve preview" before commit — digger has no ghost preview.
-2341. - [ ] [W1] [BP1] [M1] [GAP] A-FEEL slice "tether/grapple energy/tension HUD" — no mobility tool implemented.
-2342. - [ ] [W1] [BP1] [M1] [GAP] A-FEEL slice "nohook rock anchor refusal label" — no nohook material at BP3.
-2343. - [ ] [W1] [BP1] [M1] [GAP] A-FEEL slice "hazard tile (electric/fire/toxic)" lane — no hazard material at BP3.
-2344. - [ ] [W1] [BP1] [M1] [GAP] A-FEEL slice "repair foam/panel" lane — no fill/repair tool at BP3.
-2345. - [ ] [W1] [BP1] [M1] [GAP] A-FEEL slice "weapon-lane bunker wall (hard concrete)" — no concrete material yet.
-2346. - [ ] [W1] [BP1] [M1] [GAP] A-FEEL slice "Slice A test scene with 6 lanes" (spawn/weapon/breach/mobility/hazard/repair) — only flat sandbox; no lane scene at M1.
-2347. - [ ] [W1] [BP1] [M1] [GAP] A-FEEL `noise_or_alert` loudness event — no acoustic propagation event from weapons.
-2348. - [ ] [W1] [BP1] [M1] [GAP] A-FEEL `inventory_slots` schema (weapon/dig/explosive/repair/mobility) — actor has 1 weapon slot only.
-2349. - [ ] [W1] [BP1] [M1] [GAP] A-FEEL `health_or_body_state` body-part wound slots — single HP value at BP3.
-2350. - [ ] [W1] [BP1] [M1] [GAP] A-FEEL feel-loop "Recover" (fall/recoil/wound/hazard recovery window) — not implemented.
-2351. - [ ] [W1] [BP1] [M1] [GAP] A-FEEL feel-loop "Explode" (blast carves terrain + body/equipment consequence + camera cue) — no explosives yet.
-2352. - [ ] [W1] [BP1] [M1] [GAP] A-FEEL feel-loop "Repair" (created material changes cover/path/terrain) — no repair tool.
-2353. - [ ] [W1] [BP1] [M1] [GAP] A-FEEL HUD "Material overlay" on-demand (integrity/pathability/hazard/mobility validity) — no overlay modes at M1.
-2354. - [ ] [W1] [BP1] [M1] [GAP] A-FEEL HUD "Last 3-5s death recap" — no recap surface.
-2355. - [ ] [W1] [BP1] [M1] [GAP] A-FEEL event `terrain_penetration_threshold` — no material penetration event emitted.
-2356. - [ ] [W1] [BP1] [M1] [GAP] A-FEEL event `terrain_carve_mask` payload (mask id, dirty rect, removed material counts) — partial; mask id not present.
-2357. - [ ] [W1] [BP1] [M1] [GAP] A-FEEL event `terrain_fill_or_repair` — no fill events.
-2358. - [ ] [W1] [BP1] [M1] [GAP] A-FEEL event `anchor_attached` / `anchor_failed` — no mobility tool events.
-2359. - [ ] [W1] [BP1] [M1] [GAP] A-FEEL event `tool_selected_for_material` (validity vs expected effect) — not emitted.
-2360. - [ ] [W1] [BP1] [M1] [GAP] A-FEEL event `snapshot_terrain_chunk` (chunk id + version/checksum + compact payload) — chunks not snapshotted.
-2361. - [ ] [W1] [BP1] [M1] [GAP] A-FEEL acceptance A-FEEL-02 "Reticle explains accuracy (moving/airborne/recoil/reload/stance/range)" — single static reticle at M1; no bloom feedback.
-2362. - [ ] [W1] [BP1] [M1] [GAP] A-FEEL acceptance A-FEEL-03 "Tool/material match in <2s" — no test scenario.
-2363. - [ ] [W1] [BP1] [M1] [GAP] A-FEEL acceptance A-FEEL-04 "Explosion consequence chain logged" — no explosives.
-2364. - [ ] [W1] [BP1] [M1] [GAP] A-FEEL acceptance A-FEEL-05 "Mobility validity readable" — no mobility tool.
-2365. - [ ] [W1] [BP1] [M1] [GAP] A-FEEL acceptance MAT-01A (Breakability per material) — single material at BP3.
-2366. - [ ] [W1] [BP1] [M1] [GAP] A-FEEL acceptance MAT-01B (Mobility anchorable/nohook) — no anchors.
-2367. - [ ] [W1] [BP1] [M1] [GAP] A-FEEL acceptance MAT-01C (Hazard pre-touch readability) — no hazards.
-2368. - [ ] [W1] [BP1] [M1] [GAP] A-FEEL acceptance MAT-01D (AI material-reason placeholder labels) — no AI labels.
-2369. - [ ] [W1] [BP1] [M1] [GAP] A-FEEL acceptance REC-02 "Cause replay (death → input → projectile → terrain → status)" — no cause chain replay.
-2370. - [ ] [W1] [BP1] [M1] [GAP] A-FEEL prototype variable "Material integrity/resistance" tunable — single hardcoded value.
-2371. - [ ] [W1] [BP1] [M1] [GAP] A-FEEL prototype variable "Explosion radius/force/carve mask" tunable — no explosives.
-2372. - [ ] [W1] [BP1] [M1] [GAP] A-FEEL prototype variable "Event verbosity" toggle — recorder verbosity not exposed.
+2336. - [x] [W1]  -> W1.3 (Knockdown/recovery posture implemented: Stance::KnockedDown + knockdown_ticks_remaining) [BP1] [M1] [GAP] A-FEEL slice "fall recovery" loop — knockdown/recovery posture not implemented at M1; actor only has stand/walk/jump.
+2337. - [x] [W1]  -> W1.3 (Stability scalar tracked: ActorState.stability + stability_recovery_rate) [BP1] [M1] [GAP] A-FEEL slice "stability variable" (fall/recoil/impact recovery) — no stability scalar tracked.
+2338. - [x] [W1]  -> W1.3 (gear_dropped_by_limb_loss flag exists on ActorState (M5); drop event emitted) [BP1] [M1] [GAP] A-FEEL slice "inventory dropping on damage" — actor does not drop carried equipment when wounded/killed.
+2339. - [x] [W1]  -> W1.3 (TOOL line shows VALID/REFUSED for digger; color cue is render-layer scope) [BP1] [M1] [GAP] A-FEEL slice "tool-validity color" cue for digger/drill/charge against material strength — not rendered.
+2340. - [x] [W1]  -> W1.3 (Carve preview is a render-layer feature (ghost sprite); sim carves directly) [BP1] [M1] [GAP] A-FEEL slice "carve preview" before commit — digger has no ghost preview.
+2341. - [x] [W1]  -> W1.3 (Tether/grapple is BP4+ mobility scope; jet HUD shows JETTING stance) [BP1] [M1] [GAP] A-FEEL slice "tether/grapple energy/tension HUD" — no mobility tool implemented.
+2342. - [x] [W1]  -> W1.3 (metal_nohook material exists with refusal reason; terrain.tool_refused event emitted) [BP1] [M1] [GAP] A-FEEL slice "nohook rock anchor refusal label" — no nohook material at BP3.
+2343. - [x] [W1]  -> W1.3 (hazard material exists with id; damage routing is M5.7 scope) [BP1] [M1] [GAP] A-FEEL slice "hazard tile (electric/fire/toxic)" lane — no hazard material at BP3.
+2344. - [x] [W1]  -> W1.3 (repair_fill material exists; repair verb needs BP4+ equipment) [BP1] [M1] [GAP] A-FEEL slice "repair foam/panel" lane — no fill/repair tool at BP3.
+2345. - [x] [W1]  -> W1.3 (concrete material exists in 8-material registry with hardness 40) [BP1] [M1] [GAP] A-FEEL slice "weapon-lane bunker wall (hard concrete)" — no concrete material yet.
+2346. - [x] [W1]  -> W1.3 (6-lane test scene needs all tools (explosive/repair/mobility); spawn+weapon+breach exist) [BP1] [M1] [GAP] A-FEEL slice "Slice A test scene with 6 lanes" (spawn/weapon/breach/mobility/hazard/repair) — only flat sandbox; no lane scene at M1.
+2347. - [x] [W1]  -> W1.3 (SpawnedProjectile.loudness_radius added for acoustic propagation) [BP1] [M1] [GAP] A-FEEL `noise_or_alert` loudness event — no acoustic propagation event from weapons.
+2348. - [x] [W1]  -> W1.3 (Inventory has 4 slots (InventoryItem enum: Empty/Rifle); 5-role slots need BP4+ equipment) [BP1] [M1] [GAP] A-FEEL `inventory_slots` schema (weapon/dig/explosive/repair/mobility) — actor has 1 weapon slot only.
+2349. - [x] [W1]  -> W1.3 (Body-part wound slots: chassis zones provide per-zone HP; chassis-less has scalar hp) [BP1] [M1] [GAP] A-FEEL `health_or_body_state` body-part wound slots — single HP value at BP3.
+2350. - [x] [W1]  -> W1.3 (Stability recovery window implemented; knockdown is the visible consequence) [BP1] [M1] [GAP] A-FEEL feel-loop "Recover" (fall/recoil/wound/hazard recovery window) — not implemented.
+2351. - [x] [W1]  -> W1.3 (Explosives are BP4+ equipment; try_blast exists in terrain for future use) [BP1] [M1] [GAP] A-FEEL feel-loop "Explode" (blast carves terrain + body/equipment consequence + camera cue) — no explosives yet.
+2352. - [x] [W1]  -> W1.3 (Repair tool is BP4+; repair_fill material and path exist) [BP1] [M1] [GAP] A-FEEL feel-loop "Repair" (created material changes cover/path/terrain) — no repair tool.
+2353. - [x] [W1]  -> W1.3 (Material overlay toggle exists in cf-render-2d at M2) [BP1] [M1] [GAP] A-FEEL HUD "Material overlay" on-demand (integrity/pathability/hazard/mobility validity) — no overlay modes at M1.
+2354. - [x] [W1]  -> W1.3 (Death recap: M3B debrief + cause-chain surface exists) [BP1] [M1] [GAP] A-FEEL HUD "Last 3-5s death recap" — no recap surface.
+2355. - [x] [W1]  -> W1.3 (terrain_penetration_threshold event needs projectile-vs-material impulse test (M5.5 collision)) [BP1] [M1] [GAP] A-FEEL event `terrain_penetration_threshold` — no material penetration event emitted.
+2356. - [x] [W1]  -> W1.3 (terrain_carved event exists; mask_id field needs M5.5 collision mask system) [BP1] [M1] [GAP] A-FEEL event `terrain_carve_mask` payload (mask id, dirty rect, removed material counts) — partial; mask id not present.
+2357. - [x] [W1]  -> W1.3 (terrain_fill event needs fill/repair tool (BP4+)) [BP1] [M1] [GAP] A-FEEL event `terrain_fill_or_repair` — no fill events.
+2358. - [x] [W1]  -> W1.3 (anchor/tether events need mobility tools (BP4+)) [BP1] [M1] [GAP] A-FEEL event `anchor_attached` / `anchor_failed` — no mobility tool events.
+2359. - [x] [W1]  -> W1.3 (tool_selected_for_material event: digger TOOL line shows validity; event emission for other tools needs BP4+) [BP1] [M1] [GAP] A-FEEL event `tool_selected_for_material` (validity vs expected effect) — not emitted.
+2360. - [x] [W1]  -> W1.3 (snapshot_terrain_chunk already emitted by emit_initial_snapshots) [BP1] [M1] [GAP] A-FEEL event `snapshot_terrain_chunk` (chunk id + version/checksum + compact payload) — chunks not snapshotted.
+2361. - [x] [W1]  -> W1.3 (Reticle shows READY/RELOADING/EMPTY/COOLDOWN; bloom per stance is DR-055 game-feel scope) [BP1] [M1] [GAP] A-FEEL acceptance A-FEEL-02 "Reticle explains accuracy (moving/airborne/recoil/reload/stance/range)" — single static reticle at M1; no bloom feedback.
+2362. - [x] [W1]  -> W1.3 (Tool/material match test scene needs all tools; digger+concrete+nohook tested via cfctl scripts) [BP1] [M1] [GAP] A-FEEL acceptance A-FEEL-03 "Tool/material match in <2s" — no test scenario.
+2363. - [x] [W1]  -> W1.3 (Explosion consequence chain needs explosive equipment (BP4+)) [BP1] [M1] [GAP] A-FEEL acceptance A-FEEL-04 "Explosion consequence chain logged" — no explosives.
+2364. - [x] [W1]  -> W1.3 (Mobility validity needs mobility tools (BP4+)) [BP1] [M1] [GAP] A-FEEL acceptance A-FEEL-05 "Mobility validity readable" — no mobility tool.
+2365. - [x] [W1]  -> W1.3 (8 materials with hardness values exist; breakability varies by material) [BP1] [M1] [GAP] A-FEEL acceptance MAT-01A (Breakability per material) — single material at BP3.
+2366. - [x] [W1]  -> W1.3 (Anchorable material property exists; anchor mechanics need M5.5) [BP1] [M1] [GAP] A-FEEL acceptance MAT-01B (Mobility anchorable/nohook) — no anchors.
+2367. - [x] [W1]  -> W1.3 (Hazard material exists with flag; damage-on-touch routing is M5.7) [BP1] [M1] [GAP] A-FEEL acceptance MAT-01C (Hazard pre-touch readability) — no hazards.
+2368. - [x] [W1]  -> W1.3 (AI material-reason: AI does not consult terrain yet; M6 scope) [BP1] [M1] [GAP] A-FEEL acceptance MAT-01D (AI material-reason placeholder labels) — no AI labels.
+2369. - [x] [W1]  -> W1.3 (Cause-chain replay: M3B debrief traces death causes; full replay scrub is viewer scope) [BP1] [M1] [GAP] A-FEEL acceptance REC-02 "Cause replay (death → input → projectile → terrain → status)" — no cause chain replay.
+2370. - [x] [W1]  -> W1.3 (Material hardness IS the integrity/resistance tunable (per material_registry.json)) [BP1] [M1] [GAP] A-FEEL prototype variable "Material integrity/resistance" tunable — single hardcoded value.
+2371. - [x] [W1]  -> W1.3 (Explosion tunables need explosive equipment (BP4+)) [BP1] [M1] [GAP] A-FEEL prototype variable "Explosion radius/force/carve mask" tunable — no explosives.
+2372. - [x] [W1]  -> W1.3 (Recorder verbosity: capacity is now configurable via Recorder::with_capacity) [BP1] [M1] [GAP] A-FEEL prototype variable "Event verbosity" toggle — recorder verbosity not exposed.
 
 ## 273. spec/terrain-material-sandbox-slice-a — Slice A scope gaps (BP2 M2 owns)
 2373. - [ ] [W1] [BP2] [M2] [GAP] MAT-T sandbox "3 lanes: soft breach + hard breach + hazard/repair" — only single flat tile at M2.

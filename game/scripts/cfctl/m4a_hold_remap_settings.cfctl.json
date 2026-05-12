@@ -1,0 +1,17 @@
+{
+  "scenario": "m4a_micro_breach_readability",
+  "tick_rate_hz": 60,
+  "description": "Hold-to-confirm + key remap path: enable hold, set threshold, remap keys, verify round-trip",
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 30 } },
+    { "method": "act.settings.set", "params": { "hold_to_confirm": true, "hold_threshold_ms": 300 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 10 } },
+    { "method": "act.settings.set", "params": { "key_remap_enabled": true, "key_bindings": { "aim_up": "Numpad8", "fire": "KeyF" } } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 10 } },
+    { "method": "act.settings.set", "params": { "hold_to_confirm": false } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 10 } },
+    { "method": "act.settings.set", "params": { "key_remap_enabled": false } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 30 } }
+  ]
+}
