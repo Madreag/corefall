@@ -834,6 +834,34 @@ fn invoke_composer(python_bin: &str, script: &Path, run_dir: &Path) -> Result<Va
 
 /// - `enemy.<actor_id>.state` etc.
 fn lookup(value: &Value, key: &str) -> Option<Value> {
+    // **M1 R2 / Gap G3**: structured event-stream operators. These are useful
+    // for cfctl scripts that need to assert "K events of type X with field
+    // Y = Z fired during this run." The grammar:
+    //
+    // - `events.count` ........................ total event count.
+    // - `events.<category>.count` ............. count by category.
+    // - `events.<category>.<event_type>.count`  count by category+type.
+    // - `events.<category>.<event_type>.last.payload.<field>`
+    //                                          last matching event's payload field.
+    // - `events.where(<f1=v1>,<f2=v2>).count`  count where field=value for
+    //                                          all listed fields (and-of).
+    // - `events.where(<f1=v1>).last.payload.<field>` analogous.
+    //
+    // Mission shorthands (deferred to the existing `mission.*` path) remain
+    // unchanged.
+    if let Some(rest) = key.strip_prefix("events.where(") {
+        return lookup_events_where(value, rest);
+    }
+    if let Some(rest) = key.strip_prefix("events.") {
+        return lookup_events_dotted(value, rest);
+    }
+    if key == "events.count" || key == "events" {
+        // `events` alone returns the raw array. `events.count` falls through
+        // to the generic walker below (handled there).
+        if key == "events" {
+            return value.get("events").cloned();
+        }
+    }
     let parts: Vec<&str> = key.split('.').collect();
     if parts.len() >= 2 && parts[0] == "objective" {
         let id = parts[1];
@@ -917,6 +945,130 @@ fn lookup(value: &Value, key: &str) -> Option<Value> {
     Some(current)
 }
 
+/// Resolve an `events.<category>[.<event_type>][.last.payload.<field>][.count]`
+/// lookup against the observation snapshot's `events` array.
+///
+/// Grammar:
+///   events.<cat>.count                          → matching count
+///   events.<cat>.<type>.count                   → cat+type count
+///   events.<cat>.<type>.last.payload.<field>    → payload field of last match
+///   events.<cat>.<type>.last.event_id           → event_id of last match
+fn lookup_events_dotted(observation: &Value, rest: &str) -> Option<Value> {
+    let parts: Vec<&str> = rest.split('.').collect();
+    if parts.is_empty() {
+        return None;
+    }
+    let events = observation.get("events")?.as_array()?;
+    // Single-segment "events.count" already handled by caller's generic walker
+    // because it sits on `value.events`. Here we expect at least a category.
+    if parts.len() == 1 && parts[0] == "count" {
+        return Some(Value::from(events.len() as u64));
+    }
+    let category = parts[0];
+    // Filter by category first.
+    let mut filtered: Vec<&Value> = events
+        .iter()
+        .filter(|e| e.get("category").and_then(|v| v.as_str()) == Some(category))
+        .collect();
+    let tail = &parts[1..];
+    if tail.is_empty() {
+        return Some(Value::from(filtered.len() as u64));
+    }
+    if tail.len() == 1 && tail[0] == "count" {
+        return Some(Value::from(filtered.len() as u64));
+    }
+    // tail[0] may be an event_type filter; if it doesn't look like a special
+    // token (count/last/payload/where), treat it as a type filter.
+    let mut tail_iter: &[&str] = tail;
+    let reserved = ["count", "last", "payload", "first", "event_id"];
+    if !reserved.contains(&tail[0]) {
+        let event_type = tail[0];
+        filtered.retain(|e| e.get("event_type").and_then(|v| v.as_str()) == Some(event_type));
+        tail_iter = &tail[1..];
+    }
+    resolve_event_subpath(&filtered, tail_iter)
+}
+
+/// `events.where(category=actor,event_type=inventory_settled).count` style.
+/// `rest` begins **after** `events.where(`.
+fn lookup_events_where(observation: &Value, rest: &str) -> Option<Value> {
+    let close = rest.find(')')?;
+    let filter_expr = &rest[..close];
+    let after = rest[close + 1..].trim_start_matches('.');
+    let events = observation.get("events")?.as_array()?;
+    let filters: Vec<(&str, &str)> = filter_expr
+        .split(',')
+        .filter_map(|kv| kv.split_once('='))
+        .map(|(k, v)| (k.trim(), v.trim()))
+        .collect();
+    if filters.is_empty() {
+        return None;
+    }
+    let filtered: Vec<&Value> = events
+        .iter()
+        .filter(|e| {
+            filters.iter().all(|(k, v)| {
+                // The filter key can be a dotted payload path
+                // (e.g. payload.zone=head).
+                let candidate = if let Some(payload_field) = k.strip_prefix("payload.") {
+                    e.get("payload").and_then(|p| p.get(payload_field))
+                } else {
+                    e.get(*k)
+                };
+                match candidate {
+                    Some(Value::String(s)) => s == v,
+                    Some(Value::Bool(b)) => *b == matches!(*v, "true" | "1"),
+                    Some(Value::Number(n)) => v.parse::<f64>().is_ok_and(|x| n.as_f64() == Some(x)),
+                    _ => false,
+                }
+            })
+        })
+        .collect();
+    if after.is_empty() {
+        return Some(Value::from(filtered.len() as u64));
+    }
+    let parts: Vec<&str> = after.split('.').collect();
+    resolve_event_subpath(&filtered, &parts)
+}
+
+fn resolve_event_subpath(filtered: &[&Value], parts: &[&str]) -> Option<Value> {
+    if parts.is_empty() || (parts.len() == 1 && parts[0] == "count") {
+        return Some(Value::from(filtered.len() as u64));
+    }
+    if parts[0] == "first" || parts[0] == "last" {
+        let target = if parts[0] == "first" {
+            filtered.first()
+        } else {
+            filtered.last()
+        };
+        let target = target?;
+        if parts.len() == 1 {
+            return Some((*target).clone());
+        }
+        if parts[1] == "payload" {
+            let payload = target.get("payload")?;
+            if parts.len() == 2 {
+                return Some(payload.clone());
+            }
+            let mut cur = payload;
+            for seg in &parts[2..] {
+                cur = cur.get(*seg)?;
+            }
+            return Some(cur.clone());
+        }
+        if parts[1] == "event_id" {
+            return target.get("event_id").cloned();
+        }
+        // Generic dotted walk into the event object.
+        let mut cur: &Value = target;
+        for seg in &parts[1..] {
+            cur = cur.get(*seg)?;
+        }
+        return Some(cur.clone());
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -971,6 +1123,7 @@ mod tests {
                 reduced_motion: true,
                 reduced_shake: true,
                 reduced_flash: true,
+                unpaced: false,
             },
             Some(port_path),
         );
@@ -997,6 +1150,7 @@ mod tests {
                 reduced_motion: false,
                 reduced_shake: false,
                 reduced_flash: false,
+                unpaced: false,
             },
             None,
         );
@@ -1008,5 +1162,117 @@ mod tests {
             .expect("control port value");
         assert_eq!(port_arg, "17900");
         assert!(!args.contains(&"--control-port-file".to_string()));
+    }
+
+    fn fixture_observation() -> Value {
+        serde_json::json!({
+            "events": [
+                {"category": "equipment", "event_type": "weapon_fired",
+                 "event_id": "e1",
+                 "payload": {"actor": 1, "loudness_radius": 480.0, "bloom_factor": 0.5}},
+                {"category": "equipment", "event_type": "weapon_fired",
+                 "event_id": "e2",
+                 "payload": {"actor": 1, "loudness_radius": 480.0, "bloom_factor": 0.6}},
+                {"category": "combat", "event_type": "projectile_hit",
+                 "event_id": "e3",
+                 "payload": {"shooter": 1, "target": 2, "zone": "torso"}},
+                {"category": "combat", "event_type": "projectile_hit",
+                 "event_id": "e4",
+                 "payload": {"shooter": 1, "target": 2, "zone": "head"}},
+                {"category": "actor", "event_type": "inventory_dropped",
+                 "event_id": "e5",
+                 "payload": {"actor": 2, "item_label": "rifle"}},
+                {"category": "actor", "event_type": "inventory_settled",
+                 "event_id": "e6",
+                 "payload": {"loose_item_id": 0, "item_label": "rifle"}},
+            ]
+        })
+    }
+
+    #[test]
+    fn events_dotted_count_filters_by_category_and_type() {
+        let obs = fixture_observation();
+        assert_eq!(
+            lookup(&obs, "events.equipment.weapon_fired.count"),
+            Some(Value::from(2u64))
+        );
+        assert_eq!(
+            lookup(&obs, "events.combat.projectile_hit.count"),
+            Some(Value::from(2u64))
+        );
+        assert_eq!(
+            lookup(&obs, "events.actor.inventory_settled.count"),
+            Some(Value::from(1u64))
+        );
+        assert_eq!(lookup(&obs, "events.actor.count"), Some(Value::from(2u64)));
+    }
+
+    #[test]
+    fn events_dotted_last_payload_returns_last_match_field() {
+        let obs = fixture_observation();
+        assert_eq!(
+            lookup(&obs, "events.combat.projectile_hit.last.payload.zone"),
+            Some(Value::String("head".into()))
+        );
+        assert_eq!(
+            lookup(&obs, "events.equipment.weapon_fired.last.payload.bloom_factor"),
+            Some(Value::from(0.6))
+        );
+        assert_eq!(
+            lookup(&obs, "events.actor.inventory_settled.last.payload.item_label"),
+            Some(Value::String("rifle".into()))
+        );
+    }
+
+    #[test]
+    fn events_where_count_with_payload_filter() {
+        let obs = fixture_observation();
+        assert_eq!(
+            lookup(&obs, "events.where(category=combat,payload.zone=head).count"),
+            Some(Value::from(1u64))
+        );
+        assert_eq!(
+            lookup(&obs, "events.where(category=combat,payload.zone=torso).count"),
+            Some(Value::from(1u64))
+        );
+        assert_eq!(
+            lookup(&obs, "events.where(category=actor,event_type=inventory_settled).count"),
+            Some(Value::from(1u64))
+        );
+    }
+
+    #[test]
+    fn events_where_last_payload_drill_down() {
+        let obs = fixture_observation();
+        assert_eq!(
+            lookup(
+                &obs,
+                "events.where(category=combat,event_type=projectile_hit).last.payload.zone"
+            ),
+            Some(Value::String("head".into()))
+        );
+        assert_eq!(
+            lookup(&obs, "events.where(category=actor).last.payload.item_label"),
+            Some(Value::String("rifle".into()))
+        );
+    }
+
+    #[test]
+    fn events_first_returns_first_match() {
+        let obs = fixture_observation();
+        assert_eq!(
+            lookup(&obs, "events.combat.projectile_hit.first.payload.zone"),
+            Some(Value::String("torso".into()))
+        );
+    }
+
+    #[test]
+    fn events_count_for_unknown_type_returns_zero() {
+        let obs = fixture_observation();
+        assert_eq!(lookup(&obs, "events.combat.nonexistent.count"), Some(Value::from(0u64)));
+        assert_eq!(
+            lookup(&obs, "events.where(category=unknown).count"),
+            Some(Value::from(0u64))
+        );
     }
 }
