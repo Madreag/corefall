@@ -43,6 +43,8 @@ SCRIPTS=(
   "micro_breach_abort:\"result\":\"aborted\":60,120"
   "micro_breach_stealth:\"event_type\":\"terrain_carved\":60"
   "ai_h_01_sentry_hears_threat:\"kind\":\"hearing\":60,120"
+  "m1_5_difficulty_cakewalk:\"ai_difficulty\":\"cakewalk\":60"
+  "m1_5_difficulty_veteran:\"ai_difficulty\":\"veteran\":60"
 )
 
 OUT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/cf-m1-5-determinism-XXXXXX")"

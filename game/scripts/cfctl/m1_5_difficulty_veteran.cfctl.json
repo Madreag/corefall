@@ -1,0 +1,24 @@
+{
+  "description": "M1.5 difficulty preset: veteran. Same as micro_breach_loss but applies `act.settings.set { ai_difficulty: veteran }` at boot so the guard is sharp (120hp, 6-tick aim_settle, 0.05 miss_chance, 480-unit sight, 600-unit hearing, 600-tick memory, 1200ms reload, 0.2 retreat hp pct). Player walks into LOS and stands still — the harder guard reliably scores enough hits to drop the player. Round-trip proved by observe.once.enemies[0] showing veteran values and mission.mission_resolved firing with loss_reason=player_dead.",
+  "scenario": "micro_breach",
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+    { "method": "act.settings.set", "params": { "ai_difficulty": "veteran" } },
+    { "method": "act.player.aim", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "act.player.move", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 160 } },
+    { "method": "act.player.move", "params": { "x": 0.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
+    { "method": "act.player.dig", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 4 } },
+    { "method": "act.player.dig", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 4 } },
+    { "method": "act.player.dig", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 4 } },
+    { "method": "act.player.move", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 30 } },
+    { "method": "act.player.move", "params": { "x": 0.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 800 } },
+    { "method": "observe.once", "params": {} }
+  ]
+}
