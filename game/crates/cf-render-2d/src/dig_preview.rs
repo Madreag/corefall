@@ -98,8 +98,7 @@ fn update_dig_preview_sprite(
 /// duplicating the rule.
 #[must_use]
 pub fn probe_dig_validity(material_id: MaterialId) -> bool {
-    cf_terrain::material_affordance(material_id)
-        .is_some_and(|a| a.diggable)
+    cf_terrain::material_affordance(material_id).is_some_and(|a| a.diggable)
 }
 
 #[cfg(test)]

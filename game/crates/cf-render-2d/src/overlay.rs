@@ -35,9 +35,10 @@ pub enum OverlayMode {
 }
 
 impl OverlayMode {
-    /// Parse a string mode (matches the canonical names the engine emits).
+    /// Parse the canonical engine mode string. Distinct from `FromStr` so
+    /// it can be `#[must_use]` and infallible (unknown names map to Off).
     #[must_use]
-    pub fn from_str(s: &str) -> Self {
+    pub fn parse_mode(s: &str) -> Self {
         match s {
             "integrity" => Self::Integrity,
             "pathability" => Self::Pathability,
@@ -161,8 +162,8 @@ fn integrity_tint(hardness: f32, base_alpha: u8) -> [u8; 4] {
 mod tests {
     use super::*;
     use cf_terrain::{
-        MATERIAL_AIR, MATERIAL_ANCHOR, MATERIAL_CONCRETE, MATERIAL_DIRT, MATERIAL_HAZARD,
-        MATERIAL_METAL_NOHOOK, MATERIAL_REPAIR_FILL,
+        MATERIAL_AIR, MATERIAL_ANCHOR, MATERIAL_CONCRETE, MATERIAL_DIRT, MATERIAL_HAZARD, MATERIAL_METAL_NOHOOK,
+        MATERIAL_REPAIR_FILL,
     };
 
     #[test]
@@ -175,10 +176,10 @@ mod tests {
             OverlayMode::Hazard,
             OverlayMode::BuildRepair,
         ] {
-            assert_eq!(OverlayMode::from_str(mode.as_str()), mode);
+            assert_eq!(OverlayMode::parse_mode(mode.as_str()), mode);
         }
         // Unknown defaults to Off.
-        assert_eq!(OverlayMode::from_str("garbage"), OverlayMode::Off);
+        assert_eq!(OverlayMode::parse_mode("garbage"), OverlayMode::Off);
     }
 
     #[test]

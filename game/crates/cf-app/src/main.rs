@@ -779,7 +779,7 @@ fn sync_terrain_state_to_render(
             pixels: u.pixels,
         });
     }
-    overlay_state.mode = OverlayMode::from_str(snap.overlay_mode.as_str());
+    overlay_state.mode = OverlayMode::parse_mode(snap.overlay_mode.as_str());
     let live_settings = holder.0.current_settings();
     dig_ghost.reduced_motion = live_settings.reduced_motion;
     dig_ghost.target = snap.dig_preview.map(|p| DigPreviewTarget {
@@ -871,11 +871,7 @@ fn pump_recorder_events_into_render_effects(
                     .and_then(|arr| arr.get(1))
                     .and_then(|v| v.as_f64())
                     .unwrap_or(0.0) as f32;
-                let count = ev
-                    .payload
-                    .get("count")
-                    .and_then(|v| v.as_u64())
-                    .unwrap_or(1) as u32;
+                let count = ev.payload.get("count").and_then(|v| v.as_u64()).unwrap_or(1) as u32;
                 let mat = ev
                     .payload
                     .get("spawn_material_id")

@@ -67,14 +67,7 @@ impl Plugin for DebrisPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<DebrisSpawnQueue>()
             .add_message::<RenderDebrisCappedEvent>()
-            .add_systems(
-                Update,
-                (
-                    spawn_pending_debris,
-                    settle_and_despawn_debris,
-                )
-                    .chain(),
-            );
+            .add_systems(Update, (spawn_pending_debris, settle_and_despawn_debris).chain());
     }
 }
 
@@ -112,11 +105,7 @@ fn spawn_pending_debris(
                     custom_size: Some(Vec2::new(2.0, 2.0)),
                     ..default()
                 },
-                Transform::from_translation(Vec3::new(
-                    req.pos.x + jitter_x,
-                    req.pos.y + 4.0 + jitter_y,
-                    0.85,
-                )),
+                Transform::from_translation(Vec3::new(req.pos.x + jitter_x, req.pos.y + 4.0 + jitter_y, 0.85)),
                 LooseDebris {
                     velocity: Vec2::new(jitter_x * 0.5, -20.0 - jitter_y.abs() * 4.0),
                     spawn_material: req.spawn_material,

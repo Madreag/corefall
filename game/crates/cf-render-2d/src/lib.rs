@@ -26,8 +26,7 @@ pub use debris::{
 pub use dig_preview::{probe_dig_validity, DigPreviewGhost, DigPreviewPlugin, DigPreviewTarget};
 pub use overlay::{material_tint, OverlayMode, OverlayModePlugin, OverlayModeState};
 pub use terrain::{
-    build_chunk_image, material_rgba, ChunkRenderTag, ChunkUpdate, ChunkedTerrainRendererPlugin,
-    ChunkedTerrainSnapshot,
+    build_chunk_image, material_rgba, ChunkRenderTag, ChunkUpdate, ChunkedTerrainRendererPlugin, ChunkedTerrainSnapshot,
 };
 
 use std::collections::HashMap;

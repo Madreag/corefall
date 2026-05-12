@@ -3815,11 +3815,7 @@ impl M0Engine {
                 })
             });
             active = read.chunked_terrain.is_some();
-            anchor = read
-                .chunked_terrain
-                .as_ref()
-                .map(|t| t.anchor)
-                .unwrap_or([0.0, 0.0]);
+            anchor = read.chunked_terrain.as_ref().map(|t| t.anchor).unwrap_or([0.0, 0.0]);
             needs_drain = read
                 .chunked_terrain
                 .as_ref()
@@ -3873,11 +3869,7 @@ impl M0Engine {
         (
             state.total_carve_events,
             state.total_debris_spawned,
-            state
-                .chunked_terrain
-                .as_ref()
-                .map(|t| t.refusal_count)
-                .unwrap_or(0),
+            state.chunked_terrain.as_ref().map(|t| t.refusal_count).unwrap_or(0),
         )
     }
 

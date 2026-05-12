@@ -201,7 +201,7 @@ fn sync_chunk_textures(
                 },
                 Name::new(format!("cf::render::terrain::chunk_{}_{}", update.cx, update.cy)),
             ));
-            applied_total = applied_total.saturating_add((CHUNK_SIZE * CHUNK_SIZE) as u32);
+            applied_total = applied_total.saturating_add(CHUNK_SIZE * CHUNK_SIZE);
             continue;
         }
         let handle = chunk_images
@@ -270,7 +270,7 @@ mod tests {
         }
         let mut image = build_chunk_image(&uniform(MATERIAL_AIR));
         let applied = apply_dirty_rect(&mut image, &pixels, [lx0, ly0, lx1, ly1]);
-        let expected = ((lx1 - lx0 + 1) * (ly1 - ly0 + 1)) as u32;
+        let expected = (lx1 - lx0 + 1) * (ly1 - ly0 + 1);
         assert_eq!(applied, expected);
 
         let buf = image.data.as_ref().expect("image data");
@@ -333,11 +333,7 @@ mod tests {
             });
         }
         app.update();
-        assert!(app
-            .world()
-            .resource::<ChunkImages>()
-            .handles
-            .contains_key(&(0, 0)));
+        assert!(app.world().resource::<ChunkImages>().handles.contains_key(&(0, 0)));
         // Now toggle inactive — handles must clear next frame.
         {
             let mut snap = app.world_mut().resource_mut::<ChunkedTerrainSnapshot>();
