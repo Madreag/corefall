@@ -94,8 +94,8 @@ use crate::{
         ActChassisClearJamParams, ActChassisRepairParams, ActChassisSalvageParams, ActPlayerAimParams,
         ActPlayerClimbParams, ActPlayerCrouchParams, ActPlayerDigParams, ActPlayerEjectParams, ActPlayerFireParams,
         ActPlayerJetParams, ActPlayerJumpParams, ActPlayerMoveParams, ActPlayerReloadParams, ActPlayerResetParams,
-        ActPlayerSelectItemParams, ObserveOnceParams, ObserveSubscribeParams, RunBundleWriteParams, RunForTicksParams,
-        ScenarioLoadParams, StepParams, SystemShutdownParams,
+        ActPlayerSelectItemParams, ActPlayerSharpAimParams, ObserveOnceParams, ObserveSubscribeParams,
+        RunBundleWriteParams, RunForTicksParams, ScenarioLoadParams, StepParams, SystemShutdownParams,
     },
     state::{ControlEnvelopeStatus, ObserveFrame, ObserveSettings},
     Settings,
@@ -278,6 +278,12 @@ pub enum ControlCommand {
     },
     /// **M5**: manually clear a weapon jam.
     ActChassisClearJam {
+        source: IntentSource,
+    },
+    /// **M1**: sticky sharp-aim hold (CCCP AHuman.cpp:1779). `active=true`
+    /// asks the sim to build `sharp_aim_progress`; `active=false` releases.
+    ActPlayerSharpAim {
+        active: bool,
         source: IntentSource,
     },
     SettingsSet {
@@ -971,6 +977,19 @@ async fn process_request<E: EngineHandle>(
             };
             let result = engine
                 .dispatch(ControlCommand::ActChassisClearJam {
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.sharp_aim" => {
+            let p: ActPlayerSharpAimParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerSharpAim {
+                    active: p.active,
                     source: IntentSource::Cfctl,
                 })
                 .await;

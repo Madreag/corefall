@@ -2261,7 +2261,7 @@ impl M0Engine {
             }
             if outcome.fired {
                 let muzzle = outcome.muzzle_origin.unwrap_or(Vec2::ZERO);
-                self.recorder.record(
+                let weapon_fired_id = self.recorder.record(
                     tick,
                     sim_time_ms,
                     "equipment",
@@ -2270,6 +2270,138 @@ impl M0Engine {
                         "actor": outcome.actor.0,
                         "muzzle_origin": [muzzle.x, muzzle.y],
                         "recoil_impulse": outcome.recoil_applied,
+                        "loudness_radius": outcome.loudness_radius,
+                        "bloom_factor": outcome.bloom_factor,
+                    }),
+                    Some(intent_event_id.clone()),
+                );
+                // M1: acoustic noise alarm (CCCP HDFirearm.cpp:948 — registered
+                // alarm event consumed by M1.5+ AI perception within the radius).
+                if outcome.loudness_radius > 0.0 {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "equipment",
+                        "alarm_registered",
+                        json!({
+                            "actor": outcome.actor.0,
+                            "muzzle_origin": [muzzle.x, muzzle.y],
+                            "loudness_radius": outcome.loudness_radius,
+                            "cause": "weapon_fired",
+                        }),
+                        Some(weapon_fired_id.clone()),
+                    );
+                }
+                // M1: camera punch / hit-stop forward-hooks for DR-055 game feel.
+                // The renderer reads these to apply screen shake and brief
+                // freeze-frame on critical hits. The events fire at the surface
+                // boundary; full juice lands at M5+.
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "ux",
+                    "camera_punch_requested",
+                    json!({
+                        "actor": outcome.actor.0,
+                        "magnitude": outcome.recoil_applied,
+                    }),
+                    Some(weapon_fired_id.clone()),
+                );
+            }
+            // M1: sharp-aim invalidation surface (CCCP AHuman.cpp:1779).
+            if let Some(reason) = outcome.sharp_aim_invalidation_reason.as_ref() {
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "actor",
+                    "sharp_aim_invalidated",
+                    json!({
+                        "actor": outcome.actor.0,
+                        "reason": reason,
+                    }),
+                    Some(intent_event_id.clone()),
+                );
+            }
+            // M1: knockdown surface — physics authority handover (animation <-> ragdoll).
+            if outcome.knockdown_started {
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "physics",
+                    "authority_changed",
+                    json!({
+                        "actor": outcome.actor.0,
+                        "from": "animation",
+                        "to": "ragdoll",
+                        "cause": "knockdown",
+                    }),
+                    Some(intent_event_id.clone()),
+                );
+            }
+            if outcome.knockdown_recovered {
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "physics",
+                    "authority_changed",
+                    json!({
+                        "actor": outcome.actor.0,
+                        "from": "ragdoll",
+                        "to": "animation",
+                        "cause": "knockdown_recovered",
+                    }),
+                    Some(intent_event_id.clone()),
+                );
+            }
+            // M1: DYING entry → inventory drop (CCCP Actor.cpp:1215).
+            if outcome.entered_dying {
+                let dying_event_id = self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "actor",
+                    "actor_status_changed",
+                    json!({
+                        "actor": outcome.actor.0,
+                        "previous_status": outcome.previous_status.as_str(),
+                        "new_status": "dying",
+                        "cause": "lethal_damage",
+                    }),
+                    Some(intent_event_id.clone()),
+                );
+                if let (Some(pos), Some(vel), Some(label)) = (
+                    outcome.inventory_drop_position,
+                    outcome.inventory_drop_velocity,
+                    outcome.inventory_drop_label.as_ref(),
+                ) {
+                    if label != "empty" {
+                        self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "actor",
+                            "inventory_dropped",
+                            json!({
+                                "actor": outcome.actor.0,
+                                "item_label": label,
+                                "hand_position": [pos.x, pos.y],
+                                "toss_velocity": [vel.x, vel.y],
+                            }),
+                            Some(dying_event_id.clone()),
+                        );
+                    }
+                }
+            }
+            // M1: DYING dwell elapsed → DEAD (CCCP Actor.cpp:1229).
+            if outcome.dying_dwell_elapsed {
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "actor",
+                    "actor_status_changed",
+                    json!({
+                        "actor": outcome.actor.0,
+                        "previous_status": "dying",
+                        "new_status": "dead",
+                        "cause": "dying_dwell_elapsed",
                     }),
                     Some(intent_event_id.clone()),
                 );
@@ -4457,6 +4589,29 @@ impl EngineHandle for M0Engine {
                     CommandResult::accepted(tick.0)
                 } else {
                     self.reject_actor_command(tick, sim_time_ms, state, "act.player.reset")
+                }
+            }
+            ControlCommand::ActPlayerSharpAim { active, source } => {
+                if !self.config.has_actor_world {
+                    return self.reject_actor_command(tick, sim_time_ms, state, "act.player.sharp_aim");
+                }
+                let player = state.player_actor;
+                if let Some(player_id) = player {
+                    state.pending_intent.actor = player_id;
+                    state.pending_intent.source = source;
+                    state.pending_intent.sharp_aim = active;
+                    drop(state);
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_accepted",
+                        json!({"method": "act.player.sharp_aim", "actor": player_id.0, "active": active}),
+                        None,
+                    );
+                    CommandResult::accepted(tick.0)
+                } else {
+                    self.reject_actor_command(tick, sim_time_ms, state, "act.player.sharp_aim")
                 }
             }
             ControlCommand::ActPlayerDig { target, source } => {

@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ActPlayerSharpAimParams",
+  "description": "**M1**: `act.player.sharp_aim` — sticky toggle for the sharp-aim hold\n(CCCP `AHuman.cpp:1779`). While `active=true` the sim builds\n`ActorState::sharp_aim_progress` toward 1.0 each tick as long as the\nactor is STABLE, grounded, slow, and equipped; invalidations snap it back\nto zero.",
+  "type": "object",
+  "properties": {
+    "active": {
+      "type": "boolean"
+    },
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "active"
+  ]
+}

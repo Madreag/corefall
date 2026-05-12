@@ -210,6 +210,18 @@ pub struct ActChassisClearJamParams {
     pub schema_version: u32,
 }
 
+/// **M1**: `act.player.sharp_aim` — sticky toggle for the sharp-aim hold
+/// (CCCP `AHuman.cpp:1779`). While `active=true` the sim builds
+/// `ActorState::sharp_aim_progress` toward 1.0 each tick as long as the
+/// actor is STABLE, grounded, slow, and equipped; invalidations snap it back
+/// to zero.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerSharpAimParams {
+    pub schema_version: u32,
+    pub active: bool,
+}
+
 fn default_true() -> bool {
     true
 }
@@ -276,6 +288,7 @@ pub fn dump_v1() -> BTreeMap<String, String> {
         entry::<ActChassisRepairParams>("act_chassis_repair_params"),
         entry::<ActChassisSalvageParams>("act_chassis_salvage_params"),
         entry::<ActChassisClearJamParams>("act_chassis_clear_jam_params"),
+        entry::<ActPlayerSharpAimParams>("act_player_sharp_aim_params"),
         entry::<RunBundleWriteParams>("run_bundle_write_params"),
         entry::<SystemShutdownParams>("system_shutdown_params"),
         entry::<SettingsPatch>("settings_patch"),
