@@ -2479,7 +2479,7 @@ impl M0Engine {
                     outcome.inventory_drop_label.as_ref(),
                 ) {
                     if label != "empty" {
-                        self.recorder.record(
+                        let dropped_event_id = self.recorder.record(
                             tick,
                             sim_time_ms,
                             "actor",
@@ -2492,6 +2492,17 @@ impl M0Engine {
                             }),
                             Some(dying_event_id.clone()),
                         );
+                        // **M1 R2 / Gap G1**: spawn a `LooseItem` in the sim
+                        // so subsequent ticks integrate gravity + emit
+                        // `actor.inventory_settled` once it comes to rest.
+                        // We acquire the state lock briefly here; the lock
+                        // ordering matches `dispatch` (state write → recorder
+                        // record) so cannot deadlock.
+                        if let Ok(mut s) = self.state.write() {
+                            if let Some(sim) = s.actor_state.as_mut() {
+                                sim.spawn_loose_item(label.clone(), pos, vel, dropped_event_id);
+                            }
+                        }
                     }
                 }
             }
@@ -2681,6 +2692,25 @@ impl M0Engine {
                     "last_position": [expired.last_position.x, expired.last_position.y],
                 }),
                 Some(parent),
+            );
+        }
+
+        // **M1 R2 / Gap G1**: emit `actor.inventory_settled` for every loose
+        // item that came to rest this tick. parent_event_id walks back to
+        // the originating `actor.inventory_dropped` so cf-tools-replay-viewer
+        // can render the full chain inventory_dropped → inventory_settled.
+        for settled in &report.settled_loose_items {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "actor",
+                "inventory_settled",
+                json!({
+                    "loose_item_id": settled.id,
+                    "item_label": settled.item_label.clone(),
+                    "rest_position": [settled.position.x, settled.position.y],
+                }),
+                Some(settled.source_event_id.clone()),
             );
         }
     }

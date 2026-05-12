@@ -117,6 +117,27 @@ pub struct Projectile {
     pub remaining_ticks: u32,
 }
 
+/// **M1 R2 / Gap G1**: a dropped inventory item subject to gravity + ground
+/// collision until it settles. Spawned on `actor.inventory_dropped` from the
+/// DYING entry path; settles when its velocity magnitude is below the
+/// settle threshold AND it has been on the ground for `settle_dwell_ticks`
+/// consecutive ticks. The engine emits `actor.inventory_settled` once on
+/// the settle tick, parent_event_id = the originating inventory_dropped.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct LooseItem {
+    pub id: u64,
+    pub source_event_id: String,
+    pub item_label: String,
+    pub position: Vec2,
+    pub velocity: Vec2,
+    pub half_extents: Vec2,
+    pub settled: bool,
+    pub on_ground_dwell_ticks: u32,
+    /// Set on the tick the engine fires `actor.inventory_settled`; cleared
+    /// the next tick so the engine doesn't double-emit.
+    pub just_settled_this_tick: bool,
+}
+
 /// Entire mutable sim state owned by the engine across ticks.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct ActorSimState {
@@ -124,6 +145,14 @@ pub struct ActorSimState {
     pub rifles: RifleStates,
     pub projectiles: Vec<Projectile>,
     next_projectile_id: u64,
+    /// **M1 R2 / Gap G1**: loose items spawned by `actor.inventory_dropped`.
+    /// The sim applies gravity + ground collision each tick until they settle.
+    #[serde(default)]
+    pub loose_items: Vec<LooseItem>,
+    /// Monotonic id counter for `LooseItem`s; never reused across resets so
+    /// the `actor.inventory_settled` event log carries a stable id.
+    #[serde(default)]
+    next_loose_item_id: u64,
 }
 
 impl ActorSimState {
@@ -133,7 +162,34 @@ impl ActorSimState {
             rifles: BTreeMap::new(),
             projectiles: Vec::new(),
             next_projectile_id: 0,
+            loose_items: Vec::new(),
+            next_loose_item_id: 0,
         }
+    }
+
+    /// **M1 R2 / Gap G1**: spawn a `LooseItem` from an
+    /// `actor.inventory_dropped` outcome. Returns the new item's id.
+    pub fn spawn_loose_item(
+        &mut self,
+        item_label: impl Into<String>,
+        position: Vec2,
+        velocity: Vec2,
+        source_event_id: impl Into<String>,
+    ) -> u64 {
+        let id = self.next_loose_item_id;
+        self.next_loose_item_id = self.next_loose_item_id.wrapping_add(1);
+        self.loose_items.push(LooseItem {
+            id,
+            source_event_id: source_event_id.into(),
+            item_label: item_label.into(),
+            position,
+            velocity,
+            half_extents: Vec2::new(4.0, 4.0),
+            settled: false,
+            on_ground_dwell_ticks: 0,
+            just_settled_this_tick: false,
+        });
+        id
     }
 
     pub fn ensure_rifle_for(&mut self, actor_id: ActorId, state: RifleState) {
@@ -182,6 +238,20 @@ impl ActorSimState {
             out.extend_from_slice(&quantize_f32(p.velocity.x).to_le_bytes());
             out.extend_from_slice(&quantize_f32(p.velocity.y).to_le_bytes());
             out.extend_from_slice(&p.remaining_ticks.to_le_bytes());
+        }
+        // **M1 R2 / Gap G1**: loose items appended AFTER the projectile
+        // section so runs that produced zero loose items remain byte-stable
+        // (the length prefix is 0 → no per-item bytes follow).
+        out.extend_from_slice(&(self.loose_items.len() as u64).to_le_bytes());
+        out.extend_from_slice(&self.next_loose_item_id.to_le_bytes());
+        for item in &self.loose_items {
+            out.extend_from_slice(&item.id.to_le_bytes());
+            out.extend_from_slice(&quantize_f32(item.position.x).to_le_bytes());
+            out.extend_from_slice(&quantize_f32(item.position.y).to_le_bytes());
+            out.extend_from_slice(&quantize_f32(item.velocity.x).to_le_bytes());
+            out.extend_from_slice(&quantize_f32(item.velocity.y).to_le_bytes());
+            out.push(u8::from(item.settled));
+            out.extend_from_slice(&item.on_ground_dwell_ticks.to_le_bytes());
         }
         out
     }
@@ -348,6 +418,18 @@ pub struct ExpiredProjectile {
     pub last_position: Vec2,
 }
 
+/// **M1 R2 / Gap G1**: outcome row for a `LooseItem` that just settled this
+/// tick. The engine consumes this to fire one-shot
+/// `actor.inventory_settled` events with parent_event_id = the originating
+/// `actor.inventory_dropped`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct SettledLooseItem {
+    pub id: u64,
+    pub source_event_id: String,
+    pub item_label: String,
+    pub position: Vec2,
+}
+
 /// All structured outcomes from one [`step`]. The engine turns these into recorder
 /// events.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
@@ -356,7 +438,34 @@ pub struct StepReport {
     pub spawned_projectiles: Vec<SpawnedProjectile>,
     pub hits: Vec<HitOutcome>,
     pub expired_projectiles: Vec<ExpiredProjectile>,
+    /// **M1 R2 / Gap G1**: loose items that came to rest on this tick.
+    /// Engine emits one `actor.inventory_settled` event per entry.
+    #[serde(default)]
+    pub settled_loose_items: Vec<SettledLooseItem>,
 }
+
+/// Loose-item physics constants.
+///
+/// Tuned for the cfctl scripts in `game/scripts/cfctl/m1_*` (60Hz baseline).
+/// All values are in actor sim units (pixels per second). At 60Hz a tick is
+/// ~16.67ms, so a gravity of 600 u/s² imparts ~10 u/s of vertical velocity
+/// per tick — items fall fast enough that a body dropping from spawn height
+/// reaches the floor in roughly 10 ticks, then bounces and settles in
+/// ~30 more. The settle dwell window is 10 ticks so observers see a stable
+/// `actor.inventory_settled` event well within the 60-tick post-death
+/// window the M1 scripts allocate.
+const LOOSE_ITEM_GRAVITY_Y: f32 = 600.0;
+/// Velocity magnitude below which a loose item is considered "at rest". This
+/// avoids declaring settled on jitter from clamped floor collision.
+const LOOSE_ITEM_SETTLE_SPEED_THRESHOLD: f32 = 1.0;
+/// Number of consecutive ticks on-ground + below-threshold required for
+/// settle to fire. 10 ticks @60Hz = ~167ms (and 83ms @120Hz).
+const LOOSE_ITEM_SETTLE_DWELL_TICKS: u32 = 10;
+/// Coefficient of restitution applied on floor impact. < 1 so items bleed
+/// energy and eventually rest.
+const LOOSE_ITEM_FLOOR_RESTITUTION: f32 = 0.35;
+/// Per-tick horizontal-velocity damping while on the ground.
+const LOOSE_ITEM_GROUND_FRICTION: f32 = 0.85;
 
 /// Run one fixed-tick step for every actor in `state.world`.
 ///
@@ -386,6 +495,7 @@ pub fn step<R: FnMut() -> u64>(
     }
 
     step_projectiles(state, deps, &mut report);
+    step_loose_items(state, deps, &mut report);
 
     report
 }
@@ -1101,6 +1211,82 @@ fn step_projectiles(state: &mut ActorSimState, deps: StepDeps, report: &mut Step
     state.projectiles = survivors;
 }
 
+/// **M1 R2 / Gap G1**: tick the gravity/floor/dwell loop on every loose
+/// item. Items that already settled this tick clear their one-shot latch;
+/// items that newly settle push a `SettledLooseItem` into the step report
+/// for the engine to emit `actor.inventory_settled`.
+fn step_loose_items(state: &mut ActorSimState, deps: StepDeps, report: &mut StepReport) {
+    if state.loose_items.is_empty() {
+        return;
+    }
+    let dt = deps.tick_dt;
+    let floor_y = state.world.floor_y;
+    for item in state.loose_items.iter_mut() {
+        // Clear the one-shot latch from the previous tick so post-settle
+        // ticks don't double-emit.
+        item.just_settled_this_tick = false;
+
+        if !item.settled {
+            // Integrate gravity → position.
+            item.velocity.y += LOOSE_ITEM_GRAVITY_Y * dt;
+            item.position.x += item.velocity.x * dt;
+            item.position.y += item.velocity.y * dt;
+
+            // Floor collision. world.floor_y is the floor surface; the
+            // item's centre rests at floor_y - half_extents.y when grounded.
+            // Below this terminal-bounce threshold we snap vel.y to zero
+            // outright; otherwise an infinite series of micro-bounces would
+            // converge to the steady-state v* = gravity*dt / (1 + restitution)
+            // (~2.6 u/s for the M1 R2 tuning) and never fall below the speed
+            // gate — the item would jiggle on the floor forever.
+            let terminal_bounce_threshold = (LOOSE_ITEM_GRAVITY_Y * dt) * 1.5;
+            let rest_y = floor_y - item.half_extents.y;
+            let on_ground = if item.position.y >= rest_y {
+                item.position.y = rest_y;
+                if item.velocity.y > 0.0 {
+                    let bounced = -item.velocity.y * LOOSE_ITEM_FLOOR_RESTITUTION;
+                    item.velocity.y = if bounced.abs() < terminal_bounce_threshold {
+                        0.0
+                    } else {
+                        bounced
+                    };
+                }
+                // Apply ground friction to horizontal velocity.
+                item.velocity.x *= LOOSE_ITEM_GROUND_FRICTION;
+                if item.velocity.x.abs() < 0.5 {
+                    item.velocity.x = 0.0;
+                }
+                true
+            } else {
+                false
+            };
+
+            let speed_squared = item.velocity.x * item.velocity.x + item.velocity.y * item.velocity.y;
+            let below_threshold = speed_squared < LOOSE_ITEM_SETTLE_SPEED_THRESHOLD * LOOSE_ITEM_SETTLE_SPEED_THRESHOLD;
+            if on_ground && below_threshold {
+                item.on_ground_dwell_ticks = item.on_ground_dwell_ticks.saturating_add(1);
+                if item.on_ground_dwell_ticks >= LOOSE_ITEM_SETTLE_DWELL_TICKS {
+                    item.settled = true;
+                    item.just_settled_this_tick = true;
+                    // Force exact rest so checksums are byte-stable across
+                    // 60Hz vs 120Hz runs (where the integration step
+                    // produces different sub-quantization residue).
+                    item.velocity = Vec2::ZERO;
+                    item.position.y = rest_y;
+                    report.settled_loose_items.push(SettledLooseItem {
+                        id: item.id,
+                        source_event_id: item.source_event_id.clone(),
+                        item_label: item.item_label.clone(),
+                        position: item.position,
+                    });
+                }
+            } else {
+                item.on_ground_dwell_ticks = 0;
+            }
+        }
+    }
+}
+
 /// Returns the entry parameter `t` in `[0, 1]` for the segment `start -> end` against the
 /// AABB centred on `centre` with `half_extents`, or `None` if the segment misses. A point
 /// already inside the AABB at `start` returns `Some(0.0)`.
@@ -1694,5 +1880,64 @@ mod tests {
                 assert_ne!(hit.target, ActorId(1), "projectile must not hit its owner");
             }
         }
+    }
+
+    /// **M1 R2 / Gap G1 (drop physics)**: a `LooseItem` dropped above the
+    /// floor must fall under gravity, settle within a bounded number of
+    /// ticks, and emit exactly one `SettledLooseItem` outcome.
+    #[test]
+    fn loose_item_falls_and_settles_within_bounded_ticks() {
+        let mut state = ActorSimState::new(ActorWorld {
+            floor_y: 200.0,
+            ..Default::default()
+        });
+        let id = state.spawn_loose_item("rifle", Vec2::new(100.0, 50.0), Vec2::new(10.0, 0.0), "evt_inv_dropped");
+        let mut intents = BTreeMap::new();
+        let mut total_settled = 0;
+        let mut settle_tick: Option<usize> = None;
+        for tick in 0..240 {
+            let r = step_no_rng(&mut state, &mut intents, deps());
+            if !r.settled_loose_items.is_empty() {
+                assert_eq!(r.settled_loose_items.len(), 1);
+                let s = &r.settled_loose_items[0];
+                assert_eq!(s.id, id);
+                assert_eq!(s.source_event_id, "evt_inv_dropped");
+                assert_eq!(s.item_label, "rifle");
+                total_settled += 1;
+                settle_tick = Some(tick);
+                break;
+            }
+        }
+        let settle_tick = settle_tick.expect("LooseItem must settle within 240 ticks");
+        assert!(settle_tick < 240, "settled after {settle_tick} ticks; expected < 240");
+        // The settled latch must fire exactly once for this item across the run.
+        // Drive 60 more ticks and confirm no more `SettledLooseItem` outcomes
+        // surface for the same id.
+        for _ in 0..60 {
+            let r = step_no_rng(&mut state, &mut intents, deps());
+            assert!(
+                r.settled_loose_items.is_empty(),
+                "settled latch must fire exactly once per item"
+            );
+        }
+        assert_eq!(total_settled, 1);
+        // The item itself must be at rest on the floor surface.
+        let item = state
+            .loose_items
+            .iter()
+            .find(|i| i.id == id)
+            .expect("loose item must still exist after settle");
+        assert!(item.settled, "settled flag must persist after fire");
+        assert!(
+            item.velocity.x == 0.0 && item.velocity.y == 0.0,
+            "settled item velocity must be zero, got {:?}",
+            item.velocity
+        );
+        assert!(
+            (item.position.y - (state.world.floor_y - item.half_extents.y)).abs() < 0.01,
+            "settled item must rest at floor; got y={} floor_y={}",
+            item.position.y,
+            state.world.floor_y
+        );
     }
 }
