@@ -30,8 +30,9 @@ use cf_control::{
     EngineHandle, Settings,
 };
 use cf_render_2d::{
-    ActorRenderState, ActorSpritePlugin, BreachRender, CameraFollow, CameraShake, CfRenderPlugin, ExtractionRender,
-    HitStop, MuzzleFlashRender,
+    ActorRenderState, ActorSpritePlugin, BreachRender, CameraFollow, CameraShake, CfRenderPlugin, ChunkUpdate,
+    ChunkedTerrainPlugin, ChunkedTerrainSnapshot, DebrisSpawnQueue, DebrisSpawnRequest, DigPreviewGhost,
+    DigPreviewTarget, ExtractionRender, HitStop, MuzzleFlashRender, OverlayMode, OverlayModeState,
 };
 use cf_replay::diagnostics;
 use cf_sim_core::WallClock;
@@ -650,6 +651,7 @@ fn run_bevy(
     app.add_plugins(plugins)
         .add_plugins(CfRenderPlugin::default())
         .add_plugins(ActorSpritePlugin)
+        .add_plugins(ChunkedTerrainPlugin)
         .add_plugins(StatusStripPlugin);
     app.init_resource::<HoldTracker>();
     let capture_handle = CaptureStateHandle::default();
@@ -691,6 +693,7 @@ fn run_bevy(
             ingest_player_input,
             ingest_focus_input,
             sync_actor_state_to_render,
+            sync_terrain_state_to_render,
             sync_engine_tick_to_capture_clock,
             pump_recorder_events_into_capture_keyframes,
             pump_recorder_events_into_render_effects,
@@ -738,6 +741,41 @@ fn run_bevy(
 
 fn sync_engine_tick_to_capture_clock(holder: Res<EngineHolder>, mut clock: ResMut<CaptureClock>) {
     clock.current_tick = holder.0.current_tick().0;
+}
+
+/// **M2**: bridge the engine's chunked terrain into cf-render-2d each
+/// frame. Drains every dirty chunk into `ChunkedTerrainSnapshot.updates`,
+/// mirrors the active overlay mode into `OverlayModeState`, and probes
+/// the dig-preview point at the player's aim into `DigPreviewGhost`.
+/// `ChunkedTerrain::clear_dirty()` is called inside the engine's
+/// `terrain_render_snapshot()` so the next frame sees a fresh dirty set.
+fn sync_terrain_state_to_render(
+    holder: Res<EngineHolder>,
+    mut terrain_snapshot: ResMut<ChunkedTerrainSnapshot>,
+    mut overlay_state: ResMut<OverlayModeState>,
+    mut dig_ghost: ResMut<DigPreviewGhost>,
+) {
+    let snap = holder.0.terrain_render_snapshot();
+    terrain_snapshot.active = snap.active;
+    terrain_snapshot.anchor = snap.anchor;
+    terrain_snapshot.updates.clear();
+    for u in snap.dirty_updates {
+        terrain_snapshot.updates.push(ChunkUpdate {
+            cx: u.cx,
+            cy: u.cy,
+            dirty_rect: u.dirty_rect,
+            pixels: u.pixels,
+        });
+    }
+    overlay_state.mode = OverlayMode::from_str(snap.overlay_mode.as_str());
+    let live_settings = holder.0.current_settings();
+    dig_ghost.reduced_motion = live_settings.reduced_motion;
+    dig_ghost.target = snap.dig_preview.map(|p| DigPreviewTarget {
+        position: bevy::math::Vec2::new(p.position[0], p.position[1]),
+        radius: p.radius,
+        valid: p.valid,
+        material_id: Some(p.material_id),
+    });
 }
 
 #[derive(Resource, Default)]
@@ -801,6 +839,7 @@ fn pump_recorder_events_into_render_effects(
     mut shake: ResMut<CameraShake>,
     mut hit_stop: ResMut<HitStop>,
     mut state: ResMut<ActorRenderState>,
+    mut debris_queue: ResMut<DebrisSpawnQueue>,
     mut cursor: ResMut<RenderEffectsCursor>,
 ) {
     let settings = futures_block_on(async { holder.0.settings_snapshot().await });
@@ -810,6 +849,39 @@ fn pump_recorder_events_into_render_effects(
     cursor.0 += new_events.len();
     for ev in new_events {
         match (ev.category.as_str(), ev.event_type.as_str()) {
+            ("terrain", "terrain_pixel_dislodged") => {
+                let pos_arr = ev.payload.get("pos").and_then(|v| v.as_array());
+                let x = pos_arr
+                    .and_then(|arr| arr.first())
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.0) as f32;
+                let y = pos_arr
+                    .and_then(|arr| arr.get(1))
+                    .and_then(|v| v.as_f64())
+                    .unwrap_or(0.0) as f32;
+                let count = ev
+                    .payload
+                    .get("count")
+                    .and_then(|v| v.as_u64())
+                    .unwrap_or(1) as u32;
+                let mat = ev
+                    .payload
+                    .get("spawn_material_id")
+                    .and_then(|v| v.as_u64())
+                    .and_then(|n| u8::try_from(n).ok())
+                    .or_else(|| {
+                        ev.payload
+                            .get("source_material_id")
+                            .and_then(|v| v.as_u64())
+                            .and_then(|n| u8::try_from(n).ok())
+                    })
+                    .unwrap_or(cf_terrain::MATERIAL_LOOSE_FILL);
+                debris_queue.pending.push_back(DebrisSpawnRequest {
+                    pos: bevy::math::Vec2::new(x, y),
+                    spawn_material: mat,
+                    count,
+                });
+            }
             ("ux", "camera_punch_requested") => {
                 let magnitude = ev.payload.get("magnitude").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
                 shake.magnitude_px = (shake.magnitude_px + magnitude * 0.05).clamp(0.0, 40.0);

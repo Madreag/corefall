@@ -15,6 +15,21 @@
     clippy::needless_pass_by_value
 )]
 
+pub mod debris;
+pub mod dig_preview;
+pub mod overlay;
+pub mod terrain;
+
+pub use debris::{
+    DebrisPlugin, DebrisSpawnQueue, DebrisSpawnRequest, LooseDebris, RenderDebrisCappedEvent, DEBRIS_CAP,
+};
+pub use dig_preview::{probe_dig_validity, DigPreviewGhost, DigPreviewPlugin, DigPreviewTarget};
+pub use overlay::{material_tint, OverlayMode, OverlayModePlugin, OverlayModeState};
+pub use terrain::{
+    build_chunk_image, material_rgba, ChunkRenderTag, ChunkUpdate, ChunkedTerrainRendererPlugin,
+    ChunkedTerrainSnapshot,
+};
+
 use std::collections::HashMap;
 
 use bevy::asset::RenderAssetUsages;
@@ -46,6 +61,23 @@ impl Plugin for CfRenderPlugin {
             .insert_resource(CameraFollow::default())
             .insert_resource(HitStop::default())
             .add_systems(Startup, spawn_camera);
+    }
+}
+
+/// **M2**: composite plugin wiring the chunked-terrain renderer, the 5-mode
+/// material overlay, the loose-pixel debris system, and the tool-validity
+/// ghost preview. cf-app adds this alongside [`CfRenderPlugin`] +
+/// [`ActorSpritePlugin`].
+pub struct ChunkedTerrainPlugin;
+
+impl Plugin for ChunkedTerrainPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_plugins((
+            ChunkedTerrainRendererPlugin,
+            OverlayModePlugin,
+            DebrisPlugin,
+            DigPreviewPlugin,
+        ));
     }
 }
 

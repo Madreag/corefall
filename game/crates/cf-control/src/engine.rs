@@ -3770,6 +3770,87 @@ impl M0Engine {
         snapshot
     }
 
+    /// **M2**: build the render-side terrain snapshot. Drains dirty chunks
+    /// from `ChunkedTerrain::dirty_chunks` and clears them so the next
+    /// frame only re-uploads new edits. Also probes the dig-preview point
+    /// at the player's aim and surfaces the active overlay mode.
+    pub fn terrain_render_snapshot(&self) -> TerrainRenderSnapshot {
+        let mut state = self.state.write().expect("engine state poisoned");
+        let overlay_mode = state.material_overlay_mode.clone();
+        let dig_preview = state.player_actor.and_then(|pid| {
+            let actor = state.actor_state.as_ref()?.world.actors.get(&pid)?;
+            let terrain = state.chunked_terrain.as_ref()?;
+            const DIG_REACH: f32 = 22.0;
+            const DIG_RADIUS: f32 = 12.0;
+            let aim_x = actor.aim.x;
+            let aim_y = actor.aim.y;
+            let aim_len = ((aim_x * aim_x) + (aim_y * aim_y)).sqrt().max(0.001);
+            let nx = aim_x / aim_len;
+            let ny = aim_y / aim_len;
+            let probe_x = actor.position.x + nx * DIG_REACH;
+            let probe_y = actor.position.y + ny * DIG_REACH;
+            let material_id = terrain.material_at_world(probe_x, probe_y);
+            let valid = terrain.registry.is_diggable(material_id);
+            Some(TerrainDigPreview {
+                position: [probe_x, probe_y],
+                radius: DIG_RADIUS,
+                valid,
+                material_id,
+            })
+        });
+        let Some(terrain) = state.chunked_terrain.as_mut() else {
+            return TerrainRenderSnapshot {
+                active: false,
+                anchor: [0.0, 0.0],
+                overlay_mode,
+                dirty_updates: Vec::new(),
+                dig_preview,
+            };
+        };
+        let anchor = terrain.anchor;
+        let dirty: Vec<cf_terrain::ChunkCoord> = terrain.dirty_chunks().collect();
+        let mut updates = Vec::with_capacity(dirty.len());
+        for coord in &dirty {
+            let pixels = terrain.chunk_pixels(coord.cx, coord.cy);
+            updates.push(TerrainChunkUpdate {
+                cx: coord.cx,
+                cy: coord.cy,
+                // M2 ships the conservative "full-chunk" dirty rect; the
+                // M5.6 active material kernel will refine this to a tight
+                // sub-rect per coalesced dirty area. The renderer accepts
+                // both equally.
+                dirty_rect: [0, 0, cf_terrain::CHUNK_SIZE - 1, cf_terrain::CHUNK_SIZE - 1],
+                pixels,
+            });
+        }
+        // Per the M2 contract — clear the dirty set AFTER the renderer
+        // pulls the updates so the next frame doesn't re-upload chunks
+        // that haven't changed.
+        terrain.clear_dirty();
+        TerrainRenderSnapshot {
+            active: true,
+            anchor,
+            overlay_mode,
+            dirty_updates: updates,
+            dig_preview,
+        }
+    }
+
+    /// **M2**: render-only snapshot of cumulative debris counters. cf-app
+    /// uses this to limit debris spawn requests + report perf health.
+    pub fn terrain_render_counters(&self) -> (u64, u64, u64) {
+        let state = self.state.read().expect("engine state poisoned");
+        (
+            state.total_carve_events,
+            state.total_debris_spawned,
+            state
+                .chunked_terrain
+                .as_ref()
+                .map(|t| t.refusal_count)
+                .unwrap_or(0),
+        )
+    }
+
     fn reject_actor_command(
         &self,
         tick: Tick,
@@ -3968,6 +4049,37 @@ pub struct ActorRenderSnapshot {
     pub extraction_zone: Option<ExtractionZoneView>,
     /// M1.5: per-enemy state + tactic projection so the HUD doesn't fabricate values.
     pub enemies: Vec<EnemyHudView>,
+}
+
+/// **M2**: render-side snapshot of the chunked terrain. Carries the
+/// terrain anchor, every dirty chunk's pixel data (then clears the dirty
+/// set), the active material-overlay mode, and a tool-validity probe at
+/// the player's aim direction.
+#[derive(Debug, Clone, Default)]
+pub struct TerrainRenderSnapshot {
+    pub active: bool,
+    pub anchor: [f32; 2],
+    pub overlay_mode: String,
+    pub dirty_updates: Vec<TerrainChunkUpdate>,
+    pub dig_preview: Option<TerrainDigPreview>,
+}
+
+/// **M2**: one chunk's pixel grid + dirty rect for render upload.
+#[derive(Debug, Clone)]
+pub struct TerrainChunkUpdate {
+    pub cx: i32,
+    pub cy: i32,
+    pub dirty_rect: [u32; 4],
+    pub pixels: Vec<cf_terrain::MaterialId>,
+}
+
+/// **M2**: tool-validity probe at the player's aim direction.
+#[derive(Debug, Clone, Copy)]
+pub struct TerrainDigPreview {
+    pub position: [f32; 2],
+    pub radius: f32,
+    pub valid: bool,
+    pub material_id: cf_terrain::MaterialId,
 }
 
 /// M1.5: HUD-side projection of one reactive guard.

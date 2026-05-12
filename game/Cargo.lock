@@ -1436,6 +1436,7 @@ dependencies = [
  "cf-render-2d",
  "cf-replay",
  "cf-sim-core",
+ "cf-terrain",
  "cf-ui",
  "chrono",
  "clap",
@@ -1644,6 +1645,7 @@ version = "0.0.1"
 dependencies = [
  "bevy",
  "cf-actor",
+ "cf-terrain",
  "serde",
  "tracing",
 ]

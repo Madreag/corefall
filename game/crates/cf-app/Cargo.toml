@@ -31,3 +31,4 @@ cf-capture = { path = "../cf-capture" }
 cf-ui = { path = "../cf-ui" }
 cf-actor = { path = "../cf-actor" }
 cf-equipment = { path = "../cf-equipment" }
+cf-terrain = { path = "../cf-terrain" }
