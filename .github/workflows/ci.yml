@@ -96,3 +96,39 @@ jobs:
             exit 1
           fi
           echo "OK: only ./prototype_runs exists (or none)."
+
+      - name: schema-version drift gate
+        run: cargo run --release -p cf-control --example dump_schemas -- --check
+
+      - name: check status surfaces
+        if: runner.os == 'Linux'
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        run: bash game/tools/check_status_surfaces.sh
+
+      - name: cargo audit (CVE check)
+        if: runner.os == 'Linux'
+        continue-on-error: true
+        run: |
+          cargo install cargo-audit --quiet 2>/dev/null || true
+          cargo audit || echo "::warning::cargo audit found issues"
+
+      - name: inventory println in production code
+        if: runner.os == 'Linux'
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        continue-on-error: true
+        run: bash game/tools/inventory_println.sh
+
+      - name: inventory thread_rng in sim crates
+        if: runner.os == 'Linux'
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        run: bash game/tools/inventory_thread_rng.sh
+
+      - name: inventory unsafe blocks
+        if: runner.os == 'Linux'
+        shell: bash
+        working-directory: ${{ github.workspace }}
+        continue-on-error: true
+        run: bash game/tools/inventory_unsafe_blocks.sh

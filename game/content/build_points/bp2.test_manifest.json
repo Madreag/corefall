@@ -246,6 +246,13 @@
     "anti_fomo_anti_p2w_audit": "N/A pre-monetization",
     "captions_for_all_audio": "N/A pre-cf-audio"
   },
+  "required_source_patterns": [
+    "game/content/scenarios/m2_material_lane.ron",
+    "game/content/scenarios/micro_reactor_defense.ron",
+    "game/scripts/cfctl/m2_dig_concrete_refuse_metal.cfctl.json",
+    "game/scripts/cfctl/micro_reactor_defense_win.cfctl.json",
+    "game/scripts/cfctl/micro_reactor_defense_loss.cfctl.json"
+  ],
   "loop_thresholds": {
     "max_iterations": 10,
     "minimum_grading_aggregate_for_pass": 7.0,

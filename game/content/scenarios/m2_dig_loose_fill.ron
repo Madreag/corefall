@@ -1,0 +1,32 @@
+(
+  schema_version: 1,
+  id: "m2_dig_loose_fill",
+  display_name: "M2 Dig Loose Fill",
+  description: "Loose-fill behavior test per M2-S08: dig into loose rubble material, observe debris + fill settling.",
+  seed: 42,
+  duration_ticks: Some(3600),
+  region: (anchor: (0.0, 0.0), width: 640.0, height: 360.0),
+  gravity: -980.0,
+  floor_y: 16.0,
+  teams: [],
+  actors: [
+    (id: 1, team: "blue", spawn: (80.0, 32.0), controllable: true, hp: 100.0,
+      inventory: (rifle: Some("rifle_m1_default")), half_extents: Some((8.0, 16.0))),
+  ],
+  terrain: Some((
+    width_px: 640,
+    height_px: 360,
+    default_material: "air",
+    stamps: [
+      (kind: "fill_aabb", min: (0.0, 0.0), max: (640.0, 64.0), material: "dirt"),
+      (kind: "fill_aabb", min: (200.0, 64.0), max: (300.0, 200.0), material: "loose_fill"),
+      (kind: "fill_aabb", min: (400.0, 64.0), max: (500.0, 200.0), material: "dirt"),
+    ],
+  )),
+  objectives: [],
+  director: None,
+  capabilities: (debug: false, control_api: true, save_load: false),
+  save_fields: [],
+  expected_tests: ["M2-LOOSE-01"],
+  notes: "Loose fill material dig test. Player digs into loose rubble column and observes debris behavior.",
+)

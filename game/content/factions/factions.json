@@ -1,0 +1,36 @@
+{
+  "schema_version": 1,
+  "description": "Faction registry. DR-016 BP3 narrative seed. 2 starter factions; DR-045 launch roster targets 8.",
+  "factions": [
+    {
+      "id": "coalition",
+      "display_name": "Coalition",
+      "short_name": "COAL",
+      "colors": {
+        "primary_hex": "2266CC",
+        "secondary_hex": "88BBFF",
+        "hud_text_hex": "AADDFF"
+      },
+      "ai_policy_hint": "defensive",
+      "description": "Earth-based multinational defense force. Favors fortified positions, repair infrastructure, and coordinated fire. Doctrine: hold the line, deny terrain, protect the core.",
+      "origin_pool": ["human", "android"],
+      "home_worlds": ["earth", "mars"],
+      "motto": "Protect. Fortify. Endure."
+    },
+    {
+      "id": "frontier",
+      "display_name": "Frontier Corps",
+      "short_name": "FRNTR",
+      "colors": {
+        "primary_hex": "CC6622",
+        "secondary_hex": "FFAA55",
+        "hud_text_hex": "FFCC88"
+      },
+      "ai_policy_hint": "aggressive",
+      "description": "Outer-system irregular force. Favors mobility, sabotage, tunnel warfare, and overwhelming local force. Doctrine: breach fast, hit hard, extract before reinforcements.",
+      "origin_pool": ["human", "robot"],
+      "home_worlds": ["mars", "belt"],
+      "motto": "Strike. Breach. Vanish."
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+(
+  schema_version: 1,
+  id: "lab_chassis_damage",
+  display_name: "Lau: chassis damage",
+  description: "DR-023 lab scenario: lab_chassis_damage sandbox.",
+  seed: 42, duration_ticks: None,
+  region: (anchor: (0.0, 0.0), width: 1280.0, height: 720.0),
+  gravity: -980.0, floor_y: 16.0, teams: [],
+  actors: [(id: 1, team: "blue", spawn: (100.0, 32.0), controllable: true, hp: 100.0, inventory: (rifle: Some("rifle_m1_default")), half_extents: Some((8.0, 16.0)))],
+  objectives: [], director: None,
+  capabilities: (debug: false, control_api: true, save_load: false),
+  save_fields: [], expected_tests: [], notes: "Lab sandbox for lab_chassis_damage.",
+  scenario_tags: ["lab"],
+)

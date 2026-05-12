@@ -1,0 +1,33 @@
+(
+  schema_version: 1,
+  id: "m5_chassis_climb",
+  display_name: "M5 Chassis Climb",
+  description: "Climbing stance test: player activates climb intent on a powered armor chassis near a vertical surface.",
+  seed: 42,
+  duration_ticks: Some(3600),
+  region: (anchor: (0.0, 0.0), width: 640.0, height: 480.0),
+  gravity: -980.0,
+  floor_y: 16.0,
+  teams: [],
+  actors: [
+    (id: 1, team: "blue", spawn: (100.0, 32.0), controllable: true, hp: 100.0,
+      inventory: (rifle: Some("rifle_m1_default")), half_extents: Some((10.0, 20.0)),
+      chassis: Some((spec_id: "powered_armor_v1", tutorial_safety: true)),
+      origin_id: Some("human")),
+  ],
+  terrain: Some((
+    width_px: 640,
+    height_px: 480,
+    default_material: "air",
+    stamps: [
+      (kind: "fill_aabb", min: (0.0, 0.0), max: (640.0, 64.0), material: "dirt"),
+      (kind: "fill_aabb", min: (300.0, 64.0), max: (320.0, 320.0), material: "concrete"),
+    ],
+  )),
+  objectives: [],
+  director: None,
+  capabilities: (debug: false, control_api: true, save_load: false),
+  save_fields: [],
+  expected_tests: ["M5-CLIMB-01"],
+  notes: "Climb stance test. Player approaches vertical concrete wall and activates climb. Stance should show CLIMBING.",
+)

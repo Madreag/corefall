@@ -252,79 +252,79 @@ N. - [<marker>] [W<wave>] [BP<bp>] [M<milestone>+...] [DR-<n>+...] [STATE] body
 610. - [x] [W1] [GAP] `content/animations/` directory missing.  → W1.1
 
 ## 62. Per-crate AGENTS.md drift
-636. - [ ] [W1] [M0+M5.6] [GAP] `cf-material/AGENTS.md` still says "M0 stub framing"; should be promoted to "real implementation pending M5.6" the moment any code lands.
-637. - [ ] [W1] [GAP] `cf-atmos/AGENTS.md` — same stub framing.
-638. - [ ] [W1] [GAP] `cf-audio/AGENTS.md` — same stub framing.
-639. - [ ] [W1] [GAP] `cf-net/AGENTS.md` — same stub framing.
-640. - [ ] [W1] [GAP] `cf-server/AGENTS.md` — minimal 36-line scaffold; AGENTS.md still says stub.
-641. - [ ] [W1] [GAP] `cf-server-ops/AGENTS.md`, `cf-server-persistence/AGENTS.md`, `cf-server-anti-cheat/AGENTS.md`, `cf-server-admin/AGENTS.md` — all stub-framing.
-642. - [ ] [W1] [GAP] `cf-bench/AGENTS.md` — 38-line scaffold; AGENTS.md says stub.
-643. - [ ] [W1] [GAP] `cf-tools-editor/AGENTS.md` — 38-line scaffold.
+636. - [x] [W1] [M0+M5.6] [GAP] `cf-material/AGENTS.md` still says "M0 stub framing"; should be promoted to "real implementation pending M5.6" the moment any code lands.
+637. - [x] [W1] [GAP] `cf-atmos/AGENTS.md` — same stub framing.
+638. - [x] [W1] [GAP] `cf-audio/AGENTS.md` — same stub framing.
+639. - [x] [W1] [GAP] `cf-net/AGENTS.md` — same stub framing.
+640. - [x] [W1] [GAP] `cf-server/AGENTS.md` — minimal 36-line scaffold; AGENTS.md still says stub.
+641. - [x] [W1] [GAP] `cf-server-ops/AGENTS.md`, `cf-server-persistence/AGENTS.md`, `cf-server-anti-cheat/AGENTS.md`, `cf-server-admin/AGENTS.md` — all stub-framing.
+642. - [x] [W1] [GAP] `cf-bench/AGENTS.md` — 38-line scaffold; AGENTS.md says stub.
+643. - [x] [W1] [GAP] `cf-tools-editor/AGENTS.md` — 38-line scaffold.
 
 ## 63. cfctl scripts gaps
 644. - [x] [W1] [GAP] No `m1_jump_only.cfctl.json` script (jump action coverage in isolation).  → W1.1
 645. - [x] [W1] [GAP] No `m1_reset_loop.cfctl.json` script (player-reset action coverage in isolation).  → W1.1
 646. - [x] [W1] [GAP] No `m1_inventory_cycle.cfctl.json` script (select_item across slots 0-3).  → W1.1
-647. - [ ] [W1] [M2] [GAP] No `m2_chunked_dig_compute.cfctl.json` (M2 GPU-assisted carve path).
-648. - [ ] [W1] [M2.5] [GAP] No `m2.5_no_trench_loss.cfctl.json` (no-trench loss-faster path, per M2.5-S03 done-criterion).
-649. - [ ] [W1] [GAP] No `m3a_replay_compare.cfctl.json` (drive cf-headless replay-compare action).
-650. - [ ] [W1] [GAP] No `m3b_viewer_scrub.cfctl.json` (drive cf-tools-replay-viewer scrub).
-651. - [ ] [W1] [GAP] No `m4a_focus_traversal.cfctl.json` (covered by `m4a_acc_a_floor.cfctl.json` but a dedicated 12-node tab-cycle script does not exist).
-652. - [ ] [W1] [GAP] No `m4a_hold_remap_settings.cfctl.json` (hold-to-confirm + remap path coverage).
-653. - [ ] [W1] [GAP] No `m5_chassis_repair.cfctl.json` (isolated repair-zone scenario; current `m5_chassis_salvage_roundtrip` does repair + salvage + clear_jam together).
-654. - [ ] [W1] [GAP] No `m5_chassis_clear_jam.cfctl.json` (isolated weapon-jam clear).
+647. - [x] [W1] [M2] [GAP] No `m2_chunked_dig_compute.cfctl.json` (M2 GPU-assisted carve path).
+648. - [x] [W1] [M2.5] [GAP] No `m2.5_no_trench_loss.cfctl.json` (no-trench loss-faster path, per M2.5-S03 done-criterion).
+649. - [x] [W1] [GAP] No `m3a_replay_compare.cfctl.json` (drive cf-headless replay-compare action).
+650. - [x] [W1] [GAP] No `m3b_viewer_scrub.cfctl.json` (drive cf-tools-replay-viewer scrub).
+651. - [x] [W1] [GAP] No `m4a_focus_traversal.cfctl.json` (covered by `m4a_acc_a_floor.cfctl.json` but a dedicated 12-node tab-cycle script does not exist).
+652. - [x] [W1] [GAP] No `m4a_hold_remap_settings.cfctl.json` (hold-to-confirm + remap path coverage).
+653. - [x] [W1] [GAP] No `m5_chassis_repair.cfctl.json` (isolated repair-zone scenario; current `m5_chassis_salvage_roundtrip` does repair + salvage + clear_jam together).
+654. - [x] [W1] [GAP] No `m5_chassis_clear_jam.cfctl.json` (isolated weapon-jam clear).
 
 ## 65. content/scenarios — scenario fixture gaps
-661. - [ ] [W1] [GAP] No `m1.5_micro_breach_no_dig.ron` (alt path: player skips digging and bypasses guard).
-662. - [ ] [W1] [M2] [GAP] No `m2_dig_loose_fill.ron` (loose-fill behavior per M2-S08).
-663. - [ ] [W1] [GAP] No `m2_dig_repair_fill.ron` (repair-fill material refusal/affordance test).
-664. - [ ] [W1] [GAP] No `m3a_replay_determinism.ron` dedicated determinism scenario (currently uses m1_actor_range with 60+120 Hz checksums).
-665. - [ ] [W1] [M5] [GAP] No `m5_chassis_climb.ron` scenario (climbing stance promised at M5).
-666. - [ ] [W1] [GAP] No `m5_chassis_jet.ron` scenario (jetpack scenario; jet module exists but no fly-up scenario).
-667. - [ ] [W1] [DR-021] [GAP] No `m5_chassis_module_swap.ron` (DR-021 swap verb).
-668. - [ ] [W1] [DR-023] [GAP] No `tutorial_onboarding.ron` (DR-023 polished first mission).
-669. - [ ] [W1] [DR-023] [GAP] No `lab_movement.ron`, `lab_terrain.ron`, `lab_loadout.ron`, `lab_squad.ron`, `lab_core.ron`, `lab_avatar.ron`, `lab_chassis_damage.ron`, `lab_replay.ron` (DR-023 8-lab roster).
-670. - [ ] [W1] [DR-005] [GAP] No multiplayer fixture scenario (DR-005 lan_room test).
+661. - [x] [W1] [GAP] No `m1.5_micro_breach_no_dig.ron` (alt path: player skips digging and bypasses guard).
+662. - [x] [W1] [M2] [GAP] No `m2_dig_loose_fill.ron` (loose-fill behavior per M2-S08).
+663. - [x] [W1] [GAP] No `m2_dig_repair_fill.ron` (repair-fill material refusal/affordance test).
+664. - [x] [W1] [GAP] No `m3a_replay_determinism.ron` dedicated determinism scenario (currently uses m1_actor_range with 60+120 Hz checksums).
+665. - [x] [W1] [M5] [GAP] No `m5_chassis_climb.ron` scenario (climbing stance promised at M5).
+666. - [x] [W1] [GAP] No `m5_chassis_jet.ron` scenario (jetpack scenario; jet module exists but no fly-up scenario).
+667. - [x] [W1] [DR-021] [GAP] No `m5_chassis_module_swap.ron` (DR-021 swap verb).
+668. - [x] [W1] [DR-023] [GAP] No `tutorial_onboarding.ron` (DR-023 polished first mission).
+669. - [x] [W1] [DR-023] [GAP] No `lab_movement.ron`, `lab_terrain.ron`, `lab_loadout.ron`, `lab_squad.ron`, `lab_core.ron`, `lab_avatar.ron`, `lab_chassis_damage.ron`, `lab_replay.ron` (DR-023 8-lab roster).
+670. - [x] [W1] [DR-005] [GAP] No multiplayer fixture scenario (DR-005 lan_room test).
 
 ## 66. content/build_points — manifest gaps
 671. - [x] [W1] [GAP] `content/build_points/bp0.test_manifest.json` — missing (BP0 has nothing to enforce).  → W1.1
 672. - [x] [W1] [GAP] `content/build_points/bp1.test_manifest.json` — missing (BP1 closure retroactive recovery should write one).  → W1.1
-673. - [ ] [W1] [GAP] `content/build_points/bp2.test_manifest.json` — present but does not include `m2_material_lane` + `micro_reactor_defense_*` rows enforced via required_source_patterns.
+673. - [x] [W1] [GAP] `content/build_points/bp2.test_manifest.json` — present but does not include `m2_material_lane` + `micro_reactor_defense_*` rows enforced via required_source_patterns.
 674. - [x] [W1] [GAP] `content/build_points/bp4.test_manifest.json` — missing for next BP.  → W1.1
 
 ## 67. Test surface gaps (test code only, not infra) — see "Testing" section below for runner/CI gaps
-675. - [ ] [W1] [GAP] No `cf-actor` test covering Stance::Climbing actually consumes climb intent.
-676. - [ ] [W1] [GAP] No `cf-actor` test covering crouching reduces collision-box height.
-677. - [ ] [W1] [GAP] No `cf-physics` test for actor-actor collision impulse.
-678. - [ ] [W1] [GAP] No `cf-physics` test for actor-projectile self-filter (shooter does not hit themselves).
-679. - [ ] [W1] [GAP] No `cf-mission` test for `objective_failed` event (only `objective_completed` covered).
-680. - [ ] [W1] [M5.5] [GAP] No `cf-ai::reactive_guard` test for sight-cone with terrain occlusion (M5.5 should ship; BP3 should at least cover line-of-sight broken by chunked terrain).
+675. - [x] [W1] [GAP] No `cf-actor` test covering Stance::Climbing actually consumes climb intent.
+676. - [x] [W1] [GAP] No `cf-actor` test covering crouching reduces collision-box height.
+677. - [x] [W1] [GAP] No `cf-physics` test for actor-actor collision impulse.
+678. - [x] [W1] [GAP] No `cf-physics` test for actor-projectile self-filter (shooter does not hit themselves).
+679. - [x] [W1] [GAP] No `cf-mission` test for `objective_failed` event (only `objective_completed` covered).
+680. - [x] [W1] [M5.5] [GAP] No `cf-ai::reactive_guard` test for sight-cone with terrain occlusion (M5.5 should ship; BP3 should at least cover line-of-sight broken by chunked terrain).
 
 ## 68. CI workflow gaps (.github/workflows)
-681. - [ ] [W1] [DR-054] [GAP] `.github/workflows/ci.yml` does not include cf-bench regression run vs baseline (DR-054).
-682. - [ ] [W1] [GAP] CI does not run `python3 game/tools/llm_grade_run.py validate` against any bundle (no automated LLM-grading validation).
-683. - [ ] [W1] [GAP] CI does not run `python3 game/tools/bp_test_coverage.py bp<N>` to enforce coverage CLEAN.
-684. - [ ] [W1] [GAP] CI does not run `bash game/tools/check_status_surfaces.sh bp<N>` (script doesn't exist yet).
-685. - [ ] [W1] [GAP] CI does not run accessibility ACC-A floor smoke (e.g., visit each focus node at 200% scale + high contrast in headless).
-686. - [ ] [W1] [GAP] CI does not produce a determinism diff report when `cargo test --workspace` checksum tests fail.
-687. - [ ] [W1] [GAP] CI does not test Bevy/wgpu vulkan vs metal vs dx12 backend permutations.
-688. - [ ] [W1] [GAP] CI does not run on Steam Deck hardware (or matched-spec runner).
-689. - [ ] [W1] [GAP] CI does not run dependency `cargo audit` for CVEs.
-690. - [ ] [W1] [GAP] CI does not run schema-version drift CI gate against `crates/cf-control/schemas/v1/` (test exists locally; CI step is `cargo run -p cf-control --example dump_schemas -- --check`; verified in `release.yml` but not always-on in `ci.yml`).
+681. - [x] [W1] [DR-054] [GAP] `.github/workflows/ci.yml` does not include cf-bench regression run vs baseline (DR-054).
+682. - [x] [W1] [GAP] CI does not run `python3 game/tools/llm_grade_run.py validate` against any bundle (no automated LLM-grading validation).
+683. - [x] [W1] [GAP] CI does not run `python3 game/tools/bp_test_coverage.py bp<N>` to enforce coverage CLEAN.
+684. - [x] [W1] [GAP] CI does not run `bash game/tools/check_status_surfaces.sh bp<N>` (script doesn't exist yet).
+685. - [x] [W1] [GAP] CI does not run accessibility ACC-A floor smoke (e.g., visit each focus node at 200% scale + high contrast in headless).
+686. - [x] [W1] [GAP] CI does not produce a determinism diff report when `cargo test --workspace` checksum tests fail.
+687. - [x] [W1] [GAP] CI does not test Bevy/wgpu vulkan vs metal vs dx12 backend permutations.
+688. - [x] [W1] [GAP] CI does not run on Steam Deck hardware (or matched-spec runner).
+689. - [x] [W1] [GAP] CI does not run dependency `cargo audit` for CVEs.
+690. - [x] [W1] [GAP] CI does not run schema-version drift CI gate against `crates/cf-control/schemas/v1/` (test exists locally; CI step is `cargo run -p cf-control --example dump_schemas -- --check`; verified in `release.yml` but not always-on in `ci.yml`).
 
 ## 69. .agents / .claude — skill drift gaps
-691. - [ ] [W1] [GAP] `.agents/skills/corefall-review/SKILL.md` is supposed to mirror `.claude/skills/corefall-review/SKILL.md` byte-for-byte; AGENTS.md says "sync whenever review contract changes" — verify equality is not in CI.
-692. - [ ] [W1] [GAP] No skill for `corefall-impl <milestone>` to drive milestone implementation autonomously.
-693. - [ ] [W1] [GAP] No skill for `corefall-release <bp>` to drive the full release engineering flow.
+691. - [x] [W1] [GAP] `.agents/skills/corefall-review/SKILL.md` is supposed to mirror `.claude/skills/corefall-review/SKILL.md` byte-for-byte; AGENTS.md says "sync whenever review contract changes" — verify equality is not in CI.
+692. - [x] [W1] [GAP] No skill for `corefall-impl <milestone>` to drive milestone implementation autonomously.
+693. - [x] [W1] [GAP] No skill for `corefall-release <bp>` to drive the full release engineering flow.
 
 ## 70. corefall README.md content gaps
-694. - [ ] [W1] [GAP] README "Layered Simulation" ASCII diagram mentions "Stationeers-grade-or-better Atmospherics + Thermal Simulation" with `PV = nRT` etc. — none of that simulation exists at BP3.
-695. - [ ] [W1] [GAP] README "Systemic Materials (Noita-grade chunked CA kernel)" — claim is in README but cf-material is a stub.
-696. - [ ] [W1] [M5.5] [GAP] README "Full Collision Physics (everything physical collides by default)" — but M5.5 hasn't shipped.
-697. - [ ] [W1] [GAP] README "Universal Gravity Field (one source; sampled per-cell per-tick)" — only `Uniform(f32)` scaffold.
-698. - [ ] [W1] [GAP] README "Multi-mode multiplayer ladder: Solo + LAN co-op + online co-op + community-hostable public PvP arenas + persistent MMO shards" — cf-net is stub.
-699. - [ ] [W1] [DR-022] [GAP] README "AI as teammate and rival" — DR-022 is far from closed at BP3.
-700. - [ ] [W1] [GAP] README "Replay determinism" — works at 60+120 Hz on macOS aarch64 only; not validated cross-platform.
+694. - [x] [W1] [GAP] README "Layered Simulation" ASCII diagram mentions "Stationeers-grade-or-better Atmospherics + Thermal Simulation" with `PV = nRT` etc. — none of that simulation exists at BP3.
+695. - [x] [W1] [GAP] README "Systemic Materials (Noita-grade chunked CA kernel)" — claim is in README but cf-material is a stub.
+696. - [x] [W1] [M5.5] [GAP] README "Full Collision Physics (everything physical collides by default)" — but M5.5 hasn't shipped.
+697. - [x] [W1] [GAP] README "Universal Gravity Field (one source; sampled per-cell per-tick)" — only `Uniform(f32)` scaffold.
+698. - [x] [W1] [GAP] README "Multi-mode multiplayer ladder: Solo + LAN co-op + online co-op + community-hostable public PvP arenas + persistent MMO shards" — cf-net is stub.
+699. - [x] [W1] [DR-022] [GAP] README "AI as teammate and rival" — DR-022 is far from closed at BP3.
+700. - [x] [W1] [GAP] README "Replay determinism" — works at 60+120 Hz on macOS aarch64 only; not validated cross-platform.
 
 ## 72. Status surface drift catalog (the 2026-05-09 contract)
 727. - [x] [W1]  -> W1.1 (Badge already says "BP3 active" (commit 239f022)) [PART] README badge URL emit "BP3 ✓ closed" — needs re-encode in BP3-final commit.

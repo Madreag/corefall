@@ -1255,4 +1255,58 @@ mod tests {
         let report = step(&mut state, &mut intents, deps());
         assert!(!report.actor_outcomes.is_empty(), "step must produce outcomes");
     }
+
+    #[test]
+    fn climb_intent_produces_climbing_stance() {
+        // Item 675: Stance::Climbing consumes climb intent.
+        let (mut state, _) = setup();
+        {
+            let actor = state.world.actors.get_mut(&ActorId(1)).unwrap();
+            actor.on_ground = true;
+            actor.climb_active = true;
+        }
+        let stance = state.world.actors.get(&ActorId(1)).unwrap().stance();
+        assert_eq!(stance, crate::Stance::Climbing);
+    }
+
+    #[test]
+    fn crouch_sets_stance_on_ground() {
+        // Item 676: crouching stance when on ground.
+        let (mut state, _) = setup();
+        {
+            let actor = state.world.actors.get_mut(&ActorId(1)).unwrap();
+            actor.on_ground = true;
+            actor.crouch_active = true;
+        }
+        let stance = state.world.actors.get(&ActorId(1)).unwrap().stance();
+        assert_eq!(stance, crate::Stance::Crouching);
+    }
+
+    #[test]
+    fn projectile_does_not_hit_owner() {
+        // Item 678: actor-projectile self-filter (shooter does not hit themselves).
+        let (mut state, mut intents) = setup();
+        // Fire a projectile.
+        intents.insert(
+            ActorId(1),
+            ControlIntent {
+                actor: ActorId(1),
+                fire: true,
+                aim: Vec2::new(1.0, 0.0),
+                ..ControlIntent::new(ActorId(1), IntentSource::Human)
+            },
+        );
+        let report = step(&mut state, &mut intents, deps());
+        assert!(
+            report.actor_outcomes.iter().any(|o| o.fired),
+            "must fire a projectile"
+        );
+        // Run many ticks: the projectile should never hit the actor who fired it.
+        for _ in 0..120 {
+            let r = step(&mut state, &mut intents, deps());
+            for hit in &r.hits {
+                assert_ne!(hit.target, ActorId(1), "projectile must not hit its owner");
+            }
+        }
+    }
 }

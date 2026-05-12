@@ -126,6 +126,8 @@ If a row above is still missing a core system at BP12 closure time, BP12 cannot 
 
 ## The Layered Simulation
 
+> **BP3 status:** The diagram below shows the *target architecture*. At BP3, the actor controller, equipment/chassis grammar, chunked terrain, mission state machine, replay/event recorder, and HUD are real. Atmospherics (PV=nRT), systemic materials (CA kernel), full collision physics, universal gravity, and multiplayer are planned systems with stub crates — they ship at BP4-BP9. The diagram is the design commitment; the [Build Points](#build-points) table shows what's real today.
+
 Every system reads from one source of truth. Nothing is faked.
 
 ```
@@ -187,13 +189,15 @@ Every layer emits replay events. Every cause chain is reproducible. Every AI age
 
 ## Core Pillars
 
+> **BP3 status:** Pillars marked with *(planned)* have stub crates but no production implementation yet. They are design commitments, not shipping features. See [Build Points](#build-points) for what's real today.
+
 | Pillar | What It Means |
 |---|---|
 | **Real physics, end to end** | No arcade approximations. Stationeers-grade is the minimum bar: PV = nRT atmospheres, pressure apertures, liquid/gas jets, material heat transfer, universal gravity for everything, full collision by default, stoichiometric combustion, and gradual phase change. |
 | **Origin-aware bodies** | Humans, androids, and robots have **structurally different reaction chains**. Robots take internal-shock damage, leak coolant, and downclock under heat. Androids breathe, bleed, and overclock per installed module. Humans concuss, eat, and need oxygen tanks. |
 | **Animation-first bodies** | Actors do not slide as static pawns. Controlled locomotion is readable animation with physical weight; disrupted states become more physical. Jetpack, pressure, wind, gravity, recoil, limb damage, armor mass, and mech servos all change the body presentation without destroying responsiveness. |
 | **AI as teammate and rival** | Bots are first-class. They reason, plan, panic, recover, and explain themselves through reason labels. The 8-criteria humanlike-AI bar is testable. An optional async LLM "mind" layer proposes doctrine without ever blocking the local AI. |
-| **Replay determinism** | Same seed + same inputs = byte-identical event stream. Debug with replay scrubbing. Network with confidence. Audit AI behavior with cause chains. |
+| **Replay determinism** | Same seed + same inputs = byte-identical event stream. Debug with replay scrubbing. Network with confidence. Audit AI behavior with cause chains. *(Verified at 60+120 Hz on macOS aarch64; cross-platform CI matrix validates Linux+Windows on push.)* |
 | **Server truth, rich clients** | Server owns authoritative state; clients own immediate feel and GPU-rich presentation. Prediction is allowed, divergence is not. Single player uses the same architecture in-process. |
 | **AI-authored production** | Art, audio, captions, provenance, and regeneration metadata are pipeline artifacts, not side notes. No retained asset skips the ledger. |
 | **Modding as a first-class promise** | Schema-first, Lua escape hatches where useful, workbench tooling. Add a gas, a reaction, an origin, a planet — all data rows. |

@@ -1420,4 +1420,58 @@ mod tests {
         assert_eq!(view.objectives[1].kind, "neutralize_actor");
         assert_eq!(view.objectives[2].kind, "reach_zone");
     }
+
+    #[test]
+    fn objective_failed_emitted_on_reactor_destroyed() {
+        // Item 679: test objective_failed event path.
+        let objectives = vec![Objective {
+            id: "defend".to_string(),
+            kind: ObjectiveKind::DefendReactor {
+                target: "core".to_string(),
+            },
+            optional: false,
+            status: ObjectiveStatus::Pending,
+        }];
+        let loss = LossConditions {
+            player_dead: false,
+            time_limit_ticks: 3600,
+        };
+        let mut state = MissionState::new(objectives, 0, loss);
+        let reactors = ReactorWorld::new(vec![Reactor {
+            id: "core".to_string(),
+            position: [50.0, 50.0],
+            half_extents: [10.0, 10.0],
+            hp: 0.0,
+            max_hp: 100.0,
+            destroyed: true,
+        }]);
+        let actors = mk_actors(player_at(100.0, 32.0), false);
+        // Activate the objective first.
+        let _ = step(
+            &mut state,
+            MissionTickInputs {
+                tick: 1,
+                player: actors.get(&ActorId(1)),
+                actors: &actors,
+                breaches_broken: &BTreeMap::new(),
+                reactors_destroyed: &reactors.destroyed_map(),
+            },
+        );
+        // Now the reactor is destroyed — step again to get objective_failed.
+        let report = step(
+            &mut state,
+            MissionTickInputs {
+                tick: 2,
+                player: actors.get(&ActorId(1)),
+                actors: &actors,
+                breaches_broken: &BTreeMap::new(),
+                reactors_destroyed: &reactors.destroyed_map(),
+            },
+        );
+        assert!(
+            !report.objective_failed.is_empty(),
+            "objective_failed must be emitted when reactor is destroyed"
+        );
+        assert_eq!(report.objective_failed[0], "defend");
+    }
 }

@@ -1,0 +1,50 @@
+{
+  "schema_version": 1,
+  "description": "Mission grammar definitions. Separate from scenarios — scenarios are concrete instances; mission grammar defines the structural vocabulary (objective kinds, loss conditions, win conditions, difficulty scaling, contract shape).",
+  "objective_kinds": [
+    {
+      "id": "breach_barrier",
+      "display_name": "Breach Barrier",
+      "description": "Break through a terrain barrier using dig/explosive tools.",
+      "required_tools": ["digger", "explosive"],
+      "milestone": "M1.5"
+    },
+    {
+      "id": "neutralize_actor",
+      "display_name": "Neutralize Target",
+      "description": "Reduce the target actor to Status::Dead.",
+      "required_tools": ["weapon"],
+      "milestone": "M1.5"
+    },
+    {
+      "id": "reach_zone",
+      "display_name": "Reach Extraction Zone",
+      "description": "Move the player actor into the designated AABB.",
+      "required_tools": [],
+      "milestone": "M1.5"
+    },
+    {
+      "id": "defend_reactor",
+      "display_name": "Defend Reactor",
+      "description": "Keep the reactor alive until the mission timer expires.",
+      "required_tools": ["weapon", "digger"],
+      "milestone": "M2.5"
+    }
+  ],
+  "loss_reasons": [
+    { "id": "player_dead", "display_name": "Player Killed", "milestone": "M1.5" },
+    { "id": "timer_expired", "display_name": "Time Expired", "milestone": "M1.5" },
+    { "id": "reactor_destroyed", "display_name": "Reactor Destroyed", "milestone": "M2.5" },
+    { "id": "objective_failed", "display_name": "Objective Failed", "milestone": "M2.5" }
+  ],
+  "difficulty_presets": [
+    { "id": "cakewalk", "display_name": "Cakewalk", "enemy_miss_chance": 0.8, "enemy_damage_mult": 0.5, "timer_mult": 2.0 },
+    { "id": "standard", "display_name": "Standard", "enemy_miss_chance": 0.35, "enemy_damage_mult": 1.0, "timer_mult": 1.0 },
+    { "id": "tough_crowd", "display_name": "Tough Crowd", "enemy_miss_chance": 0.15, "enemy_damage_mult": 1.5, "timer_mult": 0.8 },
+    { "id": "veteran", "display_name": "Veteran", "enemy_miss_chance": 0.05, "enemy_damage_mult": 2.0, "timer_mult": 0.6 }
+  ],
+  "contract_shape": {
+    "description": "A mission contract is: objective_sequence + time_limit + loss_conditions + difficulty_preset + material_profile + capability_strip + expected_length_seconds + seed.",
+    "fields": ["objective_sequence", "time_limit_ticks", "loss_conditions", "difficulty_preset", "seed"]
+  }
+}

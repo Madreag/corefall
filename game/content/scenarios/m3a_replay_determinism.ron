@@ -1,0 +1,28 @@
+(
+  schema_version: 1,
+  id: "m3a_replay_determinism",
+  display_name: "M3A Replay Determinism",
+  description: "Dedicated determinism scenario: actor moves, fires, digs, jumps in a reproducible sequence for checksum verification at 60+120 Hz.",
+  seed: 99,
+  duration_ticks: Some(600),
+  region: (anchor: (0.0, 0.0), width: 1280.0, height: 720.0),
+  gravity: -980.0,
+  floor_y: 16.0,
+  teams: [],
+  actors: [
+    (id: 1, team: "blue", spawn: (200.0, 32.0), controllable: true, hp: 100.0,
+      inventory: (rifle: Some("rifle_m1_default")), half_extents: Some((8.0, 16.0))),
+    (id: 2, team: "red", spawn: (800.0, 32.0), controllable: false, hp: 50.0,
+      inventory: (rifle: None), half_extents: Some((8.0, 16.0))),
+  ],
+  breaches: [
+    (id: "test_wall", bbox_min: (500.0, 16.0), bbox_max: (540.0, 96.0), material: "concrete_soft",
+      max_hp: Some(30.0), hardness: Some(10.0), dig_range: Some(64.0)),
+  ],
+  objectives: [],
+  director: None,
+  capabilities: (debug: false, control_api: true, save_load: false),
+  save_fields: [],
+  expected_tests: ["M3A-DET-01", "M3A-DET-02"],
+  notes: "Determinism fixture: same seed + same inputs must produce identical checksums at 60 Hz and 120 Hz.",
+)
