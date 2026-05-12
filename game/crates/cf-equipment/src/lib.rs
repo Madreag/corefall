@@ -60,6 +60,66 @@ pub struct RifleSpec {
     pub damage_per_hit: f32,
     /// Seconds of flight time before the projectile expires if it never hits.
     pub projectile_lifetime_seconds: f32,
+    /// **M1**: per-tick decay of the recoil_accumulator (CCCP `HDFirearm.cpp:891`).
+    /// Default 0.05 = subtract 0.05 toward zero per tick.
+    #[serde(default = "default_recoil_decay_rate")]
+    pub recoil_decay_rate: f32,
+    /// **M1**: per-shot loudness radius scalar (multiplied with the damage-scaled
+    /// alarm radius). 1.0 = baseline; higher = louder. CCCP `HDFirearm.cpp:948`.
+    #[serde(default = "default_loudness_scalar")]
+    pub loudness: f32,
+    /// **M1**: when true, the spawned projectile inherits a fraction of the
+    /// firer's velocity (running-and-gunning shots arc). When false (mortar-
+    /// style), only the muzzle velocity is used. Default true.
+    #[serde(default = "default_inherits_firer_velocity")]
+    pub inherits_firer_velocity: bool,
+    /// **M1**: number of projectile particles spawned per shot (CCCP
+    /// `Round.ParticleCount`). 1 = single round; >1 = shotgun-style spread.
+    /// M1 ships a single rifle (=1); the field is data so future presets can
+    /// describe pellet weapons without code changes.
+    #[serde(default = "default_particle_count")]
+    pub particle_count: u32,
+    /// **M1**: cone spread in radians applied to multi-particle shots
+    /// (CCCP `Round.Spread`). 0 = no spread; ~0.15 ≈ ±9° pellet cone.
+    #[serde(default)]
+    pub spread_radians: f32,
+    /// **M1**: tracer round cadence (CCCP `Magazine.RTTRatio`). 1 in N
+    /// projectiles uses the tracer visual preset. 0 = no tracers. M1's
+    /// default rifle ships without tracers (=0).
+    #[serde(default)]
+    pub tracer_round_to_total_ratio: u32,
+    /// **M1 AI**: ai_fire_vel hint (CCCP `Round::Create` AI default). Defaults
+    /// to `projectile_speed` so AI threat estimation matches the live shot.
+    #[serde(default)]
+    pub ai_fire_vel: f32,
+    /// **M1 AI**: ai_penetration hint (CCCP `Round::Create`). Defaults to 0;
+    /// future presets fill in mass * sharpness * fire_vel.
+    #[serde(default)]
+    pub ai_penetration: f32,
+    /// **M1 AI**: ai_life_time hint (CCCP `Round::Create`). Defaults to the
+    /// first particle's lifetime (= `projectile_lifetime_seconds`).
+    #[serde(default)]
+    pub ai_life_time: f32,
+    /// **M1 AI**: ai_blast_radius hint. 0 for non-explosive rifles; future
+    /// grenade / rocket presets set this for AI avoidance.
+    #[serde(default)]
+    pub ai_blast_radius: f32,
+}
+
+fn default_recoil_decay_rate() -> f32 {
+    0.05
+}
+
+fn default_loudness_scalar() -> f32 {
+    1.0
+}
+
+fn default_inherits_firer_velocity() -> bool {
+    true
+}
+
+fn default_particle_count() -> u32 {
+    1
 }
 
 impl RifleSpec {
@@ -306,6 +366,16 @@ impl FiringProfile {
             projectile_speed: self.projectile_speed,
             damage_per_hit: self.damage_per_hit,
             projectile_lifetime_seconds: self.projectile_lifetime_seconds,
+            recoil_decay_rate: default_recoil_decay_rate(),
+            loudness: default_loudness_scalar(),
+            inherits_firer_velocity: default_inherits_firer_velocity(),
+            particle_count: default_particle_count(),
+            spread_radians: 0.0,
+            tracer_round_to_total_ratio: 0,
+            ai_fire_vel: self.projectile_speed,
+            ai_penetration: 0.0,
+            ai_life_time: self.projectile_lifetime_seconds,
+            ai_blast_radius: 0.0,
         }
     }
 }
@@ -335,6 +405,16 @@ fn rifle_m1_default() -> RifleSpec {
         projectile_speed: 1200.0,
         damage_per_hit: 12.0,
         projectile_lifetime_seconds: 1.5,
+        recoil_decay_rate: default_recoil_decay_rate(),
+        loudness: default_loudness_scalar(),
+        inherits_firer_velocity: true,
+        particle_count: 1,
+        spread_radians: 0.0,
+        tracer_round_to_total_ratio: 0,
+        ai_fire_vel: 1200.0,
+        ai_penetration: 0.0,
+        ai_life_time: 1.5,
+        ai_blast_radius: 0.0,
     }
 }
 
@@ -352,6 +432,16 @@ fn carbine_m5_powered() -> RifleSpec {
         projectile_speed: 1400.0,
         damage_per_hit: 9.0,
         projectile_lifetime_seconds: 1.5,
+        recoil_decay_rate: default_recoil_decay_rate(),
+        loudness: default_loudness_scalar(),
+        inherits_firer_velocity: true,
+        particle_count: 1,
+        spread_radians: 0.0,
+        tracer_round_to_total_ratio: 0,
+        ai_fire_vel: 1400.0,
+        ai_penetration: 0.0,
+        ai_life_time: 1.5,
+        ai_blast_radius: 0.0,
     }
 }
 
@@ -369,6 +459,16 @@ fn rifle_m5_mech_heavy() -> RifleSpec {
         projectile_speed: 1100.0,
         damage_per_hit: 40.0,
         projectile_lifetime_seconds: 2.0,
+        recoil_decay_rate: default_recoil_decay_rate(),
+        loudness: 1.5,
+        inherits_firer_velocity: true,
+        particle_count: 1,
+        spread_radians: 0.0,
+        tracer_round_to_total_ratio: 4,
+        ai_fire_vel: 1100.0,
+        ai_penetration: 0.0,
+        ai_life_time: 2.0,
+        ai_blast_radius: 0.0,
     }
 }
 
