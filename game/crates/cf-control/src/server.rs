@@ -1367,6 +1367,7 @@ mod tests {
                 captions: vec![],
                 tool_validity: None,
                 accessibility: crate::state::AccessibilityView::default(),
+                controls_capture: crate::state::ControlsCaptureView::default(),
             }
         }
         async fn settings_snapshot(&self) -> Settings {

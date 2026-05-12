@@ -776,6 +776,7 @@ impl M0Engine {
             tool_validity: s.hud_tool_validity.clone(),
             focused_node: s.hud_focus_index.map(|i| HUD_FOCUSABLE_NODES[i].to_string()),
             focus_cycle: s.hud_focus_cycle,
+            controls_captured_by: s.controls_captured_by.clone(),
         }
     }
 
@@ -3171,6 +3172,9 @@ pub struct HudCachesSnapshot {
     pub tool_validity: crate::state::ToolValidityView,
     pub focused_node: Option<String>,
     pub focus_cycle: u64,
+    /// **M1 / Gap D3**: mirrors `EngineMutable::controls_captured_by` so
+    /// cf-app can update the CAPTURED HUD zone without an async snapshot.
+    pub controls_captured_by: Option<String>,
 }
 
 /// Snapshot of the actor world for cf-app's Bevy bridge. Cheap to clone; reuses
@@ -4265,6 +4269,10 @@ impl EngineHandle for M0Engine {
             captions,
             tool_validity,
             accessibility,
+            controls_capture: crate::state::ControlsCaptureView {
+                captured: state.controls_captured_by.is_some(),
+                capturer: state.controls_captured_by.clone(),
+            },
         };
         let tick = state.clock.tick();
         let sim_time_ms = state.clock.sim_time_ms();

@@ -53,6 +53,13 @@
         "$ref": "#/$defs/CaptionView"
       }
     },
+    "controls_capture": {
+      "description": "**M1 / Gap D3**: controls-capture surface. When `captured=true`\ncf-ui renders the CAPTURED zone and cf-app suppresses keyboard/mouse\ndispatch.",
+      "$ref": "#/$defs/ControlsCaptureView",
+      "default": {
+        "captured": false
+      }
+    },
     "enemies": {
       "description": "M1.5: reactive guards and their last-tick view. Empty for sandbox scenarios.",
       "type": "array",
@@ -750,6 +757,24 @@
         "wound_integrity",
         "destroyed",
         "zone_integrity"
+      ]
+    },
+    "ControlsCaptureView": {
+      "description": "**M1 / Gap D3**: minimal HUD projection for the CONTROLS CAPTURED badge.",
+      "type": "object",
+      "properties": {
+        "captured": {
+          "type": "boolean"
+        },
+        "capturer": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "captured"
       ]
     },
     "EnemyView": {

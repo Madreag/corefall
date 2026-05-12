@@ -63,6 +63,9 @@ pub struct HudState {
     pub tool_validity: Option<HudToolValidity>,
     /// W1.3: stability scalar (0.0=disrupted, 1.0=stable) from actor state.
     pub stability: f32,
+    /// **M1 / Gap D3**: when `Some(label)` the CONTROLS CAPTURED HUD zone
+    /// renders with `CONTROLS CAPTURED: <label>`; hidden when `None`.
+    pub controls_captured_by: Option<String>,
 }
 
 /// M4A accessibility/settings mirror. cf-ui depends on `cf-actor` + `bevy` only;
@@ -245,6 +248,12 @@ pub struct BreachStripText;
 #[derive(Component, Debug)]
 pub struct LastEventStripText;
 
+/// **M1 / Gap D3**: text component for the CONTROLS CAPTURED HUD zone.
+/// Hidden when no overlay has captured controls; shown with the capturer
+/// label when `controls_capture.captured=true`.
+#[derive(Component, Debug)]
+pub struct CapturedStripText;
+
 #[derive(Component, Debug)]
 pub struct StanceStripText;
 
@@ -288,8 +297,30 @@ impl Plugin for StatusStripPlugin {
                     update_banner_strip,
                     update_caption_strip,
                     update_focus_ring,
+                    update_captured_strip,
                 ),
             );
+    }
+}
+
+/// **M1 / Gap D3**: keep the CONTROLS CAPTURED HUD line in sync with
+/// `HudState::controls_captured_by`. When `None`, the text is empty (hides
+/// the line visually because the BorderColor stays transparent and the row
+/// renders zero-content). When `Some(name)`, the text reads
+/// `CONTROLS CAPTURED: <name>`.
+fn update_captured_strip(
+    state: Res<HudState>,
+    mut query: Query<&mut Text, With<CapturedStripText>>,
+) {
+    let desired = match &state.controls_captured_by {
+        Some(label) if !label.is_empty() => format!("CONTROLS CAPTURED: {}", label.to_uppercase()),
+        Some(_) => "CONTROLS CAPTURED".to_string(),
+        None => String::new(),
+    };
+    for mut text in &mut query {
+        if text.0 != desired {
+            text.0 = desired.clone();
+        }
     }
 }
 
@@ -438,7 +469,20 @@ fn spawn_status_strip(mut commands: Commands) {
                     HudAccessibilityId("hud.last_event"),
                 ))
                 .with_children(|p| {
-                    p.spawn((Text::new("EVENT: --"), text_font, text_color, LastEventStripText));
+                    p.spawn((Text::new("EVENT: --"), text_font.clone(), text_color, LastEventStripText));
+                });
+            // M1 Gap D3: CONTROLS CAPTURED zone — invisible by default.
+            // cf-app's `sync_hud_text` system updates the text to `CONTROLS
+            // CAPTURED: <capturer>` whenever ControlsCaptureView.captured is
+            // true and clears it otherwise.
+            parent
+                .spawn((
+                    line_node(),
+                    BorderColor::all(palette_focus_ring_clear()),
+                    HudAccessibilityId("hud.captured"),
+                ))
+                .with_children(|p| {
+                    p.spawn((Text::new(""), text_font, text_color, CapturedStripText));
                 });
         });
 }

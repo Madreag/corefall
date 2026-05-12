@@ -14,7 +14,7 @@ use bevy::{
     },
     log::LogPlugin,
     prelude::*,
-    window::{PresentMode, WindowCloseRequested, WindowResolution},
+    window::{PresentMode, WindowCloseRequested, WindowFocused, WindowResolution},
 };
 use clap::Parser;
 
@@ -586,6 +586,7 @@ fn run_bevy(
         Update,
         (
             esc_or_close_to_exit,
+            handle_window_focus_capture,
             check_completion,
             log_tick_progress,
             ingest_player_input,
@@ -1903,6 +1904,8 @@ fn sync_actor_state_to_render(
         } else {
             None
         };
+    // M1 Gap D3: surface the CONTROLS CAPTURED state to the HUD.
+    hud_state.controls_captured_by = hud_caches.controls_captured_by.clone();
 
     // M1.5 — propagate mission, enemy, breach, extraction zone to renderer + HUD.
     render_state.breaches = snapshot
@@ -2189,6 +2192,30 @@ fn esc_or_close_to_exit(
     if close_events.read().next().is_some() {
         tracing::info!(target: "cf::app", "window close requested; exiting");
         events.write(AppExit::Success);
+    }
+}
+
+/// **M1 / Gap D4**: react to window-focus events by toggling the engine's
+/// `controls_captured_by` flag. When the OS gives focus back to cf-app's
+/// window the captured state clears; when focus moves away (alt-tab, click
+/// on another app, settings panel takes input on top), capture engages so
+/// keyboard/mouse don't drive the actor while the player is interacting
+/// with the overlay or another window.
+fn handle_window_focus_capture(holder: Res<EngineHolder>, mut focus_events: MessageReader<WindowFocused>) {
+    for ev in focus_events.read() {
+        let captured = !ev.focused;
+        let label = if captured { "window_blur" } else { "" };
+        let engine = holder.0.clone();
+        let label = label.to_string();
+        futures_block_on(async move {
+            let _ = engine
+                .dispatch(cf_control::ControlCommand::ActInputCaptureControls {
+                    captured,
+                    capturer: if captured { Some(label) } else { None },
+                    source: IntentSource::Human,
+                })
+                .await;
+        });
     }
 }
 

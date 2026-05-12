@@ -73,6 +73,19 @@ pub struct ObserveFrame {
     /// palette active, captions visible, focusable nodes in z-order).
     #[serde(default)]
     pub accessibility: AccessibilityView,
+    /// **M1 / Gap D3**: controls-capture surface. When `captured=true`
+    /// cf-ui renders the CAPTURED zone and cf-app suppresses keyboard/mouse
+    /// dispatch.
+    #[serde(default)]
+    pub controls_capture: ControlsCaptureView,
+}
+
+/// **M1 / Gap D3**: minimal HUD projection for the CONTROLS CAPTURED badge.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ControlsCaptureView {
+    pub captured: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capturer: Option<String>,
 }
 
 /// M1.5 mission projection (re-exposed via JsonSchema-friendly types).
