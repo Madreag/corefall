@@ -218,6 +218,11 @@ fn walk(dir: &Path, report: &mut ValidationReport) {
             walk(&path, report);
         } else if path.extension().and_then(|s| s.to_str()) == Some("ron") {
             validate_one(&path, report);
+        } else if path.extension().and_then(|s| s.to_str()) == Some("json")
+            && path.parent().and_then(|p| p.file_name()).and_then(|s| s.to_str()) == Some("ai")
+            && path.file_name().and_then(|s| s.to_str()) == Some("difficulty.json")
+        {
+            validate_one(&path, report);
         }
     }
 }
@@ -244,6 +249,12 @@ fn validate_one(path: &Path, report: &mut ValidationReport) {
         validate_scenario(path, report);
         return;
     }
+    if path.parent().and_then(|p| p.file_name()).and_then(|s| s.to_str()) == Some("ai")
+        && path.file_name().and_then(|s| s.to_str()) == Some("difficulty.json")
+    {
+        validate_difficulty_json(path, report);
+        return;
+    }
     let path_components: Vec<String> = path
         .components()
         .map(|c| c.as_os_str().to_string_lossy().to_string())
@@ -265,6 +276,79 @@ fn validate_one(path: &Path, report: &mut ValidationReport) {
         path.to_path_buf(),
         "no validator wired for this content type yet (M0 only validates content/scenarios/*.ron)".to_string(),
     );
+}
+
+/// **M1.5**: cf-mod validator for `content/ai/difficulty.json`. Confirms the
+/// schema version, the three required preset ids (cakewalk, tough_crowd,
+/// veteran), and that every preset carries the required AI tuning fields.
+/// Acceptance criterion in `specs/done/M1.5.md` under "Validation + scenario
+/// manifest > cf-mod validates difficulty.json".
+fn validate_difficulty_json(path: &Path, report: &mut ValidationReport) {
+    let text = match fs::read_to_string(path) {
+        Ok(t) => t,
+        Err(err) => {
+            report.add_error(path.to_path_buf(), format!("read failed: {err}"));
+            return;
+        }
+    };
+    let value: serde_json::Value = match serde_json::from_str(&text) {
+        Ok(v) => v,
+        Err(err) => {
+            report.add_error(path.to_path_buf(), format!("json parse failed: {err}"));
+            return;
+        }
+    };
+    let mut messages: Vec<String> = Vec::new();
+    match value.get("schema").and_then(|v| v.as_u64()) {
+        Some(1) => {}
+        Some(other) => messages.push(format!("difficulty.schema must be 1 (got {other})")),
+        None => messages.push("difficulty.schema missing or not an integer".to_string()),
+    }
+    let presets = match value.get("presets").and_then(|v| v.as_array()) {
+        Some(arr) => arr,
+        None => {
+            messages.push("difficulty.presets missing or not an array".to_string());
+            report.add_error(path.to_path_buf(), messages.join("; "));
+            return;
+        }
+    };
+    const REQUIRED_IDS: &[&str] = &["cakewalk", "tough_crowd", "veteran"];
+    const REQUIRED_FIELDS: &[&str] = &[
+        "hp",
+        "aim_settle_ticks",
+        "miss_chance",
+        "sight_range",
+        "hearing_radius",
+        "memory_decay_ticks",
+        "reload_ms",
+    ];
+    let mut found_ids: Vec<String> = Vec::new();
+    for (i, preset) in presets.iter().enumerate() {
+        let id = preset.get("id").and_then(|v| v.as_str()).unwrap_or("");
+        if id.is_empty() {
+            messages.push(format!("presets[{i}].id missing or not a string"));
+            continue;
+        }
+        found_ids.push(id.to_string());
+        for field in REQUIRED_FIELDS {
+            if preset.get(*field).is_none() {
+                messages.push(format!("presets[{i}={id}].{field} missing"));
+            }
+        }
+    }
+    for required in REQUIRED_IDS {
+        if !found_ids.iter().any(|id| id == required) {
+            messages.push(format!("required preset id `{required}` missing"));
+        }
+    }
+    if messages.is_empty() {
+        report.add_pass(
+            path.to_path_buf(),
+            format!("difficulty.json ({} presets)", presets.len()),
+        );
+    } else {
+        report.add_error(path.to_path_buf(), messages.join("; "));
+    }
 }
 
 fn validate_scenario(path: &Path, report: &mut ValidationReport) {
@@ -381,5 +465,90 @@ impl ValidationReport {
                 })
                 .collect::<Vec<_>>()
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Write;
+
+    fn write_tmp(name: &str, contents: &str) -> PathBuf {
+        let mut path = std::env::temp_dir();
+        path.push(format!("cf-mod-test-{name}"));
+        let mut f = fs::File::create(&path).unwrap();
+        f.write_all(contents.as_bytes()).unwrap();
+        path
+    }
+
+    #[test]
+    fn difficulty_json_accepts_three_required_presets() {
+        let body = serde_json::json!({
+            "schema": 1,
+            "presets": [
+                {"id": "cakewalk", "display_name": "Cakewalk", "hp": 60, "aim_settle_ticks": 24, "miss_chance": 0.3, "sight_range": 240, "sight_fov_degrees": 90, "hearing_radius": 320, "memory_decay_ticks": 180, "reload_ms": 2400, "retreat_hp_pct": 0.5},
+                {"id": "tough_crowd", "display_name": "Tough Crowd", "hp": 80, "aim_settle_ticks": 12, "miss_chance": 0.1, "sight_range": 320, "sight_fov_degrees": 120, "hearing_radius": 480, "memory_decay_ticks": 300, "reload_ms": 1800, "retreat_hp_pct": 0.3},
+                {"id": "veteran", "display_name": "Veteran", "hp": 120, "aim_settle_ticks": 6, "miss_chance": 0.05, "sight_range": 480, "sight_fov_degrees": 140, "hearing_radius": 600, "memory_decay_ticks": 600, "reload_ms": 1200, "retreat_hp_pct": 0.2}
+            ]
+        });
+        let path = write_tmp("difficulty_pass.json", &body.to_string());
+        let mut report = ValidationReport::default();
+        validate_difficulty_json(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.pass(), 1, "expected one PASS entry");
+        assert_eq!(report.fail(), 0, "expected zero FAIL entries");
+    }
+
+    #[test]
+    fn difficulty_json_rejects_missing_preset() {
+        let body = serde_json::json!({
+            "schema": 1,
+            "presets": [
+                {"id": "cakewalk", "display_name": "Cakewalk", "hp": 60, "aim_settle_ticks": 24, "miss_chance": 0.3, "sight_range": 240, "sight_fov_degrees": 90, "hearing_radius": 320, "memory_decay_ticks": 180, "reload_ms": 2400, "retreat_hp_pct": 0.5}
+            ]
+        });
+        let path = write_tmp("difficulty_missing.json", &body.to_string());
+        let mut report = ValidationReport::default();
+        validate_difficulty_json(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1, "expected one FAIL entry");
+        assert!(report.entries[0].message.contains("tough_crowd"));
+        assert!(report.entries[0].message.contains("veteran"));
+    }
+
+    #[test]
+    fn difficulty_json_rejects_missing_field() {
+        let body = serde_json::json!({
+            "schema": 1,
+            "presets": [
+                {"id": "cakewalk", "display_name": "Cakewalk", "hp": 60, "aim_settle_ticks": 24, "miss_chance": 0.3, "sight_range": 240, "sight_fov_degrees": 90, "hearing_radius": 320, "memory_decay_ticks": 180, "retreat_hp_pct": 0.5},
+                {"id": "tough_crowd", "display_name": "Tough Crowd", "hp": 80, "aim_settle_ticks": 12, "miss_chance": 0.1, "sight_range": 320, "sight_fov_degrees": 120, "hearing_radius": 480, "memory_decay_ticks": 300, "reload_ms": 1800, "retreat_hp_pct": 0.3},
+                {"id": "veteran", "display_name": "Veteran", "hp": 120, "aim_settle_ticks": 6, "miss_chance": 0.05, "sight_range": 480, "sight_fov_degrees": 140, "hearing_radius": 600, "memory_decay_ticks": 600, "reload_ms": 1200, "retreat_hp_pct": 0.2}
+            ]
+        });
+        let path = write_tmp("difficulty_field_missing.json", &body.to_string());
+        let mut report = ValidationReport::default();
+        validate_difficulty_json(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1, "expected one FAIL entry");
+        assert!(report.entries[0].message.contains("reload_ms"));
+    }
+
+    #[test]
+    fn difficulty_json_rejects_wrong_schema() {
+        let body = serde_json::json!({
+            "schema": 2,
+            "presets": [
+                {"id": "cakewalk", "display_name": "C", "hp": 60, "aim_settle_ticks": 24, "miss_chance": 0.3, "sight_range": 240, "sight_fov_degrees": 90, "hearing_radius": 320, "memory_decay_ticks": 180, "reload_ms": 2400, "retreat_hp_pct": 0.5},
+                {"id": "tough_crowd", "display_name": "T", "hp": 80, "aim_settle_ticks": 12, "miss_chance": 0.1, "sight_range": 320, "sight_fov_degrees": 120, "hearing_radius": 480, "memory_decay_ticks": 300, "reload_ms": 1800, "retreat_hp_pct": 0.3},
+                {"id": "veteran", "display_name": "V", "hp": 120, "aim_settle_ticks": 6, "miss_chance": 0.05, "sight_range": 480, "sight_fov_degrees": 140, "hearing_radius": 600, "memory_decay_ticks": 600, "reload_ms": 1200, "retreat_hp_pct": 0.2}
+            ]
+        });
+        let path = write_tmp("difficulty_schema.json", &body.to_string());
+        let mut report = ValidationReport::default();
+        validate_difficulty_json(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1, "expected one FAIL entry");
+        assert!(report.entries[0].message.contains("schema must be 1"));
     }
 }
