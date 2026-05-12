@@ -1151,7 +1151,20 @@ impl M0Engine {
                     ai_payloads.push((tick, sim_time_ms, guard_id, report));
                 }
 
-                let actor_state_mut = state.actor_state.as_mut().expect("actor state present");
+                // M1: actor_step now takes a mutable RNG closure for the
+                // multi-particle spread cone. Engine's seeded RNG flows in;
+                // determinism is preserved across replays. We split the
+                // `state` borrow into disjoint fields via destructuring so
+                // the closure can capture `&mut state.rng` while the sim
+                // takes `&mut state.actor_state`. The local destructure
+                // refers to `EngineMutable` (the inner struct held by
+                // `RwLock`); fields named here must match its definition.
+                let EngineMutable {
+                    actor_state: actor_state_slot,
+                    rng: rng_slot,
+                    ..
+                } = &mut *state;
+                let actor_state_mut = actor_state_slot.as_mut().expect("actor state present");
                 let report = actor_step(
                     actor_state_mut,
                     &mut intents,
@@ -1162,6 +1175,7 @@ impl M0Engine {
                         region_max_y,
                         auto_reload_when_empty: auto_reload,
                     },
+                    &mut || rng_slot.next_u64(),
                 );
 
                 // M1.5: spawn guard projectiles into the same projectile pool the
@@ -2143,6 +2157,11 @@ impl M0Engine {
     }
 
     fn emit_actor_events(&self, tick: Tick, sim_time_ms: f64, intent: &ControlIntent, report: &StepReport) {
+        // **M1 Gap C**: collect weapon_fired event_id per actor so subsequent
+        // projectile_spawned events parent to the closer fire event rather
+        // than the input.intent_received root. Built during the actor-outcomes
+        // loop below and consumed by the spawn loop.
+        let mut weapon_fired_event_by_actor: BTreeMap<u64, String> = BTreeMap::new();
         // input.intent_received reflects what was actually consumed (after status gating).
         let player_outcome = report.actor_outcomes.iter().find(|o| o.actor == intent.actor).cloned();
         let player_view = json!({
@@ -2275,6 +2294,7 @@ impl M0Engine {
                     }),
                     Some(intent_event_id.clone()),
                 );
+                weapon_fired_event_by_actor.insert(outcome.actor.0, weapon_fired_id.clone());
                 // M1: acoustic noise alarm (CCCP HDFirearm.cpp:948 — registered
                 // alarm event consumed by M1.5+ AI perception within the radius).
                 if outcome.loudness_radius > 0.0 {
@@ -2355,6 +2375,13 @@ impl M0Engine {
             }
             // M1: DYING entry → inventory drop (CCCP Actor.cpp:1215).
             if outcome.entered_dying {
+                // Gap C3: parent the DYING status change to the latched
+                // lethal cause (projectile_hit) when available, else fall
+                // back to intent_event_id.
+                let dying_parent = outcome
+                    .lethal_cause_event_id
+                    .clone()
+                    .unwrap_or_else(|| intent_event_id.clone());
                 let dying_event_id = self.recorder.record(
                     tick,
                     sim_time_ms,
@@ -2366,7 +2393,7 @@ impl M0Engine {
                         "new_status": "dying",
                         "cause": "lethal_damage",
                     }),
-                    Some(intent_event_id.clone()),
+                    Some(dying_parent),
                 );
                 if let (Some(pos), Some(vel), Some(label)) = (
                     outcome.inventory_drop_position,
@@ -2392,6 +2419,13 @@ impl M0Engine {
             }
             // M1: DYING dwell elapsed → DEAD (CCCP Actor.cpp:1229).
             if outcome.dying_dwell_elapsed {
+                // Gap C3: chain to the latched lethal cause so the M3B viewer
+                // can walk DEAD -> DYING -> wound_added -> projectile_hit
+                // -> projectile_spawned -> weapon_fired -> input.intent_received.
+                let dead_parent = outcome
+                    .lethal_cause_event_id
+                    .clone()
+                    .unwrap_or_else(|| intent_event_id.clone());
                 self.recorder.record(
                     tick,
                     sim_time_ms,
@@ -2403,12 +2437,22 @@ impl M0Engine {
                         "new_status": "dead",
                         "cause": "dying_dwell_elapsed",
                     }),
-                    Some(intent_event_id.clone()),
+                    Some(dead_parent),
                 );
             }
         }
+        // M1 (Gap C1/C2): each `combat.projectile_spawned` parents to its
+        // owning `equipment.weapon_fired` event, captured from the actor-
+        // outcomes loop via `weapon_fired_event_by_actor`. The closer
+        // cause-chain link is what M3B walks when scrubbing the run bundle.
+        // Build projectile_id -> spawn_event_id map for the hit-parent chain.
+        let mut spawn_event_by_projectile: BTreeMap<u64, String> = BTreeMap::new();
         for spawn in &report.spawned_projectiles {
-            self.recorder.record(
+            let parent = weapon_fired_event_by_actor
+                .get(&spawn.owner.0)
+                .cloned()
+                .unwrap_or_else(|| intent_event_id.clone());
+            let id = self.recorder.record(
                 tick,
                 sim_time_ms,
                 "combat",
@@ -2419,17 +2463,22 @@ impl M0Engine {
                     "origin": [spawn.origin.x, spawn.origin.y],
                     "velocity": [spawn.velocity.x, spawn.velocity.y],
                     "damage": spawn.damage,
+                    "is_tracer": spawn.is_tracer,
+                    "particle_index": spawn.particle_index,
+                    "particle_count": spawn.particle_count,
                 }),
-                Some(intent_event_id.clone()),
+                Some(parent),
             );
+            spawn_event_by_projectile.insert(spawn.id, id);
         }
         for hit in &report.hits {
-            // Capture the real event_id of the projectile_hit so the follow-up
-            // actor_status_changed can both reference it via the `projectile_event`
-            // payload field AND parent-chain to it (a stronger cause-chain link than
-            // the same-tick input.intent_received). The recorder makes this id
-            // available; the previous synthetic "projectile:N" string was a label
-            // that pointed to no real event.
+            // M1 Gap C2: parent the hit to its originating projectile_spawned
+            // event rather than the input.intent_received root, so a M3B
+            // viewer can walk hit -> spawn -> weapon_fired -> intent in one chain.
+            let hit_parent = spawn_event_by_projectile
+                .get(&hit.projectile_id)
+                .cloned()
+                .unwrap_or_else(|| intent_event_id.clone());
             let projectile_hit_event_id = self.recorder.record(
                 tick,
                 sim_time_ms,
@@ -2443,7 +2492,7 @@ impl M0Engine {
                     "damage": hit.damage,
                     "zone": hit.zone,
                 }),
-                Some(intent_event_id.clone()),
+                Some(hit_parent),
             );
             if hit.previous_status != hit.new_status {
                 self.recorder.record(
@@ -2460,6 +2509,21 @@ impl M0Engine {
                     }),
                     Some(projectile_hit_event_id.clone()),
                 );
+            }
+            // Gap C3: when this hit lands the killing blow (target transitions
+            // through DYING / DEAD), latch the projectile_hit event id onto
+            // the victim's actor state so the dwell-elapsed DEAD event AND
+            // the next-tick inventory_dropped event AND the DYING latch all
+            // resolve back to this projectile_hit (and from there to
+            // weapon_fired -> input.intent_received).
+            if matches!(hit.new_status, cf_actor::Status::Dying | cf_actor::Status::Dead) {
+                if let Ok(mut s) = self.state.write() {
+                    if let Some(sim) = s.actor_state.as_mut() {
+                        if let Some(target) = sim.world.actors.get_mut(&hit.target) {
+                            target.last_lethal_cause_event_id = Some(projectile_hit_event_id.clone());
+                        }
+                    }
+                }
             }
             // M1: scalar wound surface (M5 chassis adds zone/layer detail).
             self.recorder.record(

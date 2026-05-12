@@ -625,6 +625,18 @@ pub struct ActorState {
     /// rifle slot. Cleared on `reset()`.
     #[serde(default)]
     pub inventory_dropped_on_dying: bool,
+    /// **M1 (Gap C3)**: latched parent event id (`combat.projectile_hit` or
+    /// equivalent lethal cause) so the engine can thread the cause-chain
+    /// across the DYING dwell:
+    ///   `inventory_dropped` -> `status_changed(DEAD)` -> `status_changed(DYING)`
+    ///   -> `wound_added` -> `projectile_hit` -> `projectile_spawned`
+    ///   -> `weapon_fired` -> `input.intent_received`
+    /// without losing the parent_event_id chain when the DYING/DEAD events
+    /// fire on a different tick than the lethal projectile_hit. `None` when
+    /// the actor has not entered DYING (yet) or the lethal cause did not
+    /// come from a recordable event (e.g. seed-time spawn).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_lethal_cause_event_id: Option<String>,
     /// **M1**: horizontal-speed threshold (world units / s) below which the
     /// actor counts as "slow enough" for sharp aim to keep building.
     /// Default 1.5 (essentially "barely moving" — see OpenSoldat
@@ -779,6 +791,7 @@ impl ActorState {
             recoil_alternation_sign: 1,
             mission_critical: false,
             inventory_dropped_on_dying: false,
+            last_lethal_cause_event_id: None,
             walk_threshold: default_walk_threshold(),
             bloom_factor: default_bloom_factor(),
             resources: ResourceAccumulators::default(),
@@ -839,6 +852,7 @@ impl ActorState {
         self.recoil_accumulator = 0.0;
         self.recoil_alternation_sign = 1;
         self.inventory_dropped_on_dying = false;
+        self.last_lethal_cause_event_id = None;
         self.bloom_factor = default_bloom_factor();
         self.crouch_active = false;
         self.climb_active = false;

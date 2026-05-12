@@ -1,0 +1,15 @@
+{
+  "scenario": "m1_actor_range_shotgun",
+  "tick_rate_hz": 60,
+  "description": "M1 shotgun: one fire press spawns 8 projectiles (particle_count=8) within a 0.15 rad cone. Each projectile gets a unique projectile_id; the per-shot ammo drop is 1. Per CCCP Round.ParticleCount + Round.Spread.",
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+    { "method": "act.player.aim", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
+    { "method": "act.player.fire", "params": { "pressed": true } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 1 } },
+    { "method": "observe.once", "params": {} },
+    { "method": "act.player.fire", "params": { "pressed": false } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 60 } }
+  ]
+}

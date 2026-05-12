@@ -198,6 +198,13 @@ pub struct ActorTickOutcome {
     /// from=dying, to=dead and cause="dying_dwell_elapsed".
     #[serde(default)]
     pub dying_dwell_elapsed: bool,
+    /// **M1 (Gap C3)**: surfaced from `ActorState::last_lethal_cause_event_id`
+    /// so the engine emits `actor.inventory_dropped`,
+    /// `actor.actor_status_changed(DYING)`, and
+    /// `actor.actor_status_changed(DEAD)` with the lethal event id as parent
+    /// even when the DYING dwell elapses on a tick after the killing hit.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub lethal_cause_event_id: Option<String>,
     /// **M1**: latched when sharp aim was invalidated this tick. Engine emits
     /// `actor.sharp_aim_invalidated` with this reason.
     #[serde(default)]
@@ -279,6 +286,21 @@ pub struct SpawnedProjectile {
     /// Loudness radius in world units. AI guards within this radius
     /// can detect the shot for awareness/alert purposes.
     pub loudness_radius: f32,
+    /// **M1**: tracer flag for this projectile (CCCP `Magazine.RTTRatio`).
+    /// Applies uniformly to every particle of a multi-pellet shot — tracer
+    /// is per-shot, not per-particle.
+    #[serde(default)]
+    pub is_tracer: bool,
+    /// **M1**: index of this projectile within the same shot (0..particle_count-1).
+    #[serde(default)]
+    pub particle_index: u32,
+    /// **M1**: total particles in this shot. =1 for single-round weapons.
+    #[serde(default = "default_particle_count_in_shot")]
+    pub particle_count: u32,
+}
+
+fn default_particle_count_in_shot() -> u32 {
+    1
 }
 
 /// Projectile that flew off the map / outlasted its budget without hitting anything.
@@ -305,7 +327,16 @@ pub struct StepReport {
 /// entry are stationary (idle move, no fire/jump/reload). Actors whose `status` does
 /// not [`Status::accepts_input`] ignore movement/fire/reload intents but still take
 /// physics steps (so a downed actor falls).
-pub fn step(state: &mut ActorSimState, intents: &mut BTreeMap<ActorId, ControlIntent>, deps: StepDeps) -> StepReport {
+///
+/// `rng` is the engine's seeded source consumed for multi-particle spread cones.
+/// Pass any `FnMut() -> u64`; in production it forwards to
+/// `cf_sim_core::Rng::next_u64`. Single-particle weapons never call it.
+pub fn step<R: FnMut() -> u64>(
+    state: &mut ActorSimState,
+    intents: &mut BTreeMap<ActorId, ControlIntent>,
+    deps: StepDeps,
+    rng: &mut R,
+) -> StepReport {
     let mut report = StepReport::default();
 
     let actor_ids: Vec<ActorId> = state.world.actors.keys().copied().collect();
@@ -313,7 +344,7 @@ pub fn step(state: &mut ActorSimState, intents: &mut BTreeMap<ActorId, ControlIn
         let intent = intents
             .remove(&actor_id)
             .unwrap_or_else(|| ControlIntent::new(actor_id, IntentSource::Cfctl));
-        let outcome = step_one_actor(state, actor_id, intent, deps, &mut report);
+        let outcome = step_one_actor(state, actor_id, intent, deps, &mut report, rng);
         report.actor_outcomes.push(outcome);
     }
 
@@ -322,12 +353,28 @@ pub fn step(state: &mut ActorSimState, intents: &mut BTreeMap<ActorId, ControlIn
     report
 }
 
-fn step_one_actor(
+/// Convenience wrapper for tests / callers that don't need per-tick RNG (no
+/// multi-particle weapons in play). Internally seeds a zero state; safe for
+/// deterministic single-particle scenarios.
+pub fn step_no_rng(
+    state: &mut ActorSimState,
+    intents: &mut BTreeMap<ActorId, ControlIntent>,
+    deps: StepDeps,
+) -> StepReport {
+    let mut counter: u64 = 0x6b67c9_8a7f_3d1ad9_u64;
+    step(state, intents, deps, &mut || {
+        counter = counter.wrapping_mul(6364136223846793005).wrapping_add(1442695040888963407);
+        counter
+    })
+}
+
+fn step_one_actor<R: FnMut() -> u64>(
     state: &mut ActorSimState,
     actor_id: ActorId,
     intent: ControlIntent,
     deps: StepDeps,
     report: &mut StepReport,
+    rng: &mut R,
 ) -> ActorTickOutcome {
     let floor_y = state.world.floor_y;
     let gravity = state.world.gravity;
@@ -374,6 +421,7 @@ fn step_one_actor(
             inventory_drop_velocity: None,
             inventory_drop_label: None,
             dying_dwell_elapsed: false,
+            lethal_cause_event_id: None,
             sharp_aim_invalidation_reason: None,
             knockdown_started: false,
             knockdown_recovered: false,
@@ -582,7 +630,7 @@ fn step_one_actor(
             .expect("fired rifle must have a state");
 
         // Reborrow actor briefly to apply recoil + read aim/position.
-        let (muzzle, velocity, damage) = {
+        let (muzzle, aim, base_velocity, damage) = {
             let actor = state
                 .world
                 .actors
@@ -602,41 +650,84 @@ fn step_one_actor(
                 actor.position.x + aim.x * spec.muzzle_forward_offset,
                 actor.position.y + spec.muzzle_vertical_offset + aim.y * spec.muzzle_forward_offset,
             );
-            // A-FEEL spec: "Inherited projectile velocity from actor motion."
-            // Projectiles inherit the shooter's velocity so running-and-gunning
-            // changes shot trajectories. The inheritance fraction (0.5) means
-            // half the actor's velocity adds to the muzzle velocity — enough to
-            // matter at full sprint without making shots impossible to aim.
-            let inherit_fraction = 0.5_f32;
-            let velocity = Vec2::new(
+            // M1: projectile velocity inheritance is data-driven per
+            // `RifleSpec::inherits_firer_velocity` (CCCP `HDFirearm.cpp:752`).
+            // True => half actor velocity is added so running-and-gunning shots
+            // arc. False (mortar-style) => pure muzzle velocity.
+            let inherit_fraction = if spec.inherits_firer_velocity { 0.5_f32 } else { 0.0_f32 };
+            let base_velocity = Vec2::new(
                 aim.x * spec.projectile_speed + actor.velocity.x * inherit_fraction,
                 aim.y * spec.projectile_speed + actor.velocity.y * inherit_fraction,
             );
-            (muzzle, velocity, spec.damage_per_hit)
+            (muzzle, aim, base_velocity, spec.damage_per_hit)
         };
         outcome.muzzle_origin = Some(muzzle);
-        let projectile_id = state.allocate_projectile_id();
-        state.projectiles.push(Projectile {
-            id: projectile_id,
-            owner: actor_id,
-            origin: muzzle,
-            position: muzzle,
-            velocity,
-            damage,
-            remaining_ticks: max_flight,
-        });
-        // Loudness radius: rifles are loud. Scale with damage as a proxy for
-        // weapon size. Base 480 units = default sight_radius of the reactive guard.
-        let loudness_radius = 480.0_f32 * (damage / 10.0).max(1.0).min(3.0);
+        // Loudness radius (CCCP HDFirearm.cpp:948): scaled by spec.loudness too.
+        let loudness_radius = 480.0_f32 * (damage / 10.0).max(1.0).min(3.0) * spec.loudness.max(0.1);
         outcome.loudness_radius = loudness_radius;
-        report.spawned_projectiles.push(SpawnedProjectile {
-            id: projectile_id,
-            owner: actor_id,
-            origin: muzzle,
-            velocity,
-            damage,
-            loudness_radius,
-        });
+
+        // Per-particle spawn loop. Particle count >= 1; >1 produces a spread
+        // cone of `spread_radians` around the aim direction. Each particle
+        // gets a unique projectile_id. The tracer flag from `tick_rifle`
+        // applies to ALL particles of this shot (CCCP `Round.RTTRatio` is
+        // per-shot, not per-particle).
+        let particle_count = spec.particle_count.max(1);
+        let half_spread = spec.spread_radians * 0.5;
+        // Angle of the base aim (radians).
+        let base_angle = aim.y.atan2(aim.x);
+        let base_speed = (base_velocity.x * base_velocity.x + base_velocity.y * base_velocity.y).sqrt();
+        let inherit_fraction = if spec.inherits_firer_velocity { 0.5_f32 } else { 0.0_f32 };
+        // Reborrow actor.velocity for inheritance addition per particle.
+        let actor_velocity = state
+            .world
+            .actors
+            .get(&actor_id)
+            .map(|a| a.velocity)
+            .unwrap_or(Vec2::ZERO);
+        for particle_idx in 0..particle_count {
+            // Deterministic in-cone offset for particles 2..N. The first
+            // particle always flies on the base aim line so single-particle
+            // weapons match historical behaviour byte-for-byte.
+            let angle = if particle_count == 1 || half_spread <= 0.0 {
+                base_angle
+            } else {
+                // Sample a uniform[-1, 1] from the engine's seeded RNG.
+                let raw = (rng() as f64) / (u64::MAX as f64); // [0, 1]
+                let unit = (raw as f32) * 2.0 - 1.0; // [-1, +1]
+                base_angle + unit * half_spread
+            };
+            let projectile_id = state.allocate_projectile_id();
+            // Speed mirrors the base projectile speed (no per-particle inherit
+            // skew so all pellets follow the spec'd muzzle profile).
+            let speed = if base_speed > 0.0 { base_speed } else { spec.projectile_speed };
+            // Decompose: pure muzzle vector along the angle plus inherited actor velocity.
+            let dir = Vec2::new(angle.cos(), angle.sin());
+            let velocity = Vec2::new(
+                dir.x * spec.projectile_speed + actor_velocity.x * inherit_fraction,
+                dir.y * spec.projectile_speed + actor_velocity.y * inherit_fraction,
+            );
+            let _ = speed; // suppress unused warning when needed
+            state.projectiles.push(Projectile {
+                id: projectile_id,
+                owner: actor_id,
+                origin: muzzle,
+                position: muzzle,
+                velocity,
+                damage,
+                remaining_ticks: max_flight,
+            });
+            report.spawned_projectiles.push(SpawnedProjectile {
+                id: projectile_id,
+                owner: actor_id,
+                origin: muzzle,
+                velocity,
+                damage,
+                loudness_radius,
+                is_tracer: rifle_outcomes.fired_is_tracer,
+                particle_index: particle_idx,
+                particle_count,
+            });
+        }
         // M1: alternating recoil accumulator (CCCP HDFirearm.cpp:891) — each
         // shot pushes the muzzle drift toward the opposite sign of the last
         // one so the climb pattern feels predictable, not chaotic.
@@ -839,6 +930,10 @@ fn step_one_actor(
                 actor.status = Status::Dead;
                 outcome.dying_dwell_elapsed = true;
                 outcome.new_status = Status::Dead;
+                // Surface the lethal cause so the engine can parent the
+                // dwell-elapsed DEAD event to the projectile_hit even though
+                // the kill happened ticks earlier (Gap C3).
+                outcome.lethal_cause_event_id = actor.last_lethal_cause_event_id.clone();
             }
         }
 
@@ -855,6 +950,12 @@ fn step_one_actor(
             outcome.inventory_drop_position = Some(drop_pos);
             outcome.inventory_drop_velocity = Some(toss_vel);
             outcome.inventory_drop_label = Some(label);
+            // Gap C3: surface the latched lethal cause id so the engine emits
+            // inventory_dropped + actor_status_changed(DYING) with the right
+            // parent_event_id chain.
+            if outcome.lethal_cause_event_id.is_none() {
+                outcome.lethal_cause_event_id = actor.last_lethal_cause_event_id.clone();
+            }
             // Replace inventory slots with Empty so subsequent fire intent is
             // rejected ("no weapon"). We retain the slot count so observation
             // shapes remain stable.
@@ -1007,7 +1108,7 @@ mod tests {
     #[test]
     fn idle_actor_just_settles() {
         let (mut state, mut intents) = setup();
-        let report = step(&mut state, &mut intents, deps());
+        let report = step_no_rng(&mut state, &mut intents, deps());
         assert_eq!(report.actor_outcomes.len(), 2);
         let player = report.actor_outcomes.iter().find(|o| o.actor == ActorId(1)).unwrap();
         assert!(!player.fired);
@@ -1025,7 +1126,7 @@ mod tests {
                 ..ControlIntent::new(ActorId(1), IntentSource::Human)
             },
         );
-        let _ = step(&mut state, &mut intents, deps());
+        let _ = step_no_rng(&mut state, &mut intents, deps());
         let actor = state.world.actors.get(&ActorId(1)).unwrap();
         assert!(actor.position.x > 50.0);
     }
@@ -1041,7 +1142,7 @@ mod tests {
                 ..ControlIntent::new(ActorId(1), IntentSource::Human)
             },
         );
-        let report = step(&mut state, &mut intents, deps());
+        let report = step_no_rng(&mut state, &mut intents, deps());
         let player = report.actor_outcomes.iter().find(|o| o.actor == ActorId(1)).unwrap();
         assert!(player.jump_accepted);
 
@@ -1054,7 +1155,7 @@ mod tests {
                 ..ControlIntent::new(ActorId(1), IntentSource::Human)
             },
         );
-        let report2 = step(&mut state, &mut intents, deps());
+        let report2 = step_no_rng(&mut state, &mut intents, deps());
         let player2 = report2.actor_outcomes.iter().find(|o| o.actor == ActorId(1)).unwrap();
         assert!(!player2.jump_accepted, "no double-jump in M1");
     }
@@ -1070,7 +1171,7 @@ mod tests {
                 ..ControlIntent::new(ActorId(1), IntentSource::Cfctl)
             },
         );
-        let report = step(&mut state, &mut intents, deps());
+        let report = step_no_rng(&mut state, &mut intents, deps());
         assert_eq!(report.spawned_projectiles.len(), 1);
         let player = report.actor_outcomes.iter().find(|o| o.actor == ActorId(1)).unwrap();
         assert!(player.fired);
@@ -1099,7 +1200,7 @@ mod tests {
                 ControlIntent::new(ActorId(1), IntentSource::Cfctl)
             };
             intents.insert(ActorId(1), intent);
-            let report = step(&mut state, &mut intents, deps());
+            let report = step_no_rng(&mut state, &mut intents, deps());
             hits += report.hits.len();
         }
         assert!(hits >= 9, "all 9 shots must connect; got {hits}");
@@ -1149,7 +1250,7 @@ mod tests {
         );
         let mut total_hits = 0;
         for _ in 0..40 {
-            let report = step(&mut state, &mut intents, deps());
+            let report = step_no_rng(&mut state, &mut intents, deps());
             total_hits += report.hits.len();
             intents.insert(ActorId(1), ControlIntent::new(ActorId(1), IntentSource::Cfctl));
         }
@@ -1175,7 +1276,7 @@ mod tests {
                 ..ControlIntent::new(ActorId(1), IntentSource::Human)
             },
         );
-        let report = step(&mut state, &mut intents, deps());
+        let report = step_no_rng(&mut state, &mut intents, deps());
         let player = report.actor_outcomes.iter().find(|o| o.actor == ActorId(1)).unwrap();
         // Dead actors don't fire.
         assert!(!player.fired);
@@ -1194,7 +1295,7 @@ mod tests {
                 ..ControlIntent::new(ActorId(1), IntentSource::Human)
             },
         );
-        let _ = step(&mut state, &mut intents, deps());
+        let _ = step_no_rng(&mut state, &mut intents, deps());
         intents.insert(
             ActorId(1),
             ControlIntent {
@@ -1203,7 +1304,7 @@ mod tests {
                 ..ControlIntent::new(ActorId(1), IntentSource::Human)
             },
         );
-        let report = step(&mut state, &mut intents, deps());
+        let report = step_no_rng(&mut state, &mut intents, deps());
         let player = report.actor_outcomes.iter().find(|o| o.actor == ActorId(1)).unwrap();
         assert!(player.reset);
         let actor = state.world.actors.get(&ActorId(1)).unwrap();
@@ -1229,7 +1330,7 @@ mod tests {
                 ..ControlIntent::new(ActorId(1), IntentSource::Human)
             },
         );
-        let _ = step(&mut state, &mut intents, deps());
+        let _ = step_no_rng(&mut state, &mut intents, deps());
         assert_eq!(state.projectiles.len(), 1, "fire must spawn one projectile");
         let projectile_id = state.projectiles[0].id;
         intents.insert(
@@ -1240,7 +1341,7 @@ mod tests {
                 ..ControlIntent::new(ActorId(1), IntentSource::Human)
             },
         );
-        let report = step(&mut state, &mut intents, deps());
+        let report = step_no_rng(&mut state, &mut intents, deps());
         assert!(
             state.projectiles.iter().all(|p| p.owner != ActorId(1)),
             "reset must drain the resetting actor's own projectiles"
@@ -1272,7 +1373,7 @@ mod tests {
                 ..ControlIntent::new(ActorId(1), IntentSource::Human)
             },
         );
-        let _ = step(&mut state, &mut intents, dep);
+        let _ = step_no_rng(&mut state, &mut intents, dep);
         let actor = state.world.actors.get(&ActorId(1)).unwrap();
         let expected = ActorTuning::default().jump_impulse + gravity_step;
         assert!(
@@ -1296,7 +1397,7 @@ mod tests {
                 ..ControlIntent::new(ActorId(1), IntentSource::Human)
             },
         );
-        let _ = step(&mut state, &mut intents, deps());
+        let _ = step_no_rng(&mut state, &mut intents, deps());
         // Now the selected slot is 1 (Empty). Pressing fire must NOT spawn a projectile
         // even though the actor still owns the rifle in slot 0.
         intents.insert(
@@ -1307,7 +1408,7 @@ mod tests {
                 ..ControlIntent::new(ActorId(1), IntentSource::Human)
             },
         );
-        let report = step(&mut state, &mut intents, deps());
+        let report = step_no_rng(&mut state, &mut intents, deps());
         assert!(
             report.spawned_projectiles.is_empty(),
             "fire must be gated on selected slot"
@@ -1334,7 +1435,7 @@ mod tests {
                 ..ControlIntent::new(ActorId(1), IntentSource::Human)
             },
         );
-        let report = step(&mut state, &mut intents, deps());
+        let report = step_no_rng(&mut state, &mut intents, deps());
         assert_eq!(report.spawned_projectiles.len(), 1);
         let projectile = &report.spawned_projectiles[0];
         let speed = rifle_preset(RIFLE_M1_DEFAULT_ID).unwrap().projectile_speed;
@@ -1364,7 +1465,7 @@ mod tests {
                 ..ControlIntent::new(ActorId(1), IntentSource::Human)
             },
         );
-        let _ = step(&mut state, &mut intents, deps());
+        let _ = step_no_rng(&mut state, &mut intents, deps());
         assert_eq!(
             state.world.actors.get(&ActorId(1)).unwrap().inventory.selected,
             ItemSlot(1)
@@ -1378,7 +1479,7 @@ mod tests {
                 ..ControlIntent::new(ActorId(1), IntentSource::Human)
             },
         );
-        let _ = step(&mut state, &mut intents, deps());
+        let _ = step_no_rng(&mut state, &mut intents, deps());
         assert_eq!(
             state.world.actors.get(&ActorId(1)).unwrap().inventory.selected,
             ItemSlot(0),
@@ -1407,8 +1508,8 @@ mod tests {
             };
             a_int.insert(ActorId(1), intent.clone());
             b_int.insert(ActorId(1), intent);
-            let _ = step(&mut a, &mut a_int, deps());
-            let _ = step(&mut b, &mut b_int, deps());
+            let _ = step_no_rng(&mut a, &mut a_int, deps());
+            let _ = step_no_rng(&mut b, &mut b_int, deps());
         }
         assert_eq!(a.checksum_bytes(), b.checksum_bytes());
     }
@@ -1430,7 +1531,7 @@ mod tests {
                 ..ControlIntent::new(ActorId(1), IntentSource::Human)
             },
         );
-        let report = step(&mut state, &mut intents, deps());
+        let report = step_no_rng(&mut state, &mut intents, deps());
         let player = report.actor_outcomes.iter().find(|o| o.actor == ActorId(1)).unwrap();
         assert!(player.recoil_applied > 0.0, "rifle must have fired");
         let post_fire = state.world.actors.get(&ActorId(1)).unwrap().stability;
@@ -1438,7 +1539,7 @@ mod tests {
 
         // Idle ticks on ground: stability should recover.
         for _ in 0..60 {
-            let _ = step(&mut state, &mut intents, deps());
+            let _ = step_no_rng(&mut state, &mut intents, deps());
         }
         let recovered = state.world.actors.get(&ActorId(1)).unwrap().stability;
         assert!(
@@ -1466,7 +1567,7 @@ mod tests {
                 ..ControlIntent::new(ActorId(1), IntentSource::Human)
             },
         );
-        let report = step(&mut state, &mut intents, deps());
+        let report = step_no_rng(&mut state, &mut intents, deps());
         let player = report.actor_outcomes.iter().find(|o| o.actor == ActorId(1)).unwrap();
         assert!(
             player.jump_accepted,
@@ -1489,7 +1590,7 @@ mod tests {
                 ..ControlIntent::new(ActorId(1), IntentSource::Human)
             },
         );
-        let report = step(&mut state, &mut intents, deps());
+        let report = step_no_rng(&mut state, &mut intents, deps());
         assert!(!report.actor_outcomes.is_empty(), "step must produce outcomes");
     }
 
@@ -1533,14 +1634,14 @@ mod tests {
                 ..ControlIntent::new(ActorId(1), IntentSource::Human)
             },
         );
-        let report = step(&mut state, &mut intents, deps());
+        let report = step_no_rng(&mut state, &mut intents, deps());
         assert!(
             report.actor_outcomes.iter().any(|o| o.fired),
             "must fire a projectile"
         );
         // Run many ticks: the projectile should never hit the actor who fired it.
         for _ in 0..120 {
-            let r = step(&mut state, &mut intents, deps());
+            let r = step_no_rng(&mut state, &mut intents, deps());
             for hit in &r.hits {
                 assert_ne!(hit.target, ActorId(1), "projectile must not hit its owner");
             }
