@@ -103,6 +103,13 @@ pub struct StepDeps {
     /// `None` for tests / callers that want the historical defaults).
     #[serde(default)]
     pub tuning: Option<ActorTuning>,
+    /// **M1.5 G8**: when true, the DYING → DEAD transition is suppressed
+    /// for controllable actors so a tutorial player can never be punted to
+    /// a restart screen by a single lethal hit (DR-023). The flag is
+    /// sourced from the scenario manifest's `tutorial_safety` field via
+    /// the engine; callers that want the M1 vanilla behaviour pass `false`.
+    #[serde(default)]
+    pub tutorial_safety: bool,
 }
 
 /// One projectile in flight.
@@ -709,6 +716,41 @@ fn step_one_actor<R: FnMut() -> u64>(
     };
 
     let mut outcome = pass.outcome;
+
+    // **M1.5 G8 fix**: tick down DYING dwell regardless of accepted_input.
+    // Previously the dwell decrement lived inside the post-`accepted_input`
+    // block which short-circuits for non-accepting-input actors (Dying /
+    // Downed / Dead / Inactive). That meant a Dying actor's dwell never
+    // counted down → the DEAD transition relied on the M1 R1 fluke where
+    // accepted_input was captured BEFORE apply_damage applied lethal damage
+    // (1-tick decrement); a fresh Dying actor (e.g. tutorial-safety
+    // synthesised) stays Dying forever. Tick the dwell here so it always
+    // counts down, then honour the dying-cap policy (mission_critical /
+    // tutorial_safety + controllable).
+    if matches!(outcome.previous_status, Status::Dying) || matches!(outcome.new_status, Status::Dying) {
+        let dying_cap_in_effect = {
+            let actor = state
+                .world
+                .actors
+                .get(&actor_id)
+                .expect("actor id exists by construction");
+            actor.mission_critical || (deps.tutorial_safety && actor.controllable)
+        };
+        if let Some(actor) = state.world.actors.get_mut(&actor_id) {
+            if matches!(actor.status, Status::Dying) && actor.dying_dwell_ticks_remaining > 0 {
+                actor.dying_dwell_ticks_remaining -= 1;
+                if actor.dying_dwell_ticks_remaining == 0 && !dying_cap_in_effect {
+                    actor.status = Status::Dead;
+                    outcome.dying_dwell_elapsed = true;
+                    outcome.new_status = Status::Dead;
+                    outcome
+                        .lethal_cause_event_id
+                        .clone_from(&actor.last_lethal_cause_event_id);
+                }
+            }
+        }
+    }
+
     if pass.early_exit {
         if let Some(rifle) = state.rifles.get_mut(&actor_id) {
             rifle.reset();
@@ -1078,22 +1120,11 @@ fn step_one_actor<R: FnMut() -> u64>(
             }
         }
 
-        // M1: DYING dwell countdown (CCCP Actor.cpp:1229). When dwell expires,
-        // transition to DEAD (unless mission_critical, which caps at Downed).
-        if matches!(actor.status, Status::Dying) && actor.dying_dwell_ticks_remaining > 0 {
-            actor.dying_dwell_ticks_remaining -= 1;
-            if actor.dying_dwell_ticks_remaining == 0 && !actor.mission_critical {
-                actor.status = Status::Dead;
-                outcome.dying_dwell_elapsed = true;
-                outcome.new_status = Status::Dead;
-                // Surface the lethal cause so the engine can parent the
-                // dwell-elapsed DEAD event to the projectile_hit even though
-                // the kill happened ticks earlier (Gap C3).
-                outcome
-                    .lethal_cause_event_id
-                    .clone_from(&actor.last_lethal_cause_event_id);
-            }
-        }
+        // **M1.5 G8 note**: DYING dwell countdown now lives in the
+        // unconditional pre-return block at the top of step_one_actor's
+        // post-pass phase so dying actors (which don't accept input) still
+        // tick their dwell. The dwell update therefore lands BEFORE this
+        // block ran historically.
 
         // M1: one-shot inventory drop on DYING entry. Captures hand position
         // and an outward toss velocity for the engine to emit on the recorder.
@@ -1339,6 +1370,7 @@ mod tests {
             region_max_y: 720.0,
             auto_reload_when_empty: false,
             tuning: None,
+            tutorial_safety: false,
         }
     }
 
@@ -1880,6 +1912,51 @@ mod tests {
                 assert_ne!(hit.target, ActorId(1), "projectile must not hit its owner");
             }
         }
+    }
+
+    /// **M1.5 G8 (tutorial_safety)**: lethal damage to a controllable actor
+    /// caps at DYING when StepDeps.tutorial_safety = true. Without the flag
+    /// the DYING dwell promotes to DEAD as usual.
+    #[test]
+    fn tutorial_safety_caps_lethal_damage_at_dying() {
+        let make_world = || {
+            let mut world = ActorWorld::new(64.0, -980.0);
+            let mut actor = ActorState::player(
+                ActorId(1),
+                "blue",
+                Vec2::new(100.0, 32.0),
+                100.0,
+                Inventory::with_rifle(cf_equipment::RIFLE_M1_DEFAULT_ID),
+            );
+            actor.hp = 0.0;
+            actor.status = Status::Dying;
+            actor.dying_dwell_ticks_remaining = 2;
+            world.insert(actor);
+            ActorSimState::new(world)
+        };
+        let mut state = make_world();
+        let mut intents = BTreeMap::new();
+        let mut tutorial_deps = deps();
+        tutorial_deps.tutorial_safety = true;
+        // Step three times: dwell goes 2 → 1 → 0. With tutorial_safety the
+        // tick where dwell reaches 0 must NOT promote to Dead.
+        for _ in 0..3 {
+            let _ = step_no_rng(&mut state, &mut intents, tutorial_deps);
+        }
+        let actor = state.world.actors.get(&ActorId(1)).expect("actor must persist");
+        assert_eq!(
+            actor.status,
+            Status::Dying,
+            "tutorial_safety must cap at DYING; got {:?}",
+            actor.status
+        );
+        // Without tutorial_safety the same sequence promotes to Dead.
+        let mut state = make_world();
+        for _ in 0..3 {
+            let _ = step_no_rng(&mut state, &mut intents, deps());
+        }
+        let actor = state.world.actors.get(&ActorId(1)).expect("actor must persist");
+        assert_eq!(actor.status, Status::Dead);
     }
 
     /// **M1 R2 / Gap G1 (drop physics)**: a `LooseItem` dropped above the

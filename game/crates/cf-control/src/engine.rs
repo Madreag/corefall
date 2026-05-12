@@ -1331,6 +1331,7 @@ impl M0Engine {
                         region_max_y,
                         auto_reload_when_empty: auto_reload,
                         tuning: Some(tuning),
+                        tutorial_safety: self.config.tutorial_safety,
                     },
                     &mut || rng_slot.next_u64(),
                 );
@@ -2445,7 +2446,12 @@ impl M0Engine {
             .record(tick, sim_time_ms, "input", "intent_received", player_view, None);
 
         for outcome in &report.actor_outcomes {
-            if outcome.previous_status != outcome.new_status {
+            // **M1.5 G8**: the dedicated dying-dwell-elapsed path below emits
+            // its own actor_status_changed event with cause='dying_dwell_elapsed'
+            // and the correct lethal-cause parent_event_id. Skip the generic
+            // status-changed emission for that transition to avoid duplicate
+            // events + a mis-causally-labelled 'reset'/'unknown' fallback.
+            if outcome.previous_status != outcome.new_status && !outcome.dying_dwell_elapsed {
                 self.recorder.record(
                     tick,
                     sim_time_ms,

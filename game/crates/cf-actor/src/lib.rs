@@ -1197,6 +1197,13 @@ pub struct ActorWorld {
     /// Gravity in world units / s² (negative = pulls toward floor). Defaults to scenario's
     /// `gravity`. Sim systems apply this each tick.
     pub gravity: f32,
+    /// **M1.5 G8**: when true, lethal damage to controllable actors caps
+    /// at `Status::Dying` — the DYING dwell does NOT promote to DEAD so a
+    /// tutorial player can finish their first session without restarting.
+    /// Per DR-023 onboarding policy; sourced from the scenario manifest's
+    /// `tutorial_safety` flag.
+    #[serde(default)]
+    pub tutorial_safety: bool,
 }
 
 impl ActorWorld {
@@ -1206,6 +1213,7 @@ impl ActorWorld {
             player: None,
             floor_y,
             gravity,
+            tutorial_safety: false,
         }
     }
 
