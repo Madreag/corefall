@@ -1221,7 +1221,7 @@ fn step_loose_items(state: &mut ActorSimState, deps: StepDeps, report: &mut Step
     }
     let dt = deps.tick_dt;
     let floor_y = state.world.floor_y;
-    for item in state.loose_items.iter_mut() {
+    for item in &mut state.loose_items {
         // Clear the one-shot latch from the previous tick so post-settle
         // ticks don't double-emit.
         item.just_settled_this_tick = false;

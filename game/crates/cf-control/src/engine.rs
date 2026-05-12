@@ -4460,7 +4460,28 @@ impl EngineHandle for M0Engine {
             run_status: observed_run_status(&state),
             scenario: self.config.scenario_id.clone(),
             events_since: self.recorder.snapshot_events().len() as u64,
-            events: vec![],
+            // **M1 R2 / Gap G3 support**: surface the full recorded event
+            // stream so cf-e2e's events.<cat>.<type>.{count,first,last}
+            // expectation grammar can drill into it. Heavy runs (≥18000
+            // ticks) produce O(50K) events; the snapshot allocs a Vec
+            // O(events) once per observe.once. Acceptable for M1 because
+            // cf-e2e calls observe.once at most once per script.
+            events: self
+                .recorder
+                .snapshot_events()
+                .into_iter()
+                .map(|e| {
+                    json!({
+                        "tick": e.tick,
+                        "sim_time_ms": e.sim_time_ms,
+                        "event_id": e.event_id,
+                        "category": e.category,
+                        "event_type": e.event_type,
+                        "payload": e.payload,
+                        "parent_event_id": e.parent_event_id,
+                    })
+                })
+                .collect(),
             settings: ObserveSettings {
                 schema_version: SCHEMA_VERSION,
                 settings: state.settings.clone(),
