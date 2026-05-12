@@ -1,0 +1,13 @@
+{
+  "schema": 1,
+  "_doc": "M1 R2 stub manifest. cf-audio::AudioCue::stub_tag() maps cue → tag; real backends look up tag → wav path here. Until M4+, every wav field is null because no SFX has been authored. cf-audio::NullAudioPlugin honours every cue with a tracing trace; cf-audio::RecordingAudioPlugin captures cues for tests. The manifest is checked into git so cf-content-loader can validate the cue/tag space against schema drift.",
+  "cues": [
+    {"tag": "weapon_fired", "wav": null, "default_caption": "weapon fires"},
+    {"tag": "reload_started", "wav": null, "default_caption": "reloading"},
+    {"tag": "reload_completed", "wav": null, "default_caption": "reload complete"},
+    {"tag": "body_hit", "wav": null, "default_caption": "body hit"},
+    {"tag": "inventory_dropped", "wav": null, "default_caption": "item dropped"},
+    {"tag": "inventory_settled", "wav": null, "default_caption": "item settled"},
+    {"tag": "status_changed", "wav": null, "default_caption": "status changed"}
+  ]
+}

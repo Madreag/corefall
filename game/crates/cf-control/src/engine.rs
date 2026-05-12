@@ -521,6 +521,10 @@ pub struct M0Engine {
     started_at: DateTime<Utc>,
     started_instant: Instant,
     run_bundle_dir: PathBuf,
+    /// **M1 R2**: pluggable audio backend. M1 default is `NullAudioPlugin`
+    /// (no-op + tracing). cf-app or cf-tools-replay-viewer install their own
+    /// implementation via `set_audio_plugin` to play real sound.
+    audio_plugin: std::sync::Mutex<Box<dyn cf_audio::AudioPlugin>>,
 }
 
 struct EngineMutable {
@@ -746,6 +750,37 @@ impl M0Engine {
             started_at,
             started_instant,
             run_bundle_dir,
+            audio_plugin: std::sync::Mutex::new(Box::new(cf_audio::NullAudioPlugin)),
+        }
+    }
+
+    /// **M1 R2**: install a custom audio backend. Default is
+    /// `NullAudioPlugin`; cf-app installs a native backend, cf-e2e installs
+    /// `RecordingAudioPlugin` so tests can assert on cue stream.
+    pub fn set_audio_plugin(&self, plugin: Box<dyn cf_audio::AudioPlugin>) {
+        if let Ok(mut p) = self.audio_plugin.lock() {
+            *p = plugin;
+        }
+    }
+
+    /// Internal helper that fires a cue through the installed plugin AND
+    /// pushes the cue's caption into the HUD's caption queue. Both happen
+    /// on the engine thread so HUD captions stay tick-deterministic for
+    /// replay.
+    fn emit_audio_cue(&self, cue: cf_audio::AudioCue, tick: cf_sim_core::Tick) {
+        if let Ok(plugin) = self.audio_plugin.lock() {
+            plugin.play(&cue);
+        }
+        if let Ok(mut s) = self.state.write() {
+            push_caption(
+                &mut s.hud_captions,
+                crate::state::CaptionView {
+                    id: format!("audio.{}.{}", cue.stub_tag(), tick.0),
+                    label: cue.caption().to_string(),
+                    raised_at_tick: tick.0,
+                    accessibility_id: format!("hud.caption.audio.{}", cue.stub_tag()),
+                },
+            );
         }
     }
 
@@ -2335,6 +2370,13 @@ impl M0Engine {
                     json!({"actor": outcome.actor.0}),
                     Some(intent_event_id.clone()),
                 );
+                self.emit_audio_cue(
+                    cf_audio::AudioCue::ReloadStarted {
+                        equipment_id: cf_equipment::RIFLE_M1_DEFAULT_ID.to_string(),
+                        caption: format!("actor {} reloading", outcome.actor.0),
+                    },
+                    tick,
+                );
             }
             if outcome.reload_completed {
                 self.recorder.record(
@@ -2344,6 +2386,13 @@ impl M0Engine {
                     "weapon_reloaded",
                     json!({"actor": outcome.actor.0}),
                     Some(intent_event_id.clone()),
+                );
+                self.emit_audio_cue(
+                    cf_audio::AudioCue::ReloadCompleted {
+                        equipment_id: cf_equipment::RIFLE_M1_DEFAULT_ID.to_string(),
+                        caption: format!("actor {} reload complete", outcome.actor.0),
+                    },
+                    tick,
                 );
             }
             if outcome.dry_fire {
@@ -2373,6 +2422,13 @@ impl M0Engine {
                     Some(intent_event_id.clone()),
                 );
                 weapon_fired_event_by_actor.insert(outcome.actor.0, weapon_fired_id.clone());
+                self.emit_audio_cue(
+                    cf_audio::AudioCue::WeaponFired {
+                        equipment_id: cf_equipment::RIFLE_M1_DEFAULT_ID.to_string(),
+                        caption: format!("actor {} fires rifle", outcome.actor.0),
+                    },
+                    tick,
+                );
                 // M1: acoustic noise alarm (CCCP HDFirearm.cpp:948 — registered
                 // alarm event consumed by M1.5+ AI perception within the radius).
                 if outcome.loudness_radius > 0.0 {
@@ -2503,6 +2559,13 @@ impl M0Engine {
                                 sim.spawn_loose_item(label.clone(), pos, vel, dropped_event_id);
                             }
                         }
+                        self.emit_audio_cue(
+                            cf_audio::AudioCue::InventoryDropped {
+                                item_label: label.clone(),
+                                caption: format!("{label} dropped"),
+                            },
+                            tick,
+                        );
                     }
                 }
             }
@@ -2593,6 +2656,13 @@ impl M0Engine {
                     "zone": hit.zone,
                 }),
                 Some(hit_parent),
+            );
+            self.emit_audio_cue(
+                cf_audio::AudioCue::BodyHit {
+                    zone: hit.zone.clone(),
+                    caption: format!("body hit ({})", hit.zone),
+                },
+                tick,
             );
             if hit.previous_status != hit.new_status {
                 self.recorder.record(
@@ -2711,6 +2781,13 @@ impl M0Engine {
                     "rest_position": [settled.position.x, settled.position.y],
                 }),
                 Some(settled.source_event_id.clone()),
+            );
+            self.emit_audio_cue(
+                cf_audio::AudioCue::InventorySettled {
+                    item_label: settled.item_label.clone(),
+                    caption: format!("{} settled", settled.item_label),
+                },
+                tick,
             );
         }
     }
