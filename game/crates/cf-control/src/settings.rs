@@ -142,10 +142,67 @@ pub struct Settings {
     /// authoritative value. Defaults to 60.
     #[serde(default = "default_tick_rate_hz")]
     pub tick_rate_hz: u32,
+    /// **M1 Gap F1**: ground acceleration (units / s²). Default 1500.0
+    /// mirrors `cf-actor::sim::ActorTuning::default().ground_acceleration`.
+    #[serde(default = "default_accel")]
+    pub accel: f32,
+    /// **M1 Gap F1**: ground friction (units / s²). Default 1200.0 mirrors
+    /// `cf-actor::sim::ActorTuning::default().ground_friction`.
+    #[serde(default = "default_friction")]
+    pub friction: f32,
+    /// **M1 Gap F1**: gravity acceleration applied to the actor in
+    /// `cf-physics` (units / s²; negative pulls toward the floor). Default
+    /// `-980.0`.
+    #[serde(default = "default_gravity")]
+    pub gravity: f32,
+    /// **M1 Gap F1**: jump impulse (units / s). Default `420.0` mirrors
+    /// `cf-actor::sim::ActorTuning::default().jump_impulse`.
+    #[serde(default = "default_jump_force")]
+    pub jump_force: f32,
+    /// **M1 Gap F1**: per-tick decay of `recoil_accumulator` toward zero
+    /// (CCCP `HDFirearm.cpp:891`). Default `0.05`.
+    #[serde(default = "default_recoil_decay_per_tick")]
+    pub recoil_decay_per_tick: f32,
+    /// **M1 Gap F1**: ticks to fully build sharp aim from 0 -> 1.0 (CCCP
+    /// `AHuman.cpp:1779`). Default `30` (~0.5s at 60Hz).
+    #[serde(default = "default_sharp_aim_build_ticks")]
+    pub sharp_aim_build_ticks: u32,
+    /// **M1 Gap F1**: horizontal-speed threshold (units / s) below which the
+    /// actor counts as "slow enough" to keep building sharp aim. Default 1.5.
+    #[serde(default = "default_walk_threshold")]
+    pub walk_threshold: f32,
 }
 
 fn default_tick_rate_hz() -> u32 {
     60
+}
+
+fn default_accel() -> f32 {
+    1500.0
+}
+
+fn default_friction() -> f32 {
+    1200.0
+}
+
+fn default_gravity() -> f32 {
+    -980.0
+}
+
+fn default_jump_force() -> f32 {
+    420.0
+}
+
+fn default_recoil_decay_per_tick() -> f32 {
+    0.05
+}
+
+fn default_sharp_aim_build_ticks() -> u32 {
+    30
+}
+
+fn default_walk_threshold() -> f32 {
+    1.5
 }
 
 fn default_hold_threshold_ms() -> u32 {
@@ -245,6 +302,13 @@ impl Default for Settings {
             key_bindings: BTreeMap::new(),
             reduce_camera_shake_pct: 0.0,
             tick_rate_hz: default_tick_rate_hz(),
+            accel: default_accel(),
+            friction: default_friction(),
+            gravity: default_gravity(),
+            jump_force: default_jump_force(),
+            recoil_decay_per_tick: default_recoil_decay_per_tick(),
+            sharp_aim_build_ticks: default_sharp_aim_build_ticks(),
+            walk_threshold: default_walk_threshold(),
         }
     }
 }

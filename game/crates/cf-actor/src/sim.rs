@@ -39,6 +39,30 @@ pub struct ActorTuning {
     pub ground_friction: f32,
     pub jump_impulse: f32,
     pub terminal_velocity: f32,
+    /// **M1 Gap F1**: per-tick recoil decay rate; passed through to the
+    /// per-actor `recoil_decay_rate` field at construction. Defaulted on
+    /// stale serialized bundles via `#[serde(default = ...)]`.
+    #[serde(default = "default_recoil_decay_per_tick")]
+    pub recoil_decay_per_tick: f32,
+    /// **M1 Gap F1**: ticks to fully build sharp aim from 0 -> 1.0.
+    #[serde(default = "default_sharp_aim_build_ticks")]
+    pub sharp_aim_build_ticks: u32,
+    /// **M1 Gap F1**: horizontal-speed threshold (units / s) for sharp-aim
+    /// "slow enough" gate.
+    #[serde(default = "default_walk_threshold_tuning")]
+    pub walk_threshold: f32,
+}
+
+fn default_recoil_decay_per_tick() -> f32 {
+    0.05
+}
+
+fn default_sharp_aim_build_ticks() -> u32 {
+    30
+}
+
+fn default_walk_threshold_tuning() -> f32 {
+    1.5
 }
 
 impl Default for ActorTuning {
@@ -50,11 +74,18 @@ impl Default for ActorTuning {
             ground_friction: 1200.0,
             jump_impulse: 420.0,
             terminal_velocity: -1800.0,
+            recoil_decay_per_tick: default_recoil_decay_per_tick(),
+            sharp_aim_build_ticks: default_sharp_aim_build_ticks(),
+            walk_threshold: default_walk_threshold_tuning(),
         }
     }
 }
 
 /// Inputs for one [`step`] call.
+///
+/// **M1 Gap F3**: `tuning` lets the engine pass settings-driven cvars in.
+/// When `tuning` is `None`, `ActorTuning::default()` is used (matches
+/// historical M1 behaviour byte-for-byte).
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct StepDeps {
     pub tick_dt: f32,
@@ -66,6 +97,10 @@ pub struct StepDeps {
     /// pattern on the Y-axis instead of a hardcoded constant.
     pub region_max_y: f32,
     pub auto_reload_when_empty: bool,
+    /// **M1 Gap F3**: feel cvars sourced from `cf-control::Settings` (or
+    /// `None` for tests / callers that want the historical defaults).
+    #[serde(default)]
+    pub tuning: Option<ActorTuning>,
 }
 
 /// One projectile in flight.
@@ -470,7 +505,12 @@ fn step_one_actor<R: FnMut() -> u64>(
             // and the `disables_rifle_when_destroyed` flag gates fire/reload.
             // The `forces_crawl_when_destroyed` and `disables_jet_when_destroyed`
             // flags route through stance derivation + jet command rejection.
-            let mut tuning = ActorTuning::default();
+            //
+            // **M1 Gap F3**: when `deps.tuning` is `Some(...)`, use those
+            // engine-supplied values (settings-driven cvars) instead of the
+            // defaults. None preserves byte-identical behaviour on bundles
+            // recorded before the cvar surface existed.
+            let mut tuning = deps.tuning.unwrap_or_default();
             // Mass-based physics feel: heavier chassis accelerate/decelerate
             // slower and jump lower, making them feel appropriately weighty.
             // 80kg = 1.0x, 200kg = 0.63x, 600kg = 0.37x.
@@ -783,8 +823,15 @@ fn step_one_actor<R: FnMut() -> u64>(
 
         // M1: recoil accumulator decay (CCCP HDFirearm.cpp:891) — angular drift
         // exponentially decays toward zero each tick the actor isn't firing.
+        // Gap F3: prefer engine-supplied `deps.tuning.recoil_decay_per_tick`
+        // when present so cfctl `act.settings.set { recoil_decay_per_tick: ... }`
+        // takes effect immediately without per-actor patching.
+        let decay_rate = deps
+            .tuning
+            .map(|t| t.recoil_decay_per_tick)
+            .unwrap_or(actor.recoil_decay_rate);
         if outcome.recoil_applied == 0.0 && actor.recoil_accumulator.abs() > 1e-4 {
-            let decay = actor.recoil_decay_rate * actor.recoil_accumulator.signum();
+            let decay = decay_rate * actor.recoil_accumulator.signum();
             let next = actor.recoil_accumulator - decay;
             if next.signum() != actor.recoil_accumulator.signum() {
                 actor.recoil_accumulator = 0.0;
@@ -797,9 +844,14 @@ fn step_one_actor<R: FnMut() -> u64>(
         // Build only when ALL conditions hold: STABLE status (not Unstable, not
         // knockdown), grounded, slow, equipped (rifle selected), and player
         // holds the sharp_aim sticky input.
+        // Gap F3: prefer engine-supplied tuning when present.
         let rifle_equipped_for_sharp = actor.inventory.selected_item().is_rifle();
         let horizontal_speed = actor.velocity.x.abs();
-        let walk_threshold = actor.walk_threshold;
+        let walk_threshold = deps.tuning.map(|t| t.walk_threshold).unwrap_or(actor.walk_threshold);
+        let sharp_aim_build_ticks_eff = deps
+            .tuning
+            .map(|t| t.sharp_aim_build_ticks)
+            .unwrap_or(actor.sharp_aim_build_ticks);
         let prior_sharp = actor.sharp_aim_progress;
         let mut invalidation: Option<&'static str> = None;
         let mut invalidation_reason: Option<String> = None;
@@ -837,8 +889,8 @@ fn step_one_actor<R: FnMut() -> u64>(
             && matches!(actor.status, Status::Stable)
             && actor.knockdown_ticks_remaining == 0
         {
-            let build_step = if actor.sharp_aim_build_ticks > 0 {
-                1.0 / (actor.sharp_aim_build_ticks as f32)
+            let build_step = if sharp_aim_build_ticks_eff > 0 {
+                1.0 / (sharp_aim_build_ticks_eff as f32)
             } else {
                 1.0
             };
@@ -1102,6 +1154,7 @@ mod tests {
             region_max_x: 1280.0,
             region_max_y: 720.0,
             auto_reload_when_empty: false,
+            tuning: None,
         }
     }
 

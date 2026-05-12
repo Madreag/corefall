@@ -3,11 +3,33 @@
   "title": "SettingsPatch",
   "type": "object",
   "properties": {
+    "accel": {
+      "description": "**M1 Gap F1**: configurable feel cvars. All values must be finite\nand (where applicable) positive; `apply_settings_patch` rejects\ninvalid patches via `validation_error`.",
+      "type": [
+        "number",
+        "null"
+      ],
+      "format": "float"
+    },
     "captions": {
       "type": [
         "boolean",
         "null"
       ]
+    },
+    "friction": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "format": "float"
+    },
+    "gravity": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "format": "float"
     },
     "high_contrast": {
       "type": [
@@ -31,6 +53,13 @@
         "null"
       ]
     },
+    "jump_force": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "format": "float"
+    },
     "key_bindings": {
       "description": "M4A: ACC-A-05 per-action key binding overrides. When `Some(...)` the\npatch REPLACES the entire table (not merged) so a remap UI clearing\nevery binding can ship the empty map. When `None`, the existing\ntable is preserved.",
       "type": [
@@ -47,6 +76,13 @@
         "boolean",
         "null"
       ]
+    },
+    "recoil_decay_per_tick": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "format": "float"
     },
     "reduce_camera_shake_pct": {
       "description": "**M1 / DR-055**: camera shake reduction. Clamped to `[0, 1]`.\n`1.0` = no shake (accessibility floor).",
@@ -74,6 +110,14 @@
         "null"
       ]
     },
+    "sharp_aim_build_ticks": {
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint32",
+      "minimum": 0
+    },
     "tick_rate_hz": {
       "description": "**M1**: tick-rate observable. Clamped to `>= 1`. The engine does not\nlive-retick on patch; this mirrors the engine's configured tick rate\nso cfctl `observe.settings` is round-trippable.",
       "type": [
@@ -84,6 +128,13 @@
       "minimum": 0
     },
     "ui_scale": {
+      "type": [
+        "number",
+        "null"
+      ],
+      "format": "float"
+    },
+    "walk_threshold": {
       "type": [
         "number",
         "null"

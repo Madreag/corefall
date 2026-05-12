@@ -1180,12 +1180,26 @@ impl M0Engine {
                 // takes `&mut state.actor_state`. The local destructure
                 // refers to `EngineMutable` (the inner struct held by
                 // `RwLock`); fields named here must match its definition.
+                let settings_for_tuning = state.settings.clone();
                 let EngineMutable {
                     actor_state: actor_state_slot,
                     rng: rng_slot,
                     ..
                 } = &mut *state;
                 let actor_state_mut = actor_state_slot.as_mut().expect("actor state present");
+                // Gap F3: build tuning from live settings so cvar patches
+                // applied via `act.settings.set` take effect on the next tick.
+                let tuning = cf_actor::sim::ActorTuning {
+                    max_speed: 220.0,
+                    ground_acceleration: settings_for_tuning.accel,
+                    air_acceleration: 600.0,
+                    ground_friction: settings_for_tuning.friction,
+                    jump_impulse: settings_for_tuning.jump_force,
+                    terminal_velocity: -1800.0,
+                    recoil_decay_per_tick: settings_for_tuning.recoil_decay_per_tick,
+                    sharp_aim_build_ticks: settings_for_tuning.sharp_aim_build_ticks,
+                    walk_threshold: settings_for_tuning.walk_threshold,
+                };
                 let report = actor_step(
                     actor_state_mut,
                     &mut intents,
@@ -1195,6 +1209,7 @@ impl M0Engine {
                         region_max_x,
                         region_max_y,
                         auto_reload_when_empty: auto_reload,
+                        tuning: Some(tuning),
                     },
                     &mut || rng_slot.next_u64(),
                 );
@@ -4048,6 +4063,49 @@ fn apply_settings_patch(settings: &mut Settings, patch: &SettingsPatch) -> Vec<S
             changed.push("tick_rate_hz".to_string());
         }
     }
+    // M1 Gap F1-F2: feel cvars (already validated by SettingsPatch::validation_error).
+    if let Some(v) = patch.accel {
+        if (settings.accel - v).abs() > f32::EPSILON {
+            settings.accel = v;
+            changed.push("accel".to_string());
+        }
+    }
+    if let Some(v) = patch.friction {
+        if (settings.friction - v).abs() > f32::EPSILON {
+            settings.friction = v;
+            changed.push("friction".to_string());
+        }
+    }
+    if let Some(v) = patch.gravity {
+        if (settings.gravity - v).abs() > f32::EPSILON {
+            settings.gravity = v;
+            changed.push("gravity".to_string());
+        }
+    }
+    if let Some(v) = patch.jump_force {
+        if (settings.jump_force - v).abs() > f32::EPSILON {
+            settings.jump_force = v;
+            changed.push("jump_force".to_string());
+        }
+    }
+    if let Some(v) = patch.recoil_decay_per_tick {
+        if (settings.recoil_decay_per_tick - v).abs() > f32::EPSILON {
+            settings.recoil_decay_per_tick = v;
+            changed.push("recoil_decay_per_tick".to_string());
+        }
+    }
+    if let Some(v) = patch.sharp_aim_build_ticks {
+        if settings.sharp_aim_build_ticks != v {
+            settings.sharp_aim_build_ticks = v;
+            changed.push("sharp_aim_build_ticks".to_string());
+        }
+    }
+    if let Some(v) = patch.walk_threshold {
+        if (settings.walk_threshold - v).abs() > f32::EPSILON {
+            settings.walk_threshold = v;
+            changed.push("walk_threshold".to_string());
+        }
+    }
     changed
 }
 
@@ -5473,6 +5531,7 @@ impl EngineHandle for M0Engine {
                     );
                     return CommandResult::rejected(reason, tick.0);
                 }
+                let prev_settings = state.settings.clone();
                 let changed = apply_settings_patch(&mut state.settings, &changes);
                 let new_settings = state.settings.clone();
                 drop(state);
@@ -5493,6 +5552,40 @@ impl EngineHandle for M0Engine {
                     json!({"settings": value}),
                     None,
                 );
+                // M1 Gap G1: emit one accessibility.settings_changed event per
+                // changed a11y-relevant field. Backward-compat: the
+                // control.settings_changed envelope above stays unchanged.
+                const A11Y_FIELDS: &[&str] = &[
+                    "ui_scale",
+                    "high_contrast",
+                    "captions",
+                    "reduced_motion",
+                    "reduced_shake",
+                    "reduced_flash",
+                    "reduce_camera_shake_pct",
+                    "hold_to_confirm",
+                    "key_remap_enabled",
+                ];
+                let prev_value = serde_json::to_value(&prev_settings).unwrap_or(serde_json::Value::Null);
+                for field in &changed {
+                    if !A11Y_FIELDS.contains(&field.as_str()) {
+                        continue;
+                    }
+                    let from = prev_value.get(field).cloned().unwrap_or(serde_json::Value::Null);
+                    let to = value.get(field).cloned().unwrap_or(serde_json::Value::Null);
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "accessibility",
+                        "settings_changed",
+                        json!({
+                            "field": field,
+                            "from": from,
+                            "to": to,
+                        }),
+                        None,
+                    );
+                }
                 CommandResult::accepted(tick.0)
             }
             ControlCommand::RunBundleWrite { id_override } => {

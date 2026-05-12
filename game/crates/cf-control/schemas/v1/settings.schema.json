@@ -3,8 +3,26 @@
   "title": "Settings",
   "type": "object",
   "properties": {
+    "accel": {
+      "description": "**M1 Gap F1**: ground acceleration (units / s²). Default 1500.0\nmirrors `cf-actor::sim::ActorTuning::default().ground_acceleration`.",
+      "type": "number",
+      "format": "float",
+      "default": 1500.0
+    },
     "captions": {
       "type": "boolean"
+    },
+    "friction": {
+      "description": "**M1 Gap F1**: ground friction (units / s²). Default 1200.0 mirrors\n`cf-actor::sim::ActorTuning::default().ground_friction`.",
+      "type": "number",
+      "format": "float",
+      "default": 1200.0
+    },
+    "gravity": {
+      "description": "**M1 Gap F1**: gravity acceleration applied to the actor in\n`cf-physics` (units / s²; negative pulls toward the floor). Default\n`-980.0`.",
+      "type": "number",
+      "format": "float",
+      "default": -980.0
     },
     "high_contrast": {
       "type": "boolean"
@@ -21,6 +39,12 @@
       "type": "boolean",
       "default": false
     },
+    "jump_force": {
+      "description": "**M1 Gap F1**: jump impulse (units / s). Default `420.0` mirrors\n`cf-actor::sim::ActorTuning::default().jump_impulse`.",
+      "type": "number",
+      "format": "float",
+      "default": 420.0
+    },
     "key_bindings": {
       "description": "M4A: per-action key binding overrides. Action names are limited to\n[`SUPPORTED_KEY_BINDING_ACTIONS`]; KeyCode names are limited to\n[`SUPPORTED_KEY_CODE_NAMES`]. Empty by default; `act.settings.set`\nreplaces the table only after validation so unsupported remaps reject\nat the control boundary instead of silently falling back in cf-app.",
       "type": "object",
@@ -33,6 +57,12 @@
       "description": "M4A: when `true`, cf-app's keyboard layer reads its action bindings\nfrom `key_bindings` instead of the built-in defaults. When `false`,\nthe built-in defaults apply (Space=jump, Enter|J=fire, R=reload,\nG=dig, L=reset, 1..4=select_slot_0..3). The remap UI editor lands\nat M8; M4A ships the cfctl-settable surface so the contract is\nbehavior-testable today.",
       "type": "boolean",
       "default": false
+    },
+    "recoil_decay_per_tick": {
+      "description": "**M1 Gap F1**: per-tick decay of `recoil_accumulator` toward zero\n(CCCP `HDFirearm.cpp:891`). Default `0.05`.",
+      "type": "number",
+      "format": "float",
+      "default": 0.05000000074505806
     },
     "reduce_camera_shake_pct": {
       "description": "**M1 / DR-055**: accessibility floor — camera shake magnitude is\nmultiplied by `(1.0 - reduce_camera_shake_pct)`. 0.0 = full shake,\n1.0 = no shake. Clamped to `[0, 1]` by `apply_settings_patch`.",
@@ -49,6 +79,13 @@
     "reduced_shake": {
       "type": "boolean"
     },
+    "sharp_aim_build_ticks": {
+      "description": "**M1 Gap F1**: ticks to fully build sharp aim from 0 -> 1.0 (CCCP\n`AHuman.cpp:1779`). Default `30` (~0.5s at 60Hz).",
+      "type": "integer",
+      "format": "uint32",
+      "default": 30,
+      "minimum": 0
+    },
     "tick_rate_hz": {
       "description": "**M1**: tick-rate observable. Mirrors the engine's\n`tick_rate_hz` so cfctl `observe.settings` round-trips a single\nauthoritative value. Defaults to 60.",
       "type": "integer",
@@ -59,6 +96,12 @@
     "ui_scale": {
       "type": "number",
       "format": "float"
+    },
+    "walk_threshold": {
+      "description": "**M1 Gap F1**: horizontal-speed threshold (units / s) below which the\nactor counts as \"slow enough\" to keep building sharp aim. Default 1.5.",
+      "type": "number",
+      "format": "float",
+      "default": 1.5
     }
   },
   "required": [

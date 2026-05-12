@@ -170,6 +170,23 @@ pub struct SettingsPatch {
     /// so cfctl `observe.settings` is round-trippable.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub tick_rate_hz: Option<u32>,
+    /// **M1 Gap F1**: configurable feel cvars. All values must be finite
+    /// and (where applicable) positive; `apply_settings_patch` rejects
+    /// invalid patches via `validation_error`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub accel: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub friction: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub gravity: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub jump_force: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub recoil_decay_per_tick: Option<f32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub sharp_aim_build_ticks: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub walk_threshold: Option<f32>,
 }
 
 impl SettingsPatch {
@@ -186,9 +203,60 @@ impl SettingsPatch {
             && self.key_bindings.is_none()
             && self.reduce_camera_shake_pct.is_none()
             && self.tick_rate_hz.is_none()
+            && self.accel.is_none()
+            && self.friction.is_none()
+            && self.gravity.is_none()
+            && self.jump_force.is_none()
+            && self.recoil_decay_per_tick.is_none()
+            && self.sharp_aim_build_ticks.is_none()
+            && self.walk_threshold.is_none()
     }
 
     pub fn validation_error(&self) -> Option<String> {
+        // M1 Gap F2: feel cvars must be finite, sane values.
+        let positive = |label: &'static str, v: Option<f32>| -> Option<String> {
+            v.and_then(|x| {
+                if !x.is_finite() {
+                    Some(format!("{label}_must_be_finite"))
+                } else if x < 0.0 {
+                    Some(format!("{label}_must_be_non_negative"))
+                } else {
+                    None
+                }
+            })
+        };
+        if let Some(reason) = positive("accel", self.accel) {
+            return Some(reason);
+        }
+        if let Some(reason) = positive("friction", self.friction) {
+            return Some(reason);
+        }
+        if let Some(reason) = positive("jump_force", self.jump_force) {
+            return Some(reason);
+        }
+        if let Some(reason) = positive("recoil_decay_per_tick", self.recoil_decay_per_tick) {
+            return Some(reason);
+        }
+        if let Some(reason) = positive("walk_threshold", self.walk_threshold) {
+            return Some(reason);
+        }
+        if let Some(v) = self.gravity {
+            // Gravity must be finite; sign is negotiable (negative = pulls
+            // down; positive = anti-gravity test mode). Reject only NaN/Inf.
+            if !v.is_finite() {
+                return Some("gravity_must_be_finite".to_string());
+            }
+        }
+        if let Some(v) = self.sharp_aim_build_ticks {
+            if v == 0 {
+                return Some("sharp_aim_build_ticks_must_be_positive".to_string());
+            }
+        }
+        if let Some(v) = self.reduce_camera_shake_pct {
+            if !v.is_finite() {
+                return Some("reduce_camera_shake_pct_must_be_finite".to_string());
+            }
+        }
         self.key_bindings
             .as_ref()
             .and_then(|bindings| crate::settings::validate_key_bindings(bindings).err())
