@@ -722,11 +722,7 @@ fn step_one_actor<R: FnMut() -> u64>(
         let base_speed = (base_velocity.x * base_velocity.x + base_velocity.y * base_velocity.y).sqrt();
         let inherit_fraction = if spec.inherits_firer_velocity { 0.5_f32 } else { 0.0_f32 };
         // Reborrow actor.velocity for inheritance addition per particle.
-        let actor_velocity = state
-            .world
-            .actors
-            .get(&actor_id)
-            .map_or(Vec2::ZERO, |a| a.velocity);
+        let actor_velocity = state.world.actors.get(&actor_id).map_or(Vec2::ZERO, |a| a.velocity);
         for particle_idx in 0..particle_count {
             // Deterministic in-cone offset for particles 2..N. The first
             // particle always flies on the base aim line so single-particle
@@ -829,9 +825,7 @@ fn step_one_actor<R: FnMut() -> u64>(
         // Gap F3: prefer engine-supplied `deps.tuning.recoil_decay_per_tick`
         // when present so cfctl `act.settings.set { recoil_decay_per_tick: ... }`
         // takes effect immediately without per-actor patching.
-        let decay_rate = deps
-            .tuning
-            .map_or(actor.recoil_decay_rate, |t| t.recoil_decay_per_tick);
+        let decay_rate = deps.tuning.map_or(actor.recoil_decay_rate, |t| t.recoil_decay_per_tick);
         if outcome.recoil_applied == 0.0 && actor.recoil_accumulator.abs() > 1e-4 {
             let decay = decay_rate * actor.recoil_accumulator.signum();
             let next = actor.recoil_accumulator - decay;
