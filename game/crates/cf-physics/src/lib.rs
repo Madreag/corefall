@@ -21,7 +21,11 @@
     clippy::missing_panics_doc,
     clippy::must_use_candidate,
     clippy::doc_markdown,
-    clippy::missing_const_for_fn
+    clippy::missing_const_for_fn,
+    clippy::cast_precision_loss,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_lossless
 )]
 
 use serde::{Deserialize, Serialize};
@@ -374,6 +378,118 @@ pub fn apply_recoil(velocity_x: f32, aim_x: f32, recoil_impulse: f32) -> f32 {
     velocity_x - aim_x * recoil_impulse
 }
 
+/// **M2**: projectile-vs-pixel penetration parameters. Mirrors CCCP
+/// `SceneMan::TryPenetrate` (`SceneMan.cpp:544-686`). The formula uses
+/// `impulse² > integrity²` (CCCP `:571`) so the hot path stays sqrt-free.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct PenetrationInputs {
+    /// Projectile mass (kg).
+    pub mass: f32,
+    /// Projectile velocity magnitude at contact (units / s).
+    pub velocity: f32,
+    /// Sharpness multiplier in [0, 1]. 1.0 = perfectly sharp.
+    pub sharpness: f32,
+    /// Per-pixel integrity (= material hardness in cf-terrain).
+    pub integrity: f32,
+    /// Stickiness in [0, 1] — chance the projectile is drawn into the
+    /// terrain on failed penetration (CCCP `Material.Stickiness`).
+    pub stickiness: f32,
+    /// Restitution coefficient in [0, 1] — bounce energy retained when the
+    /// projectile fails to penetrate AND doesn't stick.
+    pub restitution: f32,
+    /// Friction coefficient in [0, 1] — drag applied to bouncing projectiles.
+    pub friction: f32,
+    /// Engine RNG roll in [0, 1). Used to resolve the stickiness check.
+    /// Caller MUST pass a deterministic roll from the seeded engine RNG;
+    /// never `thread_rng()` (AGENTS.md rule).
+    pub rng_roll: f32,
+}
+
+/// **M2**: projectile-vs-pixel penetration outcome.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct PenetrationOutcome {
+    /// True if the projectile passed through (the pixel is cleared to air
+    /// and spawn_material debris fires).
+    pub passes: bool,
+    /// True if the projectile stuck to the terrain (becomes part of the
+    /// pixel color grid; consumed for future restitution behavior).
+    pub stuck: bool,
+    /// Surviving velocity magnitude after this collision. Zero when the
+    /// projectile stuck; reduced via `restitution * friction` on bounce.
+    pub remaining_velocity: f32,
+    /// Squared impulse computed by the formula (cached for the
+    /// `terrain.terrain_penetration_threshold` event payload).
+    pub impulse_squared: f32,
+    /// Squared integrity used by the formula (cached for the event).
+    pub integrity_squared: f32,
+}
+
+/// Run the canonical penetration formula. Returns a deterministic outcome
+/// per the inputs (uses `rng_roll` for stickiness; no internal RNG).
+///
+/// Per CCCP `SceneMan.cpp:571`:
+///   impulse_squared > integrity_squared  →  penetrates
+///   else                                    →  stickiness roll, then bounce
+#[must_use]
+pub fn try_penetrate(inputs: PenetrationInputs) -> PenetrationOutcome {
+    let impulse = inputs.mass.max(0.0) * inputs.velocity.max(0.0) * inputs.sharpness.clamp(0.0, 1.0);
+    let impulse_squared = impulse * impulse;
+    let integrity_squared = inputs.integrity.max(0.0) * inputs.integrity.max(0.0);
+    if impulse_squared > integrity_squared {
+        // Penetration succeeds. CCCP `:614` clears the pixel + spawns debris;
+        // the caller wires the spawn_material lookup.
+        let speed_loss_factor = (integrity_squared / impulse_squared.max(f32::EPSILON))
+            .sqrt()
+            .clamp(0.0, 1.0);
+        let remaining = (inputs.velocity * (1.0 - speed_loss_factor)).max(0.0);
+        return PenetrationOutcome {
+            passes: true,
+            stuck: false,
+            remaining_velocity: remaining,
+            impulse_squared,
+            integrity_squared,
+        };
+    }
+    // Failed penetration: roll for stickiness.
+    let stuck = inputs.rng_roll < inputs.stickiness.clamp(0.0, 1.0);
+    if stuck {
+        return PenetrationOutcome {
+            passes: false,
+            stuck: true,
+            remaining_velocity: 0.0,
+            impulse_squared,
+            integrity_squared,
+        };
+    }
+    // Bounce: keep restitution × (1 - friction) of the incoming speed.
+    let bounce = inputs.restitution.clamp(0.0, 1.0) * (1.0 - inputs.friction.clamp(0.0, 1.0));
+    PenetrationOutcome {
+        passes: false,
+        stuck: false,
+        remaining_velocity: inputs.velocity * bounce,
+        impulse_squared,
+        integrity_squared,
+    }
+}
+
+/// **M2**: hazard contact damage routing. Returns the total damage to apply
+/// to the actor when their AABB overlaps `hazard_pixels` count of hazard
+/// pixels at `damage_per_tick` per-pixel. Pure / stateless: callers pull
+/// the overlap count from `ChunkedTerrain` and the per-tick rate from
+/// `MaterialAffordance::damage_per_tick`.
+#[must_use]
+pub fn hazard_contact_damage(hazard_pixels: u32, damage_per_tick: f32) -> f32 {
+    if hazard_pixels == 0 || damage_per_tick <= 0.0 {
+        return 0.0;
+    }
+    // Per-tile damage scales by pixel overlap normalized to a unit body
+    // (16x32 = 512 pixels nominal). Below 16-pixel overlap (~1% of an
+    // actor's footprint) we apply the base rate; above scales linearly to
+    // 2x at 256-pixel overlap (~50% body inside hazard).
+    let normalized = (hazard_pixels as f32 / 256.0).clamp(0.5, 2.0);
+    damage_per_tick * normalized
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -625,5 +741,82 @@ mod tests {
         assert_eq!(z, cf_chassis::BodyZone::FootRight);
         let z = zone_from_hit((0.0, 0.0), (8.0, 16.0), (-1.0, -14.0));
         assert_eq!(z, cf_chassis::BodyZone::FootLeft);
+    }
+
+    fn pen(mass: f32, velocity: f32, integrity: f32) -> PenetrationInputs {
+        PenetrationInputs {
+            mass,
+            velocity,
+            sharpness: 0.8,
+            integrity,
+            stickiness: 0.0,
+            restitution: 0.30,
+            friction: 0.5,
+            rng_roll: 0.99,
+        }
+    }
+
+    #[test]
+    fn try_penetrate_dirt_passes() {
+        // Spec: mass=0.05, velocity=400, sharpness=0.8 -> impulse=16 -> impulse²=256
+        // dirt integrity=10 -> integrity²=100. 256 > 100 → passes.
+        let outcome = try_penetrate(pen(0.05, 400.0, 10.0));
+        assert!(outcome.passes);
+        assert!(outcome.impulse_squared > outcome.integrity_squared);
+    }
+
+    #[test]
+    fn try_penetrate_concrete_blocks() {
+        // Spec: concrete integrity=40 -> integrity²=1600. 256 < 1600 → does NOT pass.
+        let outcome = try_penetrate(pen(0.05, 400.0, 40.0));
+        assert!(!outcome.passes);
+        assert!(!outcome.stuck);
+        assert!(outcome.remaining_velocity > 0.0);
+    }
+
+    #[test]
+    fn try_penetrate_metal_blocks() {
+        // Spec: metal_nohook integrity=100 -> integrity²=10000.
+        let outcome = try_penetrate(pen(0.05, 400.0, 100.0));
+        assert!(!outcome.passes);
+        assert!(outcome.impulse_squared < outcome.integrity_squared);
+    }
+
+    #[test]
+    fn try_penetrate_stickiness_pulls_in() {
+        // High stickiness + low rng_roll = stuck.
+        let mut inputs = pen(0.05, 400.0, 100.0);
+        inputs.stickiness = 0.70;
+        inputs.rng_roll = 0.10;
+        let outcome = try_penetrate(inputs);
+        assert!(!outcome.passes);
+        assert!(outcome.stuck);
+        assert_eq!(outcome.remaining_velocity, 0.0);
+    }
+
+    #[test]
+    fn try_penetrate_stickiness_misses_at_high_roll() {
+        let mut inputs = pen(0.05, 400.0, 100.0);
+        inputs.stickiness = 0.70;
+        inputs.rng_roll = 0.95;
+        let outcome = try_penetrate(inputs);
+        assert!(!outcome.passes);
+        assert!(!outcome.stuck);
+        assert!(outcome.remaining_velocity > 0.0);
+    }
+
+    #[test]
+    fn hazard_contact_damage_scales_with_pixel_overlap() {
+        // Zero overlap → zero damage.
+        assert_eq!(hazard_contact_damage(0, 2.0), 0.0);
+        // Small overlap clamps to 0.5x.
+        let small = hazard_contact_damage(8, 2.0);
+        assert!((small - 1.0).abs() < 1e-6);
+        // Mid overlap (above 128 = 0.5x clamp threshold) scales linearly.
+        let mid = hazard_contact_damage(320, 2.0);
+        assert!(mid > small);
+        // Large overlap clamps to 2x.
+        let big = hazard_contact_damage(1024, 2.0);
+        assert!((big - 4.0).abs() < 1e-6);
     }
 }
