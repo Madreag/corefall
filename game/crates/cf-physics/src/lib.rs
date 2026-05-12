@@ -791,7 +791,7 @@ mod tests {
         let outcome = try_penetrate(inputs);
         assert!(!outcome.passes);
         assert!(outcome.stuck);
-        assert_eq!(outcome.remaining_velocity, 0.0);
+        assert!(outcome.remaining_velocity.abs() < f32::EPSILON);
     }
 
     #[test]
@@ -808,7 +808,7 @@ mod tests {
     #[test]
     fn hazard_contact_damage_scales_with_pixel_overlap() {
         // Zero overlap → zero damage.
-        assert_eq!(hazard_contact_damage(0, 2.0), 0.0);
+        assert!(hazard_contact_damage(0, 2.0).abs() < f32::EPSILON);
         // Small overlap clamps to 0.5x.
         let small = hazard_contact_damage(8, 2.0);
         assert!((small - 1.0).abs() < 1e-6);
