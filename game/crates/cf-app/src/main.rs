@@ -112,6 +112,14 @@ struct Cli {
     /// desktop cannot inject player/focus commands into the control script.
     #[arg(long)]
     disable_local_input: bool,
+    /// **M1 R2 / Blocker 3b**: when set, cf-app's drive_engine_tick advances
+    /// as many sim ticks per Bevy frame as the engine's clock budget allows
+    /// (capped at 1024 per frame). cf-e2e passes this for cfctl scripts whose
+    /// total sim ticks exceed the wall-clock window cf-e2e's default 180s
+    /// timeout allows. Determinism is preserved because the sim is still
+    /// deterministic per tick; only the wall-clock pacing changes.
+    #[arg(long)]
+    unpaced: bool,
     /// M4A: ACC-A-05 hold-to-press alternative for tap-to-press actions.
     #[arg(long)]
     hold_to_confirm: bool,
@@ -202,6 +210,7 @@ fn main() -> Result<()> {
             cli.control_port,
             cli.control_uds.clone(),
             cli.control_port_file.clone(),
+            cli.unpaced,
         ),
         (true, false) => run_headless(config),
         (false, _) => run_bevy(
@@ -212,6 +221,7 @@ fn main() -> Result<()> {
             cli.control_port_file.clone(),
             !cli.disable_local_input,
             capture_opts,
+            cli.unpaced,
         ),
     }
 }
@@ -249,6 +259,7 @@ fn run_headless_server(
     control_port: u16,
     _uds: Option<PathBuf>,
     control_port_file: Option<PathBuf>,
+    unpaced: bool,
 ) -> Result<()> {
     let engine = Arc::new(M0Engine::new(config.clone()));
     engine.record_run_started();
@@ -257,7 +268,11 @@ fn run_headless_server(
     let control_rt = start_control_server(engine.clone(), control_port)?;
     write_control_port_file(control_port_file.as_deref(), control_rt.bound_addr)?;
     let _control_rt = control_rt;
-    let bundle_written = run_paced_loop(&engine, config.duration_ticks, config.tick_rate_hz);
+    let bundle_written = if unpaced {
+        run_unpaced_loop(&engine, config.duration_ticks)
+    } else {
+        run_paced_loop(&engine, config.duration_ticks, config.tick_rate_hz)
+    };
 
     // Final bundle drain BEFORE finalize so `system.shutdown {write_run_bundle: true}` is honored.
     let mut bundle_written = bundle_written;
@@ -320,6 +335,45 @@ fn run_paced_loop(engine: &Arc<M0Engine>, target_ticks: u64, tick_rate_hz: u32) 
             std::thread::sleep(remaining.min(poll_chunk));
         }
         next_tick_at += tick_dt;
+    }
+    bundle_written
+}
+
+/// **M1 R2 / Blocker 3b**: race `engine.drive_tick()` as fast as possible
+/// while the control API processes commands on its own tokio runtime. When
+/// the engine's clock budget is exhausted, sleep briefly so the control
+/// server can dispatch the next `sim.run_for_ticks` / `sim.step` command.
+/// Used by `--headless-smoke --control-api --unpaced` and required for
+/// cf-e2e scripts whose total sim ticks exceed the wall-clock window cf-e2e's
+/// 180s timeout allows (18000-tick m1_5min_endurance would otherwise take
+/// 300s of wall-clock pacing).
+///
+/// Unlike `run_paced_loop`, this **does not** auto-exit when
+/// `engine.current_tick() >= config.duration_ticks`. The driving cf-e2e
+/// session is authoritative over lifecycle: it explicitly invokes
+/// `system.shutdown` (or closes the WS) when the script is done.
+/// Auto-exiting on `target_ticks` in unpaced mode would cause cf-app to
+/// tear down its control server BEFORE cf-e2e finishes the script,
+/// producing the "Connection reset without closing handshake" failure mode
+/// observed during M1 R2 development. `_target_ticks` is accepted for
+/// signature parity but intentionally unused.
+fn run_unpaced_loop(engine: &Arc<M0Engine>, _target_ticks: u64) -> bool {
+    let mut bundle_written = false;
+    let idle_chunk = std::time::Duration::from_millis(1);
+    loop {
+        if engine.shutdown_requested() {
+            break;
+        }
+        if engine.drive_tick().is_none() {
+            flush_pending_runbundle(engine, &mut bundle_written);
+            // SimClock budget exhausted; wait for the next control-server
+            // dispatch to raise the budget. 1 ms is short enough that
+            // `sim.run_for_ticks` round-trip latency dominates the cf-e2e
+            // poll loop; long enough that we don't busy-spin a CPU core.
+            std::thread::sleep(idle_chunk);
+            continue;
+        }
+        flush_pending_runbundle(engine, &mut bundle_written);
     }
     bundle_written
 }
@@ -482,6 +536,18 @@ struct EngineHolder(Arc<M0Engine>);
 struct AppRuntime {
     duration_ticks: u64,
     last_announced_tick: u64,
+    /// **M1 R2 / Blocker 3b**: when true, `drive_engine_tick` advances as
+    /// many sim ticks per Bevy frame as the engine's clock budget allows
+    /// (capped at `unpaced_max_ticks_per_frame`). Without this, cf-app
+    /// drives exactly one tick per Bevy frame (~60Hz wall-clock), which
+    /// makes 18000-tick endurance scripts take 300s of wall clock and
+    /// cf-e2e's 180s default timeout kill them. With this flag the engine
+    /// races through pending budget so 18000 ticks complete in seconds.
+    unpaced: bool,
+    /// Safety cap on ticks-per-frame so a runaway budget can't starve
+    /// Bevy's other systems. Defaults to 1024 which is plenty for the M1
+    /// endurance script (~18 Bevy frames to finish 18000 ticks).
+    unpaced_max_ticks_per_frame: u32,
 }
 
 #[derive(Resource)]
@@ -509,6 +575,7 @@ fn run_bevy(
     control_port_file: Option<PathBuf>,
     local_input_enabled: bool,
     capture_opts: CaptureOptions,
+    unpaced: bool,
 ) -> Result<()> {
     let engine = Arc::new(M0Engine::new(config.clone()));
     engine.record_run_started();
@@ -589,12 +656,23 @@ fn run_bevy(
     app.insert_resource(AppRuntime {
         duration_ticks: config.duration_ticks,
         last_announced_tick: 0,
+        unpaced,
+        unpaced_max_ticks_per_frame: 1024,
     });
     if let Some(rt) = control_rt {
         app.insert_resource(rt);
     }
 
-    app.add_systems(FixedUpdate, drive_engine_tick).add_systems(
+    // Paced (default) path: drive_engine_tick fires from FixedUpdate at
+    // tick_rate_hz, exactly one sim tick per fire. The unpaced path below
+    // drives from Update so it isn't capped by the FixedUpdate schedule;
+    // both gate internally on `runtime.unpaced` so only one of them does
+    // real work per Bevy iteration.
+    app.add_systems(FixedUpdate, drive_engine_tick);
+    if unpaced {
+        app.add_systems(Update, drive_engine_tick_unpaced);
+    }
+    app.add_systems(
         Update,
         (
             esc_or_close_to_exit,
@@ -750,6 +828,13 @@ fn pump_recorder_events_into_render_effects(
 }
 
 fn drive_engine_tick(holder: Res<EngineHolder>, mut runtime: ResMut<AppRuntime>) {
+    if runtime.unpaced {
+        // Paced path is short-circuited when unpaced is requested; the
+        // separate Update-scheduled `drive_engine_tick_unpaced` does the
+        // real work. We bail here so the FixedUpdate firing rate doesn't
+        // bottleneck cf-e2e scripts with thousand-tick budgets.
+        return;
+    }
     if holder.0.shutdown_requested() {
         return;
     }
@@ -757,6 +842,40 @@ fn drive_engine_tick(holder: Res<EngineHolder>, mut runtime: ResMut<AppRuntime>)
         return;
     }
     let _ = holder.0.drive_tick();
+    drain_pending_bundle(&holder.0);
+    let cur = holder.0.current_tick().0;
+    if runtime.duration_ticks > 0 && cur >= runtime.duration_ticks {
+        runtime.last_announced_tick = cur;
+    }
+}
+
+/// **M1 R2 / Blocker 3b**: unpaced engine driver. Runs on Bevy's Update
+/// schedule (not FixedUpdate) so it isn't capped at `tick_rate_hz` real-time
+/// firing. Drives up to `unpaced_max_ticks_per_frame` (default 1024) ticks
+/// per Bevy frame, stopping when the engine's clock budget is exhausted.
+/// This is what makes the 18000-tick m1_5min_endurance cfctl script
+/// complete in seconds instead of 5 minutes of wall-clock pacing.
+fn drive_engine_tick_unpaced(holder: Res<EngineHolder>, mut runtime: ResMut<AppRuntime>) {
+    if !runtime.unpaced {
+        return;
+    }
+    if holder.0.shutdown_requested() {
+        return;
+    }
+    if runtime.duration_ticks > 0 && holder.0.current_tick().0 >= runtime.duration_ticks {
+        return;
+    }
+    let max_ticks_this_frame = runtime.unpaced_max_ticks_per_frame.max(1);
+    for _ in 0..max_ticks_this_frame {
+        if runtime.duration_ticks > 0 && holder.0.current_tick().0 >= runtime.duration_ticks {
+            break;
+        }
+        if holder.0.drive_tick().is_none() {
+            // SimClock budget exhausted; wait for the next sim.run_for_ticks
+            // / sim.step dispatch to raise the budget again.
+            break;
+        }
+    }
     drain_pending_bundle(&holder.0);
     let cur = holder.0.current_tick().0;
     if runtime.duration_ticks > 0 && cur >= runtime.duration_ticks {

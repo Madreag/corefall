@@ -111,6 +111,15 @@ struct Cli {
     /// invocation). 0 = use cf-app's default (60 Hz).
     #[arg(long, default_value_t = 0)]
     tick_rate_hz: u32,
+    /// **M1 R2 / Blocker 3b**: drive the spawned cf-app in unpaced mode so
+    /// `sim.run_for_ticks` budgets resolve in a handful of Bevy frames
+    /// instead of pacing 1 tick per Bevy frame (~60Hz wall-clock).
+    /// Required for the m1_5min_endurance script (18000 ticks) which
+    /// otherwise takes 300s of wall clock and exceeds the default 180s
+    /// timeout. Determinism is preserved — the sim is deterministic
+    /// per-tick, only the wall-clock pacing changes.
+    #[arg(long)]
+    unpaced: bool,
     /// Path to `python3` used to invoke the grid composer. Defaults to `python3`.
     #[arg(long, default_value = "python3")]
     python_bin: String,
@@ -185,6 +194,7 @@ async fn main() -> Result<()> {
         reduced_motion: cli.reduced_motion,
         reduced_shake: cli.reduced_shake,
         reduced_flash: cli.reduced_flash,
+        unpaced: cli.unpaced,
     })?;
     let control_port = if let Some(port_file) = launched.control_port_file.as_ref() {
         match wait_for_control_port_file(port_file, Duration::from_secs(8)).await {
@@ -534,6 +544,10 @@ struct LaunchOptions<'a> {
     reduced_motion: bool,
     reduced_shake: bool,
     reduced_flash: bool,
+    /// **M1 R2 / Blocker 3b**: forward `--unpaced` to cf-app so the engine
+    /// races through sim.run_for_ticks budgets without per-tick wall-clock
+    /// pacing.
+    unpaced: bool,
 }
 
 struct LaunchedApp {
@@ -632,6 +646,9 @@ fn build_cf_app_args(opts: &LaunchOptions<'_>, control_port_file: Option<&Path>)
     // still opens a Bevy window, but it must not ingest ambient keyboard or
     // gamepad input from the developer machine and corrupt the scenario path.
     args.push("--disable-local-input".into());
+    if opts.unpaced {
+        args.push("--unpaced".into());
+    }
     args
 }
 
