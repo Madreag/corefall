@@ -1330,6 +1330,7 @@ mod tests {
             chassis: None,
             origin_id: "human".into(),
             stability: 1.0,
+            mass_kg: 80.0,
             crouch_active: false,
             climb_active: false,
             jet_active: false,

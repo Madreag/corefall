@@ -495,6 +495,11 @@ pub struct ActorState {
     /// Half-extents of the AABB used for ground collision + future limb proxies.
     /// M1 uses a chunky 8x16 actor footprint; M5 replaces this with chassis half-extents.
     pub half_extents: Vec2,
+    /// Physical mass in kg. Affects recoil magnitude, knockdown resistance,
+    /// and future collision impulse routing. Chassis kind overrides this
+    /// when attached (Infantry 80kg, PoweredArmor 200kg, LightMech 600kg).
+    #[serde(default = "default_mass_kg")]
+    pub mass_kg: f32,
     /// **M5**: full chassis state (body graph + armor zones + modules + pilot binding).
     /// `None` for legacy M1 / M1.5 actors that haven't been promoted; `Some` for
     /// M5+ chassis-grade actors (infantry / powered_armor / light_mech).
@@ -621,6 +626,10 @@ fn default_stability_recovery_rate() -> f32 {
     0.02
 }
 
+fn default_mass_kg() -> f32 {
+    80.0 // human infantry default
+}
+
 impl ActorState {
     /// Create a default M1 player actor at `spawn` with `inventory` and full HP.
     pub fn player(id: ActorId, team: impl Into<String>, spawn: Vec2, hp_max: f32, inventory: Inventory) -> Self {
@@ -640,6 +649,7 @@ impl ActorState {
             inventory,
             controllable: true,
             half_extents: Vec2::new(8.0, 16.0),
+            mass_kg: 80.0,
             chassis: None,
             origin_id: default_origin_id(),
             crouch_active: false,
@@ -677,12 +687,13 @@ impl ActorState {
     /// chassis silhouette for the given chassis kind so M5.5 collision proxies
     /// match the visible silhouette.
     pub fn attach_chassis(&mut self, chassis: cf_chassis::ChassisState) {
-        let half_extents = match chassis.kind {
-            cf_chassis::ChassisKind::Infantry => Vec2::new(8.0, 16.0),
-            cf_chassis::ChassisKind::PoweredArmor => Vec2::new(10.0, 20.0),
-            cf_chassis::ChassisKind::LightMech => Vec2::new(18.0, 36.0),
+        let (half_extents, mass) = match chassis.kind {
+            cf_chassis::ChassisKind::Infantry => (Vec2::new(8.0, 16.0), 80.0),
+            cf_chassis::ChassisKind::PoweredArmor => (Vec2::new(10.0, 20.0), 200.0),
+            cf_chassis::ChassisKind::LightMech => (Vec2::new(18.0, 36.0), 600.0),
         };
         self.half_extents = half_extents;
+        self.mass_kg = mass;
         self.chassis = Some(chassis);
     }
 
@@ -1133,6 +1144,9 @@ pub struct ActorObservation {
     /// W1.3: stability scalar (0.0 = fully disrupted, 1.0 = stable).
     #[serde(default = "default_stability")]
     pub stability: f32,
+    /// Physical mass in kg. Affects movement feel, stability resistance, knockdown.
+    #[serde(default = "default_mass_kg")]
+    pub mass_kg: f32,
     /// **M5**: per-tick movement-intent mirror.
     #[serde(default)]
     pub crouch_active: bool,
@@ -1162,6 +1176,7 @@ impl From<&ActorState> for ActorObservation {
             chassis: actor.chassis_view(),
             origin_id: actor.origin_id.clone(),
             stability: actor.stability,
+            mass_kg: actor.mass_kg,
             crouch_active: actor.crouch_active,
             climb_active: actor.climb_active,
             jet_active: actor.jet_active,

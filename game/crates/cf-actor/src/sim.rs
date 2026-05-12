@@ -233,6 +233,9 @@ pub struct SpawnedProjectile {
     pub origin: Vec2,
     pub velocity: Vec2,
     pub damage: f32,
+    /// Loudness radius in world units. AI guards within this radius
+    /// can detect the shot for awareness/alert purposes.
+    pub loudness_radius: f32,
 }
 
 /// Projectile that flew off the map / outlasted its budget without hitting anything.
@@ -366,7 +369,15 @@ fn step_one_actor(
             // and the `disables_rifle_when_destroyed` flag gates fire/reload.
             // The `forces_crawl_when_destroyed` and `disables_jet_when_destroyed`
             // flags route through stance derivation + jet command rejection.
-            let tuning = ActorTuning::default();
+            let mut tuning = ActorTuning::default();
+            // Mass-based physics feel: heavier chassis accelerate/decelerate
+            // slower and jump lower, making them feel appropriately weighty.
+            // 80kg = 1.0x, 200kg = 0.63x, 600kg = 0.37x.
+            let mass_factor = (80.0 / actor.mass_kg.max(1.0)).sqrt().min(1.0);
+            tuning.ground_acceleration *= mass_factor;
+            tuning.air_acceleration *= mass_factor;
+            tuning.ground_friction *= mass_factor;
+            tuning.jump_impulse *= mass_factor;
             let (move_factor, jump_factor, _disable_rifle, force_crawl, drop_gear, disable_jet) =
                 if let Some(chassis) = actor.chassis.as_ref() {
                     chassis.body_graph.movement_factor(&chassis.destroyed_zones())
@@ -535,7 +546,16 @@ fn step_one_actor(
                 actor.position.x + aim.x * spec.muzzle_forward_offset,
                 actor.position.y + spec.muzzle_vertical_offset + aim.y * spec.muzzle_forward_offset,
             );
-            let velocity = Vec2::new(aim.x * spec.projectile_speed, aim.y * spec.projectile_speed);
+            // A-FEEL spec: "Inherited projectile velocity from actor motion."
+            // Projectiles inherit the shooter's velocity so running-and-gunning
+            // changes shot trajectories. The inheritance fraction (0.5) means
+            // half the actor's velocity adds to the muzzle velocity — enough to
+            // matter at full sprint without making shots impossible to aim.
+            let inherit_fraction = 0.5_f32;
+            let velocity = Vec2::new(
+                aim.x * spec.projectile_speed + actor.velocity.x * inherit_fraction,
+                aim.y * spec.projectile_speed + actor.velocity.y * inherit_fraction,
+            );
             (muzzle, velocity, spec.damage_per_hit)
         };
         outcome.muzzle_origin = Some(muzzle);
@@ -549,12 +569,16 @@ fn step_one_actor(
             damage,
             remaining_ticks: max_flight,
         });
+        // Loudness radius: rifles are loud. Scale with damage as a proxy for
+        // weapon size. Base 480 units = default sight_radius of the reactive guard.
+        let loudness_radius = 480.0_f32 * (damage / 10.0).max(1.0).min(3.0);
         report.spawned_projectiles.push(SpawnedProjectile {
             id: projectile_id,
             owner: actor_id,
             origin: muzzle,
             velocity,
             damage,
+            loudness_radius,
         });
     }
 
@@ -568,18 +592,19 @@ fn step_one_actor(
             .get_mut(&actor_id)
             .expect("actor id exists by construction");
 
-        // Recoil destabilizes proportional to impulse strength (normalized to a
-        // 200-impulse reference so a standard rifle recoil ~120 costs ~0.06 stability).
+        // Mass-scaled stability: heavier actors resist destabilization.
+        // 80kg infantry = 1.0x cost; 200kg powered armor = 0.4x; 600kg mech = 0.13x.
+        let mass_resistance = (80.0 / actor.mass_kg.max(1.0)).min(2.0);
+
+        // Recoil destabilizes proportional to impulse strength, scaled by mass.
         if outcome.recoil_applied > 0.0 {
-            let recoil_cost = (outcome.recoil_applied / 200.0).min(0.3);
+            let recoil_cost = (outcome.recoil_applied / 200.0).min(0.3) * mass_resistance;
             actor.stability = (actor.stability - recoil_cost).max(0.0);
         }
 
         // Landing impact destabilizes based on vertical impulse magnitude.
-        // A normal jump lands at ~420 impulse → ~0.04 cost; a long fall
-        // at terminal velocity (~1800) → ~0.18 cost.
         if outcome.landed_impulse > 0.0 {
-            let impact_cost = (outcome.landed_impulse / 1000.0).min(0.5);
+            let impact_cost = (outcome.landed_impulse / 1000.0).min(0.5) * mass_resistance;
             actor.stability = (actor.stability - impact_cost).max(0.0);
         }
 
