@@ -887,7 +887,7 @@ impl M0Engine {
             }),
             None,
         );
-        self.emit_initial_snapshots(tick, sim_time_ms, &started_id);
+        self.emit_initial_snapshots(tick, sim_time_ms, Some(&started_id));
         self.emit_category_baseline(tick, sim_time_ms, &started_id);
         // M1 Seam S4: pre-emit `mission.mission_started` whenever a
         // MissionState is attached. M1.5 will populate richer payloads;
@@ -981,7 +981,7 @@ impl M0Engine {
     /// cf-headless replay verifier (and any future M3B viewer) can reconstruct
     /// the world without re-loading the manifest from disk. Snapshots are
     /// emitted again on every objective change inside `drive_tick`.
-    fn emit_initial_snapshots(&self, tick: Tick, sim_time_ms: f64, parent_event_id: &str) {
+    fn emit_initial_snapshots(&self, tick: Tick, sim_time_ms: f64, parent_event_id: Option<&str>) {
         let state = self.state.read().expect("engine state poisoned");
         let actor_state = state.actor_state.as_ref().cloned();
         let chunked_terrain = state.chunked_terrain.as_ref().cloned();
@@ -1007,7 +1007,7 @@ impl M0Engine {
                         "selected_slot": actor.inventory.selected.0,
                         "kind": "actor",
                     }),
-                    Some(parent_event_id.to_string()),
+                    parent_event_id.map(|s| s.to_string()),
                 );
                 let rifle_ammo = sim
                     .rifles
@@ -1025,7 +1025,7 @@ impl M0Engine {
                         "items": actor.inventory.items.iter().map(|i| i.label()).collect::<Vec<_>>(),
                         "rifle_state": rifle_ammo,
                     }),
-                    Some(parent_event_id.to_string()),
+                    parent_event_id.map(|s| s.to_string()),
                 );
             }
         }
@@ -1045,7 +1045,7 @@ impl M0Engine {
                         "hp_max": r.max_hp,
                         "destroyed": r.is_destroyed(),
                     }),
-                    Some(parent_event_id.to_string()),
+                    parent_event_id.map(|s| s.to_string()),
                 );
             }
         }
@@ -1065,7 +1065,7 @@ impl M0Engine {
                         "pixels_len": chunk.pixels.len(),
                         "pixels_blake3": hex::encode(&blake3::hash(&chunk.pixels).as_bytes()[..16]),
                     }),
-                    Some(parent_event_id.to_string()),
+                    parent_event_id.map(|s| s.to_string()),
                 );
             }
             self.recorder.record(
@@ -1082,7 +1082,7 @@ impl M0Engine {
                     "material_counts": snapshot.material_counts,
                     "allocated_chunks": snapshot.chunks.len(),
                 }),
-                Some(parent_event_id.to_string()),
+                parent_event_id.map(|s| s.to_string()),
             );
         }
     }
@@ -1983,7 +1983,12 @@ impl M0Engine {
             }
             // W1 item 770: re-emit snapshots on any objective state change so
             // the replay verifier and viewer can reconstruct mid-mission state.
-            self.emit_initial_snapshots(tick, sim_time_ms, "objective_change");
+            // **M1.5 fix**: objective-change re-emit has no clean parent
+            // event_id (multiple state changes can land in one tick). Emit
+            // with parent_event_id=None so the verifier doesn't reject
+            // "objective_change" as a missing parent. M3B's replay viewer
+            // walks snapshots by tick anyway.
+            self.emit_initial_snapshots(tick, sim_time_ms, None);
         }
 
         // **M5**: tick the chassis eject sequence for every actor + emit progress events.
