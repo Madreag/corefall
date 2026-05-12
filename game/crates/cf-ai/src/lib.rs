@@ -883,6 +883,35 @@ pub fn step(guard: &mut ReactiveGuard, inputs: GuardTickInputs<'_>, rng: &mut Rn
         }
     }
 
+    // **M1.5 G5**: stuck-recovery detector. While the guard is Alert /
+    // Engaged AND can't see the player, increment stuck_ticks. Reset when
+    // the player is visible OR when the guard fires successfully OR when
+    // memory decays. When stuck_ticks crosses 60 (1 second @60Hz) the
+    // engine emits ai.stuck_state_changed + ai.recovery_action and the
+    // counter resets. Recovery action is `wait_then_search` at M1.5;
+    // M2+ adds `dig_through` when chunked-terrain pathing lands.
+    if matches!(
+        guard.state,
+        GuardState::Alert | GuardState::Engaged | GuardState::Retreating
+    ) && !player_visible_now
+    {
+        guard.stuck_ticks = guard.stuck_ticks.saturating_add(1);
+        if guard.stuck_ticks >= 60 && !guard.stuck_recovery_latched {
+            guard.stuck_recovery_latched = true;
+            report.stuck_recovery = Some(StuckRecoveryRecord {
+                stuck_ticks: guard.stuck_ticks,
+                blocker: "no_path",
+                action: "wait_then_search",
+                reason: "los_blocked_too_long",
+            });
+            // Reset so a second stuck window can fire later in the run.
+            guard.stuck_ticks = 0;
+        }
+    } else {
+        guard.stuck_ticks = 0;
+        guard.stuck_recovery_latched = false;
+    }
+
     // 6) Aim tracking. When a player is currently visible, aim straight at them.
     //    When alerted but not visible, aim at the last seen position.
     update_aim(guard, &perception, inputs.self_actor.position);
@@ -922,6 +951,14 @@ pub fn step(guard: &mut ReactiveGuard, inputs: GuardTickInputs<'_>, rng: &mut Rn
                 inputs.tick_rate_hz,
                 prev_burst_pause_remaining_ticks,
             ) {
+                // **M1.5 G4**: when the shot will miss, attach a deterministic
+                // reason label so the cause-chain viewer can render an icon
+                // set rather than string-typing. The reason is bucketed
+                // from the same miss_roll the rng produced, so identical
+                // seeds produce identical reasons across runs.
+                if fire.will_miss {
+                    report.missed_shot_reason = Some(classify_miss_reason(fire.miss_roll));
+                }
                 report.fire = Some(fire);
             } else if guard.ammo_in_mag == 0 && guard.reload_remaining_ticks == 0 {
                 report.dry_fire = true;
@@ -940,6 +977,24 @@ fn decrement(value: &mut u32, by: u32) {
         *value -= by;
     } else {
         *value = 0;
+    }
+}
+
+/// **M1.5 G4**: bucket a `[0, 1]` miss roll into one of four reason labels.
+/// Same seed → same reason. Order picked so low rolls (close to threshold)
+/// favour recoil_deviation (the "your finger slipped" miss); higher rolls
+/// shift toward target_moved / occlusion / lucky_dodge (the "they did
+/// something" misses).
+fn classify_miss_reason(miss_roll: f32) -> MissedShotReason {
+    let r = miss_roll.clamp(0.0, 0.9999);
+    if r < 0.25 {
+        MissedShotReason::RecoilDeviation
+    } else if r < 0.50 {
+        MissedShotReason::TargetMoved
+    } else if r < 0.75 {
+        MissedShotReason::Occlusion
+    } else {
+        MissedShotReason::LuckyDodge
     }
 }
 
@@ -1485,6 +1540,20 @@ mod tests {
             .expect("hearing perception_signal must fire");
         assert_eq!(hearing.source_actor, Some(1));
         assert!(hearing.confidence > 0.0 && hearing.confidence <= 1.0);
+    }
+
+    /// **M1.5 G4**: `classify_miss_reason` is a pure function of the roll;
+    /// identical seeds produce identical reasons.
+    #[test]
+    fn classify_miss_reason_buckets_are_stable() {
+        assert_eq!(classify_miss_reason(0.0), MissedShotReason::RecoilDeviation);
+        assert_eq!(classify_miss_reason(0.24), MissedShotReason::RecoilDeviation);
+        assert_eq!(classify_miss_reason(0.26), MissedShotReason::TargetMoved);
+        assert_eq!(classify_miss_reason(0.49), MissedShotReason::TargetMoved);
+        assert_eq!(classify_miss_reason(0.51), MissedShotReason::Occlusion);
+        assert_eq!(classify_miss_reason(0.74), MissedShotReason::Occlusion);
+        assert_eq!(classify_miss_reason(0.76), MissedShotReason::LuckyDodge);
+        assert_eq!(classify_miss_reason(0.99), MissedShotReason::LuckyDodge);
     }
 
     /// **M1.5 G1**: low-HP guard transitions to Retreating.
