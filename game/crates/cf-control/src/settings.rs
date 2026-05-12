@@ -132,6 +132,20 @@ pub struct Settings {
     /// at the control boundary instead of silently falling back in cf-app.
     #[serde(default)]
     pub key_bindings: BTreeMap<String, String>,
+    /// **M1 / DR-055**: accessibility floor — camera shake magnitude is
+    /// multiplied by `(1.0 - reduce_camera_shake_pct)`. 0.0 = full shake,
+    /// 1.0 = no shake. Clamped to `[0, 1]` by `apply_settings_patch`.
+    #[serde(default)]
+    pub reduce_camera_shake_pct: f32,
+    /// **M1**: tick-rate observable. Mirrors the engine's
+    /// `tick_rate_hz` so cfctl `observe.settings` round-trips a single
+    /// authoritative value. Defaults to 60.
+    #[serde(default = "default_tick_rate_hz")]
+    pub tick_rate_hz: u32,
+}
+
+fn default_tick_rate_hz() -> u32 {
+    60
 }
 
 fn default_hold_threshold_ms() -> u32 {
@@ -229,6 +243,8 @@ impl Default for Settings {
             hold_threshold_ms: default_hold_threshold_ms(),
             key_remap_enabled: false,
             key_bindings: BTreeMap::new(),
+            reduce_camera_shake_pct: 0.0,
+            tick_rate_hz: default_tick_rate_hz(),
         }
     }
 }

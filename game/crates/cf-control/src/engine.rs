@@ -2461,6 +2461,41 @@ impl M0Engine {
                     Some(projectile_hit_event_id.clone()),
                 );
             }
+            // M1: scalar wound surface (M5 chassis adds zone/layer detail).
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "combat",
+                "wound_added",
+                json!({
+                    "actor": hit.target.0,
+                    "shooter": hit.shooter.0,
+                    "damage": hit.damage,
+                    "zone": hit.zone,
+                    "placeholder": true,
+                }),
+                Some(projectile_hit_event_id.clone()),
+            );
+            // M1: hit-stop request (DR-055 placeholder). Triggers when damage
+            // exceeds a critical threshold so the renderer can briefly freeze
+            // the frame. Full hit-stop renderer effect lands at M5+ when the
+            // damage grammar carries crit info.
+            const CRITICAL_DAMAGE_THRESHOLD: f32 = 20.0;
+            if hit.damage > CRITICAL_DAMAGE_THRESHOLD {
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "ux",
+                    "hit_stop_requested",
+                    json!({
+                        "actor": hit.target.0,
+                        "shooter": hit.shooter.0,
+                        "damage": hit.damage,
+                        "duration_ms": 80,
+                    }),
+                    Some(projectile_hit_event_id.clone()),
+                );
+            }
             // **M5**: emit chassis-grade events from the hit outcome.
             if let Some(outcome) = &hit.chassis_outcome {
                 self.emit_chassis_events(
@@ -3884,6 +3919,25 @@ fn apply_settings_patch(settings: &mut Settings, patch: &SettingsPatch) -> Vec<S
         if &settings.key_bindings != new_bindings {
             settings.key_bindings = new_bindings.clone();
             changed.push("key_bindings".to_string());
+        }
+    }
+    if let Some(v) = patch.reduce_camera_shake_pct {
+        let clamped = v.clamp(0.0, 1.0);
+        if (settings.reduce_camera_shake_pct - clamped).abs() > f32::EPSILON {
+            settings.reduce_camera_shake_pct = clamped;
+            changed.push("reduce_camera_shake_pct".to_string());
+        }
+    }
+    if let Some(v) = patch.tick_rate_hz {
+        // M1: the engine's tick_rate_hz is fixed at construction (so deterministic
+        // checksums are per-rate). The setting mirrors that value so cfctl
+        // observe.settings round-trips it; we accept the patch but the engine
+        // does NOT live-retick to the new rate. A future M5+ command will swap
+        // tick rate via scenario reload.
+        let v = v.max(1);
+        if settings.tick_rate_hz != v {
+            settings.tick_rate_hz = v;
+            changed.push("tick_rate_hz".to_string());
         }
     }
     changed

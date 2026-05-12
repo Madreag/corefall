@@ -441,6 +441,8 @@ fn build_config(cli: &Cli, scenario_path: PathBuf) -> Result<M0EngineConfig> {
             hold_threshold_ms: cli.hold_threshold_ms,
             key_remap_enabled: cli.key_remap_enabled,
             key_bindings: std::collections::BTreeMap::new(),
+            reduce_camera_shake_pct: 0.0,
+            tick_rate_hz: cli.tick_rate_hz,
         },
         seed_override: cli.seed,
         duration_ticks_override: if cli_duration > 0 { Some(cli_duration) } else { None },

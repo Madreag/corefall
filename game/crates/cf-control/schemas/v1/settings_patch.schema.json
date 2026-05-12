@@ -48,6 +48,14 @@
         "null"
       ]
     },
+    "reduce_camera_shake_pct": {
+      "description": "**M1 / DR-055**: camera shake reduction. Clamped to `[0, 1]`.\n`1.0` = no shake (accessibility floor).",
+      "type": [
+        "number",
+        "null"
+      ],
+      "format": "float"
+    },
     "reduced_flash": {
       "type": [
         "boolean",
@@ -65,6 +73,15 @@
         "boolean",
         "null"
       ]
+    },
+    "tick_rate_hz": {
+      "description": "**M1**: tick-rate observable. Clamped to `>= 1`. The engine does not\nlive-retick on patch; this mirrors the engine's configured tick rate\nso cfctl `observe.settings` is round-trippable.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint32",
+      "minimum": 0
     },
     "ui_scale": {
       "type": [

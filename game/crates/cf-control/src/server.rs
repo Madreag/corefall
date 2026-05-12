@@ -159,6 +159,15 @@ pub struct SettingsPatch {
     /// table is preserved.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub key_bindings: Option<std::collections::BTreeMap<String, String>>,
+    /// **M1 / DR-055**: camera shake reduction. Clamped to `[0, 1]`.
+    /// `1.0` = no shake (accessibility floor).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub reduce_camera_shake_pct: Option<f32>,
+    /// **M1**: tick-rate observable. Clamped to `>= 1`. The engine does not
+    /// live-retick on patch; this mirrors the engine's configured tick rate
+    /// so cfctl `observe.settings` is round-trippable.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tick_rate_hz: Option<u32>,
 }
 
 impl SettingsPatch {
@@ -173,6 +182,8 @@ impl SettingsPatch {
             && self.hold_threshold_ms.is_none()
             && self.key_remap_enabled.is_none()
             && self.key_bindings.is_none()
+            && self.reduce_camera_shake_pct.is_none()
+            && self.tick_rate_hz.is_none()
     }
 
     pub fn validation_error(&self) -> Option<String> {

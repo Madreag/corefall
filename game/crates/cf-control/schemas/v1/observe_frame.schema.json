@@ -1084,6 +1084,12 @@
           "type": "boolean",
           "default": false
         },
+        "reduce_camera_shake_pct": {
+          "description": "**M1 / DR-055**: accessibility floor — camera shake magnitude is\nmultiplied by `(1.0 - reduce_camera_shake_pct)`. 0.0 = full shake,\n1.0 = no shake. Clamped to `[0, 1]` by `apply_settings_patch`.",
+          "type": "number",
+          "format": "float",
+          "default": 0.0
+        },
         "reduced_flash": {
           "type": "boolean"
         },
@@ -1092,6 +1098,13 @@
         },
         "reduced_shake": {
           "type": "boolean"
+        },
+        "tick_rate_hz": {
+          "description": "**M1**: tick-rate observable. Mirrors the engine's\n`tick_rate_hz` so cfctl `observe.settings` round-trips a single\nauthoritative value. Defaults to 60.",
+          "type": "integer",
+          "format": "uint32",
+          "default": 60,
+          "minimum": 0
         },
         "ui_scale": {
           "type": "number",
