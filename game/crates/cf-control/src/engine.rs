@@ -7114,6 +7114,59 @@ mod tests {
         );
     }
 
+    /// **Enhancement D2**: in-process cross-run determinism. Drive the engine
+    /// twice with the same seed + same script and assert the final
+    /// determinism checksum hex strings match byte-for-byte.
+    #[tokio::test]
+    async fn cross_run_determinism_same_seed_same_final_checksum() {
+        async fn drive_run() -> Option<String> {
+            let path = write_m1_scenario();
+            let config = load_m1_test_config(path);
+            let engine = M0Engine::new(config);
+            engine.record_run_started();
+            // Settle to ground.
+            for _ in 0..6 {
+                engine.drive_tick();
+            }
+            let _ = engine
+                .dispatch(ControlCommand::ActPlayerAim {
+                    x: 1.0,
+                    y: 0.0,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            // Fire/release a handful of shots to exercise the cause chain.
+            for _ in 0..3 {
+                let _ = engine
+                    .dispatch(ControlCommand::ActPlayerFire {
+                        pressed: true,
+                        source: IntentSource::Cfctl,
+                    })
+                    .await;
+                for _ in 0..12 {
+                    engine.drive_tick();
+                }
+                let _ = engine
+                    .dispatch(ControlCommand::ActPlayerFire {
+                        pressed: false,
+                        source: IntentSource::Cfctl,
+                    })
+                    .await;
+                engine.drive_tick();
+            }
+            for _ in 0..120 {
+                engine.drive_tick();
+            }
+            engine.recorder().final_checksum_hex()
+        }
+        let cs_a = drive_run().await.expect("run a produced a checksum");
+        let cs_b = drive_run().await.expect("run b produced a checksum");
+        assert_eq!(
+            cs_a, cs_b,
+            "cross-run determinism: same seed + same script must produce byte-identical final sim checksum"
+        );
+    }
+
     /// **Gap C4**: walk parent_event_id from `actor.inventory_dropped` back to
     /// the root `input.intent_received`. Every link must resolve to a real
     /// recorded event id (no `ParentMissingFromBundle`). The expected chain:

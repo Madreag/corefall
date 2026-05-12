@@ -22,3 +22,8 @@ cf-sim-core = { path = "../cf-sim-core" }
 
 [dev-dependencies]
 criterion = "0.5"
+serde_json = { workspace = true }
+
+[[bench]]
+name = "m1_hot_path"
+harness = false

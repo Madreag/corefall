@@ -1475,6 +1475,7 @@ dependencies = [
  "cf-sim-core",
  "clap",
  "criterion",
+ "serde_json",
  "tracing",
  "tracing-subscriber",
 ]
