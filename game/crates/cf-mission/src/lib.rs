@@ -65,6 +65,12 @@ pub struct Objective {
     pub optional: bool,
     #[serde(default)]
     pub status: ObjectiveStatus,
+    /// **M1.5**: highest progress milestone emitted so far for this objective.
+    /// 0 = none, 1 = 25%, 2 = 50%, 3 = 75%, 4 = 100% (the 100% milestone fires
+    /// in lockstep with `objective_completed`). Tracked so `mission.objective_updated`
+    /// fires once per crossed quartile.
+    #[serde(default)]
+    pub progress_milestone_index: u8,
 }
 
 /// Kind of objective. Discriminator names match the canonical roadmap glossary so
@@ -348,6 +354,11 @@ pub struct MissionTickInputs<'a> {
     pub breaches_broken: &'a BTreeMap<String, bool>,
     /// Map of `reactor_id -> destroyed?`. `true` once hp <= 0. Defaults empty.
     pub reactors_destroyed: &'a BTreeMap<String, bool>,
+    /// **M1.5**: map of `breach_id -> carve_progress` in `[0.0, 1.0]`. Drives
+    /// `mission.objective_updated` events at 25/50/75/100% milestones for
+    /// `BreachBarrier` objectives. May be left empty; missing ids default to
+    /// `0.0` (no progress yet).
+    pub breaches_progress: &'a BTreeMap<String, f32>,
 }
 
 /// Per-tick report. Every `Vec` carries objective ids; the engine turns each into a
@@ -357,8 +368,22 @@ pub struct MissionTickReport {
     pub objective_started: Vec<String>,
     pub objective_completed: Vec<String>,
     pub objective_failed: Vec<String>,
+    /// **M1.5**: progress milestone crossings. One entry per (objective_id,
+    /// quartile) crossed on this tick. `progress` is the milestone value
+    /// (0.25, 0.5, 0.75, or 1.0). The engine emits one `mission.objective_updated`
+    /// event per entry.
+    pub objective_updated: Vec<ObjectiveProgressUpdate>,
     /// Set on the tick the mission resolves (`Won` or `Lost`).
     pub final_result: Option<MissionResult>,
+}
+
+/// **M1.5**: one milestone-crossing entry surfaced on `MissionTickReport`.
+/// The engine turns each into a `mission.objective_updated` event with a
+/// payload of `{ objective_id, progress }`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ObjectiveProgressUpdate {
+    pub objective_id: String,
+    pub progress: f32,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -409,6 +434,7 @@ impl MissionState {
     pub fn reset(&mut self, started_at_tick: u64) {
         for o in &mut self.objectives {
             o.status = ObjectiveStatus::Pending;
+            o.progress_milestone_index = 0;
         }
         // Same BP2 fix as `new()`: do NOT activate the first objective here.
         // step() handles the activation on its next call so the `objective_started`
@@ -624,6 +650,38 @@ pub fn step(state: &mut MissionState, inputs: MissionTickInputs<'_>) -> MissionT
         return report;
     }
 
+    // 1b) **M1.5**: emit `mission.objective_updated` events when the active
+    // `BreachBarrier` objective crosses the 25/50/75/100% carve milestones.
+    // The 100% milestone fires on the same tick as `objective_completed`
+    // so the cause chain shows: dig_request -> objective_updated{progress:1.0}
+    // -> objective_completed.
+    for obj in state.objectives.iter_mut() {
+        if obj.status != ObjectiveStatus::Active {
+            continue;
+        }
+        let progress = match &obj.kind {
+            ObjectiveKind::BreachBarrier { target } => {
+                inputs.breaches_progress.get(target).copied().unwrap_or(0.0)
+            }
+            _ => continue,
+        };
+        const QUARTILES: [f32; 4] = [0.25, 0.5, 0.75, 1.0];
+        while (obj.progress_milestone_index as usize) < QUARTILES.len() {
+            let next = QUARTILES[obj.progress_milestone_index as usize];
+            if progress + 1e-6 >= next {
+                obj.progress_milestone_index += 1;
+                report.objective_updated.push(ObjectiveProgressUpdate {
+                    objective_id: obj.id.clone(),
+                    progress: next,
+                });
+                state.last_event_tick = inputs.tick;
+                state.last_event_label = format!("objective_updated:{}:{:.2}", obj.id, next);
+            } else {
+                break;
+            }
+        }
+    }
+
     // 2) Progress objectives in declaration order. We only advance one row at a
     //    time so the player always has a single Active objective for the HUD.
     let mut started_index: Option<usize> = None;
@@ -688,6 +746,7 @@ pub fn step(state: &mut MissionState, inputs: MissionTickInputs<'_>) -> MissionT
         || !report.objective_started.is_empty()
         || !report.objective_completed.is_empty()
         || !report.objective_failed.is_empty()
+        || !report.objective_updated.is_empty()
     {
         state.last_transition_tick = inputs.tick;
     }
@@ -795,12 +854,14 @@ mod tests {
                 },
                 optional: false,
                 status: ObjectiveStatus::Pending,
+                progress_milestone_index: 0,
             },
             Objective {
                 id: "neutralize".to_string(),
                 kind: ObjectiveKind::NeutralizeActor { target: 2 },
                 optional: false,
                 status: ObjectiveStatus::Pending,
+                progress_milestone_index: 0,
             },
             Objective {
                 id: "extract".to_string(),
@@ -810,6 +871,7 @@ mod tests {
                 },
                 optional: false,
                 status: ObjectiveStatus::Pending,
+                progress_milestone_index: 0,
             },
         ];
         MissionState::new(
@@ -855,11 +917,100 @@ mod tests {
                 actors: &actors,
                 breaches_broken: &BTreeMap::new(),
                 reactors_destroyed: &BTreeMap::new(),
+                breaches_progress: &BTreeMap::new(),
             },
         );
         assert_eq!(report.objective_started, vec!["breach".to_string()]);
         assert_eq!(state.objectives[0].status, ObjectiveStatus::Active);
         assert_eq!(state.objectives[1].status, ObjectiveStatus::Pending);
+    }
+
+    #[test]
+    fn breach_progress_milestones_emit_objective_updated() {
+        // **M1.5**: `mission.objective_updated` fires at 25/50/75/100%
+        // carve milestones for the active `BreachBarrier` objective.
+        let mut state = build_state();
+        let actors = mk_actors(player_at(120.0, 32.0), false);
+        // Tick 1: activate the breach objective.
+        let _ = step(
+            &mut state,
+            MissionTickInputs {
+                tick: 1,
+                player: actors.get(&ActorId(1)),
+                actors: &actors,
+                breaches_broken: &BTreeMap::new(),
+                reactors_destroyed: &BTreeMap::new(),
+                breaches_progress: &BTreeMap::new(),
+            },
+        );
+        // Tick 2: 30% progress -> 25% milestone fires once.
+        let mut progress = BTreeMap::new();
+        progress.insert("outer_wall".to_string(), 0.30_f32);
+        let r2 = step(
+            &mut state,
+            MissionTickInputs {
+                tick: 2,
+                player: actors.get(&ActorId(1)),
+                actors: &actors,
+                breaches_broken: &BTreeMap::new(),
+                reactors_destroyed: &BTreeMap::new(),
+                breaches_progress: &progress,
+            },
+        );
+        assert_eq!(r2.objective_updated.len(), 1);
+        assert_eq!(r2.objective_updated[0].objective_id, "breach");
+        assert!((r2.objective_updated[0].progress - 0.25).abs() < 1e-3);
+        // Tick 3: 60% progress -> 50% milestone fires (75% not yet).
+        progress.insert("outer_wall".to_string(), 0.60_f32);
+        let r3 = step(
+            &mut state,
+            MissionTickInputs {
+                tick: 3,
+                player: actors.get(&ActorId(1)),
+                actors: &actors,
+                breaches_broken: &BTreeMap::new(),
+                reactors_destroyed: &BTreeMap::new(),
+                breaches_progress: &progress,
+            },
+        );
+        assert_eq!(r3.objective_updated.len(), 1);
+        assert!((r3.objective_updated[0].progress - 0.5).abs() < 1e-3);
+        // Tick 4: 99% progress crosses 75% only.
+        progress.insert("outer_wall".to_string(), 0.99_f32);
+        let r4 = step(
+            &mut state,
+            MissionTickInputs {
+                tick: 4,
+                player: actors.get(&ActorId(1)),
+                actors: &actors,
+                breaches_broken: &BTreeMap::new(),
+                reactors_destroyed: &BTreeMap::new(),
+                breaches_progress: &progress,
+            },
+        );
+        assert_eq!(r4.objective_updated.len(), 1);
+        assert!((r4.objective_updated[0].progress - 0.75).abs() < 1e-3);
+        // Tick 5: 100% progress + broken=true -> 100% milestone fires AND
+        // the objective completes on the same tick. The objective_updated
+        // entry precedes the objective_completed one so the cause chain
+        // reads dig -> objective_updated{1.0} -> objective_completed.
+        let mut broken = BTreeMap::new();
+        broken.insert("outer_wall".to_string(), true);
+        progress.insert("outer_wall".to_string(), 1.0_f32);
+        let r5 = step(
+            &mut state,
+            MissionTickInputs {
+                tick: 5,
+                player: actors.get(&ActorId(1)),
+                actors: &actors,
+                breaches_broken: &broken,
+                reactors_destroyed: &BTreeMap::new(),
+                breaches_progress: &progress,
+            },
+        );
+        assert_eq!(r5.objective_updated.len(), 1);
+        assert!((r5.objective_updated[0].progress - 1.0).abs() < 1e-3);
+        assert_eq!(r5.objective_completed, vec!["breach".to_string()]);
     }
 
     #[test]
@@ -877,6 +1028,7 @@ mod tests {
                 actors: &actors,
                 breaches_broken: &BTreeMap::new(),
                 reactors_destroyed: &BTreeMap::new(),
+                breaches_progress: &BTreeMap::new(),
             },
         );
         assert_eq!(state.objectives[0].status, ObjectiveStatus::Active);
@@ -890,6 +1042,7 @@ mod tests {
                 actors: &actors,
                 breaches_broken: &breaches,
                 reactors_destroyed: &BTreeMap::new(),
+                breaches_progress: &BTreeMap::new(),
             },
         );
         assert_eq!(report.objective_completed, vec!["breach".to_string()]);
@@ -914,6 +1067,7 @@ mod tests {
                 actors: &actors,
                 breaches_broken: &breaches,
                 reactors_destroyed: &BTreeMap::new(),
+                breaches_progress: &BTreeMap::new(),
             },
         );
         // Tick 2: neutralize completes.
@@ -925,6 +1079,7 @@ mod tests {
                 actors: &actors,
                 breaches_broken: &breaches,
                 reactors_destroyed: &BTreeMap::new(),
+                breaches_progress: &BTreeMap::new(),
             },
         );
         // Tick 3: extract completes.
@@ -936,6 +1091,7 @@ mod tests {
                 actors: &actors,
                 breaches_broken: &breaches,
                 reactors_destroyed: &BTreeMap::new(),
+                breaches_progress: &BTreeMap::new(),
             },
         );
         assert_eq!(report.objective_completed, vec!["extract".to_string()]);
@@ -958,6 +1114,7 @@ mod tests {
                 actors: &actors,
                 breaches_broken: &BTreeMap::new(),
                 reactors_destroyed: &BTreeMap::new(),
+                breaches_progress: &BTreeMap::new(),
             },
         );
         assert!(matches!(
@@ -981,6 +1138,7 @@ mod tests {
                 actors: &actors,
                 breaches_broken: &BTreeMap::new(),
                 reactors_destroyed: &BTreeMap::new(),
+                breaches_progress: &BTreeMap::new(),
             },
         );
         assert!(matches!(
@@ -1005,6 +1163,7 @@ mod tests {
                 actors: &actors,
                 breaches_broken: &BTreeMap::new(),
                 reactors_destroyed: &BTreeMap::new(),
+                breaches_progress: &BTreeMap::new(),
             },
         );
         assert!(report.objective_completed.is_empty());
@@ -1034,6 +1193,7 @@ mod tests {
                 actors: &actors,
                 breaches_broken: &BTreeMap::new(),
                 reactors_destroyed: &BTreeMap::new(),
+                breaches_progress: &BTreeMap::new(),
             },
         );
         assert_eq!(report.objective_started, vec!["breach".to_string()]);
@@ -1048,6 +1208,7 @@ mod tests {
             },
             optional: false,
             status: ObjectiveStatus::Pending,
+            progress_milestone_index: 0,
         }];
         MissionState::new(
             objectives,
@@ -1073,6 +1234,7 @@ mod tests {
                 actors: &actors,
                 breaches_broken: &BTreeMap::new(),
                 reactors_destroyed: &reactors,
+                breaches_progress: &BTreeMap::new(),
             },
         );
         assert_eq!(
@@ -1109,6 +1271,7 @@ mod tests {
                 },
                 optional: false,
                 status: ObjectiveStatus::Pending,
+                progress_milestone_index: 0,
             },
             Objective {
                 id: "defend".to_string(),
@@ -1117,6 +1280,7 @@ mod tests {
                 },
                 optional: false,
                 status: ObjectiveStatus::Pending,
+                progress_milestone_index: 0,
             },
         ];
         let mut state = MissionState::new(
@@ -1142,6 +1306,7 @@ mod tests {
                 actors: &actors,
                 breaches_broken: &BTreeMap::new(),
                 reactors_destroyed: &reactors,
+                breaches_progress: &BTreeMap::new(),
             },
         );
         assert!(matches!(
@@ -1168,6 +1333,7 @@ mod tests {
                 },
                 optional: false,
                 status: ObjectiveStatus::Pending,
+                progress_milestone_index: 0,
             },
             Objective {
                 id: "reach".to_string(),
@@ -1177,6 +1343,7 @@ mod tests {
                 },
                 optional: false,
                 status: ObjectiveStatus::Pending,
+                progress_milestone_index: 0,
             },
         ];
         let mut state = MissionState::new(
@@ -1198,6 +1365,7 @@ mod tests {
                 actors: &actors,
                 breaches_broken: &BTreeMap::new(),
                 reactors_destroyed: &reactors,
+                breaches_progress: &BTreeMap::new(),
             },
         );
         // Defend was completed by surviving the timer.
@@ -1231,6 +1399,7 @@ mod tests {
                 },
                 optional: false,
                 status: ObjectiveStatus::Pending,
+                progress_milestone_index: 0,
             },
             Objective {
                 id: "defend".to_string(),
@@ -1239,6 +1408,7 @@ mod tests {
                 },
                 optional: false,
                 status: ObjectiveStatus::Pending,
+                progress_milestone_index: 0,
             },
         ];
         let mut state = MissionState::new(
@@ -1260,6 +1430,7 @@ mod tests {
                 actors: &actors,
                 breaches_broken: &BTreeMap::new(),
                 reactors_destroyed: &reactors,
+                breaches_progress: &BTreeMap::new(),
             },
         );
         assert!(matches!(
@@ -1290,6 +1461,7 @@ mod tests {
                 actors: &actors,
                 breaches_broken: &BTreeMap::new(),
                 reactors_destroyed: &reactors,
+                breaches_progress: &BTreeMap::new(),
             },
         );
         assert!(matches!(state.result, MissionResult::Won));
@@ -1410,6 +1582,7 @@ mod tests {
                 actors: &actors,
                 breaches_broken: &BTreeMap::new(),
                 reactors_destroyed: &BTreeMap::new(),
+                breaches_progress: &BTreeMap::new(),
             },
         );
         let view = MissionView::from_state(&state, 30);
@@ -1443,6 +1616,7 @@ mod tests {
             },
             optional: false,
             status: ObjectiveStatus::Pending,
+            progress_milestone_index: 0,
         }];
         let loss = LossConditions {
             player_dead: false,
@@ -1466,6 +1640,7 @@ mod tests {
                 actors: &actors,
                 breaches_broken: &BTreeMap::new(),
                 reactors_destroyed: &reactors.destroyed_map(),
+                breaches_progress: &BTreeMap::new(),
             },
         );
         assert!(
@@ -1492,6 +1667,7 @@ mod tests {
                 actors: &actors,
                 breaches_broken: &BTreeMap::new(),
                 reactors_destroyed: &reactors.destroyed_map(),
+                breaches_progress: &BTreeMap::new(),
             },
         );
         assert!(report_after.objective_failed.is_empty(), "terminal step must be empty");

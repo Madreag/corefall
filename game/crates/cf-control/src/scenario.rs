@@ -285,6 +285,7 @@ impl ScenarioObjective {
             kind,
             optional: self.optional,
             status: ObjectiveStatus::Pending,
+            progress_milestone_index: 0,
         }
     }
 }

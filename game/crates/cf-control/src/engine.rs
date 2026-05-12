@@ -1545,6 +1545,7 @@ impl M0Engine {
                 // O(n)); 16-actor scenarios are well within budget. When no actor
                 // world is loaded we feed the mission an empty actor map.
                 let breaches_broken = state.breach_world.as_ref().map(|w| w.broken_map()).unwrap_or_default();
+                let breaches_progress = state.breach_world.as_ref().map(|w| w.progress_map()).unwrap_or_default();
                 let player_id = state.player_actor;
                 let (actors_clone, player_clone) = match state.actor_state.as_ref() {
                     Some(actor_state_ref) => {
@@ -1566,11 +1567,13 @@ impl M0Engine {
                     actors: &actors_clone,
                     breaches_broken: &breaches_broken,
                     reactors_destroyed: &reactors_destroyed,
+                    breaches_progress: &breaches_progress,
                 };
                 let report = cf_mission::step(mission, inputs);
                 if !report.objective_completed.is_empty()
                     || !report.objective_started.is_empty()
                     || !report.objective_failed.is_empty()
+                    || !report.objective_updated.is_empty()
                     || report.final_result.is_some()
                 {
                     mission_payload = Some((tick, sim_time_ms, report));
@@ -1901,6 +1904,20 @@ impl M0Engine {
                     "mission",
                     "objective_started",
                     json!({"objective": id}),
+                    None,
+                );
+            }
+            // **M1.5**: emit `mission.objective_updated` at 25/50/75/100%
+            // milestones. The 100% milestone fires on the same tick as
+            // `objective_completed` so the cause chain reads
+            // `objective_updated{1.0} → objective_completed → mission_resolved`.
+            for update in &report.objective_updated {
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "mission",
+                    "objective_updated",
+                    json!({"objective": update.objective_id, "progress": update.progress}),
                     None,
                 );
             }
