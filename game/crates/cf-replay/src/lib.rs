@@ -41,6 +41,7 @@ pub const EVENT_ENVELOPE_VERSION: u32 = 1;
 
 pub mod bundle_paths;
 pub mod diagnostics;
+pub mod schemas;
 
 pub use bundle_paths::{default_run_bundle_root, resolve_run_bundle_root};
 

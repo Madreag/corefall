@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/combat.wound_added.v0.1",
+  "title": "combat.wound_added",
+  "description": "M1 stub: scalar HP delta. M5 chassis adds per-zone/layer detail.",
+  "type": "object",
+  "required": ["actor", "shooter", "damage"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "shooter": {"type": "integer", "minimum": 0},
+    "damage": {"type": "number"},
+    "zone": {"type": "string"},
+    "placeholder": {"type": "boolean"}
+  },
+  "additionalProperties": true
+}

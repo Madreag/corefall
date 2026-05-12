@@ -19,3 +19,4 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 ron = { workspace = true }
 cf-control = { path = "../cf-control" }
+cf-replay = { path = "../cf-replay" }

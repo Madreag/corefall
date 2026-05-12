@@ -27,6 +27,13 @@ enum Cmd {
         /// Files or directories to validate. If empty, defaults to `content/` (then `../content/`).
         paths: Vec<PathBuf>,
     },
+    /// **M1 Gap H2**: validate every event in a run-bundle's `events.jsonl`
+    /// against the per-event JSON schemas under `cf-replay/schemas/event/`.
+    /// Returns non-zero exit on any payload that fails the schema.
+    ValidateBundle {
+        /// Path to a run-bundle directory (the one containing `events.jsonl`).
+        bundle_dir: PathBuf,
+    },
     /// Stubbed in M0; package builder lands at M5/M8.
     Build { pkg_dir: PathBuf },
     /// Stubbed in M0.
@@ -50,6 +57,7 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
     match &cli.command {
         Cmd::Validate { paths } => run_validate(paths, cli.strict, cli.json),
+        Cmd::ValidateBundle { bundle_dir } => run_validate_bundle(bundle_dir, cli.json),
         Cmd::Build { pkg_dir } => {
             anyhow::bail!(
                 "cf-mod build is not implemented in M0; package builder lands at M5/M8 (got {})",
@@ -63,6 +71,83 @@ fn main() -> Result<()> {
             );
         }
     }
+}
+
+/// **M1 Gap H2**: validate every event in `<bundle_dir>/events.jsonl` against
+/// `cf_replay::schemas::validate_event_payload`. Returns non-zero exit on
+/// any schema violation. Outputs JSON when `--json` is set so CI can parse
+/// the report.
+fn run_validate_bundle(bundle_dir: &PathBuf, json_output: bool) -> Result<()> {
+    use std::io::BufRead;
+    let events_path = bundle_dir.join("events.jsonl");
+    let file = std::fs::File::open(&events_path)
+        .map_err(|e| anyhow::anyhow!("open {}: {}", events_path.display(), e))?;
+    let reader = std::io::BufReader::new(file);
+    let mut failures: Vec<serde_json::Value> = Vec::new();
+    let mut checked: u64 = 0;
+    for line in reader.lines() {
+        let line = match line {
+            Ok(l) => l,
+            Err(_) => continue,
+        };
+        if line.trim().is_empty() {
+            continue;
+        }
+        let event: serde_json::Value = match serde_json::from_str(&line) {
+            Ok(v) => v,
+            Err(e) => {
+                failures.push(serde_json::json!({
+                    "category": "parse",
+                    "event_type": "parse",
+                    "reason": e.to_string(),
+                }));
+                continue;
+            }
+        };
+        let cat = event.get("category").and_then(|v| v.as_str()).unwrap_or("");
+        let ty = event.get("event_type").and_then(|v| v.as_str()).unwrap_or("");
+        let payload = event.get("payload").cloned().unwrap_or(serde_json::Value::Null);
+        checked += 1;
+        if let Err(reason) = cf_replay::schemas::validate_event_payload(cat, ty, &payload) {
+            let event_id = event
+                .get("event_id")
+                .and_then(|v| v.as_str())
+                .unwrap_or("")
+                .to_string();
+            failures.push(serde_json::json!({
+                "event_id": event_id,
+                "category": cat,
+                "event_type": ty,
+                "reason": reason,
+            }));
+        }
+    }
+    let report = serde_json::json!({
+        "bundle_dir": bundle_dir.display().to_string(),
+        "events_checked": checked,
+        "failures": failures,
+    });
+    if json_output {
+        println!("{}", serde_json::to_string_pretty(&report).unwrap_or_default());
+    } else {
+        tracing::info!(
+            target: "cf::mod",
+            checked,
+            failures = failures.len(),
+            "validate-bundle complete"
+        );
+        for f in &failures {
+            tracing::warn!(target: "cf::mod", failure = %f, "schema violation");
+        }
+    }
+    if !failures.is_empty() {
+        anyhow::bail!(
+            "{} event(s) failed schema validation in {}",
+            failures.len(),
+            bundle_dir.display()
+        );
+    }
+    Ok(())
 }
 
 fn run_validate(paths: &[PathBuf], strict: bool, json_output: bool) -> Result<()> {

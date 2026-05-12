@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/input.intent_received.v0.1",
+  "title": "input.intent_received",
+  "type": "object",
+  "required": ["actor", "source", "move_x", "aim_x", "aim_y", "jump", "fire", "reload"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "source": {"type": "string", "enum": ["human", "cfctl", "ai", "replay"]},
+    "move_x": {"type": "number"},
+    "aim_x": {"type": "number"},
+    "aim_y": {"type": "number"},
+    "jump": {"type": "boolean"},
+    "fire": {"type": "boolean"},
+    "reload": {"type": "boolean"},
+    "selected_item": {"type": ["integer", "null"], "minimum": 0},
+    "reset": {"type": "boolean"},
+    "applied_move_x": {"type": "number"},
+    "jump_accepted": {"type": "boolean"}
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/equipment.weapon_fired.v0.1",
+  "title": "equipment.weapon_fired",
+  "type": "object",
+  "required": ["actor", "muzzle_origin", "recoil_impulse"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "muzzle_origin": {
+      "type": "array",
+      "items": {"type": "number"},
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "recoil_impulse": {"type": "number", "minimum": 0.0},
+    "loudness_radius": {"type": "number", "minimum": 0.0},
+    "bloom_factor": {"type": "number"}
+  },
+  "additionalProperties": true
+}

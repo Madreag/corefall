@@ -1604,6 +1604,7 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "cf-control",
+ "cf-replay",
  "clap",
  "ron",
  "serde",

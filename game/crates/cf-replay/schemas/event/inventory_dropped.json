@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/actor.inventory_dropped.v0.1",
+  "title": "actor.inventory_dropped",
+  "type": "object",
+  "required": ["actor", "item_label", "hand_position", "toss_velocity"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "item_label": {"type": "string"},
+    "hand_position": {
+      "type": "array",
+      "items": {"type": "number"},
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "toss_velocity": {
+      "type": "array",
+      "items": {"type": "number"},
+      "minItems": 2,
+      "maxItems": 2
+    }
+  },
+  "additionalProperties": true
+}

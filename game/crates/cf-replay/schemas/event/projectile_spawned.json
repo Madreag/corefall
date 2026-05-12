@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/combat.projectile_spawned.v0.1",
+  "title": "combat.projectile_spawned",
+  "type": "object",
+  "required": ["id", "owner", "origin", "velocity", "damage"],
+  "properties": {
+    "id": {"type": "integer", "minimum": 0},
+    "owner": {"type": "integer", "minimum": 0},
+    "origin": {
+      "type": "array",
+      "items": {"type": "number"},
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "velocity": {
+      "type": "array",
+      "items": {"type": "number"},
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "damage": {"type": "number"},
+    "is_tracer": {"type": "boolean"},
+    "particle_index": {"type": "integer", "minimum": 0},
+    "particle_count": {"type": "integer", "minimum": 1},
+    "lifetime_ticks": {"type": "integer", "minimum": 0},
+    "will_miss": {"type": "boolean"}
+  },
+  "additionalProperties": true
+}

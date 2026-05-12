@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/equipment.alarm_registered.v0.1",
+  "title": "equipment.alarm_registered",
+  "description": "Acoustic noise event consumed by M1.5+ AI perception (CCCP HDFirearm.cpp:948).",
+  "type": "object",
+  "required": ["actor", "muzzle_origin", "loudness_radius", "cause"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "muzzle_origin": {
+      "type": "array",
+      "items": {"type": "number"},
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "loudness_radius": {"type": "number", "minimum": 0.0},
+    "cause": {"type": "string"}
+  },
+  "additionalProperties": true
+}
