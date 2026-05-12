@@ -578,6 +578,14 @@ struct EngineMutable {
     /// overlay holds input; the CONTROLS CAPTURED HUD zone renders and all
     /// `act.player.*` dispatches reject with reason `controls_captured`.
     controls_captured_by: Option<String>,
+    /// **M1 / Gap C2**: projectile_id -> spawn_event_id map persisted across
+    /// ticks so when a projectile hits N ticks after spawn, the
+    /// `combat.projectile_hit` event can parent to its originating
+    /// `combat.projectile_spawned` event (closing the cause chain back to
+    /// `equipment.weapon_fired` -> `input.intent_received`). Entries are
+    /// pruned when the projectile reaches `combat.projectile_hit` or
+    /// `combat.projectile_expired` to keep the map bounded.
+    projectile_spawn_event_ids: BTreeMap<u64, String>,
     /// **M1.5 forward-hook (Seam S1)**: latched by damage events so the
     /// next ReactiveGuard tick treats the damaged actor as a perception
     /// trigger. No consumer at M1; M1.5 ai layer reads it.
@@ -719,6 +727,7 @@ impl M0Engine {
                 hud_last_mission_result: None,
                 controls_captured_by: None,
                 force_ai_update_this_tick: false,
+                projectile_spawn_event_ids: BTreeMap::new(),
                 hud_focus_index: None,
                 hud_focus_cycle: 0,
                 hud_last_chassis_stage: None,
@@ -2456,8 +2465,9 @@ impl M0Engine {
         // owning `equipment.weapon_fired` event, captured from the actor-
         // outcomes loop via `weapon_fired_event_by_actor`. The closer
         // cause-chain link is what M3B walks when scrubbing the run bundle.
-        // Build projectile_id -> spawn_event_id map for the hit-parent chain.
-        let mut spawn_event_by_projectile: BTreeMap<u64, String> = BTreeMap::new();
+        // Spawn ids are persisted on `EngineMutable::projectile_spawn_event_ids`
+        // so a projectile that hits N ticks later can still parent its hit
+        // event to the originating spawn.
         for spawn in &report.spawned_projectiles {
             let parent = weapon_fired_event_by_actor
                 .get(&spawn.owner.0)
@@ -2480,16 +2490,26 @@ impl M0Engine {
                 }),
                 Some(parent),
             );
-            spawn_event_by_projectile.insert(spawn.id, id);
+            if let Ok(mut s) = self.state.write() {
+                s.projectile_spawn_event_ids.insert(spawn.id, id);
+            }
         }
         for hit in &report.hits {
             // M1 Gap C2: parent the hit to its originating projectile_spawned
             // event rather than the input.intent_received root, so a M3B
             // viewer can walk hit -> spawn -> weapon_fired -> intent in one chain.
-            let hit_parent = spawn_event_by_projectile
-                .get(&hit.projectile_id)
-                .cloned()
+            // Spawns persist on `EngineMutable::projectile_spawn_event_ids`
+            // because hits commonly fire ticks after the spawn.
+            let hit_parent = self
+                .state
+                .read()
+                .ok()
+                .and_then(|s| s.projectile_spawn_event_ids.get(&hit.projectile_id).cloned())
                 .unwrap_or_else(|| intent_event_id.clone());
+            // Prune the spawn entry now that the projectile resolved.
+            if let Ok(mut s) = self.state.write() {
+                s.projectile_spawn_event_ids.remove(&hit.projectile_id);
+            }
             let projectile_hit_event_id = self.recorder.record(
                 tick,
                 sim_time_ms,
@@ -2583,6 +2603,15 @@ impl M0Engine {
             }
         }
         for expired in &report.expired_projectiles {
+            let parent = self
+                .state
+                .read()
+                .ok()
+                .and_then(|s| s.projectile_spawn_event_ids.get(&expired.id).cloned())
+                .unwrap_or_else(|| intent_event_id.clone());
+            if let Ok(mut s) = self.state.write() {
+                s.projectile_spawn_event_ids.remove(&expired.id);
+            }
             self.recorder.record(
                 tick,
                 sim_time_ms,
@@ -2593,7 +2622,7 @@ impl M0Engine {
                     "owner": expired.owner.0,
                     "last_position": [expired.last_position.x, expired.last_position.y],
                 }),
-                Some(intent_event_id.clone()),
+                Some(parent),
             );
         }
     }
@@ -4435,6 +4464,8 @@ impl EngineHandle for M0Engine {
                 }
                 state.intent_epoch = state.intent_epoch.wrapping_add(1);
                 state.pending_dig = None;
+                state.projectile_spawn_event_ids.clear();
+                state.controls_captured_by = None;
                 // M1.5: rewind breach world.
                 if let (Some(world), Some(initial)) =
                     (state.breach_world.as_mut(), self.config.initial_breach_world.as_ref())
@@ -6937,6 +6968,118 @@ mod tests {
                 .filter(|e| e.event_type == "actor_status_changed")
                 .map(|e| e.payload.clone())
                 .collect::<Vec<_>>()
+        );
+    }
+
+    /// **Gap C4**: walk parent_event_id from `actor.inventory_dropped` back to
+    /// the root `input.intent_received`. Every link must resolve to a real
+    /// recorded event id (no `ParentMissingFromBundle`). The expected chain:
+    ///   inventory_dropped -> status_changed(DYING) -> projectile_hit
+    ///     -> projectile_spawned -> weapon_fired -> input.intent_received
+    #[tokio::test]
+    async fn cause_chain_walks_from_inventory_dropped_to_intent() {
+        let path = write_m1_scenario();
+        let config = load_m1_test_config(path);
+        let engine = M0Engine::new(config);
+        engine.record_run_started();
+        for _ in 0..10 {
+            engine.drive_tick();
+        }
+        let _ = engine
+            .dispatch(ControlCommand::ActPlayerAim {
+                x: 1.0,
+                y: 0.0,
+                source: IntentSource::Cfctl,
+            })
+            .await;
+        let fire_interval_ticks = cf_equipment::rifle_preset(cf_equipment::RIFLE_M1_DEFAULT_ID)
+            .unwrap()
+            .fire_interval_ticks(60) as usize;
+        // Kill the dummy (100 HP / 12 dmg => 9 hits + buffer).
+        for _ in 0..12 {
+            let _ = engine
+                .dispatch(ControlCommand::ActPlayerFire {
+                    pressed: true,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            for _ in 0..fire_interval_ticks.max(35) {
+                engine.drive_tick();
+            }
+            let _ = engine
+                .dispatch(ControlCommand::ActPlayerFire {
+                    pressed: false,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            engine.drive_tick();
+        }
+        // Let the DYING dwell elapse so inventory_dropped + DEAD chain emit.
+        for _ in 0..120 {
+            engine.drive_tick();
+        }
+        let events = engine.recorder().snapshot_events();
+        // Build id -> event lookup for the walk.
+        let by_id: std::collections::BTreeMap<String, &cf_replay::Event> =
+            events.iter().map(|e| (e.event_id.clone(), e)).collect();
+        // Find the inventory_dropped for the dummy (actor_id 2).
+        let drop_event = events
+            .iter()
+            .find(|e| {
+                e.category == "actor"
+                    && e.event_type == "inventory_dropped"
+                    && e.payload.get("actor").and_then(|v| v.as_u64()) == Some(2)
+            });
+        // The dummy carries no rifle in m1_actor_range (its inventory.rifle: None),
+        // so the inventory_dropped event may not fire (label="empty"). In that
+        // case the chain test still has value via status_changed(DYING).
+        let chain_root = drop_event.or_else(|| {
+            events
+                .iter()
+                .find(|e| {
+                    e.category == "actor"
+                        && e.event_type == "actor_status_changed"
+                        && e.payload.get("new_status").and_then(|v| v.as_str()) == Some("dying")
+                        && e.payload.get("actor").and_then(|v| v.as_u64()) == Some(2)
+                })
+        });
+        let chain_root = chain_root.expect("must find inventory_dropped OR status_changed(DYING) for actor 2");
+        // Walk the parent_event_id chain.
+        let mut chain_types: Vec<String> = Vec::new();
+        let mut current = chain_root;
+        chain_types.push(format!("{}.{}", current.category, current.event_type));
+        let mut walked = 0;
+        while let Some(parent_id) = current.parent_event_id.clone() {
+            walked += 1;
+            assert!(
+                walked < 50,
+                "chain walk runaway (events={:?})",
+                chain_types
+            );
+            let parent = by_id
+                .get(&parent_id)
+                .unwrap_or_else(|| panic!("ParentMissingFromBundle: parent_id={parent_id} not in run"));
+            chain_types.push(format!("{}.{}", parent.category, parent.event_type));
+            current = parent;
+        }
+        // The walk must terminate at an input.intent_received root.
+        let terminal = chain_types
+            .last()
+            .expect("chain must have at least one link")
+            .clone();
+        assert!(
+            terminal == "input.intent_received",
+            "cause chain must terminate at input.intent_received; got chain: {:?}",
+            chain_types
+        );
+        // The chain must include projectile_hit and weapon_fired links.
+        assert!(
+            chain_types.iter().any(|s| s == "combat.projectile_hit"),
+            "chain missing combat.projectile_hit: {chain_types:?}",
+        );
+        assert!(
+            chain_types.iter().any(|s| s == "equipment.weapon_fired"),
+            "chain missing equipment.weapon_fired: {chain_types:?}",
         );
     }
 }
