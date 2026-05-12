@@ -1,0 +1,23 @@
+{
+  "description": "M1.5 stealth win path: dig the wall, sneak past the guard WITHOUT firing, reach extraction. Guard never enters Engaged because no alarm_registered fires (player carries the rifle but never pulls the trigger). Pre-spec assert: ai.state_changed.count remains small (no Idle→Alert→Engaged sequence).",
+  "scenario": "micro_breach",
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+    { "method": "act.player.aim", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "act.player.move", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 160 } },
+    { "method": "act.player.move", "params": { "x": 0.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
+    { "method": "act.player.dig", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 4 } },
+    { "method": "act.player.dig", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 4 } },
+    { "method": "act.player.dig", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 4 } },
+    { "method": "act.player.move", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 300 } },
+    { "method": "act.player.move", "params": { "x": 0.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 12 } },
+    { "method": "observe.once", "params": {} }
+  ]
+}

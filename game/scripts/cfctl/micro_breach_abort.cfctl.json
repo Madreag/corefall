@@ -1,0 +1,15 @@
+{
+  "description": "M1.5 G9 acceptance scenario: player forfeits the run via act.player.abort. mission.mission_resolved fires with result=aborted, loss_reason=aborted.",
+  "scenario": "micro_breach",
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+    { "method": "act.player.aim", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "act.player.move", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 30 } },
+    { "method": "act.player.move", "params": { "x": 0.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
+    { "method": "act.player.abort", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
+    { "method": "observe.once", "params": {} }
+  ]
+}

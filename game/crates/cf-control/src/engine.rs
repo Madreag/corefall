@@ -5270,19 +5270,68 @@ impl EngineHandle for M0Engine {
                 }
             }
             ControlCommand::ActPlayerAbort { source } => {
-                // Gap S3: M1.5 forward-compat stub. Reject at M1; M1.5 swaps in
-                // the actual mission-abort flow without rewiring the surface.
+                // **M1.5 G9**: player-initiated forfeit. Marks the mission
+                // (if any) as Aborted and emits mission.mission_resolved.
+                // Idempotent: a second abort while the mission is already
+                // terminal is rejected with `mission_already_terminal`.
                 let _ = source;
+                if let Some(mission) = state.mission.as_mut() {
+                    if mission.result.is_terminal() {
+                        drop(state);
+                        self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "control",
+                            "command_rejected",
+                            json!({
+                                "method": "act.player.abort",
+                                "reason": "mission_already_terminal",
+                            }),
+                            None,
+                        );
+                        return CommandResult::rejected("mission_already_terminal", tick.0);
+                    }
+                    mission.result = cf_mission::MissionResult::Aborted;
+                    mission.last_event_tick = tick.0;
+                    mission.last_event_label = "mission_resolved".to_string();
+                    mission.last_transition_tick = tick.0;
+                    mission.loss_reason_label = Some("aborted".to_string());
+                    drop(state);
+                    let accepted_id = self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_accepted",
+                        json!({"method": "act.player.abort"}),
+                        None,
+                    );
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "mission",
+                        "mission_resolved",
+                        json!({
+                            "result": "aborted",
+                            "loss_reason": "aborted",
+                            "cause": "player_aborted",
+                        }),
+                        Some(accepted_id),
+                    );
+                    return CommandResult::accepted(tick.0);
+                }
                 drop(state);
                 self.recorder.record(
                     tick,
                     sim_time_ms,
                     "control",
                     "command_rejected",
-                    json!({"method": "act.player.abort", "reason": "unsupported_in_m1"}),
+                    json!({
+                        "method": "act.player.abort",
+                        "reason": "no_mission_in_scenario",
+                    }),
                     None,
                 );
-                CommandResult::rejected("unsupported_in_m1", tick.0)
+                CommandResult::rejected("no_mission_in_scenario", tick.0)
             }
             ControlCommand::ActInputCaptureControls {
                 captured,

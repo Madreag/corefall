@@ -1,0 +1,17 @@
+{
+  "description": "AI-H-01 harness scenario: player walks within hearing_radius of the guard but stays outside its sight cone (guard faces left, player approaches from the right? — or player crouches below LOS line). Player fires the rifle; guard transitions Idle → Alert with reason='heard_shot' AND emits a perception_signal of kind='hearing'. Per M1.5 spec line 'AI-H scenario runner infrastructure'.",
+  "scenario": "micro_breach",
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+    { "method": "act.player.aim", "params": { "x": 0.0, "y": -1.0 } },
+    { "method": "act.player.move", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 240 } },
+    { "method": "act.player.move", "params": { "x": 0.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
+    { "method": "act.player.fire", "params": { "pressed": true } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
+    { "method": "act.player.fire", "params": { "pressed": false } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 12 } },
+    { "method": "observe.once", "params": {} }
+  ]
+}
