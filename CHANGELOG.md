@@ -19,9 +19,18 @@ copy long-form research here; that's what the vault is for.
 
 ### BP3 — Combat Readability Build (M3B + M4A + M5)
 
-**BP3 active.** All constituent milestones landed (M3B commit 50af435, M4A PR #27, M5 commit 29edc1b). BP3 closure gate has NOT passed — MISSING_FEATURES Wave 1 foundation repair in progress. Final closure requires bp_close_loop.sh bp3 all-phases PASS.
+**BP3 active.** All constituent milestones landed. BP3 closure gate has NOT passed — MISSING_FEATURES Wave 1 foundation repair in progress. Final closure requires bp_close_loop.sh bp3 all-phases PASS.
 
-**M5 — Equipment, Chassis, And Damage Grammar (CLOSED):**
+**Per-milestone matrix outcomes:**
+
+| Milestone | Status | Closing Evidence | Deferrals |
+|---|---|---|---|
+| M3B — Replay Viewer + Debrief | LANDED | commit `50af435`; DR-002 closed | None |
+| M4A — Readability + ACC-A Floor | LANDED | PR #27; DR-003 + DR-012 closed | M4B comic-noir polish → BP7 |
+| M5 — Equipment, Chassis, Damage Grammar | LANDED | commit `29edc1b`; DR-014 + DR-021 closed | None |
+| T-RELEASE v0.3.0-prealpha | SKIPPED | Double-Click Playability Hard Gate not met | `.dmg`/`.msi`/AppImage engineering → BP4 |
+
+**M5 — Equipment, Chassis, And Damage Grammar (LANDED):**
 
 - `cf-chassis` crate promoted from stub to full implementation: 3 launch chassis archetypes (`infantry_v1`, `powered_armor_v1`, `light_mech_v1`), `BodyGraph` with 15-zone `BodyZone` enum (Head, Torso, ArmLeft, ArmRight, ForearmLeft, ForearmRight, HandLeft, HandRight, LegLeft, LegRight, ShinLeft, ShinRight, FootLeft, FootRight, Backpack) + 14 joints + 5 equipment sockets + 15 movement-contribution records, `ZoneState` with 3-layer `ArmorLayer` (External → Internal → Core → wound), 5 `ModuleKind` (WeaponMount, Jet, Shield, Sensor, RepairDrone) bound to body zones with `ModuleStateKind` ladder (Nominal → Degraded → Warning → Failed → NotPresent), 11-stage `ChassisStage` damage pipeline, `PilotState` lifecycle (Bound → Injured → Ejecting → Ejected → Extracted / BailedTooLate / Lost), `EjectWindow` with tick-rate-stable duration, `tutorial_safety` flag capping at PilotInjured, `apply_zone_damage` routing damage through layers with hardness glances + `recompute_stage` monotonic stage advancement, `repair_zone` + `repair_module` + `salvage` + `jam_weapon`/`clear_jam` methods. 20 unit tests passing.
 - `cf-equipment` extended with the full M5 role-record schema: `RoleRecord`, `RoleKind` (11 variants), `AiPolicyHint` (6 variants), `OriginCompatibility` (5 variants), `FiringProfile`, `Loadout`. 3 LOAD-A loadouts (`load_a_infantry`, `load_a_powered_armor`, `load_a_light_mech`) referencing 3 LOAD-A roles (`rifle_m1_default`, `carbine_m5_powered`, `rifle_m5_mech_heavy`). Origin compatibility check, jam-chance per shot, mass kg, provenance string, tutorial-safe flag. 15 unit tests passing.

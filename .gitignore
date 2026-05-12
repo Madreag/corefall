@@ -24,6 +24,9 @@
 target/
 **/*.rs.bk
 
+# Save files (cf-save forward-compat)
+*.cfsave
+
 # Python (game/tools/ vendors prototype_run_check.py; future tools may grow)
 __pycache__/
 *.pyc

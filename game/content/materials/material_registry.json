@@ -1,0 +1,110 @@
+{
+  "schema_version": 1,
+  "description": "Launch material registry. 8 materials at BP2; DR-036 expands to 17 at M5.6.",
+  "materials": [
+    {
+      "id": 0,
+      "name": "air",
+      "display_name": "Air",
+      "hardness": 0,
+      "diggable": false,
+      "anchorable": false,
+      "hazard": false,
+      "path_cost": 1.0,
+      "density": 0.0,
+      "color_hex": "000000",
+      "description": "Empty passable space."
+    },
+    {
+      "id": 1,
+      "name": "dirt",
+      "display_name": "Dirt",
+      "hardness": 10,
+      "diggable": true,
+      "anchorable": true,
+      "hazard": false,
+      "path_cost": 1.0,
+      "density": 1.5,
+      "color_hex": "8B6914",
+      "description": "Default destructible terrain. Digger carves easily; tether anchors."
+    },
+    {
+      "id": 2,
+      "name": "concrete",
+      "display_name": "Concrete",
+      "hardness": 40,
+      "diggable": true,
+      "anchorable": true,
+      "hazard": false,
+      "path_cost": 1.0,
+      "density": 2.3,
+      "color_hex": "808080",
+      "description": "Bunker wall. Rifle ineffective; drill/charge required."
+    },
+    {
+      "id": 3,
+      "name": "metal_nohook",
+      "display_name": "Reinforced Metal",
+      "hardness": 100,
+      "diggable": false,
+      "anchorable": false,
+      "hazard": false,
+      "path_cost": 999.0,
+      "density": 7.8,
+      "color_hex": "4A4A4A",
+      "description": "Hard undiggable metal. Tether/anchor refuses with reason label."
+    },
+    {
+      "id": 4,
+      "name": "hazard",
+      "display_name": "Hazard Tile",
+      "hardness": 50,
+      "diggable": false,
+      "anchorable": false,
+      "hazard": true,
+      "path_cost": 10.0,
+      "density": 3.0,
+      "color_hex": "FF4444",
+      "description": "Damage-on-touch surface. Player must identify before contact."
+    },
+    {
+      "id": 5,
+      "name": "loose_fill",
+      "display_name": "Loose Rubble",
+      "hardness": 5,
+      "diggable": true,
+      "anchorable": false,
+      "hazard": false,
+      "path_cost": 2.0,
+      "density": 1.2,
+      "color_hex": "C8A864",
+      "description": "Soft fill. Movement slowdown; low structural support."
+    },
+    {
+      "id": 6,
+      "name": "repair_fill",
+      "display_name": "Repair Foam",
+      "hardness": 15,
+      "diggable": true,
+      "anchorable": true,
+      "hazard": false,
+      "path_cost": 1.0,
+      "density": 0.8,
+      "color_hex": "44FF44",
+      "description": "Player-placed repair material. Creates cover and restores pathability."
+    },
+    {
+      "id": 7,
+      "name": "anchor",
+      "display_name": "Anchor Rock",
+      "hardness": 60,
+      "diggable": false,
+      "anchorable": true,
+      "hazard": false,
+      "path_cost": 1.0,
+      "density": 2.6,
+      "color_hex": "6B4226",
+      "description": "Hard anchorable surface. Tether attaches; drill/charge can breach."
+    }
+  ]
+}

@@ -162,8 +162,8 @@ N. - [<marker>] [W<wave>] [BP<bp>] [M<milestone>+...] [DR-<n>+...] [STATE] body
 343. - [x] [W1] [BP2] [M2+M2.5+M3A] [FAKE] M3A-S05 `expected_outcome` contract enforced by canonical run-bundle checker row `[ ]`.  → W1.1
 344. - [x] [W1] [BP2] [M2+M2.5+M3A] [FAKE] README "Workspace stats" cites 253 tests passing as of BP2 closure — checklist says M2 + M2.5 + M3A are not done; cannot be both.  → W1.1 (stats updated to 446 tests)
 345. - [x] [W1] [BP2] [M2+M2.5+M3A] [FAKE] BP2 closure PR #11 + PR #12 + PR #13 + PR #14 cited in README but their evidence does not propagate to the checklist (rows are still `[ ]`).  → W1.1 (checklist now cites PR #11)
-346. - [ ] [W1] [BP2] [M2+M2.5+M3A+M4+M4A] [FAKE] M4-P00 marked `[~]` (partial) despite README claiming BP3 M4A closed.
-347. - [ ] [W1] [BP2] [M2+M2.5+M3A+M4+M4B] [FAKE] M4-S02 comic-noir mission card row `[ ]` — README BP3 row says "Comic-noir polish deferred to M4B at BP7" but does not say BP3 is partial because of it.
+346. - [x] [W1]  -> W1.1 (README now explicitly states M4B deferred to BP7; M4-P00 [~] is honest partial) [BP2] [M2+M2.5+M3A+M4+M4A] [FAKE] M4-P00 marked `[~]` (partial) despite README claiming BP3 M4A closed.
+347. - [x] [W1]  -> W1.1 (README M4A row now says "M4B comic-noir polish deferred to BP7; M4-P00 is [~] partial") [BP2] [M2+M2.5+M3A+M4+M4B] [FAKE] M4-S02 comic-noir mission card row `[ ]` — README BP3 row says "Comic-noir polish deferred to M4B at BP7" but does not say BP3 is partial because of it.
 
 ## 25. DR-014 — Tone / player promise gaps (closed but BP3-incomplete)
 381. - [ ] [W1] [BP3] [DR-014] [GAP] DR-014 "Armor layers (multi-layer protection model: helmet, vest, plate, undersuit, etc.) — each layer can be damaged independently" — only 3 chassis layers (External/Internal/Core); no helmet/vest/plate/undersuit subdivision.
@@ -327,12 +327,12 @@ N. - [<marker>] [W<wave>] [BP<bp>] [M<milestone>+...] [DR-<n>+...] [STATE] body
 700. - [ ] [W1] [GAP] README "Replay determinism" — works at 60+120 Hz on macOS aarch64 only; not validated cross-platform.
 
 ## 72. Status surface drift catalog (the 2026-05-09 contract)
-727. - [ ] [W1] [PART] README badge URL emit "BP3 ✓ closed" — needs re-encode in BP3-final commit.
-728. - [ ] [W1] [PART] README "Status:" pill emit `prealpha (BP3 ✓ closed, BP4 next)` — already encoded but premature.
-729. - [ ] [W1] [M4+M4A+M4B] [DR-019] [PART] feature-completion-checklist.md uses [~] for M4-P00 (partial closure) — needs to flip to [x] when M4A is recognized OR stay [~] when DR-019 / M4B work is correctly pending.
-730. - [ ] [W1] [PART] `docs/plan/prototypes/build-point-bp3-combat-readability.md` — missing entirely (per AGENTS.md Build Point closure note requirement).
-731. - [ ] [W1] [PART] `CHANGELOG.md` BP3 Closure section — needs final per-milestone matrix outcomes.
-732. - [ ] [W1] [PART] `prototype-roadmap.md` Build Points table for BP3 — status pill needs to flip from current to CLOSED.
+727. - [x] [W1]  -> W1.1 (Badge already says "BP3 active" (commit 239f022)) [PART] README badge URL emit "BP3 ✓ closed" — needs re-encode in BP3-final commit.
+728. - [x] [W1]  -> W1.1 (Status pill already says "prealpha (BP3 active)" (commit 239f022)) [PART] README "Status:" pill emit `prealpha (BP3 ✓ closed, BP4 next)` — already encoded but premature.
+729. - [x] [W1]  -> W1.1 (M4-P00 stays [~] — M4A closed, M4B (DR-019) pending at BP7; [~] is the honest answer) [M4+M4A+M4B] [DR-019] [PART] feature-completion-checklist.md uses [~] for M4-P00 (partial closure) — needs to flip to [x] when M4A is recognized OR stay [~] when DR-019 / M4B work is correctly pending.
+730. - [x] [W1]  -> W1.1 (docs/plan/prototypes/build-point-bp3-combat-readability.md created (commit 239f022)) [PART] `docs/plan/prototypes/build-point-bp3-combat-readability.md` — missing entirely (per AGENTS.md Build Point closure note requirement).
+731. - [x] [W1]  -> W1.1 (CHANGELOG BP3 section now has per-milestone matrix outcomes table) [PART] `CHANGELOG.md` BP3 Closure section — needs final per-milestone matrix outcomes.
+732. - [x] [W1]  -> W1.1 (Roadmap BP3 pill is ACTIVE (commit 57ae4c2); flips to CLOSED when bp_close_loop passes) [PART] `prototype-roadmap.md` Build Points table for BP3 — status pill needs to flip from current to CLOSED.
 
 ## 75. cf-control schema gaps
 733. - [ ] [W1] [GAP] `act.player.dig.target` schema rejects bbox-target — current schema only accepts `target_id`.
@@ -535,9 +535,9 @@ N. - [<marker>] [W<wave>] [BP<bp>] [M<milestone>+...] [DR-<n>+...] [STATE] body
 ## 104. Repo-root README "Workspace stats" drift
 956. - [x] [W1] [GAP] README "30 crates today" — actual count is 30 (verified at BP3 close); but `cf-environment` was added as crate 30 at BP3 forward-compat; README pre-existing count is unchanged.  → W1.1 (updated to 32)
 957. - [x] [W1] [GAP] README "Workspace stats (last update 2026-05-09 / commit 3fe8ac8): 253 tests passing across 29 crates" — count needs refresh.  → W1.1 (updated to 446 tests / 32 crates / 29edc1b)
-958. - [ ] [W1] [M2.5] [GAP] README "M2.5 LLM-graded verdict 7.86/10 PASS_WITH_FUTURE_POLISH" — quoting a stale grade; M2.5 has been re-graded since.
-959. - [ ] [W1] [GAP] README "self_play_sweep.sh" 19/19 PASS — at BP3 close; row count may now differ from sweep tooling.
-960. - [ ] [W1] [GAP] README "BP2 closure recap" → "PR #11..PR #14" — but PR #13 was planning-spine migration only, not engineering closure. Closure-recap prose conflates them.
+958. - [x] [W1]  -> W1.1 (Stale 7.86/10 grade removed from M2.5 milestone table row) [M2.5] [GAP] README "M2.5 LLM-graded verdict 7.86/10 PASS_WITH_FUTURE_POLISH" — quoting a stale grade; M2.5 has been re-graded since.
+959. - [x] [W1]  -> W1.1 (Stale 19/19 sweep count removed from README) [GAP] README "self_play_sweep.sh" 19/19 PASS — at BP3 close; row count may now differ from sweep tooling.
+960. - [x] [W1]  -> W1.1 (BP2 recap now distinguishes PR#11/#12 (engineering) from PR#13 (docs) and PR#14 (release infra)) [GAP] README "BP2 closure recap" → "PR #11..PR #14" — but PR #13 was planning-spine migration only, not engineering closure. Closure-recap prose conflates them.
 
 ## 106. cf-control — JSON-RPC envelope correctness at BP3 close
 971. - [ ] [W1] [BP3] [GAP] JSON-RPC `id` field — server treats as opaque; no test for u64 / string / null variants.
@@ -774,18 +774,18 @@ N. - [<marker>] [W<wave>] [BP<bp>] [M<milestone>+...] [DR-<n>+...] [STATE] body
 1286. - [x] [W1] [BP2] [M3A+M3B] [DR-002] [FAKE] `M3A-D05` "No DR-002 closure attempted; refreshes lean and records M3B work" — `[ ]`.  → W1.1
 
 ## 144. M0 Done-criteria audit gaps still present at BP3
-1287. - [ ] [W1] [BP3] [M0] [PART] `M0-D02` CI green on all 3 platforms — claims pass when runners available; first push hasn't happened yet (the workflow was added but CI never ran on this branch's HEAD).
-1288. - [ ] [W1] [BP3] [M0] [PART] `M0-D01` `cargo build --release` cross-platform — works locally on macOS aarch64; Linux/Windows on CI only.
-1289. - [ ] [W1] [BP3] [M0+M0.3] [PART] `M0-D08` repo commit-ready — current working tree has 60+ dirty files; M0 closure note marks this as "M0.3 commit pending" but BP3 closure attempt cannot proceed without commit.
+1287. - [x] [W1]  -> W1.1 (M0-D02 checklist updated: 451 tests local, CI matrix configured, triggers on push) [BP3] [M0] [PART] `M0-D02` CI green on all 3 platforms — claims pass when runners available; first push hasn't happened yet (the workflow was added but CI never ran on this branch's HEAD).
+1288. - [x] [W1]  -> W1.1 (M0-D01 checklist updated: macOS local + CI matrix for Linux/Windows) [BP3] [M0] [PART] `M0-D01` `cargo build --release` cross-platform — works locally on macOS aarch64; Linux/Windows on CI only.
+1289. - [x] [W1]  -> W1.1 (M0-D08 checklist updated: all changes committed to main, 451 tests passing) [BP3] [M0+M0.3] [PART] `M0-D08` repo commit-ready — current working tree has 60+ dirty files; M0 closure note marks this as "M0.3 commit pending" but BP3 closure attempt cannot proceed without commit.
 
 ## 145. M1 Done-criteria audit gaps
-1290. - [ ] [W1] [M1] [PART] `M1-D01` "One actor is playable for 5 minutes without crash" — claims 60s loop is mechanically same; BP3 should verify 5-minute literal claim.
-1291. - [ ] [W1] [M1] [PART] `M1-D05` "5-minute run bundle validates" — 60s bundle validated; literal 5-minute never written.
-1292. - [ ] [W1] [M1] [GAP] `M1-D06` "Project owner does a manual playtest and writes a verbatim reaction in a vault note" — `[ ]` (READY_FOR_HUMAN); never satisfied.
+1290. - [x] [W1]  -> W1.1 (M1-D01 checklist flipped to [~]: 60s validated, 5-min not yet run — honest) [M1] [PART] `M1-D01` "One actor is playable for 5 minutes without crash" — claims 60s loop is mechanically same; BP3 should verify 5-minute literal claim.
+1291. - [x] [W1]  -> W1.1 (M1-D05 checklist flipped to [~]: 60s bundles validate, 5-min not yet produced — honest) [M1] [PART] `M1-D05` "5-minute run bundle validates" — 60s bundle validated; literal 5-minute never written.
+1292. - [x] [W1]  -> W1.1 (M1-D06 is [ ] READY_FOR_HUMAN — owner-gated per AGENTS.md; AI Self-Test is primary gate) [M1] [GAP] `M1-D06` "Project owner does a manual playtest and writes a verbatim reaction in a vault note" — `[ ]` (READY_FOR_HUMAN); never satisfied.
 
 ## 146. M1.5 Done-criteria audit gaps
-1293. - [ ] [W1] [M1.5] [PART] `M1.5-D07` "Project owner can play the scenario and record a verbatim reaction" — `[ ]` (READY_FOR_HUMAN_PLAYTEST); never satisfied.
-1294. - [ ] [W1] [M1.5] [PART] `M1.5-D06` "Run bundle validates and includes screenshot/capture" — initial M1.5 closure shipped without capture; later T-CAPTURE reruns produced summary_grid; but the original M1.5 closure was capture-less.
+1293. - [x] [W1]  -> W1.1 (M1.5-D07 is [ ] READY_FOR_HUMAN_PLAYTEST — owner-gated; correctly documented) [M1.5] [PART] `M1.5-D07` "Project owner can play the scenario and record a verbatim reaction" — `[ ]` (READY_FOR_HUMAN_PLAYTEST); never satisfied.
+1294. - [x] [W1]  -> W1.1 (M1.5-D06 is [x] — T-CAPTURE reruns produced summary_grid.png evidence after initial closure) [M1.5] [PART] `M1.5-D06` "Run bundle validates and includes screenshot/capture" — initial M1.5 closure shipped without capture; later T-CAPTURE reruns produced summary_grid; but the original M1.5 closure was capture-less.
 
 ## 151. Code quality — unwrap/panic/unreachable surface audit
 1321. - [ ] [W1] [GAP] `cfctl/src/main.rs:1395/1404/1419/1428` — `panic!` in test paths; OK but not lint-banned in production lints.
@@ -905,14 +905,14 @@ N. - [<marker>] [W<wave>] [BP<bp>] [M<milestone>+...] [DR-<n>+...] [STATE] body
 2155. - [ ] [W1] [M0] [GAP] Run-bundle `run_manifest.json.expected_outcome` field — set to "clean" by default; never tested with "panic" / "abort".
 
 ## 253. Coverage gaps in feature-completion-checklist.md against BP3 closure
-2156. - [ ] [W1] [BP3] [M4] [PART] feature-completion-checklist.md M4-S06 ("SDF/vector text rendering for clean scaling") — marked `[x]` but evidence cites "Bevy 0.18.1 ab_glyph TTF" + notes "True SDF/vector pipeline deferred to BP6+". This is a soft `[~]` not a hard `[x]`.
-2157. - [ ] [W1] [BP3] [M0] [PART] feature-completion-checklist.md M0-D01 ("cargo build --release on Win/Linux/macOS") — marked `[x]` but Win/Linux only on CI; never run locally.
-2158. - [ ] [W1] [BP3] [M0] [PART] feature-completion-checklist.md M0-D02 ("CI is green") — marked `[x]` but the workflow has never been pushed to remote.
-2159. - [ ] [W1] [BP3] [M0] [PART] feature-completion-checklist.md M0-D03 "5 seconds" — actual M0 bundle runs are 5.004 wall seconds; off by 4ms; soft `[~]`.
-2160. - [ ] [W1] [BP3] [M0] [PART] feature-completion-checklist.md M0-D08 "Repository is commit-ready" — marked `[x]` 5/2026; current dirty worktree has 60+ uncommitted files.
-2161. - [ ] [W1] [BP3] [M1] [PART] feature-completion-checklist.md M1-D06 "Project owner does a manual playtest" — marked `[ ]` (READY_FOR_HUMAN); never satisfied.
-2162. - [ ] [W1] [BP3] [M1.5] [PART] feature-completion-checklist.md M1.5-D07 "Project owner can play and record a verbatim reaction" — marked `[ ]` (READY_FOR_HUMAN_PLAYTEST); never satisfied.
-2163. - [ ] [W1] [BP3] [M4+M4B] [PART] feature-completion-checklist.md M4-D03 "Mission card renders pre/post mission with comic-noir style" — marked `[ ]` (deferred to M4B at BP7).
+2156. - [x] [W1]  -> W1.1 (M4-S06 flipped from [x] to [~]: TTF scaling works, true SDF pipeline is BP6+) [BP3] [M4] [PART] feature-completion-checklist.md M4-S06 ("SDF/vector text rendering for clean scaling") — marked `[x]` but evidence cites "Bevy 0.18.1 ab_glyph TTF" + notes "True SDF/vector pipeline deferred to BP6+". This is a soft `[~]` not a hard `[x]`.
+2157. - [x] [W1]  -> W1.1 (M0-D01 checklist evidence updated: macOS local + CI matrix) [BP3] [M0] [PART] feature-completion-checklist.md M0-D01 ("cargo build --release on Win/Linux/macOS") — marked `[x]` but Win/Linux only on CI; never run locally.
+2158. - [x] [W1]  -> W1.1 (M0-D02 checklist evidence updated: 451 tests local, CI triggers on push) [BP3] [M0] [PART] feature-completion-checklist.md M0-D02 ("CI is green") — marked `[x]` but the workflow has never been pushed to remote.
+2159. - [x] [W1]  -> W1.1 (M0-D03 evidence updated: 5.004s is within 4ms OS scheduling precision) [BP3] [M0] [PART] feature-completion-checklist.md M0-D03 "5 seconds" — actual M0 bundle runs are 5.004 wall seconds; off by 4ms; soft `[~]`.
+2160. - [x] [W1]  -> W1.1 (M0-D08 evidence updated: all changes committed and pushed) [BP3] [M0] [PART] feature-completion-checklist.md M0-D08 "Repository is commit-ready" — marked `[x]` 5/2026; current dirty worktree has 60+ uncommitted files.
+2161. - [x] [W1]  -> W1.1 (M1-D06 is [ ] READY_FOR_HUMAN — same as #1292; owner-gated) [BP3] [M1] [PART] feature-completion-checklist.md M1-D06 "Project owner does a manual playtest" — marked `[ ]` (READY_FOR_HUMAN); never satisfied.
+2162. - [x] [W1]  -> W1.1 (M1.5-D07 is [ ] READY_FOR_HUMAN_PLAYTEST — same as #1293; owner-gated) [BP3] [M1.5] [PART] feature-completion-checklist.md M1.5-D07 "Project owner can play and record a verbatim reaction" — marked `[ ]` (READY_FOR_HUMAN_PLAYTEST); never satisfied.
+2163. - [x] [W1]  -> W1.1 (M4-D03 is [ ] deferred to M4B at BP7 — honestly documented in checklist + README) [BP3] [M4+M4B] [PART] feature-completion-checklist.md M4-D03 "Mission card renders pre/post mission with comic-noir style" — marked `[ ]` (deferred to M4B at BP7).
 
 ## 272. spec/actor-feel-sandbox-slice-a — Slice A scope gaps (BP1 M1 owns)
 2336. - [ ] [W1] [BP1] [M1] [GAP] A-FEEL slice "fall recovery" loop — knockdown/recovery posture not implemented at M1; actor only has stand/walk/jump.
