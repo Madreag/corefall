@@ -4555,12 +4555,16 @@ impl EngineHandle for M0Engine {
                 if let Some(player_id) = player {
                     state.pending_intent.actor = player_id;
                     state.pending_intent.source = source;
-                    // `pressed: false` is an explicit release (a no-op for M1's
-                    // single-press rifle per the schema). Only a press raises the
-                    // edge so a release sent in the same tick as a prior press
-                    // does not erase the queued shot before `drive_tick` runs.
+                    // `pressed: true` raises the edge for one tick (cleared by
+                    // clear_edges) and sets the sticky held flag; `pressed:
+                    // false` releases the held flag. Semi-mode rifles latch
+                    // after one shot; FullAuto rifles auto-repeat at cadence
+                    // while held.
                     if pressed {
                         state.pending_intent.fire = true;
+                        state.pending_intent.fire_held = true;
+                    } else {
+                        state.pending_intent.fire_held = false;
                     }
                     drop(state);
                     self.recorder.record(
@@ -6672,6 +6676,15 @@ mod tests {
             for _ in 0..fire_interval_ticks.max(35) {
                 engine.drive_tick();
             }
+            // Release the trigger so the Semi rifle latch clears and the next
+            // pressed:true can fire (M1 default rifle is Semi).
+            let _ = engine
+                .dispatch(ControlCommand::ActPlayerFire {
+                    pressed: false,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            engine.drive_tick();
         }
         let events = engine.recorder().snapshot_events();
         // CCCP Actor.cpp:1229 — HP=0 enters DYING (not DEAD); the DEAD

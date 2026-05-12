@@ -557,7 +557,10 @@ fn step_one_actor(
     let can_fire = rifle_selected && !rifle_disabled_by_limb_loss && !weapon_jammed;
     let rifle_outcomes = if let Some(rifle) = state.rifles.get_mut(&actor_id) {
         let inputs = RifleTickInputs {
-            fire_pressed: intent.fire && can_fire,
+            // Fire is honored on either the edge `intent.fire` or the sticky
+            // `intent.fire_held`. The rifle's fire_mode controls semantics:
+            // Semi latches after one shot, FullAuto auto-repeats at cadence.
+            fire_pressed: (intent.fire || intent.fire_held) && can_fire,
             reload_pressed: intent.reload && can_fire,
             auto_reload_when_empty: deps.auto_reload_when_empty && can_fire,
         };

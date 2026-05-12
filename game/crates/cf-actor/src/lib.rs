@@ -451,6 +451,14 @@ pub struct ControlIntent {
     /// to a continuous bool here).
     #[serde(default)]
     pub sharp_aim: bool,
+    /// **M1**: sticky "fire is held" flag. Edge-triggered `fire` above is
+    /// cleared by `clear_edges` each tick; `fire_held` survives until the
+    /// player releases. The sim treats `fire || fire_held` as the trigger
+    /// signal, so FullAuto weapons auto-repeat at their fire interval while
+    /// held. Semi-mode weapons use `RifleState::semi_latched` to fire exactly
+    /// once per held press regardless of `fire_held`.
+    #[serde(default)]
+    pub fire_held: bool,
 }
 
 impl Default for IntentSource {

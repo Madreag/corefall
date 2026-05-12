@@ -31,6 +31,41 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
+/// **M1**: how the weapon's fire button is consumed.
+///
+/// - `Semi`: exactly one shot per `intent.fire` press (the press is latched in
+///   `RifleState::semi_latched` and released only when the player releases
+///   the trigger). Holding fire fires once, then waits.
+/// - `FullAuto`: as long as `intent.fire` is held the rifle fires at
+///   `fire_interval_seconds` cadence.
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FireMode {
+    Semi = 0,
+    FullAuto = 1,
+}
+
+impl Default for FireMode {
+    fn default() -> Self {
+        // M1's default rifle is semi-automatic per CCCP `HDFirearm` defaults.
+        FireMode::Semi
+    }
+}
+
+impl FireMode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            FireMode::Semi => "semi",
+            FireMode::FullAuto => "full_auto",
+        }
+    }
+}
+
+fn default_fire_mode() -> FireMode {
+    FireMode::Semi
+}
+
 /// Spec for one rifle preset. Loaded from a hard-coded registry in M1; M5 introduces
 /// the full role-record schema (`cf-equipment::RoleRecord`) and a `content/equipment/`
 /// data path.
@@ -104,6 +139,11 @@ pub struct RifleSpec {
     /// grenade / rocket presets set this for AI avoidance.
     #[serde(default)]
     pub ai_blast_radius: f32,
+    /// **M1**: fire-mode discriminator (Semi or FullAuto). Default Semi so M1's
+    /// canonical rifle keeps its single-press semantics. New presets opt in to
+    /// FullAuto by setting this field.
+    #[serde(default = "default_fire_mode")]
+    pub fire_mode: FireMode,
 }
 
 fn default_recoil_decay_rate() -> f32 {
@@ -376,6 +416,7 @@ impl FiringProfile {
             ai_penetration: 0.0,
             ai_life_time: self.projectile_lifetime_seconds,
             ai_blast_radius: 0.0,
+            fire_mode: default_fire_mode(),
         }
     }
 }
@@ -415,7 +456,49 @@ fn rifle_m1_default() -> RifleSpec {
         ai_penetration: 0.0,
         ai_life_time: 1.5,
         ai_blast_radius: 0.0,
+        fire_mode: FireMode::Semi,
     }
+}
+
+/// **M1**: shotgun preset. Multi-particle round with cone spread.
+pub const SHOTGUN_M1_DEFAULT_ID: &str = "shotgun_m1_default";
+
+fn shotgun_m1_default() -> RifleSpec {
+    RifleSpec {
+        preset_id: SHOTGUN_M1_DEFAULT_ID.to_string(),
+        fire_interval_seconds: 0.7,
+        mag_capacity: 6,
+        reload_seconds: 2.5,
+        recoil_impulse: 60.0,
+        muzzle_forward_offset: 12.0,
+        muzzle_vertical_offset: 4.0,
+        projectile_speed: 900.0,
+        damage_per_hit: 8.0,
+        projectile_lifetime_seconds: 0.6,
+        recoil_decay_rate: default_recoil_decay_rate(),
+        loudness: 1.3,
+        inherits_firer_velocity: true,
+        particle_count: 8,
+        spread_radians: 0.15,
+        tracer_round_to_total_ratio: 0,
+        ai_fire_vel: 900.0,
+        ai_penetration: 0.0,
+        ai_life_time: 0.6,
+        ai_blast_radius: 0.0,
+        fire_mode: FireMode::Semi,
+    }
+}
+
+/// **M1**: tracer-rich preset used to verify the 1-in-N tracer cadence
+/// (`RTTRatio` per CCCP `Magazine`). Same baseline as the default rifle but
+/// with `tracer_round_to_total_ratio=4` (every 4th shot is a tracer).
+pub const RIFLE_M1_TRACER_ID: &str = "rifle_m1_tracer";
+
+fn rifle_m1_tracer() -> RifleSpec {
+    let mut spec = rifle_m1_default();
+    spec.preset_id = RIFLE_M1_TRACER_ID.to_string();
+    spec.tracer_round_to_total_ratio = 4;
+    spec
 }
 
 /// M5 powered-armor carbine: 12 RPS, 25-round magazine, slightly less damage
@@ -442,6 +525,7 @@ fn carbine_m5_powered() -> RifleSpec {
         ai_penetration: 0.0,
         ai_life_time: 1.5,
         ai_blast_radius: 0.0,
+        fire_mode: FireMode::FullAuto,
     }
 }
 
@@ -469,6 +553,7 @@ fn rifle_m5_mech_heavy() -> RifleSpec {
         ai_penetration: 0.0,
         ai_life_time: 2.0,
         ai_blast_radius: 0.0,
+        fire_mode: FireMode::Semi,
     }
 }
 
@@ -479,6 +564,8 @@ pub fn rifle_presets() -> BTreeMap<&'static str, RifleSpec> {
     m.insert(RIFLE_M1_DEFAULT_ID, rifle_m1_default());
     m.insert(CARBINE_M5_POWERED_ID, carbine_m5_powered());
     m.insert(RIFLE_M5_MECH_HEAVY_ID, rifle_m5_mech_heavy());
+    m.insert(SHOTGUN_M1_DEFAULT_ID, shotgun_m1_default());
+    m.insert(RIFLE_M1_TRACER_ID, rifle_m1_tracer());
     m
 }
 
@@ -592,6 +679,18 @@ pub struct RifleState {
     pub fire_cooldown_ticks: u32,
     /// Ticks remaining in an in-progress reload. 0 = idle.
     pub reload_remaining_ticks: u32,
+    /// **M1 / Semi**: latched after a Semi-mode shot until the trigger is
+    /// released. Prevents the next held-tick from re-firing. Cleared when
+    /// `RifleTickInputs::fire_pressed=false`.
+    #[serde(default)]
+    pub semi_latched: bool,
+    /// **M1**: per-mag shot index, starting at 0 on reload. Drives the
+    /// tracer cadence: shot index N produces a tracer when
+    /// `(N % tracer_round_to_total_ratio) == (tracer_round_to_total_ratio - 1)`
+    /// for non-zero ratios (so the LAST shot in each cycle is the tracer, per
+    /// CCCP Magazine semantics). Reset to 0 by `reset()` and on reload completion.
+    #[serde(default)]
+    pub shot_index_in_mag: u32,
 }
 
 impl RifleState {
@@ -602,6 +701,8 @@ impl RifleState {
             reload_remaining_ticks: 0,
             tick_rate_hz: tick_rate_hz.max(1),
             spec,
+            semi_latched: false,
+            shot_index_in_mag: 0,
         }
     }
 
@@ -633,6 +734,22 @@ impl RifleState {
         self.ammo_in_mag = self.spec.mag_capacity;
         self.fire_cooldown_ticks = 0;
         self.reload_remaining_ticks = 0;
+        self.semi_latched = false;
+        self.shot_index_in_mag = 0;
+    }
+
+    /// **M1**: returns true if the next shot (index `shot_index_in_mag`) should
+    /// emit a tracer projectile per `tracer_round_to_total_ratio`. Deterministic
+    /// — same mag index always produces the same answer for the same ratio.
+    pub fn next_shot_is_tracer(&self) -> bool {
+        let ratio = self.spec.tracer_round_to_total_ratio;
+        if ratio == 0 {
+            return false;
+        }
+        // Tracer falls on every Nth shot starting at index `ratio - 1` so a
+        // ratio of 4 produces tracers at shots 3, 7, 11, ... (one per group
+        // of 4). Matches CCCP `Magazine::RTTRatio` cycling.
+        (self.shot_index_in_mag + 1) % ratio == 0
     }
 }
 
@@ -645,6 +762,10 @@ pub struct TickOutcomes {
     pub reload_completed: bool,
     pub dry_fire: bool,
     pub recoil_impulse_applied: f32,
+    /// **M1**: tracer flag for the shot fired this tick (per CCCP `Magazine.RTTRatio`).
+    /// Always false when no shot fired.
+    #[serde(default)]
+    pub fired_is_tracer: bool,
 }
 
 impl TickOutcomes {
@@ -655,6 +776,7 @@ impl TickOutcomes {
             reload_completed: false,
             dry_fire: false,
             recoil_impulse_applied: 0.0,
+            fired_is_tracer: false,
         }
     }
 }
@@ -680,9 +802,20 @@ impl Default for RifleTickInputs {
 
 /// One fixed-tick step of the rifle. Returns the outcomes the caller should turn into
 /// recorder events, plus any recoil impulse the caller should apply to the firer.
+///
+/// **M1**: honors `RifleSpec::fire_mode`. `Semi` latches after each shot until
+/// the trigger is released so a held button fires exactly once. `FullAuto` fires
+/// at `fire_interval_seconds` cadence while held.
 #[must_use]
 pub fn tick_rifle(state: &mut RifleState, inputs: RifleTickInputs) -> TickOutcomes {
     let mut outcomes = TickOutcomes::empty();
+
+    // Release the semi-mode latch as soon as the trigger lifts; subsequent
+    // presses are honored. Must run BEFORE the fire check so the very tick
+    // the player releases doesn't get a free shot.
+    if !inputs.fire_pressed {
+        state.semi_latched = false;
+    }
 
     // Advance reload counter first; finishing a reload this tick must take priority over
     // firing so the actor can shoot again on the very next tick.
@@ -690,6 +823,7 @@ pub fn tick_rifle(state: &mut RifleState, inputs: RifleTickInputs) -> TickOutcom
         state.reload_remaining_ticks -= 1;
         if state.reload_remaining_ticks == 0 {
             state.ammo_in_mag = state.spec.mag_capacity;
+            state.shot_index_in_mag = 0;
             outcomes.reload_completed = true;
             // Reload finished this tick; the fire check below would otherwise see a
             // zero cooldown and fire on the same tick. Defer firing to the next tick
@@ -714,10 +848,22 @@ pub fn tick_rifle(state: &mut RifleState, inputs: RifleTickInputs) -> TickOutcom
         if state.ammo_in_mag == 0 {
             outcomes.dry_fire = true;
         } else if state.fire_cooldown_ticks == 0 {
-            state.ammo_in_mag -= 1;
-            state.fire_cooldown_ticks = state.fire_interval_ticks();
-            outcomes.fired_this_tick = true;
-            outcomes.recoil_impulse_applied = state.spec.recoil_impulse;
+            // Gate the actual fire on fire_mode + latch.
+            let allow_fire = match state.spec.fire_mode {
+                FireMode::FullAuto => true,
+                FireMode::Semi => !state.semi_latched,
+            };
+            if allow_fire {
+                outcomes.fired_is_tracer = state.next_shot_is_tracer();
+                state.ammo_in_mag -= 1;
+                state.shot_index_in_mag = state.shot_index_in_mag.saturating_add(1);
+                state.fire_cooldown_ticks = state.fire_interval_ticks();
+                outcomes.fired_this_tick = true;
+                outcomes.recoil_impulse_applied = state.spec.recoil_impulse;
+                if state.spec.fire_mode == FireMode::Semi {
+                    state.semi_latched = true;
+                }
+            }
         }
     }
 
@@ -956,12 +1102,108 @@ mod tests {
     }
 
     #[test]
+    fn semi_mode_fires_once_per_press_even_when_held() {
+        let mut r = rifle();
+        assert_eq!(r.spec.fire_mode, FireMode::Semi);
+        // Press + hold for many ticks: must produce exactly one shot.
+        let first = tick_rifle(
+            &mut r,
+            RifleTickInputs {
+                fire_pressed: true,
+                ..Default::default()
+            },
+        );
+        assert!(first.fired_this_tick);
+        let mut shots_while_held = 0;
+        for _ in 0..60 {
+            let outcomes = tick_rifle(
+                &mut r,
+                RifleTickInputs {
+                    fire_pressed: true,
+                    ..Default::default()
+                },
+            );
+            if outcomes.fired_this_tick {
+                shots_while_held += 1;
+            }
+        }
+        assert_eq!(
+            shots_while_held, 0,
+            "Semi must NOT auto-repeat while held; got {shots_while_held} extra shots"
+        );
+        // Releasing + re-pressing fires again.
+        let _release = tick_rifle(&mut r, RifleTickInputs::default());
+        let second = tick_rifle(
+            &mut r,
+            RifleTickInputs {
+                fire_pressed: true,
+                ..Default::default()
+            },
+        );
+        assert!(second.fired_this_tick, "Semi must fire on a fresh press after release");
+    }
+
+    #[test]
+    fn full_auto_mode_fires_at_cadence_while_held() {
+        let preset = rifle_preset(CARBINE_M5_POWERED_ID).unwrap();
+        assert_eq!(preset.fire_mode, FireMode::FullAuto);
+        let mut r = RifleState::new(preset, 60);
+        let mut shots = 0;
+        for _ in 0..120 {
+            let outcomes = tick_rifle(
+                &mut r,
+                RifleTickInputs {
+                    fire_pressed: true,
+                    ..Default::default()
+                },
+            );
+            if outcomes.fired_this_tick {
+                shots += 1;
+            }
+        }
+        // ~12 RPS × 2 s window = ~24 shots; clamp by mag (25). Should be > 1.
+        assert!(shots > 1, "FullAuto must auto-repeat while held; only {shots} shot(s)");
+    }
+
+    #[test]
+    fn tracer_cadence_one_in_four_yields_three_tracers_in_twelve_shots() {
+        let preset = rifle_preset(RIFLE_M1_TRACER_ID).unwrap();
+        assert_eq!(preset.tracer_round_to_total_ratio, 4);
+        let mut r = RifleState::new(preset, 60);
+        let mut tracer_count = 0;
+        let mut shots = 0;
+        let cooldown = r.fire_interval_ticks();
+        while shots < 12 {
+            // Release for one tick to clear the Semi latch (preset is Semi).
+            let _ = tick_rifle(&mut r, RifleTickInputs::default());
+            for _ in 0..cooldown {
+                let _ = tick_rifle(&mut r, RifleTickInputs::default());
+            }
+            let outcomes = tick_rifle(
+                &mut r,
+                RifleTickInputs {
+                    fire_pressed: true,
+                    ..Default::default()
+                },
+            );
+            if outcomes.fired_this_tick {
+                if outcomes.fired_is_tracer {
+                    tracer_count += 1;
+                }
+                shots += 1;
+            }
+        }
+        assert_eq!(tracer_count, 3, "12 shots @ ratio 4 must yield exactly 3 tracers");
+    }
+
+    #[test]
     fn fire_rate_real_time_equivalent_at_60hz_and_120hz() {
-        // Drive both 60 Hz and 120 Hz rifles for the same wall-clock window and
-        // assert the same number of shots fired. Window: 1.0 s -> exactly 10 shots
-        // at 10 RPS. At 60 Hz that's 60 ticks; at 120 Hz that's 120 ticks.
+        // Drive both 60 Hz and 120 Hz FullAuto rifles for the same wall-clock
+        // window and assert the same number of shots fired. Uses the carbine
+        // preset (FullAuto, ~12 RPS) since the default rifle is Semi.
         fn shots_in_window(tick_rate_hz: u32, ticks: u32) -> u32 {
-            let mut r = rifle_at(tick_rate_hz);
+            let preset = rifle_preset(CARBINE_M5_POWERED_ID).unwrap();
+            let mut r = RifleState::new(preset, tick_rate_hz);
             let mut shots = 0;
             for _ in 0..ticks {
                 let outcomes = tick_rifle(
@@ -979,11 +1221,12 @@ mod tests {
         }
         let shots_60 = shots_in_window(60, 60);
         let shots_120 = shots_in_window(120, 120);
-        assert_eq!(shots_60, shots_120, "10 RPS must hold across tick rates");
-        // Should be 10 shots in 1 s for 10 RPS (one shot per fire_interval, ~10 shots).
+        // FullAuto cadence: same wall-clock window = same shot count cross-rate.
+        assert_eq!(shots_60, shots_120, "FullAuto cadence must hold across tick rates");
+        // Carbine: 0.083s fire interval ≈ 12 RPS. 1.0 s ≈ 12 shots.
         assert!(
-            (9..=11).contains(&shots_60),
-            "expected ~10 RPS, got {shots_60} at 60 Hz"
+            (11..=13).contains(&shots_60),
+            "expected ~12 RPS for carbine FullAuto, got {shots_60} at 60 Hz"
         );
     }
 }
