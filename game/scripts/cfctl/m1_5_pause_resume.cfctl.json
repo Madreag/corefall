@@ -1,0 +1,13 @@
+{
+  "description": "M1.5 tutorial-modal pause/resume round-trip. After scenario.reset the engine ticks the mission. cfctl invokes act.mission.pause -> elapsed_ticks freezes, mission.objective_paused fires. After 60 ticks elapsed cfctl invokes act.mission.resume -> mission.objective_resumed fires. Bundle proves objective_paused + objective_resumed both emit.",
+  "scenario": "micro_breach",
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 30 } },
+    { "method": "act.mission.pause", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 60 } },
+    { "method": "act.mission.resume", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 12 } },
+    { "method": "observe.once", "params": {} }
+  ]
+}

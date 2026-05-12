@@ -5373,6 +5373,114 @@ impl EngineHandle for M0Engine {
                 );
                 CommandResult::rejected("no_mission_in_scenario", tick.0)
             }
+            ControlCommand::ActMissionPause { source } => {
+                // **M1.5**: tutorial-modal pause. Suspends mission objective
+                // progress + timer; emits mission.objective_paused. No-ops
+                // when no mission, already paused, or mission is terminal.
+                let _ = source;
+                let Some(mission) = state.mission.as_mut() else {
+                    drop(state);
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_rejected",
+                        json!({"method": "act.mission.pause", "reason": "no_mission_in_scenario"}),
+                        None,
+                    );
+                    return CommandResult::rejected("no_mission_in_scenario", tick.0);
+                };
+                if mission.result.is_terminal() {
+                    drop(state);
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_rejected",
+                        json!({"method": "act.mission.pause", "reason": "mission_already_terminal"}),
+                        None,
+                    );
+                    return CommandResult::rejected("mission_already_terminal", tick.0);
+                }
+                if mission.paused {
+                    drop(state);
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_rejected",
+                        json!({"method": "act.mission.pause", "reason": "already_paused"}),
+                        None,
+                    );
+                    return CommandResult::rejected("already_paused", tick.0);
+                }
+                let active = mission.pause(tick.0);
+                drop(state);
+                let accepted_id = self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "control",
+                    "command_accepted",
+                    json!({"method": "act.mission.pause"}),
+                    None,
+                );
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "mission",
+                    "objective_paused",
+                    json!({"objective": active}),
+                    Some(accepted_id),
+                );
+                CommandResult::accepted(tick.0)
+            }
+            ControlCommand::ActMissionResume { source } => {
+                // **M1.5**: lift the pause. No-op if not paused.
+                let _ = source;
+                let Some(mission) = state.mission.as_mut() else {
+                    drop(state);
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_rejected",
+                        json!({"method": "act.mission.resume", "reason": "no_mission_in_scenario"}),
+                        None,
+                    );
+                    return CommandResult::rejected("no_mission_in_scenario", tick.0);
+                };
+                if !mission.paused {
+                    drop(state);
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_rejected",
+                        json!({"method": "act.mission.resume", "reason": "not_paused"}),
+                        None,
+                    );
+                    return CommandResult::rejected("not_paused", tick.0);
+                }
+                let active = mission.resume(tick.0);
+                drop(state);
+                let accepted_id = self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "control",
+                    "command_accepted",
+                    json!({"method": "act.mission.resume"}),
+                    None,
+                );
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "mission",
+                    "objective_resumed",
+                    json!({"objective": active}),
+                    Some(accepted_id),
+                );
+                CommandResult::accepted(tick.0)
+            }
             ControlCommand::ActInputCaptureControls {
                 captured,
                 capturer,

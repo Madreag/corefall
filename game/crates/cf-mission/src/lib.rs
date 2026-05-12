@@ -402,6 +402,24 @@ pub struct MissionState {
     /// `LossReason::as_str()` when the mission resolves as Lost.
     #[serde(default)]
     pub loss_reason_label: Option<String>,
+    /// **M1.5**: tutorial-modal pause flag. While `true`, `step()` is a
+    /// no-op AND elapsed-tick accounting skips the paused duration so the
+    /// mission timer does NOT advance. Toggled via `MissionState::pause()`
+    /// / `resume()` so the engine can wire `act.mission.{pause,resume}`
+    /// cfctl methods + emit `mission.objective_paused` / `objective_resumed`
+    /// events.
+    #[serde(default)]
+    pub paused: bool,
+    /// **M1.5**: tick on which the most recent pause began. `None` when
+    /// not paused; populated by `pause()`. `resume()` uses this to
+    /// accumulate `total_paused_ticks` and then clears the field.
+    #[serde(default)]
+    pub pause_started_at_tick: Option<u64>,
+    /// **M1.5**: cumulative paused duration in ticks. `elapsed_ticks` and
+    /// `ticks_remaining` subtract this so the timer truly freezes while
+    /// the modal is up.
+    #[serde(default)]
+    pub total_paused_ticks: u64,
 }
 
 impl MissionState {
@@ -425,7 +443,51 @@ impl MissionState {
             last_event_label: "mission_started".to_string(),
             last_transition_tick: started_at_tick,
             loss_reason_label: None,
+            paused: false,
+            pause_started_at_tick: None,
+            total_paused_ticks: 0,
         }
+    }
+
+    /// **M1.5**: pause the mission's tick-driven progress + timer.
+    /// Returns the id of the currently active objective (if any) so the
+    /// caller can emit `mission.objective_paused { objective: <id> }`.
+    /// No-op (returns None) if the mission is terminal or already paused.
+    pub fn pause(&mut self, current_tick: u64) -> Option<String> {
+        if self.result.is_terminal() || self.paused {
+            return None;
+        }
+        self.paused = true;
+        self.pause_started_at_tick = Some(current_tick);
+        self.last_event_tick = current_tick;
+        self.last_event_label = "objective_paused".to_string();
+        self.last_transition_tick = current_tick;
+        self.active_objective_id()
+    }
+
+    /// **M1.5**: resume after pause. Adds the paused duration to
+    /// `total_paused_ticks` so timer reads correctly. Returns the id of
+    /// the active objective so the engine can emit
+    /// `mission.objective_resumed { objective: <id> }`. No-op (returns
+    /// None) if the mission is not paused.
+    pub fn resume(&mut self, current_tick: u64) -> Option<String> {
+        if !self.paused {
+            return None;
+        }
+        if let Some(started) = self.pause_started_at_tick.take() {
+            self.total_paused_ticks = self
+                .total_paused_ticks
+                .saturating_add(current_tick.saturating_sub(started));
+        }
+        self.paused = false;
+        self.last_event_tick = current_tick;
+        self.last_event_label = "objective_resumed".to_string();
+        self.last_transition_tick = current_tick;
+        self.active_objective_id()
+    }
+
+    fn active_objective_id(&self) -> Option<String> {
+        self.active_objective_index().map(|i| self.objectives[i].id.clone())
     }
 
     /// Reset the mission to its starting state. Used by `scenario.reset` so the
@@ -445,6 +507,9 @@ impl MissionState {
         self.last_event_label = "mission_started".to_string();
         self.last_transition_tick = started_at_tick;
         self.loss_reason_label = None;
+        self.paused = false;
+        self.pause_started_at_tick = None;
+        self.total_paused_ticks = 0;
     }
 
     /// Number of required objectives still in `Pending` or `Active` status.
@@ -478,8 +543,18 @@ impl MissionState {
     }
 
     /// Ticks elapsed since `started_at_tick`. Saturates at 0.
+    /// **M1.5**: subtracts `total_paused_ticks` AND the current pause
+    /// in-flight (if `paused`) so the timer freezes while a tutorial
+    /// modal is up.
     pub fn elapsed_ticks(&self, current_tick: u64) -> u64 {
-        current_tick.saturating_sub(self.started_at_tick)
+        let raw = current_tick.saturating_sub(self.started_at_tick);
+        let mut pause_credit = self.total_paused_ticks;
+        if self.paused {
+            if let Some(started) = self.pause_started_at_tick {
+                pause_credit = pause_credit.saturating_add(current_tick.saturating_sub(started));
+            }
+        }
+        raw.saturating_sub(pause_credit)
     }
 
     /// Ticks remaining before the timer expires. `None` when no timer is set.
@@ -492,12 +567,22 @@ impl MissionState {
     }
 }
 
+/// **M1.5**: progress quartiles for `mission.objective_updated`. Stable
+/// vocabulary so the run-bundle viewer can render a progress bar.
+const PROGRESS_QUARTILES: [f32; 4] = [0.25, 0.5, 0.75, 1.0];
+
 /// Drive the mission state machine for one tick. Idempotent once the result is
 /// terminal (returns an empty report after Won/Lost).
 #[must_use]
 pub fn step(state: &mut MissionState, inputs: MissionTickInputs<'_>) -> MissionTickReport {
     let mut report = MissionTickReport::default();
     if state.result.is_terminal() {
+        return report;
+    }
+    // **M1.5**: while paused (tutorial modal), suspend objective progress
+    // AND timer accounting. The caller is responsible for calling
+    // `MissionState::resume` to lift the gate.
+    if state.paused {
         return report;
     }
 
@@ -655,7 +740,7 @@ pub fn step(state: &mut MissionState, inputs: MissionTickInputs<'_>) -> MissionT
     // The 100% milestone fires on the same tick as `objective_completed`
     // so the cause chain shows: dig_request -> objective_updated{progress:1.0}
     // -> objective_completed.
-    for obj in state.objectives.iter_mut() {
+    for obj in &mut state.objectives {
         if obj.status != ObjectiveStatus::Active {
             continue;
         }
@@ -665,9 +750,8 @@ pub fn step(state: &mut MissionState, inputs: MissionTickInputs<'_>) -> MissionT
             }
             _ => continue,
         };
-        const QUARTILES: [f32; 4] = [0.25, 0.5, 0.75, 1.0];
-        while (obj.progress_milestone_index as usize) < QUARTILES.len() {
-            let next = QUARTILES[obj.progress_milestone_index as usize];
+        while (obj.progress_milestone_index as usize) < PROGRESS_QUARTILES.len() {
+            let next = PROGRESS_QUARTILES[obj.progress_milestone_index as usize];
             if progress + 1e-6 >= next {
                 obj.progress_milestone_index += 1;
                 report.objective_updated.push(ObjectiveProgressUpdate {
@@ -923,6 +1007,84 @@ mod tests {
         assert_eq!(report.objective_started, vec!["breach".to_string()]);
         assert_eq!(state.objectives[0].status, ObjectiveStatus::Active);
         assert_eq!(state.objectives[1].status, ObjectiveStatus::Pending);
+    }
+
+    #[test]
+    fn pause_suspends_step_and_timer_resume_restores() {
+        // **M1.5**: while paused, step() is a no-op AND the timer freezes.
+        let mut state = build_state();
+        let actors = mk_actors(player_at(120.0, 32.0), false);
+        // Tick 1: activate breach.
+        let _ = step(
+            &mut state,
+            MissionTickInputs {
+                tick: 1,
+                player: actors.get(&ActorId(1)),
+                actors: &actors,
+                breaches_broken: &BTreeMap::new(),
+                reactors_destroyed: &BTreeMap::new(),
+                breaches_progress: &BTreeMap::new(),
+            },
+        );
+        // Tick 5: pause. elapsed_ticks at tick 5 = 5.
+        let active = state.pause(5).expect("pause returns active id");
+        assert_eq!(active, "breach");
+        assert!(state.paused);
+        assert_eq!(state.elapsed_ticks(5), 5);
+        // Tick 50: still paused; elapsed should not advance past tick 5's value.
+        let mut breaches = BTreeMap::new();
+        breaches.insert("outer_wall".to_string(), true);
+        let report = step(
+            &mut state,
+            MissionTickInputs {
+                tick: 50,
+                player: actors.get(&ActorId(1)),
+                actors: &actors,
+                breaches_broken: &breaches,
+                reactors_destroyed: &BTreeMap::new(),
+                breaches_progress: &BTreeMap::new(),
+            },
+        );
+        assert!(report.objective_completed.is_empty(), "paused step is a no-op");
+        assert!(state.objectives[0].status == ObjectiveStatus::Active);
+        // ticks_remaining at tick 50 while paused = original time_limit - 5.
+        let remaining_paused = state.ticks_remaining(50).unwrap();
+        assert_eq!(remaining_paused, state.time_limit_ticks - 5);
+        // Resume at tick 50: paused for 45 ticks; subsequent timer reads reflect that credit.
+        let resumed = state.resume(50).expect("resume returns active id");
+        assert_eq!(resumed, "breach");
+        assert!(!state.paused);
+        assert_eq!(state.total_paused_ticks, 45);
+        // Tick 100: elapsed = 100 - 0 - 45 = 55.
+        assert_eq!(state.elapsed_ticks(100), 55);
+    }
+
+    #[test]
+    fn pause_resume_skip_when_terminal_or_double_called() {
+        let mut state = build_state();
+        let actors = mk_actors(player_at(120.0, 32.0), false);
+        // Pause once.
+        let _ = step(
+            &mut state,
+            MissionTickInputs {
+                tick: 1,
+                player: actors.get(&ActorId(1)),
+                actors: &actors,
+                breaches_broken: &BTreeMap::new(),
+                reactors_destroyed: &BTreeMap::new(),
+                breaches_progress: &BTreeMap::new(),
+            },
+        );
+        assert!(state.pause(2).is_some());
+        // Second pause: None (already paused).
+        assert!(state.pause(3).is_none());
+        // Resume.
+        assert!(state.resume(4).is_some());
+        // Second resume: None (not paused).
+        assert!(state.resume(5).is_none());
+        // Terminal: pause refuses.
+        state.result = MissionResult::Won;
+        assert!(state.pause(6).is_none());
     }
 
     #[test]

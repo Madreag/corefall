@@ -260,6 +260,25 @@ pub struct ActPlayerAbortParams {
     pub schema_version: u32,
 }
 
+/// **M1.5**: `act.mission.pause` — suspend mission objective progress +
+/// timer accounting (tutorial-modal pause path). Idempotent: invoking
+/// twice in a row only emits one `mission.objective_paused` event.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActMissionPauseParams {
+    #[serde(default)]
+    pub schema_version: u32,
+}
+
+/// **M1.5**: `act.mission.resume` — lift the pause set by `act.mission.pause`.
+/// Idempotent: only emits `mission.objective_resumed` when actually paused.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActMissionResumeParams {
+    #[serde(default)]
+    pub schema_version: u32,
+}
+
 /// **M1 / Gap D1**: `act.input.capture_controls` — UI signals the engine
 /// that an overlay (settings panel, debrief prompt, future pause/menu) has
 /// captured input. `captured=true` raises the CONTROLS CAPTURED HUD badge
@@ -345,6 +364,8 @@ pub fn dump_v1() -> BTreeMap<String, String> {
         entry::<ObserveActorParams>("observe_actor_params"),
         entry::<InspectActorParams>("inspect_actor_params"),
         entry::<ActPlayerAbortParams>("act_player_abort_params"),
+        entry::<ActMissionPauseParams>("act_mission_pause_params"),
+        entry::<ActMissionResumeParams>("act_mission_resume_params"),
         entry::<ActInputCaptureControlsParams>("act_input_capture_controls_params"),
         entry::<RunBundleWriteParams>("run_bundle_write_params"),
         entry::<SystemShutdownParams>("system_shutdown_params"),

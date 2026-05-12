@@ -91,7 +91,7 @@ use crate::{
     },
     schemas::{
         ActChassisClearJamParams, ActChassisRepairParams, ActChassisSalvageParams, ActInputCaptureControlsParams,
-        ActPlayerAbortParams, ActPlayerAimParams, ActPlayerClimbParams, ActPlayerCrouchParams, ActPlayerDigParams,
+        ActMissionPauseParams, ActMissionResumeParams, ActPlayerAbortParams, ActPlayerAimParams, ActPlayerClimbParams, ActPlayerCrouchParams, ActPlayerDigParams,
         ActPlayerEjectParams, ActPlayerFireParams, ActPlayerJetParams, ActPlayerJumpParams, ActPlayerMoveParams,
         ActPlayerReloadParams, ActPlayerResetParams, ActPlayerSelectItemParams, ActPlayerSharpAimParams,
         InspectActorParams, InspectEquipmentParams, ObserveActorParams, ObserveOnceParams, ObserveSubscribeParams,
@@ -382,6 +382,15 @@ pub enum ControlCommand {
     /// `unsupported_in_m1`; M1.5 swaps in real abort logic without rewiring
     /// the cfctl surface.
     ActPlayerAbort {
+        source: IntentSource,
+    },
+    /// **M1.5**: pause mission objective progress + timer (tutorial-modal
+    /// pause path). Emits `mission.objective_paused`.
+    ActMissionPause {
+        source: IntentSource,
+    },
+    /// **M1.5**: resume after pause. Emits `mission.objective_resumed`.
+    ActMissionResume {
         source: IntentSource,
     },
     /// **M1 / Gap D1**: UI tells the engine an overlay (settings panel,
@@ -1125,6 +1134,30 @@ async fn process_request<E: EngineHandle>(
             };
             let result = engine
                 .dispatch(ControlCommand::ActPlayerAbort {
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.mission.pause" => {
+            let _p: ActMissionPauseParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActMissionPause {
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.mission.resume" => {
+            let _p: ActMissionResumeParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActMissionResume {
                     source: IntentSource::Cfctl,
                 })
                 .await;

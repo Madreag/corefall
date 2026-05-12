@@ -216,11 +216,10 @@ fn walk(dir: &Path, report: &mut ValidationReport) {
         let path = entry.path();
         if path.is_dir() {
             walk(&path, report);
-        } else if path.extension().and_then(|s| s.to_str()) == Some("ron") {
-            validate_one(&path, report);
-        } else if path.extension().and_then(|s| s.to_str()) == Some("json")
-            && path.parent().and_then(|p| p.file_name()).and_then(|s| s.to_str()) == Some("ai")
-            && path.file_name().and_then(|s| s.to_str()) == Some("difficulty.json")
+        } else if path.extension().and_then(|s| s.to_str()) == Some("ron")
+            || (path.extension().and_then(|s| s.to_str()) == Some("json")
+                && path.parent().and_then(|p| p.file_name()).and_then(|s| s.to_str()) == Some("ai")
+                && path.file_name().and_then(|s| s.to_str()) == Some("difficulty.json"))
         {
             validate_one(&path, report);
         }
