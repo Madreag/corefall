@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "JsonRpcId",
+  "anyOf": [
+    {
+      "type": "integer",
+      "format": "int64"
+    },
+    {
+      "type": "string"
+    },
+    {
+      "type": "null"
+    }
+  ]
+}

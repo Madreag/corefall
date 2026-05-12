@@ -1,0 +1,1218 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ObserveFrame",
+  "type": "object",
+  "properties": {
+    "accessibility": {
+      "description": "M4A: resolved accessibility surface (UI scale applied, high-contrast\npalette active, captions visible, focusable nodes in z-order).",
+      "$ref": "#/$defs/AccessibilityView",
+      "default": {
+        "captions_visible": true,
+        "focus_cycle": 0,
+        "focusable_nodes": [],
+        "high_contrast_applied": false,
+        "hold_threshold_ms": 250,
+        "hold_to_confirm_applied": false,
+        "key_bindings": {},
+        "key_remap_enabled": false,
+        "reduced_flash_applied": false,
+        "reduced_motion_applied": false,
+        "reduced_shake_applied": false,
+        "ui_scale_applied": 1.0
+      }
+    },
+    "actors": {
+      "description": "M1: typed projection of every actor in the world. Empty in M0 scenarios.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/ActorView"
+      }
+    },
+    "banners": {
+      "description": "M4A: HUD banner queue (status/chassis/mission events that should be\nsurfaced as a top-priority banner). FIFO; HUD draws the most recent N.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/HudBannerView"
+      }
+    },
+    "breaches": {
+      "description": "M1.5: breach strips in the scenario. Empty for sandbox scenarios.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/BreachView"
+      }
+    },
+    "captions": {
+      "description": "M4A: captions queue (audio-bound events surfaced as text when\n`Settings.captions == true`). Drained in FIFO order; HUD draws last N.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/CaptionView"
+      }
+    },
+    "enemies": {
+      "description": "M1.5: reactive guards and their last-tick view. Empty for sandbox scenarios.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/EnemyView"
+      }
+    },
+    "events": {
+      "type": "array",
+      "items": true
+    },
+    "events_since": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "mission": {
+      "description": "M1.5: mission state machine projection. `None` for sandbox scenarios.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/MissionView"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "player_actor_id": {
+      "description": "Convenience pointer to the player actor in `actors` by id, if any.",
+      "type": [
+        "integer",
+        "null"
+      ],
+      "format": "uint64",
+      "default": null,
+      "minimum": 0
+    },
+    "reactors": {
+      "description": "M2.5: reactor world projection. Empty for scenarios with no reactors.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/ReactorView"
+      }
+    },
+    "run_id": {
+      "type": "string"
+    },
+    "run_status": {
+      "$ref": "#/$defs/RunStatus"
+    },
+    "scenario": {
+      "type": "string"
+    },
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "settings": {
+      "$ref": "#/$defs/ObserveSettings"
+    },
+    "sim_time_ms": {
+      "type": "number",
+      "format": "double"
+    },
+    "terrain": {
+      "description": "M2: chunked terrain summary (per-material counts + carve / refusal /\ndirty-chunk counters). `None` when the scenario has no chunked terrain.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/TerrainView"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
+    "tick": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "tool_validity": {
+      "description": "M4A: tool-validity projection for the HUD TOOL line + AI agents.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ToolValidityView"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    }
+  },
+  "required": [
+    "schema_version",
+    "run_id",
+    "tick",
+    "sim_time_ms",
+    "run_status",
+    "scenario",
+    "events_since",
+    "events",
+    "settings"
+  ],
+  "$defs": {
+    "AccessibilityView": {
+      "description": "M4A accessibility surface contract. `Settings` already lives on the wire\nvia `observe.settings`; the resolved view in the observe frame says how\nthe HUD has applied each flag at this tick (so consumers can verify a\n200%-scale render or high-contrast palette without a screenshot).",
+      "type": "object",
+      "properties": {
+        "captions_visible": {
+          "type": "boolean"
+        },
+        "focus_cycle": {
+          "description": "M4A: monotonic counter incremented every time focus advances. Lets\ncfctl + cf-e2e detect \"focus has cycled at least once\" without a\ntime-based assertion.",
+          "type": "integer",
+          "format": "uint64",
+          "default": 0,
+          "minimum": 0
+        },
+        "focusable_nodes": {
+          "description": "Stable accessibility ids of every focusable HUD node, in z-order. Used\nby `cfctl ui` and `cf-e2e --verify-focus` to prove the HUD has a\nkeyboard-focusable surface beyond color cues.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "focused_node": {
+          "description": "M4A: id of the currently-focused HUD node (`Some(<id>)` after the\nplayer presses Tab / Shift+Tab / Arrow). `None` when focus is cleared\n(default at scenario load + after Escape). Drives the visible focus\nring in cf-ui + the cf-e2e verify path.",
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "high_contrast_applied": {
+          "type": "boolean"
+        },
+        "hold_threshold_ms": {
+          "description": "M4A: ACC-A-05 hold threshold in milliseconds.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "hold_to_confirm_applied": {
+          "description": "M4A: ACC-A-05 hold-to-press flag mirror.",
+          "type": "boolean"
+        },
+        "key_bindings": {
+          "description": "M4A: ACC-A-05 active key bindings (action → KeyCode name). When\n`key_remap_enabled` is true, cf-app's keyboard layer consults this\ntable; when false, defaults apply. Surface is observable so cfctl\ncan verify the table round-trip without reading the raw Settings.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        },
+        "key_remap_enabled": {
+          "description": "M4A: ACC-A-05 remap toggle.",
+          "type": "boolean"
+        },
+        "reduced_flash_applied": {
+          "type": "boolean"
+        },
+        "reduced_motion_applied": {
+          "type": "boolean"
+        },
+        "reduced_shake_applied": {
+          "type": "boolean"
+        },
+        "ui_scale_applied": {
+          "type": "number",
+          "format": "float"
+        }
+      },
+      "required": [
+        "ui_scale_applied",
+        "high_contrast_applied",
+        "captions_visible",
+        "reduced_motion_applied",
+        "reduced_shake_applied",
+        "reduced_flash_applied",
+        "hold_to_confirm_applied",
+        "hold_threshold_ms",
+        "key_remap_enabled",
+        "key_bindings",
+        "focusable_nodes"
+      ]
+    },
+    "ActorView": {
+      "description": "Public projection of one actor for the observe envelope. Mirrors\n`cf_actor::ActorObservation` with extra fields (rifle ammo / cooldown / reload\nstate) the engine wires through.",
+      "type": "object",
+      "properties": {
+        "aim": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "float"
+          },
+          "maxItems": 2,
+          "minItems": 2
+        },
+        "body_silhouette": {
+          "description": "M4A: per-zone body silhouette projection (head/torso/arms/legs hp%).\n**M5**: `placeholder=false` when sourced from a real chassis body graph;\n`placeholder=true` for legacy actors without a chassis.",
+          "$ref": "#/$defs/BodySilhouetteView",
+          "default": {
+            "arm_left_hp_pct": 1.0,
+            "arm_right_hp_pct": 1.0,
+            "head_hp_pct": 1.0,
+            "leg_left_hp_pct": 1.0,
+            "leg_right_hp_pct": 1.0,
+            "placeholder": true,
+            "torso_hp_pct": 1.0
+          }
+        },
+        "chassis": {
+          "description": "**M5**: full chassis projection (per-zone integrity, modules, stage,\npilot state, eject window). `None` for legacy actors without a chassis.",
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ChassisView"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "climb_active": {
+          "type": "boolean",
+          "default": false
+        },
+        "controllable": {
+          "type": "boolean"
+        },
+        "crouch_active": {
+          "description": "**M5**: per-tick movement-intent flags surfaced to AI / HUD.",
+          "type": "boolean",
+          "default": false
+        },
+        "hp": {
+          "type": "number",
+          "format": "float"
+        },
+        "hp_max": {
+          "type": "number",
+          "format": "float"
+        },
+        "id": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "jet_active": {
+          "type": "boolean",
+          "default": false
+        },
+        "module_strip": {
+          "description": "M4A: chassis module strip projection. **M5**: `placeholder=false` when\nsourced from a real chassis; `placeholder=true` for the M4A flat-rifle\nderivation.",
+          "$ref": "#/$defs/ModuleStripView",
+          "default": {
+            "modules": [],
+            "placeholder": false
+          }
+        },
+        "on_ground": {
+          "type": "boolean"
+        },
+        "origin_id": {
+          "description": "**M5**: actor origin tag (`human`, `robot`, `android`).",
+          "type": "string",
+          "default": "human"
+        },
+        "position": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "float"
+          },
+          "maxItems": 2,
+          "minItems": 2
+        },
+        "rifle_ammo": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "rifle_capacity": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "rifle_fire_cooldown_ticks": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "rifle_reload_remaining_ticks": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "rifle_reload_total_ticks": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "selected_item": {
+          "type": "string"
+        },
+        "selected_slot": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "stance": {
+          "description": "M4A: derived stance label (idle/walking/running/airborne/downed/dead/...).\n`cfctl observe` consumers + AI agents read this without a screenshot.",
+          "type": "string",
+          "default": "idle"
+        },
+        "status": {
+          "type": "string"
+        },
+        "team": {
+          "type": "string"
+        },
+        "velocity": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "float"
+          },
+          "maxItems": 2,
+          "minItems": 2
+        }
+      },
+      "required": [
+        "id",
+        "team",
+        "controllable",
+        "position",
+        "velocity",
+        "aim",
+        "on_ground",
+        "status",
+        "hp",
+        "hp_max",
+        "selected_slot",
+        "selected_item"
+      ]
+    },
+    "BodySilhouetteView": {
+      "description": "M4A body silhouette projection (mirrors `cf_actor::BodySilhouette`).",
+      "type": "object",
+      "properties": {
+        "arm_left_hp_pct": {
+          "type": "number",
+          "format": "float"
+        },
+        "arm_right_hp_pct": {
+          "type": "number",
+          "format": "float"
+        },
+        "head_hp_pct": {
+          "type": "number",
+          "format": "float"
+        },
+        "leg_left_hp_pct": {
+          "type": "number",
+          "format": "float"
+        },
+        "leg_right_hp_pct": {
+          "type": "number",
+          "format": "float"
+        },
+        "placeholder": {
+          "type": "boolean"
+        },
+        "torso_hp_pct": {
+          "type": "number",
+          "format": "float"
+        }
+      },
+      "required": [
+        "head_hp_pct",
+        "torso_hp_pct",
+        "arm_left_hp_pct",
+        "arm_right_hp_pct",
+        "leg_left_hp_pct",
+        "leg_right_hp_pct",
+        "placeholder"
+      ]
+    },
+    "BreachView": {
+      "type": "object",
+      "properties": {
+        "bbox_max": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "float"
+          },
+          "maxItems": 2,
+          "minItems": 2
+        },
+        "bbox_min": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "float"
+          },
+          "maxItems": 2,
+          "minItems": 2
+        },
+        "broken": {
+          "type": "boolean"
+        },
+        "dig_range": {
+          "type": "number",
+          "format": "float"
+        },
+        "hp": {
+          "type": "number",
+          "format": "float"
+        },
+        "id": {
+          "type": "string"
+        },
+        "material": {
+          "type": "string"
+        },
+        "max_hp": {
+          "type": "number",
+          "format": "float"
+        },
+        "refusal_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "material",
+        "bbox_min",
+        "bbox_max",
+        "hp",
+        "max_hp",
+        "broken",
+        "dig_range"
+      ]
+    },
+    "CaptionView": {
+      "description": "M4A captions queue entry. When `Settings.captions == true`, audio-bound\nevents surface as caption rows. Until cf-audio lands at BP6+ the captions\nqueue carries event-derived placeholders so the contract is testable from\nM4A onward (DR-012 ACC-A floor closure).",
+      "type": "object",
+      "properties": {
+        "accessibility_id": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "raised_at_tick": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "raised_at_tick",
+        "accessibility_id"
+      ]
+    },
+    "ChassisModuleView": {
+      "type": "object",
+      "properties": {
+        "bound_zone": {
+          "type": "string"
+        },
+        "id": {
+          "type": "string"
+        },
+        "integrity": {
+          "type": "number",
+          "format": "float"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "last_reason": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "state",
+        "bound_zone",
+        "integrity",
+        "last_reason"
+      ]
+    },
+    "ChassisView": {
+      "description": "**M5**: chassis projection for `cfctl observe` / `inspect`.",
+      "type": "object",
+      "properties": {
+        "destroyed_zones": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "eject_ticks_remaining": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "eject_ticks_total": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "integrity": {
+          "type": "number",
+          "format": "float"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "mass_kg": {
+          "type": "number",
+          "format": "float"
+        },
+        "modules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ChassisModuleView"
+          }
+        },
+        "pilot_state": {
+          "type": "string"
+        },
+        "salvaged_module_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "spec_id": {
+          "type": "string"
+        },
+        "stage": {
+          "type": "string"
+        },
+        "tutorial_safety": {
+          "type": "boolean"
+        },
+        "weapon_jammed": {
+          "type": "boolean"
+        },
+        "zones": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ChassisZoneView"
+          }
+        }
+      },
+      "required": [
+        "spec_id",
+        "kind",
+        "stage",
+        "pilot_state",
+        "weapon_jammed",
+        "tutorial_safety",
+        "mass_kg",
+        "zones",
+        "modules",
+        "integrity",
+        "eject_ticks_remaining",
+        "eject_ticks_total",
+        "destroyed_zones",
+        "salvaged_module_ids"
+      ]
+    },
+    "ChassisZoneView": {
+      "type": "object",
+      "properties": {
+        "core_integrity": {
+          "type": "number",
+          "format": "float"
+        },
+        "destroyed": {
+          "type": "boolean"
+        },
+        "external_integrity": {
+          "type": "number",
+          "format": "float"
+        },
+        "internal_integrity": {
+          "type": "number",
+          "format": "float"
+        },
+        "wound_integrity": {
+          "type": "number",
+          "format": "float"
+        },
+        "zone": {
+          "type": "string"
+        },
+        "zone_integrity": {
+          "type": "number",
+          "format": "float"
+        }
+      },
+      "required": [
+        "zone",
+        "external_integrity",
+        "internal_integrity",
+        "core_integrity",
+        "wound_integrity",
+        "destroyed",
+        "zone_integrity"
+      ]
+    },
+    "EnemyView": {
+      "type": "object",
+      "properties": {
+        "actor": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "aim": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "float"
+          },
+          "maxItems": 2,
+          "minItems": 2
+        },
+        "aim_settle_remaining_ticks": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "alert_dwell_remaining_ticks": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "ammo": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "fire_cooldown_ticks": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "last_tactic": {
+          "type": "string"
+        },
+        "mag_capacity": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "reload_remaining_ticks": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "state": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "actor",
+        "state",
+        "last_tactic",
+        "ammo",
+        "mag_capacity",
+        "fire_cooldown_ticks",
+        "reload_remaining_ticks",
+        "aim_settle_remaining_ticks",
+        "alert_dwell_remaining_ticks",
+        "aim"
+      ]
+    },
+    "HudBannerView": {
+      "description": "M4A HUD banner queue entry. Surfaced from chassis/status/mission events so\nHUD + `cfctl observe` consumers see the same priority-ordered banner stack.\nThe text-only banner is the M4A floor; M4B layers comic-noir styling on\ntop without changing the queue contract.",
+      "type": "object",
+      "properties": {
+        "accessibility_id": {
+          "description": "Stable accessibility id surfaced for `cfctl ui` (M4A surface; M4B+\nextends to comic-noir card nodes).",
+          "type": "string"
+        },
+        "expires_at_tick": {
+          "description": "Tick the banner expires at (no expiration when `None`).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "id": {
+          "description": "Stable id (e.g., `armor_cracked_left`, `eject_now`, `hp_critical`,\n`ammo_out`, `mission_failed`, `mission_won`).",
+          "type": "string"
+        },
+        "label": {
+          "description": "Player-facing banner text (English at M4A; Tier-A localization keys at\nthe next milestone-enhancement pass).",
+          "type": "string"
+        },
+        "raised_at_tick": {
+          "description": "Tick the banner was raised at; used for FIFO drain priority + replay.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "severity": {
+          "description": "Severity: `critical` (red-equivalent), `warning` (amber-equivalent),\n`info` (neutral). Severity is text + icon, never color-only — HUD MUST\nrender the severity word + icon glyph alongside the label.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "severity",
+        "label",
+        "raised_at_tick",
+        "accessibility_id"
+      ]
+    },
+    "MissionView": {
+      "description": "M1.5 mission projection (re-exposed via JsonSchema-friendly types).",
+      "type": "object",
+      "properties": {
+        "active_objective": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "elapsed_ticks": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "last_event_label": {
+          "type": "string"
+        },
+        "last_event_tick": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "loss_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "objectives": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ObjectiveView"
+          }
+        },
+        "result": {
+          "type": "string"
+        },
+        "ticks_remaining": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "time_limit_ticks": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "result",
+        "elapsed_ticks",
+        "time_limit_ticks",
+        "objectives",
+        "last_event_tick",
+        "last_event_label"
+      ]
+    },
+    "ModuleStateView": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "label": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "label",
+        "state",
+        "kind"
+      ]
+    },
+    "ModuleStripView": {
+      "description": "M4A module strip projection (mirrors `cf_actor::ModuleStrip`).",
+      "type": "object",
+      "properties": {
+        "modules": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/ModuleStateView"
+          }
+        },
+        "placeholder": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "modules",
+        "placeholder"
+      ]
+    },
+    "ObjectiveView": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string"
+        },
+        "optional": {
+          "type": "boolean"
+        },
+        "status": {
+          "type": "string"
+        },
+        "target_actor": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "target_breach": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "target_reactor": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "zone_max": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "number",
+            "format": "float"
+          },
+          "maxItems": 2,
+          "minItems": 2
+        },
+        "zone_min": {
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "number",
+            "format": "float"
+          },
+          "maxItems": 2,
+          "minItems": 2
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "status",
+        "optional"
+      ]
+    },
+    "ObserveSettings": {
+      "type": "object",
+      "properties": {
+        "schema_version": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "settings": {
+          "$ref": "#/$defs/Settings"
+        }
+      },
+      "required": [
+        "schema_version",
+        "settings"
+      ]
+    },
+    "ReactorView": {
+      "description": "M2.5 reactor projection. Drives the HUD reactor-hp bar + the cfctl\n`inspect reactor <id>` lookup.",
+      "type": "object",
+      "properties": {
+        "destroyed": {
+          "type": "boolean"
+        },
+        "half_extents": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "float"
+          },
+          "maxItems": 2,
+          "minItems": 2
+        },
+        "hp": {
+          "type": "number",
+          "format": "float"
+        },
+        "id": {
+          "type": "string"
+        },
+        "max_hp": {
+          "type": "number",
+          "format": "float"
+        },
+        "position": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "float"
+          },
+          "maxItems": 2,
+          "minItems": 2
+        }
+      },
+      "required": [
+        "id",
+        "position",
+        "half_extents",
+        "hp",
+        "max_hp",
+        "destroyed"
+      ]
+    },
+    "RunStatus": {
+      "type": "string",
+      "enum": [
+        "running",
+        "paused",
+        "stepping",
+        "ended"
+      ]
+    },
+    "Settings": {
+      "type": "object",
+      "properties": {
+        "captions": {
+          "type": "boolean"
+        },
+        "high_contrast": {
+          "type": "boolean"
+        },
+        "hold_threshold_ms": {
+          "description": "M4A: hold threshold in milliseconds. Default 250 ms; clamped to\n`[50..2000]` by `apply_settings_patch`.",
+          "type": "integer",
+          "format": "uint32",
+          "default": 250,
+          "minimum": 0
+        },
+        "hold_to_confirm": {
+          "description": "M4A: hold-to-press alternative for tap-to-press actions (ACC-A-05).\nWhen `true`, edge-triggered actions (jump / fire / reload / dig /\nreset / select_slot_*) require holding the key/button for\n`hold_threshold_ms` before firing instead of triggering on the press\nedge. Default: off (tap semantics). cf-app's `ingest_player_input`\nhonors this through the `HoldTracker` resource; cfctl-driven\ndispatches bypass the hold gate (control-plane is already explicit\npress/release semantics).",
+          "type": "boolean",
+          "default": false
+        },
+        "key_bindings": {
+          "description": "M4A: per-action key binding overrides. Action names are limited to\n[`SUPPORTED_KEY_BINDING_ACTIONS`]; KeyCode names are limited to\n[`SUPPORTED_KEY_CODE_NAMES`]. Empty by default; `act.settings.set`\nreplaces the table only after validation so unsupported remaps reject\nat the control boundary instead of silently falling back in cf-app.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {}
+        },
+        "key_remap_enabled": {
+          "description": "M4A: when `true`, cf-app's keyboard layer reads its action bindings\nfrom `key_bindings` instead of the built-in defaults. When `false`,\nthe built-in defaults apply (Space=jump, Enter|J=fire, R=reload,\nG=dig, L=reset, 1..4=select_slot_0..3). The remap UI editor lands\nat M8; M4A ships the cfctl-settable surface so the contract is\nbehavior-testable today.",
+          "type": "boolean",
+          "default": false
+        },
+        "reduced_flash": {
+          "type": "boolean"
+        },
+        "reduced_motion": {
+          "type": "boolean"
+        },
+        "reduced_shake": {
+          "type": "boolean"
+        },
+        "ui_scale": {
+          "type": "number",
+          "format": "float"
+        }
+      },
+      "required": [
+        "ui_scale",
+        "high_contrast",
+        "captions",
+        "reduced_motion",
+        "reduced_shake",
+        "reduced_flash"
+      ]
+    },
+    "TerrainView": {
+      "description": "M2 chunked terrain projection. Per-material pixel counts let cfctl + AI\nhooks query \"how much air do we have left?\" without pulling the full\nsnapshot. Carve / refusal / dirty counters expose perf health.",
+      "type": "object",
+      "properties": {
+        "allocated_chunk_count": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "anchor": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "float"
+          },
+          "maxItems": 2,
+          "minItems": 2
+        },
+        "carve_count": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "default_material": {
+          "type": "string"
+        },
+        "dirty_chunk_count": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "height_px": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "material_counts": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "format": "uint64",
+            "minimum": 0
+          }
+        },
+        "refusal_count": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "width_px": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "width_px",
+        "height_px",
+        "anchor",
+        "default_material",
+        "carve_count",
+        "refusal_count",
+        "dirty_chunk_count",
+        "allocated_chunk_count",
+        "material_counts"
+      ]
+    },
+    "ToolValidityView": {
+      "description": "M4A tool-validity projection. Mirrors the `terrain.tool_refused` reason\ncode together with the most-recent successful `terrain.terrain_carved`\ntick. Consumed by the HUD `TOOL` line and AI agents that want a one-shot\n\"is this tile diggable right now?\" answer without scanning the event log.",
+      "type": "object",
+      "properties": {
+        "last_carve_tick": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "last_refusal_reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "last_refusal_target": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "last_refusal_tick": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint64",
+          "minimum": 0
+        },
+        "valid": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "valid"
+      ]
+    }
+  }
+}

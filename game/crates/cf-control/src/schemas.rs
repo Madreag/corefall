@@ -8,7 +8,16 @@ use std::collections::BTreeMap;
 use schemars::{schema_for, JsonSchema};
 use serde::{Deserialize, Serialize};
 
-pub const SCHEMA_VERSION: u32 = 1;
+/// Protocol schema version. Bumped from 1→2 at BP3 when M5 added
+/// `act.player.crouch/climb/jet/eject` + `act.chassis.repair/salvage/clear_jam`
+/// + `act.input.focus`. Clients sending `schema_version: 1` still work because
+/// all new methods are additive (no field renames or type changes on v1 methods).
+/// The dispatcher rejects `schema_version > SCHEMA_VERSION` with `-32602`.
+pub const SCHEMA_VERSION: u32 = 2;
+
+/// Minimum schema version accepted. v1 clients are still compatible because
+/// no v1 method shapes changed — only new methods were added.
+pub const SCHEMA_VERSION_MIN: u32 = 1;
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]

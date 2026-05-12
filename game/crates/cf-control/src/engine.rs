@@ -782,7 +782,58 @@ impl M0Engine {
             None,
         );
         self.emit_initial_snapshots(tick, sim_time_ms, &started_id);
+        self.emit_category_baseline(tick, sim_time_ms, &started_id);
         self.spawn_debug_panic_if_requested();
+    }
+
+    /// M3A item 91: emit a `system.category_baseline` event listing every event
+    /// category the engine is aware of. Categories without active producers at
+    /// this BP are marked `status: "registered"` so the run bundle proves the
+    /// taxonomy is declared even before producers ship.
+    fn emit_category_baseline(&self, tick: Tick, sim_time_ms: f64, parent_event_id: &str) {
+        let categories = vec![
+            ("input", "active"),
+            ("control", "active"),
+            ("actor", "active"),
+            ("equipment", "active"),
+            ("combat", "active"),
+            ("terrain", "active"),
+            ("mission", "active"),
+            ("ai", "active"),
+            ("snapshot", "active"),
+            ("determinism", "active"),
+            ("system", "active"),
+            ("chassis", "active"),
+            ("capture", "active"),
+            ("mind", "registered"),
+            ("collision", "registered"),
+            ("server", "registered"),
+            ("anti_cheat", "registered"),
+            ("mmo", "registered"),
+            ("material", "registered"),
+            ("reaction", "registered"),
+            ("atmospherics", "registered"),
+            ("affliction", "registered"),
+            ("body", "registered"),
+            ("logistics", "registered"),
+            ("ux", "registered"),
+            ("accessibility", "registered"),
+            ("performance", "registered"),
+        ];
+        self.recorder.record(
+            tick,
+            sim_time_ms,
+            "system",
+            "category_baseline",
+            json!({
+                "categories": categories.iter()
+                    .map(|(name, status)| json!({"name": name, "status": status}))
+                    .collect::<Vec<_>>(),
+                "total": categories.len(),
+                "active": categories.iter().filter(|(_, s)| *s == "active").count(),
+            }),
+            Some(parent_event_id.to_string()),
+        );
     }
 
     /// M3A-002: emit `snapshot.snapshot_actor`, `snapshot.snapshot_inventory`,

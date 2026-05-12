@@ -15,3 +15,10 @@ anyhow = { workspace = true }
 clap = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+cf-actor = { path = "../cf-actor" }
+cf-physics = { path = "../cf-physics" }
+cf-equipment = { path = "../cf-equipment" }
+cf-sim-core = { path = "../cf-sim-core" }
+
+[dev-dependencies]
+criterion = "0.5"

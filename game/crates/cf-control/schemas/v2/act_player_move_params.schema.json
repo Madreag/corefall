@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ActPlayerMoveParams",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "x": {
+      "description": "Move axis in [-1.0, +1.0]. Negative = left, positive = right.",
+      "type": "number",
+      "format": "float"
+    },
+    "y": {
+      "description": "Reserved for vertical input (ladders / climbing). Ignored in M1.",
+      "type": "number",
+      "format": "float",
+      "default": 0.0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "x"
+  ]
+}

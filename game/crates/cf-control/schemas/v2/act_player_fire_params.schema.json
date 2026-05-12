@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ActPlayerFireParams",
+  "description": "`act.player.fire` — edge-triggered fire request.",
+  "type": "object",
+  "properties": {
+    "pressed": {
+      "description": "`true` (default) = press fire this tick; `false` = explicit release for future\nhold-to-fire weapons. M1's rifle is single-press; release is a no-op.",
+      "type": "boolean",
+      "default": true
+    },
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema_version"
+  ]
+}

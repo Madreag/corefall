@@ -118,6 +118,10 @@ struct Cli {
     /// M4A: ACC-A-05 future remap UI surface flag (M8 ships the table editor).
     #[arg(long)]
     key_remap_enabled: bool,
+    /// M3A: override the determinism checksum cadence (ticks between sim_checksum events).
+    /// Default: 60. Set 0 to disable checksums.
+    #[arg(long)]
+    checksum_cadence_ticks: Option<u64>,
     /// **DEBUG-ONLY**: spawn a sub-thread that panics at the configured tick. Used to
     /// capture `system.panic` evidence in a real run bundle (M0-008 / M0.2-F5).
     /// Production runs should never set this.
@@ -441,7 +445,7 @@ fn build_config(cli: &Cli, scenario_path: PathBuf) -> Result<M0EngineConfig> {
         seed_override: cli.seed,
         duration_ticks_override: if cli_duration > 0 { Some(cli_duration) } else { None },
         debug_inject_panic_at_tick: cli.debug_inject_panic_at_tick,
-        checksum_cadence_ticks: None,
+        checksum_cadence_ticks: cli.checksum_cadence_ticks,
     };
     build_engine_config(inputs).context("build_engine_config failed for cf-app")
 }

@@ -15,7 +15,7 @@ use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, bail, Context, Result};
 use clap::{Parser, Subcommand};
-use serde_json::Value;
+use serde_json::{json, Value};
 use tracing_subscriber::EnvFilter;
 
 use cf_actor::IntentSource;
@@ -270,9 +270,23 @@ fn replay(bundle_dir: &Path, verify_checksums: bool, scenario_path: Option<PathB
             Ok::<_, anyhow::Error>(())
         } else {
             let first = divergences.first().expect("non-empty");
-            println!(
-                "{{\"result\":\"divergence\",\"first_divergence\":{{\"tick\":{},\"recorded\":\"{}\",\"live\":\"{}\"}},\"total_divergences\":{}}}",
-                first.0, first.1, first.2, divergences.len()
+            let all_diffs: Vec<serde_json::Value> = divergences.iter()
+                .map(|(tick, recorded, live)| json!({"tick": tick, "recorded": recorded, "live": live}))
+                .collect();
+            let output = json!({
+                "result": "divergence",
+                "first_divergence": {"tick": first.0, "recorded": first.1, "live": first.2},
+                "total_divergences": divergences.len(),
+                "all_divergences": all_diffs,
+            });
+            println!("{}", serde_json::to_string(&output).unwrap_or_default());
+            tracing::error!(
+                target: "cf::headless",
+                tick = first.0,
+                recorded = %first.1,
+                live = %first.2,
+                total = divergences.len(),
+                "determinism.first_divergence"
             );
             bail!("replay diverged at tick {}", first.0)
         }

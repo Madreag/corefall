@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "JsonRpcError",
+  "type": "object",
+  "properties": {
+    "code": {
+      "type": "integer",
+      "format": "int32"
+    },
+    "data": true,
+    "message": {
+      "type": "string"
+    }
+  },
+  "required": [
+    "code",
+    "message"
+  ]
+}

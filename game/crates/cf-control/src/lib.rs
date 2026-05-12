@@ -26,7 +26,7 @@ pub use envelope::{
 };
 pub use runtime::{build_engine_config, locate_scenario, ConfigBuildError, ConfigInputs};
 pub use scenario::{Scenario, ScenarioCapabilities, ScenarioLoadError, ScenarioRegion};
-pub use schemas::SCHEMA_VERSION;
+pub use schemas::{SCHEMA_VERSION, SCHEMA_VERSION_MIN};
 pub use server::{
     async_trait, CommandResult, ControlCommand, ControlServer, ControlServerConfig, EngineHandle, FocusDirection,
     SettingsPatch,

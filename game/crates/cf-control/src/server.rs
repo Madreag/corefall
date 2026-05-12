@@ -89,7 +89,7 @@ use crate::{
         error_codes, JsonRpcError, JsonRpcId, JsonRpcNotification, JsonRpcRequest, JsonRpcResponse,
         METHOD_OBSERVE_FRAME,
     },
-    schemas::SCHEMA_VERSION,
+    schemas::{SCHEMA_VERSION, SCHEMA_VERSION_MIN},
     schemas::{
         ActChassisClearJamParams, ActChassisRepairParams, ActChassisSalvageParams, ActPlayerAimParams,
         ActPlayerClimbParams, ActPlayerCrouchParams, ActPlayerDigParams, ActPlayerEjectParams, ActPlayerFireParams,
@@ -1124,12 +1124,13 @@ fn check_schema_version(params: &serde_json::Value) -> Result<(), serde_json::Va
             "server_version": SCHEMA_VERSION,
             "fix_hint": format!("All M0 control methods require `params.schema_version: {SCHEMA_VERSION}`."),
         })),
-        Some(v) if v as u32 == SCHEMA_VERSION => Ok(()),
+        Some(v) if (SCHEMA_VERSION_MIN..=SCHEMA_VERSION).contains(&(v as u32)) => Ok(()),
         Some(other) => Err(json!({
             "reason": "schema_version_mismatch",
             "server_version": SCHEMA_VERSION,
+            "server_version_min": SCHEMA_VERSION_MIN,
             "client_version": other,
-            "fix_hint": format!("Upgrade cfctl or pin client schema_version: {SCHEMA_VERSION}"),
+            "fix_hint": format!("Server accepts schema_version {}..{}; upgrade cfctl or pin within range", SCHEMA_VERSION_MIN, SCHEMA_VERSION),
         })),
     }
 }
