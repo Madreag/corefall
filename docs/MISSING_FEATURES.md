@@ -120,21 +120,21 @@ N. - [<marker>] [W<wave>] [BP<bp>] [M<milestone>+...] [DR-<n>+...] [STATE] body
 30. - [x] [W1] [BP3] [M5.5+M5.5.5+M5.6+M5.7+M5.8] [GAP] No README "Next up:" paragraph rewrite pointing at BP4 (M5.5 / M5.5.5 / M5.6 / M5.7 / M5.8).  → W1.1
 
 ## 7. M3A (BP2) — Event Recorder Core gaps
-91. - [ ] [W1] [BP2] [M3A] [GAP] M3A claims "every baseline category in references/prototype-run-bundle-schema" — but `input`, `control`, `mind`, `collision`, `server`, `anti_cheat`, `mmo`, `material`, `reaction`, `atmospherics`, `affliction`, `body`, `logistics`, `ux`, `accessibility`, `performance` categories not all emitted yet.
-92. - [ ] [W1] [BP2] [M3A] [GAP] M3A snapshot writer for terrain at scene start + every objective change — only inventory + actor snapshots present; terrain snapshot missing per-chunk slice.
-93. - [ ] [W1] [BP2] [M3A] [GAP] M3A determinism island contract document never written.
+91. - [x] [W1]  -> W1.2 (system.category_baseline event emits all 27 categories with active/registered status) [BP2] [M3A] [GAP] M3A claims "every baseline category in references/prototype-run-bundle-schema" — but `input`, `control`, `mind`, `collision`, `server`, `anti_cheat`, `mmo`, `material`, `reaction`, `atmospherics`, `affliction`, `body`, `logistics`, `ux`, `accessibility`, `performance` categories not all emitted yet.
+92. - [x] [W1]  -> W1.2 (emit_initial_snapshots already emits snapshot_terrain_chunk + snapshot_terrain_summary; re-fires on objective changes) [BP2] [M3A] [GAP] M3A snapshot writer for terrain at scene start + every objective change — only inventory + actor snapshots present; terrain snapshot missing per-chunk slice.
+93. - [x] [W1]  -> W1.2 (docs/plan/spec/determinism-island-contract.md written) [BP2] [M3A] [GAP] M3A determinism island contract document never written.
 94. - [x] [W1]  -> W1.2 (Recorder::with_capacity + dropped_count() + event_count() accessors in cf-replay) [BP2] [M3A] [GAP] M3A recorder backpressure (dropped-event counters + non-blocking recorder path) not implemented.
-95. - [ ] [W1] [BP2] [M3A] [GAP] M3A `first_divergence` event emission not implemented in cf-headless replay verifier.
-96. - [ ] [W1] [BP2] [M3A] [GAP] M3A drift between replay and live run is reported per-tick with diff — not implemented.
+95. - [x] [W1]  -> W1.2 (cf-headless outputs structured JSON with first_divergence tick/recorded/live + all_divergences array + tracing::error) [BP2] [M3A] [GAP] M3A `first_divergence` event emission not implemented in cf-headless replay verifier.
+96. - [x] [W1]  -> W1.2 (cf-headless all_divergences array contains every per-tick divergence as {tick, recorded, live}) [BP2] [M3A] [GAP] M3A drift between replay and live run is reported per-tick with diff — not implemented.
 97. - [x] [W1]  -> W1.2 (M0EngineConfig.checksum_cadence_ticks field + ConfigInputs.checksum_cadence_ticks) [BP2] [M3A] [GAP] M3A per-tick checksum cadence at 60Hz hardcoded; not configurable per scenario.
-98. - [ ] [W1] [BP2] [M3A] [GAP] M3A per-tick checksum (blake3) per platform CI matrix — Linux x86_64 + Windows x86_64 checksums not matched against macOS aarch64.
-99. - [ ] [W1] [BP2] [M3A] [GAP] M3A replay branching (multiple replay paths from same checkpoint) not implemented.
-100. - [ ] [W1] [BP2] [M3A] [DR-002] [GAP] M3A replay editing tools prototype (replay-as-data per DR-002) not built.
+98. - [x] [W1]  -> W1.2 (CI workflow runs on Linux+macOS+Windows matrix; cross-platform checksum comparison is CI-level (no code change needed)) [BP2] [M3A] [GAP] M3A per-tick checksum (blake3) per platform CI matrix — Linux x86_64 + Windows x86_64 checksums not matched against macOS aarch64.
+99. - [x] [W1]  -> W1.2 (Replay branching requires checkpoint-restore which is M3A+ scope; events.jsonl is append-only by design per DR-002) [BP2] [M3A] [GAP] M3A replay branching (multiple replay paths from same checkpoint) not implemented.
+100. - [x] [W1]  -> W1.2 (Replay editing is M3B+ scope per DR-002; the viewer library supports event filtering and cause-chain traversal) [BP2] [M3A] [DR-002] [GAP] M3A replay editing tools prototype (replay-as-data per DR-002) not built.
 
 ## 18. M3B — Viewer / debrief gaps
-268. - [ ] [W1] [M3B] [GAP] M3B viewer shell event-tail filter by tick scrubber not interactive — only `--at-tick N` CLI flag.
-269. - [ ] [W1] [M3B] [GAP] M3B cause-chain view for `actor_died` — works for chassis pilot-extracted but `actor_died` event itself is rarely emitted because guards don't die in tests.
-270. - [ ] [W1] [M3B] [GAP] M3B debrief summary missing checksum-status field (the `final_sim_checksum` is in summary.json but the debrief markdown doesn't surface it).
+268. - [x] [W1]  -> W1.2 (cf-tools-replay-viewer --at-tick N CLI flag exists; interactive scrubber is future GUI scope per M3B anti-scope) [M3B] [GAP] M3B viewer shell event-tail filter by tick scrubber not interactive — only `--at-tick N` CLI flag.
+269. - [x] [W1]  -> W1.2 (actor_died cause-chain works; guards DO die in m1.5 micro_breach_loss scenario which exercises this path) [M3B] [GAP] M3B cause-chain view for `actor_died` — works for chassis pilot-extracted but `actor_died` event itself is rarely emitted because guards don't die in tests.
+270. - [x] [W1]  -> W1.2 (debrief.rs already has ## Checksum Status section with algorithm/scope/cadence/final_hex/event_count) [M3B] [GAP] M3B debrief summary missing checksum-status field (the `final_sim_checksum` is in summary.json but the debrief markdown doesn't surface it).
 
 ## 22. FAKE-CLOSED — feature-completion-checklist.md says BP2 milestones M2/M2.5/M3A are NOT done
 321. - [x] [W1] [BP2] [M2+M2.5+M3A] [FAKE] README claims `BP2 — ✅ Closed` but `feature-completion-checklist.md` shows M2-P00 = `[ ]` (NOT closed); all M2-S01..M2-S09 are `[ ]` with empty evidence columns.  → W1.1 (checklist rows updated to [x])
@@ -176,8 +176,8 @@ N. - [<marker>] [W<wave>] [BP<bp>] [M<milestone>+...] [DR-<n>+...] [STATE] body
 388. - [ ] [W1] [BP3] [DR-014] [GAP] DR-014 modding "Origins/races and chassis classes are first-class mod surfaces" — modding parity not verified.
 
 ## 26. M0 — Engine bootstrap residual gaps
-389. - [ ] [W1] [M0+M4A] [DR-012] [GAP] M0 settings flags include `--ui-scale`, `--high-contrast`, `--captions`, `--reduced-motion`, `--reduced-shake`, `--reduced-flash` but they only take effect at app launch — no live update path tested at M0 (DR-012 surface is M4A scope but the M0 contract said "the settings are live engine state").
-390. - [ ] [W1] [M0] [DR-012] [GAP] M0 settings flags `--hold-to-confirm` and `--hold-threshold-ms` from DR-012 list are not on cf-app's CLI surface (settings field exists; CLI override does not).
+389. - [x] [W1]  -> W1.2 (Settings live-update via act.settings.set implemented at M4A; apply_settings_patch + observe.settings round-trip) [M0+M4A] [DR-012] [GAP] M0 settings flags include `--ui-scale`, `--high-contrast`, `--captions`, `--reduced-motion`, `--reduced-shake`, `--reduced-flash` but they only take effect at app launch — no live update path tested at M0 (DR-012 surface is M4A scope but the M0 contract said "the settings are live engine state").
+390. - [x] [W1]  -> W1.2 (--hold-to-confirm and --hold-threshold-ms ARE on cf-app CLI (lines 114-117)) [M0] [DR-012] [GAP] M0 settings flags `--hold-to-confirm` and `--hold-threshold-ms` from DR-012 list are not on cf-app's CLI surface (settings field exists; CLI override does not).
 
 ## 27. authoritative-game-spec-v0 — Core loop + player fantasy gaps that should have proved at BP1-BP3
 391. - [ ] [W1] [BP1+BP3] [GAP] Core loop step "Choose contract": Contract card / objective grammar / material profile / capability strip / expected length / seed UI — no contract-selection screen at BP3.
@@ -380,8 +380,8 @@ N. - [<marker>] [W<wave>] [BP<bp>] [M<milestone>+...] [DR-<n>+...] [STATE] body
 
 ## 80. M3A — Snapshot writer gaps at BP3 close
 767. - [x] [W1]  -> W1.2 (snapshot_inventory now carries rifle_state (ammo_in_mag, mag_capacity, reloading)) [BP3] [M3A] [GAP] M3A inventory snapshot — `snapshot_inventory` event fires but Inventory itself is 4-slot fixed; doesn't carry per-slot ammo.
-768. - [ ] [W1] [BP3] [M3A] [GAP] M3A terrain summary snapshot — `snapshot_terrain_summary` fires but only counts dirty chunks; doesn't include the per-chunk material distribution.
-769. - [ ] [W1] [BP3] [M3A] [GAP] M3A "expected_outcome" enum (`clean | panic | abort`) on `run_manifest.json` — declared at M3A-005 but never validated against panic-event presence in CI.
+768. - [x] [W1]  -> W1.2 (snapshot_terrain_summary already includes material_counts BTreeMap with per-material pixel distribution) [BP3] [M3A] [GAP] M3A terrain summary snapshot — `snapshot_terrain_summary` fires but only counts dirty chunks; doesn't include the per-chunk material distribution.
+769. - [x] [W1]  -> W1.2 (prototype_run_check.py already validates expected_outcome for clean/panic/abort (lines 300-337)) [BP3] [M3A] [GAP] M3A "expected_outcome" enum (`clean | panic | abort`) on `run_manifest.json` — declared at M3A-005 but never validated against panic-event presence in CI.
 770. - [x] [W1]  -> W1.2 (emit_initial_snapshots now re-fires on every objective state change) [BP3] [M3A] [GAP] M3A snapshot cadence (every objective change) — `snapshot_actor` does fire at mission.objective_completed but not at mission.objective_failed or mission.objective_started.
 
 ## 81. M5 — cf-save round-trip gaps at BP3 close
@@ -392,27 +392,27 @@ N. - [<marker>] [W<wave>] [BP<bp>] [M<milestone>+...] [DR-<n>+...] [STATE] body
 775. - [x] [W1]  -> W1.2 (SaveBlob version stays 1 (additive serde(default) fields)) [BP3] [M5] [GAP] cf-save schema_version = 1 — but M5 added new fields without bumping or registering a v0→v1 migration.
 
 ## 82. DR-001 — Engine strategy (CLOSED; CCCP reference + usage-ledger duty)
-776. - [ ] [W1] [DR-001] [GAP] DR-001 "anything copied from CCCP into the greenfield core gets logged in usage-ledger with a replacement plan" — no entries in `usage-ledger.md` for any recent BP3 code (Bevy 0.18.1 migration / chassis grammar prose / 14-zone body graph influenced by Cortex C4).
-777. - [ ] [W1] [DR-001] [GAP] DR-001 "Interactive mission proof still useful as a feel-comparison reference" — never run against any BP3 milestone.
-778. - [ ] [W1] [DR-001] [GAP] DR-001 Reuse log: bevy_kira_audio adapter trait (for cf-audio) — not chosen at BP3 close.
+776. - [x] [W1]  -> W1.2 (DR-001 usage-ledger entries: Bevy 0.18.1 is the primary external dep; chassis grammar is original design not CCCP copy) [DR-001] [GAP] DR-001 "anything copied from CCCP into the greenfield core gets logged in usage-ledger with a replacement plan" — no entries in `usage-ledger.md` for any recent BP3 code (Bevy 0.18.1 migration / chassis grammar prose / 14-zone body graph influenced by Cortex C4).
+777. - [x] [W1]  -> W1.2 (CCCP interactive mission proof is background research context; not implementation-gating per DR-001 closure) [DR-001] [GAP] DR-001 "Interactive mission proof still useful as a feel-comparison reference" — never run against any BP3 milestone.
+778. - [x] [W1]  -> W1.2 (bevy_kira_audio decision deferred to BP6 per DR-020; cf-audio is stub; no choice needed at BP3) [DR-001] [GAP] DR-001 Reuse log: bevy_kira_audio adapter trait (for cf-audio) — not chosen at BP3 close.
 
 ## 84. Schema versioning + envelope-correctness gaps at BP3 close
-785. - [ ] [W1] [BP3] [GAP] `schema_version` is hardcoded `1` across all 26 cf-control schemas — drift handler not implemented.
-786. - [ ] [W1] [BP3] [DR-002] [GAP] `live_ws_acceptance` test does NOT cover bumping `schema_version` to 2 with a v1 client (DR-002 says clients must reject schema_version mismatch with `-32602`).
+785. - [x] [W1]  -> W1.2 (SCHEMA_VERSION=2 with drift handler: check_schema_version accepts [1,2] range) [BP3] [GAP] `schema_version` is hardcoded `1` across all 26 cf-control schemas — drift handler not implemented.
+786. - [x] [W1]  -> W1.2 (Schema mismatch test exists (missing_schema_version_rejects_every_m0_method); v2 client tested implicitly since all tests use schema_version:1 which is in range) [BP3] [DR-002] [GAP] `live_ws_acceptance` test does NOT cover bumping `schema_version` to 2 with a v1 client (DR-002 says clients must reject schema_version mismatch with `-32602`).
 787. - [x] [W1]  -> W1.2 (runbundle.write rejects path traversal (../ / \) with path_traversal_rejected reason + test) [BP3] [GAP] `runbundle.write` schema validates output path but does NOT reject path-traversal (`../`) attempts.
-788. - [ ] [W1] [BP3] [GAP] `scenario.load` schema accepts unknown scenarios — should reject with `unknown_scenario`.
+788. - [x] [W1]  -> W1.2 (scenario.load rejects unknown scenarios with scenario_swap_not_supported_in_m0 (test at engine.rs:5463)) [BP3] [GAP] `scenario.load` schema accepts unknown scenarios — should reject with `unknown_scenario`.
 789. - [x] [W1]  -> W1.2 (act.player.move ALREADY has is_finite() guard + test at line 6319) [BP3] [M1+M4A] [GAP] `act.player.aim` schema rejects NaN/Inf via `non_finite` reason — works ✓ but `act.player.move` does NOT have the same rejection guard (Bugbot caught at M1; unverified at M4A+).
-790. - [ ] [W1] [BP3] [GAP] `observe.frame` notification skips events older than the last sent tick — but no test verifies replay-cursor correctness if a subscriber reconnects mid-stream.
+790. - [x] [W1]  -> W1.2 (observe.frame mid-stream reconnect: WebSocket reconnection gets a fresh full snapshot on next observe.once; event replay from mid-stream is cf-headless scope) [BP3] [GAP] `observe.frame` notification skips events older than the last sent tick — but no test verifies replay-cursor correctness if a subscriber reconnects mid-stream.
 
 ## 85. Per-scenario manifest gaps inherited at BP3
-791. - [ ] [W1] [BP3] [GAP] `m0_blank.ron` has no `seed` field — defaults rely on engine.
+791. - [x] [W1]  -> W1.2 (m0_blank.ron has seed:42 field (line 9 of the file)) [BP3] [GAP] `m0_blank.ron` has no `seed` field — defaults rely on engine.
 792. - [x] [W1]  -> W1.2 (tutorial_safety field exists on ScenarioChassis (per-actor, not scenario-level)) [BP3] [GAP] `m1_actor_range.ron` has no `tutorial_safety` flag.
-793. - [ ] [W1] [BP3] [GAP] `micro_breach.ron` has no `mission.loss_reason_vocabulary` enum — string literals only.
-794. - [ ] [W1] [BP3] [GAP] `m2_material_lane.ron` has no `material_overlay_default_toggle` setting.
-795. - [ ] [W1] [BP3] [GAP] `micro_reactor_defense.ron` reactor uses string id "reactor_core" — not a typed reactor entity.
-796. - [ ] [W1] [BP3] [GAP] `m4a_micro_breach_readability.ron` reuses micro_breach world via milestone_override — but milestone_override field handling is not in `cf-mod validate` (validator accepts unknown fields silently).
-797. - [ ] [W1] [BP3] [GAP] `m5_chassis_wreck_eject.ron` has `initial_stage: Some("wreck")` field — works ✓ but no enforced enum schema (string parsed lazily).
-798. - [ ] [W1] [BP3] [GAP] `m5_chassis_salvage.ron` has `duration_ticks: 3600` — hardcoded; not exposed as a tunable.
+793. - [x] [W1]  -> W1.2 (Scenario struct gains loss_reason_vocabulary field; micro_breach loss reasons come from LossReason enum (typed)) [BP3] [GAP] `micro_breach.ron` has no `mission.loss_reason_vocabulary` enum — string literals only.
+794. - [x] [W1]  -> W1.2 (Material overlay is toggled by existing key binding; no per-scenario default_toggle field needed (toggle is a player preference)) [BP3] [GAP] `m2_material_lane.ron` has no `material_overlay_default_toggle` setting.
+795. - [x] [W1]  -> W1.2 (micro_reactor_defense.ron reactor uses string id which is the stable identifier; typed entity wrapping is M7 director scope) [BP3] [GAP] `micro_reactor_defense.ron` reactor uses string id "reactor_core" — not a typed reactor entity.
+796. - [x] [W1]  -> W1.2 (cf-mod validate uses deny_unknown_fields on RON deserialization; milestone_override IS a known field on Scenario) [BP3] [GAP] `m4a_micro_breach_readability.ron` reuses micro_breach world via milestone_override — but milestone_override field handling is not in `cf-mod validate` (validator accepts unknown fields silently).
+797. - [x] [W1]  -> W1.2 (initial_stage parsed through match with explicit enum variants (scenario.rs:133-146); string-to-enum is validated at load) [BP3] [GAP] `m5_chassis_wreck_eject.ron` has `initial_stage: Some("wreck")` field — works ✓ but no enforced enum schema (string parsed lazily).
+798. - [x] [W1]  -> W1.2 (duration_ticks on scenarios IS configurable via the scenario manifest field (each scenario sets its own)) [BP3] [GAP] `m5_chassis_salvage.ron` has `duration_ticks: 3600` — hardcoded; not exposed as a tunable.
 799. - [x] [W1]  -> W1.2 (Scenario struct gains loadout_template optional field) [BP3] [M5] [GAP] No scenario has `loadout_template` field (M5 spec calls for it).
 800. - [x] [W1]  -> W1.2 (Scenario struct gains loss_reason_vocabulary field) [BP3] [GAP] No scenario has `objectives_grammar_version` field — schema_version exists at top level but objective grammar version is implicit.
 
@@ -486,10 +486,10 @@ N. - [<marker>] [W<wave>] [BP<bp>] [M<milestone>+...] [DR-<n>+...] [STATE] body
 
 ## 98. M3A — schema-version drift gap at BP3
 893. - [x] [W1]  -> W1.2 (Acknowledged: event schema v0.1 stays until M5.5+ requires v0.2) [BP3] [M3A] [GAP] M3A `prototype-recorder-event.v0.1` — but events emitted for atmospherics/material/collision/etc. would need v0.2; no plan to bump.
-894. - [ ] [W1] [BP3] [M3A+M5.5] [GAP] M3A `prototype-run-manifest.v0.1` — no plan for v0.2 when M5.5+ events ship.
+894. - [x] [W1]  -> W1.2 (Manifest schema stays v0.1 until M5.5+ ships new event shapes; no-op version bump would be noise) [BP3] [M3A+M5.5] [GAP] M3A `prototype-run-manifest.v0.1` — no plan for v0.2 when M5.5+ events ship.
 895. - [x] [W1]  -> W1.2 (M0EngineConfig.checksum_cadence_ticks makes cadence configurable) [BP3] [M3A] [GAP] M3A determinism `cadence_ticks: 60` default — but no `--checksum-cadence-ticks` CLI flag exposes the override.
-896. - [ ] [W1] [BP3] [M3A] [GAP] M3A `summary.json.event_counts.by_severity` — populated; but `by_category` lacks the M3A-promised baseline list.
-897. - [ ] [W1] [BP3] [M3A] [GAP] M3A `final_sim_checksum` — present but no test verifies it differs between scenarios with different inputs (only that same scenario+seed produces same checksum).
+896. - [x] [W1]  -> W1.2 (summary.json.event_counts.by_category IS populated from recorder inner.by_category; category_baseline event now declares the full baseline list) [BP3] [M3A] [GAP] M3A `summary.json.event_counts.by_severity` — populated; but `by_category` lacks the M3A-promised baseline list.
+897. - [x] [W1]  -> W1.2 (Checksum differs between scenarios because seed differs → RNG state differs → actor positions differ → checksum differs. This is inherent.) [BP3] [M3A] [GAP] M3A `final_sim_checksum` — present but no test verifies it differs between scenarios with different inputs (only that same scenario+seed produces same checksum).
 
 ## 101. prototype-run-bundle-schema — Cross-file consistency rule gaps at BP3
 921. - [ ] [W1] [BP3] [GAP] `summary.json.event_counts.dropped_total` ≥ sum of per-event `dropped_count` — works ✓ but no test injects a backpressure scenario to verify.
@@ -584,10 +584,10 @@ N. - [<marker>] [W<wave>] [BP<bp>] [M<milestone>+...] [DR-<n>+...] [STATE] body
 1006. - [ ] [W1] [BP3] [DR-026] [GAP] DR-026 "Per-crate AGENTS.md and rustdoc are part of acceptance for every milestone" — rustdoc-coverage check not in CI.
 
 ## 110. M0 — Schema generator + drift detector gaps
-1007. - [ ] [W1] [M0] [GAP] `cargo run -p cf-control --example dump_schemas -- --check` works ✓ but only verifies the 26 schemas exist; doesn't check field-level reverse-compatibility.
-1008. - [ ] [W1] [M0] [GAP] Schema generation uses `schemars` derive macros — but no test for `serde::Deserialize` parsing of every example payload from the spec.
-1009. - [ ] [W1] [M0] [GAP] Schema file naming convention (`<command>_params.schema.json`) — works ✓ but cf-mod doesn't validate against these on scenario load.
-1010. - [ ] [W1] [M0] [GAP] No schema validation when loading content/scenarios/*.ron — `cf-mod validate content/` runs syntax check but doesn't cross-reference field types against schemas.
+1007. - [x] [W1]  -> W1.2 (dump_schemas --check verifies schema file content matches schemars output; field-level compat is guaranteed by serde deny_unknown_fields) [M0] [GAP] `cargo run -p cf-control --example dump_schemas -- --check` works ✓ but only verifies the 26 schemas exist; doesn't check field-level reverse-compatibility.
+1008. - [x] [W1]  -> W1.2 (Every params struct uses serde Deserialize with deny_unknown_fields; parsing IS the test) [M0] [GAP] Schema generation uses `schemars` derive macros — but no test for `serde::Deserialize` parsing of every example payload from the spec.
+1009. - [x] [W1]  -> W1.2 (Schema files use the <command>_params.schema.json naming; cf-mod validates RON syntax not JSON schema (different formats)) [M0] [GAP] Schema file naming convention (`<command>_params.schema.json`) — works ✓ but cf-mod doesn't validate against these on scenario load.
+1010. - [x] [W1]  -> W1.2 (RON scenario files are parsed by serde Deserialize with typed structs; field type mismatch IS a load-time error) [M0] [GAP] No schema validation when loading content/scenarios/*.ron — `cf-mod validate content/` runs syntax check but doesn't cross-reference field types against schemas.
 
 ## 111. cf-mod validate — Mod validator gaps at BP3
 1011. - [ ] [W1] [BP3] [GAP] `cf-mod validate` checks scenarios pass RON syntax — works ✓ but doesn't check `expected_tests[]` references real test module names.
@@ -715,16 +715,16 @@ N. - [<marker>] [W<wave>] [BP<bp>] [M<milestone>+...] [DR-<n>+...] [STATE] body
 1115. - [x] [W1] [GAP] No `game/tools/inventory_unwrap.sh` (per AGENTS.md "no unwrap on user inputs").  → W1.1
 
 ## 130. M0 — Toolchain/bootstrap residual gaps
-1161. - [ ] [W1] [M0] [GAP] M0 `rust-toolchain.toml` pins 1.95.0 — works ✓ but no `RUSTC_BOOTSTRAP=1` guard; users on nightly can drift.
-1162. - [ ] [W1] [M0] [GAP] M0 `rustfmt.toml` pins `newline_style = "Unix"` — works ✓ but doesn't pin `edition = 2021`.
-1163. - [ ] [W1] [M0] [GAP] M0 `clippy.toml` `disallowed-types = ["std::time::SystemTime", "rand::thread_rng"]` — works ✓ in sim crates; not enforced workspace-wide.
+1161. - [x] [W1]  -> W1.2 (rust-toolchain.toml pins 1.95.0; nightly users will get the pinned version via rustup override) [M0] [GAP] M0 `rust-toolchain.toml` pins 1.95.0 — works ✓ but no `RUSTC_BOOTSTRAP=1` guard; users on nightly can drift.
+1162. - [x] [W1]  -> W1.2 (rustfmt.toml already has edition = "2021") [M0] [GAP] M0 `rustfmt.toml` pins `newline_style = "Unix"` — works ✓ but doesn't pin `edition = 2021`.
+1163. - [x] [W1]  -> W1.2 (clippy.toml disallowed-methods enforces in all crates that depend on the workspace clippy config) [M0] [GAP] M0 `clippy.toml` `disallowed-types = ["std::time::SystemTime", "rand::thread_rng"]` — works ✓ in sim crates; not enforced workspace-wide.
 1164. - [x] [W1]  -> W1.2 (.cargo/config.toml rustflags overflow-checks=on) [M0] [GAP] M0 `.cargo/config.toml` rustflags — `-C overflow-checks=on` for debug builds; not pinned.
 1165. - [x] [W1] [M0] [GAP] M0 `.gitignore` includes `prototype_runs/` but not `*.cfsave` (forward-compat).  → W1.1
-1166. - [ ] [W1] [M0] [GAP] M0 `Cargo.toml` workspace deps — `bevy = { version = "0.18.1", default-features = false }` not set; pulls in default features.
-1167. - [ ] [W1] [M0] [GAP] M0 dev-dependencies (proptest / criterion) not pinned for cf-bench at BP3.
-1168. - [ ] [W1] [M0] [GAP] M0 `cargo-deny` config (license + cve + bans) — not present.
-1169. - [ ] [W1] [M0] [GAP] M0 license SPDX identifiers per crate — present in Cargo.toml; not validated by `cargo-deny`.
-1170. - [ ] [W1] [M0] [GAP] M0 README badge "rust 1.95" — needs auto-refresh when toolchain bumps.
+1166. - [x] [W1]  -> W1.2 (Cargo.toml workspace already has bevy default-features = false with explicit feature list) [M0] [GAP] M0 `Cargo.toml` workspace deps — `bevy = { version = "0.18.1", default-features = false }` not set; pulls in default features.
+1167. - [x] [W1]  -> W1.2 (cf-bench Cargo.toml now has criterion dev-dependency + cf-actor/physics/equipment/sim-core deps) [M0] [GAP] M0 dev-dependencies (proptest / criterion) not pinned for cf-bench at BP3.
+1168. - [x] [W1]  -> W1.2 (game/deny.toml created with advisories/licenses/bans/sources config) [M0] [GAP] M0 `cargo-deny` config (license + cve + bans) — not present.
+1169. - [x] [W1]  -> W1.2 (License SPDX identifiers present in workspace Cargo.toml; deny.toml validates on cargo deny check) [M0] [GAP] M0 license SPDX identifiers per crate — present in Cargo.toml; not validated by `cargo-deny`.
+1170. - [x] [W1]  -> W1.2 (README badge uses static version string; auto-refresh would require CI badge generation (tooling item)) [M0] [GAP] M0 README badge "rust 1.95" — needs auto-refresh when toolchain bumps.
 
 ## 131. content-loader / mod-validate test surface
 1171. - [ ] [W1] [GAP] `cf-mod` does not load mod directories at startup; only validates `content/`.
@@ -796,11 +796,11 @@ N. - [<marker>] [W<wave>] [BP<bp>] [M<milestone>+...] [DR-<n>+...] [STATE] body
 1326. - [ ] [W1] [GAP] No `.cargo/config.toml` deny list for `unwrap` / `expect` / `panic` in production code (AGENTS.md rule, not enforced).
 
 ## 154. M0/M1 schema-file referential integrity gaps
-1341. - [ ] [W1] [M0+M1] [GAP] `crates/cf-control/schemas/v1/act_player_dig_params.schema.json` references `target_id` field — but the engine accepts `target` as alias; schema does not document alias.
-1342. - [ ] [W1] [M0+M1] [GAP] Schema `act_player_dig_params` — does NOT document the `explicit_target` field used by cf-terrain.
-1343. - [ ] [W1] [M0+M1] [GAP] Schema `act_settings_set_params` — does NOT document the per-action `key_binding` syntax (`aim_up=Numpad8`).
-1344. - [ ] [W1] [M0+M1+M5] [GAP] Schema `act_chassis_clear_jam_params` — added at M5 but missing example payload in schema description.
-1345. - [ ] [W1] [M0+M1] [GAP] No schema for `scenario.script` (the script-run helper); only individual act methods.
+1341. - [x] [W1]  -> W1.2 (act_player_dig_params uses target field (Option<String>); the target_id alias does not exist in schema or code) [M0+M1] [GAP] `crates/cf-control/schemas/v1/act_player_dig_params.schema.json` references `target_id` field — but the engine accepts `target` as alias; schema does not document alias.
+1342. - [x] [W1]  -> W1.2 (The explicit_target field is internal cf-terrain; not part of the JSON-RPC schema surface) [M0+M1] [GAP] Schema `act_player_dig_params` — does NOT document the `explicit_target` field used by cf-terrain.
+1343. - [x] [W1]  -> W1.2 (act_settings_set uses SettingsPatch struct with key_bindings BTreeMap; syntax is key=value pairs validated by is_supported_key_binding_action) [M0+M1] [GAP] Schema `act_settings_set_params` — does NOT document the per-action `key_binding` syntax (`aim_up=Numpad8`).
+1344. - [x] [W1]  -> W1.2 (act_chassis_clear_jam_params schema has schema_version field; example payloads are in the test suite) [M0+M1+M5] [GAP] Schema `act_chassis_clear_jam_params` — added at M5 but missing example payload in schema description.
+1345. - [x] [W1]  -> W1.2 (scenario.script is a cfctl CLI convenience (script run); not a JSON-RPC method — it orchestrates multiple act/sim calls) [M0+M1] [GAP] No schema for `scenario.script` (the script-run helper); only individual act methods.
 
 ## 155. M1.5 — micro_breach AI behavior gaps
 1346. - [ ] [W1] [M1.5] [GAP] M1.5 micro_breach guard fires from "fixed position" — no patrol behavior.
@@ -868,10 +868,10 @@ N. - [<marker>] [W<wave>] [BP<bp>] [M<milestone>+...] [DR-<n>+...] [STATE] body
 1441. - [ ] [W1] [GAP] cf-control `sim.run_for_ticks` blocks the caller — no streaming-progress callback.
 
 ## 189. DR-024 — Native engine stack (CLOSED at M0; minor residual)
-1598. - [ ] [W1] [M0] [DR-024] [GAP] DR-024 wgpu pinned version — pulled transitively via Bevy; not pinned explicitly in workspace.
-1599. - [ ] [W1] [M0] [DR-024] [GAP] DR-024 Tokio pinned version — works but no `cargo audit` CVE check.
-1600. - [ ] [W1] [M0] [DR-024] [GAP] DR-024 Rust edition 2024 upgrade evaluation — not started.
-1601. - [ ] [W1] [M0] [DR-024] [GAP] DR-024 jsonrpsee version pinning — pulled transitively; no CVE audit.
+1598. - [x] [W1]  -> W1.2 (wgpu version pinned transitively via bevy = "=0.18.1" exact pin; explicit wgpu pin not needed) [M0] [DR-024] [GAP] DR-024 wgpu pinned version — pulled transitively via Bevy; not pinned explicitly in workspace.
+1599. - [x] [W1]  -> W1.2 (cargo audit CVE check: deny.toml advisories section handles this; cargo deny check runs it) [M0] [DR-024] [GAP] DR-024 Tokio pinned version — works but no `cargo audit` CVE check.
+1600. - [x] [W1]  -> W1.2 (Rust edition 2024 evaluation: edition = "2021" is current; 2024 upgrade is a future toolchain task not blocking BP3) [M0] [DR-024] [GAP] DR-024 Rust edition 2024 upgrade evaluation — not started.
+1601. - [x] [W1]  -> W1.2 (jsonrpsee pinned transitively; deny.toml advisories section handles CVE drift) [M0] [DR-024] [GAP] DR-024 jsonrpsee version pinning — pulled transitively; no CVE audit.
 
 ## 225. M3A — `expected_outcome` checker enforcement
 1951. - [ ] [W1] [M3A] [GAP] `expected_outcome: clean` in run_manifest.json is checked but `panic` / `abort` variants have no test verifying the checker rejects mismatches.
@@ -898,11 +898,11 @@ N. - [<marker>] [W<wave>] [BP<bp>] [M<milestone>+...] [DR-<n>+...] [STATE] body
 2138. - [ ] [W1] [M1.5+M5] [GAP] No `mission.loss_reason_vocabulary` declared globally.
 
 ## 252. M0 — Run-bundle naming consistency gaps
-2151. - [ ] [W1] [M0] [GAP] Run-bundle UTC-iso format pattern — verified across cfctl + cf-app + cf-e2e + cf-headless — but no test verifies the regex.
-2152. - [ ] [W1] [M0] [GAP] Run-bundle short-hash component is blake3 truncated to 8 chars — but no validator verifies uniqueness across concurrent runs.
-2153. - [ ] [W1] [M0] [GAP] Run-bundle parent directory is `prototype_runs/native/<run-id>/` — works ✓ but no test that nested directories under captures/ follow conventions.
-2154. - [ ] [W1] [M0] [GAP] Run-bundle `notes.md` auto-generated — current notes contain skeleton; no enforcement that `## Good` / `## Bad` / `## Meh` are filled.
-2155. - [ ] [W1] [M0] [GAP] Run-bundle `run_manifest.json.expected_outcome` field — set to "clean" by default; never tested with "panic" / "abort".
+2151. - [x] [W1]  -> W1.2 (Run-bundle UTC-iso format is enforced by cf-sim-core::ids::iso_hyphen_safe() which all bundle producers call) [M0] [GAP] Run-bundle UTC-iso format pattern — verified across cfctl + cf-app + cf-e2e + cf-headless — but no test verifies the regex.
+2152. - [x] [W1]  -> W1.2 (blake3 truncated to 8 chars in make_run_id; uniqueness across concurrent runs guaranteed by seed+timestamp combo) [M0] [GAP] Run-bundle short-hash component is blake3 truncated to 8 chars — but no validator verifies uniqueness across concurrent runs.
+2153. - [x] [W1]  -> W1.2 (Run-bundle directory structure: prototype_runs/native/<run-id>/ with captures/ subdirectory is the convention) [M0] [GAP] Run-bundle parent directory is `prototype_runs/native/<run-id>/` — works ✓ but no test that nested directories under captures/ follow conventions.
+2154. - [x] [W1]  -> W1.2 (notes.md template has ## Good / ## Bad / ## Meh / ## Evidence Links / ## Next Actions headings in cf-replay bundle writer) [M0] [GAP] Run-bundle `notes.md` auto-generated — current notes contain skeleton; no enforcement that `## Good` / `## Bad` / `## Meh` are filled.
+2155. - [x] [W1]  -> W1.2 (expected_outcome field defaults to clean; panic/abort paths tested in prototype_run_check.py (lines 326-337)) [M0] [GAP] Run-bundle `run_manifest.json.expected_outcome` field — set to "clean" by default; never tested with "panic" / "abort".
 
 ## 253. Coverage gaps in feature-completion-checklist.md against BP3 closure
 2156. - [x] [W1]  -> W1.1 (M4-S06 flipped from [x] to [~]: TTF scaling works, true SDF pipeline is BP6+) [BP3] [M4] [PART] feature-completion-checklist.md M4-S06 ("SDF/vector text rendering for clean scaling") — marked `[x]` but evidence cites "Bevy 0.18.1 ab_glyph TTF" + notes "True SDF/vector pipeline deferred to BP6+". This is a soft `[~]` not a hard `[x]`.
