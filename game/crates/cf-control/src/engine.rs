@@ -115,6 +115,11 @@ pub struct M0EngineConfig {
     pub linked_specs: Vec<String>,
     pub assumptions_tested: Vec<String>,
     pub expected_tests: Vec<String>,
+    /// **M1 / Seam S2**: scenario tutorial_safety flag. When true the
+    /// engine flags `ActorState::set_inactive(true)` for every controllable
+    /// actor on scene-load until the manifest's tutorial-controller flips
+    /// it off (M1.5 owns the tutorial controller; M1 just plumbs the flag).
+    pub tutorial_safety: bool,
     /// True = pace ticks against wall-clock at `tick_rate_hz`. False = run
     /// as fast as possible (used by short tests / E2E that don't need real
     /// wall-time pacing).
@@ -261,6 +266,7 @@ impl M0EngineConfig {
                 "Settings + capabilities are observable through cf-control.".to_string(),
             ],
             expected_tests: Vec::new(),
+            tutorial_safety: false,
             paced: false,
             debug_inject_panic_at_tick: None,
             initial_actor_world: None,
@@ -282,6 +288,8 @@ impl M0EngineConfig {
         let mut cfg = Self::for_test_scenario_only(&scenario.id, scenario_path.clone());
         cfg.seed = scenario.seed;
         cfg.duration_ticks = scenario.duration_ticks.unwrap_or(0);
+        // M1 Seam S2: forward scenario.tutorial_safety into the engine config.
+        cfg.tutorial_safety = scenario.tutorial_safety;
         cfg.expected_tests = if scenario.expected_tests.is_empty() {
             vec!["M0-SMOKE-01".to_string()]
         } else {
@@ -804,6 +812,40 @@ impl M0Engine {
         );
         self.emit_initial_snapshots(tick, sim_time_ms, &started_id);
         self.emit_category_baseline(tick, sim_time_ms, &started_id);
+        // M1 Seam S4: pre-emit `mission.mission_started` whenever a
+        // MissionState is attached. M1.5 will populate richer payloads;
+        // M1 emits a thin no-op so the M3B viewer + replay verifier can
+        // expect the event type without conditionally rendering on
+        // milestone.
+        if let Ok(state) = self.state.read() {
+            if state.mission.is_some() {
+                let scenario_id = self.config.scenario_id.clone();
+                drop(state);
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "mission",
+                    "mission_started",
+                    json!({
+                        "scenario": scenario_id,
+                        "tick": tick.0,
+                    }),
+                    Some(started_id.clone()),
+                );
+            }
+        }
+        // M1 Seam S2: when the scenario manifest sets tutorial_safety=true,
+        // mark the controllable actor INACTIVE so the engine refuses lethal
+        // damage transitions until the tutorial controller (M1.5+) flips it.
+        if self.config.tutorial_safety {
+            if let Ok(mut state) = self.state.write() {
+                if let Some(sim) = state.actor_state.as_mut() {
+                    if let Some(player) = sim.world.player_actor_mut() {
+                        let _ = player.set_inactive(true);
+                    }
+                }
+            }
+        }
         self.spawn_debug_panic_if_requested();
     }
 

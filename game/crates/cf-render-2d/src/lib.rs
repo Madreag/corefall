@@ -650,6 +650,37 @@ fn update_muzzle_flash(
 #[derive(Component, Debug)]
 pub struct MuzzleFlashTag;
 
+/// **M1 Gap J1**: per-stance silhouette tint for chassis-less actors. The
+/// pixel-art sprite frames under `content/sprites/actor_m1/` are reserved
+/// for the asset loader at BP4+; M1 ships the visible-silhouette stance
+/// swap so the player no longer renders as a transparent ghost rectangle.
+fn stance_tint_for(stance: &str, status: &str) -> Color {
+    if status == "dead" {
+        return Color::srgb(0.05, 0.05, 0.05);
+    }
+    if status == "dying" {
+        return Color::srgb(0.35, 0.05, 0.05);
+    }
+    if status == "downed" {
+        return Color::srgb(0.30, 0.10, 0.10);
+    }
+    if status == "inactive" {
+        return Color::srgb(0.35, 0.35, 0.40);
+    }
+    match stance {
+        "idle" => Color::srgb(0.55, 0.58, 0.65),
+        "walking" => Color::srgb(0.50, 0.65, 0.78),
+        "running" => Color::srgb(0.35, 0.65, 0.85),
+        "airborne" => Color::srgb(0.80, 0.75, 0.30),
+        "knocked_down" => Color::srgb(0.80, 0.25, 0.25),
+        "crouching" => Color::srgb(0.45, 0.55, 0.50),
+        "climbing" => Color::srgb(0.55, 0.45, 0.65),
+        "jetting" => Color::srgb(0.90, 0.55, 0.20),
+        "ejecting" => Color::srgb(0.95, 0.90, 0.25),
+        _ => Color::srgb(0.50, 0.55, 0.60),
+    }
+}
+
 fn spawn_floor_and_reticle(mut commands: Commands, solid: Res<SolidSpriteImage>) {
     // Floor (placeholder; real chunked terrain lands at M2).
     commands.spawn((
@@ -728,10 +759,20 @@ fn sync_actor_sprites(
         // **M5**: every actor renders via the 15 per-zone pips (see
         // `sync_chassis_zone_sprites`). Chassis-attached actors use real
         // per-zone hp; chassis-less actors use a synthetic intact body
-        // derived from HP. Either way, the parent rectangle is transparent
-        // so the pips ARE the visible silhouette — no flat colored box
-        // hiding behind them, no static sliding pawn.
-        let parent_color = Color::srgba(0.0, 0.0, 0.0, 0.0);
+        // derived from HP.
+        //
+        // **M1 Gap J1**: chassis-less actors (M1's player) get a Stance-
+        // tinted silhouette so the actor renders as a visible body, not a
+        // ghost rectangle behind the chassis pips. The tint varies by
+        // stance (Idle / Walking / Running / Airborne / KnockedDown /
+        // Downed / Dead) so the visual identity tracks the sim. Actors
+        // WITH a chassis keep the transparent parent so the per-zone pips
+        // remain authoritative (M5 chassis grammar owns the silhouette).
+        let parent_color = if actor.chassis.is_some() {
+            Color::srgba(0.0, 0.0, 0.0, 0.0)
+        } else {
+            stance_tint_for(&actor.stance, &actor.status)
+        };
         if let Some(entity) = existing.get(&actor.id) {
             if let Ok((_, _, mut transform, mut sprite)) = actor_query.get_mut(*entity) {
                 transform.translation = Vec3::new(pos.x, pos.y, 0.5);

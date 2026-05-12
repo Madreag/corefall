@@ -84,6 +84,13 @@ pub struct Scenario {
     /// chain reflects the actual milestone being proven.
     #[serde(default)]
     pub milestone_override: Option<String>,
+    /// **M1 / Seam S2**: scenario-wide tutorial-safety flag. When true the
+    /// engine seeds INACTIVE for `controllable` actors during the script's
+    /// onboarding window and refuses lethal damage transitions. M1 surfaces
+    /// the flag through the manifest -> engine config -> actor.set_inactive
+    /// path; M1.5+ tutorials act on it.
+    #[serde(default)]
+    pub tutorial_safety: bool,
 }
 
 /// One actor entry in `Scenario.actors`. M1 only models the player + simple dummies
@@ -972,6 +979,7 @@ mod tests {
             loadout_template: None,
             loss_reason_vocabulary: vec![],
             milestone_override: None,
+            tutorial_safety: false,
         };
         assert!(matches!(
             scenario.validate("t.ron"),
