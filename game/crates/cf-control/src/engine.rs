@@ -1551,7 +1551,11 @@ impl M0Engine {
                 // O(n)); 16-actor scenarios are well within budget. When no actor
                 // world is loaded we feed the mission an empty actor map.
                 let breaches_broken = state.breach_world.as_ref().map(|w| w.broken_map()).unwrap_or_default();
-                let breaches_progress = state.breach_world.as_ref().map(|w| w.progress_map()).unwrap_or_default();
+                let breaches_progress = state
+                    .breach_world
+                    .as_ref()
+                    .map(|w| w.progress_map())
+                    .unwrap_or_default();
                 let player_id = state.player_actor;
                 let (actors_clone, player_clone) = match state.actor_state.as_ref() {
                     Some(actor_state_ref) => {
@@ -4678,12 +4682,10 @@ impl EngineHandle for M0Engine {
             .reactive_guards
             .values()
             .map(|g| {
-                let position = state.actor_state.as_ref().and_then(|sim| {
-                    sim.world
-                        .actors
-                        .get(&g.actor)
-                        .map(|a| [a.position.x, a.position.y])
-                });
+                let position = state
+                    .actor_state
+                    .as_ref()
+                    .and_then(|sim| sim.world.actors.get(&g.actor).map(|a| [a.position.x, a.position.y]));
                 let intent_label = ai_intent_label(g);
                 crate::state::EnemyView {
                     actor: g.actor.0,

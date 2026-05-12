@@ -2154,9 +2154,7 @@ fn sync_actor_state_to_render(
             hp: a.hp,
             hp_max: a.hp_max,
             status: a.status.clone(),
-            intent_label: enemy_view
-                .map(|e| e.intent_label.clone())
-                .unwrap_or_default(),
+            intent_label: enemy_view.map(|e| e.intent_label.clone()).unwrap_or_default(),
             world_position: enemy_view.and_then(|e| e.position).or(Some(a.position)),
         }
     });

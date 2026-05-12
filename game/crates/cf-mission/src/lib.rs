@@ -760,9 +760,7 @@ pub fn step(state: &mut MissionState, inputs: MissionTickInputs<'_>) -> MissionT
             continue;
         }
         let progress = match &obj.kind {
-            ObjectiveKind::BreachBarrier { target } => {
-                inputs.breaches_progress.get(target).copied().unwrap_or(0.0)
-            }
+            ObjectiveKind::BreachBarrier { target } => inputs.breaches_progress.get(target).copied().unwrap_or(0.0),
             _ => continue,
         };
         while (obj.progress_milestone_index as usize) < PROGRESS_QUARTILES.len() {
