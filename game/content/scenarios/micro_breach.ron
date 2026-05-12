@@ -13,7 +13,7 @@
     (id: 1, team: "blue", spawn: (96.0, 32.0), controllable: true, hp: 100.0,
       inventory: (rifle: Some("rifle_m1_default")), half_extents: Some((8.0, 16.0))),
     (id: 2, team: "red", spawn: (900.0, 32.0), controllable: false, hp: 80.0,
-      inventory: (rifle: None), aim: Some((-1.0, 0.0)),
+      inventory: (rifle: Some("rifle_m1_default")), aim: Some((-1.0, 0.0)),
       half_extents: Some((8.0, 16.0)),
       enemy: Some((
         kind: Some("reactive_guard"),

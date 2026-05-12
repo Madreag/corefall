@@ -1941,8 +1941,12 @@ impl M0Engine {
                     }
                 }
             }
+            // **M1.5 G11**: chain objective_failed → mission_resolved so
+            // M3B can walk the cause chain from mission_resolved back to
+            // the trigger objective_failed → ... → player_dead chain.
+            let mut last_failed_event_id: Option<String> = None;
             for id in &report.objective_failed {
-                self.recorder.record(
+                let event_id = self.recorder.record(
                     tick,
                     sim_time_ms,
                     "mission",
@@ -1950,18 +1954,32 @@ impl M0Engine {
                     json!({"objective": id}),
                     None,
                 );
+                last_failed_event_id = Some(event_id);
             }
             if let Some(result) = report.final_result {
                 let payload = match result {
                     cf_mission::MissionResult::Won => json!({"result": "won"}),
                     cf_mission::MissionResult::Lost { reason } => {
-                        json!({"result": "lost", "reason": reason.as_str()})
+                        json!({"result": "lost", "loss_reason": reason.as_str()})
                     }
                     cf_mission::MissionResult::Active => json!({"result": "active"}),
                     cf_mission::MissionResult::Aborted => json!({"result": "aborted"}),
                 };
-                self.recorder
-                    .record(tick, sim_time_ms, "mission", "mission_resolved", payload, None);
+                // Chain into the last objective_failed (if any) on the same
+                // tick — that's the most specific cause of the resolution.
+                // For wins the parent is None (the chain walks back through
+                // the most recent objective_completed via its own
+                // parent_event_id link, but at M1.5 we don't have that link
+                // wired into the objective_completed loop yet — additive
+                // schema upgrade for M5+).
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "mission",
+                    "mission_resolved",
+                    payload,
+                    last_failed_event_id.clone(),
+                );
             }
             // W1 item 770: re-emit snapshots on any objective state change so
             // the replay verifier and viewer can reconstruct mid-mission state.
