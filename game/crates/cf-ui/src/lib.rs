@@ -29,6 +29,10 @@ use bevy::prelude::*;
 
 use cf_actor::ActorObservation;
 
+pub mod material_legend;
+
+pub use material_legend::{legend_entries, MaterialLegendEntry, MaterialLegendState};
+
 /// Latest HUD model derived from the engine. The cf-app bridge writes this each
 /// frame from the same `M0Engine` snapshot it feeds to `cf-render-2d::ActorRenderState`.
 #[derive(Resource, Debug, Clone, Default)]
