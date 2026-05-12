@@ -222,6 +222,58 @@ pub struct ActPlayerSharpAimParams {
     pub active: bool,
 }
 
+/// **M1**: `inspect.equipment` — return the full `RifleSpec` (firing profile +
+/// AI hints + tracer/particle metadata) for a preset id.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct InspectEquipmentParams {
+    pub schema_version: u32,
+    pub preset_id: String,
+}
+
+/// **M1**: `observe.actor` — return full `ActorView` (with M1 fields) for the
+/// player by default, or for `actor_id` when supplied.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ObserveActorParams {
+    pub schema_version: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub actor_id: Option<u64>,
+}
+
+/// **M1**: `inspect.actor` — return the full `ActorView` plus the last 30
+/// `actor` events for the target. `target` is `"player"` for the controllable
+/// actor or an actor id rendered as a string. Empty target defaults to player.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct InspectActorParams {
+    pub schema_version: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target: Option<String>,
+}
+
+/// **M1 / Gap S3 (M1.5 forward-compat seam)**: `act.player.abort` —
+/// stub at M1; flips to a real mission abort path at M1.5.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerAbortParams {
+    pub schema_version: u32,
+}
+
+/// **M1 / Gap D1**: `act.input.capture_controls` — UI signals the engine
+/// that an overlay (settings panel, debrief prompt, future pause/menu) has
+/// captured input. `captured=true` raises the CONTROLS CAPTURED HUD badge
+/// and rejects subsequent `act.player.*` dispatches; `captured=false`
+/// releases. `capturer` carries a short human-readable label.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActInputCaptureControlsParams {
+    pub schema_version: u32,
+    pub captured: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub capturer: Option<String>,
+}
+
 fn default_true() -> bool {
     true
 }
@@ -289,6 +341,11 @@ pub fn dump_v1() -> BTreeMap<String, String> {
         entry::<ActChassisSalvageParams>("act_chassis_salvage_params"),
         entry::<ActChassisClearJamParams>("act_chassis_clear_jam_params"),
         entry::<ActPlayerSharpAimParams>("act_player_sharp_aim_params"),
+        entry::<InspectEquipmentParams>("inspect_equipment_params"),
+        entry::<ObserveActorParams>("observe_actor_params"),
+        entry::<InspectActorParams>("inspect_actor_params"),
+        entry::<ActPlayerAbortParams>("act_player_abort_params"),
+        entry::<ActInputCaptureControlsParams>("act_input_capture_controls_params"),
         entry::<RunBundleWriteParams>("run_bundle_write_params"),
         entry::<SystemShutdownParams>("system_shutdown_params"),
         entry::<SettingsPatch>("settings_patch"),

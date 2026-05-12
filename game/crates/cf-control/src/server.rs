@@ -91,11 +91,13 @@ use crate::{
     },
     schemas::{SCHEMA_VERSION, SCHEMA_VERSION_MIN},
     schemas::{
-        ActChassisClearJamParams, ActChassisRepairParams, ActChassisSalvageParams, ActPlayerAimParams,
-        ActPlayerClimbParams, ActPlayerCrouchParams, ActPlayerDigParams, ActPlayerEjectParams, ActPlayerFireParams,
-        ActPlayerJetParams, ActPlayerJumpParams, ActPlayerMoveParams, ActPlayerReloadParams, ActPlayerResetParams,
-        ActPlayerSelectItemParams, ActPlayerSharpAimParams, ObserveOnceParams, ObserveSubscribeParams,
-        RunBundleWriteParams, RunForTicksParams, ScenarioLoadParams, StepParams, SystemShutdownParams,
+        ActChassisClearJamParams, ActChassisRepairParams, ActChassisSalvageParams,
+        ActInputCaptureControlsParams, ActPlayerAbortParams, ActPlayerAimParams, ActPlayerClimbParams,
+        ActPlayerCrouchParams, ActPlayerDigParams, ActPlayerEjectParams, ActPlayerFireParams, ActPlayerJetParams,
+        ActPlayerJumpParams, ActPlayerMoveParams, ActPlayerReloadParams, ActPlayerResetParams,
+        ActPlayerSelectItemParams, ActPlayerSharpAimParams, InspectActorParams, InspectEquipmentParams,
+        ObserveActorParams, ObserveOnceParams, ObserveSubscribeParams, RunBundleWriteParams, RunForTicksParams,
+        ScenarioLoadParams, StepParams, SystemShutdownParams,
     },
     state::{ControlEnvelopeStatus, ObserveFrame, ObserveSettings},
     Settings,
@@ -297,6 +299,21 @@ pub enum ControlCommand {
         active: bool,
         source: IntentSource,
     },
+    /// **M1 / Gap S3**: stub for M1.5 mission abort. M1 rejects with
+    /// `unsupported_in_m1`; M1.5 swaps in real abort logic without rewiring
+    /// the cfctl surface.
+    ActPlayerAbort {
+        source: IntentSource,
+    },
+    /// **M1 / Gap D1**: UI tells the engine an overlay (settings panel,
+    /// debrief prompt, future pause menu) has captured input. While
+    /// captured, all `act.player.*` commands are rejected with
+    /// `controls_captured` and the CONTROLS CAPTURED HUD zone surfaces.
+    ActInputCaptureControls {
+        captured: bool,
+        capturer: Option<String>,
+        source: IntentSource,
+    },
     SettingsSet {
         changes: SettingsPatch,
     },
@@ -314,6 +331,22 @@ pub trait EngineHandle: Send + Sync + 'static {
     async fn snapshot(&self, filter: Option<&str>) -> ObserveFrame;
     async fn settings_snapshot(&self) -> Settings;
     async fn dispatch(&self, command: ControlCommand) -> CommandResult;
+    /// **M1 Gap A5**: return the full `RifleSpec` for `preset_id` (firing
+    /// profile + AI hints + particle/tracer metadata). Default impl returns
+    /// `None` for handlers that don't have an equipment registry.
+    async fn inspect_equipment(&self, _preset_id: &str) -> Option<serde_json::Value> {
+        None
+    }
+    /// **M1 Gap B3**: return the `ActorView` for a specific actor (or the
+    /// player when `actor_id` is None). Default returns `None`.
+    async fn observe_actor(&self, _actor_id: Option<u64>) -> Option<serde_json::Value> {
+        None
+    }
+    /// **M1 Gap B3**: return the actor view plus its last `n` actor-category
+    /// events. Default returns `None`.
+    async fn inspect_actor(&self, _target: Option<&str>, _last_n_events: usize) -> Option<serde_json::Value> {
+        None
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -1005,6 +1038,62 @@ async fn process_request<E: EngineHandle>(
                 })
                 .await;
             Some(ack_response(request.id, &result))
+        }
+        "act.player.abort" => {
+            let _p: ActPlayerAbortParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerAbort {
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.input.capture_controls" => {
+            let p: ActInputCaptureControlsParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActInputCaptureControls {
+                    captured: p.captured,
+                    capturer: p.capturer,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "inspect.equipment" => {
+            let p: InspectEquipmentParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            match engine.inspect_equipment(&p.preset_id).await {
+                Some(value) => Some(success_response(request.id, value)),
+                None => Some(invalid_param_reason(request.id, "unknown_preset_id")),
+            }
+        }
+        "observe.actor" => {
+            let p: ObserveActorParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            match engine.observe_actor(p.actor_id).await {
+                Some(value) => Some(success_response(request.id, value)),
+                None => Some(invalid_param_reason(request.id, "no_player_actor")),
+            }
+        }
+        "inspect.actor" => {
+            let p: InspectActorParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            match engine.inspect_actor(p.target.as_deref(), 30).await {
+                Some(value) => Some(success_response(request.id, value)),
+                None => Some(invalid_param_reason(request.id, "no_player_actor")),
+            }
         }
         "act.input.focus" => {
             #[derive(Deserialize)]

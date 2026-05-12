@@ -207,6 +207,46 @@ pub struct ActorView {
     pub climb_active: bool,
     #[serde(default)]
     pub jet_active: bool,
+    /// **M1**: stability scalar (0.0 = disrupted, 1.0 = solid).
+    #[serde(default = "default_stability")]
+    pub stability: f32,
+    /// **M1**: per-tick stability recovery rate.
+    #[serde(default = "default_stability_recovery_rate")]
+    pub stability_recovery_rate: f32,
+    /// **M1**: sharp-aim progress (0..1).
+    #[serde(default)]
+    pub sharp_aim_progress: f32,
+    /// **M1**: alternating-recoil accumulator value (CCCP `HDFirearm.cpp:891`).
+    #[serde(default)]
+    pub recoil_accumulator: f32,
+    /// **M1**: knockdown recovery ticks remaining (0 when not stunned).
+    #[serde(default)]
+    pub knockdown_ticks_remaining: u32,
+    /// **M1**: DYING dwell ticks remaining (CCCP `Actor.cpp:1229`).
+    #[serde(default)]
+    pub dying_dwell_ticks_remaining: u32,
+    /// **M1**: mission_critical flag (caps damage at DOWNED when true).
+    #[serde(default)]
+    pub mission_critical: bool,
+    /// **M1**: most-recent reticle bloom factor (`Soldat Sprites.pas:4870`).
+    #[serde(default = "default_bloom_factor")]
+    pub bloom_factor: f32,
+    /// **M1**: physical mass (kg). Drives mass_factor in physics + stability cost.
+    #[serde(default = "default_mass_kg")]
+    pub mass_kg: f32,
+}
+
+fn default_stability() -> f32 {
+    1.0
+}
+fn default_stability_recovery_rate() -> f32 {
+    0.02
+}
+fn default_bloom_factor() -> f32 {
+    1.0
+}
+fn default_mass_kg() -> f32 {
+    80.0
 }
 
 fn default_origin_id() -> String {

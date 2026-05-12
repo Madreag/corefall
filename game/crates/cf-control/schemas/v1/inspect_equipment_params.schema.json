@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "InspectEquipmentParams",
+  "description": "**M1**: `inspect.equipment` — return the full `RifleSpec` (firing profile +\nAI hints + tracer/particle metadata) for a preset id.",
+  "type": "object",
+  "properties": {
+    "preset_id": {
+      "type": "string"
+    },
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "preset_id"
+  ]
+}

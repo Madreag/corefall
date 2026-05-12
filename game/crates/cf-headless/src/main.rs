@@ -400,6 +400,21 @@ fn parse_command(payload: &Value) -> Option<ControlCommand> {
         "act.player.eject" => Some(ControlCommand::ActPlayerEject {
             source: IntentSource::Replay,
         }),
+        // **M1 Gap I1**: replay arm for the sharp-aim toggle.
+        "act.player.sharp_aim" => Some(ControlCommand::ActPlayerSharpAim {
+            active: payload.get("active").and_then(Value::as_bool).unwrap_or(false),
+            source: IntentSource::Replay,
+        }),
+        // **M1 Gap S3**: replay arm for the abort stub (currently rejects).
+        "act.player.abort" => Some(ControlCommand::ActPlayerAbort {
+            source: IntentSource::Replay,
+        }),
+        // **M1 Gap D1**: replay arm for the controls-capture toggle.
+        "act.input.capture_controls" => Some(ControlCommand::ActInputCaptureControls {
+            captured: payload.get("captured").and_then(Value::as_bool).unwrap_or(false),
+            capturer: payload.get("capturer").and_then(Value::as_str).map(str::to_string),
+            source: IntentSource::Replay,
+        }),
         "act.chassis.repair" => Some(ControlCommand::ActChassisRepair {
             zone: payload.get("zone").and_then(Value::as_str).map(str::to_string),
             module_id: payload.get("module_id").and_then(Value::as_str).map(str::to_string),
@@ -593,6 +608,9 @@ mod tests {
             json!({"method": "act.player.dig", "target": null}),
             json!({"method": "act.player.select_item", "slot": 0}),
             json!({"method": "act.player.reset"}),
+            json!({"method": "act.player.sharp_aim", "active": true}),
+            json!({"method": "act.player.abort"}),
+            json!({"method": "act.input.capture_controls", "captured": true, "capturer": "settings_panel"}),
             json!({"method": "act.settings.set", "settings": {"captions": true}}),
         ];
         for p in payloads.iter() {

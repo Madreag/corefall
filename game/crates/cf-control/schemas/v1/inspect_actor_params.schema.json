@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "InspectActorParams",
+  "description": "**M1**: `inspect.actor` — return the full `ActorView` plus the last 30\n`actor` events for the target. `target` is `\"player\"` for the controllable\nactor or an actor id rendered as a string. Empty target defaults to player.",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "target": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema_version"
+  ]
+}

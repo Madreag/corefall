@@ -574,6 +574,15 @@ struct EngineMutable {
     /// M4A: previous tick's mission result, used to detect mission_resolved
     /// transitions for banner emission.
     hud_last_mission_result: Option<String>,
+    /// **M1 / Gap D**: controls-captured state. `Some(capturer)` while an
+    /// overlay holds input; the CONTROLS CAPTURED HUD zone renders and all
+    /// `act.player.*` dispatches reject with reason `controls_captured`.
+    controls_captured_by: Option<String>,
+    /// **M1.5 forward-hook (Seam S1)**: latched by damage events so the
+    /// next ReactiveGuard tick treats the damaged actor as a perception
+    /// trigger. No consumer at M1; M1.5 ai layer reads it.
+    #[allow(dead_code)]
+    force_ai_update_this_tick: bool,
     /// M4A: HUD focus state (DR-012 ACC-A-04). The cf-app keyboard layer +
     /// cfctl `act.input.focus` advance/retreat focus through the canonical
     /// `HUD_FOCUSABLE_NODES` list; observe.accessibility surfaces it.
@@ -708,6 +717,8 @@ impl M0Engine {
                 hud_tool_validity: crate::state::ToolValidityView::default(),
                 hud_last_status: BTreeMap::new(),
                 hud_last_mission_result: None,
+                controls_captured_by: None,
+                force_ai_update_this_tick: false,
                 hud_focus_index: None,
                 hud_focus_cycle: 0,
                 hud_last_chassis_stage: None,
@@ -4082,6 +4093,15 @@ impl EngineHandle for M0Engine {
                         crouch_active: a.crouch_active,
                         climb_active: a.climb_active,
                         jet_active: a.jet_active,
+                        stability: a.stability,
+                        stability_recovery_rate: a.stability_recovery_rate,
+                        sharp_aim_progress: a.sharp_aim_progress,
+                        recoil_accumulator: a.recoil_accumulator,
+                        knockdown_ticks_remaining: a.knockdown_ticks_remaining,
+                        dying_dwell_ticks_remaining: a.dying_dwell_ticks_remaining,
+                        mission_critical: a.mission_critical,
+                        bloom_factor: a.bloom_factor,
+                        mass_kg: a.mass_kg,
                     }
                 })
                 .collect()
@@ -4239,10 +4259,92 @@ impl EngineHandle for M0Engine {
         self.state.read().map(|s| s.settings.clone()).unwrap_or_default()
     }
 
+    async fn inspect_equipment(&self, preset_id: &str) -> Option<serde_json::Value> {
+        let spec = cf_equipment::rifle_preset(preset_id)?;
+        serde_json::to_value(spec).ok()
+    }
+
+    async fn observe_actor(&self, actor_id: Option<u64>) -> Option<serde_json::Value> {
+        let state = self.state.read().ok()?;
+        let sim = state.actor_state.as_ref()?;
+        let target_id = actor_id.unwrap_or_else(|| sim.world.player.map(|id| id.0).unwrap_or(0));
+        let actor = sim.world.actors.get(&ActorId(target_id))?;
+        let observation = cf_actor::ActorObservation::from(actor);
+        serde_json::to_value(observation).ok()
+    }
+
+    async fn inspect_actor(&self, target: Option<&str>, last_n_events: usize) -> Option<serde_json::Value> {
+        let actor_id_opt: Option<u64> = match target {
+            None | Some("player") | Some("") => None,
+            Some(t) => t.parse::<u64>().ok(),
+        };
+        let view = self.observe_actor(actor_id_opt).await?;
+        // Pull last N actor-category events for the target.
+        let id_for_filter = view.get("id").and_then(|v| v.as_u64());
+        let events = self.recorder.snapshot_events();
+        let mut filtered: Vec<serde_json::Value> = events
+            .iter()
+            .filter(|e| e.category == "actor")
+            .filter(|e| {
+                id_for_filter
+                    .and_then(|id| e.payload.get("actor").and_then(|v| v.as_u64()).map(|p| p == id))
+                    .unwrap_or(true)
+            })
+            .rev()
+            .take(last_n_events)
+            .map(|e| serde_json::to_value(e).unwrap_or(serde_json::Value::Null))
+            .collect();
+        filtered.reverse();
+        let merged = serde_json::json!({
+            "actor": view,
+            "events": filtered,
+            "events_count": filtered.len(),
+        });
+        Some(merged)
+    }
+
     async fn dispatch(&self, command: ControlCommand) -> CommandResult {
         let mut state = self.state.write().expect("engine state poisoned");
         let tick = state.clock.tick();
         let sim_time_ms = state.clock.sim_time_ms();
+        // Gap D2: while an overlay has captured controls, reject every
+        // `act.player.*` command. Capture/release commands themselves still
+        // flow through so the UI can release the capture.
+        if let Some(capturer) = state.controls_captured_by.clone() {
+            let method = match &command {
+                ControlCommand::ActPlayerMove { .. } => Some("act.player.move"),
+                ControlCommand::ActPlayerJump { .. } => Some("act.player.jump"),
+                ControlCommand::ActPlayerAim { .. } => Some("act.player.aim"),
+                ControlCommand::ActPlayerFire { .. } => Some("act.player.fire"),
+                ControlCommand::ActPlayerReload { .. } => Some("act.player.reload"),
+                ControlCommand::ActPlayerSelectItem { .. } => Some("act.player.select_item"),
+                ControlCommand::ActPlayerReset { .. } => Some("act.player.reset"),
+                ControlCommand::ActPlayerDig { .. } => Some("act.player.dig"),
+                ControlCommand::ActPlayerCrouch { .. } => Some("act.player.crouch"),
+                ControlCommand::ActPlayerClimb { .. } => Some("act.player.climb"),
+                ControlCommand::ActPlayerJet { .. } => Some("act.player.jet"),
+                ControlCommand::ActPlayerEject { .. } => Some("act.player.eject"),
+                ControlCommand::ActPlayerSharpAim { .. } => Some("act.player.sharp_aim"),
+                ControlCommand::ActPlayerAbort { .. } => Some("act.player.abort"),
+                _ => None,
+            };
+            if let Some(method_name) = method {
+                drop(state);
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "control",
+                    "command_rejected",
+                    json!({
+                        "method": method_name,
+                        "reason": "controls_captured",
+                        "capturer": capturer,
+                    }),
+                    None,
+                );
+                return CommandResult::rejected("controls_captured", tick.0);
+            }
+        }
         match command {
             ControlCommand::ScenarioLoad { scenario, seed } => {
                 // M0 cannot swap scenarios mid-run (no reload pipeline yet) and cannot
@@ -4735,6 +4837,73 @@ impl EngineHandle for M0Engine {
                 } else {
                     self.reject_actor_command(tick, sim_time_ms, state, "act.player.sharp_aim")
                 }
+            }
+            ControlCommand::ActPlayerAbort { source } => {
+                // Gap S3: M1.5 forward-compat stub. Reject at M1; M1.5 swaps in
+                // the actual mission-abort flow without rewiring the surface.
+                let _ = source;
+                drop(state);
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "control",
+                    "command_rejected",
+                    json!({"method": "act.player.abort", "reason": "unsupported_in_m1"}),
+                    None,
+                );
+                CommandResult::rejected("unsupported_in_m1", tick.0)
+            }
+            ControlCommand::ActInputCaptureControls {
+                captured,
+                capturer,
+                source,
+            } => {
+                let _ = source;
+                let prev = state.controls_captured_by.clone();
+                let new = if captured {
+                    Some(capturer.clone().unwrap_or_else(|| "unknown".to_string()))
+                } else {
+                    None
+                };
+                state.controls_captured_by = new.clone();
+                drop(state);
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "control",
+                    "command_accepted",
+                    json!({
+                        "method": "act.input.capture_controls",
+                        "captured": captured,
+                        "capturer": capturer,
+                    }),
+                    None,
+                );
+                // Emit ux.controls_captured / ux.controls_released on transition.
+                match (prev.as_deref(), new.as_deref()) {
+                    (None, Some(c)) => {
+                        self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "ux",
+                            "controls_captured",
+                            json!({"capturer": c}),
+                            None,
+                        );
+                    }
+                    (Some(_), None) => {
+                        self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "ux",
+                            "controls_released",
+                            json!({}),
+                            None,
+                        );
+                    }
+                    _ => {}
+                }
+                CommandResult::accepted(tick.0)
             }
             ControlCommand::ActPlayerDig { target, source } => {
                 if !self.config.has_actor_world {

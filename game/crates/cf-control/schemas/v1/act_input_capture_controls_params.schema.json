@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ActInputCaptureControlsParams",
+  "description": "**M1 / Gap D1**: `act.input.capture_controls` — UI signals the engine\nthat an overlay (settings panel, debrief prompt, future pause/menu) has\ncaptured input. `captured=true` raises the CONTROLS CAPTURED HUD badge\nand rejects subsequent `act.player.*` dispatches; `captured=false`\nreleases. `capturer` carries a short human-readable label.",
+  "type": "object",
+  "properties": {
+    "captured": {
+      "type": "boolean"
+    },
+    "capturer": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "captured"
+  ]
+}

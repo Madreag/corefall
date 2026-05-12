@@ -166,6 +166,13 @@ enum InspectAction {
         #[arg(long, value_enum, default_value_t = OutputFormat::Pretty)]
         format: OutputFormat,
     },
+    /// **M1**: Inspect equipment preset (full `RifleSpec`).
+    Equipment {
+        #[arg(long = "preset", short = 'p')]
+        preset_id: String,
+        #[arg(long, value_enum, default_value_t = OutputFormat::Pretty)]
+        format: OutputFormat,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -961,7 +968,21 @@ async fn cmd_inspect(
     };
     let output = match action {
         InspectAction::Actor { actor, format } => {
-            let target = resolve_actor(actor).cloned().unwrap_or(Value::Null);
+            // **M1**: prefer the server-side `inspect.actor` envelope (includes
+            // the last 30 actor-category events for the target). Falls back to
+            // observe.once if the server hasn't implemented inspect.actor.
+            let payload = if let Some(id) = actor {
+                session
+                    .send_request("inspect.actor", json!({"target": id.to_string()}))
+                    .await
+                    .ok()
+            } else {
+                session
+                    .send_request("inspect.actor", json!({"target": "player"}))
+                    .await
+                    .ok()
+            };
+            let target = payload.unwrap_or_else(|| resolve_actor(actor).cloned().unwrap_or(Value::Null));
             (target, format)
         }
         InspectAction::Chassis { actor, format } => {
@@ -970,11 +991,19 @@ async fn cmd_inspect(
                 .unwrap_or(Value::Null);
             (target, format)
         }
+        InspectAction::Equipment { preset_id, format } => {
+            // **M1 Gap A5**: full RifleSpec via inspect.equipment.
+            let payload = session
+                .send_request("inspect.equipment", json!({"preset_id": preset_id}))
+                .await
+                .unwrap_or(Value::Null);
+            (payload, format)
+        }
     };
     let (payload, format) = output;
     match format {
-        OutputFormat::Json => println!("{}", serde_json::to_string(&payload).unwrap()),
-        OutputFormat::Pretty => println!("{}", serde_json::to_string_pretty(&payload).unwrap()),
+        OutputFormat::Json => println!("{}", serde_json::to_string(&payload).unwrap_or_default()),
+        OutputFormat::Pretty => println!("{}", serde_json::to_string_pretty(&payload).unwrap_or_default()),
     }
     session.close().await?;
     Ok(())

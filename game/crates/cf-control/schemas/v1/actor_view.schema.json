@@ -13,6 +13,12 @@
       "maxItems": 2,
       "minItems": 2
     },
+    "bloom_factor": {
+      "description": "**M1**: most-recent reticle bloom factor (`Soldat Sprites.pas:4870`).",
+      "type": "number",
+      "format": "float",
+      "default": 1.0
+    },
     "body_silhouette": {
       "description": "M4A: per-zone body silhouette projection (head/torso/arms/legs hp%).\n**M5**: `placeholder=false` when sourced from a real chassis body graph;\n`placeholder=true` for legacy actors without a chassis.",
       "$ref": "#/$defs/BodySilhouetteView",
@@ -49,6 +55,13 @@
       "type": "boolean",
       "default": false
     },
+    "dying_dwell_ticks_remaining": {
+      "description": "**M1**: DYING dwell ticks remaining (CCCP `Actor.cpp:1229`).",
+      "type": "integer",
+      "format": "uint32",
+      "default": 0,
+      "minimum": 0
+    },
     "hp": {
       "type": "number",
       "format": "float"
@@ -63,6 +76,24 @@
       "minimum": 0
     },
     "jet_active": {
+      "type": "boolean",
+      "default": false
+    },
+    "knockdown_ticks_remaining": {
+      "description": "**M1**: knockdown recovery ticks remaining (0 when not stunned).",
+      "type": "integer",
+      "format": "uint32",
+      "default": 0,
+      "minimum": 0
+    },
+    "mass_kg": {
+      "description": "**M1**: physical mass (kg). Drives mass_factor in physics + stability cost.",
+      "type": "number",
+      "format": "float",
+      "default": 80.0
+    },
+    "mission_critical": {
+      "description": "**M1**: mission_critical flag (caps damage at DOWNED when true).",
       "type": "boolean",
       "default": false
     },
@@ -90,6 +121,12 @@
       },
       "maxItems": 2,
       "minItems": 2
+    },
+    "recoil_accumulator": {
+      "description": "**M1**: alternating-recoil accumulator value (CCCP `HDFirearm.cpp:891`).",
+      "type": "number",
+      "format": "float",
+      "default": 0.0
     },
     "rifle_ammo": {
       "type": [
@@ -138,6 +175,24 @@
       "type": "integer",
       "format": "uint32",
       "minimum": 0
+    },
+    "sharp_aim_progress": {
+      "description": "**M1**: sharp-aim progress (0..1).",
+      "type": "number",
+      "format": "float",
+      "default": 0.0
+    },
+    "stability": {
+      "description": "**M1**: stability scalar (0.0 = disrupted, 1.0 = solid).",
+      "type": "number",
+      "format": "float",
+      "default": 1.0
+    },
+    "stability_recovery_rate": {
+      "description": "**M1**: per-tick stability recovery rate.",
+      "type": "number",
+      "format": "float",
+      "default": 0.019999999552965164
     },
     "stance": {
       "description": "M4A: derived stance label (idle/walking/running/airborne/downed/dead/...).\n`cfctl observe` consumers + AI agents read this without a screenshot.",
