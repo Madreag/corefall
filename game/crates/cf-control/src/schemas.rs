@@ -293,6 +293,39 @@ pub struct ActInputCaptureControlsParams {
     pub capturer: Option<String>,
 }
 
+/// **M2**: `act.player.toggle_material_overlay` — cycle / set the HUD
+/// material overlay mode. `mode = None` cycles through
+/// off → integrity → pathability → mobility → hazard → build_repair → off.
+/// `mode = Some("...")` sets explicitly. Emits `ux.overlay_mode_changed`.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActToggleMaterialOverlayParams {
+    #[serde(default)]
+    pub schema_version: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mode: Option<String>,
+}
+
+/// **M2**: `inspect.terrain.chunk` — return the full chunk material grid
+/// plus dirty rect, last_modified_tick, and chunk_checksum for the
+/// requested chunk coord.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct InspectTerrainChunkParams {
+    pub schema_version: u32,
+    pub x: i32,
+    pub y: i32,
+}
+
+/// **M2**: `inspect.material.<id>` — return the full MaterialDef for the
+/// given id (resolved against the canonical launch set).
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct InspectMaterialParams {
+    pub schema_version: u32,
+    pub id: u8,
+}
+
 fn default_true() -> bool {
     true
 }
@@ -367,6 +400,9 @@ pub fn dump_v1() -> BTreeMap<String, String> {
         entry::<ActMissionPauseParams>("act_mission_pause_params"),
         entry::<ActMissionResumeParams>("act_mission_resume_params"),
         entry::<ActInputCaptureControlsParams>("act_input_capture_controls_params"),
+        entry::<ActToggleMaterialOverlayParams>("act_toggle_material_overlay_params"),
+        entry::<InspectTerrainChunkParams>("inspect_terrain_chunk_params"),
+        entry::<InspectMaterialParams>("inspect_material_params"),
         entry::<RunBundleWriteParams>("run_bundle_write_params"),
         entry::<SystemShutdownParams>("system_shutdown_params"),
         entry::<SettingsPatch>("settings_patch"),

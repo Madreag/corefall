@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "InspectTerrainChunkParams",
+  "description": "**M2**: `inspect.terrain.chunk` — return the full chunk material grid\nplus dirty rect, last_modified_tick, and chunk_checksum for the\nrequested chunk coord.",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "x": {
+      "type": "integer",
+      "format": "int32"
+    },
+    "y": {
+      "type": "integer",
+      "format": "int32"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "x",
+    "y"
+  ]
+}

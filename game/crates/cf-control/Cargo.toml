@@ -28,6 +28,7 @@ cf-equipment = { path = "../cf-equipment" }
 cf-chassis = { path = "../cf-chassis" }
 cf-mission = { path = "../cf-mission" }
 cf-terrain = { path = "../cf-terrain" }
+cf-material = { path = "../cf-material" }
 cf-ai = { path = "../cf-ai" }
 cf-audio = { path = "../cf-audio" }
 

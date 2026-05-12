@@ -126,6 +126,10 @@ pub struct ObjectiveView {
 /// M2 chunked terrain projection. Per-material pixel counts let cfctl + AI
 /// hooks query "how much air do we have left?" without pulling the full
 /// snapshot. Carve / refusal / dirty counters expose perf health.
+///
+/// M2 extension: `current_overlay_mode`, `total_carve_events`, and
+/// `total_debris_spawned` surface the 5-mode overlay state + cumulative
+/// debris counter for `observe.terrain` + the material legend HUD.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 pub struct TerrainView {
     pub width_px: u32,
@@ -137,6 +141,21 @@ pub struct TerrainView {
     pub dirty_chunk_count: u32,
     pub allocated_chunk_count: u32,
     pub material_counts: std::collections::BTreeMap<String, u64>,
+    /// **M2**: active material-overlay mode ("off" by default). Cycled via
+    /// `act.player.toggle_material_overlay`. One of `off`, `integrity`,
+    /// `pathability`, `mobility`, `hazard`, `build_repair`.
+    #[serde(default = "default_overlay_mode")]
+    pub current_overlay_mode: String,
+    /// **M2**: cumulative carve event count emitted this run.
+    #[serde(default)]
+    pub total_carve_events: u64,
+    /// **M2**: cumulative debris pixels spawned this run.
+    #[serde(default)]
+    pub total_debris_spawned: u64,
+}
+
+fn default_overlay_mode() -> String {
+    "off".to_string()
 }
 
 /// M2.5 reactor projection. Drives the HUD reactor-hp bar + the cfctl

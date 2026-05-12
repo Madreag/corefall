@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "InspectMaterialParams",
+  "description": "**M2**: `inspect.material.<id>` — return the full MaterialDef for the\ngiven id (resolved against the canonical launch set).",
+  "type": "object",
+  "properties": {
+    "id": {
+      "type": "integer",
+      "format": "uint8",
+      "maximum": 255,
+      "minimum": 0
+    },
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "id"
+  ]
+}

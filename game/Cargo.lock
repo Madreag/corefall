@@ -1514,6 +1514,7 @@ dependencies = [
  "cf-audio",
  "cf-chassis",
  "cf-equipment",
+ "cf-material",
  "cf-mission",
  "cf-physics",
  "cf-replay",
@@ -1588,6 +1589,8 @@ name = "cf-material"
 version = "0.0.1"
 dependencies = [
  "serde",
+ "serde_json",
+ "thiserror 2.0.18",
  "tracing",
 ]
 
@@ -1607,6 +1610,7 @@ version = "0.0.1"
 dependencies = [
  "anyhow",
  "cf-control",
+ "cf-material",
  "cf-replay",
  "clap",
  "ron",
@@ -1770,6 +1774,7 @@ version = "0.0.1"
 dependencies = [
  "bevy",
  "cf-actor",
+ "cf-terrain",
  "serde",
  "tracing",
 ]

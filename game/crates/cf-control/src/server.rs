@@ -409,6 +409,11 @@ pub enum ControlCommand {
         capturer: Option<String>,
         source: IntentSource,
     },
+    /// **M2**: cycle / set the material overlay mode.
+    ActToggleMaterialOverlay {
+        mode: Option<String>,
+        source: IntentSource,
+    },
     SettingsSet {
         changes: SettingsPatch,
     },
@@ -440,6 +445,16 @@ pub trait EngineHandle: Send + Sync + 'static {
     /// **M1 Gap B3**: return the actor view plus its last `n` actor-category
     /// events. Default returns `None`.
     async fn inspect_actor(&self, _target: Option<&str>, _last_n_events: usize) -> Option<serde_json::Value> {
+        None
+    }
+    /// **M2**: return the full chunk material grid (RLE-friendly Vec) for the
+    /// requested chunk coord. Default returns `None`.
+    async fn inspect_terrain_chunk(&self, _cx: i32, _cy: i32) -> Option<serde_json::Value> {
+        None
+    }
+    /// **M2**: return the full MaterialDef for the requested id. Default
+    /// returns `None`.
+    async fn inspect_material(&self, _id: u8) -> Option<serde_json::Value> {
         None
     }
 }
@@ -1193,6 +1208,39 @@ async fn process_request<E: EngineHandle>(
                 Some(value) => Some(success_response(request.id, value)),
                 None => Some(invalid_param_reason(request.id, "unknown_preset_id")),
             }
+        }
+        "inspect.terrain.chunk" => {
+            let p: crate::schemas::InspectTerrainChunkParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            match engine.inspect_terrain_chunk(p.x, p.y).await {
+                Some(value) => Some(success_response(request.id, value)),
+                None => Some(invalid_param_reason(request.id, "terrain_unavailable")),
+            }
+        }
+        "inspect.material" => {
+            let p: crate::schemas::InspectMaterialParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            match engine.inspect_material(p.id).await {
+                Some(value) => Some(success_response(request.id, value)),
+                None => Some(invalid_param_reason(request.id, "unknown_material_id")),
+            }
+        }
+        "act.player.toggle_material_overlay" => {
+            let p: crate::schemas::ActToggleMaterialOverlayParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActToggleMaterialOverlay {
+                    mode: p.mode,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
         }
         "observe.actor" => {
             let p: ObserveActorParams = match serde_json::from_value(params) {

@@ -1286,7 +1286,7 @@
       ]
     },
     "TerrainView": {
-      "description": "M2 chunked terrain projection. Per-material pixel counts let cfctl + AI\nhooks query \"how much air do we have left?\" without pulling the full\nsnapshot. Carve / refusal / dirty counters expose perf health.",
+      "description": "M2 chunked terrain projection. Per-material pixel counts let cfctl + AI\nhooks query \"how much air do we have left?\" without pulling the full\nsnapshot. Carve / refusal / dirty counters expose perf health.\n\nM2 extension: `current_overlay_mode`, `total_carve_events`, and\n`total_debris_spawned` surface the 5-mode overlay state + cumulative\ndebris counter for `observe.terrain` + the material legend HUD.",
       "type": "object",
       "properties": {
         "allocated_chunk_count": {
@@ -1307,6 +1307,11 @@
           "type": "integer",
           "format": "uint64",
           "minimum": 0
+        },
+        "current_overlay_mode": {
+          "description": "**M2**: active material-overlay mode (\"off\" by default). Cycled via\n`act.player.toggle_material_overlay`. One of `off`, `integrity`,\n`pathability`, `mobility`, `hazard`, `build_repair`.",
+          "type": "string",
+          "default": "off"
         },
         "default_material": {
           "type": "string"
@@ -1332,6 +1337,20 @@
         "refusal_count": {
           "type": "integer",
           "format": "uint64",
+          "minimum": 0
+        },
+        "total_carve_events": {
+          "description": "**M2**: cumulative carve event count emitted this run.",
+          "type": "integer",
+          "format": "uint64",
+          "default": 0,
+          "minimum": 0
+        },
+        "total_debris_spawned": {
+          "description": "**M2**: cumulative debris pixels spawned this run.",
+          "type": "integer",
+          "format": "uint64",
+          "default": 0,
           "minimum": 0
         },
         "width_px": {

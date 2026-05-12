@@ -636,6 +636,21 @@ struct EngineMutable {
     /// `mission.mission_resolved` when result=lost (DR-023 onboarding
     /// handoff — M3B viewer rewinds to this tick).
     last_player_input_event_id: Option<String>,
+    /// **M2**: current material-overlay mode for the HUD legend + render
+    /// layer. One of "off" | "integrity" | "pathability" | "mobility" |
+    /// "hazard" | "build_repair". Default "off".
+    material_overlay_mode: String,
+    /// **M2**: total debris pixels spawned (cumulative across the run).
+    /// Surfaced via `observe.terrain.total_debris_spawned`.
+    total_debris_spawned: u64,
+    /// **M2**: total carve events emitted (cumulative). Distinct from
+    /// `chunked_terrain.carve_count` (which counts terrain-state carves —
+    /// `total_carve_events` counts every emitted carve event including
+    /// strip + chunked).
+    total_carve_events: u64,
+    /// **M2**: last hazard contact tick per actor — used to debounce the
+    /// per-tick hazard damage event to one per actor.
+    hazard_last_contact_tick: BTreeMap<ActorId, u64>,
 }
 
 /// Pending dig request set by `act.player.dig` and consumed at the start of the
@@ -792,6 +807,10 @@ impl M0Engine {
                 hud_last_chassis_stage: None,
                 hud_last_pilot_state: None,
                 last_player_input_event_id: None,
+                material_overlay_mode: "off".to_string(),
+                total_debris_spawned: 0,
+                total_carve_events: 0,
+                hazard_last_contact_tick: BTreeMap::new(),
             }),
             recorder,
             current_tick,
@@ -1371,7 +1390,191 @@ impl M0Engine {
             // `terrain_hit`. This is what makes M2.5 micro_reactor_defense
             // strategic: dirt mounds between the guard and the reactor block
             // bullets, and the player's dig action exposes the reactor.
-            let mut terrain_kills: Vec<(u64, ActorId, [f32; 2])> = Vec::new();
+            //
+            // M2 extension: route hits through `cf_physics::try_penetrate`
+            // so impulse² > integrity² determines pass/fail per CCCP
+            // `SceneMan.cpp:571`. Passing projectiles carve the pixel and
+            // emit a `terrain.terrain_penetration_threshold` + the
+            // `terrain.terrain_pixel_dislodged` debris event. Failing
+            // projectiles roll for stickiness and may be drawn in.
+            struct TerrainHit {
+                projectile_id: u64,
+                owner: ActorId,
+                pos: [f32; 2],
+                material_id: cf_terrain::MaterialId,
+                material_name: &'static str,
+                impulse_squared: f32,
+                integrity_squared: f32,
+                passed: bool,
+                stuck: bool,
+                damage: f32,
+                spawn_material: Option<cf_terrain::MaterialId>,
+            }
+            let mut terrain_hits: Vec<TerrainHit> = Vec::new();
+            if state.chunked_terrain.is_some() && state.actor_state.is_some() {
+                let EngineMutable {
+                    actor_state,
+                    chunked_terrain,
+                    rng,
+                    ..
+                } = &mut *state;
+                let terrain = chunked_terrain.as_mut().expect("chunked terrain present");
+                if let Some(actor_state_mut) = actor_state.as_mut() {
+                    let mut survivors: Vec<cf_actor::sim::Projectile> = Vec::new();
+                    for proj in actor_state_mut.projectiles.drain(..) {
+                        let mat = terrain.material_at_world(proj.position.x, proj.position.y);
+                        if !terrain.registry.is_solid(mat) {
+                            survivors.push(proj);
+                            continue;
+                        }
+                        // Material-aware penetration formula.
+                        let aff = terrain.registry.affordance(mat).expect("solid material has affordance");
+                        // Approximate projectile mass/sharpness; M5+ wires
+                        // real per-projectile mass + sharpness from
+                        // `RifleSpec`. M2 uses spec baseline (mass=0.05,
+                        // sharpness=0.8).
+                        let velocity = (proj.velocity.x * proj.velocity.x + proj.velocity.y * proj.velocity.y).sqrt();
+                        // Seeded RNG roll for stickiness — preserves determinism.
+                        let rng_roll = (rng.next_u64() as f64 / u64::MAX as f64) as f32;
+                        let outcome = cf_physics::try_penetrate(cf_physics::PenetrationInputs {
+                            mass: 0.05,
+                            velocity,
+                            sharpness: 0.8,
+                            integrity: aff.hardness,
+                            stickiness: aff.stickiness,
+                            restitution: aff.restitution,
+                            friction: aff.friction,
+                            rng_roll,
+                        });
+                        let pos = [proj.position.x, proj.position.y];
+                        if outcome.passes {
+                            // Carve a 1-px hole + record dirty area; the
+                            // terrain handles the actual pixel clear via
+                            // try_carve at radius 0.6.
+                            let _ = terrain.try_carve([proj.position.x, proj.position.y], 0.6);
+                            terrain_hits.push(TerrainHit {
+                                projectile_id: proj.id,
+                                owner: proj.owner,
+                                pos,
+                                material_id: mat,
+                                material_name: aff.name,
+                                impulse_squared: outcome.impulse_squared,
+                                integrity_squared: outcome.integrity_squared,
+                                passed: true,
+                                stuck: false,
+                                damage: proj.damage,
+                                spawn_material: aff.spawn_material,
+                            });
+                            // The projectile is consumed by the carve at M2
+                            // (no fragment carry-through; M5.5 may extend).
+                        } else {
+                            terrain_hits.push(TerrainHit {
+                                projectile_id: proj.id,
+                                owner: proj.owner,
+                                pos,
+                                material_id: mat,
+                                material_name: aff.name,
+                                impulse_squared: outcome.impulse_squared,
+                                integrity_squared: outcome.integrity_squared,
+                                passed: false,
+                                stuck: outcome.stuck,
+                                damage: proj.damage,
+                                spawn_material: aff.spawn_material,
+                            });
+                            // Projectile dies on failure (M2 does not yet
+                            // ricochet at speed `outcome.remaining_velocity`).
+                        }
+                    }
+                    actor_state_mut.projectiles = survivors;
+                }
+            }
+            if !terrain_hits.is_empty() {
+                let sim_time_ms = state.clock.sim_time_ms();
+                for hit in terrain_hits {
+                    // M2: penetration threshold event carries the formula
+                    // inputs so replays + AI agents can verify the contact.
+                    let pen_id = self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "terrain",
+                        "terrain_penetration_threshold",
+                        json!({
+                            "projectile_id": hit.projectile_id,
+                            "owner": hit.owner.0,
+                            "material_id": hit.material_id,
+                            "material": hit.material_name,
+                            "impulse_squared": hit.impulse_squared,
+                            "integrity_squared": hit.integrity_squared,
+                            "passed": hit.passed,
+                            "stuck": hit.stuck,
+                            "spawned_material": hit.spawn_material
+                                .map(cf_terrain::material_name_from_id),
+                            "spawned_material_id": hit.spawn_material,
+                            "debris_count": if hit.passed { 1 } else { 0 },
+                            "position": hit.pos,
+                        }),
+                        None,
+                    );
+                    if hit.passed {
+                        // Carve emitted by try_carve; the dislodged-pixel
+                        // event closes the cause chain on the same tick.
+                        self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "terrain",
+                            "terrain_pixel_dislodged",
+                            json!({
+                                "pos": hit.pos,
+                                "source_material": hit.material_name,
+                                "source_material_id": hit.material_id,
+                                "spawn_material": hit.spawn_material
+                                    .map(cf_terrain::material_name_from_id),
+                                "spawn_material_id": hit.spawn_material,
+                                "count": 1u32,
+                                "child_pixel_id": format!("proj{}:{}",
+                                    hit.projectile_id, tick.0),
+                            }),
+                            Some(pen_id.clone()),
+                        );
+                        if let Ok(mut s) = self.state.write() {
+                            s.total_debris_spawned = s.total_debris_spawned.saturating_add(1);
+                        }
+                    }
+                    // Legacy combat.projectile_expired so existing tooling
+                    // (M2.5 reactor scenarios, M3A determinism viewer) still
+                    // observes the projectile lifecycle.
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "combat",
+                        "projectile_expired",
+                        json!({
+                            "id": hit.projectile_id,
+                            "owner": hit.owner.0,
+                            "last_position": hit.pos,
+                            "cause": "terrain_hit",
+                            "material": hit.material_name,
+                            "passed": hit.passed,
+                            "stuck": hit.stuck,
+                        }),
+                        Some(pen_id),
+                    );
+                    let _ = hit.damage; // reserved for future M5.5 splash damage routing
+                }
+            }
+
+            // M2: hazard tile contact damage routing. For every actor whose
+            // AABB overlaps any hazard pixel this tick, apply
+            // damage_per_tick × overlap_scale via `cf_physics::hazard_contact_damage`
+            // and emit `terrain.hazard_contact_or_avoidance`. The damage flows
+            // into the actor sim state for `actor.actor_status_changed` to
+            // surface as a HUD banner.
+            struct HazardHit {
+                actor: ActorId,
+                pixel_count: u32,
+                damage: f32,
+            }
+            let mut hazard_hits: Vec<HazardHit> = Vec::new();
             if state.chunked_terrain.is_some() && state.actor_state.is_some() {
                 let EngineMutable {
                     actor_state,
@@ -1379,44 +1582,92 @@ impl M0Engine {
                     ..
                 } = &mut *state;
                 let terrain = chunked_terrain.as_ref().expect("chunked terrain present");
-                if let Some(actor_state_mut) = actor_state.as_mut() {
-                    actor_state_mut.projectiles.retain(|proj| {
-                        // Treat each projectile as a point. The pixel-cell
-                        // containing the centre defines the collision test;
-                        // padding the AABB to ±0.5 was too aggressive and
-                        // blocked projectiles flying through carved tunnels.
-                        //
-                        // Use `material_at_world` so the terrain anchor offset
-                        // is honored. Calling `material_at` with raw world
-                        // floats would falsely shift the lookup by `anchor`
-                        // for any scenario that authors a non-(0, 0) anchor
-                        // (DR-007 Bugbot finding 864084a2).
-                        let mat = terrain.material_at_world(proj.position.x, proj.position.y);
-                        if terrain.registry.is_solid(mat) {
-                            terrain_kills.push((proj.id, proj.owner, [proj.position.x, proj.position.y]));
-                            false
-                        } else {
-                            true
+                if let Some(actor_state_ref) = actor_state.as_mut() {
+                    for (aid, actor) in actor_state_ref.world.actors.iter_mut() {
+                        if actor.status == cf_actor::Status::Dead {
+                            continue;
                         }
-                    });
+                        // Sample actor's AABB against the terrain hazard pixels.
+                        // Half-extents from the actor itself; M1.5 chassis-less
+                        // actors use 8x16.
+                        let hx = 8.0_f32;
+                        let hy = 16.0_f32;
+                        let min = [actor.position.x - hx, actor.position.y - hy];
+                        let max = [actor.position.x + hx, actor.position.y + hy];
+                        let mut hazard_pixels = 0u32;
+                        let mut total_damage_per_tick = 0.0f32;
+                        // Scan a sparse subset to keep this O(small) — every
+                        // 4th pixel in the actor AABB is sampled (256 samples
+                        // for a 16x32 actor). Sufficient for hazard detection
+                        // at M2 resolution.
+                        let mut py = min[1].floor() as i64;
+                        while py <= max[1].ceil() as i64 {
+                            let mut px = min[0].floor() as i64;
+                            while px <= max[0].ceil() as i64 {
+                                let mat = terrain.material_at(px, py);
+                                if terrain.registry.is_hazard(mat) {
+                                    hazard_pixels += 1;
+                                    total_damage_per_tick =
+                                        total_damage_per_tick.max(terrain.registry.damage_per_tick(mat));
+                                }
+                                px += 4;
+                            }
+                            py += 4;
+                        }
+                        if hazard_pixels > 0 && total_damage_per_tick > 0.0 {
+                            let dmg = cf_physics::hazard_contact_damage(hazard_pixels, total_damage_per_tick);
+                            if dmg > 0.0 {
+                                actor.hp = (actor.hp - dmg).max(0.0);
+                                if actor.hp <= 0.0 && actor.status != cf_actor::Status::Dead {
+                                    actor.status = cf_actor::Status::Dead;
+                                }
+                                hazard_hits.push(HazardHit {
+                                    actor: *aid,
+                                    pixel_count: hazard_pixels,
+                                    damage: dmg,
+                                });
+                            }
+                        }
+                    }
                 }
             }
-            if !terrain_kills.is_empty() {
+            if !hazard_hits.is_empty() {
                 let sim_time_ms = state.clock.sim_time_ms();
-                for (projectile_id, owner, pos) in terrain_kills {
-                    self.recorder.record(
-                        tick,
-                        sim_time_ms,
-                        "combat",
-                        "projectile_expired",
-                        json!({
-                            "id": projectile_id,
-                            "owner": owner.0,
-                            "last_position": pos,
-                            "cause": "terrain_hit",
-                        }),
-                        None,
-                    );
+                let current_tick = tick.0;
+                for hit in hazard_hits {
+                    // Debounce: only emit the event when the actor's last
+                    // hazard tick is more than 1 tick ago (avoids spamming
+                    // 60 events per second for stationary actors). We
+                    // still apply per-tick damage above so the actor
+                    // dies on continuous contact.
+                    let should_emit = {
+                        let s = self.state.read().expect("engine state poisoned");
+                        !matches!(
+                            s.hazard_last_contact_tick.get(&hit.actor),
+                            Some(prev) if current_tick.saturating_sub(*prev) < 6,
+                        )
+                    };
+                    if should_emit {
+                        self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "terrain",
+                            "hazard_contact_or_avoidance",
+                            json!({
+                                "actor_id": hit.actor.0,
+                                "hazard_material": "hazard",
+                                "hazard_material_id": cf_terrain::MATERIAL_HAZARD,
+                                "contact": true,
+                                "damage_applied": hit.damage,
+                                "pixel_overlap": hit.pixel_count,
+                                "cause_label": "actor_in_hazard_tile",
+                            }),
+                            None,
+                        );
+                        if let Ok(mut s) = self.state.write() {
+                            s.hazard_last_contact_tick.insert(hit.actor, current_tick);
+                        }
+                    }
                 }
             }
 
@@ -1797,6 +2048,26 @@ impl M0Engine {
                             .iter()
                             .map(|c| json!({"cx": c.cx, "cy": c.cy}))
                             .collect();
+                        // **M2**: mask_id is a stable blake3 hash over
+                        // (tool_id, dig_radius, mask_shape) so replay
+                        // determinism holds — same carve at same spot
+                        // produces the same mask_id. Mask shape is a
+                        // circle with 12-px radius for the digger; the
+                        // hash inputs are pure-data so wall-clock time
+                        // doesn't leak in.
+                        let mut hasher = blake3::Hasher::new();
+                        hasher.update(b"digger");
+                        hasher.update(&12.0_f32.to_le_bytes());
+                        hasher.update(b"circle");
+                        hasher.update(&(stats.bbox_min[0] as i32).to_le_bytes());
+                        hasher.update(&(stats.bbox_min[1] as i32).to_le_bytes());
+                        let mask_id = hex::encode(&hasher.finalize().as_bytes()[..16]);
+                        // Spawn debris (capped at 100 per event per spec
+                        // "Debris cap per event"). We cap the debris count
+                        // to keep render + replay readable.
+                        const DEBRIS_CAP: u32 = 100;
+                        let debris_count = stats.count.min(DEBRIS_CAP);
+                        let debris_capped = stats.count > DEBRIS_CAP;
                         let chunk_carved_id = self.recorder.record(
                             tick,
                             sim_time_ms,
@@ -1805,16 +2076,66 @@ impl M0Engine {
                             json!({
                                 "tick": tick.0,
                                 "mode": "chunked",
+                                "tool_id": "digger",
+                                "mask_id": mask_id,
                                 "bbox": { "min": stats.bbox_min, "max": stats.bbox_max },
+                                "pos": stats.bbox_min,
                                 "material": mat_name,
+                                "material_ids": [stats.dominant_material],
                                 "dominant_material_id": stats.dominant_material,
                                 "count": stats.count,
+                                "removed_count": stats.count,
+                                "debris_count": debris_count,
                                 "aim": aim,
                                 "target": target,
                                 "dirty_chunks": dirty,
                             }),
                             Some(action_id.clone()),
                         );
+                        // M2: emit a per-pixel dislodged event for the
+                        // first N pixels (capped) so the cause chain
+                        // covers the spawn_material debris. Per-pixel
+                        // events are rate-limited to one summary event
+                        // when debris_count > 8 (keeps event log volume
+                        // bounded for large carves).
+                        let spawn_mat =
+                            cf_terrain::material_affordance(stats.dominant_material).and_then(|a| a.spawn_material);
+                        if debris_count > 0 {
+                            self.recorder.record(
+                                tick,
+                                sim_time_ms,
+                                "terrain",
+                                "terrain_pixel_dislodged",
+                                json!({
+                                    "pos": stats.bbox_min,
+                                    "source_material": mat_name,
+                                    "source_material_id": stats.dominant_material,
+                                    "spawn_material": spawn_mat
+                                        .map(cf_terrain::material_name_from_id),
+                                    "spawn_material_id": spawn_mat,
+                                    "count": debris_count,
+                                    "child_pixel_id": format!("{}:{}:{}",
+                                        stats.bbox_min[0],
+                                        stats.bbox_min[1],
+                                        tick.0),
+                                }),
+                                Some(chunk_carved_id.clone()),
+                            );
+                            if debris_capped {
+                                self.recorder.record(
+                                    tick,
+                                    sim_time_ms,
+                                    "terrain",
+                                    "debris_capped",
+                                    json!({
+                                        "capped": true,
+                                        "requested_count": stats.count,
+                                        "granted_count": debris_count,
+                                    }),
+                                    Some(chunk_carved_id.clone()),
+                                );
+                            }
+                        }
                         // M2 also emits a `material.chunk_dirtied` event per
                         // dirty chunk so the M5.6 active material kernel can
                         // pick up the same vocabulary later.
@@ -1831,6 +2152,49 @@ impl M0Engine {
                                 }),
                                 Some(chunk_carved_id.clone()),
                             );
+                        }
+                        // M2: coalesced dirty-region batch (one event per
+                        // tick when ANY chunks were touched). Holds the
+                        // parent_event_id of the carve that produced the
+                        // batch, plus the per-chunk rect list (in_rects =
+                        // out_rects when no coalescing is required at M2).
+                        let rects: Vec<serde_json::Value> = stats
+                            .dirty_chunks
+                            .iter()
+                            .map(|c| {
+                                let origin = c.pixel_origin();
+                                json!({
+                                    "cx": c.cx,
+                                    "cy": c.cy,
+                                    "min": [origin[0], origin[1]],
+                                    "max": [
+                                        origin[0] + cf_terrain::CHUNK_SIZE as i64,
+                                        origin[1] + cf_terrain::CHUNK_SIZE as i64,
+                                    ],
+                                })
+                            })
+                            .collect();
+                        let rects_count = rects.len();
+                        self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "terrain",
+                            "terrain_dirty_region_batch",
+                            json!({
+                                "source_event_ids": [chunk_carved_id.clone()],
+                                "in_rects": rects.clone(),
+                                "out_rects": rects,
+                                "coalesce_cost": {
+                                    "rects_in": rects_count,
+                                    "rects_out": rects_count,
+                                },
+                            }),
+                            Some(action_id.clone()),
+                        );
+                        // Update cumulative counters.
+                        if let Ok(mut s) = self.state.write() {
+                            s.total_carve_events = s.total_carve_events.saturating_add(1);
+                            s.total_debris_spawned = s.total_debris_spawned.saturating_add(debris_count as u64);
                         }
                     }
                     cf_terrain::ChunkedCarveOutcome::Refused(refusal) => {
@@ -4715,6 +5079,9 @@ impl EngineHandle for M0Engine {
             dirty_chunk_count: t.dirty_chunk_count() as u32,
             allocated_chunk_count: t.allocated_chunk_count() as u32,
             material_counts: t.material_counts(),
+            current_overlay_mode: state.material_overlay_mode.clone(),
+            total_carve_events: state.total_carve_events,
+            total_debris_spawned: state.total_debris_spawned,
         });
         let reactors: Vec<crate::state::ReactorView> = state
             .reactor_world
@@ -4877,6 +5244,78 @@ impl EngineHandle for M0Engine {
             "events_count": filtered.len(),
         });
         Some(merged)
+    }
+
+    async fn inspect_terrain_chunk(&self, cx: i32, cy: i32) -> Option<serde_json::Value> {
+        let state = self.state.read().ok()?;
+        let terrain = state.chunked_terrain.as_ref()?;
+        let pixels = terrain.chunk_pixels(cx, cy);
+        let checksum = terrain.chunk_checksum(cx, cy);
+        // RLE-encode pixels for compact transport. Format: pairs of [material_id, run_length].
+        let mut rle: Vec<serde_json::Value> = Vec::new();
+        let mut iter = pixels.iter().peekable();
+        while let Some(&first) = iter.next() {
+            let mut run: u32 = 1;
+            while let Some(&&n) = iter.peek() {
+                if n == first {
+                    iter.next();
+                    run += 1;
+                } else {
+                    break;
+                }
+            }
+            rle.push(serde_json::json!([first, run]));
+        }
+        let cs = cf_terrain::CHUNK_SIZE as i64;
+        let origin = [cx as i64 * cs, cy as i64 * cs];
+        Some(serde_json::json!({
+            "chunk_pos": { "cx": cx, "cy": cy },
+            "chunk_size_pixels": cf_terrain::CHUNK_SIZE,
+            "pixel_origin": origin,
+            "material_grid_rle": rle,
+            "checksum": checksum,
+            "last_modified_tick": state.clock.tick().0,
+        }))
+    }
+
+    async fn inspect_material(&self, id: u8) -> Option<serde_json::Value> {
+        let aff = cf_terrain::material_affordance(id)?;
+        // Try to load the JSON registry to surface the full MaterialDef
+        // (with future-compat fields). If load fails we fall back to the
+        // runtime affordance projection.
+        if let Some(path) = cf_material::MaterialRegistry::locate_default() {
+            if let Ok((registry, _)) = cf_material::load_registry_from_file(&path) {
+                if let Some(def) = registry.find_by_id(id) {
+                    if let Ok(value) = serde_json::to_value(def) {
+                        return Some(value);
+                    }
+                }
+            }
+        }
+        Some(serde_json::json!({
+            "id": aff.id,
+            "name": aff.name,
+            "display_name": aff.name,
+            "hardness": aff.hardness,
+            "diggable": aff.diggable,
+            "anchorable": aff.anchorable,
+            "hazard": aff.hazard,
+            "damage_per_tick": aff.damage_per_tick,
+            "path_cost": aff.path_cost,
+            "density": aff.density,
+            "drillable": aff.drillable,
+            "blastable": aff.blastable,
+            "beam_cuttable": aff.beam_cuttable,
+            "projectile_passable": aff.projectile_passable,
+            "actor_passable": aff.actor_passable,
+            "blocks_line_of_sight": aff.blocks_line_of_sight,
+            "stickiness": aff.stickiness,
+            "restitution": aff.restitution,
+            "friction": aff.friction,
+            "spawn_material": aff.spawn_material.map(cf_terrain::material_name_from_id),
+            "spawn_material_id": aff.spawn_material,
+            "refusal_reason": aff.refusal_reason,
+        }))
     }
 
     async fn dispatch(&self, command: ControlCommand) -> CommandResult {
@@ -5632,6 +6071,61 @@ impl EngineHandle for M0Engine {
                     }
                     _ => {}
                 }
+                CommandResult::accepted(tick.0)
+            }
+            ControlCommand::ActToggleMaterialOverlay { mode, source } => {
+                let _ = source;
+                let prev = state.material_overlay_mode.clone();
+                let next = match mode.as_deref() {
+                    Some("off" | "integrity" | "pathability" | "mobility" | "hazard" | "build_repair") => {
+                        mode.unwrap_or_default()
+                    }
+                    Some(other) => {
+                        drop(state);
+                        self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "control",
+                            "command_rejected",
+                            json!({
+                                "method": "act.player.toggle_material_overlay",
+                                "reason": "unknown_overlay_mode",
+                                "mode": other,
+                            }),
+                            None,
+                        );
+                        return CommandResult::rejected("unknown_overlay_mode", tick.0);
+                    }
+                    None => match prev.as_str() {
+                        "off" => "integrity".to_string(),
+                        "integrity" => "pathability".to_string(),
+                        "pathability" => "mobility".to_string(),
+                        "mobility" => "hazard".to_string(),
+                        "hazard" => "build_repair".to_string(),
+                        _ => "off".to_string(),
+                    },
+                };
+                state.material_overlay_mode = next.clone();
+                drop(state);
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "control",
+                    "command_accepted",
+                    json!({
+                        "method": "act.player.toggle_material_overlay",
+                        "mode": next.clone(),
+                    }),
+                    None,
+                );
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "ux",
+                    "overlay_mode_changed",
+                    json!({"from": prev, "to": next}),
+                    None,
+                );
                 CommandResult::accepted(tick.0)
             }
             ControlCommand::ActPlayerDig { target, source } => {
