@@ -1,0 +1,13 @@
+{
+  "description": "M2 hazard contact: spawn the player on a hazard tile in m2_debug_strip and verify terrain.hazard_contact_or_avoidance fires with damage_applied > 0 and actor HP drops.",
+  "scenario": "m2_debug_strip",
+  "tick_rate_hz": 60,
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+    { "method": "act.player.move", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 320 } },
+    { "method": "act.player.move", "params": { "x": 0.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 30 } },
+    { "method": "observe.once", "params": {} }
+  ]
+}

@@ -1,0 +1,22 @@
+{
+  "description": "M2 overlay cycle: invoke act.player.toggle_material_overlay 6 times against the m2_debug_strip scene and verify the legend transitions off -> integrity -> pathability -> mobility -> hazard -> build_repair -> off via ux.overlay_mode_changed events.",
+  "scenario": "m2_debug_strip",
+  "tick_rate_hz": 60,
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
+    { "method": "act.player.toggle_material_overlay", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
+    { "method": "act.player.toggle_material_overlay", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
+    { "method": "act.player.toggle_material_overlay", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
+    { "method": "act.player.toggle_material_overlay", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
+    { "method": "act.player.toggle_material_overlay", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
+    { "method": "act.player.toggle_material_overlay", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
+    { "method": "observe.once", "params": {} }
+  ]
+}
