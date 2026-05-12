@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/terrain_penetration_threshold.v1",
+  "title": "terrain.terrain_penetration_threshold",
+  "description": "Projectile-vs-pixel contact decision. Carries the formula inputs (impulse², integrity²) so replays + AI agents can verify pass/fail per CCCP SceneMan.cpp:571.",
+  "type": "object",
+  "required": ["projectile_id", "material_id", "passed", "impulse_squared", "integrity_squared"],
+  "properties": {
+    "projectile_id": { "type": "integer", "minimum": 0 },
+    "owner": { "type": "integer", "minimum": 0 },
+    "material_id": { "type": "integer", "minimum": 0 },
+    "material": { "type": "string" },
+    "impulse_squared": { "type": "number", "minimum": 0 },
+    "integrity_squared": { "type": "number", "minimum": 0 },
+    "passed": { "type": "boolean" },
+    "stuck": { "type": "boolean" },
+    "spawned_material": { "type": ["string", "null"] },
+    "spawned_material_id": { "type": ["integer", "null"], "minimum": 0 },
+    "debris_count": { "type": "integer", "minimum": 0 },
+    "position": { "type": "array", "minItems": 2, "maxItems": 2 }
+  }
+}

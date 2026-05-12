@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/terrain_dirty_region_batch.v1",
+  "title": "terrain.terrain_dirty_region_batch",
+  "description": "Per-tick coalesced dirty-region batch. One event per tick when ANY chunks were touched. Holds the source event ids that contributed and the in/out rect counts.",
+  "type": "object",
+  "required": ["source_event_ids", "in_rects", "out_rects", "coalesce_cost"],
+  "properties": {
+    "source_event_ids": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "in_rects": { "type": "array" },
+    "out_rects": { "type": "array" },
+    "coalesce_cost": {
+      "type": "object",
+      "required": ["rects_in", "rects_out"],
+      "properties": {
+        "rects_in": { "type": "integer", "minimum": 0 },
+        "rects_out": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

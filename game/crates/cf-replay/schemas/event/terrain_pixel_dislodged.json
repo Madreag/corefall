@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/terrain_pixel_dislodged.v1",
+  "title": "terrain.terrain_pixel_dislodged",
+  "description": "One (or more) terrain pixel(s) dislodged into spawn_material debris. Parent cause is terrain.terrain_carved (or terrain.terrain_penetration_threshold for projectile-driven dislodgement).",
+  "type": "object",
+  "required": ["pos", "source_material_id", "count"],
+  "properties": {
+    "pos": { "type": "array", "minItems": 2, "maxItems": 2 },
+    "source_material": { "type": "string" },
+    "source_material_id": { "type": "integer", "minimum": 0 },
+    "spawn_material": { "type": ["string", "null"] },
+    "spawn_material_id": { "type": ["integer", "null"], "minimum": 0 },
+    "count": { "type": "integer", "minimum": 0 },
+    "child_pixel_id": { "type": "string" }
+  }
+}

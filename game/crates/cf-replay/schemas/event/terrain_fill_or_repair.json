@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/terrain_fill_or_repair.v1",
+  "title": "terrain.terrain_fill_or_repair",
+  "description": "One fill / repair operation (paints repair_fill into air or replaces a soft material). Parent cause is the operator's tool action.",
+  "type": "object",
+  "required": ["target_material_id", "pos", "bbox"],
+  "properties": {
+    "source_material_id": { "type": ["integer", "null"], "minimum": 0 },
+    "source_material": { "type": ["string", "null"] },
+    "target_material_id": { "type": "integer", "minimum": 0 },
+    "target_material": { "type": "string" },
+    "pos": { "type": "array", "minItems": 2, "maxItems": 2 },
+    "bbox": { "type": ["object", "array"] },
+    "integrity_delta": { "type": "number" },
+    "count": { "type": "integer", "minimum": 0 }
+  }
+}

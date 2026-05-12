@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/hazard_contact_or_avoidance.v1",
+  "title": "terrain.hazard_contact_or_avoidance",
+  "description": "Actor contact (or avoidance) with a hazard pixel. Routes per-tick damage and surfaces the cause_label for the HUD.",
+  "type": "object",
+  "required": ["actor_id", "hazard_material_id", "contact"],
+  "properties": {
+    "actor_id": { "type": "integer", "minimum": 0 },
+    "hazard_material": { "type": "string" },
+    "hazard_material_id": { "type": "integer", "minimum": 0 },
+    "contact": { "type": "boolean" },
+    "damage_applied": { "type": "number", "minimum": 0 },
+    "pixel_overlap": { "type": "integer", "minimum": 0 },
+    "cause_label": { "type": "string" }
+  }
+}

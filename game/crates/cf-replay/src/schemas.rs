@@ -32,6 +32,14 @@ const SCHEMA_PROJECTILE_SPAWNED: &str = include_str!("../schemas/event/projectil
 const SCHEMA_WOUND_ADDED: &str = include_str!("../schemas/event/wound_added.json");
 const SCHEMA_INVENTORY_DROPPED: &str = include_str!("../schemas/event/inventory_dropped.json");
 const SCHEMA_ALARM_REGISTERED: &str = include_str!("../schemas/event/alarm_registered.json");
+const SCHEMA_TERRAIN_CARVED: &str = include_str!("../schemas/event/terrain_carved.json");
+const SCHEMA_TERRAIN_PENETRATION_THRESHOLD: &str = include_str!("../schemas/event/terrain_penetration_threshold.json");
+const SCHEMA_TERRAIN_DIRTY_REGION_BATCH: &str = include_str!("../schemas/event/terrain_dirty_region_batch.json");
+const SCHEMA_TERRAIN_PIXEL_DISLODGED: &str = include_str!("../schemas/event/terrain_pixel_dislodged.json");
+const SCHEMA_HAZARD_CONTACT_OR_AVOIDANCE: &str = include_str!("../schemas/event/hazard_contact_or_avoidance.json");
+const SCHEMA_ANCHOR_MATERIAL_RESULT: &str = include_str!("../schemas/event/anchor_material_result.json");
+const SCHEMA_TERRAIN_MATERIAL_PROBE: &str = include_str!("../schemas/event/terrain_material_probe.json");
+const SCHEMA_TERRAIN_FILL_OR_REPAIR: &str = include_str!("../schemas/event/terrain_fill_or_repair.json");
 
 /// Look up the schema source by `(category, event_type)`. Returns `None` if
 /// no schema exists for this pair (callers treat as "no validation
@@ -45,6 +53,14 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("combat", "wound_added") => Some(SCHEMA_WOUND_ADDED),
         ("actor", "inventory_dropped") => Some(SCHEMA_INVENTORY_DROPPED),
         ("equipment", "alarm_registered") => Some(SCHEMA_ALARM_REGISTERED),
+        ("terrain", "terrain_carved") => Some(SCHEMA_TERRAIN_CARVED),
+        ("terrain", "terrain_penetration_threshold") => Some(SCHEMA_TERRAIN_PENETRATION_THRESHOLD),
+        ("terrain", "terrain_dirty_region_batch") => Some(SCHEMA_TERRAIN_DIRTY_REGION_BATCH),
+        ("terrain", "terrain_pixel_dislodged") => Some(SCHEMA_TERRAIN_PIXEL_DISLODGED),
+        ("terrain", "hazard_contact_or_avoidance") => Some(SCHEMA_HAZARD_CONTACT_OR_AVOIDANCE),
+        ("terrain", "anchor_material_result") => Some(SCHEMA_ANCHOR_MATERIAL_RESULT),
+        ("terrain", "terrain_material_probe") => Some(SCHEMA_TERRAIN_MATERIAL_PROBE),
+        ("terrain", "terrain_fill_or_repair") => Some(SCHEMA_TERRAIN_FILL_OR_REPAIR),
         _ => None,
     }
 }
@@ -179,11 +195,43 @@ mod tests {
             ("combat", "wound_added"),
             ("actor", "inventory_dropped"),
             ("equipment", "alarm_registered"),
+            ("terrain", "terrain_carved"),
+            ("terrain", "terrain_penetration_threshold"),
+            ("terrain", "terrain_dirty_region_batch"),
+            ("terrain", "terrain_pixel_dislodged"),
+            ("terrain", "hazard_contact_or_avoidance"),
+            ("terrain", "anchor_material_result"),
+            ("terrain", "terrain_material_probe"),
+            ("terrain", "terrain_fill_or_repair"),
         ] {
             let raw = event_schema_for(cat, ty).unwrap_or_else(|| panic!("no schema for {cat}.{ty}"));
             let _parsed: RawSchema =
                 serde_json::from_str(raw).unwrap_or_else(|e| panic!("schema parse error for {cat}.{ty}: {e}"));
         }
+    }
+
+    #[test]
+    fn terrain_carved_event_validates_minimum_payload() {
+        let payload = json!({
+            "bbox": { "min": [0, 0], "max": [10, 10] },
+            "count": 12u32,
+            "removed_count": 12u32,
+            "debris_count": 12u32,
+            "material_ids": [1u32],
+        });
+        validate_event_payload("terrain", "terrain_carved", &payload).expect("valid payload");
+    }
+
+    #[test]
+    fn terrain_penetration_threshold_event_validates() {
+        let payload = json!({
+            "projectile_id": 7u32,
+            "material_id": 1u32,
+            "passed": true,
+            "impulse_squared": 256.0,
+            "integrity_squared": 100.0,
+        });
+        validate_event_payload("terrain", "terrain_penetration_threshold", &payload).expect("valid");
     }
 
     #[test]

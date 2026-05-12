@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/terrain_carved.v1",
+  "title": "terrain.terrain_carved",
+  "description": "One successful terrain carve. Parent cause is act.player.dig (via terrain.tool_action_started); descendants are terrain.terrain_pixel_dislodged (per debris batch) and terrain.terrain_dirty_region_batch (per tick).",
+  "type": "object",
+  "required": ["bbox", "count", "removed_count"],
+  "properties": {
+    "tool_id": { "type": ["string", "null"] },
+    "mask_id": { "type": ["string", "null"] },
+    "mode": { "type": "string", "enum": ["strip", "chunked"] },
+    "bbox": {
+      "type": ["object", "array"]
+    },
+    "pos": { "type": "array", "minItems": 2, "maxItems": 2 },
+    "material": { "type": ["string", "null"] },
+    "material_ids": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 0 }
+    },
+    "dominant_material_id": { "type": ["integer", "null"], "minimum": 0 },
+    "count": { "type": "integer", "minimum": 0 },
+    "removed_count": { "type": "integer", "minimum": 0 },
+    "debris_count": { "type": "integer", "minimum": 0 },
+    "aim": { "type": ["array", "null"], "minItems": 2, "maxItems": 2 },
+    "target": { "type": ["array", "null"], "minItems": 2, "maxItems": 2 },
+    "dirty_chunks": { "type": "array" },
+    "tick": { "type": "integer", "minimum": 0 }
+  }
+}

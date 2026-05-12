@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/anchor_material_result.v1",
+  "title": "terrain.anchor_material_result",
+  "description": "Outcome of an anchor / tether placement against a material. M2 placeholder; the tool that consumes it ships at BP4+.",
+  "type": "object",
+  "required": ["material_id", "result"],
+  "properties": {
+    "actor_id": { "type": ["integer", "null"], "minimum": 0 },
+    "tool_id": { "type": "string" },
+    "material_id": { "type": "integer", "minimum": 0 },
+    "material": { "type": "string" },
+    "point": { "type": "array", "minItems": 2, "maxItems": 2 },
+    "result": { "type": "string", "enum": ["accepted", "refused"] },
+    "reason": { "type": ["string", "null"] }
+  }
+}

@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/terrain_material_probe.v1",
+  "title": "terrain.terrain_material_probe",
+  "description": "A tool / actor probed the terrain at a point to read its material id (e.g. dig-validity ghost preview, AI route check).",
+  "type": "object",
+  "required": ["material_id", "sampled_point"],
+  "properties": {
+    "actor_id": { "type": ["integer", "null"], "minimum": 0 },
+    "tool_id": { "type": ["string", "null"] },
+    "material_id": { "type": "integer", "minimum": 0 },
+    "material": { "type": "string" },
+    "sampled_point": { "type": "array", "minItems": 2, "maxItems": 2 },
+    "overlay_mode": { "type": "string" },
+    "result_label": { "type": ["string", "null"] }
+  }
+}
