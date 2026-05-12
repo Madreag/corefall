@@ -26,6 +26,11 @@
           "format": "float",
           "default": 1500.0
         },
+        "ai_debug": {
+          "description": "**M1.5**: when true, cf-ui renders a floating intent label above\nevery reactive guard (\"ALERT: heard_shot\", \"ENGAGED\", \"RELOADING\").\nToggled via `--ai-debug` CLI flag on cf-app and `act.settings.set\n{ ai_debug: true }` through cfctl.",
+          "type": "boolean",
+          "default": false
+        },
         "ai_difficulty": {
           "description": "**M1.5 G6**: active AI difficulty preset id. Engine applies the\nmatching `cf-ai::DifficultyPreset` to every `ReactiveGuard` whenever\nthis changes.",
           "type": "string",

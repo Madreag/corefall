@@ -192,6 +192,11 @@ pub struct SettingsPatch {
     /// every `ReactiveGuard` in the world.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ai_difficulty: Option<String>,
+    /// **M1.5**: AI debug overlay. `true` raises the floating intent label
+    /// above every reactive guard; `false` hides it. Defaults to current
+    /// state when omitted (Option-based settings patch).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ai_debug: Option<bool>,
 }
 
 impl SettingsPatch {
@@ -216,6 +221,7 @@ impl SettingsPatch {
             && self.sharp_aim_build_ticks.is_none()
             && self.walk_threshold.is_none()
             && self.ai_difficulty.is_none()
+            && self.ai_debug.is_none()
     }
 
     pub fn validation_error(&self) -> Option<String> {

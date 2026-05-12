@@ -176,6 +176,12 @@ pub struct Settings {
     /// this changes.
     #[serde(default = "default_ai_difficulty")]
     pub ai_difficulty: String,
+    /// **M1.5**: when true, cf-ui renders a floating intent label above
+    /// every reactive guard ("ALERT: heard_shot", "ENGAGED", "RELOADING").
+    /// Toggled via `--ai-debug` CLI flag on cf-app and `act.settings.set
+    /// { ai_debug: true }` through cfctl.
+    #[serde(default)]
+    pub ai_debug: bool,
 }
 
 fn default_ai_difficulty() -> String {
@@ -319,6 +325,7 @@ impl Default for Settings {
             sharp_aim_build_ticks: default_sharp_aim_build_ticks(),
             walk_threshold: default_walk_threshold(),
             ai_difficulty: default_ai_difficulty(),
+            ai_debug: false,
         }
     }
 }

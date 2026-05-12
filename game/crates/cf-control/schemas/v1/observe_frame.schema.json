@@ -814,6 +814,11 @@
           "format": "uint32",
           "minimum": 0
         },
+        "intent_label": {
+          "description": "**M1.5**: human-readable intent label combining guard state + last\ntactic (\"ALERT: heard_shot\", \"ENGAGED\", \"RELOADING\", \"STUCK:\nblocked\"). cf-ui surfaces this above the guard sprite when\n`Settings.ai_debug == true`.",
+          "type": "string",
+          "default": ""
+        },
         "last_tactic": {
           "type": "string"
         },
@@ -821,6 +826,20 @@
           "type": "integer",
           "format": "uint32",
           "minimum": 0
+        },
+        "position": {
+          "description": "**M1.5**: guard's last-known world position, copied from the actor\nworld so the `--ai-debug` floating intent label can anchor at the\nsprite. Optional (None when the actor world isn't loaded).",
+          "type": [
+            "array",
+            "null"
+          ],
+          "default": null,
+          "items": {
+            "type": "number",
+            "format": "float"
+          },
+          "maxItems": 2,
+          "minItems": 2
         },
         "reload_remaining_ticks": {
           "type": "integer",
@@ -1138,6 +1157,11 @@
           "type": "number",
           "format": "float",
           "default": 1500.0
+        },
+        "ai_debug": {
+          "description": "**M1.5**: when true, cf-ui renders a floating intent label above\nevery reactive guard (\"ALERT: heard_shot\", \"ENGAGED\", \"RELOADING\").\nToggled via `--ai-debug` CLI flag on cf-app and `act.settings.set\n{ ai_debug: true }` through cfctl.",
+          "type": "boolean",
+          "default": false
         },
         "ai_difficulty": {
           "description": "**M1.5 G6**: active AI difficulty preset id. Engine applies the\nmatching `cf-ai::DifficultyPreset` to every `ReactiveGuard` whenever\nthis changes.",

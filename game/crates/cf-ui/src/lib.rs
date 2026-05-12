@@ -86,6 +86,12 @@ pub struct HudSettings {
     /// M4A: id of the currently-focused HUD node (drives the visible focus
     /// ring). `None` when focus is cleared (default + after F1).
     pub focused_node: Option<String>,
+    /// **M1.5**: when true, the AI debug overlay renders a floating
+    /// intent label above every reactive guard. When false the overlay
+    /// is hidden (default). cf-app forwards the `--ai-debug` CLI flag
+    /// into this field; `act.settings.set { ai_debug: ... }` mutates it
+    /// at runtime.
+    pub ai_debug: bool,
 }
 
 impl Default for HudSettings {
@@ -101,6 +107,7 @@ impl Default for HudSettings {
             hold_threshold_ms: 250,
             key_remap_enabled: false,
             focused_node: None,
+            ai_debug: false,
         }
     }
 }
@@ -193,6 +200,14 @@ pub struct HudEnemy {
     pub hp: f32,
     pub hp_max: f32,
     pub status: String,
+    /// **M1.5**: floating intent label rendered above the guard's sprite
+    /// when `HudSettings.ai_debug == true`. Empty string when no label is
+    /// available.
+    pub intent_label: String,
+    /// **M1.5**: world position of the guard (in scene coords) so the
+    /// floating label can be projected onto the HUD overlay. `None` when
+    /// the engine did not provide a position.
+    pub world_position: Option<[f32; 2]>,
 }
 
 /// M1.5 nearest-breach summary.
@@ -1202,6 +1217,21 @@ pub fn enemy_line(enemy: Option<&HudEnemy>) -> String {
     )
 }
 
+/// **M1.5**: format the floating AI debug intent label rendered above the
+/// guard sprite when `Settings.ai_debug == true`. Returns `None` when the
+/// overlay is disabled OR no enemy is available so cf-app can despawn the
+/// text node. Acceptance criterion 'AI debug labels'.
+pub fn ai_debug_label(enemy: Option<&HudEnemy>, settings: &HudSettings) -> Option<String> {
+    if !settings.ai_debug {
+        return None;
+    }
+    let e = enemy?;
+    if e.intent_label.is_empty() {
+        return None;
+    }
+    Some(e.intent_label.clone())
+}
+
 /// Format the breach summary line.
 pub fn breach_line(breach: Option<&HudBreach>) -> String {
     let Some(b) = breach else {
@@ -1501,10 +1531,50 @@ mod tests {
             hp: 50.0,
             hp_max: 80.0,
             status: "stable".to_string(),
+            intent_label: String::new(),
+            world_position: None,
         };
         let s = enemy_line(Some(&e));
         assert!(s.contains("ENGAGED"));
         assert!(s.contains("attack_target"));
         assert!(s.contains("hp=50/80"));
+    }
+
+    #[test]
+    fn ai_debug_label_hidden_when_flag_off() {
+        let enemy = HudEnemy {
+            intent_label: "ENGAGED: ATTACK".to_string(),
+            ..Default::default()
+        };
+        let settings = HudSettings {
+            ai_debug: false,
+            ..Default::default()
+        };
+        assert_eq!(ai_debug_label(Some(&enemy), &settings), None);
+    }
+
+    #[test]
+    fn ai_debug_label_renders_when_flag_on() {
+        let enemy = HudEnemy {
+            intent_label: "ALERT: SEARCH".to_string(),
+            ..Default::default()
+        };
+        let settings = HudSettings {
+            ai_debug: true,
+            ..Default::default()
+        };
+        assert_eq!(
+            ai_debug_label(Some(&enemy), &settings),
+            Some("ALERT: SEARCH".to_string())
+        );
+    }
+
+    #[test]
+    fn ai_debug_label_hidden_when_no_enemy() {
+        let settings = HudSettings {
+            ai_debug: true,
+            ..Default::default()
+        };
+        assert_eq!(ai_debug_label(None, &settings), None);
     }
 }

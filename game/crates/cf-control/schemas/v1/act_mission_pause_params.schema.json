@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ActMissionPauseParams",
+  "description": "**M1.5**: `act.mission.pause` — suspend mission objective progress +\ntimer accounting (tutorial-modal pause path). Idempotent: invoking\ntwice in a row only emits one `mission.objective_paused` event.",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "default": 0,
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false
+}

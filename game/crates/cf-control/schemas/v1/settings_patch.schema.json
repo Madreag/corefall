@@ -11,6 +11,13 @@
       ],
       "format": "float"
     },
+    "ai_debug": {
+      "description": "**M1.5**: AI debug overlay. `true` raises the floating intent label\nabove every reactive guard; `false` hides it. Defaults to current\nstate when omitted (Option-based settings patch).",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
     "ai_difficulty": {
       "description": "**M1.5 G6**: AI difficulty preset id. Valid values:\n`\"cakewalk\" | \"tough_crowd\" | \"veteran\"`. The engine looks up the\npreset in `cf-ai::DifficultyPreset::builtin(id)` and applies it to\nevery `ReactiveGuard` in the world.",
       "type": [

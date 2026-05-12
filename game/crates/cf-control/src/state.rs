@@ -168,6 +168,17 @@ pub struct EnemyView {
     pub aim_settle_remaining_ticks: u32,
     pub alert_dwell_remaining_ticks: u32,
     pub aim: [f32; 2],
+    /// **M1.5**: guard's last-known world position, copied from the actor
+    /// world so the `--ai-debug` floating intent label can anchor at the
+    /// sprite. Optional (None when the actor world isn't loaded).
+    #[serde(default)]
+    pub position: Option<[f32; 2]>,
+    /// **M1.5**: human-readable intent label combining guard state + last
+    /// tactic ("ALERT: heard_shot", "ENGAGED", "RELOADING", "STUCK:
+    /// blocked"). cf-ui surfaces this above the guard sprite when
+    /// `Settings.ai_debug == true`.
+    #[serde(default)]
+    pub intent_label: String,
 }
 
 /// Public projection of one actor for the observe envelope. Mirrors

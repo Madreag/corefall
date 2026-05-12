@@ -45,6 +45,8 @@ SCRIPTS=(
   "ai_h_01_sentry_hears_threat:\"kind\":\"hearing\":60,120"
   "m1_5_difficulty_cakewalk:\"ai_difficulty\":\"cakewalk\":60"
   "m1_5_difficulty_veteran:\"ai_difficulty\":\"veteran\":60"
+  "m1_5_pause_resume:\"event_type\":\"objective_paused\":60"
+  "m1_5_ai_debug:\"ai_debug\":true:60"
 )
 
 OUT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/cf-m1-5-determinism-XXXXXX")"

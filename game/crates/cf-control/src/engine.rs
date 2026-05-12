@@ -3281,10 +3281,16 @@ impl M0Engine {
             enemies: Vec::new(),
         };
         for guard in state.reactive_guards.values() {
+            let position = state
+                .actor_state
+                .as_ref()
+                .and_then(|sim| sim.world.actors.get(&guard.actor).map(|a| [a.position.x, a.position.y]));
             snapshot.enemies.push(EnemyHudView {
                 actor: guard.actor.0,
                 state: guard.state.as_str().to_string(),
                 last_tactic: guard.last_tactic.as_str().to_string(),
+                intent_label: ai_intent_label(guard),
+                position,
             });
         }
         if let Some(sim) = state.actor_state.as_ref() {
@@ -3564,6 +3570,14 @@ pub struct EnemyHudView {
     pub actor: u64,
     pub state: String,
     pub last_tactic: String,
+    /// **M1.5**: floating AI debug intent label ("ALERT: heard_shot",
+    /// "ENGAGED", "RELOADING"). cf-app surfaces this above the guard's
+    /// sprite when `Settings.ai_debug == true`.
+    pub intent_label: String,
+    /// **M1.5**: world position of the guard at observation time so the
+    /// AI debug label can anchor to the sprite. `None` when the actor
+    /// world isn't loaded yet (boot).
+    pub position: Option<[f32; 2]>,
 }
 
 /// M1.5: render-side projection of a breach strip.
@@ -3783,6 +3797,35 @@ fn build_module_strip_view(
 /// keyboard focus traversal system.
 fn hud_focusable_nodes() -> Vec<String> {
     HUD_FOCUSABLE_NODES.iter().map(|s| (*s).to_string()).collect()
+}
+
+/// **M1.5**: compose the AI-debug intent label rendered above the guard
+/// sprite when `Settings.ai_debug == true`. Format mirrors the spec text
+/// ("ALERT: heard_shot", "ENGAGED", "RELOADING", "STUCK: blocked"). The
+/// label is also produced when ai_debug is disabled so the run bundle
+/// is identical regardless of overlay state — cf-ui simply hides the
+/// element when the flag is off.
+fn ai_intent_label(guard: &cf_ai::ReactiveGuard) -> String {
+    let state_label = match guard.state {
+        cf_ai::GuardState::Idle => "IDLE",
+        cf_ai::GuardState::Alert => "ALERT",
+        cf_ai::GuardState::Engaged => "ENGAGED",
+        cf_ai::GuardState::Retreating => "RETREATING",
+        cf_ai::GuardState::Dying => "DYING",
+        cf_ai::GuardState::Dead => "DEAD",
+    };
+    if guard.reload_remaining_ticks > 0 {
+        return format!("{state_label}: RELOADING");
+    }
+    if guard.stuck_recovery_latched {
+        return format!("{state_label}: STUCK");
+    }
+    match guard.last_tactic {
+        cf_ai::Tactic::Attack => format!("{state_label}: ATTACK"),
+        cf_ai::Tactic::Search => format!("{state_label}: SEARCH"),
+        cf_ai::Tactic::Reload => format!("{state_label}: RELOAD"),
+        cf_ai::Tactic::Hold => state_label.to_string(),
+    }
 }
 
 fn build_mission_view(state: &cf_mission::MissionState, current_tick: u64) -> crate::state::MissionView {
@@ -4459,6 +4502,12 @@ fn apply_settings_patch(settings: &mut Settings, patch: &SettingsPatch) -> Vec<S
             changed.push("ai_difficulty".to_string());
         }
     }
+    if let Some(v) = patch.ai_debug {
+        if settings.ai_debug != v {
+            settings.ai_debug = v;
+            changed.push("ai_debug".to_string());
+        }
+    }
     changed
 }
 
@@ -4583,17 +4632,28 @@ impl EngineHandle for M0Engine {
         let enemies: Vec<crate::state::EnemyView> = state
             .reactive_guards
             .values()
-            .map(|g| crate::state::EnemyView {
-                actor: g.actor.0,
-                state: g.state.as_str().to_string(),
-                last_tactic: g.last_tactic.as_str().to_string(),
-                ammo: g.ammo_in_mag,
-                mag_capacity: g.params.mag_capacity,
-                fire_cooldown_ticks: g.fire_cooldown_ticks,
-                reload_remaining_ticks: g.reload_remaining_ticks,
-                aim_settle_remaining_ticks: g.aim_settle_remaining_ticks,
-                alert_dwell_remaining_ticks: g.alert_dwell_remaining_ticks,
-                aim: g.aim,
+            .map(|g| {
+                let position = state.actor_state.as_ref().and_then(|sim| {
+                    sim.world
+                        .actors
+                        .get(&g.actor)
+                        .map(|a| [a.position.x, a.position.y])
+                });
+                let intent_label = ai_intent_label(g);
+                crate::state::EnemyView {
+                    actor: g.actor.0,
+                    state: g.state.as_str().to_string(),
+                    last_tactic: g.last_tactic.as_str().to_string(),
+                    ammo: g.ammo_in_mag,
+                    mag_capacity: g.params.mag_capacity,
+                    fire_cooldown_ticks: g.fire_cooldown_ticks,
+                    reload_remaining_ticks: g.reload_remaining_ticks,
+                    aim_settle_remaining_ticks: g.aim_settle_remaining_ticks,
+                    alert_dwell_remaining_ticks: g.alert_dwell_remaining_ticks,
+                    aim: g.aim,
+                    position,
+                    intent_label,
+                }
             })
             .collect();
         let terrain = state.chunked_terrain.as_ref().map(|t| crate::state::TerrainView {

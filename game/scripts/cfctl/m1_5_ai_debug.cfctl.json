@@ -1,0 +1,14 @@
+{
+  "description": "M1.5 --ai-debug round-trip: act.settings.set { ai_debug: true } then walk close to the guard so it enters Engaged. observe.once captures settings.ai_debug=true AND enemies[0].intent_label updates (e.g. 'ENGAGED: ATTACK'). The label updates every tick via the engine snapshot.",
+  "scenario": "micro_breach",
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+    { "method": "act.settings.set", "params": { "ai_debug": true } },
+    { "method": "act.player.aim", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "act.player.move", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 240 } },
+    { "method": "act.player.move", "params": { "x": 0.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 12 } },
+    { "method": "observe.once", "params": {} }
+  ]
+}

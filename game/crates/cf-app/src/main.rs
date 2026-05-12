@@ -157,6 +157,13 @@ struct Cli {
     /// Use windowed-hidden mode (default) for now.
     #[arg(long)]
     headless_capture: bool,
+    /// **M1.5**: AI debug overlay. When set, cf-ui draws a floating
+    /// intent label above every reactive guard's world position with the
+    /// guard's current state + tactic ("ALERT: heard_shot", "ENGAGED",
+    /// "RELOADING"). The label updates every tick. Without the flag the
+    /// overlay is hidden. Acceptance criterion 'AI debug labels'.
+    #[arg(long)]
+    ai_debug: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -509,6 +516,7 @@ fn build_config(cli: &Cli, scenario_path: PathBuf) -> Result<M0EngineConfig> {
             sharp_aim_build_ticks: 30,
             walk_threshold: 1.5,
             ai_difficulty: "tough_crowd".to_string(),
+            ai_debug: cli.ai_debug,
         },
         seed_override: cli.seed,
         duration_ticks_override: if cli_duration > 0 { Some(cli_duration) } else { None },
@@ -1978,6 +1986,7 @@ fn sync_actor_state_to_render(
         hold_threshold_ms: live_settings.hold_threshold_ms,
         key_remap_enabled: live_settings.key_remap_enabled,
         focused_node: hud_caches.focused_node.clone(),
+        ai_debug: live_settings.ai_debug,
     };
     if (hud_settings.ui_scale - next_settings.ui_scale).abs() > f32::EPSILON
         || hud_settings.high_contrast != next_settings.high_contrast
@@ -1989,6 +1998,7 @@ fn sync_actor_state_to_render(
         || hud_settings.hold_threshold_ms != next_settings.hold_threshold_ms
         || hud_settings.key_remap_enabled != next_settings.key_remap_enabled
         || hud_settings.focused_node != next_settings.focused_node
+        || hud_settings.ai_debug != next_settings.ai_debug
     {
         *hud_settings = next_settings;
     }
@@ -2142,6 +2152,10 @@ fn sync_actor_state_to_render(
             hp: a.hp,
             hp_max: a.hp_max,
             status: a.status.clone(),
+            intent_label: enemy_view
+                .map(|e| e.intent_label.clone())
+                .unwrap_or_default(),
+            world_position: enemy_view.and_then(|e| e.position).or(Some(a.position)),
         }
     });
 
