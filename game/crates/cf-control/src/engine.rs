@@ -631,6 +631,11 @@ struct EngineMutable {
     hud_last_chassis_stage: Option<cf_chassis::ChassisStage>,
     /// **M5**: previous tick's pilot state.
     hud_last_pilot_state: Option<cf_chassis::PilotState>,
+    /// **M1.5**: latest `input.intent_received` event_id from the player.
+    /// Used as the `show_me_why_event_id` anchor on
+    /// `mission.mission_resolved` when result=lost (DR-023 onboarding
+    /// handoff — M3B viewer rewinds to this tick).
+    last_player_input_event_id: Option<String>,
 }
 
 /// Pending dig request set by `act.player.dig` and consumed at the start of the
@@ -786,6 +791,7 @@ impl M0Engine {
                 hud_focus_cycle: 0,
                 hud_last_chassis_stage: None,
                 hud_last_pilot_state: None,
+                last_player_input_event_id: None,
             }),
             recorder,
             current_tick,
@@ -1977,7 +1983,32 @@ impl M0Engine {
                 let payload = match result {
                     cf_mission::MissionResult::Won => json!({"result": "won"}),
                     cf_mission::MissionResult::Lost { reason } => {
-                        json!({"result": "lost", "loss_reason": reason.as_str()})
+                        // **M1.5**: DR-023 "Show me why" replay handoff —
+                        // attach show_me_why_event_id pointing at the player's
+                        // last input.intent_received event (the divergence
+                        // anchor M3B's replay viewer rewinds to). cf-ui surfaces
+                        // a CTA button when this id is present. Also latched
+                        // into MissionState so observe.once.mission carries
+                        // the CTA flag without re-walking events.jsonl.
+                        let show_me_why = self
+                            .state
+                            .read()
+                            .ok()
+                            .and_then(|s| s.last_player_input_event_id.clone());
+                        if let Ok(mut s) = self.state.write() {
+                            if let Some(mission) = s.mission.as_mut() {
+                                mission.show_me_why_event_id = show_me_why.clone();
+                                mission.show_replay_cta = show_me_why.is_some();
+                            }
+                        }
+                        let mut p = json!({"result": "lost", "loss_reason": reason.as_str()});
+                        if let Some(id) = show_me_why {
+                            if let Some(obj) = p.as_object_mut() {
+                                obj.insert("show_me_why_event_id".into(), json!(id));
+                                obj.insert("show_replay_cta".into(), json!(true));
+                            }
+                        }
+                        p
                     }
                     cf_mission::MissionResult::Active => json!({"result": "active"}),
                     cf_mission::MissionResult::Aborted => json!({"result": "aborted"}),
@@ -2484,6 +2515,11 @@ impl M0Engine {
         let intent_event_id = self
             .recorder
             .record(tick, sim_time_ms, "input", "intent_received", player_view, None);
+        // **M1.5**: track latest input event_id for the mission_resolved
+        // "show_me_why" replay-handoff anchor (DR-023).
+        if let Ok(mut s) = self.state.write() {
+            s.last_player_input_event_id = Some(intent_event_id.clone());
+        }
 
         for outcome in &report.actor_outcomes {
             // **M1.5 G8**: the dedicated dying-dwell-elapsed path below emits
@@ -3347,6 +3383,8 @@ impl M0Engine {
                     .active_objective_index()
                     .map(|i| mission.objectives[i].id.clone()),
                 last_event_label: mission.last_event_label.clone(),
+                show_me_why_event_id: mission.show_me_why_event_id.clone(),
+                show_replay_cta: mission.show_replay_cta,
             });
             // Surface the first `ReachZone` so cf-render-2d can draw the extraction zone.
             for obj in &mission.objectives {
@@ -3608,6 +3646,11 @@ pub struct MissionHudView {
     pub ticks_remaining: Option<u64>,
     pub active_objective: Option<String>,
     pub last_event_label: String,
+    /// **M1.5**: DR-023 "Show me why" replay-handoff anchor surfaced
+    /// for the mission-resolved modal. cf-ui renders the CTA button
+    /// when `show_replay_cta == true`.
+    pub show_me_why_event_id: Option<String>,
+    pub show_replay_cta: bool,
 }
 
 /// M1.5: extraction zone for the renderer.
@@ -3855,6 +3898,8 @@ fn build_mission_view(state: &cf_mission::MissionState, current_tick: u64) -> cr
         objectives,
         last_event_tick: view.last_event_tick,
         last_event_label: view.last_event_label,
+        show_me_why_event_id: view.show_me_why_event_id,
+        show_replay_cta: view.show_replay_cta,
     }
 }
 

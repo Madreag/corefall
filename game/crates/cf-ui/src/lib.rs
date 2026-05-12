@@ -190,6 +190,13 @@ pub struct HudMission {
     pub ticks_remaining: Option<u64>,
     pub active_objective: Option<String>,
     pub last_event_label: String,
+    /// **M1.5**: DR-023 "Show me why" replay-handoff anchor for the
+    /// mission-resolved modal. cf-ui surfaces a CTA button when
+    /// `show_replay_cta` is true; the click handler hands the
+    /// `show_me_why_event_id` to M3B's replay viewer (M3B owns the
+    /// viewer; integration tested at BP3 close).
+    pub show_me_why_event_id: Option<String>,
+    pub show_replay_cta: bool,
 }
 
 /// M1.5 nearest-enemy summary.
@@ -1232,6 +1239,19 @@ pub fn ai_debug_label(enemy: Option<&HudEnemy>, settings: &HudSettings) -> Optio
     Some(e.intent_label.clone())
 }
 
+/// **M1.5**: spec says the mission-resolved modal renders a "Show me why"
+/// CTA button when the mission was lost. Returns the divergence event_id
+/// the CTA should hand to M3B's replay viewer when clicked, or `None` if
+/// the CTA should be hidden. Acceptance criterion 'Win/loss outcome modal
+/// with "show me why" (DR-023 handoff)'.
+pub fn show_replay_cta_event_id(mission: Option<&HudMission>) -> Option<String> {
+    let m = mission?;
+    if !m.show_replay_cta {
+        return None;
+    }
+    m.show_me_why_event_id.clone()
+}
+
 /// Format the breach summary line.
 pub fn breach_line(breach: Option<&HudBreach>) -> String {
     let Some(b) = breach else {
@@ -1330,6 +1350,8 @@ mod tests {
             ticks_remaining: Some(5340),
             active_objective: Some("breach".to_string()),
             last_event_label: "mission_started".to_string(),
+            show_me_why_event_id: None,
+            show_replay_cta: false,
         };
         assert_eq!(mission_line(Some(&m), 60), "MISSION: ACTIVE  1.0s / 90s");
     }
@@ -1576,5 +1598,36 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(ai_debug_label(None, &settings), None);
+    }
+
+    #[test]
+    fn show_replay_cta_hidden_for_won_mission() {
+        let mission = HudMission {
+            result: "won".to_string(),
+            show_replay_cta: false,
+            show_me_why_event_id: None,
+            ..Default::default()
+        };
+        assert_eq!(show_replay_cta_event_id(Some(&mission)), None);
+    }
+
+    #[test]
+    fn show_replay_cta_returns_event_id_for_lost_mission() {
+        let mission = HudMission {
+            result: "lost".to_string(),
+            loss_reason: Some("player_dead".to_string()),
+            show_replay_cta: true,
+            show_me_why_event_id: Some("event:704:3354".to_string()),
+            ..Default::default()
+        };
+        assert_eq!(
+            show_replay_cta_event_id(Some(&mission)),
+            Some("event:704:3354".to_string())
+        );
+    }
+
+    #[test]
+    fn show_replay_cta_hidden_when_no_mission() {
+        assert_eq!(show_replay_cta_event_id(None), None);
     }
 }

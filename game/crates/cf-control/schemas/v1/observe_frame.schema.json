@@ -945,6 +945,19 @@
         "result": {
           "type": "string"
         },
+        "show_me_why_event_id": {
+          "description": "**M1.5**: DR-023 \"Show me why\" replay-handoff anchor surfaced\nfor the mission-resolved modal.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "show_replay_cta": {
+          "description": "**M1.5**: cf-ui modal flag — render the \"Show me why\" CTA when\n`true`.",
+          "type": "boolean",
+          "default": false
+        },
         "ticks_remaining": {
           "type": [
             "integer",

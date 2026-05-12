@@ -420,6 +420,17 @@ pub struct MissionState {
     /// the modal is up.
     #[serde(default)]
     pub total_paused_ticks: u64,
+    /// **M1.5**: DR-023 "Show me why" replay-handoff anchor. Populated by
+    /// the engine when the mission resolves as Lost; points at the player's
+    /// last `input.intent_received` event so M3B's replay viewer can rewind
+    /// to the divergence tick. Stays `None` for Won / Aborted / Active.
+    #[serde(default)]
+    pub show_me_why_event_id: Option<String>,
+    /// **M1.5**: cf-ui renders the "Show me why" CTA button on the
+    /// mission-resolved modal when `true`. Latched from the
+    /// mission_resolved event payload's `show_replay_cta` flag.
+    #[serde(default)]
+    pub show_replay_cta: bool,
 }
 
 impl MissionState {
@@ -446,6 +457,8 @@ impl MissionState {
             paused: false,
             pause_started_at_tick: None,
             total_paused_ticks: 0,
+            show_me_why_event_id: None,
+            show_replay_cta: false,
         }
     }
 
@@ -510,6 +523,8 @@ impl MissionState {
         self.paused = false;
         self.pause_started_at_tick = None;
         self.total_paused_ticks = 0;
+        self.show_me_why_event_id = None;
+        self.show_replay_cta = false;
     }
 
     /// Number of required objectives still in `Pending` or `Active` status.
@@ -858,6 +873,15 @@ pub struct MissionView {
     pub objectives: Vec<ObjectiveView>,
     pub last_event_tick: u64,
     pub last_event_label: String,
+    /// **M1.5**: DR-023 "Show me why" replay-handoff anchor. Populated
+    /// when the mission resolves as Lost; cf-ui renders the CTA button
+    /// when this field is `Some`.
+    #[serde(default)]
+    pub show_me_why_event_id: Option<String>,
+    /// **M1.5**: cf-ui modal flag — render the "Show me why" CTA when
+    /// `true`.
+    #[serde(default)]
+    pub show_replay_cta: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -920,6 +944,8 @@ impl MissionView {
             objectives,
             last_event_tick: state.last_event_tick,
             last_event_label: state.last_event_label.clone(),
+            show_me_why_event_id: state.show_me_why_event_id.clone(),
+            show_replay_cta: state.show_replay_cta,
         }
     }
 }

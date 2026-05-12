@@ -100,6 +100,14 @@ pub struct MissionView {
     pub objectives: Vec<ObjectiveView>,
     pub last_event_tick: u64,
     pub last_event_label: String,
+    /// **M1.5**: DR-023 "Show me why" replay-handoff anchor surfaced
+    /// for the mission-resolved modal.
+    #[serde(default)]
+    pub show_me_why_event_id: Option<String>,
+    /// **M1.5**: cf-ui modal flag — render the "Show me why" CTA when
+    /// `true`.
+    #[serde(default)]
+    pub show_replay_cta: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]

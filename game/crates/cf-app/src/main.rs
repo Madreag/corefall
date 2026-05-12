@@ -2135,6 +2135,8 @@ fn sync_actor_state_to_render(
         ticks_remaining: m.ticks_remaining,
         active_objective: m.active_objective.clone(),
         last_event_label: m.last_event_label.clone(),
+        show_me_why_event_id: m.show_me_why_event_id.clone(),
+        show_replay_cta: m.show_replay_cta,
     });
     hud_state.last_event = snapshot.mission.as_ref().map(|m| m.last_event_label.clone());
 
