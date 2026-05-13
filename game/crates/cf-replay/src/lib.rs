@@ -146,6 +146,14 @@ pub struct SettingsBlock {
     /// affect the deterministic sim checksum directly.
     #[serde(default)]
     pub key_bindings: BTreeMap<String, String>,
+    /// **M2 audit pass 5 (2026-05-13)**: AI difficulty preset id ("cakewalk",
+    /// "tough_crowd", "veteran") — the live preset applied by
+    /// `act.settings.set { ai_difficulty: ... }`. Persisted into the run
+    /// manifest so consumers can reproduce the run without consulting
+    /// per-event observe.settings probes. Default empty so legacy bundles
+    /// deserialize cleanly.
+    #[serde(default)]
+    pub ai_difficulty: String,
 }
 
 fn default_hold_threshold_ms() -> u32 {
@@ -165,6 +173,7 @@ impl Default for SettingsBlock {
             hold_threshold_ms: default_hold_threshold_ms(),
             key_remap_enabled: false,
             key_bindings: BTreeMap::new(),
+            ai_difficulty: String::new(),
         }
     }
 }

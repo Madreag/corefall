@@ -140,7 +140,16 @@ pub struct TerrainView {
     pub refusal_count: u64,
     pub dirty_chunk_count: u32,
     pub allocated_chunk_count: u32,
+    /// **M3 audit pass 5 (2026-05-13)**: spec-literal alias for
+    /// `allocated_chunk_count`. Same value, different field name so
+    /// consumers can read either.
+    pub chunk_count: u32,
     pub material_counts: std::collections::BTreeMap<String, u64>,
+    /// **M3 audit pass 5 (2026-05-13)**: spec-literal `material_distribution
+    /// {id: pixel_count}` keyed by material id (u8). Same data as
+    /// `material_counts` but with id keys instead of name keys.
+    #[serde(default)]
+    pub material_distribution: std::collections::BTreeMap<u8, u64>,
     /// **M2**: active material-overlay mode ("off" by default). Cycled via
     /// `act.player.toggle_material_overlay`. One of `off`, `integrity`,
     /// `pathability`, `mobility`, `hazard`, `build_repair`.

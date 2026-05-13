@@ -1539,6 +1539,8 @@ impl M0Engine {
                 material_name: &'static str,
                 impulse_squared: f32,
                 integrity_squared: f32,
+                impulse: f32,
+                integrity: f32,
                 passed: bool,
                 stuck: bool,
                 damage: f32,
@@ -1594,6 +1596,8 @@ impl M0Engine {
                                 material_name: aff.name,
                                 impulse_squared: outcome.impulse_squared,
                                 integrity_squared: outcome.integrity_squared,
+                                impulse: outcome.impulse,
+                                integrity: outcome.integrity,
                                 passed: true,
                                 stuck: false,
                                 damage: proj.damage,
@@ -1610,6 +1614,8 @@ impl M0Engine {
                                 material_name: aff.name,
                                 impulse_squared: outcome.impulse_squared,
                                 integrity_squared: outcome.integrity_squared,
+                                impulse: outcome.impulse,
+                                integrity: outcome.integrity,
                                 passed: false,
                                 stuck: outcome.stuck,
                                 damage: proj.damage,
@@ -1646,6 +1652,8 @@ impl M0Engine {
                             "owner": hit.owner.0,
                             "material_id": hit.material_id,
                             "material": hit.material_name,
+                            "impulse": hit.impulse,
+                            "integrity": hit.integrity,
                             "impulse_squared": hit.impulse_squared,
                             "integrity_squared": hit.integrity_squared,
                             "passed": hit.passed,
@@ -2032,6 +2040,21 @@ impl M0Engine {
         }
 
         if let Some((tick, sim_time_ms, hex)) = checksum_payload {
+            // M3 audit pass 5 (2026-05-13): per-chunk hashes surface in
+            // the `chunk_summary` field per M3.md spec literal "And it
+            // appears in the determinism.sim_checksum payload's
+            // chunk-summary field". Format: ordered array of
+            // {cx, cy, hex} so the JSON serialises deterministically and
+            // M4 cross-OS verifiers can diff per-chunk.
+            let chunk_summary: Vec<serde_json::Value> = self
+                .state
+                .read()
+                .ok()
+                .and_then(|s| s.chunked_terrain.as_ref().map(|t| t.chunk_summary_entries()))
+                .unwrap_or_default()
+                .into_iter()
+                .map(|(cx, cy, hex)| json!({"cx": cx, "cy": cy, "hex": hex}))
+                .collect();
             self.recorder.record(
                 tick,
                 sim_time_ms,
@@ -2044,6 +2067,7 @@ impl M0Engine {
                     "cadence_ticks": self.config.checksum_cadence_ticks,
                     "tick_rate_hz": self.config.tick_rate_hz,
                     "seed": self.config.seed,
+                    "chunk_summary": chunk_summary,
                 }),
                 None,
             );
@@ -2144,6 +2168,18 @@ impl M0Engine {
                         broken,
                     } => {
                         dig_validity_update = Some((tick.0, ToolValidityUpdate::Carve));
+                        // M2 audit pass 5 (2026-05-13): strip carve payload
+                        // must be schema-compatible with the chunked path
+                        // (BreachStrip replaceability). Compute mask_id via
+                        // the same recipe (tool_id, dig_radius, mask_shape),
+                        // emit material_ids[], pixel_count + dirty_chunks[]
+                        // alongside the strip-specific extras.
+                        let strip_material_id = cf_terrain::material_id_from_name(&material).unwrap_or(0);
+                        let mut hasher = blake3::Hasher::new();
+                        hasher.update(b"digger");
+                        hasher.update(&12.0_f32.to_le_bytes());
+                        hasher.update(b"circle");
+                        let strip_mask_id = hex::encode(&hasher.finalize().as_bytes()[..16]);
                         self.recorder.record(
                             tick,
                             sim_time_ms,
@@ -2152,9 +2188,18 @@ impl M0Engine {
                             json!({
                                 "tick": tick.0,
                                 "mode": "strip",
+                                "tool_id": "digger",
+                                "mask_id": strip_mask_id,
                                 "bbox": { "min": bbox_min, "max": bbox_max },
+                                "material": material.clone(),
                                 "material_before": material.clone(),
                                 "material_after": if broken { "air" } else { &material },
+                                "material_ids": [strip_material_id],
+                                "dominant_material_id": strip_material_id,
+                                "pixel_count": 1u32,
+                                "removed_count": 1u32,
+                                "debris_count": 0u32,
+                                "dirty_chunks": serde_json::Value::Array(Vec::new()),
                                 "count": 1u32,
                                 "strip_id": strip_id,
                                 "damage_applied": damage_applied,
@@ -2227,12 +2272,16 @@ impl M0Engine {
                         // circle with 12-px radius for the digger; the
                         // hash inputs are pure-data so wall-clock time
                         // doesn't leak in.
+                        // M3 audit pass 5 (2026-05-13): mask_id MUST be
+                        // position-independent per spec implementer-notes
+                        // ("blake3 hash over (mask_shape, tool_id,
+                        // dig_radius)"). Position lives on the event's
+                        // `pos`/`bbox` fields; identical carve shapes at
+                        // different positions now share a mask_id.
                         let mut hasher = blake3::Hasher::new();
                         hasher.update(b"digger");
                         hasher.update(&12.0_f32.to_le_bytes());
                         hasher.update(b"circle");
-                        hasher.update(&(stats.bbox_min[0] as i32).to_le_bytes());
-                        hasher.update(&(stats.bbox_min[1] as i32).to_le_bytes());
                         let mask_id = hex::encode(&hasher.finalize().as_bytes()[..16]);
                         // Spawn debris (capped at 100 per event per spec
                         // "Debris cap per event"). We cap the debris count
@@ -2458,12 +2507,31 @@ impl M0Engine {
         if let Some((tick, sim_time_ms, report)) = mission_payload {
             for id in &report.objective_started {
                 let parent = self.state.read().ok().and_then(|s| s.mission_started_event_id.clone());
+                // M2 audit pass 5 (2026-05-13): spec literal — payload must
+                // contain `objective_id` AND `kind`. We retain `objective`
+                // as a backwards-compat alias. `kind` is the typed
+                // `ObjectiveKind::category()` string (ReachZone →
+                // "reach_zone", SurviveTimer → "survive_timer", etc.).
+                let kind = self
+                    .state
+                    .read()
+                    .ok()
+                    .and_then(|s| {
+                        s.mission
+                            .as_ref()
+                            .and_then(|m| m.objectives.iter().find(|o| &o.id == id).map(|o| o.kind.category()))
+                    })
+                    .unwrap_or("unknown");
                 let event_id = self.recorder.record(
                     tick,
                     sim_time_ms,
                     "mission",
                     "objective_started",
-                    json!({"objective": id}),
+                    json!({
+                        "objective": id,
+                        "objective_id": id,
+                        "kind": kind,
+                    }),
                     parent,
                 );
                 if let Ok(mut s) = self.state.write() {
@@ -2534,6 +2602,17 @@ impl M0Engine {
             // **M1.5 G11**: chain objective_failed → mission_resolved so
             // M3B can walk the cause chain from mission_resolved back to
             // the trigger objective_failed → ... → player_dead chain.
+            //
+            // M2 audit pass 5 (2026-05-13): spec literal — the
+            // `objective_failed` payload must include a `reason` field
+            // (e.g. "timer_expired", "player_dead", "reactor_destroyed").
+            // We derive it from the mission's final_result so each
+            // objective_failed event carries the same reason vocabulary
+            // as `mission.mission_resolved.loss_reason`.
+            let derived_reason = report.final_result.as_ref().and_then(|r| match r {
+                cf_mission::MissionResult::Lost { reason } => Some(reason.as_str().to_string()),
+                _ => None,
+            });
             let mut last_failed_event_id: Option<String> = None;
             for id in &report.objective_failed {
                 let parent = self
@@ -2541,12 +2620,18 @@ impl M0Engine {
                     .read()
                     .ok()
                     .and_then(|s| s.mission_objective_started_event_ids.get(id).cloned());
+                let mut payload = json!({"objective": id});
+                if let Some(reason) = &derived_reason {
+                    if let Some(obj) = payload.as_object_mut() {
+                        obj.insert("reason".into(), json!(reason));
+                    }
+                }
                 let event_id = self.recorder.record(
                     tick,
                     sim_time_ms,
                     "mission",
                     "objective_failed",
-                    json!({"objective": id}),
+                    payload,
                     parent,
                 );
                 last_failed_event_id = Some(event_id);
@@ -3098,6 +3183,12 @@ impl M0Engine {
         }
         // **M1.5 G2/G3**: emit one `ai.perception_signal` per fresh signal.
         for sig in &report.perception_signals {
+            // M2 audit pass 5 (2026-05-13): hearing perception signals chain
+            // back to the originating `equipment.alarm_registered` event so
+            // M10 can walk `state_changed(heard_shot) → perception_signal(hearing)
+            // → alarm_registered`. Other signal kinds have no upstream parent
+            // event (sight is intrinsic, memory_decayed is timer-driven).
+            let perception_parent = sig.alarm_event_id.clone();
             let id = self.recorder.record(
                 tick,
                 sim_time_ms,
@@ -3110,7 +3201,7 @@ impl M0Engine {
                     "source_position": sig.source_position,
                     "confidence": sig.confidence,
                 }),
-                None,
+                perception_parent,
             );
             last_perception_signal_id = Some(id);
         }
@@ -3138,7 +3229,11 @@ impl M0Engine {
             );
             tactic_chosen_event_id = Some(id);
         }
-        if let Some(s) = &report.state_changed {
+        // M2 audit pass 5 (2026-05-13): emit one `ai.state_changed` event per
+        // transition in spec order. A single tick can produce multiple
+        // transitions (e.g. Idle → Alert via heard_shot, then Alert → Engaged
+        // via target_acquired after aim_settle elapses on the same tick).
+        for s in &report.state_changes {
             self.recorder.record(
                 tick,
                 sim_time_ms,
@@ -3299,6 +3394,19 @@ impl M0Engine {
         let mut weapon_fired_event_by_actor: BTreeMap<u64, String> = BTreeMap::new();
         // input.intent_received reflects what was actually consumed (after status gating).
         let player_outcome = report.actor_outcomes.iter().find(|o| o.actor == intent.actor).cloned();
+        // M1 audit pass 5 (2026-05-13): spec literal lists 9 player actions
+        // whose edge-trigger flag the payload must include
+        // (move/aim/fire/reload/jump/dig/select_item/reset/sharp_aim). The
+        // prior payload omitted `dig` and `sharp_aim`. `dig` is consumed
+        // through the per-actor pending_dig queue (not a flag on
+        // ControlIntent), so we surface its edge by checking whether a
+        // pending dig is staged for the player this tick.
+        let dig_pressed = self
+            .state
+            .read()
+            .ok()
+            .map(|s| s.pending_dig.is_some())
+            .unwrap_or(false);
         let player_view = json!({
             "actor": intent.actor.0,
             "source": match intent.source {
@@ -3315,6 +3423,8 @@ impl M0Engine {
             "reload": intent.reload,
             "selected_item": intent.selected_item.map(|s| s.0),
             "reset": intent.reset,
+            "sharp_aim": intent.sharp_aim,
+            "dig": dig_pressed,
             "applied_move_x": player_outcome.as_ref().map(|o| o.move_x).unwrap_or(0.0),
             "jump_accepted": player_outcome.as_ref().map(|o| o.jump_accepted).unwrap_or(false),
         });
@@ -3546,7 +3656,12 @@ impl M0Engine {
                 // M1: acoustic noise alarm (CCCP HDFirearm.cpp:948 — registered
                 // alarm event consumed by M1.5+ AI perception within the radius).
                 if outcome.loudness_radius > 0.0 {
-                    self.recorder.record(
+                    // M2 audit pass 5 (2026-05-13): capture the
+                    // `equipment.alarm_registered` event id and stage it
+                    // alongside the AlarmInput so the next-tick AI loop
+                    // can thread it through `PerceptionSignal.alarm_event_id`,
+                    // which the engine emits as `ai.perception_signal.parent_event_id`.
+                    let alarm_event_id = self.recorder.record(
                         tick,
                         sim_time_ms,
                         "equipment",
@@ -3567,6 +3682,7 @@ impl M0Engine {
                             source_actor: outcome.actor.0,
                             source_position: [muzzle.x, muzzle.y],
                             loudness_radius: outcome.loudness_radius,
+                            alarm_event_id: Some(alarm_event_id),
                         });
                     }
                 }
@@ -3653,6 +3769,27 @@ impl M0Engine {
                     }),
                     Some(dying_parent),
                 );
+                // M2 audit pass 5 (2026-05-13): capture the entered_dying
+                // event id as the player's "last status changed" anchor.
+                // `mission.mission_resolved` on the PlayerDead loss path
+                // uses this so the cause chain walks
+                // `mission_resolved → status_changed(dying) → projectile_hit
+                // → weapon_fired → tactic_chosen → perception_signal`.
+                // The generic status path's `last_player_status_event_id`
+                // anchor (parent=intent) is too shallow for the spec
+                // chain — we OVERWRITE with the dying event id since
+                // entered_dying happens AFTER the generic emit each tick.
+                let is_player = self
+                    .state
+                    .read()
+                    .ok()
+                    .and_then(|s| s.player_actor)
+                    == Some(outcome.actor);
+                if is_player {
+                    if let Ok(mut s) = self.state.write() {
+                        s.last_player_status_event_id = Some(dying_event_id.clone());
+                    }
+                }
                 if let (Some(pos), Some(vel), Some(label)) = (
                     outcome.inventory_drop_position,
                     outcome.inventory_drop_velocity,
@@ -4568,6 +4705,10 @@ impl M0Engine {
                 hold_threshold_ms: live_settings.hold_threshold_ms,
                 key_remap_enabled: live_settings.key_remap_enabled,
                 key_bindings: live_settings.key_bindings.clone(),
+                // M2 audit pass 5 (2026-05-13): persist live difficulty preset
+                // into the run manifest so cfctl reproductions don't have to
+                // walk observe.settings events to recover the preset id.
+                ai_difficulty: live_settings.ai_difficulty.clone(),
             },
             checksum: ChecksumConfig::m0_default(),
             tick_rate_hz: self.config.tick_rate_hz,
@@ -4915,6 +5056,7 @@ fn ai_intent_label(guard: &cf_ai::ReactiveGuard) -> String {
         cf_ai::Tactic::Attack => format!("{state_label}: ATTACK"),
         cf_ai::Tactic::Search => format!("{state_label}: SEARCH"),
         cf_ai::Tactic::Reload => format!("{state_label}: RELOAD"),
+        cf_ai::Tactic::AimSettle => format!("{state_label}: AIM"),
         cf_ai::Tactic::Hold => state_label.to_string(),
     }
 }
@@ -5760,7 +5902,16 @@ impl EngineHandle for M0Engine {
             refusal_count: t.refusal_count,
             dirty_chunk_count: t.dirty_chunk_count() as u32,
             allocated_chunk_count: t.allocated_chunk_count() as u32,
+            // M3 audit pass 5 (2026-05-13): spec-literal aliases.
+            chunk_count: t.allocated_chunk_count() as u32,
             material_counts: t.material_counts(),
+            material_distribution: t
+                .material_counts()
+                .into_iter()
+                .filter_map(|(name, count)| {
+                    cf_terrain::material_id_from_name(&name).map(|id| (id, count))
+                })
+                .collect(),
             current_overlay_mode: state.material_overlay_mode.clone(),
             total_carve_events: state.total_carve_events,
             total_debris_spawned: state.total_debris_spawned,
@@ -6021,11 +6172,17 @@ impl EngineHandle for M0Engine {
             })
         });
         let last_modified_tick = terrain.chunk_last_modified_tick(cx, cy);
+        // M3 audit pass 5 (2026-05-13): spec literal field names are
+        // `material_grid` (RLE-encoded) and `chunk_checksum`. The legacy
+        // `material_grid_rle` + `checksum` aliases are kept alongside for
+        // backwards-compat with any in-flight tooling.
         Some(serde_json::json!({
             "chunk_pos": { "cx": cx, "cy": cy },
             "chunk_size_pixels": cf_terrain::CHUNK_SIZE,
             "pixel_origin": origin,
+            "material_grid": rle.clone(),
             "material_grid_rle": rle,
+            "chunk_checksum": checksum.clone(),
             "checksum": checksum,
             "last_modified_tick": last_modified_tick,
             "dirty_rect": dirty_rect,
@@ -6375,13 +6532,13 @@ impl EngineHandle for M0Engine {
                         "command_rejected",
                         json!({
                             "method": "act.player.move",
-                            "reason": "axis_must_be_finite",
+                            "reason": "non_finite",
                             "x": x,
                             "y": y,
                         }),
                         None,
                     );
-                    return CommandResult::rejected("axis_must_be_finite", tick.0);
+                    return CommandResult::rejected("non_finite", tick.0);
                 }
                 let player = state.player_actor;
                 if let Some(player_id) = player {
@@ -6471,13 +6628,13 @@ impl EngineHandle for M0Engine {
                         "command_rejected",
                         json!({
                             "method": "act.player.aim",
-                            "reason": "aim_must_be_finite",
+                            "reason": "non_finite",
                             "x": x,
                             "y": y,
                         }),
                         None,
                     );
-                    return CommandResult::rejected("aim_must_be_finite", tick.0);
+                    return CommandResult::rejected("non_finite", tick.0);
                 }
                 let player = state.player_actor;
                 if let Some(player_id) = player {
@@ -6925,6 +7082,34 @@ impl EngineHandle for M0Engine {
                 if state.player_actor.is_none() {
                     return self.reject_actor_command(tick, sim_time_ms, state, "act.player.dig");
                 }
+                // M1 audit pass 5 (2026-05-13): spec literal — "during
+                // knockdown ALL input is rejected: move, aim, fire, reload,
+                // jump, dig, select_item are no-ops". The sim-side
+                // accepts_input gate covers move/aim/jump/fire/reload/select_item
+                // but dig is routed through pending_dig at the dispatch
+                // boundary. Add the knockdown gate here so dig is a no-op
+                // with a labeled rejection.
+                let player_knocked_down = state
+                    .player_actor
+                    .and_then(|pid| state.actor_state.as_ref().map(|w| (pid, w)))
+                    .and_then(|(pid, w)| w.world.actors.get(&pid))
+                    .map(|a| a.knockdown_ticks_remaining > 0)
+                    .unwrap_or(false);
+                if player_knocked_down {
+                    drop(state);
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_rejected",
+                        json!({
+                            "method": "act.player.dig",
+                            "reason": "knockdown",
+                        }),
+                        None,
+                    );
+                    return CommandResult::rejected("knockdown", tick.0);
+                }
                 state.pending_dig = Some(PendingDig {
                     target: target.clone(),
                     source,
@@ -7003,10 +7188,13 @@ impl EngineHandle for M0Engine {
                     None,
                 );
 
+                // M3 audit pass 5 (2026-05-13): refuse reason is the stable
+                // spec vocabulary `material_not_anchorable`; the specific
+                // material is exposed on the `material` payload field.
                 let (result, reason) = if anchorable {
                     ("accepted", None)
                 } else {
-                    ("refused", Some(format!("material_{mat_name}")))
+                    ("refused", Some("material_not_anchorable".to_string()))
                 };
                 self.recorder.record(
                     tick,
@@ -8962,7 +9150,7 @@ mod tests {
                 crate::state::ControlEnvelopeStatus::Rejected,
                 "aim ({x}, {y}) must reject"
             );
-            assert_eq!(result.reason.as_deref(), Some("aim_must_be_finite"));
+            assert_eq!(result.reason.as_deref(), Some("non_finite"));
         }
     }
 
@@ -8993,7 +9181,7 @@ mod tests {
                 crate::state::ControlEnvelopeStatus::Rejected,
                 "move ({x}, {y}) must reject"
             );
-            assert_eq!(result.reason.as_deref(), Some("axis_must_be_finite"));
+            assert_eq!(result.reason.as_deref(), Some("non_finite"));
         }
     }
 

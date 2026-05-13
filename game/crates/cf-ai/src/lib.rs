@@ -346,6 +346,12 @@ impl GuardState {
 pub enum Tactic {
     /// Standing by; no target.
     Hold,
+    /// **M2 audit pass 5 (2026-05-13)**: aim-settle window after initial
+    /// acquisition. Spec literal: "ai.tactic_chosen fires with
+    /// tactic='aim_settle', reason='initial_acquisition'". The guard does
+    /// NOT fire during this tactic (try_fire returns None while
+    /// `aim_settle_remaining_ticks > 0`).
+    AimSettle,
     /// Aim and (eventually) fire at the player.
     Attack,
     /// Reload the magazine.
@@ -358,6 +364,7 @@ impl Tactic {
     pub fn as_str(self) -> &'static str {
         match self {
             Tactic::Hold => "hold",
+            Tactic::AimSettle => "aim_settle",
             Tactic::Attack => "attack",
             Tactic::Reload => "reload",
             Tactic::Search => "search",
@@ -545,17 +552,28 @@ pub struct GuardTickInputs<'a> {
 }
 
 /// **M1.5 G2 (hearing)**: one alarm the guard can react to this tick.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct AlarmInput {
     pub source_actor: u64,
     pub source_position: [f32; 2],
     pub loudness_radius: f32,
+    /// **M2 audit pass 5 (2026-05-13)**: id of the originating
+    /// `equipment.alarm_registered` event (None when staged by code paths
+    /// that don't capture the event id). Threaded into the resulting
+    /// `ai.perception_signal {kind:"hearing"}` event's `parent_event_id`
+    /// so M10 walkers can hop `state_changed → perception_signal → alarm_registered`.
+    pub alarm_event_id: Option<String>,
 }
 
 /// Outcomes of one [`step`] call.
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct EnemyTickReport {
-    pub state_changed: Option<GuardStateTransition>,
+    /// **M2 audit pass 5 (2026-05-13)**: a single guard tick may produce
+    /// multiple state transitions (Idle→Alert via heard_shot, then
+    /// Alert→Engaged via target_acquired on the same tick, plus an
+    /// Engaged→Engaged "reloading" reason-update). The engine emits one
+    /// `ai.state_changed` event per entry in spec order.
+    pub state_changes: Vec<GuardStateTransition>,
     pub perception: Option<PerceptionRecord>,
     pub tactic_chosen: Option<TacticRecord>,
     pub fire: Option<FireRecord>,
@@ -593,6 +611,13 @@ pub struct PerceptionSignal {
     pub confidence: f32,
     /// Tick the signal fired. Useful for replay-viewer time-anchoring.
     pub tick: u64,
+    /// **M2 audit pass 5 (2026-05-13)**: for `kind=="hearing"`, the id of
+    /// the originating `equipment.alarm_registered` event. Threaded by
+    /// the engine into the `ai.perception_signal.parent_event_id` so M10
+    /// walkers can hop `state_changed → perception_signal → alarm_registered`.
+    /// None for non-hearing signals.
+    #[serde(default)]
+    pub alarm_event_id: Option<String>,
 }
 
 /// **M1.5 G4**: why an otherwise-valid shot missed. Stable vocabulary so
@@ -718,7 +743,7 @@ pub fn step(guard: &mut ReactiveGuard, inputs: GuardTickInputs<'_>, rng: &mut Rn
         if guard.state != GuardState::Dead {
             let prev = guard.state;
             guard.state = GuardState::Dead;
-            report.state_changed = Some(GuardStateTransition {
+            report.state_changes.push(GuardStateTransition {
                 previous: prev,
                 next: GuardState::Dead,
                 cause: "dying_dwell_elapsed".to_string(),
@@ -731,7 +756,7 @@ pub fn step(guard: &mut ReactiveGuard, inputs: GuardTickInputs<'_>, rng: &mut Rn
             let prev = guard.state;
             guard.state = GuardState::Dying;
             guard.dying_dwell_remaining_ticks = guard.params.dying_dwell_ticks(inputs.tick_rate_hz);
-            report.state_changed = Some(GuardStateTransition {
+            report.state_changes.push(GuardStateTransition {
                 previous: prev,
                 next: GuardState::Dying,
                 cause: killed_by_cause.clone(),
@@ -743,7 +768,7 @@ pub fn step(guard: &mut ReactiveGuard, inputs: GuardTickInputs<'_>, rng: &mut Rn
             if guard.dying_dwell_remaining_ticks == 0 {
                 let prev = guard.state;
                 guard.state = GuardState::Dead;
-                report.state_changed = Some(GuardStateTransition {
+                report.state_changes.push(GuardStateTransition {
                     previous: prev,
                     next: GuardState::Dead,
                     cause: "dying_dwell_elapsed".to_string(),
@@ -760,7 +785,7 @@ pub fn step(guard: &mut ReactiveGuard, inputs: GuardTickInputs<'_>, rng: &mut Rn
         let prev = guard.state;
         guard.state = GuardState::Dying;
         guard.dying_dwell_remaining_ticks = guard.params.dying_dwell_ticks(inputs.tick_rate_hz);
-        report.state_changed = Some(GuardStateTransition {
+        report.state_changes.push(GuardStateTransition {
             previous: prev,
             next: GuardState::Dying,
             cause: killed_by_cause,
@@ -807,6 +832,10 @@ pub fn step(guard: &mut ReactiveGuard, inputs: GuardTickInputs<'_>, rng: &mut Rn
                 source_position: Some(alarm.source_position),
                 confidence,
                 tick: inputs.tick,
+                // M2 audit pass 5 (2026-05-13): thread the originating
+                // alarm event id so the engine emit can use it as
+                // `parent_event_id` (M10 chain).
+                alarm_event_id: alarm.alarm_event_id.clone(),
             });
             // Hearing-without-LOS transitions Idle → Alert with reason
             // `"heard_shot"` (AI-H-01 contract). Guards already in Alert
@@ -814,7 +843,7 @@ pub fn step(guard: &mut ReactiveGuard, inputs: GuardTickInputs<'_>, rng: &mut Rn
             // the alert_dwell timer above.
             if guard.state == GuardState::Idle {
                 guard.state = GuardState::Alert;
-                report.state_changed = Some(GuardStateTransition {
+                report.state_changes.push(GuardStateTransition {
                     previous: GuardState::Idle,
                     next: GuardState::Alert,
                     cause: "heard_shot".to_string(),
@@ -870,6 +899,7 @@ pub fn step(guard: &mut ReactiveGuard, inputs: GuardTickInputs<'_>, rng: &mut Rn
                 source_position: p.last_seen_position,
                 confidence: 1.0,
                 tick: inputs.tick,
+                alarm_event_id: None,
             });
         } else if player_was_visible {
             report.perception_signals.push(PerceptionSignal {
@@ -878,6 +908,7 @@ pub fn step(guard: &mut ReactiveGuard, inputs: GuardTickInputs<'_>, rng: &mut Rn
                 source_position: p.last_seen_position,
                 confidence: 0.0,
                 tick: inputs.tick,
+                alarm_event_id: None,
             });
         }
     }
@@ -897,6 +928,7 @@ pub fn step(guard: &mut ReactiveGuard, inputs: GuardTickInputs<'_>, rng: &mut Rn
                     source_position: pos,
                     confidence: 0.0,
                     tick: inputs.tick,
+                    alarm_event_id: None,
                 });
             }
         }
@@ -919,7 +951,7 @@ pub fn step(guard: &mut ReactiveGuard, inputs: GuardTickInputs<'_>, rng: &mut Rn
         if matches!(guard.state, GuardState::Engaged | GuardState::Alert | GuardState::Idle) {
             let prev = guard.state;
             guard.state = GuardState::Retreating;
-            report.state_changed = Some(GuardStateTransition {
+            report.state_changes.push(GuardStateTransition {
                 previous: prev,
                 next: GuardState::Retreating,
                 cause: "low_hp".to_string(),
@@ -932,7 +964,7 @@ pub fn step(guard: &mut ReactiveGuard, inputs: GuardTickInputs<'_>, rng: &mut Rn
         } else {
             GuardState::Alert
         };
-        report.state_changed = Some(GuardStateTransition {
+        report.state_changes.push(GuardStateTransition {
             previous: prev,
             next: guard.state,
             cause: "hp_recovered".to_string(),
@@ -944,31 +976,38 @@ pub fn step(guard: &mut ReactiveGuard, inputs: GuardTickInputs<'_>, rng: &mut Rn
             guard.last_player_position = p.last_seen_position;
             guard.memory_last_refresh_tick = Some(inputs.tick);
             guard.alert_dwell_remaining_ticks = guard.params.alert_dwell_ticks(inputs.tick_rate_hz);
-            // First sighting starts the aim-settle timer.
-            if guard.state != GuardState::Engaged {
-                guard.aim_settle_remaining_ticks = guard.params.aim_settle_ticks(inputs.tick_rate_hz);
-            }
+            // M2 audit pass 5 (2026-05-13): aim_settle is armed on first
+            // sighting (Idle → Alert), not on every per-tick refresh while
+            // already Alert/Engaged — otherwise the countdown never reaches
+            // zero and Alert → Engaged never fires. Arming moves into the
+            // `prev == GuardState::Idle` branch below.
             let prev = guard.state;
             // **M1.5 G1**: while Retreating with a visible player, stay in
             // Retreating (do NOT auto-promote to Engaged). The hp gate above
             // already promoted back to Engaged when hp recovered.
             if guard.state != GuardState::Retreating {
-                guard.state = GuardState::Engaged;
-                if prev != GuardState::Engaged {
-                    // M2 re-audit (2026-05-13): spec vocabulary —
-                    // Idle→Alert uses `saw_player_in_cone`; Alert→Engaged
-                    // uses `target_acquired`. Pre-fix the code used
-                    // `player_visible` for both (and `target_acquired` was
-                    // a separate event).
-                    let cause = if prev == GuardState::Idle {
-                        "saw_player_in_cone"
-                    } else {
-                        "target_acquired"
-                    };
-                    report.state_changed = Some(GuardStateTransition {
-                        previous: prev,
+                // M2 audit pass 5 (2026-05-13): spec literal requires
+                // Idle → Alert (cause="saw_player_in_cone") on first
+                // sighting, THEN Alert → Engaged (cause="target_acquired")
+                // after the aim-settle window elapses. Previously the code
+                // jumped Idle → Engaged in a single tick.
+                if prev == GuardState::Idle {
+                    // Idle → Alert: arm aim_settle so Alert → Engaged
+                    // promotion gates on it.
+                    guard.state = GuardState::Alert;
+                    guard.aim_settle_remaining_ticks = guard.params.aim_settle_ticks(inputs.tick_rate_hz);
+                    report.state_changes.push(GuardStateTransition {
+                        previous: GuardState::Idle,
+                        next: GuardState::Alert,
+                        cause: "saw_player_in_cone".to_string(),
+                    });
+                } else if prev == GuardState::Alert && guard.aim_settle_remaining_ticks == 0 {
+                    // Alert → Engaged when aim_settle is done.
+                    guard.state = GuardState::Engaged;
+                    report.state_changes.push(GuardStateTransition {
+                        previous: GuardState::Alert,
                         next: GuardState::Engaged,
-                        cause: cause.to_string(),
+                        cause: "target_acquired".to_string(),
                     });
                     if let Some(player) = inputs.player {
                         report.target_acquired = Some(TargetAcquiredRecord {
@@ -976,6 +1015,10 @@ pub fn step(guard: &mut ReactiveGuard, inputs: GuardTickInputs<'_>, rng: &mut Rn
                             via: "sight",
                         });
                     }
+                } else if prev == GuardState::Retreating || prev == GuardState::Engaged {
+                    // Retreating already handled by the early gate; falling
+                    // through here means stay-Engaged (no transition).
+                    guard.state = GuardState::Engaged;
                 }
             }
         } else if prev_alert_dwell_remaining_ticks > 0 {
@@ -983,7 +1026,7 @@ pub fn step(guard: &mut ReactiveGuard, inputs: GuardTickInputs<'_>, rng: &mut Rn
             if guard.state == GuardState::Engaged {
                 guard.state = GuardState::Alert;
                 if prev != GuardState::Alert {
-                    report.state_changed = Some(GuardStateTransition {
+                    report.state_changes.push(GuardStateTransition {
                         previous: prev,
                         next: GuardState::Alert,
                         cause: "target_lost".to_string(),
@@ -999,7 +1042,7 @@ pub fn step(guard: &mut ReactiveGuard, inputs: GuardTickInputs<'_>, rng: &mut Rn
         } else if guard.state != GuardState::Idle && guard.state != GuardState::Retreating {
             let prev = guard.state;
             guard.state = GuardState::Idle;
-            report.state_changed = Some(GuardStateTransition {
+            report.state_changes.push(GuardStateTransition {
                 previous: prev,
                 next: GuardState::Idle,
                 cause: "alert_expired".to_string(),
@@ -1064,6 +1107,18 @@ pub fn step(guard: &mut ReactiveGuard, inputs: GuardTickInputs<'_>, rng: &mut Rn
                 guard.burst_pause_remaining_ticks = 0;
                 guard.burst_shots_fired = 0;
                 report.reload_started = true;
+                // M2 audit pass 5 (2026-05-13): spec literal — "ai.state_changed
+                // fires with state=Engaged, reason='reloading' (state
+                // unchanged; reason updates)" when entering reload mid-fight.
+                // The transition is a same-state self-loop so M10 walkers can
+                // tag the moment without inferring it from event ordering.
+                if guard.state == GuardState::Engaged {
+                    report.state_changes.push(GuardStateTransition {
+                        previous: GuardState::Engaged,
+                        next: GuardState::Engaged,
+                        cause: "reloading".to_string(),
+                    });
+                }
             }
         }
         Tactic::Attack => {
@@ -1090,7 +1145,11 @@ pub fn step(guard: &mut ReactiveGuard, inputs: GuardTickInputs<'_>, rng: &mut Rn
                 report.reload_started = true;
             }
         }
-        Tactic::Hold | Tactic::Search => {}
+        Tactic::Hold | Tactic::Search | Tactic::AimSettle => {
+            // AimSettle/Hold/Search produce no fire + no reload work this
+            // tick; the per-tick aim_settle countdown runs unconditionally
+            // earlier in the step body.
+        }
     }
 
     report
@@ -1264,6 +1323,13 @@ fn pick_tactic(guard: &ReactiveGuard, scores: &TacticScores, player_visible: boo
     if guard.reload_remaining_ticks > 0 {
         return (Tactic::Reload, "reload_in_progress");
     }
+    // M2 audit pass 5 (2026-05-13): spec literal — while aim_settle is
+    // active AND the player is visible, the chosen tactic is `aim_settle`
+    // with reason `initial_acquisition`. This gates BEFORE the magazine /
+    // attack / search ladder.
+    if guard.aim_settle_remaining_ticks > 0 && player_visible {
+        return (Tactic::AimSettle, "initial_acquisition");
+    }
     if guard.ammo_in_mag == 0 {
         return (Tactic::Reload, "magazine_empty");
     }
@@ -1277,7 +1343,6 @@ fn pick_tactic(guard: &ReactiveGuard, scores: &TacticScores, player_visible: boo
     if scores.search > best.1 {
         best = (Tactic::Search, scores.search, "search_alerted");
     }
-    let _ = player_visible; // Reserved for future heuristics; kept for ergonomics.
     (best.0, best.2)
 }
 
@@ -1431,12 +1496,21 @@ mod tests {
         let actor = guard_actor();
         let player = player_actor(700.0, 32.0);
         let mut rng = rng();
+        // M2 audit pass 5 (2026-05-13): first sighting transitions
+        // Idle → Alert (cause="saw_player_in_cone") AND arms aim_settle.
         let report = step(&mut guard, tick_inputs(1, &actor, Some(&player)), &mut rng);
-        assert_eq!(guard.state, GuardState::Engaged);
-        assert!(report.state_changed.is_some());
+        assert_eq!(guard.state, GuardState::Alert);
+        assert!(!report.state_changes.is_empty());
         let perception = report.perception.unwrap();
         assert!(perception.player_seen);
         assert!(perception.distance.unwrap() > 0.0);
+        // After aim_settle ticks elapse with the player still in cone,
+        // Alert → Engaged (cause="target_acquired").
+        let settle_ticks = guard.aim_settle_remaining_ticks;
+        for t in 2..=(2 + settle_ticks as u64) {
+            let _ = step(&mut guard, tick_inputs(t, &actor, Some(&player)), &mut rng);
+        }
+        assert_eq!(guard.state, GuardState::Engaged);
     }
 
     #[test]
@@ -1492,7 +1566,7 @@ mod tests {
         let mut rng = rng();
         let report = step(&mut guard, tick_inputs(1, &actor, None), &mut rng);
         assert_eq!(guard.state, GuardState::Dead);
-        assert!(report.state_changed.is_some());
+        assert!(!report.state_changes.is_empty());
     }
 
     #[test]
@@ -1567,9 +1641,12 @@ mod tests {
         let player_lost = player_actor(2000.0, 32.0);
         let mut rng = rng();
 
-        // Tick 1: player visible -> state becomes Engaged, dwell SET to 3.
+        // M2 audit pass 5 (2026-05-13): first sighting now transitions to
+        // Alert (not Engaged) so the alert_dwell test starts from Alert
+        // with the dwell pre-armed. The semantics carry through unchanged
+        // for the loss path.
         let _ = step(&mut guard, tick_inputs(1, &actor, Some(&player_visible)), &mut rng);
-        assert_eq!(guard.state, GuardState::Engaged);
+        assert_eq!(guard.state, GuardState::Alert);
         assert_eq!(guard.alert_dwell_remaining_ticks, 3);
 
         // Tick 2: player out-of-sight -> dwell decrements to 2, prev=3 > 0 keeps Alert.
@@ -1652,10 +1729,15 @@ mod tests {
             source_actor: 1,
             source_position: [actor.position.x + 200.0, actor.position.y],
             loudness_radius: 480.0,
+            alarm_event_id: None,
         }];
         let report = step(&mut guard, tick_inputs_with_alarms(1, &actor, None, &alarms), &mut rng);
         assert_eq!(guard.state, GuardState::Alert);
-        let transitioned = report.state_changed.expect("state must change on heard_shot");
+        let transitioned = report
+            .state_changes
+            .first()
+            .cloned()
+            .expect("state must change on heard_shot");
         assert_eq!(transitioned.previous, GuardState::Idle);
         assert_eq!(transitioned.next, GuardState::Alert);
         assert_eq!(transitioned.cause, "heard_shot");
@@ -1695,7 +1777,7 @@ mod tests {
         let mut rng = rng();
         let report = step(&mut guard, tick_inputs(1, &actor, Some(&player)), &mut rng);
         assert_eq!(guard.state, GuardState::Retreating);
-        let transitioned = report.state_changed.expect("hp gate must transition");
+        let transitioned = report.state_changes.first().cloned().expect("hp gate must transition");
         assert_eq!(transitioned.cause, "low_hp");
         assert_eq!(transitioned.next, GuardState::Retreating);
     }

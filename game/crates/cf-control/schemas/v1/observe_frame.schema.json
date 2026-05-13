@@ -1316,6 +1316,12 @@
           "format": "uint64",
           "minimum": 0
         },
+        "chunk_count": {
+          "description": "**M3 audit pass 5 (2026-05-13)**: spec-literal alias for\n`allocated_chunk_count`. Same value, different field name so\nconsumers can read either.",
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
         "current_overlay_mode": {
           "description": "**M2**: active material-overlay mode (\"off\" by default). Cycled via\n`act.player.toggle_material_overlay`. One of `off`, `integrity`,\n`pathability`, `mobility`, `hazard`, `build_repair`.",
           "type": "string",
@@ -1340,6 +1346,19 @@
             "type": "integer",
             "format": "uint64",
             "minimum": 0
+          }
+        },
+        "material_distribution": {
+          "description": "**M3 audit pass 5 (2026-05-13)**: spec-literal `material_distribution\n{id: pixel_count}` keyed by material id (u8). Same data as\n`material_counts` but with id keys instead of name keys.",
+          "type": "object",
+          "additionalProperties": false,
+          "default": {},
+          "patternProperties": {
+            "^\\d+$": {
+              "type": "integer",
+              "format": "uint64",
+              "minimum": 0
+            }
           }
         },
         "refusal_count": {
@@ -1376,6 +1395,7 @@
         "refusal_count",
         "dirty_chunk_count",
         "allocated_chunk_count",
+        "chunk_count",
         "material_counts"
       ]
     },

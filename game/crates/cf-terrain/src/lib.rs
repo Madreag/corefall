@@ -354,9 +354,13 @@ fn apply_dig_to(strip: &mut BreachStrip, origin: [f32; 2]) -> DigOutcome {
             bbox_max: Some(strip.bbox_max),
         };
     }
-    if let Some(reason) = &strip.refusal_reason {
+    if let Some(_reason) = &strip.refusal_reason {
+        // M2/M3 audit pass 5 (2026-05-13): all non-diggable strip refusals
+        // use the stable `material_not_diggable` reason vocabulary per spec.
+        // The specific material name remains on the `material` field for
+        // structured consumers.
         return DigOutcome::Refused {
-            reason: format!("material_{reason}"),
+            reason: "material_not_diggable".to_string(),
             strip_id: Some(strip.id.clone()),
             material: Some(strip.material.clone()),
             bbox_min: Some(strip.bbox_min),
@@ -471,7 +475,7 @@ mod tests {
                 explicit_target: None,
             },
         );
-        assert_eq!(outcome.refused_reason(), Some("material_metal_nohook"));
+        assert_eq!(outcome.refused_reason(), Some("material_not_diggable"));
         assert_eq!(w.get("anchor").unwrap().hp, 999.0);
     }
 
@@ -515,7 +519,7 @@ mod tests {
         // The anchor strip is the only one in range at x=820, so the picker returns it.
         match outcome {
             DigOutcome::Refused { reason, strip_id, .. } => {
-                assert_eq!(reason, "material_metal_nohook");
+                assert_eq!(reason, "material_not_diggable");
                 assert_eq!(strip_id.as_deref(), Some("anchor"));
             }
             DigOutcome::Carved { .. } => panic!("expected anchor refusal, got carved"),

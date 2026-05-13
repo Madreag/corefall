@@ -225,7 +225,12 @@ const MATERIAL_TABLE: [MaterialAffordance; 8] = [
         spawn_material: None,
         path_cost: 999.0,
         overlay_rgba: [80, 100, 140, 0xFF],
-        refusal_reason: Some("material_metal_nohook"),
+        // M3 audit pass 5 (2026-05-13): spec literal demands
+        // `reason="material_not_diggable"` for all non-diggable carve refusals.
+        // Concrete `material_<name>` strings are kept as the structured
+        // `material` field on the event payload; this is the stable reason
+        // vocabulary the spec contract specifies.
+        refusal_reason: Some("material_not_diggable"),
     },
     MaterialAffordance {
         id: MATERIAL_HAZARD,
@@ -256,7 +261,10 @@ const MATERIAL_TABLE: [MaterialAffordance; 8] = [
         spawn_material: Some(MATERIAL_LOOSE_FILL),
         path_cost: 10.0,
         overlay_rgba: [200, 60, 60, 0xFF],
-        refusal_reason: Some("material_hazard"),
+        // M3 audit pass 5 (2026-05-13): non-diggable carve refusals route
+        // through the stable `material_not_diggable` reason; the specific
+        // material is on the payload's `material` field.
+        refusal_reason: Some("material_not_diggable"),
     },
     MaterialAffordance {
         id: MATERIAL_LOOSE_FILL,
@@ -333,7 +341,10 @@ const MATERIAL_TABLE: [MaterialAffordance; 8] = [
         spawn_material: Some(MATERIAL_LOOSE_FILL),
         path_cost: 1.0,
         overlay_rgba: [60, 60, 200, 0xFF],
-        refusal_reason: Some("material_anchor"),
+        // M3 audit pass 5 (2026-05-13): non-diggable carve refusals route
+        // through the stable `material_not_diggable` reason; the specific
+        // material is on the payload's `material` field.
+        refusal_reason: Some("material_not_diggable"),
     },
 ];
 
@@ -1221,6 +1232,25 @@ impl ChunkedTerrain {
         self.chunks.len()
     }
 
+    /// **M3 audit pass 5 (2026-05-13)**: per-chunk blake3 hex summaries for
+    /// every allocated chunk. Used by the engine to populate the
+    /// `chunk_summary` field on `determinism.sim_checksum` payloads per
+    /// spec literal "And it appears in the determinism.sim_checksum
+    /// payload's chunk-summary field". Returns `(cx, cy, blake3_hex)`
+    /// triples ordered by (cx, cy) for deterministic JSON output.
+    pub fn chunk_summary_entries(&self) -> Vec<(i32, i32, String)> {
+        self.chunks
+            .iter()
+            .map(|(coord, chunk)| {
+                let mut hasher = blake3::Hasher::new();
+                hasher.update(&coord.cx.to_le_bytes());
+                hasher.update(&coord.cy.to_le_bytes());
+                hasher.update(&chunk.pixels);
+                (coord.cx, coord.cy, hex::encode(hasher.finalize().as_bytes()))
+            })
+            .collect()
+    }
+
     /// Per-material pixel counts across every allocated chunk + the implicit
     /// default-material area. Used for snapshot + summary stats.
     pub fn material_counts(&self) -> BTreeMap<String, u64> {
@@ -1480,7 +1510,7 @@ mod tests {
         let outcome = t.try_carve([476.0, 60.0], 8.0);
         match outcome {
             ChunkedCarveOutcome::Refused(refusal) => {
-                assert_eq!(refusal.reason, "material_metal_nohook");
+                assert_eq!(refusal.reason, "material_not_diggable");
                 assert_eq!(refusal.material, MATERIAL_METAL_NOHOOK);
             }
             other => panic!("expected Refused, got {other:?}"),
@@ -1639,7 +1669,7 @@ mod tests {
         let outcome = t.try_fill_or_repair([16.0, 16.0], 6.0, MATERIAL_REPAIR_FILL);
         match outcome {
             ChunkedCarveOutcome::Refused(refusal) => {
-                assert_eq!(refusal.reason, "material_metal_nohook");
+                assert_eq!(refusal.reason, "material_not_diggable");
             }
             other => panic!("expected refusal, got {other:?}"),
         }

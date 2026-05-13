@@ -801,6 +801,7 @@ pub fn banner_line(banner: &HudBanner) -> String {
 #[allow(clippy::type_complexity, clippy::too_many_arguments)]
 fn update_status_strip(
     state: Res<HudState>,
+    settings: Res<HudSettings>,
     mut status_query: Query<
         &mut Text,
         (
@@ -858,7 +859,7 @@ fn update_status_strip(
         ),
     >,
     mut mission_query: Query<
-        &mut Text,
+        (&mut Text, &mut TextColor),
         (
             With<MissionStripText>,
             Without<StatusStripText>,
@@ -1033,8 +1034,16 @@ fn update_status_strip(
     if let Some(mut text) = reticle_query.iter_mut().next() {
         **text = rifle_status_line(state.rifle.as_ref());
     }
-    if let Some(mut text) = mission_query.iter_mut().next() {
+    if let Some((mut text, mut text_color)) = mission_query.iter_mut().next() {
         **text = mission_line(state.mission.as_ref(), state.tick_rate_hz);
+        // M2 audit pass 5 (2026-05-13): spec literal — TIMER turns yellow
+        // at <30s, red at <10s. Default to the high-contrast-aware base
+        // palette when no mission OR mission is not active.
+        *text_color = TextColor(mission_timer_color(
+            state.mission.as_ref(),
+            state.tick_rate_hz,
+            settings.high_contrast,
+        ));
     }
     if let Some(mut text) = objective_query.iter_mut().next() {
         **text = objective_line(state.mission.as_ref());
@@ -1211,6 +1220,35 @@ pub fn tool_line(validity: Option<&HudToolValidity>) -> String {
             Some(target) => format!("TOOL: REFUSED | {reason} ({target})"),
             None => format!("TOOL: REFUSED | {reason}"),
         }
+    }
+}
+
+/// **M2 audit pass 5 (2026-05-13)**: return the TIMER text color per spec
+/// "TIMER turns yellow at <30s, red at <10s". Green for >30s remaining;
+/// yellow for 10..=30s; red for <10s. Inactive mission OR no time limit
+/// returns the default base-palette color so the strip stays readable.
+pub fn mission_timer_color(
+    mission: Option<&HudMission>,
+    tick_rate_hz: u32,
+    high_contrast: bool,
+) -> Color {
+    let Some(m) = mission else {
+        return palette_text(high_contrast);
+    };
+    // Only color the timer while the mission is in progress + has a
+    // finite time limit. WIN / LOST / ABORTED keep the base palette.
+    let in_progress = matches!(m.result.as_str(), "in_progress" | "active");
+    if !in_progress || m.time_limit_ticks == 0 {
+        return palette_text(high_contrast);
+    }
+    let rate = tick_rate_hz.max(1) as f32;
+    let remaining_s = ((m.time_limit_ticks.saturating_sub(m.elapsed_ticks)) as f32 / rate).max(0.0);
+    if remaining_s < 10.0 {
+        Color::srgb(1.0, 0.25, 0.25) // red
+    } else if remaining_s < 30.0 {
+        Color::srgb(1.0, 0.85, 0.2) // yellow
+    } else {
+        Color::srgb(0.4, 1.0, 0.4) // green
     }
 }
 

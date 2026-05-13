@@ -167,6 +167,12 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
     tracing::info!(target: "cf::e2e", scenario = %cli.scenario, script = ?cli.script, ai_harness = ?cli.ai_harness, "starting cf-e2e");
     let _ = (cli.save_load_roundtrip, cli.verify_checksums);
+    // M2 audit pass 5 (2026-05-13): for `--ai-harness`, the spec requires
+    // the runner to emit an `ai_test_result {status, duration_seconds,
+    // replay_path}` block alongside the standard stdout JSON. Capture the
+    // wall-clock start now so the printout at the end can include the
+    // measured duration.
+    let ai_harness_started_at = cli.ai_harness.as_ref().map(|_| std::time::Instant::now());
 
     // M2 re-audit (2026-05-13): `--ai-harness` is a spec-canonical alias for
     // `--script` so AI-H-NN scenarios can be invoked with the spec wording.
@@ -428,17 +434,32 @@ async fn main() -> Result<()> {
     if !all_pass {
         anyhow::bail!("cf-e2e expectations failed");
     }
-    println!(
-        "{}",
-        serde_json::to_string(&json!({
-            "schema_version": SCHEMA_VERSION,
-            "scenario": cli.scenario,
-            "script": script_path.display().to_string(),
-            "expectations_pass": cli.expect,
-            "result": "pass",
-        }))
-        .unwrap()
-    );
+    // M2 audit pass 5 (2026-05-13): augment stdout with an `ai_test_result`
+    // block when --ai-harness was used. Spec literal: "the runner emits
+    // ai_test_result with status, duration, replay_path".
+    let mut payload = json!({
+        "schema_version": SCHEMA_VERSION,
+        "scenario": cli.scenario,
+        "script": script_path.display().to_string(),
+        "expectations_pass": cli.expect,
+        "result": "pass",
+    });
+    if let (Some(name), Some(started)) = (cli.ai_harness.as_deref(), ai_harness_started_at) {
+        let duration_seconds = started.elapsed().as_secs_f64();
+        let replay_path = cf_replay::resolve_run_bundle_root(None).display().to_string();
+        if let Some(obj) = payload.as_object_mut() {
+            obj.insert(
+                "ai_test_result".into(),
+                json!({
+                    "harness": name,
+                    "status": "pass",
+                    "duration_seconds": duration_seconds,
+                    "replay_path": replay_path,
+                }),
+            );
+        }
+    }
+    println!("{}", serde_json::to_string(&payload).unwrap());
     Ok(())
 }
 

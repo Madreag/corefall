@@ -924,6 +924,18 @@ pub fn step(state: &mut MissionState, inputs: MissionTickInputs<'_>) -> MissionT
             }
             return report;
         }
+        // M2 audit pass 5 (2026-05-13): spec literal — "mission.objective_failed
+        // fires with objective_id='reach_extraction', reason='timer_expired'"
+        // when the timer expires while any Active objective is incomplete.
+        // Iterate every Active objective and flip it to Failed so the engine
+        // emits per-objective `mission.objective_failed` before
+        // `mission.mission_resolved`.
+        for obj in &mut state.objectives {
+            if obj.status == ObjectiveStatus::Active {
+                obj.status = ObjectiveStatus::Failed;
+                report.objective_failed.push(obj.id.clone());
+            }
+        }
         state.result = MissionResult::Lost {
             reason: LossReason::TimerExpired,
         };
@@ -1832,10 +1844,16 @@ mod tests {
         ));
         // Phase 0 still ran first — ReachZone activated.
         assert_eq!(report.objective_started, vec!["reach".to_string()]);
-        assert_eq!(state.objectives[0].status, ObjectiveStatus::Active);
+        // M2 audit pass 5 (2026-05-13): spec literal — active objectives
+        // are flipped to Failed on timer-expired loss so the engine emits
+        // `mission.objective_failed { reason: "timer_expired" }` before
+        // `mission.mission_resolved`. The ReachZone just got Activated this
+        // tick, then fails immediately.
+        assert_eq!(state.objectives[0].status, ObjectiveStatus::Failed);
         // DefendReactor never got activated — it stays Pending (the player
         // didn't even get a tick to start defending).
         assert_eq!(state.objectives[1].status, ObjectiveStatus::Pending);
+        assert_eq!(report.objective_failed, vec!["reach".to_string()]);
     }
 
     #[test]

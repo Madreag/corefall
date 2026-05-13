@@ -976,7 +976,7 @@ async fn process_request<E: EngineHandle>(
                 Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
             };
             if !p.x.is_finite() || !p.y.is_finite() {
-                return Some(invalid_param_reason(request.id, "axis_must_be_finite"));
+                return Some(invalid_param_reason(request.id, "non_finite"));
             }
             let result = engine
                 .dispatch(ControlCommand::ActPlayerMove {
@@ -1005,7 +1005,7 @@ async fn process_request<E: EngineHandle>(
                 Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
             };
             if !p.x.is_finite() || !p.y.is_finite() {
-                return Some(invalid_param_reason(request.id, "aim_must_be_finite"));
+                return Some(invalid_param_reason(request.id, "non_finite"));
             }
             let result = engine
                 .dispatch(ControlCommand::ActPlayerAim {

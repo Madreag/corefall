@@ -112,9 +112,12 @@ pub fn material_tint(mode: OverlayMode, id: MaterialId) -> [u8; 4] {
             }
         }
         OverlayMode::Mobility => {
+            // M3 audit pass 5 (2026-05-13): metal_nohook detection moved
+            // from refusal_reason string (renamed to material_not_diggable)
+            // to direct material-id comparison.
             if aff.id == cf_terrain::MATERIAL_AIR {
                 [0, 0, 0, 0]
-            } else if matches!(aff.refusal_reason, Some("material_metal_nohook")) {
+            } else if aff.id == cf_terrain::MATERIAL_METAL_NOHOOK {
                 [220, 80, 80, 0xD0]
             } else if aff.anchorable {
                 [90, 140, 220, 0xC8]
@@ -132,13 +135,15 @@ pub fn material_tint(mode: OverlayMode, id: MaterialId) -> [u8; 4] {
             }
         }
         OverlayMode::BuildRepair => {
+            // M3 audit pass 5 (2026-05-13): all non-diggable surfaces share
+            // the stable `material_not_diggable` refusal reason. The
+            // anchor/metal_nohook visual cue now relies on the material id
+            // directly rather than the refusal_reason vocabulary.
             if aff.id == cf_terrain::MATERIAL_AIR {
                 [80, 200, 80, 0x70]
             } else if aff.hazard
-                || matches!(
-                    aff.refusal_reason,
-                    Some("material_metal_nohook") | Some("material_anchor")
-                )
+                || aff.id == cf_terrain::MATERIAL_METAL_NOHOOK
+                || aff.id == cf_terrain::MATERIAL_ANCHOR
             {
                 [100, 100, 110, 0x70]
             } else {

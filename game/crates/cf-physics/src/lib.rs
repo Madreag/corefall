@@ -455,6 +455,14 @@ pub struct PenetrationOutcome {
     pub impulse_squared: f32,
     /// Squared integrity used by the formula (cached for the event).
     pub integrity_squared: f32,
+    /// **M3 audit pass 5 (2026-05-13)**: unsquared impulse
+    /// (= mass × velocity × sharpness). Spec literal payload field;
+    /// retained alongside `impulse_squared` for replay-verification
+    /// convenience.
+    pub impulse: f32,
+    /// **M3 audit pass 5 (2026-05-13)**: unsquared integrity (material
+    /// hardness). Spec literal payload field.
+    pub integrity: f32,
 }
 
 /// Run the canonical penetration formula. Returns a deterministic outcome
@@ -481,6 +489,8 @@ pub fn try_penetrate(inputs: PenetrationInputs) -> PenetrationOutcome {
             remaining_velocity: remaining,
             impulse_squared,
             integrity_squared,
+            impulse,
+            integrity: inputs.integrity.max(0.0),
         };
     }
     // Failed penetration: roll for stickiness.
@@ -492,6 +502,8 @@ pub fn try_penetrate(inputs: PenetrationInputs) -> PenetrationOutcome {
             remaining_velocity: 0.0,
             impulse_squared,
             integrity_squared,
+            impulse,
+            integrity: inputs.integrity.max(0.0),
         };
     }
     // Bounce: keep restitution × (1 - friction) of the incoming speed.
@@ -502,6 +514,8 @@ pub fn try_penetrate(inputs: PenetrationInputs) -> PenetrationOutcome {
         remaining_velocity: inputs.velocity * bounce,
         impulse_squared,
         integrity_squared,
+        impulse,
+        integrity: inputs.integrity.max(0.0),
     }
 }
 

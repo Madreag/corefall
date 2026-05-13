@@ -151,9 +151,12 @@ mod tests {
 
     #[test]
     fn metal_nohook_carries_refusal_label() {
+        // M3 audit pass 5 (2026-05-13): refusal reason vocabulary moved
+        // from per-material `material_<name>` to the stable
+        // `material_not_diggable` token per spec literal.
         let entries = legend_entries();
         let metal = entries.iter().find(|e| e.name == "metal_nohook").unwrap();
-        assert_eq!(metal.refusal_reason.as_deref(), Some("material_metal_nohook"));
+        assert_eq!(metal.refusal_reason.as_deref(), Some("material_not_diggable"));
         assert!(!metal.diggable);
     }
 }
