@@ -1,8 +1,12 @@
-//! M1.5: minimal objective state machine.
+//! M2: minimal objective state machine.
 //!
-//! This crate owns the `MissionState` + `Objective` types used by the M1.5 micro
+//! (Historical name: M1.5 — renamed to M2 in the canonical roadmap. Code
+//! comments may still say "M1.5"; they refer to the same milestone whose
+//! spec lives at `specs/done/M2.md`.)
+//!
+//! This crate owns the `MissionState` + `Objective` types used by the M2 micro
 //! breach scenario. The full mission director (typed manifest, command-core, base
-//! power, commander AI, comic-noir cards) lands at M7. M1.5 only needs:
+//! power, commander AI, comic-noir cards) lands at M7. M2 only needs:
 //!
 //! - A small ordered list of objectives the player must clear in turn (or fail).
 //! - A win/loss decision per tick (player dead, timer expired, or all required
@@ -44,6 +48,12 @@
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
+
+// M2 spec "## Files" wiring: re-export the canonical types via thin
+// modules so consumers that import per the spec path (`cf_mission::objective::*`
+// / `cf_mission::director::*`) compile cleanly.
+pub mod director;
+pub mod objective;
 
 use cf_actor::{ActorId, ActorState, Status};
 
@@ -104,13 +114,22 @@ pub enum FailSensor {
 }
 
 /// Kind of objective. Discriminator names match the canonical roadmap glossary so
-/// M7's typed manifest can read M1.5 scenario files without migrating ids.
+/// M7's typed manifest can read M2 scenario files without migrating ids.
+///
+/// **M2 re-audit pass 3 (2026-05-13)**: spec literal at M2.md line 109 calls
+/// for `ReachZone, KillActor, SurviveTimer, DefendActor, EscortActor`. The
+/// codebase predates the spec rename so `NeutralizeActor` / `DefendReactor`
+/// are still the canonical Rust identifiers — but `kill_actor` and
+/// `defend_actor` are accepted as JSON discriminator aliases via `serde(alias)`
+/// so scenario manifests authored against the spec deserialize cleanly. The
+/// underlying behaviour is identical.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum ObjectiveKind {
     BreachBarrier {
         target: String,
     },
+    #[serde(alias = "kill_actor")]
     NeutralizeActor {
         target: u64,
     },
@@ -120,7 +139,9 @@ pub enum ObjectiveKind {
     },
     /// M2.5: defend a reactor (named static actor) until either the mission
     /// timer expires (success) or the reactor's hp reaches zero (failure).
-    /// `target` is the reactor id.
+    /// `target` is the reactor id. The `defend_actor` JSON discriminator
+    /// (M2 spec literal) is accepted as an alias.
+    #[serde(alias = "defend_actor")]
     DefendReactor {
         target: String,
     },

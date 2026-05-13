@@ -50,6 +50,14 @@ use serde::{Deserialize, Serialize};
 use cf_actor::{ActorId, ActorState, Status, Vec2};
 use cf_sim_core::Rng;
 
+// M2 spec "## Files" wiring: re-export the canonical types via thin
+// modules so consumers that import per the spec paths
+// (`cf_ai::perception::*` / `cf_ai::guard_state::*` / `cf_ai::difficulty::*`)
+// compile cleanly.
+pub mod difficulty;
+pub mod guard_state;
+pub mod perception;
+
 /// Tunable parameters for the M1.5 reactive guard.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct ReactiveGuardParams {

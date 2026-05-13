@@ -53,7 +53,16 @@
     clippy::manual_let_else
 )]
 
+// M2 / M3 spec "## Files" wiring: re-export the canonical types via thin
+// modules so consumers that import per the spec paths
+// (`cf_terrain::breach::*`, `cf_terrain::chunk::*`, `cf_terrain::dirty::*`,
+// `cf_terrain::carve::*`, `cf_terrain::checksum::*`) compile cleanly.
+pub mod breach;
+pub mod carve;
+pub mod checksum;
+pub mod chunk;
 pub mod chunked;
+pub mod dirty;
 
 pub use chunked::{
     material_affordance, material_id_from_name, material_name_from_id, Chunk, ChunkCoord, ChunkedCarveNoOp,

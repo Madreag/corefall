@@ -2,11 +2,13 @@
   "$schema": "http://json-schema.org/draft-2020-12/schema",
   "$id": "cf-replay/event/mission_started.v1",
   "title": "mission.mission_started",
-  "description": "Emitted once per scenario load when the mission state machine transitions from Loaded → InProgress. Carries the scenario id, time limit, and the initial objectives[] roster so replay viewers can reconstruct the mission shape without consulting the scenario manifest.",
+  "description": "Emitted once per scenario load when the mission state machine transitions from Loaded → InProgress. Carries the mission_id, scenario_id, seed, time limit, and the initial objectives[] roster so replay viewers can reconstruct the mission shape without consulting the scenario manifest. Per M2 spec: 'mission.mission_started fires once with mission_id, seed, scenario_id'.",
   "type": "object",
-  "required": ["scenario_id", "started_at_tick", "time_limit_ticks", "objectives"],
+  "required": ["scenario_id"],
   "properties": {
+    "mission_id": { "type": "string", "description": "M2: mirrors scenario_id (one mission per scenario load). M13+ adds explicit ids when scenarios chain missions." },
     "scenario_id": { "type": "string" },
+    "seed": { "type": "integer", "minimum": 0, "description": "Engine RNG seed for the run." },
     "started_at_tick": { "type": "integer", "minimum": 0 },
     "time_limit_ticks": { "type": ["integer", "null"], "minimum": 0 },
     "objectives": {

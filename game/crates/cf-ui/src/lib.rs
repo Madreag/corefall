@@ -29,7 +29,15 @@ use bevy::prelude::*;
 
 use cf_actor::ActorObservation;
 
+// M2 / M3 spec "## Files" wiring: the HUD widgets live in dedicated
+// submodules so consumers that import per the spec paths resolve cleanly.
+pub mod ai_debug_label;
+pub mod enemy_hp;
+pub mod last_event_ticker;
 pub mod material_legend;
+pub mod mission_resolved_modal;
+pub mod mission_timer;
+pub mod objective_banner;
 
 pub use material_legend::{legend_entries, MaterialLegendEntry, MaterialLegendState};
 

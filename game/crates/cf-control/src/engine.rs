@@ -997,13 +997,21 @@ impl M0Engine {
                 }
             }
             {
+                // M2 re-audit pass 3 (2026-05-13): per spec line "mission.mission_started
+                // fires once with mission_id, seed, scenario_id". Previous payload was
+                // missing mission_id + seed. mission_id mirrors scenario_id at M2
+                // (one mission per scenario load; M13+ adds explicit mission_id when
+                // multiple missions per scenario exist).
                 let mission_started_id = self.recorder.record(
                     tick,
                     sim_time_ms,
                     "mission",
                     "mission_started",
                     json!({
+                        "mission_id": scenario_id,
+                        "scenario_id": scenario_id,
                         "scenario": scenario_id,
+                        "seed": self.config.seed,
                         "tick": tick.0,
                     }),
                     Some(started_id.clone()),

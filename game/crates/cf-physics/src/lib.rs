@@ -31,9 +31,13 @@
     clippy::cast_lossless
 )]
 
-// M1 re-audit (2026-05-13): per spec "## Files", cf-physics/src/authority.rs
-// is a separate submodule. Re-export the helpers for ergonomics.
+// M1 / M3 spec "## Files" wiring: the helpers live in dedicated
+// submodules so consumers that import per the spec paths
+// (`cf_physics::authority::*`, `cf_physics::penetration::*`,
+// `cf_physics::hazard::*`) resolve cleanly.
 pub mod authority;
+pub mod hazard;
+pub mod penetration;
 pub use authority::{AuthorityKind, AuthorityTransition};
 
 use serde::{Deserialize, Serialize};

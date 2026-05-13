@@ -31,9 +31,12 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
-// M1 re-audit (2026-05-13): spec lists `cf-equipment/src/projectile.rs` as a
-// separate file. The helper lives there now; re-exported here for ergonomics.
+// M1 / M2 / M3 spec "## Files" wiring: the helpers live in dedicated
+// submodules so consumers that import per the spec paths
+// (`cf_equipment::projectile::*`, `cf_equipment::digger::*`) resolve cleanly.
+pub mod digger;
 pub mod projectile;
+pub use digger::DiggerTool;
 pub use projectile::ProjectileSpawnParams;
 
 /// **M1**: how the weapon's fire button is consumed.
