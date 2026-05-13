@@ -636,6 +636,13 @@ struct EngineMutable {
     /// `mission.mission_resolved` when result=lost (DR-023 onboarding
     /// handoff — M3B viewer rewinds to this tick).
     last_player_input_event_id: Option<String>,
+    /// **M2 re-audit pass 4 (2026-05-13)**: most-recent
+    /// `actor.actor_status_changed` event id for the player actor. Used as
+    /// `parent_event_id` on `mission.mission_resolved` when the loss path
+    /// is `PlayerDead` so M10's cause-chain walker can hop
+    /// `mission_resolved → actor_status_changed(player DYING) → projectile_hit → ...`.
+    /// None until the first player status_changed fires.
+    last_player_status_event_id: Option<String>,
     /// **M2**: current material-overlay mode for the HUD legend + render
     /// layer. One of "off" | "integrity" | "pathability" | "mobility" |
     /// "hazard" | "build_repair". Default "off".
@@ -661,6 +668,12 @@ struct EngineMutable {
     /// `mission.objective_failed` so the cause chain walks back to the
     /// origination event.
     mission_objective_started_event_ids: BTreeMap<String, String>,
+    /// **M1 re-audit pass 4 (2026-05-13)**: per-actor `equipment.weapon_reload_started`
+    /// event id, used as `parent_event_id` on the subsequent
+    /// `equipment.weapon_reload_completed` so M10 viewers can walk the
+    /// reload chain cleanly. Entry is inserted on reload_started and removed
+    /// on reload_completed (so a cancelled reload doesn't strand a stale id).
+    reload_started_event_id_by_actor: BTreeMap<ActorId, String>,
     /// **M3 re-open (2026-05-13)**: per-tick coalesced dirty-region accumulator.
     /// Carve events push their dirty rects + source event ids here; the engine
     /// flushes ONE `terrain.terrain_dirty_region_batch` per tick at end of
@@ -865,12 +878,14 @@ impl M0Engine {
                 hud_last_chassis_stage: None,
                 hud_last_pilot_state: None,
                 last_player_input_event_id: None,
+                last_player_status_event_id: None,
                 material_overlay_mode: "off".to_string(),
                 total_debris_spawned: 0,
                 total_carve_events: 0,
                 hazard_last_contact_tick: BTreeMap::new(),
                 mission_started_event_id: None,
                 mission_objective_started_event_ids: BTreeMap::new(),
+                reload_started_event_id_by_actor: BTreeMap::new(),
                 pending_dirty_rects: Vec::new(),
                 sustained_unupdated_ticks: 0,
                 perf_coalesce_samples: Vec::new(),
@@ -1101,6 +1116,17 @@ impl M0Engine {
         drop(state);
         if let Some(sim) = actor_state {
             for actor in sim.world.actors.values() {
+                // M1 re-audit pass 4 (2026-05-13): the spec requires the
+                // scene-start snapshot payload to contain "full ActorState
+                // (M1 fields)". Previously only position/velocity/aim/
+                // status/hp/hp_max/selected_slot were emitted — the M1
+                // sim-relevant fields (stability, sharp_aim_progress,
+                // recoil_accumulator, knockdown_ticks_remaining,
+                // mission_critical, bloom_factor, dying_dwell_ticks_remaining,
+                // mass_kg, stability_recovery_rate) were dropped on the
+                // floor. Replay viewers that try to reconstruct mid-mission
+                // state from tick 0 + per-tick deltas saw zeros instead of
+                // the spawn values. Add them now.
                 self.recorder.record(
                     tick,
                     sim_time_ms,
@@ -1118,6 +1144,15 @@ impl M0Engine {
                         "hp_max": actor.hp_max,
                         "selected_slot": actor.inventory.selected.0,
                         "kind": "actor",
+                        "stability": actor.stability,
+                        "stability_recovery_rate": actor.stability_recovery_rate,
+                        "sharp_aim_progress": actor.sharp_aim_progress,
+                        "recoil_accumulator": actor.recoil_accumulator,
+                        "knockdown_ticks_remaining": actor.knockdown_ticks_remaining,
+                        "mission_critical": actor.mission_critical,
+                        "bloom_factor": actor.bloom_factor,
+                        "dying_dwell_ticks_remaining": actor.dying_dwell_ticks_remaining,
+                        "mass_kg": actor.mass_kg,
                     }),
                     parent_event_id.map(|s| s.to_string()),
                 );
@@ -1263,6 +1298,14 @@ impl M0Engine {
         let mut mission_payload: Option<(Tick, f64, cf_mission::MissionTickReport)> = None;
         if let Some(tick) = advanced {
             state.rng.next_u64();
+
+            // M3 re-audit pass 4 (2026-05-13): stamp the current tick onto
+            // the terrain so subsequent pixel writes set the right
+            // `last_modified_tick` on the affected chunk(s). Engine drives
+            // this BEFORE any carve / blast / fill in this tick's body.
+            if let Some(t) = state.chunked_terrain.as_mut() {
+                t.set_current_tick(tick.0);
+            }
 
             // BP2 dig path. Chunked terrain takes priority when loaded; legacy
             // breach strips drive M1.5 backward compatibility. The dig first
@@ -1584,6 +1627,15 @@ impl M0Engine {
                 for hit in terrain_hits {
                     // M2: penetration threshold event carries the formula
                     // inputs so replays + AI agents can verify the contact.
+                    //
+                    // M3 re-audit pass 4 (2026-05-13): spec requires
+                    // `parent_event_id` linking to the
+                    // `combat.projectile_spawned` event. Use the persisted
+                    // spawn id map.
+                    let projectile_spawn_parent = state
+                        .projectile_spawn_event_ids
+                        .get(&hit.projectile_id)
+                        .cloned();
                     let pen_id = self.recorder.record(
                         tick,
                         sim_time_ms,
@@ -1604,7 +1656,7 @@ impl M0Engine {
                             "debris_count": if hit.passed { 1 } else { 0 },
                             "position": hit.pos,
                         }),
-                        None,
+                        projectile_spawn_parent,
                     );
                     if hit.passed {
                         // Carve emitted by try_carve; the dislodged-pixel
@@ -2540,13 +2592,36 @@ impl M0Engine {
                 // parent_event_id link, but at M1.5 we don't have that link
                 // wired into the objective_completed loop yet — additive
                 // schema upgrade for M5+).
+                //
+                // M2 re-audit pass 4 (2026-05-13): when the loss reason is
+                // PlayerDead, no objective_failed fires (the player-dead
+                // check short-circuits in `cf_mission::step`), so
+                // `last_failed_event_id` is None and the cause chain
+                // breaks at the very first hop. Fall back to the player's
+                // last status_changed event id so M10 walkers can hop
+                // `mission_resolved → actor_status_changed(player DYING)
+                // → wound_added → projectile_hit → ...` cleanly.
+                let resolved_parent = if last_failed_event_id.is_some() {
+                    last_failed_event_id.clone()
+                } else if matches!(
+                    &result,
+                    cf_mission::MissionResult::Lost { reason }
+                        if matches!(reason, cf_mission::LossReason::PlayerDead)
+                ) {
+                    self.state
+                        .read()
+                        .ok()
+                        .and_then(|s| s.last_player_status_event_id.clone())
+                } else {
+                    None
+                };
                 self.recorder.record(
                     tick,
                     sim_time_ms,
                     "mission",
                     "mission_resolved",
                     payload,
-                    last_failed_event_id.clone(),
+                    resolved_parent,
                 );
                 // M2 re-audit (2026-05-13): lifecycle InProgress → Resolved.
                 if let Ok(mut s) = self.state.write() {
@@ -3039,8 +3114,13 @@ impl M0Engine {
             );
             last_perception_signal_id = Some(id);
         }
+        // M2 re-audit pass 4 (2026-05-13): retain the ai.tactic_chosen
+        // event id so the subsequent equipment.weapon_fired emit can
+        // chain back to it (spec cause chain requires
+        // weapon_fired → tactic_chosen → target_acquired → perception_signal).
+        let mut tactic_chosen_event_id: Option<String> = None;
         if let Some(t) = &report.tactic_chosen {
-            self.recorder.record(
+            let id = self.recorder.record(
                 tick,
                 sim_time_ms,
                 "ai",
@@ -3054,8 +3134,9 @@ impl M0Engine {
                     "score_hold": t.score_hold,
                     "score_search": t.score_search,
                 }),
-                None,
+                last_perception_signal_id.clone(),
             );
+            tactic_chosen_event_id = Some(id);
         }
         if let Some(s) = &report.state_changed {
             self.recorder.record(
@@ -3175,7 +3256,10 @@ impl M0Engine {
             );
         }
         if let Some(fire) = &report.fire {
-            self.recorder.record(
+            // M2 re-audit pass 4 (2026-05-13): chain guard weapon_fired +
+            // projectile_spawned to ai.tactic_chosen so the cause chain
+            // walks back to the AI's decision.
+            let weapon_fired_id = self.recorder.record(
                 tick,
                 sim_time_ms,
                 "equipment",
@@ -3187,7 +3271,7 @@ impl M0Engine {
                     "miss_roll": fire.miss_roll,
                     "will_miss": fire.will_miss,
                 }),
-                None,
+                tactic_chosen_event_id.clone(),
             );
             self.recorder.record(
                 tick,
@@ -3202,7 +3286,7 @@ impl M0Engine {
                     "lifetime_ticks": fire.lifetime_ticks,
                     "will_miss": fire.will_miss,
                 }),
-                None,
+                Some(weapon_fired_id),
             );
         }
     }
@@ -3252,7 +3336,7 @@ impl M0Engine {
             // status-changed emission for that transition to avoid duplicate
             // events + a mis-causally-labelled 'reset'/'unknown' fallback.
             if outcome.previous_status != outcome.new_status && !outcome.dying_dwell_elapsed {
-                self.recorder.record(
+                let status_event_id = self.recorder.record(
                     tick,
                     sim_time_ms,
                     "actor",
@@ -3265,6 +3349,20 @@ impl M0Engine {
                     }),
                     Some(intent_event_id.clone()),
                 );
+                // M2 re-audit pass 4 (2026-05-13): stash the most-recent
+                // player status_changed event id so `mission.mission_resolved`
+                // on the PlayerDead loss path can chain to it.
+                let is_player = self
+                    .state
+                    .read()
+                    .ok()
+                    .and_then(|s| s.player_actor)
+                    == Some(outcome.actor);
+                if is_player {
+                    if let Ok(mut s) = self.state.write() {
+                        s.last_player_status_event_id = Some(status_event_id);
+                    }
+                }
             }
             if outcome.reset {
                 self.recorder.record(
@@ -3310,14 +3408,33 @@ impl M0Engine {
                 );
             }
             if outcome.reload_started {
-                self.recorder.record(
+                // M1 re-audit pass 4 (2026-05-13): spec requires
+                // `equipment.weapon_reload_started.weapon_id`,
+                // `.magazine_id`, `.reload_duration_ticks`.
+                let weapon_id = cf_equipment::RIFLE_M1_DEFAULT_ID.to_string();
+                // Pre-reload magazine_index is the one being SWAPPED OUT; the
+                // post-reload index lands on `weapon_reload_completed`. The
+                // engine doesn't introspect the rifle directly here, so we
+                // derive the outgoing magazine_id by subtracting one from the
+                // post-reload counter on the completion event; the started
+                // event uses a "pending" suffix.
+                let magazine_id = format!("{weapon_id}:pending");
+                let started_id = self.recorder.record(
                     tick,
                     sim_time_ms,
                     "equipment",
                     "weapon_reload_started",
-                    json!({"actor": outcome.actor.0}),
+                    json!({
+                        "actor": outcome.actor.0,
+                        "weapon_id": weapon_id,
+                        "magazine_id": magazine_id,
+                        "reload_duration_ticks": outcome.reload_ticks_total,
+                    }),
                     Some(intent_event_id.clone()),
                 );
+                if let Ok(mut s) = self.state.write() {
+                    s.reload_started_event_id_by_actor.insert(outcome.actor, started_id);
+                }
                 self.emit_audio_cue(
                     cf_audio::AudioCue::ReloadStarted {
                         equipment_id: cf_equipment::RIFLE_M1_DEFAULT_ID.to_string(),
@@ -3327,20 +3444,69 @@ impl M0Engine {
                 );
             }
             if outcome.reload_completed {
+                // M1 re-audit pass 4 (2026-05-13): spec requires the
+                // completion event to be named `weapon_reload_completed`
+                // AND carry `parent_event_id=<weapon_reload_started>`. We
+                // keep `weapon_reloaded` emitted as well for backwards-
+                // compat with any existing run bundles.
+                let weapon_id = cf_equipment::RIFLE_M1_DEFAULT_ID.to_string();
+                let magazine_id = format!("{}:{}", weapon_id, outcome.magazine_index_after_reload);
+                let reload_started_parent = self
+                    .state
+                    .read()
+                    .ok()
+                    .and_then(|s| s.reload_started_event_id_by_actor.get(&outcome.actor).cloned())
+                    .or_else(|| Some(intent_event_id.clone()));
+                let payload = json!({
+                    "actor": outcome.actor.0,
+                    "weapon_id": weapon_id,
+                    "magazine_id": magazine_id,
+                });
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "equipment",
+                    "weapon_reload_completed",
+                    payload.clone(),
+                    reload_started_parent.clone(),
+                );
+                // Legacy alias kept for run-bundle backwards-compat.
                 self.recorder.record(
                     tick,
                     sim_time_ms,
                     "equipment",
                     "weapon_reloaded",
-                    json!({"actor": outcome.actor.0}),
-                    Some(intent_event_id.clone()),
+                    payload,
+                    reload_started_parent,
                 );
+                if let Ok(mut s) = self.state.write() {
+                    s.reload_started_event_id_by_actor.remove(&outcome.actor);
+                }
                 self.emit_audio_cue(
                     cf_audio::AudioCue::ReloadCompleted {
                         equipment_id: cf_equipment::RIFLE_M1_DEFAULT_ID.to_string(),
                         caption: format!("actor {} reload complete", outcome.actor.0),
                     },
                     tick,
+                );
+            }
+            if outcome.fire_denied_reloading {
+                // M1 re-audit pass 4 (2026-05-13): spec requires
+                // `control.command_rejected reason="reloading"` when fire
+                // is pressed during reload. Surface the rejection so
+                // replay viewers can show "REFUSED: reloading" in the
+                // last-event ticker.
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "control",
+                    "command_rejected",
+                    json!({
+                        "actor": outcome.actor.0,
+                        "method": "act.player.fire",
+                        "reason": "reloading",
+                    }),
+                    Some(intent_event_id.clone()),
                 );
             }
             if outcome.dry_fire {
@@ -5845,13 +6011,24 @@ impl EngineHandle for M0Engine {
         }
         let cs = cf_terrain::CHUNK_SIZE as i64;
         let origin = [cx as i64 * cs, cy as i64 * cs];
+        // M3 re-audit pass 4 (2026-05-13): spec requires the response to
+        // include `dirty_rect` AND the chunk's stored `last_modified_tick`
+        // (not the engine's current tick).
+        let dirty_rect = terrain.chunk_dirty_rect(cx, cy).map(|r| {
+            serde_json::json!({
+                "min": [r.min[0], r.min[1]],
+                "max": [r.max[0], r.max[1]],
+            })
+        });
+        let last_modified_tick = terrain.chunk_last_modified_tick(cx, cy);
         Some(serde_json::json!({
             "chunk_pos": { "cx": cx, "cy": cy },
             "chunk_size_pixels": cf_terrain::CHUNK_SIZE,
             "pixel_origin": origin,
             "material_grid_rle": rle,
             "checksum": checksum,
-            "last_modified_tick": state.clock.tick().0,
+            "last_modified_tick": last_modified_tick,
+            "dirty_rect": dirty_rect,
         }))
     }
 

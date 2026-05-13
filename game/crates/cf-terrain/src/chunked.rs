@@ -673,6 +673,12 @@ pub struct ChunkedTerrain {
     pub carve_count: u64,
     pub refusal_count: u64,
     pub registry: MaterialRegistry,
+    /// **M3 re-audit pass 4 (2026-05-13)**: most-recent sim tick stamped
+    /// onto chunks that were modified this tick. Engine calls
+    /// `set_current_tick` from `drive_tick` so every subsequent pixel
+    /// write updates the affected chunk's `last_modified_tick`. Default
+    /// 0 (chunks never modified). Not serialized (transient runtime state).
+    pub current_tick: u64,
 }
 
 impl ChunkedTerrain {
@@ -689,7 +695,15 @@ impl ChunkedTerrain {
             carve_count: 0,
             refusal_count: 0,
             registry: MaterialRegistry,
+            current_tick: 0,
         }
+    }
+
+    /// **M3 re-audit pass 4 (2026-05-13)**: engine calls this each tick so
+    /// the next pixel write stamps the right `last_modified_tick` on the
+    /// affected chunk.
+    pub fn set_current_tick(&mut self, tick: u64) {
+        self.current_tick = tick;
     }
 
     /// Apply a list of [`TerrainStamp`]s. Returns the number of pixels written.
@@ -1094,6 +1108,27 @@ impl ChunkedTerrain {
         }
     }
 
+    /// **M3 re-audit pass 4 (2026-05-13)**: read the chunk's current
+    /// `dirty_rect` without taking it. Returns `None` when the chunk is
+    /// unallocated OR has no pending dirty rect. Used by
+    /// `inspect.terrain.chunk` so cfctl consumers can see in-flight dirt
+    /// state without affecting the next render-bridge drain.
+    #[must_use]
+    pub fn chunk_dirty_rect(&self, cx: i32, cy: i32) -> Option<DirtyRect> {
+        self.chunks.get(&ChunkCoord::new(cx, cy)).and_then(|c| c.dirty_rect)
+    }
+
+    /// **M3 re-audit pass 4 (2026-05-13)**: read the chunk's
+    /// `last_modified_tick` stamp. Returns 0 for unallocated chunks (they
+    /// have never been modified).
+    #[must_use]
+    pub fn chunk_last_modified_tick(&self, cx: i32, cy: i32) -> u64 {
+        self.chunks
+            .get(&ChunkCoord::new(cx, cy))
+            .map(|c| c.last_modified_tick)
+            .unwrap_or(0)
+    }
+
     /// Try to fill / repair a circular region with `material`. Mirrors
     /// `try_carve` semantics: the operation refuses when the mask overlaps a
     /// refusal-reason material (e.g., metal_nohook — can't repaint over
@@ -1348,7 +1383,10 @@ impl ChunkedTerrain {
             .chunks
             .entry(coord)
             .or_insert_with(|| Chunk::uniform(self.default_material));
-        let changed = entry.set_pixel(lx, ly, mat);
+        // M3 re-audit pass 4 (2026-05-13): route through `set_pixel_at_tick`
+        // so the chunk's `last_modified_tick` stamp tracks the engine's
+        // current tick. `inspect.terrain.chunk` reads this stamp.
+        let changed = entry.set_pixel_at_tick(lx, ly, mat, self.current_tick);
         if changed {
             self.dirty_chunks.insert(coord);
             // Reclaim chunks that fully match the default to keep storage sparse.

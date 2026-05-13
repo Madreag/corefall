@@ -277,6 +277,20 @@ pub struct ActorTickOutcome {
     pub jump_accepted: bool,
     pub reload_started: bool,
     pub reload_completed: bool,
+    /// **M1 re-audit pass 4 (2026-05-13)**: reload duration in ticks at the
+    /// moment the reload was initiated. Zero unless `reload_started=true`.
+    #[serde(default)]
+    pub reload_ticks_total: u32,
+    /// **M1 re-audit pass 4 (2026-05-13)**: stable per-rifle magazine
+    /// counter AFTER any reload completion this tick. Engine uses this
+    /// (+ the rifle preset id) to synthesize a stable `magazine_id`.
+    #[serde(default)]
+    pub magazine_index_after_reload: u32,
+    /// **M1 re-audit pass 4 (2026-05-13)**: latched when the player
+    /// pressed fire this tick but the rifle was reloading. Engine emits
+    /// `control.command_rejected reason="reloading"`.
+    #[serde(default)]
+    pub fire_denied_reloading: bool,
     pub fired: bool,
     pub dry_fire: bool,
     pub muzzle_origin: Option<Vec2>,
@@ -564,6 +578,9 @@ fn step_one_actor<R: FnMut() -> u64>(
             jump_accepted: false,
             reload_started: false,
             reload_completed: false,
+            reload_ticks_total: 0,
+            magazine_index_after_reload: 0,
+            fire_denied_reloading: false,
             fired: false,
             dry_fire: false,
             muzzle_origin: None,
@@ -815,6 +832,9 @@ fn step_one_actor<R: FnMut() -> u64>(
     };
     outcome.reload_started = rifle_outcomes.reload_started;
     outcome.reload_completed = rifle_outcomes.reload_completed;
+    outcome.reload_ticks_total = rifle_outcomes.reload_ticks_total;
+    outcome.magazine_index_after_reload = rifle_outcomes.magazine_index_after;
+    outcome.fire_denied_reloading = rifle_outcomes.fire_denied_reloading;
     outcome.dry_fire = rifle_outcomes.dry_fire;
 
     if rifle_outcomes.fired_this_tick {

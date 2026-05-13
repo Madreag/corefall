@@ -699,6 +699,13 @@ pub struct RifleState {
     /// CCCP Magazine semantics). Reset to 0 by `reset()` and on reload completion.
     #[serde(default)]
     pub shot_index_in_mag: u32,
+    /// **M1 re-audit pass 4 (2026-05-13)**: stable per-rifle magazine
+    /// counter; incremented on each successful reload. Used by the engine
+    /// to synthesize a stable `magazine_id` (e.g. `<preset_id>:<index>`)
+    /// for `equipment.weapon_reload_started` / `equipment.weapon_reload_completed`.
+    /// Starts at 0 — the magazine the rifle ships with.
+    #[serde(default)]
+    pub magazine_index: u32,
 }
 
 impl RifleState {
@@ -711,6 +718,7 @@ impl RifleState {
             spec,
             semi_latched: false,
             shot_index_in_mag: 0,
+            magazine_index: 0,
         }
     }
 
@@ -774,6 +782,24 @@ pub struct TickOutcomes {
     /// Always false when no shot fired.
     #[serde(default)]
     pub fired_is_tracer: bool,
+    /// **M1 re-audit pass 4 (2026-05-13)**: total reload-duration in ticks
+    /// at the moment a reload was initiated this tick. Engine emits
+    /// `equipment.weapon_reload_started.reload_duration_ticks` from this.
+    /// Zero when `reload_started=false`.
+    #[serde(default)]
+    pub reload_ticks_total: u32,
+    /// **M1 re-audit pass 4 (2026-05-13)**: stable magazine slot index
+    /// (incremented on each successful reload). Drives the per-mag
+    /// `magazine_id` exposed on `equipment.weapon_reload_started` /
+    /// `equipment.weapon_reload_completed` so M10 replay viewers can group
+    /// per-magazine shots.
+    #[serde(default)]
+    pub magazine_index_after: u32,
+    /// **M1 re-audit pass 4 (2026-05-13)**: fire intent was received but
+    /// the rifle silently gated it (reload in progress). Engine emits
+    /// `control.command_rejected reason="reloading"` from this.
+    #[serde(default)]
+    pub fire_denied_reloading: bool,
 }
 
 impl TickOutcomes {
@@ -785,6 +811,9 @@ impl TickOutcomes {
             dry_fire: false,
             recoil_impulse_applied: 0.0,
             fired_is_tracer: false,
+            reload_ticks_total: 0,
+            magazine_index_after: 0,
+            fire_denied_reloading: false,
         }
     }
 }
@@ -832,11 +861,24 @@ pub fn tick_rifle(state: &mut RifleState, inputs: RifleTickInputs) -> TickOutcom
         if state.reload_remaining_ticks == 0 {
             state.ammo_in_mag = state.spec.mag_capacity;
             state.shot_index_in_mag = 0;
+            state.magazine_index = state.magazine_index.saturating_add(1);
             outcomes.reload_completed = true;
+            outcomes.magazine_index_after = state.magazine_index;
             // Reload finished this tick; the fire check below would otherwise see a
             // zero cooldown and fire on the same tick. Defer firing to the next tick
             // to match the documented "shoot again on the very next tick" semantics.
+            // M1 re-audit pass 4: if the player also pressed fire this tick while
+            // the reload was completing, surface the rejection so the engine can
+            // emit `control.command_rejected reason="reloading"`.
+            if inputs.fire_pressed {
+                outcomes.fire_denied_reloading = true;
+            }
             return outcomes;
+        }
+        // Reload still in progress; if the player pressed fire this tick the
+        // rifle silently gates it. Surface the rejection.
+        if inputs.fire_pressed {
+            outcomes.fire_denied_reloading = true;
         }
     } else if state.fire_cooldown_ticks > 0 {
         state.fire_cooldown_ticks -= 1;
@@ -850,6 +892,7 @@ pub fn tick_rifle(state: &mut RifleState, inputs: RifleTickInputs) -> TickOutcom
         // Cancel the pending fire cooldown; reloading takes over.
         state.fire_cooldown_ticks = 0;
         outcomes.reload_started = true;
+        outcomes.reload_ticks_total = state.reload_remaining_ticks;
     }
 
     if inputs.fire_pressed && !state.is_reloading() {
