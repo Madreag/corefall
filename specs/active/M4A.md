@@ -2201,7 +2201,332 @@ The audit should mark these STILL FAILING:
 - ModuleStrip bound_zone reference (item #2132)
 - cf-ui/AGENTS.md M4A accessibility surfaces section (item #1031)
 
-### Pitfalls / things that have bitten us before
+### Personal-power HUD widgets (M5.8 + M7.6 integration; CANONICAL UX/UI deep-dive)
+
+Per the user's vision: **"power management should be integral to the actors... humans don't require power but their equipment and gear and certain armor do; androids require power but don't completely disable when out depending on which parts are still human; robots will power down, can overclock; they need to carry battery packs."**
+
+M4A's HUD makes power + oxygen state immediately readable for every actor + every play style. Below is the deep-dive UX/UI design.
+
+**Per-origin HUD power layout — adaptive per actor:**
+
+Per chassis-bearing actor, the HUD adapts based on origin:
+
+**Human actor (battery-only HUD):**
+```
++------------------------------------------------+
+|  [HEAD]  HP: 90% | STAMINA: ████░░░ 60%       |
+|          BLOOD: 4250 mL (-3 ml/s bleeding)    |
+|                                                |
+|  [BATTERY PACK]  T2 Lithium-Ion                |
+|    █████████░░░░░ 65% (3.25 kWh / 5.0 kWh)    |
+|    Time to empty: 18:42 (at current draw)     |
+|    Equipment shed: [ flashlight ]              |
+|                                                |
+|  [O2 TANK]  T1 Compressed (60 L)              |
+|    ████████████░░░ 78% — 47 min remaining     |
+|    Helmet seal: ✓ INTACT (100%)               |
++------------------------------------------------+
+```
+
+**Robot actor (full power-dependent HUD):**
+```
++------------------------------------------------+
+|  [CHASSIS]  HP: 95% | HEAT: ██░░░░░░ 22%      |
+|             POWER (core+battery): 75%          |
+|                                                |
+|  [BATTERY PACK]  T2 Standard                   |
+|    ████████░░░░░ 60% (3.0 kWh / 5.0 kWh)      |
+|    Time to inert: 24:15                       |
+|    Solar trickle: +50 W (daylight)            |
+|    Equipment shed: [ jet pack — utility ]     |
+|                                                |
+|  [VACUUM HEAT WARN]  Heat radiator: 60% used  |
+|                       Cool method: passive     |
+|                                                |
+|  [NO OXYGEN]  (robot — immune)                |
++------------------------------------------------+
+```
+
+**Android actor (hybrid HUD):**
+```
++--------------------------------+
+|  [BODY]  HP: 88%                |
+|         BLOOD: 3800 mL          |
+|         BATTERY: 70% (synth side)|
+|                                  |
+|  [EQUIPMENT]   T2 battery pack  |
+|    ████████░░ 70%               |
+|                                  |
+|  [O2 TANK]   60 L (organic side)|
+|    ████████░░ 75%               |
+|    Time: 38 min                  |
++--------------------------------+
+```
+
+**Persistent HUD strip placement:**
+
+- **Battery widget**: bottom-right of HUD (small icon + percentage); expandable on hover
+- **O2 widget**: bottom-right below battery (humans/androids only)
+- **Power equipment list**: under widget; shows top 3 active equipment + power draw
+- **Charge indicator**: lightning bolt animation when on charging pad / cable
+- **Robot thermal widget**: replaces O2 slot for robots; shows heat % + cooling method
+- **Helmet seal indicator**: small ring icon near reticle; green/yellow/red
+
+**Battery-low cascade UX:**
+
+| Battery % | Visual | Banner | Audio |
+|---|---|---|---|
+| 100-50% | Green | (none) | (none) |
+| 50-30% | Yellow | (none) | (none) |
+| 30-15% | Orange | "LOW BATTERY" warning | Soft alert tone |
+| 15-5% | Red flash | "BATTERY CRITICAL — utilities shed" | Urgent alert |
+| 5-0% | Red strobe | "BATTERY EMPTY IN 2:30" | Critical alarm |
+| 0% (human/android) | Equipment greyed out | "EQUIPMENT OFFLINE" | Power-down sound |
+| 0% (robot) | Full HUD freeze; black overlay with red emergency LED | "ROBOT INERT — REQUIRES BATTERY" | Heartbeat-style pulse |
+
+**Battery hot-swap UX flow:**
+
+1. Player presses [B] (Battery hot-swap hotkey, remappable)
+2. Pie menu opens (per M2.2C pie menu UI) with 4 slices:
+   - Hot-swap primary battery
+   - Hot-swap backup battery
+   - Charge primary at nearest pad (path-finder hint)
+   - Cancel
+3. Player selects "hot-swap primary"
+4. 1-3s animation (depends on tier); equipment briefly offline
+5. New battery seated; equipment powers up
+6. Caption: "Primary battery swapped — T2 Standard Lithium-Ion (5.0 kWh)"
+
+**Equipment power priority customization UX:**
+
+Player can drag-and-drop equipment in priority order:
+
+```
++--------------------------------+
+| EQUIPMENT POWER PRIORITY        |
+|--------------------------------|
+| 1. [CRITICAL] Helmet HUD      |
+| 2. [CRITICAL] Suit life-support|
+| 3. [IMPORTANT] Weapon          |
+| 4. [IMPORTANT] Servo armor     |
+| 5. [UTILITY] Thermal optics    |
+| 6. [UTILITY] Flashlight        |
+| 7. [LUXURY] Cosmetic lighting  |
+|--------------------------------|
+| [Drag-and-drop to reorder]     |
+| [Auto-shed threshold: 30% ▼]  |
+| [Save preset: "Combat"]        |
++--------------------------------+
+```
+
+Settings persist per profile (T-CONFIG in M9).
+
+**O2 management UX:**
+
+- Helmet seal indicator: ring around reticle (green = sealed; yellow = minor breach; red = major breach)
+- Sound cue: "BREACH" voice line on critical (M9.5 audio)
+- Caption: "Helmet seal breached at left vent — 2 sec to reseal"
+- Player can press [R] (or remap) to reseal manually (slow process; 5-10s depending on damage)
+- Time-remaining countdown in HUD: HH:MM:SS based on current activity
+- Warning at <30s: amber banner "LOW O2"
+- Critical at <10s: red banner "OXYGEN CRITICAL"
+- Zero: hypoxia affliction cascades (per M5.8 + M5.9)
+
+**Charging pad UX:**
+
+- Approach pad → HUD shows charge rate (e.g. "2 kW from T1 charging pad")
+- Press [E] to plug in / unplug
+- Battery icon shows live charge rate (lightning bolt animation)
+- Multiple players can share pad if it has multiple ports
+- Cable visible from pad to actor backpack
+- Pad shows power consumption from grid + queue of users
+
+**Power overlay HUD (F5 toggle):**
+
+Comprehensive grid view (per M7.6 base + M5.8 personal):
+```
++----------------------------------------------------------+
+|  POWER OVERLAY  ─  GRID STATE: NOMINAL (78% load)        |
+|----------------------------------------------------------|
+|                                                          |
+|  Generation:  Solar 8.2 kW | Wind 3.1 kW | Reactor 0 kW |
+|  Total supply: 11.3 kW                                   |
+|  Total demand: 8.8 kW (77.9%)                            |
+|                                                          |
+|  Per-actor batteries:                                    |
+|  └─ Player: T2 65% (3.25 kWh) — 18:42 remaining         |
+|  └─ Squad 1 (robot): T2 60% (3.0 kWh) + solar +50 W     |
+|  └─ Squad 2 (android): T1 30% (0.3 kWh) — LOW WARNING   |
+|                                                          |
+|  Charging:                                               |
+|  └─ Pad 1: empty                                         |
+|  └─ Pad 2: 1 battery charging (15 min remaining)        |
+|                                                          |
+|  Grid topology (live):                                   |
+|    [Solar] ──── [Battery Bank 50%] ─── [Distribution]   |
+|         └─[Charging Pad] └─[Shield] └─[Turrets] └─[Lights]|
+|                                                          |
+|  Brown-out band:  ░░░░░░░░░░ 0% (clean)                 |
+|                                                          |
+|  Per-tick graph (last 60s):                              |
+|  Supply: ────────────╱──────                            |
+|  Demand: ─────╱─╲────────╱───                          |
+|  Battery: ────────────╲──────                          |
++----------------------------------------------------------+
+```
+
+Press F5 to toggle. Per DR-012 accessibility:
+- Color-independent text labels for every state
+- High-contrast mode: monochrome topology
+- Reduce motion: no animated curves; only updates on state change events
+- Captions: "Solar output 8.2 kW; brown-out risk at 90%"
+
+**Quick-access power management:**
+
+- Hotkey [P] → opens personal power panel (per actor)
+- Hotkey [P + Shift] → opens base power panel (per base)
+- Hotkey [P + Ctrl] → opens orbital power panel (per station)
+- Hotkey [F5] → toggle overlay
+- Hotkey [B] → hot-swap battery
+- Hotkey [O] → check oxygen status
+
+### UX/UI master deep-dive — Cortex / Terraria / Stationeers / Soldat / Noita synthesis
+
+Per the user's vision: **"the best all-encompassing 2D Cortex Command game! with features from Terraria, Stationeers, Soldat, Noita, etc."**
+
+M4A unifies the HUD design across all major reference games:
+
+| Reference game | What Corefall borrows |
+|---|---|
+| **Cortex Command** | Command core HUD widget + objective arrows + actor-switching UI + brain camera + dropship landing UI |
+| **Terraria** | Crafting recipe panel (top-bar tier filter + drag-input slot + queue) + inventory grid Tetris (per M7) + day/night countdown + boss healthbar (per M7 bosses) |
+| **Stationeers** | Power overlay (live grid topology) + per-room atmospheric overlay + IC10 chip programming + cable/wire connection preview + voltage tier visual cues |
+| **Soldat** | Reticle bloom from movement/recoil + status pip strip (HP/AMMO/JET) + footstep sound radius indicator (per M2.2A perception kernel) |
+| **Noita** | Material affordance overlay + flask system UI + alchemy + perk/curse altar UI |
+| **Helldivers** | Stratagem call-in panel (D-pad combo) + extraction zone arrows + dropship landing alert |
+| **Diablo** | Loot rarity color borders + drop pickup glow + tooltip with affixes |
+| **Rimworld** | Per-actor mood/stress widget (per M5.8 affliction strip) + storyteller event ticker + scheduler |
+| **ONI** | Power circuit overlay (grid topology + voltage tier colors) + per-room atmospheric readouts |
+| **ACRE2** | Radio frequency indicator + helmet HUD overlay + comms blackout banner |
+| **Factorio** | Per-tick load graph (supply/demand/battery) + crafting queue + research tree UI |
+| **OpenSoldat launcher** | Lobby browser with dense rows + double-click join + compatibility pip |
+
+**Information priority ladder (CRITICAL UX RULE)**:
+
+Every HUD surface follows the L0..L4 ladder from M4A's primary spec:
+
+- **L0 (0-500ms attention)**: Body status changes, incoming projectile arrows, helmet breach warning, battery critical, oxygen critical — these CANNOT be hidden behind menus
+- **L1 (0.5-2s)**: Ammo, current weapon, reticle state, current stance, current power level
+- **L2 (2-5s)**: Mini-map, objective banner, squad strip, faction status
+- **L3 (5-60s)**: Buy/loadout panel, base build menu, crafting panel, power management panel, settings
+- **L4 (after-action)**: Debrief, replay viewer, codex, research tree, cosmetic locker
+
+Each new HUD widget gets a specific L tier; M4A validates that no L3/L4 panel obscures L0/L1 surfaces.
+
+**Quick visualization examples (ASCII mock-ups for clarity):**
+
+**Power management quick-look (top-right corner; persistent):**
+```
+[BAT] T2 65% [O2] 78% [HEAT] 22%
+```
+
+**Crafting panel (M7.8; activated by [C]):**
+```
++------------------------------------------------+
+| CRAFT  ●●○○○ T1 Industrial                     |
+|------------------------------------------------|
+| Filter: [Weapons ▼] Station: [Workbench ✓]    |
+|------------------------------------------------|
+| ▶ Iron Rifle M1                                |
+|   Cost: 15 iron ✓ | 5 wood ✓ | 2 copper ✓     |
+|   Power: 1 kW | Time: 60s                     |
+|   [CRAFT NOW]                                  |
+|------------------------------------------------|
+| ▷ Iron Plate Armor (locked — research needed) |
+|   Requires: "Industrial Metallurgy"            |
++------------------------------------------------+
+```
+
+**Base build palette (M7; activated by [G]):**
+```
++--------------------------+
+| BUILD ●●○○○ T1            |
+|--------------------------|
+| Tabs: [Walls][Floors]    |
+|       [Power][Doors]     |
+|       [Defense][Crafting]|
+|--------------------------|
+| ▶ Iron Wall              |
+|   Cost: 5 iron + 1 plastic|
+|   HP: 200                 |
+|   [PLACE]                 |
++--------------------------+
+```
+
+**Power management deep panel ([P]):**
+```
++--------------------------------+
+| PERSONAL POWER                  |
+|--------------------------------|
+| BATTERY: T2 Lithium 65%        |
+| Time to empty: 18:42           |
+|                                |
+| Charging: NO (off pad)         |
+| Charging rate available: 0 W   |
+|                                |
+| EQUIPMENT POWER:               |
+| └─ Helmet HUD ✓ 15 W           |
+| └─ Suit heating ✓ 200 W        |
+| └─ Servo assist ✓ 300 W        |
+| └─ Energy rifle ✓ 200 W        |
+| └─ Flashlight ✗ SHEDDED        |
+| └─ Thermal optics ✗ SHEDDED    |
+|                                |
+| [HOT-SWAP BATTERY]             |
+| [CHANGE PRIORITY]              |
+| [AUTO-SHED THRESHOLD: 30% ▼]  |
++--------------------------------+
+```
+
+**World map (PvE survival; M11.5):**
+```
++--------------------------------+
+| EARTH — Surface (planet-side)  |
+|--------------------------------|
+|                                |
+|        ⓿ Base                  |
+|       /        ⓪ Outpost        |
+|      /                         |
+|     /  ⓢ Storm zone             |
+|    /                           |
+|  ⓘ Iron deposit                |
+|                                |
+| Press [Shift+M] for orbital map|
++--------------------------------+
+```
+
+**Orbital map (PvE survival; M11.5):**
+```
++--------------------------------+
+| SOLAR SYSTEM                   |
+|--------------------------------|
+|                                |
+|         ☼ Sol                  |
+|        /  \                    |
+|       /    \                   |
+|     ◐ Mercury                  |
+|       \    /                   |
+|        \  / ●Earth (you)       |
+|              ⓢ                  |
+|         ⓘ                       |
+|        Mars   distance 1.5 AU  |
+|              comms delay 8 min |
+|                                |
+| [TRAVEL TO MARS] (dropship 4h) |
++--------------------------------+
+```
+
+**Pitfalls / things that have bitten us before**
 
 - **Hardcoding HUD_FOCUSABLE_NODES in multiple places**: focus traversal breaks when one consumer's list goes stale. The const is the single source of truth.
 - **Manual Val::Px multiplication for scale**: defeats Bevy UiScale; reflow breaks. Use UiScale resource.
