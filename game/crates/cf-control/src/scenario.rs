@@ -286,6 +286,11 @@ impl ScenarioObjective {
             optional: self.optional,
             status: ObjectiveStatus::Pending,
             progress_milestone_index: 0,
+            // M2 re-audit (2026-05-13): new continuous progress + fail_sensor
+            // fields. Default progress=0.0 + None fail_sensor; the engine
+            // populates progress as the objective advances.
+            progress: 0.0,
+            fail_sensor: None,
         }
     }
 }

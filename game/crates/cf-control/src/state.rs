@@ -225,6 +225,12 @@ pub struct ActorView {
     pub hp_max: f32,
     pub selected_slot: u32,
     pub selected_item: String,
+    /// **M1 re-audit (2026-05-13)**: full inventory contents as labels in
+    /// slot order (4 entries for M1; "empty" for unset slots). Mirrors
+    /// `cf_actor::ActorObservation.inventory` so consumers reading
+    /// `observe.frame.actors[]` see the same payload as `observe.actor`.
+    #[serde(default)]
+    pub inventory: Vec<String>,
     pub rifle_ammo: Option<u32>,
     pub rifle_capacity: Option<u32>,
     pub rifle_fire_cooldown_ticks: Option<u32>,

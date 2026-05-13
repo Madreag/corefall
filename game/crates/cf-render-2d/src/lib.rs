@@ -18,6 +18,11 @@
 pub mod debris;
 pub mod dig_preview;
 pub mod overlay;
+// M1 re-audit (2026-05-13): spec lists cf-render-2d/src/reticle.rs as a
+// separate file. The helper lives there now; the bloom + tool-validity
+// color logic still operates inside this lib.rs but consumers can
+// `use cf_render_2d::reticle::{reticle_pixel_radius, reticle_color_for_validity}`.
+pub mod reticle;
 pub mod terrain;
 
 pub use debris::{

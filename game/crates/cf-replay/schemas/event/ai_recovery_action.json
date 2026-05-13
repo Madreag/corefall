@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ai_recovery_action.v1",
+  "title": "ai.recovery_action",
+  "description": "Emitted when a guard's stuck-recovery selects an action. parent_event_id chains back to `ai.stuck_state_changed`. `action` is one of wait_then_search / random_walk / fall_back / call_for_help.",
+  "type": "object",
+  "required": ["actor_id", "action", "reason"],
+  "properties": {
+    "actor_id": { "type": "integer", "minimum": 0 },
+    "action": { "type": "string" },
+    "reason": { "type": "string" }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/objective_updated.v1",
+  "title": "mission.objective_updated",
+  "description": "Emitted at quartile milestones (25%/50%/75%) during the lifetime of an in-progress objective. M2 emits one per quartile crossing per `PROGRESS_QUARTILES = [0.25, 0.5, 0.75, 1.0]`. parent_event_id chains back to `mission.objective_started`.",
+  "type": "object",
+  "required": ["objective_id", "progress"],
+  "properties": {
+    "objective_id": { "type": "string" },
+    "kind": { "type": "string" },
+    "progress": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+    "milestone_index": { "type": "integer", "minimum": 0 }
+  }
+}

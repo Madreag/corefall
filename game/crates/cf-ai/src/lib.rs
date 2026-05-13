@@ -529,6 +529,11 @@ pub struct GuardTickInputs<'a> {
     /// alarms within range collapse to one perception_signal per tick
     /// (closest-source wins).
     pub alarms: &'a [AlarmInput],
+    /// **M2 re-audit (2026-05-13)**: actor id of the most recent damager.
+    /// Engine populates from `last_damage_source_actor_id` so the
+    /// Dying transition cause reads `killed_by_<actor_id>` instead of the
+    /// hardcoded `killed_by_player`. `None` when no recorded source.
+    pub last_damage_source: Option<u64>,
 }
 
 /// **M1.5 G2 (hearing)**: one alarm the guard can react to this tick.
@@ -633,10 +638,14 @@ pub struct TargetLostRecord {
 
 /// Recorded `ai.state_changed` payload.
 #[derive(Debug, Clone, PartialEq)]
+// M2 re-audit (2026-05-13): `cause` was previously `&'static str`. The spec
+// requires `killed_by_<source_actor_id>` (with the killer's actor id
+// interpolated) so we now carry an owned `String`. Public callers that
+// previously passed string literals work unchanged via `.to_string()`.
 pub struct GuardStateTransition {
     pub previous: GuardState,
     pub next: GuardState,
-    pub cause: &'static str,
+    pub cause: String,
 }
 
 /// Recorded `ai.perception` payload.
@@ -690,6 +699,13 @@ pub fn step(guard: &mut ReactiveGuard, inputs: GuardTickInputs<'_>, rng: &mut Rn
     // **M1.5 G1**: mirror the actor body state machine so the AI surface
     // exposes the full death ladder (Engaged → Dying → Dead) for the
     // replay viewer to walk.
+    // M2 re-audit (2026-05-13): cause vocabulary per spec — killed_by_<id>
+    // when the engine recorded a damage source; falls back to "killed_by_unknown"
+    // when no source is available.
+    let killed_by_cause = match inputs.last_damage_source {
+        Some(id) => format!("killed_by_{id}"),
+        None => "killed_by_unknown".to_string(),
+    };
     if inputs.self_actor.status == Status::Dead || guard.state == GuardState::Dead {
         if guard.state != GuardState::Dead {
             let prev = guard.state;
@@ -697,7 +713,7 @@ pub fn step(guard: &mut ReactiveGuard, inputs: GuardTickInputs<'_>, rng: &mut Rn
             report.state_changed = Some(GuardStateTransition {
                 previous: prev,
                 next: GuardState::Dead,
-                cause: "dying_dwell_elapsed",
+                cause: "dying_dwell_elapsed".to_string(),
             });
         }
         return report;
@@ -710,7 +726,7 @@ pub fn step(guard: &mut ReactiveGuard, inputs: GuardTickInputs<'_>, rng: &mut Rn
             report.state_changed = Some(GuardStateTransition {
                 previous: prev,
                 next: GuardState::Dying,
-                cause: "killed_by_player",
+                cause: killed_by_cause.clone(),
             });
             return report;
         }
@@ -722,7 +738,7 @@ pub fn step(guard: &mut ReactiveGuard, inputs: GuardTickInputs<'_>, rng: &mut Rn
                 report.state_changed = Some(GuardStateTransition {
                     previous: prev,
                     next: GuardState::Dead,
-                    cause: "dying_dwell_elapsed",
+                    cause: "dying_dwell_elapsed".to_string(),
                 });
             }
         }
@@ -739,7 +755,7 @@ pub fn step(guard: &mut ReactiveGuard, inputs: GuardTickInputs<'_>, rng: &mut Rn
         report.state_changed = Some(GuardStateTransition {
             previous: prev,
             next: GuardState::Dying,
-            cause: "killed_by_player",
+            cause: killed_by_cause,
         });
         return report;
     }
@@ -793,7 +809,7 @@ pub fn step(guard: &mut ReactiveGuard, inputs: GuardTickInputs<'_>, rng: &mut Rn
                 report.state_changed = Some(GuardStateTransition {
                     previous: GuardState::Idle,
                     next: GuardState::Alert,
-                    cause: "heard_shot",
+                    cause: "heard_shot".to_string(),
                 });
             }
         }
@@ -898,7 +914,7 @@ pub fn step(guard: &mut ReactiveGuard, inputs: GuardTickInputs<'_>, rng: &mut Rn
             report.state_changed = Some(GuardStateTransition {
                 previous: prev,
                 next: GuardState::Retreating,
-                cause: "low_hp",
+                cause: "low_hp".to_string(),
             });
         }
     } else if !should_retreat && hp_pct >= guard.params.recover_hp_pct && guard.state == GuardState::Retreating {
@@ -911,7 +927,7 @@ pub fn step(guard: &mut ReactiveGuard, inputs: GuardTickInputs<'_>, rng: &mut Rn
         report.state_changed = Some(GuardStateTransition {
             previous: prev,
             next: guard.state,
-            cause: "hp_recovered",
+            cause: "hp_recovered".to_string(),
         });
     }
     if let Some(p) = &perception {
@@ -931,10 +947,20 @@ pub fn step(guard: &mut ReactiveGuard, inputs: GuardTickInputs<'_>, rng: &mut Rn
             if guard.state != GuardState::Retreating {
                 guard.state = GuardState::Engaged;
                 if prev != GuardState::Engaged {
+                    // M2 re-audit (2026-05-13): spec vocabulary —
+                    // Idle→Alert uses `saw_player_in_cone`; Alert→Engaged
+                    // uses `target_acquired`. Pre-fix the code used
+                    // `player_visible` for both (and `target_acquired` was
+                    // a separate event).
+                    let cause = if prev == GuardState::Idle {
+                        "saw_player_in_cone"
+                    } else {
+                        "target_acquired"
+                    };
                     report.state_changed = Some(GuardStateTransition {
                         previous: prev,
                         next: GuardState::Engaged,
-                        cause: "player_visible",
+                        cause: cause.to_string(),
                     });
                     if let Some(player) = inputs.player {
                         report.target_acquired = Some(TargetAcquiredRecord {
@@ -952,7 +978,7 @@ pub fn step(guard: &mut ReactiveGuard, inputs: GuardTickInputs<'_>, rng: &mut Rn
                     report.state_changed = Some(GuardStateTransition {
                         previous: prev,
                         next: GuardState::Alert,
-                        cause: "player_lost",
+                        cause: "target_lost".to_string(),
                     });
                     if let Some(player) = inputs.player {
                         report.target_lost = Some(TargetLostRecord {
@@ -968,7 +994,7 @@ pub fn step(guard: &mut ReactiveGuard, inputs: GuardTickInputs<'_>, rng: &mut Rn
             report.state_changed = Some(GuardStateTransition {
                 previous: prev,
                 next: GuardState::Idle,
-                cause: "alert_expired",
+                cause: "alert_expired".to_string(),
             });
         }
     }
@@ -1360,6 +1386,7 @@ mod tests {
             self_actor: guard_a,
             player,
             alarms: &[],
+            last_damage_source: player.map(|p| p.id.0),
         }
     }
 
@@ -1375,6 +1402,7 @@ mod tests {
             self_actor: guard_a,
             player,
             alarms,
+            last_damage_source: player.map(|p| p.id.0),
         }
     }
 

@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ai_stuck_state_changed.v1",
+  "title": "ai.stuck_state_changed",
+  "description": "Emitted when a guard's stuck-tick counter crosses the threshold (default 60 ticks @60Hz = 1 second of stuck). Pairs with `ai.recovery_action` for the actual recovery choice.",
+  "type": "object",
+  "required": ["actor_id", "stuck"],
+  "properties": {
+    "actor_id": { "type": "integer", "minimum": 0 },
+    "stuck": { "type": "boolean" },
+    "ticks_stuck": { "type": "integer", "minimum": 0 }
+  }
+}

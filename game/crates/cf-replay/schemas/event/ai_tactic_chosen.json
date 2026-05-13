@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ai_tactic_chosen.v1",
+  "title": "ai.tactic_chosen",
+  "description": "Emitted when a guard's utility scorer picks a tactic for the current tick. parent_event_id chains back to the perception signal that triggered the re-score (target_acquired / hearing / memory_decayed).",
+  "type": "object",
+  "required": ["actor_id", "tactic"],
+  "properties": {
+    "actor_id": { "type": "integer", "minimum": 0 },
+    "tactic": { "type": "string" },
+    "utility": { "type": "number" },
+    "target_actor_id": { "type": ["integer", "null"], "minimum": 0 }
+  }
+}

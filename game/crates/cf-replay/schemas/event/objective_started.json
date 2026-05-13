@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/objective_started.v1",
+  "title": "mission.objective_started",
+  "description": "Emitted when an objective transitions from `pending` → `in_progress`. Carries the objective id + kind + initial progress (0.0). parent_event_id chains back to `mission.mission_started` for the FRE objective set OR to whichever event triggered a mid-mission objective start.",
+  "type": "object",
+  "required": ["objective_id", "kind"],
+  "properties": {
+    "objective_id": { "type": "string" },
+    "kind": { "type": "string" },
+    "optional": { "type": "boolean", "default": false },
+    "progress": { "type": "number", "minimum": 0.0, "maximum": 1.0, "default": 0.0 }
+  }
+}

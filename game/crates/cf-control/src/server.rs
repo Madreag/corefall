@@ -92,7 +92,8 @@ use crate::{
     schemas::{
         ActChassisClearJamParams, ActChassisRepairParams, ActChassisSalvageParams, ActInputCaptureControlsParams,
         ActMissionPauseParams, ActMissionResumeParams, ActPlayerAbortParams, ActPlayerAimParams, ActPlayerClimbParams,
-        ActPlayerAnchorParams, ActPlayerCrouchParams, ActPlayerDigParams, ActPlayerEjectParams, ActPlayerFireParams, ActPlayerJetParams,
+        ActPlayerAnchorParams, ActPlayerCrouchParams, ActPlayerDigParams, ActPlayerEjectParams, ActPlayerFireParams,
+        ActPlayerJetParams, InspectAiParams, InspectMissionParams, ObserveAiParams, ObserveMissionParams,
         ActPlayerJumpParams, ActPlayerMoveParams, ActPlayerReloadParams, ActPlayerResetParams,
         ActPlayerSelectItemParams, ActPlayerSharpAimParams, InspectActorParams, InspectEquipmentParams,
         ObserveActorParams, ObserveOnceParams, ObserveSubscribeParams, RunBundleWriteParams, RunForTicksParams,
@@ -458,6 +459,26 @@ pub trait EngineHandle: Send + Sync + 'static {
     }
     /// **M1 Gap B3**: return the `ActorView` for a specific actor (or the
     /// player when `actor_id` is None). Default returns `None`.
+    /// **M2 re-audit (2026-05-13)**: return the full `MissionState`
+    /// projection or `None` if no mission is loaded.
+    async fn observe_mission(&self) -> Option<serde_json::Value> {
+        None
+    }
+    /// **M2 re-audit (2026-05-13)**: return per-AI projection (guard state +
+    /// perception summary + current target + reason) for `actor_id`.
+    async fn observe_ai(&self, _actor_id: u64) -> Option<serde_json::Value> {
+        None
+    }
+    /// **M2 re-audit (2026-05-13)**: return the full `MissionState` +
+    /// objectives + last N mission events.
+    async fn inspect_mission(&self) -> Option<serde_json::Value> {
+        None
+    }
+    /// **M2 re-audit (2026-05-13)**: return per-AI perception state + memory
+    /// grid + last N ai events.
+    async fn inspect_ai(&self, _actor_id: u64) -> Option<serde_json::Value> {
+        None
+    }
     async fn observe_actor(&self, _actor_id: Option<u64>) -> Option<serde_json::Value> {
         None
     }
@@ -1301,6 +1322,50 @@ async fn process_request<E: EngineHandle>(
             match engine.inspect_actor(p.target.as_deref(), 30).await {
                 Some(value) => Some(success_response(request.id, value)),
                 None => Some(invalid_param_reason(request.id, "no_player_actor")),
+            }
+        }
+        // M2 re-audit (2026-05-13): full mission projection cfctl method.
+        "observe.mission" => {
+            let _p: ObserveMissionParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            match engine.observe_mission().await {
+                Some(value) => Some(success_response(request.id, value)),
+                None => Some(invalid_param_reason(request.id, "no_mission_loaded")),
+            }
+        }
+        // M2 re-audit (2026-05-13): per-AI projection cfctl method.
+        "observe.ai" => {
+            let p: ObserveAiParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            match engine.observe_ai(p.actor_id).await {
+                Some(value) => Some(success_response(request.id, value)),
+                None => Some(invalid_param_reason(request.id, "no_such_ai_actor")),
+            }
+        }
+        // M2 re-audit (2026-05-13): mission inspect (includes objectives + last events).
+        "inspect.mission" => {
+            let _p: InspectMissionParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            match engine.inspect_mission().await {
+                Some(value) => Some(success_response(request.id, value)),
+                None => Some(invalid_param_reason(request.id, "no_mission_loaded")),
+            }
+        }
+        // M2 re-audit (2026-05-13): per-AI inspect (perception + memory grid + last 30 ai events).
+        "inspect.ai" => {
+            let p: InspectAiParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            match engine.inspect_ai(p.actor_id).await {
+                Some(value) => Some(success_response(request.id, value)),
+                None => Some(invalid_param_reason(request.id, "no_such_ai_actor")),
             }
         }
         "act.input.focus" => {

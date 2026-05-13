@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/objective_completed.v1",
+  "title": "mission.objective_completed",
+  "description": "Emitted when an objective transitions to `completed`. parent_event_id chains back to the event that triggered completion (e.g. `terrain.terrain_carved` for BreachBarrier, `actor.actor_status_changed` for NeutralizeActor, etc.).",
+  "type": "object",
+  "required": ["objective_id"],
+  "properties": {
+    "objective_id": { "type": "string" },
+    "kind": { "type": "string" },
+    "final_progress": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+  }
+}

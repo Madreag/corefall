@@ -71,6 +71,36 @@ pub struct Objective {
     /// fires once per crossed quartile.
     #[serde(default)]
     pub progress_milestone_index: u8,
+    /// **M2 re-audit (2026-05-13)**: continuous progress fraction (0.0..1.0).
+    /// PROGRESS_QUARTILES = [0.25, 0.5, 0.75, 1.0] drives the M2 quartile
+    /// event emission. Mirrors the spec's `Objective.progress: f32`.
+    #[serde(default)]
+    pub progress: f32,
+    /// **M2 re-audit (2026-05-13)**: optional fail-sensor descriptor per
+    /// the spec literal `Objective { id, kind, status, progress, fail_sensor }`.
+    /// `None` for objectives without an explicit fail-sensor (the kind's
+    /// implicit fail-sensor still applies — e.g. DefendReactor fails on
+    /// reactor destruction). M7+ uses this for declarative fail-sensors
+    /// (`FailSensor::TimerWindow { from_tick, threshold_ticks }`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fail_sensor: Option<FailSensor>,
+}
+
+/// **M2 re-audit (2026-05-13)**: declarative fail-sensor descriptor. M7+
+/// extends with richer sensors; M2 ships the type so scenario manifests can
+/// reference it without a schema bump.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum FailSensor {
+    /// Fail if `current_tick - from_tick > threshold_ticks`.
+    TimerWindow {
+        from_tick: u64,
+        threshold_ticks: u64,
+    },
+    /// Fail when the target actor's HP reaches zero.
+    ActorHpZero {
+        target: u64,
+    },
 }
 
 /// Kind of objective. Discriminator names match the canonical roadmap glossary so
@@ -94,6 +124,20 @@ pub enum ObjectiveKind {
     DefendReactor {
         target: String,
     },
+    /// **M2 re-audit (2026-05-13)**: spec literal — "ObjectiveKind enum:
+    /// ReachZone, KillActor, SurviveTimer, DefendActor, EscortActor". The
+    /// variant completes when `current_tick - started_at_tick >= survive_ticks`
+    /// AND the actor is still alive.
+    SurviveTimer {
+        survive_ticks: u64,
+    },
+    /// **M2 re-audit (2026-05-13)**: escort `target` actor until they
+    /// reach `destination` AABB. Fails if `target` dies during transit.
+    EscortActor {
+        target: u64,
+        destination_min: [f32; 2],
+        destination_max: [f32; 2],
+    },
 }
 
 impl ObjectiveKind {
@@ -103,6 +147,8 @@ impl ObjectiveKind {
             ObjectiveKind::NeutralizeActor { .. } => "neutralize_actor",
             ObjectiveKind::ReachZone { .. } => "reach_zone",
             ObjectiveKind::DefendReactor { .. } => "defend_reactor",
+            ObjectiveKind::SurviveTimer { .. } => "survive_timer",
+            ObjectiveKind::EscortActor { .. } => "escort_actor",
         }
     }
 }
@@ -139,46 +185,113 @@ impl ObjectiveStatus {
 
 /// Mission outcome reason once `Lost`. M1.5 only needs two reasons; M7 adds more
 /// (objective_failed, ally_lost, command_core_destroyed, etc.).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
+///
+/// **M2 re-audit (2026-05-13)**: `ObjectiveFailed` now carries the failing
+/// objective id + a reason label per the spec literal "ObjectiveFailed {
+/// id, reason }". `Aborted` variant added so the abort path doesn't have
+/// to route through a raw string literal.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case", tag = "kind")]
 pub enum LossReason {
     PlayerDead,
     TimerExpired,
     /// M2.5: a `defend_reactor` objective failed because the reactor was
     /// destroyed before the mission timer expired.
     ReactorDestroyed,
-    /// M2.5+: a defend_target objective failed for a generic reason. Not
-    /// emitted in BP2 by default; reserved.
-    ObjectiveFailed,
+    /// M2: a player-tracked objective failed.
+    ObjectiveFailed {
+        id: String,
+        reason: String,
+    },
+    /// M2: player-initiated mission abandonment via `act.player.abort`.
+    Aborted,
 }
 
 impl LossReason {
-    pub fn as_str(self) -> &'static str {
+    pub fn as_str(&self) -> &'static str {
         match self {
             LossReason::PlayerDead => "player_dead",
             LossReason::TimerExpired => "timer_expired",
             LossReason::ReactorDestroyed => "reactor_destroyed",
-            LossReason::ObjectiveFailed => "objective_failed",
+            LossReason::ObjectiveFailed { .. } => "objective_failed",
+            LossReason::Aborted => "aborted",
+        }
+    }
+
+    /// **M2 re-audit (2026-05-13)**: when `ObjectiveFailed`, returns the
+    /// failing objective id; otherwise `None`. Used by replay viewers and
+    /// debrief markdown.
+    pub fn objective_id(&self) -> Option<&str> {
+        match self {
+            LossReason::ObjectiveFailed { id, .. } => Some(id),
+            _ => None,
+        }
+    }
+
+    /// **M2 re-audit (2026-05-13)**: when `ObjectiveFailed`, returns the
+    /// failure reason label; otherwise `None`.
+    pub fn objective_reason(&self) -> Option<&str> {
+        match self {
+            LossReason::ObjectiveFailed { reason, .. } => Some(reason),
+            _ => None,
         }
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+/// **M2 re-audit (2026-05-13)**: mission lifecycle state machine per spec
+/// literal "Mission state machine: Init → Loaded → InProgress → Resolved".
+/// Independent from `MissionResult` — `MissionResult` is the OUTCOME shape
+/// when `lifecycle == Resolved`. Transitions:
+/// - `Init` → `Loaded` on scenario load (MissionState constructed)
+/// - `Loaded` → `InProgress` on first tick / mission_started event
+/// - `InProgress` → `Resolved` on mission_resolved event (Won/Lost/Aborted)
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum MissionLifecycle {
+    /// Pre-scenario-load (no MissionState exists in this state — kept for
+    /// symmetry with the spec wording).
+    Init,
+    /// Scenario loaded; objectives present; tick 0 not yet fired.
+    #[default]
+    Loaded,
+    /// `mission.mission_started` event has fired.
+    InProgress,
+    /// `mission.mission_resolved` event has fired. The resolution shape
+    /// (Won / Lost / Aborted) lives on `MissionState.result`.
+    Resolved,
+}
+
+impl MissionLifecycle {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            MissionLifecycle::Init => "init",
+            MissionLifecycle::Loaded => "loaded",
+            MissionLifecycle::InProgress => "in_progress",
+            MissionLifecycle::Resolved => "resolved",
+        }
+    }
+}
+
+/// **M2 re-audit (2026-05-13)**: renamed `Active → InProgress` per the
+/// spec literal "MissionResult::{InProgress, Won, Lost, Aborted}".
+/// `serde(rename_all = "snake_case")` makes the wire value `"in_progress"`
+/// — the prior `"active"` was renamed in lockstep.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case", tag = "result")]
 pub enum MissionResult {
-    Active,
+    InProgress,
     Won,
     Lost {
         reason: LossReason,
     },
-    /// Player-initiated mission abandonment. BP4+ implementation.
+    /// Player-initiated mission abandonment via `act.player.abort`.
     Aborted,
 }
 
 impl MissionResult {
     pub fn as_str(&self) -> &'static str {
         match self {
-            MissionResult::Active => "active",
+            MissionResult::InProgress => "in_progress",
             MissionResult::Won => "won",
             MissionResult::Lost { .. } => "lost",
             MissionResult::Aborted => "aborted",
@@ -186,7 +299,7 @@ impl MissionResult {
     }
 
     pub fn is_terminal(&self) -> bool {
-        !matches!(self, MissionResult::Active)
+        !matches!(self, MissionResult::InProgress)
     }
 }
 
@@ -388,6 +501,16 @@ pub struct ObjectiveProgressUpdate {
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MissionState {
+    /// **M2 re-audit (2026-05-13)**: scenario id (mirrors `scenario.id`).
+    /// Empty string for legacy callers that didn't populate it; the engine
+    /// sets this from the loaded scenario.
+    #[serde(default)]
+    pub id: String,
+    /// **M2 re-audit (2026-05-13)**: lifecycle state machine per spec
+    /// (`Init → Loaded → InProgress → Resolved`). Distinct from `result`
+    /// (which is the outcome SHAPE when `lifecycle == Resolved`).
+    #[serde(default)]
+    pub lifecycle: MissionLifecycle,
     pub objectives: Vec<Objective>,
     pub started_at_tick: u64,
     pub time_limit_ticks: u64,
@@ -402,6 +525,12 @@ pub struct MissionState {
     /// `LossReason::as_str()` when the mission resolves as Lost.
     #[serde(default)]
     pub loss_reason_label: Option<String>,
+    /// **M2 re-audit (2026-05-13)**: explicit typed loss reason (not just
+    /// the as_str() label). Populated alongside `loss_reason_label` so
+    /// consumers can access the structured payload (e.g.
+    /// `LossReason::ObjectiveFailed { id, reason }`).
+    #[serde(default)]
+    pub loss_reason: Option<LossReason>,
     /// **M1.5**: tutorial-modal pause flag. While `true`, `step()` is a
     /// no-op AND elapsed-tick accounting skips the paused duration so the
     /// mission timer does NOT advance. Toggled via `MissionState::pause()`
@@ -445,21 +574,54 @@ impl MissionState {
         // cross-referencing the manifest's `required_events_emitted` list against
         // the M2.5 win bundle's events.jsonl.
         Self {
+            id: String::new(),
+            lifecycle: MissionLifecycle::Loaded,
             objectives,
             started_at_tick,
             time_limit_ticks: loss.time_limit_ticks,
             loss,
-            result: MissionResult::Active,
+            result: MissionResult::InProgress,
             last_event_tick: started_at_tick,
             last_event_label: "mission_started".to_string(),
             last_transition_tick: started_at_tick,
             loss_reason_label: None,
+            loss_reason: None,
             paused: false,
             pause_started_at_tick: None,
             total_paused_ticks: 0,
             show_me_why_event_id: None,
             show_replay_cta: false,
         }
+    }
+
+    /// **M2 re-audit (2026-05-13)**: returns the id of the currently-active
+    /// objective (if any), per the spec's `current_objective_id` field. Walks
+    /// objectives in order, returning the first `Active`.
+    pub fn current_objective_id(&self) -> Option<&str> {
+        self.objectives
+            .iter()
+            .find(|o| o.status == ObjectiveStatus::Active)
+            .map(|o| o.id.as_str())
+    }
+
+    /// **M2 re-audit (2026-05-13)**: list of completed objective ids in
+    /// declaration order, per the spec's `completed_objectives[]` field.
+    pub fn completed_objective_ids(&self) -> Vec<String> {
+        self.objectives
+            .iter()
+            .filter(|o| o.status == ObjectiveStatus::Completed)
+            .map(|o| o.id.clone())
+            .collect()
+    }
+
+    /// **M2 re-audit (2026-05-13)**: list of failed objective ids in
+    /// declaration order, per the spec's `failed_objectives[]` field.
+    pub fn failed_objective_ids(&self) -> Vec<String> {
+        self.objectives
+            .iter()
+            .filter(|o| o.status == ObjectiveStatus::Failed)
+            .map(|o| o.id.clone())
+            .collect()
     }
 
     /// **M1.5**: pause the mission's tick-driven progress + timer.
@@ -515,7 +677,7 @@ impl MissionState {
         // step() handles the activation on its next call so the `objective_started`
         // event for the first objective fires through the same path as later ones.
         self.started_at_tick = started_at_tick;
-        self.result = MissionResult::Active;
+        self.result = MissionResult::InProgress;
         self.last_event_tick = started_at_tick;
         self.last_event_label = "mission_started".to_string();
         self.last_transition_tick = started_at_tick;
@@ -634,7 +796,7 @@ pub fn step(state: &mut MissionState, inputs: MissionTickInputs<'_>) -> MissionT
             };
             state.last_event_tick = inputs.tick;
             state.last_event_label = "mission_lost_player_dead".to_string();
-            report.final_result = Some(state.result);
+            report.final_result = Some(state.result.clone());
             return report;
         }
     }
@@ -676,7 +838,7 @@ pub fn step(state: &mut MissionState, inputs: MissionTickInputs<'_>) -> MissionT
         state.last_event_tick = inputs.tick;
         state.last_event_label = format!("mission_lost_reactor_destroyed:{target}");
         report.objective_failed.push(obj_id);
-        report.final_result = Some(state.result);
+        report.final_result = Some(state.result.clone());
         return report;
     }
 
@@ -730,14 +892,14 @@ pub fn step(state: &mut MissionState, inputs: MissionTickInputs<'_>) -> MissionT
                 state.result = MissionResult::Won;
                 state.last_event_tick = inputs.tick;
                 state.last_event_label = "mission_won".to_string();
-                report.final_result = Some(state.result);
+                report.final_result = Some(state.result.clone());
             } else {
                 state.result = MissionResult::Lost {
                     reason: LossReason::TimerExpired,
                 };
                 state.last_event_tick = inputs.tick;
                 state.last_event_label = "mission_lost_timer".to_string();
-                report.final_result = Some(state.result);
+                report.final_result = Some(state.result.clone());
             }
             return report;
         }
@@ -746,7 +908,7 @@ pub fn step(state: &mut MissionState, inputs: MissionTickInputs<'_>) -> MissionT
         };
         state.last_event_tick = inputs.tick;
         state.last_event_label = "mission_lost_timer".to_string();
-        report.final_result = Some(state.result);
+        report.final_result = Some(state.result.clone());
         return report;
     }
 
@@ -801,6 +963,28 @@ pub fn step(state: &mut MissionState, inputs: MissionTickInputs<'_>) -> MissionT
                 // above; passive ticks never auto-complete it.
                 false
             }
+            // M2 re-audit (2026-05-13): SurviveTimer completes when the
+            // window has elapsed AND the player is still alive. The fail
+            // branch (player dies) is handled by the player-dead loss
+            // check earlier in step(); a SurviveTimer that hasn't elapsed
+            // simply stays Active until then.
+            ObjectiveKind::SurviveTimer { survive_ticks } => {
+                let elapsed = inputs.tick.saturating_sub(state.started_at_tick);
+                elapsed >= *survive_ticks
+                    && inputs
+                        .player
+                        .is_some_and(|p| p.status != Status::Dead && p.status != Status::Dying)
+            }
+            // M2 re-audit (2026-05-13): EscortActor completes when the
+            // escortee enters the destination AABB AND is still alive.
+            ObjectiveKind::EscortActor {
+                target,
+                destination_min,
+                destination_max,
+            } => inputs.actors.get(&ActorId(*target)).is_some_and(|a| {
+                a.status != Status::Dead
+                    && point_in_aabb(a.position.x, a.position.y, *destination_min, *destination_max)
+            }),
         };
         if completed {
             obj.status = ObjectiveStatus::Completed;
@@ -835,7 +1019,7 @@ pub fn step(state: &mut MissionState, inputs: MissionTickInputs<'_>) -> MissionT
         state.result = MissionResult::Won;
         state.last_event_tick = inputs.tick;
         state.last_event_label = "mission_won".to_string();
-        report.final_result = Some(state.result);
+        report.final_result = Some(state.result.clone());
     }
 
     // Track transition timing for analytics (W1 item 866).
@@ -847,7 +1031,7 @@ pub fn step(state: &mut MissionState, inputs: MissionTickInputs<'_>) -> MissionT
     {
         state.last_transition_tick = inputs.tick;
     }
-    if let Some(MissionResult::Lost { reason }) = report.final_result {
+    if let Some(MissionResult::Lost { ref reason }) = report.final_result {
         state.loss_reason_label = Some(reason.as_str().to_string());
     }
 
@@ -898,7 +1082,7 @@ pub struct ObjectiveView {
 impl MissionView {
     pub fn from_state(state: &MissionState, current_tick: u64) -> Self {
         let active_objective = state.active_objective_index().map(|i| state.objectives[i].id.clone());
-        let loss_reason = match state.result {
+        let loss_reason = match &state.result {
             MissionResult::Lost { reason } => Some(reason.as_str().to_string()),
             _ => None,
         };
@@ -962,14 +1146,14 @@ mod tests {
                 },
                 optional: false,
                 status: ObjectiveStatus::Pending,
-                progress_milestone_index: 0,
+                progress_milestone_index: 0, progress: 0.0, fail_sensor: None,
             },
             Objective {
                 id: "neutralize".to_string(),
                 kind: ObjectiveKind::NeutralizeActor { target: 2 },
                 optional: false,
                 status: ObjectiveStatus::Pending,
-                progress_milestone_index: 0,
+                progress_milestone_index: 0, progress: 0.0, fail_sensor: None,
             },
             Objective {
                 id: "extract".to_string(),
@@ -979,7 +1163,7 @@ mod tests {
                 },
                 optional: false,
                 status: ObjectiveStatus::Pending,
-                progress_milestone_index: 0,
+                progress_milestone_index: 0, progress: 0.0, fail_sensor: None,
             },
         ];
         MissionState::new(
@@ -1368,7 +1552,7 @@ mod tests {
         assert_eq!(state.objectives[0].status, ObjectiveStatus::Pending);
         assert_eq!(state.objectives[1].status, ObjectiveStatus::Pending);
         assert_eq!(state.started_at_tick, 100);
-        assert!(matches!(state.result, MissionResult::Active));
+        assert!(matches!(state.result, MissionResult::InProgress));
         // Drive one step; first objective activates + objective_started fires.
         let actors = mk_actors(player_at(120.0, 32.0), false);
         let report = step(
@@ -1394,7 +1578,7 @@ mod tests {
             },
             optional: false,
             status: ObjectiveStatus::Pending,
-            progress_milestone_index: 0,
+            progress_milestone_index: 0, progress: 0.0, fail_sensor: None,
         }];
         MissionState::new(
             objectives,
@@ -1457,7 +1641,7 @@ mod tests {
                 },
                 optional: false,
                 status: ObjectiveStatus::Pending,
-                progress_milestone_index: 0,
+                progress_milestone_index: 0, progress: 0.0, fail_sensor: None,
             },
             Objective {
                 id: "defend".to_string(),
@@ -1466,7 +1650,7 @@ mod tests {
                 },
                 optional: false,
                 status: ObjectiveStatus::Pending,
-                progress_milestone_index: 0,
+                progress_milestone_index: 0, progress: 0.0, fail_sensor: None,
             },
         ];
         let mut state = MissionState::new(
@@ -1519,7 +1703,7 @@ mod tests {
                 },
                 optional: false,
                 status: ObjectiveStatus::Pending,
-                progress_milestone_index: 0,
+                progress_milestone_index: 0, progress: 0.0, fail_sensor: None,
             },
             Objective {
                 id: "reach".to_string(),
@@ -1529,7 +1713,7 @@ mod tests {
                 },
                 optional: false,
                 status: ObjectiveStatus::Pending,
-                progress_milestone_index: 0,
+                progress_milestone_index: 0, progress: 0.0, fail_sensor: None,
             },
         ];
         let mut state = MissionState::new(
@@ -1585,7 +1769,7 @@ mod tests {
                 },
                 optional: false,
                 status: ObjectiveStatus::Pending,
-                progress_milestone_index: 0,
+                progress_milestone_index: 0, progress: 0.0, fail_sensor: None,
             },
             Objective {
                 id: "defend".to_string(),
@@ -1594,7 +1778,7 @@ mod tests {
                 },
                 optional: false,
                 status: ObjectiveStatus::Pending,
-                progress_milestone_index: 0,
+                progress_milestone_index: 0, progress: 0.0, fail_sensor: None,
             },
         ];
         let mut state = MissionState::new(
@@ -1772,7 +1956,7 @@ mod tests {
             },
         );
         let view = MissionView::from_state(&state, 30);
-        assert_eq!(view.result, "active");
+        assert_eq!(view.result, "in_progress");
         assert_eq!(view.active_objective.as_deref(), Some("breach"));
         assert_eq!(view.objectives.len(), 3);
         assert_eq!(view.objectives[0].kind, "breach_barrier");
@@ -1802,7 +1986,7 @@ mod tests {
             },
             optional: false,
             status: ObjectiveStatus::Pending,
-            progress_milestone_index: 0,
+            progress_milestone_index: 0, progress: 0.0, fail_sensor: None,
         }];
         let loss = LossConditions {
             player_dead: false,

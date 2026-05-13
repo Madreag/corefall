@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/mission_started.v1",
+  "title": "mission.mission_started",
+  "description": "Emitted once per scenario load when the mission state machine transitions from Loaded → InProgress. Carries the scenario id, time limit, and the initial objectives[] roster so replay viewers can reconstruct the mission shape without consulting the scenario manifest.",
+  "type": "object",
+  "required": ["scenario_id", "started_at_tick", "time_limit_ticks", "objectives"],
+  "properties": {
+    "scenario_id": { "type": "string" },
+    "started_at_tick": { "type": "integer", "minimum": 0 },
+    "time_limit_ticks": { "type": ["integer", "null"], "minimum": 0 },
+    "objectives": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "kind", "status"],
+        "properties": {
+          "id": { "type": "string" },
+          "kind": { "type": "string" },
+          "optional": { "type": "boolean", "default": false },
+          "status": { "type": "string", "enum": ["pending", "in_progress", "completed", "failed"] },
+          "progress": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+        }
+      }
+    }
+  }
+}

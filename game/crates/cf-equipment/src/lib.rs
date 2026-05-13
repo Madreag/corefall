@@ -31,6 +31,11 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
+// M1 re-audit (2026-05-13): spec lists `cf-equipment/src/projectile.rs` as a
+// separate file. The helper lives there now; re-exported here for ergonomics.
+pub mod projectile;
+pub use projectile::ProjectileSpawnParams;
+
 /// **M1**: how the weapon's fire button is consumed.
 ///
 /// - `Semi`: exactly one shot per `intent.fire` press (the press is latched in

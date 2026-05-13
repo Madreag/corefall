@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ai_perception_signal.v1",
+  "title": "ai.perception_signal",
+  "description": "Emitted whenever a guard's perception kernel fires a sensor hit. `kind` is one of: sight (LOS entered), sight_lost (LOS broken), hearing (alarm within radius), memory_decayed (last-known position aged out).",
+  "type": "object",
+  "required": ["actor_id", "kind"],
+  "properties": {
+    "actor_id": { "type": "integer", "minimum": 0 },
+    "kind": { "type": "string", "enum": ["sight", "sight_lost", "hearing", "memory_decayed"] },
+    "target_actor_id": { "type": ["integer", "null"], "minimum": 0 },
+    "position": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "number" } },
+    "alarm_event_id": { "type": ["string", "null"] }
+  }
+}

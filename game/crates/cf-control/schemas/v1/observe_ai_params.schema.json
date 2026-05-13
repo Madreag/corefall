@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ObserveAiParams",
+  "description": "**M2 re-audit (2026-05-13)**: `observe.ai` — return per-AI projection for\n`actor_id`. Includes guard state + perception summary + current target +\nreason vocabulary.",
+  "type": "object",
+  "properties": {
+    "actor_id": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "actor_id"
+  ]
+}

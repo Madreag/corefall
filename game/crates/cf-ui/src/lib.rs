@@ -1070,7 +1070,15 @@ pub fn stance_line(stance: &str, player: Option<&ActorObservation>) -> String {
         Some(p) if !p.on_ground => " (airborne)",
         _ => "",
     };
+    // M1 re-audit (2026-05-13): when knocked_down, prefer the KNOCKED_DOWN
+    // descriptor over the per-stability cycle so the spec's literal six
+    // descriptors (SOLID/SHAKEN/UNSTABLE/CRITICAL/DISRUPTED/KNOCKED_DOWN)
+    // all surface.
     let stability_tag = match player {
+        Some(p) if p.knockdown_ticks_remaining > 0 => {
+            let pct = (p.stability * 100.0).round() as i32;
+            format!(" | STABILITY {pct}% KNOCKED_DOWN")
+        }
         Some(p) if p.stability < 0.9 => {
             let pct = (p.stability * 100.0).round() as i32;
             let label = if pct >= 60 {

@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/mission_resolved.v1",
+  "title": "mission.mission_resolved",
+  "description": "Emitted exactly once at the terminal transition of the mission state machine. parent_event_id chains back to the event that caused the resolution (last failed/completed objective, player death, timer expiry, or player abort).",
+  "type": "object",
+  "required": ["result"],
+  "properties": {
+    "result": {
+      "type": "string",
+      "enum": ["won", "lost", "aborted", "in_progress"]
+    },
+    "loss_reason": {
+      "type": ["string", "null"],
+      "description": "Stable replay vocabulary from LossReason::as_str(). Never a raw string literal."
+    },
+    "loss_objective_id": {
+      "type": ["string", "null"],
+      "description": "When loss_reason is `objective_failed`, the objective id that triggered the loss."
+    },
+    "show_me_why_event_id": {
+      "type": ["string", "null"],
+      "description": "Lost outcomes attach the cause-chain root event id so the M10 replay viewer's 'Show Me Why' button can jump directly to it."
+    }
+  }
+}

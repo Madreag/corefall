@@ -271,6 +271,41 @@ pub struct InspectActorParams {
     pub target: Option<String>,
 }
 
+/// **M2 re-audit (2026-05-13)**: `observe.mission` — return the full
+/// `MissionState` projection. No params required.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ObserveMissionParams {
+    pub schema_version: u32,
+}
+
+/// **M2 re-audit (2026-05-13)**: `observe.ai` — return per-AI projection for
+/// `actor_id`. Includes guard state + perception summary + current target +
+/// reason vocabulary.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ObserveAiParams {
+    pub schema_version: u32,
+    pub actor_id: u64,
+}
+
+/// **M2 re-audit (2026-05-13)**: `inspect.mission` — return the full
+/// `MissionState` + objectives[] + commander stub. No params required.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct InspectMissionParams {
+    pub schema_version: u32,
+}
+
+/// **M2 re-audit (2026-05-13)**: `inspect.ai` — return per-AI perception
+/// state + memory grid contents + last 30 ai events.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct InspectAiParams {
+    pub schema_version: u32,
+    pub actor_id: u64,
+}
+
 /// **M1 / Gap S3 (M1.5 forward-compat seam)**: `act.player.abort` —
 /// stub at M1; flips to a real mission abort path at M1.5.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -405,6 +440,10 @@ pub fn dump_v1() -> BTreeMap<String, String> {
         entry::<ActPlayerResetParams>("act_player_reset_params"),
         entry::<ActPlayerDigParams>("act_player_dig_params"),
         entry::<ActPlayerAnchorParams>("act_player_anchor_params"),
+        entry::<ObserveMissionParams>("observe_mission_params"),
+        entry::<ObserveAiParams>("observe_ai_params"),
+        entry::<InspectMissionParams>("inspect_mission_params"),
+        entry::<InspectAiParams>("inspect_ai_params"),
         entry::<ActPlayerCrouchParams>("act_player_crouch_params"),
         entry::<ActPlayerClimbParams>("act_player_climb_params"),
         entry::<ActPlayerJetParams>("act_player_jet_params"),

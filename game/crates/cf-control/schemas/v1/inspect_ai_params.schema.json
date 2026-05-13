@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "InspectAiParams",
+  "description": "**M2 re-audit (2026-05-13)**: `inspect.ai` — return per-AI perception\nstate + memory grid contents + last 30 ai events.",
+  "type": "object",
+  "properties": {
+    "actor_id": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "actor_id"
+  ]
+}

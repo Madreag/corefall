@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-mission/v1/MissionState",
+  "title": "MissionState",
+  "description": "Canonical mission state machine projection (M2 spec). Carries the live status, objective roster, timer surface, transition history, and resolution metadata. Serializes to JSON for observe.mission, observe.frame.mission, and inspect.mission.",
+  "type": "object",
+  "required": [
+    "id",
+    "status",
+    "started_at_tick",
+    "last_transition_tick",
+    "objectives",
+    "completed_objectives",
+    "failed_objectives",
+    "loss_reason",
+    "timer_total_ticks",
+    "timer_ticks_remaining"
+  ],
+  "properties": {
+    "id": { "type": "string", "description": "Scenario id (mirrors scenario.id)." },
+    "status": {
+      "type": "string",
+      "enum": ["init", "loaded", "in_progress", "won", "lost", "aborted"],
+      "description": "Lifecycle states per the spec's mission state machine: Init → Loaded → InProgress → {Won, Lost, Aborted}."
+    },
+    "started_at_tick": { "type": "integer", "minimum": 0 },
+    "last_transition_tick": { "type": "integer", "minimum": 0 },
+    "current_objective_id": { "type": ["string", "null"] },
+    "completed_objectives": { "type": "array", "items": { "type": "string" } },
+    "failed_objectives": { "type": "array", "items": { "type": "string" } },
+    "objectives": {
+      "type": "array",
+      "items": { "$ref": "objective.schema.json" }
+    },
+    "loss_reason": {
+      "anyOf": [
+        { "type": "null" },
+        {
+          "type": "string",
+          "enum": ["player_dead", "timer_expired", "objective_failed", "reactor_destroyed", "aborted"]
+        }
+      ],
+      "description": "Stable replay vocabulary from LossReason::as_str()."
+    },
+    "loss_objective_id": {
+      "type": ["string", "null"],
+      "description": "When loss_reason is `objective_failed`, the objective id that triggered the loss."
+    },
+    "show_me_why_event_id": {
+      "type": ["string", "null"]
+    },
+    "timer_total_ticks": { "type": ["integer", "null"], "minimum": 0 },
+    "timer_ticks_remaining": { "type": ["integer", "null"], "minimum": 0 },
+    "paused": { "type": "boolean" },
+    "pause_started_at_tick": { "type": ["integer", "null"], "minimum": 0 },
+    "total_paused_ticks": { "type": "integer", "minimum": 0 }
+  }
+}

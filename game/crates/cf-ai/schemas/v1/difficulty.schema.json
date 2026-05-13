@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-ai/v1/DifficultyPreset",
+  "title": "DifficultyPreset",
+  "description": "M2 AI difficulty preset shape. Each preset maps to a DifficultyParams record consumed by ReactiveGuard. The launch registry at content/ai/difficulty.json carries cakewalk / tough_crowd / veteran. Custom presets can be added by mods at the same path.",
+  "type": "object",
+  "required": ["schema_version", "presets"],
+  "properties": {
+    "schema_version": { "type": "integer", "const": 1 },
+    "presets": {
+      "type": "array",
+      "minItems": 3,
+      "items": {
+        "type": "object",
+        "required": [
+          "id",
+          "hp",
+          "aim_settle_ticks",
+          "miss_chance",
+          "sight_range",
+          "hearing_radius",
+          "memory_decay_ticks",
+          "reload_ms"
+        ],
+        "properties": {
+          "id": {
+            "type": "string",
+            "enum": ["cakewalk", "tough_crowd", "veteran"],
+            "description": "Built-in preset id. Custom mod presets MUST use a different id."
+          },
+          "hp": { "type": "number", "minimum": 0.0 },
+          "aim_settle_ticks": { "type": "integer", "minimum": 0 },
+          "miss_chance": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+          "sight_range": { "type": "number", "minimum": 0.0 },
+          "hearing_radius": { "type": "number", "minimum": 0.0 },
+          "memory_decay_ticks": { "type": "integer", "minimum": 0 },
+          "reload_ms": { "type": "integer", "minimum": 0 }
+        }
+      }
+    }
+  }
+}

@@ -651,6 +651,16 @@ struct EngineMutable {
     /// **M2**: last hazard contact tick per actor — used to debounce the
     /// per-tick hazard damage event to one per actor.
     hazard_last_contact_tick: BTreeMap<ActorId, u64>,
+    /// **M2 re-audit (2026-05-13)**: id of the latest `mission.mission_started`
+    /// event, used as parent for the first batch of `mission.objective_started`
+    /// emissions per spec line 558 ("every event carries parent_event_id").
+    mission_started_event_id: Option<String>,
+    /// **M2 re-audit (2026-05-13)**: per-objective `mission.objective_started`
+    /// event id keyed by objective id. Used as parent for
+    /// `mission.objective_updated`, `mission.objective_completed`,
+    /// `mission.objective_failed` so the cause chain walks back to the
+    /// origination event.
+    mission_objective_started_event_ids: BTreeMap<String, String>,
     /// **M3 re-open (2026-05-13)**: per-tick coalesced dirty-region accumulator.
     /// Carve events push their dirty rects + source event ids here; the engine
     /// flushes ONE `terrain.terrain_dirty_region_batch` per tick at end of
@@ -859,6 +869,8 @@ impl M0Engine {
                 total_debris_spawned: 0,
                 total_carve_events: 0,
                 hazard_last_contact_tick: BTreeMap::new(),
+                mission_started_event_id: None,
+                mission_objective_started_event_ids: BTreeMap::new(),
                 pending_dirty_rects: Vec::new(),
                 sustained_unupdated_ticks: 0,
                 perf_coalesce_samples: Vec::new(),
@@ -972,11 +984,20 @@ impl M0Engine {
         // M1 emits a thin no-op so the M3B viewer + replay verifier can
         // expect the event type without conditionally rendering on
         // milestone.
-        if let Ok(state) = self.state.read() {
-            if state.mission.is_some() {
-                let scenario_id = self.config.scenario_id.clone();
-                drop(state);
-                self.recorder.record(
+        let has_mission = self.state.read().ok().map(|s| s.mission.is_some()).unwrap_or(false);
+        if has_mission {
+            let scenario_id = self.config.scenario_id.clone();
+            // M2 re-audit (2026-05-13): lifecycle Loaded → InProgress.
+            if let Ok(mut state) = self.state.write() {
+                if let Some(mission) = state.mission.as_mut() {
+                    mission.lifecycle = cf_mission::MissionLifecycle::InProgress;
+                    if mission.id.is_empty() {
+                        mission.id = scenario_id.clone();
+                    }
+                }
+            }
+            {
+                let mission_started_id = self.recorder.record(
                     tick,
                     sim_time_ms,
                     "mission",
@@ -987,6 +1008,11 @@ impl M0Engine {
                     }),
                     Some(started_id.clone()),
                 );
+                // M2 re-audit (2026-05-13): stash the mission_started event
+                // id so subsequent objective_started events can chain to it.
+                if let Ok(mut s) = self.state.write() {
+                    s.mission_started_event_id = Some(mission_started_id);
+                }
             }
         }
         // M1 Seam S2: when the scenario manifest sets tutorial_safety=true,
@@ -1354,6 +1380,10 @@ impl M0Engine {
                             self_actor: &self_actor,
                             player: player_ref,
                             alarms: &alarms_snapshot,
+                            // M2 re-audit (2026-05-13): M2 has exactly one damage source
+                            // (the player). M7+ extends to multi-actor damage sources by
+                            // wiring a per-actor `last_damage_source_actor_id` tracker.
+                            last_damage_source: player_ref.map(|p| p.id.0),
                         },
                         &mut state.rng,
                     );
@@ -2361,39 +2391,57 @@ impl M0Engine {
         }
 
         // M1.5: emit mission events.
+        // M2 re-audit (2026-05-13): all mission.objective_* events chain to
+        // their parent. objective_started chains to mission_started; the
+        // remaining lifecycle events chain to the corresponding
+        // objective_started.
         if let Some((tick, sim_time_ms, report)) = mission_payload {
             for id in &report.objective_started {
-                self.recorder.record(
+                let parent = self.state.read().ok().and_then(|s| s.mission_started_event_id.clone());
+                let event_id = self.recorder.record(
                     tick,
                     sim_time_ms,
                     "mission",
                     "objective_started",
                     json!({"objective": id}),
-                    None,
+                    parent,
                 );
+                if let Ok(mut s) = self.state.write() {
+                    s.mission_objective_started_event_ids.insert(id.clone(), event_id);
+                }
             }
             // **M1.5**: emit `mission.objective_updated` at 25/50/75/100%
             // milestones. The 100% milestone fires on the same tick as
             // `objective_completed` so the cause chain reads
             // `objective_updated{1.0} → objective_completed → mission_resolved`.
             for update in &report.objective_updated {
+                let parent = self
+                    .state
+                    .read()
+                    .ok()
+                    .and_then(|s| s.mission_objective_started_event_ids.get(&update.objective_id).cloned());
                 self.recorder.record(
                     tick,
                     sim_time_ms,
                     "mission",
                     "objective_updated",
                     json!({"objective": update.objective_id, "progress": update.progress}),
-                    None,
+                    parent,
                 );
             }
             for id in &report.objective_completed {
+                let parent = self
+                    .state
+                    .read()
+                    .ok()
+                    .and_then(|s| s.mission_objective_started_event_ids.get(id).cloned());
                 self.recorder.record(
                     tick,
                     sim_time_ms,
                     "mission",
                     "objective_completed",
                     json!({"objective": id}),
-                    None,
+                    parent,
                 );
                 // **M5**: when an objective completes AND the player has
                 // ejected (Ejected pilot reached the extraction zone),
@@ -2428,18 +2476,23 @@ impl M0Engine {
             // the trigger objective_failed → ... → player_dead chain.
             let mut last_failed_event_id: Option<String> = None;
             for id in &report.objective_failed {
+                let parent = self
+                    .state
+                    .read()
+                    .ok()
+                    .and_then(|s| s.mission_objective_started_event_ids.get(id).cloned());
                 let event_id = self.recorder.record(
                     tick,
                     sim_time_ms,
                     "mission",
                     "objective_failed",
                     json!({"objective": id}),
-                    None,
+                    parent,
                 );
                 last_failed_event_id = Some(event_id);
             }
             if let Some(result) = report.final_result {
-                let payload = match result {
+                let payload = match &result {
                     cf_mission::MissionResult::Won => json!({"result": "won"}),
                     cf_mission::MissionResult::Lost { reason } => {
                         // **M1.5**: DR-023 "Show me why" replay handoff —
@@ -2469,7 +2522,7 @@ impl M0Engine {
                         }
                         p
                     }
-                    cf_mission::MissionResult::Active => json!({"result": "active"}),
+                    cf_mission::MissionResult::InProgress => json!({"result": "in_progress"}),
                     cf_mission::MissionResult::Aborted => json!({"result": "aborted"}),
                 };
                 // Chain into the last objective_failed (if any) on the same
@@ -2487,6 +2540,12 @@ impl M0Engine {
                     payload,
                     last_failed_event_id.clone(),
                 );
+                // M2 re-audit (2026-05-13): lifecycle InProgress → Resolved.
+                if let Ok(mut s) = self.state.write() {
+                    if let Some(mission) = s.mission.as_mut() {
+                        mission.lifecycle = cf_mission::MissionLifecycle::Resolved;
+                    }
+                }
             }
             // W1 item 770: re-emit snapshots on any objective state change so
             // the replay verifier and viewer can reconstruct mid-mission state.
@@ -2886,10 +2945,10 @@ impl M0Engine {
         }
 
         // Mission resolution banner.
-        let cur_mission_result = state.mission.as_ref().map(|m| match m.result {
+        let cur_mission_result = state.mission.as_ref().map(|m| match &m.result {
             cf_mission::MissionResult::Won => "won".to_string(),
             cf_mission::MissionResult::Lost { .. } => "lost".to_string(),
-            cf_mission::MissionResult::Active => "active".to_string(),
+            cf_mission::MissionResult::InProgress => "in_progress".to_string(),
             cf_mission::MissionResult::Aborted => "aborted".to_string(),
         });
         if state.hud_last_mission_result != cur_mission_result {
@@ -4050,7 +4109,7 @@ impl M0Engine {
         if let Some(mission) = state.mission.as_ref() {
             snapshot.mission = Some(MissionHudView {
                 result: mission.result.as_str().to_string(),
-                loss_reason: match mission.result {
+                loss_reason: match &mission.result {
                     cf_mission::MissionResult::Lost { reason } => Some(reason.as_str().to_string()),
                     _ => None,
                 },
@@ -5425,6 +5484,8 @@ impl EngineHandle for M0Engine {
                         hp_max: a.hp_max,
                         selected_slot: a.inventory.selected.0,
                         selected_item: a.inventory.selected_item().label().to_string(),
+                        // M1 re-audit (2026-05-13): mirror cf_actor::ActorObservation.inventory
+                        inventory: a.inventory.items.iter().map(|i| i.label().to_string()).collect(),
                         rifle_ammo: rifle.map(|r| r.ammo_in_mag),
                         rifle_capacity: rifle.map(|r| r.spec.mag_capacity),
                         rifle_fire_cooldown_ticks: rifle.map(|r| r.fire_cooldown_ticks),
@@ -5661,6 +5722,67 @@ impl EngineHandle for M0Engine {
         let actor = sim.world.actors.get(&ActorId(target_id))?;
         let observation = cf_actor::ActorObservation::from(actor);
         serde_json::to_value(observation).ok()
+    }
+
+    /// **M2 re-audit (2026-05-13)**: full MissionState projection. Returns
+    /// `None` when no mission is loaded (e.g. m0_blank scenario).
+    async fn observe_mission(&self) -> Option<serde_json::Value> {
+        let state = self.state.read().ok()?;
+        let mission = state.mission.as_ref()?;
+        serde_json::to_value(mission).ok()
+    }
+
+    /// **M2 re-audit (2026-05-13)**: per-AI projection for `actor_id`.
+    /// Returns guard state + perception summary + current target + reason.
+    async fn observe_ai(&self, actor_id: u64) -> Option<serde_json::Value> {
+        let state = self.state.read().ok()?;
+        let guard = state.reactive_guards.get(&ActorId(actor_id))?;
+        serde_json::to_value(guard).ok()
+    }
+
+    /// **M2 re-audit (2026-05-13)**: full mission inspect including the last
+    /// 30 mission-category events.
+    async fn inspect_mission(&self) -> Option<serde_json::Value> {
+        let mission = self.observe_mission().await?;
+        let events = self.recorder.snapshot_events();
+        let mut filtered: Vec<serde_json::Value> = events
+            .iter()
+            .filter(|e| e.category == "mission")
+            .rev()
+            .take(30)
+            .map(|e| serde_json::to_value(e).unwrap_or(serde_json::Value::Null))
+            .collect();
+        filtered.reverse();
+        Some(serde_json::json!({
+            "mission": mission,
+            "events": filtered,
+        }))
+    }
+
+    /// **M2 re-audit (2026-05-13)**: per-AI inspect including the last 30
+    /// `ai.*` events filtered to `actor_id`.
+    async fn inspect_ai(&self, actor_id: u64) -> Option<serde_json::Value> {
+        let view = self.observe_ai(actor_id).await?;
+        let events = self.recorder.snapshot_events();
+        let mut filtered: Vec<serde_json::Value> = events
+            .iter()
+            .filter(|e| e.category == "ai")
+            .filter(|e| {
+                e.payload
+                    .get("actor_id")
+                    .and_then(|v| v.as_u64())
+                    .map(|id| id == actor_id)
+                    .unwrap_or(false)
+            })
+            .rev()
+            .take(30)
+            .map(|e| serde_json::to_value(e).unwrap_or(serde_json::Value::Null))
+            .collect();
+        filtered.reverse();
+        Some(serde_json::json!({
+            "ai": view,
+            "events": filtered,
+        }))
     }
 
     async fn inspect_actor(&self, target: Option<&str>, last_n_events: usize) -> Option<serde_json::Value> {
@@ -6080,7 +6202,20 @@ impl EngineHandle for M0Engine {
                 if let Some(player_id) = player {
                     state.pending_intent.actor = player_id;
                     state.pending_intent.source = source;
-                    state.pending_intent.move_x = x.clamp(-1.0, 1.0);
+                    let clamped = x.clamp(-1.0, 1.0);
+                    if (clamped - x).abs() > f32::EPSILON {
+                        // M1 re-audit (2026-05-13): spec line for "Magnitude
+                        // clamp on movement intent" — "And emits a debug
+                        // log with the clamp; not a hard reject."
+                        tracing::debug!(
+                            target: "cf::control::move_clamp",
+                            requested = x,
+                            clamped = clamped,
+                            actor = player_id.0,
+                            "act.player.move magnitude clamped to [-1.0, 1.0]"
+                        );
+                    }
+                    state.pending_intent.move_x = clamped;
                     // y is reserved for future ladder/climb input.
                     let _ = y;
                     drop(state);
@@ -6329,7 +6464,13 @@ impl EngineHandle for M0Engine {
                     mission.last_event_tick = tick.0;
                     mission.last_event_label = "mission_resolved".to_string();
                     mission.last_transition_tick = tick.0;
-                    mission.loss_reason_label = Some("aborted".to_string());
+                    // M2 re-audit (2026-05-13): lifecycle → Resolved on abort.
+                    mission.lifecycle = cf_mission::MissionLifecycle::Resolved;
+                    // M2 re-audit (2026-05-13): route through the typed enum's
+                    // as_str() — never a raw string literal. Per spec pitfall:
+                    // "String-literal loss reasons: DR-002 stable-vocabulary
+                    // contract. Use the typed enum's `as_str()`."
+                    mission.loss_reason_label = Some(cf_mission::LossReason::Aborted.as_str().to_string());
                     drop(state);
                     let accepted_id = self.recorder.record(
                         tick,

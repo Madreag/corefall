@@ -12,6 +12,9 @@
 //! All functions are pure (they take and return values; they never call wall-clock or
 //! `rand::thread_rng`). The engine's seeded RNG is wired in by callers when randomness
 //! is needed.
+//!
+//! Submodules:
+//! - [`authority`]: physics-authority transitions (animation ↔ ragdoll ↔ explosion).
 
 #![deny(unsafe_code)]
 #![warn(clippy::pedantic)]
@@ -27,6 +30,11 @@
     clippy::cast_sign_loss,
     clippy::cast_lossless
 )]
+
+// M1 re-audit (2026-05-13): per spec "## Files", cf-physics/src/authority.rs
+// is a separate submodule. Re-export the helpers for ergonomics.
+pub mod authority;
+pub use authority::{AuthorityKind, AuthorityTransition};
 
 use serde::{Deserialize, Serialize};
 

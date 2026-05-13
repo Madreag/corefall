@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ai_state_changed.v1",
+  "title": "ai.state_changed",
+  "description": "Emitted on every guard FSM state transition (Idle / Alert / Engaged / Retreating / Dying / Dead). `reason` uses the stable replay vocabulary: saw_player_in_cone / heard_shot / target_acquired / target_lost / low_hp / squad_killed / hp_recovered / dying_dwell_elapsed / killed_by_<actor_id>.",
+  "type": "object",
+  "required": ["actor_id", "from", "to", "reason"],
+  "properties": {
+    "actor_id": { "type": "integer", "minimum": 0 },
+    "from": { "type": "string", "enum": ["idle", "alert", "engaged", "retreating", "dying", "dead"] },
+    "to": { "type": "string", "enum": ["idle", "alert", "engaged", "retreating", "dying", "dead"] },
+    "reason": { "type": "string" }
+  }
+}

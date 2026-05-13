@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ai_missed_shot_reason.v1",
+  "title": "ai.missed_shot_reason",
+  "description": "Emitted when a guard's fire-resolution rolls a miss against the configured miss_chance. `reason` is the deterministic classification: recoil_deviation / target_moved / occlusion / lucky_dodge.",
+  "type": "object",
+  "required": ["actor_id", "reason"],
+  "properties": {
+    "actor_id": { "type": "integer", "minimum": 0 },
+    "reason": { "type": "string", "enum": ["recoil_deviation", "target_moved", "occlusion", "lucky_dodge"] },
+    "target_actor_id": { "type": ["integer", "null"], "minimum": 0 }
+  }
+}

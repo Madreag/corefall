@@ -54,7 +54,7 @@
     { "method": "act.player.reset", "params": {} },
     { "method": "sim.run_for_ticks", "params": { "ticks": 60 } },
 
-    { "method": "sim.run_for_ticks", "params": { "ticks": 16000 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 16787 } },
     { "method": "observe.once", "params": {} }
   ]
 }

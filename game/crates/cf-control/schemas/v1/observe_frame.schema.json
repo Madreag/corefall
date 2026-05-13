@@ -322,6 +322,14 @@
           "format": "uint64",
           "minimum": 0
         },
+        "inventory": {
+          "description": "**M1 re-audit (2026-05-13)**: full inventory contents as labels in\nslot order (4 entries for M1; \"empty\" for unset slots). Mirrors\n`cf_actor::ActorObservation.inventory` so consumers reading\n`observe.frame.actors[]` see the same payload as `observe.actor`.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
         "jet_active": {
           "type": "boolean",
           "default": false

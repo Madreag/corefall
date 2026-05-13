@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/objective_failed.v1",
+  "title": "mission.objective_failed",
+  "description": "Emitted when an objective transitions to `failed`. parent_event_id chains back to the event that triggered failure (typically `system.timer_expired` or `actor.actor_status_changed`). The `reason` field uses the stable replay vocabulary defined in the spec.",
+  "type": "object",
+  "required": ["objective_id", "reason"],
+  "properties": {
+    "objective_id": { "type": "string" },
+    "kind": { "type": "string" },
+    "reason": { "type": "string" },
+    "final_progress": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+  }
+}

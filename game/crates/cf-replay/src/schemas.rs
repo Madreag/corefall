@@ -41,6 +41,20 @@ const SCHEMA_ANCHOR_MATERIAL_RESULT: &str = include_str!("../schemas/event/ancho
 const SCHEMA_TERRAIN_MATERIAL_PROBE: &str = include_str!("../schemas/event/terrain_material_probe.json");
 const SCHEMA_TERRAIN_FILL_OR_REPAIR: &str = include_str!("../schemas/event/terrain_fill_or_repair.json");
 const SCHEMA_FORCED_REFRESH_REQUESTED: &str = include_str!("../schemas/event/forced_refresh_requested.json");
+// M2 re-audit (2026-05-13): mission + AI event schemas the spec lists in
+// "## Files" / "## Crates / modules touched" but were never created.
+const SCHEMA_MISSION_STARTED: &str = include_str!("../schemas/event/mission_started.json");
+const SCHEMA_OBJECTIVE_STARTED: &str = include_str!("../schemas/event/objective_started.json");
+const SCHEMA_OBJECTIVE_UPDATED: &str = include_str!("../schemas/event/objective_updated.json");
+const SCHEMA_OBJECTIVE_COMPLETED: &str = include_str!("../schemas/event/objective_completed.json");
+const SCHEMA_OBJECTIVE_FAILED: &str = include_str!("../schemas/event/objective_failed.json");
+const SCHEMA_MISSION_RESOLVED: &str = include_str!("../schemas/event/mission_resolved.json");
+const SCHEMA_AI_STATE_CHANGED: &str = include_str!("../schemas/event/ai_state_changed.json");
+const SCHEMA_AI_PERCEPTION_SIGNAL: &str = include_str!("../schemas/event/ai_perception_signal.json");
+const SCHEMA_AI_TACTIC_CHOSEN: &str = include_str!("../schemas/event/ai_tactic_chosen.json");
+const SCHEMA_AI_MISSED_SHOT_REASON: &str = include_str!("../schemas/event/ai_missed_shot_reason.json");
+const SCHEMA_AI_STUCK_STATE_CHANGED: &str = include_str!("../schemas/event/ai_stuck_state_changed.json");
+const SCHEMA_AI_RECOVERY_ACTION: &str = include_str!("../schemas/event/ai_recovery_action.json");
 
 /// Look up the schema source by `(category, event_type)`. Returns `None` if
 /// no schema exists for this pair (callers treat as "no validation
@@ -63,6 +77,19 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("terrain", "terrain_material_probe") => Some(SCHEMA_TERRAIN_MATERIAL_PROBE),
         ("terrain", "terrain_fill_or_repair") => Some(SCHEMA_TERRAIN_FILL_OR_REPAIR),
         ("terrain", "forced_refresh_requested") => Some(SCHEMA_FORCED_REFRESH_REQUESTED),
+        // M2 re-audit (2026-05-13): mission + AI event schemas.
+        ("mission", "mission_started") => Some(SCHEMA_MISSION_STARTED),
+        ("mission", "objective_started") => Some(SCHEMA_OBJECTIVE_STARTED),
+        ("mission", "objective_updated") => Some(SCHEMA_OBJECTIVE_UPDATED),
+        ("mission", "objective_completed") => Some(SCHEMA_OBJECTIVE_COMPLETED),
+        ("mission", "objective_failed") => Some(SCHEMA_OBJECTIVE_FAILED),
+        ("mission", "mission_resolved") => Some(SCHEMA_MISSION_RESOLVED),
+        ("ai", "state_changed") => Some(SCHEMA_AI_STATE_CHANGED),
+        ("ai", "perception_signal") => Some(SCHEMA_AI_PERCEPTION_SIGNAL),
+        ("ai", "tactic_chosen") => Some(SCHEMA_AI_TACTIC_CHOSEN),
+        ("ai", "missed_shot_reason") => Some(SCHEMA_AI_MISSED_SHOT_REASON),
+        ("ai", "stuck_state_changed") => Some(SCHEMA_AI_STUCK_STATE_CHANGED),
+        ("ai", "recovery_action") => Some(SCHEMA_AI_RECOVERY_ACTION),
         _ => None,
     }
 }
