@@ -27,11 +27,12 @@ A 2D side-view physics sandbox where every gas, grain, bullet, body, world, tran
 [![Specs](https://img.shields.io/badge/active%20specs-70%20%28M4..M49%20%2B%2024%20suffix--letter%29-blueviolet?style=flat-square)](specs/active/)
 [![Releases](https://img.shields.io/github/v/release/Madreag/corefall?include_prereleases&sort=semver&style=flat-square&label=release)](https://github.com/Madreag/corefall/releases)
 
-> **Where we are:** badges above are the source of truth. Full milestone matrix in [Project status](#project-status); BP scope table in [Build Points](#build-points); release policy in [Releases](#releases).
+> [!important]
+> **Where we are:** badges above are the source of truth. Visual progress dashboard in [Roadmap At A Glance](#roadmap-at-a-glance); full milestone matrix in [Project status](#project-status); BP scope table in [Build Points](#build-points); release policy in [Releases](#releases).
 >
 > **Where to play:** today, build from source via [Getting started](#getting-started). First friend-handoff release (`.dmg` / `.msi` / AppImage — double-click to play, no Terminal) lands when BP3 closes per the [Double-Click Playability Hard Gate](#releases).
 
-**[Marketing highlights](#headline-systems) · [Project status](#project-status) · [Build Points](#build-points) · [Roadmap shape](#roadmap-shape) · [Releases](#releases) · [Tech stack](#tech-stack) · [Getting started](#getting-started)**
+**[Pillars](#headline-systems) · [Roadmap](#roadmap-at-a-glance) · [Content](#launch-content-roster) · [Build Points](#build-points) · [Inspirations](#inspirations-and-credits) · [AWAW Layer](#awaw-inspired-grand-strategy-layer) · [Project status](#project-status) · [Releases](#releases) · [Getting started](#getting-started)**
 
 </div>
 
@@ -61,7 +62,6 @@ The pillars that make Corefall its own genre, not a clone of any of its inspirat
 | **Stationeers-grade gas tank inventory + filter system** | 5-tier gas tank progression (T0 Emergency 5L → T1 Compressed 60L → T2 Pressurized 300L → T3 Cryogenic 500L → T4 Closed-Loop Cycler indefinite). Tank gas content (Pure O2 / N2 / CO2 / Volatiles / H2 / N2O / Ozone / He / Argon / specialty mix). Filter system (CO2 / Volatiles / Pollutant / Radiation / Composite). Tank physics computed via PV=nRT; overpressure rupture; cryogenic Joule-Thomson cooling. **Vehicles require tanks**: dropships need fuel + breathing + buffer; rockets need cryogenic O2 + H2; mechs need coolant + oil; submarines need closed-loop breathing. **Owned by M5.8 + M5.9 + M2.2A.** |
 | **Crafting tiers + fabrication chain** | 5-tier ladder (T0 Primitive → T1 Industrial → T2 Advanced → T3 Endgame → T4 Exotic via Material Lab). 150 launch recipes covering weapons / armor / chassis / tools / base / power. Fabrication chain: raw ore → refined → component → equipment → assembly. Material purity grading (Stationeers parity) propagates through chain. Multi-step recipe chains (T3 plasma rifle = 8 steps). Power-coupled (fabricators consume kW; brown-out pauses crafting). Research-gated unlocks via 30-node tech tree. **Owned by M7.8.** |
 | **PvE Survival mode + Inter-Planet Transport** | Terraria/Stationeers/Minecraft/Cortex hybrid solo + 2-8 player coop. **3 launch survival worlds** (Earth + Mars + Mimas; 9 more post-launch unlock). 7-step procgen pass (topology → biomes → ore → hazards → structures → AI raiders → validation). Survival mechanics per race (hunger / thirst / sleep / sanity / temperature). **3 inter-planet transport modes**: dropship (T1; 8-phase flight + 6 risk events) / multi-stage rocket (T2; 5-stage Kerbal-style) / paired teleporters (T3). Orbital stations + asteroid mining colonies. 5 PvE endgame bosses (Hollow King / Frozen Heart / Crimson Tide / Eclipse Walker / Last Star). 12 dynamic world events. Acclimatization mechanic (chitin fast; humans slow). Race-specific tech tree branches. **Owned by M11.5 (mode + procgen) + M11.6 (transport + stations) + M11.7 (bosses + events).** |
-| **Crafting tiers + fabrication chain** | 5-tier ladder (T0 Primitive → T1 Industrial → T2 Advanced → T3 Endgame → T4 Exotic via Material Lab). 150 launch recipes covering weapons / armor / chassis / tools / base / power. Fabrication chain: raw ore → refined → component → equipment → assembly. Power-coupled (fabricators consume kW; brown-out pauses crafting). Research-gated unlocks via tech tree + boss drops + Material Lab puzzles. Stationeers + Terraria hybrid UX. **Owned by M7.8.** |
 | **Configurable everything — 7-tier settings hierarchy** | Every dial is a settings key with typed schema + default + range + description + owner. 7-tier hierarchy (engine → system → profile → scenario → server → CLI → runtime) with key locking. Server admin's `server.ron` controls **200+ tunables** across 17 subsystems (anti-cheat, mods, AI, power, damage, crafting, atmospherics, hazards, survival, etc.). Player's `profile.ron` for personal prefs. 20+ admin CLI commands (kick / ban / save / restart / hot-load / lock / unlock / mod / broadcast). Schema migration on bump. Auto-generated settings UI from schema. Audit log + change history. Settings included in replay determinism contract. **Owned by M9.10.** |
 | **Accessibility as a floor, not an afterthought** | 200% UI scale + high contrast + color-independent state labels + reduce motion / shake / flash + hold-to-confirm + focus traversal + key remap + captions for ALL audio. **G-Force vision blackout** scales per origin (humans full; androids 50%; robots immune). 8 color-blind protocols. ACC-A floor from M4A onwards; ACC-A-PLUS extension at BP9+. **Owned by M4A + ACC-A-PLUS.** |
 | **Animation-first bodies — never sliding pawns** | Actors don't slide as static sprites. Controlled locomotion is readable animation with physical weight (walk / run / crouch / sprint / slide / vault / climb / dive / lean / swim / crawl). Stability scalar + recoil bloom + sharp aim + travel-impulse damage. Disrupted states become physical (ragdoll on death; gibs cascade per CCCP's `MOSRotating::CreateGibsWhenGibbing` pattern). **Owned by M1 + M2.2A + M5 + M5.5.** |
@@ -101,33 +101,23 @@ The full content target shipping by BP12 (every entry **functional + AI-readable
 
 ### Build Point Timeline
 
-```mermaid
-flowchart LR
-    BP0([✅ BP0<br/>Engine])
-    BP1([✅ BP1<br/>Actor + Breach])
-    BP2([✅ BP2<br/>Terrain + Replay])
-    BP3([🔄 BP3<br/>Combat + Body])
-    BP4([⏳ BP4<br/>Physics])
-    BP5([⏳ BP5<br/>Atmospherics])
-    BP6([⏳ BP6<br/>AI Combat])
-    BP7([⏳ BP7<br/>Vertical Slice])
-    BP8([⏳ BP8<br/>Creator])
-    BP9([⏳ BP9<br/>Server + LAN])
-    BP10([⏳ BP10<br/>Online])
-    BP11([⏳ BP11<br/>Public])
-    BP12([🚀 BP12<br/>Launch GA])
-    BP0 --> BP1 --> BP2 --> BP3 --> BP4 --> BP5 --> BP6 --> BP7 --> BP8 --> BP9 --> BP10 --> BP11 --> BP12
-    classDef done fill:#d4edda,stroke:#28a745,color:#155724
-    classDef active fill:#fff3cd,stroke:#ffc107,color:#856404
-    classDef planned fill:#f8f9fa,stroke:#6c757d,color:#495057
-    classDef launch fill:#cce5ff,stroke:#007bff,color:#004085
-    class BP0,BP1,BP2 done
-    class BP3 active
-    class BP4,BP5,BP6,BP7,BP8,BP9,BP10,BP11 planned
-    class BP12 launch
-```
+Read top-to-bottom. ✅ closed · 🔄 active · ⏳ planned · 🚀 launch GA. Click any BP to jump to its detailed roadmap below.
 
-`✅ closed` · `🔄 active (BP3)` · `⏳ planned` · `🚀 launch GA`
+| BP | Status | Theme | Key Milestones (old → new ID) | Headline Outcome |
+|---|:---:|---|---|---|
+| [**BP0**](#bp0-foundation) | ✅ | **Engine Bootstrap** | M0 | 32-crate workspace · JSON-RPC · cfctl · replay run-bundle · 60/120 Hz sim |
+| [**BP1**](#bp1-foundation) | ✅ | **Actor + Breach** | M1 / M1.5 (→ M1 / M2) · T-CAPTURE | Playable actor · micro breach fun-proof · frame capture for AI agents |
+| [**BP2**](#bp2-foundation) | ✅ | **Terrain + Replay** | M2 / M2.2A/B/C / M2.5 / M3A (→ M3 / M6 / M7 / M8 / M9 / M4) | 256×256 chunked terrain · 36 actions · 5 AI types · reactor defense · headless replay |
+| [**BP3**](#bp3-active) | 🔄 | **Combat + Body** ← *now* | M3B / M4A / M5 (→ M10 / M11 / M13) + M4A new | Replay viewer · ACC-A floor · chassis grammar · asset ledger · friend-handoff release |
+| [**BP4**](#bp4-physics-sandbox) | ⏳ | **Physics Sandbox** | M5.5 / M5.5.5 / M5.6 / M5.7 / M5.8 (→ M14 / M18 / M15 / M16 / M17) | Full collision · 50+ Noita-grade materials · 18 hazards · origin resources · sabotage slice |
+| [**BP5**](#bp5-atmospherics) | ⏳ | **Atmospherics + Worlds** | M5.9 / M5.9.5 / M5.10 (→ M19 / M21 / M20) | PV=nRT · 10 gases · 6 combustion reactions · 6 launch worlds · pressure-hold slice |
+| [**BP6**](#bp6-ai-combat) | ⏳ | **AI Combat** | M6 / M6.5 / M6.6 (→ M22 / M23 / M24) | Hierarchical A* · async LLM mind · 8-test environmental competence · VFX Tier 1 |
+| [**BP7**](#bp7-vertical-slice) | ⏳ | **Vertical Slice** | M7.x → M25–M32 + UX | 30+ missions · 8 factions · 150 recipes · 30-node research · 8 generators · base build UX |
+| [**BP8**](#bp8-creator) | ⏳ | **Creator** | M8 / M8.5 / M8.6 (→ M33 / M34 / M35) | Mod tools · Material Lab · 12 ores · Tier 2 ComfyUI · 8 tutorial labs |
+| [**BP9**](#bp9-server-lan) | ⏳ | **Server + LAN** | M9 / M9.5 / M9.10 / M10 (→ M36 / M37 / M38 / M40) | Dedicated server · ACRE2-tier radio · 200+ tunables · LAN co-op · 19 languages |
+| [**BP10**](#bp10-online) | ⏳ | **Online + Worlds** | M11.x → M41–M45 + UX | Online co-op · PvE survival · 12 worlds · 3 transport modes · 5 PvE bosses · spectator |
+| [**BP11**](#bp11-grand-strategy) | ⏳ | **Grand Strategy (Opt-In)** | M7.3 / M7.4 / M7.1.5 (→ M46 / M47 / M48) | AWAW-inspired upkeep · strategy phase · faction intelligence; all opt-in per server |
+| [**BP12**](#bp12-launch) | 🚀 | **Launch GA** | M12 (→ M49) · T-tracks | Public PvP · persistent MMO · Bunker Defence flagship · Steam store · **v1.0.0** |
 
 ### Phase Summary
 
@@ -157,6 +147,10 @@ flowchart LR
 
 Each Build Point bundles related milestones into a shippable proof slice. Suffix-letter milestones (`M4A`, `M9A`, …) are production-track + UX/UI inserts added 2026-05-13. Click any phase below to expand.
 
+<a id="bp0-foundation"></a>
+<a id="bp1-foundation"></a>
+<a id="bp2-foundation"></a>
+
 <details>
 <summary><b>✅ BP0..BP2 — Foundation</b> (closed: engine + actor + terrain + replay)</summary>
 
@@ -176,6 +170,8 @@ Each Build Point bundles related milestones into a shippable proof slice. Suffix
 
 </details>
 
+<a id="bp3-active"></a>
+
 <details open>
 <summary><b>🔄 BP3 — Combat Readability Build</b> (active: ACC-A floor + chassis grammar + asset ledger + release)</summary>
 
@@ -188,6 +184,8 @@ Each Build Point bundles related milestones into a shippable proof slice. Suffix
 | **—** | — | Double-Click Release Engineering | ⏳ Pending | `.dmg` / `.msi` / AppImage friend-handoff release per T-RELEASE |
 
 </details>
+
+<a id="bp4-physics-sandbox"></a>
 
 <details>
 <summary><b>⏳ BP4 — Physics Sandbox Alpha</b> (full collision · materials · hazards · origin resources)</summary>
@@ -207,6 +205,8 @@ Each Build Point bundles related milestones into a shippable proof slice. Suffix
 
 </details>
 
+<a id="bp5-atmospherics"></a>
+
 <details>
 <summary><b>⏳ BP5 — Atmospherics + Worlds Alpha</b> (PV=nRT · 10 gases · 6 launch worlds)</summary>
 
@@ -217,6 +217,8 @@ Each Build Point bundles related milestones into a shippable proof slice. Suffix
 | **M5.10** | `M20` | EnvironmentSignal Aggregator | DR-040 · per-tick per-actor bundle (atmospheric / gravitational / thermal / radiation / photic / EM / weather / …) |
 
 </details>
+
+<a id="bp6-ai-combat"></a>
 
 <details>
 <summary><b>⏳ BP6 — AI Combat Alpha</b> (pathfinding · LLM mind · environmental competence)</summary>
@@ -229,6 +231,8 @@ Each Build Point bundles related milestones into a shippable proof slice. Suffix
 | *new* | `M24A` | VFX Tier 1 | 600+ particle configs · 80+ textures (impact / spark / explosion / debris) |
 
 </details>
+
+<a id="bp7-vertical-slice"></a>
 
 <details>
 <summary><b>⏳ BP7 — Vertical Slice Alpha</b> (campaign · factions · loot · power · mining · crafting)</summary>
@@ -250,6 +254,8 @@ Each Build Point bundles related milestones into a shippable proof slice. Suffix
 
 </details>
 
+<a id="bp8-creator"></a>
+
 <details>
 <summary><b>⏳ BP8 — Creator Alpha</b> (mod tools · Material Lab · advanced mining)</summary>
 
@@ -263,6 +269,8 @@ Each Build Point bundles related milestones into a shippable proof slice. Suffix
 | *new* | `M33A` | Tutorial Lab Production | 8 modular labs · First Contract · FRE wizard · adaptive hints |
 
 </details>
+
+<a id="bp9-server-lan"></a>
 
 <details>
 <summary><b>⏳ BP9 — Server + LAN Alpha</b> (dedicated server · voice/radio · LAN co-op · localization)</summary>
@@ -281,6 +289,8 @@ Each Build Point bundles related milestones into a shippable proof slice. Suffix
 
 </details>
 
+<a id="bp10-online"></a>
+
 <details>
 <summary><b>⏳ BP10 — Online Beta</b> (online co-op · PvE survival · planet travel · bosses)</summary>
 
@@ -298,6 +308,8 @@ Each Build Point bundles related milestones into a shippable proof slice. Suffix
 
 </details>
 
+<a id="bp11-grand-strategy"></a>
+
 <details>
 <summary><b>⏳ BP11 — Public Systems Beta</b> (grand-strategy opt-in: upkeep · strategy · intelligence)</summary>
 
@@ -308,6 +320,8 @@ Each Build Point bundles related milestones into a shippable proof slice. Suffix
 | **M7.1.5** | `M48` | Inter-Faction Intelligence (Opt-In) | AWAW-inspired: codebreaking · spy rings · 8 covert ops · counter-intel; AI factions follow same rules; opt-in per server |
 
 </details>
+
+<a id="bp12-launch"></a>
 
 <details>
 <summary><b>🚀 BP12 — Release Candidate</b> (Public PvP + MMO shards + Bunker Defence flagship + launch GA)</summary>
@@ -430,7 +444,8 @@ If a row above is still missing a core system at BP12 closure time, BP12 cannot 
 
 ## The Layered Simulation
 
-> **BP3 status:** The diagram below shows the *target architecture*. At BP3, the actor controller, equipment / chassis grammar, chunked terrain, mission state machine, replay / event recorder, and HUD are real. Atmospherics (PV=nRT), systemic materials (CA kernel), full collision physics, universal gravity, and multiplayer are planned systems with stub crates — they ship at BP4-BP9. The diagram is the design commitment; the [Build Points](#build-points) table shows what's real today.
+> [!note]
+> **BP3 status.** The diagram below shows the *target architecture*. At BP3, the actor controller, equipment / chassis grammar, chunked terrain, mission state machine, replay / event recorder, and HUD are real. Atmospherics (PV=nRT), systemic materials (CA kernel), full collision physics, universal gravity, and multiplayer are planned systems with stub crates — they ship at BP4-BP9. The diagram is the design commitment; the [Build Points](#build-points) table shows what's real today.
 
 Every system reads from one source of truth. Nothing is faked.
 
@@ -505,7 +520,8 @@ Every layer emits replay events. Every cause chain is reproducible. Every AI age
 
 ## Core Pillars
 
-> **BP3 status:** Pillars marked with *(planned)* have stub crates but no production implementation yet. They are design commitments, not shipping features. See [Build Points](#build-points) for what's real today.
+> [!note]
+> **BP3 status.** Pillars marked with *(planned)* have stub crates but no production implementation yet. They are design commitments, not shipping features. See [Build Points](#build-points) for what's real today.
 
 | Pillar | What It Means |
 |---|---|
@@ -554,12 +570,12 @@ Corefall stands on the shoulders of an exceptional set of games that figured out
 
 We **also** lean on the open Rust gamedev ecosystem: [Bevy](https://bevyengine.org), [wgpu](https://wgpu.rs), [Rapier / Avian](https://rapier.rs), [Tokio](https://tokio.rs), [serde](https://serde.rs), [BLAKE3](https://github.com/BLAKE3-team/BLAKE3), and many more. See [game/Cargo.toml](game/Cargo.toml) for the full dependency tree.
 
-> [!important] Reuse posture
-> No code, no assets, no sprites, no audio, no scripting from any of the inspiration games is copied into Corefall. Everything is implemented from chemistry / physics / game-design first principles plus public documentation (wikis, GDC talks, modding docs, public source where applicable). Provenance is logged in the canonical vault's usage ledger when any specific snippet of public documentation is quoted in spec / research notes.
+> [!important]
+> **Reuse posture.** No code, no assets, no sprites, no audio, no scripting from any of the inspiration games is copied into Corefall. Everything is implemented from chemistry / physics / game-design first principles plus public documentation (wikis, GDC talks, modding docs, public source where applicable). Provenance is logged in the canonical vault's usage ledger when any specific snippet of public documentation is quoted in spec / research notes.
 
 ---
 
-## Grand-Strategy Layer — Inspired By A World At War
+## AWAW-Inspired Grand-Strategy Layer
 
 > [!note]
 > Corefall ships a **fully opt-in grand-strategy layer** modeled on Bruce Harper's **A World at War** (Avalon Hill, 2001) — the deepest WWII grand-strategy wargame ever published. Server admins choose how much AWAW-derived depth to enable; defaults are OFF so vanilla Corefall plays as a tactical sandbox without forcing strategic accounting on every player. Spec sources: [`specs/COHERENCE-TIER-5.md`](specs/COHERENCE-TIER-5.md) + milestones `M32` / `M38` / `M43` / `M45` / `M46` / `M47` / `M48`.
@@ -607,27 +623,17 @@ PvE Survival default = **Classic Upkeep**; PvP Arena default = **Vanilla** (comb
 
 ### When AWAW Features Ship
 
-The AWAW-inspired grand-strategy layer ships across **BP7 (`M32`), BP9 (`M38`), BP10 (`M43` / `M45`), and BP11 (`M46` / `M47` / `M48`)** — see the [Roadmap At A Glance](#roadmap-at-a-glance). Foundational pieces (config toggle tree in `M38`; code-name secrecy in `M32`) ship before the heavy intelligence + upkeep + strategy phase layers, so by the time `M48` lands the player can flip on full AWAW mode end-to-end.
+The AWAW-inspired grand-strategy layer ships across **BP7 → BP11**. Foundational pieces (config toggle tree in `M38`; code-name secrecy in `M32`) ship before the heavy intelligence + upkeep + strategy phase layers, so by the time `M48` lands the player can flip on full AWAW mode end-to-end.
 
-```mermaid
-flowchart LR
-    M32([M32<br/>Code-Name Secrecy<br/>Rule 41.5])
-    M38([M38<br/>Config Toggle Tree<br/>4 Presets])
-    M43([M43<br/>Industrial Centers<br/>Rule 37])
-    M45([M45<br/>Resistance Levels<br/>Rule 60])
-    M46([M46<br/>Upkeep Economy<br/>Rules 35.31/35.53/40])
-    M47([M47<br/>Strategy Phase<br/>Rule 8])
-    M48([M48<br/>Intelligence x4<br/>Rules 44-48])
-    M32 --> M38 --> M43 --> M45 --> M46 --> M47 --> M48
-    classDef bp7 fill:#fff3cd,stroke:#ffc107
-    classDef bp9 fill:#cce5ff,stroke:#007bff
-    classDef bp10 fill:#d1ecf1,stroke:#17a2b8
-    classDef bp11 fill:#f8d7da,stroke:#dc3545
-    class M32 bp7
-    class M38 bp9
-    class M43,M45 bp10
-    class M46,M47,M48 bp11
-```
+| Order | BP | Milestone | AWAW Rule(s) | What it adds |
+|:---:|---|---|---|---|
+| 1 | BP7 | `M32` Crafting Tiers | **Rule 41.5** | Code-name research secrecy (public dice, hidden project intent) |
+| 2 | BP9 | `M38` Server Config | **Rule 8 / 35.31 / 36 / 49.21 / 49.31 / 49.5** | Config toggle tree + 4 launch presets (vanilla / classic-upkeep / awaw-lite / awaw-full) |
+| 3 | BP10 | `M43` PvE Survival | **Rule 37** | Industrial Center Evacuation — strategic redeployment, scorched-earth option |
+| 4 | BP10 | `M45` PvE Endgame | **Rule 49 / 60** | Diplomatic results + Faction Resistance Levels graduated collapse |
+| 5 | BP11 | `M46` Upkeep Economy | **Rule 35.53 / 40** | BRP deficit cascade Day 1→30 + allied BP grants |
+| 6 | BP11 | `M47` Strategy Phase | **Rule 8** | Per-cycle decision phase — 75 stance/production/logistics combos |
+| 7 | BP11 | `M48` Intelligence | **Rule 44-48 / 24.622 / 46.411A / 48.5 / 49.4262** | Codebreaking + spy rings + 8 covert ops + counter-intel |
 
 > [!tip]
 > **For AWAW veterans:** Corefall is not a digital AWAW port — it's a tactical sandbox that adopts AWAW's strategic rule families as an opt-in metagame layer. The hex map, BRP economy, and unit roster are different (we're in a sci-fi setting with 12 worlds and 10 races, not 1939-1945 Europe), but the *decision shape* AWAW creates — bankruptcy pressure, intelligence-vs-counter-intelligence cat-and-mouse, IC-evacuation-or-scorch tradeoffs, resistance-level death spiral — all map directly into Corefall's faction system. You can lose a campaign because you over-invested in cosmetic loadouts and couldn't pay upkeep; you can win one because your level-5 codebreaking revealed an enemy's research focus three cycles before they completed it.
@@ -695,8 +701,8 @@ game/crates/
 
 ## Project Status
 
-> [!warning] Pre-alpha
-> Corefall is in active development. The repo is public so CI can run unrestricted (free GitHub Actions minutes for public repos), but the game is **not** ready to play yet — first friend-handoff release lands at BP3 closure (see [Releases](#releases)).
+> [!warning]
+> **Pre-alpha.** Corefall is in active development. The repo is public so CI can run unrestricted (free GitHub Actions minutes for public repos), but the game is **not** ready to play yet — first friend-handoff release lands at BP3 closure (see [Releases](#releases)).
 
 **Workspace stats (last update 2026-05-12 / commit `3244a80`):** **545 tests passing** across 32 crates; cargo fmt + clippy `-D warnings` clean; `bp_test_coverage bp3` reports CLEAN with 0 gaps; M2 determinism CI matrix passes all 6 combinations.
 
@@ -1005,7 +1011,7 @@ Built on Rust. Built on Bevy. Inspired by Cortex Command, Noita, Stationeers, Ba
 
 <div align="center">
 
-**[Headline Systems](#headline-systems) · [Launch Content Roster](#launch-content-roster) · [Project status](#project-status) · [Build Points](#build-points) · [Inspirations](#inspirations-and-credits) · [Tech stack](#tech-stack) · [Getting started](#getting-started) · [License](#license)**
+**[Pillars](#headline-systems) · [Roadmap](#roadmap-at-a-glance) · [Content](#launch-content-roster) · [Build Points](#build-points) · [Inspirations](#inspirations-and-credits) · [AWAW Layer](#awaw-inspired-grand-strategy-layer) · [Project status](#project-status) · [Releases](#releases) · [Getting started](#getting-started) · [License](#license)**
 
 *One field for gravity. One kernel for atmospheres. One source of truth for everything. No HP bars — only blood, oil, and power.*
 
