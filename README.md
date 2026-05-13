@@ -20,19 +20,18 @@ A 2D side-view physics sandbox where every gas, grain, bullet, body, world, tran
 [![Windows](https://img.shields.io/badge/Windows-supported-0078D6?style=flat-square&logo=windows&logoColor=white)](#)
 [![Steam Deck](https://img.shields.io/badge/Steam_Deck-floor_target-1A9FFF?style=flat-square&logo=steamdeck&logoColor=white)](#)
 
-[![Status](https://img.shields.io/badge/status-prealpha%20%28BP3%20active%29-orange?style=flat-square)](#project-status)
-[![Build Points](https://img.shields.io/badge/Build_Points-BP2%20closed%20%2F%20BP3%20active-2EA043?style=flat-square)](#build-points)
+[![Status](https://img.shields.io/badge/status-prealpha-orange?style=flat-square)](#project-status)
+[![Milestone](https://img.shields.io/badge/milestone-M3%20done%20%2F%20M4%20next-2EA043?style=flat-square)](#roadmap)
 [![Tests](https://img.shields.io/badge/tests-545%20passing-2EA043?style=flat-square)](#ci)
-[![Roadmap V2](https://img.shields.io/badge/roadmap-V2%202026--05--08%20additive-8A2BE2?style=flat-square)](#roadmap-shape)
-[![Specs](https://img.shields.io/badge/active%20specs-70%20%28M4..M49%20%2B%2024%20suffix--letter%29-blueviolet?style=flat-square)](specs/active/)
+[![Specs](https://img.shields.io/badge/milestones-3%20done%20%2F%2070%20planned-blueviolet?style=flat-square)](#roadmap)
 [![Releases](https://img.shields.io/github/v/release/Madreag/corefall?include_prereleases&sort=semver&style=flat-square&label=release)](https://github.com/Madreag/corefall/releases)
 
 > [!important]
-> **Where we are:** badges above are the source of truth. Visual progress dashboard in [Roadmap At A Glance](#roadmap-at-a-glance); full milestone matrix in [Project status](#project-status); BP scope table in [Build Points](#build-points); release policy in [Releases](#releases).
+> **Where we are:** just finished `M3` (Pixel Terrain + Materials). Next up: `M4` (Event Recorder Core). Full ordered milestone table in [Roadmap](#roadmap); shipped-code detail in [Project status](#project-status); release policy in [Releases](#releases).
 >
-> **Where to play:** today, build from source via [Getting started](#getting-started). First friend-handoff release (`.dmg` / `.msi` / AppImage — double-click to play, no Terminal) lands when BP3 closes per the [Double-Click Playability Hard Gate](#releases).
+> **Where to play:** today, build from source via [Getting started](#getting-started). First friend-handoff release (`.dmg` / `.msi` / AppImage — double-click to play, no Terminal) lands once `M11` (Readability + ACC-A Floor) + release engineering close per the [Double-Click Playability Hard Gate](#releases).
 
-**[Pillars](#headline-systems) · [Roadmap](#roadmap-at-a-glance) · [Content](#launch-content-roster) · [Build Points](#build-points) · [Inspirations](#inspirations-and-credits) · [AWAW Layer](#awaw-inspired-grand-strategy-layer) · [Project status](#project-status) · [Releases](#releases) · [Getting started](#getting-started)**
+**[Pillars](#headline-systems) · [Roadmap](#roadmap) · [Content](#launch-content-roster) · [Inspirations](#inspirations-and-credits) · [AWAW Layer](#awaw-inspired-grand-strategy-layer) · [Project status](#project-status) · [Releases](#releases) · [Getting started](#getting-started)**
 
 </div>
 
@@ -94,247 +93,89 @@ The full content target shipping by BP12 (every entry **functional + AI-readable
 
 ---
 
-## Roadmap At A Glance
+## Roadmap
 
 > [!tip]
-> **Where Corefall is today** and **what every milestone owns**, end-to-end. Full BP closure-gate contract in [Build Points](#build-points); historical PR / commit / test detail in [Project status](#project-status); spec files in [`specs/active/`](specs/active/).
+> **Where we are (2026-05-13):** just finished `M3` (Pixel Terrain + Materials). Next up: `M4` (Event Recorder Core). One ordered table below — read top to bottom. Spec files in [`specs/active/`](specs/active/) · closed specs in [`specs/done/`](specs/done/).
 
-### Build Point Timeline
+**Legend:** ✅ done · 🔄 in progress · ⏳ planned · 🚀 launch GA
+**Workspace:** 32 crates · 545 tests · 57 closed/directional DRs · 73 milestones across 13 Build Points (BP0..BP12).
 
-Read top-to-bottom. ✅ closed · 🔄 active · ⏳ planned · 🚀 launch GA. Click any BP to jump to its detailed roadmap below.
-
-| BP | Status | Theme | Key Milestones (old → new ID) | Headline Outcome |
+| # | ⬤ | BP | Milestone | What it ships |
 |---|:---:|---|---|---|
-| [**BP0**](#bp0-foundation) | ✅ | **Engine Bootstrap** | M0 | 32-crate workspace · JSON-RPC · cfctl · replay run-bundle · 60/120 Hz sim |
-| [**BP1**](#bp1-foundation) | ✅ | **Actor + Breach** | M1 / M1.5 (→ M1 / M2) · T-CAPTURE | Playable actor · micro breach fun-proof · frame capture for AI agents |
-| [**BP2**](#bp2-foundation) | ✅ | **Terrain + Replay** | M2 / M2.2A/B/C / M2.5 / M3A (→ M3 / M6 / M7 / M8 / M9 / M4) | 256×256 chunked terrain · 36 actions · 5 AI types · reactor defense · headless replay |
-| [**BP3**](#bp3-active) | 🔄 | **Combat + Body** ← *now* | M3B / M4A / M5 (→ M10 / M11 / M13) + M4A new | Replay viewer · ACC-A floor · chassis grammar · asset ledger · friend-handoff release |
-| [**BP4**](#bp4-physics-sandbox) | ⏳ | **Physics Sandbox** | M5.5 / M5.5.5 / M5.6 / M5.7 / M5.8 (→ M14 / M18 / M15 / M16 / M17) | Full collision · 50+ Noita-grade materials · 18 hazards · origin resources · sabotage slice |
-| [**BP5**](#bp5-atmospherics) | ⏳ | **Atmospherics + Worlds** | M5.9 / M5.9.5 / M5.10 (→ M19 / M21 / M20) | PV=nRT · 10 gases · 6 combustion reactions · 6 launch worlds · pressure-hold slice |
-| [**BP6**](#bp6-ai-combat) | ⏳ | **AI Combat** | M6 / M6.5 / M6.6 (→ M22 / M23 / M24) | Hierarchical A* · async LLM mind · 8-test environmental competence · VFX Tier 1 |
-| [**BP7**](#bp7-vertical-slice) | ⏳ | **Vertical Slice** | M7.x → M25–M32 + UX | 30+ missions · 8 factions · 150 recipes · 30-node research · 8 generators · base build UX |
-| [**BP8**](#bp8-creator) | ⏳ | **Creator** | M8 / M8.5 / M8.6 (→ M33 / M34 / M35) | Mod tools · Material Lab · 12 ores · Tier 2 ComfyUI · 8 tutorial labs |
-| [**BP9**](#bp9-server-lan) | ⏳ | **Server + LAN** | M9 / M9.5 / M9.10 / M10 (→ M36 / M37 / M38 / M40) | Dedicated server · ACRE2-tier radio · 200+ tunables · LAN co-op · 19 languages |
-| [**BP10**](#bp10-online) | ⏳ | **Online + Worlds** | M11.x → M41–M45 + UX | Online co-op · PvE survival · 12 worlds · 3 transport modes · 5 PvE bosses · spectator |
-| [**BP11**](#bp11-grand-strategy) | ⏳ | **Grand Strategy (Opt-In)** | M7.3 / M7.4 / M7.1.5 (→ M46 / M47 / M48) | AWAW-inspired upkeep · strategy phase · faction intelligence; all opt-in per server |
-| [**BP12**](#bp12-launch) | 🚀 | **Launch GA** | M12 (→ M49) · T-tracks | Public PvP · persistent MMO · Bunker Defence flagship · Steam store · **v1.0.0** |
-
-### Phase Summary
-
-| Phase | BPs | Status | Headline Outcome |
-|---|---|---|---|
-| **1. Foundation** | BP0..BP2 | ✅ Closed | 32 crates, 545 tests, deterministic 60/120 Hz sim, chunked terrain, replay verifier, reactor defense fun-proof |
-| **2. Combat + Body** | BP3 | 🔄 **Active** | Chassis grammar, ACC-A floor, replay viewer, asset ledger, first friend-handoff release (`.dmg` / `.msi` / AppImage) |
-| **3. Physics Sandbox** | BP4..BP6 | ⏳ Planned | Full collision, 50+ Noita-grade materials, 18 hazards, Stationeers atmospherics, AI environmental competence, LLM mind layer |
-| **4. Vertical Slice** | BP7..BP8 | ⏳ Planned | 30+ campaign missions, 8 factions, 150 crafting recipes, mining, 30-node research tree, Material Lab, mod tools |
-| **5. Multi + Worlds** | BP9..BP10 | ⏳ Planned | Dedicated server, LAN + online co-op, 12 worlds, 3 transport modes, 5 PvE bosses, voice / radio, 19 languages |
-| **6. Launch GA** | BP11..BP12 | ⏳ Planned | Public PvP arenas, persistent MMO shards, Bunker Defence flagship, Steam store, capsule, trailers, **v1.0.0** |
-
-### Quick Stats <sub>(snapshot 2026-05-13)</sub>
-
-| Metric | Value |
-|---|---|
-| **Workspace** | 32 crates · 545 tests · ~80k LOC Rust |
-| **Active spec backlog** | 70 milestones (46 core `M4..M49` + 16 production-track + 8 UX/UI suffix-letter) |
-| **Closed milestones** | 3 (`M1` / `M2` / `M3`) + foundational BP0..BP2 |
-| **Decision records** | 57 closed/directional |
-| **Build Points** | 3 closed · 1 active · 9 planned |
-| **Launch content** | 70+ weapons · 44+ actors · 18+ vehicles · 60+ base objects · 8 factions · 30+ missions |
-| **Launch worlds × races × langs** | 12 · 10 · 19 |
-| **Launch promise** | 80,000 words narrative · 600 codex · 75+ achievements · 50+ cosmetics/actor · 10 endgame modes |
-
-### Detailed Per-Milestone Roadmap
-
-Each Build Point bundles related milestones into a shippable proof slice. Suffix-letter milestones (`M4A`, `M9A`, …) are production-track + UX/UI inserts added 2026-05-13. Click any phase below to expand.
-
-<a id="bp0-foundation"></a>
-<a id="bp1-foundation"></a>
-<a id="bp2-foundation"></a>
-
-<details>
-<summary><b>✅ BP0..BP2 — Foundation</b> (closed: engine + actor + terrain + replay)</summary>
-
-| Old ID | Spec | Title | Headline Feature |
-|---|---|---|---|
-| **M0** | — | Engine Bootstrap | 32-crate workspace · JSON-RPC control plane · `cfctl` · replay run-bundle writer · 60/120 Hz sim |
-| **M1** | `M1` | Actor Controller + Sim Core | One playable actor (WASD / jump / aim / fire / reload / dig) · 9 JSON-RPC methods · tick-rate-independent timing |
-| **M1.5** | `M2` | Micro Breach Fun Slice | 60-90s win/loss · ReactiveGuard FSM · 3 difficulty presets · cfctl-scriptable |
-| **M2** | `M3` | Pixel Terrain + Materials | 256×256 chunked terrain · 8 launch materials · 9 affordance flags · GPU-assisted carving |
-| **M2.2A** | `M6` | Actor + Equipment + Inventory + Sound | 36 actions · 6 weapons · 4 grenades · 8-slot inventory · side-view facing · limb-loss restrictions |
-| **M2.2B** | `M7` | AI Archetypes + Mission Director | 5 archetypes (Rifleman/Sniper/Assault/Engineer/Spotter) · 20+ traits · 3 factions · multi-objective DAG |
-| **M2.2C** | `M8` | UX + Camera + Debug + L10n + Accessibility | 10+ HUD widgets · pie menu · 7 debug overlays · 4 color-blind modes · photo mode · replay scrubber · killcam |
-| **M2.5** | `M9` | Micro Reactor Defense Fun Slice | 60-90s defend · 5-tier terrain HP · 3-layer reactor armor · trench gameplay |
-| **M2.5-SCHEMA** | `M5` | Deep Damage Event Surface Lock | ~60-80 event schemas across 13 families (armor / internal / concussion / fluid / origin / hazard / …) |
-| **M3A** | `M4` | Event Recorder + Headless Replay | 38 event categories · `cf-headless` replay verifier · deterministic event log |
-| **T-CAPTURE** | — | Frame capture + grid composer | PNG readback @ 10 Hz · `capture_grid.py` composer · AI-agent visual validation |
-
-</details>
-
-<a id="bp3-active"></a>
-
-<details open>
-<summary><b>🔄 BP3 — Combat Readability Build</b> (active: ACC-A floor + chassis grammar + asset ledger + release)</summary>
-
-| Old ID | Spec | Title | Status | Headline Feature |
-|---|---|---|---|---|
-| **M3B** | `M10` | Replay Viewer + Debrief | ✅ Closed | Bundle viewer · cause-chain walker · 18-section debrief markdown · DR-002 closed |
-| **M4A** | `M11` | Readability + ACC-A Floor | ✅ Closed | 12 HUD nodes / 7 zones · 200% scale · high contrast · 5-tier integrity colors · War Thunder angle widget |
-| **M5** | `M13` | Equipment + Chassis + Damage Grammar | ✅ Landed | 3 chassis · 15-zone body graph · layered armor · module state machine · pilot eject · save/load |
-| **—** | `M4A` *(new)* | Asset Ledger Infrastructure | ⏳ | `cf-asset-ledger` crate · JSONL append-only ledger · 17 asset categories · 6 production tiers · regen/verify CLI |
-| **—** | — | Double-Click Release Engineering | ⏳ Pending | `.dmg` / `.msi` / AppImage friend-handoff release per T-RELEASE |
-
-</details>
-
-<a id="bp4-physics-sandbox"></a>
-
-<details>
-<summary><b>⏳ BP4 — Physics Sandbox Alpha</b> (full collision · materials · hazards · origin resources)</summary>
-
-| Old ID | Spec | Title | Headline Feature |
-|---|---|---|---|
-| **M4B** | `M12` | Comic-Noir Aesthetic + Juice | Hand-drawn ink-line UI · 12 mission comic panels · death-recap-as-graphic-novel · juice rules per DR-055 |
-| **M5.5** | `M14` | Full Collision Gauntlet | DR-033 · projectile-projectile CCD · universal gravity · War Thunder penetration ray · HE/HEAT/APFSDS · spalling |
-| **M5.5.5** | `M18` | Micro Sabotage Fun Slice | 60-90s sabotage integrating collision + materials + hazards + origin (chemistry / physics / stealth / origin paths) |
-| **M5.6** | `M15` | Active Material Kernel | Noita-grade per-pixel CA · 50+ materials · 30+ reactions · alchemy · flasks · GPU compute |
-| **M5.7** | `M16` | Hazard Package + Afflictions | 18 afflictions · 6 STALKER anomalies · 20+ artifacts · swimming/underwater combat |
-| **M5.8** | `M17` | Origin Reaction + Resource Model | No-HP-bar canonical · blood / oil / power / caloric / bio-fluid per origin · G-Force vision blackout · vacuum scenarios |
-| *new* | `M9A` | Tier 1 SVG Asset Pipeline | 5000+ placeholders · Python + cairo-svg + LLM-prompted SVG · 8 faction style.json · per-origin palettes |
-| *new* | `M11A` | Shell UI Foundation | Title · main menu · pause · save-load · settings tree · credits · loading screens |
-| *new* | `M12A` | Tier 1 Audio Pipeline | 1200+ SFX via Stable Audio Open / AudioCraft · caption metadata |
-| *new* | `M18A` | Animation Production Tier 1 | 1100+ frame strips (walk / hit reactions / death) via AnimateDiff |
-
-</details>
-
-<a id="bp5-atmospherics"></a>
-
-<details>
-<summary><b>⏳ BP5 — Atmospherics + Worlds Alpha</b> (PV=nRT · 10 gases · 6 launch worlds)</summary>
-
-| Old ID | Spec | Title | Headline Feature |
-|---|---|---|---|
-| **M5.9** | `M19` | Atmospherics-Grade Kernel | DR-037 · PV=nRT · 10 gases · 6 combustion reactions · phase change · pipe networks · 6 launch worlds |
-| **M5.9.5** | `M21` | Micro Pressure Hold Fun Slice | 60-90s hold-the-room while atmosphere is breached · gases mix · fires propagate · suits compensate |
-| **M5.10** | `M20` | EnvironmentSignal Aggregator | DR-040 · per-tick per-actor bundle (atmospheric / gravitational / thermal / radiation / photic / EM / weather / …) |
-
-</details>
-
-<a id="bp6-ai-combat"></a>
-
-<details>
-<summary><b>⏳ BP6 — AI Combat Alpha</b> (pathfinding · LLM mind · environmental competence)</summary>
-
-| Old ID | Spec | Title | Headline Feature |
-|---|---|---|---|
-| **M6** | `M22` | AI Pathfinding + Collision Avoidance | Hierarchical A* (tile / chunk / region) · dynamic re-path on terrain_dirty · team costs · stuck recovery |
-| **M6.5** | `M23` | LLM Mind Layer | Async LLM mind never blocks local AI · per-actor 5s ticks · doctrine proposals · sandbox safety |
-| **M6.6** | `M24` | AI Environmental Competence | 8-test AI-MAT suite · bots wear O2 in vacuum · retreat from radiation · downclock under heat · reason labels |
-| *new* | `M24A` | VFX Tier 1 | 600+ particle configs · 80+ textures (impact / spark / explosion / debris) |
-
-</details>
-
-<a id="bp7-vertical-slice"></a>
-
-<details>
-<summary><b>⏳ BP7 — Vertical Slice Alpha</b> (campaign · factions · loot · power · mining · crafting)</summary>
-
-| Old ID | Spec | Title | Headline Feature |
-|---|---|---|---|
-| **M7** | `M25` | Campaign + Base + Commander Spine | 30+ missions · 5 storytellers (Cassandra/Phoebe/Randy/Ironman/Sandbox) · buy menu · 8 stratagems · AI commander rivalry |
-| **M7.1** | `M26` | Factions + NPCs + Narrative | 8 factions · relationship matrix · quartermasters · diplomacy · dialog trees · 8 quest templates · 4 pet companions |
-| **M7.2** | `M27` | Loot + Progression + RPG | 5 rarity tiers · 30+ affixes · set bonuses · XP/level · 30+ achievements · 20+ perks · 10+ curses · Tetris inventory |
-| **M7.5** | `M28` | Base Atmospherics | Pumps · vents · pressure doors · breach repair · heaters · coolers · radiators · coolant loops · emergency venting |
-| **M7.6** | `M29` | Power & Electrical Engineering | 8 generators · 6 cable tiers · voltage classes · 6 storage types · IC10 priority chips · brown-out cascades |
-| **M7.6.5** | `M30` | Basic Mining + Refining (Foundation) | 4 mining tools · 7 launch ores · 3 worlds ore distribution · AI-MINE-A-01..05 subset |
-| **M7.7** | `M31` | Weather + Day/Night Kernel | 7 weather states · 24-hour cycle · AI behavior shifts · remaining 6 worlds ship (12 total) |
-| **M7.8** | `M32` | Crafting Tiers + Fabrication Chain | 5-tier ladder (T0-T4) · 150 launch recipes · fabrication chain · power-coupled · 30-node research tree |
-| *new* | `M25A` | Narrative + Codex Production | 5k-word LLM-driven bible → 80k words · 600 codex · 24 NPCs |
-| *new* | `M27A` | Player Game UI | Inventory Tetris · loadout · cosmetic · codex 600 · achievements 75 · tutorial menu |
-| *new* | `M28A` | Base Build Mode UX | Palette · ghost preview · rotation · room detection · blueprints · demolish/repair · multiplayer co-build |
-| *new* | `M29A` | Power Grid + IC10 Editor UX | Factorio-style overlay · IC10 editor with breakpoints · per-generator dashboard · brown-out cascade viz |
-
-</details>
-
-<a id="bp8-creator"></a>
-
-<details>
-<summary><b>⏳ BP8 — Creator Alpha</b> (mod tools · Material Lab · advanced mining)</summary>
-
-| Old ID | Spec | Title | Headline Feature |
-|---|---|---|---|
-| **M8** | `M33` | Modding Workbench | In-game scenario editor · Lua · IC10 chip editor · Steam Workshop · photo mode · replay browser · 8 tutorial labs |
-| **M8.5** | `M34` | Material Lab | DR-036 workbench · brushes · 17 materials · 13 lab-unlocked · recipe inspector · stamp save/load · AI puppet validation |
-| **M8.6** | `M35` | Advanced Mining + Extraction | DR-041 · 9 mining tools · 12 ores · AI-MINE-A 8-test suite · server-authoritative ledger |
-| *new* | `M32A` | Tier 2 ComfyUI Pipeline | 4500+ production assets via SDXL + Flux + AnimateDiff + ControlNet + per-faction LoRAs |
-| *new* | `M32B` | Crafting + Research + Salvage UX | 3-pane crafting (Stationeers/Terraria/Factorio hybrid) · research tree pan/zoom · 30+ mod slots · material flow Sankey |
-| *new* | `M33A` | Tutorial Lab Production | 8 modular labs · First Contract · FRE wizard · adaptive hints |
-
-</details>
-
-<a id="bp9-server-lan"></a>
-
-<details>
-<summary><b>⏳ BP9 — Server + LAN Alpha</b> (dedicated server · voice/radio · LAN co-op · localization)</summary>
-
-| Old ID | Spec | Title | Headline Feature |
-|---|---|---|---|
-| **M0.5** | `M39` | Universal Schema Locks | Manifest at `cf-mod/manifest/all_schemas.ron` · ~120 locked schemas · one-shot conformance check · bump policy |
-| **M9** | `M36` | Dedicated Server + Determinism Islands | 5 server modes · cf-server-ops/persistence/anti-cheat/admin · 4 mod trust tiers · SERVER-001..016 suite |
-| **M9.5** | `M37` | Voice + Radio + Comms | ACRE2-tier radio (distance / occlusion / frequency / antenna) · EMP · vacuum no_voice · AI chatter · captions |
-| **M9.10** | `M38` | Server Config + Admin CLI | 200+ tunables · 7-tier hierarchy · 20+ admin commands · auto-gen settings UI · audit log |
-| **M10** | `M40` | LAN Co-op | 2-4 player co-op via lan_room · mDNS/UDP discovery · 7 squad roles · revive · death cam · mod hash sync |
-| *new* | `M36A` | Platform Integration | Steam SDK · Discord rich presence · EOS · Workshop · Cloud · Achievements bridge |
-| *new* | `M36B` | Telemetry + Crash + Bug Report | Opt-in privacy · per-shard analytics · in-game bug-submit |
-| *new* | `M37A` | Tier 2 Audio + Voice + Music | 7000+ voice clips via ElevenLabs/Bark/XTTS · 30+ music tracks via MusicGen · adaptive music engine |
-| *new* | `M38A` | Localization (19 langs) | 11 Tier-A + 8 Tier-B · 380k+ translations via LLM auto-translation · ICU MessageFormat |
-
-</details>
-
-<a id="bp10-online"></a>
-
-<details>
-<summary><b>⏳ BP10 — Online Beta</b> (online co-op · PvE survival · planet travel · bosses)</summary>
-
-| Old ID | Spec | Title | Headline Feature |
-|---|---|---|---|
-| **M11** | `M41` | Online Co-op + Full Match Grammar | Community-hosted online · NAT punch-through · 10 endgame modes · persistent AI commander · multi-squad · War Thunder kill cam |
-| **M11.4** | `M42` | Self-Hosted Server Deployment | 3 Docker tiers · systemd · launchd · Terraform · Ansible · Grafana/Prometheus/Loki · 15-min Discord-modder deploy target |
-| **M11.5** | `M43` | PvE Survival Mode + Procgen | 1-8 player coop · 7-step procgen · 3 launch survival worlds · per-race difficulty matrix · acclimatization |
-| **M11.6** | `M44` | Inter-Planet Transport + Stations | 3 transport modes (dropship 8-phase / multi-stage rocket / paired teleporters) · orbital stations · 7 new vehicles |
-| **M11.7** | `M45` | PvE Endgame Bosses + World Events | 5 named bosses (Hollow King / Frozen Heart / Crimson Tide / Eclipse Walker / Last Star) · 12 dynamic world events |
-| *new* | `M40A` | Spectator + Streamer Polish | Replay-to-MP4 via FFmpeg · 10+ overlay themes · Twitch/YouTube/Discord webhook integration |
-| *new* | `M40B` | Online UX | Server browser · friends (Steam/Discord/in-game) · party invite · lobby · admin web panel · mod hash sync UI · voice chat UI |
-| *new* | `M43A` | Map + Mission + Campaign UX | World map · solar system map (12 worlds) · mission select · campaign tree · briefing · travel planner |
-| *new* | `M45A` | Cosmetic Production | 2200+ items · anti-pay-to-win audit (DR-031) |
-
-</details>
-
-<a id="bp11-grand-strategy"></a>
-
-<details>
-<summary><b>⏳ BP11 — Public Systems Beta</b> (grand-strategy opt-in: upkeep · strategy · intelligence)</summary>
-
-| Old ID | Spec | Title | Headline Feature |
-|---|---|---|---|
-| **M7.3** | `M46` | Upkeep Economy (Opt-In) | Per-cycle BP/power/parts/food/fuel/O2/coolant drain · bankruptcy cascade Day 1-30 · rescue mechanisms · AI factions follow same rules |
-| **M7.4** | `M47` | Strategy Phase + Goals (Opt-In) | 5 stances × 5 production × 3 logistics = 75 combos · 8 goal templates × 3 stake tiers = 24 launch goals |
-| **M7.1.5** | `M48` | Inter-Faction Intelligence (Opt-In) | AWAW-inspired: codebreaking · spy rings · 8 covert ops · counter-intel; AI factions follow same rules; opt-in per server |
-
-</details>
-
-<a id="bp12-launch"></a>
-
-<details>
-<summary><b>🚀 BP12 — Release Candidate</b> (Public PvP + MMO shards + Bunker Defence flagship + launch GA)</summary>
-
-| Old ID | Spec | Title | Headline Feature |
-|---|---|---|---|
-| **M12** | `M49` | Public PvP Arenas + Persistent MMO Shards | Public PvP half · MMO shard half · **Bunker Defence flagship** · 4 launch shards (NA/EU/APAC/SA) · cross-shard events |
-| *new* | `M48A` | Tier 3 Polish | Top 50 Aseprite hand-polish · top 20 Spine rigs · FMOD/Kira mix · Steam Deck Verified |
-| *new* | `M48B` | Steam Store + Marketing | Capsule art · 12 screenshots · 6 trailer types · press kit · tag taxonomy |
-| *new* | `M48C` | Endgame + Workshop UX Polish | Debrief · replay browser · photo mode · mech bay · pilot/commander dossier · faction diplomacy · quest log · NPC dialog · hub · mod manager |
-| **T-tracks** | — | Production-track finalization | T-CONTENT-ART · T-CONTENT-NARRATIVE · T-LOCALIZATION · T-LIVEOPS all reach launch GA |
-
-</details>
+| **M1** | ✅ | BP1 | Actor Controller + Sim Core | Playable actor (WASD / jump / aim / fire / reload / dig) · 5-state body machine · 9 JSON-RPC methods · tick-rate-independent timing |
+| **M2** | ✅ | BP1 | Micro Breach Fun Slice | 60-90s win/loss · ReactiveGuard FSM · 3 difficulty presets · cfctl-scriptable |
+| **M3** | ✅ | BP2 | Pixel Terrain + Materials | 256×256 chunked deformable terrain · 8 launch materials · 9 affordance flags · GPU-assisted carving |
+| **M4** | ⏳ | BP2 | Event Recorder Core | 38 event categories · `cf-headless` replay verifier · deterministic event log |
+| **M4A** | ⏳ | BP3 | Asset Ledger Infrastructure | `cf-asset-ledger` crate · JSONL append-only ledger · 17 asset categories · 6 production tiers · regen + verify CLI |
+| **M5** | ⏳ | BP2 | Deep Damage Event Surface Lock | ~60-80 event schemas across 13 families (armor / internal / concussion / fluid / origin / hazard / atmos / shield / environment / thermal / …) |
+| **M6** | ⏳ | BP2 | Actor Depth + Equipment + Sound + Squad | 36 actions · 6 weapons · 4 grenades · 8-slot inventory · side-view facing · 1 friendly bot + 4 squad commands |
+| **M7** | ⏳ | BP2 | AI Archetypes + Mission Director | 5 archetypes (Rifleman / Sniper / Assault / Engineer / Spotter) · 20+ traits · 3 doctrines · 3-faction matrix · multi-objective DAG · 4-phase pacing |
+| **M8** | ⏳ | BP2 | UX + Camera + Debug + L10n + Accessibility | 10+ HUD widgets · pie menu · 7 debug overlays · 4 color-blind modes · photo mode · replay scrubber · killcam |
+| **M9** | ⏳ | BP2 | Micro Reactor Defense Fun Slice | 60-90s defend scenario · 5-tier terrain HP · 3-layer reactor armor · trench gameplay |
+| **M9A** | ⏳ | BP4 | Tier 1 SVG Asset Pipeline | 5000+ placeholders · Python + cairo-svg + LLM-prompted SVG · 8 faction style.json · per-origin palettes |
+| **M10** | ⏳ | BP3 | Replay Viewer + Debrief | Bundle viewer · cause-chain walker · 18-section debrief markdown · plain-language event template rendering |
+| **M11** | ⏳ | BP3 | Readability + ACC-A Floor | 12 HUD nodes / 7 zones · 200% scale · high contrast · 5-tier integrity colors · War Thunder angle widget |
+| **M11A** | ⏳ | BP4 | Shell UI Foundation | Title · main menu · pause · save-load · settings tree · credits · loading screens |
+| **M12** | ⏳ | BP4 | Comic-Noir Aesthetic + Juice | Hand-drawn ink-line UI · 12 mission comic panels · death-recap-as-graphic-novel · juice rules per DR-055 |
+| **M12A** | ⏳ | BP4 | Tier 1 Audio Pipeline | 1200+ SFX via Stable Audio Open / AudioCraft · caption metadata |
+| **M13** | ⏳ | BP3 | Equipment + Chassis + Damage Grammar | 3 chassis archetypes · 15-zone body graph · layered armor · module state machine · pilot eject · save/load · **brain-hop API** |
+| **M14** | ⏳ | BP4 | Full Collision + Impulse Routing | Universal gravity field · projectile-projectile CCD · War Thunder penetration ray · HE / HEAT / APFSDS · spalling |
+| **M15** | ⏳ | BP4 | Active Material Kernel | Noita-grade per-pixel CA · 50+ materials · 30+ reactions · alchemy · flasks · GPU compute |
+| **M16** | ⏳ | BP4 | Hazard Package + Afflictions | 18 afflictions · 6 STALKER anomalies · 20+ artifacts · swimming + underwater combat |
+| **M17** | ⏳ | BP4 | Origin Reaction + Resource Model | **No-HP-bar canonical** · blood / oil / power / caloric / bio-fluid per origin · G-Force vision blackout · vacuum scenarios |
+| **M18** | ⏳ | BP4 | Micro Sabotage Fun Slice | 60-90s sabotage integrating collision + materials + hazards + origin (chemistry / physics / stealth / origin paths) |
+| **M18A** | ⏳ | BP4 | Animation Production Tier 1 | 1100+ frame strips (walk / hit reactions / death) via AnimateDiff |
+| **M19** | ⏳ | BP5 | Atmospherics-Grade Kernel | PV=nRT · 10 gases · 6 combustion reactions · phase change · pipe networks · 6 launch worlds (Earth / Mars / Moon / Phobos / Mimas / Vulcan) |
+| **M20** | ⏳ | BP5 | EnvironmentSignal Aggregator | Per-tick per-actor bundle · 11 slices (atmospheric / gravitational / thermal / radiation / photic / EM / weather / water / acoustic / day-night / comms) |
+| **M21** | ⏳ | BP5 | Micro Pressure Hold Fun Slice | 60-90s hold-the-room while atmosphere is breached · gases mix · fires propagate · suits compensate |
+| **M22** | ⏳ | BP6 | AI Pathfinding + Collision Avoidance | Hierarchical A* (tile / chunk / region) · dynamic re-pathing on terrain dirty · per-team path costs · stuck recovery |
+| **M23** | ⏳ | BP6 | AI MIND Layer | Async LLM mind never blocks local AI · per-actor 5s ticks · doctrine proposals · sandbox safety · no API key required |
+| **M24** | ⏳ | BP6 | AI Environmental Competence | 8-test AI-MAT suite · bots wear O2 in vacuum · retreat from radiation · downclock under heat · reason labels |
+| **M24A** | ⏳ | BP6 | VFX Tier 1 | 600+ particle configs · 80+ textures (impact / spark / explosion / debris) |
+| **M25** | ⏳ | BP7 | Campaign + Base + Commander Spine | 30+ missions · 5 storytellers (Cassandra / Phoebe / Randy / Ironman / Sandbox) · buy menu · 8 stratagems · **persistent AI commander rivalry** |
+| **M25A** | ⏳ | BP7 | Narrative + Codex Production | 5k-word LLM-driven bible → 80k words · 600 codex entries · 24 named NPCs |
+| **M26** | ⏳ | BP7 | Factions + NPCs + Narrative | 8 factions · relationship matrix · quartermasters · diplomacy · dialog trees · 8 quest templates · 4 pet companions |
+| **M27** | ⏳ | BP7 | Loot + Progression + RPG | 5 rarity tiers · 30+ affixes · set bonuses · XP / level · 30+ achievements · 20+ perks · 10+ curses · Tetris inventory |
+| **M27A** | ⏳ | BP7 | Player Game UI | Inventory Tetris · loadout · cosmetic locker · codex (600) · achievements (75) · tutorial menu · comparison tooltip |
+| **M28** | ⏳ | BP7 | Base Atmospherics | Pumps · vents · pressure doors · breach repair · heaters · coolers · radiators · coolant loops · emergency venting |
+| **M28A** | ⏳ | BP7 | Base Build Mode UX | Palette · ghost preview · rotation · room detection · blueprints · demolish / repair · multiplayer co-build |
+| **M29** | ⏳ | BP7 | Power & Electrical Engineering | 8 generators · 6 cable tiers · 6 storage types · IC10 priority chips · brown-out cascades · **brain rooted / uprooted / embedded** with per-origin avatar buffs |
+| **M29A** | ⏳ | BP7 | Power Grid + IC10 Editor UX | Factorio-style overlay · IC10 editor with breakpoints · per-generator dashboard · brown-out cascade viz |
+| **M30** | ⏳ | BP7 | Basic Mining + Refining | 4 mining tools · 7 launch ores · 3 worlds ore distribution · AI-MINE-A-01..05 acceptance subset |
+| **M31** | ⏳ | BP7 | Weather + Day/Night Kernel | 7 weather states · 24-hour cycle · AI behavior shifts · remaining 6 worlds (Deimos / Europa / Venus / Sol / Belt / Orbital — 12 total) |
+| **M32** | ⏳ | BP7 | Crafting Tiers + Fabrication Chain | 5-tier ladder (T0..T4) · 150 launch recipes · fabrication chain · power-coupled · 30-node research tree |
+| **M32A** | ⏳ | BP8 | Tier 2 ComfyUI Pipeline | 4500+ production assets · SDXL + Flux + AnimateDiff + ControlNet + per-faction LoRAs |
+| **M32B** | ⏳ | BP8 | Crafting + Research + Salvage UX | 3-pane crafting (Stationeers / Terraria / Factorio hybrid) · research tree pan / zoom · 30+ mod slots · material flow Sankey |
+| **M33** | ⏳ | BP8 | Modding Workbench | In-game scenario editor · Lua · IC10 chip editor · Steam Workshop · photo mode · replay browser · 8 tutorial labs |
+| **M33A** | ⏳ | BP8 | Tutorial Lab Production | 8 modular labs · First Contract · FRE wizard · adaptive hints |
+| **M34** | ⏳ | BP8 | Material Lab | DR-036 workbench · brushes · 17 materials · 13 lab-unlocked · recipe inspector · stamp save / load · AI puppet validation |
+| **M35** | ⏳ | BP8 | Advanced Mining + Extraction | 9 mining tools · 12 ores · AI-MINE-A 8-test suite · server-authoritative ledger |
+| **M36** | ⏳ | BP9 | Dedicated Server + Determinism Islands | 5 server modes · `cf-server-ops` / `persistence` / `anti-cheat` / `admin` · 4 mod trust tiers · SERVER-001..016 suite |
+| **M36A** | ⏳ | BP9 | Platform Integration | Steam SDK · Discord rich presence · EOS adapter · Workshop · Cloud · Achievements bridge |
+| **M36B** | ⏳ | BP9 | Telemetry + Crash + Bug Report | Opt-in privacy · per-shard analytics · in-game bug-submit |
+| **M37** | ⏳ | BP9 | Voice + Radio + Comms | ACRE2-tier radio (distance / occlusion / frequency / antenna) · EMP · vacuum no_voice · AI chatter · captions |
+| **M37A** | ⏳ | BP9 | Tier 2 Audio + Voice + Music | 7000+ voice clips (ElevenLabs / Bark / XTTS) · 30+ music tracks (MusicGen) · adaptive music engine |
+| **M38** | ⏳ | BP9 | Server Config + Admin CLI + Settings | 200+ tunables · 7-tier hierarchy · 20+ admin commands · auto-gen settings UI · audit log |
+| **M38A** | ⏳ | BP9 | Localization (19 languages) | 11 Tier-A + 8 Tier-B · 380k+ translations via LLM auto-translation · ICU MessageFormat |
+| **M39** | ⏳ | BP9 | Universal Schema Locks | Manifest at `cf-mod/manifest/all_schemas.ron` · ~120 locked schemas · one-shot conformance check · bump policy |
+| **M40** | ⏳ | BP9 | LAN Co-op | 2-4 player co-op via `lan_room` · mDNS / UDP discovery · 7 squad roles · revive · death cam · mod hash sync |
+| **M40A** | ⏳ | BP10 | Spectator + Streamer Polish | Replay-to-MP4 via FFmpeg · 10+ overlay themes · Twitch / YouTube / Discord webhook integration |
+| **M40B** | ⏳ | BP10 | Online UX | Server browser · friends (Steam / Discord / in-game) · party invite · lobby · admin web panel · mod hash sync UI · voice chat UI |
+| **M41** | ⏳ | BP10 | Online Co-op + Full Match Grammar | NAT punch-through · 10 endgame modes · persistent AI commander · **4+ squads × 7 role types × 12 commands** · War Thunder kill cam |
+| **M42** | ⏳ | BP10 | Self-Hosted Server Deployment | 3 Docker tiers · systemd · launchd · Terraform · Ansible · Grafana / Prometheus / Loki · 15-min deploy target |
+| **M43** | ⏳ | BP10 | PvE Survival Mode + Procgen | 1-8 player coop · 7-step procgen · 3 launch survival worlds · per-race difficulty matrix · acclimatization |
+| **M43A** | ⏳ | BP10 | Map + Mission + Campaign UX | World map · solar system map (12 worlds) · mission select · campaign tree · briefing · travel planner |
+| **M44** | ⏳ | BP10 | Inter-Planet Transport + Stations | 3 transport modes (dropship 8-phase / multi-stage rocket / paired teleporters) · orbital stations · 7 new vehicles |
+| **M45** | ⏳ | BP10 | PvE Endgame Bosses + World Events | 5 named bosses (Hollow King / Frozen Heart / Crimson Tide / Eclipse Walker / Last Star) · 12 dynamic world events |
+| **M45A** | ⏳ | BP10 | Cosmetic Production | 2200+ items · anti-pay-to-win audit (DR-031) |
+| **M46** | ⏳ | BP11 | Upkeep Economy (Opt-In) | AWAW BRP drain · bankruptcy cascade Day 1 → 30 · rescue mechanisms · AI factions follow same rules |
+| **M47** | ⏳ | BP11 | Strategy Phase + Goals (Opt-In) | AWAW Rule 8 turn sequence · 5 stances × 5 production × 3 logistics = 75 combos · 24 launch goals |
+| **M48** | ⏳ | BP11 | Inter-Faction Intelligence (Opt-In) | AWAW codebreaking · spy rings · 8 covert ops · counter-intel · AI factions follow same rules · opt-in per server |
+| **M48A** | ⏳ | BP12 | Tier 3 Polish | Top 50 Aseprite hand-polish · top 20 Spine rigs · FMOD / Kira mix · Steam Deck Verified |
+| **M48B** | ⏳ | BP12 | Steam Store + Marketing | Capsule art · 12 screenshots · 6 trailer types · press kit · tag taxonomy |
+| **M48C** | ⏳ | BP12 | Endgame + Workshop UX Polish | Debrief · replay browser · photo mode · mech bay · pilot / commander dossier · faction diplomacy · quest log · NPC dialog · hub · mod manager |
+| **M49** | 🚀 | BP12 | Public PvP + Persistent MMO + Bunker Defence | **Launch GA** · public PvP arenas · MMO shards · **Bunker Defence flagship mode** · 4 launch shards · cross-shard events · `v1.0.0` |
 
 ---
 
@@ -356,66 +197,6 @@ You will:
 - **Brain-hop** between controlled actors as in Cortex Command — but your designated brain dying ends the mission.
 
 This is not a Cortex Command remake. It is a **best-of-genre synthesis** that takes Cortex Command's command-core / dropship / chassis / digging fantasy and sets it on top of Stationeers-grade-or-better atmospherics + gas tank progression + IC10 programmable chips, ONI-grade closed-loop life support + per-tile thermal conductivity + geyser harvesting, Noita-grade systemic materials, Subnautica-style temperature acclimatization, full collision physics, universal gravity, ACRE2-tier voice + radio simulation, War Thunder-grade armor + spalling, and a full astrography of 12 playable worlds with 10 distinct playable races. AI bots are first-class teammates and rivals. Replay is deterministic. Modding is data-first. Accessibility is a floor, not an afterthought.
-
----
-
-## Roadmap Shape
-
-The canonical roadmap now covers **57 closed/directional decision records**, **73 sequenced milestones** (3 closed in `specs/done/M1..M3.md` + 70 active in `specs/active/M4..M49.md` plus 24 suffix-letter milestones), **17 side tracks** including 4 dedicated production tracks (art, narrative, localization, live-ops), and a **13-step Build Points layer (BP0..BP12)** that bundles related milestones into shippable proof slices.
-
-**Spec renumbering (2026-05-12 → 2026-05-13).** Spec files were renamed to a flat sequential scheme `M1..M49` (commit `655cf39`) and reordered by execution dependency (commit `1c7a73c`). Then 24 milestones were added via suffix-letter convention (commit `1d33f61`) — 16 production-track (`M4A`, `M9A`, `M12A`, `M18A`, `M24A`, `M25A`, `M32A`, `M33A`, `M36A`, `M36B`, `M37A`, `M38A`, `M40A`, `M45A`, `M48A`, `M48B`) and 8 UX/UI (`M11A`, `M27A`, `M28A`, `M29A`, `M32B`, `M40B`, `M43A`, `M48C`). The suffix-letter convention slots additional milestones between existing ones without renumbering everything downstream (alphanumeric read order: `M4 → M4A → M5 → ... → M9 → M9A → M10 → M11 → M11A → M12 → M12A → ...`). See [`specs/active/README.md`](specs/active/README.md) for the full table.
-
-**Historical IDs preserved in commits and shipped code.** Closed PRs, commit subjects, BP table rows below, and the Milestone Matrix retain their original M0..M12 + sub-ID names (M1.5 / M2.2A/B/C / M2.5 / M3A / M3B / M4A / M5.5 / M5.6 / M5.8 / M5.9 / M5.10 / M6.5 / M7.x / M8.5 / M8.6 / M9.x / M11.x). The new flat scheme is forward-looking for unshipped planning. The Roadmap V2 (2026-05-08) additive pass kept every prior milestone/DR id stable; BPs and micro-fun interludes layered *on top of* M0..M12 without renaming anything. The M2.2 mega-bridge slice was split into M2.2A (actor / equipment / inventory / sound) + M2.2B (AI archetypes / mission director / personality / faction) + M2.2C (camera / UX / debug / localization / pie menu) so each can be implemented and reviewed independently.
-
-| Area | Current Direction |
-|---|---|
-| Authority model | Solo runs as an in-process server. Multiplayer uses `cf-server` as the canonical fixed-tick truth. Clients predict feel locally; server corrections preserve shared state. |
-| GPU policy | GPU is used aggressively for rendering, particles, lighting, smoke, debug overlays, prediction, advisory maps, and optional certified server acceleration. CPU deterministic sim remains the required authoritative fallback. |
-| Asset / audio pipeline | All project assets and audio are AI-agent-authored, ledgered, regenerable where possible, captioned where audible, and exposed to modders through the same pipeline. |
-| Damage simulation | **Per-limb armor + AP rounds + organ / circuit internal damage + concussion dose + fluid leak channels + War Thunder angled armor + spalling + ricochet + multi-zone passthrough + per-origin resource depletion (no abstract HP bar)** integrated end-to-end from M2.5 forward. Every death is causally explainable. |
-| Content target | 70+ weapons, 44+ actors, 18+ vehicles, 60+ base objects, 8 factions, 30+ missions, 12 worlds with biomes, 17 materials, 12 ores, 30+ tracks, 400+ SFX, 80,000 words, 600 codex, 75+ achievements, 11+8 languages, 10 endgame modes, 50+ cosmetics per actor. |
-| Shell and platform | Title / menu / settings / lobby / workbench / briefing / debrief / map / achievements / replay viewer / codex / photo mode / cosmetic locker / death cam / mod manager, plus Steam Workshop, cloud, achievements, input, and Steam Deck readiness. |
-| Accessibility | ACC-A floor plus cognitive, motor, hearing, reading, and sensory presets. Captions, full subtitles, reduced motion / shake / flash, UI scaling, high contrast, remap / hold alternatives, color-blind palettes, and screen-reader paths are roadmap gates. |
-| Modding | Modders extend chassis, weapons, materials, atmospheres, missions, AI doctrines, audio, animations, scripts, factions, localization, and test runs with the same schema-first pipeline as the base game. 4 trust tiers (`vanilla` / `verified` / `community` / `experimental`). |
-| Monetization posture | Premium one-time purchase direction, free modding, community-hostable servers, no pay-to-win. Optional cosmetic-only gacha / battle-pass hooks are late-cycle, dormant / default-off systems and require a future activation DR. |
-| Production T-tracks | 4 dedicated late-anchored tracks ride alongside the gameplay spine: **T-CONTENT-ART** (AI-authored art / animation / VFX / decals / lighting / music / SFX / launch roster), **T-CONTENT-NARRATIVE** (~80,000 words bible / codex / dialogue), **T-LOCALIZATION** (Project Fluent + 11 Tier-A langs + 8 Tier-B UI-only + mod-localization), **T-LIVEOPS** (telemetry, marketing, Steam, legal, post-launch ops). Each finalizes at BP12; placeholder generation begins at BP3+. |
-| Micro-fun-slice cadence | After every major systems milestone, a short interlude proves the new system is *fun* before the next one stacks on top: **M1.5** (breach), **M2.5** (reactor defense with the deep damage / armor / hazard / atmospherics surface), **M5.5.5** (sabotage combining collision + materials + hazards + origin), **M5.9.5** (pressure hold under breached atmosphere). Each is a 60-90 s scenario driven by cfctl, validated by run bundles. |
-| AI-agent self-testing | **T-CAPTURE** layer (BP2+): cf-app emits PNG frame readbacks at 10 Hz baseline + event-triggered keyframes; `game/tools/capture_grid.py` composes machine-oriented 8×8 grid PNGs + `summary_grid.png` (one frame per major event, ≤64 frames) and a review-sized `review_grid.png` capped at 16 frames (4×4 when full). cf-e2e drives the loop end-to-end. AI agents read the grids to validate motion, physics, effects, and HUD readability without a human eyeballing every frame. |
-| Actor presentation | Animation-first while controlled, physics-first while disrupted, and always replay/event-visible. Visible actor movement cannot remain a static sliding pawn once the milestone owns movement/body presentation: walking, running, crouching, climbing, jetting, aim blending, limb damage, knockdown, pressure/wind/explosion response, severance, and mech gait all need observable state, events, and capture evidence at their maturity level. |
-
----
-
-## Build Points
-
-The Roadmap V2 layer groups gameplay milestones into **13 Build Points (BP0..BP12)**. A Build Point is a shippable proof slice — when a BP closes, every milestone inside it has the Acceptance Matrix + Contract Integrity Matrix + Performance/Config Audit + run-bundle evidence, plus the AI-Agent Self-Test Report and LLM-graded verdict. Human playtest is welcome confirmation, not the blocking gate. BPs do not replace milestones; they bundle them.
-
-| BP | Anchor | Bundles | Fun-Proof Slice | Status |
-|---:|---|---|---|---|
-| **BP0** | Engine bootstrap | M0 | (kickoff smoke) | Closed |
-| **BP0+** | **M0.5 — Universal Schema Locks (Cross-Milestone Manifest)** | Planned | Meta-milestone: schema manifest at `game/crates/cf-mod/manifest/all_schemas.ron` listing ~120 locked schemas across ~15 owning milestones + `cf-mod validate --all-schemas` one-shot conformance check + schema-bump migration policy at `docs/plan/spec/schema-bump-migration-policy.md`. M0.5 doesn't OWN schemas; it manifests them all. Future v0.1 → v0.2 bumps run through one tool. |
-| **BP1** | Actor controller + breach fun proof | M1 + M1.5 + T-CAPTURE | M1.5 Micro Breach | Closed |
-| **BP2** | Terrain & Replay Build | M2 + **M2.2A** + **M2.2B** + **M2.2C** + M2.5 + M3A | M2.5 Micro Reactor Defense + headless replay verifier | M2/M2.5/M3A Closed; **M2.2A/B/C bridge active** |
-| **BP3** | Combat Readability Build | M3B + M4A + M5 + Double-Click Release Engineering | HUD / body / chassis proof + first friend-handoff release | Active (M3B/M4A/M5 landed; release engineering pending) |
-| **BP4** | Physics Sandbox Alpha | M5.5 + M5.5.5 + M5.6 + M5.7 + M5.8 | M5.5.5 Micro Sabotage | Planned |
-| **BP5** | Atmospherics & Worlds Alpha | M5.9 + M5.9.5 + M5.10 | M5.9.5 Micro Pressure Hold | Planned |
-| **BP6** | AI Combat Alpha | M6 + M6.5 + M6.6 | AI-H / MIND / AI-MAT suites | Planned |
-| **BP7** | Vertical Slice Alpha | M7 + **M7.1 (Factions + NPCs)** + **M7.2 (Loot + Progression)** + M7.5 + **M7.6 (Power & Electrical)** + **M7.6.5 (Basic Mining + Smelting)** + M7.7 + **M7.8 (Crafting Tiers)** + M4B | Breach Contract + Bunker Defence proof + factions + loot + power grid + tier ladder + basic mining foundation | Planned |
-| **BP8** | Creator Alpha | M8 + **M8.5 (Material Lab)** + **M8.6 (Mining & Extraction)** | Modder parity smoke + AI-MINE-A suite | Planned |
-| **BP9** | Server / LAN Alpha | M9 (Dedicated Server App) + **M9.10 (Server Config + Admin CLI)** + M10 (LAN Co-op) | LAN co-op smoke + DET-A suite + comprehensive config | Planned |
-| **BP10** | Online Beta | M11 (Online Co-op + Full Match Grammar) + **M11.5 (PvE Survival + Procgen)** + **M11.6 (Inter-Planet Transport + Stations)** + **M11.7 (PvE Endgame Bosses + World Events)** + M9.5 (Voice + Radio) | Self-hosted online co-op + comms + PvE survival + planet travel + endgame bosses | Planned |
-| **BP11** | Public Systems Beta | M12 (Public PvP + MMO Shards + Bunker Defence Flagship) | PvP / MMO shard proof | Planned |
-| **BP12** | Release Candidate | Production T-track finalization | Launch GA build | Planned |
-
-> [!note]
-> **BP table refers to historical milestone IDs** (M0..M12 + sub-IDs). After the 2026-05-12 spec renumbering, the new flat scheme is `M1..M49 + suffix-letter` (see [Spec renumbering](#roadmap-shape) above). The 24 newly-added production-track + UX/UI milestones (M4A, M9A, M11A, M12A, M18A, M24A, M25A, M27A, M28A, M29A, M32A, M32B, M33A, M36A, M36B, M37A, M38A, M40A, M40B, M43A, M45A, M48A, M48B, M48C) are slotted into the BP cadence above by alphanumeric position: M4A bundles with BP3 (M5); M9A/M11A/M12A bundle with BP3/BP4; M25A/M27A/M28A/M29A bundle with BP7; M32A/M32B/M33A bundle with BP7-BP8; M36A/M36B/M37A/M38A bundle with BP9; M40A/M40B/M43A/M45A bundle with BP10; M48A/M48B/M48C bundle with BP12 release-candidate. The forward-looking spec content is in [`specs/active/`](specs/active/); the BP table above is the canonical bundling for closure gates.
-
-**Build Point closure gate.** Every BP closeout requires (a) every milestone inside it PASS in the Acceptance Matrix, (b) the Minimum-Bar Design Coverage Matrix proving the worker handled obvious inside-scope game / UX affordances instead of only narrow task wording, (c) the Contract Integrity Matrix proving shared code paths + negative / adversarial proof, (d) the **Universal Enhancement Done-Criteria (DR-056)** matrix PASSing for every M1+ milestone inside the BP, (e) run-bundle evidence for every fun-proof slice at multiple tick rates, (f) **T-CAPTURE evidence** (each fun-proof script emits a `summary_grid.png`, review grid, and `capture_manifest.json` recorded in `summary.json.artifacts`; `--expect capture.summary_grid.non_blank_ratio>=0.95` mandatory from BP2 onward), (g) **T-RELEASE evidence** (tagged GitHub pre-release from BP1 onward with the BP exemplar bundle + `summary_grid.png` + SHA256SUMS), (h) `/corefall-review <bp>` verdict = `Accept`, and (i) the BP Goal Coverage Report + AI-Agent Self-Test Report + LLM-graded verdict. Human playtest notes are welcome confirmation, not a blocker when the AI report and grading gate pass.
-
-**Universal Enhancement Done-Criteria (DR-056) — applies to every M1+ milestone.** Per-tier perf gate (Steam Deck 800p/60 + 1080p/60 + 4K/120) + CI bench regression + 24h memory-leak soak + network sync verified + replay determinism CI matrix per platform + every player surface scriptable via cfctl + AI-agent validation report + AI audio pipeline + juice rules per DR-055 + ACC-A floor + Tier-A localization keyed strings + modding parity + anti-FOMO + anti-pay-to-win audit + captions for ALL audio. Universal rows are not optional polish — a milestone is not closed if any Universal row FAILS unless the user explicitly approves that exact deferral. Per-milestone specifics layer on top of the universal contract (see [`docs/plan/spec/milestone-enhancement-pass-m1-plus.md`](docs/plan/spec/milestone-enhancement-pass-m1-plus.md)).
-
-**Production-track wiring.** T-CONTENT-ART, T-CONTENT-NARRATIVE, T-LOCALIZATION, and T-LIVEOPS run alongside the BP spine but only finalize at BP12. They begin placeholder generation at BP3+ so the gameplay spine isn't blocked on art / audio / copy / legal.
-
-See [`docs/plan/spec/prototype-roadmap.md`](docs/plan/spec/prototype-roadmap.md) for the full BP table, the **Design-Completeness Map** (every product surface mapped to its owning BP+milestone so you can verify "yes, by BP12 this is a complete game"), the milestone-map gap fills, the done-criteria summary, the kickoff smoke commands, and the inter-milestone bridge contracts.
 
 ---
 
@@ -445,7 +226,7 @@ If a row above is still missing a core system at BP12 closure time, BP12 cannot 
 ## The Layered Simulation
 
 > [!note]
-> **BP3 status.** The diagram below shows the *target architecture*. At BP3, the actor controller, equipment / chassis grammar, chunked terrain, mission state machine, replay / event recorder, and HUD are real. Atmospherics (PV=nRT), systemic materials (CA kernel), full collision physics, universal gravity, and multiplayer are planned systems with stub crates — they ship at BP4-BP9. The diagram is the design commitment; the [Build Points](#build-points) table shows what's real today.
+> **Current status.** The diagram below shows the *target architecture* at full BP12 launch. As of `M3` close, the actor controller, equipment / chassis grammar, chunked terrain, mission state machine, replay / event recorder, and HUD are real. Atmospherics (PV=nRT), systemic materials (CA kernel), full collision physics, universal gravity, and multiplayer are planned systems with stub crates — they ship at `M14`+. The diagram is the design commitment; the [Roadmap](#roadmap) table shows what's real today.
 
 Every system reads from one source of truth. Nothing is faked.
 
@@ -521,7 +302,7 @@ Every layer emits replay events. Every cause chain is reproducible. Every AI age
 ## Core Pillars
 
 > [!note]
-> **BP3 status.** Pillars marked with *(planned)* have stub crates but no production implementation yet. They are design commitments, not shipping features. See [Build Points](#build-points) for what's real today.
+> **Current status.** Pillars marked with *(planned)* have stub crates but no production implementation yet. They are design commitments, not shipping features. See [Roadmap](#roadmap) for the per-milestone status.
 
 | Pillar | What It Means |
 |---|---|
@@ -702,68 +483,15 @@ game/crates/
 ## Project Status
 
 > [!warning]
-> **Pre-alpha.** Corefall is in active development. The repo is public so CI can run unrestricted (free GitHub Actions minutes for public repos), but the game is **not** ready to play yet — first friend-handoff release lands at BP3 closure (see [Releases](#releases)).
+> **Pre-alpha.** Corefall is in active development. The repo is public so CI can run unrestricted (free GitHub Actions minutes for public repos), but the game is **not** ready to play yet — first friend-handoff release lands when `M11` (Readability + ACC-A Floor) + release engineering land (see [Releases](#releases)).
 
-**Workspace stats (last update 2026-05-12 / commit `3244a80`):** **545 tests passing** across 32 crates; cargo fmt + clippy `-D warnings` clean; `bp_test_coverage bp3` reports CLEAN with 0 gaps; M2 determinism CI matrix passes all 6 combinations.
+**Workspace stats (2026-05-13 / commit `7c47104`):** 32 crates · **545 tests passing** · cargo fmt + clippy `-D warnings` clean · M3 determinism CI matrix passes all 6 combinations.
 
-**BP2 closure recap.** Chunked deformable terrain (M2) replaced the M1.5 soft-breach strip; M2.5 fun-proof scenario shows the player surviving a 60-90s reactor defense as terrain is dug + debris fields form; cf-headless re-runs any run bundle's `events.jsonl` deterministically (M3A). Engineering closed via PR #11 (BP2 milestone code) + PR #12 (source-truthful run bundles + AI-Agent Self-Test contract + LLM-graded test verdicts + per-BP test suite). M2 R2 round closed clippy `-D warnings` green, built the cf-render-2d M2 visual surface, and landed the determinism CI matrix. The **M2.2A/B/C bridge slice** is active in `specs/active/` and fills the gap between M2 baseline and M2.5 reactor defense with actor controller depth (36 actions), 6-weapon suite, 5 AI archetypes, mission director v0.5, 10+ HUD widgets, 7 debug overlays, color-blind variants, and pie menu UI.
+**Just finished:** `M3` — Pixel Terrain + Materials. 256×256 chunked deformable terrain, 8 launch materials, 9 affordance flags, GPU-assisted carving, per-pixel integrity, penetration formula, determinism CI matrix landed. Closed via PRs #11 + #12 + #27 + the M3 R2 round; moved to [`specs/done/M3.md`](specs/done/M3.md).
 
-**BP3 (active) constituent milestones.** M3B Replay Viewer + Debrief (commit `50af435`); M4A Readability + ACC-A Floor (PR #27, DR-003 + DR-012 closed); M5 Equipment / Chassis / Damage Grammar (commit `29edc1b`) — 3 chassis archetypes, body graph (15 zones, 14 joints), layered armor, module state machine, pilot binding + eject, save/load, 7 cfctl methods added, DR-014 + DR-021 closed. **BP3 closure gate has NOT passed:** MISSING_FEATURES Wave 1 inventory identifies ~1,100 foundation gaps; `bp_close_loop.sh bp3` has not produced an all-phases PASS verdict. Double-Click Playability release engineering not yet landed.
+**Up next:** `M4` — Event Recorder Core. Locks the 38-event-category taxonomy + extends `cf-headless` replay verifier + finalizes the run-bundle envelope contract. Spec: [`specs/active/M4.md`](specs/active/M4.md). AGENTS.md workflow: implementer reads `M4.md` + source under `cf-*` crates, audit-first gap-fills, commits per-scenario, then moves to `specs/done/M4.md` when every Gherkin acceptance scenario verdicts as `PASS` or `IMPLEMENTED`.
 
-**Next up after BP3 closure.** BP4 (M5.5 Full Collision Gauntlet, M5.5.5 Micro Sabotage, M5.6 Material Kernel, M5.7 Hazard Package, M5.8 Origin Resource & Overclock Pass). BP3 must first close via MISSING_FEATURES Wave 1 completion + closure gate pass.
-
-### Milestone matrix
-
-| BP | Milestone | Status | What It Proves |
-|---:|---|---|---|
-| BP0 | **M0 — Engine Bootstrap** | Closed ([PR #1](https://github.com/Madreag/corefall/pull/1) merged) | 32-crate workspace, JSON-RPC control plane, cfctl, replay run-bundle writer, deterministic 60 Hz / 120 Hz sim, panic capture, CI matrix on Linux + macOS + Windows. |
-| BP1 | **M1 — Actor Controller And Sim Core** | Closed ([PR #2](https://github.com/Madreag/corefall/pull/2) merged) | Single playable actor with movement, jump, aim, rifle fire, reload, status state machine (STABLE / UNSTABLE / DOWNED / DYING / DEAD), projectile flight, damage routing, stability + recoil + sharp aim + travel-impulse damage + DYING dwell + inventory drop. 9 `act.player.*` JSON-RPC methods. Tick-rate-independent rifle timing (10 RPS / 1.5 s reload identical at 60 Hz and 120 Hz). |
-| BP1 | **M1.5 — Micro Breach Fun Slice** | Closed ([PR #5](https://github.com/Madreag/corefall/pull/5) merged) | 60-90 s win/loss scenario plays end-to-end via cfctl scripts. ReactiveGuard with DR-008 LEAN (jobs + utility + scripted hooks) fires deterministic seeded miss rolls. Soft breach emits M2-compatible `terrain_carved` events. Mission state machine + 4 outcomes (Won / Lost / Aborted / InProgress) + 3 difficulty presets (cakewalk / tough_crowd / veteran). AI-H-01 sentry-hears-threat scenario establishes the AI-H harness. |
-| BP1 | **T-CAPTURE — Frame capture + grid composer** | Shipped ([PR #6](https://github.com/Madreag/corefall/pull/6) merged) | cf-capture crate + `capture_grid.py` composer + cf-e2e wiring. PNG readbacks at 10 Hz baseline + event-triggered keyframes. AI agents read `summary_grid.png` via the Read tool to validate motion + physics + effects without a human eyeballing every smoke run. T-CAPTURE evidence is mandatory at every BP closure gate from BP2 onward. |
-| BP2 | **M2 — Pixel Terrain And Materials** | Closed ([PR #11](https://github.com/Madreag/corefall/pull/11) merged; M2 R2 finalized) | Deformable chunked terrain (256×256 chunks) + 8-material launch set (air / dirt / concrete / metal_nohook / hazard / loose_fill / repair_fill / anchor) + GPU-assisted carving + material overlay (5 modes) + tool-validity feedback + 9 affordance flags + penetration formula (impulse² > integrity²) + stickiness + spalling threshold. M2 R2 fixed engine RwLock re-entrancy, rebuilt cf-render-2d M2 visual surface (terrain.rs / overlay.rs / debris.rs / dig_preview.rs), and landed the determinism CI matrix. |
-| BP2 | **M2.2A — Actor + Equipment + Inventory + Sound Bridge** | Active | 36 actor actions (sprint / crouch / prone / slide / vault / climb / dive / lean / stealth_kill / knife_throw / 26 more) + 6 weapons (rifle / SMG / shotgun / sniper / pistol / grenade_launcher) + 4 grenades + 4 melee + 7 tools + 8-slot inventory with weight + centralized sound propagation kernel + 1 friendly bot + 4 squad commands + side-view facing direction + limb-loss action restrictions. |
-| BP2 | **M2.2B — AI Archetypes + Mission Director + Personality + Faction** | Active | 5 AI archetypes (Rifleman / Sniper / Assault / Engineer / Spotter) + cover seeking + suppression + retreat + squad comm + patrol + friendly fire awareness + 20+ personality traits + 3 squad doctrines (Defensive / Aggressive / Scout) + 3-faction relationship matrix + multi-objective DiGraph mission director + 4-phase pacing (Setup / Buildup / Climax / Debrief) + mini-boss patterns + AI-H-01..06 harness extension. |
-| BP2 | **M2.2C — Camera + UX + Debug + Localization + Accessibility Extras** | Active | Camera (smooth follow + hit-stop + scope + free-look + slowdown) + 10+ HUD widgets (hotbar / minimap / compass / damage direction / squad strip / stamina / stealth meter / grenade arc / phase strip / branching banner) + settings menu (6 tabs) + 7 debug overlays (F1-F7) + localization (~500 keyed strings, English baseline) + color blind variants (4 modes) + aim assist + speedrun mode + damage numbers + custom HUD basic + pie menu radial UI + photo mode basic + replay scrubber + killcam + slow-mo kill cam. |
-| BP2 | **M2.5 — Micro Reactor Defense Fun Slice** | Active | 60-90s defend-the-reactor scenario; chunked terrain-driven win/loss; cfctl-scripted. 5-tier terrain HP color states (Pristine / Scratched / Cracked / Critical / Destroyed) + 8 launch materials + 9 affordance flags + trench gameplay with partial cover + 3-layer reactor armor (External / Internal / Core). Sister milestone M2.5-SCHEMA locks the deep damage event surfaces. |
-| BP2 | **M2.5-SCHEMA — Deep Damage Event Surface Lock** | Planned | Locks v0.1 event schemas for armor / internal / concussion / fluid / origin / hazard / affliction / atmos / shield / environment / thermal families + combat.projectile_hit_mo expanded payload (~60-80 event schemas across 13 families). Pure schema-lock milestone; M2.5 ships scenario, M2.5-SCHEMA ships schemas. Both close BP3 together. M5+ fills producers. |
-| BP2 | **M3A — Event Recorder Core + Headless Replay** | Closed ([PR #11](https://github.com/Madreag/corefall/pull/11) merged) | Deterministic event log + cf-headless replay verifier proves end-to-end determinism by re-running any run bundle's events.jsonl. **38 event categories** (27 baseline + 9 added at M2.5 + 1 at M5 + 1 at M5.8): input, control, mind, collision, server, anti_cheat, mmo, material, reaction, atmospherics, affliction, hazard, shield, thermal, environment, armor, module, resource, internal, concussion, fluid, origin, combat, body, terrain, ai, logistics, mission, system, snapshot, determinism, ux, accessibility, performance, equipment, chassis, actor, ability. M3B (Replay Viewer + Debrief) lands in BP3. |
-| BP3 | **M3B — Replay Viewer + Debrief** | Closed ([commit `50af435`](https://github.com/Madreag/corefall/commit/50af435)) | Replay viewer (cf-tools-replay-viewer): view / cause-chain / debrief / validate / summary subcommands. 7 typed BundleError variants. 4 typed cause-chain terminations (RootReached / ParentMissingFromBundle / MaxDepthReached / CycleDetected). 18-section debrief markdown. Plain-language event template rendering (NEVER raw JSON to players). DR-002 closed. |
-| BP3 | **M4A — Readability + ACC-A Floor** | Closed ([PR #27](https://github.com/Madreag/corefall/pull/27) merged) | 12 focusable HUD nodes across 7 zones. Body silhouette + module strip + ammo + objective + timer + last-event ticker + reactor pressure line + banner stack with severity glyphs. 5-tier integrity color signature reused from terrain to armor layers. Side-view body layout + pilot-inside-chassis dual silhouette + chassis HUD by weight class (Light / Medium / Heavy / Drone). Origin-specific resource bars (no master HP bar for chassis-bearing actors). War Thunder armor angle HUD widget. Internal silhouette overlay. Concussion vignette curves. Fluid drain HUD bars. Accessibility floor (200% scale + high contrast + reduced_* + focus traversal + hold-to-confirm + validated remap table + captions). DR-003 + DR-012 closed. **M4B comic-noir polish (mission cards, stylized banners, ink-line UI, juice rules) deferred to BP7 per Roadmap V2 split.** |
-| BP3 | **M5 — Equipment, Chassis, And Damage Grammar** | Landed (commit `29edc1b`; BP3 closure gate pending) | 3 launch chassis archetypes (infantry_v1 / powered_armor_v1 / light_mech_v1), 15-zone body graph (head, torso, arms, forearms, hands, legs, shins, feet, backpack), 14 joints, 5 equipment sockets, layered armor (External / Internal / Core), module state machine (Nominal → Degraded → Warning → Failed → NotPresent), 11-stage damage pipeline, pilot binding + eject + bail-too-late + extraction lifecycle, save/load with chassis round-trip. 7 cfctl methods (`act.player.crouch / climb / jet / eject`, `act.chassis.repair / salvage / clear_jam`). 13 chassis event types. DR-014 + DR-021 closed. **Spec extends M2.5's reserved surfaces:** 5 chassis archetypes shipped (added crab/quadruped + drone), brain-hopping, cockpit camera anchor, chassis ability slots (8 launch abilities including time_stop / time_slow / cloak / EMP_pulse / gravity_well / overdrive), weapon modifier slots (30+ Noita-style stackable modifiers), drone allies (4 autonomous modes), hit reactions per body part, side-view body layout + facing direction, limb-loss functional consequences matrix, stance-aware hit-zone AABB tables, multi-zone passthrough, per-module positioning + War Thunder ray traversal, armor mounting angles per chassis archetype. |
-| BP4 | M5.5 — Full Collision Gauntlet | Planned | DR-033 closure: full collision + projectile-projectile + CCD tiers + universal gravity field integration + swept-volume collision per CCCP `Atom::Travel` + limb detachment via joint impulse + gib spawning with authored data + ragdoll on death + per-organ internal damage routing + War Thunder penetration ray + HE overpressure + HEAT shaped jet + APFSDS long-rod + spalling fragment ray + hit-stop + camera punch + impact frame. |
-| BP4 | **M5.5.5 — Micro Sabotage** | Planned | Fun-proof interlude after M5.5/5.6/5.7/5.8: 60-90 s sabotage scenario integrating collision + materials + hazards + origin. Chemistry path (oil ignition chain) + physics path (explosive breach) + stealth path (alarm suppressed) + origin path (human stealth + android overclock + robot vacuum-immune). |
-| BP4 | M5.6 — Material Kernel | Planned | DR-036 closure: Noita-grade per-pixel cellular automata + 50+ materials + 30+ reactions (acid + iron → rust; water + lava → obsidian; gunpowder + fire → explosion) + alchemy table + flask system + GPU compute acceleration (CPU deterministic fallback). |
-| BP4 | M5.7 — Hazard Package | Planned | 18-affliction full mechanics (burning / wet / electrified / poisoned / hypoxic / combustible_atmosphere / breach_decomp / hyperthermic / hypothermic / radiation / concussed / deafened / bleeding / internal_shock / low_battery / coolant_leaking / oil_leaking / overheating). 6 STALKER-inspired anomaly hazards (gravity / electric / time / chemical / bloodsucker / psy_storm). 20+ artifacts with passive bonuses. Swimming + underwater combat. |
-| BP4 | M5.8 — Origin Resource & Overclock Pass | Planned | Per-origin reaction matrix runtime: humans concuss, androids battery-drain, robots overclock + leak coolant. **No-HP-bar canonical**: blood / oil / power / caloric / bio_fluid / oxygen_supply per origin. Per-organ + per-circuit cascade rules. G-Force vision blackout HUD per origin. Helmet + oxygen tank vacuum scenarios. Internal shock + downclock + overclock (voluntary + involuntary). |
-| BP5 | M5.9 — Atmospherics-Grade Kernel | Planned | DR-037 closure: Stationeers-grade-or-better PV = nRT, 10 launch gases + 6 liquid mixtures, 6 deterministic combustion reactions with autoignition T, gradual phase change with latent heat, pipe networks with pumps / valves / regulators / filtration, suit life-support, pressure apertures, jets, heat transfer, universal-gravity ballistic drag. 6 launch worlds (Earth / Mars / Moon / Phobos / Mimas / Vulcan). |
-| BP5 | **M5.9.5 — Micro Pressure Hold** | Planned | Fun-proof interlude after M5.9: 60-90 s hold a room while atmosphere is breached, gases mix, fires propagate, suits compensate. |
-| BP5 | **M5.10 — Environmental Conditions Aggregation** | Planned | EnvironmentSignal aggregator (per DR-040): per-tick per-actor bundle aggregating atmospheric / gravitational / thermal / radiation / photic / EM / weather / water / acoustic / day-night / comms slices into one source of truth. 15-class hazard taxonomy + comms light-lag. |
-| BP6 | M6 — AI Core And Pathfinding | Planned | Hierarchical Pathfinding A* (H-PA*) with 3 hierarchy levels (tile → chunk → region). Dynamic re-pathing on `terrain.terrain_dirty_region_batch`. Per-team path costs. Multi-actor collision avoidance via spatial hashing. Stuck recovery. Sleeping AI optimization. |
-| BP6 | M6.5 — LLM Mind Lab | Planned | Async LLM mind layer; local AI never blocks; no API key required. Per-actor MIND ticks every 5 seconds (fully async). Doctrine proposal format with reason labels + confidence. Sandbox + safety (no file I/O, no network shell, no OS execute). AI Self-Test grading via MIND. |
-| BP6 | M6.6 — AI Environmental Competence | Planned | 8-test AI-MAT acceptance suite. AI reads EnvironmentSignal per slice (atmospheric / gravitational / thermal / radiation / photic / EM / weather). Bots wear oxygen tanks in vacuum, retreat from radiation, seek cover from lightning, avoid combustible atmosphere fires, navigate gravity anomalies, downclock robots under heat, fall back to last-known orders in comms blackout. Reason labels for every environmental decision. |
-| BP7 | **M7 — Campaign + Base + Commander Spine** | Planned | Campaign + base building (DR-027/029) + 5 storytellers (Cassandra/Phoebe/Randy/Ironman/Sandbox) + buy menu + delivery craft + 8 stratagems + AI commander with persistent rivalry + boss schema (canonical data model for all bosses). Sister milestones M7.1 + M7.2 fill factions/NPCs and loot/progression. |
-| BP7 | **M7.1 — Factions + NPCs + Narrative** | Planned | 8 factions full mechanics (Hostile Corp / Allied Resistance / Marauder / Religious / Scientist / Mercenary / Pirates / Drone Collective) + relationship matrix + quartermasters + diplomacy + faction wars + NPC dialog with branching trees + procedural quest generator (8 templates) + investigation (crime scenes + clues + codex) + hostage / captives + 4 pet companions. |
-| **BP7** | **M7.1.5 — Inter-Faction Intelligence (4 Subsystems; AWAW-Inspired; Opt-In)** | Planned | 4 intelligence subsystems per AWAW Rules 44-48: Codebreaking (level 0-5 across 5 categories; passive combat modifier ±1 to ±5) + Spy Rings (placed in target factions; reveal BP/army/stance/goals; +/-1 diplomatic die roll modifier) + Covert Operations (8 launch action types: negate research/diplomacy/construction/supply/intel-steal/sabotage/assassinate/false-strategy) + Counter-Intelligence (detect spies, block covert ops, reduce enemy codebreaking). AI factions follow same rules. Opt-in per server. |
-| BP7 | **M7.2 — Loot + Progression + RPG** | Planned | 5 loot rarity tiers (Common 70%/Magic 25%/Rare 4%/Legendary 1%/Unique 0.1%) + 30+ affixes (weapon/armor/chassis-module) + set bonuses at 2/4/6 + XP+level + 30+ launch achievements + 20+ perks + 10+ curses + inventory grid Tetris (per-chassis sizing) + treasure maps + voyages (Sea of Thieves). |
-| **BP7** | **M7.3 — Upkeep Economy (Grand-Strategy Foundation; Opt-In)** | Planned | Per-cycle upkeep drain (BP + power + parts + food + fuel + O2 + coolant) per asset type; faction-wide HQ pool + per-base local pool + supply-line transfers; bankruptcy cascade Day 1 → 3 → 7 → 14 → 30 with graduated effects (low morale → forced demobilization → building auto-shut → Resistance Level → collapse); rescue mechanisms (emergency mobilization / allied BP grants / austerity / sell asset). AI factions follow same rules (exploitable). Opt-in per server (`grand_strategy.enable_upkeep_economy=true` in server.ron). PvE Survival defaults ON; PvP defaults OFF. |
-| **BP7** | **M7.4 — Strategy Phase + Goals (Per-Cycle Decision Layer; Opt-In)** | Planned | Per-cycle decision phase (5 stances × 5 production focuses × 3 logistics priorities = 75 combos) + goal system (8 launch goal templates × 3 stake tiers = 24 launch goals; pick 1-3 per cycle; stake creates reward/penalty risk). AI factions follow same rules; choices revealable via M7.1.5 intelligence. Opt-in per server. |
-| BP7 | M7.5 — Base Atmospherics | Planned | Base modules wired into M5.9 kernel: pumps, vents, pressure doors, breach repair, heaters/coolers, radiators, coolant loops, emergency venting, and room-state mission objectives. |
-| BP7 | **M7.6.5 — Basic Mining + Smelting (Foundation)** | Planned | Foundation tier for M7.8 crafting chain: 4 launch mining tools (Sampler / LightDigger / HeavyDrill / RefiningStation) + 7 launch ores (iron / copper / coal / lead / nickel / tin / ice) + 3 launch worlds (Earth / Mars / Mimas) ore distribution + AI-MINE-A-01..05 acceptance subset. M8.6 extends with advanced tools + 5 more ores + 9 more worlds + AI-MINE-A-06..08 + server-grade ledger replication. |
-| BP7 | **M7.7 — Day/Night, Weather & Dynamic Events** | Planned | Weather + day-night kernel. 7 weather states (clear / rain / storm / dust / fog / snow / acid_rain). 24-hour day/night cycle per world with AI behavior shifts. Remaining 3 worlds ship (Deimos / Europa / Venus + Sol-zone / Belt / Orbital = 12 total per README). |
-| BP7 | **M4B — Comic-Noir Polish** | Planned | Comic-noir aesthetic (hand-drawn ink-line UI, comic-book speech bubbles, ink-style impact particles, dynamic color grading). Juice rules per DR-055 (button hover, click punch, banner slide, hit-stop, weapon swap whoosh, pickup glow). Mission briefing comic panels (12 launch). Death recap as graphic novel. All juice respects reduce_motion / shake / flash. |
-| BP8 | M8 — Scenario Editor And Mod Tools | Planned | Full in-game scenario editor + Lua script editor + IC10 chip editor + mod manifest + Steam Workshop integration + photo mode (full filter palette + color grading + animation) + replay browser full scrubbable timeline + custom HUD editor + 8 modular tutorial labs + mod parity contract per DR-045. |
-| BP8 | M8.5 — Material Lab | Planned | `cf-tools-editor --mode material_lab` workbench per DR-036. Brushes + material palette (17 launch + 13 expansion unlocked via lab) + recipe inspector + stamp save/load (Powder Toy pattern) + snapshot/delta undo + test-run with replay capture + AI puppet validation. 5 launch material-lab mod templates. |
-| BP8 | **M8.6 — Mining And Extraction** | Planned | Full mining pipeline per DR-041: sample → drill → extract → refine → smelt → use. 9 mining tools (Sampler / LightDigger / HeavyDrill / CoreDrill / RefiningStation / SmelterFurnace / EnrichmentReactor / OreCargoBay / ConveyorBelt). 12 launch ores (iron / gold / copper / uranium / ice / sulfur / coal / lithium / titanium / lead / nickel / tin). AI-MINE-A 8-test acceptance suite. Server-authoritative resource ledger replicates across shards. |
-| BP9 | M9 — Dedicated Server App + Determinism Islands | Planned | `cf-server` multi-mode binary with 5 launch modes (coop_room / pvp_arena / lan_room / mmo_shard / lobby_directory). cf-server-ops (config + health + readiness + metrics + drain shutdown). cf-server-persistence (snapshot writer + event journal). cf-server-anti-cheat (3 profiles: casual / competitive / tournament_strict). cf-server-admin (kick / save / restart / hot_load / ban). Mod whitelist/blacklist with 4 trust tiers. 5 server config templates (deathmatch / coop_campaign / pvp_arena / endless_wave / sandbox). SERVER-001..016 acceptance suite. DR-052 networking transport library decision locks at M9 (lightyear vs renet vs quinn). |
-| BP9 | M10 — LAN Co-op | Planned | Local 2-4 player co-op through `cf-server --mode lan_room`. mDNS / UDP broadcast LAN discovery. Server-authoritative simulation with client prediction + reconciliation. Per-client replay bundles align tick-for-tick. Co-op friendly fire policy (configurable). 7 squad role types at lobby. Revive mechanic. Death cam. LAN scanner + quick-host wizard. Anti-cheat profile `casual` default. Mod hash sync with clean diff UI on mismatch. |
-| BP10 | M11 — Online Co-op (Self-Hosted Dedicated Servers) | Planned | Community-hostable online co-op via `cf-server --mode coop_room`. NAT punch-through + relay (Steam Datagram Relay / EOS adapters available). `lobby_directory` for server registration + discovery. Latency masking at 50-150 ms RTT. Anti-cheat profile `competitive` default. **Full match grammar per DR-042**: 10 endgame modes (Bunker Defence / Bunker Attack / Salvage Run / Tournament / Wave Survival / Boss Rush / Stealth Challenge / Time Attack / Permadeath Campaign / Cross-Shard Events). Multi-squad command (4+ squads, 7 role types, 12 commands). Persistent AI commander rivalry across online sessions. Persistent veteran actors + scars. Bunker meta-game persistence. War Thunder-style polished kill cam. Spectator mode (full). Friend lobby + Steam Friends integration. Network sync verified per DR-056. |
-| BP10 | **M11.4 — Self-Hosted Server Deployment** | Planned | Deployment toolkit for cf-server: 3 Docker image tiers (quick-start single-mode / production with volumes / MMO cluster) + systemd service files (Linux) + launchd plists (macOS) + Terraform module (AWS/GCP/Azure/DigitalOcean) + cloud-init templates + Ansible playbook + Grafana + Prometheus + Loki configs + `docs/server-hosting.md` comprehensive guide + 5 reference server.ron templates. 15-minute Discord-modder deploy target. |
-| BP10 | **M11.5 — PvE Survival Mode + Procgen** | Planned | PvE Survival match preset (1-8 player coop) + 7-step procgen pipeline + 3 launch survival worlds (Earth / Mars / Mimas) + per-race × per-environmental-factor difficulty matrix + acclimatization mechanic + race-specific tech tree branches + race-specific colony designs + ONI room types + NPC dwellers + procedural quest generator (8 templates). |
-| BP10 | **M11.6 — Inter-Planet Transport + Stations** | Planned | 3 transport modes (dropship 8-phase + multi-stage rocket 5-stage + paired teleporters) + orbital stations (Foundation Kit + 8 modules including zero-g manufacturing) + asteroid mining colonies + 7 new vehicles (submarine / cargo freighter / orbital shuttle / amphibious truck / asteroid drill ship / etc.). |
-| BP10 | **M11.7 — PvE Endgame Bosses + World Events** | Planned | 5 named PvE bosses (Hollow King volcanic / Frozen Heart cryogenic / Crimson Tide dust / Eclipse Walker microgravity / Last Star Vulcan) authored against M7 boss schema + 12 dynamic world events (solar flare / pirate raid / trader arrival / anomaly storm / etc.) registered via M7 storyteller API. |
-| BP10 | **M9.5 — Voice + Radio Sim** | Planned | ACRE2-tier radio + Steam Audio-tier voice through atmospheric medium per DR-043. Proximity voice chat (3 channels: Squad / Public / Faction). Radio set propagation (distance attenuation + occlusion + frequency band + antenna height). Interference + EMP. Vacuum no_voice (sound doesn't propagate; radio still works). AI radio chatter with reason labels. Captions mandatory per DR-012. |
-| BP11 | M12 — Public PvP Arenas + Persistent MMO Shards | Planned | Public PvP arena half (`cf-server --mode pvp_arena`). MMO shard half (`cf-server --mode mmo_shard`). **Bunker Defence flagship mode** (per DR-042) with persistent base across sessions + per-server-shard tournament ladder. Persistent world state (4 launch shards: NA / EU / APAC / SA). Cross-shard events. Faction-vs-faction war at large scale. MMO shard architecture (per DR-035). Persistent player progression. Anti-FOMO + anti-pay-to-win audit (DR-031) — all cosmetics earnable through play. Live operations (T-LIVEOPS finalization). DR-035 MMO-001..012 readiness gate. |
-| BP12 | T-CONTENT-ART / T-CONTENT-NARRATIVE / T-LOCALIZATION / T-LIVEOPS finalization | Planned | All four production tracks reach launch GA. Full content roster verified (70+ weapons / 44+ actors / 18+ vehicles / 60+ base objects / 8 factions / 30+ missions / 12 worlds × 3-5 biomes / 17 materials / 12 ores / 30+ music / 400+ SFX / 80,000 words / 600 codex / 75+ achievements / 11+8 languages / 10 endgame modes / 50+ cosmetics per actor). T-RELEASE GA at v1.0.0. |
+**Per-milestone status:** see [Roadmap](#roadmap) above for the full ordered table.
 
 ---
 
@@ -1011,7 +739,7 @@ Built on Rust. Built on Bevy. Inspired by Cortex Command, Noita, Stationeers, Ba
 
 <div align="center">
 
-**[Pillars](#headline-systems) · [Roadmap](#roadmap-at-a-glance) · [Content](#launch-content-roster) · [Build Points](#build-points) · [Inspirations](#inspirations-and-credits) · [AWAW Layer](#awaw-inspired-grand-strategy-layer) · [Project status](#project-status) · [Releases](#releases) · [Getting started](#getting-started) · [License](#license)**
+**[Pillars](#headline-systems) · [Roadmap](#roadmap) · [Content](#launch-content-roster) · [Inspirations](#inspirations-and-credits) · [AWAW Layer](#awaw-inspired-grand-strategy-layer) · [Project status](#project-status) · [Releases](#releases) · [Getting started](#getting-started) · [License](#license)**
 
 *One field for gravity. One kernel for atmospheres. One source of truth for everything. No HP bars — only blood, oil, and power.*
 
