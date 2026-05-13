@@ -94,6 +94,236 @@ The full content target shipping by BP12 (every entry **functional + AI-readable
 
 ---
 
+## Roadmap At A Glance
+
+> [!tip]
+> **Where Corefall is today** and **what every milestone owns**, end-to-end. Full BP closure-gate contract in [Build Points](#build-points); historical PR / commit / test detail in [Project status](#project-status); spec files in [`specs/active/`](specs/active/).
+
+### Build Point Timeline
+
+```mermaid
+flowchart LR
+    BP0([✅ BP0<br/>Engine])
+    BP1([✅ BP1<br/>Actor + Breach])
+    BP2([✅ BP2<br/>Terrain + Replay])
+    BP3([🔄 BP3<br/>Combat + Body])
+    BP4([⏳ BP4<br/>Physics])
+    BP5([⏳ BP5<br/>Atmospherics])
+    BP6([⏳ BP6<br/>AI Combat])
+    BP7([⏳ BP7<br/>Vertical Slice])
+    BP8([⏳ BP8<br/>Creator])
+    BP9([⏳ BP9<br/>Server + LAN])
+    BP10([⏳ BP10<br/>Online])
+    BP11([⏳ BP11<br/>Public])
+    BP12([🚀 BP12<br/>Launch GA])
+    BP0 --> BP1 --> BP2 --> BP3 --> BP4 --> BP5 --> BP6 --> BP7 --> BP8 --> BP9 --> BP10 --> BP11 --> BP12
+    classDef done fill:#d4edda,stroke:#28a745,color:#155724
+    classDef active fill:#fff3cd,stroke:#ffc107,color:#856404
+    classDef planned fill:#f8f9fa,stroke:#6c757d,color:#495057
+    classDef launch fill:#cce5ff,stroke:#007bff,color:#004085
+    class BP0,BP1,BP2 done
+    class BP3 active
+    class BP4,BP5,BP6,BP7,BP8,BP9,BP10,BP11 planned
+    class BP12 launch
+```
+
+`✅ closed` · `🔄 active (BP3)` · `⏳ planned` · `🚀 launch GA`
+
+### Phase Summary
+
+| Phase | BPs | Status | Headline Outcome |
+|---|---|---|---|
+| **1. Foundation** | BP0..BP2 | ✅ Closed | 32 crates, 545 tests, deterministic 60/120 Hz sim, chunked terrain, replay verifier, reactor defense fun-proof |
+| **2. Combat + Body** | BP3 | 🔄 **Active** | Chassis grammar, ACC-A floor, replay viewer, asset ledger, first friend-handoff release (`.dmg` / `.msi` / AppImage) |
+| **3. Physics Sandbox** | BP4..BP6 | ⏳ Planned | Full collision, 50+ Noita-grade materials, 18 hazards, Stationeers atmospherics, AI environmental competence, LLM mind layer |
+| **4. Vertical Slice** | BP7..BP8 | ⏳ Planned | 30+ campaign missions, 8 factions, 150 crafting recipes, mining, 30-node research tree, Material Lab, mod tools |
+| **5. Multi + Worlds** | BP9..BP10 | ⏳ Planned | Dedicated server, LAN + online co-op, 12 worlds, 3 transport modes, 5 PvE bosses, voice / radio, 19 languages |
+| **6. Launch GA** | BP11..BP12 | ⏳ Planned | Public PvP arenas, persistent MMO shards, Bunker Defence flagship, Steam store, capsule, trailers, **v1.0.0** |
+
+### Quick Stats <sub>(snapshot 2026-05-13)</sub>
+
+| Metric | Value |
+|---|---|
+| **Workspace** | 32 crates · 545 tests · ~80k LOC Rust |
+| **Active spec backlog** | 70 milestones (46 core `M4..M49` + 16 production-track + 8 UX/UI suffix-letter) |
+| **Closed milestones** | 3 (`M1` / `M2` / `M3`) + foundational BP0..BP2 |
+| **Decision records** | 57 closed/directional |
+| **Build Points** | 3 closed · 1 active · 9 planned |
+| **Launch content** | 70+ weapons · 44+ actors · 18+ vehicles · 60+ base objects · 8 factions · 30+ missions |
+| **Launch worlds × races × langs** | 12 · 10 · 19 |
+| **Launch promise** | 80,000 words narrative · 600 codex · 75+ achievements · 50+ cosmetics/actor · 10 endgame modes |
+
+### Detailed Per-Milestone Roadmap
+
+Each Build Point bundles related milestones into a shippable proof slice. Suffix-letter milestones (`M4A`, `M9A`, …) are production-track + UX/UI inserts added 2026-05-13. Click any phase below to expand.
+
+<details>
+<summary><b>✅ BP0..BP2 — Foundation</b> (closed: engine + actor + terrain + replay)</summary>
+
+| Old ID | Spec | Title | Headline Feature |
+|---|---|---|---|
+| **M0** | — | Engine Bootstrap | 32-crate workspace · JSON-RPC control plane · `cfctl` · replay run-bundle writer · 60/120 Hz sim |
+| **M1** | `M1` | Actor Controller + Sim Core | One playable actor (WASD / jump / aim / fire / reload / dig) · 9 JSON-RPC methods · tick-rate-independent timing |
+| **M1.5** | `M2` | Micro Breach Fun Slice | 60-90s win/loss · ReactiveGuard FSM · 3 difficulty presets · cfctl-scriptable |
+| **M2** | `M3` | Pixel Terrain + Materials | 256×256 chunked terrain · 8 launch materials · 9 affordance flags · GPU-assisted carving |
+| **M2.2A** | `M6` | Actor + Equipment + Inventory + Sound | 36 actions · 6 weapons · 4 grenades · 8-slot inventory · side-view facing · limb-loss restrictions |
+| **M2.2B** | `M7` | AI Archetypes + Mission Director | 5 archetypes (Rifleman/Sniper/Assault/Engineer/Spotter) · 20+ traits · 3 factions · multi-objective DAG |
+| **M2.2C** | `M8` | UX + Camera + Debug + L10n + Accessibility | 10+ HUD widgets · pie menu · 7 debug overlays · 4 color-blind modes · photo mode · replay scrubber · killcam |
+| **M2.5** | `M9` | Micro Reactor Defense Fun Slice | 60-90s defend · 5-tier terrain HP · 3-layer reactor armor · trench gameplay |
+| **M2.5-SCHEMA** | `M5` | Deep Damage Event Surface Lock | ~60-80 event schemas across 13 families (armor / internal / concussion / fluid / origin / hazard / …) |
+| **M3A** | `M4` | Event Recorder + Headless Replay | 38 event categories · `cf-headless` replay verifier · deterministic event log |
+| **T-CAPTURE** | — | Frame capture + grid composer | PNG readback @ 10 Hz · `capture_grid.py` composer · AI-agent visual validation |
+
+</details>
+
+<details open>
+<summary><b>🔄 BP3 — Combat Readability Build</b> (active: ACC-A floor + chassis grammar + asset ledger + release)</summary>
+
+| Old ID | Spec | Title | Status | Headline Feature |
+|---|---|---|---|---|
+| **M3B** | `M10` | Replay Viewer + Debrief | ✅ Closed | Bundle viewer · cause-chain walker · 18-section debrief markdown · DR-002 closed |
+| **M4A** | `M11` | Readability + ACC-A Floor | ✅ Closed | 12 HUD nodes / 7 zones · 200% scale · high contrast · 5-tier integrity colors · War Thunder angle widget |
+| **M5** | `M13` | Equipment + Chassis + Damage Grammar | ✅ Landed | 3 chassis · 15-zone body graph · layered armor · module state machine · pilot eject · save/load |
+| **—** | `M4A` *(new)* | Asset Ledger Infrastructure | ⏳ | `cf-asset-ledger` crate · JSONL append-only ledger · 17 asset categories · 6 production tiers · regen/verify CLI |
+| **—** | — | Double-Click Release Engineering | ⏳ Pending | `.dmg` / `.msi` / AppImage friend-handoff release per T-RELEASE |
+
+</details>
+
+<details>
+<summary><b>⏳ BP4 — Physics Sandbox Alpha</b> (full collision · materials · hazards · origin resources)</summary>
+
+| Old ID | Spec | Title | Headline Feature |
+|---|---|---|---|
+| **M4B** | `M12` | Comic-Noir Aesthetic + Juice | Hand-drawn ink-line UI · 12 mission comic panels · death-recap-as-graphic-novel · juice rules per DR-055 |
+| **M5.5** | `M14` | Full Collision Gauntlet | DR-033 · projectile-projectile CCD · universal gravity · War Thunder penetration ray · HE/HEAT/APFSDS · spalling |
+| **M5.5.5** | `M18` | Micro Sabotage Fun Slice | 60-90s sabotage integrating collision + materials + hazards + origin (chemistry / physics / stealth / origin paths) |
+| **M5.6** | `M15` | Active Material Kernel | Noita-grade per-pixel CA · 50+ materials · 30+ reactions · alchemy · flasks · GPU compute |
+| **M5.7** | `M16` | Hazard Package + Afflictions | 18 afflictions · 6 STALKER anomalies · 20+ artifacts · swimming/underwater combat |
+| **M5.8** | `M17` | Origin Reaction + Resource Model | No-HP-bar canonical · blood / oil / power / caloric / bio-fluid per origin · G-Force vision blackout · vacuum scenarios |
+| *new* | `M9A` | Tier 1 SVG Asset Pipeline | 5000+ placeholders · Python + cairo-svg + LLM-prompted SVG · 8 faction style.json · per-origin palettes |
+| *new* | `M11A` | Shell UI Foundation | Title · main menu · pause · save-load · settings tree · credits · loading screens |
+| *new* | `M12A` | Tier 1 Audio Pipeline | 1200+ SFX via Stable Audio Open / AudioCraft · caption metadata |
+| *new* | `M18A` | Animation Production Tier 1 | 1100+ frame strips (walk / hit reactions / death) via AnimateDiff |
+
+</details>
+
+<details>
+<summary><b>⏳ BP5 — Atmospherics + Worlds Alpha</b> (PV=nRT · 10 gases · 6 launch worlds)</summary>
+
+| Old ID | Spec | Title | Headline Feature |
+|---|---|---|---|
+| **M5.9** | `M19` | Atmospherics-Grade Kernel | DR-037 · PV=nRT · 10 gases · 6 combustion reactions · phase change · pipe networks · 6 launch worlds |
+| **M5.9.5** | `M21` | Micro Pressure Hold Fun Slice | 60-90s hold-the-room while atmosphere is breached · gases mix · fires propagate · suits compensate |
+| **M5.10** | `M20` | EnvironmentSignal Aggregator | DR-040 · per-tick per-actor bundle (atmospheric / gravitational / thermal / radiation / photic / EM / weather / …) |
+
+</details>
+
+<details>
+<summary><b>⏳ BP6 — AI Combat Alpha</b> (pathfinding · LLM mind · environmental competence)</summary>
+
+| Old ID | Spec | Title | Headline Feature |
+|---|---|---|---|
+| **M6** | `M22` | AI Pathfinding + Collision Avoidance | Hierarchical A* (tile / chunk / region) · dynamic re-path on terrain_dirty · team costs · stuck recovery |
+| **M6.5** | `M23` | LLM Mind Layer | Async LLM mind never blocks local AI · per-actor 5s ticks · doctrine proposals · sandbox safety |
+| **M6.6** | `M24` | AI Environmental Competence | 8-test AI-MAT suite · bots wear O2 in vacuum · retreat from radiation · downclock under heat · reason labels |
+| *new* | `M24A` | VFX Tier 1 | 600+ particle configs · 80+ textures (impact / spark / explosion / debris) |
+
+</details>
+
+<details>
+<summary><b>⏳ BP7 — Vertical Slice Alpha</b> (campaign · factions · loot · power · mining · crafting)</summary>
+
+| Old ID | Spec | Title | Headline Feature |
+|---|---|---|---|
+| **M7** | `M25` | Campaign + Base + Commander Spine | 30+ missions · 5 storytellers (Cassandra/Phoebe/Randy/Ironman/Sandbox) · buy menu · 8 stratagems · AI commander rivalry |
+| **M7.1** | `M26` | Factions + NPCs + Narrative | 8 factions · relationship matrix · quartermasters · diplomacy · dialog trees · 8 quest templates · 4 pet companions |
+| **M7.2** | `M27` | Loot + Progression + RPG | 5 rarity tiers · 30+ affixes · set bonuses · XP/level · 30+ achievements · 20+ perks · 10+ curses · Tetris inventory |
+| **M7.5** | `M28` | Base Atmospherics | Pumps · vents · pressure doors · breach repair · heaters · coolers · radiators · coolant loops · emergency venting |
+| **M7.6** | `M29` | Power & Electrical Engineering | 8 generators · 6 cable tiers · voltage classes · 6 storage types · IC10 priority chips · brown-out cascades |
+| **M7.6.5** | `M30` | Basic Mining + Refining (Foundation) | 4 mining tools · 7 launch ores · 3 worlds ore distribution · AI-MINE-A-01..05 subset |
+| **M7.7** | `M31` | Weather + Day/Night Kernel | 7 weather states · 24-hour cycle · AI behavior shifts · remaining 6 worlds ship (12 total) |
+| **M7.8** | `M32` | Crafting Tiers + Fabrication Chain | 5-tier ladder (T0-T4) · 150 launch recipes · fabrication chain · power-coupled · 30-node research tree |
+| *new* | `M25A` | Narrative + Codex Production | 5k-word LLM-driven bible → 80k words · 600 codex · 24 NPCs |
+| *new* | `M27A` | Player Game UI | Inventory Tetris · loadout · cosmetic · codex 600 · achievements 75 · tutorial menu |
+| *new* | `M28A` | Base Build Mode UX | Palette · ghost preview · rotation · room detection · blueprints · demolish/repair · multiplayer co-build |
+| *new* | `M29A` | Power Grid + IC10 Editor UX | Factorio-style overlay · IC10 editor with breakpoints · per-generator dashboard · brown-out cascade viz |
+
+</details>
+
+<details>
+<summary><b>⏳ BP8 — Creator Alpha</b> (mod tools · Material Lab · advanced mining)</summary>
+
+| Old ID | Spec | Title | Headline Feature |
+|---|---|---|---|
+| **M8** | `M33` | Modding Workbench | In-game scenario editor · Lua · IC10 chip editor · Steam Workshop · photo mode · replay browser · 8 tutorial labs |
+| **M8.5** | `M34` | Material Lab | DR-036 workbench · brushes · 17 materials · 13 lab-unlocked · recipe inspector · stamp save/load · AI puppet validation |
+| **M8.6** | `M35` | Advanced Mining + Extraction | DR-041 · 9 mining tools · 12 ores · AI-MINE-A 8-test suite · server-authoritative ledger |
+| *new* | `M32A` | Tier 2 ComfyUI Pipeline | 4500+ production assets via SDXL + Flux + AnimateDiff + ControlNet + per-faction LoRAs |
+| *new* | `M32B` | Crafting + Research + Salvage UX | 3-pane crafting (Stationeers/Terraria/Factorio hybrid) · research tree pan/zoom · 30+ mod slots · material flow Sankey |
+| *new* | `M33A` | Tutorial Lab Production | 8 modular labs · First Contract · FRE wizard · adaptive hints |
+
+</details>
+
+<details>
+<summary><b>⏳ BP9 — Server + LAN Alpha</b> (dedicated server · voice/radio · LAN co-op · localization)</summary>
+
+| Old ID | Spec | Title | Headline Feature |
+|---|---|---|---|
+| **M0.5** | `M39` | Universal Schema Locks | Manifest at `cf-mod/manifest/all_schemas.ron` · ~120 locked schemas · one-shot conformance check · bump policy |
+| **M9** | `M36` | Dedicated Server + Determinism Islands | 5 server modes · cf-server-ops/persistence/anti-cheat/admin · 4 mod trust tiers · SERVER-001..016 suite |
+| **M9.5** | `M37` | Voice + Radio + Comms | ACRE2-tier radio (distance / occlusion / frequency / antenna) · EMP · vacuum no_voice · AI chatter · captions |
+| **M9.10** | `M38` | Server Config + Admin CLI | 200+ tunables · 7-tier hierarchy · 20+ admin commands · auto-gen settings UI · audit log |
+| **M10** | `M40` | LAN Co-op | 2-4 player co-op via lan_room · mDNS/UDP discovery · 7 squad roles · revive · death cam · mod hash sync |
+| *new* | `M36A` | Platform Integration | Steam SDK · Discord rich presence · EOS · Workshop · Cloud · Achievements bridge |
+| *new* | `M36B` | Telemetry + Crash + Bug Report | Opt-in privacy · per-shard analytics · in-game bug-submit |
+| *new* | `M37A` | Tier 2 Audio + Voice + Music | 7000+ voice clips via ElevenLabs/Bark/XTTS · 30+ music tracks via MusicGen · adaptive music engine |
+| *new* | `M38A` | Localization (19 langs) | 11 Tier-A + 8 Tier-B · 380k+ translations via LLM auto-translation · ICU MessageFormat |
+
+</details>
+
+<details>
+<summary><b>⏳ BP10 — Online Beta</b> (online co-op · PvE survival · planet travel · bosses)</summary>
+
+| Old ID | Spec | Title | Headline Feature |
+|---|---|---|---|
+| **M11** | `M41` | Online Co-op + Full Match Grammar | Community-hosted online · NAT punch-through · 10 endgame modes · persistent AI commander · multi-squad · War Thunder kill cam |
+| **M11.4** | `M42` | Self-Hosted Server Deployment | 3 Docker tiers · systemd · launchd · Terraform · Ansible · Grafana/Prometheus/Loki · 15-min Discord-modder deploy target |
+| **M11.5** | `M43` | PvE Survival Mode + Procgen | 1-8 player coop · 7-step procgen · 3 launch survival worlds · per-race difficulty matrix · acclimatization |
+| **M11.6** | `M44` | Inter-Planet Transport + Stations | 3 transport modes (dropship 8-phase / multi-stage rocket / paired teleporters) · orbital stations · 7 new vehicles |
+| **M11.7** | `M45` | PvE Endgame Bosses + World Events | 5 named bosses (Hollow King / Frozen Heart / Crimson Tide / Eclipse Walker / Last Star) · 12 dynamic world events |
+| *new* | `M40A` | Spectator + Streamer Polish | Replay-to-MP4 via FFmpeg · 10+ overlay themes · Twitch/YouTube/Discord webhook integration |
+| *new* | `M40B` | Online UX | Server browser · friends (Steam/Discord/in-game) · party invite · lobby · admin web panel · mod hash sync UI · voice chat UI |
+| *new* | `M43A` | Map + Mission + Campaign UX | World map · solar system map (12 worlds) · mission select · campaign tree · briefing · travel planner |
+| *new* | `M45A` | Cosmetic Production | 2200+ items · anti-pay-to-win audit (DR-031) |
+
+</details>
+
+<details>
+<summary><b>⏳ BP11 — Public Systems Beta</b> (grand-strategy opt-in: upkeep · strategy · intelligence)</summary>
+
+| Old ID | Spec | Title | Headline Feature |
+|---|---|---|---|
+| **M7.3** | `M46` | Upkeep Economy (Opt-In) | Per-cycle BP/power/parts/food/fuel/O2/coolant drain · bankruptcy cascade Day 1-30 · rescue mechanisms · AI factions follow same rules |
+| **M7.4** | `M47` | Strategy Phase + Goals (Opt-In) | 5 stances × 5 production × 3 logistics = 75 combos · 8 goal templates × 3 stake tiers = 24 launch goals |
+| **M7.1.5** | `M48` | Inter-Faction Intelligence (Opt-In) | AWAW-inspired: codebreaking · spy rings · 8 covert ops · counter-intel; AI factions follow same rules; opt-in per server |
+
+</details>
+
+<details>
+<summary><b>🚀 BP12 — Release Candidate</b> (Public PvP + MMO shards + Bunker Defence flagship + launch GA)</summary>
+
+| Old ID | Spec | Title | Headline Feature |
+|---|---|---|---|
+| **M12** | `M49` | Public PvP Arenas + Persistent MMO Shards | Public PvP half · MMO shard half · **Bunker Defence flagship** · 4 launch shards (NA/EU/APAC/SA) · cross-shard events |
+| *new* | `M48A` | Tier 3 Polish | Top 50 Aseprite hand-polish · top 20 Spine rigs · FMOD/Kira mix · Steam Deck Verified |
+| *new* | `M48B` | Steam Store + Marketing | Capsule art · 12 screenshots · 6 trailer types · press kit · tag taxonomy |
+| *new* | `M48C` | Endgame + Workshop UX Polish | Debrief · replay browser · photo mode · mech bay · pilot/commander dossier · faction diplomacy · quest log · NPC dialog · hub · mod manager |
+| **T-tracks** | — | Production-track finalization | T-CONTENT-ART · T-CONTENT-NARRATIVE · T-LOCALIZATION · T-LIVEOPS all reach launch GA |
+
+</details>
+
+---
+
 ## What Corefall Is
 
 Corefall is the implementation repo for a **tactical pulp sci-fi disaster sandbox**. The player fantasy is Cortex Command's command-core, dropship, chassis, digging, and body-swapping chaos rebuilt around a stricter simulation contract: deterministic replay, server-authoritative multiplayer, real atmospherics, systemic materials, universal gravity, full collision, and scriptable AI/modder workflows from day one.
@@ -326,6 +556,81 @@ We **also** lean on the open Rust gamedev ecosystem: [Bevy](https://bevyengine.o
 
 > [!important] Reuse posture
 > No code, no assets, no sprites, no audio, no scripting from any of the inspiration games is copied into Corefall. Everything is implemented from chemistry / physics / game-design first principles plus public documentation (wikis, GDC talks, modding docs, public source where applicable). Provenance is logged in the canonical vault's usage ledger when any specific snippet of public documentation is quoted in spec / research notes.
+
+---
+
+## Grand-Strategy Layer — Inspired By A World At War
+
+> [!note]
+> Corefall ships a **fully opt-in grand-strategy layer** modeled on Bruce Harper's **A World at War** (Avalon Hill, 2001) — the deepest WWII grand-strategy wargame ever published. Server admins choose how much AWAW-derived depth to enable; defaults are OFF so vanilla Corefall plays as a tactical sandbox without forcing strategic accounting on every player. Spec sources: [`specs/COHERENCE-TIER-5.md`](specs/COHERENCE-TIER-5.md) + milestones `M32` / `M38` / `M43` / `M45` / `M46` / `M47` / `M48`.
+
+### Why AWAW?
+
+Every canonical grand-strategy game — A World at War, Hearts of Iron, Stellaris, Crusader Kings, Civilization, RimWorld, Oxygen Not Included — solves the same core tension: **the unit you can't afford to keep is worse than the one you never built**. Corefall's tactical sandbox loop (Cortex Command + Stationeers + Noita + ACRE2) creates per-mission strategy, but **no campaign-scale strategic decisions** about which assets to retire, which factions to ally with, or which research to invest in. AWAW's rule system — battle-tested across hundreds of hours of competitive play since 1993 (its predecessor *A World At War* / *Advanced Third Reich*) — is the canonical answer.
+
+We pull eight AWAW rule families into Corefall's grand-strategy layer, all gated behind `server.ron::grand_strategy.awaw_rulesets.*` toggles. AI factions follow the same rules as human players, so every AWAW mechanic is exploitable in both directions.
+
+### AWAW Rules Implemented
+
+| AWAW Rule | Corefall Milestone | In-Game Effect |
+|---|---|---|
+| **Rule 8** — Strategic Campaign Turn Sequence | `M47` Strategy Phase + Goals | Per-cycle decision phase: Research → Diplomacy → DOW → Movement → Combat → Post-combat → Construction → Redeployment. 5 stances × 5 production focuses × 3 logistics priorities = 75 combos |
+| **Rule 24.622** — Codebreaking combat modifier | `M48` Inter-Faction Intelligence | Codebreaking level 0-5 across 5 categories grants passive combat modifier ±1 to ±5 against the breached faction |
+| **Rule 35.31** — BRP-Oil Coupling | `M38` Server config | Oil shortage cuts faction-wide growth rate 5% per missing fuel unit (per-tick economic drag) |
+| **Rule 35.53** — BRP Deficits + Bankruptcy Cascade | `M46` Upkeep Economy | Cumulative deficit triggers Day 1 → 3 → 7 → 14 → 30 cascade: low morale → forced demobilization → building auto-shutdown → Resistance Level → faction collapse |
+| **Rule 36** — Mobilization Phases | `M38` Server config | Civilian → military shift per year toggles industrial output multipliers |
+| **Rule 37** — Industrial Center Evacuation | `M43` PvE Survival | Lose territory but keep IC via strategic redeployment; materials in transit go to enemy on intercept; scorched-earth option for unsalvageable ICs |
+| **Rule 40** — BRP Grants | `M46` Upkeep Economy | Allied faction transfers BP to rescue a bankrupt ally (multiplayer co-op + cross-faction diplomacy) |
+| **Rule 41.5** — Code-Name Research Secrecy | `M32` Crafting Tiers | Public dice rolls but **hidden project intent** — opponents see RP investment without knowing what's being researched. Decoy code names supported |
+| **Rule 44-48** — Intelligence Subsystems | `M48` Inter-Faction Intelligence | **Four subsystems:** Codebreaking (passive combat modifier) + Spy Rings (placed in target factions; reveal BP/army/stance/goals + diplomatic die roll modifier) + Covert Operations (negate research / diplomacy / construction / supply / intel-steal / sabotage / assassinate / false-strategy; 1-2 per cycle depending on RP) + Counter-Intelligence (detect spies, block covert ops, reduce enemy codebreaking) |
+| **Rule 46.411A** — Counter-Intel Reveal | `M48` Inter-Faction Intelligence | Detected spy rings become revealed and trigger diplomatic incident events |
+| **Rule 48.5** — Code-Name Reveal | `M48` Inter-Faction Intelligence | Level-5 codebreaking exposes the underlying project a code name refers to (chains with Rule 41.5) |
+| **Rule 49** — Diplomatic Results | `M45` PvE Endgame | Diplomatic outcomes: minor agreement / agreement / major agreement / alliance / pact-breaking / war declaration; per-faction reputation cascade |
+| **Rule 49.21** — Secret DP Allocation | `M38` Server config | Faction DP allocation hidden from other factions until effect resolves |
+| **Rule 49.31** — One-Third DP Limit | `M38` Server config | No faction can spend more than 1/3 of its DP on a single target per cycle (anti-runaway gating) |
+| **Rule 49.4262** — Spy Ring Diplomatic Modifier | `M48` Inter-Faction Intelligence | Active spy ring grants ±1 modifier on diplomatic die rolls against target faction |
+| **Rule 49.5** — Lesser Diplomatic Result Downgrade | `M38` Server config | When DP target faction has spy ring or counter-intel advantage, diplomatic results downgrade by one tier |
+| **Rule 60** — Faction Resistance Levels | `M45` PvE Endgame | Graduated collapse: Level 0 (normal) → -1 (-20 BP cumulative) → -2 (-50) → -3 (-100). Resistance applies penalties to all faction activities; recovery via internal restructure or allied intervention |
+
+### Opt-In Server Presets
+
+The `M38` settings hierarchy ships four launch presets so server admins can pick their depth without writing config from scratch. Every AWAW rule is independently toggleable inside `grand_strategy.awaw_rulesets.*`.
+
+| Preset | File | Upkeep Economy | AWAW Rulesets | Target audience |
+|---|---|---|---|---|
+| **Vanilla** | `server.ron.template-vanilla` | OFF | ALL OFF | Tactical sandbox players who want classic Corefall — Cortex Command + Stationeers + Noita with no strategic accounting |
+| **Classic Upkeep** | `server.ron.template-classic-upkeep` | ON | mostly OFF (only Rule 35.31 BRP-Oil coupling) | RimWorld / ONI fans who want resource-pressure but not full grand-strategy decision phases |
+| **AWAW-Lite** | `server.ron.template-awaw-lite` | ON | Rules 8 / 37 / 41.5 / 44-48 / 60 enabled | Players who want strategic decisions + intelligence + resistance + IC evacuation without full diplomatic-die-roll complexity |
+| **AWAW-Full** | `server.ron.template-awaw-full` | ON | ALL rulesets ON | Grand-strategy veterans who want every AWAW rule active; PvE Survival hardcore + competitive MMO |
+
+PvE Survival default = **Classic Upkeep**; PvP Arena default = **Vanilla** (combat-only); MMO shard default = configurable per shard.
+
+### When AWAW Features Ship
+
+The AWAW-inspired grand-strategy layer ships across **BP7 (`M32`), BP9 (`M38`), BP10 (`M43` / `M45`), and BP11 (`M46` / `M47` / `M48`)** — see the [Roadmap At A Glance](#roadmap-at-a-glance). Foundational pieces (config toggle tree in `M38`; code-name secrecy in `M32`) ship before the heavy intelligence + upkeep + strategy phase layers, so by the time `M48` lands the player can flip on full AWAW mode end-to-end.
+
+```mermaid
+flowchart LR
+    M32([M32<br/>Code-Name Secrecy<br/>Rule 41.5])
+    M38([M38<br/>Config Toggle Tree<br/>4 Presets])
+    M43([M43<br/>Industrial Centers<br/>Rule 37])
+    M45([M45<br/>Resistance Levels<br/>Rule 60])
+    M46([M46<br/>Upkeep Economy<br/>Rules 35.31/35.53/40])
+    M47([M47<br/>Strategy Phase<br/>Rule 8])
+    M48([M48<br/>Intelligence x4<br/>Rules 44-48])
+    M32 --> M38 --> M43 --> M45 --> M46 --> M47 --> M48
+    classDef bp7 fill:#fff3cd,stroke:#ffc107
+    classDef bp9 fill:#cce5ff,stroke:#007bff
+    classDef bp10 fill:#d1ecf1,stroke:#17a2b8
+    classDef bp11 fill:#f8d7da,stroke:#dc3545
+    class M32 bp7
+    class M38 bp9
+    class M43,M45 bp10
+    class M46,M47,M48 bp11
+```
+
+> [!tip]
+> **For AWAW veterans:** Corefall is not a digital AWAW port — it's a tactical sandbox that adopts AWAW's strategic rule families as an opt-in metagame layer. The hex map, BRP economy, and unit roster are different (we're in a sci-fi setting with 12 worlds and 10 races, not 1939-1945 Europe), but the *decision shape* AWAW creates — bankruptcy pressure, intelligence-vs-counter-intelligence cat-and-mouse, IC-evacuation-or-scorch tradeoffs, resistance-level death spiral — all map directly into Corefall's faction system. You can lose a campaign because you over-invested in cosmetic loadouts and couldn't pay upkeep; you can win one because your level-5 codebreaking revealed an enemy's research focus three cycles before they completed it.
 
 ---
 
