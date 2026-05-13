@@ -290,6 +290,71 @@ Scenario: chassis.* + body.* event rendering templates (M5+ placeholder)
   Given body.gib_created event (M5+)
   Then: "<actor name> gibbed at (X, Y) (cause: <cause>)"
 
+Scenario: War Thunder-style penetration cause-chain rendering
+  Given a death from AP round with angled armor + ricochet attempt + spalling + module ray traversal
+  When debrief.md renders the cause chain
+  Then it produces (plain English):
+    "You were killed by <enemy>'s <weapon> (hardened_AP round, AP=0.7).
+     - Impact angle: 32° (effective armor: 30mm RHA → 35.4mm)
+     - Ricochet roll: 8% (did not ricochet)
+     - Penetration: 12mm of armor breached
+     - Spalling: 2 fragments spawned (Cast Iron — high spalling susceptibility)
+     - Ray traversal: passed through External armor → Internal armor (destroyed) → ammo_rack module (took 8 damage; cooking off) → fuel_tank module (took 4 damage; small leak)
+     - Ammo rack detonation cascade: cooking → 1/3 ammo rounds detonated → reactor pressure_state advanced to Stressed → mission_critical chain
+     - Final status: dead at tick 4521"
+
+Scenario: armor.angle_deflection_calculated rendering
+  Given armor.angle_deflection_calculated event
+  Then: "Hit at <impact_angle>° angle; nominal <nominal_mm>mm armor → effective <effective_mm>mm via cos(angle)"
+
+Scenario: armor.ricochet rendering
+  Given armor.ricochet event
+  Then: "RICOCHET! Hit at <impact_angle>° (above <ricochet_threshold>°); projectile deflected"
+  When was_ricocheted=false:
+  Then: "Glancing hit at <impact_angle>°; close to ricochet but penetrated"
+
+Scenario: armor.spalling rendering
+  Given armor.spalling event
+  Then: "Spalling! <fragment_count> fragments sprayed into chassis interior; each deals <damage_per_fragment> damage"
+
+Scenario: armor.penetration_ray_traversed rendering
+  Given armor.penetration_ray_traversed event
+  Then: "Penetrator passed through chassis: <modules_hit_count> modules struck; final stopping point at (X, Y) with <energy_remaining> J remaining"
+
+Scenario: armor.he_overpressure_wave rendering
+  Given armor.he_overpressure_wave event
+  Then: "HE overpressure wave at (X, Y); radius <radius>m; damage <damage_at_zero> at zero range; <fall_off_curve>"
+
+Scenario: armor.heat_jet_penetrated rendering
+  Given armor.heat_jet_penetrated event
+  Then: "HEAT shaped jet pierced armor (depth: <depth_mm>mm); modules hit: <modules_count>"
+
+Scenario: armor.heat_jet_pre_detonated_by_era rendering
+  Given armor.heat_jet_pre_detonated_by_era event
+  Then: "ERA panel detonated! Shaped charge pre-detonated before penetrating"
+
+Scenario: armor.apfsds_penetrated rendering
+  Given armor.apfsds_penetrated event
+  Then: "APFSDS long-rod penetrator pierced armor (rod length <length>mm; energy remaining <energy>J)"
+
+Scenario: module.* rendering templates (M5+ chassis)
+  Given module.ammo_rack_cooking event
+  Then: "AMMO RACK COOKING! 1/3 rounds detonating; catastrophic explosion imminent"
+  Given module.ammo_rack_detonated event
+  Then: "AMMO RACK DETONATED — chassis catastrophic loss"
+  Given module.engine_fire_started event
+  Then: "Engine on fire — oil leak igniting"
+  Given module.optics_damaged event
+  Then: "Optics damaged — sight range halved"
+  Given module.optics_blind event
+  Then: "Optics destroyed — BLIND (no sight)"
+  Given module.transmission_immobile event
+  Then: "Transmission destroyed — chassis immobile"
+  Given module.crew_knockout event
+  Then: "<crew_member_name> knocked out (no longer crewing module <module_id>)"
+  Given module.cockpit_breach event
+  Then: "Cockpit breached — pilot exposed to atmosphere"
+
 Scenario: armor.* event rendering templates (M2.5 NEW)
   Given armor.layer_hp_changed event
   Then: "<actor name>'s <zone> <layer> armor HP: <from> → <to> (<material> armor); cause: <ap_round_tier> round at AP factor <ap_factor>"
@@ -507,39 +572,55 @@ Scenario: Death recap respects DR-012 accessibility
   And the recap fits at 200% UI scale
   And `caption_mode` controls how much detail surfaces
 
-Scenario: Death recap variants by origin
-  Given a human died → recap focuses on organ damage + concussion + bleed
-  Given an android died → recap focuses on hybrid organ/circuit damage + reduced concussion
-  Given a robot died → recap focuses on circuit damage + fluid leaks + internal_shock + heat cascade
-  And the recap NEVER uses human-only language (e.g. "concussed") for a robot
-  And NEVER uses robot-only language (e.g. "internal_shock") for a human
+Scenario: Death recap variants by origin (no-HP-bar model)
+  Given a human died → recap focuses on blood loss + bleed timeline + organ damage + concussion
+    Example: "You bled out. Blood: 5000ml → 0ml over 23s. Caused by: heart wound (-5 ml/s) at tick 1200 + femoral artery (-10 ml/s) at tick 1500. Medikit applied at tick 1230 but couldn't save you. Organs damaged: heart (60% destroyed), liver (40%), left lung (50%)."
+  Given an android died → recap focuses on hybrid blood + power depletion + organ + circuit
+    Example: "You shut down (hybrid). Synthetic side power: 100 kWh → 0 at tick 2100 (battery depleted; CPU damaged at 30% throughput). Organic side blood: 4000ml → 0 at tick 2350 (gut wound bleeding). Either side empty alone wouldn't have killed you. Both empty = full destruction."
+  Given a robot died → recap focuses on power + oil + circuit destruction + heat cascade
+    Example: "You went offline. Power: 100 kWh → 0 over 18s. Power_core destroyed at tick 3450 by AP round (instant offline)." OR "You ignited. Fuel tank punctured + heat critical → fluid.ignition → chassis fire → power_core thermal damage → INERT."
+  Given a heavy_biomech died → recap focuses on bio_fluid + bio-energy slow death
+  And the recap NEVER uses human-only language (e.g. "concussed", "bleeding") for a robot
+  And NEVER uses robot-only language (e.g. "internal_shock", "oil_leaking") for a human
+  And the recap shows actual resource graphs (blood / oil / power) over time
+
+Scenario: Resource graph in debrief
+  Given a death bundle
+  Then ## Damage breakdown section includes resource graphs:
+    - Blood (humans/androids): drain rate per affliction over time
+    - Power (robots/androids): drain rate from action + cascade over time
+    - Oil (robots/androids): drain rate from leaks over time
+    - Caloric (humans/androids): depletion rate
+  And graph displayed as plain-text ASCII chart in debrief.md
+  When --render-png flag: charts as PNG export
 ```
 
 ### Debrief markdown (12 required sections — expanded from 8)
 
 ```gherkin
-Scenario: Debrief markdown has 17 required sections (M2.5 deep damage expansion)
+Scenario: Debrief markdown has 18 required sections (M2.5 + M5.8 expansion)
   Given a completed run bundle
   When `debrief <bundle>` runs
   Then debrief.md is written to <bundle>/debrief.md
-  And the markdown contains these 17 ## sections in order:
+  And the markdown contains these 18 ## sections in order:
     1. ## Outcome
     2. ## Mission state
     3. ## Key events
     4. ## Cause chain (for losses only)
-    5. ## Damage breakdown (NEW M2.5: by source actor + by weapon + by surface kind + by damage kind + by ap_round_tier)
-    6. ## Armor durability (NEW M2.5 deep: per actor per zone — layer states, breach kinds, chunked-off events, debris collected)
-    7. ## Internal damage breakdown (NEW M2.5 deep: per actor — organs damaged/destroyed [humans/androids] OR circuits damaged/destroyed [robots], failure cascades applied)
-    8. ## Concussion timeline (NEW M2.5 deep: per actor — concussion bands over time, KO events, recovery events; robot equivalent: internal_shock timeline)
-    9. ## Fluid drain timeline (NEW M2.5 deep: per actor — leaks started, rates, reservoir empties, ignitions, refills)
-    10. ## Origin force feedback summary (NEW M2.5 deep: per origin — pain_jolt vs servo_jolt vs frame_ring counts, g_load summary, helmet breaches, oxygen depletion)
-    11. ## Terrain damage summary (M2.5: integrity-band distribution + pixels-removed + cascades + tool refusals)
-    12. ## Hazard summary (M2.5: spawned/spread/dissipated counts per kind)
-    13. ## Affliction summary (M2.5: applied/escalated/cleared per kind + actor)
-    14. ## Atmospheric events (M2.5: M5.9 placeholder counts)
-    15. ## Checksum status
-    16. ## Captures
-    17. ## Accessibility surface + recorder health
+    5. ## Damage breakdown (M2.5: by source actor + weapon + surface kind + damage kind + ap_round_tier)
+    6. ## Resource timeline (NEW M5.8: per actor — blood/oil/power/caloric graphs over time + drain rates per affliction)
+    7. ## Armor durability (M2.5 deep: per zone × per layer)
+    8. ## Internal damage breakdown (M2.5 deep: organs/circuits damaged/destroyed + cascade afflictions)
+    9. ## Concussion timeline (M2.5 deep: bands over time, KO events, recovery events; robot equiv = internal_shock)
+    10. ## Fluid drain timeline (M2.5 deep: leaks + reservoir empties + ignitions + refills)
+    11. ## Origin force feedback summary (M2.5 deep: pain_jolt vs servo_jolt vs frame_ring + g_load + helmet breaches)
+    12. ## Terrain damage summary (M2.5: integrity-band + pixels-removed + cascades + tool refusals)
+    13. ## Hazard summary (M2.5: spawned/spread/dissipated counts per kind)
+    14. ## Affliction summary (M2.5: applied/escalated/cleared per kind + actor)
+    15. ## Atmospheric events (M2.5: M5.9 placeholder counts)
+    16. ## Checksum status
+    17. ## Captures
+    18. ## Accessibility surface + recorder health
 
 Scenario: Outcome section
   Given a won bundle

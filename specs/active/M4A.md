@@ -379,6 +379,210 @@ Per ux-overlay-screen-brief Squad panel + CCCP `Activity.cpp:676-715`:
 - Leader/follower badge shows who leads when player is not directly controlling
 - Body-switch transition: 200ms ease, caption "Switched to <name>"
 
+### Side-view body silhouette (per Cortex Command / Soldat lineage)
+
+The user demand: **"limb resolution is currently in game but seems to be facing the camera, and should be facing side to side right?"**. M4A HUD silhouette explicitly renders the **side-profile body** (matching the side-view game rendering).
+
+**Side-view body silhouette layout:**
+
+```
++---------------------+
+|     (HEAD)          |
+|       O             |     ← head zone (top-center)
+|       |             |
+|    /<---+---->\     |     ← shoulders + arms (near + far)
+|   /     |      \    |     ← side-profile torso (chest forward)
+|  /  TORSO     \    |     ← (chest = "front" zone facing camera direction)
+| /              \    |
+| |   |  |   |  |     |     ← legs side-by-side (front + back per facing)
+| |   |  |   |  |     |     ← feet at bottom
++---------------------+
+```
+
+**Side-profile zones rendered:**
+
+- `head` — top-center; visible
+- `torso_front` — chest area (visible when facing toward camera-side)
+- `torso_back` — back of torso (visible when facing away)
+- `arm_near` — arm closer to camera; always visible
+- `arm_far` — arm farther from camera; mostly hidden behind torso (visible if torso damaged)
+- `leg_front` — leg in front (relative to facing direction)
+- `leg_back` — leg in back
+- `backpack` — visible as small wedge behind torso (when facing perpendicular to view)
+- `feet_pair` — paired at bottom
+
+**Sprite-flip per facing direction:**
+
+- When `Actor::facing = Right`: torso right side faces camera; back of torso = `torso_back` zone
+- When `Actor::facing = Left`: sprite flipped horizontally; what was `torso_front` becomes `torso_back` visually
+- Per zone, HUD silhouette renders the SIDE PROFILE (NOT front-facing). The widget is a 2D side-view bone structure, not a front-facing humanoid.
+
+**Side-view per-zone tinting (M2.5 + M5 5-tier integrity carries over):**
+
+Each side-profile zone tints per HP / integrity band:
+- Pristine: full color
+- Scratched: slight darkening
+- Cracked: visible cracks rendered on sprite
+- Critical: red halo + visible damage texture
+- Destroyed: zone removed from sprite (severed limb visible as ground debris)
+
+**Side-view armor angle indicator (M5 forward-compat):**
+
+When chassis attached:
+- Per-zone armor angle pip shows the mount angle (e.g. "Torso 30° forward slope")
+- Threat-direction indicator overlays on silhouette — shows where enemy fire is coming from
+- Side-view layout makes it clear which zones are exposed per facing direction
+
+**Limb-loss visual update:**
+
+When a limb is severed (per M5/M5.5 contract):
+- Silhouette removes that limb from the side-view render
+- Visible blood/oil splatter at severance point (per origin)
+- Severed limb visible on ground as physical debris (M5.5 ragdoll)
+- HUD banner: "LIMB LOST: <which arm/leg> — <consequence>"
+
+**Anti-pattern: do NOT render front-facing humanoid silhouette for chassis-bearing actors:**
+
+- M4A's HUD silhouette MUST be side-profile (matching the side-view game)
+- Front-facing silhouette is reserved ONLY for menu / loadout / character sheet UIs (M8+ shell UI)
+- Per CCCP `AHuman` and Soldat character rendering — actors are 2D side-profile
+
+### Origin-specific resource bars (M5.8 — no HP bar)
+
+The user demand: **"actors don't have HP, they either have blood (human) or oil and energy (robot) or blood and energy (android)"**. M4A's HUD ditches the master HP bar for chassis-bearing actors and shows origin-specific resource bars.
+
+**Per-origin HUD layouts:**
+
+**Humans (blood + caloric + stamina + oxygen):**
+
+```
++-------------------------------+
+| BLOOD     [▮▮▮▮▮▮▮▮▮▮]  100%   |  ← primary (red); critical at <30%
+| CALORIC   [▮▮▮▮▮▮▮▮  ]  78%    |  ← orange
+| STAMINA   [▮▮▮▮      ]  40%    |  ← cyan (M2.2A baseline)
+| OXYGEN    [▮▮▮       ] 120s    |  ← in vacuum only; cyan
++-------------------------------+
+```
+
+**Robots (power + oil + heat + electrolyte):**
+
+```
++-------------------------------+
+| POWER     [▮▮▮▮▮▮▮▮▮ ]  85%    |  ← primary (cyan); critical at <30%
+| OIL       [▮▮▮▮▮     ]  50%    |  ← yellow; mobility-critical at 0%
+| HEAT      [▮▮▮       ]  35%    |  ← orange; critical at 90% (overheat)
+| BATTERY   [▮▮▮▮▮▮▮   ]  70%    |  ← if dual-source robot
++-------------------------------+
+```
+
+**Androids (blood + power + caloric + stamina):**
+
+```
++-----------------+-----------------+
+| BLOOD  100%     | POWER     85%    |  ← hybrid: both shown side-by-side
+| [▮▮▮▮▮▮▮▮▮▮]    | [▮▮▮▮▮▮▮▮ ]      |
++-----------------+-----------------+
+| CALORIC 78%     | OIL       50%    |
+| [▮▮▮▮▮▮▮▮▮▮]    | [▮▮▮▮▮    ]      |
++-----------------+-----------------+
+```
+
+**Powered organic / heavy_biomech:** custom layouts per origin matrix.
+
+**Per-bar visual:**
+
+- **Bar fill** = current_resource / max_capacity
+- **Color tint** per state: cyan/green >50%, yellow <50%, orange <30%, red <10%
+- **Pulsing animation** when actively draining (subtle; respects reduce_motion)
+- **Tooltip on hover**: "Blood: 3850/5000 mL | Drain rate: -5 ml/s (severe bleeding from heart wound) | Predicted depletion: 13s"
+- **Banner triggers per resource**:
+  - `BLOOD_CRITICAL` (red, critical) at <30%
+  - `BLOOD_LETHAL` (red, critical) at <10%
+  - `POWER_LOW` (yellow) at <30%
+  - `POWER_RESERVE` (red) at <10%
+  - `OIL_LOW` (yellow) at <30%
+  - `OIL_EMPTY` (red) at 0%
+  - `HEAT_CRITICAL` (red) at 90%
+  - `OXYGEN_LOW` (yellow) at <30s remaining
+  - `OXYGEN_CRITICAL` (red) at <10s
+
+**HUD widget — Origin-Specific Resource Strip:**
+
+- Renders in the STATUS zone (top-left)
+- For chassis-bearing actors only; un-chassis actors (M1 baseline) still show scalar HP for backward compat
+- Layout adapts per origin (1-4 bars visible; 1-3 advanced bars in expandable tooltip)
+- Settings.advanced_resource_view (default false) shows all resource bars + drain rates + organ damage indicators
+
+**Death recap modal — origin-aware (M3B integration):**
+
+When player dies, the modal shows the actual resource depletion that killed them:
+
+- "You bled out. Blood: 5000 → 0 ml over 23s. Caused by: heart wound (-5 ml/s, started tick 1200) + femoral artery (-10 ml/s, started tick 1500). Medikit applied at 1230 but couldn't stop both bleeds."
+- "You shut down (robot). Power_core destroyed by AP round at tick 3450 — instant offline. Total power dropped 100 → 0 in 18s."
+
+**Anti-pattern check — no master HP bar:**
+
+- HUD MUST NOT render a master "HP" bar for chassis-bearing actors (only resource bars)
+- Replay viewer death recap MUST NOT report "HP: 0" — must report "Blood: 0 ml" / "Power: 0 kWh" / etc.
+- Cause chain MUST attribute cause to specific resource depletion + organ/circuit that triggered it
+- "HP" backward-compat field on ActorState is DERIVED only — never directly damaged
+
+### War Thunder-style armor angle HUD widget (M2.5 + M5 forward-compat)
+
+The user demand: **War Thunder-style armor / deflection / angled armor visualization**. M4A reserves the **armor angle HUD widget** for chassis-bearing actors; M5 fills with full per-zone angle visualization.
+
+**Armor Angle Indicator widget** — positioned near the body silhouette (chassis HUD section):
+
+```
++----------------------------------------------------------------------+
+|              CHASSIS SILHOUETTE (primary)                             |
+|                                                                       |
+|        ARMOR ANGLE INDICATOR (overlaid on silhouette)                 |
+|        Per-zone arrow showing armor mount angle                       |
+|        e.g. Front: 30° slope; Side: 0° (flat); Back: 45° slope        |
+|                                                                       |
+|        THREAT ARROW (red; shows current incoming-fire angle)          |
+|        e.g. "Incoming from 25° NE"                                    |
+|                                                                       |
+|        EFFECTIVE ARMOR TOOLTIP (on hover)                             |
+|        "Front: 30° slope + threat at 35°NE = 65° impact angle         |
+|        → 2.0× effective thickness (60mm RHA → 120mm)                  |
+|        → Ricochet probability: 25%"                                   |
++----------------------------------------------------------------------+
+```
+
+**Pre-fire penetration probability tooltip** (when aiming at enemy):
+
+When player hovers reticle over an enemy chassis:
+- Tooltip shows: target zone, nominal armor, mount angle, projected impact angle (computed from player position + target facing), effective thickness, ricochet probability, penetration probability with current weapon
+- Example: "Target: enemy mech (Light) | Zone: Front | Nominal: 60mm RHA | Mount: 30° | Impact angle: 25° | Effective: 66mm | Ricochet: 5% | Pen prob (rifle): 12% | Pen prob (AP rifle): 65% | Pen prob (HEAT): 95% (if spaced armor → 60%)"
+
+Player can learn the math + plan weapon choice + approach angle.
+
+**Threat awareness — angle indicator:**
+
+When taking fire from a specific direction:
+- HUD shows incoming-fire angle relative to actor's facing
+- Color-coded: green if armor is angled toward threat (effective thickness >1.5×); yellow neutral; red if flat/exposed
+- Banner if hit at unsafe angle: `HIT AT UNSAFE ANGLE — face the threat`
+
+**Penetration cam — basic ray visualization (M4A; M11 polishes)**:
+
+When penetration succeeds:
+- Brief 200ms slow-motion of the ray traversal through chassis
+- Visible ray line + module hit indicators (red highlight on hit modules)
+- Spalling fragments visible as small sparks
+- Settings.penetration_cam_enabled toggleable (default on; respects reduce_motion)
+- HUD caption shows module impact summary
+
+M11 ships the full **War Thunder-style polished kill cam** with 3D ray rendering + full module visualization + ammo rack detonation cinematic + spalling fragment trace.
+
+**M5 chassis penetration cam fills full:**
+- Per-zone armor angle pip strip (per chassis silhouette)
+- Real-time threat-direction arrow
+- Pre-fire penetration probability vs aimed target
+- Penetration cam playback on each hit
+
 ### Per-limb armor strip — deep damage HUD readability (M5 forward-compat)
 
 The user demand: armor takes damage before the limb; every limb has separate armor based on equipped gear; armor visibly chunks off; damage events route through layered armor stages. M4A reserves the per-limb armor surface; M5 chassis fills with real per-zone armor items.

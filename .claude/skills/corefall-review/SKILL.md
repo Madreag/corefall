@@ -346,13 +346,62 @@ cd /Users/erol/projects/corefall && {
 Read these before judging the work:
 
 - `/Users/erol/projects/corefall/AGENTS.md` (especially **Build Point Closure Gate** + **Contract Integrity Gate** + **Universal Enhancement Contract (DR-056)** + **Minimum Bar And Enhancement Rule** + **Self-Play Validation Rule** + **Cursor Bugbot Loop** sections).
-- `docs/plan/spec/prototype-roadmap.md` (especially the **Build Points** table BP0..BP12, the Universal Enhancement Done-Criteria callout above the Milestone Details header, the **Design-Completeness Map**, and the **§T-CAPTURE** + **§T-RELEASE** side-track sections).
+- `docs/plan/spec/prototype-roadmap.md` (especially the **Build Points** table BP0..BP12, the Universal Enhancement Done-Criteria callout above the Milestone Details header, the **Design-Completeness Map**, the **§T-CAPTURE** + **§T-RELEASE** side-track sections, and the **Milestone Details** section for the assigned milestone's canonical scope — DO NOT trust spec scope guesses; read the canonical roadmap entry verbatim).
 - `docs/plan/spec/native-implementation-backlog.md`
 - `docs/plan/spec/feature-completion-checklist.md` (per-milestone rows AND the **Build Points Checklist** addendum).
 - `docs/plan/spec/milestone-enhancement-pass-m1-plus.md` (Universal Enhancement Done-Criteria + per-milestone enhancement specifics for the assigned milestone).
 - `docs/plan/spec/ai-control-observability-layer.md`
 - `docs/plan/references/prototype-run-bundle-schema.md` (especially the `captures/` rows and `summary.json.artifacts[].type` values).
+- `docs/plan/content-roster-tracking.md` (cumulative content roster targets per milestone — 70+ weapons / 44+ actors / 18+ vehicles / 60+ base objects / 8 factions / 30+ missions / 12 worlds / 17 materials / 12 ores / 30+ tracks / 400+ SFX / 80,000 words / 600 codex / 75+ achievements / 11+8 languages / 10 endgame modes / 50+ cosmetics per actor; verify per-milestone subset shipped).
+- `docs/plan/final-pass-tracker.md` (cross-milestone audit: 38 milestones, Universal Done-Criteria coverage matrix, DR closure mapping, production track integration, surface preservation tracker, content roster verification — used as quick-reference for cross-milestone gaps).
+- `specs/active/<milestone>.md` AND `specs/done/<milestone>.md` for the assigned milestone (the per-milestone implementation spec; details cf-crates touched, files modified, acceptance Gherkin scenarios, dependencies, closure procedure).
 - Relevant DRs and specs linked from the assigned milestone or Build Point (including DR-052..057 for the universal contract).
+
+### Milestone ladder reference (32 active specs)
+
+Per `prototype-roadmap.md` canonical:
+
+| BP | Milestones | Spec |
+|---|---|---|
+| BP0 | M0 | (closed) |
+| BP1 | M1, M1.5 | (closed) |
+| BP2 | M2, **M2.2A, M2.2B, M2.2C**, M2.5, M3A | specs/active + specs/done |
+| BP3 | M3B, M4A, M5 + Double-Click Release Engineering | specs/active |
+| BP4 | M5.5, M5.5.5, M5.6, M5.7, M5.8 | specs/active |
+| BP5 | M5.9, M5.9.5, M5.10 | specs/active |
+| BP6 | M6, M6.5, M6.6 | specs/active |
+| BP7 | M7, M7.5, M7.7, M4B | specs/active |
+| BP8 | M8, **M8.5 (Material Lab), M8.6 (Mining + Extraction)** | specs/active |
+| BP9 | M9 (Dedicated Server App), M10 (LAN Co-op) | specs/active |
+| BP10 | M11 (Online Co-op + Full Match Grammar), M9.5 (Voice + Radio) | specs/active |
+| BP11 | M12 (Public PvP + MMO Shards + Bunker Defence Flagship) | specs/active |
+| BP12 | Production T-track finalization | (no spec; T-track closure) |
+
+**Note**: M2.2A/B/C are the bridge sub-milestones between M2 and M2.5 (catch-up "mega bridge" for actor controller depth + AI archetypes + UX widgets + accessibility extras + debug overlays + localization). They are NOT in `prototype-roadmap.md` as separate entries but ARE active per `specs/active/M2.2A.md`, `specs/active/M2.2B.md`, `specs/active/M2.2C.md`. See `docs/plan/closure-notes/m2.2-split-source.md` for the original M2.2 monolith that was split.
+
+### Canonical scope correction notes (don't get burned)
+
+These milestones had INCORRECT scopes in earlier spec passes — verify against `prototype-roadmap.md` canonical:
+
+- **M8.5** = Material Lab (`cf-tools-editor --mode material_lab` workbench per DR-036), NOT "mod parity" or "mod validation"
+- **M8.6** = Mining And Extraction (per DR-041; 9 mining tools + 12 ores + AI-MINE-A 8-test suite + server-authoritative resource ledger), NOT "mod social/workshop"
+- **M9** = Dedicated Server App + Determinism Islands (`cf-server` binary + 5 modes + DR-052 networking transport locks at M9 close), NOT "multiplayer foundation"
+- **M10** = LAN Co-op (`cf-server --mode lan_room` + 2-4 player + mDNS discovery), NOT "dedicated server + admin"
+- **M11** = Online Co-op (Self-Hosted Dedicated Servers) + Extended For Full Match Grammar Per DR-042 + 10 endgame modes + 7 squad role types + War Thunder kill cam + persistent AI commander rivalry + Spectator + Friend lobby, NOT "squad command + endgame standalone"
+- **M12** = Public PvP Arenas + Persistent MMO Shards + Bunker Defence Flagship Per DR-042 + Realistic Comms Per DR-043 (both PvP + MMO half), NOT just "MMO + persistent world"
+
+### Cross-cutting contracts to verify
+
+The following contracts span multiple milestones; reviewing one milestone often requires verifying the cross-cutting surface is preserved:
+
+| Contract | Owning milestone | Cross-cutting surfaces |
+|---|---|---|
+| No-HP-bar Cortex-Command-style survival model | M5.8 (canonical) | Per-origin resource model (blood/oil/power/caloric/bio_fluid/oxygen_supply); deprecated `hp` field is derived backward-compat view; every damage event has `routed_to_resource`; HUD shows origin-specific resource bars (NOT master HP bar) |
+| War Thunder-style angled armor + spalling | M2.5 (canonical) + M5/M5.5 (full impl) | `effective_thickness = nominal / cos(impact_angle)`; ricochet probability per ammo type; 9 armor types; spalling mechanic; HE vs AP vs HEAT vs APFSDS differentiation |
+| Side-view body layout + limb-loss functional consequences | M5 (canonical) | Actor::facing field; per-zone hit routing per facing; sprite renders SIDE PROFILE (NOT camera-facing); limb-loss consequence matrix (head=instant_death; both_legs=crawl; etc.) |
+| Hit zone determination (stance-aware AABB tables) | M5 (canonical) + M5.5 (impl) | Per-stance zone AABB tables (Standing / Crouching / Prone / Crawl); Y-position primary cue; facing direction mirrors X; multi-zone passthrough |
+| War Thunder-style polished kill cam | M11 (canonical) | 2-3s slow-motion 3D ray visualization; module ray highlights; spalling fragments visible; replay-deterministic playback |
+| Penetration ray traversal | M5.5 (canonical) | Ray traces through chassis modules in order; backstop armor check; module damage decreasing per energy absorption |
 
 If the review is for M0, also read [references/m0-review.md](references/m0-review.md).
 For the full pass definitions, read [references/review-passes.md](references/review-passes.md).

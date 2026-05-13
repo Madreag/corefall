@@ -12,7 +12,7 @@ The event taxonomy, snapshot writer, and headless replay verifier are complete e
 
 (M3A is infrastructure, not directly player-facing — but it underpins every visible feature: death recap, debug, AI trust, grading, future networking.)
 
-- **Every player action emits a typed event** into a deterministic stream. The event taxonomy (**36 categories** — 27 from baseline + 9 added at M2.5: `hazard`, `shield`, `thermal`, `environment`, `armor`, `internal`, `concussion`, `fluid`, `origin`) is the single source of truth for what the sim did.
+- **Every player action emits a typed event** into a deterministic stream. The event taxonomy (**38 categories** — 27 from baseline + 9 added at M2.5: `hazard`, `shield`, `thermal`, `environment`, `armor`, `internal`, `concussion`, `fluid`, `origin` + 1 added at M5: `module` + 1 added at M5.8: `resource`) is the single source of truth for what the sim did.
 - **`cf-headless replay <bundle>`** replays a run off-line and prints `result=ok` (matching) or `result=divergence` with structured `first_divergence` (tick, recorded, live checksums). Non-zero exit on divergence.
 - **`cfctl observe --once`** returns a snapshot of current sim state — actor, inventory, mission, terrain summary, hazards, afflictions, armor layers, atmospherics.
 - The **run bundle directory** under `prototype_runs/native/<run-id>/` is the offline-review contract: `run_manifest.json`, `events.jsonl`, `summary.json`, `notes.md`, `screenshots/`, `captures/` (per-tick keyframes + 8×8 grids + `summary_grid.png`), `expected_outcome` enforced.
@@ -132,6 +132,8 @@ Scenario: 36-category baseline declared at run start with producer status
         { "name": "thermal",       "status": "active",     "first_event_type": "thermal.signature_changed" },
         { "name": "environment",   "status": "active",     "first_event_type": "environment.signal_delta" },
         { "name": "armor",         "status": "active",     "first_event_type": "armor.layer_hp_changed" },
+        { "name": "module",        "status": "registered", "ladder_at": "M5+" },
+        { "name": "resource",      "status": "registered", "ladder_at": "M5.8" },
         { "name": "internal",      "status": "active",     "first_event_type": "internal.organ_damaged" },
         { "name": "concussion",    "status": "active",     "first_event_type": "concussion.dose_changed" },
         { "name": "fluid",         "status": "active",     "first_event_type": "fluid.leak_started" },
@@ -161,7 +163,7 @@ Scenario: Locked event-type taxonomy per category (M2.5 active surfaces)
   Given the system.category_baseline event fires
   And the per-category event-type schema list is loaded
   Then the `terrain.*` category accepts these event types (M2.5 locked):
-    terrain_carved, terrain_dirty_region_batch, material_state_changed, pixel_removed, debris_spawned, cascade_triggered, tool_refused
+    terrain_carved, terrain_dirty_region_batch, material_state_changed, pixel_removed, debris_spawned, debris_capped, cascade_triggered, tool_refused, terrain_penetration_threshold, terrain_pixel_dislodged, anchor_material_result, terrain_fill_or_repair, terrain_material_probe, hazard_contact_or_avoidance, path_invalidated
   And the `combat.*` category accepts (M2.5 locked):
     weapon_fired, projectile_spawned, projectile_hit_mo, projectile_hit_terrain, wound_added, kill, reactor.armor_layer_hp_changed, reactor.armor_layer_cracked, reactor.armor_layer_destroyed
   And the `hazard.*` category accepts (M2.5 locked):
@@ -181,7 +183,11 @@ Scenario: Locked event-type taxonomy per category (M2.5 active surfaces)
   And the `mission.*` category accepts:
     mission_started, objective_started, objective_updated, objective_completed, objective_failed, objective_paused, objective_resumed, mission_resolved, reactor_hp_changed, reactor_destroyed, reactor_pressure_state_changed, timer_warning_threshold, objective_progress_updated, director_phase_change
   And the `armor.*` category accepts (M2.5 locked):
-    layer_hp_changed, layer_critical, layer_destroyed, all_layers_destroyed, chunked_off, debris_spawned, repaired
+    layer_hp_changed, layer_critical, layer_destroyed, all_layers_destroyed, chunked_off, debris_spawned, repaired, angle_deflection_calculated, ricochet, spalling, spalling_fragment_spawned, spalling_fragment_hit_module, penetration_ray_traversed, he_overpressure_wave, heat_jet_penetrated, heat_jet_pre_detonated_by_era, apfsds_penetrated, era_panel_detonated, schurzen_pre_detonated, multi_hit_degradation (ceramic), reactive_armor_consumed
+  And the `module.*` category accepts (M5+ chassis):
+    module_hp_changed, module_state_changed, module_penetrated_by_ray, module_spalling_damage, module_destroyed, ammo_rack_cooking, ammo_rack_detonated, engine_fire_started, engine_destroyed, optics_damaged, optics_blind, transmission_damaged, transmission_immobile, crew_knockout, crew_revived, cockpit_breach, reactor_pressure_advanced, motor_controller_damaged
+  And the `resource.*` category accepts (M5.8 origin reaction model — "no HP bar" survival):
+    changed (kind: blood|oil|power|caloric|bio_fluid|oxygen_supply + from + to + cause), critical (threshold 30%/10%/0%), depleted (at 0%), restored (medikit/repair_tool/food/recharge/transfusion), drain_rate_changed (from rate + to rate + source_affliction_id), cascade_offline (kind + organ_id + reason)
   And the `internal.*` category accepts (M2.5 locked):
     organ_damaged, organ_destroyed, organ_failure_cascade, circuit_damaged, circuit_destroyed, circuit_failure_cascade
   And the `concussion.*` category accepts (M2.5 locked):
