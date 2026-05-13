@@ -105,7 +105,7 @@ The full content target shipping by BP12 (every entry **functional + AI-readable
 |---|:---:|---|---|---|
 | **M1** | ✅ | BP1 | Actor Controller + Sim Core | Playable actor (WASD / jump / aim / fire / reload / dig) · 5-state body machine · 9 JSON-RPC methods · tick-rate-independent timing |
 | **M2** | ✅ | BP1 | Micro Breach Fun Slice | 60-90s win/loss · ReactiveGuard FSM · 3 difficulty presets · cfctl-scriptable |
-| **M3** | ✅ | BP2 | Pixel Terrain + Materials | 256×256 chunked deformable terrain · 8 launch materials · 9 affordance flags · GPU-assisted carving |
+| **M3** | ✅ | BP2 | Pixel Terrain + Materials | 256×256 chunked deformable terrain · 8 launch materials · DR-007 9-flag affordance taxonomy · CPU-deterministic carving + GPU dirty-rect re-upload · per-pixel integrity · penetration formula |
 | **M4** | ⏳ | BP2 | Event Recorder Core | 38 event categories · `cf-headless` replay verifier · deterministic event log |
 | **M4A** | ⏳ | BP3 | Asset Ledger Infrastructure | `cf-asset-ledger` crate · JSONL append-only ledger · 17 asset categories · 6 production tiers · regen + verify CLI |
 | **M5** | ⏳ | BP2 | Deep Damage Event Surface Lock | ~60-80 event schemas across 13 families (armor / internal / concussion / fluid / origin / hazard / atmos / shield / environment / thermal / …) |
@@ -487,7 +487,7 @@ game/crates/
 
 **Workspace stats (2026-05-13 / commit `7c47104`):** 32 crates · **545 tests passing** · cargo fmt + clippy `-D warnings` clean · M3 determinism CI matrix passes all 6 combinations.
 
-**Just finished:** `M3` — Pixel Terrain + Materials. 256×256 chunked deformable terrain, 8 launch materials, 9 affordance flags, GPU-assisted carving, per-pixel integrity, penetration formula, determinism CI matrix landed. Closed via PRs #11 + #12 + #27 + the M3 R2 round; moved to [`specs/done/M3.md`](specs/done/M3.md).
+**Just finished:** `M3` — Pixel Terrain + Materials. 256×256 chunked deformable terrain, 8 launch materials (air / dirt / concrete / metal_nohook / hazard / loose_fill / repair_fill / anchor), DR-007 9-flag affordance taxonomy in `MaterialDef` (registry data populates 3 explicit booleans per material; remaining 6 fields are `Option<bool>` defaulting to `None`), CPU-deterministic carve math + GPU dirty-rect re-upload (the carve compute shader is anti-scoped for BP4; the M3 floor is the CPU path), per-pixel integrity, penetration formula, determinism CI matrix all 6 combinations PASS. Closed via PRs #11 + #12 + the M3 R2 round; moved to [`specs/done/M3.md`](specs/done/M3.md).
 
 **Up next:** `M4` — Event Recorder Core. Locks the 38-event-category taxonomy + extends `cf-headless` replay verifier + finalizes the run-bundle envelope contract. Spec: [`specs/active/M4.md`](specs/active/M4.md). AGENTS.md workflow: implementer reads `M4.md` + source under `cf-*` crates, audit-first gap-fills, commits per-scenario, then moves to `specs/done/M4.md` when every Gherkin acceptance scenario verdicts as `PASS` or `IMPLEMENTED`.
 
