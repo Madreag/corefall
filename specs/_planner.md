@@ -6,7 +6,7 @@ Use this when writing a new spec from the backlog / old roadmap. Run as a separa
 
 ## Prompt to paste
 
-You are the **planner** for milestone `<ID>` (e.g., `M5.5`).
+You are the **planner** for milestone `<ID>` (e.g., `M14`).
 
 ## Your job
 

@@ -1,6 +1,6 @@
 # <ID> — <Name>
 
-<!-- Example: # M5.5 — Projectiles And Ballistics -->
+<!-- Example: # M14 — Full Collision + Impulse Routing -->
 
 ## Status
 
@@ -68,16 +68,16 @@ Scenario: Visible projectile trail
 
 Bulleted. What is explicitly NOT in this milestone (will be picked up by a later spec).
 
-- Ricochets (M5.5.5)
-- Tracer rounds (M5.6 visual juice pass)
-- Penetration through actor body zones (M5.7 body damage extension)
+- Ricochets (M18)
+- Tracer rounds (M15 visual juice pass)
+- Penetration through actor body zones (M16 body damage extension)
 - Projectile-vs-projectile collision (never)
 
 ## Dependencies
 
 What must exist before this spec can start.
 
-- M5 chassis system (closed; commit `29edc1b`)
+- M13 chassis system (closed; commit `29edc1b`)
 - `cf-equipment::FiringProfile` (exists)
 
 ## Notes for the implementer

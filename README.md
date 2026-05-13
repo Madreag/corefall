@@ -24,7 +24,7 @@ A 2D side-view physics sandbox where every gas, grain, bullet, body, world, tran
 [![Build Points](https://img.shields.io/badge/Build_Points-BP2%20closed%20%2F%20BP3%20active-2EA043?style=flat-square)](#build-points)
 [![Tests](https://img.shields.io/badge/tests-545%20passing-2EA043?style=flat-square)](#ci)
 [![Roadmap V2](https://img.shields.io/badge/roadmap-V2%202026--05--08%20additive-8A2BE2?style=flat-square)](#roadmap-shape)
-[![Specs](https://img.shields.io/badge/active%20specs-46%20%28M0.5..M12%29-blueviolet?style=flat-square)](specs/active/)
+[![Specs](https://img.shields.io/badge/active%20specs-46%20%28M4..M49%29-blueviolet?style=flat-square)](specs/active/)
 [![Releases](https://img.shields.io/github/v/release/Madreag/corefall?include_prereleases&sort=semver&style=flat-square&label=release)](https://github.com/Madreag/corefall/releases)
 
 > **Where we are:** badges above are the source of truth. Full milestone matrix in [Project status](#project-status); BP scope table in [Build Points](#build-points); release policy in [Releases](#releases).

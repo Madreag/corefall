@@ -4,7 +4,7 @@ Milestone(s) currently being implemented. ONE file per milestone. The implemente
 
 ## Naming
 
-`<milestone-id>.md` — e.g., `M5.5.md`, `M5.6.md`, `BP4.md`.
+`<milestone-id>.md` — e.g., `M14.md`, `M15.md`. Milestones are numbered sequentially 1..49.
 
 ## Lifecycle
 
