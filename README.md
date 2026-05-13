@@ -24,7 +24,7 @@ A 2D side-view physics sandbox where every gas, grain, bullet, body, world, tran
 [![Build Points](https://img.shields.io/badge/Build_Points-BP2%20closed%20%2F%20BP3%20active-2EA043?style=flat-square)](#build-points)
 [![Tests](https://img.shields.io/badge/tests-545%20passing-2EA043?style=flat-square)](#ci)
 [![Roadmap V2](https://img.shields.io/badge/roadmap-V2%202026--05--08%20additive-8A2BE2?style=flat-square)](#roadmap-shape)
-[![Specs](https://img.shields.io/badge/active%20specs-41%20%28M2.2A..M12%29-blueviolet?style=flat-square)](specs/active/)
+[![Specs](https://img.shields.io/badge/active%20specs-42%20%28M0.5..M12%29-blueviolet?style=flat-square)](specs/active/)
 [![Releases](https://img.shields.io/github/v/release/Madreag/corefall?include_prereleases&sort=semver&style=flat-square&label=release)](https://github.com/Madreag/corefall/releases)
 
 > **Where we are:** badges above are the source of truth. Full milestone matrix in [Project status](#project-status); BP scope table in [Build Points](#build-points); release policy in [Releases](#releases).
@@ -144,6 +144,7 @@ The Roadmap V2 layer groups gameplay milestones into **13 Build Points (BP0..BP1
 | BP | Anchor | Bundles | Fun-Proof Slice | Status |
 |---:|---|---|---|---|
 | **BP0** | Engine bootstrap | M0 | (kickoff smoke) | Closed |
+| **BP0+** | **M0.5 — Universal Schema Locks (Cross-Milestone Manifest)** | Planned | Meta-milestone: schema manifest at `game/crates/cf-mod/manifest/all_schemas.ron` listing ~120 locked schemas across ~15 owning milestones + `cf-mod validate --all-schemas` one-shot conformance check + schema-bump migration policy at `docs/plan/spec/schema-bump-migration-policy.md`. M0.5 doesn't OWN schemas; it manifests them all. Future v0.1 → v0.2 bumps run through one tool. |
 | **BP1** | Actor controller + breach fun proof | M1 + M1.5 + T-CAPTURE | M1.5 Micro Breach | Closed |
 | **BP2** | Terrain & Replay Build | M2 + **M2.2A** + **M2.2B** + **M2.2C** + M2.5 + M3A | M2.5 Micro Reactor Defense + headless replay verifier | M2/M2.5/M3A Closed; **M2.2A/B/C bridge active** |
 | **BP3** | Combat Readability Build | M3B + M4A + M5 + Double-Click Release Engineering | HUD / body / chassis proof + first friend-handoff release | Active (M3B/M4A/M5 landed; release engineering pending) |
