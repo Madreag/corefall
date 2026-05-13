@@ -20,7 +20,8 @@ use serde::{Deserialize, Serialize};
 
 use cf_equipment::{tick_rifle, RifleState, RifleTickInputs, TickOutcomes as RifleOutcomes};
 use cf_physics::{
-    apply_horizontal_motion, apply_jump, apply_recoil, step_kinematics, HorizontalInputs, JumpInputs, StepInputs,
+    apply_horizontal_motion, apply_jump, apply_recoil_with_mass, step_kinematics, HorizontalInputs, JumpInputs,
+    StepInputs,
 };
 
 use crate::{
@@ -832,7 +833,15 @@ fn step_one_actor<R: FnMut() -> u64>(
                 .actors
                 .get_mut(&actor_id)
                 .expect("actor id exists by construction");
-            actor.velocity.x = apply_recoil(actor.velocity.x, actor.aim.x, rifle_outcomes.recoil_impulse_applied);
+            // M1 re-audit (2026-05-13): use mass-aware F=ma form.
+            // mass_kg=80 (baseline) → same Δv as legacy apply_recoil.
+            // mass_kg=160 (heavy) → half the Δv; mass_kg=40 (light) → 2× Δv.
+            actor.velocity.x = apply_recoil_with_mass(
+                actor.velocity.x,
+                actor.aim.x,
+                rifle_outcomes.recoil_impulse_applied,
+                actor.mass_kg,
+            );
             let aim = if actor.aim == Vec2::ZERO {
                 Vec2::new(1.0, 0.0)
             } else {
@@ -1055,11 +1064,21 @@ fn step_one_actor<R: FnMut() -> u64>(
 
         // M1: movement accuracy bloom (OpenSoldat Sprites.pas:4870).
         // standing/walking = 1.0×; running/jumping/jetting = 7.0×;
-        // airborne/prone-transition = 3.0×. Sharp aim multiplies the bloom by
+        // airborne (falling) = 3.0×. Sharp aim multiplies the bloom by
         // (1 - 0.6 * sharp_aim_progress) so a full sharp aim cuts the reticle
         // down to 40% of its baseline.
+        //
+        // **M1 re-audit (2026-05-13)**: jumping (upward velocity off the
+        // ground) gets the 7× multiplier — the spec literally distinguishes
+        // "jumping = 7×" from "airborne = 3×". Implementation distinguishes
+        // via `velocity.y > 0`: actor is rising = jumping; otherwise =
+        // descending/falling. Previously the airborne branch returned 3.0
+        // uniformly which collapsed both states.
         let speed = actor.velocity.x.abs();
-        let mut bloom: f32 = if !actor.on_ground {
+        let is_jumping = !actor.on_ground && actor.velocity.y > 0.0;
+        let mut bloom: f32 = if is_jumping {
+            7.0
+        } else if !actor.on_ground {
             3.0
         } else if speed >= Stance::RUN_THRESHOLD {
             7.0

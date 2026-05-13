@@ -38,16 +38,22 @@ done
 # rewrites land at M5+ when the cfctl grammar gains seconds-based
 # duration primitives.
 SCRIPTS=(
-  "micro_breach_win:\"event_type\":\"mission_resolved\":60"
-  "micro_breach_loss:\"event_type\":\"mission_resolved\":60"
+  "micro_breach_win:\"event_type\":\"mission_resolved\":60,120"
+  "micro_breach_loss:\"event_type\":\"mission_resolved\":60,120"
   "micro_breach_abort:\"result\":\"aborted\":60,120"
-  "micro_breach_stealth:\"event_type\":\"terrain_carved\":60"
+  "micro_breach_stealth:\"event_type\":\"terrain_carved\":60,120"
   "ai_h_01_sentry_hears_threat:\"kind\":\"hearing\":60,120"
   "m1_5_difficulty_cakewalk:\"ai_difficulty\":\"cakewalk\":60"
   "m1_5_difficulty_veteran:\"ai_difficulty\":\"veteran\":60"
   "m1_5_pause_resume:\"event_type\":\"objective_paused\":60"
   "m1_5_ai_debug:\"ai_debug\":true:60"
 )
+# M2 re-audit (2026-05-13): expanded 60+120Hz coverage to micro_breach_win,
+# micro_breach_loss, micro_breach_stealth (was 60Hz-only because the cfctl
+# scripts use fixed-tick movement budgets). 120Hz runs work because cf-e2e
+# stays in paced mode; the tick-rate-independent rifle timing + mission
+# state machine produce identical per-tick checksums within each rate
+# (cross-rate parity remains M4's job per M2.md line 446).
 
 OUT_DIR="$(mktemp -d "${TMPDIR:-/tmp}/cf-m1-5-determinism-XXXXXX")"
 echo "M1.5 determinism matrix: writing bundles to $OUT_DIR" >&2

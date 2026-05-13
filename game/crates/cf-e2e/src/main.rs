@@ -42,8 +42,21 @@ static CONTROL_PORT_FILE_SEQ: AtomicU64 = AtomicU64::new(0);
 struct Cli {
     #[arg(long)]
     scenario: String,
-    #[arg(long)]
+    /// Path to a `.cfctl.json` script file (or unqualified script name from
+    /// `game/scripts/cfctl/`). M1.5 baseline name.
+    ///
+    /// **M2 re-audit (2026-05-13)**: `--ai-harness <name>` is an alias for
+    /// `--script <name>` so AI-trust-harness scenarios (AI-H-01..) can be
+    /// invoked by the spec-canonical flag name. Both flags accept the same
+    /// values; specifying both is a CLI error.
+    #[arg(long, conflicts_with = "ai_harness")]
     script: Option<String>,
+    /// **M2 re-audit (2026-05-13)**: AI trust harness alias for `--script`.
+    /// Use this when invoking AI-H-NN test scenarios so the invocation reads
+    /// `cargo run -p cf-e2e -- --ai-harness ai_h_01_sentry_hears_threat`
+    /// per the M2 spec text.
+    #[arg(long, conflicts_with = "script")]
+    ai_harness: Option<String>,
     /// Expected post-run state in `key=value` form. May be repeated.
     #[arg(long, action = clap::ArgAction::Append)]
     expect: Vec<String>,
@@ -152,12 +165,16 @@ fn init_diagnostics() {
 async fn main() -> Result<()> {
     init_diagnostics();
     let cli = Cli::parse();
-    tracing::info!(target: "cf::e2e", scenario = %cli.scenario, script = ?cli.script, "starting cf-e2e");
+    tracing::info!(target: "cf::e2e", scenario = %cli.scenario, script = ?cli.script, ai_harness = ?cli.ai_harness, "starting cf-e2e");
     let _ = (cli.save_load_roundtrip, cli.verify_checksums);
 
-    let script_path = match &cli.script {
+    // M2 re-audit (2026-05-13): `--ai-harness` is a spec-canonical alias for
+    // `--script` so AI-H-NN scenarios can be invoked with the spec wording.
+    // `conflicts_with` on the clap arg already rejects passing both.
+    let script_source = cli.script.as_deref().or(cli.ai_harness.as_deref());
+    let script_path = match script_source {
         Some(name) => locate_script(name)?,
-        None => anyhow::bail!("--script <name> is required for M1.5; M0/M1 inline runs use cfctl run"),
+        None => anyhow::bail!("--script <name> (or --ai-harness <name>) is required for M1.5; M0/M1 inline runs use cfctl run"),
     };
     let script: ControlScript = serde_json::from_str(&std::fs::read_to_string(&script_path)?)
         .with_context(|| format!("parse {}", script_path.display()))?;

@@ -1322,6 +1322,12 @@ pub struct ActorObservation {
     pub hp_max: f32,
     pub selected_slot: u32,
     pub selected_item: String,
+    /// **M1 re-audit (2026-05-13)**: full inventory contents as an array of
+    /// item labels in slot order (length 4 for M1; matches `Inventory.items`).
+    /// Closes the M1 spec drift item — spec said the observation includes
+    /// `inventory[]` but code only surfaced `selected_slot + selected_item`.
+    #[serde(default)]
+    pub inventory: Vec<String>,
     /// M4A: derived stance label (idle/walking/running/airborne/downed/dead/crouching/...).
     pub stance: String,
     /// M4A: per-zone body silhouette projection. `placeholder=false` when sourced
@@ -1385,6 +1391,7 @@ impl From<&ActorState> for ActorObservation {
             hp_max: actor.hp_max,
             selected_slot: actor.inventory.selected.0,
             selected_item: actor.inventory.selected_item().label().to_string(),
+            inventory: actor.inventory.items.iter().map(|i| i.label().to_string()).collect(),
             stance: actor.stance().as_str().to_string(),
             body_silhouette: actor.body_silhouette(),
             chassis: actor.chassis_view(),

@@ -373,9 +373,30 @@ pub fn apply_horizontal_motion(inputs: HorizontalInputs) -> HorizontalOutputs {
 /// horizontal kick (instead of an arbitrary leftward jolt) and diagonal aim only kicks
 /// by the horizontal projection. Vertical recoil isn't modeled in M1 (the rifle preset
 /// only kicks horizontally). Returns the new horizontal velocity.
+///
+/// Mass-INDEPENDENT form: same Δv regardless of actor mass. Retained for
+/// backwards compatibility with M1 fixtures that calibrated against this
+/// signature. New code should prefer `apply_recoil_with_mass` below.
 #[must_use]
 pub fn apply_recoil(velocity_x: f32, aim_x: f32, recoil_impulse: f32) -> f32 {
     velocity_x - aim_x * recoil_impulse
+}
+
+/// **M1 re-audit (2026-05-13)**: F=ma form of recoil application. The
+/// `recoil_impulse` is treated as an actual impulse (kg·m/s) and divided by
+/// the actor mass to produce a Δv. Result: a heavy actor (mass=160 kg) gets
+/// half the velocity delta of a baseline actor (mass=80 kg) from the same
+/// impulse. This closes the M1 spec drift item — the spec literally says
+/// "heavy actor's resulting velocity is ~1/4 of the light actor's (per F=ma)"
+/// and the prior mass-independent form did not satisfy that.
+///
+/// `mass_kg` must be > 0; a non-positive mass defaults to the M1 baseline
+/// (80 kg) so callers can't accidentally divide by zero.
+#[must_use]
+pub fn apply_recoil_with_mass(velocity_x: f32, aim_x: f32, recoil_impulse: f32, mass_kg: f32) -> f32 {
+    let mass = if mass_kg > 0.0 { mass_kg } else { 80.0 };
+    let delta_v = aim_x * recoil_impulse * (80.0 / mass);
+    velocity_x - delta_v
 }
 
 /// **M2**: projectile-vs-pixel penetration parameters. Mirrors CCCP

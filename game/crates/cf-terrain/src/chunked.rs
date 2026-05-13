@@ -377,15 +377,65 @@ pub const MATERIAL_SCHEMA_VERSION: &str = "cf-terrain-launch-v1";
 /// Sparse: chunks with all pixels equal to the terrain's `default_material` are
 /// NOT stored at all — `ChunkedTerrain::material_at` returns the default in
 /// that case.
+///
+/// **M3 re-open (2026-05-13) fix #7**: forward-compat fields for M14 (sub-rect
+/// upload) + M15 (active material kernel). All four extra fields are
+/// `serde(default)` so legacy v0.1 snapshots round-trip cleanly:
+/// - `active_region: bool` — M15 active-cell hint; true when any cell in this
+///   chunk participates in an ongoing reaction (per CCCP active-region pattern)
+/// - `last_modified_tick: u64` — bumped by every successful `set_pixel`; used
+///   by M22 pathfinder + M15 active-region eviction policy
+/// - `color_grid: Option<Vec<u32>>` — M14 per-pixel color cache (Noita-grade
+///   visual variation); None at M3 means "render the material's color_hex"
+/// - `dirty_rect: Option<DirtyRect>` — M14 sub-rect upload bound. None at M3
+///   means "uploader assumes whole-chunk dirty"
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Chunk {
     pixels: Vec<MaterialId>,
+    #[serde(default)]
+    pub active_region: bool,
+    #[serde(default)]
+    pub last_modified_tick: u64,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color_grid: Option<Vec<u32>>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub dirty_rect: Option<DirtyRect>,
+}
+
+/// **M3 re-open (2026-05-13) fix #7 + fix #6**: per-chunk dirty AABB for
+/// sub-rect upload (M14 forward-compat). Coordinates are LOCAL to the chunk
+/// (0..CHUNK_SIZE). `min`/`max` inclusive. None means "no pending dirty
+/// region"; the chunk is considered up-to-date.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub struct DirtyRect {
+    pub min: [u32; 2],
+    pub max: [u32; 2],
+}
+
+impl DirtyRect {
+    pub fn single(lx: u32, ly: u32) -> Self {
+        Self {
+            min: [lx, ly],
+            max: [lx, ly],
+        }
+    }
+
+    pub fn extend(&mut self, lx: u32, ly: u32) {
+        self.min[0] = self.min[0].min(lx);
+        self.min[1] = self.min[1].min(ly);
+        self.max[0] = self.max[0].max(lx);
+        self.max[1] = self.max[1].max(ly);
+    }
 }
 
 impl Chunk {
     fn uniform(material: MaterialId) -> Self {
         Self {
             pixels: vec![material; CHUNK_PIXELS],
+            active_region: false,
+            last_modified_tick: 0,
+            color_grid: None,
+            dirty_rect: None,
         }
     }
 
@@ -396,6 +446,10 @@ impl Chunk {
     }
 
     /// Set the material at `(lx, ly)`; returns true if the cell changed.
+    /// **M3 re-open fix #6/#7**: also extends `dirty_rect` to cover this pixel
+    /// and bumps `last_modified_tick` (caller is responsible for passing the
+    /// current tick via `set_pixel_at_tick`). For backward compat, this
+    /// 3-arg form leaves `last_modified_tick` alone.
     pub fn set_pixel(&mut self, lx: u32, ly: u32, mat: MaterialId) -> bool {
         debug_assert!(lx < CHUNK_SIZE && ly < CHUNK_SIZE);
         let idx = (ly as usize) * (CHUNK_SIZE as usize) + (lx as usize);
@@ -404,7 +458,31 @@ impl Chunk {
             return false;
         }
         self.pixels[idx] = mat;
+        // Extend the dirty rect so the M14 sub-rect upload bridge can re-upload
+        // only the affected sub-region instead of the whole 256×256 chunk.
+        match &mut self.dirty_rect {
+            Some(rect) => rect.extend(lx, ly),
+            None => self.dirty_rect = Some(DirtyRect::single(lx, ly)),
+        }
         true
+    }
+
+    /// **M3 re-open fix #6/#7**: M15 forward-compat — set the material AND
+    /// stamp `last_modified_tick`. Returns true if the cell changed.
+    pub fn set_pixel_at_tick(&mut self, lx: u32, ly: u32, mat: MaterialId, tick: u64) -> bool {
+        if self.set_pixel(lx, ly, mat) {
+            self.last_modified_tick = tick;
+            true
+        } else {
+            false
+        }
+    }
+
+    /// **M3 re-open fix #6**: drain the per-chunk dirty rect (consumes it).
+    /// Returns `None` when the chunk has nothing pending. Caller uploads the
+    /// returned sub-rect through the render bridge.
+    pub fn take_dirty_rect(&mut self) -> Option<DirtyRect> {
+        self.dirty_rect.take()
     }
 
     /// True if every pixel equals `mat`. Used to compress chunks back to the
@@ -954,6 +1032,16 @@ impl ChunkedTerrain {
         self.dirty_chunks.clear();
     }
 
+    /// **M3 re-open (2026-05-13) fix #6**: take + clear the per-chunk
+    /// `dirty_rect`. Returns `None` when the chunk has been reclaimed
+    /// (uniform default) OR when no pixel writes have landed since the last
+    /// take. Caller uses this to upload only the affected sub-rect through
+    /// the render bridge instead of the entire 256×256 chunk.
+    pub fn take_chunk_dirty_rect(&mut self, cx: i32, cy: i32) -> Option<DirtyRect> {
+        let coord = ChunkCoord::new(cx, cy);
+        self.chunks.get_mut(&coord).and_then(Chunk::take_dirty_rect)
+    }
+
     /// **M2 contract**: mark every chunk whose pixels intersect the closed
     /// pixel-space AABB as dirty. This is the canonical "I just touched the
     /// terrain at this region" path — any caller that mutates pixels via a
@@ -1209,6 +1297,10 @@ impl ChunkedTerrain {
                 c.coord,
                 Chunk {
                     pixels: c.pixels.clone(),
+                    active_region: false,
+                    last_modified_tick: 0,
+                    color_grid: None,
+                    dirty_rect: None,
                 },
             );
         }

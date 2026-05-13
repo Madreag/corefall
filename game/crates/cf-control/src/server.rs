@@ -254,10 +254,18 @@ impl SettingsPatch {
             return Some(reason);
         }
         if let Some(v) = self.gravity {
-            // Gravity must be finite; sign is negotiable (negative = pulls
-            // down; positive = anti-gravity test mode). Reject only NaN/Inf.
+            // M1 re-audit (2026-05-13): reject NaN/Inf AND negative gravity.
+            // Spec says invalid patches like `negative gravity` are rejected
+            // (the engine uses Bevy convention `gravity = -980.0` baked into
+            // the EngineConfig, so the SettingsPatch only ever sets the
+            // magnitude). A negative input would flip the sim into
+            // anti-gravity which is reserved for explicit scenario opt-in,
+            // not user-toggleable via settings.
             if !v.is_finite() {
                 return Some("gravity_must_be_finite".to_string());
+            }
+            if v < 0.0 {
+                return Some("gravity_must_be_non_negative".to_string());
             }
         }
         if let Some(v) = self.sharp_aim_build_ticks {

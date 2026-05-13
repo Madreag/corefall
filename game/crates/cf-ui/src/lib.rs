@@ -1092,9 +1092,25 @@ pub fn stance_line(stance: &str, player: Option<&ActorObservation>) -> String {
 /// Format the stability HUD line. Shows the stability scalar as a percentage
 /// with a readable label so the player knows WHY they feel sluggish, inaccurate,
 /// or vulnerable. This is the A-FEEL-06 "damage cause explanation" surface.
+///
+/// **M1 re-audit (2026-05-13)**: when the actor is in a knockdown stun
+/// (`knockdown_ticks_remaining > 0`), the descriptor reads "KNOCKED_DOWN"
+/// instead of cycling through the stability percentage labels. This closes
+/// the M1 spec drift item where the HUD STANCE stability descriptor was
+/// missing the literal "KNOCKED_DOWN" state called out in the spec.
 pub fn stability_line(stability: f32) -> String {
+    stability_line_with_knockdown(stability, false)
+}
+
+/// Knockdown-aware variant of `stability_line`. When `knocked_down=true`,
+/// returns "KNOCKED_DOWN" as the descriptor regardless of the stability
+/// percentage. Used by the HUD bridge once the actor's
+/// `knockdown_ticks_remaining > 0`.
+pub fn stability_line_with_knockdown(stability: f32, knocked_down: bool) -> String {
     let pct = (stability * 100.0).round() as i32;
-    let label = if pct >= 90 {
+    let label = if knocked_down {
+        "KNOCKED_DOWN"
+    } else if pct >= 90 {
         "SOLID"
     } else if pct >= 60 {
         "SHAKEN"
@@ -1427,6 +1443,7 @@ mod tests {
             hp_max: 100.0,
             selected_slot: 0,
             selected_item: "rifle".into(),
+            inventory: vec!["rifle".into(), "empty".into(), "empty".into(), "empty".into()],
             stance: "airborne".into(),
             body_silhouette: cf_actor::BodySilhouette::default(),
             chassis: None,

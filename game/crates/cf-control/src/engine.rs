@@ -2019,6 +2019,29 @@ impl M0Engine {
                 }),
                 None,
             );
+            // M3 re-open (2026-05-13) fix #5: emit the spec-aligned
+            // `equipment.tool_action_started` mirror so consumers that read
+            // the M3 spec text literally see the event under the
+            // `equipment.*` category. The terrain.* event is retained for
+            // back-compat with existing replays + the BP3 test manifest.
+            // Both share the same parent_event_id (None at start; the
+            // terminal `equipment.tool_action_completed` chains back to
+            // `action_id`).
+            let equipment_action_id = self.recorder.record(
+                tick,
+                sim_time_ms,
+                "equipment",
+                "tool_action_started",
+                json!({
+                    "tool": "digger",
+                    "mode": mode,
+                    "source": dig_source,
+                    "origin": evt.origin(),
+                    "explicit_target": evt.outcome_target_string(),
+                    "terrain_action_id": action_id.clone(),
+                }),
+                Some(action_id.clone()),
+            );
             match evt {
                 DigEvent::Strip { outcome, .. } => match outcome {
                     cf_terrain::DigOutcome::Carved {
@@ -2283,13 +2306,37 @@ impl M0Engine {
                             json!({
                                 "reason": "out_of_range",
                                 "mode": "chunked",
-                                "probe_at": noop.probe_at,
+                                "probe_at": Some(noop.probe_at),
                             }),
-                            Some(action_id),
+                            Some(action_id.clone()),
                         );
                     }
                 },
             }
+            // M3 re-open (2026-05-13) fix #5: emit the spec-aligned
+            // `equipment.tool_action_completed` terminus. Result derives from
+            // the dig_validity_update set above (Carve → "carved";
+            // Refuse → "refused" with reason). Parent chains back to the
+            // `equipment.tool_action_started` mirror so consumers walk the
+            // equipment.* chain end-to-end.
+            let (outcome_label, refusal_reason) = match &dig_validity_update {
+                Some((_, ToolValidityUpdate::Carve)) => ("carved", None),
+                Some((_, ToolValidityUpdate::Refuse { reason, .. })) => ("refused", Some(reason.clone())),
+                None => ("noop", None),
+            };
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "equipment",
+                "tool_action_completed",
+                json!({
+                    "tool": "digger",
+                    "result": outcome_label,
+                    "reason": refusal_reason,
+                    "tool_action_started_id": equipment_action_id.clone(),
+                }),
+                Some(equipment_action_id),
+            );
         }
         // M4A: persist tool-validity update for the HUD + observe consumers.
         if let Some((update_tick, update)) = dig_validity_update {
@@ -4102,10 +4149,19 @@ impl M0Engine {
         let mut updates = Vec::with_capacity(dirty.len());
         for coord in &dirty {
             let pixels = terrain.chunk_pixels(coord.cx, coord.cy);
+            // M3 re-open (2026-05-13) fix #6: emit the per-chunk sub-rect
+            // instead of the full 256×256 chunk so the renderer can re-upload
+            // only the affected pixels. Falls back to the full chunk rect
+            // when no sub-rect is available (chunk reclaimed, snapshot
+            // restore, or first-time chunk allocation).
+            let dirty_rect = terrain
+                .take_chunk_dirty_rect(coord.cx, coord.cy)
+                .map(|r| [r.min[0], r.min[1], r.max[0], r.max[1]])
+                .unwrap_or([0, 0, cf_terrain::CHUNK_SIZE - 1, cf_terrain::CHUNK_SIZE - 1]);
             updates.push(TerrainChunkUpdate {
                 cx: coord.cx,
                 cy: coord.cy,
-                dirty_rect: [0, 0, cf_terrain::CHUNK_SIZE - 1, cf_terrain::CHUNK_SIZE - 1],
+                dirty_rect,
                 pixels,
             });
         }
