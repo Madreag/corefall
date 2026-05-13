@@ -1,0 +1,25 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/forced_refresh_requested.v1",
+  "title": "terrain.forced_refresh_requested",
+  "description": "M3 re-open (2026-05-13) M22 pathfinder forward-compat signal. Emitted by the per-tick dirty-region coalescer when `unupdated_areas > 0` has persisted for N consecutive ticks (default 60 @ 60Hz = 1 second). Tells the M22 pathfinder its incremental dirty-rect updates are falling behind and it should perform a full path-cost grid rebuild on the next tick.",
+  "type": "object",
+  "required": ["reason", "sustained_ticks", "threshold_ticks"],
+  "properties": {
+    "reason": {
+      "type": "string",
+      "enum": ["sustained_unupdated_areas"],
+      "description": "Why a forced refresh was requested. Currently only one reason; left as an enum so M22 can extend (e.g. `chunk_load_pressure`, `path_request_starvation`)."
+    },
+    "sustained_ticks": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Number of consecutive ticks where `unupdated_areas > 0` before this signal fired."
+    },
+    "threshold_ticks": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Threshold the engine was watching. Configurable in future via `settings.terrain.forced_refresh_threshold_ticks`."
+    }
+  }
+}

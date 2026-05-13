@@ -142,6 +142,25 @@ pub struct ActPlayerDigParams {
     pub target: Option<String>,
 }
 
+/// **M3 re-open (2026-05-13)**: `act.player.anchor` — attempt to place a
+/// tether / anchor / rope-grapple at world-space `(x, y)`. The engine samples
+/// the material at the target and emits `terrain.anchor_material_result`:
+/// - `anchorable=true` (dirt, concrete, anchor) → `result="accepted"`
+/// - `anchorable=false` (metal_nohook, hazard, loose_fill) → `result="refused"`
+///   with `reason="material_<name>"`
+///
+/// `tool_id` is optional ("grapple" / "tether_gun" / "rope_anchor"); defaults
+/// to `"anchor_tool"`. Spec ref: `specs/active/M3.md` § Re-opened gaps, MAT-T-06.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerAnchorParams {
+    pub schema_version: u32,
+    pub x: f64,
+    pub y: f64,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub tool_id: Option<String>,
+}
+
 /// **M5**: `act.player.crouch` — sticky crouch toggle.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -385,6 +404,7 @@ pub fn dump_v1() -> BTreeMap<String, String> {
         entry::<ActPlayerSelectItemParams>("act_player_select_item_params"),
         entry::<ActPlayerResetParams>("act_player_reset_params"),
         entry::<ActPlayerDigParams>("act_player_dig_params"),
+        entry::<ActPlayerAnchorParams>("act_player_anchor_params"),
         entry::<ActPlayerCrouchParams>("act_player_crouch_params"),
         entry::<ActPlayerClimbParams>("act_player_climb_params"),
         entry::<ActPlayerJetParams>("act_player_jet_params"),

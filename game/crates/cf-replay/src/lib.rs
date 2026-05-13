@@ -269,6 +269,24 @@ pub struct PerformanceBlock {
     pub ticks_run: u64,
     pub wall_seconds: f64,
     pub tick_rate_hz: u32,
+    /// **M3 re-open (2026-05-13)**: terrain coalesce-cost roll-up. Populated
+    /// from the engine's per-tick `terrain.terrain_dirty_region_batch`
+    /// samples. `coalesce_cost_avg` is the mean rects_in over the sampled
+    /// window (last 1024 ticks). `total_rects_in` / `total_rects_out` are
+    /// cumulative across the run. See `specs/active/M3.md` § Re-opened gaps.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub terrain: Option<TerrainPerfBlock>,
+}
+
+/// **M3 re-open (2026-05-13)**: terrain coalesce-cost roll-up for
+/// `summary.json.perf.terrain`.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct TerrainPerfBlock {
+    pub coalesce_cost_avg: f64,
+    pub coalesce_cost_max: u32,
+    pub total_rects_in: u64,
+    pub total_rects_out: u64,
+    pub batches_emitted: u64,
 }
 
 /// Perf sample plumbed in from the engine when writing a bundle.
@@ -281,6 +299,8 @@ pub struct PerfSample {
     pub ticks_run: u64,
     pub wall_seconds: f64,
     pub tick_rate_hz: u32,
+    /// **M3 re-open**: optional terrain perf block.
+    pub terrain: Option<TerrainPerfBlock>,
 }
 
 impl From<PerfSample> for PerformanceBlock {
@@ -293,6 +313,7 @@ impl From<PerfSample> for PerformanceBlock {
             ticks_run: s.ticks_run,
             wall_seconds: s.wall_seconds,
             tick_rate_hz: s.tick_rate_hz,
+            terrain: s.terrain,
         }
     }
 }
@@ -627,6 +648,7 @@ pub fn write_run_bundle(bundle_dir: &Path, inputs: BundleInputs<'_>) -> Result<R
             ticks_run: last_tick.unwrap_or(0),
             wall_seconds: duration_sec,
             tick_rate_hz: inputs.manifest.tick_rate_hz,
+            terrain: None,
         },
     };
     let summary = RunSummary {

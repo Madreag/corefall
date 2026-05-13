@@ -92,7 +92,7 @@ use crate::{
     schemas::{
         ActChassisClearJamParams, ActChassisRepairParams, ActChassisSalvageParams, ActInputCaptureControlsParams,
         ActMissionPauseParams, ActMissionResumeParams, ActPlayerAbortParams, ActPlayerAimParams, ActPlayerClimbParams,
-        ActPlayerCrouchParams, ActPlayerDigParams, ActPlayerEjectParams, ActPlayerFireParams, ActPlayerJetParams,
+        ActPlayerAnchorParams, ActPlayerCrouchParams, ActPlayerDigParams, ActPlayerEjectParams, ActPlayerFireParams, ActPlayerJetParams,
         ActPlayerJumpParams, ActPlayerMoveParams, ActPlayerReloadParams, ActPlayerResetParams,
         ActPlayerSelectItemParams, ActPlayerSharpAimParams, InspectActorParams, InspectEquipmentParams,
         ObserveActorParams, ObserveOnceParams, ObserveSubscribeParams, RunBundleWriteParams, RunForTicksParams,
@@ -328,6 +328,17 @@ pub enum ControlCommand {
     /// optional explicit breach id; `None` => pick the nearest in-range strip.
     ActPlayerDig {
         target: Option<String>,
+        source: IntentSource,
+    },
+    /// **M3 re-open (2026-05-13)**: place an anchor / tether at world `(x, y)`.
+    /// Samples the chunked terrain material at the target and emits
+    /// `terrain.anchor_material_result` with `result="accepted"` (anchorable
+    /// material) or `result="refused"` (non-anchorable, with `reason` label).
+    /// See `specs/active/M3.md` § Re-opened gaps, MAT-T-06.
+    ActPlayerAnchor {
+        x: f64,
+        y: f64,
+        tool_id: Option<String>,
         source: IntentSource,
     },
     /// M4A: ACC-A-04 keyboard/controller focus traversal.
@@ -1034,6 +1045,28 @@ async fn process_request<E: EngineHandle>(
             let result = engine
                 .dispatch(ControlCommand::ActPlayerDig {
                     target: p.target,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.anchor" => {
+            // M3 re-open (2026-05-13): MAT-T-06 — emit
+            // `terrain.anchor_material_result` after sampling the chunked
+            // terrain material at world `(x, y)`. NaN/Inf coordinates are
+            // rejected at the dispatch boundary mirroring `act.player.aim`.
+            let p: ActPlayerAnchorParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            if !p.x.is_finite() || !p.y.is_finite() {
+                return Some(invalid_param_reason(request.id, "anchor_point_must_be_finite"));
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerAnchor {
+                    x: p.x,
+                    y: p.y,
+                    tool_id: p.tool_id,
                     source: IntentSource::Cfctl,
                 })
                 .await;

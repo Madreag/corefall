@@ -40,6 +40,7 @@ const SCHEMA_HAZARD_CONTACT_OR_AVOIDANCE: &str = include_str!("../schemas/event/
 const SCHEMA_ANCHOR_MATERIAL_RESULT: &str = include_str!("../schemas/event/anchor_material_result.json");
 const SCHEMA_TERRAIN_MATERIAL_PROBE: &str = include_str!("../schemas/event/terrain_material_probe.json");
 const SCHEMA_TERRAIN_FILL_OR_REPAIR: &str = include_str!("../schemas/event/terrain_fill_or_repair.json");
+const SCHEMA_FORCED_REFRESH_REQUESTED: &str = include_str!("../schemas/event/forced_refresh_requested.json");
 
 /// Look up the schema source by `(category, event_type)`. Returns `None` if
 /// no schema exists for this pair (callers treat as "no validation
@@ -61,6 +62,7 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("terrain", "anchor_material_result") => Some(SCHEMA_ANCHOR_MATERIAL_RESULT),
         ("terrain", "terrain_material_probe") => Some(SCHEMA_TERRAIN_MATERIAL_PROBE),
         ("terrain", "terrain_fill_or_repair") => Some(SCHEMA_TERRAIN_FILL_OR_REPAIR),
+        ("terrain", "forced_refresh_requested") => Some(SCHEMA_FORCED_REFRESH_REQUESTED),
         _ => None,
     }
 }

@@ -2,16 +2,41 @@
   "$schema": "http://json-schema.org/draft-2020-12/schema",
   "$id": "cf-replay/event/terrain_dirty_region_batch.v1",
   "title": "terrain.terrain_dirty_region_batch",
-  "description": "Per-tick coalesced dirty-region batch. One event per tick when ANY chunks were touched. Holds the source event ids that contributed and the in/out rect counts.",
+  "description": "Per-tick coalesced dirty-region batch. Emitted ONCE per tick when ANY chunks were touched by carves. Holds ALL source event ids that contributed to the batch (deduplicated, in deterministic insertion order), the in/out rect counts, and the M22-forward-compat `unupdated_areas` field (rects merged below the ≤25-rect budget per terrain-material-slice-a). M3 re-open 2026-05-13.",
   "type": "object",
   "required": ["source_event_ids", "in_rects", "out_rects", "coalesce_cost"],
   "properties": {
     "source_event_ids": {
       "type": "array",
+      "description": "Every carve event id that contributed a dirty rect to this batch, deduplicated in insertion order. Replay viewers walk this list for the full causal fan-in.",
       "items": { "type": "string" }
     },
-    "in_rects": { "type": "array" },
-    "out_rects": { "type": "array" },
+    "in_rects": {
+      "description": "Pre-coalesce rect count (integer) — the number of (cx,cy)-keyed dirty entries pushed by carves this tick. Spec older versions allowed an array of rect objects; the integer form is canonical from M3 re-open onward.",
+      "oneOf": [
+        { "type": "integer", "minimum": 0 },
+        { "type": "array" }
+      ]
+    },
+    "out_rects": {
+      "type": "array",
+      "description": "Post-coalesce rect list (≤25 entries per terrain-material-slice-a budget). Each rect is {cx, cy, min:[x,y], max:[x,y]} in pixel coordinates.",
+      "items": {
+        "type": "object",
+        "required": ["cx", "cy", "min", "max"],
+        "properties": {
+          "cx": { "type": "integer" },
+          "cy": { "type": "integer" },
+          "min": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "integer" } },
+          "max": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "integer" } }
+        }
+      }
+    },
+    "unupdated_areas": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "M22-forward-compat: count of rects merged into another rect during coalescing (i.e. `rects_in - rects_out`). When this is sustained > 0 across many ticks the engine emits `terrain.forced_refresh_requested` so the pathfinder can rebuild its cost grid."
+    },
     "coalesce_cost": {
       "type": "object",
       "required": ["rects_in", "rects_out"],

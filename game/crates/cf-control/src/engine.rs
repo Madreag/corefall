@@ -651,6 +651,21 @@ struct EngineMutable {
     /// **M2**: last hazard contact tick per actor — used to debounce the
     /// per-tick hazard damage event to one per actor.
     hazard_last_contact_tick: BTreeMap<ActorId, u64>,
+    /// **M3 re-open (2026-05-13)**: per-tick coalesced dirty-region accumulator.
+    /// Carve events push their dirty rects + source event ids here; the engine
+    /// flushes ONE `terrain.terrain_dirty_region_batch` per tick at end of
+    /// `drive_tick` with the merged rect list + all contributing source ids.
+    /// See `specs/active/M3.md` § Re-opened gaps.
+    pending_dirty_rects: Vec<PendingDirtyRect>,
+    /// **M3 re-open**: rolling counter of ticks where `unupdated_areas > 0`,
+    /// used to trigger `terrain.forced_refresh_requested` after sustained
+    /// load. Reset on any tick with `unupdated_areas == 0`.
+    sustained_unupdated_ticks: u32,
+    /// **M3 re-open**: cumulative coalesce cost samples (ticks where a batch
+    /// was emitted). Surfaced via `summary.json.perf.terrain` at run close.
+    perf_coalesce_samples: Vec<u32>,
+    perf_coalesce_rects_in_total: u64,
+    perf_coalesce_rects_out_total: u64,
 }
 
 /// Pending dig request set by `act.player.dig` and consumed at the start of the
@@ -659,6 +674,39 @@ struct EngineMutable {
 struct PendingDig {
     target: Option<String>,
     source: IntentSource,
+}
+
+/// **M3 re-open (2026-05-13)**: a single dirty-region entry pushed by a carve
+/// during the tick. The engine flushes a coalesced batch at end-of-tick.
+/// See `specs/active/M3.md` § Re-opened gaps, scenarios 2-4.
+#[derive(Debug, Clone)]
+pub(crate) struct PendingDirtyRect {
+    pub source_event_id: String,
+    pub cx: i32,
+    pub cy: i32,
+    pub min: [i64; 2],
+    pub max: [i64; 2],
+}
+
+/// **M3 re-open (2026-05-13)**: helper struct for the end-of-tick coalesce
+/// pass. Holds the merged AABB after union operations.
+#[derive(Debug, Clone)]
+struct MergedDirtyRect {
+    cx: i32,
+    cy: i32,
+    min: [i64; 2],
+    max: [i64; 2],
+}
+
+/// **M3 re-open**: two rects "touch or overlap" if they share at least one
+/// edge or interior. Used by the greedy coalesce pass. Adjacent chunks
+/// (e.g. (0,0) at [0,0..256] + (1,0) at [256,0..512]) satisfy
+/// `a.max[0] == b.min[0]` so the inclusive `>=`/`<=` comparison captures
+/// shared-edge unions.
+fn rects_touch_or_overlap(a_min: [i64; 2], a_max: [i64; 2], b_min: [i64; 2], b_max: [i64; 2]) -> bool {
+    let x_overlap = a_min[0] <= b_max[0] && b_min[0] <= a_max[0];
+    let y_overlap = a_min[1] <= b_max[1] && b_min[1] <= a_max[1];
+    x_overlap && y_overlap
 }
 
 fn observed_run_status(state: &EngineMutable) -> RunStatus {
@@ -811,6 +859,11 @@ impl M0Engine {
                 total_debris_spawned: 0,
                 total_carve_events: 0,
                 hazard_last_contact_tick: BTreeMap::new(),
+                pending_dirty_rects: Vec::new(),
+                sustained_unupdated_ticks: 0,
+                perf_coalesce_samples: Vec::new(),
+                perf_coalesce_rects_in_total: 0,
+                perf_coalesce_rects_out_total: 0,
             }),
             recorder,
             current_tick,
@@ -2159,46 +2212,31 @@ impl M0Engine {
                                 Some(chunk_carved_id.clone()),
                             );
                         }
-                        // M2: coalesced dirty-region batch (one event per
-                        // tick when ANY chunks were touched). Holds the
-                        // parent_event_id of the carve that produced the
-                        // batch, plus the per-chunk rect list (in_rects =
-                        // out_rects when no coalescing is required at M2).
-                        let rects: Vec<serde_json::Value> = stats
-                            .dirty_chunks
-                            .iter()
-                            .map(|c| {
+                        // M3 re-open (2026-05-13): instead of emitting a
+                        // per-carve `terrain.terrain_dirty_region_batch`
+                        // (which made the "ONE per tick coalesced" spec
+                        // contract a lie when two carves landed in the same
+                        // tick), push every dirty chunk into the engine's
+                        // per-tick accumulator. The end-of-tick flush in
+                        // `drive_tick` emits exactly one batch with all
+                        // `source_event_ids[]` and a coalesced rect list
+                        // bounded by the ≤25-rect budget. See `specs/active/M3.md`
+                        // § Re-opened gaps, scenarios 2-4.
+                        if let Ok(mut s) = self.state.write() {
+                            for c in &stats.dirty_chunks {
                                 let origin = c.pixel_origin();
-                                json!({
-                                    "cx": c.cx,
-                                    "cy": c.cy,
-                                    "min": [origin[0], origin[1]],
-                                    "max": [
+                                s.pending_dirty_rects.push(PendingDirtyRect {
+                                    source_event_id: chunk_carved_id.clone(),
+                                    cx: c.cx,
+                                    cy: c.cy,
+                                    min: [origin[0], origin[1]],
+                                    max: [
                                         origin[0] + cf_terrain::CHUNK_SIZE as i64,
                                         origin[1] + cf_terrain::CHUNK_SIZE as i64,
                                     ],
-                                })
-                            })
-                            .collect();
-                        let rects_count = rects.len();
-                        self.recorder.record(
-                            tick,
-                            sim_time_ms,
-                            "terrain",
-                            "terrain_dirty_region_batch",
-                            json!({
-                                "source_event_ids": [chunk_carved_id.clone()],
-                                "in_rects": rects.clone(),
-                                "out_rects": rects,
-                                "coalesce_cost": {
-                                    "rects_in": rects_count,
-                                    "rects_out": rects_count,
-                                },
-                            }),
-                            Some(action_id.clone()),
-                        );
-                        // Update cumulative counters.
-                        if let Ok(mut s) = self.state.write() {
+                                });
+                            }
+                            // Update cumulative counters.
                             s.total_carve_events = s.total_carve_events.saturating_add(1);
                             s.total_debris_spawned = s.total_debris_spawned.saturating_add(debris_count as u64);
                         }
@@ -2419,6 +2457,20 @@ impl M0Engine {
             self.tick_chassis_eject_for_all(t, sim_time_ms);
         }
 
+        // M3 re-open (2026-05-13): flush the per-tick coalesced
+        // `terrain.terrain_dirty_region_batch`. All carves during this tick
+        // pushed their dirty chunks into `state.pending_dirty_rects`; here we
+        // drain the accumulator, merge adjacent/overlapping rects via greedy
+        // AABB union until count ≤ 25, and emit ONE batch with all
+        // `source_event_ids[]`. Tracks `unupdated_areas` (count merged below
+        // budget) + emits `terrain.forced_refresh_requested` when sustained
+        // pressure exceeds the threshold for N consecutive ticks. See
+        // `specs/active/M3.md` § Re-opened gaps.
+        if let Some(t) = advanced {
+            let sim_time_ms = self.state.read().map(|s| s.clock.sim_time_ms()).unwrap_or(0.0);
+            self.flush_pending_dirty_batch(t, sim_time_ms);
+        }
+
         // M4A: refresh HUD banners + captions + tool_validity caches AFTER all events
         // have been emitted for this tick. The cache reads world state directly so it
         // does not have to scan the event log on every observe().
@@ -2429,6 +2481,190 @@ impl M0Engine {
         }
 
         advanced
+    }
+
+    /// **M3 re-open (2026-05-13)**: drain `state.pending_dirty_rects` and emit
+    /// exactly one `terrain.terrain_dirty_region_batch` per tick, with:
+    /// - all `source_event_ids[]` deduplicated (in deterministic order)
+    /// - rects merged via greedy AABB union if count > `DIRTY_RECT_BUDGET` (25)
+    /// - `unupdated_areas` = pre-coalesce count − post-coalesce count
+    /// - `coalesce_cost.rects_in` / `rects_out` for perf tracking
+    ///
+    /// Emits `terrain.forced_refresh_requested` when `unupdated_areas > 0` has
+    /// persisted for `FORCED_REFRESH_THRESHOLD_TICKS` consecutive ticks
+    /// (M22 pathfinder forward-compat).
+    ///
+    /// See `specs/active/M3.md` § Re-opened gaps, scenarios 2-4.
+    fn flush_pending_dirty_batch(&self, tick: Tick, sim_time_ms: f64) {
+        /// Hard coalescing budget per `terrain-material-slice-a`.
+        const DIRTY_RECT_BUDGET: usize = 25;
+        /// Number of consecutive ticks at `unupdated_areas > 0` before the
+        /// engine emits a `terrain.forced_refresh_requested` signal for M22
+        /// pathfinder. Tuned conservatively; 60 ticks @ 60 Hz = 1 second.
+        const FORCED_REFRESH_THRESHOLD_TICKS: u32 = 60;
+
+        let pending: Vec<PendingDirtyRect> = match self.state.write() {
+            Ok(mut s) => std::mem::take(&mut s.pending_dirty_rects),
+            Err(_) => return,
+        };
+        if pending.is_empty() {
+            // No carves this tick — reset the sustained counter so transient
+            // pressure doesn't accumulate into a stale forced-refresh signal.
+            if let Ok(mut s) = self.state.write() {
+                s.sustained_unupdated_ticks = 0;
+            }
+            return;
+        }
+
+        let rects_in = pending.len();
+
+        // Collect unique source event ids in stable insertion order. A
+        // BTreeSet preserves determinism if we keyed by string; we want
+        // first-emit order so use a Vec with linear dedup.
+        let mut source_event_ids: Vec<String> = Vec::with_capacity(rects_in);
+        for entry in &pending {
+            if !source_event_ids.contains(&entry.source_event_id) {
+                source_event_ids.push(entry.source_event_id.clone());
+            }
+        }
+
+        // Greedy coalesce: merge any rects whose AABBs overlap or touch on
+        // an edge. Two-pass — first dedupe exact chunk hits (cx,cy match),
+        // then if count > budget, AABB-union adjacent rects until count
+        // ≤ budget. This is deterministic because we sort by (cx, cy) first.
+        let mut merged: Vec<MergedDirtyRect> = pending
+            .into_iter()
+            .map(|e| MergedDirtyRect {
+                cx: e.cx,
+                cy: e.cy,
+                min: e.min,
+                max: e.max,
+            })
+            .collect();
+        merged.sort_by(|a, b| (a.cx, a.cy, a.min[0], a.min[1]).cmp(&(b.cx, b.cy, b.min[0], b.min[1])));
+        // Dedupe exact chunk matches (a single tick may dispatch multiple
+        // carves into the same chunk; we only need one rect per chunk).
+        merged.dedup_by(|a, b| a.cx == b.cx && a.cy == b.cy);
+
+        // If we still exceed the budget, perform AABB unions on adjacent
+        // pairs (in sorted order). This is intentionally simple and
+        // deterministic — it always merges the lexicographically earliest
+        // overlapping pair until count ≤ budget. Worst case: 60 chunks
+        // collapse to a single super-rect.
+        while merged.len() > DIRTY_RECT_BUDGET {
+            let mut i = 0;
+            let mut merged_any = false;
+            while i + 1 < merged.len() {
+                let (left, right) = merged.split_at_mut(i + 1);
+                let a = &mut left[i];
+                let b = &right[0];
+                if rects_touch_or_overlap(a.min, a.max, b.min, b.max) {
+                    a.min[0] = a.min[0].min(b.min[0]);
+                    a.min[1] = a.min[1].min(b.min[1]);
+                    a.max[0] = a.max[0].max(b.max[0]);
+                    a.max[1] = a.max[1].max(b.max[1]);
+                    merged.remove(i + 1);
+                    merged_any = true;
+                } else {
+                    i += 1;
+                }
+            }
+            if !merged_any {
+                // Nothing further to merge — coalescing has saturated. Force
+                // a global super-rect by unioning everything to fit the
+                // budget exactly at 1 rect.
+                if let Some((first, rest)) = merged.split_first_mut() {
+                    for other in rest.iter() {
+                        first.min[0] = first.min[0].min(other.min[0]);
+                        first.min[1] = first.min[1].min(other.min[1]);
+                        first.max[0] = first.max[0].max(other.max[0]);
+                        first.max[1] = first.max[1].max(other.max[1]);
+                    }
+                }
+                merged.truncate(1);
+                break;
+            }
+        }
+
+        let rects_out = merged.len();
+        let unupdated_areas = rects_in.saturating_sub(rects_out) as u32;
+
+        let out_rects_json: Vec<serde_json::Value> = merged
+            .iter()
+            .map(|m| {
+                serde_json::json!({
+                    "cx": m.cx,
+                    "cy": m.cy,
+                    "min": m.min,
+                    "max": m.max,
+                })
+            })
+            .collect();
+
+        // Sample for `summary.json.perf.terrain` — keep last 1024 samples
+        // (enough for a full-mission cost histogram without unbounded growth).
+        if let Ok(mut s) = self.state.write() {
+            const PERF_SAMPLE_CAP: usize = 1024;
+            s.perf_coalesce_samples.push(rects_in as u32);
+            if s.perf_coalesce_samples.len() > PERF_SAMPLE_CAP {
+                s.perf_coalesce_samples.remove(0);
+            }
+            s.perf_coalesce_rects_in_total = s.perf_coalesce_rects_in_total.saturating_add(rects_in as u64);
+            s.perf_coalesce_rects_out_total = s.perf_coalesce_rects_out_total.saturating_add(rects_out as u64);
+            if unupdated_areas > 0 {
+                s.sustained_unupdated_ticks = s.sustained_unupdated_ticks.saturating_add(1);
+            } else {
+                s.sustained_unupdated_ticks = 0;
+            }
+        }
+
+        // The parent_event_id of the batch is the first contributing
+        // source event (typically `tool_action_started.<id>` chain). Replay
+        // viewers walk source_event_ids[] for the full causal fan-in.
+        let parent_event_id = source_event_ids.first().cloned();
+        self.recorder.record(
+            tick,
+            sim_time_ms,
+            "terrain",
+            "terrain_dirty_region_batch",
+            serde_json::json!({
+                "source_event_ids": source_event_ids,
+                "in_rects": rects_in,
+                "out_rects": out_rects_json,
+                "unupdated_areas": unupdated_areas,
+                "coalesce_cost": {
+                    "rects_in": rects_in,
+                    "rects_out": rects_out,
+                },
+            }),
+            parent_event_id,
+        );
+
+        // Emit forced-refresh signal if sustained pressure exceeds threshold.
+        let sustained = self
+            .state
+            .read()
+            .map(|s| s.sustained_unupdated_ticks)
+            .unwrap_or(0);
+        if sustained >= FORCED_REFRESH_THRESHOLD_TICKS {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "terrain",
+                "forced_refresh_requested",
+                serde_json::json!({
+                    "reason": "sustained_unupdated_areas",
+                    "sustained_ticks": sustained,
+                    "threshold_ticks": FORCED_REFRESH_THRESHOLD_TICKS,
+                }),
+                None,
+            );
+            // Reset counter so we don't spam — wait for another threshold
+            // before re-emitting.
+            if let Ok(mut s) = self.state.write() {
+                s.sustained_unupdated_ticks = 0;
+            }
+        }
     }
 
     /// **M5**: raise HUD banners for chassis stage transitions (armor cracked,
@@ -3648,6 +3884,12 @@ impl M0Engine {
         let state = self.state.read().expect("engine state poisoned");
         let mut samples = state.tick_durations_us.clone();
         let ticks_run = state.clock.tick().0;
+        // M3 re-open (2026-05-13): roll up the terrain coalesce samples
+        // collected by `flush_pending_dirty_batch`. Surfaces as
+        // `summary.json.perf.terrain` per `specs/active/M3.md` § Re-opened gaps.
+        let terrain_samples = state.perf_coalesce_samples.clone();
+        let total_rects_in = state.perf_coalesce_rects_in_total;
+        let total_rects_out = state.perf_coalesce_rects_out_total;
         drop(state);
         let wall_seconds = self.started_instant.elapsed().as_secs_f64();
         let avg_tick_ms = if samples.is_empty() {
@@ -3662,6 +3904,20 @@ impl M0Engine {
             let idx = ((samples.len() as f64 * 0.99) as usize).min(samples.len() - 1);
             samples[idx] as f64 / 1000.0
         };
+        let terrain = if terrain_samples.is_empty() {
+            None
+        } else {
+            let batches_emitted = terrain_samples.len() as u64;
+            let coalesce_cost_avg = terrain_samples.iter().map(|s| *s as f64).sum::<f64>() / batches_emitted as f64;
+            let coalesce_cost_max = terrain_samples.iter().copied().max().unwrap_or(0);
+            Some(cf_replay::TerrainPerfBlock {
+                coalesce_cost_avg,
+                coalesce_cost_max,
+                total_rects_in,
+                total_rects_out,
+                batches_emitted,
+            })
+        };
         PerfSample {
             avg_frame_ms: avg_tick_ms,
             p99_frame_ms: p99_tick_ms,
@@ -3670,6 +3926,7 @@ impl M0Engine {
             ticks_run,
             wall_seconds,
             tick_rate_hz: self.config.tick_rate_hz,
+            terrain,
         }
     }
 
@@ -5469,6 +5726,7 @@ impl EngineHandle for M0Engine {
                 ControlCommand::ActPlayerSelectItem { .. } => Some("act.player.select_item"),
                 ControlCommand::ActPlayerReset { .. } => Some("act.player.reset"),
                 ControlCommand::ActPlayerDig { .. } => Some("act.player.dig"),
+                ControlCommand::ActPlayerAnchor { .. } => Some("act.player.anchor"),
                 ControlCommand::ActPlayerCrouch { .. } => Some("act.player.crouch"),
                 ControlCommand::ActPlayerClimb { .. } => Some("act.player.climb"),
                 ControlCommand::ActPlayerJet { .. } => Some("act.player.jet"),
@@ -6297,6 +6555,92 @@ impl EngineHandle for M0Engine {
                     "command_accepted",
                     json!({"method": "act.player.dig", "target": target}),
                     None,
+                );
+                CommandResult::accepted(tick.0)
+            }
+            ControlCommand::ActPlayerAnchor {
+                x,
+                y,
+                tool_id,
+                source,
+            } => {
+                // M3 re-open (2026-05-13): MAT-T-06 — sample the chunked
+                // terrain material at (x, y) and emit
+                // `terrain.anchor_material_result`. Refuses when the chunked
+                // terrain is not loaded (no surface to anchor against) and
+                // when the sampled material's `anchorable` affordance is
+                // false. Spec ref: `specs/active/M3.md` § Re-opened gaps.
+                let actor_id = state.player_actor.map(|a| a.0);
+                let tool_label = tool_id.clone().unwrap_or_else(|| "anchor_tool".to_string());
+                let source_label = match source {
+                    IntentSource::Human => "human",
+                    IntentSource::Cfctl => "cfctl",
+                    IntentSource::Ai => "ai",
+                    IntentSource::Replay => "replay",
+                };
+                let terrain_ref = state.chunked_terrain.as_ref();
+                if terrain_ref.is_none() {
+                    drop(state);
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_rejected",
+                        json!({
+                            "method": "act.player.anchor",
+                            "reason": "no_chunked_terrain",
+                            "fix_hint": "scenario manifest must declare a chunked terrain (M2+)."
+                        }),
+                        None,
+                    );
+                    return CommandResult::rejected("no_chunked_terrain", tick.0);
+                }
+                let terrain = terrain_ref.expect("chunked terrain is_some");
+                // Sample the material at the target world point. Out-of-bounds
+                // reads return the chunk's default material (`air`), which is
+                // non-anchorable.
+                let material_id = terrain.material_at_world(x as f32, y as f32);
+                let affordance = cf_terrain::material_affordance(material_id);
+                let mat_name = affordance.map(|a| a.name).unwrap_or("unknown");
+                let anchorable = affordance.map(|a| a.anchorable).unwrap_or(false);
+                drop(state);
+
+                // Emit a control.command_accepted parent so the anchor result
+                // can chain back through the full event ladder.
+                let action_id = self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "control",
+                    "command_accepted",
+                    json!({
+                        "method": "act.player.anchor",
+                        "tool_id": tool_label,
+                        "source": source_label,
+                        "point": [x, y],
+                    }),
+                    None,
+                );
+
+                let (result, reason) = if anchorable {
+                    ("accepted", None)
+                } else {
+                    ("refused", Some(format!("material_{mat_name}")))
+                };
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "terrain",
+                    "anchor_material_result",
+                    json!({
+                        "actor_id": actor_id,
+                        "tool_id": tool_label,
+                        "material_id": material_id,
+                        "material": mat_name,
+                        "point": [x, y],
+                        "result": result,
+                        "reason": reason,
+                    }),
+                    Some(action_id),
                 );
                 CommandResult::accepted(tick.0)
             }
@@ -8495,5 +8839,52 @@ mod tests {
             chain_types.iter().any(|s| s == "equipment.weapon_fired"),
             "chain missing equipment.weapon_fired: {chain_types:?}",
         );
+    }
+
+    // --- M3 re-open (2026-05-13): coalesce-logic regression tests ---
+
+    #[test]
+    fn rects_touch_or_overlap_detects_shared_edge() {
+        // Two CHUNK_SIZE × CHUNK_SIZE rects sitting edge-to-edge along x.
+        // Chunk (0,0) occupies [0,0..256] and chunk (1,0) occupies [256,0..512].
+        // The shared edge at x=256 means the AABBs touch.
+        let a_min = [0i64, 0i64];
+        let a_max = [256i64, 256i64];
+        let b_min = [256i64, 0i64];
+        let b_max = [512i64, 256i64];
+        assert!(rects_touch_or_overlap(a_min, a_max, b_min, b_max));
+    }
+
+    #[test]
+    fn rects_touch_or_overlap_detects_diagonal_neighbor() {
+        // Corner-touching rects (diagonal). a.max == b.min for both axes.
+        // The greedy coalescer treats this as touching so the union covers
+        // both chunks in one pass.
+        let a_min = [0i64, 0i64];
+        let a_max = [256i64, 256i64];
+        let b_min = [256i64, 256i64];
+        let b_max = [512i64, 512i64];
+        assert!(rects_touch_or_overlap(a_min, a_max, b_min, b_max));
+    }
+
+    #[test]
+    fn rects_touch_or_overlap_rejects_disjoint() {
+        // A gap of 10 pixels between rects → no overlap → coalesce keeps
+        // them as separate batch entries.
+        let a_min = [0i64, 0i64];
+        let a_max = [256i64, 256i64];
+        let b_min = [266i64, 0i64];
+        let b_max = [522i64, 256i64];
+        assert!(!rects_touch_or_overlap(a_min, a_max, b_min, b_max));
+    }
+
+    #[test]
+    fn rects_touch_or_overlap_detects_interior_overlap() {
+        // A rect fully contained inside another.
+        let a_min = [0i64, 0i64];
+        let a_max = [256i64, 256i64];
+        let b_min = [100i64, 100i64];
+        let b_max = [120i64, 120i64];
+        assert!(rects_touch_or_overlap(a_min, a_max, b_min, b_max));
     }
 }

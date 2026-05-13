@@ -22,12 +22,12 @@ A 2D side-view physics sandbox where every gas, grain, bullet, body, world, tran
 
 [![Status](https://img.shields.io/badge/status-prealpha-orange?style=flat-square)](#project-status)
 [![Milestone](https://img.shields.io/badge/milestone-M3%20done%20%2F%20M4%20next-2EA043?style=flat-square)](#roadmap)
-[![Tests](https://img.shields.io/badge/tests-545%20passing-2EA043?style=flat-square)](#ci)
+[![Tests](https://img.shields.io/badge/tests-549%20passing-2EA043?style=flat-square)](#ci)
 [![Specs](https://img.shields.io/badge/milestones-3%20done%20%2F%2070%20planned-blueviolet?style=flat-square)](#roadmap)
 [![Releases](https://img.shields.io/github/v/release/Madreag/corefall?include_prereleases&sort=semver&style=flat-square&label=release)](https://github.com/Madreag/corefall/releases)
 
 > [!important]
-> **Where we are:** just finished `M3` (Pixel Terrain + Materials). Next up: `M4` (Event Recorder Core). Full ordered milestone table in [Roadmap](#roadmap); shipped-code detail in [Project status](#project-status); release policy in [Releases](#releases).
+> **Where we are:** `M3` (Pixel Terrain + Materials) re-closed after audit-driven fixes — anchor RPC + per-tick coalesced dirty-region batching + ≤25-rect budget cap + `unupdated_areas` forward-compat all shipped (549 tests pass). Next up: `M4` (Event Recorder Core). Full ordered milestone table in [Roadmap](#roadmap); shipped-code detail in [Project status](#project-status); release policy in [Releases](#releases).
 >
 > **Where to play:** today, build from source via [Getting started](#getting-started). First friend-handoff release (`.dmg` / `.msi` / AppImage — double-click to play, no Terminal) lands once `M11` (Readability + ACC-A Floor) + release engineering close per the [Double-Click Playability Hard Gate](#releases).
 
@@ -96,16 +96,16 @@ The full content target shipping by BP12 (every entry **functional + AI-readable
 ## Roadmap
 
 > [!tip]
-> **Where we are (2026-05-13):** just finished `M3` (Pixel Terrain + Materials). Next up: `M4` (Event Recorder Core). One ordered table below — read top to bottom. Spec files in [`specs/active/`](specs/active/) · closed specs in [`specs/done/`](specs/done/).
+> **Where we are (2026-05-13):** just re-closed `M3` (Pixel Terrain + Materials) after audit-driven fixes (anchor RPC + per-tick coalesce + budget cap + `unupdated_areas` field). Next up: `M4` (Event Recorder Core). One ordered table below — read top to bottom. Spec files in [`specs/active/`](specs/active/) · closed specs in [`specs/done/`](specs/done/).
 
 **Legend:** ✅ done · 🔄 in progress · ⏳ planned · 🚀 launch GA
-**Workspace:** 32 crates · 545 tests · 57 closed/directional DRs · 73 milestones across 13 Build Points (BP0..BP12).
+**Workspace:** 32 crates · 549 tests · 57 closed/directional DRs · 73 milestones across 13 Build Points (BP0..BP12).
 
 | # | ⬤ | BP | Milestone | What it ships |
 |---|:---:|---|---|---|
 | **M1** | ✅ | BP1 | Actor Controller + Sim Core | Playable actor (WASD / jump / aim / fire / reload / dig) · 5-state body machine · 9 JSON-RPC methods · tick-rate-independent timing |
 | **M2** | ✅ | BP1 | Micro Breach Fun Slice | 60-90s win/loss · ReactiveGuard FSM · 3 difficulty presets · cfctl-scriptable |
-| **M3** | ✅ | BP2 | Pixel Terrain + Materials | 256×256 chunked deformable terrain · 8 launch materials · DR-007 9-flag affordance taxonomy · CPU-deterministic carving + GPU dirty-rect re-upload · per-pixel integrity · penetration formula |
+| **M3** | ✅ | BP2 | Pixel Terrain + Materials | 256×256 chunked deformable terrain · 8 launch materials · DR-007 9-flag affordance taxonomy · CPU-deterministic carving · per-pixel integrity · penetration formula · **anchor RPC (`act.player.anchor`)** · **per-tick coalesced `terrain.terrain_dirty_region_batch` with ≤25-rect budget + `unupdated_areas` + forced-refresh signal** |
 | **M4** | ⏳ | BP2 | Event Recorder Core | 38 event categories · `cf-headless` replay verifier · deterministic event log |
 | **M4A** | ⏳ | BP3 | Asset Ledger Infrastructure | `cf-asset-ledger` crate · JSONL append-only ledger · 17 asset categories · 6 production tiers · regen + verify CLI |
 | **M5** | ⏳ | BP2 | Deep Damage Event Surface Lock | ~60-80 event schemas across 13 families (armor / internal / concussion / fluid / origin / hazard / atmos / shield / environment / thermal / …) |
@@ -487,7 +487,7 @@ game/crates/
 
 **Workspace stats (2026-05-13 / commit `7c47104`):** 32 crates · **545 tests passing** · cargo fmt + clippy `-D warnings` clean · M3 determinism CI matrix passes all 6 combinations.
 
-**Just finished:** `M3` — Pixel Terrain + Materials. 256×256 chunked deformable terrain, 8 launch materials (air / dirt / concrete / metal_nohook / hazard / loose_fill / repair_fill / anchor), DR-007 9-flag affordance taxonomy in `MaterialDef` (registry data populates 3 explicit booleans per material; remaining 6 fields are `Option<bool>` defaulting to `None`), CPU-deterministic carve math + GPU dirty-rect re-upload (the carve compute shader is anti-scoped for BP4; the M3 floor is the CPU path), per-pixel integrity, penetration formula, determinism CI matrix all 6 combinations PASS. Closed via PRs #11 + #12 + the M3 R2 round; moved to [`specs/done/M3.md`](specs/done/M3.md).
+**M3 re-closed (2026-05-13):** post-close audit found 4 Acceptance Criteria scenarios failing. M3 was moved back to `specs/active/`, fixes were implemented, and the spec is back in [`specs/done/M3.md`](specs/done/M3.md). Fixes shipped: (1) `act.player.anchor` JSON-RPC + `terrain.anchor_material_result` event emission (MAT-T-06); (2) per-tick coalesced `terrain.terrain_dirty_region_batch` via end-of-tick `flush_pending_dirty_batch` with deduplicated `source_event_ids[]`; (3) ≤25-rect coalescing budget cap via greedy AABB-union loop + `summary.json.perf.terrain.coalesce_cost_avg` surfaced via new `TerrainPerfBlock`; (4) `unupdated_areas: u32` field on batch payload + new `terrain.forced_refresh_requested` event after sustained pressure (M22 forward-compat). 4 unit tests added for the coalesce-overlap predicate (`rects_touch_or_overlap`). Workspace test count: 549 pass (up from 545); clippy `-D warnings` clean. Remaining cosmetic overclaims either AMENDED in spec text or DEFERRED to M14/M15 with documented forward-compat plan.
 
 **Up next:** `M4` — Event Recorder Core. Locks the 38-event-category taxonomy + extends `cf-headless` replay verifier + finalizes the run-bundle envelope contract. Spec: [`specs/active/M4.md`](specs/active/M4.md). AGENTS.md workflow: implementer reads `M4.md` + source under `cf-*` crates, audit-first gap-fills, commits per-scenario, then moves to `specs/done/M4.md` when every Gherkin acceptance scenario verdicts as `PASS` or `IMPLEMENTED`.
 
