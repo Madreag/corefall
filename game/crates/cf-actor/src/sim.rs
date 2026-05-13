@@ -356,6 +356,13 @@ pub struct ActorTickOutcome {
     /// reticle widget reads.
     #[serde(default)]
     pub bloom_factor: f32,
+    /// **M1 audit pass 6 (2026-05-13)**: latched when travel-impulse
+    /// damage was applied this tick to an UNSTABLE actor (per CCCP
+    /// `Actor.cpp:1199`). Engine emits `actor.actor_status_changed
+    /// cause="travel_impulse"` AND `cf_audio::AudioCue::BodyHit` from
+    /// this flag.
+    #[serde(default)]
+    pub travel_impulse_damage: bool,
 }
 
 /// Hit applied to an actor by a projectile this tick.
@@ -601,6 +608,7 @@ fn step_one_actor<R: FnMut() -> u64>(
             knockdown_recovered: false,
             loudness_radius: 0.0,
             bloom_factor: actor.bloom_factor,
+            travel_impulse_damage: false,
         };
 
         if intent.reset {
@@ -879,7 +887,12 @@ fn step_one_actor<R: FnMut() -> u64>(
             // `RifleSpec::inherits_firer_velocity` (CCCP `HDFirearm.cpp:752`).
             // True => half actor velocity is added so running-and-gunning shots
             // arc. False (mortar-style) => pure muzzle velocity.
-            let inherit_fraction = if spec.inherits_firer_velocity { 0.5_f32 } else { 0.0_f32 };
+            // M1 audit pass 6 (2026-05-13): spec literal — when
+            // `inherits_firer_velocity=true`, the projectile's initial
+            // velocity is the muzzle vector PLUS the FULL actor velocity
+            // (per CCCP HDFirearm.cpp:752). Pre-fix used `0.5` (half),
+            // which the spec does not authorize.
+            let inherit_fraction = if spec.inherits_firer_velocity { 1.0_f32 } else { 0.0_f32 };
             let base_velocity = Vec2::new(
                 aim.x * spec.projectile_speed + actor.velocity.x * inherit_fraction,
                 aim.y * spec.projectile_speed + actor.velocity.y * inherit_fraction,
@@ -901,7 +914,11 @@ fn step_one_actor<R: FnMut() -> u64>(
         // Angle of the base aim (radians).
         let base_angle = aim.y.atan2(aim.x);
         let base_speed = (base_velocity.x * base_velocity.x + base_velocity.y * base_velocity.y).sqrt();
-        let inherit_fraction = if spec.inherits_firer_velocity { 0.5_f32 } else { 0.0_f32 };
+        // M1 audit pass 6 (2026-05-13): full inheritance per spec literal
+        // (CCCP HDFirearm.cpp:752). Same fix as the single-particle path
+        // above; kept duplicated because the multi-particle path computes
+        // base_velocity independently.
+        let inherit_fraction = if spec.inherits_firer_velocity { 1.0_f32 } else { 0.0_f32 };
         // Reborrow actor.velocity for inheritance addition per particle.
         let actor_velocity = state.world.actors.get(&actor_id).map_or(Vec2::ZERO, |a| a.velocity);
         for particle_idx in 0..particle_count {
@@ -1140,6 +1157,12 @@ fn step_one_actor<R: FnMut() -> u64>(
         // M1: travel-impulse damage on UNSTABLE actor (CCCP Actor.cpp:1199).
         // STABLE actors do NOT take travel-impulse damage — they only become
         // UNSTABLE first via the stability scalar.
+        //
+        // M1 audit pass 6 (2026-05-13): the previous outcome.new_status was
+        // captured BEFORE this block so the engine missed the transition
+        // and never emitted `actor.actor_status_changed cause="travel_impulse"`.
+        // Re-sync new_status AND latch `travel_impulse_damage=true` so the
+        // engine knows to use the travel_impulse cause + emit BodyHit audio.
         if matches!(actor.status, Status::Unstable) {
             const TRAVEL_IMPULSE_THRESHOLD: f32 = 100.0;
             const GIB_IMPULSE_LIMIT: f32 = 1000.0;
@@ -1147,7 +1170,10 @@ fn step_one_actor<R: FnMut() -> u64>(
             if impulse > TRAVEL_IMPULSE_THRESHOLD {
                 let raw = (impulse - TRAVEL_IMPULSE_THRESHOLD) / (GIB_IMPULSE_LIMIT - TRAVEL_IMPULSE_THRESHOLD);
                 let damage = (raw * actor.hp_max).max(0.0).min(actor.hp_max);
-                let _ = actor.apply_damage(damage);
+                if actor.apply_damage(damage).is_some() {
+                    outcome.travel_impulse_damage = true;
+                    outcome.new_status = actor.status;
+                }
             }
         }
 

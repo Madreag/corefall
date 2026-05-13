@@ -870,19 +870,20 @@ impl ActorState {
     /// for actors without a chassis.
     ///
     /// **M1**: `Dying` and `Dead` reject further damage; `Inactive` also rejects
-    /// (cutscene safety). Mission-critical actors clamp HP at `0.01` to keep
-    /// them in DOWNED (they cannot reach DYING).
+    /// (cutscene safety).
+    ///
+    /// **M1 audit pass 6 (2026-05-13)**: mission-critical actors now cap at
+    /// DYING (per spec literal "caps at DYING (does not reach DEAD)"). HP
+    /// can reach 0; the actor enters DYING; the DYING dwell never elapses
+    /// to DEAD while `mission_critical=true` (the dwell-elapsed branch in
+    /// `cf-actor::sim::step_one_actor` honors `dying_cap_in_effect`,
+    /// which is true for mission_critical actors). Prior behaviour
+    /// clamped HP at the Downed threshold; that was spec drift.
     pub fn apply_damage(&mut self, amount: f32) -> Option<Status> {
         if amount <= 0.0 || self.status.is_dead() || matches!(self.status, Status::Dying | Status::Inactive) {
             return None;
         }
         self.hp = (self.hp - amount).max(0.0);
-        if self.mission_critical && self.hp <= 0.0 {
-            // Mission-critical actors cap above zero so derived_status returns
-            // Downed (not Dying); they cannot be killed by damage alone. The
-            // mission director (M1.5+) can still mark them dead via scripts.
-            self.hp = self.hp_downed_threshold.max(0.01);
-        }
         let new_status = self.derived_status();
         if new_status != self.status {
             self.status = new_status;
@@ -1479,14 +1480,18 @@ mod tests {
     }
 
     #[test]
-    fn mission_critical_caps_at_downed() {
+    fn mission_critical_caps_at_dying() {
+        // M1 audit pass 6 (2026-05-13): spec literal "caps at DYING (does
+        // not reach DEAD)". HP can reach 0; the actor enters DYING; the
+        // DYING dwell never elapses to DEAD while mission_critical=true
+        // (the dwell-elapsed branch in cf-actor::sim::step_one_actor
+        // honors `dying_cap_in_effect`).
         let inv = Inventory::with_rifle("rifle_m1_default");
         let mut actor = ActorState::player(ActorId(1), "blue", Vec2::ZERO, 100.0, inv);
         actor.mission_critical = true;
         actor.apply_damage(1000.0);
-        // Lethal damage cannot push a mission-critical actor past Downed.
-        assert_eq!(actor.status, Status::Downed);
-        assert!(actor.hp > 0.0);
+        assert_eq!(actor.status, Status::Dying);
+        assert!(actor.dying_dwell_ticks_remaining > 0);
     }
 
     #[test]

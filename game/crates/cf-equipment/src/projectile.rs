@@ -29,10 +29,14 @@ pub struct ProjectileSpawnParams {
 
 impl ProjectileSpawnParams {
     /// **M1**: extract spawn params from a rifle spec.
+    ///
+    /// M1 audit pass 6 (2026-05-13): full velocity inheritance per spec
+    /// literal `muzzle_velocity_vector + actor_velocity` (CCCP
+    /// `HDFirearm.cpp:752`).
     pub fn from_rifle(spec: &RifleSpec) -> Self {
         Self {
             particle_count: spec.particle_count.max(1),
-            inherit_fraction: if spec.inherits_firer_velocity { 0.5 } else { 0.0 },
+            inherit_fraction: if spec.inherits_firer_velocity { 1.0 } else { 0.0 },
             loudness_scalar: spec.loudness.max(0.1),
             spread_radians: spec.spread_radians,
             muzzle_velocity: spec.projectile_speed,
@@ -56,7 +60,7 @@ mod tests {
     fn loudness_formula_baseline_rifle() {
         let params = ProjectileSpawnParams {
             particle_count: 1,
-            inherit_fraction: 0.5,
+            inherit_fraction: 1.0,
             loudness_scalar: 1.0,
             spread_radians: 0.0,
             muzzle_velocity: 1200.0,

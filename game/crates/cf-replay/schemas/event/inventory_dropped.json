@@ -2,10 +2,12 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://corefall/event/actor.inventory_dropped.v0.1",
   "title": "actor.inventory_dropped",
+  "description": "M1 audit pass 6 (2026-05-13): spec literal requires `item_id`. Legacy `item_label` is retained as a backwards-compat alias and remains populated alongside `item_id`.",
   "type": "object",
-  "required": ["actor", "item_label", "hand_position", "toss_velocity"],
+  "required": ["actor", "item_id", "hand_position", "toss_velocity"],
   "properties": {
     "actor": {"type": "integer", "minimum": 0},
+    "item_id": {"type": "string"},
     "item_label": {"type": "string"},
     "hand_position": {
       "type": "array",

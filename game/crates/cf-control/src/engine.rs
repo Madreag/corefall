@@ -3473,6 +3473,18 @@ impl M0Engine {
                         s.last_player_status_event_id = Some(status_event_id);
                     }
                 }
+                // M1 audit pass 6 (2026-05-13): emit BodyHit audio cue when
+                // a travel-impulse triggered the status change (per spec
+                // "And a body-hit sound event is emitted").
+                if outcome.travel_impulse_damage {
+                    self.emit_audio_cue(
+                        cf_audio::AudioCue::BodyHit {
+                            zone: "torso".to_string(),
+                            caption: format!("actor {} took travel impulse", outcome.actor.0),
+                        },
+                        tick,
+                    );
+                }
             }
             if outcome.reset {
                 self.recorder.record(
@@ -3803,6 +3815,12 @@ impl M0Engine {
                             "inventory_dropped",
                             json!({
                                 "actor": outcome.actor.0,
+                                // M1 audit pass 6 (2026-05-13): spec literal
+                                // requires `item_id` (the equipment preset id
+                                // like "rifle_m1_default"). Legacy `item_label`
+                                // ("rifle") kept as an alias for backwards
+                                // compat with any in-flight bundles.
+                                "item_id": label,
                                 "item_label": label,
                                 "hand_position": [pos.x, pos.y],
                                 "toss_velocity": [vel.x, vel.y],
@@ -5227,20 +5245,21 @@ fn chassis_pilot_banner(state: cf_chassis::PilotState, now_tick: u64) -> Option<
 /// M5.6 hazard contact, etc.) MUST extend [`ActorTickOutcome`] with an explicit
 /// cause discriminant rather than relying on a generic catch-all label here, so
 /// the cause-chain stays semantically correct for replay analysis.
+///
+/// **M1 audit pass 6 (2026-05-13)**: recognize the `travel_impulse_damage`
+/// flag (latched by `cf-actor::sim` when an UNSTABLE actor takes
+/// travel-impulse damage per CCCP `Actor.cpp:1199`).
 fn status_change_cause(outcome: &ActorTickOutcome) -> &'static str {
-    debug_assert!(
-        outcome.reset,
-        "status_change_cause called for an outcome with no known cause; M1 only emits step_one_actor status changes via actor.reset(). Extend ActorTickOutcome with an explicit cause discriminant before adding new mutators."
-    );
-    // Defensive fallback for release builds: if a future milestone introduces
-    // another status-mutating path inside `step_one_actor` without extending
-    // `ActorTickOutcome` with an explicit cause discriminant, mislabeling the
-    // change as `reset` would silently corrupt replay/cause-chain analysis.
-    // Surfacing `unknown` makes the contract gap visible in the run bundle so
-    // it can be caught and fixed rather than masquerading as a reset.
-    if outcome.reset {
+    if outcome.travel_impulse_damage {
+        "travel_impulse"
+    } else if outcome.reset {
         "reset"
     } else {
+        // Defensive fallback: if a future milestone introduces another
+        // status-mutating path inside `step_one_actor` without extending
+        // `ActorTickOutcome` with an explicit cause discriminant,
+        // surfacing `unknown` makes the contract gap visible in the run
+        // bundle so it can be caught and fixed.
         "unknown"
     }
 }
