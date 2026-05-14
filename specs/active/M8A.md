@@ -39,6 +39,57 @@ Player doesn't see new content from M8A — but every scene the player ever expe
 - **The same scene runs the same way on every player's machine and every server topology.** Mac M3 client, Windows on 9950X3D client, Linux on a Threadripper client, Mac mini M4 Pro server, Hetzner Linux VPS server — same scenario.ron + same seed + same cfctl inputs → byte-identical run bundles across every node. This is the determinism island contract from DR-052, now enforced by CI on x86_64-linux, x86_64-windows, aarch64-darwin matrix.
 - **Powerful servers are first-class.** A Mac mini M4 Pro 64 GB or a Hetzner Linux VPS without a GPU can run an authoritative `cf-headless serve` instance at 60 Hz for 8 clients. The server doesn't need a renderer; it just needs the deterministic sim core + cf-net transport. Apple Silicon (M4 Pro and later) and x86_64 Linux datacenter machines both pass the same cross-OS determinism CI gate as Windows clients.
 - **Cosmetic events scale without budgeting risk.** Particle effects, debris rendering, damage numbers, blood splatter, shell ejection — all GPU-side, all `cosmetic: true`, all droppable under backpressure with zero impact on sim. Player sees 10,000 sparks during a reactor breach and the sim doesn't even know.
+- **Every M1-M6 system already in the game also runs on the new foundation.** When M8A closes, the project is *fully caught up*: actor controller (M1), micro breach + ReactiveGuard + MissionState (M2), chunked terrain (M3), event recorder + run bundle (M4), deep damage event schemas (M5), and the M6 actor / equipment / squad / perception expansion all run on the parallel-deterministic ECS scheduler. Players will not see new content from M8A, but every existing scenario from M1 onward runs measurably faster, with byte-identical determinism enforced by CI, on every supported platform — client or server.
+
+## M1-M6 backfill — bringing already-shipped subsystems forward to the M8A contract
+
+M8A's promise is not just "new foundation" — it's "old subsystems run on the new foundation." When M8A closes, **every M1-M6 surface has been retrofitted** to:
+
+1. Live in Bevy ECS (no `RwLock<EngineMutable>` mega-mutex)
+2. Tick under the parallel-deterministic scheduler (snapshot-read / compute-parallel / commit-serial)
+3. Pass the cross-OS determinism CI gate (Linux x86_64 + macOS aarch64 + Windows x86_64 → byte-identical)
+4. Emit per-subsystem perf samples into `summary.json.performance`
+5. Replay byte-identically across server topologies (workstation, Apple Silicon, Linux VPS)
+
+### Backfill matrix
+
+| Closed/Active milestone | Subsystems to backfill | M8A contract delivered | CI gate that proves it |
+|---|---|---|---|
+| **M0 (cfctl JSON-RPC, closed)** | cfctl handlers in `cf-control` | Handlers read/write ECS state via Bevy `World` queries. Wire shape is **frozen** (no break from M0); SCHEMA_VERSION not bumped. `act.player.*`, `observe.*`, `inspect.*` continue to work unchanged from the M1-M8 client's perspective. | `cargo test --workspace -p cf-control --test wire_contract` passes 100% of the M0-M8 wire shape suite. |
+| **M1 (actor controller, closed)** | `cf-actor::ActorState`; act.player.move/aim/fire/dig; per-actor tick step | `ActorState` decomposed into `ActorBundle { Pos, Vel, Aim, Stance, Status, HP, Stability, Stamina, Lean, Cover, StealthMeter, LimbLossFlags, InventorySlot, ... }`. Per-tick split into 4 sub-systems: `apply_intent` / `step_kinematics` / `derive_status` / `latch_outcomes`. `par_iter` over actor entities with disjoint per-entity writes. All RNG (recoil drift, jitter, stamina ticks) pre-rolled into `Vec<u64>` before the parallel section. Zero `thread_rng()` in cf-actor; zero `f64`; zero default-hashed HashMap iteration. | `cargo run --release -p cf-bench -- m1_actor_range --determinism-cross-os` returns identical blake3 on all three OS platforms; `cargo clippy -p cf-actor` passes the determinism-lint rules. |
+| **M2 (micro breach + ReactiveGuard + MissionState, must close OR concurrent)** | `cf-ai::ReactiveGuard`; AI tick throttle; `cf-mission::MissionState`; mission director phase machine; LossReason enum | `ReactiveGuard` → `GuardComponent`. AI tick runs in `par_iter` over the stride window (M2's `actor_id % stride` partition is preserved). `MissionState` → `MissionComponent` (Bevy resource). Mission director phase machine becomes an ECS system reading actor + reactor + timer components. LossReason enum unchanged. The `AI-H` test harness (AI-H-01..06 from M2 + M7) re-runs under the parallel scheduler with identical outcomes. | `cargo run --release -p cf-bench -- m2_breach_replay --determinism-cross-os` passes; `cargo test -p cf-e2e --test ai_harness_suite -- --par-iter-mode` passes all AI-H-XX scenarios. |
+| **M3 (chunked terrain, closed)** | `cf-terrain::ChunkedTerrain`; 8 materials registry; 9 affordance flags; `try_penetrate` / `try_carve`; dirty-region tracker; `active_region` flag | `ChunkedTerrain` becomes a Bevy resource (no `Box<RwLock<...>>`). Per-chunk mutation runs in `par_iter_mut` over the dirty-chunk set. Inter-chunk boundary post-pass runs single-threaded in `(cx, cy)` ascending order. The `active_region: bool` flag (M3 had it but didn't enforce) is **enforced on every chunk write** — neighbors within 1-chunk radius wake; chunks idle for 300+ ticks sleep. Every mutation emits a semantic `terrain.chunk_mutated` event with `post_state_checksum` (CCCP bitmap-delta paths are forbidden). The 8 materials + 9 affordance flags + `MaterialAffordance::overlay_rgba` table all unchanged; just moved to a Bevy resource. | `cargo run --release -p cf-bench -- m3_terrain_burst --determinism-cross-os` passes; `cargo test -p cf-terrain --test chunk_parallel` proves chunk-parallel checksum matches single-threaded reference for 1000-tick stress. |
+| **M4 (event recorder + run bundle, must close OR concurrent)** | `cf-replay::Recorder`; per-tick `sim_checksum`; v0.1 envelope; 27-category baseline; `cosmetic` flag; `prototype_run_check.py` | Recorder gains `RecorderShard` per worker thread. Per-stage shards merge canonically end-of-tick (sorted by `(tick, shard_id, monotonic_seq)`; re-stamped with canonical `event_id`). v0.1 envelope unchanged. 27-category baseline preserved. `cosmetic` flag stays the canonical drop-policy boundary. `prototype_run_check.py` extended to validate `summary.json.performance` has all required per-subsystem keys (`cf-mod validate-bundle` is the canonical bundle-validator post-M8A). | `cargo run --release -p cf-replay --bin recorder_shard_merge_test` proves byte-identical canonical stream across 1, 4, 16, 32 worker thread configurations; `prototype_run_check.py` + `cf-mod validate-bundle` both pass on every M1-M6 reference bundle. |
+| **M5 (deep damage event schemas, sister of M9)** | `armor.*`, `internal.*`, `concussion.*`, `fluid.*`, `origin.*`, `hazard.*`, `affliction.*`, `atmos.*`, `shield.*`, `environment.*`, `thermal.*` event family schemas | Schemas unchanged at M5; emission paths run as ECS systems. Multi-layer armor cascade (External → Internal → Core) routes through the serial commit phase (single writer per reactor / chassis entity). Cross-zone damage routing is deterministic (no thread-scheduling-dependent ordering). The M9 reactor-defense scenario tests the full event family chain. | `cargo test -p cf-replay --test damage_event_schemas` validates every M5 schema is emitted by at least one M9 / M13 / M14 / M16 / M17 / M19 / M20 stress test under the parallel scheduler with the byte-identical cross-OS gate. |
+| **M6 (actor expansion + equipment + squad + perception, ACTIVE — concurrent with M8A)** | `cf-actor` extended ActorObservation (facing + stamina + lean + cover + stealth + limb-loss + inventory); 6 weapons + 4 grenades + 6 melee + 8 tools + attachments; 8-slot inventory; sound propagation; 1 friendly bot + 4 squad commands; stealth kill; knife throw; rope/pipe/ladder climbing; damage falloff; tool degradation; `cf-perception` + `cf-squad` new crates; 26 `act.player.*` cfctl methods + 41 event schemas | M6 lands first (M6-M11 train is in flight). M8A's M6 retrofit: equipment registries become Bevy resources; the 36-action surface routes through the actor `apply_intent` sub-system; squad-command dispatch (`act.squad.issue_command`) is an ECS system reading `SquadComponent`; sound propagation is a chunk-parallel system over emitters; perception kernel runs `par_iter` over perceiving entities with pre-rolled RNG for any randomized rolls (false sighting, hearing jitter). The 26 cfctl methods + 41 event schemas are unchanged in wire shape; handlers move to ECS query patterns. | `cargo run --release -p cf-bench -- m6_full_loadout_combat --determinism-cross-os` passes; `cargo test -p cf-perception --test parallel_perception` proves par_iter outcome matches single-thread reference. |
+
+### Backfill discipline — what the implementing agent does NOT do
+
+The backfill is a **refactor**, not a redesign. The implementing agent must NOT:
+
+1. **Change any M1-M6 player-facing behavior.** Every M1-M6 reference bundle replays byte-identically after the M8A refactor with the same player-observable outcomes (win/loss, mission_resolved reason, kill chain, ammo counts, terrain carved pixels). Player-visible behavior changes are NOT allowed under cover of M8A.
+2. **Change the cfctl JSON-RPC wire shape.** SCHEMA_VERSION does not bump. Existing scripts in `game/scripts/cfctl/*.cfctl.json` from M1-M8 continue to drive the engine unchanged.
+3. **Break the M4 run-bundle envelope.** Additive-only extensions to `summary.json.performance` and `events.jsonl` schemas. Existing `prototype_run_check.py` checks continue to pass on M1-M8 fixture bundles.
+4. **Re-tune simulation parameters.** Recoil curves, AI sight ranges, material hardness, ammunition damage, mission timers — all locked. If a perf optimization would require re-tuning a sim parameter, the optimization is rejected.
+5. **Tear out working code that doesn't need refactor.** If a subsystem already passes the determinism contract (no f64, no thread_rng, no default HashMap), leave it alone. The audit (step 2 in "Recommended order of operations") is what identifies which subsystems need work.
+
+### Acceptance proof — every M1-M6 reference bundle replays identically post-M8A
+
+Per the M4 + M9 reference-bundle contract: every milestone closure produces a canonical `prototype_runs/native/m<N>_<UTC>_<hash>/` reference bundle. M8A's "fully caught up" gate is:
+
+```
+for milestone in [M1, M2, M3, M4, M5, M6]:
+    pre_m8a_bundle  = prototype_runs/native/m<N>_<closure-UTC>_<closure-hash>/   # captured at closure
+    post_m8a_bundle = prototype_runs/native/m<N>_<m8a-replay-UTC>_<m8a-hash>/   # captured by re-running M<N>'s reference scenario on M8A engine
+
+    assert pre_m8a_bundle.summary.json.outcome == post_m8a_bundle.summary.json.outcome
+    assert pre_m8a_bundle.events.jsonl.final_checksum == post_m8a_bundle.events.jsonl.final_checksum
+    assert pre_m8a_bundle.run_manifest.json.determinism_mode == post_m8a_bundle.run_manifest.json.determinism_mode
+```
+
+CI script at `game/scripts/ci/m8a_m1_m6_backfill_gate.sh` re-runs each M1-M6 reference scenario through the M8A engine and diffs the bundles. If any mismatch, the M8A merge is blocked.
+
+Per the M8A "Refactor authorization" clause: byte-identical outcomes ARE the contract. Outcomes change only at M9+ when M8A's parallel scheduler is paired with M9's new content (reactor armor + per-pixel integrity + hazard spawn + atmos venting). For M1-M6, byte-identical replay across the M8A refactor is non-negotiable.
 
 ## Crates / modules touched
 
@@ -109,6 +160,7 @@ Content + scripts:
 - `game/scripts/cfctl/bench_8player_lan.cfctl.json` (NEW: 8-client lockstep replay)
 - `game/scripts/ci/m8a_perf_gate.sh` (NEW: runs all benches, asserts thresholds, fails CI on regression)
 - `game/scripts/ci/m8a_cross_os_determinism.sh` (NEW: runs same script on Linux+macOS+Windows, diffs final checksums, fails on mismatch)
+- `game/scripts/ci/m8a_m1_m6_backfill_gate.sh` (NEW: re-runs each M1-M6 reference scenario through the M8A engine, diffs against the closure-time reference bundle, fails on ANY divergence — events.jsonl final_checksum, summary.json.outcome, per-tick sim_checksum, parent_event_id chain shape)
 - `game/content/scenarios/bench_m9_firehose.ron` (NEW)
 - `game/content/scenarios/bench_mp_8player.ron` (NEW)
 
@@ -458,6 +510,94 @@ Scenario: Apple M4 Pro / M5+ server cross-OS checksum gate
   When the same input trace replays on an x86_64 Linux server
   Then the final blake3 checksum matches byte-for-byte
   And cf-headless replay-validate passes on both bundles independently
+```
+
+### M1-M6 backfill — every shipped subsystem catches up to the M8A contract
+
+These scenarios prove M8A leaves the project fully caught up. Every M1-M6 reference bundle replays byte-identically on the M8A engine. The backfill gate (`game/scripts/ci/m8a_m1_m6_backfill_gate.sh`) is green on the merge PR.
+
+```gherkin
+Scenario: M0 cfctl JSON-RPC wire shape preserved
+  Given the cfctl wire contract from M0 (act.player.*, observe.*, inspect.*, act.system.*)
+  When the M8A ECS refactor lands
+  Then the JSON-RPC envelope shape is unchanged
+  And SCHEMA_VERSION does not bump
+  And every existing game/scripts/cfctl/*.cfctl.json from M1-M8 drives the engine unchanged
+  And cf-control's wire_contract test suite passes 100% against the M0-M8 expectations
+
+Scenario: M1 actor controller runs on ECS with byte-identical replay
+  Given the M1 reference bundle prototype_runs/native/m1_<closure>_<hash>/
+  When the same scenario.ron + same seed + same cfctl inputs replay through the M8A engine
+  Then the produced bundle has the same events.jsonl final_checksum byte-for-byte
+  And the same summary.json.outcome
+  And the per-tick checksum at every cadence point byte-matches
+  And per-actor sub-systems (apply_intent / step_kinematics / derive_status / latch_outcomes) run on the parallel scheduler with disjoint per-entity writes
+  And no thread_rng() calls exist anywhere in cf-actor (verified by cargo clippy + grep CI gate)
+  And no f64 fields exist anywhere in cf-actor sim state
+  And `cargo run --release -p cf-bench -- m1_actor_range --determinism-cross-os` passes on Linux + macOS + Windows
+
+Scenario: M2 ReactiveGuard + MissionState runs on ECS with byte-identical replay
+  Given the M2 reference bundle prototype_runs/native/m2_<closure>_<hash>/
+  When the same scenario.ron + same seed + same cfctl inputs replay through the M8A engine
+  Then the produced bundle has the same events.jsonl final_checksum byte-for-byte
+  And the AI-H test harness (AI-H-01..06) passes with identical outcomes
+  And AI tick runs in par_iter over the stride window (M2's actor_id % stride partition preserved)
+  And mission director phase machine runs as an ECS system
+  And LossReason enum produces the same typed result for every M2 termination path
+  And `cargo run --release -p cf-bench -- m2_breach_replay --determinism-cross-os` passes
+
+Scenario: M3 ChunkedTerrain runs on parallel scheduler with byte-identical replay
+  Given the M3 reference bundle prototype_runs/native/m3_<closure>_<hash>/
+  When the same digging + carving + penetration sequence replays through the M8A engine
+  Then the produced bundle has the same events.jsonl final_checksum byte-for-byte
+  And the same per-chunk post_state_checksum at every dirty-region commit
+  And per-chunk mutation runs in par_iter_mut over the dirty-chunk set
+  And inter-chunk boundary post-pass runs single-threaded in (cx, cy) ascending order
+  And active_region is enforced on every chunk write (neighbors wake; idle chunks sleep after 300+ ticks)
+  And every terrain mutation emits terrain.chunk_mutated with post_state_checksum (no bitmap-delta paths)
+  And the 8 launch materials + 9 affordance flags are unchanged
+  And `cargo test -p cf-terrain --test chunk_parallel` proves chunk-parallel checksum matches single-thread reference
+
+Scenario: M4 Recorder runs with per-shard merge producing byte-identical canonical stream
+  Given the M4 reference bundle prototype_runs/native/m4_<closure>_<hash>/
+  When the same scenario replays with N ∈ {1, 4, 16, 32} worker thread counts
+  Then the canonical events.jsonl is byte-identical across all worker counts
+  And the canonical event_id sequence is identical (re-stamped post-merge to (tick, canonical_seq))
+  And parent_event_id references are correctly re-mapped from shard-local to canonical ids
+  And summary.json.performance carries p50/p99/p999 microseconds for every required subsystem
+  And cf-mod validate-bundle passes on the M4 reference bundle + the post-M8A re-run
+
+Scenario: M5 deep damage event schemas emit through the parallel scheduler
+  Given the M5 event family schemas (armor.* / internal.* / concussion.* / fluid.* / origin.* / hazard.* / affliction.* / atmos.* / shield.* / environment.* / thermal.*)
+  When any M9 / M13 / M14 / M16 / M17 / M19 / M20 stress test runs under the M8A scheduler
+  Then every M5 schema is emitted by at least one such test
+  And cross-zone damage routing is deterministic across thread-scheduling variance
+  And multi-layer armor cascade (External → Internal → Core) routes through the serial commit phase with a single writer per entity
+  And cf-mod validate-bundle accepts every emitted event as schema-conformant
+
+Scenario: M6 actor / equipment / squad / perception expansion runs on ECS
+  Given the M6 reference bundle prototype_runs/native/m6_<closure>_<hash>/ (after M6 closes)
+  When the same scenario.ron + 36 actor actions + 6 weapons + 4 grenades + 6 melee + 8 tools + 4 squad commands replay through the M8A engine
+  Then the produced bundle has the same events.jsonl final_checksum byte-for-byte
+  And the 26 act.player.* + act.squad.issue_command methods produce identical effect chains
+  And the 41 M6 event schemas emit identically
+  And perception kernel runs par_iter over perceiving entities with pre-rolled RNG
+  And squad-command dispatch runs as an ECS system reading SquadComponent
+  And sound propagation runs as a chunk-parallel system over emitters
+  And `cargo run --release -p cf-bench -- m6_full_loadout_combat --determinism-cross-os` passes
+  And M6's M2-extension scenarios (AI-H-02..06 archetypes, cover, suppression, retreat, squad comm, friendly fire) all pass
+
+Scenario: Backfill gate enforces every M1-M6 bundle replays identically
+  Given game/scripts/ci/m8a_m1_m6_backfill_gate.sh
+  When the M8A merge PR is built
+  Then the gate re-runs each M1-M6 reference scenario through the M8A engine
+  And diffs the produced bundle against the closure-time reference bundle
+  And blocks the merge if ANY bundle diverges in:
+    - events.jsonl final_checksum
+    - summary.json.outcome
+    - any per-tick sim_checksum at any cadence point
+    - any parent_event_id chain shape
+  And reports the first divergent tick + nearest parent event for any failure
 ```
 
 ### Refactor authorization
@@ -878,6 +1018,8 @@ The DR references below cite the canonical copies at `corefall/docs/plan/decisio
 
 ### Existing work to credit during the M8A audit
 
+See the **"M1-M6 backfill" section above** (next to "Player-facing behavior") for the full per-milestone retrofit matrix + the acceptance gate (`m8a_m1_m6_backfill_gate.sh`) that proves every M1-M6 reference bundle replays byte-identically through the M8A engine. The list below is the short version — the milestone-by-milestone matrix above is the canonical contract for the implementing agent.
+
 The following M1-M8 surfaces are already aligned with the M8A direction and should NOT be re-architected — credit them and build on them:
 
 - **ChunkedTerrain's sparse storage + dirty-region tracker** (M3). Already the right shape for chunk-parallel mutation.
@@ -892,8 +1034,14 @@ The following M1-M8 surfaces are already aligned with the M8A direction and shou
 
 ### What "done" looks like for M8A
 
-When the implementing agent reports the M8A verdict table, every scenario above is `PASS (already in)` or `IMPLEMENTED`. The reference-platform bench numbers are captured in `summary.json.performance` for `m9_firehose` AND `mp_8player_lan`. CI gates (perf-budget + cross-OS determinism) are green on the M8A merge PR. The M6-M11 content team can begin M9 on the new foundation with no further refactor.
+When the implementing agent reports the M8A verdict table, every scenario above is `PASS (already in)` or `IMPLEMENTED`. The reference-platform bench numbers are captured in `summary.json.performance` for `m9_firehose` AND `mp_8player_lan`. **All three CI gates are green on the M8A merge PR:**
 
-If any scenario is `STILL FAILING`, the agent reports it honestly. No silent overclaims. No verdict drift.
+1. **Perf-budget gate** (`m8a_perf_gate.sh`) — per-subsystem p99 latencies within budget; no subsystem regression ≥ 25% vs baseline.
+2. **Cross-OS determinism gate** (`m8a_cross_os_determinism.sh`) — Linux x86_64 + macOS aarch64 + Windows x86_64 produce byte-identical final checksums on every scenario in the gate set.
+3. **M1-M6 backfill gate** (`m8a_m1_m6_backfill_gate.sh`) — every M1-M6 reference bundle replays byte-identically through the M8A engine. Player-facing behavior of every M1-M6 scenario is preserved exactly. This is what "fully caught up" means in practice.
+
+The M6-M11 content team can begin M9 on the new foundation with no further refactor. Every existing M1-M6 scenario the player ever plays after M8A runs faster (per `summary.json.performance` measurement) and replays byte-identically across server topologies (per the cross-OS gate).
+
+If any scenario is `STILL FAILING`, the agent reports it honestly. No silent overclaims. No verdict drift. The backfill gate failing on any M1-M6 bundle is a HARD-HALT — M8A does not merge with a regression in already-shipped subsystems.
 
 The spec then moves to `specs/done/M8A.md` and M9 is unblocked.
