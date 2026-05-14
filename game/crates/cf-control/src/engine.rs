@@ -805,6 +805,13 @@ struct EngineMutable {
     /// `equipment.weapon_fired` event with `misfire=true`. Drained each tick
     /// after the recorder reads it.
     m6_charge_misfires: BTreeMap<ActorId, ChargeFireInfo>,
+    /// **M7-A**: smart commandable AI surface — per-actor BotState
+    /// (Archetype + 5-layer ThinkingStack + auto-triage/auto-repair
+    /// missions), faction registry, 4-phase mission director, reinforcement
+    /// registry, mini-boss state. Co-resident with M2 `reactive_guards`:
+    /// the M2 guard FSM still drives projectile / fire behavior; M7-A
+    /// adds the reason-label + role-template surface on top.
+    m7_ai_world: crate::m7_ai::M7AiWorld,
 }
 
 /// **M6**: per-actor charge-fire annotation shipped from the M6 post-step
@@ -1102,6 +1109,18 @@ impl M0Engine {
             }
         }
 
+        // **M7-A**: seed the M7-A AI world with a `BotState` for every
+        // reactive guard the scenario declared so the 5-layer thinking
+        // stack ticks alongside the M2 FSM from tick 0. Built before the
+        // EngineMutable move below so the borrow checker is happy.
+        let m7_ai_world_seed = {
+            let mut world = crate::m7_ai::M7AiWorld::new();
+            for actor_id in reactive_guards.keys() {
+                world.assign_archetype(*actor_id, cf_ai::Archetype::Rifleman);
+            }
+            world
+        };
+
         diagnostics::set_panic_reporter({
             let recorder = recorder.clone();
             let tick_snap = current_tick.clone();
@@ -1177,6 +1196,7 @@ impl M0Engine {
                 m6_dropped_items: Vec::new(),
                 m6_next_dropped_item_id: 1,
                 m6_charge_misfires: BTreeMap::new(),
+                m7_ai_world: m7_ai_world_seed,
             }),
             recorder,
             current_tick,
@@ -3297,6 +3317,14 @@ impl M0Engine {
             self.emit_guard_events(*tick, *sim_time_ms, *guard_id, report);
         }
 
+        // **M7-A**: drive the 5-layer thinking stack for every BotState
+        // managed in `m7_ai_world`. The M2 reactive guards still drive the
+        // M2 FSM + projectile spawn; M7-A's stack overlays the reason-label
+        // + thinking_layer_invoked + auto-triage/auto-repair surfaces.
+        for (tick, sim_time_ms, guard_id, _) in &ai_payloads {
+            self.emit_m7_ai_events(*tick, *sim_time_ms, *guard_id);
+        }
+
         // M1.5: emit mission events.
         // M2 re-audit (2026-05-13): all mission.objective_* events chain to
         // their parent. objective_started chains to mission_started; the
@@ -4134,6 +4162,102 @@ impl M0Engine {
             for (id, actor) in &sim.world.actors {
                 state.hud_last_status.insert(*id, actor.status);
             }
+        }
+    }
+
+    /// **M7-A**: drive the 5-layer thinking stack for one bot AND emit the
+    /// resulting `ai.reason_label_changed` + `ai.thinking_layer_invoked`
+    /// events. Also detects DYING-ally + DEGRADED chassis-module triggers
+    /// and emits the auto-triage / auto-repair contract events.
+    fn emit_m7_ai_events(&self, tick: Tick, sim_time_ms: f64, guard_id: ActorId) {
+        // Snapshot world state needed by the thinking context, then
+        // exclusive-borrow the bot state and tick the stack.
+        let tick_rate_hz = self.config.tick_rate_hz;
+        let world_snapshot = {
+            let state = match self.state.read() {
+                Ok(s) => s,
+                Err(_) => return,
+            };
+            let self_actor = state
+                .actor_state
+                .as_ref()
+                .and_then(|sim| sim.world.actors.get(&guard_id).cloned());
+            let player_actor = state.player_actor.and_then(|pid| {
+                state
+                    .actor_state
+                    .as_ref()
+                    .and_then(|s| s.world.actors.get(&pid).cloned())
+            });
+            (self_actor, player_actor)
+        };
+        let (Some(self_actor), player_actor) = world_snapshot else {
+            return;
+        };
+
+        let (emit, archetype) = {
+            let mut state = match self.state.write() {
+                Ok(s) => s,
+                Err(_) => return,
+            };
+            let bot = match state.m7_ai_world.bot_mut(guard_id) {
+                Some(b) => b,
+                None => return,
+            };
+            let enemy_visible = player_actor
+                .as_ref()
+                .map(|p| {
+                    let dx = p.position.x - self_actor.position.x;
+                    let dy = p.position.y - self_actor.position.y;
+                    let d = (dx * dx + dy * dy).sqrt();
+                    d <= bot.stack.archetype.default_sight_range()
+                })
+                .unwrap_or(false);
+            let enemy_distance_normalized = player_actor
+                .as_ref()
+                .map(|p| {
+                    let dx = p.position.x - self_actor.position.x;
+                    let dy = p.position.y - self_actor.position.y;
+                    let d = (dx * dx + dy * dy).sqrt();
+                    let max = bot.stack.archetype.default_sight_range().max(1.0);
+                    (d / max).clamp(0.0, 1.0)
+                })
+                .unwrap_or(1.0);
+            let downed_ally_within_reach = player_actor
+                .as_ref()
+                .map(|p| matches!(p.status, cf_actor::Status::Dying | cf_actor::Status::Downed))
+                .unwrap_or(false);
+            let ctx = crate::m7_ai::build_context(
+                bot,
+                &self_actor,
+                tick.0,
+                tick_rate_hz,
+                enemy_visible,
+                enemy_distance_normalized,
+                false,
+                downed_ally_within_reach,
+                false,
+                false,
+                false,
+            );
+            (crate::m7_ai::tick_bot(bot, ctx), bot.archetype)
+        };
+
+        let label_changed = emit.reason_label_changed.is_some();
+        if let Some(payload) = emit.reason_label_changed {
+            self.recorder
+                .record(tick, sim_time_ms, "ai", "reason_label_changed", payload, None);
+        }
+        if let Some(payload) = emit.thinking_layer_invoked {
+            self.recorder
+                .record(tick, sim_time_ms, "ai", "thinking_layer_invoked", payload, None);
+        }
+        // **M7-A**: emit `ai.archetype_chosen` whenever the reason-label
+        // flips. The first tick a bot ticks the label is fresh, so this
+        // also fires the initial archetype assignment for replay viewers.
+        if label_changed {
+            let payload = crate::m7_ai::archetype_chosen_payload(guard_id.0, archetype);
+            self.recorder
+                .record(tick, sim_time_ms, "ai", "archetype_chosen", payload, None);
         }
     }
 

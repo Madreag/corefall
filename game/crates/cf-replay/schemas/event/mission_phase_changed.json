@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/mission_phase_changed.v1",
+  "title": "mission.phase_changed",
+  "description": "Emitted when the mission director v0.5 advances its 4-phase pacing (Setup / Buildup / Climax / Debrief).",
+  "type": "object",
+  "required": ["from", "to", "tick"],
+  "properties": {
+    "from": { "type": "string", "enum": ["setup", "buildup", "climax", "debrief"] },
+    "to": { "type": "string", "enum": ["setup", "buildup", "climax", "debrief"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "cause": { "type": "string" }
+  }
+}

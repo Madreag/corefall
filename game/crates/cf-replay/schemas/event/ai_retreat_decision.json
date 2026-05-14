@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ai_retreat_decision.v1",
+  "title": "ai.retreat_decision",
+  "description": "Emitted when a bot decides to retreat from combat. Reason vocabulary: hp_low / squad_dead / overwhelmed / order_received.",
+  "type": "object",
+  "required": ["actor_id", "reason"],
+  "properties": {
+    "actor_id": { "type": "integer", "minimum": 0 },
+    "reason": { "type": "string" },
+    "hp_fraction": { "type": "number" },
+    "tick": { "type": "integer", "minimum": 0 }
+  }
+}

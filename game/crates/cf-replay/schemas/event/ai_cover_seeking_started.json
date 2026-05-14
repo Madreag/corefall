@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ai_cover_seeking_started.v1",
+  "title": "ai.cover_seeking_started",
+  "description": "Emitted when a bot decides to relocate to cover. Spec § M7 cover seeking.",
+  "type": "object",
+  "required": ["actor_id", "reason"],
+  "properties": {
+    "actor_id": { "type": "integer", "minimum": 0 },
+    "archetype": { "type": "string" },
+    "reason": { "type": "string" },
+    "target_position": { "type": "array", "minItems": 2, "maxItems": 2 },
+    "distance": { "type": "number" }
+  }
+}

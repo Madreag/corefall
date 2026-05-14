@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ai_suppression_started.v1",
+  "title": "ai.suppression_started",
+  "description": "Emitted when a Rifleman / Assault begins suppression fire while a squadmate flanks the target.",
+  "type": "object",
+  "required": ["actor_id", "target_actor_id"],
+  "properties": {
+    "actor_id": { "type": "integer", "minimum": 0 },
+    "target_actor_id": { "type": "integer", "minimum": 0 },
+    "flanker_actor_id": { "type": ["integer", "null"], "minimum": 0 },
+    "duration_ticks": { "type": "integer", "minimum": 0 }
+  }
+}

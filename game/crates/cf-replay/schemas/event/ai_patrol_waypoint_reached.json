@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ai_patrol_waypoint_reached.v1",
+  "title": "ai.patrol_waypoint_reached",
+  "description": "Emitted when a patrolling bot reaches a waypoint. Idle pause 5-10 seconds before advancing.",
+  "type": "object",
+  "required": ["actor_id", "waypoint_index"],
+  "properties": {
+    "actor_id": { "type": "integer", "minimum": 0 },
+    "waypoint_index": { "type": "integer", "minimum": 0 },
+    "position": { "type": "array", "minItems": 2, "maxItems": 2 },
+    "idle_seconds": { "type": "number" }
+  }
+}

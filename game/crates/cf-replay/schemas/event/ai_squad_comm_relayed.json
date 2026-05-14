@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ai_squad_comm_relayed.v1",
+  "title": "ai.squad_comm_relayed",
+  "description": "Emitted after the 0.5-second squad-comm relay delay expires; receivers transition to Alert without direct LOS.",
+  "type": "object",
+  "required": ["originator_actor_id", "receiver_actor_ids", "target_actor_id"],
+  "properties": {
+    "originator_actor_id": { "type": "integer", "minimum": 0 },
+    "receiver_actor_ids": { "type": "array" },
+    "target_actor_id": { "type": "integer", "minimum": 0 },
+    "target_position": { "type": "array", "minItems": 2, "maxItems": 2 },
+    "delay_ticks": { "type": "integer", "minimum": 0 }
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/boss_special_ability_triggered.v1",
+  "title": "boss.special_ability_triggered",
+  "description": "Emitted when a mini-boss activates its phase-specific special ability (e.g. shield up at phase 2).",
+  "type": "object",
+  "required": ["actor_id", "phase", "ability"],
+  "properties": {
+    "actor_id": { "type": "integer", "minimum": 0 },
+    "phase": { "type": "string", "enum": ["phase_1", "phase_2", "phase_3"] },
+    "ability": { "type": "string" },
+    "tick": { "type": "integer", "minimum": 0 }
+  }
+}

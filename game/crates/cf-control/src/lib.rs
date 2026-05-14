@@ -9,6 +9,7 @@
 pub mod engine;
 pub mod envelope;
 pub mod m6_actions;
+pub mod m7_ai;
 pub mod runtime;
 pub mod scenario;
 pub mod schemas;

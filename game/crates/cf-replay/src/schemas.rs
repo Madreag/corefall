@@ -246,6 +246,35 @@ const SCHEMA_SQUAD_COMMAND_ISSUED: &str = include_str!("../schemas/event/squad_c
 const SCHEMA_SQUAD_MEMBER_ADDED: &str = include_str!("../schemas/event/squad_member_added.json");
 const SCHEMA_SQUAD_WAYPOINT_MARKED: &str = include_str!("../schemas/event/squad_waypoint_marked.json");
 
+// **M7-A**: smart commandable AI surface — reason labels, layer invocations,
+// archetype assignment, auto-triage / auto-repair contracts, cover seeking,
+// suppression, retreat, squad-comm relays, patrol, friendly-fire avoidance,
+// high-ground preference. Mission director v0.5 adds phase changes,
+// branching, optional offerings, reinforcement waves, mini-boss phases.
+const SCHEMA_AI_REASON_LABEL_CHANGED: &str = include_str!("../schemas/event/ai_reason_label_changed.json");
+const SCHEMA_AI_THINKING_LAYER_INVOKED: &str = include_str!("../schemas/event/ai_thinking_layer_invoked.json");
+const SCHEMA_AI_ARCHETYPE_CHOSEN: &str = include_str!("../schemas/event/ai_archetype_chosen.json");
+const SCHEMA_AI_AUTO_TRIAGE_INITIATED: &str = include_str!("../schemas/event/ai_auto_triage_initiated.json");
+const SCHEMA_AI_AUTO_TRIAGE_APPLIED: &str = include_str!("../schemas/event/ai_auto_triage_applied.json");
+const SCHEMA_AI_AUTO_REPAIR_INITIATED: &str = include_str!("../schemas/event/ai_auto_repair_initiated.json");
+const SCHEMA_AI_AUTO_REPAIR_PROGRESSED: &str = include_str!("../schemas/event/ai_auto_repair_progressed.json");
+const SCHEMA_AI_COVER_SEEKING_STARTED: &str = include_str!("../schemas/event/ai_cover_seeking_started.json");
+const SCHEMA_AI_SUPPRESSION_STARTED: &str = include_str!("../schemas/event/ai_suppression_started.json");
+const SCHEMA_AI_RETREAT_DECISION: &str = include_str!("../schemas/event/ai_retreat_decision.json");
+const SCHEMA_AI_SQUAD_COMM_RELAYED: &str = include_str!("../schemas/event/ai_squad_comm_relayed.json");
+const SCHEMA_AI_PATROL_WAYPOINT_REACHED: &str = include_str!("../schemas/event/ai_patrol_waypoint_reached.json");
+const SCHEMA_AI_FRIENDLY_FIRE_AVOIDANCE: &str = include_str!("../schemas/event/ai_friendly_fire_avoidance.json");
+const SCHEMA_AI_HIGH_GROUND_PREFERENCE_APPLIED: &str =
+    include_str!("../schemas/event/ai_high_ground_preference_applied.json");
+const SCHEMA_MISSION_PHASE_CHANGED: &str = include_str!("../schemas/event/mission_phase_changed.json");
+const SCHEMA_MISSION_OBJECTIVE_BRANCHED: &str = include_str!("../schemas/event/mission_objective_branched.json");
+const SCHEMA_MISSION_OPTIONAL_OFFERED: &str = include_str!("../schemas/event/mission_optional_offered.json");
+const SCHEMA_MISSION_REINFORCEMENT_WAVE_SPAWNED: &str =
+    include_str!("../schemas/event/mission_reinforcement_wave_spawned.json");
+const SCHEMA_BOSS_PHASE_CHANGED: &str = include_str!("../schemas/event/boss_phase_changed.json");
+const SCHEMA_BOSS_SPECIAL_ABILITY_TRIGGERED: &str =
+    include_str!("../schemas/event/boss_special_ability_triggered.json");
+
 /// Look up the schema source by `(category, event_type)`. Returns `None` if
 /// no schema exists for this pair (callers treat as "no validation
 /// constraint"; the recorder envelope itself is checked by the bundle
@@ -452,6 +481,28 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("squad", "command_issued") => Some(SCHEMA_SQUAD_COMMAND_ISSUED),
         ("squad", "member_added") => Some(SCHEMA_SQUAD_MEMBER_ADDED),
         ("squad", "waypoint_marked") => Some(SCHEMA_SQUAD_WAYPOINT_MARKED),
+        // **M7-A**: smart commandable AI event surface.
+        ("ai", "reason_label_changed") => Some(SCHEMA_AI_REASON_LABEL_CHANGED),
+        ("ai", "thinking_layer_invoked") => Some(SCHEMA_AI_THINKING_LAYER_INVOKED),
+        ("ai", "archetype_chosen") => Some(SCHEMA_AI_ARCHETYPE_CHOSEN),
+        ("ai", "auto_triage_initiated") => Some(SCHEMA_AI_AUTO_TRIAGE_INITIATED),
+        ("ai", "auto_triage_applied") => Some(SCHEMA_AI_AUTO_TRIAGE_APPLIED),
+        ("ai", "auto_repair_initiated") => Some(SCHEMA_AI_AUTO_REPAIR_INITIATED),
+        ("ai", "auto_repair_progressed") => Some(SCHEMA_AI_AUTO_REPAIR_PROGRESSED),
+        ("ai", "cover_seeking_started") => Some(SCHEMA_AI_COVER_SEEKING_STARTED),
+        ("ai", "suppression_started") => Some(SCHEMA_AI_SUPPRESSION_STARTED),
+        ("ai", "retreat_decision") => Some(SCHEMA_AI_RETREAT_DECISION),
+        ("ai", "squad_comm_relayed") => Some(SCHEMA_AI_SQUAD_COMM_RELAYED),
+        ("ai", "patrol_waypoint_reached") => Some(SCHEMA_AI_PATROL_WAYPOINT_REACHED),
+        ("ai", "friendly_fire_avoidance") => Some(SCHEMA_AI_FRIENDLY_FIRE_AVOIDANCE),
+        ("ai", "high_ground_preference_applied") => Some(SCHEMA_AI_HIGH_GROUND_PREFERENCE_APPLIED),
+        // **M7**: mission director v0.5 event surface.
+        ("mission", "phase_changed") => Some(SCHEMA_MISSION_PHASE_CHANGED),
+        ("mission", "objective_branched") => Some(SCHEMA_MISSION_OBJECTIVE_BRANCHED),
+        ("mission", "optional_offered") => Some(SCHEMA_MISSION_OPTIONAL_OFFERED),
+        ("mission", "reinforcement_wave_spawned") => Some(SCHEMA_MISSION_REINFORCEMENT_WAVE_SPAWNED),
+        ("boss", "phase_changed") => Some(SCHEMA_BOSS_PHASE_CHANGED),
+        ("boss", "special_ability_triggered") => Some(SCHEMA_BOSS_SPECIAL_ABILITY_TRIGGERED),
         _ => None,
     }
 }

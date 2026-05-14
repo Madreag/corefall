@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ai_friendly_fire_avoidance.v1",
+  "title": "ai.friendly_fire_avoidance",
+  "description": "Emitted when a bot repositions to avoid hitting a friendly. Spec § Friendly fire awareness.",
+  "type": "object",
+  "required": ["actor_id", "friendly_actor_id", "kind"],
+  "properties": {
+    "actor_id": { "type": "integer", "minimum": 0 },
+    "friendly_actor_id": { "type": "integer", "minimum": 0 },
+    "kind": { "type": "string", "enum": ["line_of_fire", "blast_radius"] }
+  }
+}

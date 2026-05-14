@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ai_auto_repair_progressed.v1",
+  "title": "ai.auto_repair_progressed",
+  "description": "Emitted on each repair tick while the Engineer is applying a chassis module repair. Spec § Auto-repair Gherkin.",
+  "type": "object",
+  "required": ["engineer_actor_id", "target_actor_id", "target_module_id", "tick"],
+  "properties": {
+    "engineer_actor_id": { "type": "integer", "minimum": 0 },
+    "target_actor_id": { "type": "integer", "minimum": 0 },
+    "target_module_id": { "type": "string" },
+    "tick": { "type": "integer", "minimum": 0 },
+    "repair_amount": { "type": "number" },
+    "total_progressed_ticks": { "type": "integer", "minimum": 0 }
+  }
+}
