@@ -1085,13 +1085,11 @@ mod tests {
     static TMP_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
     fn write_tmp(name: &str, contents: &str) -> PathBuf {
-        let nanos = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
+        // PID + atomic counter is enough for uniqueness; SystemTime::now is
+        // disallowed by the workspace clippy lint.
         let seq = TMP_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         let pid = std::process::id();
-        let dir = std::env::temp_dir().join(format!("cf-mod-test-{pid}-{nanos}-{seq}"));
+        let dir = std::env::temp_dir().join(format!("cf-mod-test-{pid}-{seq}"));
         fs::create_dir_all(&dir).unwrap();
         let path = dir.join(name);
         let mut f = fs::File::create(&path).unwrap();

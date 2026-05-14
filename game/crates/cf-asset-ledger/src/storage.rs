@@ -507,13 +507,11 @@ mod tests {
     static TMP_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
     fn tmp_path() -> PathBuf {
-        let nanos = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
+        // PID + atomic counter is enough for uniqueness; SystemTime::now is
+        // disallowed by the workspace clippy lint.
         let seq = TMP_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         let pid = std::process::id();
-        std::env::temp_dir().join(format!("cf-asset-ledger-storage-{pid}-{nanos}-{seq}.jsonl"))
+        std::env::temp_dir().join(format!("cf-asset-ledger-storage-{pid}-{seq}.jsonl"))
     }
 
     fn build_entry(name: &str, tier: ProductionTier, category: AssetCategory) -> AssetEntry {

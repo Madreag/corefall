@@ -12,7 +12,10 @@
 //!   what's verified across machines)
 //! - "Schema version locked at v1" → `schema_version_locked_v1`
 
-use std::{path::PathBuf, process::Command};
+use std::{
+    path::{Path, PathBuf},
+    process::Command,
+};
 
 fn target_bin() -> PathBuf {
     // CARGO_BIN_EXE_<name> is set when running integration tests so we
@@ -24,19 +27,17 @@ fn target_bin() -> PathBuf {
 static TMP_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
 fn tmp_workspace() -> PathBuf {
-    let nanos = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap()
-        .as_nanos();
+    // PID + atomic counter is enough for uniqueness; SystemTime::now is
+    // disallowed by the workspace clippy lint.
     let seq = TMP_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
     let pid = std::process::id();
-    let dir = std::env::temp_dir().join(format!("cf-mod-ledger-itest-{pid}-{nanos}-{seq}"));
+    let dir = std::env::temp_dir().join(format!("cf-mod-ledger-itest-{pid}-{seq}"));
     std::fs::create_dir_all(&dir).unwrap();
     std::fs::create_dir_all(dir.join("content/assets")).unwrap();
     dir
 }
 
-fn write_asset(workspace: &PathBuf, rel: &str, bytes: &[u8]) -> PathBuf {
+fn write_asset(workspace: &Path, rel: &str, bytes: &[u8]) -> PathBuf {
     let p = workspace.join(rel);
     if let Some(parent) = p.parent() {
         std::fs::create_dir_all(parent).unwrap();
@@ -45,11 +46,11 @@ fn write_asset(workspace: &PathBuf, rel: &str, bytes: &[u8]) -> PathBuf {
     p
 }
 
-fn ledger_path(workspace: &PathBuf) -> PathBuf {
+fn ledger_path(workspace: &Path) -> PathBuf {
     workspace.join("ledger.jsonl")
 }
 
-fn run_cmd(workspace: &PathBuf, args: &[&str]) -> (i32, String, String) {
+fn run_cmd(workspace: &Path, args: &[&str]) -> (i32, String, String) {
     let mut cmd = Command::new(target_bin());
     cmd.current_dir(workspace).args(args);
     let output = cmd.output().expect("spawn cf-mod");
@@ -59,7 +60,7 @@ fn run_cmd(workspace: &PathBuf, args: &[&str]) -> (i32, String, String) {
     (code, stdout, stderr)
 }
 
-fn add_entry(workspace: &PathBuf, name: &str, output_rel: &str) -> (i32, String, String) {
+fn add_entry(workspace: &Path, name: &str, output_rel: &str) -> (i32, String, String) {
     let lp = ledger_path(workspace);
     let lp_str = lp.display().to_string();
     run_cmd(

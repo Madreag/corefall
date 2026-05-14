@@ -131,13 +131,12 @@ mod tests {
     static TMP_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
     fn tmp_path() -> PathBuf {
-        let nanos = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
+        // PID + atomic counter is enough for uniqueness across parallel
+        // test runners; we deliberately avoid SystemTime::now because the
+        // workspace clippy.toml disallows it (determinism discipline).
         let seq = TMP_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         let pid = std::process::id();
-        std::env::temp_dir().join(format!("cf-asset-ledger-{pid}-{nanos}-{seq}.jsonl"))
+        std::env::temp_dir().join(format!("cf-asset-ledger-{pid}-{seq}.jsonl"))
     }
 
     #[test]

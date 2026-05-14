@@ -707,13 +707,11 @@ mod tests {
     static TMP_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
     fn tmp_workspace() -> PathBuf {
-        let nanos = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
+        // PID + atomic counter is enough for uniqueness; SystemTime::now is
+        // disallowed by the workspace clippy lint.
         let seq = TMP_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         let pid = std::process::id();
-        let dir = std::env::temp_dir().join(format!("cf-asset-ledger-cli-{pid}-{nanos}-{seq}"));
+        let dir = std::env::temp_dir().join(format!("cf-asset-ledger-cli-{pid}-{seq}"));
         fs::create_dir_all(&dir).unwrap();
         dir
     }
@@ -1043,7 +1041,7 @@ mod tests {
         // entry as Drifted:
         let handle = paths.handle();
         let mut entries = handle.read_all().unwrap();
-        for e in entries.iter_mut() {
+        for e in &mut entries {
             if e.canonical_name == "b" {
                 e.regen_status = RegenStatus::Drifted;
             }

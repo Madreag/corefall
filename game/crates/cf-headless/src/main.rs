@@ -967,12 +967,13 @@ mod tests {
     /// live ledger entry.
     #[test]
     fn verify_asset_refs_against_ledger_flags_missing() {
-        // Build a sandbox ledger with no entries.
-        let nanos = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
-        let dir = std::env::temp_dir().join(format!("cf-headless-asset-ref-test-{nanos}"));
+        // Build a sandbox ledger with no entries. PID + atomic counter is
+        // enough for uniqueness; SystemTime::now is disallowed by the
+        // workspace clippy lint.
+        static C: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+        let seq = C.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let pid = std::process::id();
+        let dir = std::env::temp_dir().join(format!("cf-headless-asset-ref-test-{pid}-{seq}"));
         std::fs::create_dir_all(&dir).unwrap();
         let ledger_path = dir.join("ledger.jsonl");
         std::fs::write(&ledger_path, "").unwrap();

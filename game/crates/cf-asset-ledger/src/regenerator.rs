@@ -443,13 +443,11 @@ mod tests {
     static TMP_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
 
     fn tmp_dir() -> PathBuf {
-        let nanos = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
+        // PID + atomic counter is enough for uniqueness; SystemTime::now is
+        // disallowed by the workspace clippy lint.
         let seq = TMP_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
         let pid = std::process::id();
-        let dir = std::env::temp_dir().join(format!("cf-asset-ledger-regen-{pid}-{nanos}-{seq}"));
+        let dir = std::env::temp_dir().join(format!("cf-asset-ledger-regen-{pid}-{seq}"));
         std::fs::create_dir_all(&dir).unwrap();
         dir
     }
@@ -503,7 +501,7 @@ mod tests {
             let entry = AssetEntryBuilder::new(
                 AssetCategory::WeaponSprite,
                 "kind",
-                &format!("entry_{i}"),
+                format!("entry_{i}"),
                 ProductionTier::Tier1Svg,
                 "M9A_svg_v1",
                 "prompt",
