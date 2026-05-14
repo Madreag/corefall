@@ -1,0 +1,195 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-asset-ledger/asset_entry.v1",
+  "title": "AssetEntry",
+  "description": "M4A § AssetEntry (locked v1.0.0). One line per entry in content/asset_ledger/ledger.jsonl. Additive optional fields permitted; layout-breaking changes require a v2 migration registered at M39.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "id",
+    "category",
+    "kind",
+    "canonical_name",
+    "tier",
+    "pipeline",
+    "generator",
+    "prompt",
+    "seed",
+    "output_path",
+    "output_format",
+    "output_size_bytes",
+    "output_blake3",
+    "generated_at_iso",
+    "generated_on_machine",
+    "regen_command",
+    "regen_status",
+    "schema_version"
+  ],
+  "properties": {
+    "id": {
+      "type": "string",
+      "minLength": 64,
+      "maxLength": 64,
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "blake3 hex of category|canonical_name|tier."
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "UiIcon",
+        "WeaponSprite",
+        "ActorSprite",
+        "VehicleSprite",
+        "ChassisSprite",
+        "BaseModuleSprite",
+        "TerrainTile",
+        "MaterialSwatch",
+        "Particle",
+        "Animation",
+        "Audio_SFX",
+        "Audio_Voice",
+        "Audio_Music",
+        "Narrative_Text",
+        "Localization_Strings",
+        "Cosmetic",
+        "Mod_Custom"
+      ]
+    },
+    "kind": { "type": "string", "minLength": 1 },
+    "canonical_name": { "type": "string", "minLength": 1 },
+    "tier": {
+      "type": "string",
+      "enum": [
+        "Tier0_Placeholder",
+        "Tier1_SVG",
+        "Tier1_LLM_Audio",
+        "Tier2_ComfyUI",
+        "Tier2_Audio_Production",
+        "Tier3_Polish",
+        "Mod_Supplied"
+      ]
+    },
+    "pipeline": { "type": "string", "minLength": 1 },
+    "generator": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["tool", "model"],
+      "properties": {
+        "tool": { "type": "string" },
+        "model": { "type": "string" },
+        "workflow": { "type": ["string", "null"] },
+        "model_version": { "type": ["string", "null"] }
+      }
+    },
+    "prompt": { "type": "string" },
+    "negative_prompt": { "type": ["string", "null"] },
+    "seed": { "type": "integer", "minimum": 0 },
+    "palette_ref": { "type": ["string", "null"] },
+    "style_lora": { "type": ["string", "null"] },
+    "upstream_assets": {
+      "type": "array",
+      "items": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+    },
+    "output_path": { "type": "string", "minLength": 1 },
+    "output_format": { "type": "string", "minLength": 1 },
+    "output_size_bytes": { "type": "integer", "minimum": 0 },
+    "output_blake3": {
+      "type": "string",
+      "minLength": 0,
+      "maxLength": 64,
+      "pattern": "^([0-9a-f]{64})?$"
+    },
+    "additional_outputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["label", "output_path", "blake3", "size_bytes"],
+        "properties": {
+          "label": { "type": "string" },
+          "output_path": { "type": "string" },
+          "blake3": { "type": "string", "pattern": "^[0-9a-f]{64}$" },
+          "size_bytes": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "generated_at_iso": { "type": "string", "minLength": 1 },
+    "generated_on_machine": { "type": "string" },
+    "generated_by_human": { "type": "boolean" },
+    "human_edit_notes": { "type": ["string", "null"] },
+    "package_source": {
+      "oneOf": [
+        { "type": "string", "enum": ["Vanilla"] },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "Mod": { "type": "string" },
+            "FactionPack": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "license": {
+      "oneOf": [
+        { "type": "string", "enum": ["CC0", "CC-BY", "CC-BY-SA", "Proprietary"] },
+        {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mod-supplied": { "type": "string" },
+            "custom": { "type": "string" }
+          }
+        }
+      ]
+    },
+    "regen_command": { "type": "string", "minLength": 1 },
+    "regen_inputs": {
+      "type": "array",
+      "items": {
+        "oneOf": [
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "AssetId": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+            }
+          },
+          {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "Path": {
+                "type": "object",
+                "additionalProperties": false,
+                "required": ["path", "blake3"],
+                "properties": {
+                  "path": { "type": "string" },
+                  "blake3": { "type": "string", "pattern": "^[0-9a-f]{64}$" }
+                }
+              }
+            }
+          }
+        ]
+      }
+    },
+    "regen_validated_at": { "type": ["string", "null"] },
+    "regen_status": {
+      "type": "string",
+      "enum": ["Fresh", "Stale", "Drifted", "Missing", "Failed"]
+    },
+    "superseded_by": {
+      "type": ["string", "null"],
+      "pattern": "^([0-9a-f]{64})?$"
+    },
+    "deprecated_at": { "type": ["string", "null"] },
+    "schema_version": {
+      "type": "string",
+      "enum": ["1.0.0"]
+    },
+    "extension_fields": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

@@ -20,6 +20,7 @@ async-trait = { workspace = true }
 blake3 = { workspace = true }
 hex = { workspace = true }
 chrono = { workspace = true }
+cf-asset-ledger = { path = "../cf-asset-ledger" }
 cf-sim-core = { path = "../cf-sim-core" }
 cf-replay = { path = "../cf-replay" }
 cf-actor = { path = "../cf-actor" }

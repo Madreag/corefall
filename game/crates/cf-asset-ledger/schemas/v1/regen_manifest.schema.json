@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-asset-ledger/regen_manifest.v1",
+  "title": "RegenManifest",
+  "description": "M4A § per-pipeline regen scripts + model_version pin. Stored at content/asset_ledger/regen_manifest.ron. Each pipeline declares the canonical regen command + pinned model version + determinism notes. M4A locks the schema at v1; new pipelines append new entries without bumping.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "pipelines"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "enum": ["1.0.0"]
+    },
+    "pipelines": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["pipeline_id", "regen_command", "model_version", "deterministic"],
+        "properties": {
+          "pipeline_id": {
+            "type": "string",
+            "description": "Stable id (e.g. 'M9A_svg_v1', 'M32A_comfyui_v1'). Matches AssetEntry.pipeline."
+          },
+          "owner_milestone": { "type": "string" },
+          "regen_command": {
+            "type": "string",
+            "description": "Shell-style command template. May reference $ASSET_ID / $OUTPUT_PATH / $SEED / $PROMPT placeholders."
+          },
+          "model_version": { "type": "string" },
+          "deterministic": {
+            "type": "boolean",
+            "description": "When true, the pipeline produces byte-identical output across machines for the same seed. When false, the regenerator uses freeze-then-store."
+          },
+          "freeze_path_suffix": {
+            "type": "string",
+            "description": "Suffix used to derive the canonical freeze path. Default '.frozen'.",
+            "default": ".frozen"
+          },
+          "notes": { "type": "string" }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,10 @@
+{
+  "scenario": "m0_blank",
+  "tick_rate_hz": 60,
+  "description": "M4A: smoke-test the observe.assets.ledger_summary surface — the engine must respond with a well-formed projection (counts + status arrays) even when no ledger entries exist yet.",
+  "steps": [
+    { "method": "observe.assets.ledger_summary", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 5 } },
+    { "method": "observe.assets.ledger_summary", "params": {} }
+  ]
+}

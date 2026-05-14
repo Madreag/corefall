@@ -3,7 +3,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use cf_control::Scenario;
 use clap::{Parser, Subcommand};
 use serde_json::json;
@@ -38,6 +38,202 @@ enum Cmd {
     Build { pkg_dir: PathBuf },
     /// Stubbed in M0.
     Inspect { cfpkg: PathBuf },
+    /// **M4A**: asset-ledger CLI. Append / list / verify / regenerate /
+    /// summarize entries in `content/asset_ledger/ledger.jsonl`.
+    Ledger {
+        #[command(subcommand)]
+        action: Box<LedgerAction>,
+    },
+}
+
+/// **M4A** asset-ledger subcommands.
+#[derive(Debug, Subcommand)]
+#[allow(clippy::large_enum_variant)]
+enum LedgerAction {
+    /// Append a new entry to the ledger. The output file must already
+    /// exist; blake3 is computed at write-time. Re-running with the same
+    /// `--canonical-name`+`--tier`+`--category` appends a new line AND
+    /// marks the previous entry as `superseded_by` the new one.
+    Add {
+        #[arg(long)]
+        category: String,
+        #[arg(long)]
+        kind: String,
+        #[arg(long = "canonical-name")]
+        canonical_name: String,
+        #[arg(long)]
+        tier: String,
+        #[arg(long)]
+        pipeline: String,
+        #[arg(long)]
+        prompt: String,
+        #[arg(long = "negative-prompt")]
+        negative_prompt: Option<String>,
+        #[arg(long)]
+        seed: u64,
+        #[arg(long = "output-path")]
+        output_path: PathBuf,
+        #[arg(long = "generator-tool")]
+        generator_tool: Option<String>,
+        #[arg(long = "generator-model")]
+        generator_model: Option<String>,
+        #[arg(long = "generator-workflow")]
+        generator_workflow: Option<String>,
+        #[arg(long = "generator-model-version")]
+        generator_model_version: Option<String>,
+        /// Palette reference id used by the producing pipeline. Spec
+        /// names this `--palette-ref`; both `--palette` (short) and
+        /// `--palette-ref` (spec-literal) work.
+        #[arg(long, alias = "palette-ref")]
+        palette: Option<String>,
+        #[arg(long = "style-lora")]
+        style_lora: Option<String>,
+        #[arg(long)]
+        upstream: Vec<String>,
+        #[arg(long = "package-source")]
+        package_source: Option<String>,
+        #[arg(long)]
+        license: Option<String>,
+        #[arg(long = "generated-by-human")]
+        generated_by_human: bool,
+        #[arg(long = "human-edit-notes")]
+        human_edit_notes: Option<String>,
+        #[arg(long = "regen-command")]
+        regen_command: Option<String>,
+        /// **M4A determinism**: pin the entry's `generated_at_iso` field
+        /// instead of using wall-clock time. Combined with the `freeze`
+        /// snapshot this makes the ledger byte-reproducible across CI.
+        #[arg(long = "generated-at-iso")]
+        generated_at_iso: Option<String>,
+        /// **M4A determinism**: pin `generated_on_machine`. Defaults to
+        /// `HOSTNAME` / `COMPUTERNAME` / `"unknown"` (or `"deterministic"`
+        /// when `CF_DETERMINISTIC_LEDGER=1`).
+        #[arg(long = "generated-on-machine")]
+        generated_on_machine: Option<String>,
+        /// Snapshot the canonical output bytes as `<output_path>.frozen`
+        /// so future regens can reproduce byte-for-byte (default true so
+        /// the deterministic contract holds for non-deterministic pipelines).
+        #[arg(long, default_value_t = true)]
+        freeze: bool,
+        #[arg(long)]
+        ledger_path: Option<PathBuf>,
+    },
+    /// List entries. Use `--category`, `--tier`, `--pipeline`, `--status`
+    /// for filtering; `--include-superseded` to walk the full history.
+    List {
+        #[arg(long)]
+        category: Option<String>,
+        #[arg(long)]
+        tier: Option<String>,
+        #[arg(long)]
+        pipeline: Option<String>,
+        #[arg(long)]
+        status: Option<String>,
+        #[arg(long = "include-superseded")]
+        include_superseded: bool,
+        #[arg(long)]
+        ledger_path: Option<PathBuf>,
+    },
+    /// Show a single entry by full hex id, by id prefix, or by canonical_name.
+    Show {
+        id: String,
+        #[arg(long)]
+        ledger_path: Option<PathBuf>,
+    },
+    /// Diff ledger metadata vs the actual disk state.
+    Diff {
+        /// Optional id; omit to diff every live entry.
+        id: Option<String>,
+        #[arg(long)]
+        ledger_path: Option<PathBuf>,
+        #[arg(long)]
+        all: bool,
+    },
+    /// Verify integrity (re-hash and compare). With `--strict`, exits
+    /// non-zero on any non-Fresh entry.
+    Verify {
+        id: Option<String>,
+        #[arg(long)]
+        all: bool,
+        #[arg(long = "strict-status")]
+        strict_status: bool,
+        #[arg(long)]
+        ledger_path: Option<PathBuf>,
+    },
+    /// Re-bake one or more entries. Uses the freeze-then-store path by
+    /// default; pipelines may register their own deterministic runner.
+    Regenerate {
+        id: Option<String>,
+        #[arg(long)]
+        cascade: bool,
+        #[arg(long)]
+        category: Option<String>,
+        #[arg(long)]
+        tier: Option<String>,
+        #[arg(long)]
+        all: bool,
+        #[arg(long = "continue-on-error")]
+        continue_on_error: bool,
+        #[arg(long)]
+        ledger_path: Option<PathBuf>,
+    },
+    /// Aggregate summary (counts by category / tier / status).
+    Summary {
+        #[arg(long)]
+        ledger_path: Option<PathBuf>,
+    },
+    /// Compact the ledger: drop superseded history.
+    Compact {
+        #[arg(long, default_value_t = true)]
+        keep_latest: bool,
+        #[arg(long)]
+        before: Option<String>,
+        #[arg(long)]
+        ledger_path: Option<PathBuf>,
+    },
+    /// **M4A § "Mod pack integration"**: walk a mod package directory
+    /// and auto-register every asset as a new ledger entry with
+    /// `category = Mod_Custom` and `package_source = mod:<mod_id>`.
+    /// Optionally writes a sidecar mod manifest that references the
+    /// generated ledger entry ids (not raw file paths) per the spec.
+    RegisterPack {
+        /// Mod package directory (must exist; contains `assets/...`).
+        pkg_dir: PathBuf,
+        /// Stable mod identifier; used for `package_source = mod:<id>`
+        /// and as the canonical_name prefix.
+        #[arg(long = "mod-id")]
+        mod_id: String,
+        /// Production tier for the mod's assets. Default
+        /// `Mod_Supplied` per spec; pipelines that want stricter tiers
+        /// can override (e.g. `--tier Tier1_SVG`).
+        #[arg(long, default_value = "Mod_Supplied")]
+        tier: String,
+        /// Pipeline id recorded on every entry. Default
+        /// `Mod_Supplied_v1`.
+        #[arg(long, default_value = "Mod_Supplied_v1")]
+        pipeline: String,
+        /// Asset roots inside the mod package directory. Defaults to
+        /// `assets`. Repeatable.
+        #[arg(long = "asset-root")]
+        asset_roots: Vec<PathBuf>,
+        /// Per-asset license declaration. The author asserts; engine
+        /// does NOT verify.
+        #[arg(long)]
+        license: Option<String>,
+        /// Snapshot canonical bytes as `<path>.frozen` so freeze-then-
+        /// store regens work for non-deterministic mod content.
+        #[arg(long, default_value_t = true)]
+        freeze: bool,
+        /// Optional path to a sidecar mod manifest file (JSON). When
+        /// set, the manifest is written referencing ledger entry ids
+        /// per the M4A spec.
+        #[arg(long = "manifest-out")]
+        manifest_out: Option<PathBuf>,
+        /// Override the global canonical ledger path (defaults to
+        /// `<workspace>/content/asset_ledger/ledger.jsonl`).
+        #[arg(long)]
+        ledger_path: Option<PathBuf>,
+    },
 }
 
 fn init_diagnostics() {
@@ -69,6 +265,314 @@ fn main() -> Result<()> {
                 "cf-mod inspect is not implemented in M0; package format lands at M8 (got {})",
                 cfpkg.display()
             );
+        }
+        Cmd::Ledger { action } => run_ledger(action.as_ref(), cli.strict, cli.json),
+    }
+}
+
+fn ledger_paths(override_path: Option<&PathBuf>) -> cf_asset_ledger::LedgerPaths {
+    let workspace_root = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let mut paths = cf_asset_ledger::LedgerPaths::default_for(&workspace_root);
+    if let Some(p) = override_path {
+        paths.ledger_path = p.clone();
+    }
+    paths
+}
+
+#[allow(clippy::too_many_lines)]
+fn run_ledger(action: &LedgerAction, global_strict: bool, json_output: bool) -> Result<()> {
+    use cf_asset_ledger::{
+        cmd_add, cmd_compact, cmd_diff, cmd_list, cmd_regenerate, cmd_show, cmd_summary, cmd_verify,
+        render_regen_attempts, render_summary, render_verify_report, AddArgs, AssetCategory, ListFilter,
+        ProductionTier, RegenStatus,
+    };
+    match action {
+        LedgerAction::Add {
+            category,
+            kind,
+            canonical_name,
+            tier,
+            pipeline,
+            prompt,
+            negative_prompt,
+            seed,
+            output_path,
+            generator_tool,
+            generator_model,
+            generator_workflow,
+            generator_model_version,
+            palette,
+            style_lora,
+            upstream,
+            package_source,
+            license,
+            generated_by_human,
+            human_edit_notes,
+            regen_command,
+            generated_at_iso,
+            generated_on_machine,
+            freeze,
+            ledger_path,
+        } => {
+            let paths = ledger_paths(ledger_path.as_ref());
+            let args = AddArgs {
+                category: category.clone(),
+                kind: kind.clone(),
+                canonical_name: canonical_name.clone(),
+                tier: tier.clone(),
+                pipeline: pipeline.clone(),
+                prompt: prompt.clone(),
+                negative_prompt: negative_prompt.clone(),
+                seed: *seed,
+                output_path: output_path.clone(),
+                generator_tool: generator_tool.clone(),
+                generator_model: generator_model.clone(),
+                generator_workflow: generator_workflow.clone(),
+                generator_model_version: generator_model_version.clone(),
+                palette: palette.clone(),
+                style_lora: style_lora.clone(),
+                upstream: upstream.clone(),
+                package_source: package_source.clone(),
+                license: license.clone(),
+                generated_by_human: *generated_by_human,
+                human_edit_notes: human_edit_notes.clone(),
+                regen_command: regen_command.clone(),
+                freeze: *freeze,
+                generated_at_iso: generated_at_iso.clone(),
+                generated_on_machine: generated_on_machine.clone(),
+            };
+            let entry = cmd_add(&paths, &args).context("ledger add")?;
+            if json_output {
+                println!("{}", serde_json::to_string_pretty(&entry).unwrap_or_default());
+            } else {
+                println!(
+                    "ledger add OK: id={} canonical_name={} category={} tier={} pipeline={}",
+                    entry.id.as_str(),
+                    entry.canonical_name,
+                    entry.category.as_str(),
+                    entry.tier.as_str(),
+                    entry.pipeline
+                );
+            }
+            Ok(())
+        }
+        LedgerAction::List {
+            category,
+            tier,
+            pipeline,
+            status,
+            include_superseded,
+            ledger_path,
+        } => {
+            let paths = ledger_paths(ledger_path.as_ref());
+            let filter = ListFilter {
+                category: category.as_deref().and_then(AssetCategory::parse),
+                tier: tier.as_deref().and_then(ProductionTier::parse),
+                pipeline: pipeline.clone(),
+                status: status.as_deref().and_then(RegenStatus::parse),
+                package_source_label: None,
+                include_superseded: *include_superseded,
+            };
+            let entries = cmd_list(&paths, &filter).context("ledger list")?;
+            if json_output {
+                println!("{}", serde_json::to_string_pretty(&entries).unwrap_or_default());
+            } else {
+                for e in &entries {
+                    println!(
+                        "{}  {}  {}  {}  status={}",
+                        e.id.as_str(),
+                        e.category.as_str(),
+                        e.tier.as_str(),
+                        e.canonical_name,
+                        e.regen_status.as_str()
+                    );
+                }
+            }
+            Ok(())
+        }
+        LedgerAction::Show { id, ledger_path } => {
+            let paths = ledger_paths(ledger_path.as_ref());
+            let entry = cmd_show(&paths, id).context("ledger show")?;
+            // Show always pretty-prints — JSON is the only viable readable
+            // representation of an AssetEntry; the `--json` global is a
+            // no-op here but kept for consistency with the other verbs.
+            let _ = json_output;
+            println!("{}", serde_json::to_string_pretty(&entry).unwrap_or_default());
+            Ok(())
+        }
+        LedgerAction::Diff { id, ledger_path, all } => {
+            let paths = ledger_paths(ledger_path.as_ref());
+            let target = if *all { None } else { id.as_deref() };
+            let results = cmd_diff(&paths, target).context("ledger diff")?;
+            let drifted = results
+                .iter()
+                .filter(|r| matches!(r.status, cf_asset_ledger::RegenStatus::Drifted))
+                .count();
+            let missing = results
+                .iter()
+                .filter(|r| matches!(r.status, cf_asset_ledger::RegenStatus::Missing))
+                .count();
+            if json_output {
+                println!("{}", serde_json::to_string_pretty(&results).unwrap_or_default());
+            } else {
+                for r in &results {
+                    println!(
+                        "{}  status={}  observed_blake3={}  observed_size={}",
+                        r.id.as_str(),
+                        r.status.as_str(),
+                        r.observed_blake3,
+                        r.observed_size_bytes
+                    );
+                }
+            }
+            if drifted > 0 || missing > 0 {
+                std::process::exit(1);
+            }
+            Ok(())
+        }
+        LedgerAction::Verify {
+            id,
+            all,
+            strict_status,
+            ledger_path,
+        } => {
+            let paths = ledger_paths(ledger_path.as_ref());
+            let target = if *all { None } else { id.as_deref() };
+            // **M4A spec literal**: `cf-mod ledger verify --strict` (global flag)
+            // is the CI-gate form. `--strict-status` is the local alias. Either
+            // one engages strict mode; both reduce to `strict = true`.
+            let strict = *strict_status || global_strict;
+            let report = cmd_verify(&paths, target, strict).context("ledger verify")?;
+            if json_output {
+                println!("{}", serde_json::to_string_pretty(&report).unwrap_or_default());
+            } else {
+                render_verify_report(&report, std::io::stdout()).ok();
+            }
+            if strict && !report.is_strict_ok() {
+                std::process::exit(1);
+            }
+            Ok(())
+        }
+        LedgerAction::Regenerate {
+            id,
+            cascade,
+            category,
+            tier,
+            all,
+            continue_on_error,
+            ledger_path,
+        } => {
+            let paths = ledger_paths(ledger_path.as_ref());
+            let cat = category.as_deref().and_then(AssetCategory::parse);
+            let t = tier.as_deref().and_then(ProductionTier::parse);
+            let attempts = cmd_regenerate(&paths, id.as_deref(), *cascade, cat, t, *all, *continue_on_error)
+                .context("ledger regenerate")?;
+            let failed = attempts.iter().filter(|a| !a.ok).count();
+            if json_output {
+                let json = serde_json::json!({
+                    "total": attempts.len(),
+                    "ok": attempts.iter().filter(|a| a.ok).count(),
+                    "failed": failed,
+                    "attempts": attempts.iter().map(|a| serde_json::json!({
+                        "id": a.id.as_str(),
+                        "ok": a.ok,
+                        "error": a.error,
+                    })).collect::<Vec<_>>()
+                });
+                println!("{}", serde_json::to_string_pretty(&json).unwrap_or_default());
+            } else {
+                render_regen_attempts(&attempts, std::io::stdout()).ok();
+            }
+            if failed > 0 {
+                std::process::exit(1);
+            }
+            Ok(())
+        }
+        LedgerAction::Summary { ledger_path } => {
+            let paths = ledger_paths(ledger_path.as_ref());
+            let summary = cmd_summary(&paths).context("ledger summary")?;
+            if json_output {
+                let json = cf_asset_ledger::summary_to_observe_json(&summary);
+                println!("{}", serde_json::to_string_pretty(&json).unwrap_or_default());
+            } else {
+                render_summary(&summary, std::io::stdout()).ok();
+            }
+            Ok(())
+        }
+        LedgerAction::Compact {
+            keep_latest,
+            before,
+            ledger_path,
+        } => {
+            let paths = ledger_paths(ledger_path.as_ref());
+            let stats = cmd_compact(&paths, *keep_latest, before.as_deref()).context("ledger compact")?;
+            if json_output {
+                let json = serde_json::json!({
+                    "total_before": stats.total_before,
+                    "total_after": stats.total_after,
+                    "backup_path": stats.backup_path.display().to_string(),
+                });
+                println!("{}", serde_json::to_string_pretty(&json).unwrap_or_default());
+            } else {
+                println!(
+                    "compact: before={} after={} backup={}",
+                    stats.total_before,
+                    stats.total_after,
+                    stats.backup_path.display()
+                );
+            }
+            Ok(())
+        }
+        LedgerAction::RegisterPack {
+            pkg_dir,
+            mod_id,
+            tier,
+            pipeline,
+            asset_roots,
+            license,
+            freeze,
+            manifest_out,
+            ledger_path,
+        } => {
+            let paths = ledger_paths(ledger_path.as_ref());
+            let register_args = cf_asset_ledger::RegisterPackArgs {
+                pkg_dir: pkg_dir.clone(),
+                mod_id: mod_id.clone(),
+                tier: tier.clone(),
+                pipeline: pipeline.clone(),
+                asset_roots: asset_roots.clone(),
+                license: license.clone(),
+                freeze: *freeze,
+                manifest_out: manifest_out.clone(),
+            };
+            let registered =
+                cf_asset_ledger::cmd_register_pack(&paths, &register_args).context("ledger register-pack")?;
+            if json_output {
+                let json = serde_json::json!({
+                    "mod_id": mod_id,
+                    "total_registered": registered.len(),
+                    "assets": registered,
+                });
+                println!("{}", serde_json::to_string_pretty(&json).unwrap_or_default());
+            } else {
+                println!(
+                    "register-pack: mod_id={} tier={} pipeline={} registered={}",
+                    mod_id,
+                    tier,
+                    pipeline,
+                    registered.len()
+                );
+                for asset in &registered {
+                    println!(
+                        "  {} → {} (category={}, tier={})",
+                        asset.relative_path.display(),
+                        asset.asset_id,
+                        asset.category,
+                        asset.tier
+                    );
+                }
+            }
+            Ok(())
         }
     }
 }
@@ -222,6 +726,7 @@ fn walk(dir: &Path, report: &mut ValidationReport) {
                 && path.file_name().and_then(|s| s.to_str()) == Some("difficulty.json"))
             || (path.extension().and_then(|s| s.to_str()) == Some("json")
                 && path.components().any(|c| c.as_os_str() == "materials"))
+            || path.file_name().and_then(|s| s.to_str()) == Some("ledger.jsonl")
         {
             validate_one(&path, report);
         }
@@ -245,6 +750,11 @@ const STRICT_FAIL_CONTENT_CATEGORIES: &[(&str, &str)] = &[
 ];
 
 fn validate_one(path: &Path, report: &mut ValidationReport) {
+    // **M4A**: validate ledger.jsonl entries against the v1 AssetEntry schema.
+    if path.file_name().and_then(|s| s.to_str()) == Some("ledger.jsonl") {
+        validate_ledger_jsonl(path, report);
+        return;
+    }
     if path.parent().and_then(|p| p.file_name()).and_then(|s| s.to_str()) == Some("scenarios")
         || path
             .components()
@@ -404,6 +914,52 @@ fn validate_difficulty_json(path: &Path, report: &mut ValidationReport) {
     }
 }
 
+/// **M4A**: validate every JSONL line in a ledger file against the locked
+/// v1 AssetEntry schema. Each line that fails surfaces as a FAIL with the
+/// per-line reason; lines that recompute their AssetId mismatch
+/// `id_drift` reason for CI to pattern-match.
+fn validate_ledger_jsonl(path: &Path, report: &mut ValidationReport) {
+    use std::io::BufRead;
+    let file = match std::fs::File::open(path) {
+        Ok(f) => f,
+        Err(err) => {
+            report.add_error(path.to_path_buf(), format!("open failed: {err}"));
+            return;
+        }
+    };
+    let reader = std::io::BufReader::new(file);
+    let mut total = 0u64;
+    let mut failures: Vec<String> = Vec::new();
+    for (i, line) in reader.lines().enumerate() {
+        let line = match line {
+            Ok(l) => l,
+            Err(err) => {
+                failures.push(format!("line {} read error: {err}", i + 1));
+                continue;
+            }
+        };
+        if line.trim().is_empty() {
+            continue;
+        }
+        let value: serde_json::Value = match serde_json::from_str(&line) {
+            Ok(v) => v,
+            Err(err) => {
+                failures.push(format!("line {} json parse: {err}", i + 1));
+                continue;
+            }
+        };
+        total += 1;
+        if let Err(err) = cf_asset_ledger::validate_entry_json(&value) {
+            failures.push(format!("line {} schema reject: {err}", i + 1));
+        }
+    }
+    if failures.is_empty() {
+        report.add_pass(path.to_path_buf(), format!("ledger ({total} entries)"));
+    } else {
+        report.add_error(path.to_path_buf(), failures.join("; "));
+    }
+}
+
 fn validate_scenario(path: &Path, report: &mut ValidationReport) {
     match Scenario::load_from_file(path) {
         Ok(scenario) => {
@@ -526,9 +1082,18 @@ mod tests {
     use super::*;
     use std::io::Write;
 
+    static TMP_COUNTER: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
     fn write_tmp(name: &str, contents: &str) -> PathBuf {
-        let mut path = std::env::temp_dir();
-        path.push(format!("cf-mod-test-{name}"));
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let seq = TMP_COUNTER.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+        let pid = std::process::id();
+        let dir = std::env::temp_dir().join(format!("cf-mod-test-{pid}-{nanos}-{seq}"));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join(name);
         let mut f = fs::File::create(&path).unwrap();
         f.write_all(contents.as_bytes()).unwrap();
         path
@@ -665,5 +1230,70 @@ mod tests {
         let _ = fs::remove_file(&path);
         assert_eq!(report.fail(), 1, "expected one FAIL entry");
         assert!(report.entries[0].message.contains("schema must be 1"));
+    }
+
+    /// **M4A**: `cf-mod validate content/asset_ledger/ledger.jsonl` happily
+    /// accepts a well-formed v1 ledger AND surfaces id_drift / schema drift
+    /// as FAIL.
+    #[test]
+    fn validate_ledger_jsonl_accepts_well_formed() {
+        use cf_asset_ledger::{AssetCategory, AssetEntryBuilder, ProductionTier};
+        let entry = AssetEntryBuilder::new(
+            AssetCategory::WeaponSprite,
+            "weapon-side",
+            "rifle_validate_mod",
+            ProductionTier::Tier1Svg,
+            "M9A_svg_v1",
+            "p",
+            1,
+            "/tmp/x.svg",
+        )
+        .with_output_blake3("a".repeat(64))
+        .with_output_size(0)
+        .build();
+        let mut line = serde_json::to_string(&entry).unwrap();
+        line.push('\n');
+        let path = write_tmp("ledger_pass.jsonl", &line);
+        let new_path = path.with_file_name("ledger.jsonl");
+        let _ = std::fs::rename(&path, &new_path);
+        let mut report = ValidationReport::default();
+        validate_ledger_jsonl(&new_path, &mut report);
+        let _ = fs::remove_file(&new_path);
+        assert_eq!(report.pass(), 1, "expected one PASS entry, got {:?}", report.entries);
+        assert_eq!(report.fail(), 0);
+    }
+
+    #[test]
+    fn validate_ledger_jsonl_rejects_id_drift() {
+        let body = serde_json::json!({
+            "id": "0".repeat(64),
+            "category": "WeaponSprite",
+            "kind": "weapon-side",
+            "canonical_name": "drifted",
+            "tier": "Tier1_SVG",
+            "pipeline": "M9A_svg_v1",
+            "generator": {"tool": "", "model": ""},
+            "prompt": "p",
+            "seed": 0,
+            "output_path": "x.svg",
+            "output_format": "svg",
+            "output_size_bytes": 0,
+            "output_blake3": "a".repeat(64),
+            "generated_at_iso": "2026-05-13T00:00:00Z",
+            "generated_on_machine": "ci",
+            "regen_command": "cf-mod ledger regenerate x",
+            "schema_version": "1.0.0"
+        });
+        let mut line = body.to_string();
+        line.push('\n');
+        let path = write_tmp("ledger_drift.jsonl", &line);
+        let new_path = path.with_file_name("ledger.jsonl");
+        let _ = std::fs::rename(&path, &new_path);
+        let mut report = ValidationReport::default();
+        validate_ledger_jsonl(&new_path, &mut report);
+        let _ = fs::remove_file(&new_path);
+        assert_eq!(report.fail(), 1);
+        let msg = &report.entries[0].message;
+        assert!(msg.contains("id_drift"), "expected id_drift but got: {msg}");
     }
 }

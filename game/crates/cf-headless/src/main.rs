@@ -66,6 +66,20 @@ enum Cmd {
         /// values give the verifier more rope in unusual cfctl scripts.
         #[arg(long, default_value_t = 3)]
         max_no_advance_retries: u32,
+        /// **M4A § "Run bundle references ledger entries"**: cross-check
+        /// every event with an `asset_ref` field against the canonical
+        /// `content/asset_ledger/ledger.jsonl`. Fails the replay when a
+        /// referenced ledger entry is missing, drifted, failed, or stale.
+        /// Default behavior is to check; pass `--no-verify-asset-refs`
+        /// to opt out (consistent with `--no-verify-checksums`).
+        #[arg(long, default_value_t = false)]
+        no_verify_asset_refs: bool,
+        /// **M4A**: optional override path for the canonical asset ledger.
+        /// Defaults to the same three candidate paths the cf-control
+        /// `observe.assets.ledger_summary` surface searches. Useful for
+        /// tests that bake against a sandbox ledger.
+        #[arg(long)]
+        asset_ledger_path: Option<PathBuf>,
     },
 }
 
@@ -98,23 +112,46 @@ fn main() -> Result<()> {
             scenario_path,
             measure,
             max_no_advance_retries,
+            no_verify_asset_refs,
+            asset_ledger_path,
         } => {
             let verify = match measure {
                 Some(MeasureMode::Throughput) => false,
                 None => !no_verify_checksums,
             };
-            replay(&bundle_dir, verify, scenario_path, measure, max_no_advance_retries)
+            replay(ReplayArgs {
+                bundle_dir: &bundle_dir,
+                verify_checksums: verify,
+                scenario_path,
+                measure,
+                max_no_advance_retries,
+                verify_asset_refs: !no_verify_asset_refs,
+                asset_ledger_path,
+            })
         }
     }
 }
 
-fn replay(
-    bundle_dir: &Path,
+struct ReplayArgs<'a> {
+    bundle_dir: &'a Path,
     verify_checksums: bool,
     scenario_path: Option<PathBuf>,
     measure: Option<MeasureMode>,
     max_no_advance_retries: u32,
-) -> Result<()> {
+    verify_asset_refs: bool,
+    asset_ledger_path: Option<PathBuf>,
+}
+
+fn replay(args: ReplayArgs<'_>) -> Result<()> {
+    let ReplayArgs {
+        bundle_dir,
+        verify_checksums,
+        scenario_path,
+        measure,
+        max_no_advance_retries,
+        verify_asset_refs,
+        asset_ledger_path,
+    } = args;
     if !bundle_dir.exists() {
         bail!("bundle directory does not exist: {}", bundle_dir.display());
     }
@@ -211,6 +248,16 @@ fn replay(
         bail!("bundle contains no determinism.sim_checksum events; cannot verify");
     }
     let recorded_commands = collect_commands(&events_text)?;
+
+    // **M4A § "Run bundle references ledger entries"**: collect every event
+    // whose envelope-level `asset_ref` field is set so we can cross-check
+    // them against the canonical asset ledger AFTER the deterministic
+    // replay loop completes.
+    let asset_refs_in_bundle: Vec<AssetRefReference> = if verify_asset_refs {
+        collect_asset_refs(&events_text)
+    } else {
+        Vec::new()
+    };
     let max_tick = recorded_checksums
         .iter()
         .map(|(t, _)| *t)
@@ -304,7 +351,43 @@ fn replay(
         }
 
         let live_state = engine_state(&engine).await;
+
+        // **M4A § "Run bundle references ledger entries"**: cross-check
+        // every event with `asset_ref` against the canonical ledger.
+        // Surfaces missing/drifted/failed ledger entries as a structured
+        // result the same way determinism.first_divergence is surfaced.
+        let asset_ref_report = if verify_asset_refs && !asset_refs_in_bundle.is_empty() {
+            Some(verify_asset_refs_against_ledger(
+                &asset_refs_in_bundle,
+                asset_ledger_path.as_deref(),
+            )?)
+        } else {
+            None
+        };
+
         if divergences.is_empty() {
+            // Asset-ref verification can also fail the replay.
+            if let Some(report) = &asset_ref_report {
+                if !report.failures.is_empty() {
+                    let output = json!({
+                        "result": "asset_ref_failure",
+                        "first_failure": report.failures[0],
+                        "total_failures": report.failures.len(),
+                        "asset_ref_failures": report.failures,
+                        "asset_refs_checked": report.checked,
+                    });
+                    println!("{}", serde_json::to_string(&output).unwrap_or_default());
+                    tracing::error!(
+                        target: "cf::headless",
+                        total = report.failures.len(),
+                        "m4a.asset_ref.failure"
+                    );
+                    bail!(
+                        "replay verified determinism but {} asset_ref(s) failed ledger cross-check",
+                        report.failures.len()
+                    );
+                }
+            }
             let mut ok = json!({
                 "result": "ok",
                 "replayed_ticks": next_tick,
@@ -314,6 +397,14 @@ fn replay(
             });
             if !verify_checksums {
                 ok["checksum_verification"] = serde_json::Value::String("skipped".to_string());
+            }
+            if let Some(report) = &asset_ref_report {
+                ok["asset_refs_checked"] = serde_json::json!(report.checked);
+                ok["asset_ref_verification"] = serde_json::Value::String("ok".to_string());
+            } else if verify_asset_refs {
+                ok["asset_ref_verification"] = serde_json::Value::String("no_asset_refs".to_string());
+            } else {
+                ok["asset_ref_verification"] = serde_json::Value::String("skipped".to_string());
             }
             if let Some(MeasureMode::Throughput) = measure {
                 let wall_time_ms = replay_start.elapsed().as_secs_f64() * 1000.0;
@@ -535,12 +626,7 @@ fn peak_memory_mb() -> f64 {
         if let Ok(status) = std::fs::read_to_string("/proc/self/status") {
             for line in status.lines() {
                 if let Some(rest) = line.strip_prefix("VmHWM:") {
-                    let kb: u64 = rest
-                        .trim()
-                        .trim_end_matches(" kB")
-                        .trim()
-                        .parse()
-                        .unwrap_or(0);
+                    let kb: u64 = rest.trim().trim_end_matches(" kB").trim().parse().unwrap_or(0);
                     return (kb as f64) / 1024.0;
                 }
             }
@@ -561,7 +647,9 @@ fn peak_memory_mb() -> f64 {
             _pad: [i64; 14],
         }
         let mut ru = Rusage::default();
-        let rc = unsafe { getrusage(0 /* RUSAGE_SELF */, &mut ru) };
+        let rc = unsafe {
+            getrusage(0 /* RUSAGE_SELF */, &mut ru)
+        };
         if rc != 0 {
             return 0.0;
         }
@@ -627,6 +715,130 @@ fn collect_checksums(events_text: &str) -> Vec<(u64, String)> {
         out.push((tick, hex));
     }
     out
+}
+
+// ---------------------------------------------------------------------------
+// M4A asset-ledger cross-check
+// ---------------------------------------------------------------------------
+
+/// **M4A § "Run bundle references ledger entries"** — every envelope-level
+/// `asset_ref` collected for ledger cross-check. Keeping `event_id` and
+/// `tick` lets the failure report point operators at the exact event.
+#[derive(Debug, Clone, serde::Serialize)]
+pub(crate) struct AssetRefReference {
+    pub asset_ref: String,
+    pub event_id: String,
+    pub tick: u64,
+    pub category: String,
+    pub event_type: String,
+}
+
+fn collect_asset_refs(events_text: &str) -> Vec<AssetRefReference> {
+    let mut out = Vec::new();
+    for line in events_text.lines() {
+        if line.is_empty() {
+            continue;
+        }
+        let v: Value = match serde_json::from_str(line) {
+            Ok(v) => v,
+            Err(_) => continue,
+        };
+        let Some(asset_ref) = v.get("asset_ref").and_then(Value::as_str) else {
+            continue;
+        };
+        if asset_ref.is_empty() {
+            continue;
+        }
+        out.push(AssetRefReference {
+            asset_ref: asset_ref.to_string(),
+            event_id: v.get("event_id").and_then(Value::as_str).unwrap_or("").to_string(),
+            tick: v.get("tick").and_then(Value::as_u64).unwrap_or(0),
+            category: v.get("category").and_then(Value::as_str).unwrap_or("").to_string(),
+            event_type: v.get("event_type").and_then(Value::as_str).unwrap_or("").to_string(),
+        });
+    }
+    out
+}
+
+#[derive(Debug)]
+pub(crate) struct AssetRefVerifyReport {
+    pub checked: usize,
+    pub failures: Vec<Value>,
+}
+
+/// Open the canonical ledger (or an explicit override path) and verify
+/// every referenced `AssetId` exists in the live set and is `Fresh` on
+/// disk. Failures are reported as JSON values for the `result` envelope.
+pub(crate) fn verify_asset_refs_against_ledger(
+    refs: &[AssetRefReference],
+    ledger_path_override: Option<&Path>,
+) -> Result<AssetRefVerifyReport> {
+    let (ledger_path, base_dir) = resolve_ledger_path(ledger_path_override)?;
+    let handle = cf_asset_ledger::LedgerHandle::new(&ledger_path);
+    let live = handle
+        .live_entries()
+        .with_context(|| format!("read ledger {}", ledger_path.display()))?;
+    let mut by_id: std::collections::HashMap<String, &cf_asset_ledger::AssetEntry> =
+        std::collections::HashMap::with_capacity(live.len());
+    for entry in &live {
+        by_id.insert(entry.id.as_str().to_string(), entry);
+    }
+    let mut failures: Vec<Value> = Vec::new();
+    for r in refs {
+        match by_id.get(&r.asset_ref) {
+            None => failures.push(json!({
+                "asset_ref": r.asset_ref,
+                "event_id": r.event_id,
+                "tick": r.tick,
+                "category": r.category,
+                "event_type": r.event_type,
+                "reason": "asset_id_not_in_ledger",
+            })),
+            Some(entry) => {
+                let verify_result = cf_asset_ledger::verify_entry(entry, &base_dir);
+                if !matches!(verify_result.status, cf_asset_ledger::RegenStatus::Fresh) {
+                    failures.push(json!({
+                        "asset_ref": r.asset_ref,
+                        "event_id": r.event_id,
+                        "tick": r.tick,
+                        "category": r.category,
+                        "event_type": r.event_type,
+                        "reason": format!("ledger_entry_not_fresh:{}", verify_result.status.as_str()),
+                        "note": verify_result.note,
+                    }));
+                }
+            }
+        }
+    }
+    Ok(AssetRefVerifyReport {
+        checked: refs.len(),
+        failures,
+    })
+}
+
+fn resolve_ledger_path(override_path: Option<&Path>) -> Result<(PathBuf, PathBuf)> {
+    if let Some(p) = override_path {
+        let base = p
+            .parent()
+            .and_then(|d| d.parent())
+            .map(PathBuf::from)
+            .unwrap_or_else(|| PathBuf::from("."));
+        return Ok((p.to_path_buf(), base));
+    }
+    let candidates: [(&str, &str); 3] = [
+        ("content/asset_ledger/ledger.jsonl", "."),
+        ("../content/asset_ledger/ledger.jsonl", ".."),
+        ("game/content/asset_ledger/ledger.jsonl", "game"),
+    ];
+    for (lp, base) in &candidates {
+        let p = PathBuf::from(lp);
+        if p.exists() {
+            return Ok((p, PathBuf::from(base)));
+        }
+    }
+    bail!(
+        "no asset ledger found at any of: content/asset_ledger/ledger.jsonl, ../content/asset_ledger/ledger.jsonl, game/content/asset_ledger/ledger.jsonl (override with --asset-ledger-path)"
+    );
 }
 
 #[cfg(test)]
@@ -731,6 +943,53 @@ mod tests {
                 "replay verifier failed to parse method={method}"
             );
         }
+    }
+
+    /// **M4A § "Run bundle references ledger entries"**: collect_asset_refs
+    /// walks events.jsonl and surfaces every envelope-level `asset_ref`
+    /// (cosmetic events included).
+    #[test]
+    fn collect_asset_refs_finds_envelope_field() {
+        let events = r#"{"schema_version":"prototype-recorder-event.v0.1","run_id":"r","tick":0,"sim_time_ms":0,"event_id":"r:0:0","category":"system","event_type":"run_started","payload":{}}
+{"schema_version":"prototype-recorder-event.v0.1","run_id":"r","tick":1,"sim_time_ms":16.6,"event_id":"r:1:1","category":"capture","event_type":"capture_grid_screenshot","payload":{},"asset_ref":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa","cosmetic":true}
+{"schema_version":"prototype-recorder-event.v0.1","run_id":"r","tick":2,"sim_time_ms":33.3,"event_id":"r:2:2","category":"system","event_type":"run_finished","payload":{}}
+"#;
+        let refs = collect_asset_refs(events);
+        assert_eq!(refs.len(), 1, "expected exactly one asset_ref event");
+        assert_eq!(refs[0].asset_ref, "a".repeat(64));
+        assert_eq!(refs[0].tick, 1);
+        assert_eq!(refs[0].category, "capture");
+        assert_eq!(refs[0].event_type, "capture_grid_screenshot");
+    }
+
+    /// **M4A § "Run bundle references ledger entries"**: the verifier
+    /// surfaces failures when an event's asset_ref doesn't match any
+    /// live ledger entry.
+    #[test]
+    fn verify_asset_refs_against_ledger_flags_missing() {
+        // Build a sandbox ledger with no entries.
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap()
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!("cf-headless-asset-ref-test-{nanos}"));
+        std::fs::create_dir_all(&dir).unwrap();
+        let ledger_path = dir.join("ledger.jsonl");
+        std::fs::write(&ledger_path, "").unwrap();
+        let refs = vec![AssetRefReference {
+            asset_ref: "b".repeat(64),
+            event_id: "r:1:0".to_string(),
+            tick: 1,
+            category: "capture".to_string(),
+            event_type: "capture_grid_screenshot".to_string(),
+        }];
+        let report = verify_asset_refs_against_ledger(&refs, Some(&ledger_path)).expect("verify");
+        assert_eq!(report.checked, 1);
+        assert_eq!(report.failures.len(), 1);
+        assert_eq!(
+            report.failures[0].get("reason").and_then(|v| v.as_str()),
+            Some("asset_id_not_in_ledger")
+        );
     }
 
     /// M3A: the replay verifier must REJECT unknown methods rather than

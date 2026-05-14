@@ -1255,11 +1255,13 @@ impl M0Engine {
                     .items
                     .iter()
                     .enumerate()
-                    .map(|(i, it)| json!({
-                        "slot": i,
-                        "label": it.label(),
-                        "kind": it.kind_label(),
-                    }))
+                    .map(|(i, it)| {
+                        json!({
+                            "slot": i,
+                            "label": it.label(),
+                            "kind": it.kind_label(),
+                        })
+                    })
                     .collect();
                 let body_silhouette = json!({
                     "placeholder": true,
@@ -1529,11 +1531,13 @@ impl M0Engine {
                 .items
                 .iter()
                 .enumerate()
-                .map(|(i, it)| json!({
-                    "slot": i,
-                    "label": it.label(),
-                    "kind": it.kind_label(),
-                }))
+                .map(|(i, it)| {
+                    json!({
+                        "slot": i,
+                        "label": it.label(),
+                        "kind": it.kind_label(),
+                    })
+                })
                 .collect();
             let body_silhouette = json!({
                 "placeholder": true,
@@ -2047,10 +2051,7 @@ impl M0Engine {
                     // `parent_event_id` linking to the
                     // `combat.projectile_spawned` event. Use the persisted
                     // spawn id map.
-                    let projectile_spawn_parent = state
-                        .projectile_spawn_event_ids
-                        .get(&hit.projectile_id)
-                        .cloned();
+                    let projectile_spawn_parent = state.projectile_spawn_event_ids.get(&hit.projectile_id).cloned();
                     let pen_id = self.recorder.record(
                         tick,
                         sim_time_ms,
@@ -2979,7 +2980,8 @@ impl M0Engine {
                     parent,
                 );
                 if let Ok(mut s) = self.state.write() {
-                    s.mission_objective_started_event_ids.insert(id.clone(), event_id.clone());
+                    s.mission_objective_started_event_ids
+                        .insert(id.clone(), event_id.clone());
                     s.last_mission_event_id = Some(event_id);
                 }
             }
@@ -3098,14 +3100,9 @@ impl M0Engine {
                         obj.insert("reason".into(), json!(reason));
                     }
                 }
-                let event_id = self.recorder.record(
-                    tick,
-                    sim_time_ms,
-                    "mission",
-                    "objective_failed",
-                    payload,
-                    parent,
-                );
+                let event_id = self
+                    .recorder
+                    .record(tick, sim_time_ms, "mission", "objective_failed", payload, parent);
                 last_failed_event_id = Some(event_id.clone());
                 if let Ok(mut s) = self.state.write() {
                     s.last_mission_event_id = Some(event_id);
@@ -3208,10 +3205,7 @@ impl M0Engine {
             } else if last_completed_event_id.is_some() {
                 last_completed_event_id.clone()
             } else {
-                self.state
-                    .read()
-                    .ok()
-                    .and_then(|s| s.last_mission_event_id.clone())
+                self.state.read().ok().and_then(|s| s.last_mission_event_id.clone())
             };
             self.emit_initial_snapshots(tick, sim_time_ms, snapshot_parent.as_deref());
         }
@@ -3225,12 +3219,8 @@ impl M0Engine {
         if let Some(t) = advanced {
             let sim_time_ms = self.state.read().map(|s| s.clock.sim_time_ms()).unwrap_or(0.0);
             let actor_period = (self.config.tick_rate_hz.max(1) as u64) / 4; // ~250ms
-            let summary_period = self.config.tick_rate_hz.max(1) as u64;     // 1 second
-            let run_started_parent = self
-                .state
-                .read()
-                .ok()
-                .and_then(|s| s.run_started_event_id.clone());
+            let summary_period = self.config.tick_rate_hz.max(1) as u64; // 1 second
+            let run_started_parent = self.state.read().ok().and_then(|s| s.run_started_event_id.clone());
             if actor_period > 0 && t.0 > 0 && t.0 % actor_period == 0 {
                 self.emit_periodic_snapshot_actor(t, sim_time_ms, run_started_parent.clone());
             }
@@ -3477,12 +3467,11 @@ impl M0Engine {
         // the path-invalidation version BEFORE emitting the batch, so the
         // subsequent terrain.path_invalidated event carries the right
         // version_old/_new. Only fires when out_rects[] is non-empty.
-        let path_bbox = out_rects_json
-            .iter()
-            .filter_map(|v| v.as_object())
-            .fold(
-                None::<([f32; 2], [f32; 2])>,
-                |acc, r| {
+        let path_bbox =
+            out_rects_json
+                .iter()
+                .filter_map(|v| v.as_object())
+                .fold(None::<([f32; 2], [f32; 2])>, |acc, r| {
                     let min_v = r.get("min")?;
                     let max_v = r.get("max")?;
                     let min = min_v.as_array()?;
@@ -3496,8 +3485,7 @@ impl M0Engine {
                         ),
                         None => (mn, mx),
                     })
-                },
-            );
+                });
         let (version_old, version_new) = if let Ok(mut s) = self.state.write() {
             let old = s.path_invalidation_version;
             if path_bbox.is_some() {
@@ -3543,11 +3531,7 @@ impl M0Engine {
         }
 
         // Emit forced-refresh signal if sustained pressure exceeds threshold.
-        let sustained = self
-            .state
-            .read()
-            .map(|s| s.sustained_unupdated_ticks)
-            .unwrap_or(0);
+        let sustained = self.state.read().map(|s| s.sustained_unupdated_ticks).unwrap_or(0);
         if sustained >= FORCED_REFRESH_THRESHOLD_TICKS {
             self.recorder.record(
                 tick,
@@ -4109,12 +4093,7 @@ impl M0Engine {
         // through the per-actor pending_dig queue (not a flag on
         // ControlIntent), so we surface its edge by checking whether a
         // pending dig is staged for the player this tick.
-        let dig_pressed = self
-            .state
-            .read()
-            .ok()
-            .map(|s| s.pending_dig.is_some())
-            .unwrap_or(false);
+        let dig_pressed = self.state.read().ok().map(|s| s.pending_dig.is_some()).unwrap_or(false);
         let player_view = json!({
             "actor": intent.actor.0,
             "source": match intent.source {
@@ -4170,12 +4149,7 @@ impl M0Engine {
                 // M2 re-audit pass 4 (2026-05-13): stash the most-recent
                 // player status_changed event id so `mission.mission_resolved`
                 // on the PlayerDead loss path can chain to it.
-                let is_player = self
-                    .state
-                    .read()
-                    .ok()
-                    .and_then(|s| s.player_actor)
-                    == Some(outcome.actor);
+                let is_player = self.state.read().ok().and_then(|s| s.player_actor) == Some(outcome.actor);
                 if is_player {
                     if let Ok(mut s) = self.state.write() {
                         s.last_player_status_event_id = Some(status_event_id);
@@ -4509,12 +4483,7 @@ impl M0Engine {
                 // anchor (parent=intent) is too shallow for the spec
                 // chain — we OVERWRITE with the dying event id since
                 // entered_dying happens AFTER the generic emit each tick.
-                let is_player = self
-                    .state
-                    .read()
-                    .ok()
-                    .and_then(|s| s.player_actor)
-                    == Some(outcome.actor);
+                let is_player = self.state.read().ok().and_then(|s| s.player_actor) == Some(outcome.actor);
                 if is_player {
                     if let Ok(mut s) = self.state.write() {
                         s.last_player_status_event_id = Some(dying_event_id.clone());
@@ -4974,10 +4943,7 @@ impl M0Engine {
         // the engine's started_instant; final_sim_checksum is the latest
         // emitted determinism.sim_checksum.
         let wall_seconds = self.started_instant.elapsed().as_secs_f64();
-        let final_sim_checksum = self
-            .recorder
-            .final_checksum_hex()
-            .unwrap_or_default();
+        let final_sim_checksum = self.recorder.final_checksum_hex().unwrap_or_default();
         self.recorder.record(
             tick,
             sim_time_ms,
@@ -5496,16 +5462,13 @@ impl M0Engine {
             // debug path (`cf-app --debug-inject-panic-at-tick`) flips the
             // default to Panic so the produced events match. Everything
             // else defaults to Clean.
-            expected_outcome: self
-                .config
-                .expected_outcome_override
-                .unwrap_or_else(|| {
-                    if self.config.debug_inject_panic_at_tick.is_some() {
-                        cf_replay::ExpectedOutcome::Panic
-                    } else {
-                        cf_replay::ExpectedOutcome::Clean
-                    }
-                }),
+            expected_outcome: self.config.expected_outcome_override.unwrap_or_else(|| {
+                if self.config.debug_inject_panic_at_tick.is_some() {
+                    cf_replay::ExpectedOutcome::Panic
+                } else {
+                    cf_replay::ExpectedOutcome::Clean
+                }
+            }),
         }
     }
 }
@@ -6714,9 +6677,7 @@ impl EngineHandle for M0Engine {
             material_distribution: t
                 .material_counts()
                 .into_iter()
-                .filter_map(|(name, count)| {
-                    cf_terrain::material_id_from_name(&name).map(|id| (id, count))
-                })
+                .filter_map(|(name, count)| cf_terrain::material_id_from_name(&name).map(|id| (id, count)))
                 .collect(),
             current_overlay_mode: state.material_overlay_mode.clone(),
             total_carve_events: state.total_carve_events,
@@ -6893,9 +6854,7 @@ impl EngineHandle for M0Engine {
             material_distribution: t
                 .material_counts()
                 .into_iter()
-                .filter_map(|(name, count)| {
-                    cf_terrain::material_id_from_name(&name).map(|id| (id, count))
-                })
+                .filter_map(|(name, count)| cf_terrain::material_id_from_name(&name).map(|id| (id, count)))
                 .collect(),
             current_overlay_mode: state.material_overlay_mode.clone(),
             total_carve_events: state.total_carve_events,
@@ -7989,12 +7948,7 @@ impl EngineHandle for M0Engine {
                 );
                 CommandResult::accepted(tick.0)
             }
-            ControlCommand::ActPlayerAnchor {
-                x,
-                y,
-                tool_id,
-                source,
-            } => {
+            ControlCommand::ActPlayerAnchor { x, y, tool_id, source } => {
                 // M3 re-open (2026-05-13): MAT-T-06 — sample the chunked
                 // terrain material at (x, y) and emit
                 // `terrain.anchor_material_result`. Refuses when the chunked

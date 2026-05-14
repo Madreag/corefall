@@ -18,6 +18,11 @@ tracing-subscriber = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 ron = { workspace = true }
+cf-asset-ledger = { path = "../cf-asset-ledger" }
 cf-control = { path = "../cf-control" }
 cf-material = { path = "../cf-material" }
 cf-replay = { path = "../cf-replay" }
+
+[dev-dependencies]
+blake3 = { workspace = true }
+serde_json = { workspace = true }

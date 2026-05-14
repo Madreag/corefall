@@ -147,6 +147,16 @@ enum Cmd {
         #[command(subcommand)]
         action: InspectAction,
     },
+    /// **M4A**: query the engine's asset-ledger summary projection via
+    /// `observe.assets.ledger_summary`. Prints total + per-category / tier
+    /// / status counts. Use `--inline` to skip the server and read the
+    /// canonical `content/asset_ledger/ledger.jsonl` directly.
+    LedgerSummary {
+        #[arg(long, value_enum, default_value_t = OutputFormat::Json)]
+        format: OutputFormat,
+        #[arg(long)]
+        inline: bool,
+    },
     Version,
 }
 
@@ -494,8 +504,50 @@ async fn dispatch(cli: Cli) -> Result<()> {
         Cmd::Script { action } => cmd_script(&cli.connect, cli.auto_launch_port, cli.no_auto_launch, action).await,
         Cmd::Inspect { action } => cmd_inspect(&cli.connect, cli.auto_launch_port, cli.no_auto_launch, action).await,
         Cmd::Replay { action } => cmd_replay(action),
+        Cmd::LedgerSummary { format, inline } => {
+            cmd_ledger_summary(&cli.connect, cli.auto_launch_port, cli.no_auto_launch, format, inline).await
+        }
         Cmd::Version => cmd_version(),
     }
+}
+
+async fn cmd_ledger_summary(
+    connect: &Option<String>,
+    auto_launch_port: u16,
+    no_auto_launch: bool,
+    format: OutputFormat,
+    inline: bool,
+) -> Result<()> {
+    let payload = if inline {
+        // Read the canonical ledger directly without a server round-trip.
+        // Tries common locations relative to the current working directory.
+        let candidates = [
+            PathBuf::from("content/asset_ledger/ledger.jsonl"),
+            PathBuf::from("../content/asset_ledger/ledger.jsonl"),
+            PathBuf::from("game/content/asset_ledger/ledger.jsonl"),
+        ];
+        let mut summary = Value::Null;
+        for c in candidates.iter() {
+            if c.exists() {
+                let handle = cf_asset_ledger::LedgerHandle::new(c);
+                let entries = handle.read_all().context("read ledger")?;
+                let s = cf_asset_ledger::summarize(&entries);
+                summary = cf_asset_ledger::summary_to_observe_json(&s);
+                break;
+            }
+        }
+        if summary.is_null() {
+            anyhow::bail!("no ledger.jsonl found at any of: content/asset_ledger/ledger.jsonl, ../content/asset_ledger/ledger.jsonl, game/content/asset_ledger/ledger.jsonl");
+        }
+        summary
+    } else {
+        let mut session = Session::open(connect, auto_launch_port, no_auto_launch).await?;
+        let result = session.send_request("observe.assets.ledger_summary", json!({})).await?;
+        session.close().await?;
+        result
+    };
+    print_value(&payload, &format);
+    Ok(())
 }
 
 /// Proxy to `cf-tools-replay-viewer`. Resolves the binary via `CF_REPLAY_VIEWER_BIN`

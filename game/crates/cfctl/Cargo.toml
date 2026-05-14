@@ -23,6 +23,7 @@ futures-util = { workspace = true }
 chrono = { workspace = true }
 blake3 = { workspace = true }
 hex = { workspace = true }
+cf-asset-ledger = { path = "../cf-asset-ledger" }
 cf-control = { path = "../cf-control" }
 cf-replay = { path = "../cf-replay" }
 cf-sim-core = { path = "../cf-sim-core" }

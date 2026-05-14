@@ -1,0 +1,11 @@
+{
+  "scenario": "m0_blank",
+  "tick_rate_hz": 60,
+  "description": "M4A closure sweep: cf-control surface for the asset ledger. Smoke-tests the observe.assets.ledger_summary projection (pre + post sim.run_for_ticks) AND the empty-ledger fallback contract. Companion to the cf-mod CLI integration tests (cf-mod/tests/ledger_cli_integration.rs) which cover the m4a_ledger_{add,list,regenerate,verify,drift_detection,mod_pack_integration,universal_done_criteria} closure-procedure rows.",
+  "steps": [
+    { "method": "observe.assets.ledger_summary", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 5 } },
+    { "method": "observe.assets.ledger_summary", "params": {} },
+    { "method": "observe.once", "params": {} }
+  ]
+}

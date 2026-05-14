@@ -576,6 +576,41 @@ impl Recorder {
         self.record_with_cosmetic(tick, sim_time_ms, category, event_type, payload, parent_event_id, true)
     }
 
+    /// **M4 ↔ M4A integration**: record an event referencing an asset-ledger
+    /// entry (`asset_ref`). Used by capture-grid screenshots, audio playback,
+    /// mod-supplied content, etc. The asset_ref value is a string-encoded
+    /// `cf-asset-ledger::AssetId` (blake3 hex). Cosmetic when `cosmetic` is
+    /// true — capture surfaces don't participate in the deterministic sim
+    /// checksum.
+    pub fn record_with_asset_ref(&self, params: AssetRefRecordParams<'_>) -> String {
+        let AssetRefRecordParams {
+            tick,
+            sim_time_ms,
+            category,
+            event_type,
+            payload,
+            parent_event_id,
+            asset_ref,
+            cosmetic,
+        } = params;
+        let event_id = self.record_with_cosmetic(
+            tick,
+            sim_time_ms,
+            category,
+            event_type,
+            payload,
+            parent_event_id,
+            cosmetic,
+        );
+        let mut inner = self.inner.lock().expect("recorder mutex poisoned; aborting run");
+        if let Some(last) = inner.events.last_mut() {
+            if last.event_id == event_id {
+                last.asset_ref = Some(asset_ref);
+            }
+        }
+        event_id
+    }
+
     /// M4 § "unknown_cause" marker. Record an event with `parent_event_id = None`
     /// and inject `cause_origin: "unknown_cause"` + a `reason` field into
     /// the payload so the M10 cause-chain walker reports a clean terminal
@@ -781,6 +816,22 @@ impl Recorder {
         let inner = self.inner.lock().expect("recorder mutex poisoned; aborting run");
         inner.checksum_event_count
     }
+}
+
+/// **M4A ↔ M4**: parameter bundle for [`Recorder::record_with_asset_ref`].
+/// Bundles the envelope identity (`tick`, `sim_time_ms`, `category`, etc.)
+/// plus the `asset_ref` (string-encoded `cf-asset-ledger::AssetId`) and the
+/// cosmetic flag so the recorder writes a single event with the ledger
+/// pointer on the M4 envelope.
+pub struct AssetRefRecordParams<'a> {
+    pub tick: Tick,
+    pub sim_time_ms: f64,
+    pub category: &'a str,
+    pub event_type: &'a str,
+    pub payload: serde_json::Value,
+    pub parent_event_id: Option<String>,
+    pub asset_ref: String,
+    pub cosmetic: bool,
 }
 
 /// Final state passed into `write_run_bundle`.
@@ -1084,6 +1135,37 @@ mod tests {
         assert_eq!(parsed.category, "system");
     }
 
+    /// **M4 ↔ M4A integration**: `record_with_asset_ref` populates the
+    /// envelope-level `asset_ref` field with a ledger AssetId string. Run
+    /// bundles that capture grids / audio playback / mod assets MUST link
+    /// to the canonical ledger entry via this field.
+    #[test]
+    fn record_with_asset_ref_populates_envelope_field() {
+        let recorder = Recorder::new("m4a_test_run".to_string());
+        let asset_id = "a".repeat(64);
+        let id = recorder.record_with_asset_ref(AssetRefRecordParams {
+            tick: Tick(1),
+            sim_time_ms: 16.6,
+            category: "capture",
+            event_type: "capture_grid_screenshot",
+            payload: serde_json::json!({"path": "captures/grid_001.png"}),
+            parent_event_id: None,
+            asset_ref: asset_id.clone(),
+            cosmetic: true,
+        });
+        let events = recorder.snapshot_events();
+        assert_eq!(events.len(), 1);
+        let serialized = serde_json::to_string(&events[0]).unwrap();
+        assert!(
+            serialized.contains(&format!("\"asset_ref\":\"{asset_id}\"")),
+            "asset_ref must round-trip through JSON envelope: {serialized}"
+        );
+        let parsed: Event = serde_json::from_str(&serialized).unwrap();
+        assert_eq!(parsed.event_id, id);
+        assert_eq!(parsed.asset_ref.as_deref(), Some(asset_id.as_str()));
+        assert_eq!(parsed.cosmetic, Some(true));
+    }
+
     #[test]
     fn write_bundle_and_validate_basics() {
         let tmp = tempdir_for_test();
@@ -1328,10 +1410,16 @@ mod tests {
         let events = recorder.snapshot_events();
         // Gameplay event must not serialize cosmetic field.
         let s = serde_json::to_string(&events[0]).unwrap();
-        assert!(!s.contains("\"cosmetic\""), "gameplay event must not serialize cosmetic field: {s}");
+        assert!(
+            !s.contains("\"cosmetic\""),
+            "gameplay event must not serialize cosmetic field: {s}"
+        );
         // Cosmetic event must serialize cosmetic: true.
         let s = serde_json::to_string(&events[1]).unwrap();
-        assert!(s.contains("\"cosmetic\":true"), "cosmetic event must serialize cosmetic: true: {s}");
+        assert!(
+            s.contains("\"cosmetic\":true"),
+            "cosmetic event must serialize cosmetic: true: {s}"
+        );
     }
 
     #[test]
@@ -1358,6 +1446,10 @@ mod tests {
         let id = recorder.record(Tick(0), 0.0, "system", "run_started", serde_json::json!({}), None);
         let events = recorder.snapshot_events();
         let ev = events.iter().find(|e| e.event_id == id).expect("recorded event");
-        assert_eq!(ev.dropped_count, Some(7), "next emitted event must carry the outstanding drop count");
+        assert_eq!(
+            ev.dropped_count,
+            Some(7),
+            "next emitted event must carry the outstanding drop count"
+        );
     }
 }

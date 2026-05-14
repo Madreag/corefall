@@ -11,6 +11,7 @@
 //!     followed by `observe.frame` notifications (server -> client).
 //!   - `observe.unsubscribe`       -> CommandAck
 //!   - `observe.settings`          -> ObserveSettings
+//!   - `observe.assets.ledger_summary` (M4A) -> AssetLedgerSummary
 //!   - `act.player.move`           (params: ActPlayerMoveParams) -> CommandAck
 //!   - `act.settings.set`          (params: SettingsPatch) -> CommandAck
 //!   - `runbundle.write`           (params: RunBundleWriteParams) -> CommandAck
@@ -91,13 +92,13 @@ use crate::{
     },
     schemas::{
         ActChassisClearJamParams, ActChassisRepairParams, ActChassisSalvageParams, ActInputCaptureControlsParams,
-        ActMissionPauseParams, ActMissionResumeParams, ActPlayerAbortParams, ActPlayerAimParams, ActPlayerClimbParams,
-        ActPlayerAnchorParams, ActPlayerCrouchParams, ActPlayerDigParams, ActPlayerEjectParams, ActPlayerFireParams,
-        ActPlayerJetParams, InspectAiParams, InspectMissionParams, ObserveAiParams, ObserveMissionParams,
-        ActPlayerJumpParams, ActPlayerMoveParams, ActPlayerReloadParams, ActPlayerResetParams,
-        ActPlayerSelectItemParams, ActPlayerSharpAimParams, InspectActorParams, InspectEquipmentParams,
-        ObserveActorParams, ObserveOnceParams, ObserveSubscribeParams, RunBundleWriteParams, RunForTicksParams,
-        ScenarioLoadParams, StepParams, SystemShutdownParams,
+        ActMissionPauseParams, ActMissionResumeParams, ActPlayerAbortParams, ActPlayerAimParams, ActPlayerAnchorParams,
+        ActPlayerClimbParams, ActPlayerCrouchParams, ActPlayerDigParams, ActPlayerEjectParams, ActPlayerFireParams,
+        ActPlayerJetParams, ActPlayerJumpParams, ActPlayerMoveParams, ActPlayerReloadParams, ActPlayerResetParams,
+        ActPlayerSelectItemParams, ActPlayerSharpAimParams, InspectActorParams, InspectAiParams,
+        InspectEquipmentParams, InspectMissionParams, ObserveActorParams, ObserveAiParams, ObserveMissionParams,
+        ObserveOnceParams, ObserveSubscribeParams, RunBundleWriteParams, RunForTicksParams, ScenarioLoadParams,
+        StepParams, SystemShutdownParams,
     },
     schemas::{SCHEMA_VERSION, SCHEMA_VERSION_MIN},
     state::{ControlEnvelopeStatus, ObserveFrame, ObserveSettings},
@@ -504,6 +505,47 @@ pub trait EngineHandle: Send + Sync + 'static {
     async fn inspect_material(&self, _id: u8) -> Option<serde_json::Value> {
         None
     }
+    /// **M4A**: return the asset-ledger summary projection (total counts +
+    /// by-category / by-tier / by-status / missing-id list). Reads the
+    /// canonical `content/asset_ledger/ledger.jsonl` at the workspace
+    /// root by default; engines that ship a non-default ledger path can
+    /// override. Returns `None` when no ledger file exists.
+    async fn observe_assets_ledger_summary(&self) -> Option<serde_json::Value> {
+        default_observe_assets_ledger_summary()
+    }
+}
+
+/// **M4A**: default ledger-summary projection. Reads
+/// `content/asset_ledger/ledger.jsonl` from the current working directory
+/// (or the parent, when invoked from inside a crate sub-directory). Engines
+/// can override `EngineHandle::observe_assets_ledger_summary` to point at a
+/// different ledger path or to skip reading entirely.
+pub fn default_observe_assets_ledger_summary() -> Option<serde_json::Value> {
+    use std::path::PathBuf;
+
+    let candidates = [
+        PathBuf::from("content/asset_ledger/ledger.jsonl"),
+        PathBuf::from("../content/asset_ledger/ledger.jsonl"),
+        PathBuf::from("game/content/asset_ledger/ledger.jsonl"),
+    ];
+    let mut ledger_path: Option<PathBuf> = None;
+    for c in &candidates {
+        if c.exists() {
+            ledger_path = Some(c.clone());
+            break;
+        }
+    }
+    let ledger_path = ledger_path?;
+    let handle = cf_asset_ledger::LedgerHandle::new(&ledger_path);
+    let entries = match handle.read_all() {
+        Ok(e) => e,
+        Err(err) => {
+            tracing::warn!(target: "cf::ctl", error = %err, "observe.assets.ledger_summary: failed to read ledger");
+            return None;
+        }
+    };
+    let summary = cf_asset_ledger::summarize(&entries);
+    Some(cf_asset_ledger::summary_to_observe_json(&summary))
 }
 
 #[derive(Debug, Clone)]
@@ -1345,12 +1387,10 @@ async fn process_request<E: EngineHandle>(
         // M3 audit pass 7 (2026-05-13): dedicated `observe.terrain` cfctl
         // method per spec literal "When cfctl observe.terrain runs".
         // Returns the live `TerrainView` projection.
-        "observe.terrain" => {
-            match engine.observe_terrain().await {
-                Some(value) => Some(success_response(request.id, value)),
-                None => Some(invalid_param_reason(request.id, "no_terrain_world")),
-            }
-        }
+        "observe.terrain" => match engine.observe_terrain().await {
+            Some(value) => Some(success_response(request.id, value)),
+            None => Some(invalid_param_reason(request.id, "no_terrain_world")),
+        },
         // M2 re-audit (2026-05-13): per-AI projection cfctl method.
         "observe.ai" => {
             let p: ObserveAiParams = match serde_json::from_value(params) {
@@ -1360,6 +1400,36 @@ async fn process_request<E: EngineHandle>(
             match engine.observe_ai(p.actor_id).await {
                 Some(value) => Some(success_response(request.id, value)),
                 None => Some(invalid_param_reason(request.id, "no_such_ai_actor")),
+            }
+        }
+        // M4A: asset-ledger summary projection. Returns total + per-category +
+        // per-tier + per-status counts; lists every non-Fresh entry id for
+        // CI gates that need to fail fast on drift/missing/failed.
+        "observe.assets.ledger_summary" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            match engine.observe_assets_ledger_summary().await {
+                Some(value) => Some(success_response(request.id, value)),
+                None => {
+                    // Return an empty summary rather than an error so the
+                    // surface is always queryable, even on fresh checkouts
+                    // with no ledger yet.
+                    let empty = serde_json::json!({
+                        "schema_version": 1,
+                        "total_entries": 0,
+                        "live_entries": 0,
+                        "superseded_entries": 0,
+                        "by_category": {},
+                        "by_tier": {},
+                        "by_status": {},
+                        "missing": [],
+                        "drifted": [],
+                        "failed": [],
+                        "stale": [],
+                    });
+                    Some(success_response(request.id, empty))
+                }
             }
         }
         // M2 re-audit (2026-05-13): mission inspect (includes objectives + last events).
@@ -2015,6 +2085,100 @@ mod tests {
             .expect("waiter task should not panic");
     }
 
+    /// **M4A**: `observe.assets.ledger_summary` returns a well-formed JSON
+    /// summary (total + by_category + by_tier + by_status + non-fresh
+    /// arrays) backed by the engine handle's projection. Default impl
+    /// returns either the canonical ledger's contents or an empty
+    /// projection when no ledger is present.
+    #[tokio::test]
+    async fn observe_assets_ledger_summary_returns_summary() {
+        struct LedgerEngine;
+        #[async_trait::async_trait]
+        impl EngineHandle for LedgerEngine {
+            async fn snapshot(&self, filter: Option<&str>) -> ObserveFrame {
+                StubEngine.snapshot(filter).await
+            }
+            async fn settings_snapshot(&self) -> Settings {
+                Settings::default()
+            }
+            async fn dispatch(&self, _c: ControlCommand) -> CommandResult {
+                CommandResult::accepted(0)
+            }
+            async fn observe_assets_ledger_summary(&self) -> Option<serde_json::Value> {
+                Some(json!({
+                    "schema_version": 1,
+                    "total_entries": 5,
+                    "live_entries": 4,
+                    "superseded_entries": 1,
+                    "by_category": {"WeaponSprite": 4},
+                    "by_tier": {"Tier1_SVG": 4},
+                    "by_status": {"Fresh": 4},
+                    "missing": [],
+                    "drifted": [],
+                    "failed": [],
+                    "stale": [],
+                }))
+            }
+        }
+        let engine = LedgerEngine;
+        let hz: Arc<Mutex<Option<u32>>> = Arc::new(Mutex::new(None));
+        let filter: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+        let req = json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "observe.assets.ledger_summary",
+            "params": {"schema_version": SCHEMA_VERSION}
+        });
+        let resp = process_request(&req.to_string(), &engine, &hz, &filter, 240)
+            .await
+            .unwrap();
+        let parsed: JsonRpcResponse = serde_json::from_str(&resp).unwrap();
+        let result = parsed.result.expect("ledger summary returns success");
+        assert_eq!(result.get("schema_version").unwrap(), 1);
+        assert_eq!(result.get("total_entries").unwrap(), 5);
+        assert_eq!(result.get("live_entries").unwrap(), 4);
+        assert!(result.get("by_category").unwrap().is_object());
+    }
+
+    /// **M4A**: when no ledger summary is available the surface still
+    /// returns an empty-but-well-formed projection so callers don't have
+    /// to special-case the missing-file case.
+    #[tokio::test]
+    async fn observe_assets_ledger_summary_falls_back_to_empty() {
+        struct EmptyEngine;
+        #[async_trait::async_trait]
+        impl EngineHandle for EmptyEngine {
+            async fn snapshot(&self, filter: Option<&str>) -> ObserveFrame {
+                StubEngine.snapshot(filter).await
+            }
+            async fn settings_snapshot(&self) -> Settings {
+                Settings::default()
+            }
+            async fn dispatch(&self, _c: ControlCommand) -> CommandResult {
+                CommandResult::accepted(0)
+            }
+            async fn observe_assets_ledger_summary(&self) -> Option<serde_json::Value> {
+                None
+            }
+        }
+        let engine = EmptyEngine;
+        let hz: Arc<Mutex<Option<u32>>> = Arc::new(Mutex::new(None));
+        let filter: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+        let req = json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "observe.assets.ledger_summary",
+            "params": {"schema_version": SCHEMA_VERSION}
+        });
+        let resp = process_request(&req.to_string(), &engine, &hz, &filter, 240)
+            .await
+            .unwrap();
+        let parsed: JsonRpcResponse = serde_json::from_str(&resp).unwrap();
+        let result = parsed.result.expect("ledger summary returns success");
+        assert_eq!(result.get("total_entries").unwrap(), 0);
+        assert!(result.get("missing").unwrap().is_array());
+    }
+
     #[tokio::test]
     async fn runbundle_write_rejects_path_traversal() {
         // **M4 § runbundle.write rejects path traversal**: spec requires
@@ -2025,11 +2189,26 @@ mod tests {
         let hz = std::sync::Arc::new(tokio::sync::Mutex::new(None::<u32>));
         let filter = std::sync::Arc::new(tokio::sync::Mutex::new(None::<String>));
         let cases: &[(serde_json::Value, &str)] = &[
-            (json!({"schema_version": 1, "id_override": "../../../etc/passwd"}), "path_traversal_rejected"),
-            (json!({"schema_version": 1, "id_override": "foo/bar"}), "path_traversal_rejected"),
-            (json!({"schema_version": 1, "id_override": "foo\\bar"}), "path_traversal_rejected"),
-            (json!({"schema_version": 1, "id_override": "/absolute/path"}), "absolute_path_rejected"),
-            (json!({"schema_version": 1, "id_override": "..\\windows\\system32"}), "path_traversal_rejected"),
+            (
+                json!({"schema_version": 1, "id_override": "../../../etc/passwd"}),
+                "path_traversal_rejected",
+            ),
+            (
+                json!({"schema_version": 1, "id_override": "foo/bar"}),
+                "path_traversal_rejected",
+            ),
+            (
+                json!({"schema_version": 1, "id_override": "foo\\bar"}),
+                "path_traversal_rejected",
+            ),
+            (
+                json!({"schema_version": 1, "id_override": "/absolute/path"}),
+                "absolute_path_rejected",
+            ),
+            (
+                json!({"schema_version": 1, "id_override": "..\\windows\\system32"}),
+                "path_traversal_rejected",
+            ),
         ];
         for (params, expected_reason) in cases {
             let req = json!({"jsonrpc": "2.0", "id": 1, "method": "runbundle.write", "params": params});

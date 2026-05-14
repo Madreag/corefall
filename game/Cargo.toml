@@ -24,6 +24,7 @@ members = [
   "crates/cf-ui",
   "crates/cf-audio",
   "crates/cf-mod",
+  "crates/cf-asset-ledger",
   "crates/cf-tools-editor",
   "crates/cf-tools-replay-viewer",
   "crates/cf-headless",
@@ -64,6 +65,7 @@ futures-util = "0.3"
 async-trait = "0.1"
 image = { version = "0.25", default-features = false, features = ["png"] }
 crossbeam-channel = "0.5"
+fs2 = "0.4"
 
 [profile.dev]
 opt-level = 1
