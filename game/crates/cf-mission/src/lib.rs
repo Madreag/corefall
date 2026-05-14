@@ -42,7 +42,15 @@
     clippy::trivially_copy_pass_by_ref,
     clippy::too_many_lines,
     clippy::uninlined_format_args,
-    clippy::single_match_else
+    clippy::single_match_else,
+    // M7 director v0.5 additions: phases/reinforcement/boss/graph modules
+    // trip a handful of additional pedantic lints whose remedy doesn't add
+    // clarity (inherent `from_str`, similar names across enums, etc.).
+    clippy::should_implement_trait,
+    clippy::explicit_iter_loop,
+    clippy::needless_lifetimes,
+    clippy::similar_names,
+    clippy::map_unwrap_or
 )]
 
 use std::collections::BTreeMap;
@@ -54,6 +62,23 @@ use serde::{Deserialize, Serialize};
 // / `cf_mission::director::*`) compile cleanly.
 pub mod director;
 pub mod objective;
+
+// **M7**: Mission director v0.5 — additive multi-objective DiGraph + 4-phase
+// pacing + reinforcement waves + mini-boss patterns. The M2 single-vec
+// objective list keeps working unchanged; M7 layers the v0.5 graph on top
+// so scenarios can opt in.
+pub mod boss_phases;
+pub mod objective_graph;
+pub mod phases;
+pub mod reinforcement;
+
+pub use boss_phases::{BossPhase, BossPhaseChangedEvent, BossSpecialAbilityEvent, BossState};
+pub use objective_graph::{
+    BranchingPoint, ExtendedObjectiveKind, ObjectiveBranchedEvent, ObjectiveGraph, ObjectiveNode, ObjectiveNodeStatus,
+    OptionalOfferedEvent,
+};
+pub use phases::{MissionPhase, PhaseChangedEvent, PhaseState};
+pub use reinforcement::{ReinforcementRegistry, ReinforcementWave, ReinforcementWaveSpawnedEvent};
 
 use cf_actor::{ActorId, ActorState, Status};
 
