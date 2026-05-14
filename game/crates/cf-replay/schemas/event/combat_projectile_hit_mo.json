@@ -6,7 +6,7 @@
   "type": "object",
   "additionalProperties": true,
   "properties": {
-    "schema_version": { "const": "0.1" },
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
     "category": { "const": "combat" },
     "event_type": { "const": "projectile_hit_mo" },
     "actor_id": { "type": ["integer", "null"] },
@@ -50,10 +50,9 @@
         "pierced_armor": { "type": "boolean" },
         "organ_damaged_id": { "type": ["string", "null"], "enum": ["brain", "eyes_left", "eyes_right", "ears_left", "ears_right", "heart", "lungs_left", "lungs_right", "liver", "kidneys_left", "kidneys_right", "spine", "stomach", "intestines", "pancreas", null] },
         "circuit_damaged_id": { "type": ["string", "null"], "enum": ["power_core", "cpu", "sensor_array", "motor_controller_left_arm", "motor_controller_right_arm", "motor_controller_left_leg", "motor_controller_right_leg", "hydraulic_pump", "coolant_pump", "oil_reservoir", "fuel_tank", "comm_relay", null] },
-        "parent_event_id": { "type": "string" },
-        "cosmetic": { "const": false }
+        "parent_hit_event_id": { "type": "string" }
       },
-      "required": ["shooter_id", "weapon_id", "projectile_id", "target_id", "hit_zone", "impact_point", "impact_normal", "impact_impulse", "impact_energy_j", "ap_factor", "ap_round_tier", "material_at_impact", "surface_kind", "armor_effective_hardness", "armor_absorbed_dmg", "passthrough_dmg", "damage_kind", "hp_before", "hp_after", "damage_amount", "pierced_armor", "parent_event_id"]
+      "required": ["shooter_id", "weapon_id", "projectile_id", "target_id", "hit_zone", "impact_point", "impact_normal", "impact_impulse", "impact_energy_j", "ap_factor", "ap_round_tier", "material_at_impact", "surface_kind", "armor_effective_hardness", "armor_absorbed_dmg", "passthrough_dmg", "damage_kind", "hp_before", "hp_after", "damage_amount", "pierced_armor", "parent_hit_event_id"]
     }
   },
   "required": ["schema_version", "category", "event_type", "tick", "payload"]

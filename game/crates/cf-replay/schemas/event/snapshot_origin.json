@@ -13,7 +13,7 @@
     },
     "by_actor": {
       "type": "array",
-      "description": "Per-actor origin reaction state: { actor_id, origin_id: Human|Android|Robot|PoweredOrganic|Construct|HeavyBioMech, g_load_dose, oxygen_supply_s (humans + androids), helmet_seal_intact (humans + androids) }."
+      "description": "Per-actor origin reaction state: { actor_id, origin_id: Human|Android|Robot|PoweredOrganic|HeavyBiomech, g_load_dose, oxygen_supply_s (humans + androids), helmet_seal_intact (humans + androids) }. The Origin enum is locked at M5; 5 values match concussion.dose_changed.origin_id + origin.shot_force_feedback.origin_id."
     }
   }
 }

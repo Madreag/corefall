@@ -6,7 +6,7 @@
   "type": "object",
   "additionalProperties": true,
   "properties": {
-    "schema_version": { "const": "0.1" },
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
     "category": { "const": "fluid" },
     "event_type": { "const": "ignition" },
     "actor_id": { "type": ["integer", "null"] },
@@ -16,7 +16,7 @@
       "additionalProperties": true,
       "properties": {
         "actor_id": { "type": "integer" },
-        "fluid_kind": { "type": "string", "enum": ["oil", "coolant", "fuel", "electrolyte"] },
+        "fluid_kind": { "type": "string", "enum": ["oil", "fuel"] },
         "ignition_source_event_id": { "type": "string" }
       },
       "required": ["actor_id", "fluid_kind", "ignition_source_event_id"]

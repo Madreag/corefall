@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "snapshot_shield.v0.1",
+  "title": "snapshot.snapshot_shield payload",
+  "description": "M5 § shield.* family + M4 § M9 firehose surface. Placeholder payload at M5 (placeholder=true); M13+ chassis shields + M25+ base shields fill by_actor. Fires at scenario start and on every objective transition. ShieldState struct (locked): { hp, max_hp, regen_rate_per_s, downtime_after_break_s, status: Up|Down|Regenerating|Disrupted }.",
+  "type": "object",
+  "required": ["tick"],
+  "properties": {
+    "tick": { "type": "integer", "minimum": 0 },
+    "placeholder": {
+      "type": "boolean",
+      "description": "True when emitted by M4/M5 with a stub payload; M13+ producer fills real data and clears this flag."
+    },
+    "by_actor": {
+      "type": "array",
+      "description": "Per-actor shield state: { actor_id, hp, max_hp, regen_rate_per_s, downtime_after_break_s, status: Up|Down|Regenerating|Disrupted }. status is a string enum mirroring the ShieldState struct."
+    }
+  }
+}

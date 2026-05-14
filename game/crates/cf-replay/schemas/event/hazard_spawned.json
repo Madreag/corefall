@@ -2,11 +2,11 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://corefall/event/hazard.spawned.v0.1",
   "title": "hazard.spawned",
-  "description": "M5 § hazard.* family — declarative event schema locked at v0.1. 5 launch hazard kinds (locked): fire, smoke, electric, wet, hot_cold. M16 extends to 9 with acid, radiation, toxic. Schema enum permits all 9 names. Producer fills at M16. Additive-only per M4 DR-002.",
+  "description": "M5 § hazard.* family — declarative event schema locked at v0.1. 9 hazard kinds (locked): fire, smoke, electric, wet, hot, cold, acid, radiation, toxic. The 5-launch subset for M16-launch is {fire, smoke, electric, wet, hot|cold}; M16 extends to 9 by adding acid, radiation, toxic. The spec bullet's 'hot_cold' single-token name is split into 'hot' + 'cold' here; the spec bullet's 'radiation_zone' / 'toxic_atmosphere' bullet names are short-form 'radiation' / 'toxic' in this enum. Producer fills at M16. Additive-only per M4 DR-002.",
   "type": "object",
   "additionalProperties": true,
   "properties": {
-    "schema_version": { "const": "0.1" },
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
     "category": { "const": "hazard" },
     "event_type": { "const": "spawned" },
     "actor_id": { "type": ["integer", "null"] },

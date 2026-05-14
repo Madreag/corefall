@@ -6,12 +6,12 @@
   "type": "object",
   "additionalProperties": true,
   "properties": {
-    "schema_version": { "const": "0.1" },
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
     "category": { "const": "fluid" },
     "event_type": { "const": "ground_splatter_spawned" },
     "actor_id": { "type": ["integer", "null"] },
     "tick": { "type": "integer", "minimum": 0 },
-    "cosmetic": { "type": ["boolean", "null"] },
+    "cosmetic": { "const": true },
     "payload": {
       "type": "object",
       "additionalProperties": true,

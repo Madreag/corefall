@@ -766,10 +766,39 @@ fn is_envelope_schema_file(path: &Path) -> bool {
     let Some(parent_name) = parent.file_name().and_then(|s| s.to_str()) else {
         return false;
     };
-    if parent_name != "v0_1" && parent_name != "v1" {
+    if !is_envelope_version_dir(parent_name) {
         return false;
     }
     parent.parent().and_then(|gp| gp.file_name()).and_then(|s| s.to_str()) == Some("schemas")
+}
+
+/// **M5-A1**: matches a version-suffixed envelope directory like `v0_1`,
+/// `v1`, `v0_2`, `v2_5`. Strictly: `^v[0-9]+(_[0-9]+)?$`. Widens the legacy
+/// `v0_1`/`v1` literal match so future M4 envelope-bump migration directories
+/// (BP6+) are picked up automatically.
+fn is_envelope_version_dir(name: &str) -> bool {
+    let Some(rest) = name.strip_prefix('v') else {
+        return false;
+    };
+    if rest.is_empty() {
+        return false;
+    }
+    let mut seen_underscore = false;
+    let mut current_segment_has_digit = false;
+    for ch in rest.chars() {
+        if ch == '_' {
+            if seen_underscore || !current_segment_has_digit {
+                return false;
+            }
+            seen_underscore = true;
+            current_segment_has_digit = false;
+        } else if ch.is_ascii_digit() {
+            current_segment_has_digit = true;
+        } else {
+            return false;
+        }
+    }
+    current_segment_has_digit
 }
 
 /// BP4 + BP5 content surfaces. Paths under any of these directories must FAIL
@@ -924,13 +953,17 @@ fn validate_event_schema_value(path: &Path, value: &serde_json::Value) -> Vec<St
         return messages;
     }
     // M5 envelope-shape conformance: walk the contract.
+    // schema_version.const MUST equal the canonical M4 envelope literal
+    // (matches cf-replay/src/lib.rs::EVENT_SCHEMA_VERSION). Producers emit
+    // this exact string at envelope level; per-event schemas must declare it
+    // so strict JSON Schema validators accept the events.
     let sv = value
         .pointer("/properties/schema_version/const")
         .and_then(|v| v.as_str())
         .unwrap_or_default();
-    if sv != "0.1" {
+    if sv != "prototype-recorder-event.v0.1" {
         messages.push(format!(
-            "properties.schema_version.const must be \"0.1\" (got \"{sv}\")"
+            "properties.schema_version.const must be \"prototype-recorder-event.v0.1\" (got \"{sv}\")"
         ));
     }
     // Extract canonical (family, type) from the filename: <family>_<type>.json.
@@ -981,6 +1014,10 @@ fn validate_event_schema_value(path: &Path, value: &serde_json::Value) -> Vec<St
         }
     }
     // properties.payload must be an object sub-schema with type=object.
+    // M5-A1: also assert payload does NOT declare `additionalProperties: false`,
+    // which would break the M4 additive-only contract (DR-002) by rejecting
+    // new payload fields that M13+/M14+/M16+/M17+/M19+/M20+ producers want
+    // to add additively.
     let payload_schema = value.pointer("/properties/payload");
     match payload_schema {
         Some(serde_json::Value::Object(p)) => {
@@ -990,6 +1027,12 @@ fn validate_event_schema_value(path: &Path, value: &serde_json::Value) -> Vec<St
                 }
             } else {
                 messages.push("properties.payload.type must be set to \"object\"".to_string());
+            }
+            if let Some(serde_json::Value::Bool(false)) = p.get("additionalProperties") {
+                messages.push(
+                    "properties.payload.additionalProperties must NOT be `false` — M4 envelope is additive-only per DR-002; future producers must be able to add fields without an envelope bump"
+                        .to_string(),
+                );
             }
         }
         Some(_) => messages.push("properties.payload must be a JSON object schema".to_string()),
@@ -1510,7 +1553,7 @@ mod tests {
             "title": "armor.layer_destroyed",
             "type": "object",
             "properties": {
-                "schema_version": { "const": "0.1" },
+                "schema_version": { "const": "prototype-recorder-event.v0.1" },
                 "category": { "const": "armor" },
                 "event_type": { "const": "layer_destroyed" },
                 "actor_id": { "type": "integer" },
@@ -1548,7 +1591,7 @@ mod tests {
         assert_eq!(report.fail(), 0);
     }
 
-    /// **M5**: schema_version drift (≠ "0.1") is rejected.
+    /// **M5**: schema_version drift (≠ canonical envelope literal) is rejected.
     #[test]
     fn m5_event_schema_rejects_wrong_schema_version() {
         let body = serde_json::json!({
@@ -1568,7 +1611,31 @@ mod tests {
         assert!(
             messages
                 .iter()
-                .any(|m| m.contains("schema_version") && m.contains("0.2")),
+                .any(|m| m.contains("schema_version") && m.contains("prototype-recorder-event.v0.1")),
+            "messages: {messages:?}"
+        );
+    }
+
+    /// **M5**: the old M5 literal (`"0.1"`) is rejected — the canonical M4
+    /// envelope literal is required.
+    #[test]
+    fn m5_event_schema_rejects_legacy_short_literal() {
+        let body = serde_json::json!({
+            "title": "armor.layer_destroyed",
+            "type": "object",
+            "properties": {
+                "schema_version": { "const": "0.1" },
+                "category": { "const": "armor" },
+                "event_type": { "const": "layer_destroyed" },
+                "tick": { "type": "integer" },
+                "payload": { "type": "object" }
+            },
+            "required": ["schema_version", "category", "event_type", "tick", "payload"]
+        });
+        let path = PathBuf::from("/tmp/schemas/event/armor_layer_destroyed.json");
+        let messages = validate_event_schema_value(&path, &body);
+        assert!(
+            messages.iter().any(|m| m.contains("schema_version")),
             "messages: {messages:?}"
         );
     }
@@ -1580,7 +1647,7 @@ mod tests {
             "title": "armor.layer_destroyed",
             "type": "object",
             "properties": {
-                "schema_version": { "const": "0.1" },
+                "schema_version": { "const": "prototype-recorder-event.v0.1" },
                 "category": { "const": "internal" },
                 "event_type": { "const": "layer_destroyed" },
                 "tick": { "type": "integer" },
@@ -1603,7 +1670,7 @@ mod tests {
             "title": "armor.layer_destroyed",
             "type": "object",
             "properties": {
-                "schema_version": { "const": "0.1" },
+                "schema_version": { "const": "prototype-recorder-event.v0.1" },
                 "category": { "const": "armor" },
                 "event_type": { "const": "layer_destroyed" },
                 "tick": { "type": "integer" }
@@ -1626,7 +1693,7 @@ mod tests {
             "title": "armor.layer_destroyed",
             "type": "object",
             "properties": {
-                "schema_version": { "const": "0.1" },
+                "schema_version": { "const": "prototype-recorder-event.v0.1" },
                 "category": { "const": "armor" },
                 "event_type": { "const": "layer_destroyed" },
                 "tick": { "type": "integer" },
@@ -1696,6 +1763,59 @@ mod tests {
             "expected at least 50 schemas (got {})",
             report.pass()
         );
+    }
+
+    /// **M5-A1**: `additionalProperties: false` at payload level is REJECTED
+    /// because it would break M4's additive-only contract.
+    #[test]
+    fn m5_event_schema_rejects_payload_additional_properties_false() {
+        let body = serde_json::json!({
+            "title": "armor.layer_destroyed",
+            "type": "object",
+            "properties": {
+                "schema_version": { "const": "prototype-recorder-event.v0.1" },
+                "category": { "const": "armor" },
+                "event_type": { "const": "layer_destroyed" },
+                "tick": { "type": "integer" },
+                "payload": {
+                    "type": "object",
+                    "additionalProperties": false,
+                    "properties": { "item_id": { "type": "integer" } },
+                    "required": ["item_id"]
+                }
+            },
+            "required": ["schema_version", "category", "event_type", "tick", "payload"]
+        });
+        let path = PathBuf::from("/tmp/schemas/event/armor_layer_destroyed.json");
+        let messages = validate_event_schema_value(&path, &body);
+        assert!(
+            messages
+                .iter()
+                .any(|m| m.contains("additionalProperties") && m.contains("DR-002")),
+            "messages: {messages:?}"
+        );
+    }
+
+    /// **M5-A1**: envelope-version-dir regex accepts v0_1, v1, v0_2, v2_5.
+    #[test]
+    fn m5_envelope_version_dir_regex_accepts_canonical_forms() {
+        assert!(is_envelope_version_dir("v0_1"));
+        assert!(is_envelope_version_dir("v1"));
+        assert!(is_envelope_version_dir("v0_2"));
+        assert!(is_envelope_version_dir("v2_5"));
+        assert!(is_envelope_version_dir("v10_42"));
+    }
+
+    /// **M5-A1**: envelope-version-dir regex rejects junk names.
+    #[test]
+    fn m5_envelope_version_dir_regex_rejects_bad_forms() {
+        assert!(!is_envelope_version_dir("v"));
+        assert!(!is_envelope_version_dir("v_1"));
+        assert!(!is_envelope_version_dir("v1_"));
+        assert!(!is_envelope_version_dir("v1_2_3"));
+        assert!(!is_envelope_version_dir("event"));
+        assert!(!is_envelope_version_dir("v0.1"));
+        assert!(!is_envelope_version_dir("alpha"));
     }
 
     #[test]

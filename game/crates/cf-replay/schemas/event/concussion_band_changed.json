@@ -6,7 +6,7 @@
   "type": "object",
   "additionalProperties": true,
   "properties": {
-    "schema_version": { "const": "0.1" },
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
     "category": { "const": "concussion" },
     "event_type": { "const": "band_changed" },
     "actor_id": { "type": ["integer", "null"] },
@@ -18,7 +18,7 @@
         "actor_id": { "type": "integer" },
         "from_band": { "type": "string", "enum": ["Clear", "Mild", "Moderate", "Severe", "KO_Imminent", "KO"] },
         "to_band": { "type": "string", "enum": ["Clear", "Mild", "Moderate", "Severe", "KO_Imminent", "KO"] },
-        "dose": { "type": "number", "minimum": 0.0 }
+        "dose": { "type": "number", "minimum": 0.0, "maximum": 100.0 }
       },
       "required": ["actor_id", "from_band", "to_band", "dose"]
     }

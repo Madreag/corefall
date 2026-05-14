@@ -6,7 +6,7 @@
   "type": "object",
   "additionalProperties": true,
   "properties": {
-    "schema_version": { "const": "0.1" },
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
     "category": { "const": "atmos" },
     "event_type": { "const": "phase_transition" },
     "actor_id": { "type": ["integer", "null"] },
@@ -17,8 +17,8 @@
       "properties": {
         "atm_id": { "type": ["integer", "string"] },
         "gas": { "type": "string", "enum": ["O2", "N2", "CO2", "volatiles", "pollutant", "H2", "N2O", "H2O", "O3", "He"] },
-        "from_phase": { "type": "string" },
-        "to_phase": { "type": "string" },
+        "from_phase": { "type": "string", "enum": ["gas", "liquid", "solid", "supercritical"] },
+        "to_phase": { "type": "string", "enum": ["gas", "liquid", "solid", "supercritical"] },
         "latent_heat_consumed_j": { "type": "number" }
       },
       "required": ["atm_id", "gas", "from_phase", "to_phase", "latent_heat_consumed_j"]

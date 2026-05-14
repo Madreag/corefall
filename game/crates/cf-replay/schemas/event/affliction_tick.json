@@ -6,18 +6,18 @@
   "type": "object",
   "additionalProperties": true,
   "properties": {
-    "schema_version": { "const": "0.1" },
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
     "category": { "const": "affliction" },
     "event_type": { "const": "tick" },
     "actor_id": { "type": ["integer", "null"] },
     "tick": { "type": "integer", "minimum": 0 },
-    "cosmetic": { "type": ["boolean", "null"] },
+    "cosmetic": { "const": true },
     "payload": {
       "type": "object",
       "additionalProperties": true,
       "properties": {
         "actor_id": { "type": "integer" },
-        "kind": { "type": "string", "enum": ["burning", "wet", "electrified", "poisoned", "hypoxic", "combustible_atmosphere", "breach_decomp", "hyperthermic", "hypothermic", "radiation", "concussed", "deafened", "bleeding", "internal_shock", "low_battery", "coolant_leaking", "oil_leaking", "overheating", "hunger", "thirst", "sleep_dep", "sanity_low"] },
+        "kind": { "type": "string", "enum": ["burning", "wet", "electrified", "poisoned", "hypoxic", "combustible_atmosphere", "breach_decomp", "hyperthermic", "hypothermic", "radiation", "concussed", "deafened", "blinded", "bleeding", "internal_shock", "low_battery", "coolant_leaking", "oil_leaking", "overheating", "hunger", "thirst", "sleep_dep", "sanity_low"] },
         "hp_delta": { "type": "number" },
         "tick": { "type": "integer", "minimum": 0 }
       },

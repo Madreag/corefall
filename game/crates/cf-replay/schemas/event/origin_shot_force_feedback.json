@@ -6,7 +6,7 @@
   "type": "object",
   "additionalProperties": true,
   "properties": {
-    "schema_version": { "const": "0.1" },
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
     "category": { "const": "origin" },
     "event_type": { "const": "shot_force_feedback" },
     "actor_id": { "type": ["integer", "null"] },
@@ -24,8 +24,13 @@
           "maxItems": 2
         },
         "impulse_magnitude": { "type": "number" },
-        "origin_id": { "type": ["integer", "string"] },
-        "chassis_layer": { "type": "string" },
+        "origin_id": {
+          "oneOf": [
+            { "type": "integer" },
+            { "type": "string", "enum": ["Human", "Android", "Robot", "PoweredOrganic", "HeavyBiomech"] }
+          ]
+        },
+        "chassis_layer": { "type": "string", "enum": ["armor_external", "armor_internal", "armor_core", "armor_chunked_breach", "flesh", "circuit", "unarmored", "terrain"] },
         "feedback_kind": { "type": "string", "enum": ["pain_jolt", "servo_jolt", "frame_ring"] },
         "g_load_delta": { "type": "number" },
         "concussion_dose_delta": { "type": "number" },

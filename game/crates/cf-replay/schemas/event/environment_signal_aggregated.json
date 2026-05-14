@@ -6,19 +6,33 @@
   "type": "object",
   "additionalProperties": true,
   "properties": {
-    "schema_version": { "const": "0.1" },
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
     "category": { "const": "environment" },
     "event_type": { "const": "signal_aggregated" },
     "actor_id": { "type": ["integer", "null"] },
     "tick": { "type": "integer", "minimum": 0 },
-    "cosmetic": { "type": ["boolean", "null"] },
+    "cosmetic": { "const": true },
     "payload": {
       "type": "object",
       "additionalProperties": true,
       "properties": {
         "actor_id": { "type": "integer" },
         "tick": { "type": "integer", "minimum": 0 },
-        "signal": { "type": "object" }
+        "signal": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "schema_version": { "type": "integer", "minimum": 1 },
+            "active_hazards": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "enum": ["Hypoxic", "CombustibleAtmosphere", "ToxicAtmosphere", "BreachDecomp", "Hyperthermic", "Hypothermic", "Radiation", "LowVisibility", "Glare", "EmDisruption", "WindForce", "DrowningHazard", "VacuumNoVoice", "CommsBlackout", "GravityShift"]
+              }
+            }
+          },
+          "required": ["schema_version", "active_hazards"]
+        }
       },
       "required": ["actor_id", "tick", "signal"]
     }

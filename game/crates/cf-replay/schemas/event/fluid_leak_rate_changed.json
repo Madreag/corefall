@@ -6,7 +6,7 @@
   "type": "object",
   "additionalProperties": true,
   "properties": {
-    "schema_version": { "const": "0.1" },
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
     "category": { "const": "fluid" },
     "event_type": { "const": "leak_rate_changed" },
     "actor_id": { "type": ["integer", "null"] },

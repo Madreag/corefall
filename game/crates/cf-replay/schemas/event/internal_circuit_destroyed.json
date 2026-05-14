@@ -6,7 +6,7 @@
   "type": "object",
   "additionalProperties": true,
   "properties": {
-    "schema_version": { "const": "0.1" },
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
     "category": { "const": "internal" },
     "event_type": { "const": "circuit_destroyed" },
     "actor_id": { "type": ["integer", "null"] },

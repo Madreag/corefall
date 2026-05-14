@@ -87,6 +87,9 @@ const SCHEMA_SNAPSHOT_INTERNAL: &str = include_str!("../schemas/event/snapshot_i
 const SCHEMA_SNAPSHOT_CONCUSSION: &str = include_str!("../schemas/event/snapshot_concussion.json");
 const SCHEMA_SNAPSHOT_FLUID: &str = include_str!("../schemas/event/snapshot_fluid.json");
 const SCHEMA_SNAPSHOT_ORIGIN: &str = include_str!("../schemas/event/snapshot_origin.json");
+// M5-A1 (2026-05-13): snapshot.shield mirrors the ShieldState struct for the
+// M9 firehose. Parallels snapshot_atmospherics + snapshot_environment_signal.
+const SCHEMA_SNAPSHOT_SHIELD: &str = include_str!("../schemas/event/snapshot_shield.json");
 // M5 (2026-05-13): deep-damage event-surface lock. Each schema declares the
 // M4 v0.1 envelope shape with `schema_version: "0.1"` const, `category` const,
 // `event_type` const, and the payload nested under properties.payload.
@@ -183,6 +186,8 @@ const SCHEMA_THERMAL_HEAT_EXCHANGED: &str = include_str!("../schemas/event/therm
 const SCHEMA_THERMAL_MATERIAL_PHASE_CHANGE: &str = include_str!("../schemas/event/thermal_material_phase_change.json");
 // combat.projectile_hit_mo expanded payload (M13 + M14).
 const SCHEMA_COMBAT_PROJECTILE_HIT_MO: &str = include_str!("../schemas/event/combat_projectile_hit_mo.json");
+// audio.event_requested (M5 mandate — M13.x cf-audio consumes).
+const SCHEMA_AUDIO_EVENT_REQUESTED: &str = include_str!("../schemas/event/audio_event_requested.json");
 
 /// Look up the schema source by `(category, event_type)`. Returns `None` if
 /// no schema exists for this pair (callers treat as "no validation
@@ -246,6 +251,7 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("snapshot", "snapshot_concussion") => Some(SCHEMA_SNAPSHOT_CONCUSSION),
         ("snapshot", "snapshot_fluid") => Some(SCHEMA_SNAPSHOT_FLUID),
         ("snapshot", "snapshot_origin") => Some(SCHEMA_SNAPSHOT_ORIGIN),
+        ("snapshot", "snapshot_shield") => Some(SCHEMA_SNAPSHOT_SHIELD),
         // M5 deep-damage event-surface lock (2026-05-13). Each schema is the
         // M4 v0.1 envelope shape with `schema_version: "0.1"` const and the
         // payload nested under properties.payload. Producers ladder up at
@@ -336,6 +342,8 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("thermal", "material_phase_change") => Some(SCHEMA_THERMAL_MATERIAL_PHASE_CHANGE),
         // combat.projectile_hit_mo expanded payload (M13 + M14).
         ("combat", "projectile_hit_mo") => Some(SCHEMA_COMBAT_PROJECTILE_HIT_MO),
+        // audio.event_requested (M5 spec mandate — M13.x cf-audio consumes).
+        ("audio", "event_requested") => Some(SCHEMA_AUDIO_EVENT_REQUESTED),
         _ => None,
     }
 }
@@ -363,6 +371,14 @@ struct PropConstraint {
     max_items: Option<usize>,
     #[serde(default)]
     minimum: Option<f64>,
+    #[serde(default)]
+    maximum: Option<f64>,
+    /// **M5-A1**: `oneOf` lets a property accept one of several alternative
+    /// type/enum branches (e.g. `origin_id` accepts either an integer OR a
+    /// canonical Origin-enum string). The minimal validator walks each
+    /// branch and passes if ANY branch accepts the value.
+    #[serde(default, rename = "oneOf")]
+    one_of: Option<Vec<Value>>,
 }
 
 /// Validate that `payload` matches the schema registered for
@@ -375,10 +391,13 @@ struct PropConstraint {
 ///    schema describes the payload object directly; `required` /
 ///    `properties` apply to the payload value.
 /// 2. **M5 envelope-shaped**: the schema describes the full event envelope
-///    with `properties.schema_version.const = "0.1"`, `category` const,
-///    `event_type` const, and `payload` nested under `properties.payload`.
-///    For these schemas the validator extracts the `payload` sub-schema and
-///    validates the supplied `payload` argument against it.
+///    with `properties.schema_version.const = "prototype-recorder-event.v0.1"`,
+///    `category` const, `event_type` const, and `payload` nested under
+///    `properties.payload`. For these schemas the validator extracts the
+///    `payload` sub-schema and validates the supplied `payload` argument
+///    against it. The canonical literal matches `EVENT_SCHEMA_VERSION` in
+///    `lib.rs` so producer events emitted by the recorder will satisfy
+///    strict JSON Schema validators reading these schemas externally.
 pub fn validate_event_payload(category: &str, event_type: &str, payload: &Value) -> ValidationResult {
     let Some(raw) = event_schema_for(category, event_type) else {
         return Ok(());
@@ -386,10 +405,16 @@ pub fn validate_event_payload(category: &str, event_type: &str, payload: &Value)
     let full_value: serde_json::Value =
         serde_json::from_str(raw).map_err(|e| format!("schema parse error for {category}.{event_type}: {e}"))?;
     // Detect M5 envelope-shape: schema_version is a const-checked property at
-    // the top level. If so, walk into properties.payload to extract the actual
-    // payload sub-schema.
+    // the top level pinning the canonical M4 envelope literal. If so, walk
+    // into properties.payload to extract the actual payload sub-schema. We
+    // accept either the canonical envelope literal or the legacy short form
+    // ("0.1") as the marker so the marker check is tolerant during migration.
     let payload_schema_source: Value = if let Some(props) = full_value.get("properties").and_then(|v| v.as_object()) {
-        if props.get("schema_version").and_then(|v| v.get("const")).is_some() {
+        let sv = props
+            .get("schema_version")
+            .and_then(|v| v.get("const"))
+            .and_then(|v| v.as_str());
+        if matches!(sv, Some("prototype-recorder-event.v0.1") | Some("0.1")) {
             props
                 .get("payload")
                 .cloned()
@@ -454,6 +479,54 @@ pub fn validate_event_payload(category: &str, event_type: &str, payload: &Value)
                     return Err(format!("{category}.{event_type}::{key} value {n} < minimum {min}"));
                 }
             }
+        }
+        if let Some(max) = constraint.maximum {
+            if let Some(n) = value.as_f64() {
+                if n > max {
+                    return Err(format!("{category}.{event_type}::{key} value {n} > maximum {max}"));
+                }
+            }
+        }
+        if let Some(branches) = &constraint.one_of {
+            let mut any_match = false;
+            let mut branch_errors: Vec<String> = Vec::new();
+            for (i, branch) in branches.iter().enumerate() {
+                match check_one_of_branch(category, event_type, key, branch, value) {
+                    Ok(()) => {
+                        any_match = true;
+                        break;
+                    }
+                    Err(e) => branch_errors.push(format!("branch[{i}]: {e}")),
+                }
+            }
+            if !any_match {
+                return Err(format!(
+                    "{category}.{event_type}::{key} value {value} did not satisfy any oneOf branch — {}",
+                    branch_errors.join("; ")
+                ));
+            }
+        }
+    }
+    Ok(())
+}
+
+/// **M5-A1**: validate a single `oneOf` branch as a mini-schema (type +
+/// enum). Returns `Ok` if the value satisfies the branch. The minimal
+/// validator only supports `type` and `enum` constraints inside `oneOf`
+/// branches; richer JSON-Schema features inside `oneOf` are not needed by
+/// any M5 schema today.
+fn check_one_of_branch(category: &str, event_type: &str, key: &str, branch: &Value, value: &Value) -> ValidationResult {
+    let branch_obj = branch
+        .as_object()
+        .ok_or_else(|| format!("oneOf branch for {category}.{event_type}::{key} must be an object"))?;
+    if let Some(ty) = branch_obj.get("type") {
+        check_type(category, event_type, key, ty, value)?;
+    }
+    if let Some(enum_values) = branch_obj.get("enum").and_then(|v| v.as_array()) {
+        if !enum_values.contains(value) {
+            return Err(format!(
+                "{category}.{event_type}::{key} value {value} not in enum {enum_values:?}"
+            ));
         }
     }
     Ok(())
@@ -527,6 +600,7 @@ mod tests {
             ("snapshot", "snapshot_concussion"),
             ("snapshot", "snapshot_fluid"),
             ("snapshot", "snapshot_origin"),
+            ("snapshot", "snapshot_shield"),
             // M5 deep-damage event-surface lock — armor.* family.
             ("armor", "layer_hp_changed"),
             ("armor", "layer_critical"),
@@ -613,6 +687,8 @@ mod tests {
             ("thermal", "material_phase_change"),
             // M5 combat.projectile_hit_mo expanded payload.
             ("combat", "projectile_hit_mo"),
+            // M5 audio.event_requested (M5 mandate, M5-A1).
+            ("audio", "event_requested"),
         ] {
             let raw = event_schema_for(cat, ty).unwrap_or_else(|| panic!("no schema for {cat}.{ty}"));
             let _parsed_value: serde_json::Value =
@@ -722,7 +798,252 @@ mod tests {
         assert!(err.contains("breach_kind"), "got: {err}");
     }
 
-    /// **M5**: payload enum mismatch on `zone` is rejected.
+    /// **M5-A1**: per-family happy-path round trip — one event per family
+    /// validates with a representative payload. Closes the test-coverage gap
+    /// flagged by the validator audit.
+    #[test]
+    fn m5_per_family_happy_path() {
+        validate_event_payload(
+            "armor",
+            "layer_hp_changed",
+            &json!({
+                "actor_id": 1,
+                "item_id": 10,
+                "zone": "torso",
+                "layer": "External",
+                "from": 50.0,
+                "to": 30.0,
+                "cause": "kinetic_round",
+                "ap_factor": 0.7,
+            }),
+        )
+        .expect("armor.layer_hp_changed valid");
+        validate_event_payload(
+            "internal",
+            "organ_damaged",
+            &json!({
+                "actor_id": 1,
+                "organ_id": "heart",
+                "organ_kind": "vital",
+                "from_hp": 100.0,
+                "to_hp": 60.0,
+                "cause": "kinetic_pierce",
+                "source_hit_event_id": "run:42:7",
+            }),
+        )
+        .expect("internal.organ_damaged valid");
+        validate_event_payload(
+            "concussion",
+            "band_changed",
+            &json!({
+                "actor_id": 1,
+                "from_band": "Mild",
+                "to_band": "Moderate",
+                "dose": 45.0,
+            }),
+        )
+        .expect("concussion.band_changed valid");
+        validate_event_payload(
+            "internal_shock",
+            "dose_changed",
+            &json!({
+                "actor_id": 2,
+                "from_dose": 10.0,
+                "to_dose": 40.0,
+                "source_event_id": "run:42:9",
+            }),
+        )
+        .expect("internal_shock.dose_changed valid");
+        validate_event_payload(
+            "fluid",
+            "leak_started",
+            &json!({
+                "actor_id": 1,
+                "fluid_kind": "oil",
+                "source_module_id": "oil_reservoir",
+                "leak_rate": 0.5,
+                "position": [10.0, 20.0],
+            }),
+        )
+        .expect("fluid.leak_started valid");
+        validate_event_payload(
+            "origin",
+            "g_load_dose_changed",
+            &json!({
+                "actor_id": 1,
+                "from_dose": 0.0,
+                "to_dose": 4.5,
+                "source": "fall",
+            }),
+        )
+        .expect("origin.g_load_dose_changed valid");
+        validate_event_payload(
+            "hazard",
+            "spawned",
+            &json!({
+                "hazard_id": "h-1",
+                "kind": "fire",
+                "position": [5.0, 5.0],
+                "intensity": 0.8,
+                "source_event_id": "run:42:11",
+            }),
+        )
+        .expect("hazard.spawned valid");
+        validate_event_payload(
+            "affliction",
+            "applied",
+            &json!({
+                "actor_id": 1,
+                "kind": "blinded",
+                "source_event_id": "run:42:13",
+                "expected_duration_ticks": 90,
+                "severity_0_1": 0.6,
+            }),
+        )
+        .expect("affliction.applied (with new `blinded` kind) valid");
+        validate_event_payload(
+            "atmos",
+            "gas_released",
+            &json!({
+                "atm_id": "atm-1",
+                "gas": "H2",
+                "moles": 3.5,
+                "source": "electrolysis",
+                "ignition_risk": 0.4,
+            }),
+        )
+        .expect("atmos.gas_released valid");
+        validate_event_payload(
+            "shield",
+            "hit",
+            &json!({
+                "actor_id": 1,
+                "hp_before": 100.0,
+                "hp_after": 75.0,
+                "cause": "kinetic_round",
+            }),
+        )
+        .expect("shield.hit valid");
+        validate_event_payload(
+            "environment",
+            "signal_delta",
+            &json!({
+                "actor_id": 1,
+                "slice": "thermal",
+                "from": 295.0,
+                "to": 310.0,
+                "tick": 100,
+            }),
+        )
+        .expect("environment.signal_delta valid");
+        validate_event_payload(
+            "thermal",
+            "material_phase_change",
+            &json!({
+                "material_id": 7,
+                "from_phase": "solid",
+                "to_phase": "liquid",
+                "position": [1.0, 2.0],
+                "latent_heat_consumed_j": 12345.0,
+            }),
+        )
+        .expect("thermal.material_phase_change valid");
+        validate_event_payload(
+            "combat",
+            "projectile_hit_mo",
+            &json!({
+                "shooter_id": 1,
+                "weapon_id": 5,
+                "projectile_id": 99,
+                "target_id": 2,
+                "hit_zone": "torso",
+                "impact_point": [10.0, 20.0],
+                "impact_normal": [0.0, 1.0],
+                "impact_impulse": 50.0,
+                "impact_energy_j": 1200.0,
+                "ap_factor": 0.5,
+                "ap_round_tier": "standard",
+                "material_at_impact": 1,
+                "surface_kind": "armor_external",
+                "armor_effective_hardness": 0.8,
+                "armor_absorbed_dmg": 30.0,
+                "passthrough_dmg": 20.0,
+                "damage_kind": "kinetic",
+                "hp_before": 100.0,
+                "hp_after": 80.0,
+                "damage_amount": 20.0,
+                "pierced_armor": false,
+                "parent_hit_event_id": "run:42:5",
+            }),
+        )
+        .expect("combat.projectile_hit_mo valid");
+        validate_event_payload(
+            "audio",
+            "event_requested",
+            &json!({
+                "kind": "material_state",
+                "material": "metal",
+                "impact_state": "pristine_hit",
+                "surface_kind": "armor_external",
+                "damage_kind": "kinetic",
+                "source_event_id": "run:42:5",
+            }),
+        )
+        .expect("audio.event_requested valid");
+    }
+
+    /// **M5-A1**: combat.projectile_hit_mo payload now requires
+    /// `parent_hit_event_id` instead of the envelope-colliding
+    /// `parent_event_id`.
+    #[test]
+    fn m5_combat_projectile_hit_mo_rejects_envelope_named_parent() {
+        let payload = json!({
+            "shooter_id": 1,
+            "weapon_id": 5,
+            "projectile_id": 99,
+            "target_id": 2,
+            "hit_zone": "torso",
+            "impact_point": [10.0, 20.0],
+            "impact_normal": [0.0, 1.0],
+            "impact_impulse": 50.0,
+            "impact_energy_j": 1200.0,
+            "ap_factor": 0.5,
+            "ap_round_tier": "standard",
+            "material_at_impact": 1,
+            "surface_kind": "armor_external",
+            "armor_effective_hardness": 0.8,
+            "armor_absorbed_dmg": 30.0,
+            "passthrough_dmg": 20.0,
+            "damage_kind": "kinetic",
+            "hp_before": 100.0,
+            "hp_after": 80.0,
+            "damage_amount": 20.0,
+            "pierced_armor": false,
+            "parent_event_id": "run:42:5",
+        });
+        let err = validate_event_payload("combat", "projectile_hit_mo", &payload).unwrap_err();
+        assert!(
+            err.contains("parent_hit_event_id"),
+            "expected error about parent_hit_event_id, got: {err}"
+        );
+    }
+
+    /// **M5-A1**: Origin enum is locked — a non-canonical Origin string is
+    /// rejected on concussion.dose_changed.
+    #[test]
+    fn m5_concussion_dose_changed_rejects_bad_origin() {
+        let payload = json!({
+            "actor_id": 1,
+            "from_dose": 10.0,
+            "to_dose": 20.0,
+            "source_event_id": "run:42:7",
+            "origin_id": "Construct",
+        });
+        let result = validate_event_payload("concussion", "dose_changed", &payload);
+        assert!(result.is_err(), "expected rejection of non-canonical Origin");
+    }
+
+    /// **M5-A1**: payload enum mismatch on `zone` is rejected.
     #[test]
     fn m5_armor_layer_destroyed_rejects_bad_zone_enum() {
         let payload = json!({
@@ -816,6 +1137,7 @@ mod tests {
             ("thermal", "heat_exchanged"),
             ("thermal", "material_phase_change"),
             ("combat", "projectile_hit_mo"),
+            ("audio", "event_requested"),
         ];
         for (cat, ty) in pairs {
             let raw = event_schema_for(cat, ty).unwrap_or_else(|| panic!("no schema for {cat}.{ty}"));
@@ -824,7 +1146,10 @@ mod tests {
                 .pointer("/properties/schema_version/const")
                 .and_then(|x| x.as_str())
                 .unwrap_or_else(|| panic!("{cat}.{ty} missing properties.schema_version.const"));
-            assert_eq!(sv, "0.1", "{cat}.{ty} schema_version must be 0.1 (got {sv})");
+            assert_eq!(
+                sv, "prototype-recorder-event.v0.1",
+                "{cat}.{ty} schema_version must be canonical M4 envelope literal (got {sv})"
+            );
             let cat_const = v
                 .pointer("/properties/category/const")
                 .and_then(|x| x.as_str())

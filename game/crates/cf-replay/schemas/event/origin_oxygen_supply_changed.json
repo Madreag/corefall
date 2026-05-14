@@ -6,7 +6,7 @@
   "type": "object",
   "additionalProperties": true,
   "properties": {
-    "schema_version": { "const": "0.1" },
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
     "category": { "const": "origin" },
     "event_type": { "const": "oxygen_supply_changed" },
     "actor_id": { "type": ["integer", "null"] },
@@ -18,7 +18,7 @@
         "actor_id": { "type": "integer" },
         "from_s": { "type": "number", "minimum": 0.0 },
         "to_s": { "type": "number", "minimum": 0.0 },
-        "source": { "type": "string" }
+        "source": { "type": "string", "enum": ["helmet_breach", "refilled", "exhaled", "atmosphere"] }
       },
       "required": ["actor_id", "from_s", "to_s", "source"]
     }

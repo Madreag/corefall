@@ -1,0 +1,37 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/audio.event_requested.v0.1",
+  "title": "audio.event_requested",
+  "description": "M5 § Sound clip variants — declarative event schema locked at v0.1. M5 spec mandates 'M5 just locks the request shape'; M13.x+ cf-audio consumes. kind discriminates between material_state (armor surface impacts) and internal_hit (internal-ray traversal sounds). Locked 7-material × 5-impact-state taxonomy: metal/ceramic/composite/cloth/leather/hardened_plate/reactive_armor crossed with pristine_hit/cracked_hit/destroyed_hit/chunked_off/pierce. Locked 6-name internal-hit enum: flesh_punctured/bone_cracked/organ_ruptured/circuit_sparked/circuit_destroyed/fluid_pierce. surface_kind and damage_kind mirror combat.projectile_hit_mo. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "audio" },
+    "event_type": { "const": "event_requested" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "kind": { "type": "string", "enum": ["material_state", "internal_hit"] },
+        "material": { "type": ["string", "null"], "enum": ["metal", "ceramic", "composite", "cloth", "leather", "hardened_plate", "reactive_armor", null] },
+        "impact_state": { "type": ["string", "null"], "enum": ["pristine_hit", "cracked_hit", "destroyed_hit", "chunked_off", "pierce", null] },
+        "internal_hit_kind": { "type": ["string", "null"], "enum": ["flesh_punctured", "bone_cracked", "organ_ruptured", "circuit_sparked", "circuit_destroyed", "fluid_pierce", null] },
+        "surface_kind": { "type": "string", "enum": ["armor_external", "armor_internal", "armor_core", "armor_chunked_breach", "flesh", "circuit", "unarmored", "terrain"] },
+        "damage_kind": { "type": "string", "enum": ["kinetic", "thermal", "electric", "chemical", "radiation"] },
+        "source_event_id": { "type": "string" },
+        "position": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "loudness": { "type": "number", "minimum": 0.0 }
+      },
+      "required": ["kind", "surface_kind", "damage_kind", "source_event_id"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

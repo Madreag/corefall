@@ -6,7 +6,7 @@
   "type": "object",
   "additionalProperties": true,
   "properties": {
-    "schema_version": { "const": "0.1" },
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
     "category": { "const": "thermal" },
     "event_type": { "const": "material_phase_change" },
     "actor_id": { "type": ["integer", "null"] },
@@ -16,8 +16,8 @@
       "additionalProperties": true,
       "properties": {
         "material_id": { "type": ["integer", "string"] },
-        "from_phase": { "type": "string" },
-        "to_phase": { "type": "string" },
+        "from_phase": { "type": "string", "enum": ["gas", "liquid", "solid", "molten", "supercritical"] },
+        "to_phase": { "type": "string", "enum": ["gas", "liquid", "solid", "molten", "supercritical"] },
         "position": {
           "type": "array",
           "items": { "type": "number" },
