@@ -726,6 +726,32 @@ pub fn rifle_preset(preset_id: &str) -> Option<RifleSpec> {
     rifle_presets().get(preset_id).cloned()
 }
 
+/// **M6**: resolve the available [`AdvancedFireMode`] list for a given
+/// weapon preset id. M1 rifle presets default to the full Single / Burst3 /
+/// Auto ladder per spec § "Weapons" (M1 rifle table row "Single / Burst-3 /
+/// Auto"). M6 launch-weapon presets surface their declared
+/// [`WeaponPreset::available_modes`]. Unknown presets fall back to
+/// `[Single]` so `act.player.cycle_fire_mode` is always well-defined for any
+/// equipped weapon — the engine never panics on an unknown preset.
+#[must_use]
+pub fn available_fire_modes_for(preset_id: &str) -> Vec<AdvancedFireMode> {
+    match preset_id {
+        RIFLE_M1_DEFAULT_ID | RIFLE_M1_TRACER_ID | CARBINE_M5_POWERED_ID | RIFLE_M5_MECH_HEAVY_ID => vec![
+            AdvancedFireMode::Single,
+            AdvancedFireMode::Burst3,
+            AdvancedFireMode::Auto,
+        ],
+        SHOTGUN_M1_DEFAULT_ID => vec![AdvancedFireMode::Single, AdvancedFireMode::Pump],
+        _ => {
+            if let Some(preset) = m6_weapon_presets().into_iter().find(|p| p.id == preset_id) {
+                preset.available_modes
+            } else {
+                vec![AdvancedFireMode::Single]
+            }
+        }
+    }
+}
+
 /// Per-actor rifle state machine. Carries the configured `tick_rate_hz` so timings
 /// derived from `RifleSpec` (in seconds) resolve to a stable tick budget at both
 /// 60 Hz and 120 Hz simulations.

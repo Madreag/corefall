@@ -974,6 +974,37 @@ pub struct ActorState {
     /// "sensor_pulse" }` for hostile actors within the reveal radius.
     #[serde(default)]
     pub reveal_until_tick: u64,
+    /// **M6**: cached [`AdvancedFireMode`] for the actor's currently
+    /// selected weapon. `act.player.cycle_fire_mode` rotates this through
+    /// the weapon's `FireModeSet::available` list; the firing path consults
+    /// it to gate Burst3 / Charge / Arc semantics. Default `Single` matches
+    /// the cold-start weapon state.
+    #[serde(default)]
+    pub weapon_fire_mode: cf_equipment::AdvancedFireMode,
+    /// **M6**: charge-mode accumulator scalar in `0..=1`. Ticks up while
+    /// the trigger is held under `AdvancedFireMode::Charge`; clamps to 1.0
+    /// at full charge (per [`cf_equipment::SNIPER_CHARGE_MAX_SECONDS`]).
+    /// Reset to 0 on trigger release.
+    #[serde(default)]
+    pub weapon_charge_fraction: f32,
+    /// **M6**: queued follow-up shots for `AdvancedFireMode::Burst3`. Seeded
+    /// to `BURST3_ROUND_COUNT - 1` when the first round of a 3-round burst
+    /// fires through the M1 path; decremented as each follow-up round
+    /// fires from the M6 tick scheduler.
+    #[serde(default)]
+    pub burst3_remaining_shots: u32,
+    /// **M6**: seconds remaining until the next burst-3 follow-up shot
+    /// fires. Reset to [`cf_equipment::BURST3_INTER_SHOT_SECONDS`] each
+    /// time a follow-up round leaves the muzzle so the 3-round burst
+    /// completes within 100 ms per spec § "SMG burst-3 fire mode".
+    #[serde(default)]
+    pub burst3_next_fire_at_seconds: f32,
+    /// **M6**: trigger-state edge tracker for Charge-mode release detection.
+    /// `true` the tick after the player begins holding fire; transitions
+    /// to `false` on release, at which point the engine fires one
+    /// charge-scaled shot.
+    #[serde(default)]
+    pub fire_held_prev: bool,
 }
 
 fn default_bipod_equipped() -> cf_equipment::Bipod {
@@ -1139,6 +1170,11 @@ impl ActorState {
             grenade_held_fuse_remaining: 5.0,
             drill_heat: 0.0,
             reveal_until_tick: 0,
+            weapon_fire_mode: cf_equipment::AdvancedFireMode::Single,
+            weapon_charge_fraction: 0.0,
+            burst3_remaining_shots: 0,
+            burst3_next_fire_at_seconds: 0.0,
+            fire_held_prev: false,
         }
     }
 
@@ -1222,6 +1258,11 @@ impl ActorState {
         self.grenade_held_fuse_remaining = 5.0;
         self.drill_heat = 0.0;
         self.reveal_until_tick = 0;
+        self.weapon_fire_mode = cf_equipment::AdvancedFireMode::Single;
+        self.weapon_charge_fraction = 0.0;
+        self.burst3_remaining_shots = 0;
+        self.burst3_next_fire_at_seconds = 0.0;
+        self.fire_held_prev = false;
     }
 
     /// Apply damage with a cause string. Returns the new status if it changed.
@@ -1850,8 +1891,9 @@ impl ReloadState {
 /// - `mag_remaining` — current rounds in the chambered magazine (mirrors
 ///   [`cf_equipment::RifleState::ammo_in_mag`] for an M1 rifle).
 /// - `fire_mode` — extended fire-mode discriminator
-///   ([`cf_equipment::AdvancedFireMode`]). Defaults to `Single` until the
-///   per-weapon `FireModeSet::current` is wired into the engine tick path.
+///   ([`cf_equipment::AdvancedFireMode`]) reflecting the live
+///   `ActorState::weapon_fire_mode`. Rotated by
+///   `act.player.cycle_fire_mode`.
 /// - `bipod_state` — current [`cf_equipment::BipodState`] (`Stowed` /
 ///   `Deployed`). Default `Stowed` until bipod state lands on the actor's
 ///   weapon.
@@ -1859,14 +1901,16 @@ impl ReloadState {
 ///   has an attached, intact suppressor.
 /// - `reload_state` — [`ReloadState`] reload-window discriminator (`Idle` vs
 ///   `Reloading`).
-/// - `charge_fraction` — charge-mode (e.g. sniper) accumulator scalar `0..1`.
-///   0.0 when the weapon is not in `AdvancedFireMode::Charge` mode.
+/// - `charge_fraction` — charge-mode (e.g. sniper) accumulator scalar
+///   `0..1` from `ActorState::weapon_charge_fraction`. 0.0 when the
+///   weapon is not in `AdvancedFireMode::Charge` mode or the trigger
+///   has not been held this trigger cycle.
 ///
 /// The shape is deliberately additive — every field carries a default so the
 /// observation surface remains consistent even before the engine wires the
-/// per-actor bipod / suppressor / charge accumulator state. Future tick-path
-/// integration features (out of scope for this M6 schema-and-surface fix)
-/// will mutate these fields as the underlying state machines advance.
+/// per-actor bipod / suppressor state. Future tick-path integration features
+/// will mutate the remaining defaults as the underlying state machines
+/// advance.
 #[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct WeaponStateView {
@@ -1982,14 +2026,17 @@ impl ActorState {
     }
 
     /// **M6**: project a [`WeaponStateView`] for the actor's currently
-    /// selected weapon. The `mag_remaining` field is sourced from the M1
-    /// rifle preset's `mag_capacity` for a rifle slot (until the engine
-    /// hands back the live `RifleState::ammo_in_mag`), and zero for any
-    /// other slot. The other five fields default to their bottom-of-
-    /// ladder values (Single fire mode, Stowed bipod, no suppressor,
-    /// Idle reload, no charge) until tick-path integration lands the
-    /// per-weapon state struct on the actor. See the [`WeaponStateView`]
-    /// doc comment for the full shape contract.
+    /// selected weapon. `mag_remaining` is sourced from the M1 rifle
+    /// preset's `mag_capacity` for a rifle slot (until the engine hands
+    /// back the live `RifleState::ammo_in_mag` in a later fix feature),
+    /// and zero for any other slot. `fire_mode` reads the live
+    /// [`ActorState::weapon_fire_mode`] (rotated by
+    /// `act.player.cycle_fire_mode`), and `charge_fraction` reads the
+    /// live [`ActorState::weapon_charge_fraction`] (filled by the
+    /// Charge-mode firing path). The remaining fields default until the
+    /// follow-on fix feature ties them to the live attachment / reload
+    /// state. See the [`WeaponStateView`] doc comment for the full
+    /// shape contract.
     pub fn weapon_state_view(&self) -> WeaponStateView {
         let mag_remaining = match self.inventory.selected_item() {
             InventoryItem::Rifle { preset } => cf_equipment::rifle_preset(preset).map_or(0, |spec| spec.mag_capacity),
@@ -1997,6 +2044,8 @@ impl ActorState {
         };
         WeaponStateView {
             mag_remaining,
+            fire_mode: self.weapon_fire_mode,
+            charge_fraction: self.weapon_charge_fraction.clamp(0.0, 1.0),
             ..WeaponStateView::default()
         }
     }
