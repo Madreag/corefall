@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "snapshot_actor.v0.1",
+  "title": "snapshot.snapshot_actor payload",
+  "description": "M4 § Snapshot writer. Per-actor checkpoint emitted at scene start + every objective transition.",
+  "type": "object",
+  "required": ["actor", "kind"],
+  "properties": {
+    "actor": { "type": ["integer", "string"] },
+    "kind": { "type": "string" },
+    "team": { "type": "string" },
+    "controllable": { "type": "boolean" },
+    "position": { "type": "array", "minItems": 2, "maxItems": 2 },
+    "velocity": { "type": "array", "minItems": 2, "maxItems": 2 },
+    "aim": { "type": "array", "minItems": 2, "maxItems": 2 },
+    "status": { "type": "string" },
+    "hp": { "type": "number" },
+    "hp_max": { "type": "number" },
+    "selected_slot": { "type": "integer" },
+    "stability": { "type": "number" },
+    "sharp_aim_progress": { "type": "number" },
+    "mass_kg": { "type": "number" }
+  }
+}

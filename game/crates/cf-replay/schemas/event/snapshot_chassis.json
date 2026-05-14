@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "snapshot_chassis.v0.1",
+  "title": "snapshot.snapshot_chassis payload",
+  "description": "M4 § Snapshot writer (M13 forward-compat placeholder). At M4 this fires once at scene start with placeholder=true; M13 fills the payload with per-zone armor HP, module states, pilot lifecycle, eject window.",
+  "type": "object",
+  "required": ["schema_version", "placeholder"],
+  "properties": {
+    "schema_version": { "type": "integer", "minimum": 1 },
+    "placeholder": { "type": "boolean" },
+    "milestone_ready": { "type": "string" },
+    "actors_with_chassis": { "type": "array" }
+  }
+}

@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "system_run_started.v0.1",
+  "title": "system.run_started payload",
+  "description": "M4 § Expected outcome + system events. Fired once at tick 0 to declare scenario id, seed, tick rate, run mode, cfctl protocol version, manifest hash, and the cf-app build id.",
+  "type": "object",
+  "required": [
+    "scenario_id",
+    "seed",
+    "tick_rate_hz",
+    "run_mode",
+    "protocol_version",
+    "manifest_hash",
+    "build_id"
+  ],
+  "properties": {
+    "scenario_id": { "type": "string" },
+    "scenario": { "type": "string" },
+    "seed": { "type": "integer", "minimum": 0 },
+    "tick_rate_hz": { "type": "integer", "minimum": 1 },
+    "run_mode": { "type": "string" },
+    "control_api": { "type": "boolean" },
+    "protocol_version": { "type": "integer", "minimum": 1 },
+    "manifest_hash": { "type": "string" },
+    "build_id": { "type": "string" },
+    "settings": { "type": ["object", "null"] }
+  }
+}

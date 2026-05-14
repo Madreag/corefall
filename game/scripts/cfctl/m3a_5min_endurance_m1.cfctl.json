@@ -1,0 +1,25 @@
+{
+  "scenario": "m1_actor_range",
+  "tick_rate_hz": 60,
+  "description": "M4 § Acceptance: 5-minute literal run (18000 ticks @ 60 Hz) on the M1 actor range. The recorded run bundle must replay headlessly with all checksums matching (cf-headless replay returns result=ok and replayed_ticks=18000). This is the canonical replay-determinism fixture for the long-running case.",
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+    { "method": "act.player.aim", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "act.player.move", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 60 } },
+    { "method": "act.player.fire", "params": { "pressed": true } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 8 } },
+    { "method": "act.player.fire", "params": { "pressed": false } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 60 } },
+    { "method": "act.player.reload", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 120 } },
+    { "method": "act.player.move", "params": { "x": -1.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 120 } },
+    { "method": "act.player.move", "params": { "x": 0.0, "y": 0.0 } },
+    { "method": "act.player.jump", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 60 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 17452 } },
+    { "method": "observe.once", "params": {} },
+    { "method": "runbundle.write", "params": {} }
+  ]
+}

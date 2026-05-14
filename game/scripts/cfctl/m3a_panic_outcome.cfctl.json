@@ -1,0 +1,13 @@
+{
+  "scenario": "m1_actor_range",
+  "tick_rate_hz": 60,
+  "expected_outcome": "panic",
+  "description": "M4 § Acceptance: induce a sim panic via --debug-inject-panic-at-tick and verify that prototype_run_check.py REJECTS the bundle when manifest.expected_outcome=clean. The companion negative bundle MUST set expected_outcome=panic so the checker accepts it. This proves the adversarial outcome contract.",
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+    { "method": "act.player.move", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 60 } },
+    { "method": "observe.once", "params": {} },
+    { "method": "runbundle.write", "params": {} }
+  ]
+}

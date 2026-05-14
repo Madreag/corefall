@@ -1,0 +1,19 @@
+{
+  "scenario": "m1_actor_range",
+  "tick_rate_hz": 60,
+  "description": "M4 § Acceptance: produces a baseline bundle that downstream test harness mutates (one checksum event payload byte changed) to verify that cf-headless replay emits a structured first_divergence with non-zero exit. Used by tests/headless_replay_divergence_smoke.rs or the manual workflow documented in M4.md.",
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+    { "method": "act.player.aim", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "act.player.move", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 120 } },
+    { "method": "act.player.fire", "params": { "pressed": true } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 8 } },
+    { "method": "act.player.fire", "params": { "pressed": false } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 60 } },
+    { "method": "act.player.reload", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 120 } },
+    { "method": "observe.once", "params": {} },
+    { "method": "runbundle.write", "params": {} }
+  ]
+}

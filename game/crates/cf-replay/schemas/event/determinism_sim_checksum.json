@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "determinism_sim_checksum.v0.1",
+  "title": "determinism.sim_checksum payload",
+  "description": "M4 § Checksum cadence + determinism. Per-tick blake3 of sim_state_v1 scope (tick counter + rng state + actor world + terrain + mission + etc.).",
+  "type": "object",
+  "required": ["checksum_hex", "algorithm", "scope"],
+  "properties": {
+    "checksum_hex": { "type": "string", "minLength": 8 },
+    "algorithm": { "type": "string", "enum": ["blake3"] },
+    "scope": { "type": "string" },
+    "cadence_ticks": { "type": "integer", "minimum": 0 },
+    "tick_rate_hz": { "type": "integer", "minimum": 1 },
+    "seed": { "type": "integer", "minimum": 0 },
+    "kind": { "type": "string", "enum": ["cadence", "final"] }
+  }
+}

@@ -52,7 +52,22 @@ enum Cmd {
         /// recorded in `run_manifest.json.scene.source_path`.
         #[arg(long)]
         scenario_path: Option<PathBuf>,
+        /// **M4 § Replay throughput benchmark**: emit performance counters
+        /// (`throughput_ticks_per_sec`, `wall_time_ms`, `peak_memory_mb`)
+        /// alongside the result envelope. Implies `--no-verify-checksums`
+        /// because throughput measurements are orthogonal to determinism
+        /// verification (the verifier doesn't have to walk every recorded
+        /// checksum when timing the replay).
+        #[arg(long, value_enum)]
+        measure: Option<MeasureMode>,
     },
+}
+
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+enum MeasureMode {
+    /// Measure ticks-replayed-per-second + peak memory. Skips checksum
+    /// verification.
+    Throughput,
 }
 
 fn init_diagnostics() {
@@ -75,11 +90,23 @@ fn main() -> Result<()> {
             bundle_dir,
             no_verify_checksums,
             scenario_path,
-        } => replay(&bundle_dir, !no_verify_checksums, scenario_path),
+            measure,
+        } => {
+            let verify = match measure {
+                Some(MeasureMode::Throughput) => false,
+                None => !no_verify_checksums,
+            };
+            replay(&bundle_dir, verify, scenario_path, measure)
+        }
     }
 }
 
-fn replay(bundle_dir: &Path, verify_checksums: bool, scenario_path: Option<PathBuf>) -> Result<()> {
+fn replay(
+    bundle_dir: &Path,
+    verify_checksums: bool,
+    scenario_path: Option<PathBuf>,
+    measure: Option<MeasureMode>,
+) -> Result<()> {
     if !bundle_dir.exists() {
         bail!("bundle directory does not exist: {}", bundle_dir.display());
     }
@@ -97,6 +124,14 @@ fn replay(bundle_dir: &Path, verify_checksums: bool, scenario_path: Option<PathB
         .and_then(Value::as_u64)
         .map(|n| n as u32)
         .unwrap_or(60);
+    // **M4 § Per-scenario checksum cadence**: the verifier must use the
+    // SAME cadence the bundle was produced with. Read it from
+    // `run_manifest.json.checksum.cadence_ticks` and pass it into the
+    // engine config so per-tick checksum events line up.
+    let recorded_cadence = manifest
+        .get("checksum")
+        .and_then(|c| c.get("cadence_ticks"))
+        .and_then(Value::as_u64);
     let scenario_source = scenario_path
         .map(|p| p.display().to_string())
         .or_else(|| {
@@ -153,7 +188,8 @@ fn replay(bundle_dir: &Path, verify_checksums: bool, scenario_path: Option<PathB
         paced: false,
         settings: Settings::default(),
         debug_inject_panic_at_tick: None,
-        checksum_cadence_ticks: None,
+        checksum_cadence_ticks: recorded_cadence,
+        expected_outcome: None,
     })?;
     config.run_mode = "headless-replay".to_string();
     config.write_run_bundle = false;
@@ -179,6 +215,7 @@ fn replay(bundle_dir: &Path, verify_checksums: bool, scenario_path: Option<PathB
         .build()
         .context("build tokio runtime")?;
 
+    let replay_start = std::time::Instant::now();
     runtime.block_on(async move {
         let engine = std::sync::Arc::new(M0Engine::new(config.clone()));
         engine.record_run_started();
@@ -260,13 +297,29 @@ fn replay(bundle_dir: &Path, verify_checksums: bool, scenario_path: Option<PathB
 
         let live_state = engine_state(&engine).await;
         if divergences.is_empty() {
-            println!(
-                "{{\"result\":\"ok\",\"replayed_ticks\":{},\"checksums_verified\":{},\"commands_replayed\":{},\"final_run_id\":\"{}\"}}",
-                next_tick,
-                recorded_checksums.len(),
-                recorded_commands.len(),
-                live_state.run_id
-            );
+            let mut ok = json!({
+                "result": "ok",
+                "replayed_ticks": next_tick,
+                "checksums_verified": if verify_checksums { recorded_checksums.len() } else { 0 },
+                "commands_replayed": recorded_commands.len(),
+                "final_run_id": live_state.run_id,
+            });
+            if !verify_checksums {
+                ok["checksum_verification"] = serde_json::Value::String("skipped".to_string());
+            }
+            if let Some(MeasureMode::Throughput) = measure {
+                let wall_time_ms = replay_start.elapsed().as_secs_f64() * 1000.0;
+                let throughput = if wall_time_ms > 0.0 {
+                    (next_tick as f64) / (wall_time_ms / 1000.0)
+                } else {
+                    0.0
+                };
+                let peak_mb = peak_memory_mb();
+                ok["throughput_ticks_per_sec"] = serde_json::json!(throughput);
+                ok["wall_time_ms"] = serde_json::json!(wall_time_ms);
+                ok["peak_memory_mb"] = serde_json::json!(peak_mb);
+            }
+            println!("{}", serde_json::to_string(&ok).unwrap_or_default());
             Ok::<_, anyhow::Error>(())
         } else {
             let first = divergences.first().expect("non-empty");
@@ -459,6 +512,56 @@ fn parse_command(payload: &Value) -> Option<ControlCommand> {
         }
         "runbundle.write" | "system.shutdown" => None,
         _ => None,
+    }
+}
+
+/// **M4 § Replay throughput benchmark**: best-effort peak resident-set-size
+/// reporter. On macOS uses `mach_task_basic_info::resident_size_max`; on
+/// Linux uses `/proc/self/status`'s `VmHWM`; on Windows uses
+/// `GetProcessMemoryInfo`. Falls back to 0.0 if the platform probe fails;
+/// the throughput envelope tolerates a zero value so CI doesn't fail on
+/// unfamiliar OSes.
+fn peak_memory_mb() -> f64 {
+    #[cfg(target_os = "linux")]
+    {
+        if let Ok(status) = std::fs::read_to_string("/proc/self/status") {
+            for line in status.lines() {
+                if let Some(rest) = line.strip_prefix("VmHWM:") {
+                    let kb: u64 = rest
+                        .trim()
+                        .trim_end_matches(" kB")
+                        .trim()
+                        .parse()
+                        .unwrap_or(0);
+                    return (kb as f64) / 1024.0;
+                }
+            }
+        }
+        0.0
+    }
+    #[cfg(target_os = "macos")]
+    {
+        unsafe extern "C" {
+            fn getrusage(who: i32, usage: *mut Rusage) -> i32;
+        }
+        #[repr(C)]
+        #[derive(Default)]
+        struct Rusage {
+            ru_utime: [i64; 2],
+            ru_stime: [i64; 2],
+            ru_maxrss: i64,
+            _pad: [i64; 14],
+        }
+        let mut ru = Rusage::default();
+        let rc = unsafe { getrusage(0 /* RUSAGE_SELF */, &mut ru) };
+        if rc != 0 {
+            return 0.0;
+        }
+        (ru.ru_maxrss as f64) / (1024.0 * 1024.0)
+    }
+    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
+    {
+        0.0
     }
 }
 

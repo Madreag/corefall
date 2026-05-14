@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "determinism_first_divergence.v0.1",
+  "title": "determinism.first_divergence payload",
+  "description": "M4 § Replay determinism + headless verifier. Emitted by cf-headless replay when the recorded per-tick checksum disagrees with the live re-run at the same tick.",
+  "type": "object",
+  "required": ["tick", "recorded", "live"],
+  "properties": {
+    "tick": { "type": "integer", "minimum": 0 },
+    "recorded": { "type": "string" },
+    "live": { "type": "string" },
+    "total_divergences": { "type": "integer", "minimum": 1 }
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "snapshot_terrain_chunk.v0.1",
+  "title": "snapshot.snapshot_terrain_chunk payload",
+  "description": "M4 § Snapshot writer. One per dirty chunk at coalesce boundary + every objective transition.",
+  "type": "object",
+  "required": ["cx", "cy"],
+  "properties": {
+    "cx": { "type": "integer" },
+    "cy": { "type": "integer" },
+    "default_material": { "type": ["integer", "string"] },
+    "schema": { "type": ["integer", "string"] },
+    "pixels_len": { "type": "integer", "minimum": 0 },
+    "pixels_blake3": { "type": "string" }
+  }
+}

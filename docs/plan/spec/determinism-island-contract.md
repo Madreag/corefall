@@ -4,7 +4,9 @@
 
 Every simulation tick in Corefall produces byte-identical output given the same
 inputs (seed, scenario, control commands, tick rate). This document defines what
-is inside the deterministic island and what is outside.
+is inside the deterministic island, what is outside, and the cross-platform
+float rules that keep the boundary stable across macOS aarch64, Linux x86_64,
+and Windows x86_64 (per DR-052 § Cross-platform float-determinism).
 
 ## Inside the Determinism Island (must be identical across platforms)
 
@@ -16,30 +18,97 @@ is inside the deterministic island and what is outside.
 | `cf-equipment` | RifleState tick (fire cooldown, reload countdown, ammo count) — tick-rate-independent via seconds × hz |
 | `cf-mission` | MissionState step (objective transitions, loss conditions, timer) |
 | `cf-ai` | ReactiveGuard step (perception, tactic scoring, fire decision, miss roll via seeded Rng) |
-| `cf-terrain` | ChunkedTerrain carve/blast (pixel mutation, dirty tracking) |
+| `cf-terrain` | ChunkedTerrain carve/blast (pixel mutation, dirty tracking, integrity grid) |
 | `cf-chassis` | ChassisState damage/repair/eject (zone state, module state, pilot lifecycle) |
-| `cf-replay` | Event envelope (tick + seq → event_id), Recorder append order |
+| `cf-replay` | Event envelope (tick + seq → event_id), Recorder append order, RecordId registry |
 
-## Outside the Determinism Island (may vary across platforms)
+## Outside the Determinism Island (cosmetic-only)
 
-| System | Why |
-|---|---|
-| `cf-render-2d` | GPU rendering is not deterministic across Metal/Vulkan/DX12 |
-| `cf-ui` | HUD text layout depends on font rasterizer |
-| `cf-capture` | PNG encoding, frame timing |
-| `cf-app` | Bevy frame scheduling, input polling cadence, window events |
-| `cf-control` server | WebSocket message ordering, connection timing |
-| Wall clock | `WallClock` is for pacing only; never feeds sim state |
+| System | Why | Cosmetic flag |
+|---|---|---|
+| `cf-render-2d` | GPU rendering is not deterministic across Metal/Vulkan/DX12 | `cosmetic: true` on every emitted event |
+| `cf-ui` | HUD text layout depends on font rasterizer | `cosmetic: true` |
+| `cf-audio` | Sound playback timing is wall-clock driven | `cosmetic: true` |
+| `cf-capture` | PNG encoding, frame timing | `cosmetic: true` |
+| `cf-app` | Bevy frame scheduling, input polling cadence, window events, camera shake | `cosmetic: true` |
+| `cf-control` server | WebSocket message ordering, connection timing | (irrelevant for sim checksum) |
+| Wall clock | `WallClock` is for pacing only; never feeds sim state | (n/a) |
+
+### Cosmetic event types (default-flagged)
+
+Per M4 § Cosmetic events excluded from determinism scope:
+
+- `terrain.debris_spawned` (visual particle; the underlying pixel removal is hashed)
+- `hazard.tick` (batched per-tick visualization; the hazard grid is hashed)
+- `affliction.tick` (batched per-tick damage application; affliction state is hashed)
+- `ux.banner_raised` / `ux.banner_dismissed`
+- `shield.hit` ripple (M13+ visual cosmetic; the GAMEPLAY `shield.hit` event is NOT cosmetic)
+- render-2d particle / spark / dust events
+- `capture.frame_emitted` (frame readback for offline review)
+
+Rule: cosmetic events **describe** the change; the state itself is hashed via
+`sim_state_v1`. A replay verifier with `cosmetic=true` events excluded MUST
+still detect every gameplay drift because the underlying state is hashed.
 
 ## Checksum Contract
 
-- Algorithm: BLAKE3 over `sim_state_v1` byte layout
-- Scope: tick counter + RNG state + actor world checksum_bytes + breach/terrain/reactor bytes
-- Cadence: configurable via `M0EngineConfig.checksum_cadence_ticks` (default 60)
-- Validation: cf-headless replays the recorded commands and compares every cadence checksum
-- Cross-platform: same checksum expected on macOS aarch64, Linux x86_64, Windows x86_64
+- **Algorithm**: BLAKE3 over `sim_state_v1` byte layout (fixed order, big-endian where applicable)
+- **Cadence**: configurable via `M0EngineConfig.checksum_cadence_ticks` (default 60)
+- **Validation**: cf-headless replays recorded control commands and compares every cadence checksum
+- **Cross-platform**: same checksum expected on macOS aarch64, Linux x86_64, Windows x86_64
 
-## Rules
+### `sim_state_v1` byte layout (M0..M4 layered additions)
+
+| Milestone | Bytes added (fixed order) |
+|---|---|
+| M0 | `tick_counter (u64)`, `rng_state_bytes` |
+| M1 | `+ actor_state_quantized` (per actor: id, pos_q16, vel_q16, hp_i16, status_u8, stance_u8, stability_q16, sharp_aim_q16, mass_q16, origin_id_u8) |
+| M3 | `+ terrain_chunk_grid` (per dirty chunk: blake3 of material_grid) `+ terrain_integrity_grid` (per chunk: integrity u8) |
+| M4 | `+ inventory_state` (per actor: slots + rifle ammo_in_mag + reloading) `+ mission_state` (phase + objective states + timer) |
+| M9 (later) | `+ hazard_grid`, `+ affliction_state`, `+ armor_layer_state`, `+ internal_organ_state`, `+ concussion_dose_state`, `+ fluid_reservoir_state`, `+ origin_state`, `+ reactor_state`, `+ atmospherics_state`, `+ environment_signal_state` |
+| M13 (later) | `+ chassis_state` (per-zone HP, module states, pilot state, eject ticks). Bumps scope to `sim_state_v2` with migration shim. |
+
+Each scope name is canonical; bumping requires a migration. `sim_state_v1`
+accepts the M0..M9 layered additions because they're additive (extending the
+byte stream doesn't change the algorithm — only the input).
+
+## Cross-Platform Float Rules (DR-052)
+
+These rules guarantee that the same `sim_state_v1` checksum is produced on every
+target platform:
+
+1. **`f32` only inside sim crates** — `cf-sim-core`, `cf-actor`, `cf-physics`,
+   `cf-equipment`, `cf-mission`, `cf-ai`, `cf-terrain`, `cf-chassis`,
+   `cf-material`, `cf-atmos`. No `f64` in these crates. Quantize via
+   `quantize_f32` (multiply by 10000, round to i32) for checksum bytes.
+2. **SSE2 + SSE4.2 target features on x86_64** — set
+   `RUSTFLAGS="-C target-feature=+sse2,+sse4.2"` in CI. Disables x87 FPU
+   80-bit-internal rounding inconsistencies between toolchains.
+3. **LLVM `-ffast-math` MUST be disabled** in sim crates. `fast-math` reorders
+   FP ops and breaks bit-determinism. Use `-Cllvm-args=-no-fast-math` or
+   verify the absence of `fp-arg-with-recip`-style optimizations.
+4. **No `rand::thread_rng()`** in sim crates — enforced by `clippy.toml`
+   `disallowed-methods`. Use the engine-seeded `Rng`.
+5. **No `SystemTime::now()`** in sim crates — enforced by `clippy.toml`.
+6. **No `HashMap` iteration order** in sim crates — use `BTreeMap` for
+   deterministic ordering.
+7. **All public sim mutators are pure** (`&mut self` → state out) with no
+   side effects, no callbacks, no script invocation.
+8. **Recorder hooks emit inert data only** (per CCCP `Atom.cpp:96-99`). The
+   recorder MUST NOT trigger subscriber callbacks or sim mutations from
+   collision/script paths.
+9. **Stable `RecordId(u64)` registry**, never raw pointers / pooled MOIDs
+   (per CCCP `MovableMan.cpp:126-143` stale pointer warning).
+
+## CI verification (M36+ scope)
+
+At M4 the surface is in place: `cf-headless replay <bundle>` reproduces the
+recorded checksums on whichever platform CI is currently running. The
+cross-platform Linux + Windows + macOS matrix that *compares* checksums across
+three target platforms lands at M36+ per DR-052. M4 ships the rules; M36+
+ships the matrix.
+
+## Rules summary
 
 1. No `rand::thread_rng()` inside sim crates — enforced by `clippy.toml` `disallowed-methods`
 2. No `SystemTime::now()` inside sim crates — enforced by `clippy.toml`
@@ -47,3 +116,6 @@ is inside the deterministic island and what is outside.
 4. All f32 math uses the same operations across platforms (no platform-specific intrinsics)
 5. `quantize_f32` (multiply by 10000, round, cast to i32) used in checksum_bytes for stability
 6. Every public mutator in sim crates is pure (`&mut self` → state out) with no side effects
+7. Cosmetic events are flagged `cosmetic: true` and excluded from `sim_state_v1` hashing
+8. Recorder hooks emit inert data only (no callbacks, no mutation)
+9. Stable `RecordId(u64)` registry; raw pointers / MOIDs never serialized

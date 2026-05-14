@@ -1,0 +1,21 @@
+{
+  "scenario": "m1_actor_range",
+  "tick_rate_hz": 120,
+  "description": "M4 § Acceptance: same control sequence at 120 Hz must replay-match its own bundle (per-rate determinism). cf-equipment + cf-actor use seconds-not-ticks for cadence, so fire RPS and reload duration remain constant; only the per-tick sub-step granularity changes. Cross-rate match (60Hz vs 120Hz) is NOT required at M4 — that lands at M36+ DR-052 CI gate.",
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+    { "method": "act.player.aim", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "act.player.move", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 240 } },
+    { "method": "act.player.fire", "params": { "pressed": true } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 16 } },
+    { "method": "act.player.fire", "params": { "pressed": false } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 120 } },
+    { "method": "act.player.reload", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 240 } },
+    { "method": "act.player.move", "params": { "x": -1.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 240 } },
+    { "method": "observe.once", "params": {} },
+    { "method": "runbundle.write", "params": {} }
+  ]
+}

@@ -50,6 +50,28 @@ EVENT_REQUIRED = (
     "event_type",
     "payload",
 )
+
+# M4 § Event envelope schema v0.1 is locked. The envelope MUST contain only the
+# fields below; additive payload extensions are fine, but any envelope field
+# addition requires a schema bump (v0.2).
+EVENT_ENVELOPE_ALLOWED = {
+    "schema_version",
+    "run_id",
+    "tick",
+    "sim_time_ms",
+    "event_id",
+    "category",
+    "event_type",
+    "payload",
+    "parent_event_id",
+    "actor_id",
+    "source_id",
+    "team",
+    "pos",
+    "bbox",
+    "dropped_count",
+    "cosmetic",
+}
 SUMMARY_REQUIRED = (
     "schema_version",
     "run_id",
@@ -192,6 +214,13 @@ def validate_run(run_dir: Path) -> list[str]:
     for index, event in enumerate(events, start=1):
         label = f"events.jsonl line {index}"
         require_fields(errors, label, event, EVENT_REQUIRED)
+
+        # M4: enforce envelope shape lock — reject unknown top-level fields.
+        for k in event.keys():
+            if k not in EVENT_ENVELOPE_ALLOWED:
+                errors.append(
+                    f"{label} envelope contains unknown field {k!r}; v0.1 envelope is locked"
+                )
 
         if event.get("schema_version") != EVENT_VERSION:
             errors.append(f"{label} schema_version must be {EVENT_VERSION}")
@@ -336,6 +365,82 @@ def validate_run(run_dir: Path) -> list[str]:
                 "run_manifest.expected_outcome=abort but events.jsonl has neither "
                 "system.run_finished nor system.panic"
             )
+
+    # M4 § Acceptance: system.category_baseline + system.run_started shape rules.
+    category_baseline = next(
+        (
+            e for e in events
+            if e.get("category") == "system" and e.get("event_type") == "category_baseline"
+        ),
+        None,
+    )
+    if category_baseline is None:
+        errors.append(
+            "events.jsonl missing system.category_baseline event (M4 § Event taxonomy)"
+        )
+    else:
+        payload = category_baseline.get("payload") or {}
+        categories = payload.get("categories")
+        if not isinstance(categories, list) or len(categories) < 36:
+            errors.append(
+                "system.category_baseline must declare at least 36 categories "
+                f"(M4 § Event taxonomy); found {len(categories) if isinstance(categories, list) else 0}"
+            )
+        else:
+            required_new = {
+                "hazard",
+                "shield",
+                "thermal",
+                "environment",
+                "armor",
+                "internal",
+                "concussion",
+                "fluid",
+                "origin",
+                "module",
+                "resource",
+                "ability",
+            }
+            seen = {c.get("name") for c in categories if isinstance(c, dict)}
+            missing = required_new - seen
+            if missing:
+                errors.append(
+                    "system.category_baseline missing M9/M13/M17 categories: "
+                    f"{sorted(missing)}"
+                )
+            for c in categories:
+                if not isinstance(c, dict):
+                    continue
+                status = c.get("status")
+                if status == "active" and "first_event_type" not in c:
+                    errors.append(
+                        f"system.category_baseline.{c.get('name')!r}: "
+                        "active category missing first_event_type"
+                    )
+                if status == "registered" and "ladder_at" not in c:
+                    errors.append(
+                        f"system.category_baseline.{c.get('name')!r}: "
+                        "registered category missing ladder_at"
+                    )
+
+    run_started = next(
+        (
+            e for e in events
+            if e.get("category") == "system" and e.get("event_type") == "run_started"
+        ),
+        None,
+    )
+    if run_started is None:
+        errors.append(
+            "events.jsonl missing system.run_started event (M4 § Expected outcome + system events)"
+        )
+    else:
+        rs_payload = run_started.get("payload") or {}
+        for f in ("protocol_version", "manifest_hash", "build_id", "scenario_id", "seed", "tick_rate_hz"):
+            if f not in rs_payload:
+                errors.append(
+                    f"system.run_started payload missing required field {f!r} (M4 § Expected outcome)"
+                )
 
     # LLM-graded test verdict (optional, gated on grading.json being present).
     # When the bundle has a grading.json artifact, the AI agent has produced

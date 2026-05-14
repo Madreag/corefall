@@ -62,6 +62,17 @@ const SCHEMA_AI_TACTIC_CHOSEN: &str = include_str!("../schemas/event/ai_tactic_c
 const SCHEMA_AI_MISSED_SHOT_REASON: &str = include_str!("../schemas/event/ai_missed_shot_reason.json");
 const SCHEMA_AI_STUCK_STATE_CHANGED: &str = include_str!("../schemas/event/ai_stuck_state_changed.json");
 const SCHEMA_AI_RECOVERY_ACTION: &str = include_str!("../schemas/event/ai_recovery_action.json");
+// M4 (2026-05-13): system/determinism/snapshot event schemas locked at v0.1.
+const SCHEMA_SYSTEM_RUN_STARTED: &str = include_str!("../schemas/event/system_run_started.json");
+const SCHEMA_SYSTEM_RUN_FINISHED: &str = include_str!("../schemas/event/system_run_finished.json");
+const SCHEMA_SYSTEM_CATEGORY_BASELINE: &str = include_str!("../schemas/event/system_category_baseline.json");
+const SCHEMA_DETERMINISM_SIM_CHECKSUM: &str = include_str!("../schemas/event/determinism_sim_checksum.json");
+const SCHEMA_DETERMINISM_FIRST_DIVERGENCE: &str = include_str!("../schemas/event/determinism_first_divergence.json");
+const SCHEMA_SNAPSHOT_ACTOR: &str = include_str!("../schemas/event/snapshot_actor.json");
+const SCHEMA_SNAPSHOT_INVENTORY: &str = include_str!("../schemas/event/snapshot_inventory.json");
+const SCHEMA_SNAPSHOT_TERRAIN_CHUNK: &str = include_str!("../schemas/event/snapshot_terrain_chunk.json");
+const SCHEMA_SNAPSHOT_TERRAIN_SUMMARY: &str = include_str!("../schemas/event/snapshot_terrain_summary.json");
+const SCHEMA_SNAPSHOT_CHASSIS: &str = include_str!("../schemas/event/snapshot_chassis.json");
 
 /// Look up the schema source by `(category, event_type)`. Returns `None` if
 /// no schema exists for this pair (callers treat as "no validation
@@ -103,6 +114,17 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("ai", "missed_shot_reason") => Some(SCHEMA_AI_MISSED_SHOT_REASON),
         ("ai", "stuck_state_changed") => Some(SCHEMA_AI_STUCK_STATE_CHANGED),
         ("ai", "recovery_action") => Some(SCHEMA_AI_RECOVERY_ACTION),
+        // M4: system/determinism/snapshot event schemas locked at v0.1.
+        ("system", "run_started") => Some(SCHEMA_SYSTEM_RUN_STARTED),
+        ("system", "run_finished") => Some(SCHEMA_SYSTEM_RUN_FINISHED),
+        ("system", "category_baseline") => Some(SCHEMA_SYSTEM_CATEGORY_BASELINE),
+        ("determinism", "sim_checksum") => Some(SCHEMA_DETERMINISM_SIM_CHECKSUM),
+        ("determinism", "first_divergence") => Some(SCHEMA_DETERMINISM_FIRST_DIVERGENCE),
+        ("snapshot", "snapshot_actor") => Some(SCHEMA_SNAPSHOT_ACTOR),
+        ("snapshot", "snapshot_inventory") => Some(SCHEMA_SNAPSHOT_INVENTORY),
+        ("snapshot", "snapshot_terrain_chunk") => Some(SCHEMA_SNAPSHOT_TERRAIN_CHUNK),
+        ("snapshot", "snapshot_terrain_summary") => Some(SCHEMA_SNAPSHOT_TERRAIN_SUMMARY),
+        ("snapshot", "snapshot_chassis") => Some(SCHEMA_SNAPSHOT_CHASSIS),
         _ => None,
     }
 }
@@ -245,6 +267,17 @@ mod tests {
             ("terrain", "anchor_material_result"),
             ("terrain", "terrain_material_probe"),
             ("terrain", "terrain_fill_or_repair"),
+            // M4 schemas
+            ("system", "run_started"),
+            ("system", "run_finished"),
+            ("system", "category_baseline"),
+            ("determinism", "sim_checksum"),
+            ("determinism", "first_divergence"),
+            ("snapshot", "snapshot_actor"),
+            ("snapshot", "snapshot_inventory"),
+            ("snapshot", "snapshot_terrain_chunk"),
+            ("snapshot", "snapshot_terrain_summary"),
+            ("snapshot", "snapshot_chassis"),
         ] {
             let raw = event_schema_for(cat, ty).unwrap_or_else(|| panic!("no schema for {cat}.{ty}"));
             let _parsed: RawSchema =

@@ -1,0 +1,15 @@
+{
+  "scenario": "micro_breach",
+  "tick_rate_hz": 60,
+  "expected_outcome": "abort",
+  "description": "M4 § Acceptance: act.player.abort triggers a clean abort lifecycle. The bundle's expected_outcome=abort must match the actual run outcome. prototype_run_check.py accepts abort bundles when at least one of system.run_finished or system.panic is present.",
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+    { "method": "act.player.move", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 60 } },
+    { "method": "act.player.abort", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 30 } },
+    { "method": "observe.once", "params": {} },
+    { "method": "runbundle.write", "params": {} }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "snapshot_inventory.v0.1",
+  "title": "snapshot.snapshot_inventory payload",
+  "description": "M4 § Snapshot writer. Per-actor inventory snapshot fired at scene start, on inventory_dropped, and on every objective transition.",
+  "type": "object",
+  "required": ["actor"],
+  "properties": {
+    "actor": { "type": ["integer", "string"] },
+    "selected_slot": { "type": "integer" },
+    "items": { "type": "array" },
+    "rifle_state": {
+      "type": ["object", "null"],
+      "properties": {
+        "ammo_in_mag": { "type": "integer", "minimum": 0 },
+        "mag_capacity": { "type": "integer", "minimum": 0 },
+        "reloading": { "type": "boolean" }
+      }
+    }
+  }
+}

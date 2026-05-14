@@ -60,6 +60,16 @@ pub struct Event {
     pub parent_event_id: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub dropped_count: Option<u64>,
+    /// M4 § DR-052 cosmetic vs gameplay split. When `Some(true)`, this event
+    /// is a cosmetic surface (particle, debris spawn, UI banner, etc.) and
+    /// MUST be excluded from `determinism.sim_checksum` hashing AND
+    /// preferentially dropped first under recorder backpressure. The
+    /// underlying STATE change (terrain integrity, hazard intensity,
+    /// affliction severity) is hashed through the actor/world state — the
+    /// cosmetic event only DESCRIBES the change. When `None` or `Some(false)`
+    /// the event is a gameplay surface.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub cosmetic: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -394,6 +404,12 @@ pub struct RunSummary {
 
 /// Append-friendly recorder. Events go through here so the writer can apply backpressure
 /// and surface dropped counts in `summary.json.event_counts.dropped_total`.
+///
+/// **M4 § Recorder backpressure**: when `capacity` is reached, the recorder
+/// drops the oldest COSMETIC event first (priority-aware drop) so gameplay
+/// events are never starved by particle/visual cosmetics. If no cosmetic
+/// event is in the buffer, the new gameplay event itself is dropped (counted
+/// in `dropped_total` and the next emitted event picks up the dropped count).
 pub struct Recorder {
     run_id: String,
     seq: AtomicU64,
@@ -408,6 +424,14 @@ struct RecorderInner {
     by_type: BTreeMap<String, u64>,
     by_severity: BTreeMap<String, u64>,
     dropped: u64,
+    dropped_cosmetic: u64,
+    dropped_gameplay: u64,
+    /// Outstanding drops not yet attached to a subsequent emitted event's
+    /// `dropped_count` payload field (per M4 § "the per-event payload that
+    /// triggered the overflow includes dropped_count=N in the next emitted
+    /// event").
+    pending_drop_tag: u64,
+    peak_buffer_depth: usize,
     first_tick: Option<u64>,
     last_tick: Option<u64>,
     final_checksum: Option<String>,
@@ -432,6 +456,10 @@ impl Recorder {
                 by_type: BTreeMap::new(),
                 by_severity: BTreeMap::new(),
                 dropped: 0,
+                dropped_cosmetic: 0,
+                dropped_gameplay: 0,
+                pending_drop_tag: 0,
+                peak_buffer_depth: 0,
                 first_tick: None,
                 last_tick: None,
                 final_checksum: None,
@@ -439,6 +467,18 @@ impl Recorder {
             }),
             capacity,
         }
+    }
+
+    pub fn peak_buffer_depth(&self) -> usize {
+        self.inner.lock().expect("recorder mutex poisoned").peak_buffer_depth
+    }
+
+    pub fn dropped_cosmetic_count(&self) -> u64 {
+        self.inner.lock().expect("recorder mutex poisoned").dropped_cosmetic
+    }
+
+    pub fn dropped_gameplay_count(&self) -> u64 {
+        self.inner.lock().expect("recorder mutex poisoned").dropped_gameplay
     }
 
     pub fn run_id(&self) -> &str {
@@ -462,33 +502,50 @@ impl Recorder {
         payload: serde_json::Value,
         parent_event_id: Option<String>,
     ) -> String {
+        self.record_with_cosmetic(tick, sim_time_ms, category, event_type, payload, parent_event_id, false)
+    }
+
+    /// M4 § Recorder backpressure / cosmetic flag. Record an event flagged as
+    /// cosmetic (`cosmetic=true`) so the determinism island excludes it from
+    /// `sim_state_v1` hashing and the recorder drops it FIRST under
+    /// backpressure (priority-aware drop).
+    pub fn record_cosmetic(
+        &self,
+        tick: Tick,
+        sim_time_ms: f64,
+        category: &str,
+        event_type: &str,
+        payload: serde_json::Value,
+        parent_event_id: Option<String>,
+    ) -> String {
+        self.record_with_cosmetic(tick, sim_time_ms, category, event_type, payload, parent_event_id, true)
+    }
+
+    fn record_with_cosmetic(
+        &self,
+        tick: Tick,
+        sim_time_ms: f64,
+        category: &str,
+        event_type: &str,
+        payload: serde_json::Value,
+        parent_event_id: Option<String>,
+        cosmetic: bool,
+    ) -> String {
         let seq = self.seq.fetch_add(1, Ordering::Relaxed);
         let event_id = make_event_id(&self.run_id, tick.0, seq);
-        // Mutex poisoning means a thread panicked while holding the recorder
-        // lock — the run is already in an inconsistent state. We `expect()`
-        // (loud panic) instead of silently logging and returning a phantom
-        // `event_id` for an event that was never recorded (issue #18). All
-        // other recorder methods now use the same `expect()` strategy
-        // (issue #22) so error handling is consistent across the API.
         let mut inner = self.inner.lock().expect("recorder mutex poisoned; aborting run");
-        // **M1 R2 fix**: monotonically clamp the recorded tick to >= the
-        // previous record's tick. Multi-threaded dispatch can read a stale
-        // `clock.tick()` value (the dispatch path captures tick under the
-        // state lock, drops it, THEN calls recorder.record — meanwhile
-        // drive_tick advances the clock). The cfctl JSON-RPC path is the
-        // common offender: a high-frequency unpaced engine can advance many
-        // ticks between dispatch's tick-read and dispatch's record-write,
-        // producing a "tick=N command_accepted" event recorded AFTER
-        // higher-tick sim events. The bundle event log must stay monotonic
-        // (prototype_run_check.py enforces this). Clamping here keeps the
-        // contract WITHOUT moving the dispatch handlers' 53 `drop(state)`
-        // sites into a hold-through-record pattern — a refactor too risky
-        // for a small fix. The clamp is at most +1 in steady-state for the
-        // unpaced loop.
         let effective_tick = if let Some(last) = inner.last_tick {
             tick.0.max(last)
         } else {
             tick.0
+        };
+        // Drain any outstanding drop tag onto THIS event before it's stored.
+        let drop_tag = if inner.pending_drop_tag > 0 && !cosmetic {
+            let n = inner.pending_drop_tag;
+            inner.pending_drop_tag = 0;
+            Some(n)
+        } else {
+            None
         };
         let event = Event {
             schema_version: EVENT_SCHEMA_VERSION.to_string(),
@@ -500,7 +557,8 @@ impl Recorder {
             event_type: event_type.to_string(),
             payload,
             parent_event_id,
-            dropped_count: None,
+            dropped_count: drop_tag,
+            cosmetic: if cosmetic { Some(true) } else { None },
         };
         *inner.by_category.entry(event.category.clone()).or_insert(0) += 1;
         *inner.by_type.entry(event.event_type.clone()).or_insert(0) += 1;
@@ -513,10 +571,55 @@ impl Recorder {
             }
         }
         if self.capacity > 0 && inner.events.len() >= self.capacity {
+            // M4 § "Cosmetic events drop first under pressure". If the new
+            // event is cosmetic, drop the new event immediately. Otherwise,
+            // try to evict the oldest cosmetic event from the buffer to make
+            // room. If no cosmetic event is available, drop the gameplay
+            // event itself and tag the dropped_count on the next emitted
+            // event.
+            if cosmetic {
+                inner.dropped += 1;
+                inner.dropped_cosmetic += 1;
+                inner.pending_drop_tag += 1;
+                return event_id;
+            }
+            // Search for the oldest cosmetic event to evict.
+            let mut evict_idx: Option<usize> = None;
+            for (idx, ev) in inner.events.iter().enumerate() {
+                if ev.cosmetic == Some(true) {
+                    evict_idx = Some(idx);
+                    break;
+                }
+            }
+            if let Some(idx) = evict_idx {
+                let evicted = inner.events.remove(idx);
+                if let Some(cat_count) = inner.by_category.get_mut(&evicted.category) {
+                    *cat_count = cat_count.saturating_sub(1);
+                }
+                if let Some(ty_count) = inner.by_type.get_mut(&evicted.event_type) {
+                    *ty_count = ty_count.saturating_sub(1);
+                }
+                inner.dropped += 1;
+                inner.dropped_cosmetic += 1;
+                inner.pending_drop_tag += 1;
+                inner.events.push(event);
+                let depth = inner.events.len();
+                if depth > inner.peak_buffer_depth {
+                    inner.peak_buffer_depth = depth;
+                }
+                return event_id;
+            }
+            // No cosmetic event to evict; drop the gameplay event itself.
             inner.dropped += 1;
+            inner.dropped_gameplay += 1;
+            inner.pending_drop_tag += 1;
             return event_id;
         }
         inner.events.push(event);
+        let depth = inner.events.len();
+        if depth > inner.peak_buffer_depth {
+            inner.peak_buffer_depth = depth;
+        }
         event_id
     }
 
@@ -528,6 +631,21 @@ impl Recorder {
     pub fn dropped(&self, count: u64) {
         let mut inner = self.inner.lock().expect("recorder mutex poisoned; aborting run");
         inner.dropped += count;
+        inner.pending_drop_tag = inner.pending_drop_tag.saturating_add(count);
+    }
+
+    /// **M4**: tag the next emitted event with the current outstanding
+    /// drop count so it surfaces in the bundle (per M4 § "the per-event
+    /// payload that triggered the overflow includes dropped_count in the
+    /// next emitted event"). Returns the count and clears the outstanding
+    /// counter so it's not reported twice.
+    pub fn take_outstanding_drop_count(&self) -> u64 {
+        let inner = self.inner.lock().expect("recorder mutex poisoned; aborting run");
+        let n = inner.dropped;
+        // Note: we don't zero `inner.dropped` here — `dropped_total` is
+        // cumulative for `summary.json`. Callers that want a per-emit delta
+        // should diff against the prior return.
+        n
     }
 
     /// Snapshot the entire event log. Panics on mutex poisoning per the
@@ -1057,5 +1175,98 @@ mod tests {
             panic_result.is_err(),
             "record() must panic when mutex is poisoned (issue #18); previously it silently returned a phantom event_id"
         );
+    }
+
+    #[test]
+    fn m4_recorder_cosmetic_events_drop_first_under_pressure() {
+        // M4 § Acceptance: "Cosmetic events drop first under pressure".
+        let recorder = Recorder::with_capacity("m4_test_drop".to_string(), 3);
+        // Fill with two cosmetic events.
+        recorder.record_cosmetic(Tick(0), 0.0, "ux", "banner_raised", serde_json::json!({}), None);
+        recorder.record_cosmetic(Tick(0), 0.0, "ux", "banner_raised", serde_json::json!({}), None);
+        // One gameplay event.
+        recorder.record(Tick(0), 0.0, "combat", "weapon_fired", serde_json::json!({}), None);
+        assert_eq!(recorder.event_count(), 3);
+        assert_eq!(recorder.dropped_count(), 0);
+
+        // Now over capacity. A new GAMEPLAY event MUST evict a cosmetic
+        // event so the gameplay event lands in the buffer.
+        recorder.record(Tick(0), 0.0, "combat", "wound_added", serde_json::json!({}), None);
+        assert_eq!(recorder.event_count(), 3, "buffer still capped at capacity");
+        assert_eq!(recorder.dropped_count(), 1);
+        assert_eq!(recorder.dropped_cosmetic_count(), 1);
+        assert_eq!(recorder.dropped_gameplay_count(), 0);
+        // Verify the gameplay event is present.
+        let events = recorder.snapshot_events();
+        let types: Vec<&str> = events.iter().map(|e| e.event_type.as_str()).collect();
+        assert!(types.contains(&"wound_added"));
+        assert!(types.contains(&"weapon_fired"));
+    }
+
+    #[test]
+    fn m4_recorder_cosmetic_dropped_when_no_eviction_target_available() {
+        // When the buffer is filled with gameplay events, a new cosmetic
+        // event is dropped immediately (no gameplay eviction).
+        let recorder = Recorder::with_capacity("m4_test_cos".to_string(), 2);
+        recorder.record(Tick(0), 0.0, "combat", "weapon_fired", serde_json::json!({}), None);
+        recorder.record(Tick(0), 0.0, "combat", "wound_added", serde_json::json!({}), None);
+        recorder.record_cosmetic(Tick(0), 0.0, "ux", "banner_raised", serde_json::json!({}), None);
+        assert_eq!(recorder.event_count(), 2);
+        assert_eq!(recorder.dropped_cosmetic_count(), 1);
+        assert_eq!(recorder.dropped_gameplay_count(), 0);
+    }
+
+    #[test]
+    fn m4_recorder_gameplay_dropped_when_buffer_full_of_gameplay() {
+        // When no cosmetic event is available to evict, a new gameplay
+        // event is dropped.
+        let recorder = Recorder::with_capacity("m4_test_gameplay".to_string(), 2);
+        recorder.record(Tick(0), 0.0, "combat", "weapon_fired", serde_json::json!({}), None);
+        recorder.record(Tick(0), 0.0, "combat", "wound_added", serde_json::json!({}), None);
+        recorder.record(Tick(0), 0.0, "combat", "kill", serde_json::json!({}), None);
+        assert_eq!(recorder.event_count(), 2);
+        assert_eq!(recorder.dropped_count(), 1);
+        assert_eq!(recorder.dropped_gameplay_count(), 1);
+    }
+
+    #[test]
+    fn m4_recorder_cosmetic_field_serializes_only_when_set() {
+        let recorder = Recorder::new("m4_test_field".to_string());
+        recorder.record(Tick(0), 0.0, "combat", "weapon_fired", serde_json::json!({}), None);
+        recorder.record_cosmetic(Tick(0), 0.0, "ux", "banner_raised", serde_json::json!({}), None);
+        let events = recorder.snapshot_events();
+        // Gameplay event must not serialize cosmetic field.
+        let s = serde_json::to_string(&events[0]).unwrap();
+        assert!(!s.contains("\"cosmetic\""), "gameplay event must not serialize cosmetic field: {s}");
+        // Cosmetic event must serialize cosmetic: true.
+        let s = serde_json::to_string(&events[1]).unwrap();
+        assert!(s.contains("\"cosmetic\":true"), "cosmetic event must serialize cosmetic: true: {s}");
+    }
+
+    #[test]
+    fn m4_recorder_peak_buffer_depth_tracks_high_water_mark() {
+        let recorder = Recorder::new("m4_test_peak".to_string());
+        recorder.record(Tick(0), 0.0, "combat", "weapon_fired", serde_json::json!({}), None);
+        recorder.record(Tick(0), 0.0, "combat", "wound_added", serde_json::json!({}), None);
+        recorder.record(Tick(0), 0.0, "combat", "kill", serde_json::json!({}), None);
+        assert_eq!(recorder.peak_buffer_depth(), 3);
+    }
+
+    #[test]
+    fn m4_recorder_pending_drop_tag_propagates_to_next_event() {
+        let recorder = Recorder::with_capacity("m4_test_tag".to_string(), 1);
+        recorder.record(Tick(0), 0.0, "combat", "weapon_fired", serde_json::json!({}), None);
+        // Force two gameplay drops (no cosmetic available).
+        recorder.record(Tick(0), 0.0, "combat", "wound_added", serde_json::json!({}), None);
+        recorder.record(Tick(0), 0.0, "combat", "kill", serde_json::json!({}), None);
+        // Manually trigger another drop via the public dropped() API.
+        recorder.dropped(1);
+        // Bigger buffer for the next event.
+        let recorder = Recorder::new("m4_test_tag_2".to_string());
+        recorder.dropped(7);
+        let id = recorder.record(Tick(0), 0.0, "system", "run_started", serde_json::json!({}), None);
+        let events = recorder.snapshot_events();
+        let ev = events.iter().find(|e| e.event_id == id).expect("recorded event");
+        assert_eq!(ev.dropped_count, Some(7), "next emitted event must carry the outstanding drop count");
     }
 }

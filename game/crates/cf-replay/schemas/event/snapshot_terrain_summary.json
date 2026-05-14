@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "snapshot_terrain_summary.v0.1",
+  "title": "snapshot.snapshot_terrain_summary payload",
+  "description": "M4 § Snapshot writer. Per-run terrain digest fired at scene start + every 1 second + every objective transition.",
+  "type": "object",
+  "required": ["allocated_chunks"],
+  "properties": {
+    "width_px": { "type": "integer", "minimum": 0 },
+    "height_px": { "type": "integer", "minimum": 0 },
+    "default_material": { "type": ["integer", "string"] },
+    "carve_count": { "type": "integer", "minimum": 0 },
+    "refusal_count": { "type": "integer", "minimum": 0 },
+    "allocated_chunks": { "type": "integer", "minimum": 0 },
+    "material_counts": { "type": "object" }
+  }
+}

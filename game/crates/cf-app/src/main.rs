@@ -165,6 +165,36 @@ struct Cli {
     /// overlay is hidden. Acceptance criterion 'AI debug labels'.
     #[arg(long)]
     ai_debug: bool,
+    /// **M4 § Expected outcome contract**: declare the lifecycle outcome
+    /// the caller expects from this run. The canonical run-bundle checker
+    /// (`prototype_run_check.py`) verifies that the actual outcome matches
+    /// (`clean` requires exactly one `system.run_finished` + zero
+    /// `system.panic`; `panic` requires at least one `system.panic`; `abort`
+    /// is permissive). When omitted, defaults to `clean` (the M3A-005
+    /// default). Used by cfctl scripts that intentionally produce panic /
+    /// abort bundles to prove the checker rejects mismatches.
+    #[arg(long, value_enum)]
+    expected_outcome: Option<ExpectedOutcomeArg>,
+}
+
+/// CLI projection of `cf_replay::ExpectedOutcome` so clap can parse a string
+/// value into the manifest enum without exposing cf-replay's serde wrapper
+/// directly.
+#[derive(Debug, Clone, Copy, clap::ValueEnum)]
+enum ExpectedOutcomeArg {
+    Clean,
+    Panic,
+    Abort,
+}
+
+impl From<ExpectedOutcomeArg> for cf_replay::ExpectedOutcome {
+    fn from(v: ExpectedOutcomeArg) -> Self {
+        match v {
+            ExpectedOutcomeArg::Clean => cf_replay::ExpectedOutcome::Clean,
+            ExpectedOutcomeArg::Panic => cf_replay::ExpectedOutcome::Panic,
+            ExpectedOutcomeArg::Abort => cf_replay::ExpectedOutcome::Abort,
+        }
+    }
 }
 
 #[derive(Debug, Clone)]
@@ -523,6 +553,7 @@ fn build_config(cli: &Cli, scenario_path: PathBuf) -> Result<M0EngineConfig> {
         duration_ticks_override: if cli_duration > 0 { Some(cli_duration) } else { None },
         debug_inject_panic_at_tick: cli.debug_inject_panic_at_tick,
         checksum_cadence_ticks: cli.checksum_cadence_ticks,
+        expected_outcome: cli.expected_outcome.map(Into::into),
     };
     build_engine_config(inputs).context("build_engine_config failed for cf-app")
 }

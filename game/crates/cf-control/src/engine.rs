@@ -156,6 +156,11 @@ pub struct M0EngineConfig {
     /// manifest. Applied to each reactive guard at engine construction.
     /// `None` keeps each guard's params as authored.
     pub difficulty_preset: Option<String>,
+    /// **M4 § Expected outcome contract**: when `Some(...)`, overrides the
+    /// inferred default in `build_manifest`. `None` lets the engine derive
+    /// the outcome (Panic if `debug_inject_panic_at_tick` is set, else
+    /// Clean).
+    pub expected_outcome_override: Option<cf_replay::ExpectedOutcome>,
 }
 
 /// M1.5: initial breach world snapshot.
@@ -283,6 +288,7 @@ impl M0EngineConfig {
             initial_reactors: Vec::new(),
             checksum_cadence_ticks: ChecksumConfig::m0_default().cadence_ticks,
             difficulty_preset: None,
+            expected_outcome_override: None,
         }
     }
 
@@ -989,11 +995,21 @@ impl M0Engine {
             "run_started",
             json!({
                 "scenario": self.config.scenario_id,
+                "scenario_id": self.config.scenario_id,
                 "seed": self.config.seed,
                 "tick_rate_hz": self.config.tick_rate_hz,
                 "run_mode": self.config.run_mode,
                 "control_api": self.config.control_api_enabled,
                 "protocol_version": crate::SCHEMA_VERSION,
+                // **M4 § system.run_started carries protocol_version +
+                // manifest_hash + build_id**. The manifest hash mirrors
+                // `run_manifest.json.config_hash` (blake3 of effective
+                // settings + scenario id) so an offline reviewer can pin
+                // the bundle to its config without parsing the manifest.
+                // `build_id` is the cf-app git commit short hash from
+                // `cf_replay::BuildInfo.commit_sha`.
+                "manifest_hash": self.config.config_hash,
+                "build_id": self.config.commit_sha,
                 "settings": settings_value,
             }),
             None,
@@ -1059,51 +1075,89 @@ impl M0Engine {
         self.spawn_debug_panic_if_requested();
     }
 
-    /// M3A item 91: emit a `system.category_baseline` event listing every event
-    /// category the engine is aware of. Categories without active producers at
-    /// this BP are marked `status: "registered"` so the run bundle proves the
-    /// taxonomy is declared even before producers ship.
+    /// M4 § Event taxonomy: emit `system.category_baseline` once at run start
+    /// declaring every event category. Categories with active producers carry
+    /// `first_event_type`; categories whose producers ladder up later carry
+    /// `ladder_at` pointing at the owning milestone. The schema is locked at
+    /// M4; producers flip status from `registered` to `active` at their
+    /// owning milestone without forcing a schema bump.
     fn emit_category_baseline(&self, tick: Tick, sim_time_ms: f64, parent_event_id: &str) {
-        let categories = vec![
-            ("input", "active"),
-            ("control", "active"),
-            ("actor", "active"),
-            ("equipment", "active"),
-            ("combat", "active"),
-            ("terrain", "active"),
-            ("mission", "active"),
-            ("ai", "active"),
-            ("snapshot", "active"),
-            ("determinism", "active"),
-            ("system", "active"),
-            ("chassis", "active"),
-            ("capture", "active"),
-            ("mind", "registered"),
-            ("collision", "registered"),
-            ("server", "registered"),
-            ("anti_cheat", "registered"),
-            ("mmo", "registered"),
-            ("material", "registered"),
-            ("reaction", "registered"),
-            ("atmospherics", "registered"),
-            ("affliction", "registered"),
-            ("body", "registered"),
-            ("logistics", "registered"),
-            ("ux", "registered"),
-            ("accessibility", "registered"),
-            ("performance", "registered"),
+        // (name, status, first_event_type_or_ladder_at)
+        // For `active` rows, the third tuple element is the canonical first
+        // event_type (string under `first_event_type`).
+        // For `registered` rows, the third tuple element is the owning
+        // milestone (string under `ladder_at`).
+        let active_categories: &[(&str, &str)] = &[
+            ("input", "input.intent_received"),
+            ("control", "control.command_received"),
+            ("actor", "actor.snapshot"),
+            ("equipment", "equipment.weapon_fired"),
+            ("combat", "combat.weapon_fired"),
+            ("terrain", "terrain.terrain_carved"),
+            ("mission", "mission.mission_started"),
+            ("ai", "ai.state_changed"),
+            ("snapshot", "snapshot.snapshot_actor"),
+            ("determinism", "determinism.sim_checksum"),
+            ("system", "system.run_started"),
+            ("capture", "capture.frame_emitted"),
+            ("atmospherics", "atmos.pressure_changed"),
+            ("affliction", "affliction.applied"),
+            ("hazard", "hazard.spawned"),
+            ("thermal", "thermal.signature_changed"),
+            ("environment", "environment.signal_delta"),
+            ("armor", "armor.layer_hp_changed"),
+            ("internal", "internal.organ_damaged"),
+            ("concussion", "concussion.dose_changed"),
+            ("fluid", "fluid.leak_started"),
+            ("origin", "origin.shot_force_feedback"),
+            ("body", "actor.actor_status_changed"),
+            ("ux", "ux.banner_raised"),
+            ("accessibility", "accessibility.settings_changed"),
+            ("performance", "performance.tick_cost_sample"),
         ];
+        // Registered categories whose producer ladders up at a later milestone.
+        let registered_categories: &[(&str, &str)] = &[
+            ("mind", "M23"),
+            ("collision", "M14"),
+            ("server", "M36"),
+            ("anti_cheat", "M36"),
+            ("mmo", "M49"),
+            ("material", "M15"),
+            ("reaction", "M15"),
+            ("shield", "M13+"),
+            ("module", "M13+"),
+            ("resource", "M17"),
+            ("logistics", "M25"),
+            ("chassis", "M13"),
+            ("ability", "M13+"),
+        ];
+        let mut categories: Vec<serde_json::Value> = Vec::new();
+        for (name, first_event_type) in active_categories {
+            categories.push(json!({
+                "name": name,
+                "status": "active",
+                "first_event_type": first_event_type,
+            }));
+        }
+        for (name, ladder_at) in registered_categories {
+            categories.push(json!({
+                "name": name,
+                "status": "registered",
+                "ladder_at": ladder_at,
+            }));
+        }
+        let active = active_categories.len();
+        let total = categories.len();
         self.recorder.record(
             tick,
             sim_time_ms,
             "system",
             "category_baseline",
             json!({
-                "categories": categories.iter()
-                    .map(|(name, status)| json!({"name": name, "status": status}))
-                    .collect::<Vec<_>>(),
-                "total": categories.len(),
-                "active": categories.iter().filter(|(_, s)| *s == "active").count(),
+                "schema_version": 1,
+                "categories": categories,
+                "total": total,
+                "active": active,
             }),
             Some(parent_event_id.to_string()),
         );
@@ -1238,6 +1292,24 @@ impl M0Engine {
                 parent_event_id.map(|s| s.to_string()),
             );
         }
+        // **M4 § snapshot_chassis (M13 forward-compat placeholder)**: emit
+        // a placeholder snapshot event so M10's replay viewer and any
+        // chassis-aware tooling can pre-bind to the surface. M13 fills the
+        // payload with per-zone HP, module states, pilot lifecycle. At M4
+        // we emit `placeholder=true` so the viewer ignores the body.
+        self.recorder.record(
+            tick,
+            sim_time_ms,
+            "snapshot",
+            "snapshot_chassis",
+            json!({
+                "schema_version": 1,
+                "placeholder": true,
+                "milestone_ready": "M13",
+                "actors_with_chassis": serde_json::Value::Array(vec![]),
+            }),
+            parent_event_id.map(|s| s.to_string()),
+        );
     }
 
     /// **DEBUG-ONLY**: spawn a worker thread that panics at the requested tick if
@@ -4914,18 +4986,35 @@ impl M0Engine {
                 reduce_camera_shake_pct: live_settings.reduce_camera_shake_pct,
                 tick_rate_hz: self.config.tick_rate_hz,
             },
-            checksum: ChecksumConfig::m0_default(),
-            tick_rate_hz: self.config.tick_rate_hz,
-            // M3A-005: declare lifecycle outcome. cf-app + cfctl + cf-e2e
-            // drive runs that exit cleanly via `system.run_finished`. The
-            // panic-injection debug path (`cf-app --debug-inject-panic-at-tick`)
-            // overrides this to `Panic` so the bundle's expected_outcome
-            // matches the produced events.
-            expected_outcome: if self.config.debug_inject_panic_at_tick.is_some() {
-                cf_replay::ExpectedOutcome::Panic
-            } else {
-                cf_replay::ExpectedOutcome::Clean
+            // **M4 § Per-scenario checksum cadence**: respect the engine's
+            // configured `checksum_cadence_ticks` (which the CLI flag
+            // `--checksum-cadence-ticks <N>` plumbs through). Previously
+            // the manifest always reported the m0_default cadence (60),
+            // so the cf-headless replay verifier couldn't reconstruct the
+            // bundle's actual cadence and produced phantom divergences on
+            // off-default cadences.
+            checksum: ChecksumConfig {
+                algorithm: cf_sim_core::checksum::CHECKSUM_ALGORITHM.to_string(),
+                scope: cf_sim_core::checksum::CHECKSUM_SCOPE.to_string(),
+                cadence_ticks: self.config.checksum_cadence_ticks,
             },
+            tick_rate_hz: self.config.tick_rate_hz,
+            // M3A-005 / M4: declared lifecycle outcome. The CLI's
+            // `--expected-outcome <clean|panic|abort>` flag wins via
+            // `expected_outcome_override`. Otherwise, the panic-injection
+            // debug path (`cf-app --debug-inject-panic-at-tick`) flips the
+            // default to Panic so the produced events match. Everything
+            // else defaults to Clean.
+            expected_outcome: self
+                .config
+                .expected_outcome_override
+                .unwrap_or_else(|| {
+                    if self.config.debug_inject_panic_at_tick.is_some() {
+                        cf_replay::ExpectedOutcome::Panic
+                    } else {
+                        cf_replay::ExpectedOutcome::Clean
+                    }
+                }),
         }
     }
 }

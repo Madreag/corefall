@@ -49,6 +49,12 @@ pub struct ConfigInputs {
     /// M3A: override checksum cadence (ticks between sim_checksum events).
     /// `None` = use default from `ChecksumConfig::m0_default().cadence_ticks` (60).
     pub checksum_cadence_ticks: Option<u64>,
+    /// **M4 § Expected outcome contract**: declared lifecycle outcome.
+    /// `None` = leave whatever the engine derives (e.g. Panic if
+    /// `debug_inject_panic_at_tick` is set, otherwise Clean). When the CLI
+    /// sets `--expected-outcome <clean|panic|abort>` the manifest enforces
+    /// this declaration regardless of the inferred default.
+    pub expected_outcome: Option<cf_replay::ExpectedOutcome>,
 }
 
 /// Locate `<root>/content/scenarios/<id>.ron`. Searches a few well-known prefixes so
@@ -105,6 +111,7 @@ pub fn build_engine_config(inputs: ConfigInputs) -> Result<M0EngineConfig, Confi
     if let Some(cadence) = inputs.checksum_cadence_ticks {
         config.checksum_cadence_ticks = cadence;
     }
+    config.expected_outcome_override = inputs.expected_outcome;
     config.commit_sha = git_commit_sha();
     let worktree = git_worktree_info();
     config.worktree_dirty = worktree.dirty;
