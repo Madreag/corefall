@@ -127,6 +127,19 @@ pub struct ScenarioActor {
     /// **M5**: optional origin tag (`human`, `robot`, `android`).
     #[serde(default)]
     pub origin_id: Option<String>,
+    /// **M6**: optional squad role. When set, the engine adds this actor to
+    /// the [`cf_squad::Squad`] at scenario init and emits one
+    /// `squad.member_added` event. Accepted values: `"leader"` /
+    /// `"follower"`. `None` for non-squad actors (enemies, dummies).
+    #[serde(default)]
+    pub squad_role: Option<String>,
+    /// **M6**: optional friendly-AI hint surfaced by the engine for
+    /// squad followers. Currently unused beyond influencing the bot's
+    /// default `current_command` (FollowLeader); M7 expands to full
+    /// archetypes. Free-form string tag (`"rifleman"` / `"medic"` /
+    /// `"engineer"` etc).
+    #[serde(default)]
+    pub squad_archetype: Option<String>,
 }
 
 /// **M5** scenario manifest entry for chassis attachment. Resolves to a
