@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/armor.layer_destroyed.v0.1",
+  "title": "armor.layer_destroyed",
+  "description": "M5 § armor.* family — declarative event schema locked at v0.1. Fires when an armor layer reaches hp == 0. Producer fills at M13 (chassis 3-layer armor) + M14 (full collision). Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "armor" },
+    "event_type": { "const": "layer_destroyed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "item_id": { "type": "integer" },
+        "zone": { "type": "string", "enum": ["head", "torso", "arm_left", "arm_right", "forearm_left", "forearm_right", "hand_left", "hand_right", "leg_left", "leg_right", "shin_left", "shin_right", "foot_left", "foot_right", "backpack"] },
+        "layer": { "type": "string", "enum": ["External", "Internal", "Core"] },
+        "breach_kind": { "type": "string", "enum": ["punctured", "shattered", "melted", "chemically_corroded"] }
+      },
+      "required": ["item_id", "zone", "layer", "breach_kind"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

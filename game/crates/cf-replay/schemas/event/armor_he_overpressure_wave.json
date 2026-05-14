@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/armor.he_overpressure_wave.v0.1",
+  "title": "armor.he_overpressure_wave",
+  "description": "M5 § armor.* family — declarative event schema locked at v0.1. Fires for an HE round detonating with a radial overpressure wave that propagates through nearby internal modules. Producer fills at M13 + M14. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "armor" },
+    "event_type": { "const": "he_overpressure_wave" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "center": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "radius": { "type": "number", "minimum": 0.0 },
+        "overpressure_pa": { "type": "number" },
+        "modules_affected": {
+          "type": "array",
+          "items": { "type": ["integer", "string"] }
+        }
+      },
+      "required": ["center", "radius", "overpressure_pa", "modules_affected"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

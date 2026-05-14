@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/thermal.material_phase_change.v0.1",
+  "title": "thermal.material_phase_change",
+  "description": "M5 § thermal.* family — declarative event schema locked at v0.1. Material phase change (e.g. ice → water, water → vapor, metal → molten). latent_heat_consumed_j is the joules absorbed/released. Producer fills at M19 (material kernel). Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "thermal" },
+    "event_type": { "const": "material_phase_change" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "material_id": { "type": ["integer", "string"] },
+        "from_phase": { "type": "string" },
+        "to_phase": { "type": "string" },
+        "position": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "latent_heat_consumed_j": { "type": "number" }
+      },
+      "required": ["material_id", "from_phase", "to_phase", "position", "latent_heat_consumed_j"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

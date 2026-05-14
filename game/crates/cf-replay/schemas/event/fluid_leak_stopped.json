@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/fluid.leak_stopped.v0.1",
+  "title": "fluid.leak_stopped",
+  "description": "M5 § fluid.* family — declarative event schema locked at v0.1. Fires when an active leak stops (sealed via field-repair, fully repaired, or the source reservoir went empty). Producer fills at M13. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "fluid" },
+    "event_type": { "const": "leak_stopped" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "fluid_kind": { "type": "string", "enum": ["oil", "coolant", "fuel", "electrolyte"] },
+        "reason": { "type": "string", "enum": ["sealed", "repaired", "reservoir_empty"] }
+      },
+      "required": ["actor_id", "fluid_kind", "reason"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

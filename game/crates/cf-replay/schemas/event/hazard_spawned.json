@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/hazard.spawned.v0.1",
+  "title": "hazard.spawned",
+  "description": "M5 § hazard.* family — declarative event schema locked at v0.1. 5 launch hazard kinds (locked): fire, smoke, electric, wet, hot_cold. M16 extends to 9 with acid, radiation, toxic. Schema enum permits all 9 names. Producer fills at M16. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "hazard" },
+    "event_type": { "const": "spawned" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "hazard_id": { "type": ["integer", "string"] },
+        "kind": { "type": "string", "enum": ["fire", "smoke", "electric", "wet", "hot", "cold", "acid", "radiation", "toxic"] },
+        "position": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "intensity": { "type": "number" },
+        "source_event_id": { "type": "string" }
+      },
+      "required": ["hazard_id", "kind", "position", "intensity", "source_event_id"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

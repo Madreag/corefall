@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/atmos.temperature_changed.v0.1",
+  "title": "atmos.temperature_changed",
+  "description": "M5 § atmos.* family — declarative event schema locked at v0.1. Per-atmosphere temperature delta in Kelvin. source describes the cause (heat_jet, fire, electrolysis, vent). Producer fills at M19. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "atmos" },
+    "event_type": { "const": "temperature_changed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "atm_id": { "type": ["integer", "string"] },
+        "from_k": { "type": "number" },
+        "to_k": { "type": "number" },
+        "source": { "type": "string" }
+      },
+      "required": ["atm_id", "from_k", "to_k", "source"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

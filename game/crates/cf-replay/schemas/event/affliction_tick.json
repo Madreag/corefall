@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/affliction.tick.v0.1",
+  "title": "affliction.tick",
+  "description": "M5 § affliction.* family — declarative event schema locked at v0.1. Consolidated cosmetic per-tick affliction application (e.g. burning subtracts hp every N ticks). The cosmetic flag excludes this from determinism.sim_checksum per DR-052; sim authoritative effects use other affliction.* events. Producer fills at M16. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "affliction" },
+    "event_type": { "const": "tick" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "cosmetic": { "type": ["boolean", "null"] },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "kind": { "type": "string", "enum": ["burning", "wet", "electrified", "poisoned", "hypoxic", "combustible_atmosphere", "breach_decomp", "hyperthermic", "hypothermic", "radiation", "concussed", "deafened", "bleeding", "internal_shock", "low_battery", "coolant_leaking", "oil_leaking", "overheating", "hunger", "thirst", "sleep_dep", "sanity_low"] },
+        "hp_delta": { "type": "number" },
+        "tick": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["actor_id", "kind", "hp_delta", "tick"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

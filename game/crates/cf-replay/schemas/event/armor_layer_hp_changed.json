@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/armor.layer_hp_changed.v0.1",
+  "title": "armor.layer_hp_changed",
+  "description": "M5 § armor.* family — declarative event schema locked at v0.1. Producer fills at M13 (chassis 3-layer armor) + M14 (full collision). Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "armor" },
+    "event_type": { "const": "layer_hp_changed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "item_id": { "type": "integer" },
+        "zone": { "type": "string", "enum": ["head", "torso", "arm_left", "arm_right", "forearm_left", "forearm_right", "hand_left", "hand_right", "leg_left", "leg_right", "shin_left", "shin_right", "foot_left", "foot_right", "backpack"] },
+        "layer": { "type": "string", "enum": ["External", "Internal", "Core"] },
+        "from": { "type": "number" },
+        "to": { "type": "number" },
+        "cause": { "type": "string" },
+        "ap_factor": { "type": "number" }
+      },
+      "required": ["actor_id", "item_id", "zone", "layer", "from", "to", "cause", "ap_factor"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

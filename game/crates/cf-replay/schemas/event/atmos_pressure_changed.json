@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/atmos.pressure_changed.v0.1",
+  "title": "atmos.pressure_changed",
+  "description": "M5 § atmos.* family — declarative event schema locked at v0.1. Per-atmosphere pressure delta (atm_id references a Stationeers-grade atmosphere zone, sealed or open). Producer fills at M19 (atmospherics kernel). Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "atmos" },
+    "event_type": { "const": "pressure_changed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "atm_id": { "type": ["integer", "string"] },
+        "from_pa": { "type": "number" },
+        "to_pa": { "type": "number" },
+        "source": { "type": "string" }
+      },
+      "required": ["atm_id", "from_pa", "to_pa", "source"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

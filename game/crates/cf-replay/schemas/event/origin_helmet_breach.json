@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/origin.helmet_breach.v0.1",
+  "title": "origin.helmet_breach",
+  "description": "M5 § origin.* family — declarative event schema locked at v0.1. Fires when a sealed helmet is breached (incoming hit punctures the head zone with no seal). breach_pos is the world position where the breach occurs; oxygen_loss_rate kicks the hypoxic affliction timer. Producer fills at M17. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "origin" },
+    "event_type": { "const": "helmet_breach" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "helmet_item_id": { "type": "integer" },
+        "breach_pos": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "oxygen_loss_rate": { "type": "number" }
+      },
+      "required": ["actor_id", "helmet_item_id", "breach_pos", "oxygen_loss_rate"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

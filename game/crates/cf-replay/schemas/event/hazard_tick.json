@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/hazard.tick.v0.1",
+  "title": "hazard.tick",
+  "description": "M5 § hazard.* family — declarative event schema locked at v0.1. Cosmetic. Batched 10:1 ratio for determinism — one tick event per 10 sim ticks, NOT every tick. The cosmetic flag excludes this from determinism.sim_checksum per DR-052. Producer fills at M16. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "hazard" },
+    "event_type": { "const": "tick" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "cosmetic": { "type": ["boolean", "null"] },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "hazard_id": { "type": ["integer", "string"] },
+        "tick": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["hazard_id", "tick"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

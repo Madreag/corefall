@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/fluid.reservoir_warning.v0.1",
+  "title": "fluid.reservoir_warning",
+  "description": "M5 § fluid.* family — declarative event schema locked at v0.1. Fires once when fluid reservoir level crosses 50% on the way down (HUD warning trigger). Producer fills at M13. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "fluid" },
+    "event_type": { "const": "reservoir_warning" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "fluid_kind": { "type": "string", "enum": ["oil", "coolant", "fuel", "electrolyte"] },
+        "level_pct": { "type": "number", "minimum": 0.0 }
+      },
+      "required": ["actor_id", "fluid_kind", "level_pct"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

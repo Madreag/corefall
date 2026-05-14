@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/hazard.dissipated.v0.1",
+  "title": "hazard.dissipated",
+  "description": "M5 § hazard.* family — declarative event schema locked at v0.1. Fires when a hazard tile clears (intensity drops to zero). reason enum: time (natural decay), doused (water / fire extinguisher), spread_out (diluted across too many tiles). Producer fills at M16. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "hazard" },
+    "event_type": { "const": "dissipated" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "hazard_id": { "type": ["integer", "string"] },
+        "reason": { "type": "string", "enum": ["time", "doused", "spread_out"] }
+      },
+      "required": ["hazard_id", "reason"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/fluid.ignition.v0.1",
+  "title": "fluid.ignition",
+  "description": "M5 § fluid.* family — declarative event schema locked at v0.1. Fires for combustible-only fluids (fuel + leaked oil) when an ignition source (spark, heat) crosses the puddle / leak. ignition_source_event_id parents the fire/electric source event. Producer fills at M13 + M16. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "fluid" },
+    "event_type": { "const": "ignition" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "fluid_kind": { "type": "string", "enum": ["oil", "coolant", "fuel", "electrolyte"] },
+        "ignition_source_event_id": { "type": "string" }
+      },
+      "required": ["actor_id", "fluid_kind", "ignition_source_event_id"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

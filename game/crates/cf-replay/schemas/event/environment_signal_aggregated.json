@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/environment.signal_aggregated.v0.1",
+  "title": "environment.signal_aggregated",
+  "description": "M5 § environment.* family — declarative event schema locked at v0.1. Full per-actor 11-slice bundle. Cosmetic-batchable (DR-052) — heavy payload, the cosmetic flag excludes this from determinism.sim_checksum so cause-chains stay light. Producer fills at M20. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "environment" },
+    "event_type": { "const": "signal_aggregated" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "cosmetic": { "type": ["boolean", "null"] },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "tick": { "type": "integer", "minimum": 0 },
+        "signal": { "type": "object" }
+      },
+      "required": ["actor_id", "tick", "signal"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

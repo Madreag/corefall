@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/concussion.band_changed.v0.1",
+  "title": "concussion.band_changed",
+  "description": "M5 § concussion.* family — declarative event schema locked at v0.1. 5-band accumulator (Clear 0-20, Mild 20-40, Moderate 40-60, Severe 60-80, KO_Imminent 80-99, KO 100). HUD cue per band: Clear=none, Mild=edge vignette 10%, Moderate=vignette 30% + bloom, Severe=vignette 60% + sway, KO_Imminent=vignette 85% + tunnel, KO=full blackout 5-10s. Producer fills at M17. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "concussion" },
+    "event_type": { "const": "band_changed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "from_band": { "type": "string", "enum": ["Clear", "Mild", "Moderate", "Severe", "KO_Imminent", "KO"] },
+        "to_band": { "type": "string", "enum": ["Clear", "Mild", "Moderate", "Severe", "KO_Imminent", "KO"] },
+        "dose": { "type": "number", "minimum": 0.0 }
+      },
+      "required": ["actor_id", "from_band", "to_band", "dose"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

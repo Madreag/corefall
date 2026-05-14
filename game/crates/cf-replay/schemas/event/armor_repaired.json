@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/armor.repaired.v0.1",
+  "title": "armor.repaired",
+  "description": "M5 § armor.* family — declarative event schema locked at v0.1. Fires when a layer is repaired in the field (medikit-like) and restored to some hp value. Producer fills at M13 + M16. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "armor" },
+    "event_type": { "const": "repaired" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "item_id": { "type": "integer" },
+        "zone": { "type": "string", "enum": ["head", "torso", "arm_left", "arm_right", "forearm_left", "forearm_right", "hand_left", "hand_right", "leg_left", "leg_right", "shin_left", "shin_right", "foot_left", "foot_right", "backpack"] },
+        "layer": { "type": "string", "enum": ["External", "Internal", "Core"] },
+        "restored_hp": { "type": "number" },
+        "repaired_by_actor_id": { "type": "integer" }
+      },
+      "required": ["item_id", "zone", "layer", "restored_hp", "repaired_by_actor_id"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

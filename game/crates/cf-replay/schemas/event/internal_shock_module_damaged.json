@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/internal_shock.module_damaged.v0.1",
+  "title": "internal_shock.module_damaged",
+  "description": "M5 § internal_shock.* family — declarative event schema locked at v0.1. Fires when an internal robot module takes damage from an internal shock event (e.g. routed surge from circuit damage). hit_zone is the BodyZone the source ray entered. Producer fills at M17. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "internal_shock" },
+    "event_type": { "const": "module_damaged" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "module_id": { "type": ["integer", "string"] },
+        "damage_amount": { "type": "number" },
+        "hit_zone": { "type": "string", "enum": ["head", "torso", "arm_left", "arm_right", "forearm_left", "forearm_right", "hand_left", "hand_right", "leg_left", "leg_right", "shin_left", "shin_right", "foot_left", "foot_right", "backpack"] },
+        "source_hit_event_id": { "type": "string" }
+      },
+      "required": ["actor_id", "module_id", "damage_amount", "hit_zone", "source_hit_event_id"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

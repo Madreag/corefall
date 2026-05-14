@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/internal_shock.dose_changed.v0.1",
+  "title": "internal_shock.dose_changed",
+  "description": "M5 § internal_shock.* family — declarative event schema locked at v0.1. Robot equivalent of concussion dose; tracks accumulated electrical / hydraulic shock. Decay rate (locked): Robot 2/s, Heavy biomech 4/s (concussion equivalent), others n/a. Producer fills at M17. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "internal_shock" },
+    "event_type": { "const": "dose_changed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "from_dose": { "type": "number", "minimum": 0.0 },
+        "to_dose": { "type": "number", "minimum": 0.0 },
+        "source_event_id": { "type": "string" }
+      },
+      "required": ["actor_id", "from_dose", "to_dose", "source_event_id"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

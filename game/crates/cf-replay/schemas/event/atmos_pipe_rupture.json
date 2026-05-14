@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/atmos.pipe_rupture.v0.1",
+  "title": "atmos.pipe_rupture",
+  "description": "M5 § atmos.* family — declarative event schema locked at v0.1. Fires when a pipe exceeds its pressure rating and bursts. breach_position is the world position; pressure_at_rupture_pa is the pressure at the moment of failure. Producer fills at M19. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "atmos" },
+    "event_type": { "const": "pipe_rupture" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "pipe_id": { "type": ["integer", "string"] },
+        "breach_position": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "pressure_at_rupture_pa": { "type": "number" }
+      },
+      "required": ["pipe_id", "breach_position", "pressure_at_rupture_pa"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

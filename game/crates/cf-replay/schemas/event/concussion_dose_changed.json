@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/concussion.dose_changed.v0.1",
+  "title": "concussion.dose_changed",
+  "description": "M5 § concussion.* family — declarative event schema locked at v0.1. Concussion dose 0..100 accumulator for organic / hybrid origins. Per-origin decay rates: Human 5/s, Android 5/s, Robot 0/s (always 0), Powered organic 5/s, Heavy biomech 4/s. Producer fills at M17 (origin reaction matrix). Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "concussion" },
+    "event_type": { "const": "dose_changed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "from_dose": { "type": "number", "minimum": 0.0 },
+        "to_dose": { "type": "number", "minimum": 0.0 },
+        "source_event_id": { "type": "string" },
+        "origin_id": { "type": ["integer", "string"] }
+      },
+      "required": ["actor_id", "from_dose", "to_dose", "source_event_id", "origin_id"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

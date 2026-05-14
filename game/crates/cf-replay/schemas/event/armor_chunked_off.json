@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/armor.chunked_off.v0.1",
+  "title": "armor.chunked_off",
+  "description": "M5 § armor.* family — declarative event schema locked at v0.1. Fires when a destroyed armor layer chunks off as physics debris on the ground. Producer fills at M13 + M14. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "armor" },
+    "event_type": { "const": "chunked_off" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "item_id": { "type": "integer" },
+        "zone": { "type": "string", "enum": ["head", "torso", "arm_left", "arm_right", "forearm_left", "forearm_right", "hand_left", "hand_right", "leg_left", "leg_right", "shin_left", "shin_right", "foot_left", "foot_right", "backpack"] },
+        "debris_record_id": { "type": "integer" },
+        "impact_impulse": { "type": "number" },
+        "debris_kind": { "type": "string" },
+        "ground_position": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        }
+      },
+      "required": ["item_id", "zone", "debris_record_id", "impact_impulse", "debris_kind", "ground_position"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

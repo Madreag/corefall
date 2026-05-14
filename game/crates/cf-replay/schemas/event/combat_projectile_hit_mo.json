@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/combat.projectile_hit_mo.v0.1",
+  "title": "combat.projectile_hit_mo",
+  "description": "M5 § combat.projectile_hit_mo expanded payload — declarative event schema locked at v0.1. The canonical deep-damage hit event. Cause-chain root for armor.*, internal.*, fluid.*, origin.*, hazard.*, concussion.*, internal_shock.*. Per-ammo ricochet thresholds (deg): standard 60, armor_piercing 65, hardened_AP 70, discarding_sabot 75, explosive_warhead 50, kinetic_impact 70, HEAT 75, APFSDS 80. Effective thickness formula (locked): effective_thickness_mm = nominal_thickness_mm / cos(impact_angle_rad). Producer fills at M13 + M14. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "combat" },
+    "event_type": { "const": "projectile_hit_mo" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "cosmetic": { "const": false },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "shooter_id": { "type": "integer" },
+        "weapon_id": { "type": "integer" },
+        "projectile_id": { "type": "integer" },
+        "target_id": { "type": "integer" },
+        "hit_zone": { "type": "string", "enum": ["head", "torso", "arm_left", "arm_right", "forearm_left", "forearm_right", "hand_left", "hand_right", "leg_left", "leg_right", "shin_left", "shin_right", "foot_left", "foot_right", "backpack"] },
+        "impact_point": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "impact_normal": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "impact_impulse": { "type": "number" },
+        "impact_energy_j": { "type": "number" },
+        "ap_factor": { "type": "number" },
+        "ap_round_tier": { "type": "string", "enum": ["standard", "armor_piercing", "hardened_AP", "discarding_sabot", "explosive_warhead", "kinetic_impact", "HEAT", "APFSDS"] },
+        "material_at_impact": { "type": ["integer", "string"] },
+        "surface_kind": { "type": "string", "enum": ["armor_external", "armor_internal", "armor_core", "armor_chunked_breach", "flesh", "circuit", "unarmored", "terrain"] },
+        "armor_effective_hardness": { "type": "number" },
+        "armor_absorbed_dmg": { "type": "number" },
+        "passthrough_dmg": { "type": "number" },
+        "damage_kind": { "type": "string", "enum": ["kinetic", "thermal", "electric", "chemical", "radiation"] },
+        "hp_before": { "type": "number" },
+        "hp_after": { "type": "number" },
+        "damage_amount": { "type": "number" },
+        "layer_struck": { "type": ["string", "null"], "enum": ["External", "Internal", "Core", null] },
+        "pierced_armor": { "type": "boolean" },
+        "organ_damaged_id": { "type": ["string", "null"], "enum": ["brain", "eyes_left", "eyes_right", "ears_left", "ears_right", "heart", "lungs_left", "lungs_right", "liver", "kidneys_left", "kidneys_right", "spine", "stomach", "intestines", "pancreas", null] },
+        "circuit_damaged_id": { "type": ["string", "null"], "enum": ["power_core", "cpu", "sensor_array", "motor_controller_left_arm", "motor_controller_right_arm", "motor_controller_left_leg", "motor_controller_right_leg", "hydraulic_pump", "coolant_pump", "oil_reservoir", "fuel_tank", "comm_relay", null] },
+        "parent_event_id": { "type": "string" },
+        "cosmetic": { "const": false }
+      },
+      "required": ["shooter_id", "weapon_id", "projectile_id", "target_id", "hit_zone", "impact_point", "impact_normal", "impact_impulse", "impact_energy_j", "ap_factor", "ap_round_tier", "material_at_impact", "surface_kind", "armor_effective_hardness", "armor_absorbed_dmg", "passthrough_dmg", "damage_kind", "hp_before", "hp_after", "damage_amount", "pierced_armor", "parent_event_id"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

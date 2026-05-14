@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/armor.schurzen_pre_detonated.v0.1",
+  "title": "armor.schurzen_pre_detonated",
+  "description": "M5 § armor.* family — declarative event schema locked at v0.1. Fires when a Schürzen skirt plate pre-detonates an incoming HEAT round (similar to ERA but external, sacrificial plate, less dramatic). Producer fills at M13 + M14. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "armor" },
+    "event_type": { "const": "schurzen_pre_detonated" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "item_id": { "type": "integer" },
+        "zone": { "type": "string", "enum": ["head", "torso", "arm_left", "arm_right", "forearm_left", "forearm_right", "hand_left", "hand_right", "leg_left", "leg_right", "shin_left", "shin_right", "foot_left", "foot_right", "backpack"] },
+        "schurzen_plate_id": { "type": ["integer", "string"] },
+        "defeated_round_id": { "type": ["integer", "string"] }
+      },
+      "required": ["item_id", "zone", "schurzen_plate_id", "defeated_round_id"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

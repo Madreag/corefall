@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/origin.shot_force_feedback.v0.1",
+  "title": "origin.shot_force_feedback",
+  "description": "M5 § origin.* family — declarative event schema locked at v0.1. Per-origin reaction matrix output for an incoming hit. feedback_kind: pain_jolt (organic), servo_jolt (android/robot), frame_ring (heavy biomech). impulse_vector is the 2D shock direction. internal_shock_module_id + internal_shock_damage route to robot circuits. leak_channel + leak_rate fold into fluid.leak_started. Producer fills at M17. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "origin" },
+    "event_type": { "const": "shot_force_feedback" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "parent_hit_event_id": { "type": "string" },
+        "impulse_vector": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "impulse_magnitude": { "type": "number" },
+        "origin_id": { "type": ["integer", "string"] },
+        "chassis_layer": { "type": "string" },
+        "feedback_kind": { "type": "string", "enum": ["pain_jolt", "servo_jolt", "frame_ring"] },
+        "g_load_delta": { "type": "number" },
+        "concussion_dose_delta": { "type": "number" },
+        "internal_shock_module_id": { "type": ["integer", "string", "null"] },
+        "internal_shock_damage": { "type": ["number", "null"] },
+        "leak_channel": { "type": ["string", "null"] },
+        "leak_rate": { "type": ["number", "null"] },
+        "screen_kick_intensity": { "type": "number" }
+      },
+      "required": ["actor_id", "parent_hit_event_id", "impulse_vector", "impulse_magnitude", "origin_id", "chassis_layer", "feedback_kind", "g_load_delta", "concussion_dose_delta", "screen_kick_intensity"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

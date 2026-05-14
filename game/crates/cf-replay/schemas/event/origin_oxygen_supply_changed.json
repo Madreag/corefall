@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/origin.oxygen_supply_changed.v0.1",
+  "title": "origin.oxygen_supply_changed",
+  "description": "M5 § origin.* family — declarative event schema locked at v0.1. Fires when an actor's oxygen reserve (seconds remaining) changes. source describes the change (helmet_breach, refilled, exhaled, atmosphere). Producer fills at M17 + M19. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "origin" },
+    "event_type": { "const": "oxygen_supply_changed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "from_s": { "type": "number", "minimum": 0.0 },
+        "to_s": { "type": "number", "minimum": 0.0 },
+        "source": { "type": "string" }
+      },
+      "required": ["actor_id", "from_s", "to_s", "source"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

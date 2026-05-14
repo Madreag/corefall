@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/armor.angle_deflection_calculated.v0.1",
+  "title": "armor.angle_deflection_calculated",
+  "description": "M5 § armor.* family — declarative event schema locked at v0.1. Fires for War-Thunder-style angled armor — records the impact angle and the resulting effective_mm = nominal_mm / cos(angle). Producer fills at M13 + M14. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "armor" },
+    "event_type": { "const": "angle_deflection_calculated" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "impact_angle": { "type": "number" },
+        "nominal_mm": { "type": "number" },
+        "effective_mm": { "type": "number" }
+      },
+      "required": ["impact_angle", "nominal_mm", "effective_mm"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

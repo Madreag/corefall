@@ -87,6 +87,102 @@ const SCHEMA_SNAPSHOT_INTERNAL: &str = include_str!("../schemas/event/snapshot_i
 const SCHEMA_SNAPSHOT_CONCUSSION: &str = include_str!("../schemas/event/snapshot_concussion.json");
 const SCHEMA_SNAPSHOT_FLUID: &str = include_str!("../schemas/event/snapshot_fluid.json");
 const SCHEMA_SNAPSHOT_ORIGIN: &str = include_str!("../schemas/event/snapshot_origin.json");
+// M5 (2026-05-13): deep-damage event-surface lock. Each schema declares the
+// M4 v0.1 envelope shape with `schema_version: "0.1"` const, `category` const,
+// `event_type` const, and the payload nested under properties.payload.
+// Producers ladder up at M13/M14/M15/M16/M17/M19/M20.
+// armor.* (M13 + M14).
+const SCHEMA_ARMOR_LAYER_HP_CHANGED: &str = include_str!("../schemas/event/armor_layer_hp_changed.json");
+const SCHEMA_ARMOR_LAYER_CRITICAL: &str = include_str!("../schemas/event/armor_layer_critical.json");
+const SCHEMA_ARMOR_LAYER_DESTROYED: &str = include_str!("../schemas/event/armor_layer_destroyed.json");
+const SCHEMA_ARMOR_ALL_LAYERS_DESTROYED: &str = include_str!("../schemas/event/armor_all_layers_destroyed.json");
+const SCHEMA_ARMOR_CHUNKED_OFF: &str = include_str!("../schemas/event/armor_chunked_off.json");
+const SCHEMA_ARMOR_DEBRIS_SPAWNED: &str = include_str!("../schemas/event/armor_debris_spawned.json");
+const SCHEMA_ARMOR_REPAIRED: &str = include_str!("../schemas/event/armor_repaired.json");
+const SCHEMA_ARMOR_ANGLE_DEFLECTION_CALCULATED: &str =
+    include_str!("../schemas/event/armor_angle_deflection_calculated.json");
+const SCHEMA_ARMOR_RICOCHET: &str = include_str!("../schemas/event/armor_ricochet.json");
+const SCHEMA_ARMOR_SPALLING: &str = include_str!("../schemas/event/armor_spalling.json");
+const SCHEMA_ARMOR_PENETRATION_RAY_TRAVERSED: &str =
+    include_str!("../schemas/event/armor_penetration_ray_traversed.json");
+const SCHEMA_ARMOR_HE_OVERPRESSURE_WAVE: &str = include_str!("../schemas/event/armor_he_overpressure_wave.json");
+const SCHEMA_ARMOR_HEAT_JET_PENETRATED: &str = include_str!("../schemas/event/armor_heat_jet_penetrated.json");
+const SCHEMA_ARMOR_HEAT_JET_PRE_DETONATED_BY_ERA: &str =
+    include_str!("../schemas/event/armor_heat_jet_pre_detonated_by_era.json");
+const SCHEMA_ARMOR_APFSDS_PENETRATED: &str = include_str!("../schemas/event/armor_apfsds_penetrated.json");
+const SCHEMA_ARMOR_ERA_PANEL_DETONATED: &str = include_str!("../schemas/event/armor_era_panel_detonated.json");
+const SCHEMA_ARMOR_SCHURZEN_PRE_DETONATED: &str = include_str!("../schemas/event/armor_schurzen_pre_detonated.json");
+const SCHEMA_ARMOR_MULTI_HIT_DEGRADATION: &str = include_str!("../schemas/event/armor_multi_hit_degradation.json");
+const SCHEMA_ARMOR_REACTIVE_ARMOR_CONSUMED: &str = include_str!("../schemas/event/armor_reactive_armor_consumed.json");
+// internal.* (M14 + M17).
+const SCHEMA_INTERNAL_ORGAN_DAMAGED: &str = include_str!("../schemas/event/internal_organ_damaged.json");
+const SCHEMA_INTERNAL_ORGAN_DESTROYED: &str = include_str!("../schemas/event/internal_organ_destroyed.json");
+const SCHEMA_INTERNAL_ORGAN_FAILURE_CASCADE: &str =
+    include_str!("../schemas/event/internal_organ_failure_cascade.json");
+const SCHEMA_INTERNAL_CIRCUIT_DAMAGED: &str = include_str!("../schemas/event/internal_circuit_damaged.json");
+const SCHEMA_INTERNAL_CIRCUIT_DESTROYED: &str = include_str!("../schemas/event/internal_circuit_destroyed.json");
+const SCHEMA_INTERNAL_CIRCUIT_FAILURE_CASCADE: &str =
+    include_str!("../schemas/event/internal_circuit_failure_cascade.json");
+// concussion.* + internal_shock.* (M17).
+const SCHEMA_CONCUSSION_DOSE_CHANGED: &str = include_str!("../schemas/event/concussion_dose_changed.json");
+const SCHEMA_CONCUSSION_BAND_CHANGED: &str = include_str!("../schemas/event/concussion_band_changed.json");
+const SCHEMA_CONCUSSION_KO_THRESHOLD_CROSSED: &str =
+    include_str!("../schemas/event/concussion_ko_threshold_crossed.json");
+const SCHEMA_CONCUSSION_RECOVERED: &str = include_str!("../schemas/event/concussion_recovered.json");
+const SCHEMA_INTERNAL_SHOCK_DOSE_CHANGED: &str = include_str!("../schemas/event/internal_shock_dose_changed.json");
+const SCHEMA_INTERNAL_SHOCK_MODULE_DAMAGED: &str = include_str!("../schemas/event/internal_shock_module_damaged.json");
+// fluid.* (M13 + M14).
+const SCHEMA_FLUID_LEAK_STARTED: &str = include_str!("../schemas/event/fluid_leak_started.json");
+const SCHEMA_FLUID_LEAK_RATE_CHANGED: &str = include_str!("../schemas/event/fluid_leak_rate_changed.json");
+const SCHEMA_FLUID_RESERVOIR_WARNING: &str = include_str!("../schemas/event/fluid_reservoir_warning.json");
+const SCHEMA_FLUID_RESERVOIR_CRITICAL: &str = include_str!("../schemas/event/fluid_reservoir_critical.json");
+const SCHEMA_FLUID_RESERVOIR_EMPTY: &str = include_str!("../schemas/event/fluid_reservoir_empty.json");
+const SCHEMA_FLUID_IGNITION: &str = include_str!("../schemas/event/fluid_ignition.json");
+const SCHEMA_FLUID_GROUND_SPLATTER_SPAWNED: &str = include_str!("../schemas/event/fluid_ground_splatter_spawned.json");
+const SCHEMA_FLUID_LEAK_STOPPED: &str = include_str!("../schemas/event/fluid_leak_stopped.json");
+const SCHEMA_FLUID_REFILLED: &str = include_str!("../schemas/event/fluid_refilled.json");
+// origin.* (M17).
+const SCHEMA_ORIGIN_SHOT_FORCE_FEEDBACK: &str = include_str!("../schemas/event/origin_shot_force_feedback.json");
+const SCHEMA_ORIGIN_G_LOAD_DOSE_CHANGED: &str = include_str!("../schemas/event/origin_g_load_dose_changed.json");
+const SCHEMA_ORIGIN_HELMET_BREACH: &str = include_str!("../schemas/event/origin_helmet_breach.json");
+const SCHEMA_ORIGIN_OXYGEN_SUPPLY_CHANGED: &str = include_str!("../schemas/event/origin_oxygen_supply_changed.json");
+// hazard.* (M16).
+const SCHEMA_HAZARD_SPAWNED: &str = include_str!("../schemas/event/hazard_spawned.json");
+const SCHEMA_HAZARD_SPREAD: &str = include_str!("../schemas/event/hazard_spread.json");
+const SCHEMA_HAZARD_ACTOR_CONTACT: &str = include_str!("../schemas/event/hazard_actor_contact.json");
+const SCHEMA_HAZARD_TICK: &str = include_str!("../schemas/event/hazard_tick.json");
+const SCHEMA_HAZARD_DISSIPATED: &str = include_str!("../schemas/event/hazard_dissipated.json");
+// affliction.* (M16).
+const SCHEMA_AFFLICTION_APPLIED: &str = include_str!("../schemas/event/affliction_applied.json");
+const SCHEMA_AFFLICTION_TICK: &str = include_str!("../schemas/event/affliction_tick.json");
+const SCHEMA_AFFLICTION_CLEARED: &str = include_str!("../schemas/event/affliction_cleared.json");
+const SCHEMA_AFFLICTION_ESCALATED: &str = include_str!("../schemas/event/affliction_escalated.json");
+// atmos.* (M19).
+const SCHEMA_ATMOS_PRESSURE_CHANGED: &str = include_str!("../schemas/event/atmos_pressure_changed.json");
+const SCHEMA_ATMOS_TEMPERATURE_CHANGED: &str = include_str!("../schemas/event/atmos_temperature_changed.json");
+const SCHEMA_ATMOS_GAS_RELEASED: &str = include_str!("../schemas/event/atmos_gas_released.json");
+const SCHEMA_ATMOS_BREACH_DETECTED: &str = include_str!("../schemas/event/atmos_breach_detected.json");
+const SCHEMA_ATMOS_COMBUSTION_IGNITION: &str = include_str!("../schemas/event/atmos_combustion_ignition.json");
+const SCHEMA_ATMOS_PHASE_TRANSITION: &str = include_str!("../schemas/event/atmos_phase_transition.json");
+const SCHEMA_ATMOS_PIPE_FLOW: &str = include_str!("../schemas/event/atmos_pipe_flow.json");
+const SCHEMA_ATMOS_PIPE_FREEZE: &str = include_str!("../schemas/event/atmos_pipe_freeze.json");
+const SCHEMA_ATMOS_PIPE_RUPTURE: &str = include_str!("../schemas/event/atmos_pipe_rupture.json");
+const SCHEMA_ATMOS_ELECTROLYSIS_STARTED: &str = include_str!("../schemas/event/atmos_electrolysis_started.json");
+// shield.* (M13+ + M25+).
+const SCHEMA_SHIELD_HIT: &str = include_str!("../schemas/event/shield_hit.json");
+const SCHEMA_SHIELD_DEPLETED: &str = include_str!("../schemas/event/shield_depleted.json");
+const SCHEMA_SHIELD_REGEN_STARTED: &str = include_str!("../schemas/event/shield_regen_started.json");
+const SCHEMA_SHIELD_REGEN_COMPLETED: &str = include_str!("../schemas/event/shield_regen_completed.json");
+const SCHEMA_SHIELD_DISRUPTED: &str = include_str!("../schemas/event/shield_disrupted.json");
+// environment.* (M20).
+const SCHEMA_ENVIRONMENT_SIGNAL_DELTA: &str = include_str!("../schemas/event/environment_signal_delta.json");
+const SCHEMA_ENVIRONMENT_SIGNAL_AGGREGATED: &str = include_str!("../schemas/event/environment_signal_aggregated.json");
+// thermal.* (M16 + M19).
+const SCHEMA_THERMAL_SIGNATURE_CHANGED: &str = include_str!("../schemas/event/thermal_signature_changed.json");
+const SCHEMA_THERMAL_HEAT_EXCHANGED: &str = include_str!("../schemas/event/thermal_heat_exchanged.json");
+const SCHEMA_THERMAL_MATERIAL_PHASE_CHANGE: &str = include_str!("../schemas/event/thermal_material_phase_change.json");
+// combat.projectile_hit_mo expanded payload (M13 + M14).
+const SCHEMA_COMBAT_PROJECTILE_HIT_MO: &str = include_str!("../schemas/event/combat_projectile_hit_mo.json");
 
 /// Look up the schema source by `(category, event_type)`. Returns `None` if
 /// no schema exists for this pair (callers treat as "no validation
@@ -150,6 +246,96 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("snapshot", "snapshot_concussion") => Some(SCHEMA_SNAPSHOT_CONCUSSION),
         ("snapshot", "snapshot_fluid") => Some(SCHEMA_SNAPSHOT_FLUID),
         ("snapshot", "snapshot_origin") => Some(SCHEMA_SNAPSHOT_ORIGIN),
+        // M5 deep-damage event-surface lock (2026-05-13). Each schema is the
+        // M4 v0.1 envelope shape with `schema_version: "0.1"` const and the
+        // payload nested under properties.payload. Producers ladder up at
+        // M13/M14/M15/M16/M17/M19/M20.
+        // armor.* (M13 + M14).
+        ("armor", "layer_hp_changed") => Some(SCHEMA_ARMOR_LAYER_HP_CHANGED),
+        ("armor", "layer_critical") => Some(SCHEMA_ARMOR_LAYER_CRITICAL),
+        ("armor", "layer_destroyed") => Some(SCHEMA_ARMOR_LAYER_DESTROYED),
+        ("armor", "all_layers_destroyed") => Some(SCHEMA_ARMOR_ALL_LAYERS_DESTROYED),
+        ("armor", "chunked_off") => Some(SCHEMA_ARMOR_CHUNKED_OFF),
+        ("armor", "debris_spawned") => Some(SCHEMA_ARMOR_DEBRIS_SPAWNED),
+        ("armor", "repaired") => Some(SCHEMA_ARMOR_REPAIRED),
+        ("armor", "angle_deflection_calculated") => Some(SCHEMA_ARMOR_ANGLE_DEFLECTION_CALCULATED),
+        ("armor", "ricochet") => Some(SCHEMA_ARMOR_RICOCHET),
+        ("armor", "spalling") => Some(SCHEMA_ARMOR_SPALLING),
+        ("armor", "penetration_ray_traversed") => Some(SCHEMA_ARMOR_PENETRATION_RAY_TRAVERSED),
+        ("armor", "he_overpressure_wave") => Some(SCHEMA_ARMOR_HE_OVERPRESSURE_WAVE),
+        ("armor", "heat_jet_penetrated") => Some(SCHEMA_ARMOR_HEAT_JET_PENETRATED),
+        ("armor", "heat_jet_pre_detonated_by_era") => Some(SCHEMA_ARMOR_HEAT_JET_PRE_DETONATED_BY_ERA),
+        ("armor", "apfsds_penetrated") => Some(SCHEMA_ARMOR_APFSDS_PENETRATED),
+        ("armor", "era_panel_detonated") => Some(SCHEMA_ARMOR_ERA_PANEL_DETONATED),
+        ("armor", "schurzen_pre_detonated") => Some(SCHEMA_ARMOR_SCHURZEN_PRE_DETONATED),
+        ("armor", "multi_hit_degradation") => Some(SCHEMA_ARMOR_MULTI_HIT_DEGRADATION),
+        ("armor", "reactive_armor_consumed") => Some(SCHEMA_ARMOR_REACTIVE_ARMOR_CONSUMED),
+        // internal.* (M14 + M17).
+        ("internal", "organ_damaged") => Some(SCHEMA_INTERNAL_ORGAN_DAMAGED),
+        ("internal", "organ_destroyed") => Some(SCHEMA_INTERNAL_ORGAN_DESTROYED),
+        ("internal", "organ_failure_cascade") => Some(SCHEMA_INTERNAL_ORGAN_FAILURE_CASCADE),
+        ("internal", "circuit_damaged") => Some(SCHEMA_INTERNAL_CIRCUIT_DAMAGED),
+        ("internal", "circuit_destroyed") => Some(SCHEMA_INTERNAL_CIRCUIT_DESTROYED),
+        ("internal", "circuit_failure_cascade") => Some(SCHEMA_INTERNAL_CIRCUIT_FAILURE_CASCADE),
+        // concussion.* + internal_shock.* (M17).
+        ("concussion", "dose_changed") => Some(SCHEMA_CONCUSSION_DOSE_CHANGED),
+        ("concussion", "band_changed") => Some(SCHEMA_CONCUSSION_BAND_CHANGED),
+        ("concussion", "ko_threshold_crossed") => Some(SCHEMA_CONCUSSION_KO_THRESHOLD_CROSSED),
+        ("concussion", "recovered") => Some(SCHEMA_CONCUSSION_RECOVERED),
+        ("internal_shock", "dose_changed") => Some(SCHEMA_INTERNAL_SHOCK_DOSE_CHANGED),
+        ("internal_shock", "module_damaged") => Some(SCHEMA_INTERNAL_SHOCK_MODULE_DAMAGED),
+        // fluid.* (M13 + M14).
+        ("fluid", "leak_started") => Some(SCHEMA_FLUID_LEAK_STARTED),
+        ("fluid", "leak_rate_changed") => Some(SCHEMA_FLUID_LEAK_RATE_CHANGED),
+        ("fluid", "reservoir_warning") => Some(SCHEMA_FLUID_RESERVOIR_WARNING),
+        ("fluid", "reservoir_critical") => Some(SCHEMA_FLUID_RESERVOIR_CRITICAL),
+        ("fluid", "reservoir_empty") => Some(SCHEMA_FLUID_RESERVOIR_EMPTY),
+        ("fluid", "ignition") => Some(SCHEMA_FLUID_IGNITION),
+        ("fluid", "ground_splatter_spawned") => Some(SCHEMA_FLUID_GROUND_SPLATTER_SPAWNED),
+        ("fluid", "leak_stopped") => Some(SCHEMA_FLUID_LEAK_STOPPED),
+        ("fluid", "refilled") => Some(SCHEMA_FLUID_REFILLED),
+        // origin.* (M17).
+        ("origin", "shot_force_feedback") => Some(SCHEMA_ORIGIN_SHOT_FORCE_FEEDBACK),
+        ("origin", "g_load_dose_changed") => Some(SCHEMA_ORIGIN_G_LOAD_DOSE_CHANGED),
+        ("origin", "helmet_breach") => Some(SCHEMA_ORIGIN_HELMET_BREACH),
+        ("origin", "oxygen_supply_changed") => Some(SCHEMA_ORIGIN_OXYGEN_SUPPLY_CHANGED),
+        // hazard.* (M16).
+        ("hazard", "spawned") => Some(SCHEMA_HAZARD_SPAWNED),
+        ("hazard", "spread") => Some(SCHEMA_HAZARD_SPREAD),
+        ("hazard", "actor_contact") => Some(SCHEMA_HAZARD_ACTOR_CONTACT),
+        ("hazard", "tick") => Some(SCHEMA_HAZARD_TICK),
+        ("hazard", "dissipated") => Some(SCHEMA_HAZARD_DISSIPATED),
+        // affliction.* (M16).
+        ("affliction", "applied") => Some(SCHEMA_AFFLICTION_APPLIED),
+        ("affliction", "tick") => Some(SCHEMA_AFFLICTION_TICK),
+        ("affliction", "cleared") => Some(SCHEMA_AFFLICTION_CLEARED),
+        ("affliction", "escalated") => Some(SCHEMA_AFFLICTION_ESCALATED),
+        // atmos.* (M19).
+        ("atmos", "pressure_changed") => Some(SCHEMA_ATMOS_PRESSURE_CHANGED),
+        ("atmos", "temperature_changed") => Some(SCHEMA_ATMOS_TEMPERATURE_CHANGED),
+        ("atmos", "gas_released") => Some(SCHEMA_ATMOS_GAS_RELEASED),
+        ("atmos", "breach_detected") => Some(SCHEMA_ATMOS_BREACH_DETECTED),
+        ("atmos", "combustion_ignition") => Some(SCHEMA_ATMOS_COMBUSTION_IGNITION),
+        ("atmos", "phase_transition") => Some(SCHEMA_ATMOS_PHASE_TRANSITION),
+        ("atmos", "pipe_flow") => Some(SCHEMA_ATMOS_PIPE_FLOW),
+        ("atmos", "pipe_freeze") => Some(SCHEMA_ATMOS_PIPE_FREEZE),
+        ("atmos", "pipe_rupture") => Some(SCHEMA_ATMOS_PIPE_RUPTURE),
+        ("atmos", "electrolysis_started") => Some(SCHEMA_ATMOS_ELECTROLYSIS_STARTED),
+        // shield.* (M13+ + M25+).
+        ("shield", "hit") => Some(SCHEMA_SHIELD_HIT),
+        ("shield", "depleted") => Some(SCHEMA_SHIELD_DEPLETED),
+        ("shield", "regen_started") => Some(SCHEMA_SHIELD_REGEN_STARTED),
+        ("shield", "regen_completed") => Some(SCHEMA_SHIELD_REGEN_COMPLETED),
+        ("shield", "disrupted") => Some(SCHEMA_SHIELD_DISRUPTED),
+        // environment.* (M20).
+        ("environment", "signal_delta") => Some(SCHEMA_ENVIRONMENT_SIGNAL_DELTA),
+        ("environment", "signal_aggregated") => Some(SCHEMA_ENVIRONMENT_SIGNAL_AGGREGATED),
+        // thermal.* (M16 + M19).
+        ("thermal", "signature_changed") => Some(SCHEMA_THERMAL_SIGNATURE_CHANGED),
+        ("thermal", "heat_exchanged") => Some(SCHEMA_THERMAL_HEAT_EXCHANGED),
+        ("thermal", "material_phase_change") => Some(SCHEMA_THERMAL_MATERIAL_PHASE_CHANGE),
+        // combat.projectile_hit_mo expanded payload (M13 + M14).
+        ("combat", "projectile_hit_mo") => Some(SCHEMA_COMBAT_PROJECTILE_HIT_MO),
         _ => None,
     }
 }
@@ -183,12 +369,39 @@ struct PropConstraint {
 /// `(category, event_type)`. Returns `Ok(())` when there is no registered
 /// schema or the payload satisfies the schema's required-field + type +
 /// range constraints.
+///
+/// Supports two schema shapes:
+/// 1. **Legacy payload-only** (M2/M3/M4 schemas in `schemas/event/`): the
+///    schema describes the payload object directly; `required` /
+///    `properties` apply to the payload value.
+/// 2. **M5 envelope-shaped**: the schema describes the full event envelope
+///    with `properties.schema_version.const = "0.1"`, `category` const,
+///    `event_type` const, and `payload` nested under `properties.payload`.
+///    For these schemas the validator extracts the `payload` sub-schema and
+///    validates the supplied `payload` argument against it.
 pub fn validate_event_payload(category: &str, event_type: &str, payload: &Value) -> ValidationResult {
     let Some(raw) = event_schema_for(category, event_type) else {
         return Ok(());
     };
-    let schema: RawSchema =
+    let full_value: serde_json::Value =
         serde_json::from_str(raw).map_err(|e| format!("schema parse error for {category}.{event_type}: {e}"))?;
+    // Detect M5 envelope-shape: schema_version is a const-checked property at
+    // the top level. If so, walk into properties.payload to extract the actual
+    // payload sub-schema.
+    let payload_schema_source: Value = if let Some(props) = full_value.get("properties").and_then(|v| v.as_object()) {
+        if props.get("schema_version").and_then(|v| v.get("const")).is_some() {
+            props
+                .get("payload")
+                .cloned()
+                .unwrap_or_else(|| serde_json::json!({"type": "object"}))
+        } else {
+            full_value.clone()
+        }
+    } else {
+        full_value.clone()
+    };
+    let schema: RawSchema = serde_json::from_value(payload_schema_source)
+        .map_err(|e| format!("payload schema parse error for {category}.{event_type}: {e}"))?;
     let obj = payload
         .as_object()
         .ok_or_else(|| format!("payload for {category}.{event_type} must be an object"))?;
@@ -314,10 +527,96 @@ mod tests {
             ("snapshot", "snapshot_concussion"),
             ("snapshot", "snapshot_fluid"),
             ("snapshot", "snapshot_origin"),
+            // M5 deep-damage event-surface lock — armor.* family.
+            ("armor", "layer_hp_changed"),
+            ("armor", "layer_critical"),
+            ("armor", "layer_destroyed"),
+            ("armor", "all_layers_destroyed"),
+            ("armor", "chunked_off"),
+            ("armor", "debris_spawned"),
+            ("armor", "repaired"),
+            ("armor", "angle_deflection_calculated"),
+            ("armor", "ricochet"),
+            ("armor", "spalling"),
+            ("armor", "penetration_ray_traversed"),
+            ("armor", "he_overpressure_wave"),
+            ("armor", "heat_jet_penetrated"),
+            ("armor", "heat_jet_pre_detonated_by_era"),
+            ("armor", "apfsds_penetrated"),
+            ("armor", "era_panel_detonated"),
+            ("armor", "schurzen_pre_detonated"),
+            ("armor", "multi_hit_degradation"),
+            ("armor", "reactive_armor_consumed"),
+            // M5 internal.* family.
+            ("internal", "organ_damaged"),
+            ("internal", "organ_destroyed"),
+            ("internal", "organ_failure_cascade"),
+            ("internal", "circuit_damaged"),
+            ("internal", "circuit_destroyed"),
+            ("internal", "circuit_failure_cascade"),
+            // M5 concussion.* + internal_shock.*.
+            ("concussion", "dose_changed"),
+            ("concussion", "band_changed"),
+            ("concussion", "ko_threshold_crossed"),
+            ("concussion", "recovered"),
+            ("internal_shock", "dose_changed"),
+            ("internal_shock", "module_damaged"),
+            // M5 fluid.*.
+            ("fluid", "leak_started"),
+            ("fluid", "leak_rate_changed"),
+            ("fluid", "reservoir_warning"),
+            ("fluid", "reservoir_critical"),
+            ("fluid", "reservoir_empty"),
+            ("fluid", "ignition"),
+            ("fluid", "ground_splatter_spawned"),
+            ("fluid", "leak_stopped"),
+            ("fluid", "refilled"),
+            // M5 origin.*.
+            ("origin", "shot_force_feedback"),
+            ("origin", "g_load_dose_changed"),
+            ("origin", "helmet_breach"),
+            ("origin", "oxygen_supply_changed"),
+            // M5 hazard.*.
+            ("hazard", "spawned"),
+            ("hazard", "spread"),
+            ("hazard", "actor_contact"),
+            ("hazard", "tick"),
+            ("hazard", "dissipated"),
+            // M5 affliction.*.
+            ("affliction", "applied"),
+            ("affliction", "tick"),
+            ("affliction", "cleared"),
+            ("affliction", "escalated"),
+            // M5 atmos.*.
+            ("atmos", "pressure_changed"),
+            ("atmos", "temperature_changed"),
+            ("atmos", "gas_released"),
+            ("atmos", "breach_detected"),
+            ("atmos", "combustion_ignition"),
+            ("atmos", "phase_transition"),
+            ("atmos", "pipe_flow"),
+            ("atmos", "pipe_freeze"),
+            ("atmos", "pipe_rupture"),
+            ("atmos", "electrolysis_started"),
+            // M5 shield.*.
+            ("shield", "hit"),
+            ("shield", "depleted"),
+            ("shield", "regen_started"),
+            ("shield", "regen_completed"),
+            ("shield", "disrupted"),
+            // M5 environment.*.
+            ("environment", "signal_delta"),
+            ("environment", "signal_aggregated"),
+            // M5 thermal.*.
+            ("thermal", "signature_changed"),
+            ("thermal", "heat_exchanged"),
+            ("thermal", "material_phase_change"),
+            // M5 combat.projectile_hit_mo expanded payload.
+            ("combat", "projectile_hit_mo"),
         ] {
             let raw = event_schema_for(cat, ty).unwrap_or_else(|| panic!("no schema for {cat}.{ty}"));
-            let _parsed: RawSchema =
-                serde_json::from_str(raw).unwrap_or_else(|e| panic!("schema parse error for {cat}.{ty}: {e}"));
+            let _parsed_value: serde_json::Value =
+                serde_json::from_str(raw).unwrap_or_else(|e| panic!("schema json parse error for {cat}.{ty}: {e}"));
         }
     }
 
@@ -380,5 +679,162 @@ mod tests {
         });
         let err = validate_event_payload("combat", "projectile_spawned", &bad).unwrap_err();
         assert!(err.contains("origin"), "got: {err}");
+    }
+
+    /// **M5**: per-spec sample armor.layer_destroyed payload validates against
+    /// the envelope-shaped schema (the validator must walk into
+    /// `properties.payload` to find required/properties).
+    #[test]
+    fn m5_armor_layer_destroyed_payload_validates() {
+        let payload = json!({
+            "item_id": 12,
+            "zone": "torso",
+            "layer": "External",
+            "breach_kind": "punctured",
+        });
+        validate_event_payload("armor", "layer_destroyed", &payload).expect("valid payload");
+    }
+
+    /// **M5**: an additive extra field (`bound_zone`) is accepted (the schema
+    /// declares `additionalProperties: true` at the payload level so producer
+    /// extensions don't bump the envelope).
+    #[test]
+    fn m5_armor_layer_destroyed_accepts_additive_payload_extension() {
+        let payload = json!({
+            "item_id": 12,
+            "zone": "torso",
+            "layer": "External",
+            "breach_kind": "punctured",
+            "bound_zone": "torso_front",
+        });
+        validate_event_payload("armor", "layer_destroyed", &payload).expect("additive ok");
+    }
+
+    /// **M5**: a missing required payload field fails validation.
+    #[test]
+    fn m5_armor_layer_destroyed_rejects_missing_breach_kind() {
+        let payload = json!({
+            "item_id": 12,
+            "zone": "torso",
+            "layer": "External",
+        });
+        let err = validate_event_payload("armor", "layer_destroyed", &payload).unwrap_err();
+        assert!(err.contains("breach_kind"), "got: {err}");
+    }
+
+    /// **M5**: payload enum mismatch on `zone` is rejected.
+    #[test]
+    fn m5_armor_layer_destroyed_rejects_bad_zone_enum() {
+        let payload = json!({
+            "item_id": 12,
+            "zone": "not_a_zone",
+            "layer": "External",
+            "breach_kind": "punctured",
+        });
+        let err = validate_event_payload("armor", "layer_destroyed", &payload).unwrap_err();
+        assert!(err.contains("zone"), "got: {err}");
+    }
+
+    /// **M5**: every registered M5 schema declares `schema_version: "0.1"` as
+    /// a const property — proves the M5 conformance contract per the spec's
+    /// "each schema declares schema_version=\"0.1\" matching the M4 locked
+    /// envelope" scenario.
+    #[test]
+    fn m5_schemas_declare_schema_version_v0_1() {
+        let pairs: &[(&str, &str)] = &[
+            ("armor", "layer_hp_changed"),
+            ("armor", "layer_critical"),
+            ("armor", "layer_destroyed"),
+            ("armor", "all_layers_destroyed"),
+            ("armor", "chunked_off"),
+            ("armor", "debris_spawned"),
+            ("armor", "repaired"),
+            ("armor", "angle_deflection_calculated"),
+            ("armor", "ricochet"),
+            ("armor", "spalling"),
+            ("armor", "penetration_ray_traversed"),
+            ("armor", "he_overpressure_wave"),
+            ("armor", "heat_jet_penetrated"),
+            ("armor", "heat_jet_pre_detonated_by_era"),
+            ("armor", "apfsds_penetrated"),
+            ("armor", "era_panel_detonated"),
+            ("armor", "schurzen_pre_detonated"),
+            ("armor", "multi_hit_degradation"),
+            ("armor", "reactive_armor_consumed"),
+            ("internal", "organ_damaged"),
+            ("internal", "organ_destroyed"),
+            ("internal", "organ_failure_cascade"),
+            ("internal", "circuit_damaged"),
+            ("internal", "circuit_destroyed"),
+            ("internal", "circuit_failure_cascade"),
+            ("concussion", "dose_changed"),
+            ("concussion", "band_changed"),
+            ("concussion", "ko_threshold_crossed"),
+            ("concussion", "recovered"),
+            ("internal_shock", "dose_changed"),
+            ("internal_shock", "module_damaged"),
+            ("fluid", "leak_started"),
+            ("fluid", "leak_rate_changed"),
+            ("fluid", "reservoir_warning"),
+            ("fluid", "reservoir_critical"),
+            ("fluid", "reservoir_empty"),
+            ("fluid", "ignition"),
+            ("fluid", "ground_splatter_spawned"),
+            ("fluid", "leak_stopped"),
+            ("fluid", "refilled"),
+            ("origin", "shot_force_feedback"),
+            ("origin", "g_load_dose_changed"),
+            ("origin", "helmet_breach"),
+            ("origin", "oxygen_supply_changed"),
+            ("hazard", "spawned"),
+            ("hazard", "spread"),
+            ("hazard", "actor_contact"),
+            ("hazard", "tick"),
+            ("hazard", "dissipated"),
+            ("affliction", "applied"),
+            ("affliction", "tick"),
+            ("affliction", "cleared"),
+            ("affliction", "escalated"),
+            ("atmos", "pressure_changed"),
+            ("atmos", "temperature_changed"),
+            ("atmos", "gas_released"),
+            ("atmos", "breach_detected"),
+            ("atmos", "combustion_ignition"),
+            ("atmos", "phase_transition"),
+            ("atmos", "pipe_flow"),
+            ("atmos", "pipe_freeze"),
+            ("atmos", "pipe_rupture"),
+            ("atmos", "electrolysis_started"),
+            ("shield", "hit"),
+            ("shield", "depleted"),
+            ("shield", "regen_started"),
+            ("shield", "regen_completed"),
+            ("shield", "disrupted"),
+            ("environment", "signal_delta"),
+            ("environment", "signal_aggregated"),
+            ("thermal", "signature_changed"),
+            ("thermal", "heat_exchanged"),
+            ("thermal", "material_phase_change"),
+            ("combat", "projectile_hit_mo"),
+        ];
+        for (cat, ty) in pairs {
+            let raw = event_schema_for(cat, ty).unwrap_or_else(|| panic!("no schema for {cat}.{ty}"));
+            let v: serde_json::Value = serde_json::from_str(raw).expect("schema is json");
+            let sv = v
+                .pointer("/properties/schema_version/const")
+                .and_then(|x| x.as_str())
+                .unwrap_or_else(|| panic!("{cat}.{ty} missing properties.schema_version.const"));
+            assert_eq!(sv, "0.1", "{cat}.{ty} schema_version must be 0.1 (got {sv})");
+            let cat_const = v
+                .pointer("/properties/category/const")
+                .and_then(|x| x.as_str())
+                .unwrap_or_else(|| panic!("{cat}.{ty} missing properties.category.const"));
+            assert_eq!(cat_const, *cat, "{cat}.{ty} category const mismatch");
+            let ty_const = v
+                .pointer("/properties/event_type/const")
+                .and_then(|x| x.as_str())
+                .unwrap_or_else(|| panic!("{cat}.{ty} missing properties.event_type.const"));
+            assert_eq!(ty_const, *ty, "{cat}.{ty} event_type const mismatch");
+        }
     }
 }

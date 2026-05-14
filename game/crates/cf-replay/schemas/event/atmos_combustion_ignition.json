@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/atmos.combustion_ignition.v0.1",
+  "title": "atmos.combustion_ignition",
+  "description": "M5 § atmos.* family — declarative event schema locked at v0.1. Fires when a combustible mixture ignites (e.g. H2 + O2 reaches threshold). reaction_id identifies the M19 reaction recipe; energy_release_j is the joules released; temperature_after_k is the post-reaction zone temperature. Producer fills at M19. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "atmos" },
+    "event_type": { "const": "combustion_ignition" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "atm_id": { "type": ["integer", "string"] },
+        "reaction_id": { "type": "string" },
+        "energy_release_j": { "type": "number" },
+        "temperature_after_k": { "type": "number" }
+      },
+      "required": ["atm_id", "reaction_id", "energy_release_j", "temperature_after_k"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

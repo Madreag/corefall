@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/thermal.signature_changed.v0.1",
+  "title": "thermal.signature_changed",
+  "description": "M5 § thermal.* family — declarative event schema locked at v0.1. Per-actor thermal signature in Kelvin (drives AI thermal sight, IR seekers, atmosphere heat-exchange). Producer fills at M16 + M19. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "thermal" },
+    "event_type": { "const": "signature_changed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "from_k": { "type": "number" },
+        "to_k": { "type": "number" }
+      },
+      "required": ["actor_id", "from_k", "to_k"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

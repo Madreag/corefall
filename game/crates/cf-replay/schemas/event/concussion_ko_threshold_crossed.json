@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/concussion.ko_threshold_crossed.v0.1",
+  "title": "concussion.ko_threshold_crossed",
+  "description": "M5 § concussion.* family — declarative event schema locked at v0.1. Fires once when dose reaches 100 and the actor enters the KO band (full blackout 5-10s). ko_duration_s is the expected unconscious duration. Producer fills at M17. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "concussion" },
+    "event_type": { "const": "ko_threshold_crossed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "ko_duration_s": { "type": "number", "minimum": 0.0 }
+      },
+      "required": ["actor_id", "ko_duration_s"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

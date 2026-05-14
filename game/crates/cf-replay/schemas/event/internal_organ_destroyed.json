@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/internal.organ_destroyed.v0.1",
+  "title": "internal.organ_destroyed",
+  "description": "M5 § internal.* family — declarative event schema locked at v0.1. Fires when an organ's HP reaches 0. failure_cascade describes which follow-on afflictions / hp drains fire as a result (M17 origin reaction matrix fills the exact map). Producer fills at M14 + M17. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "internal" },
+    "event_type": { "const": "organ_destroyed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "organ_id": { "type": "string", "enum": ["brain", "eyes_left", "eyes_right", "ears_left", "ears_right", "heart", "lungs_left", "lungs_right", "liver", "kidneys_left", "kidneys_right", "spine", "stomach", "intestines", "pancreas"] },
+        "organ_kind": { "type": "string" },
+        "failure_cascade": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "required": ["actor_id", "organ_id", "organ_kind", "failure_cascade"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

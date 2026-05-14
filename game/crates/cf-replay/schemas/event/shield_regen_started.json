@@ -1,0 +1,24 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/shield.regen_started.v0.1",
+  "title": "shield.regen_started",
+  "description": "M5 § shield.* family — declarative event schema locked at v0.1. Fires when shield status moves to Regenerating (after downtime_after_break_s post-depleted). Producer fills at M13+. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "shield" },
+    "event_type": { "const": "regen_started" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" }
+      },
+      "required": ["actor_id"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/atmos.phase_transition.v0.1",
+  "title": "atmos.phase_transition",
+  "description": "M5 § atmos.* family — declarative event schema locked at v0.1. Fires when a gas in an atmosphere crosses a phase boundary (e.g. H2O gas → liquid at the dewpoint, or liquid → solid (ice)). latent_heat_consumed_j is the joules absorbed/released by the transition. Producer fills at M19. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "atmos" },
+    "event_type": { "const": "phase_transition" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "atm_id": { "type": ["integer", "string"] },
+        "gas": { "type": "string", "enum": ["O2", "N2", "CO2", "volatiles", "pollutant", "H2", "N2O", "H2O", "O3", "He"] },
+        "from_phase": { "type": "string" },
+        "to_phase": { "type": "string" },
+        "latent_heat_consumed_j": { "type": "number" }
+      },
+      "required": ["atm_id", "gas", "from_phase", "to_phase", "latent_heat_consumed_j"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

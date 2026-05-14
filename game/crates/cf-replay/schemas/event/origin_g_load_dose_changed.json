@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/origin.g_load_dose_changed.v0.1",
+  "title": "origin.g_load_dose_changed",
+  "description": "M5 § origin.* family — declarative event schema locked at v0.1. G-load accumulator delta. source enum: fall, high_g_maneuver, rapid_impact. Producer fills at M17. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "origin" },
+    "event_type": { "const": "g_load_dose_changed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "from_dose": { "type": "number" },
+        "to_dose": { "type": "number" },
+        "source": { "type": "string", "enum": ["fall", "high_g_maneuver", "rapid_impact"] }
+      },
+      "required": ["actor_id", "from_dose", "to_dose", "source"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/armor.debris_spawned.v0.1",
+  "title": "armor.debris_spawned",
+  "description": "M5 § armor.* family — declarative event schema locked at v0.1. Fires when armor chunked-off debris becomes a physics record that can later be picked up. Producer fills at M13 + M14. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "armor" },
+    "event_type": { "const": "debris_spawned" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "record_id": { "type": "integer" },
+        "kind": { "type": "string" },
+        "material": { "type": ["integer", "string"] },
+        "position": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "velocity": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "can_pickup": { "type": "boolean" }
+      },
+      "required": ["record_id", "kind", "material", "position", "velocity", "can_pickup"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

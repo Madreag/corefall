@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/armor.penetration_ray_traversed.v0.1",
+  "title": "armor.penetration_ray_traversed",
+  "description": "M5 § armor.* family — declarative event schema locked at v0.1. Fires for an AP-class round that pierces armor and traces a ray through internal modules. modules_hit is an array of [module_id, damage] pairs. Producer fills at M14 + M17. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "armor" },
+    "event_type": { "const": "penetration_ray_traversed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "ray_origin": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "ray_direction": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "modules_hit": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": [
+              { "type": ["integer", "string"] },
+              { "type": "number" }
+            ],
+            "minItems": 2,
+            "maxItems": 2
+          }
+        },
+        "final_resting_point": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        }
+      },
+      "required": ["ray_origin", "ray_direction", "modules_hit", "final_resting_point"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

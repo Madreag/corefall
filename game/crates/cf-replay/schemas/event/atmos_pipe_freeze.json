@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/atmos.pipe_freeze.v0.1",
+  "title": "atmos.pipe_freeze",
+  "description": "M5 § atmos.* family — declarative event schema locked at v0.1. Fires when a pipe's internal temperature drops below freezing for the carried gas (water freezes first; H2 last). A frozen pipe stops flow. Producer fills at M19. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "atmos" },
+    "event_type": { "const": "pipe_freeze" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "pipe_id": { "type": ["integer", "string"] },
+        "temperature_k": { "type": "number" }
+      },
+      "required": ["pipe_id", "temperature_k"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

@@ -1,0 +1,36 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/thermal.heat_exchanged.v0.1",
+  "title": "thermal.heat_exchanged",
+  "description": "M5 § thermal.* family — declarative event schema locked at v0.1. Per-tile ONI-style heat flow event. joules is the energy moving from from_tile to to_tile. Producer fills at M16 + M19. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "thermal" },
+    "event_type": { "const": "heat_exchanged" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "from_tile": {
+          "type": "array",
+          "items": { "type": "integer" },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "to_tile": {
+          "type": "array",
+          "items": { "type": "integer" },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "joules": { "type": "number" }
+      },
+      "required": ["from_tile", "to_tile", "joules"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

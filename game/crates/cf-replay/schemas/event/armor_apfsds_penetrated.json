@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/armor.apfsds_penetrated.v0.1",
+  "title": "armor.apfsds_penetrated",
+  "description": "M5 § armor.* family — declarative event schema locked at v0.1. Fires when an APFSDS (Armor-Piercing Fin-Stabilized Discarding Sabot) rod penetrates armor; rod_length_remaining_mm is what's left after passing through. Producer fills at M13 + M14. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "armor" },
+    "event_type": { "const": "apfsds_penetrated" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "item_id": { "type": "integer" },
+        "zone": { "type": "string", "enum": ["head", "torso", "arm_left", "arm_right", "forearm_left", "forearm_right", "hand_left", "hand_right", "leg_left", "leg_right", "shin_left", "shin_right", "foot_left", "foot_right", "backpack"] },
+        "rod_length_remaining_mm": { "type": "number", "minimum": 0.0 }
+      },
+      "required": ["item_id", "zone", "rod_length_remaining_mm"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

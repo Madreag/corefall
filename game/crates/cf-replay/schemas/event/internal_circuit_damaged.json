@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/internal.circuit_damaged.v0.1",
+  "title": "internal.circuit_damaged",
+  "description": "M5 § internal.* family — declarative event schema locked at v0.1. Per-circuit HP delta for robots. 12-circuit robot graph (locked names): power_core, cpu, sensor_array, motor_controller_left_arm, motor_controller_right_arm, motor_controller_left_leg, motor_controller_right_leg, hydraulic_pump, coolant_pump, oil_reservoir, fuel_tank, comm_relay. Producer fills at M14 + M17. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "internal" },
+    "event_type": { "const": "circuit_damaged" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "circuit_id": { "type": "string", "enum": ["power_core", "cpu", "sensor_array", "motor_controller_left_arm", "motor_controller_right_arm", "motor_controller_left_leg", "motor_controller_right_leg", "hydraulic_pump", "coolant_pump", "oil_reservoir", "fuel_tank", "comm_relay"] },
+        "circuit_kind": { "type": "string" },
+        "from_hp": { "type": "number" },
+        "to_hp": { "type": "number" }
+      },
+      "required": ["actor_id", "circuit_id", "circuit_kind", "from_hp", "to_hp"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

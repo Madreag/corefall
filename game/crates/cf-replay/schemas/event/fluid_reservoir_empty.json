@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/fluid.reservoir_empty.v0.1",
+  "title": "fluid.reservoir_empty",
+  "description": "M5 § fluid.* family — declarative event schema locked at v0.1. Fires when a reservoir reaches 0. cascade_effects lists the locked downstream consequences per fluid: oil → joint seizure + movement -50% + eventual motor failure; coolant → heat buildup + overheating affliction stacks; fuel → mobility offline + chassis inert + ignition risk; electrolyte → action costs rise + eventually inert. Producer fills at M13. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "fluid" },
+    "event_type": { "const": "reservoir_empty" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "fluid_kind": { "type": "string", "enum": ["oil", "coolant", "fuel", "electrolyte"] },
+        "cascade_effects": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "required": ["actor_id", "fluid_kind", "cascade_effects"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

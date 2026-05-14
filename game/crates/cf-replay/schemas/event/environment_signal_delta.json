@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/environment.signal_delta.v0.1",
+  "title": "environment.signal_delta",
+  "description": "M5 § environment.* family — declarative event schema locked at v0.1. 11 slices (locked): atmospheric, gravitational, thermal, radiation, photic, em, weather, water, acoustic, day_night, comms. Producer fills at M20 (EnvironmentSignal aggregator). Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "environment" },
+    "event_type": { "const": "signal_delta" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "slice": { "type": "string", "enum": ["atmospheric", "gravitational", "thermal", "radiation", "photic", "em", "weather", "water", "acoustic", "day_night", "comms"] },
+        "from": {},
+        "to": {},
+        "tick": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["actor_id", "slice", "from", "to", "tick"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

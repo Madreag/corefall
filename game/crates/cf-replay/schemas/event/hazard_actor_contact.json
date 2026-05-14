@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/hazard.actor_contact.v0.1",
+  "title": "hazard.actor_contact",
+  "description": "M5 § hazard.* family — declarative event schema locked at v0.1. Fires when an actor enters a hazard tile or a hazard tile spreads onto an actor. Cause-chains forward into affliction.applied. Producer fills at M16. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "hazard" },
+    "event_type": { "const": "actor_contact" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "hazard_id": { "type": ["integer", "string"] },
+        "kind": { "type": "string", "enum": ["fire", "smoke", "electric", "wet", "hot", "cold", "acid", "radiation", "toxic"] },
+        "intensity": { "type": "number" }
+      },
+      "required": ["actor_id", "hazard_id", "kind", "intensity"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

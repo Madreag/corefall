@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/internal.organ_failure_cascade.v0.1",
+  "title": "internal.organ_failure_cascade",
+  "description": "M5 § internal.* family — declarative event schema locked at v0.1. Fires for each follow-on affliction / hp drain after an organ destruction. applied_afflictions references the affliction.* family kinds. Producer fills at M17 (origin reaction matrix). Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "internal" },
+    "event_type": { "const": "organ_failure_cascade" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "organ_id": { "type": "string", "enum": ["brain", "eyes_left", "eyes_right", "ears_left", "ears_right", "heart", "lungs_left", "lungs_right", "liver", "kidneys_left", "kidneys_right", "spine", "stomach", "intestines", "pancreas"] },
+        "applied_afflictions": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "hp_drain_per_s": { "type": "number" }
+      },
+      "required": ["actor_id", "organ_id", "applied_afflictions", "hp_drain_per_s"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

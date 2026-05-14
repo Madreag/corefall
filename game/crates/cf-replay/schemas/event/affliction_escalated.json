@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/affliction.escalated.v0.1",
+  "title": "affliction.escalated",
+  "description": "M5 § affliction.* family — declarative event schema locked at v0.1. Fires when an existing affliction's severity is upgraded (e.g. mild bleeding → heavy bleeding). Producer fills at M16. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "affliction" },
+    "event_type": { "const": "escalated" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "kind": { "type": "string", "enum": ["burning", "wet", "electrified", "poisoned", "hypoxic", "combustible_atmosphere", "breach_decomp", "hyperthermic", "hypothermic", "radiation", "concussed", "deafened", "bleeding", "internal_shock", "low_battery", "coolant_leaking", "oil_leaking", "overheating", "hunger", "thirst", "sleep_dep", "sanity_low"] },
+        "from_severity": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "to_severity": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+      },
+      "required": ["actor_id", "kind", "from_severity", "to_severity"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

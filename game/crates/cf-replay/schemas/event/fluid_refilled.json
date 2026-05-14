@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/fluid.refilled.v0.1",
+  "title": "fluid.refilled",
+  "description": "M5 § fluid.* family — declarative event schema locked at v0.1. Fires when a reservoir is refilled (e.g. fuel can / coolant top-up). source_actor_id is the actor that performed the refill (may equal actor_id for self-refill). Producer fills at M13 + M16. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "fluid" },
+    "event_type": { "const": "refilled" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "fluid_kind": { "type": "string", "enum": ["oil", "coolant", "fuel", "electrolyte"] },
+        "amount": { "type": "number", "minimum": 0.0 },
+        "source_actor_id": { "type": "integer" }
+      },
+      "required": ["actor_id", "fluid_kind", "amount", "source_actor_id"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

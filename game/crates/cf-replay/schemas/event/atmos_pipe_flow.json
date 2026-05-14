@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/atmos.pipe_flow.v0.1",
+  "title": "atmos.pipe_flow",
+  "description": "M5 § atmos.* family — declarative event schema locked at v0.1. Per-tick gas transfer between connected atmosphere pipes (Stationeers-style piping). Producer fills at M19. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "atmos" },
+    "event_type": { "const": "pipe_flow" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "from_pipe_id": { "type": ["integer", "string"] },
+        "to_pipe_id": { "type": ["integer", "string"] },
+        "gas": { "type": "string", "enum": ["O2", "N2", "CO2", "volatiles", "pollutant", "H2", "N2O", "H2O", "O3", "He"] },
+        "moles_per_s": { "type": "number" }
+      },
+      "required": ["from_pipe_id", "to_pipe_id", "gas", "moles_per_s"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

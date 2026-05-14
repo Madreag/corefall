@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/concussion.recovered.v0.1",
+  "title": "concussion.recovered",
+  "description": "M5 § concussion.* family — declarative event schema locked at v0.1. Fires when dose returns to Clear band (0-20) after a KO/Severe state. recovery_reason indicates time-based decay vs medikit vs environment intervention. Producer fills at M17. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "concussion" },
+    "event_type": { "const": "recovered" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "recovery_reason": { "type": "string", "enum": ["time", "medikit", "environment"] }
+      },
+      "required": ["actor_id", "recovery_reason"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

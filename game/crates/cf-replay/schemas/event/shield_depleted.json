@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/shield.depleted.v0.1",
+  "title": "shield.depleted",
+  "description": "M5 § shield.* family — declarative event schema locked at v0.1. Fires when shield hp reaches 0; status moves Up → Down for downtime_after_break_s before regen begins. Producer fills at M13+. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "shield" },
+    "event_type": { "const": "depleted" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "cause": { "type": "string" }
+      },
+      "required": ["actor_id", "cause"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

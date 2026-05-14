@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/shield.hit.v0.1",
+  "title": "shield.hit",
+  "description": "M5 § shield.* family — declarative event schema locked at v0.1. ShieldState struct (locked): { hp, max_hp, regen_rate_per_s, downtime_after_break_s, status: Up|Down|Regenerating|Disrupted }. Producer fills at M13+ (chassis shields) + M25+ (base shields). Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "shield" },
+    "event_type": { "const": "hit" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "hp_before": { "type": "number" },
+        "hp_after": { "type": "number" },
+        "cause": { "type": "string" }
+      },
+      "required": ["actor_id", "hp_before", "hp_after", "cause"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/fluid.ground_splatter_spawned.v0.1",
+  "title": "fluid.ground_splatter_spawned",
+  "description": "M5 § fluid.* family — declarative event schema locked at v0.1. Cosmetic. Fires when a fluid puddle spawns on the ground; volume_l is litres of fluid in the splatter; terrain_hazard_kind is the hazard.* kind the M16 hazard kernel will spawn on contact. Producer fills at M13 (visual) + M16 (hazard consumption). Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "fluid" },
+    "event_type": { "const": "ground_splatter_spawned" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "cosmetic": { "type": ["boolean", "null"] },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "fluid_kind": { "type": "string", "enum": ["oil", "coolant", "fuel", "electrolyte"] },
+        "position": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "volume_l": { "type": "number", "minimum": 0.0 },
+        "terrain_hazard_kind": { "type": "string" }
+      },
+      "required": ["fluid_kind", "position", "volume_l", "terrain_hazard_kind"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/internal.organ_damaged.v0.1",
+  "title": "internal.organ_damaged",
+  "description": "M5 § internal.* family — declarative event schema locked at v0.1. Per-organ HP delta for humans/androids. 15-organ humanoid graph (locked names): brain, eyes_left, eyes_right, ears_left, ears_right, heart, lungs_left, lungs_right, liver, kidneys_left, kidneys_right, spine, stomach, intestines, pancreas. Producer fills at M14 (ray traversal) + M17 (per-origin organ graphs). Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "0.1" },
+    "category": { "const": "internal" },
+    "event_type": { "const": "organ_damaged" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "organ_id": { "type": "string", "enum": ["brain", "eyes_left", "eyes_right", "ears_left", "ears_right", "heart", "lungs_left", "lungs_right", "liver", "kidneys_left", "kidneys_right", "spine", "stomach", "intestines", "pancreas"] },
+        "organ_kind": { "type": "string" },
+        "from_hp": { "type": "number" },
+        "to_hp": { "type": "number" },
+        "cause": { "type": "string" },
+        "source_hit_event_id": { "type": "string" }
+      },
+      "required": ["actor_id", "organ_id", "organ_kind", "from_hp", "to_hp", "cause", "source_hit_event_id"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}
