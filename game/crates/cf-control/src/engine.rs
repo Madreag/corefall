@@ -722,6 +722,23 @@ struct EngineMutable {
     /// default — populated by scenarios that declare a friendly bot. See
     /// `cf_squad::Squad` for the canonical shape.
     squad: cf_squad::Squad,
+    /// **M6**: per-actor in-flight weapon swap state. A swap starts on
+    /// `act.player.weapon_swap` and ticks here until completion, when the
+    /// engine emits `equipment.weapon_swap_completed` and removes the entry.
+    weapon_swap_state: BTreeMap<ActorId, cf_equipment::WeaponSwap>,
+    /// **M6**: last-emitted stamina value per actor for change-detection
+    /// throttling. Stamina is only re-emitted when the value moves by more
+    /// than `M6_STAMINA_EMIT_DELTA` to keep replay volume bounded.
+    m6_last_stamina_emit: BTreeMap<ActorId, f32>,
+    /// **M6**: last-emitted stealth-meter value per actor. Stealth meter is
+    /// only re-emitted when the band (Hidden / Risky / Spotted) changes.
+    m6_last_stealth_band: BTreeMap<ActorId, u8>,
+    /// **M6**: last-emitted weight-bucket per actor (0 = under threshold,
+    /// 1 = above). Toggling emits an `inventory.weight_changed` event.
+    m6_last_weight_bucket: BTreeMap<ActorId, bool>,
+    /// **M6**: per-actor footstep cadence accumulator (ticks since last
+    /// emitted `perception.footstep_emitted`). Prevents replay spam.
+    m6_footstep_cooldown: BTreeMap<ActorId, u32>,
 }
 
 /// Pending dig request set by `act.player.dig` and consumed at the start of the
@@ -930,6 +947,11 @@ impl M0Engine {
                 perf_coalesce_rects_in_total: 0,
                 perf_coalesce_rects_out_total: 0,
                 squad: cf_squad::Squad::default(),
+                weapon_swap_state: BTreeMap::new(),
+                m6_last_stamina_emit: BTreeMap::new(),
+                m6_last_stealth_band: BTreeMap::new(),
+                m6_last_weight_bucket: BTreeMap::new(),
+                m6_footstep_cooldown: BTreeMap::new(),
             }),
             recorder,
             current_tick,
@@ -3321,6 +3343,17 @@ impl M0Engine {
             self.tick_chassis_eject_for_all(t, sim_time_ms);
         }
 
+        // **M6**: tick per-actor state machines that the cfctl surface drives —
+        // stamina drain, cinematic countdown + transition, lean integration,
+        // cover sampling, stealth-meter integration, inventory weight recompute,
+        // and the WeaponSwap state machine. See `specs/active/M6.md` §
+        // "Actor controller depth" and § "Inventory: ... weight + drop/pickup".
+        if let Some(t) = advanced {
+            let sim_time_ms = self.state.read().map(|s| s.clock.sim_time_ms()).unwrap_or(0.0);
+            self.tick_m6_actor_state(t, sim_time_ms);
+            self.tick_m6_perception(t, sim_time_ms);
+        }
+
         // M3 re-open (2026-05-13): flush the per-tick coalesced
         // `terrain.terrain_dirty_region_batch`. All carves during this tick
         // pushed their dirty chunks into `state.pending_dirty_rects`; here we
@@ -4950,6 +4983,593 @@ impl M0Engine {
         }
     }
 
+    /// **M6**: per-tick step for every actor's M6 state machines. See
+    /// `specs/active/M6.md`:
+    ///
+    /// - **Stamina**: drains while sprinting, recovers when not, and auto-cancels
+    ///   sprint when it reaches 0. Emits `actor.stamina_changed` on significant
+    ///   moves so replay viewers can graph the curve.
+    /// - **Cinematic stances** (Slide/Vault/Climb/Dive/StealthAttack/KnifeThrow):
+    ///   decrement `cinematic_ticks_remaining`. When the counter reaches 0 the
+    ///   engine clears the cinematic and emits `actor.stance_changed` with the
+    ///   spec-mandated transition target (Slide→Crouch, Vault→Stand,
+    ///   Climb→Stand, Dive→Stand, StealthAttack→Stand, KnifeThrow→Stand).
+    /// - **Lean angle**: integrates toward ±45° via `LeanState::step`.
+    /// - **Cover state**: samples terrain solidness on the left and right side
+    ///   of the actor (offset = `half_extents.x + COVER_PROBE_OFFSET`) and
+    ///   produces a `CoverSide` + effectiveness. Pure read from chunked terrain.
+    /// - **Stealth meter**: targets are computed from stance + an instantaneous
+    ///   sight check against the worst (nearest, most-line-of-sight) AI guard.
+    ///   `StealthMeter::step_toward` smooths rise/fall. Emits
+    ///   `perception.stealth_meter_changed` on band-crossing transitions.
+    /// - **Inventory weight**: sums the slot weights of the M1 4-slot inventory
+    ///   (rifle slot = 8 kg interim weight per spec § Weight system). Emits
+    ///   `inventory.weight_changed` when the 30-kg bucket flips and forces
+    ///   sprint off when over the limit.
+    /// - **WeaponSwap**: advances each in-flight swap entry in
+    ///   `state.weapon_swap_state`. On completion emits
+    ///   `equipment.weapon_swap_completed { actor, active_slot }`.
+    fn tick_m6_actor_state(&self, tick: Tick, sim_time_ms: f64) {
+        const COVER_PROBE_OFFSET: f32 = 6.0;
+        const STAMINA_EMIT_DELTA: f32 = 0.05;
+        const SLOT_WEIGHT_RIFLE_KG: f32 = 8.0;
+        const SLOT_WEIGHT_EMPTY_KG: f32 = 0.0;
+
+        struct StanceTransition {
+            actor: u64,
+            from_stance: &'static str,
+            to_stance: &'static str,
+        }
+        struct StaminaEmit {
+            actor: u64,
+            stamina: f32,
+            sprinting: bool,
+        }
+        struct StealthEmit {
+            actor: u64,
+            stealth_meter: f32,
+            spotted: bool,
+        }
+        struct WeightEmit {
+            actor: u64,
+            total_weight_kg: f32,
+            forces_walk: bool,
+        }
+        struct SwapEmit {
+            actor: u64,
+            active_slot: u8,
+        }
+        struct ActionReject {
+            actor: u64,
+            reason: &'static str,
+        }
+
+        let mut stance_transitions: Vec<StanceTransition> = Vec::new();
+        let mut stamina_emits: Vec<StaminaEmit> = Vec::new();
+        let mut stealth_emits: Vec<StealthEmit> = Vec::new();
+        let mut weight_emits: Vec<WeightEmit> = Vec::new();
+        let mut swap_emits: Vec<SwapEmit> = Vec::new();
+        let mut action_rejects: Vec<ActionReject> = Vec::new();
+
+        let tick_rate_hz = self.config.tick_rate_hz;
+        let mut state = match self.state.write() {
+            Ok(s) => s,
+            Err(_) => return,
+        };
+
+        let observer_positions: Vec<(ActorId, cf_actor::Vec2, cf_actor::Vec2, f32)> = state
+            .reactive_guards
+            .keys()
+            .filter_map(|gid| {
+                state
+                    .actor_state
+                    .as_ref()
+                    .and_then(|sim| sim.world.actors.get(gid))
+                    .map(|guard| {
+                        let facing_sign = if guard.aim.x >= 0.0 { 1.0 } else { -1.0 };
+                        let aim_vec = cf_actor::Vec2::new(facing_sign, 0.0);
+                        (*gid, guard.position, aim_vec, 240.0_f32)
+                    })
+            })
+            .collect();
+
+        let actor_ids: Vec<ActorId> = state
+            .actor_state
+            .as_ref()
+            .map(|sim| sim.world.actors.keys().copied().collect())
+            .unwrap_or_default();
+
+        for actor_id in actor_ids {
+            // Snapshot terrain probes (left + right of actor) without holding
+            // a mutable borrow on the actor itself.
+            let probe = state.actor_state.as_ref().and_then(|sim| {
+                sim.world.actors.get(&actor_id).map(|a| {
+                    let half_x = a.half_extents.x.max(1.0);
+                    let probe_x = half_x + COVER_PROBE_OFFSET;
+                    let left = cf_actor::Vec2::new(a.position.x - probe_x, a.position.y);
+                    let right = cf_actor::Vec2::new(a.position.x + probe_x, a.position.y);
+                    let feet = cf_actor::Vec2::new(a.position.x, a.position.y + a.half_extents.y);
+                    (a.position, a.velocity, left, right, feet, a.aim)
+                })
+            });
+            let Some((actor_pos, _actor_vel, left_probe, right_probe, _feet_probe, _aim)) = probe else {
+                continue;
+            };
+            let (left_solid, right_solid) = match state.chunked_terrain.as_ref() {
+                Some(terrain) => {
+                    let lm = terrain.material_at_world(left_probe.x, left_probe.y);
+                    let rm = terrain.material_at_world(right_probe.x, right_probe.y);
+                    (terrain.registry.is_solid(lm), terrain.registry.is_solid(rm))
+                }
+                None => (false, false),
+            };
+            let cover_side = match (left_solid, right_solid) {
+                (true, true) => cf_actor::CoverSide::Both,
+                (true, false) => cf_actor::CoverSide::Left,
+                (false, true) => cf_actor::CoverSide::Right,
+                (false, false) => cf_actor::CoverSide::None,
+            };
+            let cover_effectiveness = match (left_solid, right_solid) {
+                (true, true) => 1.0,
+                (true, false) | (false, true) => 0.7,
+                (false, false) => 0.0,
+            };
+
+            // Stealth-meter target: take the worst (most visible) sightline
+            // across all observer guards. We use the pure sight kernel from
+            // cf-perception so the same numbers feed AI and HUD.
+            let mut worst_instantaneous: f32 = 0.0;
+            for (_gid, observer_pos, _observer_aim, max_range) in &observer_positions {
+                let check = cf_perception::SightCheck {
+                    observer: *observer_pos,
+                    observer_facing_x: 1.0,
+                    target: actor_pos,
+                    view_cone_half_angle: 1.0,
+                    max_range: *max_range,
+                    occlusion_factor: 1.0,
+                };
+                let result = cf_perception::compute_sightline(check);
+                if result.is_visible() && result.visibility > worst_instantaneous {
+                    worst_instantaneous = result.visibility;
+                }
+            }
+
+            let Some(actor) = state
+                .actor_state
+                .as_mut()
+                .and_then(|sim| sim.world.actors.get_mut(&actor_id))
+            else {
+                continue;
+            };
+
+            // (a) Stamina step + auto-cancel + change emission.
+            let stamina_before = actor.stamina.current;
+            let sprinting_before = actor.stamina.sprinting;
+            actor.stamina.step(tick_rate_hz);
+            if actor.stamina.should_auto_cancel_sprint() {
+                actor.sprint_active = false;
+                actor.stamina.sprinting = false;
+            }
+            let stamina_changed = (actor.stamina.current - stamina_before).abs() >= STAMINA_EMIT_DELTA
+                || actor.stamina.sprinting != sprinting_before;
+            let stamina_now = actor.stamina.current;
+            let sprinting_now = actor.stamina.sprinting;
+            if stamina_changed {
+                let last = state.m6_last_stamina_emit.get(&actor_id).copied().unwrap_or(-1.0);
+                if (stamina_now - last).abs() >= STAMINA_EMIT_DELTA || last < 0.0 {
+                    state.m6_last_stamina_emit.insert(actor_id, stamina_now);
+                    stamina_emits.push(StaminaEmit {
+                        actor: actor_id.0,
+                        stamina: stamina_now,
+                        sprinting: sprinting_now,
+                    });
+                }
+            }
+
+            let actor = state
+                .actor_state
+                .as_mut()
+                .and_then(|sim| sim.world.actors.get_mut(&actor_id))
+                .expect("actor still present");
+
+            // (b) Cinematic countdown + transition.
+            if actor.cinematic_ticks_remaining > 0 {
+                actor.cinematic_ticks_remaining -= 1;
+                if actor.cinematic_ticks_remaining == 0 {
+                    let from_stance = actor.cinematic_kind.map(|s| s.as_str()).unwrap_or("idle");
+                    let to_stance = match actor.cinematic_kind {
+                        Some(cf_actor::Stance::Slide) => "crouching",
+                        Some(cf_actor::Stance::Vault) => "stand",
+                        Some(cf_actor::Stance::LadderClimb)
+                        | Some(cf_actor::Stance::RopeClimb)
+                        | Some(cf_actor::Stance::PipeClimb)
+                        | Some(cf_actor::Stance::Climbing) => "stand",
+                        Some(cf_actor::Stance::Dive) => "stand",
+                        Some(cf_actor::Stance::StealthAttack) => "stand",
+                        Some(cf_actor::Stance::KnifeThrow) => "stand",
+                        _ => "stand",
+                    };
+                    if matches!(actor.cinematic_kind, Some(cf_actor::Stance::Slide)) {
+                        actor.crouch_active = true;
+                    }
+                    actor.cinematic_kind = None;
+                    stance_transitions.push(StanceTransition {
+                        actor: actor_id.0,
+                        from_stance,
+                        to_stance,
+                    });
+                }
+            }
+
+            // (c) Lean integration.
+            actor.lean_state.step(tick_rate_hz);
+
+            // (d) Cover state recompute.
+            actor.cover_state = cf_actor::CoverState {
+                side: cover_side,
+                effectiveness: cover_effectiveness,
+                peeking: actor.lean_state.is_leaning() && cover_side != cf_actor::CoverSide::None,
+            };
+
+            // (e) Stealth-meter step.
+            let visibility = cf_perception::StealthVisibility {
+                instantaneous: worst_instantaneous,
+                noise: if sprinting_now { 0.5 } else { 0.0 },
+                crouched: actor.crouch_active,
+                prone: actor.prone_active,
+                stationary: actor.velocity.x.abs() < cf_actor::Stance::WALK_THRESHOLD,
+            };
+            let target = visibility.effective();
+            let prev_meter = actor.stealth_meter;
+            let mut meter = cf_perception::StealthMeter {
+                value: prev_meter,
+                ..cf_perception::StealthMeter::default()
+            };
+            let new_meter = meter.step_toward(target);
+            actor.stealth_meter = new_meter;
+            let band = if new_meter >= cf_perception::stealth_meter::SPOTTED_CAPTION_THRESHOLD {
+                2_u8
+            } else if new_meter >= cf_perception::stealth_meter::STEALTH_KILL_THRESHOLD {
+                1_u8
+            } else {
+                0_u8
+            };
+            let prev_band = state.m6_last_stealth_band.get(&actor_id).copied().unwrap_or(255);
+            if band != prev_band {
+                state.m6_last_stealth_band.insert(actor_id, band);
+                stealth_emits.push(StealthEmit {
+                    actor: actor_id.0,
+                    stealth_meter: new_meter,
+                    spotted: band == 2,
+                });
+            }
+
+            let actor = state
+                .actor_state
+                .as_mut()
+                .and_then(|sim| sim.world.actors.get_mut(&actor_id))
+                .expect("actor still present");
+
+            // (f) Inventory-weight recompute.
+            let total_weight: f32 = actor
+                .inventory
+                .items
+                .iter()
+                .map(|item| match item {
+                    cf_actor::InventoryItem::Empty => SLOT_WEIGHT_EMPTY_KG,
+                    cf_actor::InventoryItem::Rifle { .. } => SLOT_WEIGHT_RIFLE_KG,
+                })
+                .sum();
+            actor.inventory_weight_kg = total_weight;
+            let forces_walk = total_weight > cf_equipment::WEIGHT_FORCE_WALK_KG;
+            if forces_walk && actor.sprint_active {
+                actor.sprint_active = false;
+                actor.stamina.sprinting = false;
+                action_rejects.push(ActionReject {
+                    actor: actor_id.0,
+                    reason: "weight_forces_walk",
+                });
+            }
+            let prev_bucket = state.m6_last_weight_bucket.get(&actor_id).copied();
+            if prev_bucket != Some(forces_walk) {
+                state.m6_last_weight_bucket.insert(actor_id, forces_walk);
+                weight_emits.push(WeightEmit {
+                    actor: actor_id.0,
+                    total_weight_kg: total_weight,
+                    forces_walk,
+                });
+            }
+        }
+
+        // (g) WeaponSwap tick — drain completed swaps + collect emissions.
+        let swap_ids: Vec<ActorId> = state.weapon_swap_state.keys().copied().collect();
+        for actor_id in swap_ids {
+            let completed = {
+                let swap = state
+                    .weapon_swap_state
+                    .get_mut(&actor_id)
+                    .expect("swap present by construction");
+                swap.tick(tick_rate_hz)
+            };
+            if completed {
+                let target = state
+                    .weapon_swap_state
+                    .get(&actor_id)
+                    .map(|s| s.target_slot)
+                    .unwrap_or(0);
+                state.weapon_swap_state.remove(&actor_id);
+                swap_emits.push(SwapEmit {
+                    actor: actor_id.0,
+                    active_slot: target,
+                });
+            }
+        }
+
+        drop(state);
+
+        for emit in stance_transitions {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "actor",
+                "stance_changed",
+                json!({
+                    "actor": emit.actor,
+                    "from_stance": emit.from_stance,
+                    "to_stance": emit.to_stance,
+                    "cause": "cinematic_complete",
+                }),
+                None,
+            );
+        }
+        for emit in stamina_emits {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "actor",
+                "stamina_changed",
+                json!({
+                    "actor": emit.actor,
+                    "stamina": emit.stamina,
+                    "sprinting": emit.sprinting,
+                }),
+                None,
+            );
+        }
+        for emit in stealth_emits {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "perception",
+                "stealth_meter_changed",
+                json!({
+                    "actor": emit.actor,
+                    "stealth_meter": emit.stealth_meter,
+                    "spotted": emit.spotted,
+                }),
+                None,
+            );
+        }
+        for emit in weight_emits {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "inventory",
+                "weight_changed",
+                json!({
+                    "actor": emit.actor,
+                    "total_weight_kg": emit.total_weight_kg,
+                    "forces_walk": emit.forces_walk,
+                }),
+                None,
+            );
+        }
+        for emit in swap_emits {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "equipment",
+                "weapon_swap_completed",
+                json!({
+                    "actor": emit.actor,
+                    "active_slot": emit.active_slot,
+                }),
+                None,
+            );
+        }
+        for emit in action_rejects {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "actor",
+                "action_rejected",
+                json!({
+                    "actor": emit.actor,
+                    "action": "act.player.sprint",
+                    "reason": emit.reason,
+                }),
+                None,
+            );
+        }
+    }
+
+    /// **M6**: per-tick perception emissions. Drives the new
+    /// `perception.footstep_emitted` / `perception.occlusion_applied` event
+    /// families from the unified cf-perception kernel. Co-exists with the
+    /// legacy M2 `ai.perception_signal` event (emitted from
+    /// `emit_guard_events`) so M2 replay consumers continue working.
+    ///
+    /// - **Footsteps**: emitted on a cadence (every `FOOTSTEP_PERIOD_TICKS`
+    ///   ticks at 60 Hz) for any actor whose horizontal speed is above the
+    ///   walk threshold. The surface kind is derived from the terrain
+    ///   material at the actor's feet.
+    /// - **Occlusion**: emitted once per (observer, target) pair where the
+    ///   observer is an AI guard and the line from observer to target
+    ///   crosses at least one solid terrain pixel. The factor is the
+    ///   product of per-sample attenuations along the ray.
+    fn tick_m6_perception(&self, tick: Tick, sim_time_ms: f64) {
+        const FOOTSTEP_PERIOD_TICKS: u32 = 20;
+        const OCCLUSION_RAY_STEPS: u32 = 16;
+
+        struct FootstepEmit {
+            actor: u64,
+            surface: &'static str,
+            loudness: f32,
+        }
+        struct OcclusionEmit {
+            actor: u64,
+            factor: f32,
+        }
+        let mut footsteps: Vec<FootstepEmit> = Vec::new();
+        let mut occlusions: Vec<OcclusionEmit> = Vec::new();
+
+        let mut state = match self.state.write() {
+            Ok(s) => s,
+            Err(_) => return,
+        };
+
+        // Footstep emission — actors moving horizontally on a surface.
+        let actor_movement: Vec<(ActorId, cf_actor::Vec2, f32, bool, bool)> = state
+            .actor_state
+            .as_ref()
+            .map(|sim| {
+                sim.world
+                    .actors
+                    .iter()
+                    .map(|(id, a)| {
+                        (
+                            *id,
+                            cf_actor::Vec2::new(a.position.x, a.position.y + a.half_extents.y),
+                            a.velocity.x.abs(),
+                            a.sprint_active,
+                            a.on_ground,
+                        )
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
+
+        for (actor_id, feet_pos, speed, sprinting, on_ground) in actor_movement {
+            if !on_ground || speed < cf_actor::Stance::WALK_THRESHOLD {
+                state.m6_footstep_cooldown.insert(actor_id, 0);
+                continue;
+            }
+            let cd = state.m6_footstep_cooldown.entry(actor_id).or_insert(0);
+            *cd = cd.saturating_add(1);
+            if *cd < FOOTSTEP_PERIOD_TICKS {
+                continue;
+            }
+            *cd = 0;
+
+            let surface_kind = match state.chunked_terrain.as_ref() {
+                Some(terrain) => {
+                    let mat = terrain.material_at_world(feet_pos.x, feet_pos.y + 1.0);
+                    match cf_terrain::material_name_from_id(mat) {
+                        "dirt" => cf_perception::SurfaceKind::Dirt,
+                        "concrete" | "concrete_soft" => cf_perception::SurfaceKind::Concrete,
+                        "metal_nohook" => cf_perception::SurfaceKind::Metal,
+                        "loose_fill" => cf_perception::SurfaceKind::LooseFill,
+                        _ => cf_perception::SurfaceKind::Dirt,
+                    }
+                }
+                None => cf_perception::SurfaceKind::Dirt,
+            };
+            let stance_loudness = if sprinting { 0.9 } else { 0.5 };
+            let emission = cf_perception::FootstepEmission {
+                actor: actor_id.0,
+                position: feet_pos,
+                surface: surface_kind,
+                stance_loudness,
+            };
+            let loudness = cf_perception::footstep_loudness(emission);
+            footsteps.push(FootstepEmit {
+                actor: actor_id.0,
+                surface: surface_kind.as_str(),
+                loudness,
+            });
+        }
+
+        // Occlusion emission — observer-target pairs (AI guard → player).
+        let player_pos = state.player_actor.and_then(|pid| {
+            state
+                .actor_state
+                .as_ref()
+                .and_then(|sim| sim.world.actors.get(&pid))
+                .map(|a| (pid, a.position))
+        });
+        let guard_positions: Vec<(ActorId, cf_actor::Vec2)> = state
+            .reactive_guards
+            .keys()
+            .filter_map(|gid| {
+                state
+                    .actor_state
+                    .as_ref()
+                    .and_then(|sim| sim.world.actors.get(gid))
+                    .map(|g| (*gid, g.position))
+            })
+            .collect();
+        if let (Some((player_id, player_position)), Some(terrain)) = (player_pos, state.chunked_terrain.as_ref()) {
+            for (_gid, observer_pos) in &guard_positions {
+                let dx = player_position.x - observer_pos.x;
+                let dy = player_position.y - observer_pos.y;
+                let steps = OCCLUSION_RAY_STEPS as f32;
+                let mut result = cf_perception::OcclusionResult::passthrough();
+                for i in 1..OCCLUSION_RAY_STEPS {
+                    let t = i as f32 / steps;
+                    let sx = observer_pos.x + dx * t;
+                    let sy = observer_pos.y + dy * t;
+                    let mat = terrain.material_at_world(sx, sy);
+                    let occluder = match cf_terrain::material_name_from_id(mat) {
+                        "concrete" | "concrete_soft" => cf_perception::occlusion::OcclusionMaterial::Concrete,
+                        "metal_nohook" => cf_perception::occlusion::OcclusionMaterial::Metal,
+                        "loose_fill" => cf_perception::occlusion::OcclusionMaterial::LooseFill,
+                        "dirt" => cf_perception::occlusion::OcclusionMaterial::Concrete,
+                        _ => continue,
+                    };
+                    if terrain.registry.is_solid(mat) {
+                        result = cf_perception::apply_occlusion(result, occluder);
+                    }
+                }
+                if result.factor < 1.0 {
+                    occlusions.push(OcclusionEmit {
+                        actor: player_id.0,
+                        factor: result.factor,
+                    });
+                }
+            }
+        }
+
+        drop(state);
+
+        for emit in footsteps {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "perception",
+                "footstep_emitted",
+                json!({
+                    "actor": emit.actor,
+                    "surface": emit.surface,
+                    "loudness": emit.loudness,
+                }),
+                None,
+            );
+        }
+        for emit in occlusions {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "perception",
+                "occlusion_applied",
+                json!({
+                    "actor": emit.actor,
+                    "factor": emit.factor,
+                }),
+                None,
+            );
+        }
+    }
+
     pub fn record_run_finished(&self, exit_code: i32) {
         // Always emit one final `determinism.sim_checksum` so every bundle has at least one
         // checksum and `summary.json.final_sim_checksum` is never null on a valid run.
@@ -5342,6 +5962,7 @@ impl M0Engine {
         let player_id = state.player_actor.expect("player actor present");
         let mut reject_reason: Option<&'static str> = None;
         let mut event_payload = json!({"actor": player_id.0});
+        let mut swap_to_register: Option<(ActorId, cf_equipment::WeaponSwap)> = None;
         if let Some(sim) = state.actor_state.as_mut() {
             if let Some(actor) = sim.world.actors.get_mut(&player_id) {
                 match &action {
@@ -5438,7 +6059,17 @@ impl M0Engine {
                         let new_slot = cf_actor::ItemSlot(u32::from(*slot));
                         let prev = actor.inventory.selected;
                         if actor.inventory.try_select(new_slot) {
-                            event_payload = json!({"actor": player_id.0, "from_slot": prev.0, "to_slot": (*slot)});
+                            let duration = cf_equipment::swap_duration_for_target(*slot);
+                            swap_to_register = Some((
+                                player_id,
+                                cf_equipment::WeaponSwap::start(prev.0 as u8, *slot, duration),
+                            ));
+                            event_payload = json!({
+                                "actor": player_id.0,
+                                "from_slot": prev.0,
+                                "to_slot": (*slot),
+                                "duration_seconds": duration,
+                            });
                         } else {
                             reject_reason = Some("slot_invalid");
                         }
@@ -5532,6 +6163,11 @@ impl M0Engine {
                         });
                     }
                 }
+            }
+        }
+        if reject_reason.is_none() {
+            if let Some((id, swap)) = swap_to_register {
+                state.weapon_swap_state.insert(id, swap);
             }
         }
         drop(state);
