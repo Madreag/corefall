@@ -1524,6 +1524,21 @@ mod tests {
             dying_dwell_ticks_remaining: 0,
             mission_critical: false,
             bloom_factor: 1.0,
+            facing: "right".into(),
+            stamina: 1.0,
+            stamina_max: 1.0,
+            sprint_active: false,
+            prone_active: false,
+            lean_angle_degrees: 0.0,
+            lean_direction: "none".into(),
+            stealth_meter: 0.0,
+            spotted: false,
+            cover_side: "none".into(),
+            cover_effectiveness: 0.0,
+            inventory_weight_kg: 0.0,
+            weight_forces_walk: false,
+            limb_loss: cf_actor::LimbLossFlags::default(),
+            inventory_extended: Vec::new(),
         };
         let line = stance_line("airborne", Some(&player));
         assert!(line.contains("AIRBORNE"));

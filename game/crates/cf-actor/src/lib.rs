@@ -1666,6 +1666,69 @@ pub struct ActorObservation {
     /// 1.0 = standing/walking; >1 = movement / airborne / sharp-aim breakup.
     #[serde(default = "default_bloom_factor")]
     pub bloom_factor: f32,
+    /// **M6**: side-view facing direction.
+    #[serde(default)]
+    pub facing: String,
+    /// **M6**: stamina pool current value (0..1).
+    #[serde(default)]
+    pub stamina: f32,
+    /// **M6**: stamina pool capacity (>=1.0 if extended).
+    #[serde(default)]
+    pub stamina_max: f32,
+    /// **M6**: sticky sprint intent.
+    #[serde(default)]
+    pub sprint_active: bool,
+    /// **M6**: sticky prone intent.
+    #[serde(default)]
+    pub prone_active: bool,
+    /// **M6**: current lean angle (degrees; negative=left, positive=right).
+    #[serde(default)]
+    pub lean_angle_degrees: f32,
+    /// **M6**: current lean direction (none/left/right).
+    #[serde(default)]
+    pub lean_direction: String,
+    /// **M6**: latched stealth meter (0..1).
+    #[serde(default)]
+    pub stealth_meter: f32,
+    /// **M6**: HUD spotted-caption flag.
+    #[serde(default)]
+    pub spotted: bool,
+    /// **M6**: cover side (none/left/right/both).
+    #[serde(default)]
+    pub cover_side: String,
+    /// **M6**: cover effectiveness 0..1.
+    #[serde(default)]
+    pub cover_effectiveness: f32,
+    /// **M6**: total inventory weight (kg).
+    #[serde(default)]
+    pub inventory_weight_kg: f32,
+    /// **M6**: true when weight forces walking (>30kg).
+    #[serde(default)]
+    pub weight_forces_walk: bool,
+    /// **M6 (M13 forward-compat)**: per-limb loss flags surfaced for the HUD
+    /// + action-rejection contract.
+    #[serde(default)]
+    pub limb_loss: LimbLossFlags,
+    /// **M6**: extended inventory slots (8 active + 3 reserved tank).
+    /// Each entry includes kind + state ("empty" / "occupied" / "locked")
+    /// + the locked tooltip on the reserved slots.
+    #[serde(default)]
+    pub inventory_extended: Vec<ExtendedInventorySlotView>,
+}
+
+/// **M6**: extended-inventory slot projection. Mirrors
+/// `cf_equipment::inventory::ExtendedSlot` but lives here so observe.actor
+/// stays a pure cf-actor projection.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct ExtendedInventorySlotView {
+    pub kind: String,
+    pub state: String,
+    #[serde(default)]
+    pub item_id: String,
+    #[serde(default)]
+    pub weight_kg: f32,
+    #[serde(default)]
+    pub locked_tooltip: Option<String>,
 }
 
 impl From<&ActorState> for ActorObservation {
@@ -1700,7 +1763,69 @@ impl From<&ActorState> for ActorObservation {
             dying_dwell_ticks_remaining: actor.dying_dwell_ticks_remaining,
             mission_critical: actor.mission_critical,
             bloom_factor: actor.bloom_factor,
+            facing: actor.facing.as_str().to_string(),
+            stamina: actor.stamina.current,
+            stamina_max: actor.stamina.max,
+            sprint_active: actor.sprint_active,
+            prone_active: actor.prone_active,
+            lean_angle_degrees: actor.lean_state.angle_degrees,
+            lean_direction: actor.lean_state.direction.as_str().to_string(),
+            stealth_meter: actor.stealth_meter,
+            spotted: actor.stealth_meter >= 0.5,
+            cover_side: actor.cover_state.side.as_str().to_string(),
+            cover_effectiveness: actor.cover_state.effectiveness,
+            inventory_weight_kg: actor.inventory_weight_kg,
+            weight_forces_walk: actor.inventory_weight_kg > 30.0,
+            limb_loss: actor.limb_loss,
+            inventory_extended: actor.extended_inventory_view(),
         }
+    }
+}
+
+impl ActorState {
+    /// **M6**: build the extended-inventory projection (8 active slots + 3
+    /// tank slots, with the tank slots reporting `state="locked"`).
+    pub fn extended_inventory_view(&self) -> Vec<ExtendedInventorySlotView> {
+        let slot_kinds = [
+            "primary",
+            "secondary",
+            "sidearm",
+            "tool1",
+            "tool2",
+            "grenade",
+            "medical",
+            "special",
+        ];
+        let tank_kinds = [
+            ("tank_primary", "Reserved — see M17 for tank ladder"),
+            ("tank_secondary", "Reserved — see M17 for tank ladder"),
+            ("tank_utility", "Reserved — see M17 for tank ladder"),
+        ];
+        let mut out = Vec::with_capacity(slot_kinds.len() + tank_kinds.len());
+        for (i, name) in slot_kinds.iter().enumerate() {
+            let item = self.inventory.items.get(i).cloned().unwrap_or(InventoryItem::Empty);
+            let (state, item_id, weight) = match &item {
+                InventoryItem::Empty => ("empty", String::new(), 0.0),
+                InventoryItem::Rifle { preset } => ("occupied", preset.clone(), 3.5),
+            };
+            out.push(ExtendedInventorySlotView {
+                kind: (*name).to_string(),
+                state: state.to_string(),
+                item_id,
+                weight_kg: weight,
+                locked_tooltip: None,
+            });
+        }
+        for (name, tooltip) in &tank_kinds {
+            out.push(ExtendedInventorySlotView {
+                kind: (*name).to_string(),
+                state: "locked".to_string(),
+                item_id: String::new(),
+                weight_kg: 0.0,
+                locked_tooltip: Some((*tooltip).to_string()),
+            });
+        }
+        out
     }
 }
 
