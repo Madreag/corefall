@@ -1886,31 +1886,36 @@ impl ReloadState {
 /// / modules touched / cf-actor" bullet "ActorObservation extensions
 /// (cover_state, stamina, lean_angle, weapon_state)" weapon_state field).
 ///
-/// Six fields are surfaced:
+/// Six fields are surfaced, all live:
 ///
-/// - `mag_remaining` — current rounds in the chambered magazine (mirrors
-///   [`cf_equipment::RifleState::ammo_in_mag`] for an M1 rifle).
+/// - `mag_remaining` — current rounds in the chambered magazine, read from
+///   the live [`cf_equipment::RifleState::ammo_in_mag`] when the engine
+///   passes a rifle handle; falls back to the rifle preset's `mag_capacity`
+///   when no rifle state is available (e.g. test paths).
 /// - `fire_mode` — extended fire-mode discriminator
 ///   ([`cf_equipment::AdvancedFireMode`]) reflecting the live
 ///   `ActorState::weapon_fire_mode`. Rotated by
 ///   `act.player.cycle_fire_mode`.
 /// - `bipod_state` — current [`cf_equipment::BipodState`] (`Stowed` /
-///   `Deployed`). Default `Stowed` until bipod state lands on the actor's
-///   weapon.
-/// - `suppressor_attached` — true when the actor's currently-selected weapon
-///   has an attached, intact suppressor.
-/// - `reload_state` — [`ReloadState`] reload-window discriminator (`Idle` vs
-///   `Reloading`).
+///   `Deployed`) read from `ActorState::bipod.state`.
+/// - `suppressor_attached` — true when `ActorState::suppressor.attached`
+///   is set on the actor's currently-equipped weapon.
+/// - `reload_state` — [`ReloadState`] reload-window discriminator (`Idle`
+///   vs `Reloading`), derived from
+///   [`cf_equipment::RifleState::reload_remaining_ticks`] (`Reloading` when
+///   `> 0`, otherwise `Idle`). Defaults to `Idle` when no rifle handle is
+///   threaded through.
 /// - `charge_fraction` — charge-mode (e.g. sniper) accumulator scalar
 ///   `0..1` from `ActorState::weapon_charge_fraction`. 0.0 when the
 ///   weapon is not in `AdvancedFireMode::Charge` mode or the trigger
 ///   has not been held this trigger cycle.
 ///
 /// The shape is deliberately additive — every field carries a default so the
-/// observation surface remains consistent even before the engine wires the
-/// per-actor bipod / suppressor state. Future tick-path integration features
-/// will mutate the remaining defaults as the underlying state machines
-/// advance.
+/// observation surface remains consistent for the conversion paths that
+/// only see [`ActorState`]. Engine code that has the per-actor
+/// [`cf_equipment::RifleState`] in hand should use
+/// [`ActorObservation::from_actor_and_rifle`] so the magazine + reload
+/// fields reflect the live tick state.
 #[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
 #[serde(default)]
 pub struct WeaponStateView {
@@ -1922,8 +1927,15 @@ pub struct WeaponStateView {
     pub charge_fraction: f32,
 }
 
-impl From<&ActorState> for ActorObservation {
-    fn from(actor: &ActorState) -> Self {
+impl ActorObservation {
+    /// **M6**: build an [`ActorObservation`] with the per-actor rifle state
+    /// threaded through so [`WeaponStateView::mag_remaining`] and
+    /// [`WeaponStateView::reload_state`] reflect the live tick values from
+    /// the engine's [`crate::sim::RifleStates`] map. Pass `None` from
+    /// contexts that don't track rifle state (tests, benches, and any
+    /// pre-rifle-allocation path); the magazine field falls back to the
+    /// rifle preset's `mag_capacity` and reload reports `Idle`.
+    pub fn from_actor_and_rifle(actor: &ActorState, rifle: Option<&cf_equipment::RifleState>) -> Self {
         Self {
             id: actor.id.0,
             team: actor.team.clone(),
@@ -1969,8 +1981,14 @@ impl From<&ActorState> for ActorObservation {
             weight_forces_walk: actor.inventory_weight_kg > 30.0,
             limb_loss: actor.limb_loss,
             inventory_extended: actor.extended_inventory_view(),
-            weapon_state: actor.weapon_state_view(),
+            weapon_state: actor.weapon_state_view(rifle),
         }
+    }
+}
+
+impl From<&ActorState> for ActorObservation {
+    fn from(actor: &ActorState) -> Self {
+        Self::from_actor_and_rifle(actor, None)
     }
 }
 
@@ -2026,27 +2044,46 @@ impl ActorState {
     }
 
     /// **M6**: project a [`WeaponStateView`] for the actor's currently
-    /// selected weapon. `mag_remaining` is sourced from the M1 rifle
-    /// preset's `mag_capacity` for a rifle slot (until the engine hands
-    /// back the live `RifleState::ammo_in_mag` in a later fix feature),
-    /// and zero for any other slot. `fire_mode` reads the live
-    /// [`ActorState::weapon_fire_mode`] (rotated by
-    /// `act.player.cycle_fire_mode`), and `charge_fraction` reads the
-    /// live [`ActorState::weapon_charge_fraction`] (filled by the
-    /// Charge-mode firing path). The remaining fields default until the
-    /// follow-on fix feature ties them to the live attachment / reload
-    /// state. See the [`WeaponStateView`] doc comment for the full
-    /// shape contract.
-    pub fn weapon_state_view(&self) -> WeaponStateView {
-        let mag_remaining = match self.inventory.selected_item() {
-            InventoryItem::Rifle { preset } => cf_equipment::rifle_preset(preset).map_or(0, |spec| spec.mag_capacity),
-            InventoryItem::Empty => 0,
+    /// selected weapon. All six fields are now live:
+    ///
+    /// - `mag_remaining` reads from
+    ///   [`cf_equipment::RifleState::ammo_in_mag`] when the caller threads
+    ///   the per-actor rifle state; otherwise falls back to the rifle
+    ///   preset's `mag_capacity` (and `0` when the active slot is not a
+    ///   rifle).
+    /// - `fire_mode` reads [`ActorState::weapon_fire_mode`] (rotated by
+    ///   `act.player.cycle_fire_mode`).
+    /// - `bipod_state` reads [`ActorState::bipod.state`].
+    /// - `suppressor_attached` reads [`ActorState::suppressor.attached`].
+    /// - `reload_state` is derived from
+    ///   [`cf_equipment::RifleState::reload_remaining_ticks`] (`Reloading`
+    ///   when `> 0`, `Idle` otherwise). When the caller passes `None`,
+    ///   `Idle` is reported.
+    /// - `charge_fraction` reads
+    ///   [`ActorState::weapon_charge_fraction`] (filled by the
+    ///   Charge-mode firing path).
+    ///
+    /// See the [`WeaponStateView`] doc comment for the full shape
+    /// contract.
+    pub fn weapon_state_view(&self, rifle: Option<&cf_equipment::RifleState>) -> WeaponStateView {
+        let mag_remaining = match (self.inventory.selected_item(), rifle) {
+            (InventoryItem::Rifle { .. }, Some(r)) => r.ammo_in_mag,
+            (InventoryItem::Rifle { preset }, None) => {
+                cf_equipment::rifle_preset(preset).map_or(0, |spec| spec.mag_capacity)
+            }
+            (InventoryItem::Empty, _) => 0,
+        };
+        let reload_state = match rifle {
+            Some(r) if r.reload_remaining_ticks > 0 => ReloadState::Reloading,
+            _ => ReloadState::Idle,
         };
         WeaponStateView {
             mag_remaining,
             fire_mode: self.weapon_fire_mode,
+            bipod_state: self.bipod.state,
+            suppressor_attached: self.suppressor.attached,
+            reload_state,
             charge_fraction: self.weapon_charge_fraction.clamp(0.0, 1.0),
-            ..WeaponStateView::default()
         }
     }
 }

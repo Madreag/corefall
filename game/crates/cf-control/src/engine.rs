@@ -7243,7 +7243,10 @@ impl M0Engine {
             snapshot.floor_y = sim.world.floor_y;
             snapshot.player_actor_id = sim.world.player.map(|id| id.0);
             for actor in sim.world.actors.values() {
-                snapshot.actors.push(cf_actor::ActorObservation::from(actor));
+                let rifle = sim.rifles.get(&actor.id);
+                snapshot
+                    .actors
+                    .push(cf_actor::ActorObservation::from_actor_and_rifle(actor, rifle));
             }
             if let Some(player_id) = sim.world.player {
                 let rifle_selected = sim
@@ -9999,7 +10002,8 @@ impl EngineHandle for M0Engine {
         let sim = state.actor_state.as_ref()?;
         let target_id = actor_id.unwrap_or_else(|| sim.world.player.map(|id| id.0).unwrap_or(0));
         let actor = sim.world.actors.get(&ActorId(target_id))?;
-        let observation = cf_actor::ActorObservation::from(actor);
+        let rifle = sim.rifles.get(&ActorId(target_id));
+        let observation = cf_actor::ActorObservation::from_actor_and_rifle(actor, rifle);
         serde_json::to_value(observation).ok()
     }
 
