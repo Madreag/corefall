@@ -5,6 +5,9 @@ use super::{ToolKind, ToolPreset, SENSOR_PULSE_M6_DEFAULT_ID};
 /// Spec § "Sensor pulse reveals enemies + hazards in radius for 5s".
 pub const SENSOR_PULSE_REVEAL_SECONDS: f32 = 5.0;
 
+/// Spec § "Sensor pulse reveals enemies + hazards in radius": 96 world units.
+pub const SENSOR_PULSE_REVEAL_RADIUS: f32 = 96.0;
+
 #[must_use]
 pub fn sensor_pulse_m6_default() -> ToolPreset {
     ToolPreset {

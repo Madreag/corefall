@@ -6,6 +6,10 @@ use super::{ToolKind, ToolPreset, DRILL_M6_DEFAULT_ID};
 pub const DRILL_JAM_HEAT_THRESHOLD: f32 = 0.85;
 /// Per-use heat gain (0..1).
 pub const DRILL_HEAT_PER_USE: f32 = 0.04;
+/// Per-second heat gain while continuously drilling (0..1 per s).
+/// Mirrors the spec's "DRILL_HEAT_RATE_PER_S" constant referenced from the
+/// engine's use_tool dispatcher.
+pub const DRILL_HEAT_RATE_PER_S: f32 = 0.25;
 /// Per-tick heat decay when idle.
 pub const DRILL_HEAT_DECAY_PER_S: f32 = 0.15;
 

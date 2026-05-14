@@ -83,7 +83,12 @@ pub use stealth_kill::{
     STEALTH_KILL_REACH,
 };
 pub use suppressor::{Suppressor, SUPPRESSOR_LOUDNESS_FACTOR};
-pub use tool::{m6_tool_presets, ToolKind, ToolPreset};
+pub use tool::{
+    drill::{DRILL_HEAT_DECAY_PER_S, DRILL_HEAT_PER_USE, DRILL_HEAT_RATE_PER_S, DRILL_JAM_HEAT_THRESHOLD},
+    m6_tool_presets,
+    sensor_pulse::{SENSOR_PULSE_REVEAL_RADIUS, SENSOR_PULSE_REVEAL_SECONDS},
+    ToolKind, ToolPreset,
+};
 pub use weapon::{m6_weapon_presets, WeaponClass, WeaponPreset};
 pub use weapon_swap::{swap_duration_for_target, WeaponSwap, PISTOL_SWAP_SECONDS, WEAPON_SWAP_SECONDS};
 

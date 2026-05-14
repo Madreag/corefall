@@ -587,8 +587,13 @@ pub struct Inventory {
 
 impl Default for Inventory {
     fn default() -> Self {
+        // M6: 8 active slots per spec § Inventory. M1 / M1.5 / M2 scenarios
+        // populate slot 0 with the rifle and leave 1..=7 empty; M6+ scenarios
+        // can hand-author all 8 active slots. The 3 reserved tank slots are
+        // surfaced only through `ActorObservation::inventory_extended`
+        // (locked at M6; M17 fills GasTank instances).
         Self {
-            items: vec![InventoryItem::Empty; 4],
+            items: vec![InventoryItem::Empty; 8],
             selected: ItemSlot(0),
         }
     }
@@ -958,6 +963,17 @@ pub struct ActorState {
     /// cook time.
     #[serde(default)]
     pub grenade_held_fuse_remaining: f32,
+    /// **M6**: drill heat accumulator (0..1). Above
+    /// `cf_equipment::DRILL_JAM_HEAT_THRESHOLD` the drill jams + emits
+    /// `equipment.drill_overheated`. Decays at
+    /// `cf_equipment::DRILL_HEAT_DECAY_PER_S` per second when idle.
+    #[serde(default)]
+    pub drill_heat: f32,
+    /// **M6**: tick at which sensor-pulse reveal expires for this actor.
+    /// 0 when not revealed. Set by `act.player.use_tool { kind:
+    /// "sensor_pulse" }` for hostile actors within the reveal radius.
+    #[serde(default)]
+    pub reveal_until_tick: u64,
 }
 
 fn default_bipod_equipped() -> cf_equipment::Bipod {
@@ -1121,6 +1137,8 @@ impl ActorState {
             grenade_cook_seconds: 0.0,
             grenade_held_kind: Some(cf_equipment::GrenadeKind::Frag),
             grenade_held_fuse_remaining: 5.0,
+            drill_heat: 0.0,
+            reveal_until_tick: 0,
         }
     }
 
@@ -1202,6 +1220,8 @@ impl ActorState {
         self.grenade_cook_seconds = 0.0;
         self.grenade_held_kind = Some(cf_equipment::GrenadeKind::Frag);
         self.grenade_held_fuse_remaining = 5.0;
+        self.drill_heat = 0.0;
+        self.reveal_until_tick = 0;
     }
 
     /// Apply damage with a cause string. Returns the new status if it changed.
@@ -1913,6 +1933,11 @@ impl From<&ActorState> for ActorObservation {
 impl ActorState {
     /// **M6**: build the extended-inventory projection (8 active slots + 3
     /// tank slots, with the tank slots reporting `state="locked"`).
+    ///
+    /// Slots 0..=7 mirror the actor's `Inventory.items` (8-slot vec on
+    /// M6+; legacy 4-slot vecs naturally project as empty for the upper
+    /// 4 slots). Slots 8..=10 are the M17 forward-compat tank slots and
+    /// always report `state="locked"`.
     pub fn extended_inventory_view(&self) -> Vec<ExtendedInventorySlotView> {
         let slot_kinds = [
             "primary",
