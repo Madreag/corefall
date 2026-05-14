@@ -8163,11 +8163,23 @@ impl M0Engine {
             }
         }
         // **M6**: scan pickup radius + add nearest item to first empty slot.
+        //
+        // **M6 (knife retrieve)**: the scan covers BOTH
+        // `state.m6_dropped_items` and `state.knife_projectiles` so
+        // `act.player.pickup` closes the second half of spec § "Knife
+        // throw + retrieve" ("When player approaches + presses E: knife
+        // returned to inventory"). A retrievable knife is one whose
+        // [`cf_equipment::KnifeProjectile::is_retrievable`] is true (the
+        // knife stuck in a wall and is no longer in flight). Whichever
+        // candidate (dropped item OR stuck knife) sits closer to the
+        // actor within `PICKUP_RADIUS` wins; ties go to dropped items
+        // (preserves the pre-existing behavior on the dropped-item path).
         if let Some(actor_pos) = pickup_request_pos.take() {
             const PICKUP_RADIUS: f32 = 24.0;
-            let mut picked: Option<(u64, String, f32, u8)> = None;
+            let mut picked_dropped: Option<(u64, String, f32, u8)> = None;
+            let mut picked_knife: Option<(u64, f32, u8)> = None;
             if let Ok(mut s) = self.state.write() {
-                let nearest_idx = s
+                let nearest_dropped: Option<(usize, f32)> = s
                     .m6_dropped_items
                     .iter()
                     .enumerate()
@@ -8181,9 +8193,62 @@ impl M0Engine {
                             None
                         }
                     })
-                    .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
-                    .map(|(i, _)| i);
-                if let Some(idx) = nearest_idx {
+                    .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+                let nearest_knife: Option<(usize, f32)> = s
+                    .knife_projectiles
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, k)| {
+                        if !k.is_retrievable() {
+                            return None;
+                        }
+                        let dx = k.origin_x - actor_pos.x;
+                        let dy = k.origin_y - actor_pos.y;
+                        let d2 = dx * dx + dy * dy;
+                        if d2 <= PICKUP_RADIUS * PICKUP_RADIUS {
+                            Some((i, d2))
+                        } else {
+                            None
+                        }
+                    })
+                    .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal));
+                let knife_wins = match (nearest_dropped, nearest_knife) {
+                    (None, Some(_)) => true,
+                    (Some((_, dd)), Some((_, kd))) => kd < dd,
+                    _ => false,
+                };
+                if knife_wins {
+                    if let Some((idx, _)) = nearest_knife {
+                        let knife_mass_kg = cf_equipment::m6_melee_presets()
+                            .into_iter()
+                            .find(|m| m.kind == cf_equipment::MeleeKind::Knife)
+                            .map(|p| p.mass_kg)
+                            .unwrap_or(0.3);
+                        let mut knife = s.knife_projectiles.remove(idx);
+                        let mut slot_assigned: Option<u8> = None;
+                        if let Some(actor) = s
+                            .actor_state
+                            .as_mut()
+                            .and_then(|sim| sim.world.actors.get_mut(&player_id))
+                        {
+                            for (slot_i, slot_item) in actor.inventory.items.iter_mut().enumerate() {
+                                if matches!(slot_item, cf_actor::InventoryItem::Empty) {
+                                    *slot_item = cf_actor::InventoryItem::Rifle {
+                                        preset: cf_equipment::KNIFE_M6_DEFAULT_ID.to_string(),
+                                    };
+                                    slot_assigned = Some(slot_i as u8);
+                                    break;
+                                }
+                            }
+                        }
+                        if let Some(slot) = slot_assigned {
+                            let _ = knife.retrieve();
+                            picked_knife = Some((knife.projectile_id, knife_mass_kg, slot));
+                        } else {
+                            s.knife_projectiles.push(knife);
+                        }
+                    }
+                } else if let Some((idx, _)) = nearest_dropped {
                     let item = s.m6_dropped_items.remove(idx);
                     if let Some(actor) = s
                         .actor_state
@@ -8201,14 +8266,14 @@ impl M0Engine {
                             }
                         }
                         if let Some(slot) = slot_assigned {
-                            picked = Some((item.id, item.item_id.clone(), item.weight_kg, slot));
+                            picked_dropped = Some((item.id, item.item_id.clone(), item.weight_kg, slot));
                         } else {
                             s.m6_dropped_items.push(item);
                         }
                     }
                 }
             }
-            if let Some((dropped_id, item_id, weight, slot)) = picked {
+            if let Some((dropped_id, item_id, weight, slot)) = picked_dropped {
                 self.recorder.record(
                     tick,
                     sim_time_ms,
@@ -8220,6 +8285,25 @@ impl M0Engine {
                         "weight_kg": weight,
                         "slot": slot,
                         "dropped_item_id": dropped_id,
+                        "source": "dropped_world",
+                    }),
+                    None,
+                );
+            }
+            if let Some((projectile_id, weight, slot)) = picked_knife {
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "equipment",
+                    "item_picked_up",
+                    json!({
+                        "actor": player_id.0,
+                        "item_kind": "knife",
+                        "item_id": cf_equipment::KNIFE_M6_DEFAULT_ID,
+                        "weight_kg": weight,
+                        "slot": slot,
+                        "projectile_id": projectile_id,
+                        "source": "retrieved_throw",
                     }),
                     None,
                 );

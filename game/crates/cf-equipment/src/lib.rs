@@ -76,7 +76,10 @@ pub use inventory::{
 };
 pub use knife_throw::{KnifeProjectile, KnifeThrowState, KNIFE_THROW_DAMAGE_FACTOR, KNIFE_THROW_MAX_FLIGHT_SECONDS};
 pub use magazine::{Magazine, PoppedRound, RoundKind};
-pub use melee::{m6_melee_presets, MeleeKind, MeleePreset};
+pub use melee::{
+    m6_melee_presets, MeleeKind, MeleePreset, BATON_M6_DEFAULT_ID, HATCHET_M6_DEFAULT_ID, KNIFE_M6_DEFAULT_ID,
+    RIFLE_BASH_M6_DEFAULT_ID,
+};
 pub use shell::{ShellEjection, ShellKind};
 pub use stealth_kill::{
     evaluate_attempt, StealthKillAttempt, StealthKillRejection, STEALTH_KILL_ANIMATION_SECONDS, STEALTH_KILL_METER_MAX,
