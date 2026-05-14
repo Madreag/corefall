@@ -890,15 +890,15 @@ fn step_one_actor<R: FnMut() -> u64>(
         outcome.fired = true;
         // **M6**: read bipod + suppressor state from the actor BEFORE the
         // recoil scaling so we can attribute the multiplied impulse and
-        // loudness to the correct attachment.
-        let (bipod_recoil_factor, bipod_bloom_factor, bipod_deployed, suppressor_factor, suppressor_attached) = state
-            .world
-            .actors
-            .get(&actor_id)
-            .map_or((1.0, 1.0, false, 1.0, false), |a| {
+        // loudness to the correct attachment. The bipod bloom multiplier
+        // is applied later (after the per-stance multiplier) in the bloom
+        // assignment below so it composes with stance + sharp aim + reload
+        // contributions instead of being overwritten by the final
+        // `outcome.bloom_factor = bloom` assignment.
+        let (bipod_recoil_factor, bipod_deployed, suppressor_factor, suppressor_attached) =
+            state.world.actors.get(&actor_id).map_or((1.0, false, 1.0, false), |a| {
                 (
                     a.bipod.recoil_factor(),
-                    a.bipod.bloom_factor(),
                     a.bipod.equipped && a.bipod.state == cf_equipment::BipodState::Deployed,
                     a.suppressor.loudness_factor(),
                     a.suppressor.attached && a.suppressor.integrity > 0.0,
@@ -906,7 +906,6 @@ fn step_one_actor<R: FnMut() -> u64>(
             });
         let effective_recoil = rifle_outcomes.recoil_impulse_applied * bipod_recoil_factor;
         outcome.recoil_applied = effective_recoil;
-        outcome.bloom_factor *= bipod_bloom_factor;
         outcome.bipod_deployed_at_fire = bipod_deployed;
         outcome.suppressor_attached_at_fire = suppressor_attached;
         let (spec, max_flight) = state
@@ -1233,6 +1232,13 @@ fn step_one_actor<R: FnMut() -> u64>(
         bloom *= sharp_tighten.max(0.4);
         // M6: per-stance bloom multiplier (crouch=0.6×, prone=0.4×, etc.).
         bloom *= crate::stance::stance_bloom_factor(actor.stance());
+        // M6: deployed bipod attenuates bloom by BIPOD_BLOOM_FACTOR (0.5).
+        // Applied here (before the final assignments below) so the
+        // attenuation composes with the stance multiplier and survives
+        // through to `actor.bloom_factor` + `outcome.bloom_factor`.
+        if actor.bipod.equipped && actor.bipod.state == cf_equipment::BipodState::Deployed {
+            bloom *= cf_equipment::BIPOD_BLOOM_FACTOR;
+        }
         actor.bloom_factor = bloom;
         outcome.bloom_factor = bloom;
 
