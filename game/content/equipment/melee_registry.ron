@@ -1,0 +1,11 @@
+(
+  schema_version: 1,
+  melees: [
+    (id: "melee_rifle_bash_m6", kind: "rifle_bash"),
+    (id: "melee_knife_m6", kind: "knife"),
+    (id: "melee_hatchet_m6", kind: "hatchet"),
+    (id: "melee_baton_m6", kind: "baton"),
+    (id: "melee_kick_m6", kind: "kick"),
+    (id: "melee_shoulder_check_m6", kind: "shoulder_check"),
+  ],
+)

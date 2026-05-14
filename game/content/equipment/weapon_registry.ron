@@ -1,0 +1,11 @@
+(
+  schema_version: 1,
+  weapons: [
+    (id: "rifle_m1_default", class: "rifle"),
+    (id: "smg_m6_default", class: "smg"),
+    (id: "shotgun_m6_default", class: "shotgun"),
+    (id: "sniper_m6_default", class: "sniper"),
+    (id: "pistol_m6_default", class: "pistol"),
+    (id: "grenade_launcher_m6_default", class: "grenade_launcher"),
+  ],
+)

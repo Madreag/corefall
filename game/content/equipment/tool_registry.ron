@@ -1,0 +1,14 @@
+(
+  schema_version: 1,
+  tools: [
+    (id: "tool_digger_m1", kind: "digger"),
+    (id: "tool_repair_m6", kind: "repair"),
+    (id: "tool_foam_m6", kind: "foam"),
+    (id: "tool_concrete_m6", kind: "concrete"),
+    (id: "tool_welder_m6", kind: "welder"),
+    (id: "tool_drill_m6", kind: "drill"),
+    (id: "tool_multi_tool_m6", kind: "multi_tool"),
+    (id: "tool_beacon_m6", kind: "beacon"),
+    (id: "tool_sensor_pulse_m6", kind: "sensor_pulse"),
+  ],
+)
