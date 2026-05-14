@@ -739,6 +739,95 @@ struct EngineMutable {
     /// **M6**: per-actor footstep cadence accumulator (ticks since last
     /// emitted `perception.footstep_emitted`). Prevents replay spam.
     m6_footstep_cooldown: BTreeMap<ActorId, u32>,
+    /// **M6**: in-flight grenade projectiles thrown via
+    /// `act.player.throw_grenade`. The tick scheduler advances each one
+    /// under gravity + collision and emits
+    /// `equipment.grenade_detonated` at fuse=0.
+    grenade_projectiles: Vec<GrenadeProjectile>,
+    /// **M6**: in-flight knife projectiles thrown via
+    /// `act.player.knife_throw`. The tick scheduler advances each one
+    /// under physics and emits `combat.knife_throw_landed` on collision.
+    knife_projectiles: Vec<cf_equipment::KnifeProjectile>,
+    /// **M6**: latched-per-actor previous `FacingDirection`, used by the
+    /// engine to emit `actor.facing_changed` only on flips (not every tick).
+    m6_last_facing: BTreeMap<ActorId, cf_actor::FacingDirection>,
+}
+
+/// **M6**: one in-flight grenade projectile. Owned by the engine's
+/// `grenade_projectiles` vector and advanced each tick under gravity +
+/// collision. On fuse=0 the engine emits `equipment.grenade_detonated`
+/// and applies type-specific effects (Frag radius damage, Smoke hazard
+/// tile, Flash afflictions, Stick adhesive).
+#[derive(Debug, Clone)]
+pub(crate) struct GrenadeProjectile {
+    pub id: u64,
+    pub owner: ActorId,
+    pub kind: cf_equipment::GrenadeKind,
+    pub position: cf_actor::Vec2,
+    pub velocity: cf_actor::Vec2,
+    pub fuse_remaining: f32,
+    pub radius: f32,
+    pub damage_at_center: f32,
+    pub adhesive: bool,
+    pub spawns_hazard: bool,
+    pub vision_disrupt: bool,
+    pub stuck: bool,
+}
+
+/// **M6**: scratch struct passed from cfctl dispatch to the post-dispatch
+/// emission phase so the engine can spawn a thrown grenade after the
+/// write-guard is released.
+#[derive(Debug, Clone)]
+struct PendingGrenadeSpawn {
+    owner: ActorId,
+    kind: cf_equipment::GrenadeKind,
+    origin: cf_actor::Vec2,
+    velocity: cf_actor::Vec2,
+    fuse_remaining: f32,
+    radius: f32,
+    damage_at_center: f32,
+    adhesive: bool,
+    spawns_hazard: bool,
+    vision_disrupt: bool,
+}
+
+/// **M6**: scratch struct that captures the parameters of a melee strike
+/// from the cfctl dispatch site so the engine can scan for hit actors +
+/// roll knockdown + emit the hit event in a separate, post-dispatch phase.
+#[derive(Debug, Clone)]
+struct PendingMeleeResolve {
+    attacker: ActorId,
+    kind: cf_equipment::MeleeKind,
+    facing_sign: f32,
+    actor_position: cf_actor::Vec2,
+}
+
+/// **M6**: scratch struct that captures the parameters of a knife throw
+/// from the cfctl dispatch site so the engine can spawn the
+/// [`cf_equipment::KnifeProjectile`] after releasing the write-guard.
+#[derive(Debug, Clone)]
+struct PendingKnifeSpawn {
+    owner: ActorId,
+    origin: cf_actor::Vec2,
+    aim: cf_actor::Vec2,
+    base_damage: f32,
+}
+
+/// **M6**: resolved melee hit data, captured for emission in the
+/// post-dispatch phase. Distinct from the dispatch's
+/// [`PendingMeleeResolve`] so the resolver can do the actor scan + the
+/// emitter can do only the recorder write.
+#[derive(Debug, Clone)]
+struct MeleeHitEmit {
+    attacker: u64,
+    target: u64,
+    kind: cf_equipment::MeleeKind,
+    damage: f32,
+    hp_before: f32,
+    hp_after: f32,
+    knockdown_chance: f32,
+    knockdown_rolled: f32,
+    knockdown_triggered: bool,
 }
 
 /// Pending dig request set by `act.player.dig` and consumed at the start of the
@@ -952,6 +1041,9 @@ impl M0Engine {
                 m6_last_stealth_band: BTreeMap::new(),
                 m6_last_weight_bucket: BTreeMap::new(),
                 m6_footstep_cooldown: BTreeMap::new(),
+                grenade_projectiles: Vec::new(),
+                knife_projectiles: Vec::new(),
+                m6_last_facing: BTreeMap::new(),
             }),
             recorder,
             current_tick,
@@ -3351,6 +3443,7 @@ impl M0Engine {
         if let Some(t) = advanced {
             let sim_time_ms = self.state.read().map(|s| s.clock.sim_time_ms()).unwrap_or(0.0);
             self.tick_m6_actor_state(t, sim_time_ms);
+            self.tick_m6_equipment(t, sim_time_ms);
             self.tick_m6_perception(t, sim_time_ms);
         }
 
@@ -4369,6 +4462,23 @@ impl M0Engine {
                     Some(intent_event_id.clone()),
                 );
             }
+            if outcome.fire_denied_by_swap {
+                // **M6**: per spec, fire is locked during weapon swap. Emit
+                // `actor.action_rejected reason="swap_in_progress"` so the
+                // HUD + replay surface the cause.
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "actor",
+                    "action_rejected",
+                    json!({
+                        "actor": outcome.actor.0,
+                        "action": "act.player.fire",
+                        "reason": "swap_in_progress",
+                    }),
+                    Some(intent_event_id.clone()),
+                );
+            }
             if outcome.dry_fire {
                 self.recorder.record(
                     tick,
@@ -4392,10 +4502,45 @@ impl M0Engine {
                         "recoil_impulse": outcome.recoil_applied,
                         "loudness_radius": outcome.loudness_radius,
                         "bloom_factor": outcome.bloom_factor,
+                        "bipod_deployed": outcome.bipod_deployed_at_fire,
+                        "suppressor_attached": outcome.suppressor_attached_at_fire,
                     }),
                     Some(intent_event_id.clone()),
                 );
                 weapon_fired_event_by_actor.insert(outcome.actor.0, weapon_fired_id.clone());
+                // **M6**: emit `equipment.magazine_changed` for the pop +
+                // `equipment.shell_ejected` for the casing on each fire.
+                if let Some(popped) = outcome.popped_round.as_ref() {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "equipment",
+                        "magazine_changed",
+                        json!({
+                            "actor": outcome.actor.0,
+                            "remaining": popped.remaining_in_mag,
+                            "round_kind": popped.round_kind.as_str(),
+                        }),
+                        Some(weapon_fired_id.clone()),
+                    );
+                }
+                if let Some(shell) = outcome.shell_ejection.as_ref() {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "equipment",
+                        "shell_ejected",
+                        json!({
+                            "actor": outcome.actor.0,
+                            "shell_id": shell.shell_id,
+                            "kind": shell.kind.as_str(),
+                            "origin": [shell.origin_x, shell.origin_y],
+                            "velocity": [shell.velocity_x, shell.velocity_y],
+                            "lifetime_seconds": shell.lifetime_seconds,
+                        }),
+                        Some(weapon_fired_id.clone()),
+                    );
+                }
                 self.emit_audio_cue(
                     cf_audio::AudioCue::WeaponFired {
                         equipment_id: cf_equipment::RIFLE_M1_DEFAULT_ID.to_string(),
@@ -4415,6 +4560,11 @@ impl M0Engine {
                     // includes `source_id` (the equipment preset id) and
                     // `pos` (= muzzle position). Keep existing aliases for
                     // back-compat.
+                    // **M6**: the `loudness_radius` was already multiplied
+                    // by [`SUPPRESSOR_LOUDNESS_FACTOR`] inside
+                    // `cf-actor::sim::fire_actor`. Surface the suppressed
+                    // flag so replay consumers can render the "suppressed"
+                    // badge without re-deriving the factor.
                     let alarm_event_id = self.recorder.record(
                         tick,
                         sim_time_ms,
@@ -4426,6 +4576,8 @@ impl M0Engine {
                             "pos": [muzzle.x, muzzle.y],
                             "muzzle_origin": [muzzle.x, muzzle.y],
                             "loudness_radius": outcome.loudness_radius,
+                            "loudness": outcome.loudness_radius,
+                            "suppressed": outcome.suppressor_attached_at_fire,
                             "cause": "weapon_fired",
                         }),
                         Some(weapon_fired_id.clone()),
@@ -5282,6 +5434,10 @@ impl M0Engine {
         }
 
         // (g) WeaponSwap tick — drain completed swaps + collect emissions.
+        // **M6**: when a swap completes, set the actor's selected slot to
+        // the target (deferred from dispatch time), clear the
+        // `weapon_swap_in_progress` flag so firing unlocks, and emit
+        // `equipment.weapon_swap_completed`.
         let swap_ids: Vec<ActorId> = state.weapon_swap_state.keys().copied().collect();
         for actor_id in swap_ids {
             let completed = {
@@ -5298,6 +5454,14 @@ impl M0Engine {
                     .map(|s| s.target_slot)
                     .unwrap_or(0);
                 state.weapon_swap_state.remove(&actor_id);
+                if let Some(actor) = state
+                    .actor_state
+                    .as_mut()
+                    .and_then(|sim| sim.world.actors.get_mut(&actor_id))
+                {
+                    let _ = actor.inventory.try_select(cf_actor::ItemSlot(u32::from(target)));
+                    actor.weapon_swap_in_progress = false;
+                }
                 swap_emits.push(SwapEmit {
                     actor: actor_id.0,
                     active_slot: target,
@@ -5388,6 +5552,417 @@ impl M0Engine {
                     "action": "act.player.sprint",
                     "reason": emit.reason,
                 }),
+                None,
+            );
+        }
+    }
+
+    /// **M6**: tick the grenade + knife projectiles + facing-from-aim
+    /// derivation + per-tool bipod auto-stow. Emits
+    /// `equipment.grenade_detonated`, `combat.knife_throw_landed`, and
+    /// `actor.facing_changed` events. Called from `drive_tick` after
+    /// `tick_m6_actor_state`.
+    fn tick_m6_equipment(&self, tick: Tick, sim_time_ms: f64) {
+        const GRAVITY_PER_S2: f32 = 360.0;
+        let dt_seconds = 1.0_f32 / self.config.tick_rate_hz.max(1) as f32;
+
+        struct GrenadeDetonation {
+            id: u64,
+            owner: u64,
+            kind: cf_equipment::GrenadeKind,
+            position: cf_actor::Vec2,
+            radius: f32,
+            damage_at_center: f32,
+            adhesive: bool,
+            spawns_hazard: bool,
+            vision_disrupt: bool,
+        }
+        struct KnifeLanding {
+            id: u64,
+            owner: u64,
+            target_id: Option<u64>,
+            stuck_target: &'static str,
+            position: cf_actor::Vec2,
+            damage: f32,
+            hp_before: f32,
+            hp_after: f32,
+        }
+        struct FacingFlip {
+            actor: u64,
+            from: cf_actor::FacingDirection,
+            to: cf_actor::FacingDirection,
+        }
+
+        let mut detonations: Vec<GrenadeDetonation> = Vec::new();
+        let mut landings: Vec<KnifeLanding> = Vec::new();
+        let mut facing_flips: Vec<FacingFlip> = Vec::new();
+
+        let mut state = match self.state.write() {
+            Ok(s) => s,
+            Err(_) => return,
+        };
+
+        // (a) Advance grenade projectiles under gravity + collision.
+        // Adhesive grenades stick on first ground contact; non-adhesive
+        // grenades bounce.
+        let mut remaining: Vec<GrenadeProjectile> = Vec::new();
+        let terrain_solid = |pos: cf_actor::Vec2, terrain: &Option<cf_terrain::ChunkedTerrain>| -> bool {
+            match terrain.as_ref() {
+                Some(t) => t.registry.is_solid(t.material_at_world(pos.x, pos.y)),
+                None => false,
+            }
+        };
+        let projectiles = std::mem::take(&mut state.grenade_projectiles);
+        for mut g in projectiles {
+            if !g.stuck {
+                g.velocity.y -= GRAVITY_PER_S2 * dt_seconds;
+                let new_pos = cf_actor::Vec2::new(
+                    g.position.x + g.velocity.x * dt_seconds,
+                    g.position.y + g.velocity.y * dt_seconds,
+                );
+                let hit = terrain_solid(new_pos, &state.chunked_terrain);
+                if hit {
+                    if g.adhesive {
+                        g.stuck = true;
+                        g.velocity = cf_actor::Vec2::ZERO;
+                    } else {
+                        g.velocity = cf_actor::Vec2::new(g.velocity.x * 0.4, -g.velocity.y * 0.4);
+                    }
+                } else {
+                    g.position = new_pos;
+                }
+            }
+            g.fuse_remaining = (g.fuse_remaining - dt_seconds).max(0.0);
+            if g.fuse_remaining <= 0.0 {
+                detonations.push(GrenadeDetonation {
+                    id: g.id,
+                    owner: g.owner.0,
+                    kind: g.kind,
+                    position: g.position,
+                    radius: g.radius,
+                    damage_at_center: g.damage_at_center,
+                    adhesive: g.adhesive,
+                    spawns_hazard: g.spawns_hazard,
+                    vision_disrupt: g.vision_disrupt,
+                });
+            } else {
+                remaining.push(g);
+            }
+        }
+        state.grenade_projectiles = remaining;
+
+        // (b) Advance knife projectiles under physics + detect collision.
+        let mut remaining_knives: Vec<cf_equipment::KnifeProjectile> = Vec::new();
+        let knives = std::mem::take(&mut state.knife_projectiles);
+        for mut k in knives {
+            if k.state == cf_equipment::KnifeThrowState::InFlight {
+                let new_pos = cf_actor::Vec2::new(
+                    k.origin_x + k.velocity_x * dt_seconds,
+                    k.origin_y + k.velocity_y * dt_seconds,
+                );
+                k.origin_x = new_pos.x;
+                k.origin_y = new_pos.y;
+                k.remaining_seconds = (k.remaining_seconds - dt_seconds).max(0.0);
+                // Hit actor scan (any actor other than the thrower within 6
+                // units of the knife's current position).
+                let actor_hit = state.actor_state.as_ref().and_then(|sim| {
+                    sim.world
+                        .actors
+                        .iter()
+                        .filter(|(id, _)| id.0 != k.owner_actor)
+                        .find(|(_, a)| {
+                            let dx = a.position.x - new_pos.x;
+                            let dy = a.position.y - new_pos.y;
+                            (dx * dx + dy * dy).sqrt() <= 6.0
+                        })
+                        .map(|(id, _)| *id)
+                });
+                if let Some(target_id) = actor_hit {
+                    let mut hp_before = 0.0;
+                    let mut hp_after = 0.0;
+                    if let Some(target) = state
+                        .actor_state
+                        .as_mut()
+                        .and_then(|sim| sim.world.actors.get_mut(&target_id))
+                    {
+                        hp_before = target.hp;
+                        let _ = target.apply_damage(k.damage);
+                        hp_after = target.hp;
+                    }
+                    k.stick_in_actor();
+                    landings.push(KnifeLanding {
+                        id: k.projectile_id,
+                        owner: k.owner_actor,
+                        target_id: Some(target_id.0),
+                        stuck_target: "actor",
+                        position: new_pos,
+                        damage: k.damage,
+                        hp_before,
+                        hp_after,
+                    });
+                } else if terrain_solid(new_pos, &state.chunked_terrain) {
+                    k.stick_in_wall();
+                    landings.push(KnifeLanding {
+                        id: k.projectile_id,
+                        owner: k.owner_actor,
+                        target_id: None,
+                        stuck_target: "wall",
+                        position: new_pos,
+                        damage: 0.0,
+                        hp_before: 0.0,
+                        hp_after: 0.0,
+                    });
+                } else if k.remaining_seconds <= 0.0 {
+                    // Flight expired without contact — drop the projectile.
+                    continue;
+                }
+            }
+            remaining_knives.push(k);
+        }
+        state.knife_projectiles = remaining_knives;
+
+        // (c) Facing-from-aim derivation per spec § "Side-view facing
+        // direction": each tick, derive `FacingDirection::from_aim(aim)`
+        // and emit `actor.facing_changed` on flip.
+        let facing_snapshot: Vec<(ActorId, cf_actor::Vec2, cf_actor::FacingDirection)> = state
+            .actor_state
+            .as_ref()
+            .map(|sim| sim.world.actors.iter().map(|(id, a)| (*id, a.aim, a.facing)).collect())
+            .unwrap_or_default();
+        for (actor_id, aim, current_facing) in facing_snapshot {
+            let derived = cf_actor::FacingDirection::from_aim(aim);
+            if derived != current_facing {
+                if let Some(actor) = state
+                    .actor_state
+                    .as_mut()
+                    .and_then(|sim| sim.world.actors.get_mut(&actor_id))
+                {
+                    actor.facing = derived;
+                }
+                facing_flips.push(FacingFlip {
+                    actor: actor_id.0,
+                    from: current_facing,
+                    to: derived,
+                });
+                state.m6_last_facing.insert(actor_id, derived);
+            }
+        }
+
+        // (d) Bipod auto-stow: when the actor exits crouch/prone, stow the
+        // bipod automatically per spec § "When player stands: bipod
+        // auto-stows".
+        let bipod_actors: Vec<ActorId> = state
+            .actor_state
+            .as_ref()
+            .map(|sim| sim.world.actors.keys().copied().collect())
+            .unwrap_or_default();
+        let mut bipod_stow_emits: Vec<u64> = Vec::new();
+        for actor_id in bipod_actors {
+            let needs_stow = state
+                .actor_state
+                .as_ref()
+                .and_then(|sim| sim.world.actors.get(&actor_id))
+                .map(|a| a.bipod.state == cf_equipment::BipodState::Deployed && !(a.crouch_active || a.prone_active))
+                .unwrap_or(false);
+            if needs_stow {
+                if let Some(actor) = state
+                    .actor_state
+                    .as_mut()
+                    .and_then(|sim| sim.world.actors.get_mut(&actor_id))
+                {
+                    if actor.bipod.stow() {
+                        bipod_stow_emits.push(actor_id.0);
+                    }
+                }
+            }
+        }
+
+        drop(state);
+
+        // (e) Emit follow-on events with the lock released so the recorder
+        // can re-borrow.
+        for det in detonations {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "equipment",
+                "grenade_detonated",
+                json!({
+                    "actor": det.owner,
+                    "kind": det.kind.as_str(),
+                    "position": [det.position.x, det.position.y],
+                    "radius": det.radius,
+                    "damage_at_center": det.damage_at_center,
+                    "adhesive": det.adhesive,
+                    "spawns_hazard": det.spawns_hazard,
+                    "vision_disrupt": det.vision_disrupt,
+                    "projectile_id": det.id,
+                }),
+                None,
+            );
+            // Type-specific effect emissions.
+            match det.kind {
+                cf_equipment::GrenadeKind::Frag => {
+                    // Radius damage: apply damage_at_center * (1 - distance/radius)
+                    // to actors inside the radius.
+                    if let Ok(mut s) = self.state.write() {
+                        let radius = det.radius.max(1.0);
+                        let center = det.position;
+                        let dmg_center = det.damage_at_center;
+                        let actor_ids: Vec<ActorId> = s
+                            .actor_state
+                            .as_ref()
+                            .map(|sim| sim.world.actors.keys().copied().collect())
+                            .unwrap_or_default();
+                        for aid in actor_ids {
+                            let (dx, dy, hp_before) = {
+                                let Some(actor) = s.actor_state.as_ref().and_then(|sim| sim.world.actors.get(&aid))
+                                else {
+                                    continue;
+                                };
+                                (actor.position.x - center.x, actor.position.y - center.y, actor.hp)
+                            };
+                            let dist = (dx * dx + dy * dy).sqrt();
+                            if dist >= radius {
+                                continue;
+                            }
+                            let frac = (1.0 - dist / radius).clamp(0.0, 1.0);
+                            let dmg = dmg_center * frac;
+                            if let Some(actor) = s.actor_state.as_mut().and_then(|sim| sim.world.actors.get_mut(&aid)) {
+                                let _ = actor.apply_damage(dmg);
+                                let _ = hp_before;
+                            }
+                        }
+                    }
+                }
+                cf_equipment::GrenadeKind::Smoke => {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "hazard",
+                        "spawned",
+                        json!({
+                            "kind": "smoke",
+                            "position": [det.position.x, det.position.y],
+                            "radius": det.radius,
+                            "owner": det.owner,
+                            "source": "grenade_smoke",
+                        }),
+                        None,
+                    );
+                }
+                cf_equipment::GrenadeKind::Flash => {
+                    if let Ok(mut s) = self.state.write() {
+                        let radius = det.radius.max(1.0);
+                        let center = det.position;
+                        let actor_ids: Vec<ActorId> = s
+                            .actor_state
+                            .as_ref()
+                            .map(|sim| sim.world.actors.keys().copied().collect())
+                            .unwrap_or_default();
+                        for aid in actor_ids {
+                            let dx = s
+                                .actor_state
+                                .as_ref()
+                                .and_then(|sim| sim.world.actors.get(&aid))
+                                .map(|a| a.position.x - center.x)
+                                .unwrap_or(f32::INFINITY);
+                            let dy = s
+                                .actor_state
+                                .as_ref()
+                                .and_then(|sim| sim.world.actors.get(&aid))
+                                .map(|a| a.position.y - center.y)
+                                .unwrap_or(f32::INFINITY);
+                            let dist = (dx * dx + dy * dy).sqrt();
+                            if dist < radius {
+                                if let Some(actor) =
+                                    s.actor_state.as_mut().and_then(|sim| sim.world.actors.get_mut(&aid))
+                                {
+                                    actor.afflictions.push(cf_actor::Affliction {
+                                        kind: cf_actor::AfflictionKind::InternalShock,
+                                        intensity: 1.0,
+                                        expires_tick: Some(tick.0 + 120),
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+                cf_equipment::GrenadeKind::Stick => {
+                    // Stick grenade just used 4s fuse on adhesive surface;
+                    // detonation has same effect as frag.
+                    if let Ok(mut s) = self.state.write() {
+                        let radius = det.radius.max(1.0);
+                        let center = det.position;
+                        let dmg_center = det.damage_at_center;
+                        let actor_ids: Vec<ActorId> = s
+                            .actor_state
+                            .as_ref()
+                            .map(|sim| sim.world.actors.keys().copied().collect())
+                            .unwrap_or_default();
+                        for aid in actor_ids {
+                            let (dx, dy) = {
+                                let Some(actor) = s.actor_state.as_ref().and_then(|sim| sim.world.actors.get(&aid))
+                                else {
+                                    continue;
+                                };
+                                (actor.position.x - center.x, actor.position.y - center.y)
+                            };
+                            let dist = (dx * dx + dy * dy).sqrt();
+                            if dist >= radius {
+                                continue;
+                            }
+                            let frac = (1.0 - dist / radius).clamp(0.0, 1.0);
+                            let dmg = dmg_center * frac;
+                            if let Some(actor) = s.actor_state.as_mut().and_then(|sim| sim.world.actors.get_mut(&aid)) {
+                                let _ = actor.apply_damage(dmg);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        for landing in landings {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "combat",
+                "knife_throw_landed",
+                json!({
+                    "actor": landing.owner,
+                    "projectile_id": landing.id,
+                    "stuck_target": landing.stuck_target,
+                    "target_id": landing.target_id,
+                    "position": [landing.position.x, landing.position.y],
+                    "damage": landing.damage,
+                    "hp_before": landing.hp_before,
+                    "hp_after": landing.hp_after,
+                }),
+                None,
+            );
+        }
+        for flip in facing_flips {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "actor",
+                "facing_changed",
+                json!({
+                    "actor": flip.actor,
+                    "from": flip.from.as_str(),
+                    "to": flip.to.as_str(),
+                    "cause": "aim_derived",
+                }),
+                None,
+            );
+        }
+        for actor_id in bipod_stow_emits {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "equipment",
+                "bipod_stowed",
+                json!({"actor": actor_id, "state": "stowed", "cause": "auto_stow_on_stand"}),
                 None,
             );
         }
@@ -5971,6 +6546,11 @@ impl M0Engine {
         let mut reject_reason: Option<&'static str> = None;
         let mut event_payload = json!({"actor": player_id.0});
         let mut swap_to_register: Option<(ActorId, cf_equipment::WeaponSwap)> = None;
+        let mut grenade_to_spawn: Option<PendingGrenadeSpawn> = None;
+        let mut melee_to_resolve: Option<PendingMeleeResolve> = None;
+        let mut knife_to_spawn: Option<PendingKnifeSpawn> = None;
+        let mut tool_broken_pending: Option<(u64, String, f32)> = None;
+        let mut tool_repaired_pending: Option<(u64, f32, Vec<String>)> = None;
         if let Some(sim) = state.actor_state.as_mut() {
             if let Some(actor) = sim.world.actors.get_mut(&player_id) {
                 match &action {
@@ -6060,14 +6640,48 @@ impl M0Engine {
                         } else {
                             actor.cinematic_kind = Some(cf_actor::Stance::KnifeThrow);
                             actor.cinematic_ticks_remaining = 24;
-                            event_payload = json!({"actor": player_id.0, "duration_ticks": 24});
+                            // **M6**: spawn a KnifeProjectile under physics with
+                            // 50% of the equipped melee's base damage. The tick
+                            // scheduler advances the projectile + emits
+                            // `combat.knife_throw_landed` on collision.
+                            let knife_preset = cf_equipment::m6_melee_presets()
+                                .into_iter()
+                                .find(|m| m.kind == cf_equipment::MeleeKind::Knife);
+                            let base_damage = knife_preset.map(|p| p.damage).unwrap_or(20.0);
+                            let aim = if actor.aim == cf_actor::Vec2::ZERO {
+                                cf_actor::Vec2::new(1.0, 0.0)
+                            } else {
+                                actor.aim.normalize_or_x()
+                            };
+                            knife_to_spawn = Some(PendingKnifeSpawn {
+                                owner: player_id,
+                                origin: actor.position,
+                                aim,
+                                base_damage,
+                            });
+                            event_payload = json!({
+                                "actor": player_id.0,
+                                "duration_ticks": 24,
+                                "damage_factor": cf_equipment::KNIFE_THROW_DAMAGE_FACTOR,
+                            });
                         }
                     }
                     M6Action::WeaponSwap { slot } => {
                         let new_slot = cf_actor::ItemSlot(u32::from(*slot));
                         let prev = actor.inventory.selected;
-                        if actor.inventory.try_select(new_slot) {
+                        // **M6**: replace the instant `actor.inventory.try_select(...)`
+                        // with the WeaponSwap state machine. The selected slot is
+                        // changed at swap completion (see tick_m6_actor_state),
+                        // and firing is locked while `weapon_swap_in_progress`.
+                        if (new_slot.0 as usize) >= actor.inventory.items.len() {
+                            reject_reason = Some("slot_invalid");
+                        } else if actor.weapon_swap_in_progress {
+                            reject_reason = Some("swap_in_progress");
+                        } else if prev == new_slot {
+                            reject_reason = Some("slot_already_active");
+                        } else {
                             let duration = cf_equipment::swap_duration_for_target(*slot);
+                            actor.weapon_swap_in_progress = true;
                             swap_to_register = Some((
                                 player_id,
                                 cf_equipment::WeaponSwap::start(prev.0 as u8, *slot, duration),
@@ -6078,8 +6692,6 @@ impl M0Engine {
                                 "to_slot": (*slot),
                                 "duration_seconds": duration,
                             });
-                        } else {
-                            reject_reason = Some("slot_invalid");
                         }
                     }
                     M6Action::DropItem { slot } => {
@@ -6101,40 +6713,192 @@ impl M0Engine {
                     M6Action::DeployBipod => {
                         let can_deploy = actor.crouch_active || actor.prone_active;
                         if can_deploy {
-                            event_payload = json!({"actor": player_id.0, "state": "deployed"});
+                            // **M6**: actually flip the bipod state on the actor so
+                            // the firing path in cf-actor::sim multiplies recoil by
+                            // BIPOD_RECOIL_FACTOR + bloom by BIPOD_BLOOM_FACTOR.
+                            let deployed = actor.bipod.try_deploy(true);
+                            if deployed {
+                                event_payload = json!({
+                                    "actor": player_id.0,
+                                    "state": "deployed",
+                                    "recoil_factor": cf_equipment::BIPOD_RECOIL_FACTOR,
+                                    "bloom_factor": cf_equipment::BIPOD_BLOOM_FACTOR,
+                                });
+                            } else {
+                                reject_reason = Some("bipod_already_deployed");
+                            }
                         } else {
                             reject_reason = Some("bipod_requires_crouch_or_prone");
                         }
                     }
                     M6Action::StowBipod => {
-                        event_payload = json!({"actor": player_id.0, "state": "stowed"});
+                        let stowed = actor.bipod.stow();
+                        if stowed {
+                            event_payload = json!({"actor": player_id.0, "state": "stowed"});
+                        } else {
+                            reject_reason = Some("bipod_not_deployed");
+                        }
                     }
                     M6Action::CycleFireMode => {
                         event_payload = json!({"actor": player_id.0});
                     }
                     M6Action::CookGrenade => {
-                        event_payload = json!({"actor": player_id.0});
+                        // **M6**: cook the held grenade — subtract cook tick from
+                        // remaining fuse. If cook exceeds fuse, the grenade
+                        // detonates in hand (lethal). Emits
+                        // `equipment.grenade_cooked` with the new remaining fuse.
+                        const COOK_PER_PRESS_SECONDS: f32 = 0.5;
+                        if let Some(kind) = actor.grenade_held_kind {
+                            actor.grenade_cook_seconds = (actor.grenade_cook_seconds + COOK_PER_PRESS_SECONDS).max(0.0);
+                            actor.grenade_held_fuse_remaining =
+                                cf_equipment::cook_grenade(actor.grenade_held_fuse_remaining, COOK_PER_PRESS_SECONDS);
+                            event_payload = json!({
+                                "actor": player_id.0,
+                                "kind": kind.as_str(),
+                                "cook_elapsed_seconds": actor.grenade_cook_seconds,
+                                "fuse_remaining_seconds": actor.grenade_held_fuse_remaining,
+                                "detonates_in_hand": actor.grenade_held_fuse_remaining <= 0.0,
+                            });
+                        } else {
+                            reject_reason = Some("no_grenade_equipped");
+                        }
                     }
                     M6Action::ThrowGrenade => {
-                        event_payload = json!({"actor": player_id.0});
+                        // **M6**: spawn a grenade projectile under physics with
+                        // the (possibly-cooked) fuse. The tick scheduler counts
+                        // the fuse down + emits `equipment.grenade_detonated` at
+                        // fuse=0 with the type-specific effect. The arc preview
+                        // samples are precomputed here for replay determinism.
+                        if let Some(kind) = actor.grenade_held_kind {
+                            let aim = if actor.aim == cf_actor::Vec2::ZERO {
+                                cf_actor::Vec2::new(1.0, 0.0)
+                            } else {
+                                actor.aim.normalize_or_x()
+                            };
+                            let preset = cf_equipment::m6_grenade_presets().into_iter().find(|g| g.kind == kind);
+                            let base_fuse = preset.as_ref().map(|p| p.fuse_seconds).unwrap_or(5.0);
+                            let remaining_fuse = if actor.grenade_held_fuse_remaining > 0.0 {
+                                actor.grenade_held_fuse_remaining
+                            } else {
+                                base_fuse
+                            };
+                            let throw_speed: f32 = 320.0;
+                            let throw_velocity = cf_actor::Vec2::new(aim.x * throw_speed, aim.y * throw_speed);
+                            event_payload = json!({
+                                "actor": player_id.0,
+                                "kind": kind.as_str(),
+                                "fuse_seconds": remaining_fuse,
+                                "origin": [actor.position.x, actor.position.y],
+                                "velocity": [throw_velocity.x, throw_velocity.y],
+                            });
+                            grenade_to_spawn = Some(PendingGrenadeSpawn {
+                                owner: player_id,
+                                kind,
+                                origin: actor.position,
+                                velocity: throw_velocity,
+                                fuse_remaining: remaining_fuse,
+                                radius: preset.as_ref().map(|p| p.radius).unwrap_or(60.0),
+                                damage_at_center: preset.as_ref().map(|p| p.damage_at_center).unwrap_or(50.0),
+                                adhesive: preset.as_ref().map(|p| p.adhesive).unwrap_or(false),
+                                spawns_hazard: preset.as_ref().map(|p| p.spawns_hazard).unwrap_or(false),
+                                vision_disrupt: preset.as_ref().map(|p| p.vision_disrupt).unwrap_or(false),
+                            });
+                            actor.grenade_cook_seconds = 0.0;
+                            actor.grenade_held_fuse_remaining = 0.0;
+                        } else {
+                            reject_reason = Some("no_grenade_equipped");
+                        }
                     }
                     M6Action::MeleeBash => {
                         if actor.limb_loss.weapon_fire_disabled() {
                             reject_reason = actor.limb_loss.reject_reason_for("fire");
                         } else {
-                            event_payload = json!({"actor": player_id.0, "kind": "bash"});
+                            // **M6**: shoulder-check during sprint substitutes
+                            // the rifle bash with the heavier impact (per spec
+                            // table: shoulder check = 10 blunt + 80% knockdown).
+                            let melee_kind = if actor.sprint_active {
+                                cf_equipment::MeleeKind::ShoulderCheck
+                            } else {
+                                cf_equipment::MeleeKind::RifleBash
+                            };
+                            event_payload = json!({
+                                "actor": player_id.0,
+                                "kind": if matches!(melee_kind, cf_equipment::MeleeKind::ShoulderCheck) { "shoulder_check" } else { "bash" },
+                            });
+                            melee_to_resolve = Some(PendingMeleeResolve {
+                                attacker: player_id,
+                                kind: melee_kind,
+                                facing_sign: if actor.aim.x >= 0.0 { 1.0 } else { -1.0 },
+                                actor_position: actor.position,
+                            });
                         }
                     }
                     M6Action::MeleeKick => {
                         event_payload = json!({"actor": player_id.0, "kind": "kick"});
+                        melee_to_resolve = Some(PendingMeleeResolve {
+                            attacker: player_id,
+                            kind: cf_equipment::MeleeKind::Kick,
+                            facing_sign: if actor.aim.x >= 0.0 { 1.0 } else { -1.0 },
+                            actor_position: actor.position,
+                        });
                     }
                     M6Action::UseTool { tool_kind } => {
-                        event_payload = json!({"actor": player_id.0, "tool": tool_kind});
+                        // **M6**: apply wear on each use; emit
+                        // `equipment.tool_broken` when durability hits 0. For
+                        // tool="repair", restore wear on every tool entry in
+                        // the actor's durability map and emit one
+                        // `equipment.tool_repaired` per target tool.
+                        const WEAR_PER_USE_DEFAULT: f32 = 1.0;
+                        const REPAIR_RESTORE_DEFAULT: f32 = 25.0;
+                        if tool_kind == "repair" {
+                            let tools_to_repair: Vec<String> = actor
+                                .tool_durability
+                                .iter()
+                                .filter_map(|(k, d)| if d.current < d.max { Some(k.clone()) } else { None })
+                                .collect();
+                            let mut repaired: Vec<String> = Vec::with_capacity(tools_to_repair.len());
+                            for tool_key in tools_to_repair {
+                                if let Some(d) = actor.tool_durability.get_mut(&tool_key) {
+                                    d.restore(REPAIR_RESTORE_DEFAULT);
+                                    repaired.push(tool_key);
+                                }
+                            }
+                            event_payload = json!({
+                                "actor": player_id.0,
+                                "tool": tool_kind,
+                                "repaired_tools": repaired.clone(),
+                                "amount_restored": REPAIR_RESTORE_DEFAULT,
+                            });
+                            tool_repaired_pending = Some((player_id.0, REPAIR_RESTORE_DEFAULT, repaired));
+                        } else {
+                            let entry = actor
+                                .tool_durability
+                                .entry(tool_kind.clone())
+                                .or_insert_with(cf_equipment::Durability::default);
+                            let broke = entry.apply_wear(WEAR_PER_USE_DEFAULT);
+                            let remaining = entry.current;
+                            event_payload = json!({
+                                "actor": player_id.0,
+                                "tool": tool_kind,
+                                "durability_remaining": remaining,
+                            });
+                            if broke {
+                                tool_broken_pending = Some((player_id.0, tool_kind.clone(), 0.0_f32));
+                            }
+                        }
                     }
                     M6Action::AttachSuppressor => {
-                        event_payload = json!({"actor": player_id.0, "attachment": "suppressor", "attached": true});
+                        actor.suppressor.attached = true;
+                        actor.suppressor.integrity = actor.suppressor.integrity.max(1.0);
+                        event_payload = json!({
+                            "actor": player_id.0,
+                            "attachment": "suppressor",
+                            "attached": true,
+                            "loudness_factor": cf_equipment::SUPPRESSOR_LOUDNESS_FACTOR,
+                        });
                     }
                     M6Action::DetachSuppressor => {
+                        actor.suppressor.attached = false;
                         event_payload = json!({"actor": player_id.0, "attachment": "suppressor", "attached": false});
                     }
                     M6Action::SetFacing { facing } => {
@@ -6173,12 +6937,173 @@ impl M0Engine {
                 }
             }
         }
+        // **M6**: resolve a melee hit against actors within reach BEFORE
+        // we release the state write-guard so we can mutate target HP +
+        // roll knockdown deterministically off the engine's seeded RNG.
+        let mut melee_hit_emit: Option<MeleeHitEmit> = None;
+        let mut knockdown_emit: Option<u64> = None;
         if reject_reason.is_none() {
+            if let Some(resolve) = melee_to_resolve.take() {
+                let preset = cf_equipment::m6_melee_presets()
+                    .into_iter()
+                    .find(|m| m.kind == resolve.kind);
+                if let Some(preset) = preset {
+                    let attacker_pos = resolve.actor_position;
+                    let facing_sign = resolve.facing_sign;
+                    let reach = preset.reach;
+                    let target_id_opt = state.actor_state.as_ref().and_then(|sim| {
+                        sim.world
+                            .actors
+                            .iter()
+                            .filter(|(id, _)| **id != resolve.attacker)
+                            .filter_map(|(id, a)| {
+                                let dx = a.position.x - attacker_pos.x;
+                                let dy = a.position.y - attacker_pos.y;
+                                let in_arc = dx * facing_sign > 0.0 || dx.abs() <= 4.0;
+                                let distance = (dx * dx + dy * dy).sqrt();
+                                if in_arc && distance <= reach {
+                                    Some((*id, distance))
+                                } else {
+                                    None
+                                }
+                            })
+                            .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+                            .map(|(id, _)| id)
+                    });
+                    if let Some(target_id) = target_id_opt {
+                        let knockdown_roll = ((state.rng.next_u64() as f64) / (u64::MAX as f64)) as f32;
+                        let knockdown_triggered = knockdown_roll < preset.knockdown_chance;
+                        let mut hp_before = 0.0;
+                        let mut hp_after = 0.0;
+                        if let Some(target) = state
+                            .actor_state
+                            .as_mut()
+                            .and_then(|sim| sim.world.actors.get_mut(&target_id))
+                        {
+                            hp_before = target.hp;
+                            let _ = target.apply_damage(preset.damage);
+                            hp_after = target.hp;
+                            if knockdown_triggered {
+                                target.knockdown_ticks_remaining = target.knockdown_ticks_remaining.max(45);
+                                knockdown_emit = Some(target_id.0);
+                            }
+                        }
+                        melee_hit_emit = Some(MeleeHitEmit {
+                            attacker: resolve.attacker.0,
+                            target: target_id.0,
+                            kind: preset.kind,
+                            damage: preset.damage,
+                            hp_before,
+                            hp_after,
+                            knockdown_chance: preset.knockdown_chance,
+                            knockdown_rolled: knockdown_roll,
+                            knockdown_triggered,
+                        });
+                    }
+                }
+            }
             if let Some((id, swap)) = swap_to_register {
                 state.weapon_swap_state.insert(id, swap);
             }
+            // **M6**: register the grenade projectile so the tick scheduler
+            // can advance + detonate it.
+            if let Some(spawn) = grenade_to_spawn.take() {
+                let projectile_id = state.next_guard_projectile_id;
+                state.next_guard_projectile_id = state.next_guard_projectile_id.saturating_add(1);
+                state.grenade_projectiles.push(GrenadeProjectile {
+                    id: projectile_id,
+                    owner: spawn.owner,
+                    kind: spawn.kind,
+                    position: spawn.origin,
+                    velocity: spawn.velocity,
+                    fuse_remaining: spawn.fuse_remaining,
+                    radius: spawn.radius,
+                    damage_at_center: spawn.damage_at_center,
+                    adhesive: spawn.adhesive,
+                    spawns_hazard: spawn.spawns_hazard,
+                    vision_disrupt: spawn.vision_disrupt,
+                    stuck: false,
+                });
+            }
+            // **M6**: register the knife projectile so the tick scheduler
+            // can advance + emit `combat.knife_throw_landed` on collision.
+            if let Some(spawn) = knife_to_spawn.take() {
+                let projectile_id = state.next_guard_projectile_id;
+                state.next_guard_projectile_id = state.next_guard_projectile_id.saturating_add(1);
+                let knife = cf_equipment::KnifeProjectile::new(
+                    projectile_id,
+                    spawn.owner.0,
+                    (spawn.origin.x, spawn.origin.y),
+                    (spawn.aim.x, spawn.aim.y),
+                    spawn.base_damage,
+                );
+                state.knife_projectiles.push(knife);
+            }
         }
         drop(state);
+        // **M6**: emit follow-on events (melee hit, knockdown, tool broken,
+        // tool repaired) AFTER releasing the write-guard so the recorder
+        // can re-borrow without dead-locking.
+        if let Some(emit) = melee_hit_emit {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "equipment",
+                "melee_hit_mo",
+                json!({
+                    "attacker_id": emit.attacker,
+                    "target_id": emit.target,
+                    "actor": emit.attacker,
+                    "hit_actor_id": emit.target,
+                    "melee_kind": emit.kind.as_str(),
+                    "damage": emit.damage,
+                    "damage_amount": emit.damage,
+                    "hp_before": emit.hp_before,
+                    "hp_after": emit.hp_after,
+                    "knockdown_chance": emit.knockdown_chance,
+                    "knockdown_rolled": emit.knockdown_rolled,
+                    "knockdown_triggered": emit.knockdown_triggered,
+                }),
+                None,
+            );
+        }
+        if let Some(target_id) = knockdown_emit {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "actor",
+                "stance_changed",
+                json!({
+                    "actor": target_id,
+                    "from_stance": "stand",
+                    "to_stance": cf_actor::Stance::KnockedDown.as_str(),
+                    "cause": "melee_knockdown",
+                }),
+                None,
+            );
+        }
+        if let Some((actor_id, tool, durability)) = tool_broken_pending {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "equipment",
+                "tool_broken",
+                json!({"actor": actor_id, "tool": tool, "durability": durability}),
+                None,
+            );
+        }
+        if let Some((actor_id, amount, tools)) = tool_repaired_pending {
+            for tool in &tools {
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "equipment",
+                    "tool_repaired",
+                    json!({"actor": actor_id, "tool": tool, "amount_restored": amount}),
+                    None,
+                );
+            }
+        }
         if let Some(reason) = reject_reason {
             self.recorder.record(
                 tick,
