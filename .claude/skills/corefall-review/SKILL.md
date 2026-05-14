@@ -1,8 +1,8 @@
 ---
 name: corefall-review
-description: Deep Corefall code review and bug hunt. Use when asked to review a Corefall milestone, Build Point (BP0..BP12), feature, diff, branch, PR, or implementation for bugs, misses, logic gaps, test gaps, roadmap/checklist drift, determinism/replay risk, cfctl coverage, T-CAPTURE evidence, performance, security, or Rust safety.
-when_to_use: Trigger for prompts like review M0, review BP1, bug hunt this milestone, find gaps, audit the implementation, review my diff, check if this is done, or run a pre-merge review. Always use for Corefall review work before declaring a milestone or Build Point complete.
-argument-hint: "[milestone-or-bp-or-git-range]"
+description: Deep Corefall BP-LEVEL closure review (BP0..BP12) with T-CAPTURE evidence, grading.json LLM-graded verdicts, Self-Play Validation Matrix, AI-Agent Self-Test Report, Universal Enhancement Audit (DR-056), per-tier perf gates, BP Goal Coverage Report, and cross-milestone integrity checks. Designed for end-of-BP closure and pre-launch quality gates — NOT for per-milestone content audits.
+when_to_use: Use ONLY for explicit Build Point closure review ("review BP3", "close BP4", "BP12 release candidate audit") or full pre-launch quality review with capture grids and graded run bundles. For per-milestone content-completeness audits (verifying every weapon/actor/feature in a single milestone spec is fully implemented), use the corefall-content-audit skill instead — that skill is the correct tool for "audit M9", "is M11 content complete", "verify M14 implementation".
+argument-hint: "[BP-id-or-git-range]"
 ---
 
 # Corefall Review
