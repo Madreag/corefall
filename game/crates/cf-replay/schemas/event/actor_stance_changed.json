@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/actor.stance_changed.v0.1",
+  "title": "actor.stance_changed",
+  "type": "object",
+  "required": ["actor"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "active": {"type": "boolean"},
+    "duration_ticks": {"type": "integer", "minimum": 0}
+  },
+  "additionalProperties": true
+}

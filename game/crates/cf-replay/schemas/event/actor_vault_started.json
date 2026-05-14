@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/actor.vault_started.v0.1",
+  "title": "actor.vault_started",
+  "type": "object",
+  "required": ["actor"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "duration_ticks": {"type": "integer", "minimum": 0}
+  },
+  "additionalProperties": true
+}

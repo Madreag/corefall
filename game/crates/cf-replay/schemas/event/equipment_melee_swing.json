@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/equipment.melee_swing.v0.1",
+  "title": "equipment.melee_swing",
+  "type": "object",
+  "required": ["actor", "kind"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "kind": {"type": "string"}
+  },
+  "additionalProperties": true
+}

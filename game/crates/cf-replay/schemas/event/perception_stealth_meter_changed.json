@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/perception.stealth_meter_changed.v0.1",
+  "title": "perception.stealth_meter_changed",
+  "type": "object",
+  "required": ["actor", "stealth_meter"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "stealth_meter": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+    "spotted": {"type": "boolean"}
+  },
+  "additionalProperties": true
+}

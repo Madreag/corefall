@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/combat.stealth_kill_executed.v0.1",
+  "title": "combat.stealth_kill_executed",
+  "type": "object",
+  "required": ["attacker_actor"],
+  "properties": {
+    "attacker_actor": {"type": "integer", "minimum": 0},
+    "victim_actor": {"type": "integer", "minimum": 0},
+    "stealth_meter": {"type": "number"}
+  },
+  "additionalProperties": true
+}

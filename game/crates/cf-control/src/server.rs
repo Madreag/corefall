@@ -435,6 +435,24 @@ pub enum ControlCommand {
         mode: Option<String>,
         source: IntentSource,
     },
+    /// **M6**: umbrella dispatch for the 26 new tactical-controller actions
+    /// (sprint, slide, vault, lean, stealth kill, knife throw, weapon swap,
+    /// drop / pickup, signals, mark waypoint, deploy bipod, cycle fire mode,
+    /// cook / throw grenade, melee bash / kick, use tool, suppressor
+    /// attach / detach, set facing). Engine reads the inner action + updates
+    /// `ActorState` flags + records the matching control event.
+    ActM6 {
+        action: crate::m6_actions::M6Action,
+        source: IntentSource,
+    },
+    /// **M6**: issue one of the 4 squad commands to a bot. `bot_actor=None`
+    /// broadcasts to all followers.
+    ActSquadIssueCommand {
+        bot_actor: Option<u64>,
+        kind: crate::m6_actions::SquadCommandKindOverWire,
+        waypoint: Option<(f32, f32)>,
+        source: IntentSource,
+    },
     SettingsSet {
         changes: SettingsPatch,
     },
@@ -1201,6 +1219,73 @@ async fn process_request<E: EngineHandle>(
                 .await;
             Some(ack_response(request.id, &result))
         }
+        m6_method
+            if matches!(
+                m6_method,
+                "act.player.sprint"
+                    | "act.player.prone"
+                    | "act.player.slide"
+                    | "act.player.vault"
+                    | "act.player.climb_up"
+                    | "act.player.climb_down"
+                    | "act.player.dive"
+                    | "act.player.lean"
+                    | "act.player.stealth_kill"
+                    | "act.player.knife_throw"
+                    | "act.player.weapon_swap"
+                    | "act.player.drop_item"
+                    | "act.player.pickup"
+                    | "act.player.signal_friendly"
+                    | "act.player.signal_enemy_spotted"
+                    | "act.player.mark_waypoint"
+                    | "act.player.deploy_bipod"
+                    | "act.player.stow_bipod"
+                    | "act.player.cycle_fire_mode"
+                    | "act.player.cook_grenade"
+                    | "act.player.throw_grenade"
+                    | "act.player.melee_bash"
+                    | "act.player.melee_kick"
+                    | "act.player.use_tool"
+                    | "act.player.attach_suppressor"
+                    | "act.player.detach_suppressor"
+                    | "act.player.set_facing"
+            ) =>
+        {
+            let action = match decode_m6_action(m6_method, params) {
+                Ok(a) => a,
+                Err(err) => return Some(missing_param_error(request.id, &err)),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActM6 {
+                    action,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.squad.issue_command" => {
+            let p: crate::m6_actions::ActSquadIssueCommandParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            if p.kind.requires_waypoint() && p.waypoint.is_none() {
+                return Some(invalid_param_reason(request.id, "squad_command_requires_waypoint"));
+            }
+            if let Some((x, y)) = p.waypoint {
+                if !x.is_finite() || !y.is_finite() {
+                    return Some(invalid_param_reason(request.id, "non_finite_waypoint"));
+                }
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActSquadIssueCommand {
+                    bot_actor: p.bot_actor,
+                    kind: p.kind,
+                    waypoint: p.waypoint,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
         "act.chassis.repair" => {
             let p: ActChassisRepairParams = match serde_json::from_value(params) {
                 Ok(v) => v,
@@ -1685,6 +1770,100 @@ fn missing_param_error(id: JsonRpcId, reason: &str) -> String {
         "InvalidParams",
         json!({"reason": reason, "fix_hint": "see spec/prototype-roadmap CLI Reference for the M0 method catalog"}),
     )
+}
+
+/// Decode an M6 cfctl method's params into an [`crate::m6_actions::M6Action`].
+fn decode_m6_action(method: &str, params: serde_json::Value) -> Result<crate::m6_actions::M6Action, String> {
+    use crate::m6_actions::M6Action;
+    let p = if params.is_null() {
+        serde_json::json!({})
+    } else {
+        params
+    };
+    match method {
+        "act.player.sprint" => {
+            let active = p
+                .get("active")
+                .and_then(serde_json::Value::as_bool)
+                .ok_or_else(|| "missing_active".to_string())?;
+            Ok(M6Action::Sprint { active })
+        }
+        "act.player.prone" => {
+            let active = p
+                .get("active")
+                .and_then(serde_json::Value::as_bool)
+                .ok_or_else(|| "missing_active".to_string())?;
+            Ok(M6Action::Prone { active })
+        }
+        "act.player.slide" => Ok(M6Action::Slide),
+        "act.player.vault" => Ok(M6Action::Vault),
+        "act.player.climb_up" => Ok(M6Action::ClimbUp),
+        "act.player.climb_down" => Ok(M6Action::ClimbDown),
+        "act.player.dive" => Ok(M6Action::Dive),
+        "act.player.lean" => {
+            let direction = p.get("direction").and_then(serde_json::Value::as_f64).unwrap_or(0.0) as f32;
+            if !direction.is_finite() {
+                return Err("non_finite_direction".to_string());
+            }
+            Ok(M6Action::Lean { direction })
+        }
+        "act.player.stealth_kill" => Ok(M6Action::StealthKill),
+        "act.player.knife_throw" => Ok(M6Action::KnifeThrow),
+        "act.player.weapon_swap" => {
+            let slot = p
+                .get("slot")
+                .and_then(serde_json::Value::as_u64)
+                .ok_or_else(|| "missing_slot".to_string())?;
+            if slot >= 8 {
+                return Err("slot_out_of_range".to_string());
+            }
+            Ok(M6Action::WeaponSwap { slot: slot as u8 })
+        }
+        "act.player.drop_item" => {
+            let slot = p.get("slot").and_then(serde_json::Value::as_u64).map(|v| v as u8);
+            Ok(M6Action::DropItem { slot })
+        }
+        "act.player.pickup" => Ok(M6Action::Pickup),
+        "act.player.signal_friendly" => Ok(M6Action::SignalFriendly),
+        "act.player.signal_enemy_spotted" => Ok(M6Action::SignalEnemySpotted),
+        "act.player.mark_waypoint" => {
+            let x = p.get("x").and_then(serde_json::Value::as_f64).unwrap_or(0.0) as f32;
+            let y = p.get("y").and_then(serde_json::Value::as_f64).unwrap_or(0.0) as f32;
+            if !x.is_finite() || !y.is_finite() {
+                return Err("non_finite_waypoint".to_string());
+            }
+            Ok(M6Action::MarkWaypoint { x, y })
+        }
+        "act.player.deploy_bipod" => Ok(M6Action::DeployBipod),
+        "act.player.stow_bipod" => Ok(M6Action::StowBipod),
+        "act.player.cycle_fire_mode" => Ok(M6Action::CycleFireMode),
+        "act.player.cook_grenade" => Ok(M6Action::CookGrenade),
+        "act.player.throw_grenade" => Ok(M6Action::ThrowGrenade),
+        "act.player.melee_bash" => Ok(M6Action::MeleeBash),
+        "act.player.melee_kick" => Ok(M6Action::MeleeKick),
+        "act.player.use_tool" => {
+            let tool_kind = p
+                .get("kind")
+                .and_then(serde_json::Value::as_str)
+                .ok_or_else(|| "missing_kind".to_string())?
+                .to_string();
+            Ok(M6Action::UseTool { tool_kind })
+        }
+        "act.player.attach_suppressor" => Ok(M6Action::AttachSuppressor),
+        "act.player.detach_suppressor" => Ok(M6Action::DetachSuppressor),
+        "act.player.set_facing" => {
+            let facing = p
+                .get("facing")
+                .and_then(serde_json::Value::as_str)
+                .ok_or_else(|| "missing_facing".to_string())?
+                .to_string();
+            if facing != "left" && facing != "right" {
+                return Err("invalid_facing".to_string());
+            }
+            Ok(M6Action::SetFacing { facing })
+        }
+        _ => Err(format!("unknown_m6_method:{method}")),
+    }
 }
 
 fn invalid_param_reason(id: JsonRpcId, reason: &str) -> String {

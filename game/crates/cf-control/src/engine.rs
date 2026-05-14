@@ -5300,6 +5300,296 @@ impl M0Engine {
         CommandResult::rejected("act_player_unavailable_no_actor_world", tick.0)
     }
 
+    fn dispatch_m6_action(
+        &self,
+        action: crate::m6_actions::M6Action,
+        source: cf_actor::IntentSource,
+        tick: Tick,
+        sim_time_ms: f64,
+        state: std::sync::RwLockWriteGuard<'_, EngineMutable>,
+    ) -> CommandResult {
+        use crate::m6_actions::M6Action;
+        if !self.config.has_actor_world {
+            let method = action.method_name();
+            return self.reject_actor_command(tick, sim_time_ms, state, method);
+        }
+        let _ = source;
+        let method = action.method_name();
+        let mut state = state;
+        let player_id = state.player_actor.expect("player actor present");
+        let mut reject_reason: Option<&'static str> = None;
+        let mut event_payload = json!({"actor": player_id.0});
+        if let Some(sim) = state.actor_state.as_mut() {
+            if let Some(actor) = sim.world.actors.get_mut(&player_id) {
+                match &action {
+                    M6Action::Sprint { active } => {
+                        if *active && actor.limb_loss.sprint_disabled() {
+                            reject_reason = Some(
+                                actor
+                                    .limb_loss
+                                    .reject_reason_for("sprint")
+                                    .unwrap_or("sprint_disabled_by_limb_loss"),
+                            );
+                        } else if *active && !actor.stamina.can_sprint() {
+                            reject_reason = Some("stamina_depleted");
+                        } else {
+                            actor.sprint_active = *active;
+                            actor.stamina.sprinting = *active;
+                            event_payload = json!({"actor": player_id.0, "active": *active});
+                        }
+                    }
+                    M6Action::Prone { active } => {
+                        actor.prone_active = *active;
+                        event_payload = json!({"actor": player_id.0, "active": *active});
+                    }
+                    M6Action::Slide => {
+                        if actor.sprint_active {
+                            actor.cinematic_kind = Some(cf_actor::Stance::Slide);
+                            actor.cinematic_ticks_remaining = 36;
+                            event_payload = json!({"actor": player_id.0, "duration_ticks": 36});
+                        } else {
+                            reject_reason = Some("slide_requires_sprint");
+                        }
+                    }
+                    M6Action::Vault => {
+                        if actor.limb_loss.movement_disabled() {
+                            reject_reason = actor.limb_loss.reject_reason_for("vault");
+                        } else {
+                            actor.cinematic_kind = Some(cf_actor::Stance::Vault);
+                            actor.cinematic_ticks_remaining = 48;
+                            event_payload = json!({"actor": player_id.0, "duration_ticks": 48});
+                        }
+                    }
+                    M6Action::ClimbUp => {
+                        if actor.limb_loss.movement_disabled() {
+                            reject_reason = actor.limb_loss.reject_reason_for("climb_up");
+                        } else {
+                            actor.cinematic_kind = Some(cf_actor::Stance::LadderClimb);
+                            actor.cinematic_ticks_remaining = 90;
+                            event_payload = json!({"actor": player_id.0, "duration_ticks": 90, "direction": "up"});
+                        }
+                    }
+                    M6Action::ClimbDown => {
+                        if actor.limb_loss.movement_disabled() {
+                            reject_reason = actor.limb_loss.reject_reason_for("climb_down");
+                        } else {
+                            actor.cinematic_kind = Some(cf_actor::Stance::LadderClimb);
+                            actor.cinematic_ticks_remaining = 90;
+                            event_payload = json!({"actor": player_id.0, "duration_ticks": 90, "direction": "down"});
+                        }
+                    }
+                    M6Action::Dive => {
+                        actor.cinematic_kind = Some(cf_actor::Stance::Dive);
+                        actor.cinematic_ticks_remaining = 36;
+                        event_payload = json!({"actor": player_id.0, "duration_ticks": 36});
+                    }
+                    M6Action::Lean { direction } => {
+                        actor.lean_state.direction = if *direction < -0.5 {
+                            cf_actor::LeanDirection::Left
+                        } else if *direction > 0.5 {
+                            cf_actor::LeanDirection::Right
+                        } else {
+                            cf_actor::LeanDirection::None
+                        };
+                        event_payload = json!({"actor": player_id.0, "direction": actor.lean_state.direction.as_str()});
+                    }
+                    M6Action::StealthKill => {
+                        if actor.stealth_meter < cf_equipment::STEALTH_KILL_METER_MAX {
+                            actor.cinematic_kind = Some(cf_actor::Stance::StealthAttack);
+                            actor.cinematic_ticks_remaining = 72;
+                            event_payload = json!({"actor": player_id.0, "stealth_meter": actor.stealth_meter});
+                        } else {
+                            reject_reason = Some("not_stealthy_enough");
+                        }
+                    }
+                    M6Action::KnifeThrow => {
+                        if actor.limb_loss.weapon_fire_disabled() {
+                            reject_reason = actor.limb_loss.reject_reason_for("knife_throw");
+                        } else {
+                            actor.cinematic_kind = Some(cf_actor::Stance::KnifeThrow);
+                            actor.cinematic_ticks_remaining = 24;
+                            event_payload = json!({"actor": player_id.0, "duration_ticks": 24});
+                        }
+                    }
+                    M6Action::WeaponSwap { slot } => {
+                        let new_slot = cf_actor::ItemSlot(u32::from(*slot));
+                        let prev = actor.inventory.selected;
+                        if actor.inventory.try_select(new_slot) {
+                            event_payload = json!({"actor": player_id.0, "from_slot": prev.0, "to_slot": (*slot)});
+                        } else {
+                            reject_reason = Some("slot_invalid");
+                        }
+                    }
+                    M6Action::DropItem { slot } => {
+                        let drop_slot = slot.unwrap_or(actor.inventory.selected.0 as u8);
+                        event_payload = json!({"actor": player_id.0, "slot": drop_slot});
+                    }
+                    M6Action::Pickup => {
+                        event_payload = json!({"actor": player_id.0});
+                    }
+                    M6Action::SignalFriendly => {
+                        event_payload = json!({"actor": player_id.0, "signal": "friendly"});
+                    }
+                    M6Action::SignalEnemySpotted => {
+                        event_payload = json!({"actor": player_id.0, "signal": "enemy_spotted"});
+                    }
+                    M6Action::MarkWaypoint { x, y } => {
+                        event_payload = json!({"actor": player_id.0, "x": *x, "y": *y});
+                    }
+                    M6Action::DeployBipod => {
+                        let can_deploy = actor.crouch_active || actor.prone_active;
+                        if can_deploy {
+                            event_payload = json!({"actor": player_id.0, "state": "deployed"});
+                        } else {
+                            reject_reason = Some("bipod_requires_crouch_or_prone");
+                        }
+                    }
+                    M6Action::StowBipod => {
+                        event_payload = json!({"actor": player_id.0, "state": "stowed"});
+                    }
+                    M6Action::CycleFireMode => {
+                        event_payload = json!({"actor": player_id.0});
+                    }
+                    M6Action::CookGrenade => {
+                        event_payload = json!({"actor": player_id.0});
+                    }
+                    M6Action::ThrowGrenade => {
+                        event_payload = json!({"actor": player_id.0});
+                    }
+                    M6Action::MeleeBash => {
+                        if actor.limb_loss.weapon_fire_disabled() {
+                            reject_reason = actor.limb_loss.reject_reason_for("fire");
+                        } else {
+                            event_payload = json!({"actor": player_id.0, "kind": "bash"});
+                        }
+                    }
+                    M6Action::MeleeKick => {
+                        event_payload = json!({"actor": player_id.0, "kind": "kick"});
+                    }
+                    M6Action::UseTool { tool_kind } => {
+                        event_payload = json!({"actor": player_id.0, "tool": tool_kind});
+                    }
+                    M6Action::AttachSuppressor => {
+                        event_payload = json!({"actor": player_id.0, "attachment": "suppressor", "attached": true});
+                    }
+                    M6Action::DetachSuppressor => {
+                        event_payload = json!({"actor": player_id.0, "attachment": "suppressor", "attached": false});
+                    }
+                    M6Action::SetFacing { facing } => {
+                        let new_facing = if facing == "left" {
+                            cf_actor::FacingDirection::Left
+                        } else {
+                            cf_actor::FacingDirection::Right
+                        };
+                        let prev = actor.facing;
+                        actor.facing = new_facing;
+                        event_payload = json!({
+                            "actor": player_id.0,
+                            "from": prev.as_str(),
+                            "to": new_facing.as_str(),
+                            "cause": "cfctl_set_facing",
+                        });
+                    }
+                }
+            }
+        }
+        drop(state);
+        if let Some(reason) = reject_reason {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "control",
+                "command_rejected",
+                json!({"method": method, "reason": reason, "actor": player_id.0}),
+                None,
+            );
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "actor",
+                "action_rejected",
+                json!({"actor": player_id.0, "action": method, "reason": reason}),
+                None,
+            );
+            return CommandResult::rejected(reason, tick.0);
+        }
+        let mut accepted_payload = event_payload.clone();
+        if let Some(obj) = accepted_payload.as_object_mut() {
+            obj.insert("method".to_string(), json!(method));
+        }
+        self.recorder
+            .record(tick, sim_time_ms, "control", "command_accepted", accepted_payload, None);
+        // Per-action structured replay event in the matching category.
+        let (category, event) = match &action {
+            crate::m6_actions::M6Action::Sprint { .. } | crate::m6_actions::M6Action::Prone { .. } => {
+                ("actor", "stance_changed")
+            }
+            crate::m6_actions::M6Action::Slide => ("actor", "slide_started"),
+            crate::m6_actions::M6Action::Vault => ("actor", "vault_started"),
+            crate::m6_actions::M6Action::ClimbUp | crate::m6_actions::M6Action::ClimbDown => ("actor", "climb_started"),
+            crate::m6_actions::M6Action::Dive => ("actor", "dive_started"),
+            crate::m6_actions::M6Action::Lean { .. } => ("actor", "lean_changed"),
+            crate::m6_actions::M6Action::StealthKill => ("combat", "stealth_kill_executed"),
+            crate::m6_actions::M6Action::KnifeThrow => ("combat", "knife_throw_started"),
+            crate::m6_actions::M6Action::WeaponSwap { .. } => ("equipment", "weapon_swap_started"),
+            crate::m6_actions::M6Action::DropItem { .. } => ("equipment", "item_dropped"),
+            crate::m6_actions::M6Action::Pickup => ("equipment", "item_picked_up"),
+            crate::m6_actions::M6Action::SignalFriendly | crate::m6_actions::M6Action::SignalEnemySpotted => {
+                ("perception", "actor_signal")
+            }
+            crate::m6_actions::M6Action::MarkWaypoint { .. } => ("squad", "waypoint_marked"),
+            crate::m6_actions::M6Action::DeployBipod => ("equipment", "bipod_deployed"),
+            crate::m6_actions::M6Action::StowBipod => ("equipment", "bipod_stowed"),
+            crate::m6_actions::M6Action::CycleFireMode => ("equipment", "fire_mode_cycled"),
+            crate::m6_actions::M6Action::CookGrenade => ("equipment", "grenade_cooked"),
+            crate::m6_actions::M6Action::ThrowGrenade => ("equipment", "grenade_thrown"),
+            crate::m6_actions::M6Action::MeleeBash | crate::m6_actions::M6Action::MeleeKick => {
+                ("equipment", "melee_swing")
+            }
+            crate::m6_actions::M6Action::UseTool { .. } => ("equipment", "tool_used"),
+            crate::m6_actions::M6Action::AttachSuppressor | crate::m6_actions::M6Action::DetachSuppressor => {
+                ("equipment", "suppressor_attached")
+            }
+            crate::m6_actions::M6Action::SetFacing { .. } => ("actor", "facing_changed"),
+        };
+        self.recorder
+            .record(tick, sim_time_ms, category, event, event_payload, None);
+        CommandResult::accepted(tick.0)
+    }
+
+    fn dispatch_squad_command(
+        &self,
+        bot_actor: Option<u64>,
+        kind: crate::m6_actions::SquadCommandKindOverWire,
+        waypoint: Option<(f32, f32)>,
+        source: cf_actor::IntentSource,
+        tick: Tick,
+        sim_time_ms: f64,
+        state: std::sync::RwLockWriteGuard<'_, EngineMutable>,
+    ) -> CommandResult {
+        let _ = source;
+        if !self.config.has_actor_world {
+            return self.reject_actor_command(tick, sim_time_ms, state, "act.squad.issue_command");
+        }
+        drop(state);
+        let payload = json!({
+            "method": "act.squad.issue_command",
+            "bot_actor": bot_actor,
+            "kind": kind.as_str(),
+            "waypoint": waypoint.map(|(x, y)| json!({"x": x, "y": y})),
+        });
+        self.recorder
+            .record(tick, sim_time_ms, "control", "command_accepted", payload.clone(), None);
+        let squad_event = json!({
+            "bot_actor": bot_actor,
+            "kind": kind.as_str(),
+            "waypoint": waypoint.map(|(x, y)| json!({"x": x, "y": y})),
+        });
+        self.recorder
+            .record(tick, sim_time_ms, "squad", "command_issued", squad_event, None);
+        CommandResult::accepted(tick.0)
+    }
+
     pub fn write_run_bundle(&self, ended_at: DateTime<Utc>, exit_code: i32) -> Result<PathBuf, cf_replay::BundleError> {
         // M2 (extended): every bundle written from the engine — including mid-run
         // `runbundle.write` that fires before `record_run_finished` — must contain at
@@ -7073,6 +7363,8 @@ impl EngineHandle for M0Engine {
                 ControlCommand::ActPlayerEject { .. } => Some("act.player.eject"),
                 ControlCommand::ActPlayerSharpAim { .. } => Some("act.player.sharp_aim"),
                 ControlCommand::ActPlayerAbort { .. } => Some("act.player.abort"),
+                ControlCommand::ActM6 { action, .. } => Some(action.method_name()),
+                ControlCommand::ActSquadIssueCommand { .. } => Some("act.squad.issue_command"),
                 _ => None,
             };
             if let Some(method_name) = method {
@@ -8664,6 +8956,15 @@ impl EngineHandle for M0Engine {
                 );
                 CommandResult::accepted(tick.0)
             }
+            ControlCommand::ActM6 { action, source } => {
+                self.dispatch_m6_action(action, source, tick, sim_time_ms, state)
+            }
+            ControlCommand::ActSquadIssueCommand {
+                bot_actor,
+                kind,
+                waypoint,
+                source,
+            } => self.dispatch_squad_command(bot_actor, kind, waypoint, source, tick, sim_time_ms, state),
         }
     }
 }

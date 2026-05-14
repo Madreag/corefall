@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/equipment.sensor_pulse_fired.v0.1",
+  "title": "equipment.sensor_pulse_fired",
+  "type": "object",
+  "required": ["actor"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "radius": {"type": "number"},
+    "reveal_seconds": {"type": "number"}
+  },
+  "additionalProperties": true
+}

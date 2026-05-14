@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/equipment.suppressor_attached.v0.1",
+  "title": "equipment.suppressor_attached",
+  "type": "object",
+  "required": ["actor", "attached"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "attached": {"type": "boolean"}
+  },
+  "additionalProperties": true
+}

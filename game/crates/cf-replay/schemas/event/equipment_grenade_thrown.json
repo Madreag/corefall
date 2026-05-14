@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/equipment.grenade_thrown.v0.1",
+  "title": "equipment.grenade_thrown",
+  "type": "object",
+  "required": ["actor"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "kind": {"type": "string", "enum": ["frag", "smoke", "flash", "stick"]},
+    "fuse_seconds": {"type": "number", "minimum": 0.0}
+  },
+  "additionalProperties": true
+}

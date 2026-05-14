@@ -8,12 +8,15 @@
 
 pub mod engine;
 pub mod envelope;
+pub mod m6_actions;
 pub mod runtime;
 pub mod scenario;
 pub mod schemas;
 pub mod server;
 pub mod settings;
 pub mod state;
+
+pub use m6_actions::{ActSquadIssueCommandParams, M6Action, M6ActionParams, SquadCommandKindOverWire};
 
 pub use engine::{
     run_m0_inline, ActorRenderSnapshot, BreachRenderView, EnemyHudView, ExtractionZoneView, HudCachesSnapshot,

@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/inventory.weight_changed.v0.1",
+  "title": "inventory.weight_changed",
+  "type": "object",
+  "required": ["actor", "total_weight_kg"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "total_weight_kg": {"type": "number", "minimum": 0.0},
+    "forces_walk": {"type": "boolean"}
+  },
+  "additionalProperties": true
+}

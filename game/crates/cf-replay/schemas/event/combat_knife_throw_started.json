@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/combat.knife_throw_started.v0.1",
+  "title": "combat.knife_throw_started",
+  "type": "object",
+  "required": ["actor"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "damage": {"type": "number"}
+  },
+  "additionalProperties": true
+}

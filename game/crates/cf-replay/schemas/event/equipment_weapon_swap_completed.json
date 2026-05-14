@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/equipment.weapon_swap_completed.v0.1",
+  "title": "equipment.weapon_swap_completed",
+  "type": "object",
+  "required": ["actor", "active_slot"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "active_slot": {"type": "integer", "minimum": 0}
+  },
+  "additionalProperties": true
+}

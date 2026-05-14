@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/perception.footstep_emitted.v0.1",
+  "title": "perception.footstep_emitted",
+  "type": "object",
+  "required": ["actor", "surface"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "surface": {"type": "string"},
+    "loudness": {"type": "number", "minimum": 0.0, "maximum": 1.0}
+  },
+  "additionalProperties": true
+}

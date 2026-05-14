@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/equipment.grenade_detonated.v0.1",
+  "title": "equipment.grenade_detonated",
+  "type": "object",
+  "required": ["actor", "kind"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "kind": {"type": "string"},
+    "position": {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2},
+    "radius": {"type": "number", "minimum": 0.0}
+  },
+  "additionalProperties": true
+}

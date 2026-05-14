@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/squad.waypoint_marked.v0.1",
+  "title": "squad.waypoint_marked",
+  "type": "object",
+  "required": ["actor", "x", "y"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "x": {"type": "number"},
+    "y": {"type": "number"}
+  },
+  "additionalProperties": true
+}

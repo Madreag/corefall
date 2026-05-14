@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/actor.facing_changed.v0.1",
+  "title": "actor.facing_changed",
+  "type": "object",
+  "required": ["actor", "from", "to"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "from": {"type": "string", "enum": ["left", "right"]},
+    "to": {"type": "string", "enum": ["left", "right"]},
+    "cause": {"type": "string"}
+  },
+  "additionalProperties": true
+}
