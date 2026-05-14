@@ -1,0 +1,22 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/equipment.melee_hit_mo.v0.1",
+  "title": "equipment.melee_hit_mo",
+  "type": "object",
+  "required": ["actor", "hit_actor_id", "damage"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "attacker_id": {"type": "integer", "minimum": 0},
+    "target_id": {"type": "integer", "minimum": 0},
+    "hit_actor_id": {"type": "integer", "minimum": 0},
+    "melee_kind": {"type": "string"},
+    "damage": {"type": "number"},
+    "damage_amount": {"type": "number"},
+    "hp_before": {"type": "number"},
+    "hp_after": {"type": "number"},
+    "knockdown_chance": {"type": "number"},
+    "knockdown_rolled": {"type": "number"},
+    "knockdown_triggered": {"type": "boolean"}
+  },
+  "additionalProperties": true
+}

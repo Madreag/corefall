@@ -225,6 +225,7 @@ const SCHEMA_EQUIPMENT_ITEM_DROPPED: &str = include_str!("../schemas/event/equip
 const SCHEMA_EQUIPMENT_ITEM_PICKED_UP: &str = include_str!("../schemas/event/equipment_item_picked_up.json");
 const SCHEMA_EQUIPMENT_MAGAZINE_CHANGED: &str = include_str!("../schemas/event/equipment_magazine_changed.json");
 const SCHEMA_EQUIPMENT_MELEE_SWING: &str = include_str!("../schemas/event/equipment_melee_swing.json");
+const SCHEMA_EQUIPMENT_MELEE_HIT_MO: &str = include_str!("../schemas/event/equipment_melee_hit_mo.json");
 const SCHEMA_EQUIPMENT_SENSOR_PULSE_FIRED: &str = include_str!("../schemas/event/equipment_sensor_pulse_fired.json");
 const SCHEMA_EQUIPMENT_SHELL_EJECTED: &str = include_str!("../schemas/event/equipment_shell_ejected.json");
 const SCHEMA_EQUIPMENT_SUPPRESSOR_ATTACHED: &str = include_str!("../schemas/event/equipment_suppressor_attached.json");
@@ -433,6 +434,7 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("equipment", "item_picked_up") => Some(SCHEMA_EQUIPMENT_ITEM_PICKED_UP),
         ("equipment", "magazine_changed") => Some(SCHEMA_EQUIPMENT_MAGAZINE_CHANGED),
         ("equipment", "melee_swing") => Some(SCHEMA_EQUIPMENT_MELEE_SWING),
+        ("equipment", "melee_hit_mo") => Some(SCHEMA_EQUIPMENT_MELEE_HIT_MO),
         ("equipment", "sensor_pulse_fired") => Some(SCHEMA_EQUIPMENT_SENSOR_PULSE_FIRED),
         ("equipment", "shell_ejected") => Some(SCHEMA_EQUIPMENT_SHELL_EJECTED),
         ("equipment", "suppressor_attached") => Some(SCHEMA_EQUIPMENT_SUPPRESSOR_ATTACHED),
