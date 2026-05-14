@@ -16,8 +16,8 @@
       "additionalProperties": true,
       "properties": {
         "actor_id": { "type": "integer" },
-        "from_dose": { "type": "number", "minimum": 0.0 },
-        "to_dose": { "type": "number", "minimum": 0.0 },
+        "from_dose": { "type": "number", "minimum": 0.0, "maximum": 100.0 },
+        "to_dose": { "type": "number", "minimum": 0.0, "maximum": 100.0 },
         "source_event_id": { "type": "string" }
       },
       "required": ["actor_id", "from_dose", "to_dose", "source_event_id"]

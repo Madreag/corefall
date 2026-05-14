@@ -17,7 +17,7 @@
       "properties": {
         "actor_id": { "type": "integer" },
         "fluid_kind": { "type": "string", "enum": ["oil", "coolant", "fuel", "electrolyte"] },
-        "level_pct": { "type": "number", "minimum": 0.0 }
+        "level_pct": { "type": "number", "minimum": 0.0, "maximum": 100.0 }
       },
       "required": ["actor_id", "fluid_kind", "level_pct"]
     }

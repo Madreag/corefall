@@ -16,7 +16,7 @@
       "additionalProperties": true,
       "properties": {
         "impact_angle": { "type": "number" },
-        "ricochet_probability": { "type": "number", "minimum": 0.0 },
+        "ricochet_probability": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
         "was_ricocheted": { "type": "boolean" },
         "deflection_vector": {
           "type": "array",

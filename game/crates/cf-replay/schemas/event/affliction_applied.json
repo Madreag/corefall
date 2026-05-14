@@ -18,7 +18,7 @@
         "actor_id": { "type": "integer" },
         "kind": { "type": "string", "enum": ["burning", "wet", "electrified", "poisoned", "hypoxic", "combustible_atmosphere", "breach_decomp", "hyperthermic", "hypothermic", "radiation", "concussed", "deafened", "blinded", "bleeding", "internal_shock", "low_battery", "coolant_leaking", "oil_leaking", "overheating", "hunger", "thirst", "sleep_dep", "sanity_low"] },
         "source_event_id": { "type": "string" },
-        "expected_duration_ticks": { "type": "integer", "minimum": 0 },
+        "expected_duration_ticks": { "type": "integer", "minimum": 1 },
         "severity_0_1": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
       },
       "required": ["actor_id", "kind", "source_event_id", "expected_duration_ticks", "severity_0_1"]

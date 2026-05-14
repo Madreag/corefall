@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "snapshot_thermal.v0.1",
+  "title": "snapshot.snapshot_thermal payload",
+  "description": "M5-A2 § thermal.* family + M4 § M9 firehose surface. Placeholder payload at M5 (placeholder=true); M16 + M19 fill by_actor + heat_grid as the thermal kernel ladders up. Fires at scenario start and on every objective transition. Parallels snapshot_atmospherics + snapshot_shield + snapshot_environment_signal.",
+  "type": "object",
+  "required": ["tick"],
+  "properties": {
+    "tick": { "type": "integer", "minimum": 0 },
+    "placeholder": {
+      "type": "boolean",
+      "description": "True when emitted by M4/M5 with a stub payload; M16/M19 producer fills real data and clears this flag."
+    },
+    "by_actor": {
+      "type": "array",
+      "description": "Per-actor thermal state: { actor_id, signature_k, heat_emission_w, heat_sink_w }. signature_k is the Kelvin signature visible to IR seekers + thermal sights. heat_emission_w + heat_sink_w drive atmosphere heat exchange per ONI-style modelling."
+    },
+    "heat_grid": {
+      "type": "array",
+      "description": "Optional sparse-grid sample of per-tile thermal state: { tile: [x, y], temperature_k, conductivity_w_per_mk }. Populated for M9 firehose only when terrain heat-exchange ticks fire."
+    }
+  }
+}

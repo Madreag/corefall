@@ -19,7 +19,7 @@
         "circuit_id": { "type": "string", "enum": ["power_core", "cpu", "sensor_array", "motor_controller_left_arm", "motor_controller_right_arm", "motor_controller_left_leg", "motor_controller_right_leg", "hydraulic_pump", "coolant_pump", "oil_reservoir", "fuel_tank", "comm_relay"] },
         "applied_afflictions": {
           "type": "array",
-          "items": { "type": "string" }
+          "items": { "type": "string", "enum": ["burning", "wet", "electrified", "poisoned", "hypoxic", "combustible_atmosphere", "breach_decomp", "hyperthermic", "hypothermic", "radiation", "concussed", "deafened", "blinded", "bleeding", "internal_shock", "low_battery", "coolant_leaking", "oil_leaking", "overheating", "hunger", "thirst", "sleep_dep", "sanity_low"] }
         }
       },
       "required": ["actor_id", "circuit_id", "applied_afflictions"]

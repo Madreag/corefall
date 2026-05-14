@@ -17,8 +17,8 @@
       "properties": {
         "atm_id": { "type": ["integer", "string"] },
         "reaction_id": { "type": "string" },
-        "energy_release_j": { "type": "number" },
-        "temperature_after_k": { "type": "number" }
+        "energy_release_j": { "type": "number", "minimum": 0.0 },
+        "temperature_after_k": { "type": "number", "minimum": 0.0 }
       },
       "required": ["atm_id", "reaction_id", "energy_release_j", "temperature_after_k"]
     }

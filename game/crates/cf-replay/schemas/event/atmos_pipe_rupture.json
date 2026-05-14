@@ -22,7 +22,7 @@
           "minItems": 2,
           "maxItems": 2
         },
-        "pressure_at_rupture_pa": { "type": "number" }
+        "pressure_at_rupture_pa": { "type": "number", "minimum": 0.0 }
       },
       "required": ["pipe_id", "breach_position", "pressure_at_rupture_pa"]
     }

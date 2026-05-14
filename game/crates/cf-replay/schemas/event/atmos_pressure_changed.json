@@ -16,8 +16,8 @@
       "additionalProperties": true,
       "properties": {
         "atm_id": { "type": ["integer", "string"] },
-        "from_pa": { "type": "number" },
-        "to_pa": { "type": "number" },
+        "from_pa": { "type": "number", "minimum": 0.0 },
+        "to_pa": { "type": "number", "minimum": 0.0 },
         "source": { "type": "string" }
       },
       "required": ["atm_id", "from_pa", "to_pa", "source"]

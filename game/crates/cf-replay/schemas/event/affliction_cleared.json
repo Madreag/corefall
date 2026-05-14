@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://corefall/event/affliction.cleared.v0.1",
   "title": "affliction.cleared",
-  "description": "M5 § affliction.* family — declarative event schema locked at v0.1. Fires when an affliction is removed from an actor. reason enum: time (natural expiration), medikit (player/teammate intervention), environment (e.g. cold extinguishing fire), death (cascade clear on actor death). Producer fills at M16. Additive-only per M4 DR-002.",
+  "description": "M5 § affliction.* family — declarative event schema locked at v0.1. Fires when an affliction is removed from an actor. The `kind` enum mirrors affliction.applied (23 kinds incl. M5-A1 `blinded`). reason enum: time (natural expiration), medikit (player/teammate intervention), environment (e.g. cold extinguishing fire), death (cascade clear on actor death). Producer fills at M16. Additive-only per M4 DR-002.",
   "type": "object",
   "additionalProperties": true,
   "properties": {

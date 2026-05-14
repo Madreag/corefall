@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://corefall/event/hazard.spread.v0.1",
   "title": "hazard.spread",
-  "description": "M5 § hazard.* family — declarative event schema locked at v0.1. Fires when a hazard tile crosses into a neighbor tile (per-tick batched). Producer fills at M16. Additive-only per M4 DR-002.",
+  "description": "M5 § hazard.* family — declarative event schema locked at v0.1. Fires when a hazard tile crosses into a neighbor tile (per-tick batched). hazard_id chains back to the originating hazard.spawned for M10 cause-chain walks. Producer fills at M16. Additive-only per M4 DR-002.",
   "type": "object",
   "additionalProperties": true,
   "properties": {
@@ -15,6 +15,7 @@
       "type": "object",
       "additionalProperties": true,
       "properties": {
+        "hazard_id": { "type": ["integer", "string"] },
         "from_pos": {
           "type": "array",
           "items": { "type": "number" },
@@ -31,7 +32,7 @@
         "intensity": { "type": "number" },
         "rate": { "type": "number" }
       },
-      "required": ["from_pos", "to_pos", "kind", "intensity", "rate"]
+      "required": ["hazard_id", "from_pos", "to_pos", "kind", "intensity", "rate"]
     }
   },
   "required": ["schema_version", "category", "event_type", "tick", "payload"]

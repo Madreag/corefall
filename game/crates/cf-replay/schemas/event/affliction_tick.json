@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://corefall/event/affliction.tick.v0.1",
   "title": "affliction.tick",
-  "description": "M5 § affliction.* family — declarative event schema locked at v0.1. Consolidated cosmetic per-tick affliction application (e.g. burning subtracts hp every N ticks). The cosmetic flag excludes this from determinism.sim_checksum per DR-052; sim authoritative effects use other affliction.* events. Producer fills at M16. Additive-only per M4 DR-002.",
+  "description": "M5 § affliction.* family — declarative event schema locked at v0.1. Consolidated cosmetic per-tick affliction application (e.g. burning subtracts hp every N ticks). The `kind` enum mirrors affliction.applied (23 kinds incl. M5-A1 `blinded`). The cosmetic flag excludes this from determinism.sim_checksum per DR-052; sim authoritative effects use other affliction.* events. Producer fills at M16. Additive-only per M4 DR-002.",
   "type": "object",
   "additionalProperties": true,
   "properties": {

@@ -19,7 +19,7 @@
         "organ_id": { "type": "string", "enum": ["brain", "eyes_left", "eyes_right", "ears_left", "ears_right", "heart", "lungs_left", "lungs_right", "liver", "kidneys_left", "kidneys_right", "spine", "stomach", "intestines", "pancreas"] },
         "applied_afflictions": {
           "type": "array",
-          "items": { "type": "string" }
+          "items": { "type": "string", "enum": ["burning", "wet", "electrified", "poisoned", "hypoxic", "combustible_atmosphere", "breach_decomp", "hyperthermic", "hypothermic", "radiation", "concussed", "deafened", "blinded", "bleeding", "internal_shock", "low_battery", "coolant_leaking", "oil_leaking", "overheating", "hunger", "thirst", "sleep_dep", "sanity_low"] }
         },
         "hp_drain_per_s": { "type": "number" }
       },

@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://corefall/event/affliction.escalated.v0.1",
   "title": "affliction.escalated",
-  "description": "M5 § affliction.* family — declarative event schema locked at v0.1. Fires when an existing affliction's severity is upgraded (e.g. mild bleeding → heavy bleeding). Producer fills at M16. Additive-only per M4 DR-002.",
+  "description": "M5 § affliction.* family — declarative event schema locked at v0.1. Fires when an existing affliction's severity is upgraded (e.g. mild bleeding → heavy bleeding). The `kind` enum mirrors affliction.applied (23 kinds incl. M5-A1 `blinded`). Producer fills at M16. Additive-only per M4 DR-002.",
   "type": "object",
   "additionalProperties": true,
   "properties": {

@@ -16,7 +16,7 @@
       "additionalProperties": true,
       "properties": {
         "actor_id": { "type": "integer" },
-        "ko_duration_s": { "type": "number", "minimum": 0.0 }
+        "ko_duration_s": { "type": "number", "minimum": 5.0, "maximum": 10.0 }
       },
       "required": ["actor_id", "ko_duration_s"]
     }

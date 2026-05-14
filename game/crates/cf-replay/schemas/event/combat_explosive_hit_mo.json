@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/combat.explosive_hit_mo.v0.1",
+  "title": "combat.explosive_hit_mo",
+  "description": "M5-A2 § combat.* deep-damage family — declarative event schema locked at v0.1. Sibling of combat.projectile_hit_mo for radius-damage hits (frag grenade per-actor hit; grenade launcher impact; rocket detonation). Cause-chain root for armor.he_overpressure_wave, internal.*, fluid.*, origin.*, hazard.*, concussion.*. explosive_kind enum: frag|smoke|flash|stick|grenade_launcher|rocket|c4. range_to_epicenter_m measures radial distance from the explosion's epicenter for falloff. damage_kind enum mirrors combat.projectile_hit_mo. Producer fills at M6 (grenades) + M13 (HE rounds) + M16 (hazard package). Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "combat" },
+    "event_type": { "const": "explosive_hit_mo" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "cosmetic": { "const": false },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "attacker_id": { "type": "integer" },
+        "weapon_id": { "type": "integer" },
+        "explosive_kind": { "type": "string", "enum": ["frag", "smoke", "flash", "stick", "grenade_launcher", "rocket", "c4"] },
+        "target_id": { "type": "integer" },
+        "hit_zone": { "type": "string", "enum": ["head", "torso", "arm_left", "arm_right", "forearm_left", "forearm_right", "hand_left", "hand_right", "leg_left", "leg_right", "shin_left", "shin_right", "foot_left", "foot_right", "backpack"] },
+        "epicenter": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "range_to_epicenter_m": { "type": "number", "minimum": 0.0 },
+        "blast_radius_m": { "type": "number", "minimum": 0.0 },
+        "impact_impulse": { "type": "number" },
+        "impact_energy_j": { "type": "number" },
+        "overpressure_pa": { "type": "number" },
+        "material_at_impact": { "type": ["integer", "string"] },
+        "surface_kind": { "type": "string", "enum": ["armor_external", "armor_internal", "armor_core", "armor_chunked_breach", "flesh", "circuit", "unarmored", "terrain"] },
+        "armor_effective_hardness": { "type": "number" },
+        "armor_absorbed_dmg": { "type": "number" },
+        "passthrough_dmg": { "type": "number" },
+        "damage_kind": { "type": "string", "enum": ["kinetic", "thermal", "electric", "chemical", "radiation"] },
+        "hp_before": { "type": "number" },
+        "hp_after": { "type": "number" },
+        "damage_amount": { "type": "number" },
+        "layer_struck": { "type": ["string", "null"], "enum": ["External", "Internal", "Core", null] },
+        "pierced_armor": { "type": "boolean" },
+        "organ_damaged_id": { "type": ["string", "null"], "enum": ["brain", "eyes_left", "eyes_right", "ears_left", "ears_right", "heart", "lungs_left", "lungs_right", "liver", "kidneys_left", "kidneys_right", "spine", "stomach", "intestines", "pancreas", null] },
+        "circuit_damaged_id": { "type": ["string", "null"], "enum": ["power_core", "cpu", "sensor_array", "motor_controller_left_arm", "motor_controller_right_arm", "motor_controller_left_leg", "motor_controller_right_leg", "hydraulic_pump", "coolant_pump", "oil_reservoir", "fuel_tank", "comm_relay", null] },
+        "parent_hit_event_id": { "type": "string" }
+      },
+      "required": ["attacker_id", "weapon_id", "explosive_kind", "target_id", "hit_zone", "epicenter", "range_to_epicenter_m", "blast_radius_m", "impact_impulse", "impact_energy_j", "overpressure_pa", "material_at_impact", "surface_kind", "armor_effective_hardness", "armor_absorbed_dmg", "passthrough_dmg", "damage_kind", "hp_before", "hp_after", "damage_amount", "pierced_armor", "parent_hit_event_id"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

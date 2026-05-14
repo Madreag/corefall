@@ -90,6 +90,10 @@ const SCHEMA_SNAPSHOT_ORIGIN: &str = include_str!("../schemas/event/snapshot_ori
 // M5-A1 (2026-05-13): snapshot.shield mirrors the ShieldState struct for the
 // M9 firehose. Parallels snapshot_atmospherics + snapshot_environment_signal.
 const SCHEMA_SNAPSHOT_SHIELD: &str = include_str!("../schemas/event/snapshot_shield.json");
+// M5-A2 (2026-05-13): snapshot.thermal mirrors the M16/M19 thermal kernel
+// state for the M9 firehose. Parallels snapshot_atmospherics +
+// snapshot_environment_signal + snapshot_shield.
+const SCHEMA_SNAPSHOT_THERMAL: &str = include_str!("../schemas/event/snapshot_thermal.json");
 // M5 (2026-05-13): deep-damage event-surface lock. Each schema declares the
 // M4 v0.1 envelope shape with `schema_version: "0.1"` const, `category` const,
 // `event_type` const, and the payload nested under properties.payload.
@@ -188,6 +192,10 @@ const SCHEMA_THERMAL_MATERIAL_PHASE_CHANGE: &str = include_str!("../schemas/even
 const SCHEMA_COMBAT_PROJECTILE_HIT_MO: &str = include_str!("../schemas/event/combat_projectile_hit_mo.json");
 // audio.event_requested (M5 mandate — M13.x cf-audio consumes).
 const SCHEMA_AUDIO_EVENT_REQUESTED: &str = include_str!("../schemas/event/audio_event_requested.json");
+// M5-A2: combat.melee_hit_mo + combat.explosive_hit_mo siblings of
+// projectile_hit_mo for M6 melee + grenade hits.
+const SCHEMA_COMBAT_MELEE_HIT_MO: &str = include_str!("../schemas/event/combat_melee_hit_mo.json");
+const SCHEMA_COMBAT_EXPLOSIVE_HIT_MO: &str = include_str!("../schemas/event/combat_explosive_hit_mo.json");
 
 /// Look up the schema source by `(category, event_type)`. Returns `None` if
 /// no schema exists for this pair (callers treat as "no validation
@@ -252,6 +260,7 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("snapshot", "snapshot_fluid") => Some(SCHEMA_SNAPSHOT_FLUID),
         ("snapshot", "snapshot_origin") => Some(SCHEMA_SNAPSHOT_ORIGIN),
         ("snapshot", "snapshot_shield") => Some(SCHEMA_SNAPSHOT_SHIELD),
+        ("snapshot", "snapshot_thermal") => Some(SCHEMA_SNAPSHOT_THERMAL),
         // M5 deep-damage event-surface lock (2026-05-13). Each schema is the
         // M4 v0.1 envelope shape with `schema_version: "0.1"` const and the
         // payload nested under properties.payload. Producers ladder up at
@@ -344,6 +353,10 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("combat", "projectile_hit_mo") => Some(SCHEMA_COMBAT_PROJECTILE_HIT_MO),
         // audio.event_requested (M5 spec mandate — M13.x cf-audio consumes).
         ("audio", "event_requested") => Some(SCHEMA_AUDIO_EVENT_REQUESTED),
+        // M5-A2: combat.melee_hit_mo + combat.explosive_hit_mo for M6 melee
+        // + grenade hits + M13 HE rounds.
+        ("combat", "melee_hit_mo") => Some(SCHEMA_COMBAT_MELEE_HIT_MO),
+        ("combat", "explosive_hit_mo") => Some(SCHEMA_COMBAT_EXPLOSIVE_HIT_MO),
         _ => None,
     }
 }
@@ -379,6 +392,21 @@ struct PropConstraint {
     /// branch and passes if ANY branch accepts the value.
     #[serde(default, rename = "oneOf")]
     one_of: Option<Vec<Value>>,
+    /// **M5-A2**: `items` lets an array property constrain its items'
+    /// type + enum (e.g. `applied_afflictions: array<affliction-kind-string>`).
+    /// Only the simple form `items: { type, enum }` is honored — tuple form
+    /// `items: [...]` is left unenforced (the projectile-spawned schemas
+    /// use that form for fixed-arity tuples; their arity is already gated
+    /// by `minItems`/`maxItems`).
+    #[serde(default)]
+    items: Option<Value>,
+    /// **M5-A2**: `properties` + `required` on a nested object property
+    /// (e.g. `signal: { properties: { schema_version, active_hazards }, required: [...] }`).
+    /// The validator recurses into the nested object and enforces both.
+    #[serde(default)]
+    properties: Option<serde_json::Map<String, Value>>,
+    #[serde(default)]
+    required: Option<Vec<String>>,
 }
 
 /// Validate that `payload` matches the schema registered for
@@ -506,6 +534,119 @@ pub fn validate_event_payload(category: &str, event_type: &str, payload: &Value)
                 ));
             }
         }
+        // **M5-A2**: array-item type + enum enforcement.
+        if let Some(items_schema) = &constraint.items {
+            if items_schema.is_object() {
+                if let Some(arr) = value.as_array() {
+                    for (i, item) in arr.iter().enumerate() {
+                        check_array_item(category, event_type, key, i, items_schema, item)?;
+                    }
+                }
+            }
+        }
+        // **M5-A2**: nested-object properties + required enforcement.
+        // Triggered when the parent property is type=object AND declares
+        // its own properties/required (e.g. environment.signal_aggregated.signal).
+        if let Some(nested_props) = &constraint.properties {
+            if let Some(obj) = value.as_object() {
+                if let Some(nested_required) = &constraint.required {
+                    for req in nested_required {
+                        if !obj.contains_key(req) {
+                            return Err(format!("{category}.{event_type}::{key}.{req} required field missing"));
+                        }
+                    }
+                }
+                for (nested_key, nested_raw) in nested_props {
+                    let Some(nested_value) = obj.get(nested_key) else {
+                        continue;
+                    };
+                    check_nested_property(category, event_type, key, nested_key, nested_raw, nested_value)?;
+                }
+            }
+        }
+    }
+    Ok(())
+}
+
+/// **M5-A2**: validate one element of an array against the schema's
+/// `items` constraint. Supports `type` (string or array union) and `enum`.
+fn check_array_item(
+    category: &str,
+    event_type: &str,
+    key: &str,
+    index: usize,
+    items_schema: &Value,
+    item: &Value,
+) -> ValidationResult {
+    let items_obj = items_schema
+        .as_object()
+        .ok_or_else(|| format!("{category}.{event_type}::{key}.items must be a JSON object schema"))?;
+    if let Some(ty) = items_obj.get("type") {
+        let key_with_index = format!("{key}[{index}]");
+        check_type(category, event_type, &key_with_index, ty, item)?;
+    }
+    if let Some(enum_values) = items_obj.get("enum").and_then(|v| v.as_array()) {
+        if !enum_values.contains(item) {
+            return Err(format!(
+                "{category}.{event_type}::{key}[{index}] value {item} not in enum {enum_values:?}"
+            ));
+        }
+    }
+    Ok(())
+}
+
+/// **M5-A2**: validate a single nested-object property as a mini-schema
+/// (type + enum + minimum + maximum). Used for sub-structs like
+/// environment.signal_aggregated.signal.{schema_version,active_hazards}.
+/// Supports recursion one level deep.
+fn check_nested_property(
+    category: &str,
+    event_type: &str,
+    parent_key: &str,
+    nested_key: &str,
+    nested_schema: &Value,
+    value: &Value,
+) -> ValidationResult {
+    let nested_obj = nested_schema
+        .as_object()
+        .ok_or_else(|| format!("{category}.{event_type}::{parent_key}.{nested_key} schema must be an object"))?;
+    let qualified_key = format!("{parent_key}.{nested_key}");
+    if let Some(ty) = nested_obj.get("type") {
+        check_type(category, event_type, &qualified_key, ty, value)?;
+    }
+    if let Some(enum_values) = nested_obj.get("enum").and_then(|v| v.as_array()) {
+        if !enum_values.contains(value) {
+            return Err(format!(
+                "{category}.{event_type}::{qualified_key} value {value} not in enum {enum_values:?}"
+            ));
+        }
+    }
+    if let Some(min) = nested_obj.get("minimum").and_then(|v| v.as_f64()) {
+        if let Some(n) = value.as_f64() {
+            if n < min {
+                return Err(format!(
+                    "{category}.{event_type}::{qualified_key} value {n} < minimum {min}"
+                ));
+            }
+        }
+    }
+    if let Some(max) = nested_obj.get("maximum").and_then(|v| v.as_f64()) {
+        if let Some(n) = value.as_f64() {
+            if n > max {
+                return Err(format!(
+                    "{category}.{event_type}::{qualified_key} value {n} > maximum {max}"
+                ));
+            }
+        }
+    }
+    if let Some(items_schema) = nested_obj.get("items") {
+        if items_schema.is_object() {
+            if let Some(arr) = value.as_array() {
+                for (i, item) in arr.iter().enumerate() {
+                    check_array_item(category, event_type, &qualified_key, i, items_schema, item)?;
+                }
+            }
+        }
     }
     Ok(())
 }
@@ -601,6 +742,7 @@ mod tests {
             ("snapshot", "snapshot_fluid"),
             ("snapshot", "snapshot_origin"),
             ("snapshot", "snapshot_shield"),
+            ("snapshot", "snapshot_thermal"),
             // M5 deep-damage event-surface lock — armor.* family.
             ("armor", "layer_hp_changed"),
             ("armor", "layer_critical"),
@@ -689,6 +831,9 @@ mod tests {
             ("combat", "projectile_hit_mo"),
             // M5 audio.event_requested (M5 mandate, M5-A1).
             ("audio", "event_requested"),
+            // M5-A2: combat melee + explosive hit_mo siblings.
+            ("combat", "melee_hit_mo"),
+            ("combat", "explosive_hit_mo"),
         ] {
             let raw = event_schema_for(cat, ty).unwrap_or_else(|| panic!("no schema for {cat}.{ty}"));
             let _parsed_value: serde_json::Value =
@@ -990,6 +1135,241 @@ mod tests {
             }),
         )
         .expect("audio.event_requested valid");
+        validate_event_payload(
+            "combat",
+            "melee_hit_mo",
+            &json!({
+                "attacker_id": 1,
+                "melee_weapon_id": 8,
+                "melee_kind": "knife_stab",
+                "target_id": 2,
+                "hit_zone": "torso",
+                "impact_point": [3.0, 4.0],
+                "impact_normal": [0.0, 1.0],
+                "impact_impulse": 5.0,
+                "impact_energy_j": 80.0,
+                "material_at_impact": 1,
+                "surface_kind": "flesh",
+                "armor_effective_hardness": 0.0,
+                "armor_absorbed_dmg": 0.0,
+                "passthrough_dmg": 25.0,
+                "damage_kind": "kinetic",
+                "hp_before": 100.0,
+                "hp_after": 75.0,
+                "damage_amount": 25.0,
+                "pierced_armor": false,
+                "parent_hit_event_id": "run:42:20",
+            }),
+        )
+        .expect("combat.melee_hit_mo valid");
+        validate_event_payload(
+            "combat",
+            "explosive_hit_mo",
+            &json!({
+                "attacker_id": 1,
+                "weapon_id": 12,
+                "explosive_kind": "frag",
+                "target_id": 2,
+                "hit_zone": "torso",
+                "epicenter": [10.0, 10.0],
+                "range_to_epicenter_m": 1.5,
+                "blast_radius_m": 4.0,
+                "impact_impulse": 200.0,
+                "impact_energy_j": 5000.0,
+                "overpressure_pa": 150000.0,
+                "material_at_impact": 1,
+                "surface_kind": "armor_external",
+                "armor_effective_hardness": 0.6,
+                "armor_absorbed_dmg": 20.0,
+                "passthrough_dmg": 60.0,
+                "damage_kind": "thermal",
+                "hp_before": 100.0,
+                "hp_after": 40.0,
+                "damage_amount": 60.0,
+                "pierced_armor": false,
+                "parent_hit_event_id": "run:42:30",
+            }),
+        )
+        .expect("combat.explosive_hit_mo valid");
+    }
+
+    /// **M5-A2**: `applied_afflictions` array items now enforce the
+    /// 23-affliction enum.
+    #[test]
+    fn m5_internal_failure_cascade_rejects_unknown_affliction() {
+        let payload = json!({
+            "actor_id": 1,
+            "organ_id": "heart",
+            "applied_afflictions": ["bleeding", "not_a_real_affliction"],
+            "hp_drain_per_s": 1.0,
+        });
+        let err = validate_event_payload("internal", "organ_failure_cascade", &payload).unwrap_err();
+        assert!(
+            err.contains("applied_afflictions"),
+            "expected error about applied_afflictions, got: {err}"
+        );
+    }
+
+    /// **M5-A2**: `applied_afflictions` happy path with a real affliction.
+    #[test]
+    fn m5_internal_failure_cascade_accepts_known_affliction() {
+        let payload = json!({
+            "actor_id": 1,
+            "organ_id": "lungs_left",
+            "applied_afflictions": ["bleeding", "hypoxic", "concussed"],
+            "hp_drain_per_s": 1.5,
+        });
+        validate_event_payload("internal", "organ_failure_cascade", &payload).expect("valid applied_afflictions array");
+    }
+
+    /// **M5-A2**: nested-object recursion validates
+    /// environment.signal_aggregated.signal.{schema_version, active_hazards}.
+    /// A missing required nested field is rejected.
+    #[test]
+    fn m5_environment_signal_aggregated_rejects_missing_signal_field() {
+        let payload = json!({
+            "actor_id": 1,
+            "tick": 100,
+            "signal": {
+                "active_hazards": ["Hypoxic"]
+            }
+        });
+        let err = validate_event_payload("environment", "signal_aggregated", &payload).unwrap_err();
+        assert!(err.contains("schema_version"), "got: {err}");
+    }
+
+    /// **M5-A2**: nested-object recursion rejects unknown HazardClass enum
+    /// values in active_hazards array.
+    #[test]
+    fn m5_environment_signal_aggregated_rejects_bad_hazard_class() {
+        let payload = json!({
+            "actor_id": 1,
+            "tick": 100,
+            "signal": {
+                "schema_version": 1,
+                "active_hazards": ["Hypoxic", "NotARealHazard"]
+            }
+        });
+        let err = validate_event_payload("environment", "signal_aggregated", &payload).unwrap_err();
+        assert!(
+            err.contains("active_hazards") || err.contains("NotARealHazard"),
+            "got: {err}"
+        );
+    }
+
+    /// **M5-A2**: nested-object recursion accepts valid signal sub-struct.
+    #[test]
+    fn m5_environment_signal_aggregated_accepts_valid_signal() {
+        let payload = json!({
+            "actor_id": 1,
+            "tick": 100,
+            "signal": {
+                "schema_version": 1,
+                "active_hazards": ["Hypoxic", "Hyperthermic", "Radiation"]
+            }
+        });
+        validate_event_payload("environment", "signal_aggregated", &payload).expect("valid signal");
+    }
+
+    /// **M5-A2**: concussion.dose_changed `to_dose: 100.0` is exactly at the
+    /// new locked maximum and should pass.
+    #[test]
+    fn m5_concussion_dose_changed_accepts_max_dose() {
+        let payload = json!({
+            "actor_id": 1,
+            "from_dose": 99.0,
+            "to_dose": 100.0,
+            "source_event_id": "run:42:7",
+            "origin_id": "Human",
+        });
+        validate_event_payload("concussion", "dose_changed", &payload).expect("dose=100 accepted");
+    }
+
+    /// **M5-A2**: concussion.dose_changed `to_dose: 100.1` exceeds locked
+    /// maximum and is rejected.
+    #[test]
+    fn m5_concussion_dose_changed_rejects_over_max_dose() {
+        let payload = json!({
+            "actor_id": 1,
+            "from_dose": 50.0,
+            "to_dose": 100.1,
+            "source_event_id": "run:42:7",
+            "origin_id": "Human",
+        });
+        let err = validate_event_payload("concussion", "dose_changed", &payload).unwrap_err();
+        assert!(err.contains("100"), "expected error about maximum 100, got: {err}");
+    }
+
+    /// **M5-A2**: armor.ricochet `ricochet_probability: 1.5` exceeds locked
+    /// maximum 1.0 and is rejected.
+    #[test]
+    fn m5_armor_ricochet_rejects_probability_over_one() {
+        let payload = json!({
+            "impact_angle": 0.5,
+            "ricochet_probability": 1.5,
+            "was_ricocheted": false,
+            "deflection_vector": [0.0, 1.0],
+        });
+        let err = validate_event_payload("armor", "ricochet", &payload).unwrap_err();
+        assert!(err.contains("ricochet_probability"), "got: {err}");
+    }
+
+    /// **M5-A2**: armor.spalling.fragment_count is locked to 1..3 per spec.
+    #[test]
+    fn m5_armor_spalling_rejects_fragment_count_out_of_range() {
+        let payload_high = json!({
+            "item_id": 1,
+            "zone": "torso",
+            "layer": "External",
+            "fragment_count": 99,
+            "damage_per_fragment": 10.0,
+            "cause_event_id": "run:42:1",
+        });
+        let err = validate_event_payload("armor", "spalling", &payload_high).unwrap_err();
+        assert!(err.contains("fragment_count"), "got: {err}");
+        let payload_low = json!({
+            "item_id": 1,
+            "zone": "torso",
+            "layer": "External",
+            "fragment_count": 0,
+            "damage_per_fragment": 10.0,
+            "cause_event_id": "run:42:1",
+        });
+        let err = validate_event_payload("armor", "spalling", &payload_low).unwrap_err();
+        assert!(err.contains("fragment_count"), "got: {err}");
+    }
+
+    /// **M5-A2**: hazard.spread now requires hazard_id for M10 cause-chain
+    /// integrity.
+    #[test]
+    fn m5_hazard_spread_requires_hazard_id() {
+        let payload = json!({
+            "from_pos": [0.0, 0.0],
+            "to_pos": [1.0, 0.0],
+            "kind": "fire",
+            "intensity": 0.5,
+            "rate": 0.1,
+        });
+        let err = validate_event_payload("hazard", "spread", &payload).unwrap_err();
+        assert!(err.contains("hazard_id"), "got: {err}");
+    }
+
+    /// **M5-A2**: concussion.ko_threshold_crossed.ko_duration_s is now
+    /// locked to 5..10 per spec ("full blackout 5-10s").
+    #[test]
+    fn m5_concussion_ko_threshold_crossed_rejects_out_of_range_duration() {
+        let payload_short = json!({
+            "actor_id": 1,
+            "ko_duration_s": 2.0,
+        });
+        let err = validate_event_payload("concussion", "ko_threshold_crossed", &payload_short).unwrap_err();
+        assert!(err.contains("ko_duration_s"), "got: {err}");
+        let payload_long = json!({
+            "actor_id": 1,
+            "ko_duration_s": 30.0,
+        });
+        let err = validate_event_payload("concussion", "ko_threshold_crossed", &payload_long).unwrap_err();
+        assert!(err.contains("ko_duration_s"), "got: {err}");
     }
 
     /// **M5-A1**: combat.projectile_hit_mo payload now requires
@@ -1138,6 +1518,8 @@ mod tests {
             ("thermal", "material_phase_change"),
             ("combat", "projectile_hit_mo"),
             ("audio", "event_requested"),
+            ("combat", "melee_hit_mo"),
+            ("combat", "explosive_hit_mo"),
         ];
         for (cat, ty) in pairs {
             let raw = event_schema_for(cat, ty).unwrap_or_else(|| panic!("no schema for {cat}.{ty}"));
