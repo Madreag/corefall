@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/equipment.tool_action_completed.v0.1",
+  "title": "equipment.tool_action_completed",
+  "description": "M3: emitted at the end of a tool action with success/refusal counts. Chains to the parent terrain.tool_action_started via parent_event_id.",
+  "type": "object",
+  "required": ["tool", "result"],
+  "properties": {
+    "tool": {"type": "string"},
+    "result": {"type": "string", "enum": ["carved", "refused", "noop"]},
+    "reason": {"type": ["string", "null"]},
+    "tool_action_started_id": {"type": ["string", "null"]}
+  },
+  "additionalProperties": true
+}

@@ -179,8 +179,11 @@ const MATERIAL_TABLE: [MaterialAffordance; 8] = [
         name: "concrete",
         solid: true,
         diggable: true,
-        // CCCP concrete=200 normalized; spec M2 baseline = 40 (5-10x dirt).
-        hardness: 40.0,
+        // CCCP concrete=200 normalized. M3 audit pass 7 (2026-05-13):
+        // bumped from 40 → 50 so the dirt/concrete hardness ratio is
+        // exactly 5x per spec literal ("concrete carves in 5-10x the dirt
+        // time"). 50/10 = 5x lower bound; spec allows up to 10x.
+        hardness: 50.0,
         anchorable: true,
         hazard: false,
         damage_per_tick: 0.0,
@@ -1696,12 +1699,14 @@ mod tests {
 
     #[test]
     fn dirt_to_concrete_hardness_ratio_matches_spec() {
-        // Spec: concrete carves in 5-10x dirt time (hardness=40 vs hardness=10).
+        // Spec: concrete carves in 5-10x dirt time (hardness=50 vs hardness=10).
+        // M3 audit pass 7 (2026-05-13): concrete bumped to 50 so the ratio
+        // hits the 5x lower bound exactly.
         let dirt = material_affordance(MATERIAL_DIRT).unwrap();
         let concrete = material_affordance(MATERIAL_CONCRETE).unwrap();
-        assert_eq!(dirt.hardness, 10.0);
-        assert_eq!(concrete.hardness, 40.0);
-        assert!(concrete.hardness >= 4.0 * dirt.hardness);
+        assert!((dirt.hardness - 10.0).abs() < f32::EPSILON);
+        assert!((concrete.hardness - 50.0).abs() < f32::EPSILON);
+        assert!(concrete.hardness >= 5.0 * dirt.hardness);
         assert!(concrete.hardness <= 10.0 * dirt.hardness);
     }
 
@@ -1711,7 +1716,9 @@ mod tests {
             (MATERIAL_AIR, 0.0_f32),
             (MATERIAL_DIRT, 10.0),
             (MATERIAL_LOOSE_FILL, 5.0),
-            (MATERIAL_CONCRETE, 40.0),
+            // M3 audit pass 7 (2026-05-13): concrete bumped to 50 so the
+            // 5x dirt-ratio spec floor is satisfied exactly.
+            (MATERIAL_CONCRETE, 50.0),
             (MATERIAL_METAL_NOHOOK, 100.0),
             (MATERIAL_ANCHOR, 60.0),
             (MATERIAL_HAZARD, 50.0),

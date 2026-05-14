@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/terrain.debris_capped.v0.1",
+  "title": "terrain.debris_capped",
+  "description": "M3: emitted when a single carve / blast event would have spawned more debris pixels than DEBRIS_CAP (=100). Carries the requested vs granted counts so replay viewers can show 'capped' badges.",
+  "type": "object",
+  "required": ["capped", "requested_count", "granted_count"],
+  "properties": {
+    "capped": {"type": "boolean"},
+    "requested_count": {"type": "integer", "minimum": 0},
+    "granted_count": {"type": "integer", "minimum": 0}
+  },
+  "additionalProperties": true
+}

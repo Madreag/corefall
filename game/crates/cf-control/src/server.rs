@@ -469,6 +469,13 @@ pub trait EngineHandle: Send + Sync + 'static {
     async fn observe_ai(&self, _actor_id: u64) -> Option<serde_json::Value> {
         None
     }
+    /// **M3 audit pass 7 (2026-05-13)**: return the live `TerrainView`
+    /// projection (chunk_count / dirty_chunk_count / material_distribution
+    /// / current_overlay_mode / total_carve_events / total_debris_spawned).
+    /// `None` when no chunked terrain is loaded.
+    async fn observe_terrain(&self) -> Option<serde_json::Value> {
+        None
+    }
     /// **M2 re-audit (2026-05-13)**: return the full `MissionState` +
     /// objectives + last N mission events.
     async fn inspect_mission(&self) -> Option<serde_json::Value> {
@@ -1333,6 +1340,15 @@ async fn process_request<E: EngineHandle>(
             match engine.observe_mission().await {
                 Some(value) => Some(success_response(request.id, value)),
                 None => Some(invalid_param_reason(request.id, "no_mission_loaded")),
+            }
+        }
+        // M3 audit pass 7 (2026-05-13): dedicated `observe.terrain` cfctl
+        // method per spec literal "When cfctl observe.terrain runs".
+        // Returns the live `TerrainView` projection.
+        "observe.terrain" => {
+            match engine.observe_terrain().await {
+                Some(value) => Some(success_response(request.id, value)),
+                None => Some(invalid_param_reason(request.id, "no_terrain_world")),
             }
         }
         // M2 re-audit (2026-05-13): per-AI projection cfctl method.

@@ -419,6 +419,14 @@ pub struct ReactiveGuard {
     /// substate. Cleared when stuck_ticks resets to 0.
     #[serde(default)]
     pub stuck_recovery_latched: bool,
+    /// **M2 audit pass 7 (2026-05-13)**: most recent state-transition cause
+    /// label ("saw_player_in_cone", "heard_shot", "target_acquired",
+    /// "low_hp", "killed_by_<id>", "reloading", "dying_dwell_elapsed").
+    /// Drives the `--ai-debug` floating label per spec ("ALERT: heard
+    /// shot", "ENGAGED: target acquired"). None until the first
+    /// transition fires.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub last_state_change_cause: Option<String>,
 }
 
 fn default_max_hp() -> f32 {
@@ -448,6 +456,7 @@ impl ReactiveGuard {
             memory_last_refresh_tick: None,
             stuck_ticks: 0,
             stuck_recovery_latched: false,
+            last_state_change_cause: None,
         }
     }
 

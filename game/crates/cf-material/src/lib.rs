@@ -99,6 +99,13 @@ pub struct MaterialDef {
     /// Anchor / tether tool can attach.
     pub anchorable: bool,
     /// Damages actors on contact when true.
+    ///
+    /// M3 audit pass 7 (2026-05-13): spec literal field name is
+    /// `damage_on_touch`; `hazard` retained as the canonical Rust
+    /// identifier with `damage_on_touch` accepted as a serde alias so
+    /// scenario manifests authored against the spec literal deserialize
+    /// cleanly.
+    #[serde(alias = "damage_on_touch")]
     pub hazard: bool,
     /// AI path-cost contribution (1.0 baseline; > 1.0 expensive; >= 999 impassable).
     pub path_cost: f32,

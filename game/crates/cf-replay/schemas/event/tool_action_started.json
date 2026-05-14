@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/terrain.tool_action_started.v0.1",
+  "title": "terrain.tool_action_started",
+  "description": "M3: emitted at the start of a tool action (act.player.dig / .anchor / .fill_or_repair). The downstream terrain_carved / terrain_carved_complete events chain to this event's id via parent_event_id.",
+  "type": "object",
+  "required": ["tool", "mode"],
+  "properties": {
+    "tool": {"type": "string"},
+    "mode": {"type": "string"},
+    "source": {"type": ["string", "null"]},
+    "origin": {"type": ["array", "null"]},
+    "explicit_target": {"type": ["string", "null"]},
+    "terrain_action_id": {"type": ["string", "null"]}
+  },
+  "additionalProperties": true
+}

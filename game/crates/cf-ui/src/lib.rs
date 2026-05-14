@@ -1259,8 +1259,19 @@ pub fn mission_line(mission: Option<&HudMission>, tick_rate_hz: u32) -> String {
     };
     let rate = tick_rate_hz.max(1) as f32;
     let elapsed_s = m.elapsed_ticks as f32 / rate;
+    // M2 audit pass 7 (2026-05-13): TIMER countdown in MM:SS form per spec
+    // literal "TIMER shows MM:SS countdown". Active missions: show
+    // remaining time as countdown; Won/Lost: show elapsed.
+    let in_progress = matches!(m.result.as_str(), "in_progress" | "active");
     let total = if m.time_limit_ticks > 0 {
-        format!(" / {:.0}s", m.time_limit_ticks as f32 / rate)
+        if in_progress {
+            let remaining_s = (m.time_limit_ticks.saturating_sub(m.elapsed_ticks) as f32 / rate).max(0.0);
+            let minutes = (remaining_s as u32) / 60;
+            let seconds = (remaining_s as u32) % 60;
+            format!(" / {minutes:02}:{seconds:02}")
+        } else {
+            format!(" / {:.0}s", m.time_limit_ticks as f32 / rate)
+        }
     } else {
         String::new()
     };
@@ -1416,6 +1427,8 @@ mod tests {
 
     #[test]
     fn mission_line_formats_active_with_timer() {
+        // M2 audit pass 7 (2026-05-13): active missions now show
+        // remaining time as MM:SS countdown per spec literal.
         let m = HudMission {
             result: "active".to_string(),
             loss_reason: None,
@@ -1427,7 +1440,8 @@ mod tests {
             show_me_why_event_id: None,
             show_replay_cta: false,
         };
-        assert_eq!(mission_line(Some(&m), 60), "MISSION: ACTIVE  1.0s / 90s");
+        // 5400 - 60 = 5340 ticks remaining at 60Hz = 89.0s = 01:29.
+        assert_eq!(mission_line(Some(&m), 60), "MISSION: ACTIVE  1.0s / 01:29");
     }
 
     #[test]

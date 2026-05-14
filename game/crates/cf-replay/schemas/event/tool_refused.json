@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/terrain.tool_refused.v0.1",
+  "title": "terrain.tool_refused",
+  "description": "M3: emitted when a dig/anchor/repair tool action is refused by the terrain (non-diggable material, out-of-range, etc.). Carries the refusal reason + tool/target identifiers.",
+  "type": "object",
+  "required": ["reason", "tool_id"],
+  "properties": {
+    "reason": {"type": "string"},
+    "tool_id": {"type": "string"},
+    "mode": {"type": "string"},
+    "target_material_id": {"type": ["integer", "null"], "minimum": 0},
+    "material": {"type": ["string", "null"]},
+    "material_id": {"type": ["integer", "null"], "minimum": 0},
+    "strip_id": {"type": ["string", "null"]},
+    "probe_at": {"type": ["array", "null"], "items": {"type": "number"}, "minItems": 2, "maxItems": 2},
+    "bbox_min": {"type": ["array", "null"]},
+    "bbox_max": {"type": ["array", "null"]}
+  },
+  "additionalProperties": true
+}

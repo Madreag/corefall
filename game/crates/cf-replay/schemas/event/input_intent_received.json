@@ -15,6 +15,8 @@
     "reload": {"type": "boolean"},
     "selected_item": {"type": ["integer", "null"], "minimum": 0},
     "reset": {"type": "boolean"},
+    "sharp_aim": {"type": "boolean"},
+    "dig": {"type": "boolean"},
     "applied_move_x": {"type": "number"},
     "jump_accepted": {"type": "boolean"}
   },

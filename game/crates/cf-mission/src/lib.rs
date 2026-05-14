@@ -1079,12 +1079,32 @@ fn point_in_aabb(x: f32, y: f32, min: [f32; 2], max: [f32; 2]) -> bool {
 /// envelope. M1.5 keeps it tiny; M4 will wire the comic-noir HUD on top.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct MissionView {
+    /// **M2 audit pass 7 (2026-05-13)**: spec literal field name is
+    /// `status`. `result` retained as alias because the wire was stable
+    /// across the M1-M3 era.
+    #[serde(rename = "status")]
     pub result: String,
     pub loss_reason: Option<String>,
     pub elapsed_ticks: u64,
+    /// **M2 audit pass 7 (2026-05-13)**: spec literal field name is
+    /// `timer_total_ticks`. `time_limit_ticks` retained as alias.
+    #[serde(rename = "timer_total_ticks")]
     pub time_limit_ticks: u64,
+    /// **M2 audit pass 7 (2026-05-13)**: spec literal field name is
+    /// `timer_ticks_remaining`.
+    #[serde(rename = "timer_ticks_remaining")]
     pub ticks_remaining: Option<u64>,
+    /// **M2 audit pass 7 (2026-05-13)**: spec literal field name is
+    /// `current_objective_id`.
+    #[serde(rename = "current_objective_id")]
     pub active_objective: Option<String>,
+    /// **M2 audit pass 7 (2026-05-13)**: spec-literal `completed_objectives[]`
+    /// — list of objective ids in completion order.
+    #[serde(default)]
+    pub completed_objectives: Vec<String>,
+    /// **M2 audit pass 7 (2026-05-13)**: spec-literal `failed_objectives[]`.
+    #[serde(default)]
+    pub failed_objectives: Vec<String>,
     pub objectives: Vec<ObjectiveView>,
     pub last_event_tick: u64,
     pub last_event_label: String,
@@ -1149,6 +1169,21 @@ impl MissionView {
                 },
             })
             .collect();
+        // M2 audit pass 7 (2026-05-13): populate completed_objectives[] +
+        // failed_objectives[] arrays so observe.mission carries them in
+        // the JSON, per spec MissionState surface.
+        let completed_objectives = state
+            .objectives
+            .iter()
+            .filter(|o| o.status == ObjectiveStatus::Completed)
+            .map(|o| o.id.clone())
+            .collect();
+        let failed_objectives = state
+            .objectives
+            .iter()
+            .filter(|o| o.status == ObjectiveStatus::Failed)
+            .map(|o| o.id.clone())
+            .collect();
         Self {
             result: state.result.as_str().to_string(),
             loss_reason,
@@ -1156,6 +1191,8 @@ impl MissionView {
             time_limit_ticks: state.time_limit_ticks,
             ticks_remaining: state.ticks_remaining(current_tick),
             active_objective,
+            completed_objectives,
+            failed_objectives,
             objectives,
             last_event_tick: state.last_event_tick,
             last_event_label: state.last_event_label.clone(),

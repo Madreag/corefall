@@ -44,7 +44,7 @@
       "id": 2,
       "name": "concrete",
       "display_name": "Concrete",
-      "hardness": 40,
+      "hardness": 50,
       "diggable": true,
       "drillable": true,
       "blastable": true,

@@ -154,6 +154,29 @@ pub struct SettingsBlock {
     /// deserialize cleanly.
     #[serde(default)]
     pub ai_difficulty: String,
+    /// **M1 audit pass 7 (2026-05-13)**: full "feel cvars" suite persisted
+    /// into run_manifest.json.settings so deterministic replay tools can
+    /// reconstruct the run's tunings without consulting `observe.settings`
+    /// probes. All fields default to 0.0/false/0 so legacy bundles
+    /// deserialize cleanly.
+    #[serde(default)]
+    pub accel: f32,
+    #[serde(default)]
+    pub friction: f32,
+    #[serde(default)]
+    pub gravity: f32,
+    #[serde(default)]
+    pub jump_force: f32,
+    #[serde(default)]
+    pub recoil_decay_per_tick: f32,
+    #[serde(default)]
+    pub sharp_aim_build_ticks: u32,
+    #[serde(default)]
+    pub walk_threshold: f32,
+    #[serde(default)]
+    pub reduce_camera_shake_pct: f32,
+    #[serde(default)]
+    pub tick_rate_hz: u32,
 }
 
 fn default_hold_threshold_ms() -> u32 {
@@ -174,6 +197,15 @@ impl Default for SettingsBlock {
             key_remap_enabled: false,
             key_bindings: BTreeMap::new(),
             ai_difficulty: String::new(),
+            accel: 0.0,
+            friction: 0.0,
+            gravity: 0.0,
+            jump_force: 0.0,
+            recoil_decay_per_tick: 0.0,
+            sharp_aim_build_ticks: 0,
+            walk_threshold: 0.0,
+            reduce_camera_shake_pct: 0.0,
+            tick_rate_hz: 0,
         }
     }
 }

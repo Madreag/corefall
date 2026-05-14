@@ -41,6 +41,13 @@ const SCHEMA_ANCHOR_MATERIAL_RESULT: &str = include_str!("../schemas/event/ancho
 const SCHEMA_TERRAIN_MATERIAL_PROBE: &str = include_str!("../schemas/event/terrain_material_probe.json");
 const SCHEMA_TERRAIN_FILL_OR_REPAIR: &str = include_str!("../schemas/event/terrain_fill_or_repair.json");
 const SCHEMA_FORCED_REFRESH_REQUESTED: &str = include_str!("../schemas/event/forced_refresh_requested.json");
+// M3 audit pass 7 (2026-05-13): schemas for terrain.* events that were
+// previously recorded without a schema.
+const SCHEMA_TERRAIN_DEBRIS_CAPPED: &str = include_str!("../schemas/event/debris_capped.json");
+const SCHEMA_TERRAIN_TOOL_REFUSED: &str = include_str!("../schemas/event/tool_refused.json");
+const SCHEMA_TERRAIN_TOOL_ACTION_STARTED: &str = include_str!("../schemas/event/tool_action_started.json");
+const SCHEMA_EQUIPMENT_TOOL_ACTION_COMPLETED: &str = include_str!("../schemas/event/tool_action_completed.json");
+const SCHEMA_TERRAIN_PATH_INVALIDATED: &str = include_str!("../schemas/event/path_invalidated.json");
 // M2 re-audit (2026-05-13): mission + AI event schemas the spec lists in
 // "## Files" / "## Crates / modules touched" but were never created.
 const SCHEMA_MISSION_STARTED: &str = include_str!("../schemas/event/mission_started.json");
@@ -77,6 +84,12 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("terrain", "terrain_material_probe") => Some(SCHEMA_TERRAIN_MATERIAL_PROBE),
         ("terrain", "terrain_fill_or_repair") => Some(SCHEMA_TERRAIN_FILL_OR_REPAIR),
         ("terrain", "forced_refresh_requested") => Some(SCHEMA_FORCED_REFRESH_REQUESTED),
+        // M3 audit pass 7 (2026-05-13): newly-registered schemas.
+        ("terrain", "debris_capped") => Some(SCHEMA_TERRAIN_DEBRIS_CAPPED),
+        ("terrain", "tool_refused") => Some(SCHEMA_TERRAIN_TOOL_REFUSED),
+        ("terrain", "tool_action_started") => Some(SCHEMA_TERRAIN_TOOL_ACTION_STARTED),
+        ("equipment", "tool_action_completed") => Some(SCHEMA_EQUIPMENT_TOOL_ACTION_COMPLETED),
+        ("terrain", "path_invalidated") => Some(SCHEMA_TERRAIN_PATH_INVALIDATED),
         // M2 re-audit (2026-05-13): mission + AI event schemas.
         ("mission", "mission_started") => Some(SCHEMA_MISSION_STARTED),
         ("mission", "objective_started") => Some(SCHEMA_OBJECTIVE_STARTED),

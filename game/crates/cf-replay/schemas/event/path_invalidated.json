@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/terrain.path_invalidated.v0.1",
+  "title": "terrain.path_invalidated",
+  "description": "M3 (placeholder; pathfinder lands at M22+): emitted when the dirty-region tracker flushes a non-trivial set of rect changes that would invalidate previously cached path queries. version_old/_new are monotonic per-engine counters so consumers (M22+ pathfinder) can detect stale cached paths.",
+  "type": "object",
+  "required": ["bbox", "version_old", "version_new"],
+  "properties": {
+    "bbox": {"type": "object", "required": ["min", "max"], "properties": {"min": {"type": "array"}, "max": {"type": "array"}}},
+    "version_old": {"type": "integer", "minimum": 0},
+    "version_new": {"type": "integer", "minimum": 0},
+    "affected_teams": {"type": "array", "items": {"type": "integer"}}
+  },
+  "additionalProperties": true
+}

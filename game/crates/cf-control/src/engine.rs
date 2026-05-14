@@ -684,6 +684,11 @@ struct EngineMutable {
     /// used to trigger `terrain.forced_refresh_requested` after sustained
     /// load. Reset on any tick with `unupdated_areas == 0`.
     sustained_unupdated_ticks: u32,
+    /// **M3 audit pass 7 (2026-05-13)**: monotonic path-invalidation version
+    /// counter. Bumped every time `flush_pending_dirty_batch` produces a
+    /// non-empty `out_rects[]`. Carried on `terrain.path_invalidated`
+    /// events so M22+ pathfinder consumers can detect cache invalidation.
+    path_invalidation_version: u64,
     /// **M3 re-open**: cumulative coalesce cost samples (ticks where a batch
     /// was emitted). Surfaced via `summary.json.perf.terrain` at run close.
     perf_coalesce_samples: Vec<u32>,
@@ -888,6 +893,7 @@ impl M0Engine {
                 reload_started_event_id_by_actor: BTreeMap::new(),
                 pending_dirty_rects: Vec::new(),
                 sustained_unupdated_ticks: 0,
+                path_invalidation_version: 0,
                 perf_coalesce_samples: Vec::new(),
                 perf_coalesce_rects_in_total: 0,
                 perf_coalesce_rects_out_total: 0,
@@ -2190,7 +2196,17 @@ impl M0Engine {
                                 "mode": "strip",
                                 "tool_id": "digger",
                                 "mask_id": strip_mask_id,
+                                // M3 audit pass 7 (2026-05-13): spec literal
+                                // requires scalar `material_id` and `bbox`
+                                // in (x, y, w, h) tuple form.
+                                "material_id": strip_material_id,
                                 "bbox": { "min": bbox_min, "max": bbox_max },
+                                "bbox_xywh": [
+                                    bbox_min[0],
+                                    bbox_min[1],
+                                    (bbox_max[0] - bbox_min[0]).max(0.0),
+                                    (bbox_max[1] - bbox_min[1]).max(0.0),
+                                ],
                                 "material": material.clone(),
                                 "material_before": material.clone(),
                                 "material_after": if broken { "air" } else { &material },
@@ -2241,6 +2257,10 @@ impl M0Engine {
                             "terrain",
                             "tool_refused",
                             json!({
+                                // M2 audit pass 7 (2026-05-13): spec literal
+                                // requires `tool_id` + `target_material_id`.
+                                "tool_id": "digger",
+                                "target_material_id": material.as_ref().and_then(|m| cf_terrain::material_id_from_name(m)),
                                 "reason": reason,
                                 "mode": "strip",
                                 "strip_id": strip_id,
@@ -2299,11 +2319,24 @@ impl M0Engine {
                                 "mode": "chunked",
                                 "tool_id": "digger",
                                 "mask_id": mask_id,
+                                // M3 audit pass 7 (2026-05-13): spec literal
+                                // requires `material_id` (scalar dominant id)
+                                // alongside `material_ids[]` AND `pixel_count`
+                                // for parity with the strip emit (BreachStrip
+                                // replaceability contract).
+                                "material_id": stats.dominant_material,
                                 "bbox": { "min": stats.bbox_min, "max": stats.bbox_max },
+                                "bbox_xywh": [
+                                    stats.bbox_min[0],
+                                    stats.bbox_min[1],
+                                    stats.bbox_max[0].saturating_sub(stats.bbox_min[0]).saturating_add(1),
+                                    stats.bbox_max[1].saturating_sub(stats.bbox_min[1]).saturating_add(1),
+                                ],
                                 "pos": stats.bbox_min,
                                 "material": mat_name,
                                 "material_ids": [stats.dominant_material],
                                 "dominant_material_id": stats.dominant_material,
+                                "pixel_count": stats.count,
                                 "count": stats.count,
                                 "removed_count": stats.count,
                                 "debris_count": debris_count,
@@ -2420,6 +2453,10 @@ impl M0Engine {
                             "terrain",
                             "tool_refused",
                             json!({
+                                // M2 audit pass 7 (2026-05-13): spec literal
+                                // requires `tool_id` + `target_material_id`.
+                                "tool_id": "digger",
+                                "target_material_id": refusal.material,
                                 "reason": refusal.reason,
                                 "mode": "chunked",
                                 "material": mat_name,
@@ -2443,6 +2480,10 @@ impl M0Engine {
                             "terrain",
                             "tool_refused",
                             json!({
+                                // M2 audit pass 7 (2026-05-13): out-of-range
+                                // refusal has no target material; emit
+                                // tool_id only.
+                                "tool_id": "digger",
                                 "reason": "out_of_range",
                                 "mode": "chunked",
                                 "probe_at": Some(noop.probe_at),
@@ -2548,29 +2589,45 @@ impl M0Engine {
                     .read()
                     .ok()
                     .and_then(|s| s.mission_objective_started_event_ids.get(&update.objective_id).cloned());
+                // M2 audit pass 7 (2026-05-13): payload must include
+                // `objective_id` per schema; `objective` retained as alias.
                 self.recorder.record(
                     tick,
                     sim_time_ms,
                     "mission",
                     "objective_updated",
-                    json!({"objective": update.objective_id, "progress": update.progress}),
+                    json!({
+                        "objective_id": update.objective_id,
+                        "objective": update.objective_id,
+                        "progress": update.progress,
+                    }),
                     parent,
                 );
             }
+            // M2 audit pass 7 (2026-05-13): retain the LAST objective_completed
+            // event id so `mission.mission_resolved` on the Won path can
+            // chain back to it (spec literal cause chain).
+            let mut last_completed_event_id: Option<String> = None;
             for id in &report.objective_completed {
                 let parent = self
                     .state
                     .read()
                     .ok()
                     .and_then(|s| s.mission_objective_started_event_ids.get(id).cloned());
-                self.recorder.record(
+                // M2 audit pass 7 (2026-05-13): payload must include
+                // `objective_id` per schema; `objective` retained as alias.
+                let event_id = self.recorder.record(
                     tick,
                     sim_time_ms,
                     "mission",
                     "objective_completed",
-                    json!({"objective": id}),
+                    json!({
+                        "objective_id": id,
+                        "objective": id,
+                    }),
                     parent,
                 );
+                last_completed_event_id = Some(event_id);
                 // **M5**: when an objective completes AND the player has
                 // ejected (Ejected pilot reached the extraction zone),
                 // promote the chassis pilot_state to Extracted so further
@@ -2620,7 +2677,12 @@ impl M0Engine {
                     .read()
                     .ok()
                     .and_then(|s| s.mission_objective_started_event_ids.get(id).cloned());
-                let mut payload = json!({"objective": id});
+                // M2 audit pass 7 (2026-05-13): payload must include
+                // `objective_id` per schema; `objective` retained as alias.
+                let mut payload = json!({
+                    "objective_id": id,
+                    "objective": id,
+                });
                 if let Some(reason) = &derived_reason {
                     if let Some(obj) = payload.as_object_mut() {
                         obj.insert("reason".into(), json!(reason));
@@ -2697,6 +2759,11 @@ impl M0Engine {
                         .read()
                         .ok()
                         .and_then(|s| s.last_player_status_event_id.clone())
+                } else if matches!(&result, cf_mission::MissionResult::Won) {
+                    // M2 audit pass 7 (2026-05-13): spec literal — Won path
+                    // chains mission_resolved → objective_completed (the
+                    // last one).
+                    last_completed_event_id.clone()
                 } else {
                     None
                 };
@@ -2896,6 +2963,40 @@ impl M0Engine {
         // source event (typically `tool_action_started.<id>` chain). Replay
         // viewers walk source_event_ids[] for the full causal fan-in.
         let parent_event_id = source_event_ids.first().cloned();
+        // M3 audit pass 7 (2026-05-13): compute bbox-of-bboxes and bump
+        // the path-invalidation version BEFORE emitting the batch, so the
+        // subsequent terrain.path_invalidated event carries the right
+        // version_old/_new. Only fires when out_rects[] is non-empty.
+        let path_bbox = out_rects_json
+            .iter()
+            .filter_map(|v| v.as_object())
+            .fold(
+                None::<([f32; 2], [f32; 2])>,
+                |acc, r| {
+                    let min_v = r.get("min")?;
+                    let max_v = r.get("max")?;
+                    let min = min_v.as_array()?;
+                    let max = max_v.as_array()?;
+                    let mn = [min.first()?.as_f64()? as f32, min.get(1)?.as_f64()? as f32];
+                    let mx = [max.first()?.as_f64()? as f32, max.get(1)?.as_f64()? as f32];
+                    Some(match acc {
+                        Some(a) => (
+                            [a.0[0].min(mn[0]), a.0[1].min(mn[1])],
+                            [a.1[0].max(mx[0]), a.1[1].max(mx[1])],
+                        ),
+                        None => (mn, mx),
+                    })
+                },
+            );
+        let (version_old, version_new) = if let Ok(mut s) = self.state.write() {
+            let old = s.path_invalidation_version;
+            if path_bbox.is_some() {
+                s.path_invalidation_version = s.path_invalidation_version.saturating_add(1);
+            }
+            (old, s.path_invalidation_version)
+        } else {
+            (0, 0)
+        };
         self.recorder.record(
             tick,
             sim_time_ms,
@@ -2911,8 +3012,25 @@ impl M0Engine {
                     "rects_out": rects_out,
                 },
             }),
-            parent_event_id,
+            parent_event_id.clone(),
         );
+        // M3 audit pass 7 (2026-05-13): emit terrain.path_invalidated for
+        // M22+ pathfinder consumers. Placeholder event per spec ledger.
+        if let Some((bbox_min, bbox_max)) = path_bbox {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "terrain",
+                "path_invalidated",
+                serde_json::json!({
+                    "bbox": { "min": bbox_min, "max": bbox_max },
+                    "version_old": version_old,
+                    "version_new": version_new,
+                    "affected_teams": serde_json::Value::Array(Vec::new()),
+                }),
+                parent_event_id,
+            );
+        }
 
         // Emit forced-refresh signal if sustained pressure exceeds threshold.
         let sustained = self
@@ -3189,16 +3307,30 @@ impl M0Engine {
             // → alarm_registered`. Other signal kinds have no upstream parent
             // event (sight is intrinsic, memory_decayed is timer-driven).
             let perception_parent = sig.alarm_event_id.clone();
+            // M2 audit pass 7 (2026-05-13): payload includes spec-literal
+            // aliases — `actor_id` (guard), `source_id` (player), `source_pos`
+            // (=source_position), `line_of_sight` (for sight kinds). Legacy
+            // `actor`/`source_actor`/`source_position` retained.
+            let line_of_sight = match sig.kind {
+                "sight" => Some("clear"),
+                "sight_lost" => Some("blocked"),
+                _ => None,
+            };
             let id = self.recorder.record(
                 tick,
                 sim_time_ms,
                 "ai",
                 "perception_signal",
                 json!({
+                    "actor_id": guard_id.0,
                     "actor": guard_id.0,
                     "kind": sig.kind,
+                    "source_id": sig.source_actor,
                     "source_actor": sig.source_actor,
+                    "source_pos": sig.source_position,
                     "source_position": sig.source_position,
+                    "last_known_pos": sig.source_position,
+                    "line_of_sight": line_of_sight,
                     "confidence": sig.confidence,
                 }),
                 perception_parent,
@@ -3234,19 +3366,37 @@ impl M0Engine {
         // transitions (e.g. Idle → Alert via heard_shot, then Alert → Engaged
         // via target_acquired after aim_settle elapses on the same tick).
         for s in &report.state_changes {
+            // M2 audit pass 7 (2026-05-13): spec literal payload uses
+            // `from`/`to`/`reason` (matching the JSON schema). Emit both the
+            // schema-required names AND the legacy `previous`/`next`/`cause`
+            // alias so in-flight bundles continue to parse.
             self.recorder.record(
                 tick,
                 sim_time_ms,
                 "ai",
                 "state_changed",
                 json!({
+                    "actor_id": guard_id.0,
                     "actor": guard_id.0,
+                    "from": s.previous.as_str(),
+                    "to": s.next.as_str(),
+                    "reason": s.cause,
                     "previous": s.previous.as_str(),
                     "next": s.next.as_str(),
                     "cause": s.cause,
                 }),
                 last_perception_signal_id.clone(),
             );
+        }
+        // M2 audit pass 7 (2026-05-13): stash the most recent state-change
+        // cause onto the guard so the --ai-debug label can render
+        // "ALERT: heard shot" (reason) rather than the chosen tactic.
+        if let Some(last) = report.state_changes.last() {
+            if let Ok(mut s) = self.state.write() {
+                if let Some(guard) = s.reactive_guards.get_mut(&guard_id) {
+                    guard.last_state_change_cause = Some(last.cause.clone());
+                }
+            }
         }
         // **M1.5 G1**: target_acquired chains to the last perception_signal
         // so M3B can walk acquired → signal → alarm/sight.
@@ -3294,6 +3444,11 @@ impl M0Engine {
             );
         }
         // **M1.5 G5**: stuck_state_changed + recovery_action.
+        //
+        // M2 audit pass 7 (2026-05-13): spec literal payload requires
+        // `stuck_time_ticks` + `blocker_id` + `old_state` + `new_state`
+        // (with values e.g. "engaged"→"engaged_stuck"). Keep legacy
+        // `stuck_ticks` + `blocker` aliases for back-compat.
         if let Some(r) = &report.stuck_recovery {
             self.recorder.record(
                 tick,
@@ -3301,9 +3456,14 @@ impl M0Engine {
                 "ai",
                 "stuck_state_changed",
                 json!({
+                    "actor_id": guard_id.0,
                     "actor": guard_id.0,
+                    "stuck_time_ticks": r.stuck_ticks,
                     "stuck_ticks": r.stuck_ticks,
+                    "blocker_id": r.blocker,
                     "blocker": r.blocker,
+                    "old_state": "engaged",
+                    "new_state": "engaged_stuck",
                 }),
                 None,
             );
@@ -3673,6 +3833,10 @@ impl M0Engine {
                     // alongside the AlarmInput so the next-tick AI loop
                     // can thread it through `PerceptionSignal.alarm_event_id`,
                     // which the engine emits as `ai.perception_signal.parent_event_id`.
+                    // M1 audit pass 7 (2026-05-13): spec literal payload
+                    // includes `source_id` (the equipment preset id) and
+                    // `pos` (= muzzle position). Keep existing aliases for
+                    // back-compat.
                     let alarm_event_id = self.recorder.record(
                         tick,
                         sim_time_ms,
@@ -3680,6 +3844,8 @@ impl M0Engine {
                         "alarm_registered",
                         json!({
                             "actor": outcome.actor.0,
+                            "source_id": cf_equipment::RIFLE_M1_DEFAULT_ID,
+                            "pos": [muzzle.x, muzzle.y],
                             "muzzle_origin": [muzzle.x, muzzle.y],
                             "loudness_radius": outcome.loudness_radius,
                             "cause": "weapon_fired",
@@ -4247,12 +4413,20 @@ impl M0Engine {
         let tick = state.clock.tick();
         let sim_time_ms = state.clock.sim_time_ms();
         drop(state);
+        // M1 audit pass 7 (2026-05-13): spec literal — `system.run_finished
+        // outcome=clean` (or panic / abort). exit_code=0 → "clean", non-zero
+        // → "panic" (current convention; abort path not yet wired through
+        // exit_code). Keep `exit_code` for tooling that diffs by integer.
+        let outcome = if exit_code == 0 { "clean" } else { "panic" };
         self.recorder.record(
             tick,
             sim_time_ms,
             "system",
             "run_finished",
-            json!({"exit_code": exit_code}),
+            json!({
+                "outcome": outcome,
+                "exit_code": exit_code,
+            }),
             None,
         );
     }
@@ -4727,6 +4901,18 @@ impl M0Engine {
                 // into the run manifest so cfctl reproductions don't have to
                 // walk observe.settings events to recover the preset id.
                 ai_difficulty: live_settings.ai_difficulty.clone(),
+                // M1 audit pass 7 (2026-05-13): persist the full feel-cvar
+                // suite per spec literal "run_manifest.json.settings reflects
+                // the patched values".
+                accel: live_settings.accel,
+                friction: live_settings.friction,
+                gravity: live_settings.gravity,
+                jump_force: live_settings.jump_force,
+                recoil_decay_per_tick: live_settings.recoil_decay_per_tick,
+                sharp_aim_build_ticks: live_settings.sharp_aim_build_ticks,
+                walk_threshold: live_settings.walk_threshold,
+                reduce_camera_shake_pct: live_settings.reduce_camera_shake_pct,
+                tick_rate_hz: self.config.tick_rate_hz,
             },
             checksum: ChecksumConfig::m0_default(),
             tick_rate_hz: self.config.tick_rate_hz,
@@ -5064,11 +5250,21 @@ fn ai_intent_label(guard: &cf_ai::ReactiveGuard) -> String {
         cf_ai::GuardState::Dying => "DYING",
         cf_ai::GuardState::Dead => "DEAD",
     };
+    // M2 audit pass 7 (2026-05-13): spec literal — label shows
+    // "{STATE}: {REASON}" (e.g. "ALERT: heard shot", "ENGAGING",
+    // "RELOADING", "STUCK: blocked"). Reason is the most recent
+    // state-change cause. Fall back to the chosen-tactic vocabulary when
+    // no transition has fired yet (e.g. tick 0 with no perception).
     if guard.reload_remaining_ticks > 0 {
         return format!("{state_label}: RELOADING");
     }
     if guard.stuck_recovery_latched {
-        return format!("{state_label}: STUCK");
+        return format!("{state_label}: STUCK: blocked");
+    }
+    if let Some(cause) = &guard.last_state_change_cause {
+        // Render reason in human-readable form (snake_case → space).
+        let pretty = cause.replace('_', " ");
+        return format!("{state_label}: {pretty}");
     }
     match guard.last_tactic {
         cf_ai::Tactic::Attack => format!("{state_label}: ATTACK"),
@@ -6070,18 +6266,73 @@ impl EngineHandle for M0Engine {
 
     /// **M2 re-audit (2026-05-13)**: full MissionState projection. Returns
     /// `None` when no mission is loaded (e.g. m0_blank scenario).
+    ///
+    /// M2 audit pass 7 (2026-05-13): returns the `MissionView` projection
+    /// (with spec-literal field names — `status`, `timer_total_ticks`,
+    /// `timer_ticks_remaining`, `current_objective_id`,
+    /// `completed_objectives`, `failed_objectives`) instead of the raw
+    /// `MissionState` struct so observe.mission carries the canonical
+    /// surface.
     async fn observe_mission(&self) -> Option<serde_json::Value> {
         let state = self.state.read().ok()?;
         let mission = state.mission.as_ref()?;
-        serde_json::to_value(mission).ok()
+        let current_tick = state.clock.tick().0;
+        let view = cf_mission::MissionView::from_state(mission, current_tick);
+        serde_json::to_value(view).ok()
+    }
+
+    /// M3 audit pass 7 (2026-05-13): dedicated `observe.terrain` cfctl
+    /// method per spec literal. Returns the live `TerrainView` projection.
+    async fn observe_terrain(&self) -> Option<serde_json::Value> {
+        let state = self.state.read().ok()?;
+        let t = state.chunked_terrain.as_ref()?;
+        let view = crate::state::TerrainView {
+            width_px: t.width_px,
+            height_px: t.height_px,
+            anchor: t.anchor,
+            default_material: cf_terrain::material_affordance(t.default_material)
+                .map(|m| m.name.to_string())
+                .unwrap_or_else(|| "unknown".to_string()),
+            carve_count: t.carve_count,
+            refusal_count: t.refusal_count,
+            dirty_chunk_count: t.dirty_chunk_count() as u32,
+            allocated_chunk_count: t.allocated_chunk_count() as u32,
+            chunk_count: t.allocated_chunk_count() as u32,
+            material_counts: t.material_counts(),
+            material_distribution: t
+                .material_counts()
+                .into_iter()
+                .filter_map(|(name, count)| {
+                    cf_terrain::material_id_from_name(&name).map(|id| (id, count))
+                })
+                .collect(),
+            current_overlay_mode: state.material_overlay_mode.clone(),
+            total_carve_events: state.total_carve_events,
+            total_debris_spawned: state.total_debris_spawned,
+        };
+        serde_json::to_value(view).ok()
     }
 
     /// **M2 re-audit (2026-05-13)**: per-AI projection for `actor_id`.
     /// Returns guard state + perception summary + current target + reason.
+    ///
+    /// M2 audit pass 7 (2026-05-13): also enriches the response with the
+    /// guard actor's `hp` + `hp_max` from the actor world so the
+    /// difficulty preset round-trip ("guard's hp=120") can be verified
+    /// without a separate observe.actor call.
     async fn observe_ai(&self, actor_id: u64) -> Option<serde_json::Value> {
         let state = self.state.read().ok()?;
         let guard = state.reactive_guards.get(&ActorId(actor_id))?;
-        serde_json::to_value(guard).ok()
+        let mut v = serde_json::to_value(guard).ok()?;
+        if let Some(world) = state.actor_state.as_ref() {
+            if let Some(actor) = world.world.actors.get(&ActorId(actor_id)) {
+                if let Some(obj) = v.as_object_mut() {
+                    obj.insert("hp".into(), json!(actor.hp));
+                    obj.insert("hp_max".into(), json!(actor.hp_max));
+                }
+            }
+        }
+        Some(v)
     }
 
     /// **M2 re-audit (2026-05-13)**: full mission inspect including the last
@@ -6848,7 +7099,10 @@ impl EngineHandle for M0Engine {
                         "mission_resolved",
                         json!({
                             "result": "aborted",
-                            "loss_reason": "aborted",
+                            // M2 audit pass 7 (2026-05-13): route through
+                            // the typed enum's as_str() (DR-002 stable
+                            // vocabulary contract) — never a raw literal.
+                            "loss_reason": cf_mission::LossReason::Aborted.as_str(),
                             "cause": "player_aborted",
                         }),
                         Some(accepted_id),
@@ -7729,12 +7983,41 @@ impl EngineHandle for M0Engine {
                 // **M1.5 G6**: when ai_difficulty changed, re-apply the
                 // preset to every live ReactiveGuard so the new params take
                 // effect on the next AI tick.
+                //
+                // M2 audit pass 7 (2026-05-13): also propagate the preset's
+                // `hp` into every reactive guard's actor state so the spec
+                // literal "guard's hp=120" round-trip holds.
                 if changed.iter().any(|f| f == "ai_difficulty") {
-                    if let Some(preset) = cf_ai::DifficultyPreset::builtin(&state.settings.ai_difficulty) {
+                    let preset = cf_ai::DifficultyPreset::builtin(&state.settings.ai_difficulty);
+                    if let Some(preset) = preset {
                         let tick_rate_hz = self.config.tick_rate_hz;
+                        let guard_ids: Vec<ActorId> = state.reactive_guards.keys().copied().collect();
                         for guard in state.reactive_guards.values_mut() {
                             preset.apply_to(&mut guard.params, tick_rate_hz);
                         }
+                        // M2 audit pass 7 (2026-05-13): also write preset.hp
+                        // into each reactive guard's actor state so the
+                        // round-trip "guard's hp=120" holds. Borrow guard_ids
+                        // before the actor_state mutable borrow to avoid an
+                        // overlapping mutable borrow on `state`.
+                        if let Some(world) = state.actor_state.as_mut() {
+                            for gid in &guard_ids {
+                                if let Some(actor) = world.world.actors.get_mut(gid) {
+                                    actor.hp = preset.hp;
+                                    actor.hp_max = preset.hp;
+                                }
+                            }
+                        }
+                    }
+                }
+                // M1 audit pass 7 (2026-05-13): propagate `gravity` setting
+                // into the live actor world so subsequent ticks use the new
+                // value (settings.gravity is the magnitude; world.gravity
+                // is signed-negative).
+                if changed.iter().any(|f| f == "gravity") {
+                    let gravity_signed = -state.settings.gravity;
+                    if let Some(world) = state.actor_state.as_mut() {
+                        world.world.gravity = gravity_signed;
                     }
                 }
                 let new_settings = state.settings.clone();

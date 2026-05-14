@@ -448,11 +448,14 @@ async fn main() -> Result<()> {
         let duration_seconds = started.elapsed().as_secs_f64();
         let replay_path = cf_replay::resolve_run_bundle_root(None).display().to_string();
         if let Some(obj) = payload.as_object_mut() {
+            // M2 audit pass 7 (2026-05-13): spec literal field name is
+            // `duration`; `duration_seconds` retained as alias.
             obj.insert(
                 "ai_test_result".into(),
                 json!({
                     "harness": name,
                     "status": "pass",
+                    "duration": duration_seconds,
                     "duration_seconds": duration_seconds,
                     "replay_path": replay_path,
                 }),
