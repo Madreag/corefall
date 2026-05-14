@@ -1876,8 +1876,15 @@ fn decode_m6_action(method: &str, params: serde_json::Value) -> Result<crate::m6
                 .get("slot")
                 .and_then(serde_json::Value::as_u64)
                 .ok_or_else(|| "missing_slot".to_string())?;
-            if slot >= 8 {
+            // **M6**: 1-8 hotbar keys target the 8 active slots (indices
+            // 0..=7). Tank slots (9-11 / indices 8..=10) reject with the
+            // spec-locked reason `tank_slot_locked_at_m2_2a` so the M17
+            // unlock has a stable contract to clear.
+            if slot >= 11 {
                 return Err("slot_out_of_range".to_string());
+            }
+            if slot >= 8 {
+                return Err(cf_equipment::TANK_SLOT_LOCKED_REASON.to_string());
             }
             Ok(M6Action::WeaponSwap { slot: slot as u8 })
         }
