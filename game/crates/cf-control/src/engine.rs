@@ -149,6 +149,10 @@ pub struct M0EngineConfig {
     pub initial_chunked_terrain: Option<cf_terrain::ChunkedTerrain>,
     /// M2.5: optional ordered list of reactor world entries.
     pub initial_reactors: Vec<cf_mission::Reactor>,
+    /// **M6**: initial squad roster built from `ScenarioActor.squad_role`.
+    /// Each entry pairs (actor_id, SquadRole, display_name). Empty for
+    /// scenarios with no squad declarations.
+    pub initial_squad_members: Vec<InitialSquadMember>,
     /// M3A: configurable checksum cadence. 0 = disabled. Default from
     /// `ChecksumConfig::m0_default().cadence_ticks` (60).
     pub checksum_cadence_ticks: u64,
@@ -174,6 +178,15 @@ pub struct InitialBreachWorld {
 pub struct InitialGuard {
     pub actor: ActorId,
     pub params: cf_ai::ReactiveGuardParams,
+}
+
+/// **M6**: initial squad member built from a scenario actor entry.
+#[derive(Debug, Clone, PartialEq)]
+pub struct InitialSquadMember {
+    pub actor: ActorId,
+    pub role: cf_squad::SquadRole,
+    pub display_name: String,
+    pub hp_max: f32,
 }
 
 /// Snapshot of the initial actor world. Held in the engine config so `scenario.reset`
@@ -286,6 +299,7 @@ impl M0EngineConfig {
             mission_loss: None,
             initial_chunked_terrain: None,
             initial_reactors: Vec::new(),
+            initial_squad_members: Vec::new(),
             checksum_cadence_ticks: ChecksumConfig::m0_default().cadence_ticks,
             difficulty_preset: None,
             expected_outcome_override: None,
@@ -335,6 +349,28 @@ impl M0EngineConfig {
                     actor: ActorId(actor.id),
                     params: enemy.build_params(),
                 });
+            }
+        }
+        // **M6**: build initial squad roster from `ScenarioActor.squad_role`.
+        for actor in &scenario.actors {
+            if let Some(role_str) = actor.squad_role.as_deref() {
+                let role = match role_str.to_ascii_lowercase().as_str() {
+                    "leader" => Some(cf_squad::SquadRole::Leader),
+                    "follower" => Some(cf_squad::SquadRole::Follower),
+                    _ => None,
+                };
+                if let Some(role) = role {
+                    let display_name = actor
+                        .squad_archetype
+                        .clone()
+                        .unwrap_or_else(|| format!("Actor {}", actor.id));
+                    cfg.initial_squad_members.push(InitialSquadMember {
+                        actor: ActorId(actor.id),
+                        role,
+                        display_name,
+                        hp_max: actor.hp,
+                    });
+                }
             }
         }
         // M1.5: objectives + mission loss conditions.
@@ -751,6 +787,33 @@ struct EngineMutable {
     /// **M6**: latched-per-actor previous `FacingDirection`, used by the
     /// engine to emit `actor.facing_changed` only on flips (not every tick).
     m6_last_facing: BTreeMap<ActorId, cf_actor::FacingDirection>,
+    /// **M6**: persistent map markers dropped via the Beacon tool. Each
+    /// entry is (owner_id, position). Surfaced via observe.squad for the
+    /// HUD; consumed by future M7 mission director when waypoints route
+    /// AI.
+    m6_beacons: Vec<(ActorId, cf_actor::Vec2)>,
+    /// **M6**: physically-dropped items in the world. Created by
+    /// `act.player.drop_item`, consumed by `act.player.pickup`. Each item
+    /// carries the actor that dropped it, the item id (rifle preset or
+    /// material id), the position, and the slot the dropping inventory
+    /// originally held it in.
+    m6_dropped_items: Vec<DroppedItem>,
+    /// **M6**: monotonic id counter for dropped items.
+    m6_next_dropped_item_id: u64,
+}
+
+/// **M6**: a physical item entity in the world. Spawned by
+/// `act.player.drop_item`; despawned by `act.player.pickup`.
+#[derive(Debug, Clone)]
+pub(crate) struct DroppedItem {
+    pub id: u64,
+    pub item_id: String,
+    pub position: cf_actor::Vec2,
+    pub weight_kg: f32,
+    #[allow(dead_code)]
+    pub dropped_by: ActorId,
+    #[allow(dead_code)]
+    pub original_slot: u8,
 }
 
 /// **M6**: one in-flight grenade projectile. Owned by the engine's
@@ -811,6 +874,42 @@ struct PendingKnifeSpawn {
     origin: cf_actor::Vec2,
     aim: cf_actor::Vec2,
     base_damage: f32,
+}
+
+/// **M6**: scratch struct that captures the parameters of a stealth-kill
+/// attempt from the cfctl dispatch site so the engine can find the target
+/// (behind + within reach) + apply instant-kill damage + emit
+/// `combat.stealth_kill_executed` after releasing the write-guard.
+#[derive(Debug, Clone)]
+struct StealthKillAttempt {
+    attacker: ActorId,
+    attacker_pos: cf_actor::Vec2,
+    attacker_facing_x: f32,
+}
+
+/// **M6**: per-tool effect kind dispatched after the actor write-guard is
+/// released. The dispatcher captures the tool kind + origin/aim; the
+/// post-dispatch resolver applies the side-effect (terrain carve/fill, reveal
+/// hostile actors, drop beacon, etc).
+#[derive(Debug, Clone, Copy)]
+enum ToolEffectKind {
+    Digger,
+    Repair,
+    Foam,
+    Concrete,
+    Welder,
+    Drill,
+    MultiTool,
+    Beacon,
+    SensorPulse,
+}
+
+#[derive(Debug, Clone)]
+struct ToolEffect {
+    kind: ToolEffectKind,
+    origin: cf_actor::Vec2,
+    aim: cf_actor::Vec2,
+    actor_id: ActorId,
 }
 
 /// **M6**: resolved melee hit data, captured for emission in the
@@ -972,6 +1071,21 @@ impl M0Engine {
                 config.mission_loss.unwrap_or_default(),
             ))
         };
+        // **M6**: instantiate the squad-of-two from the scenario manifest.
+        // One leader + N followers; the engine emits `squad.member_added`
+        // for each member at run start (see `emit_initial_snapshots`).
+        let mut squad = cf_squad::Squad::default();
+        for member in &config.initial_squad_members {
+            let m = cf_squad::SquadMember::new(member.actor, member.role, member.display_name.clone(), member.hp_max);
+            match member.role {
+                cf_squad::SquadRole::Leader => {
+                    let _ = squad.add_leader(m);
+                }
+                cf_squad::SquadRole::Follower => {
+                    let _ = squad.add_follower(m);
+                }
+            }
+        }
 
         diagnostics::set_panic_reporter({
             let recorder = recorder.clone();
@@ -1035,7 +1149,7 @@ impl M0Engine {
                 perf_coalesce_samples: Vec::new(),
                 perf_coalesce_rects_in_total: 0,
                 perf_coalesce_rects_out_total: 0,
-                squad: cf_squad::Squad::default(),
+                squad,
                 weapon_swap_state: BTreeMap::new(),
                 m6_last_stamina_emit: BTreeMap::new(),
                 m6_last_stealth_band: BTreeMap::new(),
@@ -1044,6 +1158,9 @@ impl M0Engine {
                 grenade_projectiles: Vec::new(),
                 knife_projectiles: Vec::new(),
                 m6_last_facing: BTreeMap::new(),
+                m6_beacons: Vec::new(),
+                m6_dropped_items: Vec::new(),
+                m6_next_dropped_item_id: 1,
             }),
             recorder,
             current_tick,
@@ -1486,6 +1603,25 @@ impl M0Engine {
                     );
                 }
             }
+        }
+        // **M6**: emit one `squad.member_added` per actor in the squad
+        // roster declared by the scenario manifest. The Squad struct is
+        // already populated in `M0Engine::new` from
+        // `config.initial_squad_members`.
+        for member in &self.config.initial_squad_members {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "squad",
+                "member_added",
+                json!({
+                    "actor": member.actor.0,
+                    "role": member.role.as_str(),
+                    "display_name": member.display_name,
+                    "hp_max": member.hp_max,
+                }),
+                parent_event_id.map(|s| s.to_string()),
+            );
         }
         if let Some(reactors) = reactor_world {
             for r in reactors.iter() {
@@ -3445,6 +3581,7 @@ impl M0Engine {
             self.tick_m6_actor_state(t, sim_time_ms);
             self.tick_m6_equipment(t, sim_time_ms);
             self.tick_m6_perception(t, sim_time_ms);
+            self.tick_m6_squad(t, sim_time_ms);
         }
 
         // M3 re-open (2026-05-13): flush the per-tick coalesced
@@ -6153,6 +6290,303 @@ impl M0Engine {
         }
     }
 
+    /// **M6**: tick the squad of followers — each follower consults its
+    /// `current_command` and acts accordingly. M6 implements two of the
+    /// four kinds end-to-end (FollowLeader + HoldPosition); DefendPoint and
+    /// PushToWaypoint move toward a waypoint when one is set. Full AI
+    /// archetypes (cover seeking, suppression, retreat, engage en-route)
+    /// land in M7 — at M6 we only need the action surface to be reachable
+    /// so `squad.command_issued` has a real consumer.
+    fn tick_m6_squad(&self, tick: Tick, sim_time_ms: f64) {
+        use cf_squad::SquadCommandKind;
+        const FOLLOWER_SPEED_PX_S: f32 = 90.0;
+        const FOLLOWER_STOP_RADIUS: f32 = 24.0;
+        let dt = 1.0_f32 / self.config.tick_rate_hz.max(1) as f32;
+        let mut state = match self.state.write() {
+            Ok(s) => s,
+            Err(_) => return,
+        };
+        if state.squad.followers.is_empty() {
+            return;
+        }
+        let leader_id = state.squad.leader.as_ref().map(|m| m.actor);
+        let leader_pos = leader_id.and_then(|lid| {
+            state
+                .actor_state
+                .as_ref()
+                .and_then(|sim| sim.world.actors.get(&lid))
+                .map(|a| a.position)
+        });
+        let follower_targets: Vec<(cf_actor::ActorId, SquadCommandKind, Option<cf_actor::Vec2>)> = state
+            .squad
+            .followers
+            .iter()
+            .map(|m| (m.actor, m.current_command.kind, m.current_command.waypoint))
+            .collect();
+        let mut command_events: Vec<(u64, &'static str)> = Vec::new();
+        for (actor_id, kind, waypoint) in follower_targets {
+            let target = match kind {
+                SquadCommandKind::FollowLeader => leader_pos,
+                SquadCommandKind::HoldPosition => None,
+                SquadCommandKind::DefendPoint | SquadCommandKind::PushToWaypoint => waypoint,
+            };
+            let stop_radius = match kind {
+                SquadCommandKind::FollowLeader => FOLLOWER_STOP_RADIUS,
+                _ => 8.0,
+            };
+            let new_vel = if let Some(target_pos) = target {
+                if let Some(actor) = state
+                    .actor_state
+                    .as_ref()
+                    .and_then(|sim| sim.world.actors.get(&actor_id))
+                {
+                    let dx = target_pos.x - actor.position.x;
+                    let dy = target_pos.y - actor.position.y;
+                    let dist = (dx * dx + dy * dy).sqrt();
+                    if dist > stop_radius {
+                        cf_actor::Vec2::new((dx / dist) * FOLLOWER_SPEED_PX_S, actor.velocity.y)
+                    } else {
+                        cf_actor::Vec2::new(0.0, actor.velocity.y)
+                    }
+                } else {
+                    continue;
+                }
+            } else {
+                let vy = state
+                    .actor_state
+                    .as_ref()
+                    .and_then(|sim| sim.world.actors.get(&actor_id))
+                    .map(|a| a.velocity.y)
+                    .unwrap_or(0.0);
+                cf_actor::Vec2::new(0.0, vy)
+            };
+            if let Some(actor) = state
+                .actor_state
+                .as_mut()
+                .and_then(|sim| sim.world.actors.get_mut(&actor_id))
+            {
+                actor.velocity = new_vel;
+                actor.position = cf_actor::Vec2::new(actor.position.x + new_vel.x * dt, actor.position.y);
+                command_events.push((actor_id.0, kind.as_str()));
+            }
+        }
+        drop(state);
+        let _ = (sim_time_ms, tick, command_events);
+    }
+
+    /// **M6**: apply a per-tool side-effect after the cfctl dispatch
+    /// finishes. Repair fills terrain at the aim point; Foam/Concrete
+    /// spawn material; Welder cuts metal_nohook; Drill carves with heat
+    /// (jamming above DRILL_JAM_HEAT_THRESHOLD); MultiTool probes the
+    /// material at the aim point and emits tool_used with `affordances`;
+    /// Beacon drops a persistent map marker; SensorPulse reveals enemies
+    /// within `SENSOR_PULSE_REVEAL_RADIUS` for `SENSOR_PULSE_REVEAL_SECONDS`.
+    fn apply_tool_effect(&self, effect: ToolEffect, tick: Tick, sim_time_ms: f64) {
+        use cf_terrain::{material_id_from_name, MATERIAL_REPAIR_FILL};
+        match effect.kind {
+            ToolEffectKind::Digger => {
+                let target = [
+                    effect.origin.x + effect.aim.x * 16.0,
+                    effect.origin.y + effect.aim.y * 16.0,
+                ];
+                if let Ok(mut s) = self.state.write() {
+                    if let Some(terrain) = s.chunked_terrain.as_mut() {
+                        let _ = terrain.try_carve(target, 6.0);
+                    }
+                }
+            }
+            ToolEffectKind::Repair => {
+                let target = [
+                    effect.origin.x + effect.aim.x * 12.0,
+                    effect.origin.y + effect.aim.y * 12.0,
+                ];
+                if let Ok(mut s) = self.state.write() {
+                    if let Some(terrain) = s.chunked_terrain.as_mut() {
+                        let _ = terrain.try_fill_or_repair(target, 12.0, MATERIAL_REPAIR_FILL);
+                    }
+                }
+            }
+            ToolEffectKind::Foam => {
+                let mat = material_id_from_name("loose_fill").unwrap_or(0);
+                let target = [
+                    effect.origin.x + effect.aim.x * 8.0,
+                    effect.origin.y + effect.aim.y * 8.0,
+                ];
+                if let Ok(mut s) = self.state.write() {
+                    if let Some(terrain) = s.chunked_terrain.as_mut() {
+                        let _ = terrain.try_fill_or_repair(target, 8.0, mat);
+                    }
+                }
+            }
+            ToolEffectKind::Concrete => {
+                let mat = material_id_from_name("concrete").unwrap_or(0);
+                let target = [
+                    effect.origin.x + effect.aim.x * 10.0,
+                    effect.origin.y + effect.aim.y * 10.0,
+                ];
+                if let Ok(mut s) = self.state.write() {
+                    if let Some(terrain) = s.chunked_terrain.as_mut() {
+                        let _ = terrain.try_fill_or_repair(target, 10.0, mat);
+                    }
+                }
+            }
+            ToolEffectKind::Welder => {
+                let target = [
+                    effect.origin.x + effect.aim.x * 4.0,
+                    effect.origin.y + effect.aim.y * 4.0,
+                ];
+                if let Ok(mut s) = self.state.write() {
+                    if let Some(terrain) = s.chunked_terrain.as_mut() {
+                        let _ = terrain.try_carve(target, 4.0);
+                    }
+                    if let Some(actor) = s
+                        .actor_state
+                        .as_mut()
+                        .and_then(|sim| sim.world.actors.get_mut(&effect.actor_id))
+                    {
+                        actor.drill_heat = (actor.drill_heat + cf_equipment::DRILL_HEAT_PER_USE * 0.5).min(1.0);
+                    }
+                }
+            }
+            ToolEffectKind::Drill => {
+                let target = [
+                    effect.origin.x + effect.aim.x * 6.0,
+                    effect.origin.y + effect.aim.y * 6.0,
+                ];
+                let mut overheated = false;
+                let mut heat_now = 0.0_f32;
+                if let Ok(mut s) = self.state.write() {
+                    if let Some(terrain) = s.chunked_terrain.as_mut() {
+                        // Drill carves twice as wide as the regular digger.
+                        let _ = terrain.try_carve(target, 12.0);
+                    }
+                    if let Some(actor) = s
+                        .actor_state
+                        .as_mut()
+                        .and_then(|sim| sim.world.actors.get_mut(&effect.actor_id))
+                    {
+                        actor.drill_heat = (actor.drill_heat + cf_equipment::DRILL_HEAT_PER_USE).min(1.0);
+                        heat_now = actor.drill_heat;
+                        if actor.drill_heat >= cf_equipment::DRILL_JAM_HEAT_THRESHOLD {
+                            overheated = true;
+                        }
+                    }
+                }
+                if overheated {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "equipment",
+                        "drill_overheated",
+                        json!({
+                            "actor": effect.actor_id.0,
+                            "heat": heat_now,
+                            "threshold": cf_equipment::DRILL_JAM_HEAT_THRESHOLD,
+                        }),
+                        None,
+                    );
+                }
+            }
+            ToolEffectKind::MultiTool => {
+                let probe_pos = [
+                    effect.origin.x + effect.aim.x * 18.0,
+                    effect.origin.y + effect.aim.y * 18.0,
+                ];
+                let material_name = if let Ok(s) = self.state.read() {
+                    s.chunked_terrain.as_ref().map(|t| {
+                        let mid = t.material_at_world(probe_pos[0], probe_pos[1]);
+                        cf_terrain::material_name_from_id(mid).to_string()
+                    })
+                } else {
+                    None
+                };
+                let affordances: Vec<&'static str> = match material_name.as_deref() {
+                    Some("dirt") | Some("loose_fill") => vec!["dig", "fill", "anchor"],
+                    Some("concrete") | Some("concrete_soft") => vec!["dig", "anchor"],
+                    Some("metal_nohook") => vec!["weld_cut"],
+                    Some("anchor") => vec!["anchor"],
+                    Some("repair_fill") => vec!["repair"],
+                    Some("hazard") => vec!["hazard"],
+                    _ => vec!["probe"],
+                };
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "equipment",
+                    "tool_used",
+                    json!({
+                        "actor": effect.actor_id.0,
+                        "tool": "multi_tool",
+                        "probe_position": probe_pos,
+                        "probed_material": material_name.unwrap_or_default(),
+                        "affordances": affordances,
+                    }),
+                    None,
+                );
+            }
+            ToolEffectKind::Beacon => {
+                if let Ok(mut s) = self.state.write() {
+                    s.m6_beacons.push((effect.actor_id, effect.origin));
+                }
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "equipment",
+                    "beacon_dropped",
+                    json!({
+                        "actor": effect.actor_id.0,
+                        "owner_id": effect.actor_id.0,
+                        "position": [effect.origin.x, effect.origin.y],
+                    }),
+                    None,
+                );
+            }
+            ToolEffectKind::SensorPulse => {
+                let reveal_until_tick = tick.0.saturating_add(
+                    (cf_equipment::SENSOR_PULSE_REVEAL_SECONDS * self.config.tick_rate_hz as f32) as u64,
+                );
+                let mut revealed: Vec<u64> = Vec::new();
+                if let Ok(mut s) = self.state.write() {
+                    let origin = effect.origin;
+                    let actor_ids: Vec<ActorId> = s
+                        .actor_state
+                        .as_ref()
+                        .map(|sim| sim.world.actors.keys().copied().collect())
+                        .unwrap_or_default();
+                    for aid in actor_ids {
+                        if aid == effect.actor_id {
+                            continue;
+                        }
+                        if let Some(target) = s.actor_state.as_mut().and_then(|sim| sim.world.actors.get_mut(&aid)) {
+                            let dx = target.position.x - origin.x;
+                            let dy = target.position.y - origin.y;
+                            let dist = (dx * dx + dy * dy).sqrt();
+                            if dist <= cf_equipment::SENSOR_PULSE_REVEAL_RADIUS {
+                                target.reveal_until_tick = reveal_until_tick;
+                                revealed.push(aid.0);
+                            }
+                        }
+                    }
+                }
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "equipment",
+                    "sensor_pulse_fired",
+                    json!({
+                        "actor": effect.actor_id.0,
+                        "origin": [effect.origin.x, effect.origin.y],
+                        "radius": cf_equipment::SENSOR_PULSE_REVEAL_RADIUS,
+                        "reveal_until_tick": reveal_until_tick,
+                        "reveal_seconds": cf_equipment::SENSOR_PULSE_REVEAL_SECONDS,
+                        "revealed_actors": revealed,
+                    }),
+                    None,
+                );
+            }
+        }
+    }
+
     pub fn record_run_finished(&self, exit_code: i32) {
         // Always emit one final `determinism.sim_checksum` so every bundle has at least one
         // checksum and `summary.json.final_sim_checksum` is never null on a valid run.
@@ -6551,6 +6985,10 @@ impl M0Engine {
         let mut knife_to_spawn: Option<PendingKnifeSpawn> = None;
         let mut tool_broken_pending: Option<(u64, String, f32)> = None;
         let mut tool_repaired_pending: Option<(u64, f32, Vec<String>)> = None;
+        let mut stealth_kill_attempt: Option<StealthKillAttempt> = None;
+        let mut tool_effect: Option<ToolEffect> = None;
+        let mut drop_item_spawn: Option<DroppedItem> = None;
+        let mut pickup_request_pos: Option<cf_actor::Vec2> = None;
         if let Some(sim) = state.actor_state.as_mut() {
             if let Some(actor) = sim.world.actors.get_mut(&player_id) {
                 match &action {
@@ -6562,6 +7000,8 @@ impl M0Engine {
                                     .reject_reason_for("sprint")
                                     .unwrap_or("sprint_disabled_by_limb_loss"),
                             );
+                        } else if *active && actor.inventory_weight_kg > cf_equipment::WEIGHT_FORCE_WALK_KG {
+                            reject_reason = Some("weight_forces_walk");
                         } else if *active && !actor.stamina.can_sprint() {
                             reject_reason = Some("stamina_depleted");
                         } else {
@@ -6630,6 +7070,11 @@ impl M0Engine {
                             actor.cinematic_kind = Some(cf_actor::Stance::StealthAttack);
                             actor.cinematic_ticks_remaining = 72;
                             event_payload = json!({"actor": player_id.0, "stealth_meter": actor.stealth_meter});
+                            stealth_kill_attempt = Some(StealthKillAttempt {
+                                attacker: player_id,
+                                attacker_pos: actor.position,
+                                attacker_facing_x: actor.facing.sign(),
+                            });
                         } else {
                             reject_reason = Some("not_stealthy_enough");
                         }
@@ -6696,10 +7141,60 @@ impl M0Engine {
                     }
                     M6Action::DropItem { slot } => {
                         let drop_slot = slot.unwrap_or(actor.inventory.selected.0 as u8);
-                        event_payload = json!({"actor": player_id.0, "slot": drop_slot});
+                        let slot_idx = drop_slot as usize;
+                        let dropped_label = actor
+                            .inventory
+                            .items
+                            .get(slot_idx)
+                            .map(|it| it.label().to_string())
+                            .unwrap_or_else(|| "empty".to_string());
+                        let dropped_item_id = match actor.inventory.items.get(slot_idx) {
+                            Some(cf_actor::InventoryItem::Rifle { preset }) => preset.clone(),
+                            _ => String::new(),
+                        };
+                        let weight = match actor.inventory.items.get(slot_idx) {
+                            Some(cf_actor::InventoryItem::Rifle { .. }) => 3.5_f32,
+                            _ => 0.0_f32,
+                        };
+                        // Compute hand position with a small forward + up
+                        // toss so the dropped entity doesn't immediately
+                        // collide with the actor's collision proxy.
+                        let aim = if actor.aim == cf_actor::Vec2::ZERO {
+                            cf_actor::Vec2::new(actor.facing.sign(), 0.0)
+                        } else {
+                            actor.aim.normalize_or_x()
+                        };
+                        let hand_pos = cf_actor::Vec2::new(
+                            actor.position.x + aim.x * 12.0,
+                            actor.position.y + actor.half_extents.y * 0.5,
+                        );
+                        let toss_velocity = cf_actor::Vec2::new(aim.x * 80.0, 60.0);
+                        if dropped_item_id.is_empty() {
+                            reject_reason = Some("slot_empty");
+                        } else {
+                            actor.inventory.items[slot_idx] = cf_actor::InventoryItem::Empty;
+                            event_payload = json!({
+                                "actor": player_id.0,
+                                "slot": drop_slot,
+                                "item_id": dropped_item_id,
+                                "label": dropped_label,
+                                "position": [hand_pos.x, hand_pos.y],
+                                "velocity": [toss_velocity.x, toss_velocity.y],
+                                "weight_kg": weight,
+                            });
+                            drop_item_spawn = Some(DroppedItem {
+                                id: 0,
+                                item_id: dropped_item_id,
+                                position: hand_pos,
+                                weight_kg: weight,
+                                dropped_by: player_id,
+                                original_slot: drop_slot,
+                            });
+                        }
                     }
                     M6Action::Pickup => {
                         event_payload = json!({"actor": player_id.0});
+                        pickup_request_pos = Some(actor.position);
                     }
                     M6Action::SignalFriendly => {
                         event_payload = json!({"actor": player_id.0, "signal": "friendly"});
@@ -6708,7 +7203,7 @@ impl M0Engine {
                         event_payload = json!({"actor": player_id.0, "signal": "enemy_spotted"});
                     }
                     M6Action::MarkWaypoint { x, y } => {
-                        event_payload = json!({"actor": player_id.0, "x": *x, "y": *y});
+                        event_payload = json!({"actor": player_id.0, "x": *x, "y": *y, "position": [*x, *y]});
                     }
                     M6Action::DeployBipod => {
                         let can_deploy = actor.crouch_active || actor.prone_active;
@@ -6847,7 +7342,10 @@ impl M0Engine {
                         // `equipment.tool_broken` when durability hits 0. For
                         // tool="repair", restore wear on every tool entry in
                         // the actor's durability map and emit one
-                        // `equipment.tool_repaired` per target tool.
+                        // `equipment.tool_repaired` per target tool. Each
+                        // tool kind also produces tool-specific side-effects
+                        // captured in `tool_effect` for the post-dispatch
+                        // resolver.
                         const WEAR_PER_USE_DEFAULT: f32 = 1.0;
                         const REPAIR_RESTORE_DEFAULT: f32 = 25.0;
                         if tool_kind == "repair" {
@@ -6870,6 +7368,17 @@ impl M0Engine {
                                 "amount_restored": REPAIR_RESTORE_DEFAULT,
                             });
                             tool_repaired_pending = Some((player_id.0, REPAIR_RESTORE_DEFAULT, repaired));
+                            let aim = if actor.aim == cf_actor::Vec2::ZERO {
+                                cf_actor::Vec2::new(1.0, 0.0)
+                            } else {
+                                actor.aim.normalize_or_x()
+                            };
+                            tool_effect = Some(ToolEffect {
+                                kind: ToolEffectKind::Repair,
+                                origin: actor.position,
+                                aim,
+                                actor_id: player_id,
+                            });
                         } else {
                             let entry = actor
                                 .tool_durability
@@ -6877,6 +7386,30 @@ impl M0Engine {
                                 .or_insert_with(cf_equipment::Durability::default);
                             let broke = entry.apply_wear(WEAR_PER_USE_DEFAULT);
                             let remaining = entry.current;
+                            let aim = if actor.aim == cf_actor::Vec2::ZERO {
+                                cf_actor::Vec2::new(1.0, 0.0)
+                            } else {
+                                actor.aim.normalize_or_x()
+                            };
+                            let effect_kind = match tool_kind.as_str() {
+                                "foam" => Some(ToolEffectKind::Foam),
+                                "concrete" => Some(ToolEffectKind::Concrete),
+                                "welder" => Some(ToolEffectKind::Welder),
+                                "drill" => Some(ToolEffectKind::Drill),
+                                "multi_tool" | "multi-tool" => Some(ToolEffectKind::MultiTool),
+                                "beacon" => Some(ToolEffectKind::Beacon),
+                                "sensor_pulse" => Some(ToolEffectKind::SensorPulse),
+                                "digger" => Some(ToolEffectKind::Digger),
+                                _ => None,
+                            };
+                            if let Some(kind) = effect_kind {
+                                tool_effect = Some(ToolEffect {
+                                    kind,
+                                    origin: actor.position,
+                                    aim,
+                                    actor_id: player_id,
+                                });
+                            }
                             event_payload = json!({
                                 "actor": player_id.0,
                                 "tool": tool_kind,
@@ -7040,7 +7573,143 @@ impl M0Engine {
                 state.knife_projectiles.push(knife);
             }
         }
+        // **M6**: resolve the stealth-kill: find the nearest actor in front
+        // of (same facing as) the attacker within STEALTH_KILL_REACH, apply
+        // instant-kill damage, and emit `combat.stealth_kill_executed`.
+        // Gate already enforced by the dispatch (stealth_meter < MAX).
+        let mut stealth_kill_emit: Option<(u64, u64, f32, f32)> = None;
+        if let Some(attempt) = stealth_kill_attempt.take() {
+            let target_id_opt = state.actor_state.as_ref().and_then(|sim| {
+                sim.world
+                    .actors
+                    .iter()
+                    .filter(|(id, _)| **id != attempt.attacker)
+                    .filter_map(|(id, a)| {
+                        let dx = a.position.x - attempt.attacker_pos.x;
+                        let dy = a.position.y - attempt.attacker_pos.y;
+                        let distance = (dx * dx + dy * dy).sqrt();
+                        let facing_alignment = a.facing.sign() * attempt.attacker_facing_x;
+                        if distance <= cf_equipment::STEALTH_KILL_REACH && facing_alignment > 0.0 && !a.status.is_dead()
+                        {
+                            Some((*id, distance))
+                        } else {
+                            None
+                        }
+                    })
+                    .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+                    .map(|(id, _)| id)
+            });
+            if let Some(target_id) = target_id_opt {
+                let mut hp_before = 0.0;
+                let mut hp_after = 0.0;
+                if let Some(target) = state
+                    .actor_state
+                    .as_mut()
+                    .and_then(|sim| sim.world.actors.get_mut(&target_id))
+                {
+                    hp_before = target.hp;
+                    // Instant-kill: drive HP to zero so apply_damage flips
+                    // to DYING; clear mission_critical so DEAD is reachable.
+                    target.mission_critical = false;
+                    let _ = target.apply_damage(target.hp + 1.0);
+                    hp_after = target.hp;
+                }
+                stealth_kill_emit = Some((attempt.attacker.0, target_id.0, hp_before, hp_after));
+            }
+        }
         drop(state);
+        if let Some((attacker_id, target_id, hp_before, hp_after)) = stealth_kill_emit {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "combat",
+                "stealth_kill_executed",
+                json!({
+                    "attacker_id": attacker_id,
+                    "target_id": target_id,
+                    "actor": attacker_id,
+                    "victim_id": target_id,
+                    "hp_before": hp_before,
+                    "hp_after": hp_after,
+                }),
+                None,
+            );
+        }
+        // **M6**: apply per-tool side-effects + emit tool-specific events.
+        if let Some(effect) = tool_effect.take() {
+            self.apply_tool_effect(effect, tick, sim_time_ms);
+        }
+        // **M6**: spawn a physical item entity in the world for drop_item.
+        if let Some(mut spawn) = drop_item_spawn.take() {
+            if let Ok(mut s) = self.state.write() {
+                spawn.id = s.m6_next_dropped_item_id;
+                s.m6_next_dropped_item_id = s.m6_next_dropped_item_id.saturating_add(1);
+                s.m6_dropped_items.push(spawn);
+            }
+        }
+        // **M6**: scan pickup radius + add nearest item to first empty slot.
+        if let Some(actor_pos) = pickup_request_pos.take() {
+            const PICKUP_RADIUS: f32 = 24.0;
+            let mut picked: Option<(u64, String, f32, u8)> = None;
+            if let Ok(mut s) = self.state.write() {
+                let nearest_idx = s
+                    .m6_dropped_items
+                    .iter()
+                    .enumerate()
+                    .filter_map(|(i, item)| {
+                        let dx = item.position.x - actor_pos.x;
+                        let dy = item.position.y - actor_pos.y;
+                        let d2 = dx * dx + dy * dy;
+                        if d2 <= PICKUP_RADIUS * PICKUP_RADIUS {
+                            Some((i, d2))
+                        } else {
+                            None
+                        }
+                    })
+                    .min_by(|a, b| a.1.partial_cmp(&b.1).unwrap_or(std::cmp::Ordering::Equal))
+                    .map(|(i, _)| i);
+                if let Some(idx) = nearest_idx {
+                    let item = s.m6_dropped_items.remove(idx);
+                    if let Some(actor) = s
+                        .actor_state
+                        .as_mut()
+                        .and_then(|sim| sim.world.actors.get_mut(&player_id))
+                    {
+                        let mut slot_assigned: Option<u8> = None;
+                        for (slot_i, slot_item) in actor.inventory.items.iter_mut().enumerate() {
+                            if matches!(slot_item, cf_actor::InventoryItem::Empty) {
+                                *slot_item = cf_actor::InventoryItem::Rifle {
+                                    preset: item.item_id.clone(),
+                                };
+                                slot_assigned = Some(slot_i as u8);
+                                break;
+                            }
+                        }
+                        if let Some(slot) = slot_assigned {
+                            picked = Some((item.id, item.item_id.clone(), item.weight_kg, slot));
+                        } else {
+                            s.m6_dropped_items.push(item);
+                        }
+                    }
+                }
+            }
+            if let Some((dropped_id, item_id, weight, slot)) = picked {
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "equipment",
+                    "item_picked_up",
+                    json!({
+                        "actor": player_id.0,
+                        "item_id": item_id,
+                        "weight_kg": weight,
+                        "slot": slot,
+                        "dropped_item_id": dropped_id,
+                    }),
+                    None,
+                );
+            }
+        }
         // **M6**: emit follow-on events (melee hit, knockdown, tool broken,
         // tool repaired) AFTER releasing the write-guard so the recorder
         // can re-borrow without dead-locking.
@@ -7129,6 +7798,47 @@ impl M0Engine {
         }
         self.recorder
             .record(tick, sim_time_ms, "control", "command_accepted", accepted_payload, None);
+        // **M6**: signal_friendly / signal_enemy_spotted / mark_waypoint
+        // broadcast the corresponding intent to all squad followers via
+        // `cf_squad::Squad::broadcast_to_followers`. Mark_waypoint also
+        // emits a stand-alone `squad.waypoint_marked` event with the
+        // resolved position so the M7 mission director can hook it.
+        match &action {
+            crate::m6_actions::M6Action::SignalFriendly | crate::m6_actions::M6Action::SignalEnemySpotted => {
+                if let Ok(mut s) = self.state.write() {
+                    let cmd = cf_squad::SquadCommand {
+                        kind: cf_squad::SquadCommandKind::FollowLeader,
+                        waypoint: None,
+                        issuer: player_id,
+                    };
+                    let _ = s.squad.broadcast_to_followers(&cmd);
+                }
+            }
+            crate::m6_actions::M6Action::MarkWaypoint { x, y } => {
+                if let Ok(mut s) = self.state.write() {
+                    let cmd = cf_squad::SquadCommand {
+                        kind: cf_squad::SquadCommandKind::DefendPoint,
+                        waypoint: Some(cf_actor::Vec2::new(*x, *y)),
+                        issuer: player_id,
+                    };
+                    let _ = s.squad.broadcast_to_followers(&cmd);
+                }
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "squad",
+                    "waypoint_marked",
+                    json!({
+                        "issuer": player_id.0,
+                        "position": [*x, *y],
+                        "x": *x,
+                        "y": *y,
+                    }),
+                    None,
+                );
+            }
+            _ => {}
+        }
         // Per-action structured replay event in the matching category.
         let (category, event) = match &action {
             crate::m6_actions::M6Action::Sprint { .. } | crate::m6_actions::M6Action::Prone { .. } => {
@@ -7182,12 +7892,36 @@ impl M0Engine {
         if !self.config.has_actor_world {
             return self.reject_actor_command(tick, sim_time_ms, state, "act.squad.issue_command");
         }
+        let mut state = state;
+        let issuer = state.player_actor.unwrap_or_default();
+        // **M6**: build the command + apply it to the named member (or
+        // broadcast to all followers when `bot_actor` is None). This
+        // mutates `state.squad` so the AI tick can consult
+        // `member.current_command` and act accordingly.
+        let waypoint_v2 = waypoint.map(|(x, y)| cf_actor::Vec2::new(x, y));
+        let command_kind = match kind {
+            crate::m6_actions::SquadCommandKindOverWire::FollowLeader => cf_squad::SquadCommandKind::FollowLeader,
+            crate::m6_actions::SquadCommandKindOverWire::HoldPosition => cf_squad::SquadCommandKind::HoldPosition,
+            crate::m6_actions::SquadCommandKindOverWire::DefendPoint => cf_squad::SquadCommandKind::DefendPoint,
+            crate::m6_actions::SquadCommandKindOverWire::PushToWaypoint => cf_squad::SquadCommandKind::PushToWaypoint,
+        };
+        let command = cf_squad::SquadCommand {
+            kind: command_kind,
+            waypoint: waypoint_v2,
+            issuer,
+        };
+        let applied = if let Some(target_id) = bot_actor {
+            state.squad.issue_command(cf_actor::ActorId(target_id), command.clone())
+        } else {
+            state.squad.broadcast_to_followers(&command) > 0
+        };
         drop(state);
         let payload = json!({
             "method": "act.squad.issue_command",
             "bot_actor": bot_actor,
             "kind": kind.as_str(),
             "waypoint": waypoint.map(|(x, y)| json!({"x": x, "y": y})),
+            "applied": applied,
         });
         self.recorder
             .record(tick, sim_time_ms, "control", "command_accepted", payload.clone(), None);
