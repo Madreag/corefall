@@ -823,6 +823,15 @@ fn validate_one(path: &Path, report: &mut ValidationReport) {
         validate_ledger_jsonl(path, report);
         return;
     }
+    // **M4A**: validate the per-pipeline regen manifest at
+    // `content/asset_ledger/regen_manifest.ron` against its locked v1.0.0
+    // schema (`cf-asset-ledger/schemas/v1/regen_manifest.schema.json`). Each
+    // pipeline entry must declare pipeline_id / regen_command / model_version
+    // / deterministic; the rest of the schema's fields are optional.
+    if path.file_name().and_then(|s| s.to_str()) == Some("regen_manifest.ron") {
+        validate_regen_manifest(path, report);
+        return;
+    }
     // **M5**: per-event JSON schema files under cf-replay/schemas/event/.
     if is_event_schema_file(path) {
         validate_event_schema_file(path, report);
@@ -1272,6 +1281,81 @@ fn validate_scenario(path: &Path, report: &mut ValidationReport) {
         Err(err) => {
             report.add_error(path.to_path_buf(), format!("scenario load failed: {err}"));
         }
+    }
+}
+
+/// **M4A**: minimal structural mirror of `content/asset_ledger/regen_manifest.ron`,
+/// kept in this binary so the validator does not pull a serde dep into
+/// `cf-asset-ledger` itself. Matches the locked v1.0.0 schema at
+/// `cf-asset-ledger/schemas/v1/regen_manifest.schema.json`.
+#[derive(Debug, serde::Deserialize)]
+struct RegenManifestV1 {
+    schema_version: String,
+    pipelines: Vec<RegenPipelineEntry>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[allow(dead_code)]
+struct RegenPipelineEntry {
+    pipeline_id: String,
+    #[serde(default)]
+    owner_milestone: String,
+    regen_command: String,
+    model_version: String,
+    deterministic: bool,
+    #[serde(default)]
+    freeze_path_suffix: String,
+    #[serde(default)]
+    notes: String,
+}
+
+fn validate_regen_manifest(path: &Path, report: &mut ValidationReport) {
+    let raw = match fs::read_to_string(path) {
+        Ok(t) => t,
+        Err(err) => {
+            report.add_error(path.to_path_buf(), format!("read failed: {err}"));
+            return;
+        }
+    };
+    let manifest: RegenManifestV1 = match ron::from_str(&raw) {
+        Ok(m) => m,
+        Err(err) => {
+            report.add_error(path.to_path_buf(), format!("regen_manifest parse: {err}"));
+            return;
+        }
+    };
+    let mut messages: Vec<String> = Vec::new();
+    if manifest.schema_version != "1.0.0" {
+        messages.push(format!(
+            "regen_manifest.schema_version must be \"1.0.0\" (got {:?})",
+            manifest.schema_version
+        ));
+    }
+    if manifest.pipelines.is_empty() {
+        messages.push("regen_manifest.pipelines must contain at least one entry".to_string());
+    }
+    for (i, entry) in manifest.pipelines.iter().enumerate() {
+        if entry.pipeline_id.trim().is_empty() {
+            messages.push(format!("pipelines[{i}].pipeline_id must be non-empty"));
+        }
+        if entry.regen_command.trim().is_empty() {
+            messages.push(format!("pipelines[{i}].regen_command must be non-empty"));
+        }
+        if entry.model_version.trim().is_empty() {
+            messages.push(format!("pipelines[{i}].model_version must be non-empty"));
+        }
+    }
+    if messages.is_empty() {
+        report.add_pass(
+            path.to_path_buf(),
+            format!(
+                "regen_manifest v{} ({} pipelines)",
+                manifest.schema_version,
+                manifest.pipelines.len()
+            ),
+        );
+    } else {
+        report.add_error(path.to_path_buf(), messages.join("; "));
     }
 }
 
@@ -1850,5 +1934,116 @@ mod tests {
         assert_eq!(report.fail(), 1);
         let msg = &report.entries[0].message;
         assert!(msg.contains("id_drift"), "expected id_drift but got: {msg}");
+    }
+
+    #[test]
+    fn validate_regen_manifest_accepts_well_formed() {
+        let body = r#"(
+            schema_version: "1.0.0",
+            pipelines: [
+                (
+                    pipeline_id: "M9A_svg_v1",
+                    owner_milestone: "M9A",
+                    regen_command: "cf-tools-svg-gen --asset-id $ASSET_ID",
+                    model_version: "llm:gpt-4o-mini@2026-05",
+                    deterministic: true,
+                    freeze_path_suffix: ".frozen",
+                    notes: "ok",
+                ),
+            ],
+        )"#;
+        let path = write_tmp("regen_manifest.ron", body);
+        let mut report = ValidationReport::default();
+        validate_regen_manifest(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.pass(), 1, "expected PASS, got {:?}", report.entries);
+        assert_eq!(report.fail(), 0);
+    }
+
+    #[test]
+    fn validate_regen_manifest_accepts_missing_optional_fields() {
+        let body = r#"(
+            schema_version: "1.0.0",
+            pipelines: [
+                (
+                    pipeline_id: "minimal_v1",
+                    regen_command: "cf-tools-minimal",
+                    model_version: "v1",
+                    deterministic: false,
+                ),
+            ],
+        )"#;
+        let path = write_tmp("regen_manifest.ron", body);
+        let mut report = ValidationReport::default();
+        validate_regen_manifest(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.pass(), 1, "expected PASS, got {:?}", report.entries);
+    }
+
+    #[test]
+    fn validate_regen_manifest_rejects_wrong_schema_version() {
+        let body = r#"(
+            schema_version: "2.0.0",
+            pipelines: [
+                (
+                    pipeline_id: "x",
+                    regen_command: "y",
+                    model_version: "z",
+                    deterministic: true,
+                ),
+            ],
+        )"#;
+        let path = write_tmp("regen_manifest.ron", body);
+        let mut report = ValidationReport::default();
+        validate_regen_manifest(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+        assert!(report.entries[0].message.contains("schema_version"));
+    }
+
+    #[test]
+    fn validate_regen_manifest_rejects_empty_pipelines() {
+        let body = r#"(
+            schema_version: "1.0.0",
+            pipelines: [],
+        )"#;
+        let path = write_tmp("regen_manifest.ron", body);
+        let mut report = ValidationReport::default();
+        validate_regen_manifest(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+        assert!(report.entries[0].message.contains("pipelines"));
+    }
+
+    #[test]
+    fn validate_regen_manifest_rejects_empty_pipeline_id() {
+        let body = r#"(
+            schema_version: "1.0.0",
+            pipelines: [
+                (
+                    pipeline_id: "",
+                    regen_command: "y",
+                    model_version: "z",
+                    deterministic: true,
+                ),
+            ],
+        )"#;
+        let path = write_tmp("regen_manifest.ron", body);
+        let mut report = ValidationReport::default();
+        validate_regen_manifest(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+        assert!(report.entries[0].message.contains("pipeline_id"));
+    }
+
+    #[test]
+    fn validate_regen_manifest_rejects_malformed_ron() {
+        let body = "this is not valid ron";
+        let path = write_tmp("regen_manifest.ron", body);
+        let mut report = ValidationReport::default();
+        validate_regen_manifest(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+        assert!(report.entries[0].message.contains("regen_manifest parse"));
     }
 }

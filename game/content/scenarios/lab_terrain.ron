@@ -18,6 +18,6 @@
   ])),
   objectives: [], director: None,
   capabilities: (debug: false, control_api: true, save_load: false),
-  save_fields: [], expected_tests: [], notes: "Terrain lab: all 8 materials in columns for dig/tool testing.",
+  save_fields: [], expected_tests: ["DR023-LAB-TERRAIN-01"], notes: "Terrain lab: all 8 materials in columns for dig/tool testing.",
   scenario_tags: ["lab"],
 )

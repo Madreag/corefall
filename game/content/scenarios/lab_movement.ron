@@ -29,7 +29,7 @@
   director: None,
   capabilities: (debug: false, control_api: true, save_load: false),
   save_fields: [],
-  expected_tests: [],
+  expected_tests: ["DR023-LAB-MOVEMENT-01"],
   notes: "Movement lab: practice jump over obstacles, crouch under gaps, climb surfaces. No enemies, no timer.",
   scenario_tags: ["lab"],
 )
