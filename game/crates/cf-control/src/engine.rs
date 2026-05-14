@@ -5415,9 +5415,11 @@ impl M0Engine {
             actor: u64,
             surface: &'static str,
             loudness: f32,
+            band: &'static str,
         }
         struct OcclusionEmit {
             actor: u64,
+            receiver: u64,
             factor: f32,
         }
         let mut footsteps: Vec<FootstepEmit> = Vec::new();
@@ -5482,10 +5484,12 @@ impl M0Engine {
                 stance_loudness,
             };
             let loudness = cf_perception::footstep_loudness(emission);
+            let band = cf_perception::LoudnessBand::from_intensity(loudness).as_str();
             footsteps.push(FootstepEmit {
                 actor: actor_id.0,
                 surface: surface_kind.as_str(),
                 loudness,
+                band,
             });
         }
 
@@ -5533,6 +5537,7 @@ impl M0Engine {
                 if result.factor < 1.0 {
                     occlusions.push(OcclusionEmit {
                         actor: player_id.0,
+                        receiver: player_id.0,
                         factor: result.factor,
                     });
                 }
@@ -5551,6 +5556,7 @@ impl M0Engine {
                     "actor": emit.actor,
                     "surface": emit.surface,
                     "loudness": emit.loudness,
+                    "band": emit.band,
                 }),
                 None,
             );
@@ -5563,7 +5569,9 @@ impl M0Engine {
                 "occlusion_applied",
                 json!({
                     "actor": emit.actor,
+                    "receiver": emit.receiver,
                     "factor": emit.factor,
+                    "occlusion_factor": emit.factor,
                 }),
                 None,
             );
@@ -11405,5 +11413,158 @@ mod tests {
         let b_min = [100i64, 100i64];
         let b_max = [120i64, 120i64];
         assert!(rects_touch_or_overlap(a_min, a_max, b_min, b_max));
+    }
+
+    #[tokio::test]
+    async fn m6_sprint_drains_stamina_and_auto_cancels() {
+        let path = write_m1_scenario();
+        let config = load_m1_test_config(path);
+        let engine = M0Engine::new(config);
+        engine.record_run_started();
+
+        let result = engine
+            .dispatch(ControlCommand::ActM6 {
+                action: crate::m6_actions::M6Action::Sprint { active: true },
+                source: IntentSource::Cfctl,
+            })
+            .await;
+        assert_eq!(result.status, crate::state::ControlEnvelopeStatus::Accepted);
+
+        for _ in 0..(5 * 60 + 2) {
+            engine.drive_tick();
+        }
+
+        let events = engine.recorder().snapshot_events();
+        assert!(
+            events
+                .iter()
+                .any(|e| e.category == "actor" && e.event_type == "stamina_changed"),
+            "actor.stamina_changed must be emitted as stamina drains"
+        );
+        let state = engine.state.read().expect("engine state poisoned");
+        let sim = state.actor_state.as_ref().expect("actor sim present");
+        let actor = sim.world.actors.get(&ActorId(1)).expect("player actor present");
+        assert!(
+            actor.stamina.current <= 0.01,
+            "after 5s sprint stamina must drain to ~0: {}",
+            actor.stamina.current
+        );
+        assert!(!actor.sprint_active, "sprint must auto-cancel at zero stamina");
+    }
+
+    #[tokio::test]
+    async fn m6_cinematic_slide_transitions_back_to_crouch() {
+        let path = write_m1_scenario();
+        let config = load_m1_test_config(path);
+        let engine = M0Engine::new(config);
+        engine.record_run_started();
+
+        engine
+            .dispatch(ControlCommand::ActM6 {
+                action: crate::m6_actions::M6Action::Sprint { active: true },
+                source: IntentSource::Cfctl,
+            })
+            .await;
+        engine
+            .dispatch(ControlCommand::ActM6 {
+                action: crate::m6_actions::M6Action::Slide,
+                source: IntentSource::Cfctl,
+            })
+            .await;
+
+        for _ in 0..40 {
+            engine.drive_tick();
+        }
+
+        let events = engine.recorder().snapshot_events();
+        let stance_changed = events
+            .iter()
+            .find(|e| {
+                e.category == "actor"
+                    && e.event_type == "stance_changed"
+                    && e.payload
+                        .get("cause")
+                        .and_then(|v| v.as_str())
+                        .map(|s| s == "cinematic_complete")
+                        .unwrap_or(false)
+            })
+            .expect("actor.stance_changed must fire when slide finishes");
+        let to_stance = stance_changed
+            .payload
+            .get("to_stance")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
+        assert_eq!(to_stance, "crouching", "slide must transition to crouch");
+
+        let state = engine.state.read().expect("engine state poisoned");
+        let sim = state.actor_state.as_ref().expect("actor sim present");
+        let actor = sim.world.actors.get(&ActorId(1)).expect("player actor present");
+        assert_eq!(actor.cinematic_ticks_remaining, 0);
+        assert!(actor.cinematic_kind.is_none());
+    }
+
+    #[tokio::test]
+    async fn m6_lean_angle_approaches_target_over_time() {
+        let path = write_m1_scenario();
+        let config = load_m1_test_config(path);
+        let engine = M0Engine::new(config);
+        engine.record_run_started();
+
+        engine
+            .dispatch(ControlCommand::ActM6 {
+                action: crate::m6_actions::M6Action::Lean { direction: 1.0 },
+                source: IntentSource::Cfctl,
+            })
+            .await;
+
+        for _ in 0..120 {
+            engine.drive_tick();
+        }
+
+        let state = engine.state.read().expect("engine state poisoned");
+        let sim = state.actor_state.as_ref().expect("actor sim present");
+        let actor = sim.world.actors.get(&ActorId(1)).expect("player actor present");
+        assert!(
+            actor.lean_state.angle_degrees >= 40.0,
+            "lean angle must approach +45° (got {})",
+            actor.lean_state.angle_degrees
+        );
+    }
+
+    #[tokio::test]
+    async fn m6_weapon_swap_completes_after_300ms() {
+        let path = write_m1_scenario();
+        let config = load_m1_test_config(path);
+        let engine = M0Engine::new(config);
+        engine.record_run_started();
+
+        engine
+            .dispatch(ControlCommand::ActM6 {
+                action: crate::m6_actions::M6Action::WeaponSwap { slot: 1 },
+                source: IntentSource::Cfctl,
+            })
+            .await;
+
+        for _ in 0..30 {
+            engine.drive_tick();
+        }
+
+        let events = engine.recorder().snapshot_events();
+        assert!(
+            events
+                .iter()
+                .any(|e| e.category == "equipment" && e.event_type == "weapon_swap_started"),
+            "weapon_swap_started must fire when swap is requested"
+        );
+        assert!(
+            events
+                .iter()
+                .any(|e| e.category == "equipment" && e.event_type == "weapon_swap_completed"),
+            "weapon_swap_completed must fire after 300ms tick path: {:?}",
+            events
+                .iter()
+                .map(|e| (e.category.clone(), e.event_type.clone()))
+                .collect::<Vec<_>>()
+        );
     }
 }
