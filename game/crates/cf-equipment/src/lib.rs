@@ -24,7 +24,15 @@
     clippy::doc_markdown,
     clippy::struct_excessive_bools,
     clippy::derivable_impls,
-    clippy::missing_const_for_fn
+    clippy::missing_const_for_fn,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_precision_loss,
+    clippy::cast_lossless,
+    clippy::cast_possible_wrap,
+    clippy::float_cmp,
+    clippy::manual_is_multiple_of,
+    clippy::similar_names
 )]
 
 use std::collections::BTreeMap;
@@ -38,6 +46,46 @@ pub mod digger;
 pub mod projectile;
 pub use digger::DiggerTool;
 pub use projectile::ProjectileSpawnParams;
+
+// M6 modules — see spec § Files for the canonical list.
+pub mod bipod;
+pub mod durability;
+pub mod fire_modes;
+pub mod grenade;
+pub mod inventory;
+pub mod knife_throw;
+pub mod magazine;
+pub mod melee;
+pub mod shell;
+pub mod stealth_kill;
+pub mod suppressor;
+pub mod tool;
+pub mod weapon;
+pub mod weapon_swap;
+
+pub use bipod::{Bipod, BipodState, BIPOD_BLOOM_FACTOR, BIPOD_RECOIL_FACTOR};
+pub use durability::{Durability, DURABILITY_MAX};
+pub use fire_modes::{
+    charge_damage_multiplier, charge_fraction, AdvancedFireMode, FireModeSet, BURST3_INTER_SHOT_SECONDS,
+    BURST3_ROUND_COUNT, SNIPER_CHARGE_MAX_SECONDS, SNIPER_MISFIRE_BELOW,
+};
+pub use grenade::{cook_grenade, m6_grenade_presets, GrenadeKind, GrenadePreset};
+pub use inventory::{
+    ExtendedInventory, ExtendedSlot, SlotKind, SlotState, ACTIVE_SLOT_COUNT, TANK_SLOT_COUNT, TANK_SLOT_LOCKED_REASON,
+    TOTAL_SLOT_COUNT, WEIGHT_FORCE_CRAWL_KG, WEIGHT_FORCE_WALK_KG,
+};
+pub use knife_throw::{KnifeProjectile, KnifeThrowState, KNIFE_THROW_DAMAGE_FACTOR, KNIFE_THROW_MAX_FLIGHT_SECONDS};
+pub use magazine::{Magazine, PoppedRound, RoundKind};
+pub use melee::{m6_melee_presets, MeleeKind, MeleePreset};
+pub use shell::{ShellEjection, ShellKind};
+pub use stealth_kill::{
+    evaluate_attempt, StealthKillAttempt, StealthKillRejection, STEALTH_KILL_ANIMATION_SECONDS, STEALTH_KILL_METER_MAX,
+    STEALTH_KILL_REACH,
+};
+pub use suppressor::{Suppressor, SUPPRESSOR_LOUDNESS_FACTOR};
+pub use tool::{m6_tool_presets, ToolKind, ToolPreset};
+pub use weapon::{m6_weapon_presets, WeaponClass, WeaponPreset};
+pub use weapon_swap::{swap_duration_for_target, WeaponSwap, PISTOL_SWAP_SECONDS, WEAPON_SWAP_SECONDS};
 
 /// **M1**: how the weapon's fire button is consumed.
 ///

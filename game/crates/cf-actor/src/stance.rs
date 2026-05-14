@@ -186,11 +186,7 @@ pub fn stance_bloom_factor(stance: Stance) -> f32 {
         Stance::ProneWalk => 0.55,
         Stance::Lean => 0.8,
         Stance::Running => 1.4,
-        Stance::Sprint
-        | Stance::Climbing
-        | Stance::RopeClimb
-        | Stance::LadderClimb
-        | Stance::PipeClimb => 2.0,
+        Stance::Sprint | Stance::Climbing | Stance::RopeClimb | Stance::LadderClimb | Stance::PipeClimb => 2.0,
         Stance::Airborne | Stance::Jetting => 3.0,
         Stance::Slide => 0.9,
         Stance::Dive | Stance::Vault => 2.5,
