@@ -1539,6 +1539,7 @@ mod tests {
             weight_forces_walk: false,
             limb_loss: cf_actor::LimbLossFlags::default(),
             inventory_extended: Vec::new(),
+            weapon_state: cf_actor::WeaponStateView::default(),
         };
         let line = stance_line("airborne", Some(&player));
         assert!(line.contains("AIRBORNE"));

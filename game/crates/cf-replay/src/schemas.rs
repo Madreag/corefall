@@ -196,6 +196,54 @@ const SCHEMA_AUDIO_EVENT_REQUESTED: &str = include_str!("../schemas/event/audio_
 // projectile_hit_mo for M6 melee + grenade hits.
 const SCHEMA_COMBAT_MELEE_HIT_MO: &str = include_str!("../schemas/event/combat_melee_hit_mo.json");
 const SCHEMA_COMBAT_EXPLOSIVE_HIT_MO: &str = include_str!("../schemas/event/combat_explosive_hit_mo.json");
+// M6 actor / combat / equipment / inventory / perception / squad event
+// schema registrations. The 41 schema files were authored alongside the M6
+// dispatch surface but never wired into the validator registry — without
+// these include_str! lines + match arms the M5-locked envelope validator
+// silently bypasses every M6 event payload.
+const SCHEMA_ACTOR_ACTION_REJECTED: &str = include_str!("../schemas/event/actor_action_rejected.json");
+const SCHEMA_ACTOR_CLIMB_STARTED: &str = include_str!("../schemas/event/actor_climb_started.json");
+const SCHEMA_ACTOR_DIVE_STARTED: &str = include_str!("../schemas/event/actor_dive_started.json");
+const SCHEMA_ACTOR_FACING_CHANGED: &str = include_str!("../schemas/event/actor_facing_changed.json");
+const SCHEMA_ACTOR_LEAN_CHANGED: &str = include_str!("../schemas/event/actor_lean_changed.json");
+const SCHEMA_ACTOR_SLIDE_STARTED: &str = include_str!("../schemas/event/actor_slide_started.json");
+const SCHEMA_ACTOR_STAMINA_CHANGED: &str = include_str!("../schemas/event/actor_stamina_changed.json");
+const SCHEMA_ACTOR_STANCE_CHANGED: &str = include_str!("../schemas/event/actor_stance_changed.json");
+const SCHEMA_ACTOR_VAULT_STARTED: &str = include_str!("../schemas/event/actor_vault_started.json");
+const SCHEMA_COMBAT_KNIFE_THROW_LANDED: &str = include_str!("../schemas/event/combat_knife_throw_landed.json");
+const SCHEMA_COMBAT_KNIFE_THROW_STARTED: &str = include_str!("../schemas/event/combat_knife_throw_started.json");
+const SCHEMA_COMBAT_STEALTH_KILL_EXECUTED: &str = include_str!("../schemas/event/combat_stealth_kill_executed.json");
+const SCHEMA_EQUIPMENT_BEACON_DROPPED: &str = include_str!("../schemas/event/equipment_beacon_dropped.json");
+const SCHEMA_EQUIPMENT_BIPOD_DEPLOYED: &str = include_str!("../schemas/event/equipment_bipod_deployed.json");
+const SCHEMA_EQUIPMENT_BIPOD_STOWED: &str = include_str!("../schemas/event/equipment_bipod_stowed.json");
+const SCHEMA_EQUIPMENT_DRILL_OVERHEATED: &str = include_str!("../schemas/event/equipment_drill_overheated.json");
+const SCHEMA_EQUIPMENT_FIRE_MODE_CYCLED: &str = include_str!("../schemas/event/equipment_fire_mode_cycled.json");
+const SCHEMA_EQUIPMENT_GRENADE_COOKED: &str = include_str!("../schemas/event/equipment_grenade_cooked.json");
+const SCHEMA_EQUIPMENT_GRENADE_DETONATED: &str = include_str!("../schemas/event/equipment_grenade_detonated.json");
+const SCHEMA_EQUIPMENT_GRENADE_THROWN: &str = include_str!("../schemas/event/equipment_grenade_thrown.json");
+const SCHEMA_EQUIPMENT_ITEM_DROPPED: &str = include_str!("../schemas/event/equipment_item_dropped.json");
+const SCHEMA_EQUIPMENT_ITEM_PICKED_UP: &str = include_str!("../schemas/event/equipment_item_picked_up.json");
+const SCHEMA_EQUIPMENT_MAGAZINE_CHANGED: &str = include_str!("../schemas/event/equipment_magazine_changed.json");
+const SCHEMA_EQUIPMENT_MELEE_SWING: &str = include_str!("../schemas/event/equipment_melee_swing.json");
+const SCHEMA_EQUIPMENT_SENSOR_PULSE_FIRED: &str = include_str!("../schemas/event/equipment_sensor_pulse_fired.json");
+const SCHEMA_EQUIPMENT_SHELL_EJECTED: &str = include_str!("../schemas/event/equipment_shell_ejected.json");
+const SCHEMA_EQUIPMENT_SUPPRESSOR_ATTACHED: &str = include_str!("../schemas/event/equipment_suppressor_attached.json");
+const SCHEMA_EQUIPMENT_TOOL_BROKEN: &str = include_str!("../schemas/event/equipment_tool_broken.json");
+const SCHEMA_EQUIPMENT_TOOL_REPAIRED: &str = include_str!("../schemas/event/equipment_tool_repaired.json");
+const SCHEMA_EQUIPMENT_TOOL_USED: &str = include_str!("../schemas/event/equipment_tool_used.json");
+const SCHEMA_EQUIPMENT_WEAPON_SWAP_COMPLETED: &str =
+    include_str!("../schemas/event/equipment_weapon_swap_completed.json");
+const SCHEMA_EQUIPMENT_WEAPON_SWAP_STARTED: &str = include_str!("../schemas/event/equipment_weapon_swap_started.json");
+const SCHEMA_INVENTORY_TANK_SLOT_RESERVED: &str = include_str!("../schemas/event/inventory_tank_slot_reserved.json");
+const SCHEMA_INVENTORY_WEIGHT_CHANGED: &str = include_str!("../schemas/event/inventory_weight_changed.json");
+const SCHEMA_PERCEPTION_ACTOR_SIGNAL: &str = include_str!("../schemas/event/perception_actor_signal.json");
+const SCHEMA_PERCEPTION_FOOTSTEP_EMITTED: &str = include_str!("../schemas/event/perception_footstep_emitted.json");
+const SCHEMA_PERCEPTION_OCCLUSION_APPLIED: &str = include_str!("../schemas/event/perception_occlusion_applied.json");
+const SCHEMA_PERCEPTION_STEALTH_METER_CHANGED: &str =
+    include_str!("../schemas/event/perception_stealth_meter_changed.json");
+const SCHEMA_SQUAD_COMMAND_ISSUED: &str = include_str!("../schemas/event/squad_command_issued.json");
+const SCHEMA_SQUAD_MEMBER_ADDED: &str = include_str!("../schemas/event/squad_member_added.json");
+const SCHEMA_SQUAD_WAYPOINT_MARKED: &str = include_str!("../schemas/event/squad_waypoint_marked.json");
 
 /// Look up the schema source by `(category, event_type)`. Returns `None` if
 /// no schema exists for this pair (callers treat as "no validation
@@ -357,6 +405,51 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         // + grenade hits + M13 HE rounds.
         ("combat", "melee_hit_mo") => Some(SCHEMA_COMBAT_MELEE_HIT_MO),
         ("combat", "explosive_hit_mo") => Some(SCHEMA_COMBAT_EXPLOSIVE_HIT_MO),
+        // M6 actor / combat / equipment / inventory / perception / squad
+        // event payload schemas. Event types match the literals the cf-control
+        // engine records via `recorder.record(tick, sim_time_ms, category,
+        // event_type, payload, parent)` for each M6 dispatch path.
+        ("actor", "action_rejected") => Some(SCHEMA_ACTOR_ACTION_REJECTED),
+        ("actor", "climb_started") => Some(SCHEMA_ACTOR_CLIMB_STARTED),
+        ("actor", "dive_started") => Some(SCHEMA_ACTOR_DIVE_STARTED),
+        ("actor", "facing_changed") => Some(SCHEMA_ACTOR_FACING_CHANGED),
+        ("actor", "lean_changed") => Some(SCHEMA_ACTOR_LEAN_CHANGED),
+        ("actor", "slide_started") => Some(SCHEMA_ACTOR_SLIDE_STARTED),
+        ("actor", "stamina_changed") => Some(SCHEMA_ACTOR_STAMINA_CHANGED),
+        ("actor", "stance_changed") => Some(SCHEMA_ACTOR_STANCE_CHANGED),
+        ("actor", "vault_started") => Some(SCHEMA_ACTOR_VAULT_STARTED),
+        ("combat", "knife_throw_landed") => Some(SCHEMA_COMBAT_KNIFE_THROW_LANDED),
+        ("combat", "knife_throw_started") => Some(SCHEMA_COMBAT_KNIFE_THROW_STARTED),
+        ("combat", "stealth_kill_executed") => Some(SCHEMA_COMBAT_STEALTH_KILL_EXECUTED),
+        ("equipment", "beacon_dropped") => Some(SCHEMA_EQUIPMENT_BEACON_DROPPED),
+        ("equipment", "bipod_deployed") => Some(SCHEMA_EQUIPMENT_BIPOD_DEPLOYED),
+        ("equipment", "bipod_stowed") => Some(SCHEMA_EQUIPMENT_BIPOD_STOWED),
+        ("equipment", "drill_overheated") => Some(SCHEMA_EQUIPMENT_DRILL_OVERHEATED),
+        ("equipment", "fire_mode_cycled") => Some(SCHEMA_EQUIPMENT_FIRE_MODE_CYCLED),
+        ("equipment", "grenade_cooked") => Some(SCHEMA_EQUIPMENT_GRENADE_COOKED),
+        ("equipment", "grenade_detonated") => Some(SCHEMA_EQUIPMENT_GRENADE_DETONATED),
+        ("equipment", "grenade_thrown") => Some(SCHEMA_EQUIPMENT_GRENADE_THROWN),
+        ("equipment", "item_dropped") => Some(SCHEMA_EQUIPMENT_ITEM_DROPPED),
+        ("equipment", "item_picked_up") => Some(SCHEMA_EQUIPMENT_ITEM_PICKED_UP),
+        ("equipment", "magazine_changed") => Some(SCHEMA_EQUIPMENT_MAGAZINE_CHANGED),
+        ("equipment", "melee_swing") => Some(SCHEMA_EQUIPMENT_MELEE_SWING),
+        ("equipment", "sensor_pulse_fired") => Some(SCHEMA_EQUIPMENT_SENSOR_PULSE_FIRED),
+        ("equipment", "shell_ejected") => Some(SCHEMA_EQUIPMENT_SHELL_EJECTED),
+        ("equipment", "suppressor_attached") => Some(SCHEMA_EQUIPMENT_SUPPRESSOR_ATTACHED),
+        ("equipment", "tool_broken") => Some(SCHEMA_EQUIPMENT_TOOL_BROKEN),
+        ("equipment", "tool_repaired") => Some(SCHEMA_EQUIPMENT_TOOL_REPAIRED),
+        ("equipment", "tool_used") => Some(SCHEMA_EQUIPMENT_TOOL_USED),
+        ("equipment", "weapon_swap_completed") => Some(SCHEMA_EQUIPMENT_WEAPON_SWAP_COMPLETED),
+        ("equipment", "weapon_swap_started") => Some(SCHEMA_EQUIPMENT_WEAPON_SWAP_STARTED),
+        ("inventory", "tank_slot_reserved") => Some(SCHEMA_INVENTORY_TANK_SLOT_RESERVED),
+        ("inventory", "weight_changed") => Some(SCHEMA_INVENTORY_WEIGHT_CHANGED),
+        ("perception", "actor_signal") => Some(SCHEMA_PERCEPTION_ACTOR_SIGNAL),
+        ("perception", "footstep_emitted") => Some(SCHEMA_PERCEPTION_FOOTSTEP_EMITTED),
+        ("perception", "occlusion_applied") => Some(SCHEMA_PERCEPTION_OCCLUSION_APPLIED),
+        ("perception", "stealth_meter_changed") => Some(SCHEMA_PERCEPTION_STEALTH_METER_CHANGED),
+        ("squad", "command_issued") => Some(SCHEMA_SQUAD_COMMAND_ISSUED),
+        ("squad", "member_added") => Some(SCHEMA_SQUAD_MEMBER_ADDED),
+        ("squad", "waypoint_marked") => Some(SCHEMA_SQUAD_WAYPOINT_MARKED),
         _ => None,
     }
 }
@@ -834,6 +927,48 @@ mod tests {
             // M5-A2: combat melee + explosive hit_mo siblings.
             ("combat", "melee_hit_mo"),
             ("combat", "explosive_hit_mo"),
+            // M6 actor / combat / equipment / inventory / perception / squad.
+            ("actor", "action_rejected"),
+            ("actor", "climb_started"),
+            ("actor", "dive_started"),
+            ("actor", "facing_changed"),
+            ("actor", "lean_changed"),
+            ("actor", "slide_started"),
+            ("actor", "stamina_changed"),
+            ("actor", "stance_changed"),
+            ("actor", "vault_started"),
+            ("combat", "knife_throw_landed"),
+            ("combat", "knife_throw_started"),
+            ("combat", "stealth_kill_executed"),
+            ("equipment", "beacon_dropped"),
+            ("equipment", "bipod_deployed"),
+            ("equipment", "bipod_stowed"),
+            ("equipment", "drill_overheated"),
+            ("equipment", "fire_mode_cycled"),
+            ("equipment", "grenade_cooked"),
+            ("equipment", "grenade_detonated"),
+            ("equipment", "grenade_thrown"),
+            ("equipment", "item_dropped"),
+            ("equipment", "item_picked_up"),
+            ("equipment", "magazine_changed"),
+            ("equipment", "melee_swing"),
+            ("equipment", "sensor_pulse_fired"),
+            ("equipment", "shell_ejected"),
+            ("equipment", "suppressor_attached"),
+            ("equipment", "tool_broken"),
+            ("equipment", "tool_repaired"),
+            ("equipment", "tool_used"),
+            ("equipment", "weapon_swap_completed"),
+            ("equipment", "weapon_swap_started"),
+            ("inventory", "tank_slot_reserved"),
+            ("inventory", "weight_changed"),
+            ("perception", "actor_signal"),
+            ("perception", "footstep_emitted"),
+            ("perception", "occlusion_applied"),
+            ("perception", "stealth_meter_changed"),
+            ("squad", "command_issued"),
+            ("squad", "member_added"),
+            ("squad", "waypoint_marked"),
         ] {
             let raw = event_schema_for(cat, ty).unwrap_or_else(|| panic!("no schema for {cat}.{ty}"));
             let _parsed_value: serde_json::Value =

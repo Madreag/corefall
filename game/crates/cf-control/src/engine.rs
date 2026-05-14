@@ -718,6 +718,10 @@ struct EngineMutable {
     perf_coalesce_samples: Vec<u32>,
     perf_coalesce_rects_in_total: u64,
     perf_coalesce_rects_out_total: u64,
+    /// **M6**: squad-of-two state surfaced by `observe.squad`. Empty by
+    /// default — populated by scenarios that declare a friendly bot. See
+    /// `cf_squad::Squad` for the canonical shape.
+    squad: cf_squad::Squad,
 }
 
 /// Pending dig request set by `act.player.dig` and consumed at the start of the
@@ -925,6 +929,7 @@ impl M0Engine {
                 perf_coalesce_samples: Vec::new(),
                 perf_coalesce_rects_in_total: 0,
                 perf_coalesce_rects_out_total: 0,
+                squad: cf_squad::Squad::default(),
             }),
             recorder,
             current_tick,
@@ -5508,6 +5513,24 @@ impl M0Engine {
                             "cause": "cfctl_set_facing",
                         });
                     }
+                    M6Action::AimSetFacing { facing } => {
+                        let explicit_facing = if facing == "left" {
+                            cf_actor::FacingDirection::Left
+                        } else {
+                            cf_actor::FacingDirection::Right
+                        };
+                        let aim_unit = cf_actor::Vec2::new(explicit_facing.sign(), 0.0);
+                        actor.aim = aim_unit;
+                        let prev = actor.facing;
+                        let derived = cf_actor::FacingDirection::from_aim(aim_unit);
+                        actor.facing = derived;
+                        event_payload = json!({
+                            "actor": player_id.0,
+                            "from": prev.as_str(),
+                            "to": derived.as_str(),
+                            "cause": "cfctl_aim_set_facing",
+                        });
+                    }
                 }
             }
         }
@@ -5569,6 +5592,7 @@ impl M0Engine {
                 ("equipment", "suppressor_attached")
             }
             crate::m6_actions::M6Action::SetFacing { .. } => ("actor", "facing_changed"),
+            crate::m6_actions::M6Action::AimSetFacing { .. } => ("actor", "facing_changed"),
         };
         self.recorder
             .record(tick, sim_time_ms, category, event, event_payload, None);
@@ -5602,6 +5626,46 @@ impl M0Engine {
             "bot_actor": bot_actor,
             "kind": kind.as_str(),
             "waypoint": waypoint.map(|(x, y)| json!({"x": x, "y": y})),
+        });
+        self.recorder
+            .record(tick, sim_time_ms, "squad", "command_issued", squad_event, None);
+        CommandResult::accepted(tick.0)
+    }
+
+    /// **M6**: `act.squad.cancel_command` — returns the named squad member
+    /// to the default `FollowLeader` command. Re-emits
+    /// `squad.command_issued` with `kind="follow_leader"` so the replay
+    /// stream stays linear.
+    fn dispatch_squad_cancel_command(
+        &self,
+        actor_id: u64,
+        source: cf_actor::IntentSource,
+        tick: Tick,
+        sim_time_ms: f64,
+        state: std::sync::RwLockWriteGuard<'_, EngineMutable>,
+    ) -> CommandResult {
+        let _ = source;
+        if !self.config.has_actor_world {
+            return self.reject_actor_command(tick, sim_time_ms, state, "act.squad.cancel_command");
+        }
+        let mut state = state;
+        let target = cf_actor::ActorId(actor_id);
+        let updated = state
+            .squad
+            .issue_command(target, cf_squad::SquadCommand::follow(cf_actor::ActorId::default()));
+        drop(state);
+        let payload = json!({
+            "method": "act.squad.cancel_command",
+            "actor_id": actor_id,
+            "applied": updated,
+        });
+        self.recorder
+            .record(tick, sim_time_ms, "control", "command_accepted", payload, None);
+        let squad_event = json!({
+            "bot_actor": actor_id,
+            "kind": cf_squad::SquadCommandKind::FollowLeader.as_str(),
+            "waypoint": serde_json::Value::Null,
+            "cause": "cancel_command",
         });
         self.recorder
             .record(tick, sim_time_ms, "squad", "command_issued", squad_event, None);
@@ -7193,6 +7257,85 @@ impl EngineHandle for M0Engine {
         Some(v)
     }
 
+    /// **M6**: per-actor perception projection — sight cone + hearing radius
+    /// + stealth_meter + last footstep loudness band + last occlusion
+    /// factor + spotted flag. `actor_id=None` resolves to the player.
+    /// Returns `None` when no actor world is loaded.
+    async fn observe_perception(&self, actor_id: Option<u64>) -> Option<serde_json::Value> {
+        let state = self.state.read().ok()?;
+        let sim = state.actor_state.as_ref()?;
+        let target_id = actor_id.unwrap_or_else(|| sim.world.player.map(|id| id.0).unwrap_or(0));
+        let actor = sim.world.actors.get(&ActorId(target_id))?;
+        let events = self.recorder.snapshot_events();
+        let last_footstep_band = events
+            .iter()
+            .rev()
+            .find(|e| {
+                e.category == "perception"
+                    && e.event_type == "footstep_emitted"
+                    && e.payload
+                        .get("actor")
+                        .and_then(|v| v.as_u64())
+                        .map(|id| id == target_id)
+                        .unwrap_or(false)
+            })
+            .and_then(|e| e.payload.get("band").and_then(|v| v.as_str()).map(str::to_string))
+            .unwrap_or_else(|| cf_perception::LoudnessBand::Inaudible.as_str().to_string());
+        let last_occlusion = events
+            .iter()
+            .rev()
+            .find(|e| {
+                e.category == "perception"
+                    && e.event_type == "occlusion_applied"
+                    && e.payload
+                        .get("receiver")
+                        .and_then(|v| v.as_u64())
+                        .map(|id| id == target_id)
+                        .unwrap_or(false)
+            })
+            .and_then(|e| e.payload.get("occlusion_factor").and_then(|v| v.as_f64()))
+            .unwrap_or(1.0) as f32;
+        Some(json!({
+            "schema_version": 1,
+            "actor_id": target_id,
+            "sight_cone_degrees": 110.0,
+            "hearing_radius": cf_perception::ALARM_RADIUS_BASE,
+            "stealth_meter": actor.stealth_meter,
+            "spotted": actor.stealth_meter >= 0.5,
+            "last_footstep_loudness_band": last_footstep_band,
+            "last_occlusion_factor": last_occlusion,
+        }))
+    }
+
+    /// **M6**: squad-of-two projection — leader id + members[] each with
+    /// per-member current_command + hp + waypoint. Returns `None` when no
+    /// actor world is loaded.
+    async fn observe_squad(&self) -> Option<serde_json::Value> {
+        let state = self.state.read().ok()?;
+        let _sim = state.actor_state.as_ref()?;
+        let squad = state.squad.clone();
+        let members: Vec<serde_json::Value> = squad
+            .iter()
+            .map(|m| {
+                json!({
+                    "actor_id": m.actor.0,
+                    "role": m.role.as_str(),
+                    "display_name": m.display_name,
+                    "current_command": m.current_command.kind.as_str(),
+                    "waypoint": m.waypoint.map(|p| json!({"x": p.x, "y": p.y})),
+                    "hp": m.hp,
+                    "hp_max": m.hp_max,
+                })
+            })
+            .collect();
+        Some(json!({
+            "schema_version": 1,
+            "leader_id": squad.leader.as_ref().map(|l| l.actor.0),
+            "member_count": squad.member_count(),
+            "members": members,
+        }))
+    }
+
     /// **M2 re-audit (2026-05-13)**: full mission inspect including the last
     /// 30 mission-category events.
     async fn inspect_mission(&self) -> Option<serde_json::Value> {
@@ -7383,6 +7526,7 @@ impl EngineHandle for M0Engine {
                 ControlCommand::ActPlayerAbort { .. } => Some("act.player.abort"),
                 ControlCommand::ActM6 { action, .. } => Some(action.method_name()),
                 ControlCommand::ActSquadIssueCommand { .. } => Some("act.squad.issue_command"),
+                ControlCommand::ActSquadCancelCommand { .. } => Some("act.squad.cancel_command"),
                 _ => None,
             };
             if let Some(method_name) = method {
@@ -8983,6 +9127,9 @@ impl EngineHandle for M0Engine {
                 waypoint,
                 source,
             } => self.dispatch_squad_command(bot_actor, kind, waypoint, source, tick, sim_time_ms, state),
+            ControlCommand::ActSquadCancelCommand { actor_id, source } => {
+                self.dispatch_squad_cancel_command(actor_id, source, tick, sim_time_ms, state)
+            }
         }
     }
 }

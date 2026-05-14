@@ -64,6 +64,12 @@ pub enum M6Action {
     DetachSuppressor,
     /// Edge-trigger set side-view facing direction explicitly (debug/cfctl).
     SetFacing { facing: String },
+    /// Edge-trigger aim-driven set facing — explicit facing override that
+    /// also auto-derives body facing via `FacingDirection::from_aim`. Spec §
+    /// "Updated on act.player.aim direction (mouse position relative to
+    /// actor)". Distinct from `SetFacing` which is the manual cfctl
+    /// override (debug surface).
+    AimSetFacing { facing: String },
 }
 
 impl M6Action {
@@ -98,6 +104,7 @@ impl M6Action {
             M6Action::AttachSuppressor => "act.player.attach_suppressor",
             M6Action::DetachSuppressor => "act.player.detach_suppressor",
             M6Action::SetFacing { .. } => "act.player.set_facing",
+            M6Action::AimSetFacing { .. } => "act.player.aim_set_facing",
         }
     }
 }
@@ -145,6 +152,14 @@ pub struct ActSquadIssueCommandParams {
     pub waypoint: Option<(f32, f32)>,
 }
 
+/// `act.squad.cancel_command` — returns the named squad member to the
+/// default `FollowLeader` command. Re-emits `squad.command_issued` with
+/// `kind="follow_leader"` so the replay stream stays linear.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ActSquadCancelCommandParams {
+    pub actor_id: u64,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -181,6 +196,7 @@ mod tests {
             M6Action::AttachSuppressor,
             M6Action::DetachSuppressor,
             M6Action::SetFacing { facing: "right".into() },
+            M6Action::AimSetFacing { facing: "right".into() },
         ];
         let names: std::collections::BTreeSet<&str> = actions.iter().map(M6Action::method_name).collect();
         assert_eq!(names.len(), actions.len());

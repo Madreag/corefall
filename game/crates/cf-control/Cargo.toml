@@ -32,6 +32,8 @@ cf-terrain = { path = "../cf-terrain" }
 cf-material = { path = "../cf-material" }
 cf-ai = { path = "../cf-ai" }
 cf-audio = { path = "../cf-audio" }
+cf-perception = { path = "../cf-perception" }
+cf-squad = { path = "../cf-squad" }
 
 [dev-dependencies]
 anyhow = { workspace = true }

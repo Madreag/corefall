@@ -97,8 +97,8 @@ use crate::{
         ActPlayerJetParams, ActPlayerJumpParams, ActPlayerMoveParams, ActPlayerReloadParams, ActPlayerResetParams,
         ActPlayerSelectItemParams, ActPlayerSharpAimParams, InspectActorParams, InspectAiParams,
         InspectEquipmentParams, InspectMissionParams, ObserveActorParams, ObserveAiParams, ObserveMissionParams,
-        ObserveOnceParams, ObserveSubscribeParams, RunBundleWriteParams, RunForTicksParams, ScenarioLoadParams,
-        StepParams, SystemShutdownParams,
+        ObserveOnceParams, ObservePerceptionParams, ObserveSubscribeParams, RunBundleWriteParams, RunForTicksParams,
+        ScenarioLoadParams, StepParams, SystemShutdownParams,
     },
     schemas::{SCHEMA_VERSION, SCHEMA_VERSION_MIN},
     state::{ControlEnvelopeStatus, ObserveFrame, ObserveSettings},
@@ -453,6 +453,13 @@ pub enum ControlCommand {
         waypoint: Option<(f32, f32)>,
         source: IntentSource,
     },
+    /// **M6**: cancel the named squad member's current command, returning
+    /// them to the default `FollowLeader`. Re-emits `squad.command_issued`
+    /// with `kind="follow_leader"` so the replay stream stays linear.
+    ActSquadCancelCommand {
+        actor_id: u64,
+        source: IntentSource,
+    },
     SettingsSet {
         changes: SettingsPatch,
     },
@@ -506,6 +513,19 @@ pub trait EngineHandle: Send + Sync + 'static {
         None
     }
     async fn observe_actor(&self, _actor_id: Option<u64>) -> Option<serde_json::Value> {
+        None
+    }
+    /// **M6**: per-actor perception projection — sight cone + hearing radius
+    /// + stealth_meter + last footstep loudness band + last occlusion
+    /// factor + spotted flag. `actor_id=None` resolves to the player. Default
+    /// returns `None` for handlers without a perception kernel.
+    async fn observe_perception(&self, _actor_id: Option<u64>) -> Option<serde_json::Value> {
+        None
+    }
+    /// **M6**: squad-of-two projection — leader id + members[] each with
+    /// per-member current_command + hp + waypoint. Default returns `None`
+    /// when no squad is loaded.
+    async fn observe_squad(&self) -> Option<serde_json::Value> {
         None
     }
     /// **M1 Gap B3**: return the actor view plus its last `n` actor-category
@@ -1249,6 +1269,7 @@ async fn process_request<E: EngineHandle>(
                     | "act.player.attach_suppressor"
                     | "act.player.detach_suppressor"
                     | "act.player.set_facing"
+                    | "act.player.aim_set_facing"
             ) =>
         {
             let action = match decode_m6_action(m6_method, params) {
@@ -1281,6 +1302,22 @@ async fn process_request<E: EngineHandle>(
                     bot_actor: p.bot_actor,
                     kind: p.kind,
                     waypoint: p.waypoint,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        // M6: cancel a named squad member's current command, returning them
+        // to the default FollowLeader. Re-emits squad.command_issued with
+        // kind=follow_leader.
+        "act.squad.cancel_command" => {
+            let p: crate::m6_actions::ActSquadCancelCommandParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActSquadCancelCommand {
+                    actor_id: p.actor_id,
                     source: IntentSource::Cfctl,
                 })
                 .await;
@@ -1485,6 +1522,31 @@ async fn process_request<E: EngineHandle>(
             match engine.observe_ai(p.actor_id).await {
                 Some(value) => Some(success_response(request.id, value)),
                 None => Some(invalid_param_reason(request.id, "no_such_ai_actor")),
+            }
+        }
+        // M6: per-actor perception projection (sight cone + hearing radius +
+        // stealth meter + last footstep loudness band + last occlusion
+        // factor). Spec § "Crates / modules touched / cf-control" lists
+        // `observe.perception` alongside `observe.squad`.
+        "observe.perception" => {
+            let p: ObservePerceptionParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            match engine.observe_perception(p.actor_id).await {
+                Some(value) => Some(success_response(request.id, value)),
+                None => Some(invalid_param_reason(request.id, "no_player_actor")),
+            }
+        }
+        // M6: squad-of-two projection (leader + members[] + per-member
+        // current_command). Spec § "1 friendly bot + 4 squad commands".
+        "observe.squad" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            match engine.observe_squad().await {
+                Some(value) => Some(success_response(request.id, value)),
+                None => Some(invalid_param_reason(request.id, "no_squad_loaded")),
             }
         }
         // M4A: asset-ledger summary projection. Returns total + per-category +
@@ -1861,6 +1923,17 @@ fn decode_m6_action(method: &str, params: serde_json::Value) -> Result<crate::m6
                 return Err("invalid_facing".to_string());
             }
             Ok(M6Action::SetFacing { facing })
+        }
+        "act.player.aim_set_facing" => {
+            let facing = p
+                .get("facing")
+                .and_then(serde_json::Value::as_str)
+                .ok_or_else(|| "missing_facing".to_string())?
+                .to_string();
+            if facing != "left" && facing != "right" {
+                return Err("invalid_facing".to_string());
+            }
+            Ok(M6Action::AimSetFacing { facing })
         }
         _ => Err(format!("unknown_m6_method:{method}")),
     }

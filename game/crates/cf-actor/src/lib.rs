@@ -193,6 +193,8 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
+use cf_equipment::{AdvancedFireMode, BipodState};
+
 /// Stable per-actor id. Allocated by the scenario loader; future networking will
 /// reuse the same id space across the wire.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Default, Serialize, Deserialize)]
@@ -1714,6 +1716,11 @@ pub struct ActorObservation {
     /// + the locked tooltip on the reserved slots.
     #[serde(default)]
     pub inventory_extended: Vec<ExtendedInventorySlotView>,
+    /// **M6**: weapon-state projection (mag_remaining, fire_mode, bipod_state,
+    /// suppressor_attached, reload_state, charge_fraction). See
+    /// [`WeaponStateView`] for the shape contract.
+    #[serde(default)]
+    pub weapon_state: WeaponStateView,
 }
 
 /// **M6**: extended-inventory slot projection. Mirrors
@@ -1729,6 +1736,68 @@ pub struct ExtendedInventorySlotView {
     pub weight_kg: f32,
     #[serde(default)]
     pub locked_tooltip: Option<String>,
+}
+
+/// **M6**: high-level reload-state projection for [`WeaponStateView`].
+///
+/// `Idle` covers both "ready to fire" and "between shots / pump-action
+/// chamber" — anything that is not actively in a multi-tick reload animation.
+/// `Reloading` covers the multi-tick reload window driven by the M1
+/// `cf_equipment::RifleState::reload_remaining_ticks` counter (plus any
+/// future weapon-specific reload state machines).
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReloadState {
+    #[default]
+    Idle = 0,
+    Reloading = 1,
+}
+
+impl ReloadState {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ReloadState::Idle => "idle",
+            ReloadState::Reloading => "reloading",
+        }
+    }
+}
+
+/// **M6**: per-actor weapon-state observation projection (the spec § "Crates
+/// / modules touched / cf-actor" bullet "ActorObservation extensions
+/// (cover_state, stamina, lean_angle, weapon_state)" weapon_state field).
+///
+/// Six fields are surfaced:
+///
+/// - `mag_remaining` — current rounds in the chambered magazine (mirrors
+///   [`cf_equipment::RifleState::ammo_in_mag`] for an M1 rifle).
+/// - `fire_mode` — extended fire-mode discriminator
+///   ([`cf_equipment::AdvancedFireMode`]). Defaults to `Single` until the
+///   per-weapon `FireModeSet::current` is wired into the engine tick path.
+/// - `bipod_state` — current [`cf_equipment::BipodState`] (`Stowed` /
+///   `Deployed`). Default `Stowed` until bipod state lands on the actor's
+///   weapon.
+/// - `suppressor_attached` — true when the actor's currently-selected weapon
+///   has an attached, intact suppressor.
+/// - `reload_state` — [`ReloadState`] reload-window discriminator (`Idle` vs
+///   `Reloading`).
+/// - `charge_fraction` — charge-mode (e.g. sniper) accumulator scalar `0..1`.
+///   0.0 when the weapon is not in `AdvancedFireMode::Charge` mode.
+///
+/// The shape is deliberately additive — every field carries a default so the
+/// observation surface remains consistent even before the engine wires the
+/// per-actor bipod / suppressor / charge accumulator state. Future tick-path
+/// integration features (out of scope for this M6 schema-and-surface fix)
+/// will mutate these fields as the underlying state machines advance.
+#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct WeaponStateView {
+    pub mag_remaining: u32,
+    pub fire_mode: AdvancedFireMode,
+    pub bipod_state: BipodState,
+    pub suppressor_attached: bool,
+    pub reload_state: ReloadState,
+    pub charge_fraction: f32,
 }
 
 impl From<&ActorState> for ActorObservation {
@@ -1778,6 +1847,7 @@ impl From<&ActorState> for ActorObservation {
             weight_forces_walk: actor.inventory_weight_kg > 30.0,
             limb_loss: actor.limb_loss,
             inventory_extended: actor.extended_inventory_view(),
+            weapon_state: actor.weapon_state_view(),
         }
     }
 }
@@ -1826,6 +1896,26 @@ impl ActorState {
             });
         }
         out
+    }
+
+    /// **M6**: project a [`WeaponStateView`] for the actor's currently
+    /// selected weapon. The `mag_remaining` field is sourced from the M1
+    /// rifle preset's `mag_capacity` for a rifle slot (until the engine
+    /// hands back the live `RifleState::ammo_in_mag`), and zero for any
+    /// other slot. The other five fields default to their bottom-of-
+    /// ladder values (Single fire mode, Stowed bipod, no suppressor,
+    /// Idle reload, no charge) until tick-path integration lands the
+    /// per-weapon state struct on the actor. See the [`WeaponStateView`]
+    /// doc comment for the full shape contract.
+    pub fn weapon_state_view(&self) -> WeaponStateView {
+        let mag_remaining = match self.inventory.selected_item() {
+            InventoryItem::Rifle { preset } => cf_equipment::rifle_preset(preset).map_or(0, |spec| spec.mag_capacity),
+            InventoryItem::Empty => 0,
+        };
+        WeaponStateView {
+            mag_remaining,
+            ..WeaponStateView::default()
+        }
     }
 }
 
