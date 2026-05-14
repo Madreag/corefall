@@ -845,6 +845,15 @@ fn step_one_actor<R: FnMut() -> u64>(
     // **M5**: a destroyed `HandRight` / `ForearmRight` / `ArmRight` zone with
     // `disables_rifle_when_destroyed=true` in the BodyGraph movement contribution
     // gates the fire path so a player with a blown-off rifle arm cannot keep shooting.
+    //
+    // **M6**: `ActorState::weapon_fire_mode` selects between Single / Burst3 /
+    // Charge / Arc / Auto. The cf-control engine pre-processes Charge holds
+    // (accumulating `weapon_charge_fraction` up to
+    // [`cf_equipment::SNIPER_CHARGE_MAX_SECONDS`]) and post-processes the
+    // fired projectile with [`cf_equipment::charge_damage_multiplier`] +
+    // burst-3 follow-up + GL Arc conversion. The sim itself remains M1-shape;
+    // the fire-mode hooks live in the engine because they cross multiple
+    // sim ticks.
     let (rifle_selected, rifle_disabled_by_limb_loss, weapon_jammed, swap_in_progress) = {
         let actor = state.world.actors.get(&actor_id);
         let selected = actor.is_some_and(|a| a.inventory.selected_item().is_rifle());

@@ -800,6 +800,21 @@ struct EngineMutable {
     m6_dropped_items: Vec<DroppedItem>,
     /// **M6**: monotonic id counter for dropped items.
     m6_next_dropped_item_id: u64,
+    /// **M6**: per-actor latch consumed by `emit_actor_events` so a Charge-mode
+    /// release whose `charge_fraction < SNIPER_MISFIRE_BELOW` annotates the
+    /// `equipment.weapon_fired` event with `misfire=true`. Drained each tick
+    /// after the recorder reads it.
+    m6_charge_misfires: BTreeMap<ActorId, ChargeFireInfo>,
+}
+
+/// **M6**: per-actor charge-fire annotation shipped from the M6 post-step
+/// hook to `emit_actor_events`. `charge_fraction` is the latched accumulator
+/// at trigger release; `misfire` is true iff the fraction was below
+/// [`cf_equipment::SNIPER_MISFIRE_BELOW`].
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct ChargeFireInfo {
+    pub charge_fraction: f32,
+    pub misfire: bool,
 }
 
 /// **M6**: a physical item entity in the world. Spawned by
@@ -1161,6 +1176,7 @@ impl M0Engine {
                 m6_beacons: Vec::new(),
                 m6_dropped_items: Vec::new(),
                 m6_next_dropped_item_id: 1,
+                m6_charge_misfires: BTreeMap::new(),
             }),
             recorder,
             current_tick,
@@ -2065,7 +2081,7 @@ impl M0Engine {
             // augments this by running each reactive guard's controller and feeding its
             // generated intent into the same actor-step pipeline.
             if state.actor_state.is_some() {
-                let intent = state.pending_intent.clone();
+                let mut intent = state.pending_intent.clone();
                 state.pending_intent.clear_edges();
                 let region_min_x = self.config.region_anchor_x;
                 let region_max_x = self.config.region_anchor_x + self.config.region_width.max(0.0);
@@ -2077,6 +2093,63 @@ impl M0Engine {
                 .as_secs_f32();
                 let auto_reload = false;
                 let player = state.player_actor;
+                // **M6**: pre-step pass for `AdvancedFireMode::Charge` semantics.
+                // - While `intent.fire_held`: accumulate `weapon_charge_fraction`
+                //   at (tick_dt / SNIPER_CHARGE_MAX_SECONDS) per tick (so a full
+                //   charge lands at 0.8 s of hold per spec § "Sniper charge mode")
+                //   and suppress the rifle fire so the M1 path doesn't pop a round
+                //   prematurely.
+                // - On the release edge: synthesize a one-tick `intent.fire=true`
+                //   so the M1 rifle path produces exactly one shot (whose damage
+                //   the post-step pass scales by `charge_damage_multiplier`).
+                // `fire_held_prev` latches the previous tick's hold state so the
+                // release edge survives even when the player release-pulse is a
+                // single tick.
+                if let Some(player_id) = player {
+                    if let Some(sim) = state.actor_state.as_mut() {
+                        if let Some(actor) = sim.world.actors.get_mut(&player_id) {
+                            let now_held = intent.fire_held;
+                            let was_held = actor.fire_held_prev;
+                            match actor.weapon_fire_mode {
+                                cf_equipment::AdvancedFireMode::Charge => {
+                                    if now_held {
+                                        let inc = tick_dt / cf_equipment::SNIPER_CHARGE_MAX_SECONDS;
+                                        actor.weapon_charge_fraction =
+                                            (actor.weapon_charge_fraction + inc).clamp(0.0, 1.0);
+                                        intent.fire = false;
+                                        intent.fire_held = false;
+                                    } else if was_held && actor.weapon_charge_fraction > 0.0 {
+                                        intent.fire = true;
+                                        intent.fire_held = false;
+                                    } else {
+                                        actor.weapon_charge_fraction = 0.0;
+                                    }
+                                    actor.fire_held_prev = now_held;
+                                }
+                                cf_equipment::AdvancedFireMode::Burst3 => {
+                                    // Burst-3 is "fire 3 rounds per trigger
+                                    // press". Suppress the M1 trigger while a
+                                    // burst is still in flight so the
+                                    // FullAuto cadence on SMG doesn't pile
+                                    // overlapping bursts together. The first
+                                    // round still fires through the M1 path
+                                    // on the edge press; the M6 tick
+                                    // scheduler emits rounds 2 and 3.
+                                    if actor.burst3_remaining_shots > 0 {
+                                        intent.fire = false;
+                                        intent.fire_held = false;
+                                    }
+                                    actor.weapon_charge_fraction = 0.0;
+                                    actor.fire_held_prev = false;
+                                }
+                                _ => {
+                                    actor.weapon_charge_fraction = 0.0;
+                                    actor.fire_held_prev = false;
+                                }
+                            }
+                        }
+                    }
+                }
                 let mut intents = BTreeMap::new();
                 if let Some(player_id) = player {
                     intents.insert(player_id, intent.clone());
@@ -2711,7 +2784,14 @@ impl M0Engine {
         self.current_tick.store(new_tick, std::sync::atomic::Ordering::Relaxed);
 
         // Emit M1 events from the actor step.
-        if let Some((tick, sim_time_ms, intent, report)) = step_report {
+        if let Some((tick, sim_time_ms, intent, mut report)) = step_report {
+            // **M6**: post-step pass for `AdvancedFireMode::Burst3`,
+            // `AdvancedFireMode::Charge`, and the Grenade Launcher's
+            // `AdvancedFireMode::Arc` mode. Mutates the in-flight projectile
+            // list + the `report.spawned_projectiles` view so emit_actor_events
+            // sees the correctly-typed projectile (or no projectile, for Arc)
+            // and the right damage (for Charge).
+            self.post_process_m6_fire_modes(&mut report);
             self.emit_actor_events(tick, sim_time_ms, &intent, &report);
         }
         // **M1.5 G2 (hearing) end-of-tick**: promote alarms staged during
@@ -4628,20 +4708,39 @@ impl M0Engine {
             }
             if outcome.fired {
                 let muzzle = outcome.muzzle_origin.unwrap_or(Vec2::ZERO);
+                // **M6**: when the M6 fire-mode post-step pass latched a Charge
+                // misfire, surface it on the `equipment.weapon_fired` payload
+                // alongside the charge_fraction so replay consumers can render
+                // the "MISFIRE" caption + accurate charge bar.
+                let charge_info = self
+                    .state
+                    .read()
+                    .ok()
+                    .and_then(|s| s.m6_charge_misfires.get(&outcome.actor).copied());
+                let mut payload = json!({
+                    "actor": outcome.actor.0,
+                    "muzzle_origin": [muzzle.x, muzzle.y],
+                    "recoil_impulse": outcome.recoil_applied,
+                    "loudness_radius": outcome.loudness_radius,
+                    "bloom_factor": outcome.bloom_factor,
+                    "bipod_deployed": outcome.bipod_deployed_at_fire,
+                    "suppressor_attached": outcome.suppressor_attached_at_fire,
+                });
+                if let Some(info) = charge_info {
+                    if let Some(obj) = payload.as_object_mut() {
+                        obj.insert("misfire".to_string(), serde_json::Value::Bool(info.misfire));
+                        obj.insert(
+                            "charge_fraction".to_string(),
+                            serde_json::Value::from(info.charge_fraction),
+                        );
+                    }
+                }
                 let weapon_fired_id = self.recorder.record(
                     tick,
                     sim_time_ms,
                     "equipment",
                     "weapon_fired",
-                    json!({
-                        "actor": outcome.actor.0,
-                        "muzzle_origin": [muzzle.x, muzzle.y],
-                        "recoil_impulse": outcome.recoil_applied,
-                        "loudness_radius": outcome.loudness_radius,
-                        "bloom_factor": outcome.bloom_factor,
-                        "bipod_deployed": outcome.bipod_deployed_at_fire,
-                        "suppressor_attached": outcome.suppressor_attached_at_fire,
-                    }),
+                    payload,
                     Some(intent_event_id.clone()),
                 );
                 weapon_fired_event_by_actor.insert(outcome.actor.0, weapon_fired_id.clone());
@@ -5269,6 +5368,156 @@ impl M0Engine {
                 json!({"actor": id.0, "stage": stage}),
                 None,
             );
+        }
+    }
+
+    /// **M6**: post-`actor_step` pass that applies
+    /// [`cf_equipment::AdvancedFireMode`] semantics to projectiles the M1
+    /// rifle path just spawned. Three modes have non-Single behaviour:
+    ///
+    /// - `Burst3`: the first round fires through the M1 path; this hook
+    ///   queues `BURST3_ROUND_COUNT - 1` follow-up shots on the firing
+    ///   actor (`burst3_remaining_shots` + `burst3_next_fire_at_seconds`)
+    ///   so the M6 tick scheduler emits them at
+    ///   [`cf_equipment::BURST3_INTER_SHOT_SECONDS`] cadence — yielding 3
+    ///   projectiles within 100 ms per spec § "SMG burst-3 fire mode".
+    /// - `Charge`: the actor's `weapon_charge_fraction` is read, the
+    ///   resulting shot's damage is multiplied by
+    ///   [`cf_equipment::charge_damage_multiplier`], and a misfire
+    ///   annotation is latched on [`EngineMutable::m6_charge_misfires`]
+    ///   when `charge_fraction < SNIPER_MISFIRE_BELOW`. `emit_actor_events`
+    ///   consumes the latch to surface `misfire=true` on the
+    ///   `equipment.weapon_fired` payload.
+    /// - `Arc` on the Grenade Launcher: the spawned straight-flight rifle
+    ///   projectile is removed from `state.actor_state.projectiles` and the
+    ///   `report.spawned_projectiles` view, and a
+    ///   [`GrenadeProjectile`] is queued in `state.grenade_projectiles`
+    ///   with the M6 GL preset's `blast_radius=60` so the projectile arcs
+    ///   under gravity and detonates on impact per spec § "Grenade
+    ///   launcher arcing projectile".
+    fn post_process_m6_fire_modes(&self, report: &mut cf_actor::sim::StepReport) {
+        let Ok(mut state) = self.state.write() else {
+            return;
+        };
+        state.m6_charge_misfires.clear();
+
+        struct ActorFire {
+            actor: ActorId,
+            fire_mode: cf_equipment::AdvancedFireMode,
+            preset_id: String,
+            charge_fraction: f32,
+        }
+        let mut fires: Vec<ActorFire> = Vec::new();
+        for outcome in &report.actor_outcomes {
+            if !outcome.fired {
+                continue;
+            }
+            let Some(sim) = state.actor_state.as_ref() else {
+                break;
+            };
+            let Some(actor) = sim.world.actors.get(&outcome.actor) else {
+                continue;
+            };
+            let preset_id = match actor.inventory.selected_item() {
+                cf_actor::InventoryItem::Rifle { preset } => preset.clone(),
+                cf_actor::InventoryItem::Empty => String::new(),
+            };
+            fires.push(ActorFire {
+                actor: outcome.actor,
+                fire_mode: actor.weapon_fire_mode,
+                preset_id,
+                charge_fraction: actor.weapon_charge_fraction,
+            });
+        }
+
+        for fire in &fires {
+            match fire.fire_mode {
+                cf_equipment::AdvancedFireMode::Burst3 => {
+                    if let Some(sim) = state.actor_state.as_mut() {
+                        if let Some(actor) = sim.world.actors.get_mut(&fire.actor) {
+                            actor.burst3_remaining_shots = cf_equipment::BURST3_ROUND_COUNT.saturating_sub(1);
+                            actor.burst3_next_fire_at_seconds = cf_equipment::BURST3_INTER_SHOT_SECONDS;
+                        }
+                    }
+                }
+                cf_equipment::AdvancedFireMode::Charge => {
+                    let charge = fire.charge_fraction.clamp(0.0, 1.0);
+                    let multiplier = cf_equipment::charge_damage_multiplier(charge);
+                    let misfire = charge < cf_equipment::SNIPER_MISFIRE_BELOW;
+                    let mut ids: Vec<u64> = Vec::new();
+                    for spawn in report.spawned_projectiles.iter_mut() {
+                        if spawn.owner == fire.actor {
+                            spawn.damage *= multiplier;
+                            ids.push(spawn.id);
+                        }
+                    }
+                    if let Some(sim) = state.actor_state.as_mut() {
+                        for proj in sim.projectiles.iter_mut() {
+                            if ids.contains(&proj.id) {
+                                proj.damage *= multiplier;
+                            }
+                        }
+                        if let Some(actor) = sim.world.actors.get_mut(&fire.actor) {
+                            actor.weapon_charge_fraction = 0.0;
+                            actor.fire_held_prev = false;
+                        }
+                    }
+                    state.m6_charge_misfires.insert(
+                        fire.actor,
+                        ChargeFireInfo {
+                            charge_fraction: charge,
+                            misfire,
+                        },
+                    );
+                }
+                cf_equipment::AdvancedFireMode::Arc => {
+                    // Spawn a grenade_launcher arc projectile (gravity-affected
+                    // GrenadeProjectile with blast_radius=60 per spec) in place
+                    // of the straight-flight rifle round produced by the M1
+                    // path. Only fires when the selected weapon is the M6
+                    // grenade_launcher preset; other presets fall through to
+                    // the default rifle projectile.
+                    if fire.preset_id != cf_equipment::weapon::GRENADE_LAUNCHER_M6_DEFAULT_ID {
+                        continue;
+                    }
+                    let preset = cf_equipment::weapon::grenade_launcher::grenade_launcher_m6_default();
+                    let blast_radius = preset.firing.ai_blast_radius.max(60.0);
+                    let damage_at_center = preset.firing.damage_per_hit;
+                    let projectile_lifetime = preset.firing.projectile_lifetime_seconds.max(1.0);
+                    let mut converted: Vec<(u64, cf_actor::Vec2, cf_actor::Vec2)> = Vec::new();
+                    report.spawned_projectiles.retain(|spawn| {
+                        if spawn.owner == fire.actor {
+                            converted.push((spawn.id, spawn.origin, spawn.velocity));
+                            false
+                        } else {
+                            true
+                        }
+                    });
+                    if let Some(sim) = state.actor_state.as_mut() {
+                        sim.projectiles
+                            .retain(|p| !converted.iter().any(|(id, _, _)| *id == p.id));
+                    }
+                    for (proj_id, origin, velocity) in converted {
+                        state.grenade_projectiles.push(GrenadeProjectile {
+                            id: proj_id,
+                            owner: fire.actor,
+                            kind: cf_equipment::GrenadeKind::Frag,
+                            position: origin,
+                            velocity,
+                            fuse_remaining: projectile_lifetime,
+                            radius: blast_radius,
+                            damage_at_center,
+                            adhesive: false,
+                            spawns_hazard: false,
+                            vision_disrupt: false,
+                            stuck: false,
+                        });
+                    }
+                }
+                cf_equipment::AdvancedFireMode::Single
+                | cf_equipment::AdvancedFireMode::Auto
+                | cf_equipment::AdvancedFireMode::Pump => {}
+            }
         }
     }
 
@@ -6102,6 +6351,238 @@ impl M0Engine {
                 json!({"actor": actor_id, "state": "stowed", "cause": "auto_stow_on_stand"}),
                 None,
             );
+        }
+
+        // **M6**: tick `AdvancedFireMode::Burst3` follow-up shots. The first
+        // round in a burst already fired through the M1 path; this scheduler
+        // emits the remaining 2 rounds at `BURST3_INTER_SHOT_SECONDS` cadence
+        // so the full 3-round burst lands within 100 ms per spec § "SMG
+        // burst-3 fire mode" Gherkin.
+        struct Burst3Shot {
+            owner: ActorId,
+            projectile_id: u64,
+            shell_id: u64,
+            muzzle_origin: cf_actor::Vec2,
+            velocity: cf_actor::Vec2,
+            damage: f32,
+            loudness_radius: f32,
+            facing_sign: f32,
+            remaining_in_mag: u32,
+            is_tracer: bool,
+            spec_loudness: f32,
+            suppressor_attached: bool,
+            preset_id: String,
+        }
+        let mut burst3_shots: Vec<Burst3Shot> = Vec::new();
+        let actor_ids_burst: Vec<ActorId> = self
+            .state
+            .read()
+            .ok()
+            .and_then(|s| {
+                s.actor_state
+                    .as_ref()
+                    .map(|sim| sim.world.actors.keys().copied().collect())
+            })
+            .unwrap_or_default();
+        if let Ok(mut s) = self.state.write() {
+            for actor_id in &actor_ids_burst {
+                let (remaining, mut next_at, fire_mode) =
+                    match s.actor_state.as_ref().and_then(|sim| sim.world.actors.get(actor_id)) {
+                        Some(actor) => (
+                            actor.burst3_remaining_shots,
+                            actor.burst3_next_fire_at_seconds,
+                            actor.weapon_fire_mode,
+                        ),
+                        None => continue,
+                    };
+                if remaining == 0 || fire_mode != cf_equipment::AdvancedFireMode::Burst3 {
+                    if remaining > 0 {
+                        if let Some(actor) = s
+                            .actor_state
+                            .as_mut()
+                            .and_then(|sim| sim.world.actors.get_mut(actor_id))
+                        {
+                            actor.burst3_remaining_shots = 0;
+                            actor.burst3_next_fire_at_seconds = 0.0;
+                        }
+                    }
+                    continue;
+                }
+                next_at -= dt_seconds;
+                if next_at > 0.0 {
+                    if let Some(actor) = s
+                        .actor_state
+                        .as_mut()
+                        .and_then(|sim| sim.world.actors.get_mut(actor_id))
+                    {
+                        actor.burst3_next_fire_at_seconds = next_at;
+                    }
+                    continue;
+                }
+                let rifle_snapshot = s.actor_state.as_ref().and_then(|sim| sim.rifles.get(actor_id)).cloned();
+                let Some(rifle) = rifle_snapshot else {
+                    continue;
+                };
+                let spec = rifle.spec.clone();
+                let (position, aim, suppressor_factor, suppressor_attached) = {
+                    let Some(actor) = s.actor_state.as_ref().and_then(|sim| sim.world.actors.get(actor_id)) else {
+                        continue;
+                    };
+                    let aim = if actor.aim == cf_actor::Vec2::ZERO {
+                        cf_actor::Vec2::new(1.0, 0.0)
+                    } else {
+                        actor.aim.normalize_or_x()
+                    };
+                    (
+                        actor.position,
+                        aim,
+                        actor.suppressor.loudness_factor(),
+                        actor.suppressor.attached && actor.suppressor.integrity > 0.0,
+                    )
+                };
+                let muzzle = cf_actor::Vec2::new(
+                    position.x + aim.x * spec.muzzle_forward_offset,
+                    position.y + spec.muzzle_vertical_offset + aim.y * spec.muzzle_forward_offset,
+                );
+                let velocity = cf_actor::Vec2::new(aim.x * spec.projectile_speed, aim.y * spec.projectile_speed);
+                let loudness_radius = 480.0_f32
+                    * (spec.damage_per_hit / 10.0).clamp(1.0, 3.0)
+                    * spec.loudness.max(0.1)
+                    * suppressor_factor;
+                let max_flight = rifle.projectile_max_flight_ticks();
+                let projectile_id = s.next_guard_projectile_id;
+                s.next_guard_projectile_id = s.next_guard_projectile_id.saturating_add(1);
+                let shell_id = s.next_guard_projectile_id;
+                s.next_guard_projectile_id = s.next_guard_projectile_id.saturating_add(1);
+                let facing_sign = if aim.x >= 0.0 { 1.0_f32 } else { -1.0_f32 };
+                if let Some(sim) = s.actor_state.as_mut() {
+                    sim.projectiles.push(cf_actor::sim::Projectile {
+                        id: projectile_id,
+                        owner: *actor_id,
+                        origin: muzzle,
+                        position: muzzle,
+                        velocity,
+                        damage: spec.damage_per_hit,
+                        remaining_ticks: max_flight,
+                    });
+                }
+                let mag_remaining = s
+                    .actor_state
+                    .as_ref()
+                    .and_then(|sim| sim.rifles.get(actor_id))
+                    .map_or(0_u32, |r| r.ammo_in_mag);
+                let is_tracer = spec.tracer_round_to_total_ratio > 0
+                    && (rifle.shot_index_in_mag % spec.tracer_round_to_total_ratio.max(1))
+                        == spec.tracer_round_to_total_ratio.max(1) - 1;
+                burst3_shots.push(Burst3Shot {
+                    owner: *actor_id,
+                    projectile_id,
+                    shell_id,
+                    muzzle_origin: muzzle,
+                    velocity,
+                    damage: spec.damage_per_hit,
+                    loudness_radius,
+                    facing_sign,
+                    remaining_in_mag: mag_remaining,
+                    is_tracer,
+                    spec_loudness: spec.loudness,
+                    suppressor_attached,
+                    preset_id: spec.preset_id.clone(),
+                });
+                if let Some(actor) = s
+                    .actor_state
+                    .as_mut()
+                    .and_then(|sim| sim.world.actors.get_mut(actor_id))
+                {
+                    actor.burst3_remaining_shots = actor.burst3_remaining_shots.saturating_sub(1);
+                    actor.burst3_next_fire_at_seconds = if actor.burst3_remaining_shots > 0 {
+                        cf_equipment::BURST3_INTER_SHOT_SECONDS
+                    } else {
+                        0.0
+                    };
+                }
+                let _ = facing_sign;
+            }
+        }
+
+        for shot in burst3_shots {
+            let weapon_fired_id = self.recorder.record(
+                tick,
+                sim_time_ms,
+                "equipment",
+                "weapon_fired",
+                json!({
+                    "actor": shot.owner.0,
+                    "preset_id": shot.preset_id,
+                    "muzzle_origin": [shot.muzzle_origin.x, shot.muzzle_origin.y],
+                    "bipod_deployed": false,
+                    "suppressor_attached": shot.suppressor_attached,
+                    "burst3_followup": true,
+                }),
+                None,
+            );
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "combat",
+                "projectile_spawned",
+                json!({
+                    "id": shot.projectile_id,
+                    "owner": shot.owner.0,
+                    "origin": [shot.muzzle_origin.x, shot.muzzle_origin.y],
+                    "velocity": [shot.velocity.x, shot.velocity.y],
+                    "damage": shot.damage,
+                    "is_tracer": shot.is_tracer,
+                    "particle_index": 0,
+                    "particle_count": 1,
+                    "burst3_followup": true,
+                }),
+                Some(weapon_fired_id.clone()),
+            );
+            let shell = cf_equipment::ShellEjection::default_for(
+                cf_equipment::ShellKind::Rifle,
+                shot.shell_id,
+                shot.muzzle_origin.x,
+                shot.muzzle_origin.y + 4.0,
+                shot.facing_sign,
+            );
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "equipment",
+                "shell_ejected",
+                json!({
+                    "actor": shot.owner.0,
+                    "shell_id": shell.shell_id,
+                    "kind": shell.kind.as_str(),
+                    "origin": [shell.origin_x, shell.origin_y],
+                    "velocity": [shell.velocity_x, shell.velocity_y],
+                    "lifetime_seconds": shell.lifetime_seconds,
+                    "cosmetic": true,
+                }),
+                Some(weapon_fired_id.clone()),
+            );
+            if shot.loudness_radius > 0.0 {
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "equipment",
+                    "alarm_registered",
+                    json!({
+                        "actor": shot.owner.0,
+                        "source_id": shot.preset_id,
+                        "pos": [shot.muzzle_origin.x, shot.muzzle_origin.y],
+                        "muzzle_origin": [shot.muzzle_origin.x, shot.muzzle_origin.y],
+                        "loudness_radius": shot.loudness_radius,
+                        "loudness": shot.loudness_radius,
+                        "suppressed": shot.suppressor_attached,
+                        "cause": "weapon_fired",
+                    }),
+                    Some(weapon_fired_id),
+                );
+            }
+            let _ = shot.remaining_in_mag;
+            let _ = shot.spec_loudness;
         }
     }
 
@@ -7235,7 +7716,38 @@ impl M0Engine {
                         }
                     }
                     M6Action::CycleFireMode => {
-                        event_payload = json!({"actor": player_id.0});
+                        // **M6**: cycle the actor's current weapon to the next
+                        // entry in its [`cf_equipment::FireModeSet::available`]
+                        // list. The selected weapon's preset id determines the
+                        // mode ladder (see [`cf_equipment::available_fire_modes_for`]);
+                        // unknown / empty slots fall back to `[Single]` so the
+                        // call is always well-defined. Updates
+                        // `actor.weapon_fire_mode` and emits
+                        // `equipment.fire_mode_cycled` with both `from_mode` and
+                        // `to_mode` so replay consumers can render the HUD
+                        // transition.
+                        let preset_id = match actor.inventory.selected_item() {
+                            cf_actor::InventoryItem::Rifle { preset } => preset.clone(),
+                            cf_actor::InventoryItem::Empty => String::new(),
+                        };
+                        let available = cf_equipment::available_fire_modes_for(&preset_id);
+                        let from_mode = actor.weapon_fire_mode;
+                        let mut mode_set = cf_equipment::FireModeSet {
+                            available,
+                            current: from_mode,
+                        };
+                        let to_mode = mode_set.cycle_next();
+                        actor.weapon_fire_mode = to_mode;
+                        if to_mode != cf_equipment::AdvancedFireMode::Charge {
+                            actor.weapon_charge_fraction = 0.0;
+                        }
+                        event_payload = json!({
+                            "actor": player_id.0,
+                            "from_mode": from_mode.as_str(),
+                            "to_mode": to_mode.as_str(),
+                            "new_mode": to_mode.as_str(),
+                            "weapon_preset": preset_id,
+                        });
                     }
                     M6Action::CookGrenade => {
                         // **M6**: cook the held grenade — subtract cook tick from
