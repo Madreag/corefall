@@ -1327,9 +1327,7 @@ fn validate_m6_registry_common(
     }
     for (i, k) in entry_kinds.iter().enumerate() {
         if k.trim().is_empty() {
-            messages.push(format!(
-                "{expected_label}[{i}].kind/class must be non-empty"
-            ));
+            messages.push(format!("{expected_label}[{i}].kind/class must be non-empty"));
         }
     }
     let _ = path;
