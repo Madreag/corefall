@@ -1348,6 +1348,24 @@ impl M0Engine {
                     }),
                     parent_event_id.map(|s| s.to_string()),
                 );
+                // **M6 § Tank slot reservation**: emit one
+                // `inventory.tank_slot_reserved` event per reserved tank
+                // slot at actor spawn so the M17 unlock can rely on the
+                // spec-required event surface being present from M6 onward.
+                for slot_kind in ["tank_primary", "tank_secondary", "tank_utility"] {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "inventory",
+                        "tank_slot_reserved",
+                        json!({
+                            "actor": actor.id.0,
+                            "slot_kind": slot_kind,
+                            "slot_state": "locked",
+                        }),
+                        parent_event_id.map(|s| s.to_string()),
+                    );
+                }
             }
         }
         if let Some(reactors) = reactor_world {
