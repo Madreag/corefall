@@ -11,6 +11,8 @@ members = [
   "crates/cf-actor",
   "crates/cf-chassis",
   "crates/cf-equipment",
+  "crates/cf-perception",
+  "crates/cf-squad",
   "crates/cf-ai",
   "crates/cf-mission",
   "crates/cf-replay",

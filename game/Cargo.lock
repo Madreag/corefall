@@ -1652,6 +1652,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "cf-perception"
+version = "0.0.1"
+dependencies = [
+ "cf-actor",
+ "serde",
+ "tracing",
+]
+
+[[package]]
 name = "cf-physics"
 version = "0.0.1"
 dependencies = [
@@ -1754,6 +1763,15 @@ dependencies = [
  "rand_xoshiro",
  "serde",
  "thiserror 2.0.18",
+ "tracing",
+]
+
+[[package]]
+name = "cf-squad"
+version = "0.0.1"
+dependencies = [
+ "cf-actor",
+ "serde",
  "tracing",
 ]
 

@@ -41,7 +41,153 @@
     clippy::needless_pass_by_value
 )]
 
+pub mod cover;
+pub mod lean;
 pub mod sim;
+pub mod stamina;
+pub mod stance;
+
+pub use cover::{CoverSide, CoverState};
+pub use lean::{LeanDirection, LeanState, LEAN_MAX_DEGREES};
+pub use stamina::{Stamina, SPRINT_STAMINA_DRAIN_PER_S, SPRINT_STAMINA_RECOVERY_PER_S};
+pub use stance::{derive_stance, fire_allowed_in_stance, is_cinematic, stance_bloom_factor, StanceInputs};
+
+/// **M6**: side-view facing direction. Updated when the player aims; the
+/// sprite renderer flips horizontally on change. M13 chassis adds armor
+/// zone visibility per facing direction (spec § "Side-view facing direction
+/// + limb-loss action restrictions (M13 forward-compat)").
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FacingDirection {
+    Left = 0,
+    Right = 1,
+}
+
+impl Default for FacingDirection {
+    fn default() -> Self {
+        FacingDirection::Right
+    }
+}
+
+impl FacingDirection {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            FacingDirection::Left => "left",
+            FacingDirection::Right => "right",
+        }
+    }
+
+    /// Flip the facing direction.
+    pub fn flipped(self) -> Self {
+        match self {
+            FacingDirection::Left => FacingDirection::Right,
+            FacingDirection::Right => FacingDirection::Left,
+        }
+    }
+
+    /// Derive facing from an aim vector. Right-half-plane returns Right.
+    pub fn from_aim(aim: Vec2) -> Self {
+        if aim.x >= 0.0 {
+            FacingDirection::Right
+        } else {
+            FacingDirection::Left
+        }
+    }
+
+    pub fn sign(self) -> f32 {
+        match self {
+            FacingDirection::Left => -1.0,
+            FacingDirection::Right => 1.0,
+        }
+    }
+}
+
+/// **M6 (M13 forward-compat)**: per-limb loss tracking. M6 only sets these
+/// flags via scenario seed / debug commands so the action-rejection surface
+/// can be tested before M13 chassis ships full limb damage routing. Each
+/// flag rejects a specific action category per spec § "Limb-loss action
+/// restrictions".
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct LimbLossFlags {
+    pub both_arms_lost: bool,
+    pub single_arm_lost: bool,
+    pub both_legs_lost: bool,
+    pub single_leg_lost: bool,
+    pub both_hands_lost: bool,
+    pub backpack_lost: bool,
+    pub head_destroyed: bool,
+    pub torso_destroyed: bool,
+}
+
+impl LimbLossFlags {
+    /// True when the actor cannot fire any weapon (both arms lost or both
+    /// hands lost).
+    pub fn weapon_fire_disabled(self) -> bool {
+        self.both_arms_lost || self.both_hands_lost
+    }
+
+    /// True when two-hand weapons are rejected (single arm lost).
+    pub fn two_hand_weapon_disabled(self) -> bool {
+        self.single_arm_lost
+    }
+
+    /// True when sprint / jump / vault / climb are rejected.
+    pub fn movement_disabled(self) -> bool {
+        self.both_legs_lost
+    }
+
+    /// True when sprint / jump are rejected (but reduced-mobility movement still ok).
+    pub fn sprint_disabled(self) -> bool {
+        self.both_legs_lost || self.single_leg_lost
+    }
+
+    /// True for instant-death conditions.
+    pub fn instant_death(self) -> bool {
+        self.head_destroyed || self.torso_destroyed
+    }
+
+    /// Short reason label per spec § "Limb-loss action restrictions".
+    /// Returns the most-specific reason that applies for the given action.
+    pub fn reject_reason_for(self, action: &str) -> Option<&'static str> {
+        match action {
+            "fire" | "throw_grenade" | "knife_throw" => {
+                if self.both_hands_lost {
+                    Some("no_hands_for_grip")
+                } else if self.both_arms_lost {
+                    Some("no_arms_for_weapon")
+                } else {
+                    None
+                }
+            }
+            "two_hand_fire" => {
+                if self.single_arm_lost {
+                    Some("single_arm_two_hand_weapon_rejected")
+                } else {
+                    None
+                }
+            }
+            "sprint" | "jump" | "vault" | "climb_up" | "climb_down" => {
+                if self.both_legs_lost {
+                    Some("no_legs_for_movement")
+                } else if self.single_leg_lost {
+                    Some("single_leg_reduced_mobility")
+                } else {
+                    None
+                }
+            }
+            "deploy_jet" => {
+                if self.backpack_lost {
+                    Some("backpack_lost_no_jet")
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+}
 
 use std::collections::BTreeMap;
 
@@ -151,6 +297,39 @@ pub enum Stance {
     /// W1.3: temporarily stunned by stability loss. Actor cannot accept input
     /// but is not Downed (will recover in knockdown_ticks_remaining ticks).
     KnockedDown = 10,
+    /// M6: explicit upright-stationary stance (modern tactical shooter
+    /// surface; distinct from `Idle` so HUD/AI can name it directly).
+    Stand = 11,
+    /// M6: sprinting (faster than running; depletes stamina).
+    Sprint = 12,
+    /// M6: crouch-walking (speed below run threshold while crouched).
+    CrouchWalk = 13,
+    /// M6: prone-stationary (lowest silhouette; bipod-deployable).
+    Prone = 14,
+    /// M6: prone-crawling (moving while prone).
+    ProneWalk = 15,
+    /// M6: sprint-to-crouch transition (600 ms with i-frames).
+    Slide = 16,
+    /// M6: vaulting over low cover (800 ms; transitions to other side).
+    Vault = 17,
+    /// M6: forward-roll evasive (600 ms; brief i-frames).
+    Dive = 18,
+    /// M6: leaning around corner (lean_angle in `ActorState::lean_angle`).
+    Lean = 19,
+    /// M6: explicit DYING dwell stance (visually distinct from Downed).
+    Dying = 20,
+    /// M6: rope climbing (reserved; ladder takes priority for M6).
+    RopeClimb = 21,
+    /// M6: ladder climbing (1500 ms transition to top).
+    LadderClimb = 22,
+    /// M6: pipe climbing.
+    PipeClimb = 23,
+    /// M6: stealth-kill animation in progress (instant kill once landed).
+    StealthAttack = 24,
+    /// M6: knife throw windup + release.
+    KnifeThrow = 25,
+    /// M16+ reserved: aquatic locomotion.
+    Swim = 26,
 }
 
 impl Stance {
@@ -174,7 +353,41 @@ impl Stance {
             Stance::Jetting => "jetting",
             Stance::Ejecting => "ejecting",
             Stance::KnockedDown => "knocked_down",
+            Stance::Stand => "stand",
+            Stance::Sprint => "sprint",
+            Stance::CrouchWalk => "crouch_walk",
+            Stance::Prone => "prone",
+            Stance::ProneWalk => "prone_walk",
+            Stance::Slide => "slide",
+            Stance::Vault => "vault",
+            Stance::Dive => "dive",
+            Stance::Lean => "lean",
+            Stance::Dying => "dying",
+            Stance::RopeClimb => "rope_climb",
+            Stance::LadderClimb => "ladder_climb",
+            Stance::PipeClimb => "pipe_climb",
+            Stance::StealthAttack => "stealth_attack",
+            Stance::KnifeThrow => "knife_throw",
+            Stance::Swim => "swim",
         }
+    }
+
+    /// M6: returns true when this stance prevents the actor from firing
+    /// (slide/vault/dive/stealth attack/knife throw + dead/downed/dying/knockdown).
+    pub fn locks_fire(self) -> bool {
+        matches!(
+            self,
+            Stance::Slide
+                | Stance::Vault
+                | Stance::Dive
+                | Stance::StealthAttack
+                | Stance::KnifeThrow
+                | Stance::Dead
+                | Stance::Downed
+                | Stance::Dying
+                | Stance::KnockedDown
+                | Stance::Ejecting
+        )
     }
 
     /// Derive stance from kinematic + status state. Pure; no clock reads.
@@ -671,6 +884,43 @@ pub struct ActorState {
     /// at M5 baseline; serde-default preserves backward compat.
     #[serde(default)]
     pub afflictions: Vec<Affliction>,
+    /// **M6**: side-view facing direction. Updates on aim; flips sprite.
+    #[serde(default)]
+    pub facing: FacingDirection,
+    /// **M6**: stamina pool driving Sprint stance.
+    #[serde(default)]
+    pub stamina: Stamina,
+    /// **M6**: lean angle + direction (for "lean around corner").
+    #[serde(default)]
+    pub lean_state: LeanState,
+    /// **M6**: current cover state (side + effectiveness).
+    #[serde(default)]
+    pub cover_state: CoverState,
+    /// **M6**: sticky sprint intent (toggled by act.player.sprint).
+    #[serde(default)]
+    pub sprint_active: bool,
+    /// **M6**: sticky prone intent (toggled by act.player.prone).
+    #[serde(default)]
+    pub prone_active: bool,
+    /// **M6**: animation-bound stance ticks remaining (slide / vault / dive / climb).
+    /// 0 when no animation is playing.
+    #[serde(default)]
+    pub cinematic_ticks_remaining: u32,
+    /// **M6**: which cinematic stance is currently playing.
+    #[serde(default)]
+    pub cinematic_kind: Option<Stance>,
+    /// **M6**: latched stealth-meter value (0..1).
+    #[serde(default)]
+    pub stealth_meter: f32,
+    /// **M6 (M13 forward-compat)**: limb-loss tracking + action restriction surface.
+    /// Per spec § "Limb-loss action restrictions": M6 reserves the surface;
+    /// M13 chassis fills physics-driven limb damage.
+    #[serde(default)]
+    pub limb_loss: LimbLossFlags,
+    /// **M6**: total inventory weight (kg). Recomputed each tick; > 30 kg
+    /// forces Walk per spec § "Weight system".
+    #[serde(default)]
+    pub inventory_weight_kg: f32,
 }
 
 /// **M5.8 forward-hook (DR-040 ResourceAccumulators)**: per-actor resource
@@ -807,6 +1057,17 @@ impl ActorState {
             bloom_factor: default_bloom_factor(),
             resources: ResourceAccumulators::default(),
             afflictions: Vec::new(),
+            facing: FacingDirection::Right,
+            stamina: Stamina::full(),
+            lean_state: LeanState::default(),
+            cover_state: CoverState::open(),
+            sprint_active: false,
+            prone_active: false,
+            cinematic_ticks_remaining: 0,
+            cinematic_kind: None,
+            stealth_meter: 0.0,
+            limb_loss: LimbLossFlags::default(),
+            inventory_weight_kg: 0.0,
         }
     }
 
@@ -871,6 +1132,16 @@ impl ActorState {
         if let Some(chassis) = self.chassis.as_mut() {
             chassis.reset();
         }
+        self.facing = FacingDirection::Right;
+        self.stamina.reset();
+        self.lean_state.reset();
+        self.cover_state = CoverState::open();
+        self.sprint_active = false;
+        self.prone_active = false;
+        self.cinematic_ticks_remaining = 0;
+        self.cinematic_kind = None;
+        self.stealth_meter = 0.0;
+        self.inventory_weight_kg = 0.0;
     }
 
     /// Apply damage with a cause string. Returns the new status if it changed.
