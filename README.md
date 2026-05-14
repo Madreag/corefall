@@ -21,13 +21,13 @@ A 2D side-view physics sandbox where every gas, grain, bullet, body, world, tran
 [![Steam Deck](https://img.shields.io/badge/Steam_Deck-floor_target-1A9FFF?style=flat-square&logo=steamdeck&logoColor=white)](#)
 
 [![Status](https://img.shields.io/badge/status-prealpha-orange?style=flat-square)](#project-status)
-[![Milestone](https://img.shields.io/badge/milestone-M3%20done%20%2F%20M4%20next-2EA043?style=flat-square)](#roadmap)
-[![Tests](https://img.shields.io/badge/tests-549%20passing-2EA043?style=flat-square)](#ci)
-[![Specs](https://img.shields.io/badge/milestones-3%20done%20%2F%2070%20planned-blueviolet?style=flat-square)](#roadmap)
+[![Milestone](https://img.shields.io/badge/milestone-M5%20done%20%2F%20M6%20next-2EA043?style=flat-square)](#roadmap)
+[![Tests](https://img.shields.io/badge/tests-677%20passing-2EA043?style=flat-square)](#ci)
+[![Specs](https://img.shields.io/badge/milestones-6%20done%20%2F%2070%20planned-blueviolet?style=flat-square)](#roadmap)
 [![Releases](https://img.shields.io/github/v/release/Madreag/corefall?include_prereleases&sort=semver&style=flat-square&label=release)](https://github.com/Madreag/corefall/releases)
 
 > [!important]
-> **Where we are:** `M3` (Pixel Terrain + Materials) re-closed after audit-driven fixes — anchor RPC + per-tick coalesced dirty-region batching + ≤25-rect budget cap + `unupdated_areas` forward-compat all shipped (549 tests pass). Next up: `M4` (Event Recorder Core). Full ordered milestone table in [Roadmap](#roadmap); shipped-code detail in [Project status](#project-status); release policy in [Releases](#releases).
+> **Where we are:** `M5` (Deep Damage Event Surface Lock) closed after a two-pass audit-driven hardening cycle — 74 deep-damage event schemas locked at v0.1 + M5-A1 (17 findings) + M5-A2 (26 findings) shipped, plus `audio.event_requested` + `combat.melee_hit_mo` + `combat.explosive_hit_mo` + `snapshot.snapshot_shield` + `snapshot.snapshot_thermal`. M3 (Pixel Terrain + Materials), M4 (Event Recorder Core), and M4A (Asset Ledger Infrastructure) all closed before M5. 677 tests pass workspace-wide; `cf-mod validate cf-replay/schemas/` reports 134/134 pass. Next up: `M6` (Actor Depth + Equipment + Sound + Squad). Full ordered milestone table in [Roadmap](#roadmap); shipped-code detail in [Project status](#project-status); release policy in [Releases](#releases).
 >
 > **Where to play:** today, build from source via [Getting started](#getting-started). First friend-handoff release (`.dmg` / `.msi` / AppImage — double-click to play, no Terminal) lands once `M11` (Readability + ACC-A Floor) + release engineering close per the [Double-Click Playability Hard Gate](#releases).
 
@@ -96,19 +96,19 @@ The full content target shipping by BP12 (every entry **functional + AI-readable
 ## Roadmap
 
 > [!tip]
-> **Where we are (2026-05-13):** just re-closed `M3` (Pixel Terrain + Materials) after audit-driven fixes (anchor RPC + per-tick coalesce + budget cap + `unupdated_areas` field). Next up: `M4` (Event Recorder Core). One ordered table below — read top to bottom. Spec files in [`specs/active/`](specs/active/) · closed specs in [`specs/done/`](specs/done/).
+> **Where we are (2026-05-13):** just closed `M5` (Deep Damage Event Surface Lock) plus the M5-A1 + M5-A2 hardening passes that close 43 audit findings across 7 parallel-worker review reports. M5 ships 74 deep-damage event schemas + `audio.event_requested` + `combat.melee_hit_mo` + `combat.explosive_hit_mo` + `snapshot.snapshot_shield` + `snapshot.snapshot_thermal`. M4 (Event Recorder Core) + M4A (Asset Ledger Infrastructure) closed before M5. Next up: `M6` (Actor Depth + Equipment + Sound + Squad). One ordered table below — read top to bottom. Spec files in [`specs/active/`](specs/active/) · closed specs in [`specs/done/`](specs/done/).
 
 **Legend:** ✅ done · 🔄 in progress · ⏳ planned · 🚀 launch GA
-**Workspace:** 32 crates · 549 tests · 57 closed/directional DRs · 73 milestones across 13 Build Points (BP0..BP12).
+**Workspace:** 33 crates · 677 tests · 57 closed/directional DRs · 73 milestones across 13 Build Points (BP0..BP12).
 
 | # | ⬤ | BP | Milestone | What it ships |
 |---|:---:|---|---|---|
 | **M1** | ✅ | BP1 | Actor Controller + Sim Core | Playable actor (WASD / jump / aim / fire / reload / dig) · 5-state body machine · 9 JSON-RPC methods · tick-rate-independent timing |
 | **M2** | ✅ | BP1 | Micro Breach Fun Slice | 60-90s win/loss · ReactiveGuard FSM · 3 difficulty presets · cfctl-scriptable |
 | **M3** | ✅ | BP2 | Pixel Terrain + Materials | 256×256 chunked deformable terrain · 8 launch materials · DR-007 9-flag affordance taxonomy · CPU-deterministic carving · per-pixel integrity · penetration formula · **anchor RPC (`act.player.anchor`)** · **per-tick coalesced `terrain.terrain_dirty_region_batch` with ≤25-rect budget + `unupdated_areas` + forced-refresh signal** |
-| **M4** | ⏳ | BP2 | Event Recorder Core | 38 event categories · `cf-headless` replay verifier · deterministic event log |
-| **M4A** | ⏳ | BP3 | Asset Ledger Infrastructure | `cf-asset-ledger` crate · JSONL append-only ledger · 17 asset categories · 6 production tiers · regen + verify CLI |
-| **M5** | ⏳ | BP2 | Deep Damage Event Surface Lock | ~60-80 event schemas across 13 families (armor / internal / concussion / fluid / origin / hazard / atmos / shield / environment / thermal / …) |
+| **M4** | ✅ | BP2 | Event Recorder Core | 38 event categories · `cf-headless` replay verifier · deterministic event log · cosmetic-flag backpressure (DR-052) · per-tick blake3 sim_checksum |
+| **M4A** | ✅ | BP3 | Asset Ledger Infrastructure | `cf-asset-ledger` crate · JSONL append-only ledger · 17 asset categories · 6 production tiers · regen + verify CLI · deterministic freeze + supersede chain |
+| **M5** | ✅ | BP2 | Deep Damage Event Surface Lock | 74 deep-damage event schemas across 13 families (armor / internal / concussion / fluid / origin / hazard / atmos / shield / environment / thermal / combat hit_mo) + `audio.event_requested` + `combat.melee_hit_mo` + `combat.explosive_hit_mo` + `snapshot.snapshot_shield` + `snapshot.snapshot_thermal` · `cf-mod validate` extended to walk schemas dir; M5-A1 + M5-A2 hardening passes closed 43 audit findings |
 | **M6** | ⏳ | BP2 | Actor Depth + Equipment + Sound + Squad | 36 actions · 6 weapons · 4 grenades · 8-slot inventory · side-view facing · 1 friendly bot + 4 squad commands |
 | **M7** | ⏳ | BP2 | AI Archetypes + Mission Director | 5 archetypes (Rifleman / Sniper / Assault / Engineer / Spotter) · 20+ traits · 3 doctrines · 3-faction matrix · multi-objective DAG · 4-phase pacing |
 | **M8** | ⏳ | BP2 | UX + Camera + Debug + L10n + Accessibility | 10+ HUD widgets · pie menu · 7 debug overlays · 4 color-blind modes · photo mode · replay scrubber · killcam |
@@ -440,7 +440,7 @@ The AWAW-inspired grand-strategy layer ships across **BP7 → BP11**. Foundation
 
 ## The Workspace
 
-**32 crates today** (see [game/Cargo.toml](game/Cargo.toml)). Each crate carries its own `AGENTS.md` boundary contract. Crates marked **(real)** have shipped real implementations; the rest are stubs that will fill in at their owning milestone.
+**33 crates today** (see [game/Cargo.toml](game/Cargo.toml)). Each crate carries its own `AGENTS.md` boundary contract. Crates marked **(real)** have shipped real implementations; the rest are stubs that will fill in at their owning milestone.
 
 ```text
 game/crates/
@@ -448,7 +448,8 @@ game/crates/
 ├── cf-sim-core               # (real)  fixed-tick scheduler + RNG + checksum
 ├── cf-control                # (real)  JSON-RPC 2.0 control surface (cf-control engine + server)
 ├── cfctl                     # (real)  operator CLI (observe, run, scenario, settings, runbundle, system, act.player.*, act.chassis.*)
-├── cf-replay                 # (real)  run-bundle writer + event envelope + 27 categories
+├── cf-replay                 # (real)  M4 recorder + 38-category event taxonomy + cosmetic backpressure (DR-052) + per-tick blake3 sim_checksum + M5 schema lock (134 schemas)
+├── cf-asset-ledger           # (real)  M4A JSONL append-only ledger + 17 asset categories + 6 production tiers + supersede chain + deterministic freeze
 ├── cf-actor                  # (real)  actor records + control intent + sim step + projectile + status state machine + chassis attachment
 ├── cf-equipment              # (real)  role records + rifle spec + tick-rate-independent timing + 3 LOAD-A loadouts (infantry / powered_armor / light_mech)
 ├── cf-physics                # (real)  kinematics + ground collision + jump + recoil; M5.5 swaps in DR-033 collision matrix
@@ -459,17 +460,17 @@ game/crates/
 ├── cf-capture                # (real)  T-CAPTURE: PNG readbacks at 10 Hz baseline + event keyframes; capture_manifest.json for the composer
 ├── cf-ui                     # (real)  comic-noir UI presentation: STATUS / AMMO / STANCE / ITEM / OBJECTIVE / TIMER / EVENT / SILHOUETTE / MODULE STRIP / TOOL / REACTOR / BANNERS
 ├── cf-e2e                    # (real)  scripted end-to-end runner with auto-launch + --expect <key>=<value> assertions + --capture-grid
-├── cf-mod                    # (real)  content schema validator + manifest walker + material registry validator
+├── cf-mod                    # (real)  content schema validator + manifest walker + material registry validator + M4A ledger CLI + M5 event-schema walker
 ├── cf-chassis                # (real)  3 launch chassis archetypes (infantry_v1 / powered_armor_v1 / light_mech_v1) + 15-zone body graph + layered armor + module state machine + pilot binding + eject + salvage
 ├── cf-save                   # (real)  SaveBlob v1 with actor + chassis + rifle serialization + blake3 checksum (M5 slice of T-SAVE)
 ├── cf-material               # (real)  systemic material kernel (M2 baseline; M5.6 extends to 50+ materials + reactions)
+├── cf-headless               # (real)  CI-friendly headless runner (M4 replay verifier)
 ├── cf-tools-replay-viewer    # stub    M3B: bundle viewer + cause-chain walker + debrief markdown emitter + validate + summary
-├── cf-environment            # stub    M5.10: EnvironmentSignal aggregator (atmospheric, gravitational, thermal, radiation, photic, EM, weather, water, acoustic, day/night, comms)
-├── cf-atmos                  # stub    Stationeers-grade-or-better atmospherics + thermal kernel (M5.9)
+├── cf-environment            # stub    M20: EnvironmentSignal aggregator (atmospheric, gravitational, thermal, radiation, photic, EM, weather, water, acoustic, day/night, comms)
+├── cf-atmos                  # stub    Stationeers-grade-or-better atmospherics + thermal kernel (M19)
 ├── cf-audio                  # stub    sound + captions (M4..M7); ACRE2-tier voice + radio at M9.5
 ├── cf-net                    # stub    client/server transport (M9; lightyear vs renet vs quinn locks at M9)
 ├── cf-tools-editor           # stub    in-engine scenario / package / mod editors + Material Lab (M8 + M8.5)
-├── cf-headless               # stub    CI-friendly headless runner (replay verifier)
 ├── cf-bench                  # stub    perf benchmark harness
 ├── cf-server                 # stub    multi-mode dedicated server (M9: coop_room / pvp_arena / lan_room / mmo_shard / lobby_directory)
 ├── cf-server-ops             # stub    ops dashboards + observability + /health + /ready + Prometheus metrics + drain shutdown (M9)
@@ -485,11 +486,19 @@ game/crates/
 > [!warning]
 > **Pre-alpha.** Corefall is in active development. The repo is public so CI can run unrestricted (free GitHub Actions minutes for public repos), but the game is **not** ready to play yet — first friend-handoff release lands when `M11` (Readability + ACC-A Floor) + release engineering land (see [Releases](#releases)).
 
-**Workspace stats (2026-05-13 / commit `7c47104`):** 32 crates · **545 tests passing** · cargo fmt + clippy `-D warnings` clean · M3 determinism CI matrix passes all 6 combinations.
+**Workspace stats (2026-05-13 / commit `0951136`):** 33 crates · **677 tests passing** workspace-wide · cargo fmt + clippy `-D warnings` clean · M3 determinism CI matrix passes all 6 combinations · `cf-mod validate cf-replay/schemas/` reports **134/134** schemas pass.
 
-**M3 re-closed (2026-05-13):** post-close audit found 4 Acceptance Criteria scenarios failing. M3 was moved back to `specs/active/`, fixes were implemented, and the spec is back in [`specs/done/M3.md`](specs/done/M3.md). Fixes shipped: (1) `act.player.anchor` JSON-RPC + `terrain.anchor_material_result` event emission (MAT-T-06); (2) per-tick coalesced `terrain.terrain_dirty_region_batch` via end-of-tick `flush_pending_dirty_batch` with deduplicated `source_event_ids[]`; (3) ≤25-rect coalescing budget cap via greedy AABB-union loop + `summary.json.perf.terrain.coalesce_cost_avg` surfaced via new `TerrainPerfBlock`; (4) `unupdated_areas: u32` field on batch payload + new `terrain.forced_refresh_requested` event after sustained pressure (M22 forward-compat). 4 unit tests added for the coalesce-overlap predicate (`rects_touch_or_overlap`). Workspace test count: 549 pass (up from 545); clippy `-D warnings` clean. Remaining cosmetic overclaims either AMENDED in spec text or DEFERRED to M14/M15 with documented forward-compat plan.
+**M5 closed (2026-05-13):** ships 74 deep-damage event schemas locked at the M4 v0.1 envelope across 13 families (armor / internal / concussion / internal_shock / fluid / origin / hazard / affliction / atmos / shield / environment / thermal + `combat.projectile_hit_mo` expanded payload). Two post-close audit-driven hardening passes by parallel worker teams closed 43 findings total:
+- **M5-A1 (17 findings)**: bulk-rewrote all 74 schemas' `schema_version.const` from `"0.1"` → `"prototype-recorder-event.v0.1"` (matches `cf-replay/src/lib.rs::EVENT_SCHEMA_VERSION`); shipped `audio.event_requested` schema (M5 spec mandate); added `blinded` as 23rd affliction kind for M6 flash grenade; renamed `combat.projectile_hit_mo.payload.parent_event_id` → `parent_hit_event_id` (envelope-collision fix); locked Origin enum (Human / Android / Robot / PoweredOrganic / HeavyBiomech) via `oneOf` constraint; locked phase enums (gas / liquid / solid / supercritical / molten); locked `EnvironmentSignal` sub-struct (15-value HazardClass enum); tightened cosmetic flags to `const: true`; shipped `snapshot.snapshot_shield`. cf-mod gained envelope-shape conformance checks + payload `additionalProperties: false` rejection + envelope-version-dir regex `^v[0-9]+(_[0-9]+)?$`.
+- **M5-A2 (26 findings)**: `armor.spalling.fragment_count` locked to 1..3; `hazard.spread` now requires `hazard_id` for M10 cause-chain; Pa/K/J floors added to atmos + thermal events; `armor.ricochet.ricochet_probability` capped at 1.0; `fluid.reservoir_warning/critical.level_pct` capped at 100; `concussion.ko_threshold_crossed.ko_duration_s` locked to 5..10; `internal_shock` dose ceiling 0..100; `applied_afflictions` array items enforce 23-affliction enum. cf-replay validator gained array-item enum support + nested-object property recursion. Shipped sibling `combat.melee_hit_mo` + `combat.explosive_hit_mo` schemas so M6 melee + grenade producers don't need new schemas mid-implementation. Shipped `snapshot.snapshot_thermal` placeholder.
 
-**Up next:** `M4` — Event Recorder Core. Locks the 38-event-category taxonomy + extends `cf-headless` replay verifier + finalizes the run-bundle envelope contract. Spec: [`specs/active/M4.md`](specs/active/M4.md). AGENTS.md workflow: implementer reads `M4.md` + source under `cf-*` crates, audit-first gap-fills, commits per-scenario, then moves to `specs/done/M4.md` when every Gherkin acceptance scenario verdicts as `PASS` or `IMPLEMENTED`.
+**M4 closed (2026-05-13):** `cf-replay` recorder + 38-category event taxonomy + cosmetic-backpressure flag (DR-052) + per-tick blake3 `sim_checksum` + `first_divergence` event-type + 8-snapshot M9-firehose surface (snapshot_actor / snapshot_inventory / snapshot_chassis / snapshot_terrain_chunk / snapshot_terrain_summary + 5 placeholders for M5/M9/M17/M19/M20 ladder-up). `cf-headless` replay verifier + `cf-mod validate-bundle` walks `events.jsonl` and asserts every payload conforms to the per-event schemas under `cf-replay/schemas/event/`.
+
+**M4A closed (2026-05-13):** `cf-asset-ledger` JSONL append-only ledger with 17 asset categories + 6 production tiers + supersede chain + deterministic freeze. `cf-mod ledger` CLI commands (add / list / show / verify / diff / regenerate / summary / compact / register-pack). 7-axis audit gaps closed (BLOCKERS + MAJORS).
+
+**M3 re-closed (2026-05-13):** post-close audit found 4 Acceptance Criteria scenarios failing. Fixes shipped: (1) `act.player.anchor` JSON-RPC + `terrain.anchor_material_result` event emission; (2) per-tick coalesced `terrain.terrain_dirty_region_batch` via end-of-tick `flush_pending_dirty_batch` with deduplicated `source_event_ids[]`; (3) ≤25-rect coalescing budget cap via greedy AABB-union loop; (4) `unupdated_areas: u32` field on batch payload + new `terrain.forced_refresh_requested` event for M22 forward-compat.
+
+**Up next:** `M6` — Actor Controller Depth + Equipment + Sound + Squad Slice. Closes the actor controller + equipment + inventory + sound + squad-of-two gap left after M1+M2+M3. Player-facing promise: "a single actor in a single scenario already feels like a modern tactical shooter." 36 actions · 6 weapons + 4 grenades + 4 melee + 7 tools · 8 active inventory slots + 3 reserved tank slots · centralized sound + perception kernel · 1 friendly bot + 4 squad commands · side-view facing. Spec: [`specs/active/M6.md`](specs/active/M6.md). AGENTS.md workflow: implementer reads `M6.md` + source under `cf-*` crates, audit-first gap-fills, commits per-scenario, then moves to `specs/done/M6.md` when every Gherkin acceptance scenario verdicts as `PASS` or `IMPLEMENTED`.
 
 **Per-milestone status:** see [Roadmap](#roadmap) above for the full ordered table.
 
@@ -506,8 +515,8 @@ The **implementation-gating** planning layer lives in this repo so every PR that
 - **Decision records** (DR-001 through DR-057, plus future activation gates) — every major direction choice with pros, cons, evidence, revisit triggers. Lives at [`docs/plan/decisions/`](docs/plan/decisions/).
 - **80 spec pages** for product promise, body damage, chassis/armor/mechs/origins, equipment/loadout, Stationeers-grade-or-better atmospherics & chemistry, thermal engineering, gravity & ballistics, AI, replay, mission director, full collision physics, accessibility-plus, localization, AI asset/audio production, modding, networking, launch operations, and more. Lives at [`docs/plan/spec/`](docs/plan/spec/).
 - **Production roadmap** covering M0 through launch, side tracks, CLI/control contracts, DR-056 universal enhancement gates, and per-milestone Steam Deck/network/replay/accessibility/modding/testability budgets. Lives at [`docs/plan/spec/prototype-roadmap.md`](docs/plan/spec/prototype-roadmap.md).
-- **70 active milestone specs** in [`specs/active/`](specs/active/) — `M4..M49` (46 core, dependency-ordered) plus 24 suffix-letter inserts (16 production-track + 8 UX/UI). The executable implementation contracts for the gameplay spine + asset/audio/narrative/localization pipelines + player-facing UI surfaces. Each is read-by-implementing-agent-only per AGENTS.md.
-- **3 closed milestone specs** in [`specs/done/M1.md / M2.md / M3.md`](specs/done/) — actor controller core, micro breach fun slice, pixel terrain. Kept for audit trail.
+- **67 active milestone specs** in [`specs/active/`](specs/active/) — `M6..M49` (43 core, dependency-ordered) plus 24 suffix-letter inserts (16 production-track + 8 UX/UI). The executable implementation contracts for the gameplay spine + asset/audio/narrative/localization pipelines + player-facing UI surfaces. Each is read-by-implementing-agent-only per AGENTS.md.
+- **6 closed milestone specs** in [`specs/done/`](specs/done/) — `M1.md` (actor controller core), `M2.md` (micro breach fun slice), `M3.md` (pixel terrain + materials), `M4.md` (event recorder core), `M4A.md` (asset ledger infrastructure), `M5.md` (deep damage event surface lock). Kept for audit trail.
 - **Native implementation backlog** + **feature completion checklist** + **milestone enhancement spec** + **AI-coder reading list** + **ai-control-observability-layer** + **authoritative-game-spec** + **prototype-run-bundle-schema** + **decision-tracker dashboard** + **research-readiness dashboard** — all under `docs/plan/spec/`, `docs/plan/dashboards/`, and `docs/plan/references/`.
 - **BP closure notes** at [`docs/plan/prototypes/build-point-bp*.md`](docs/plan/prototypes/) — per-BP narrative + evidence trail.
 
@@ -676,7 +685,7 @@ GitHub Actions runs on every push and PR:
 - `cargo fmt --all -- --check` (with `.gitattributes` locking LF line endings cross-OS)
 - `cargo check --workspace --all-targets`
 - `cargo clippy --workspace --all-targets -- -D warnings`
-- `cargo test --workspace` (**545 tests passing** as of M2 R2 close: workspace-wide coverage including NaN/Inf guards, dwell-pause off-by-one regressions, `--headless-smoke` + `--capture-grid` rejection, M2 + M2.5 + M3A + M5 scenario tests, cf-headless replay-determinism harness, channel-aware install-section tests, terrain material affordance + dirty-region coalescing, chassis layered armor + pilot eject lifecycle, save round-trip with chassis state)
+- `cargo test --workspace` (**677 tests passing** as of M5 + M5-A1 + M5-A2 close: workspace-wide coverage including NaN/Inf guards, dwell-pause off-by-one regressions, `--headless-smoke` + `--capture-grid` rejection, M2 + M2.5 + M3A + M5 scenario tests, cf-headless replay-determinism harness, channel-aware install-section tests, terrain material affordance + dirty-region coalescing, chassis layered armor + pilot eject lifecycle, save round-trip with chassis state, M4 cosmetic-flag backpressure + per-tick blake3 checksum, M4A asset-ledger v1 + supersede chain + deterministic freeze, M5 envelope-shape conformance + per-family happy-path + Origin enum + array-item enum + nested-object recursion)
 - `cargo build --release`
 - Dependency drift report on the Linux leg (`tools/dependency_drift_report.py`)
 - `cf-mod validate content/` (validates M0 + M1 + M1.5 + M2 scenario manifests + material registry)
