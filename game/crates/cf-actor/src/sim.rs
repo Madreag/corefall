@@ -1231,6 +1231,8 @@ fn step_one_actor<R: FnMut() -> u64>(
         // Sharp aim tightens the reticle (scaled by progress).
         let sharp_tighten = 1.0 - 0.6 * actor.sharp_aim_progress;
         bloom *= sharp_tighten.max(0.4);
+        // M6: per-stance bloom multiplier (crouch=0.6×, prone=0.4×, etc.).
+        bloom *= crate::stance::stance_bloom_factor(actor.stance());
         actor.bloom_factor = bloom;
         outcome.bloom_factor = bloom;
 
