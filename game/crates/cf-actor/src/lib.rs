@@ -923,6 +923,50 @@ pub struct ActorState {
     /// forces Walk per spec § "Weight system".
     #[serde(default)]
     pub inventory_weight_kg: f32,
+    /// **M6**: bipod attachment + deployment state on the equipped weapon.
+    /// When deployed, the firing path multiplies recoil by
+    /// [`cf_equipment::BIPOD_RECOIL_FACTOR`] and bloom by
+    /// [`cf_equipment::BIPOD_BLOOM_FACTOR`].
+    #[serde(default = "default_bipod_equipped")]
+    pub bipod: cf_equipment::Bipod,
+    /// **M6**: suppressor attachment state on the equipped weapon. When
+    /// attached, the firing path multiplies loudness by
+    /// [`cf_equipment::SUPPRESSOR_LOUDNESS_FACTOR`].
+    #[serde(default)]
+    pub suppressor: cf_equipment::Suppressor,
+    /// **M6**: per-tool durability map (tool kind → Durability). Filled
+    /// lazily on first `act.player.use_tool` so existing scenarios serialize
+    /// cleanly.
+    #[serde(default)]
+    pub tool_durability: std::collections::BTreeMap<String, cf_equipment::Durability>,
+    /// **M6**: true while a [`cf_equipment::WeaponSwap`] is in flight for
+    /// this actor. The firing path in `sim::fire_actor` gates on this so
+    /// fire/reload intent is rejected during the swap window.
+    #[serde(default)]
+    pub weapon_swap_in_progress: bool,
+    /// **M6**: cook-time accumulator (seconds) for the currently-held
+    /// grenade. Reset on throw or grenade swap.
+    #[serde(default)]
+    pub grenade_cook_seconds: f32,
+    /// **M6**: which grenade kind is currently equipped (held). `None`
+    /// when no grenade slot is selected. Defaults to Frag at spawn so the
+    /// spec's "Cook grenade for shorter fuse" Gherkin reproduces.
+    #[serde(default = "default_grenade_kind")]
+    pub grenade_held_kind: Option<cf_equipment::GrenadeKind>,
+    /// **M6**: remaining fuse on the held grenade after cooking. Initial
+    /// value is the grenade's base fuse; cook_grenade subtracts elapsed
+    /// cook time.
+    #[serde(default)]
+    pub grenade_held_fuse_remaining: f32,
+}
+
+fn default_bipod_equipped() -> cf_equipment::Bipod {
+    cf_equipment::Bipod::equipped_default()
+}
+
+#[allow(clippy::unnecessary_wraps)]
+fn default_grenade_kind() -> Option<cf_equipment::GrenadeKind> {
+    Some(cf_equipment::GrenadeKind::Frag)
 }
 
 /// **M5.8 forward-hook (DR-040 ResourceAccumulators)**: per-actor resource
@@ -1070,6 +1114,13 @@ impl ActorState {
             stealth_meter: 0.0,
             limb_loss: LimbLossFlags::default(),
             inventory_weight_kg: 0.0,
+            bipod: cf_equipment::Bipod::equipped_default(),
+            suppressor: cf_equipment::Suppressor::default(),
+            tool_durability: std::collections::BTreeMap::new(),
+            weapon_swap_in_progress: false,
+            grenade_cook_seconds: 0.0,
+            grenade_held_kind: Some(cf_equipment::GrenadeKind::Frag),
+            grenade_held_fuse_remaining: 5.0,
         }
     }
 
@@ -1144,6 +1195,13 @@ impl ActorState {
         self.cinematic_kind = None;
         self.stealth_meter = 0.0;
         self.inventory_weight_kg = 0.0;
+        self.bipod = cf_equipment::Bipod::equipped_default();
+        self.suppressor = cf_equipment::Suppressor::default();
+        self.tool_durability.clear();
+        self.weapon_swap_in_progress = false;
+        self.grenade_cook_seconds = 0.0;
+        self.grenade_held_kind = Some(cf_equipment::GrenadeKind::Frag);
+        self.grenade_held_fuse_remaining = 5.0;
     }
 
     /// Apply damage with a cause string. Returns the new status if it changed.
