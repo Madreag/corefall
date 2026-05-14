@@ -103,14 +103,9 @@ pub struct Objective {
 #[serde(tag = "kind", rename_all = "snake_case")]
 pub enum FailSensor {
     /// Fail if `current_tick - from_tick > threshold_ticks`.
-    TimerWindow {
-        from_tick: u64,
-        threshold_ticks: u64,
-    },
+    TimerWindow { from_tick: u64, threshold_ticks: u64 },
     /// Fail when the target actor's HP reaches zero.
-    ActorHpZero {
-        target: u64,
-    },
+    ActorHpZero { target: u64 },
 }
 
 /// Kind of objective. Discriminator names match the canonical roadmap glossary so
@@ -1216,14 +1211,18 @@ mod tests {
                 },
                 optional: false,
                 status: ObjectiveStatus::Pending,
-                progress_milestone_index: 0, progress: 0.0, fail_sensor: None,
+                progress_milestone_index: 0,
+                progress: 0.0,
+                fail_sensor: None,
             },
             Objective {
                 id: "neutralize".to_string(),
                 kind: ObjectiveKind::NeutralizeActor { target: 2 },
                 optional: false,
                 status: ObjectiveStatus::Pending,
-                progress_milestone_index: 0, progress: 0.0, fail_sensor: None,
+                progress_milestone_index: 0,
+                progress: 0.0,
+                fail_sensor: None,
             },
             Objective {
                 id: "extract".to_string(),
@@ -1233,7 +1232,9 @@ mod tests {
                 },
                 optional: false,
                 status: ObjectiveStatus::Pending,
-                progress_milestone_index: 0, progress: 0.0, fail_sensor: None,
+                progress_milestone_index: 0,
+                progress: 0.0,
+                fail_sensor: None,
             },
         ];
         MissionState::new(
@@ -1648,7 +1649,9 @@ mod tests {
             },
             optional: false,
             status: ObjectiveStatus::Pending,
-            progress_milestone_index: 0, progress: 0.0, fail_sensor: None,
+            progress_milestone_index: 0,
+            progress: 0.0,
+            fail_sensor: None,
         }];
         MissionState::new(
             objectives,
@@ -1711,7 +1714,9 @@ mod tests {
                 },
                 optional: false,
                 status: ObjectiveStatus::Pending,
-                progress_milestone_index: 0, progress: 0.0, fail_sensor: None,
+                progress_milestone_index: 0,
+                progress: 0.0,
+                fail_sensor: None,
             },
             Objective {
                 id: "defend".to_string(),
@@ -1720,7 +1725,9 @@ mod tests {
                 },
                 optional: false,
                 status: ObjectiveStatus::Pending,
-                progress_milestone_index: 0, progress: 0.0, fail_sensor: None,
+                progress_milestone_index: 0,
+                progress: 0.0,
+                fail_sensor: None,
             },
         ];
         let mut state = MissionState::new(
@@ -1773,7 +1780,9 @@ mod tests {
                 },
                 optional: false,
                 status: ObjectiveStatus::Pending,
-                progress_milestone_index: 0, progress: 0.0, fail_sensor: None,
+                progress_milestone_index: 0,
+                progress: 0.0,
+                fail_sensor: None,
             },
             Objective {
                 id: "reach".to_string(),
@@ -1783,7 +1792,9 @@ mod tests {
                 },
                 optional: false,
                 status: ObjectiveStatus::Pending,
-                progress_milestone_index: 0, progress: 0.0, fail_sensor: None,
+                progress_milestone_index: 0,
+                progress: 0.0,
+                fail_sensor: None,
             },
         ];
         let mut state = MissionState::new(
@@ -1839,7 +1850,9 @@ mod tests {
                 },
                 optional: false,
                 status: ObjectiveStatus::Pending,
-                progress_milestone_index: 0, progress: 0.0, fail_sensor: None,
+                progress_milestone_index: 0,
+                progress: 0.0,
+                fail_sensor: None,
             },
             Objective {
                 id: "defend".to_string(),
@@ -1848,7 +1861,9 @@ mod tests {
                 },
                 optional: false,
                 status: ObjectiveStatus::Pending,
-                progress_milestone_index: 0, progress: 0.0, fail_sensor: None,
+                progress_milestone_index: 0,
+                progress: 0.0,
+                fail_sensor: None,
             },
         ];
         let mut state = MissionState::new(
@@ -2062,7 +2077,9 @@ mod tests {
             },
             optional: false,
             status: ObjectiveStatus::Pending,
-            progress_milestone_index: 0, progress: 0.0, fail_sensor: None,
+            progress_milestone_index: 0,
+            progress: 0.0,
+            fail_sensor: None,
         }];
         let loss = LossConditions {
             player_dead: false,

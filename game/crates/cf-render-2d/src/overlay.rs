@@ -141,9 +141,7 @@ pub fn material_tint(mode: OverlayMode, id: MaterialId) -> [u8; 4] {
             // directly rather than the refusal_reason vocabulary.
             if aff.id == cf_terrain::MATERIAL_AIR {
                 [80, 200, 80, 0x70]
-            } else if aff.hazard
-                || aff.id == cf_terrain::MATERIAL_METAL_NOHOOK
-                || aff.id == cf_terrain::MATERIAL_ANCHOR
+            } else if aff.hazard || aff.id == cf_terrain::MATERIAL_METAL_NOHOOK || aff.id == cf_terrain::MATERIAL_ANCHOR
             {
                 [100, 100, 110, 0x70]
             } else {

@@ -180,7 +180,9 @@ async fn main() -> Result<()> {
     let script_source = cli.script.as_deref().or(cli.ai_harness.as_deref());
     let script_path = match script_source {
         Some(name) => locate_script(name)?,
-        None => anyhow::bail!("--script <name> (or --ai-harness <name>) is required for M1.5; M0/M1 inline runs use cfctl run"),
+        None => anyhow::bail!(
+            "--script <name> (or --ai-harness <name>) is required for M1.5; M0/M1 inline runs use cfctl run"
+        ),
     };
     let script: ControlScript = serde_json::from_str(&std::fs::read_to_string(&script_path)?)
         .with_context(|| format!("parse {}", script_path.display()))?;

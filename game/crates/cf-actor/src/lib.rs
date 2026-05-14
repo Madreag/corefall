@@ -1185,8 +1185,8 @@ impl ActorState {
         out.extend_from_slice(&quantize_f32(self.sharp_aim_progress).to_le_bytes());
         out.extend_from_slice(&quantize_f32(self.mass_kg).to_le_bytes());
         out.push(0u8); // origin_id placeholder; M9+ fills with origin discriminator
-        // M5: append chassis bytes only when a chassis is attached; legacy actors
-        // remain byte-identical for cross-milestone determinism comparisons.
+                       // M5: append chassis bytes only when a chassis is attached; legacy actors
+                       // remain byte-identical for cross-milestone determinism comparisons.
         if let Some(chassis) = &self.chassis {
             out.push(1);
             out.extend_from_slice(&chassis.checksum_bytes());

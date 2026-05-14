@@ -1227,11 +1227,7 @@ pub fn tool_line(validity: Option<&HudToolValidity>) -> String {
 /// "TIMER turns yellow at <30s, red at <10s". Green for >30s remaining;
 /// yellow for 10..=30s; red for <10s. Inactive mission OR no time limit
 /// returns the default base-palette color so the strip stays readable.
-pub fn mission_timer_color(
-    mission: Option<&HudMission>,
-    tick_rate_hz: u32,
-    high_contrast: bool,
-) -> Color {
+pub fn mission_timer_color(mission: Option<&HudMission>, tick_rate_hz: u32, high_contrast: bool) -> Color {
     let Some(m) = mission else {
         return palette_text(high_contrast);
     };

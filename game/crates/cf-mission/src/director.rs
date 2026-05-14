@@ -16,8 +16,7 @@
 //! - No save/load mid-mission (M13+ adds save schema + resume).
 
 pub use crate::{
-    MissionLifecycle, MissionResult, MissionState, MissionTickInputs, MissionTickReport,
-    ObjectiveProgressUpdate,
+    MissionLifecycle, MissionResult, MissionState, MissionTickInputs, MissionTickReport, ObjectiveProgressUpdate,
 };
 
 /// **M2 spec hook**: advance the mission director one tick. Forwarder to the

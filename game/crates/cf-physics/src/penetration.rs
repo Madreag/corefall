@@ -14,12 +14,7 @@
 /// `mass` * `velocity` * `sharpness` = impulse; `integrity` is the
 /// material's hardness/integrity scalar from `MaterialDef`.
 #[must_use]
-pub fn try_penetrate_impulse_vs_integrity(
-    mass: f32,
-    velocity: f32,
-    sharpness: f32,
-    integrity: f32,
-) -> Penetration {
+pub fn try_penetrate_impulse_vs_integrity(mass: f32, velocity: f32, sharpness: f32, integrity: f32) -> Penetration {
     let impulse = mass * velocity * sharpness;
     let impulse_sq = impulse * impulse;
     let integrity_sq = integrity * integrity;
