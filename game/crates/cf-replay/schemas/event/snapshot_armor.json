@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "snapshot_armor.v0.1",
+  "title": "snapshot.snapshot_armor payload",
+  "description": "M4 § M9 firehose surface (deep damage). Placeholder payload at M4 (placeholder=true); M9 fills actors_with_armor with per-zone armor item + per-layer state. Fires at scenario start and on every objective transition.",
+  "type": "object",
+  "required": ["tick"],
+  "properties": {
+    "tick": { "type": "integer", "minimum": 0 },
+    "placeholder": {
+      "type": "boolean",
+      "description": "True when emitted by M4 with a stub payload; M9 producer fills real data and clears this flag."
+    },
+    "actors_with_armor": {
+      "type": "array",
+      "description": "Per-actor armor: { actor_id, per_zone: [{ zone (head|torso|arm_left|arm_right|forearm_left|forearm_right|hand_left|hand_right|leg_left|leg_right|shin_left|shin_right|foot_left|foot_right|backpack), armor_item_id: Option<ItemId>, material_id, mass_kg, coverage_zones: [BodyZone], damage_resist: BTreeMap<DamageKind, f32>, absorption_factor, ap_resistance, chunkable, layers: [{ kind: External|Internal|Core, hp, max_hp, hardness, condition: Pristine|Scratched|Cracked|Critical|Destroyed|ChunkedOff }] }] }."
+    }
+  }
+}

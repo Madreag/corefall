@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "snapshot_affliction.v0.1",
+  "title": "snapshot.snapshot_affliction payload",
+  "description": "M4 § M9 firehose surface. Placeholder payload at M4 (placeholder=true); M9 fills by_actor and by_kind. Fires at scenario start and on every objective transition.",
+  "type": "object",
+  "required": ["tick"],
+  "properties": {
+    "tick": { "type": "integer", "minimum": 0 },
+    "placeholder": {
+      "type": "boolean",
+      "description": "True when emitted by M4 with a stub payload; M9 producer fills real data and clears this flag."
+    },
+    "total_active_afflictions": { "type": "integer", "minimum": 0 },
+    "by_actor": {
+      "type": "array",
+      "description": "Per-actor afflictions: { actor_id, afflictions: [{ kind, severity, applied_at_tick, expected_clear_tick }] }."
+    },
+    "by_kind": {
+      "type": "object",
+      "description": "BTreeMap<kind, count> roll-up across all actors."
+    }
+  }
+}

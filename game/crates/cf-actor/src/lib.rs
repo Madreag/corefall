@@ -347,6 +347,17 @@ impl InventoryItem {
         }
     }
 
+    /// M4 § snapshot_inventory payload: high-level kind label for the
+    /// slot. Currently mirrors `label()` but is distinct so future
+    /// kinds (melee, tools, grenades) can expose a richer per-slot
+    /// kind taxonomy without mutating the existing `label()` strings.
+    pub fn kind_label(&self) -> &str {
+        match self {
+            InventoryItem::Empty => "empty",
+            InventoryItem::Rifle { .. } => "rifle",
+        }
+    }
+
     pub fn is_rifle(&self) -> bool {
         matches!(self, InventoryItem::Rifle { .. })
     }
@@ -1165,6 +1176,15 @@ impl ActorState {
         out.extend_from_slice(&self.inventory.selected.0.to_le_bytes());
         out.extend_from_slice(&quantize_f32(self.stability).to_le_bytes());
         out.extend_from_slice(&self.knockdown_ticks_remaining.to_le_bytes());
+        // **M4 § Checksum scope sim_state_v1** — element #3 spec literal
+        // adds: sharp_aim_q16, mass_q16, origin_id_u8. Without these
+        // three fields, two actors with identical pos/vel/aim/hp but
+        // different sharp_aim charge or origin hash identically, hiding
+        // a real determinism drift. Origin defaults to 0 (Human) at M4
+        // since the multi-origin model lands at M9/M17.
+        out.extend_from_slice(&quantize_f32(self.sharp_aim_progress).to_le_bytes());
+        out.extend_from_slice(&quantize_f32(self.mass_kg).to_le_bytes());
+        out.push(0u8); // origin_id placeholder; M9+ fills with origin discriminator
         // M5: append chassis bytes only when a chassis is attached; legacy actors
         // remain byte-identical for cross-milestone determinism comparisons.
         if let Some(chassis) = &self.chassis {
@@ -1597,7 +1617,10 @@ mod tests {
         // 8 (id u64) + 4*7 (position.x/y, velocity.x/y, aim.x/y, hp as i32) + 1 (status u8)
         // + 1 (on_ground u8) + 4 (selected slot u32) + 4 (stability i32)
         // + 4 (knockdown_ticks_remaining u32) = 50 bytes.
-        assert_eq!(bytes.len(), 50);
+        // **M4 § Checksum scope sim_state_v1** appends 9 more bytes:
+        // 4 (sharp_aim_progress i32) + 4 (mass_kg i32) + 1 (origin_id u8) = 9.
+        // Total = 59 bytes.
+        assert_eq!(bytes.len(), 59);
     }
 
     #[test]

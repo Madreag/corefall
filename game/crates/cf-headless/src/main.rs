@@ -60,6 +60,12 @@ enum Cmd {
         /// checksum when timing the replay).
         #[arg(long, value_enum)]
         measure: Option<MeasureMode>,
+        /// **M4 § Replay verifier safety**: maximum consecutive no-advance
+        /// retries before the verifier bails on a stalled engine. Default
+        /// 3 per spec. Lower values fail-fast on corrupt bundles; higher
+        /// values give the verifier more rope in unusual cfctl scripts.
+        #[arg(long, default_value_t = 3)]
+        max_no_advance_retries: u32,
     },
 }
 
@@ -91,12 +97,13 @@ fn main() -> Result<()> {
             no_verify_checksums,
             scenario_path,
             measure,
+            max_no_advance_retries,
         } => {
             let verify = match measure {
                 Some(MeasureMode::Throughput) => false,
                 None => !no_verify_checksums,
             };
-            replay(&bundle_dir, verify, scenario_path, measure)
+            replay(&bundle_dir, verify, scenario_path, measure, max_no_advance_retries)
         }
     }
 }
@@ -106,6 +113,7 @@ fn replay(
     verify_checksums: bool,
     scenario_path: Option<PathBuf>,
     measure: Option<MeasureMode>,
+    max_no_advance_retries: u32,
 ) -> Result<()> {
     if !bundle_dir.exists() {
         bail!("bundle directory does not exist: {}", bundle_dir.display());
@@ -230,7 +238,7 @@ fn replay(
         // Three consecutive None advances at the same tick is the recovery
         // budget; beyond that we abort with a structured stall report.
         let mut consecutive_no_advance: u32 = 0;
-        const MAX_NO_ADVANCE_RETRIES: u32 = 3;
+        let max_no_advance_retries_local = max_no_advance_retries;
 
         // Replay loop:
         //   1. Dispatch any commands recorded at the engine's CURRENT tick.
@@ -251,7 +259,7 @@ fn replay(
             // 2) Drive forward.
             if engine.drive_tick().is_none() {
                 consecutive_no_advance += 1;
-                if consecutive_no_advance >= MAX_NO_ADVANCE_RETRIES {
+                if consecutive_no_advance >= max_no_advance_retries_local {
                     bail!(
                         "replay verifier stalled: engine returned None from drive_tick {} times in a row at tick {} (likely shutdown_requested or another terminal state). Aborting to avoid infinite loop.",
                         consecutive_no_advance,

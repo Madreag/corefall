@@ -1,0 +1,93 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "prototype-recorder-event.v0.1",
+  "title": "Prototype recorder event envelope (v0.1, LOCKED)",
+  "description": "M4 § Event envelope. The v0.1 envelope is LOCKED at M4: additive payload extensions are permitted, but adding fields to the envelope itself requires a schema bump (v0.2) with a migration shim. Per M4 § DR-002 / DR-052. Source-of-truth Rust struct: cf-replay/src/lib.rs::Event.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "tick",
+    "sim_time_ms",
+    "event_id",
+    "category",
+    "event_type",
+    "payload"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "description": "Envelope schema id. MUST be 'prototype-recorder-event.v0.1' for M4 bundles."
+    },
+    "run_id": {
+      "type": "string",
+      "description": "The owning run's id; must equal run_manifest.json.run_id and the bundle directory basename."
+    },
+    "tick": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Sim tick at which the event fired. Monotonically non-decreasing within a run."
+    },
+    "sim_time_ms": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Sim-clock time in milliseconds at which the event fired."
+    },
+    "event_id": {
+      "type": "string",
+      "description": "Globally-unique-within-run event id. Format: '<run_id>:<tick>:<seq>'."
+    },
+    "category": {
+      "type": "string",
+      "description": "Event category (one of the 38 taxonomy categories declared in system.category_baseline)."
+    },
+    "event_type": {
+      "type": "string",
+      "description": "Event type within the category (e.g. 'weapon_fired' under category='combat')."
+    },
+    "payload": {
+      "type": "object",
+      "description": "Per-(category, event_type) payload. Shape is governed by the schemas under schemas/event/."
+    },
+    "parent_event_id": {
+      "type": ["string", "null"],
+      "description": "Optional cause-chain pointer to an earlier event_id in the same bundle. Forms the M10 cause-chain walk surface."
+    },
+    "actor_id": {
+      "type": ["integer", "string", "null"],
+      "description": "Optional acting RecordId(u64). Use the stable record_id layer; never raw pointers / pooled MOIDs."
+    },
+    "source_id": {
+      "type": ["integer", "string", "null"],
+      "description": "Optional source RecordId(u64) (e.g. weapon/equipment that produced the event)."
+    },
+    "team": {
+      "type": ["string", "null"],
+      "description": "Optional team affiliation tag of the acting entity."
+    },
+    "pos": {
+      "type": ["array", "null"],
+      "minItems": 2,
+      "maxItems": 2,
+      "description": "Optional 2D position [x, y] in world space."
+    },
+    "bbox": {
+      "type": ["object", "null"],
+      "description": "Optional bounding box { min: [x, y], max: [x, y] }."
+    },
+    "dropped_count": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "description": "Outstanding recorder backpressure drops tagged onto this event. summary.json.event_counts.dropped_total >= sum of all dropped_count fields."
+    },
+    "cosmetic": {
+      "type": ["boolean", "null"],
+      "description": "DR-052 cosmetic flag. When true, the event is excluded from determinism.sim_checksum and is preferentially dropped first under recorder backpressure."
+    },
+    "asset_ref": {
+      "type": ["string", "null"],
+      "description": "Optional M4A asset-ledger reference for any AI-generated asset used by this event."
+    }
+  }
+}

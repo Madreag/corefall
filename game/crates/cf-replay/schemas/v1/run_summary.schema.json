@@ -1,0 +1,173 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "prototype-run-summary.v0.1",
+  "title": "Prototype run summary (DR-002 v1)",
+  "description": "M4 § summary.json contract. Source-of-truth Rust struct: cf-replay/src/lib.rs::RunSummary.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "run_id",
+    "manifest_run_id",
+    "duration_sec",
+    "result",
+    "ended_at_utc",
+    "exit_code",
+    "event_counts",
+    "volume",
+    "performance",
+    "artifacts",
+    "blockers",
+    "next_actions",
+    "tests",
+    "final_sim_checksum",
+    "checksum_event_count",
+    "first_tick",
+    "last_tick"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "description": "Summary schema id. MUST be 'prototype-run-summary.v0.1' for M4."
+    },
+    "run_id": { "type": "string" },
+    "manifest_run_id": {
+      "type": "string",
+      "description": "MUST equal run_manifest.json.run_id (cross-file consistency rule)."
+    },
+    "duration_sec": { "type": "number", "minimum": 0 },
+    "result": {
+      "type": "string",
+      "description": "Run result label (e.g. 'pass', 'fail', 'partial')."
+    },
+    "ended_at_utc": { "type": "string" },
+    "exit_code": { "type": "integer" },
+    "event_counts": {
+      "type": "object",
+      "required": ["total", "by_category", "by_type", "by_severity", "dropped_total"],
+      "properties": {
+        "total": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "MUST equal JSONL line count."
+        },
+        "by_category": {
+          "type": "object",
+          "description": "Per-category event counts; MUST match actual event distribution."
+        },
+        "by_type": {
+          "type": "object",
+          "description": "Per-(category.event_type) event counts; MUST match actual event distribution."
+        },
+        "by_severity": {
+          "type": "object",
+          "description": "Per-severity event counts (info / warn / error)."
+        },
+        "dropped_total": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "MUST be >= sum of per-event dropped_count fields."
+        }
+      }
+    },
+    "volume": {
+      "type": "object",
+      "required": ["events_jsonl_bytes", "event_lines"],
+      "properties": {
+        "events_jsonl_bytes": { "type": "integer", "minimum": 0 },
+        "event_lines": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "performance": {
+      "type": "object",
+      "required": [
+        "avg_frame_ms",
+        "p99_frame_ms",
+        "avg_tick_ms",
+        "p99_tick_ms",
+        "ticks_run",
+        "wall_seconds",
+        "tick_rate_hz"
+      ],
+      "properties": {
+        "avg_frame_ms": { "type": "number", "minimum": 0 },
+        "p99_frame_ms": { "type": "number", "minimum": 0 },
+        "avg_tick_ms": { "type": "number", "minimum": 0 },
+        "p99_tick_ms": { "type": "number", "minimum": 0 },
+        "ticks_run": { "type": "integer", "minimum": 0 },
+        "wall_seconds": { "type": "number", "minimum": 0 },
+        "tick_rate_hz": { "type": "integer", "minimum": 1 },
+        "terrain": {
+          "type": ["object", "null"],
+          "description": "Optional M3 terrain coalesce-cost roll-up.",
+          "properties": {
+            "coalesce_cost_avg": { "type": "number" },
+            "coalesce_cost_max": { "type": "integer", "minimum": 0 },
+            "total_rects_in": { "type": "integer", "minimum": 0 },
+            "total_rects_out": { "type": "integer", "minimum": 0 },
+            "batches_emitted": { "type": "integer", "minimum": 0 }
+          }
+        }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "required": ["items"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["kind", "path"],
+            "properties": {
+              "kind": { "type": "string" },
+              "path": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+    "blockers": { "type": "array", "items": { "type": "string" } },
+    "next_actions": { "type": "array", "items": { "type": "string" } },
+    "tests": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "result", "evidence_event_ids"],
+        "properties": {
+          "id": { "type": "string" },
+          "result": { "type": "string" },
+          "evidence_event_ids": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Event ids cited as evidence; MUST exist in events.jsonl."
+          },
+          "notes": { "type": ["string", "null"] }
+        }
+      }
+    },
+    "final_sim_checksum": {
+      "type": ["string", "null"],
+      "description": "Hex of the last determinism.sim_checksum event; non-null on a valid M0.1+ run."
+    },
+    "checksum_event_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Count of determinism.sim_checksum events in the bundle; >= 1 on a valid run."
+    },
+    "first_tick": { "type": ["integer", "null"], "minimum": 0 },
+    "last_tick": { "type": ["integer", "null"], "minimum": 0 },
+    "recorder": {
+      "type": ["object", "null"],
+      "description": "M4 § Recorder backpressure — recorder runtime telemetry.",
+      "properties": {
+        "peak_buffer_depth": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Max ring-buffer depth reached during the run."
+        },
+        "dropped_cosmetic": { "type": "integer", "minimum": 0 },
+        "dropped_gameplay": { "type": "integer", "minimum": 0 }
+      }
+    }
+  }
+}

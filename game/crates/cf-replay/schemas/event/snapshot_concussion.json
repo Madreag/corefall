@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "snapshot_concussion.v0.1",
+  "title": "snapshot.snapshot_concussion payload",
+  "description": "M4 § M9 firehose surface (deep damage). Placeholder payload at M4 (placeholder=true); M9 fills by_actor with concussion / internal-shock / g-load doses. Fires at scenario start and on every objective transition.",
+  "type": "object",
+  "required": ["tick"],
+  "properties": {
+    "tick": { "type": "integer", "minimum": 0 },
+    "placeholder": {
+      "type": "boolean",
+      "description": "True when emitted by M4 with a stub payload; M9 producer fills real data and clears this flag."
+    },
+    "by_actor": {
+      "type": "array",
+      "description": "Per-actor concussion state: { actor_id, origin_id, concussion_dose, band: Clear|Mild|Moderate|Severe|KO_Imminent|KO, recovery_rate_per_s, internal_shock_dose (robots only), g_load_dose (humans + androids only) }."
+    }
+  }
+}

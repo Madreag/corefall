@@ -1460,6 +1460,13 @@ async fn process_request<E: EngineHandle>(
                 Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
             };
             if let Some(ref id) = p.id_override {
+                // **M4 § runbundle.write rejects path traversal**: spec
+                // requires distinct rejection codes:
+                //   - `absolute_path_rejected` for leading `/`
+                //   - `path_traversal_rejected` for `..` or `\`
+                if id.starts_with('/') {
+                    return Some(invalid_param_reason(request.id, "absolute_path_rejected"));
+                }
                 if id.contains("..") || id.contains('/') || id.contains('\\') {
                     return Some(invalid_param_reason(request.id, "path_traversal_rejected"));
                 }
@@ -2010,15 +2017,21 @@ mod tests {
 
     #[tokio::test]
     async fn runbundle_write_rejects_path_traversal() {
+        // **M4 § runbundle.write rejects path traversal**: spec requires
+        // distinct rejection reasons:
+        //   - `absolute_path_rejected` for ids starting with `/`
+        //   - `path_traversal_rejected` for `..` or `\`
         let engine = StubEngine;
         let hz = std::sync::Arc::new(tokio::sync::Mutex::new(None::<u32>));
         let filter = std::sync::Arc::new(tokio::sync::Mutex::new(None::<String>));
-        let cases = [
-            json!({"schema_version": 1, "id_override": "../../../etc/passwd"}),
-            json!({"schema_version": 1, "id_override": "foo/bar"}),
-            json!({"schema_version": 1, "id_override": "foo\\bar"}),
+        let cases: &[(serde_json::Value, &str)] = &[
+            (json!({"schema_version": 1, "id_override": "../../../etc/passwd"}), "path_traversal_rejected"),
+            (json!({"schema_version": 1, "id_override": "foo/bar"}), "path_traversal_rejected"),
+            (json!({"schema_version": 1, "id_override": "foo\\bar"}), "path_traversal_rejected"),
+            (json!({"schema_version": 1, "id_override": "/absolute/path"}), "absolute_path_rejected"),
+            (json!({"schema_version": 1, "id_override": "..\\windows\\system32"}), "path_traversal_rejected"),
         ];
-        for params in cases {
+        for (params, expected_reason) in cases {
             let req = json!({"jsonrpc": "2.0", "id": 1, "method": "runbundle.write", "params": params});
             let resp = process_request(&req.to_string(), &engine, &hz, &filter, 240)
                 .await
@@ -2028,7 +2041,11 @@ mod tests {
                 .error
                 .unwrap_or_else(|| panic!("runbundle.write must reject {params}"));
             assert_eq!(error.code, error_codes::INVALID_PARAMS);
-            assert_eq!(error.data.unwrap().get("reason").unwrap(), "path_traversal_rejected");
+            assert_eq!(
+                error.data.unwrap().get("reason").unwrap(),
+                expected_reason,
+                "wrong reason for {params}",
+            );
         }
     }
 }

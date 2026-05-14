@@ -73,6 +73,20 @@ const SCHEMA_SNAPSHOT_INVENTORY: &str = include_str!("../schemas/event/snapshot_
 const SCHEMA_SNAPSHOT_TERRAIN_CHUNK: &str = include_str!("../schemas/event/snapshot_terrain_chunk.json");
 const SCHEMA_SNAPSHOT_TERRAIN_SUMMARY: &str = include_str!("../schemas/event/snapshot_terrain_summary.json");
 const SCHEMA_SNAPSHOT_CHASSIS: &str = include_str!("../schemas/event/snapshot_chassis.json");
+// M4 § M9 firehose surface — placeholder snapshot schemas locked at v0.1 so
+// M9/M17/M19/M20 producers can ladder up without renaming. M4 emits
+// placeholder payloads (`placeholder: true`); later milestones fill the
+// optional arrays with real data and clear the flag.
+const SCHEMA_SNAPSHOT_HAZARD_GRID: &str = include_str!("../schemas/event/snapshot_hazard_grid.json");
+const SCHEMA_SNAPSHOT_AFFLICTION: &str = include_str!("../schemas/event/snapshot_affliction.json");
+const SCHEMA_SNAPSHOT_ARMOR_LAYER: &str = include_str!("../schemas/event/snapshot_armor_layer.json");
+const SCHEMA_SNAPSHOT_ATMOSPHERICS: &str = include_str!("../schemas/event/snapshot_atmospherics.json");
+const SCHEMA_SNAPSHOT_ENVIRONMENT_SIGNAL: &str = include_str!("../schemas/event/snapshot_environment_signal.json");
+const SCHEMA_SNAPSHOT_ARMOR: &str = include_str!("../schemas/event/snapshot_armor.json");
+const SCHEMA_SNAPSHOT_INTERNAL: &str = include_str!("../schemas/event/snapshot_internal.json");
+const SCHEMA_SNAPSHOT_CONCUSSION: &str = include_str!("../schemas/event/snapshot_concussion.json");
+const SCHEMA_SNAPSHOT_FLUID: &str = include_str!("../schemas/event/snapshot_fluid.json");
+const SCHEMA_SNAPSHOT_ORIGIN: &str = include_str!("../schemas/event/snapshot_origin.json");
 
 /// Look up the schema source by `(category, event_type)`. Returns `None` if
 /// no schema exists for this pair (callers treat as "no validation
@@ -125,6 +139,17 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("snapshot", "snapshot_terrain_chunk") => Some(SCHEMA_SNAPSHOT_TERRAIN_CHUNK),
         ("snapshot", "snapshot_terrain_summary") => Some(SCHEMA_SNAPSHOT_TERRAIN_SUMMARY),
         ("snapshot", "snapshot_chassis") => Some(SCHEMA_SNAPSHOT_CHASSIS),
+        // M4 § M9 firehose surface placeholders.
+        ("snapshot", "snapshot_hazard_grid") => Some(SCHEMA_SNAPSHOT_HAZARD_GRID),
+        ("snapshot", "snapshot_affliction") => Some(SCHEMA_SNAPSHOT_AFFLICTION),
+        ("snapshot", "snapshot_armor_layer") => Some(SCHEMA_SNAPSHOT_ARMOR_LAYER),
+        ("snapshot", "snapshot_atmospherics") => Some(SCHEMA_SNAPSHOT_ATMOSPHERICS),
+        ("snapshot", "snapshot_environment_signal") => Some(SCHEMA_SNAPSHOT_ENVIRONMENT_SIGNAL),
+        ("snapshot", "snapshot_armor") => Some(SCHEMA_SNAPSHOT_ARMOR),
+        ("snapshot", "snapshot_internal") => Some(SCHEMA_SNAPSHOT_INTERNAL),
+        ("snapshot", "snapshot_concussion") => Some(SCHEMA_SNAPSHOT_CONCUSSION),
+        ("snapshot", "snapshot_fluid") => Some(SCHEMA_SNAPSHOT_FLUID),
+        ("snapshot", "snapshot_origin") => Some(SCHEMA_SNAPSHOT_ORIGIN),
         _ => None,
     }
 }
@@ -278,6 +303,17 @@ mod tests {
             ("snapshot", "snapshot_terrain_chunk"),
             ("snapshot", "snapshot_terrain_summary"),
             ("snapshot", "snapshot_chassis"),
+            // M4 § M9 firehose surface placeholders.
+            ("snapshot", "snapshot_hazard_grid"),
+            ("snapshot", "snapshot_affliction"),
+            ("snapshot", "snapshot_armor_layer"),
+            ("snapshot", "snapshot_atmospherics"),
+            ("snapshot", "snapshot_environment_signal"),
+            ("snapshot", "snapshot_armor"),
+            ("snapshot", "snapshot_internal"),
+            ("snapshot", "snapshot_concussion"),
+            ("snapshot", "snapshot_fluid"),
+            ("snapshot", "snapshot_origin"),
         ] {
             let raw = event_schema_for(cat, ty).unwrap_or_else(|| panic!("no schema for {cat}.{ty}"));
             let _parsed: RawSchema =

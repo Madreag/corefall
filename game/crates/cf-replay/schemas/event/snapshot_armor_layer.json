@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "snapshot_armor_layer.v0.1",
+  "title": "snapshot.snapshot_armor_layer payload",
+  "description": "M4 § M9 firehose surface. Placeholder payload at M4 (placeholder=true); M9 fills actors_with_layers. Fires at scenario start and on every objective transition.",
+  "type": "object",
+  "required": ["tick"],
+  "properties": {
+    "tick": { "type": "integer", "minimum": 0 },
+    "placeholder": {
+      "type": "boolean",
+      "description": "True when emitted by M4 with a stub payload; M9 producer fills real data and clears this flag."
+    },
+    "actors_with_layers": {
+      "type": "array",
+      "description": "Per-actor layer state: { actor_id, layers: [{ kind: External|Internal|Core, hp, max_hp, hardness, status: Pristine|Scratched|Cracked|Critical|Destroyed }] }."
+    }
+  }
+}

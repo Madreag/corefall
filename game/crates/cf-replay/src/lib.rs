@@ -41,11 +41,18 @@ pub const EVENT_ENVELOPE_VERSION: u32 = 1;
 
 pub mod bundle_paths;
 pub mod diagnostics;
+pub mod record_id;
 pub mod schemas;
 
 pub use bundle_paths::{default_run_bundle_root, resolve_run_bundle_root};
+pub use record_id::{EntityKind, RecordId, RecordIdRegistry};
 
-/// One DR-002 v1 event.
+/// One DR-002 v1 event. M4 envelope is locked at v0.1; the optional fields
+/// (`parent_event_id`, `actor_id`, `source_id`, `team`, `pos`, `bbox`,
+/// `dropped_count`, `cosmetic`, `asset_ref`) are envelope-level so consumers
+/// (cause-chain walker, replay viewer, M4A asset ledger) can index by them
+/// without reaching into `payload`. Additive envelope extensions require a
+/// schema bump (locked at v0.1 at M4).
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Event {
     pub schema_version: String,
@@ -58,6 +65,29 @@ pub struct Event {
     pub payload: serde_json::Value,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub parent_event_id: Option<String>,
+    /// **M4 envelope v0.1**: optional envelope-level actor reference. When
+    /// the event is about / caused by a specific actor, set this so
+    /// downstream consumers can filter without parsing the payload.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub actor_id: Option<u64>,
+    /// **M4 envelope v0.1**: optional source actor (the one taking action).
+    /// Distinct from `actor_id` (the affected actor) — e.g. shooter vs
+    /// victim, or carrier vs item.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub source_id: Option<u64>,
+    /// **M4 envelope v0.1**: optional team string ("player" / "enemy" /
+    /// "neutral" / faction name) for fast filtering.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub team: Option<String>,
+    /// **M4 envelope v0.1**: optional 2D world position [x, y] where the
+    /// event happened. Surface-level convenience for spatial filtering.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub pos: Option<[f32; 2]>,
+    /// **M4 envelope v0.1**: optional bounding box [min_x, min_y, max_x,
+    /// max_y] for events that span an area (terrain carve, blast, hazard
+    /// cell). Surface-level convenience for spatial filtering.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub bbox: Option<[f32; 4]>,
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub dropped_count: Option<u64>,
     /// M4 § DR-052 cosmetic vs gameplay split. When `Some(true)`, this event
@@ -70,6 +100,14 @@ pub struct Event {
     /// the event is a gameplay surface.
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub cosmetic: Option<bool>,
+    /// **M4 ↔ M4A integration**: optional reference to a `cf-asset-ledger`
+    /// entry. Set on events that reference an AI-generated asset (capture
+    /// grid screenshot, audio playback, mod-supplied content). M4A's
+    /// `cf-mod ledger verify` cross-references this against the ledger's
+    /// `AssetId` registry. The asset_ref value is a string-encoded
+    /// `AssetId` (blake3 hex prefix).
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub asset_ref: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -400,6 +438,23 @@ pub struct RunSummary {
     pub checksum_event_count: u64,
     pub first_tick: Option<u64>,
     pub last_tick: Option<u64>,
+    /// **M4 § Recorder backpressure does not drop silently**: per-run
+    /// recorder telemetry. `peak_buffer_depth` records the maximum queue
+    /// depth reached at any point during the run; `dropped_cosmetic` /
+    /// `dropped_gameplay` partition the dropped count by event class.
+    /// Surfaced via `summary.json.recorder.*` per spec literal. Defaults
+    /// to all-zero so legacy bundles without the field continue to parse.
+    #[serde(default)]
+    pub recorder: RecorderBlock,
+}
+
+/// **M4 § Recorder backpressure**: per-run recorder telemetry block.
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
+pub struct RecorderBlock {
+    pub peak_buffer_depth: usize,
+    pub dropped_cosmetic: u64,
+    pub dropped_gameplay: u64,
+    pub dropped_total: u64,
 }
 
 /// Append-friendly recorder. Events go through here so the writer can apply backpressure
@@ -521,6 +576,30 @@ impl Recorder {
         self.record_with_cosmetic(tick, sim_time_ms, category, event_type, payload, parent_event_id, true)
     }
 
+    /// M4 § "unknown_cause" marker. Record an event with `parent_event_id = None`
+    /// and inject `cause_origin: "unknown_cause"` + a `reason` field into
+    /// the payload so the M10 cause-chain walker reports a clean terminal
+    /// instead of a "missing parent" bug.
+    ///
+    /// Use this for events that have no causal predecessor in the event
+    /// log (external interrupts, scenario-start defaults, sim-tick fallthroughs
+    /// where no upstream cause exists).
+    pub fn record_with_unknown_cause(
+        &self,
+        tick: Tick,
+        sim_time_ms: f64,
+        category: &str,
+        event_type: &str,
+        mut payload: serde_json::Value,
+        reason: &str,
+    ) -> String {
+        if let Some(obj) = payload.as_object_mut() {
+            obj.insert("cause_origin".to_string(), serde_json::json!("unknown_cause"));
+            obj.insert("cause_origin_reason".to_string(), serde_json::json!(reason));
+        }
+        self.record(tick, sim_time_ms, category, event_type, payload, None)
+    }
+
     fn record_with_cosmetic(
         &self,
         tick: Tick,
@@ -557,8 +636,14 @@ impl Recorder {
             event_type: event_type.to_string(),
             payload,
             parent_event_id,
+            actor_id: None,
+            source_id: None,
+            team: None,
+            pos: None,
+            bbox: None,
             dropped_count: drop_tag,
             cosmetic: if cosmetic { Some(true) } else { None },
+            asset_ref: None,
         };
         *inner.by_category.entry(event.category.clone()).or_insert(0) += 1;
         *inner.by_type.entry(event.event_type.clone()).or_insert(0) += 1;
@@ -834,6 +919,12 @@ pub fn write_run_bundle(bundle_dir: &Path, inputs: BundleInputs<'_>) -> Result<R
         checksum_event_count,
         first_tick,
         last_tick,
+        recorder: RecorderBlock {
+            peak_buffer_depth: inputs.recorder.peak_buffer_depth(),
+            dropped_cosmetic: inputs.recorder.dropped_cosmetic_count(),
+            dropped_gameplay: inputs.recorder.dropped_gameplay_count(),
+            dropped_total: inputs.recorder.dropped_count(),
+        },
     };
 
     let summary_path = bundle_dir.join("summary.json");

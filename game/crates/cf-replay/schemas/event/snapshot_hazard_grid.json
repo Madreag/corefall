@@ -1,0 +1,24 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "snapshot_hazard_grid.v0.1",
+  "title": "snapshot.snapshot_hazard_grid payload",
+  "description": "M4 § M9 firehose surface. Placeholder payload at M4 (placeholder=true); M9 fills hazard_cells and summary_per_kind. Fires at scenario start and on every objective transition (same cadence as snapshot_terrain_*).",
+  "type": "object",
+  "required": ["tick"],
+  "properties": {
+    "tick": { "type": "integer", "minimum": 0 },
+    "placeholder": {
+      "type": "boolean",
+      "description": "True when emitted by M4 with a stub payload; M9 producer fills real data and clears this flag."
+    },
+    "dirty_hazard_cell_count": { "type": "integer", "minimum": 0 },
+    "hazard_cells": {
+      "type": "array",
+      "description": "Per-cell hazard state: { chunk_id, local_pos, kind, intensity, dissipation_rate, spawned_at_tick }."
+    },
+    "summary_per_kind": {
+      "type": "object",
+      "description": "BTreeMap<kind, count> roll-up across all hazard cells."
+    }
+  }
+}

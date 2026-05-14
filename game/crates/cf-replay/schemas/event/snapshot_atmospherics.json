@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "snapshot_atmospherics.v0.1",
+  "title": "snapshot.snapshot_atmospherics payload",
+  "description": "M4 § M9 firehose surface. Placeholder payload at M4 (placeholder=true; empty atm_ids for default scenarios). M19 fills with real atm states. Fires at scenario start and on every objective transition.",
+  "type": "object",
+  "required": ["tick"],
+  "properties": {
+    "tick": { "type": "integer", "minimum": 0 },
+    "placeholder": {
+      "type": "boolean",
+      "description": "True when emitted by M4 with a stub payload; M19 producer fills real kernel data and clears this flag."
+    },
+    "atm_ids": {
+      "type": "array",
+      "description": "Per-atm unit: { atm_id, kind: RoomCell|PipeNetwork|Suit|Canister|Lung|DeviceInternal, volume_l, moles_per_gas, temperature_k, total_pressure_pa, flags }."
+    }
+  }
+}

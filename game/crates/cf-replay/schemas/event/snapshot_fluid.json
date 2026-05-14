@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "snapshot_fluid.v0.1",
+  "title": "snapshot.snapshot_fluid payload",
+  "description": "M4 § M9 firehose surface (deep damage). Placeholder payload at M4 (placeholder=true); M9 fills actors_with_fluids with per-reservoir state. Fires at scenario start and on every objective transition.",
+  "type": "object",
+  "required": ["tick"],
+  "properties": {
+    "tick": { "type": "integer", "minimum": 0 },
+    "placeholder": {
+      "type": "boolean",
+      "description": "True when emitted by M4 with a stub payload; M9 producer fills real data and clears this flag."
+    },
+    "actors_with_fluids": {
+      "type": "array",
+      "description": "Per-actor reservoirs: { actor_id, reservoirs: [{ fluid_kind: oil|coolant|fuel|electrolyte, current_l, capacity_l, leak_rate_per_s, leak_position, leak_active, ignition_risk_0_1 }] }."
+    }
+  }
+}

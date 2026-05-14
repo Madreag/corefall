@@ -16,7 +16,10 @@ use crate::bundle::Bundle;
 /// Default cap on chain length. Chains in practice are at most 5-10 long
 /// (`run_started` → `command_accepted` → … → terminal), but defensive against
 /// pathological loops or malformed data.
-pub const DEFAULT_MAX_DEPTH: usize = 64;
+///
+/// **M4 § Parent-event-id cause chains** sets MAX_CHAIN_DEPTH = 50 by spec
+/// literal.
+pub const DEFAULT_MAX_DEPTH: usize = 50;
 
 /// Default terminal event types the `cause-chain` command auto-discovers
 /// when the caller does not pin a specific event id.

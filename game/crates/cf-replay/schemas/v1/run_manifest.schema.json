@@ -1,0 +1,157 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "prototype-run-manifest.v0.1",
+  "title": "Prototype run manifest (DR-002 v1)",
+  "description": "M4 § run_manifest.json contract. Source-of-truth Rust struct: cf-replay/src/lib.rs::RunManifest.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "run_id",
+    "prototype_slice",
+    "run_mode",
+    "milestone",
+    "build",
+    "scene",
+    "seed",
+    "started_at_utc",
+    "duration_target_sec",
+    "material_schema_version",
+    "config_hash",
+    "assumptions_tested",
+    "linked_specs",
+    "expected_tests",
+    "capture_config",
+    "schemas",
+    "capabilities",
+    "settings",
+    "checksum",
+    "tick_rate_hz"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "description": "Manifest schema id. MUST be 'prototype-run-manifest.v0.1' for M4."
+    },
+    "run_id": {
+      "type": "string",
+      "description": "Must equal the bundle directory basename and the schema-version + run-id of every event."
+    },
+    "prototype_slice": { "type": "string" },
+    "run_mode": { "type": "string" },
+    "milestone": { "type": "string" },
+    "build": {
+      "type": "object",
+      "required": ["commit_sha", "rust_version", "bevy_version", "platform"],
+      "properties": {
+        "commit_sha": { "type": "string" },
+        "worktree_dirty": { "type": "boolean" },
+        "worktree_fingerprint": { "type": ["string", "null"] },
+        "worktree_dirty_files": { "type": "array", "items": { "type": "string" } },
+        "rust_version": { "type": "string" },
+        "bevy_version": { "type": "string" },
+        "platform": { "type": "string" }
+      }
+    },
+    "scene": {
+      "type": "object",
+      "required": ["id", "display_name", "source_path"],
+      "properties": {
+        "id": { "type": "string" },
+        "display_name": { "type": "string" },
+        "source_path": { "type": "string" }
+      }
+    },
+    "seed": { "type": "integer", "minimum": 0 },
+    "started_at_utc": {
+      "type": "string",
+      "description": "ISO-8601 UTC timestamp of run start."
+    },
+    "duration_target_sec": { "type": "number", "minimum": 0 },
+    "material_schema_version": { "type": "string" },
+    "config_hash": {
+      "type": "string",
+      "description": "blake3 hash of effective config / settings (config_hash in spec)."
+    },
+    "assumptions_tested": { "type": "array", "items": { "type": "string" } },
+    "linked_specs": { "type": "array", "items": { "type": "string" } },
+    "expected_tests": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Acceptance-test ids this run intends to evidence; cross-checked by prototype_run_check.py."
+    },
+    "capture_config": {
+      "type": "object",
+      "required": ["events", "screenshots", "captures"],
+      "properties": {
+        "events": { "type": "boolean" },
+        "screenshots": { "type": "boolean" },
+        "captures": { "type": "boolean" }
+      }
+    },
+    "schemas": {
+      "type": "object",
+      "description": "Schema-version map for sub-protocols (control, scenario, events)."
+    },
+    "capabilities": {
+      "type": "object",
+      "required": ["debug", "control_api", "save_load", "debug_capabilities"],
+      "properties": {
+        "debug": { "type": "boolean" },
+        "control_api": { "type": "boolean" },
+        "save_load": { "type": "boolean" },
+        "debug_capabilities": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "settings": {
+      "type": "object",
+      "required": [
+        "ui_scale",
+        "high_contrast",
+        "captions",
+        "reduced_motion",
+        "reduced_shake",
+        "reduced_flash"
+      ],
+      "properties": {
+        "ui_scale": { "type": "number" },
+        "high_contrast": { "type": "boolean" },
+        "captions": { "type": "boolean" },
+        "reduced_motion": { "type": "boolean" },
+        "reduced_shake": { "type": "boolean" },
+        "reduced_flash": { "type": "boolean" },
+        "hold_to_confirm": { "type": "boolean" },
+        "hold_threshold_ms": { "type": "integer", "minimum": 0 },
+        "key_remap_enabled": { "type": "boolean" },
+        "key_bindings": {
+          "type": "object",
+          "description": "Map of action id to KeyCode name."
+        },
+        "ai_difficulty": { "type": "string" },
+        "accel": { "type": "number" },
+        "friction": { "type": "number" },
+        "gravity": { "type": "number" },
+        "jump_force": { "type": "number" },
+        "recoil_decay_per_tick": { "type": "number" },
+        "sharp_aim_build_ticks": { "type": "integer", "minimum": 0 },
+        "walk_threshold": { "type": "number" },
+        "reduce_camera_shake_pct": { "type": "number" },
+        "tick_rate_hz": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "checksum": {
+      "type": "object",
+      "required": ["algorithm", "scope", "cadence_ticks"],
+      "properties": {
+        "algorithm": { "type": "string", "enum": ["blake3"] },
+        "scope": { "type": "string", "description": "Canonical scope name (e.g. 'sim_state_v1')." },
+        "cadence_ticks": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "tick_rate_hz": { "type": "integer", "minimum": 1, "enum": [60, 120] },
+    "expected_outcome": {
+      "type": "string",
+      "enum": ["clean", "panic", "abort"],
+      "description": "M3A-005 declared lifecycle outcome. prototype_run_check.py rejects bundles where this disagrees with system.run_finished.outcome."
+    }
+  }
+}

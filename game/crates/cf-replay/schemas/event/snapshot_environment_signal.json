@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "snapshot_environment_signal.v0.1",
+  "title": "snapshot.snapshot_environment_signal payload",
+  "description": "M4 § M9 firehose surface. Placeholder payload at M4 (placeholder=true; empty by_actor for default scenarios). M20 fills with real aggregator data. Fires at scenario start and on every objective transition.",
+  "type": "object",
+  "required": ["tick"],
+  "properties": {
+    "tick": { "type": "integer", "minimum": 0 },
+    "placeholder": {
+      "type": "boolean",
+      "description": "True when emitted by M4 with a stub payload; M20 producer fills real aggregator data and clears this flag."
+    },
+    "by_actor": {
+      "type": "array",
+      "description": "Per-actor signal slice bands: { actor_id, slice_bands: BTreeMap<slice_name, band_enum> }."
+    }
+  }
+}
