@@ -611,6 +611,135 @@ Scenario: Implementing agent has explicit authority to refactor any cf-* crate
   And breaking changes to internal Rust APIs between crates are expected and welcomed
 ```
 
+### AI depth foundation — BotMemory + PriorityTable + reason_label + CPU budget retune
+
+M8A is where the parallel foundation lands the budget + ECS fields the smart-AI stack (M7) needs. The 5-layer AI thinking stack (Reactive + Utility + Behavior Tree + HTN + LLM-prior) is M7's content; M8A ships the foundation it runs on.
+
+#### Per-bot ECS fields added at M8A (consumed by M7)
+
+```rust
+// Added to ActorBundle for every AI-controlled actor
+pub struct BotMemory {
+    /// 64x64 grid of per-cell flags (cover / threat-seen / known / friendly-area).
+    /// 4 KB per layer × 4 layers = 16 KB per bot. Cache-friendly; fits in L2.
+    perception_grid: [[PerceptionCell; 64]; 64],
+    /// Last-known threat positions (entity_id → record) with age timestamps.
+    threat_memory: BTreeMap<EntityId, ThreatRecord>,
+    /// Last-known ally state (actor_id → record) for triage / cover decisions.
+    ally_memory: BTreeMap<ActorId, AllyRecord>,
+    /// Player-queued orders (Door Kickers-style multi-step plans), up to 8 deep.
+    order_queue: VecDeque<Order>,
+    /// Doctrine string from cf-llm-host (M23 optional layer); cached, refreshed every 5s out-of-band.
+    doctrine_cache: Option<DoctrineString>,
+    /// Last 64 events the bot witnessed; ring buffer.
+    recent_events: RingBuffer<Event, 64>,
+    /// Reason label of the most recent tick's chosen action (for replay viewer + "Why?" key).
+    reason_label_recent: String,
+}
+
+pub struct PriorityTable {
+    /// 22 task types × 1-9 priority (0 = disabled).
+    /// Default values per role template (Medic / Engineer / Rifleman / Sniper / Assault / Spotter).
+    /// Player can override per-bot via Tab overlay (M8 owns UI).
+    weights: [u8; 22],  // 22 bytes per bot; trivial cost
+    /// Per-bot autonomy mode (FullAuto / Standard / Manual) — feeds utility scorer.
+    autonomy_mode: AutonomyMode,
+}
+
+pub enum TaskType {  // canonical 22-task list locked at M8A; M7 produces; M16/M13/M22 consume
+    // Combat (6)
+    EngageVisibleEnemy, SuppressFire, FlankTarget, ThrowGrenade, HoldCover, SharpshootTarget,
+    // Support (4)
+    TriageDownedAlly, HealSelf, ResupplyAmmo, CoverAlly,
+    // Engineering (5)
+    RepairChassisModule, RepairTerrainBreach, SetTrap, DigCover, Demolish,
+    // Reconnaissance (4)
+    MarkThreats, PatrolArea, InvestigateSound, ScoutAhead,
+    // Defensive (3)
+    DefendBrainActor, DefendObjective, RetreatToSafety,
+    // Logistics (2)
+    LootItem, MoveCarry,
+}
+
+pub enum AutonomyMode { FullAuto, Standard, Manual }
+```
+
+**Memory footprint**: 16 KB BotMemory + 22 B PriorityTable + ~200 B order queue ≈ **16.3 KB per bot**. At 50 bots = 815 KB total. Fits comfortably in L2 cache. Determinism-friendly: `BTreeMap` for stable iteration; `RingBuffer` deterministic; `VecDeque` deterministic.
+
+#### Reason label as first-class field
+
+Every AI tick output emits a structured `reason_label` consumed by the replay viewer (M10), the "Why?" key (M8), and the HUD's hover-preview (M11):
+
+```rust
+pub struct AiTickOutput {
+    pub chosen_action: TaskType,
+    pub reason_label: String,           // structured: "score(triage)=0.92 > score(suppress)=0.61; htn=protect_squad; doctrine=defensive"
+    pub utility_candidates: Vec<(TaskType, f32, String)>,  // top 3 candidates with scores + reasons
+    pub htn_goal_stack: Vec<HtnGoal>,   // current goal stack from HTN planner
+    pub behavior_tree_node: String,     // current behavior tree node id
+}
+```
+
+Reason labels are deterministic, structured-string format. The cost (~50-150 bytes per tick per bot) is included in the AI 4.0 ms p99 budget.
+
+#### Re-tuned CPU budget for 5-layer AI thinking
+
+Original M8A budget allocated 2.0 ms p99 for AI sim. With the full 5-layer stack + memory + reason labels + chatter selection, that's too tight. **Revised budget**:
+
+| Subsystem | Old p99 | New p99 | Per-bot cost @ 50 bots (par_iter, 16 cores) |
+|---|---:|---:|---|
+| Actor sim | 1.5 ms | 1.5 ms | unchanged |
+| **AI sim (5-layer + memory + reason)** | 2.0 ms | **4.0 ms** | ~80 µs/bot effective parallel slice |
+| Projectile sim | 1.0 ms | 1.0 ms | unchanged |
+| Terrain mutation + dirty batch | 2.5 ms | 2.5 ms | unchanged |
+| Mission director | 0.2 ms | 0.2 ms | unchanged |
+| Recorder + checksum + merge | 0.5 ms | 0.5 ms | unchanged |
+| Render dispatch | 4.0 ms | **3.5 ms** | tightened (GPU offload already aggressive) |
+| Headroom | 4.0 ms | **2.5 ms** | rollback resimulation buffer; tighter but still 6-frame-rollback-compatible |
+| **Total p99** | **15.5 ms** | **15.5 ms** | still under 16.6 ms 60 Hz budget |
+
+Per-bot 80 µs effective parallel slice covers:
+- Perception update + memory grid write (15-20 µs)
+- Memory aging + event ingestion (5-10 µs)
+- Utility scoring × 22 candidate tasks × priority weight multiply (20-25 µs)
+- Behavior tree traversal (10-15 µs; 3-5 nodes deep)
+- HTN sub-goal evaluation (5-10 µs; cached unless goal changes)
+- Reason-label structured-string construction (5-10 µs)
+- Chatter selection (2-5 µs; lookup + cooldown check)
+
+**LLM mind layer (M23, optional)** runs out-of-band in a separate process at 5s tick per bot. Sim sees only the cached doctrine string. 0% sim cost when LLM disabled (the default). Players who enable it get richer doctrine drift; players who don't see no perf hit.
+
+```gherkin
+Scenario: BotMemory + PriorityTable ship in ECS bundle
+  Given an AI-controlled actor at M8A close
+  When the actor is created via the ECS spawn path
+  Then ActorBundle includes BotMemory (16 KB perception grid + threat_memory + ally_memory + order_queue + recent_events + reason_label_recent)
+  And ActorBundle includes PriorityTable (22 task weights + autonomy_mode)
+  And both fields serialize into the M8A snapshot envelope byte-identically across hosts
+  And the snapshot delta encoding handles BotMemory updates incrementally (only changed cells in perception_grid; sparse encoding)
+
+Scenario: AI sim budget allows 80 µs per bot at 50-bot stress
+  Given the bench_m9_firehose scenario with 50 AI-controlled actors
+  When the scheduler ticks all AI systems in par_iter on 16 cores
+  Then total AI sim p99 ≤ 4.0 ms
+  And per-bot effective parallel slice ≥ 80 µs (sufficient for 5-layer stack + memory + reason)
+  And the per-tick determinism checksum byte-matches across thread counts (1, 4, 16, 32)
+
+Scenario: Reason labels emit deterministically
+  Given any AI-controlled actor at any tick
+  When the actor's AI sim system runs
+  Then reason_label_recent is set to a structured string with utility_candidates + htn_goal_stack + behavior_tree_node + doctrine
+  And the reason_label is deterministic across re-runs (no thread_rng, no Instant::now, no default-hashed HashMap)
+  And the M10 replay viewer can render the reason label byte-identically from the bundle
+
+Scenario: LLM mind layer is optional and runs out-of-band
+  Given a scenario with LLM mind enabled
+  When the cf-llm-host process emits a doctrine string for actor A every 5 seconds
+  Then the doctrine_cache on actor A's BotMemory updates without entering the sim tick critical path
+  And the AI sim p99 ≤ 4.0 ms (no change vs LLM-disabled scenario)
+  And turning LLM mind off (default) leaves the sim cost at exactly the same 4.0 ms p99
+```
+
 ## Out of scope
 
 - **The actual M15 active material kernel (cellular automaton).** M8A ships the scaffolding (`active_region` enforcement, chunk-parallel CA stub, baseline measurement) so M15 can land on a parallel foundation. The CA rules themselves (sand falls, water pools, fire spreads, gas rises, chemistry reactions) land at M15.
