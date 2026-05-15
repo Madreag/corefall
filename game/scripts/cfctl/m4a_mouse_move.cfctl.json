@@ -1,0 +1,20 @@
+{
+  "description": "M11 ACC-A floor: drive act.input.mouse_move across the 12 HUD focusable nodes via cfctl. Each move resolves hover_node_id and emits ux.mouse_moved.",
+  "scenario": "m1_actor_range",
+  "steps": [
+    { "method": "act.input.mouse_move", "params": { "x": 16.0, "y": 0.0 } },
+    { "method": "act.input.mouse_move", "params": { "x": 16.0, "y": 24.0 } },
+    { "method": "act.input.mouse_move", "params": { "x": 16.0, "y": 48.0 } },
+    { "method": "act.input.mouse_move", "params": { "x": 16.0, "y": 72.0 } },
+    { "method": "act.input.mouse_move", "params": { "x": 16.0, "y": 96.0 } },
+    { "method": "act.input.mouse_move", "params": { "x": 16.0, "y": 120.0 } },
+    { "method": "act.input.mouse_move", "params": { "x": 16.0, "y": 144.0 } },
+    { "method": "act.input.mouse_move", "params": { "x": 16.0, "y": 168.0 } },
+    { "method": "act.input.mouse_move", "params": { "x": 16.0, "y": 192.0 } },
+    { "method": "act.input.mouse_move", "params": { "x": 16.0, "y": 216.0 } },
+    { "method": "act.input.mouse_move", "params": { "x": 16.0, "y": 240.0 } },
+    { "method": "act.input.mouse_move", "params": { "x": 16.0, "y": 264.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
+    { "method": "observe.once", "params": {} }
+  ]
+}

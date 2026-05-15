@@ -13760,7 +13760,7 @@ impl EngineHandle for M0Engine {
                 })
             })
             .collect();
-        let nodes: Vec<&'static str> = HUD_FOCUSABLE_NODES.iter().copied().collect();
+        let nodes: Vec<&'static str> = HUD_FOCUSABLE_NODES.to_vec();
         let settings_value = serde_json::to_value(&settings).unwrap_or(serde_json::Value::Null);
         json!({
             "schema_version": SCHEMA_VERSION,
@@ -13883,11 +13883,7 @@ impl EngineHandle for M0Engine {
         let observed_text = match node_id {
             "hud.banners" => {
                 // First (highest-severity) banner's label.
-                s.hud_banners
-                    .iter()
-                    .map(|b| b.label.clone())
-                    .next()
-                    .unwrap_or_default()
+                s.hud_banners.iter().map(|b| b.label.clone()).next().unwrap_or_default()
             }
             "hud.captions" => s
                 .hud_captions
@@ -13903,7 +13899,12 @@ impl EngineHandle for M0Engine {
                 .unwrap_or_default(),
             _ => String::new(),
         };
-        let severity = s.hud_banners.iter().map(|b| b.severity.clone()).next().unwrap_or_default();
+        let severity = s
+            .hud_banners
+            .iter()
+            .map(|b| b.severity.clone())
+            .next()
+            .unwrap_or_default();
         let pass = if let Some(rest) = predicate.strip_prefix("severity=") {
             severity == rest
         } else if let Some(rest) = predicate.strip_prefix("text~=") {

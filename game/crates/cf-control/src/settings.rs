@@ -427,8 +427,7 @@ impl DebugExplainerLevel {
 
 /// **M11**: ACC-A floor caption category vocabulary. Caption_categories may
 /// be any subset of this list. Default is `[combat, ai, mission, accessibility]`.
-pub const SUPPORTED_CAPTION_CATEGORIES: &[&str] =
-    &["combat", "ai", "terrain", "mission", "system", "accessibility"];
+pub const SUPPORTED_CAPTION_CATEGORIES: &[&str] = &["combat", "ai", "terrain", "mission", "system", "accessibility"];
 
 /// **M11**: ACC-A floor key-remap groups. Restricts which UI subsystems
 /// surface their rebindable actions in the remap editor. Default is

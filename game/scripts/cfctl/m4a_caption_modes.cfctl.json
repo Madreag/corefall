@@ -1,0 +1,15 @@
+{
+  "description": "M11 ACC-A floor: cycle caption_mode through off → critical_only → standard → expanded. Verifies caption_mode rejects unknown values with structured reason.",
+  "scenario": "m1_actor_range",
+  "steps": [
+    { "method": "observe.accessibility", "params": {} },
+    { "method": "act.settings.set", "params": { "caption_mode": "critical_only" } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
+    { "method": "act.settings.set", "params": { "caption_mode": "standard" } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
+    { "method": "act.settings.set", "params": { "caption_mode": "expanded" } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
+    { "method": "act.settings.set", "params": { "caption_mode": "off" } },
+    { "method": "observe.captions", "params": {} }
+  ]
+}

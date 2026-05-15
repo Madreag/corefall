@@ -104,6 +104,12 @@ enum Cmd {
         /// Default: unbounded.
         #[arg(long)]
         watch_max_iterations: Option<u64>,
+        /// **M11**: filter the event tail to ACC-A audit trail events only
+        /// (`accessibility.*` + `ux.*` categories). Composes with `--filter`
+        /// by adding the categories to the union; takes effect even when
+        /// `--filter` is empty.
+        #[arg(long, default_value_t = false)]
+        accessibility: bool,
     },
     /// M3B-002: walk the parent_event_id chain back from a terminal event
     /// (or from every default trigger if neither --event-id nor --event-type
@@ -239,6 +245,7 @@ fn main() -> Result<()> {
             watch,
             watch_interval_ms,
             watch_max_iterations,
+            accessibility,
         } => {
             if watch {
                 // M10 watch mode: bypass markdown, tail events.jsonl,
@@ -249,9 +256,20 @@ fn main() -> Result<()> {
                 return Ok(());
             }
             let bundle = load_bundle(&bundle_dir)?;
+            // **M11**: --accessibility composes with --filter by adding the
+            // ACC-A audit trail categories (accessibility, ux) to the union.
+            let effective_filter = if accessibility {
+                if filter.trim().is_empty() {
+                    "accessibility,ux".to_string()
+                } else {
+                    format!("{},accessibility,ux", filter)
+                }
+            } else {
+                filter.clone()
+            };
             let state = ViewerState {
                 at_tick: at_tick.unwrap_or(u64::MAX),
-                filter: ViewerState::parse_filter(&filter),
+                filter: ViewerState::parse_filter(&effective_filter),
                 tail_len,
                 since_event_id,
                 paused,

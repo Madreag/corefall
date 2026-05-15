@@ -949,6 +949,60 @@ fn lookup(value: &Value, key: &str) -> Option<Value> {
                 .count();
             Some(Value::from(count as u64))
         }
+        // **M11**: ACC-A surface shortcuts. The dotted `observe.accessibility.<flag>` /
+        // `observe.actor.silhouette.<zone>` / `observe.actor.module_strip.<slot>` /
+        // `ux.banner_raised.severity` operators are spec-named convenience aliases
+        // that resolve against the live observe-frame projection.
+        key if key.starts_with("observe.accessibility.") => {
+            let rest = &key["observe.accessibility.".len()..];
+            value.get("accessibility").and_then(|a| lookup_inner(a, rest))
+        }
+        key if key.starts_with("observe.actor.silhouette.") => {
+            let rest = &key["observe.actor.silhouette.".len()..];
+            value
+                .get("actors")
+                .and_then(|a| a.as_array())
+                .and_then(|arr| {
+                    arr.iter()
+                        .find(|a| a.get("controllable").and_then(|c| c.as_bool()) == Some(true))
+                })
+                .and_then(|player| player.get("body_silhouette"))
+                .and_then(|sil| lookup_inner(sil, rest))
+        }
+        key if key.starts_with("observe.actor.module_strip.") => {
+            let rest = &key["observe.actor.module_strip.".len()..];
+            value
+                .get("actors")
+                .and_then(|a| a.as_array())
+                .and_then(|arr| {
+                    arr.iter()
+                        .find(|a| a.get("controllable").and_then(|c| c.as_bool()) == Some(true))
+                })
+                .and_then(|player| player.get("module_strip"))
+                .and_then(|strip| {
+                    // Slot lookup: <slot_id>=<state>. Iterate modules array.
+                    let modules = strip.get("modules")?.as_array()?;
+                    modules
+                        .iter()
+                        .find(|m| m.get("id").and_then(|i| i.as_str()) == Some(rest))
+                        .and_then(|m| m.get("state").cloned())
+                })
+        }
+        "ux.banner_raised.severity" => {
+            // The most-recent ux.banner_raised event's severity field, if any.
+            let events = value.get("events").and_then(|e| e.as_array())?;
+            events
+                .iter()
+                .rev()
+                .find(|e| {
+                    let cat = e.get("category").and_then(|c| c.as_str()).unwrap_or("");
+                    let typ = e.get("event_type").and_then(|c| c.as_str()).unwrap_or("");
+                    cat == "ux" && typ == "banner_raised"
+                })
+                .and_then(|e| e.get("payload"))
+                .and_then(|p| p.get("severity"))
+                .cloned()
+        }
         _ => None,
     }
     .or_else(|| lookup_inner(value, key))

@@ -64,27 +64,54 @@ pub mod reactor_hp_bar;
 pub mod reactor_pressure_line;
 pub mod timer_warnings;
 
+// **M11** § HUD readability + ACC-A floor — dedicated widget modules per
+// spec § Files. lib.rs hosted earlier versions of these surfaces; the M11
+// modules below carry the dedicated state structs + helpers cf-app's
+// bridge can mirror per frame.
+pub mod banners;
+pub mod captions;
+pub mod chatter_ticker;
+pub mod contrast;
+pub mod event_ticker;
+pub mod focus_ring;
+pub mod module_strip;
+pub mod priority_indicator;
+pub mod silhouette;
+pub mod triage_window;
+
 pub use mission_resolved_modal::{render_recap_text as render_death_recap_text, RecapEvent, MAX_RECAP_LINES};
 pub use reactor_hp_bar::{ArmorPipView, IntegrityBand, ReactorHpBarState};
 pub use reactor_pressure_line::{PressureTint, ReactorPressureLineState};
 pub use timer_warnings::{TimerColor, TimerSeverity, TimerWarning, TimerWarningsState, WARNING_THRESHOLDS};
 
 pub use action_prompt::ActionPromptState;
+pub use banners::{banner_text_line, BannerSeverity, BannerStackState, BANNER_STACK_MAX_VISIBLE};
 pub use branching_banner::{BranchOption, BranchingBannerState};
+pub use captions::{CaptionVerbosity, CaptionsState, CAPTION_QUEUE_MAX_VISIBLE};
+pub use chatter_ticker::{
+    ChatterLine, ChatterTickerState, CHATTER_TICKER_DEFAULT_DWELL_TICKS, CHATTER_TICKER_MAX_LINES,
+};
 pub use compass::{CompassBearing, CompassState, CARDINALS};
+pub use contrast::{banner_bg_color, strip_bg_color, text_color, ContrastModeUi};
 pub use cover_pip::{CoverLevel, CoverPipState};
 pub use damage_direction::{DamageDirectionMarker, DamageDirectionState, DEFAULT_FADE_MS};
+pub use event_ticker::{EventTickerEntry, EventTickerState, EVENT_TICKER_DEFAULT_DWELL_TICKS};
+pub use focus_ring::{advance_focus_index, focus_ring_clear, focus_ring_color, FocusDirectionUi, FOCUSABLE_NODES};
 pub use grenade_arc::{ArcSample, GrenadeArcState};
 pub use hotbar::{HotbarSlot, HotbarState, HOTBAR_SLOTS};
 pub use lean_pip::{LeanPipState, LEAN_MAX_DEGREES, LEAN_MIN_DEGREES};
 pub use material_legend::{legend_entries, MaterialLegendEntry, MaterialLegendState};
 pub use minimap::{MinimapMarker, MinimapState, MINIMAP_SIZE_PX};
+pub use module_strip::{ModuleState, ModuleStripEntry, ModuleStripState};
 pub use phase_strip::{MissionPhase, PhaseStripState};
+pub use priority_indicator::{PriorityIcon, PriorityIndicatorEntry, PriorityIndicatorState};
 pub use scope_reticle::ScopeReticleState;
 pub use settings_menu::{SettingsMenuState, SettingsTab};
-pub use squad_strip::{SquadStripMember, SquadStripState, SQUAD_STRIP_MAX_MEMBERS};
+pub use silhouette::{BodySilhouetteState, SilhouetteBand};
+pub use squad_strip::{squad_row_line, SquadAutonomyMode, SquadStripMember, SquadStripState, SQUAD_STRIP_MAX_MEMBERS};
 pub use stamina_bar::{StaminaBarState, StaminaColor, STAMINA_CRITICAL_THRESHOLD, STAMINA_HIGH_THRESHOLD};
 pub use stealth_meter::{StealthMeterState, SPOTTED_THRESHOLD};
+pub use triage_window::{TriageAffliction, TriageVerdict, TriageWindowState};
 pub use weapon_swap_overlay::{WeaponSwapOverlayState, SWAP_TRANSITION_MS};
 
 /// Latest HUD model derived from the engine. The cf-app bridge writes this each

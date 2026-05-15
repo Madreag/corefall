@@ -1,0 +1,17 @@
+{
+  "description": "M11 ACC-A floor: cycle screen_shake_scale 1.0 → 0.75 → 0.5 → 0.25 → 0.0. Each transition fires accessibility.settings_changed; cf-app's camera punch path multiplies by the new scale.",
+  "scenario": "m1_actor_range",
+  "steps": [
+    { "method": "observe.accessibility", "params": {} },
+    { "method": "act.settings.set", "params": { "screen_shake_scale": 0.75 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
+    { "method": "act.settings.set", "params": { "screen_shake_scale": 0.5 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
+    { "method": "act.settings.set", "params": { "screen_shake_scale": 0.25 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
+    { "method": "act.settings.set", "params": { "screen_shake_scale": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
+    { "method": "act.settings.set", "params": { "screen_shake_scale": 1.0 } },
+    { "method": "observe.accessibility", "params": {} }
+  ]
+}

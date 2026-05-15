@@ -949,6 +949,16 @@ fn validate_one(path: &Path, report: &mut ValidationReport) {
         validate_regen_manifest(path, report);
         return;
     }
+    // **M11**: validate the M11 interim TTD floors at
+    // `content/balance/ttd_floors_interim.ron` against the minimal
+    // shape locked in cf-actor::ttd. The validator only confirms the
+    // schema_version and that floors/compound_modifiers are non-empty
+    // tagged tuples per the file's documented schema; the canonical
+    // structural validator is the live cf-actor M17 loader.
+    if path.file_name().and_then(|s| s.to_str()) == Some("ttd_floors_interim.ron") {
+        validate_ttd_floors_interim(path, report);
+        return;
+    }
     // **M5**: per-event JSON schema files under cf-replay/schemas/event/.
     if is_event_schema_file(path) {
         validate_event_schema_file(path, report);
@@ -1882,6 +1892,98 @@ struct RegenPipelineEntry {
     freeze_path_suffix: String,
     #[serde(default)]
     notes: String,
+}
+
+/// **M11**: minimal structural check for `content/balance/ttd_floors_interim.ron`.
+/// Verifies the file is RON-parseable, declares `schema_version: "1.0.0"`,
+/// and has at least one floor entry. The canonical M17 loader will replace
+/// this with a strict validator once M17 ships.
+fn validate_ttd_floors_interim(path: &Path, report: &mut ValidationReport) {
+    let raw = match fs::read_to_string(path) {
+        Ok(t) => t,
+        Err(err) => {
+            report.add_error(path.to_path_buf(), format!("read failed: {err}"));
+            return;
+        }
+    };
+    #[derive(serde::Deserialize)]
+    struct FloorEntry {
+        kind: String,
+        origin: String,
+        difficulty: String,
+        seconds: f32,
+    }
+    #[derive(serde::Deserialize)]
+    struct CompoundModifier {
+        a: String,
+        b: String,
+        multiplier: f32,
+    }
+    #[derive(serde::Deserialize)]
+    struct TtdFloorsInterim {
+        schema_version: String,
+        floors: Vec<FloorEntry>,
+        #[serde(default)]
+        compound_modifiers: Vec<CompoundModifier>,
+    }
+    let v: TtdFloorsInterim = match ron::from_str(&raw) {
+        Ok(v) => v,
+        Err(err) => {
+            report.add_error(path.to_path_buf(), format!("ttd_floors_interim parse: {err}"));
+            return;
+        }
+    };
+    let mut messages: Vec<String> = Vec::new();
+    if v.schema_version != "1.0.0" {
+        messages.push(format!(
+            "ttd_floors_interim.schema_version must be \"1.0.0\" (got {:?})",
+            v.schema_version
+        ));
+    }
+    if v.floors.is_empty() {
+        messages.push("ttd_floors_interim.floors must contain at least one entry".to_string());
+    }
+    for (i, f) in v.floors.iter().enumerate() {
+        if f.kind.trim().is_empty() {
+            messages.push(format!("floors[{i}].kind must be non-empty"));
+        }
+        if f.origin.trim().is_empty() {
+            messages.push(format!("floors[{i}].origin must be non-empty"));
+        }
+        if f.difficulty.trim().is_empty() {
+            messages.push(format!("floors[{i}].difficulty must be non-empty"));
+        }
+        if !f.seconds.is_finite() || f.seconds < 0.0 {
+            messages.push(format!(
+                "floors[{i}].seconds must be a finite non-negative float (got {})",
+                f.seconds
+            ));
+        }
+    }
+    for (i, cm) in v.compound_modifiers.iter().enumerate() {
+        if !cm.multiplier.is_finite() || cm.multiplier < 0.0 {
+            messages.push(format!(
+                "compound_modifiers[{i}].multiplier must be finite and non-negative (got {})",
+                cm.multiplier
+            ));
+        }
+        if cm.a.trim().is_empty() || cm.b.trim().is_empty() {
+            messages.push(format!("compound_modifiers[{i}].a and b must be non-empty"));
+        }
+    }
+    if messages.is_empty() {
+        report.add_pass(
+            path.to_path_buf(),
+            format!(
+                "ttd_floors_interim v{} ({} floors, {} compound)",
+                v.schema_version,
+                v.floors.len(),
+                v.compound_modifiers.len()
+            ),
+        );
+    } else {
+        report.add_error(path.to_path_buf(), messages.join("; "));
+    }
 }
 
 fn validate_regen_manifest(path: &Path, report: &mut ValidationReport) {

@@ -1,0 +1,19 @@
+{
+  "description": "M11 ACC-A floor: cycle color_cue_mode through default → colorblind_safe → monochrome_test → protanopia → deuteranopia → tritanopia. Each transition fires accessibility.settings_changed.",
+  "scenario": "m1_actor_range",
+  "steps": [
+    { "method": "observe.accessibility", "params": {} },
+    { "method": "act.settings.set", "params": { "color_cue_mode": "colorblind_safe" } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
+    { "method": "act.settings.set", "params": { "color_cue_mode": "monochrome_test" } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
+    { "method": "act.settings.set", "params": { "color_cue_mode": "protanopia" } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
+    { "method": "act.settings.set", "params": { "color_cue_mode": "deuteranopia" } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
+    { "method": "act.settings.set", "params": { "color_cue_mode": "tritanopia" } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
+    { "method": "act.settings.set", "params": { "color_cue_mode": "default" } },
+    { "method": "observe.accessibility", "params": {} }
+  ]
+}
