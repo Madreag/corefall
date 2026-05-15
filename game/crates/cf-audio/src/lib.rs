@@ -33,6 +33,13 @@ use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use tracing::trace;
 
+pub mod chatter;
+
+pub use chatter::{
+    tts_stub, voice_id_for_archetype, ChatterCaption, ChatterCategory, ChatterCooldownTable, ChatterEmittedEvent,
+    EmissionInfo, Phoneme, PLACEHOLDER_PHONEME_MS,
+};
+
 /// Catalogue of M1 audio cues. Tied 1:1 to the event taxonomy in
 /// `cf-replay` so a replay-viewer plugin can pattern-match on the event
 /// stream and call `play()` deterministically.
