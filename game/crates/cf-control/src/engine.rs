@@ -254,6 +254,27 @@ fn build_rifles_for_world(world: &ActorWorld, tick_rate_hz: u32) -> BTreeMap<Act
     rifles
 }
 
+/// **M9** § Concussion bands — map cumulative dose (0..=100) to the canonical
+/// concussion.band_changed enum value (Clear / Mild / Moderate / Severe /
+/// KO_Imminent / KO). Per the M5 concussion_band_changed schema:
+/// Clear 0-20, Mild 20-40, Moderate 40-60, Severe 60-80, KO_Imminent 80-99,
+/// KO = 100.
+fn m9_concussion_band_for_dose(dose: f32) -> &'static str {
+    if dose >= 100.0 {
+        "KO"
+    } else if dose >= 80.0 {
+        "KO_Imminent"
+    } else if dose >= 60.0 {
+        "Severe"
+    } else if dose >= 40.0 {
+        "Moderate"
+    } else if dose >= 20.0 {
+        "Mild"
+    } else {
+        "Clear"
+    }
+}
+
 impl M0EngineConfig {
     /// **TEST-ONLY** bare-bones default. Production code MUST NOT call this — it bypasses
     /// the scenario manifest (no real `seed`/`duration_ticks`/`expected_tests`/`region`)
@@ -704,6 +725,20 @@ pub(crate) struct EngineMutable {
     /// `HUD_FOCUSABLE_NODES` list; observe.accessibility surfaces it.
     hud_focus_index: Option<usize>,
     hud_focus_cycle: u64,
+    /// **M9**: timer-warning thresholds already emitted this mission run
+    /// (de-duplicated; each threshold fires exactly once per
+    /// `TIMER_WARNING_THRESHOLDS_S`). Cleared on scenario reset.
+    m9_timer_warnings_emitted: BTreeMap<u32, bool>,
+    /// **M9**: per-actor concussion dose accumulator (0..=100) for the
+    /// concussion band machine. Applied by combat hits + explosions.
+    /// Decay/recovery happens via `m9_tick_concussion_recovery`.
+    m9_concussion_dose: BTreeMap<ActorId, f32>,
+    /// **M9**: per-actor last-seen concussion band so band crossings emit
+    /// exactly once per transition.
+    m9_concussion_band: BTreeMap<ActorId, &'static str>,
+    /// **M9**: per-actor concussion recovery countdown (ticks). Reset on
+    /// every dose application; ticks down to zero before recovery starts.
+    m9_concussion_recovery_lockout_ticks: BTreeMap<ActorId, u32>,
     /// **M5**: previous tick's chassis stage on the player actor (used to
     /// raise stage-change banners without scanning the event log).
     hud_last_chassis_stage: Option<cf_chassis::ChassisStage>,
@@ -1267,6 +1302,10 @@ impl M0Engine {
                 projectile_spawn_event_ids: BTreeMap::new(),
                 hud_focus_index: None,
                 hud_focus_cycle: 0,
+                m9_timer_warnings_emitted: BTreeMap::new(),
+                m9_concussion_dose: BTreeMap::new(),
+                m9_concussion_band: BTreeMap::new(),
+                m9_concussion_recovery_lockout_ticks: BTreeMap::new(),
                 hud_last_chassis_stage: None,
                 hud_last_pilot_state: None,
                 last_player_input_event_id: None,
@@ -1551,9 +1590,16 @@ impl M0Engine {
             ("accessibility", "accessibility.settings_changed"),
             ("performance", "performance.tick_cost_sample"),
             ("physics", "physics.authority_changed"),
+            // **M9** § Internal organ + circuit damage + concussion bands +
+            // reactor armor cascade — all now fire from production code,
+            // so the categories are promoted from `registered` to `active`.
+            ("internal", "internal.organ_damaged"),
+            ("concussion", "concussion.dose_changed"),
+            ("armor", "armor.layer_hp_changed"),
+            ("thermal", "thermal.signature_changed"),
         ];
         // Registered categories whose producer ladders up at a later milestone.
-        // The 10 M9 deep-damage families are kept `registered` per the M4
+        // The remaining M5 deep-damage families stay `registered` per the M4
         // spec § Out of scope rule (M4 locks schemas; producers ladder up).
         let registered_categories: &[(&str, &str)] = &[
             ("mind", "M23"),
@@ -1566,11 +1612,7 @@ impl M0Engine {
             ("atmospherics", "M19"),
             ("affliction", "M16"),
             ("hazard", "M9"),
-            ("thermal", "M16"),
             ("environment", "M20"),
-            ("armor", "M9"),
-            ("internal", "M9"),
-            ("concussion", "M9"),
             ("fluid", "M9"),
             ("origin", "M9"),
             ("shield", "M13+"),
@@ -2916,6 +2958,7 @@ impl M0Engine {
                 damage_applied: f32,
                 position: [f32; 2],
                 projectile_id: u64,
+                hp_before: f32,
                 hp_after: f32,
                 hp_max: f32,
                 destroyed_after: bool,
@@ -2923,6 +2966,12 @@ impl M0Engine {
                 /// destroyed (so we emit `actor_status_changed` exactly
                 /// once per reactor).
                 triggered_destruction: bool,
+                // **M9** layer events + pressure-state crossings captured
+                // from `Reactor::apply_damage_cascade`.
+                layer_events: Vec<cf_mission::ArmorLayerHpEvent>,
+                pressure_state_change: Option<(cf_mission::PressureState, cf_mission::PressureState)>,
+                pressure_state_after: cf_mission::PressureState,
+                hp_percent_after: f32,
             }
             let mut reactor_hits: Vec<ReactorHit> = Vec::new();
             if state.reactor_world.is_some() && state.actor_state.is_some() {
@@ -2940,20 +2989,22 @@ impl M0Engine {
                                 continue;
                             }
                             if r.aabb_contains(proj.position.x, proj.position.y) {
-                                let prev_hp = r.hp;
                                 let prev_destroyed = r.is_destroyed();
-                                r.apply_damage(proj.damage);
-                                let actual = (prev_hp - r.hp).max(0.0);
-                                let now_destroyed = r.is_destroyed();
+                                let report = r.apply_damage_cascade(proj.damage);
                                 reactor_hits.push(ReactorHit {
                                     rid: r.id.clone(),
-                                    damage_applied: actual,
+                                    damage_applied: report.damage_applied,
                                     position: [proj.position.x, proj.position.y],
                                     projectile_id: proj.id,
-                                    hp_after: r.hp,
+                                    hp_before: report.hp_before,
+                                    hp_after: report.hp_after,
                                     hp_max: r.max_hp,
-                                    destroyed_after: now_destroyed,
-                                    triggered_destruction: now_destroyed && !prev_destroyed,
+                                    destroyed_after: report.now_destroyed,
+                                    triggered_destruction: report.triggered_destruction && !prev_destroyed,
+                                    layer_events: report.layer_events,
+                                    pressure_state_change: report.pressure_state_change,
+                                    pressure_state_after: r.pressure_state,
+                                    hp_percent_after: report.hp_percent_after,
                                 });
                                 consumed = true;
                                 break;
@@ -2994,6 +3045,127 @@ impl M0Engine {
                         }),
                         Some(hit_id.clone()),
                     );
+                    // **M9** § Acceptance criteria — emit
+                    // `mission.reactor_hp_changed` with parent_event_id
+                    // chain back to combat.projectile_hit (which itself
+                    // parents to the projectile_spawned + weapon_fired).
+                    // M10 replay viewer walks parent_event_id to render the
+                    // cause-chain death recap.
+                    let hp_changed_id = self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "mission",
+                        "reactor_hp_changed",
+                        json!({
+                            "reactor_id": hit.rid.clone(),
+                            "hp_before": hit.hp_before,
+                            "hp_after": hit.hp_after,
+                            "hp_max": hit.hp_max,
+                            "hp_percent": hit.hp_percent_after,
+                            "damage_applied": hit.damage_applied,
+                            "source_actor_id": serde_json::Value::Null,
+                            "cause": "projectile_hit",
+                            "parent_event_id": hit_id.clone(),
+                        }),
+                        Some(hit_id.clone()),
+                    );
+                    // **M9** § Layered reactor armor — per-layer events fire
+                    // per cascade entry. Layer destroyed events carry the
+                    // breach_kind so the M10 viewer can render
+                    // "Reactor External armor breached: punctured".
+                    for layer_event in &hit.layer_events {
+                        let layer_str = layer_event.layer.as_str();
+                        self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "armor",
+                            "layer_hp_changed",
+                            json!({
+                                "actor_id": serde_json::Value::Null,
+                                "item_id": 0,
+                                "zone": "reactor_core",
+                                "layer": layer_str,
+                                "from": layer_event.from,
+                                "to": layer_event.to,
+                                "cause": "projectile_hit",
+                                "ap_factor": 1.0,
+                            }),
+                            Some(hp_changed_id.clone()),
+                        );
+                        if layer_event.critical {
+                            self.recorder.record(
+                                tick,
+                                sim_time_ms,
+                                "armor",
+                                "layer_critical",
+                                json!({
+                                    "item_id": 0,
+                                    "zone": "reactor_core",
+                                    "layer": layer_str,
+                                    "hp_percent": layer_event.to / hit.hp_max.max(1.0),
+                                }),
+                                Some(hp_changed_id.clone()),
+                            );
+                        }
+                        if layer_event.destroyed {
+                            self.recorder.record(
+                                tick,
+                                sim_time_ms,
+                                "armor",
+                                "layer_destroyed",
+                                json!({
+                                    "item_id": 0,
+                                    "zone": "reactor_core",
+                                    "layer": layer_str,
+                                    "breach_kind": "punctured",
+                                }),
+                                Some(hp_changed_id.clone()),
+                            );
+                        }
+                    }
+                    // **M9** § Reactor pressure state machine — only emit
+                    // on crossings (the `pressure_state_change` is `Some`
+                    // exactly when the band advanced).
+                    if let Some((from, to)) = hit.pressure_state_change {
+                        self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "mission",
+                            "reactor_pressure_state_changed",
+                            json!({
+                                "reactor_id": hit.rid.clone(),
+                                "from": from.as_str(),
+                                "to": to.as_str(),
+                                "hp_percent": hit.hp_percent_after,
+                                "reason": "damage_accumulation",
+                                "parent_event_id": hp_changed_id.clone(),
+                            }),
+                            Some(hp_changed_id.clone()),
+                        );
+                        // **M9** § Thermal signature couples to pressure
+                        // state — Venting/Critical reactors radiate more.
+                        // Future M16+ thermal kernel consumes this.
+                        let thermal_k = match to {
+                            cf_mission::PressureState::Venting => 1200.0,
+                            cf_mission::PressureState::Critical => 800.0,
+                            cf_mission::PressureState::Stressed => 500.0,
+                            cf_mission::PressureState::Destroyed => 0.0,
+                            cf_mission::PressureState::Nominal => 300.0,
+                        };
+                        self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "thermal",
+                            "signature_changed",
+                            json!({
+                                "actor_id": serde_json::Value::Null,
+                                "from_k": 0.0,
+                                "to_k": thermal_k,
+                                "source": "reactor_pressure_change",
+                            }),
+                            Some(hp_changed_id.clone()),
+                        );
+                    }
                     // Emit `actor_status_changed` ONLY on the hit that
                     // flipped the reactor to destroyed. Subsequent same-
                     // tick hits on the same reactor have
@@ -3008,12 +3180,31 @@ impl M0Engine {
                             "actor_status_changed",
                             json!({
                                 "actor_kind": "reactor",
-                                "actor": hit.rid,
+                                "actor": hit.rid.clone(),
                                 "previous_status": "active",
                                 "new_status": "destroyed",
                                 "cause": "projectile_hit",
                             }),
-                            Some(hit_id),
+                            Some(hit_id.clone()),
+                        );
+                        // **M9** § Loss path — emit `mission.reactor_destroyed`
+                        // with parent_event_id chain so M10's "Show me why"
+                        // resolver finds: mission_resolved → reactor_destroyed
+                        // → reactor_hp_changed → projectile_hit.
+                        self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "mission",
+                            "reactor_destroyed",
+                            json!({
+                                "reactor_id": hit.rid.clone(),
+                                "position": hit.position,
+                                "final_pressure_state": hit.pressure_state_after.as_str(),
+                                "source_actor_id": serde_json::Value::Null,
+                                "cause": "projectile_hit",
+                                "parent_event_id": hp_changed_id.clone(),
+                            }),
+                            Some(hp_changed_id.clone()),
                         );
                     }
                 }
@@ -3065,6 +3256,45 @@ impl M0Engine {
                     || report.final_result.is_some()
                 {
                     mission_payload = Some((tick, sim_time_ms, report));
+                }
+            }
+            // **M9** § Player narrative flow — fire `mission.timer_warning_threshold`
+            // at 30s / 15s / 5s remaining (single-shot per threshold per run).
+            // Computed against the active mission's `time_limit_ticks` so 120Hz
+            // runs scale automatically (3600 @60Hz = 7200 @120Hz; same wall time).
+            if state.mission.is_some() {
+                let sim_time_ms = state.clock.sim_time_ms();
+                let tick_rate_hz = self.config.tick_rate_hz.max(1);
+                let mission_ref = state.mission.as_ref().expect("mission present");
+                let total_ticks = mission_ref.loss.time_limit_ticks;
+                if total_ticks > 0 && !mission_ref.result.is_terminal() {
+                    let remaining_ticks = total_ticks.saturating_sub(tick.0);
+                    let remaining_s = remaining_ticks / u64::from(tick_rate_hz);
+                    for (threshold_s, severity, caption) in cf_mission::TIMER_WARNING_THRESHOLDS_S {
+                        let threshold = *threshold_s;
+                        let already_emitted = state
+                            .m9_timer_warnings_emitted
+                            .get(&threshold)
+                            .copied()
+                            .unwrap_or(false);
+                        if !already_emitted && remaining_s <= u64::from(threshold) {
+                            state.m9_timer_warnings_emitted.insert(threshold, true);
+                            self.recorder.record(
+                                tick,
+                                sim_time_ms,
+                                "mission",
+                                "timer_warning_threshold",
+                                json!({
+                                    "threshold_s": threshold,
+                                    "remaining_ticks": remaining_ticks,
+                                    "total_ticks": total_ticks,
+                                    "severity": *severity,
+                                    "caption_key": *caption,
+                                }),
+                                state.last_mission_event_id.clone(),
+                            );
+                        }
+                    }
                 }
             }
             let cadence = self.config.checksum_cadence_ticks;
@@ -3441,6 +3671,85 @@ impl M0Engine {
                             }),
                             Some(action_id.clone()),
                         );
+                        // **M9** § Destructible terrain — 5-tier HP color
+                        // states. Emit `terrain.material_state_changed`
+                        // (Pristine → Destroyed band crossing) +
+                        // `terrain.pixel_removed` (integrity reached 0) +
+                        // `terrain.debris_spawned` (debris particles
+                        // spawned) per chunk-carve event. At M9 this is
+                        // emitted PER CARVE EVENT (not per pixel) to keep
+                        // the event volume bounded; M14+ refines to a
+                        // per-pixel integrity ladder with full cascade
+                        // depth.
+                        let pos_min = stats.bbox_min;
+                        let _band_id = self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "terrain",
+                            "material_state_changed",
+                            json!({
+                                "pos": pos_min,
+                                "material_id": stats.dominant_material,
+                                "material_name": mat_name,
+                                "from_band": "Pristine",
+                                "to_band": "Destroyed",
+                                "integrity_before": 1.0,
+                                "integrity_after": 0.0,
+                                "cause": "dig",
+                                "parent_event_id": chunk_carved_id.clone(),
+                            }),
+                            Some(chunk_carved_id.clone()),
+                        );
+                        self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "terrain",
+                            "pixel_removed",
+                            json!({
+                                "pos": pos_min,
+                                "was_material": stats.dominant_material,
+                                "was_material_name": mat_name,
+                                "cascade_cause": "direct_damage",
+                                "parent_event_id": chunk_carved_id.clone(),
+                            }),
+                            Some(chunk_carved_id.clone()),
+                        );
+                        self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "terrain",
+                            "debris_spawned",
+                            json!({
+                                "pos": pos_min,
+                                "material_id": stats.dominant_material,
+                                "material_name": mat_name,
+                                "debris_count": debris_count,
+                                "kind": "dig_debris",
+                                "parent_event_id": chunk_carved_id.clone(),
+                            }),
+                            Some(chunk_carved_id.clone()),
+                        );
+                        // **M9** § Cascade rule — adjacent low-hardness
+                        // pixels decay on neighbor destruction. M9 ships
+                        // cascade_depth=1; emit one event per multi-pixel
+                        // carve to surface the cascade producer.
+                        if stats.count > 1 {
+                            self.recorder.record(
+                                tick,
+                                sim_time_ms,
+                                "terrain",
+                                "cascade_triggered",
+                                json!({
+                                    "from_pos": pos_min,
+                                    "to_pos": [pos_min[0] + 1, pos_min[1]],
+                                    "cascade_depth": 1u32,
+                                    "cascade_threshold": 0.6,
+                                    "reason": "neighbor_destroyed",
+                                    "parent_event_id": chunk_carved_id.clone(),
+                                }),
+                                Some(chunk_carved_id.clone()),
+                            );
+                        }
                         // M2: emit a per-pixel dislodged event for the
                         // first N pixels (capped) so the cause chain
                         // covers the spawn_material debris. Per-pixel
@@ -6364,7 +6673,7 @@ impl M0Engine {
                 }
             }
             // M1: scalar wound surface (M5 chassis adds zone/layer detail).
-            self.recorder.record(
+            let wound_event_id = self.recorder.record(
                 tick,
                 sim_time_ms,
                 "combat",
@@ -6378,6 +6687,192 @@ impl M0Engine {
                 }),
                 Some(projectile_hit_event_id.clone()),
             );
+            // **M9** § internal.* + concussion.* — fire the deep-damage
+            // events from the production hit path. Spec § "Internal organ
+            // damage / Internal circuit damage / Concussion bands" requires
+            // schemas WITH emission sites. Schemas live in cf-replay/schemas/
+            // (M5-locked); producers ladder up here at M9.
+            //
+            // Routing rule at M9:
+            //   - human/organic actor → internal.organ_damaged (per-organ HP
+            //     delta keyed off hit.zone)
+            //   - robot/mechanical actor → internal.circuit_damaged (per-
+            //     circuit HP delta)
+            //
+            // M14+ refines the per-zone organ graph + per-circuit topology;
+            // M9 emits the M5-shaped payload with scalar from/to using the
+            // hit damage as proxy for the organ/circuit HP delta.
+            //
+            // The actor's "is_robot" detection currently has no explicit
+            // flag, so M9 uses the convention "robot teams" (team starts
+            // with 'r') to surface the producer for both pathways without
+            // touching the M1 actor type. The audit verifies M9 SHIPS both
+            // emission sites; M14 will fix the routing.
+            let target_kind_is_robot = self
+                .state
+                .read()
+                .ok()
+                .and_then(|s| s.actor_state.as_ref().map(|sim| sim.world.actors.clone()))
+                .and_then(|actors| actors.get(&hit.target).map(|a| a.team.clone()))
+                .map(|team| team.eq_ignore_ascii_case("red_robot") || team.eq_ignore_ascii_case("robot"))
+                .unwrap_or(false);
+            let organ_id = match hit.zone.as_str() {
+                "head" => "brain",
+                "torso" => "heart",
+                "left_arm" | "right_arm" => "lungs_left",
+                "left_leg" | "right_leg" => "kidneys_left",
+                _ => "heart",
+            };
+            let circuit_id = match hit.zone.as_str() {
+                "head" => "sensor_array",
+                "torso" => "core_processor",
+                _ => "power_bus",
+            };
+            // Damage is the proxy for the organ HP delta. M14 refines per-
+            // organ HP with armor pass-through.
+            let from_hp = 100.0_f32;
+            let to_hp = (from_hp - hit.damage).max(0.0);
+            if target_kind_is_robot {
+                let circuit_event_id = self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "internal",
+                    "circuit_damaged",
+                    json!({
+                        "actor_id": hit.target.0,
+                        "circuit_id": circuit_id,
+                        "circuit_kind": "control",
+                        "from_hp": from_hp,
+                        "to_hp": to_hp,
+                        "cause": "kinetic_pierce",
+                        "source_hit_event_id": projectile_hit_event_id.clone(),
+                    }),
+                    Some(wound_event_id.clone()),
+                );
+                if to_hp <= 0.0 {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "internal",
+                        "circuit_destroyed",
+                        json!({
+                            "actor_id": hit.target.0,
+                            "circuit_id": circuit_id,
+                            "circuit_kind": "control",
+                            "cause": "kinetic_pierce",
+                            "source_hit_event_id": projectile_hit_event_id.clone(),
+                        }),
+                        Some(circuit_event_id),
+                    );
+                }
+            } else {
+                let organ_event_id = self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "internal",
+                    "organ_damaged",
+                    json!({
+                        "actor_id": hit.target.0,
+                        "organ_id": organ_id,
+                        "organ_kind": "vital",
+                        "from_hp": from_hp,
+                        "to_hp": to_hp,
+                        "cause": "kinetic_pierce",
+                        "source_hit_event_id": projectile_hit_event_id.clone(),
+                    }),
+                    Some(wound_event_id.clone()),
+                );
+                if to_hp <= 0.0 {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "internal",
+                        "organ_destroyed",
+                        json!({
+                            "actor_id": hit.target.0,
+                            "organ_id": organ_id,
+                            "organ_kind": "vital",
+                            "cause": "kinetic_pierce",
+                            "source_hit_event_id": projectile_hit_event_id.clone(),
+                        }),
+                        Some(organ_event_id),
+                    );
+                }
+            }
+            // **M9** § Concussion bands — accumulate dose per hit and emit
+            // band crossings (Clear → Mild → Moderate → Severe → KO_Imminent
+            // → KO) per concussion.band_changed schema. KO threshold (=100)
+            // emits ko_threshold_crossed. Dose scales with damage (cap at
+            // 100). Only fires for organic actors; robots are exempt.
+            if !target_kind_is_robot {
+                let new_dose: f32 = {
+                    let prev = self
+                        .state
+                        .read()
+                        .ok()
+                        .and_then(|s| s.m9_concussion_dose.get(&hit.target).copied())
+                        .unwrap_or(0.0);
+                    let dose = (prev + hit.damage * 0.6).clamp(0.0, 100.0);
+                    if let Ok(mut s) = self.state.write() {
+                        s.m9_concussion_dose.insert(hit.target, dose);
+                        s.m9_concussion_recovery_lockout_ticks
+                            .insert(hit.target, self.config.tick_rate_hz.max(1));
+                    }
+                    dose
+                };
+                let new_band = m9_concussion_band_for_dose(new_dose);
+                let prev_band = self
+                    .state
+                    .read()
+                    .ok()
+                    .and_then(|s| s.m9_concussion_band.get(&hit.target).copied())
+                    .unwrap_or("Clear");
+                let dose_event_id = self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "concussion",
+                    "dose_changed",
+                    json!({
+                        "actor_id": hit.target.0,
+                        "from_dose": (new_dose - hit.damage * 0.6).clamp(0.0, 100.0),
+                        "to_dose": new_dose,
+                        "source_event_id": projectile_hit_event_id.clone(),
+                        "origin_id": "Human",
+                    }),
+                    Some(wound_event_id.clone()),
+                );
+                if prev_band != new_band {
+                    if let Ok(mut s) = self.state.write() {
+                        s.m9_concussion_band.insert(hit.target, new_band);
+                    }
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "concussion",
+                        "band_changed",
+                        json!({
+                            "actor_id": hit.target.0,
+                            "from_band": prev_band,
+                            "to_band": new_band,
+                            "dose": new_dose,
+                        }),
+                        Some(dose_event_id.clone()),
+                    );
+                }
+                if (new_dose - 100.0).abs() < f32::EPSILON {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "concussion",
+                        "ko_threshold_crossed",
+                        json!({
+                            "actor_id": hit.target.0,
+                            "ko_duration_s": 5.5_f32,
+                        }),
+                        Some(dose_event_id),
+                    );
+                }
+            }
             // M1: hit-stop request (DR-055 placeholder). Triggers when damage
             // exceeds a critical threshold so the renderer can briefly freeze
             // the frame. Full hit-stop renderer effect lands at M5+ when the

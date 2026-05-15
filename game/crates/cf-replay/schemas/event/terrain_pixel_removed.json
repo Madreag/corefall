@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/terrain.pixel_removed.v0.1",
+  "title": "terrain.pixel_removed",
+  "description": "M9 § Destructible terrain — emitted when a pixel's integrity reaches 0 and the pixel becomes air. Carries the original material id + the cascade cause when triggered by a neighbor (vs. direct damage). Pairs with terrain.cascade_triggered + terrain.debris_spawned. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "terrain" },
+    "event_type": { "const": "pixel_removed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "pos": { "type": "array", "minItems": 2, "maxItems": 2 },
+        "was_material": { "type": "integer", "minimum": 0 },
+        "was_material_name": { "type": "string" },
+        "cascade_cause": { "type": ["string", "null"], "enum": [null, "neighbor_destroyed", "direct_damage", "cascade_chain"] },
+        "parent_event_id": { "type": ["string", "null"] }
+      },
+      "required": ["pos", "was_material"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

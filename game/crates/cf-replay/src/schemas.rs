@@ -329,6 +329,23 @@ const SCHEMA_AI_PANIC_CALL_EMITTED: &str = include_str!("../schemas/event/ai_pan
 const SCHEMA_AI_TARGET_TAGGED: &str = include_str!("../schemas/event/ai_target_tagged.json");
 const SCHEMA_AI_REASON_QUERY_RETURNED: &str = include_str!("../schemas/event/ai_reason_query_returned.json");
 
+// **M9**: reactor defense + 5-tier integrity machine event surface lock.
+// Spec § Schemas (scenario-specific) + Acceptance criteria. Producers fire
+// at runtime from cf-control/src/engine.rs reactor hit + mission timer +
+// per-pixel terrain integrity paths. Schemas pair with M5's deep-damage
+// families (armor.* / internal.* / concussion.*) that M9 also wires.
+const SCHEMA_MISSION_REACTOR_HP_CHANGED: &str = include_str!("../schemas/event/mission_reactor_hp_changed.json");
+const SCHEMA_MISSION_REACTOR_DESTROYED: &str = include_str!("../schemas/event/mission_reactor_destroyed.json");
+const SCHEMA_MISSION_REACTOR_PRESSURE_STATE_CHANGED: &str =
+    include_str!("../schemas/event/mission_reactor_pressure_state_changed.json");
+const SCHEMA_MISSION_TIMER_WARNING_THRESHOLD: &str =
+    include_str!("../schemas/event/mission_timer_warning_threshold.json");
+const SCHEMA_TERRAIN_MATERIAL_STATE_CHANGED: &str =
+    include_str!("../schemas/event/terrain_material_state_changed.json");
+const SCHEMA_TERRAIN_PIXEL_REMOVED: &str = include_str!("../schemas/event/terrain_pixel_removed.json");
+const SCHEMA_TERRAIN_CASCADE_TRIGGERED: &str = include_str!("../schemas/event/terrain_cascade_triggered.json");
+const SCHEMA_TERRAIN_DEBRIS_SPAWNED: &str = include_str!("../schemas/event/terrain_debris_spawned.json");
+
 /// Look up the schema source by `(category, event_type)`. Returns `None` if
 /// no schema exists for this pair (callers treat as "no validation
 /// constraint"; the recorder envelope itself is checked by the bundle
@@ -602,6 +619,15 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("ai", "panic_call_emitted") => Some(SCHEMA_AI_PANIC_CALL_EMITTED),
         ("ai", "target_tagged") => Some(SCHEMA_AI_TARGET_TAGGED),
         ("ai", "reason_query_returned") => Some(SCHEMA_AI_REASON_QUERY_RETURNED),
+        // **M9**: reactor defense + 5-tier integrity event surface.
+        ("mission", "reactor_hp_changed") => Some(SCHEMA_MISSION_REACTOR_HP_CHANGED),
+        ("mission", "reactor_destroyed") => Some(SCHEMA_MISSION_REACTOR_DESTROYED),
+        ("mission", "reactor_pressure_state_changed") => Some(SCHEMA_MISSION_REACTOR_PRESSURE_STATE_CHANGED),
+        ("mission", "timer_warning_threshold") => Some(SCHEMA_MISSION_TIMER_WARNING_THRESHOLD),
+        ("terrain", "material_state_changed") => Some(SCHEMA_TERRAIN_MATERIAL_STATE_CHANGED),
+        ("terrain", "pixel_removed") => Some(SCHEMA_TERRAIN_PIXEL_REMOVED),
+        ("terrain", "cascade_triggered") => Some(SCHEMA_TERRAIN_CASCADE_TRIGGERED),
+        ("terrain", "debris_spawned") => Some(SCHEMA_TERRAIN_DEBRIS_SPAWNED),
         _ => None,
     }
 }
@@ -1121,6 +1147,15 @@ mod tests {
             ("squad", "command_issued"),
             ("squad", "member_added"),
             ("squad", "waypoint_marked"),
+            // **M9** reactor defense + 5-tier integrity event surface.
+            ("mission", "reactor_hp_changed"),
+            ("mission", "reactor_destroyed"),
+            ("mission", "reactor_pressure_state_changed"),
+            ("mission", "timer_warning_threshold"),
+            ("terrain", "material_state_changed"),
+            ("terrain", "pixel_removed"),
+            ("terrain", "cascade_triggered"),
+            ("terrain", "debris_spawned"),
         ] {
             let raw = event_schema_for(cat, ty).unwrap_or_else(|| panic!("no schema for {cat}.{ty}"));
             let _parsed_value: serde_json::Value =

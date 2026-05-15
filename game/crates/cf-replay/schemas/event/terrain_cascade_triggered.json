@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/terrain.cascade_triggered.v0.1",
+  "title": "terrain.cascade_triggered",
+  "description": "M9 § Destructible terrain — cascade rule — emitted when a destroyed pixel triggers decay in an adjacent low-hardness pixel. cascade_threshold defaults to 0.6; cascade_depth=1 at M9 (direct neighbors only). Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "terrain" },
+    "event_type": { "const": "cascade_triggered" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "from_pos": { "type": "array", "minItems": 2, "maxItems": 2 },
+        "to_pos": { "type": "array", "minItems": 2, "maxItems": 2 },
+        "cascade_depth": { "type": "integer", "minimum": 0 },
+        "cascade_threshold": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "reason": { "type": "string" },
+        "parent_event_id": { "type": ["string", "null"] }
+      },
+      "required": ["from_pos", "to_pos", "reason"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

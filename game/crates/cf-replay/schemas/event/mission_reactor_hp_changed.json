@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/mission.reactor_hp_changed.v0.1",
+  "title": "mission.reactor_hp_changed",
+  "description": "M9 § Player narrative flow — emitted whenever the defended reactor's hp changes (typically projectile/explosion impact). Carries parent_event_id chain back to combat.projectile_hit_mo / combat.wound_added so M10 replay viewer can walk the cause graph. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "mission" },
+    "event_type": { "const": "reactor_hp_changed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "reactor_id": { "type": "string" },
+        "hp_before": { "type": "number" },
+        "hp_after": { "type": "number", "minimum": 0.0 },
+        "hp_max": { "type": "number", "minimum": 0.0 },
+        "hp_percent": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "damage_applied": { "type": "number", "minimum": 0.0 },
+        "source_actor_id": { "type": ["integer", "null"] },
+        "cause": { "type": "string" },
+        "parent_event_id": { "type": ["string", "null"] }
+      },
+      "required": ["reactor_id", "hp_before", "hp_after", "hp_max", "hp_percent", "damage_applied", "cause"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

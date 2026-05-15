@@ -452,14 +452,19 @@ pub struct ScenarioReactor {
 
 impl ScenarioReactor {
     pub fn build_reactor(&self) -> Reactor {
-        Reactor {
+        let mut r = Reactor {
             id: self.id.clone(),
             position: [self.position.0, self.position.1],
             half_extents: [self.half_extents.0, self.half_extents.1],
             hp: self.hp.max(0.0),
             max_hp: self.hp.max(0.0),
             destroyed: false,
-        }
+            ..Reactor::default()
+        };
+        // **M9**: populate the 3-layer armor cascade at scenario load so the
+        // engine never has to lazy-init it on the first projectile hit.
+        r.ensure_armor_layers();
+        r
     }
 }
 
