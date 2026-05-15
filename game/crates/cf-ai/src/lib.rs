@@ -87,6 +87,7 @@ pub mod auto_triage;
 pub mod autonomy;
 pub mod behavior_tree;
 pub mod bot_memory;
+pub mod cf_mind;
 pub mod constants;
 pub mod cover_seeking;
 pub mod faction;
@@ -116,6 +117,7 @@ pub use bot_memory::{
     ThreatWeaponClass, ALLY_MEMORY_CAPACITY, PERCEPTION_GRID_CELLS, PERCEPTION_GRID_DIM, RECENT_EVENTS_RING_DEPTH,
     THREAT_MEMORY_CAPACITY,
 };
+pub use cf_mind::{Doctrine, LlmMind, MindContext, NullLlmMind};
 pub use constants::{
     seconds_to_ticks_for, CHATTER_COOLDOWN_SECONDS, ENGINEER_AUTO_REPAIR_FIRST_TICK_SECONDS,
     ENGINEER_AUTO_REPAIR_REACH_SECONDS, MEDIC_AUTO_TRIAGE_APPLY_SECONDS, MEDIC_AUTO_TRIAGE_REACH_SECONDS,
