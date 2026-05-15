@@ -35,6 +35,13 @@ cf-audio = { path = "../cf-audio" }
 cf-perception = { path = "../cf-perception" }
 cf-priority = { path = "../cf-priority" }
 cf-squad = { path = "../cf-squad" }
+cf-camera = { path = "../cf-camera" }
+cf-debug = { path = "../cf-debug" }
+cf-localization = { path = "../cf-localization" }
+cf-photo = { path = "../cf-photo" }
+cf-replay-scrub = { path = "../cf-replay-scrub" }
+cf-killcam = { path = "../cf-killcam" }
+cf-squad-ui = { path = "../cf-squad-ui" }
 
 [dev-dependencies]
 anyhow = { workspace = true }

@@ -289,6 +289,35 @@ const SCHEMA_AI_MOOD_CHANGED: &str = include_str!("../schemas/event/ai_mood_chan
 const SCHEMA_AI_STRESS_THRESHOLD_CROSSED: &str = include_str!("../schemas/event/ai_stress_threshold_crossed.json");
 const SCHEMA_AI_FACTION_ALLEGIANCE_CHANGED: &str = include_str!("../schemas/event/ai_faction_allegiance_changed.json");
 
+// **M8**: camera + photo mode + replay scrubber + killcam + UX widgets +
+// smart commandable AI player UX surfaces. Spec §§ Camera + game feel,
+// Photo mode, Replay scrubber, Killcam, Settings menu tree, Smart
+// commandable AI player UX (Tab tactical overlay + plan composer +
+// context wheel + panic surfaces + MMB tag + Why? key).
+const SCHEMA_CAMERA_HIT_STOP: &str = include_str!("../schemas/event/camera_hit_stop.json");
+const SCHEMA_CAMERA_MODE_CHANGED: &str = include_str!("../schemas/event/camera_mode_changed.json");
+const SCHEMA_PHOTO_MODE_ENTERED: &str = include_str!("../schemas/event/photo_mode_entered.json");
+const SCHEMA_PHOTO_MODE_EXITED: &str = include_str!("../schemas/event/photo_mode_exited.json");
+const SCHEMA_PHOTO_MODE_FILTER_CHANGED: &str = include_str!("../schemas/event/photo_mode_filter_changed.json");
+const SCHEMA_PHOTO_MODE_SHOT_TAKEN: &str = include_str!("../schemas/event/photo_mode_shot_taken.json");
+const SCHEMA_REPLAY_SCRUB_OFFSET_CHANGED: &str = include_str!("../schemas/event/replay_scrub_offset_changed.json");
+const SCHEMA_REPLAY_BOOKMARK_ADDED: &str = include_str!("../schemas/event/replay_bookmark_added.json");
+const SCHEMA_KILLCAM_PLAYED: &str = include_str!("../schemas/event/killcam_played.json");
+const SCHEMA_KILLCAM_SKIPPED: &str = include_str!("../schemas/event/killcam_skipped.json");
+const SCHEMA_SLOW_MO_KILL_CAM_TRIGGERED: &str = include_str!("../schemas/event/slow_mo_kill_cam_triggered.json");
+const SCHEMA_UX_HUD_LAYOUT_CHANGED: &str = include_str!("../schemas/event/ux_hud_layout_changed.json");
+const SCHEMA_UX_PRESET_SAVED: &str = include_str!("../schemas/event/ux_preset_saved.json");
+const SCHEMA_UX_DEBUG_OVERLAY_TOGGLED: &str = include_str!("../schemas/event/ux_debug_overlay_toggled.json");
+const SCHEMA_UX_TACTICAL_OVERLAY_TOGGLED: &str = include_str!("../schemas/event/ux_tactical_overlay_toggled.json");
+const SCHEMA_AI_PLAN_COMPOSED: &str = include_str!("../schemas/event/ai_plan_composed.json");
+const SCHEMA_AI_PLAN_EXECUTED: &str = include_str!("../schemas/event/ai_plan_executed.json");
+const SCHEMA_AI_PLAN_ABORTED: &str = include_str!("../schemas/event/ai_plan_aborted.json");
+const SCHEMA_AI_CONTEXT_WHEEL_OPENED: &str = include_str!("../schemas/event/ai_context_wheel_opened.json");
+const SCHEMA_AI_CONTEXT_WHEEL_SELECTED: &str = include_str!("../schemas/event/ai_context_wheel_selected.json");
+const SCHEMA_AI_PANIC_CALL_EMITTED: &str = include_str!("../schemas/event/ai_panic_call_emitted.json");
+const SCHEMA_AI_TARGET_TAGGED: &str = include_str!("../schemas/event/ai_target_tagged.json");
+const SCHEMA_AI_REASON_QUERY_RETURNED: &str = include_str!("../schemas/event/ai_reason_query_returned.json");
+
 /// Look up the schema source by `(category, event_type)`. Returns `None` if
 /// no schema exists for this pair (callers treat as "no validation
 /// constraint"; the recorder envelope itself is checked by the bundle
@@ -527,6 +556,31 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("ai", "mood_changed") => Some(SCHEMA_AI_MOOD_CHANGED),
         ("ai", "stress_threshold_crossed") => Some(SCHEMA_AI_STRESS_THRESHOLD_CROSSED),
         ("ai", "faction_allegiance_changed") => Some(SCHEMA_AI_FACTION_ALLEGIANCE_CHANGED),
+        // **M8**: camera + photo + replay scrub + killcam + UX + smart-AI
+        // player UX surfaces.
+        ("camera", "hit_stop") => Some(SCHEMA_CAMERA_HIT_STOP),
+        ("camera", "mode_changed") => Some(SCHEMA_CAMERA_MODE_CHANGED),
+        ("photo_mode", "entered") => Some(SCHEMA_PHOTO_MODE_ENTERED),
+        ("photo_mode", "exited") => Some(SCHEMA_PHOTO_MODE_EXITED),
+        ("photo_mode", "filter_changed") => Some(SCHEMA_PHOTO_MODE_FILTER_CHANGED),
+        ("photo_mode", "shot_taken") => Some(SCHEMA_PHOTO_MODE_SHOT_TAKEN),
+        ("replay", "scrub_offset_changed") => Some(SCHEMA_REPLAY_SCRUB_OFFSET_CHANGED),
+        ("replay", "bookmark_added") => Some(SCHEMA_REPLAY_BOOKMARK_ADDED),
+        ("killcam", "played") => Some(SCHEMA_KILLCAM_PLAYED),
+        ("killcam", "skipped") => Some(SCHEMA_KILLCAM_SKIPPED),
+        ("slow_mo", "kill_cam_triggered") => Some(SCHEMA_SLOW_MO_KILL_CAM_TRIGGERED),
+        ("ux", "hud_layout_changed") => Some(SCHEMA_UX_HUD_LAYOUT_CHANGED),
+        ("ux", "preset_saved") => Some(SCHEMA_UX_PRESET_SAVED),
+        ("ux", "debug_overlay_toggled") => Some(SCHEMA_UX_DEBUG_OVERLAY_TOGGLED),
+        ("ux", "tactical_overlay_toggled") => Some(SCHEMA_UX_TACTICAL_OVERLAY_TOGGLED),
+        ("ai", "plan_composed") => Some(SCHEMA_AI_PLAN_COMPOSED),
+        ("ai", "plan_executed") => Some(SCHEMA_AI_PLAN_EXECUTED),
+        ("ai", "plan_aborted") => Some(SCHEMA_AI_PLAN_ABORTED),
+        ("ai", "context_wheel_opened") => Some(SCHEMA_AI_CONTEXT_WHEEL_OPENED),
+        ("ai", "context_wheel_selected") => Some(SCHEMA_AI_CONTEXT_WHEEL_SELECTED),
+        ("ai", "panic_call_emitted") => Some(SCHEMA_AI_PANIC_CALL_EMITTED),
+        ("ai", "target_tagged") => Some(SCHEMA_AI_TARGET_TAGGED),
+        ("ai", "reason_query_returned") => Some(SCHEMA_AI_REASON_QUERY_RETURNED),
         _ => None,
     }
 }

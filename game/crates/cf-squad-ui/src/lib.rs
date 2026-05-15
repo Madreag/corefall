@@ -27,9 +27,7 @@ pub mod tactical_overlay;
 pub mod tag;
 pub mod why;
 
-pub use context_wheel::{
-    context_wheel_for, ContextOrderKind, ContextWheel, ReticleTarget, WheelSlot, WHEEL_SLOTS_LEN,
-};
+pub use context_wheel::{context_wheel_for, ContextOrderKind, ContextWheel, ReticleTarget, WheelSlot, WHEEL_SLOTS_LEN};
 pub use panic::{PanicCommand, PanicKind};
 pub use plan_composer::{Plan, PlanComposeError, PlanStep, PlanStepKind, MAX_PLAN_STEPS};
 pub use priority_editor::{PriorityEditAction, PriorityEditError, PriorityEditorView};

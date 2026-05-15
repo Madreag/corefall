@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ai_plan_aborted.v1",
+  "title": "ai.plan_aborted",
+  "description": "Emitted when the player ABORTs all queued plans (clears every per-bot plan).",
+  "type": "object",
+  "required": ["plan_count"],
+  "properties": {
+    "plan_count": { "type": "integer", "minimum": 0 },
+    "actor_ids": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 0 }
+    }
+  }
+}

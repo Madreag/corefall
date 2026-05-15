@@ -73,9 +73,7 @@ pub use phase_strip::{MissionPhase, PhaseStripState};
 pub use scope_reticle::ScopeReticleState;
 pub use settings_menu::{SettingsMenuState, SettingsTab};
 pub use squad_strip::{SquadStripMember, SquadStripState, SQUAD_STRIP_MAX_MEMBERS};
-pub use stamina_bar::{
-    StaminaBarState, StaminaColor, STAMINA_CRITICAL_THRESHOLD, STAMINA_HIGH_THRESHOLD,
-};
+pub use stamina_bar::{StaminaBarState, StaminaColor, STAMINA_CRITICAL_THRESHOLD, STAMINA_HIGH_THRESHOLD};
 pub use stealth_meter::{StealthMeterState, SPOTTED_THRESHOLD};
 pub use weapon_swap_overlay::{WeaponSwapOverlayState, SWAP_TRANSITION_MS};
 

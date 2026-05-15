@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/camera_mode_changed.v1",
+  "title": "camera.mode_changed",
+  "description": "Emitted when the camera mode transitions between Follow / Scope / FreeLook via cf-camera + cf-control's act.camera.* dispatch.",
+  "type": "object",
+  "required": ["from", "to"],
+  "properties": {
+    "from": { "type": "string", "enum": ["follow", "scope", "free_look"] },
+    "to": { "type": "string", "enum": ["follow", "scope", "free_look"] },
+    "fov_degrees": { "type": "number", "minimum": 5, "maximum": 90 }
+  }
+}

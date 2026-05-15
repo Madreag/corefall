@@ -59,7 +59,10 @@ impl HotbarState {
     /// Update one slot's contents in place.
     pub fn set_slot(&mut self, slot: u8, contents: HotbarSlot) {
         let idx = (slot as usize).min(HOTBAR_SLOTS - 1);
-        self.slots[idx] = HotbarSlot { index: slot, ..contents };
+        self.slots[idx] = HotbarSlot {
+            index: slot,
+            ..contents
+        };
     }
 }
 

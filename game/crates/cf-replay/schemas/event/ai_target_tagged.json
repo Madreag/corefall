@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ai_target_tagged.v1",
+  "title": "ai.target_tagged",
+  "description": "Emitted on MMB tag drop. Tagged entities feed the Utility scorer as a +0.5 weight bonus per spec § MMB tag.",
+  "type": "object",
+  "required": ["target_id", "issuer_actor_id", "weight_bonus", "expires_at_tick"],
+  "properties": {
+    "target_id": { "type": "integer", "minimum": 0 },
+    "issuer_actor_id": { "type": "integer", "minimum": 0 },
+    "weight_bonus": { "type": "number" },
+    "expires_at_tick": { "type": "integer", "minimum": 0 },
+    "ttl_ticks": { "type": "integer", "minimum": 0 }
+  }
+}

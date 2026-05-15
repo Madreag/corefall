@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ai_reason_query_returned.v1",
+  "title": "ai.reason_query_returned",
+  "description": "Emitted when the player presses 'Why?' (Y) on a squadmate; returns the bot's reason_label_recent ringbuffer head.",
+  "type": "object",
+  "required": ["actor_id"],
+  "properties": {
+    "actor_id": { "type": "integer", "minimum": 0 },
+    "reason_label": { "type": ["string", "null"] },
+    "recent_count": { "type": "integer", "minimum": 0 }
+  }
+}

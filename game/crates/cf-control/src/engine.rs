@@ -597,8 +597,8 @@ pub struct M0EngineOutcome {
 
 pub struct M0Engine {
     config: M0EngineConfig,
-    state: RwLock<EngineMutable>,
-    recorder: Arc<Recorder>,
+    pub(crate) state: RwLock<EngineMutable>,
+    pub(crate) recorder: Arc<Recorder>,
     /// Lock-free snapshot of the engine's current tick. Updated by `drive_tick` so that
     /// the panic reporter (which fires from a panicking thread, possibly while another
     /// thread holds `state`) can record `system.panic` at the right tick without
@@ -613,10 +613,10 @@ pub struct M0Engine {
     audio_plugin: std::sync::Mutex<Box<dyn cf_audio::AudioPlugin>>,
 }
 
-struct EngineMutable {
+pub(crate) struct EngineMutable {
     clock: SimClock,
     rng: Rng,
-    settings: Settings,
+    pub(crate) settings: Settings,
     pending_runbundle: bool,
     shutdown_requested: bool,
     tick_durations_us: Vec<u64>,
@@ -627,7 +627,7 @@ struct EngineMutable {
     /// M1: actor world + rifles + projectiles. `None` for M0 scenarios.
     actor_state: Option<ActorSimState>,
     /// Cached player actor id from the actor world for fast access.
-    player_actor: Option<ActorId>,
+    pub(crate) player_actor: Option<ActorId>,
     /// Monotonic counter incremented whenever `pending_intent` is externally
     /// reset (e.g. `scenario.reset` zeroes it). Edge-detecting input bridges
     /// (`cf-app::ingest_player_input`) watch this to know when their cached
@@ -847,7 +847,31 @@ struct EngineMutable {
     /// registry, mini-boss state. Co-resident with M2 `reactive_guards`:
     /// the M2 guard FSM still drives projectile / fire behavior; M7-A
     /// adds the reason-label + role-template surface on top.
-    m7_ai_world: crate::m7_ai::M7AiWorld,
+    pub(crate) m7_ai_world: crate::m7_ai::M7AiWorld,
+    /// **M8**: smooth-follow + hit-stop + scope + free-look camera state.
+    pub(crate) camera_state: cf_camera::CameraState,
+    /// **M8**: photo mode (basic stub) state machine + filter + free camera.
+    pub(crate) photo_mode: cf_photo::PhotoModeState,
+    /// **M8**: replay-scrubber 30s window + bookmarks.
+    pub(crate) replay_scrub: cf_replay_scrub::ReplayScrubState,
+    /// **M8**: killcam state machine (Idle / Recording / Playing / Done) +
+    /// 1.5s slow-mo cinematic variant.
+    pub(crate) killcam: cf_killcam::KillcamState,
+    /// **M8**: cf-debug overlay registry (which of the 7 overlays are
+    /// currently rendered).
+    pub(crate) debug_state: cf_debug::DebugOverlayState,
+    /// **M8**: Tab tactical overlay state (open + sim-speed cap +
+    /// focused actor + open count).
+    pub(crate) tactical_overlay: cf_squad_ui::TacticalOverlayState,
+    /// **M8**: per-bot tactical plan queue (Plan Composer).
+    pub(crate) plans: BTreeMap<ActorId, cf_squad_ui::Plan>,
+    /// **M8**: MMB tag state — tagged target ids + per-tag TTL + +0.5
+    /// utility weight bonus.
+    pub(crate) tag_state: cf_squad_ui::TagState,
+    /// **M8**: en localization table loaded once from the bundled
+    /// `content/localization/en.json` baseline. Re-loaded if `Settings.
+    /// language` changes (only `en` ships at M8).
+    pub(crate) localization: cf_localization::LocalizationTable,
 }
 
 /// **M6**: per-actor charge-fire annotation shipped from the M6 post-step
@@ -1250,6 +1274,16 @@ impl M0Engine {
                 m6_next_dropped_item_id: 1,
                 m6_charge_misfires: BTreeMap::new(),
                 m7_ai_world: m7_ai_world_seed,
+                camera_state: cf_camera::CameraState::default(),
+                photo_mode: cf_photo::PhotoModeState::default(),
+                replay_scrub: cf_replay_scrub::ReplayScrubState::default(),
+                killcam: cf_killcam::KillcamState::default(),
+                debug_state: cf_debug::DebugOverlayState::default(),
+                tactical_overlay: cf_squad_ui::TacticalOverlayState::default(),
+                plans: BTreeMap::new(),
+                tag_state: cf_squad_ui::TagState::default(),
+                localization: cf_localization::LocalizationTable::english_baseline()
+                    .unwrap_or_else(|_| cf_localization::LocalizationTable::new("en")),
             }),
             recorder,
             current_tick,
@@ -8247,6 +8281,51 @@ impl M0Engine {
         self.state.read().expect("engine state poisoned").clock.tick()
     }
 
+    /// **M8 helper**: record a `control.command_accepted` envelope log.
+    pub(crate) fn record_command_accepted(&self, tick: Tick, sim_time_ms: f64, method: &str, extra: serde_json::Value) {
+        let mut payload = json!({"method": method});
+        if let Some(o) = extra.as_object() {
+            if let Some(p) = payload.as_object_mut() {
+                for (k, v) in o {
+                    p.insert(k.clone(), v.clone());
+                }
+            }
+        }
+        self.recorder
+            .record(tick, sim_time_ms, "control", "command_accepted", payload, None);
+    }
+
+    /// **M8 helper**: record a `control.command_rejected` envelope log.
+    pub(crate) fn record_command_rejected(&self, tick: Tick, sim_time_ms: f64, method: &str, reason: &str) {
+        self.recorder.record(
+            tick,
+            sim_time_ms,
+            "control",
+            "command_rejected",
+            json!({"method": method, "reason": reason}),
+            None,
+        );
+    }
+
+    /// **M8 helper**: record a generic event with no parent reference.
+    /// Per mission AGENTS.md § Audit-grep visibility convention, callers
+    /// SHOULD prefer the inline `#[rustfmt::skip] let _ = self.recorder.
+    /// record(...)` form so the audit grep finds the literal record call
+    /// site. This helper stays as a fallback for cases where the inline
+    /// form would clash with the surrounding control flow.
+    #[allow(dead_code)]
+    pub(crate) fn record_event(
+        &self,
+        tick: Tick,
+        sim_time_ms: f64,
+        category: &str,
+        event_type: &str,
+        payload: serde_json::Value,
+    ) {
+        self.recorder
+            .record(tick, sim_time_ms, category, event_type, payload, None);
+    }
+
     pub fn shutdown_requested(&self) -> bool {
         self.state.read().map(|s| s.shutdown_requested).unwrap_or(false)
     }
@@ -11181,6 +11260,168 @@ fn apply_settings_patch(settings: &mut Settings, patch: &SettingsPatch) -> Vec<S
             changed.push("ai_debug".to_string());
         }
     }
+    // === M8 accessibility / camera / debug / locale extensions ===
+    if let Some(ref s) = patch.game_speed_assist {
+        if let Some(parsed) = crate::settings::GameSpeedAssist::from_str(s) {
+            if settings.game_speed_assist != parsed {
+                settings.game_speed_assist = parsed;
+                changed.push("game_speed_assist".to_string());
+            }
+        }
+    }
+    if let Some(ref s) = patch.color_cue_mode {
+        if let Some(parsed) = crate::settings::ColorCueMode::from_str(s) {
+            if settings.color_cue_mode != parsed {
+                settings.color_cue_mode = parsed;
+                changed.push("color_cue_mode".to_string());
+            }
+        }
+    }
+    if let Some(ref s) = patch.aim_assist {
+        if let Some(parsed) = crate::settings::AimAssist::from_str(s) {
+            if settings.aim_assist != parsed {
+                settings.aim_assist = parsed;
+                changed.push("aim_assist".to_string());
+            }
+        }
+    }
+    if let Some(v) = patch.damage_numbers {
+        if settings.damage_numbers != v {
+            settings.damage_numbers = v;
+            changed.push("damage_numbers".to_string());
+        }
+    }
+    if let Some(v) = patch.killcam_enabled {
+        if settings.killcam_enabled != v {
+            settings.killcam_enabled = v;
+            changed.push("killcam_enabled".to_string());
+        }
+    }
+    if let Some(v) = patch.hit_stop_enabled {
+        if settings.hit_stop_enabled != v {
+            settings.hit_stop_enabled = v;
+            changed.push("hit_stop_enabled".to_string());
+        }
+    }
+    if let Some(v) = patch.cinematic_kills {
+        if settings.cinematic_kills != v {
+            settings.cinematic_kills = v;
+            changed.push("cinematic_kills".to_string());
+        }
+    }
+    if let Some(v) = patch.mini_map_enabled {
+        if settings.mini_map_enabled != v {
+            settings.mini_map_enabled = v;
+            changed.push("mini_map_enabled".to_string());
+        }
+    }
+    if let Some(v) = patch.compass_enabled {
+        if settings.compass_enabled != v {
+            settings.compass_enabled = v;
+            changed.push("compass_enabled".to_string());
+        }
+    }
+    if let Some(v) = patch.damage_direction_enabled {
+        if settings.damage_direction_enabled != v {
+            settings.damage_direction_enabled = v;
+            changed.push("damage_direction_enabled".to_string());
+        }
+    }
+    if let Some(v) = patch.mini_map_zoom {
+        let clamped = v.clamp(0.25, 4.0);
+        if (settings.mini_map_zoom - clamped).abs() > f32::EPSILON {
+            settings.mini_map_zoom = clamped;
+            changed.push("mini_map_zoom".to_string());
+        }
+    }
+    if let Some(v) = patch.scope_zoom_fov {
+        let clamped = v.clamp(5.0, 90.0);
+        if (settings.scope_zoom_fov - clamped).abs() > f32::EPSILON {
+            settings.scope_zoom_fov = clamped;
+            changed.push("scope_zoom_fov".to_string());
+        }
+    }
+    if let Some(v) = patch.text_scale {
+        let clamped = v.clamp(crate::settings::UI_SCALE_MIN, crate::settings::UI_SCALE_MAX);
+        if (settings.text_scale - clamped).abs() > f32::EPSILON {
+            settings.text_scale = clamped;
+            changed.push("text_scale".to_string());
+        }
+    }
+    if let Some(ref s) = patch.ui_density {
+        if let Some(parsed) = crate::settings::UiDensity::from_str(s) {
+            if settings.ui_density != parsed {
+                settings.ui_density = parsed;
+                changed.push("ui_density".to_string());
+            }
+        }
+    }
+    if let Some(ref s) = patch.language {
+        if !s.is_empty() && &settings.language != s {
+            settings.language = s.clone();
+            changed.push("language".to_string());
+        }
+    }
+    if let Some(v) = patch.speedrun_mode {
+        if settings.speedrun_mode != v {
+            settings.speedrun_mode = v;
+            changed.push("speedrun_mode".to_string());
+        }
+    }
+    if let Some(v) = patch.permadeath {
+        if settings.permadeath != v {
+            settings.permadeath = v;
+            changed.push("permadeath".to_string());
+        }
+    }
+    if let Some(v) = patch.no_respawn {
+        if settings.no_respawn != v {
+            settings.no_respawn = v;
+            changed.push("no_respawn".to_string());
+        }
+    }
+    if let Some(v) = patch.fog_of_war_on {
+        if settings.fog_of_war_on != v {
+            settings.fog_of_war_on = v;
+            changed.push("fog_of_war_on".to_string());
+        }
+    }
+    if let Some(v) = patch.limited_ammo {
+        if settings.limited_ammo != v {
+            settings.limited_ammo = v;
+            changed.push("limited_ammo".to_string());
+        }
+    }
+    if let Some(v) = patch.time_limit {
+        if settings.time_limit != v {
+            settings.time_limit = v;
+            changed.push("time_limit".to_string());
+        }
+    }
+    if let Some(v) = patch.no_minimap {
+        if settings.no_minimap != v {
+            settings.no_minimap = v;
+            changed.push("no_minimap".to_string());
+        }
+    }
+    if let Some(v) = patch.hardcore_mode {
+        if settings.hardcore_mode != v {
+            settings.hardcore_mode = v;
+            changed.push("hardcore_mode".to_string());
+        }
+    }
+    if let Some(v) = patch.friendly_fire_on {
+        if settings.friendly_fire_on != v {
+            settings.friendly_fire_on = v;
+            changed.push("friendly_fire_on".to_string());
+        }
+    }
+    if let Some(v) = patch.debug_enabled {
+        if settings.debug_enabled != v {
+            settings.debug_enabled = v;
+            changed.push("debug_enabled".to_string());
+        }
+    }
     changed
 }
 
@@ -11647,6 +11888,31 @@ impl EngineHandle for M0Engine {
     async fn observe_autonomy(&self, actor_id: u64) -> Option<serde_json::Value> {
         let state = self.state.read().ok()?;
         state.m7_ai_world.autonomy_view(cf_actor::ActorId(actor_id))
+    }
+
+    /// **M8**: live `cf_camera::CameraState` projection.
+    async fn observe_camera(&self) -> serde_json::Value {
+        self.snapshot_camera_state()
+    }
+
+    /// **M8**: active language code + key count.
+    async fn observe_localization_current_language(&self) -> serde_json::Value {
+        self.snapshot_localization_language()
+    }
+
+    /// **M8**: cf-debug overlay registry.
+    async fn observe_debug_overlays(&self) -> serde_json::Value {
+        self.snapshot_debug_overlays()
+    }
+
+    /// **M8**: Tab tactical overlay state.
+    async fn observe_tactical_overlay(&self) -> serde_json::Value {
+        self.snapshot_tactical_overlay()
+    }
+
+    /// **M8**: active MMB tag list.
+    async fn observe_tags(&self) -> serde_json::Value {
+        self.snapshot_tags()
     }
 
     /// **M2 re-audit (2026-05-13)**: full mission inspect including the last
@@ -13462,6 +13728,66 @@ impl EngineHandle for M0Engine {
                 preset_id,
                 source,
             } => self.dispatch_apply_quick_preset(actor_id, preset_id, source, tick, sim_time_ms, state),
+            // === M8 cfctl surface ===
+            ControlCommand::ActCameraSetMode { mode, source } => {
+                self.dispatch_camera_set_mode(mode, source, tick, sim_time_ms, state)
+            }
+            ControlCommand::ActCameraHitStop {
+                duration_ms,
+                trigger,
+                actor_id,
+                source,
+            } => self.dispatch_camera_hit_stop(duration_ms, trigger, actor_id, source, tick, sim_time_ms, state),
+            ControlCommand::ActCameraScopeZoom { source } => {
+                self.dispatch_camera_scope_zoom(source, tick, sim_time_ms, state)
+            }
+            ControlCommand::ActCameraFreeLookToggle {
+                active,
+                cursor,
+                max_distance,
+                source,
+            } => self.dispatch_camera_free_look_toggle(active, cursor, max_distance, source, tick, sim_time_ms, state),
+            ControlCommand::ActPhotoEnter { source } => self.dispatch_photo_enter(source, tick, sim_time_ms, state),
+            ControlCommand::ActPhotoExit { source } => self.dispatch_photo_exit(source, tick, sim_time_ms, state),
+            ControlCommand::ActPhotoCycleFilter { source } => {
+                self.dispatch_photo_cycle_filter(source, tick, sim_time_ms, state)
+            }
+            ControlCommand::ActPhotoShoot { source } => self.dispatch_photo_shoot(source, tick, sim_time_ms, state),
+            ControlCommand::ActReplayScrub { delta_seconds, source } => {
+                self.dispatch_replay_scrub(delta_seconds, source, tick, sim_time_ms, state)
+            }
+            ControlCommand::ActReplayBookmark { label, source } => {
+                self.dispatch_replay_bookmark(label, source, tick, sim_time_ms, state)
+            }
+            ControlCommand::ActDebugToggleOverlay { overlay, source } => {
+                self.dispatch_debug_toggle_overlay(overlay, source, tick, sim_time_ms, state)
+            }
+            ControlCommand::ActUiSetHudLayout { node, x, y, source } => {
+                self.dispatch_ui_set_hud_layout(node, x, y, source, tick, sim_time_ms, state)
+            }
+            ControlCommand::ActUiSavePreset { name, source } => {
+                self.dispatch_ui_save_preset(name, source, tick, sim_time_ms, state)
+            }
+            ControlCommand::ActPlayerToggleTacticalOverlay { multiplayer, source } => {
+                self.dispatch_toggle_tactical_overlay(multiplayer, source, tick, sim_time_ms, state)
+            }
+            ControlCommand::ActPlayerComposePlan {
+                actor_id,
+                steps,
+                source,
+            } => self.dispatch_compose_plan(actor_id, steps, source, tick, sim_time_ms, state),
+            ControlCommand::ActPlayerContextWheelSelect { actor_id, slot, source } => {
+                self.dispatch_context_wheel_select(actor_id, slot, source, tick, sim_time_ms, state)
+            }
+            ControlCommand::ActPlayerPanicCall { kind, source } => {
+                self.dispatch_panic_call(kind, source, tick, sim_time_ms, state)
+            }
+            ControlCommand::ActPlayerTagTarget { target_id, source } => {
+                self.dispatch_tag_target(target_id, source, tick, sim_time_ms, state)
+            }
+            ControlCommand::ActPlayerQueryWhy { actor_id, source } => {
+                self.dispatch_query_why(actor_id, source, tick, sim_time_ms, state)
+            }
         }
     }
 }
@@ -14156,12 +14482,12 @@ mod tests {
 
         let _ = engine
             .dispatch(ControlCommand::SettingsSet {
-                changes: SettingsPatch {
+                changes: Box::new(SettingsPatch {
                     ui_scale: Some(2.0),
                     high_contrast: Some(true),
                     captions: Some(false),
                     ..SettingsPatch::default()
-                },
+                }),
             })
             .await;
         let s1 = engine.settings_snapshot().await;
@@ -14182,10 +14508,10 @@ mod tests {
 
         let _ = engine
             .dispatch(ControlCommand::SettingsSet {
-                changes: SettingsPatch {
+                changes: Box::new(SettingsPatch {
                     ui_scale: Some(0.01),
                     ..SettingsPatch::default()
-                },
+                }),
             })
             .await;
         let low_settings = engine.settings_snapshot().await;
@@ -14195,10 +14521,10 @@ mod tests {
 
         let _ = engine
             .dispatch(ControlCommand::SettingsSet {
-                changes: SettingsPatch {
+                changes: Box::new(SettingsPatch {
                     ui_scale: Some(99.0),
                     ..SettingsPatch::default()
-                },
+                }),
             })
             .await;
         let high_settings = engine.settings_snapshot().await;

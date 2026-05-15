@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/replay_scrub_offset_changed.v1",
+  "title": "replay.scrub_offset_changed",
+  "description": "Emitted when the player scrubs the replay timeline (act.replay.scrub). Window is fixed at 30s per spec § Replay scrubber.",
+  "type": "object",
+  "required": ["delta_seconds", "current_offset_seconds", "window_seconds"],
+  "properties": {
+    "delta_seconds": { "type": "number" },
+    "current_offset_seconds": { "type": "number", "minimum": 0 },
+    "window_seconds": { "type": "integer", "minimum": 1 }
+  }
+}

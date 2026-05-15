@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/slow_mo_kill_cam_triggered.v1",
+  "title": "slow_mo.kill_cam_triggered",
+  "description": "Emitted on the boss final blow when Settings.cinematic_kills is true. 1.5s cinematic camera angle per spec § Slow-mo kill cam.",
+  "type": "object",
+  "required": ["killer_actor_id", "victim_actor_id", "duration_ms"],
+  "properties": {
+    "killer_actor_id": { "type": "integer", "minimum": 0 },
+    "victim_actor_id": { "type": "integer", "minimum": 0 },
+    "duration_ms": { "type": "integer", "minimum": 0 }
+  }
+}

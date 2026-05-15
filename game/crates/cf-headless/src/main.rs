@@ -606,7 +606,7 @@ fn parse_command(payload: &Value) -> Option<ControlCommand> {
             // command_accepted payload does not carry the patch contents
             // (avoid leaking accessibility flags into the event log).
             Some(ControlCommand::SettingsSet {
-                changes: SettingsPatch::default(),
+                changes: Box::new(SettingsPatch::default()),
             })
         }
         "runbundle.write" | "system.shutdown" => None,

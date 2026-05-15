@@ -73,7 +73,10 @@ pub fn parse_plural_form(template: &str, args: &[(&str, &str)]) -> Option<String
     let other_end = find_matching_brace(&after_one[other_start..])?;
     let other_body = &after_one[other_start..other_start + other_end];
 
-    let count_value = args.iter().find(|(k, _)| *k == "count").and_then(|(_, v)| v.parse::<i64>().ok())?;
+    let count_value = args
+        .iter()
+        .find(|(k, _)| *k == "count")
+        .and_then(|(_, v)| v.parse::<i64>().ok())?;
     let chosen = match PluralForm::from_count(count_value) {
         PluralForm::One => one_body,
         PluralForm::Other => other_body,

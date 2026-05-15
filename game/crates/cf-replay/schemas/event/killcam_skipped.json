@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/killcam_skipped.v1",
+  "title": "killcam.skipped",
+  "description": "Emitted on player death when killcam_enabled is false (accessibility opt-out).",
+  "type": "object",
+  "required": ["victim_actor_id", "reason"],
+  "properties": {
+    "victim_actor_id": { "type": "integer", "minimum": 0 },
+    "reason": { "type": "string", "enum": ["disabled_in_settings", "no_killer", "already_active"] }
+  }
+}

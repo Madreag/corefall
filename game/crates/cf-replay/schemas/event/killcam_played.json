@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/killcam_played.v1",
+  "title": "killcam.played",
+  "description": "Emitted on player death when killcam_enabled is true. 3-second slow-motion replay from the killer's perspective per spec § Killcam.",
+  "type": "object",
+  "required": ["killer_actor_id", "victim_actor_id", "duration_ms"],
+  "properties": {
+    "killer_actor_id": { "type": "integer", "minimum": 0 },
+    "victim_actor_id": { "type": "integer", "minimum": 0 },
+    "duration_ms": { "type": "integer", "minimum": 0 },
+    "slow_mo_kill_cam": { "type": "boolean" }
+  }
+}

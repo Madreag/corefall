@@ -548,6 +548,9 @@ fn build_config(cli: &Cli, scenario_path: PathBuf) -> Result<M0EngineConfig> {
             walk_threshold: 1.5,
             ai_difficulty: "tough_crowd".to_string(),
             ai_debug: cli.ai_debug,
+            // M8 settings — defaults from Settings::default() let cf-app
+            // pick them up without per-CLI plumbing.
+            ..Settings::default()
         },
         seed_override: cli.seed,
         duration_ticks_override: if cli_duration > 0 { Some(cli_duration) } else { None },

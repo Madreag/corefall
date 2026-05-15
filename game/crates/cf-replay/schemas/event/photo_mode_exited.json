@@ -1,0 +1,11 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/photo_mode_exited.v1",
+  "title": "photo_mode.exited",
+  "description": "Emitted when the player exits photo mode and the sim resumes.",
+  "type": "object",
+  "required": ["shot_count"],
+  "properties": {
+    "shot_count": { "type": "integer", "minimum": 0 }
+  }
+}

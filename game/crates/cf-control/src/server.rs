@@ -200,6 +200,88 @@ pub struct SettingsPatch {
     /// state when omitted (Option-based settings patch).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ai_debug: Option<bool>,
+
+    // === M8 accessibility / camera / debug / locale extensions ===
+    /// **M8**: slow-motion accessibility mode (snake_case wire form
+    /// `off | slowdown_75 | slowdown_25 | full_pause`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub game_speed_assist: Option<String>,
+    /// **M8**: color blind / contrast palette mode (snake_case wire form
+    /// `default | colorblind_safe | protanopia | deuteranopia | tritanopia
+    /// | monochrome_test`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color_cue_mode: Option<String>,
+    /// **M8**: aim assist mode (`off | steady_aim |
+    /// auto_aim_with_damage_penalty`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub aim_assist: Option<String>,
+    /// **M8**: damage numbers cosmetic toggle.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub damage_numbers: Option<bool>,
+    /// **M8**: killcam toggle.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub killcam_enabled: Option<bool>,
+    /// **M8**: hit-stop toggle.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hit_stop_enabled: Option<bool>,
+    /// **M8**: cinematic kill cam toggle.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cinematic_kills: Option<bool>,
+    /// **M8**: master mini-map enable toggle.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mini_map_enabled: Option<bool>,
+    /// **M8**: compass enable toggle.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub compass_enabled: Option<bool>,
+    /// **M8**: damage-direction indicator enable toggle.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub damage_direction_enabled: Option<bool>,
+    /// **M8**: mini-map zoom (0.25..=4.0).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mini_map_zoom: Option<f32>,
+    /// **M8**: scope ADS FOV in degrees (5..=90).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scope_zoom_fov: Option<f32>,
+    /// **M8**: text scale (0.5..=4.0; mirrors `ui_scale`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text_scale: Option<f32>,
+    /// **M8**: HUD density preset (`compact | normal | spacious`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ui_density: Option<String>,
+    /// **M8**: language code (`en` baseline; Tier-A 11 reserved for
+    /// T-ACC-PLUS BP9+).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub language: Option<String>,
+    /// **M8**: speedrun mode toggle.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub speedrun_mode: Option<bool>,
+    /// **M8**: permadeath modifier.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub permadeath: Option<bool>,
+    /// **M8**: no-respawn modifier.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub no_respawn: Option<bool>,
+    /// **M8**: fog-of-war on.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fog_of_war_on: Option<bool>,
+    /// **M8**: limited-ammo modifier.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limited_ammo: Option<bool>,
+    /// **M8**: time-limit modifier.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub time_limit: Option<bool>,
+    /// **M8**: hide the mini-map (overrides `mini_map_enabled`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub no_minimap: Option<bool>,
+    /// **M8**: hardcore composite mode.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hardcore_mode: Option<bool>,
+    /// **M8**: friendly fire on.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub friendly_fire_on: Option<bool>,
+    /// **M8**: master debug-overlay gate (production builds).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub debug_enabled: Option<bool>,
 }
 
 impl SettingsPatch {
@@ -225,6 +307,31 @@ impl SettingsPatch {
             && self.walk_threshold.is_none()
             && self.ai_difficulty.is_none()
             && self.ai_debug.is_none()
+            && self.game_speed_assist.is_none()
+            && self.color_cue_mode.is_none()
+            && self.aim_assist.is_none()
+            && self.damage_numbers.is_none()
+            && self.killcam_enabled.is_none()
+            && self.hit_stop_enabled.is_none()
+            && self.cinematic_kills.is_none()
+            && self.mini_map_enabled.is_none()
+            && self.compass_enabled.is_none()
+            && self.damage_direction_enabled.is_none()
+            && self.mini_map_zoom.is_none()
+            && self.scope_zoom_fov.is_none()
+            && self.text_scale.is_none()
+            && self.ui_density.is_none()
+            && self.language.is_none()
+            && self.speedrun_mode.is_none()
+            && self.permadeath.is_none()
+            && self.no_respawn.is_none()
+            && self.fog_of_war_on.is_none()
+            && self.limited_ammo.is_none()
+            && self.time_limit.is_none()
+            && self.no_minimap.is_none()
+            && self.hardcore_mode.is_none()
+            && self.friendly_fire_on.is_none()
+            && self.debug_enabled.is_none()
     }
 
     pub fn validation_error(&self) -> Option<String> {
@@ -283,6 +390,48 @@ impl SettingsPatch {
         if let Some(id) = self.ai_difficulty.as_deref() {
             if cf_ai::DifficultyPreset::builtin(id).is_none() {
                 return Some(format!("ai_difficulty_unknown: {id}"));
+            }
+        }
+        // M8: validate the new enum strings + numeric ranges so cfctl
+        // rejects unknown values at the dispatch boundary.
+        if let Some(s) = self.game_speed_assist.as_deref() {
+            if crate::settings::GameSpeedAssist::from_str(s).is_none() {
+                return Some(format!("game_speed_assist_unknown: {s}"));
+            }
+        }
+        if let Some(s) = self.color_cue_mode.as_deref() {
+            if crate::settings::ColorCueMode::from_str(s).is_none() {
+                return Some(format!("color_cue_mode_unknown: {s}"));
+            }
+        }
+        if let Some(s) = self.aim_assist.as_deref() {
+            if crate::settings::AimAssist::from_str(s).is_none() {
+                return Some(format!("aim_assist_unknown: {s}"));
+            }
+        }
+        if let Some(s) = self.ui_density.as_deref() {
+            if crate::settings::UiDensity::from_str(s).is_none() {
+                return Some(format!("ui_density_unknown: {s}"));
+            }
+        }
+        if let Some(v) = self.mini_map_zoom {
+            if !v.is_finite() {
+                return Some("mini_map_zoom_must_be_finite".to_string());
+            }
+        }
+        if let Some(v) = self.scope_zoom_fov {
+            if !v.is_finite() {
+                return Some("scope_zoom_fov_must_be_finite".to_string());
+            }
+        }
+        if let Some(v) = self.text_scale {
+            if !v.is_finite() {
+                return Some("text_scale_must_be_finite".to_string());
+            }
+        }
+        if let Some(s) = self.language.as_deref() {
+            if s.is_empty() {
+                return Some("language_must_not_be_empty".to_string());
             }
         }
         self.key_bindings
@@ -495,8 +644,126 @@ pub enum ControlCommand {
         preset_id: String,
         source: IntentSource,
     },
+    // === M8 cfctl surface ===
+    /// **M8**: switch the camera mode (`follow | scope | free_look`).
+    ActCameraSetMode {
+        mode: String,
+        source: IntentSource,
+    },
+    /// **M8**: trigger a hit-stop pulse (50..200ms; clamped). `trigger`
+    /// records the cause label (`melee_hit`, `ap_round_hit`, etc.).
+    ActCameraHitStop {
+        duration_ms: u32,
+        trigger: String,
+        actor_id: Option<u64>,
+        source: IntentSource,
+    },
+    /// **M8**: enter sniper scope ADS at the configured `scope_zoom_fov`.
+    /// Equivalent to `act.camera.set_mode { mode: "scope" }` but encodes
+    /// player intent specifically.
+    ActCameraScopeZoom {
+        source: IntentSource,
+    },
+    /// **M8**: toggle free-look (RMB hold). When `active=true` the camera
+    /// transitions to FreeLook anchored at `cursor`; when false it
+    /// returns to Follow.
+    ActCameraFreeLookToggle {
+        active: bool,
+        cursor: Option<(f32, f32)>,
+        max_distance: f32,
+        source: IntentSource,
+    },
+    /// **M8**: enter photo mode. cf-photo's PhotoModeState becomes active;
+    /// cf-control mirrors the sim pause + emits `photo_mode.entered`.
+    ActPhotoEnter {
+        source: IntentSource,
+    },
+    /// **M8**: exit photo mode.
+    ActPhotoExit {
+        source: IntentSource,
+    },
+    /// **M8**: cycle to the next photo filter (none / sepia / b&w /
+    /// color_grade / cyberpunk_neon).
+    ActPhotoCycleFilter {
+        source: IntentSource,
+    },
+    /// **M8**: capture a photo (records the `photo_mode.shot_taken` event;
+    /// the actual PNG export happens in cf-app via cf-photo::export_png).
+    ActPhotoShoot {
+        source: IntentSource,
+    },
+    /// **M8**: scrub the replay timeline by `delta_seconds` (negative =
+    /// rewind, positive = forward).
+    ActReplayScrub {
+        delta_seconds: f32,
+        source: IntentSource,
+    },
+    /// **M8**: drop a replay bookmark with the supplied label.
+    ActReplayBookmark {
+        label: String,
+        source: IntentSource,
+    },
+    /// **M8**: toggle one of the 7 cf-debug overlays (`ai_state |
+    /// pathfinding | collision | material | physics | sound | squad`).
+    ActDebugToggleOverlay {
+        overlay: String,
+        source: IntentSource,
+    },
+    /// **M8**: set a HUD widget's draggable position; emits
+    /// `ux.hud_layout_changed`.
+    ActUiSetHudLayout {
+        node: String,
+        x: f32,
+        y: f32,
+        source: IntentSource,
+    },
+    /// **M8**: save the current HUD layout under `name`; emits
+    /// `ux.preset_saved`.
+    ActUiSavePreset {
+        name: String,
+        source: IntentSource,
+    },
+    /// **M8**: toggle the Tab tactical overlay; emits
+    /// `ux.tactical_overlay_toggled`. `multiplayer` controls the
+    /// sim-speed cap (single-player pauses; multiplayer = 25%).
+    ActPlayerToggleTacticalOverlay {
+        multiplayer: bool,
+        source: IntentSource,
+    },
+    /// **M8**: drop a multi-step plan onto a squadmate (max 8 steps).
+    /// Emits `ai.plan_composed`.
+    ActPlayerComposePlan {
+        actor_id: u64,
+        steps: Vec<String>,
+        source: IntentSource,
+    },
+    /// **M8**: pick a slot on the Q-hold context wheel for `actor_id`.
+    /// Emits `ai.context_wheel_selected`. `slot` is 0..=7.
+    ActPlayerContextWheelSelect {
+        actor_id: u64,
+        slot: u8,
+        source: IntentSource,
+    },
+    /// **M8**: M / R / G panic surface. `kind` is `medic`, `engineer`,
+    /// or `grenade`. Emits `ai.panic_call_emitted`.
+    ActPlayerPanicCall {
+        kind: String,
+        source: IntentSource,
+    },
+    /// **M8**: MMB tag drop on `target_id`. Emits `ai.target_tagged` +
+    /// engine raises Utility weight by +0.5 for engaging the target.
+    ActPlayerTagTarget {
+        target_id: u64,
+        source: IntentSource,
+    },
+    /// **M8**: 'Why?' (Y) key — surfaces the bot's `reason_label_recent`
+    /// ringbuffer head as a HUD popup. Emits `ai.reason_query_returned`.
+    ActPlayerQueryWhy {
+        actor_id: u64,
+        source: IntentSource,
+    },
     SettingsSet {
-        changes: SettingsPatch,
+        changes: Box<SettingsPatch>,
     },
     RunBundleWrite {
         id_override: Option<String>,
@@ -595,6 +862,31 @@ pub trait EngineHandle: Send + Sync + 'static {
     /// Default returns `None`.
     async fn observe_autonomy(&self, _actor_id: u64) -> Option<serde_json::Value> {
         None
+    }
+    /// **M8**: return the live `cf_camera::CameraState` projection
+    /// (mode + position + hit_stop_remaining_ms + fov_degrees +
+    /// free_look_max_distance + free_look_cursor + deadzone_radius).
+    async fn observe_camera(&self) -> serde_json::Value {
+        json!({"schema_version": SCHEMA_VERSION, "mode": "follow", "fov_degrees": cf_camera::FOLLOW_FOV_DEGREES, "hit_stop_remaining_ms": 0_u32})
+    }
+    /// **M8**: return the active language code per cf-localization +
+    /// `Settings.language`.
+    async fn observe_localization_current_language(&self) -> serde_json::Value {
+        json!({"schema_version": SCHEMA_VERSION, "language": "en"})
+    }
+    /// **M8**: return the cf-debug overlay registry — every overlay's
+    /// snake_case id + whether it's currently enabled.
+    async fn observe_debug_overlays(&self) -> serde_json::Value {
+        json!({"schema_version": SCHEMA_VERSION, "enabled": Vec::<String>::new(), "available": cf_debug::DebugOverlay::ALL.iter().map(|o| o.as_str()).collect::<Vec<_>>()})
+    }
+    /// **M8**: return the Tab tactical overlay state.
+    async fn observe_tactical_overlay(&self) -> serde_json::Value {
+        json!({"schema_version": SCHEMA_VERSION, "open": false, "sim_speed_pct": 100_u8, "focused_actor_id": serde_json::Value::Null, "open_count": 0_u32})
+    }
+    /// **M8**: return the active MMB tag list (target_id + expires_at_tick
+    /// + weight_bonus + issuer_actor_id).
+    async fn observe_tags(&self) -> serde_json::Value {
+        json!({"schema_version": SCHEMA_VERSION, "tagged": Vec::<serde_json::Value>::new()})
     }
 }
 
@@ -1500,6 +1792,429 @@ async fn process_request<E: EngineHandle>(
                 None => Some(invalid_param_reason(request.id, "no_such_ai_actor")),
             }
         }
+        // === M8 cfctl surface ===
+        "act.camera.set_mode" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                mode: String,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            if cf_camera::CameraMode::from_str(&p.mode).is_none() {
+                return Some(invalid_param_reason(request.id, "unknown_camera_mode"));
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActCameraSetMode {
+                    mode: p.mode,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.camera.hit_stop" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                #[serde(default)]
+                duration_ms: Option<u32>,
+                #[serde(default)]
+                trigger: Option<String>,
+                #[serde(default)]
+                actor_id: Option<u64>,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            let result = engine
+                .dispatch(ControlCommand::ActCameraHitStop {
+                    duration_ms: p.duration_ms.unwrap_or(0),
+                    trigger: p.trigger.unwrap_or_else(|| "manual".to_string()),
+                    actor_id: p.actor_id,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.camera.scope_zoom" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActCameraScopeZoom {
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.camera.free_look_toggle" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                active: bool,
+                #[serde(default)]
+                cursor_x: Option<f32>,
+                #[serde(default)]
+                cursor_y: Option<f32>,
+                #[serde(default = "default_free_look_distance")]
+                max_distance: f32,
+            }
+            fn default_free_look_distance() -> f32 {
+                200.0
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            let cursor = match (p.cursor_x, p.cursor_y) {
+                (Some(x), Some(y)) => Some((x, y)),
+                _ => None,
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActCameraFreeLookToggle {
+                    active: p.active,
+                    cursor,
+                    max_distance: p.max_distance,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.photo.enter" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActPhotoEnter {
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.photo.exit" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActPhotoExit {
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.photo.cycle_filter" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActPhotoCycleFilter {
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.photo.shoot" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActPhotoShoot {
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.replay.scrub" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                delta_seconds: f32,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            let result = engine
+                .dispatch(ControlCommand::ActReplayScrub {
+                    delta_seconds: p.delta_seconds,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.replay.bookmark" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                label: String,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            let result = engine
+                .dispatch(ControlCommand::ActReplayBookmark {
+                    label: p.label,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.debug.toggle_overlay" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                overlay: String,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            if cf_debug::DebugOverlay::from_str(&p.overlay).is_none() {
+                return Some(invalid_param_reason(request.id, "unknown_overlay"));
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActDebugToggleOverlay {
+                    overlay: p.overlay,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.ui.set_hud_layout" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                node: String,
+                x: f32,
+                y: f32,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            if !x_y_finite(p.x, p.y) {
+                return Some(invalid_param_reason(request.id, "hud_layout_xy_must_be_finite"));
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActUiSetHudLayout {
+                    node: p.node,
+                    x: p.x,
+                    y: p.y,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.ui.save_preset" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                name: String,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            if p.name.is_empty() {
+                return Some(invalid_param_reason(request.id, "preset_name_must_not_be_empty"));
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActUiSavePreset {
+                    name: p.name,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.toggle_tactical_overlay" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                #[serde(default)]
+                multiplayer: bool,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerToggleTacticalOverlay {
+                    multiplayer: p.multiplayer,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.compose_plan" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                actor_id: u64,
+                steps: Vec<String>,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            if p.steps.len() > cf_squad_ui::MAX_PLAN_STEPS {
+                return Some(invalid_param_reason(request.id, "plan_full"));
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerComposePlan {
+                    actor_id: p.actor_id,
+                    steps: p.steps,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.context_wheel_select" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                actor_id: u64,
+                slot: u8,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            if (p.slot as usize) >= cf_squad_ui::WHEEL_SLOTS_LEN {
+                return Some(invalid_param_reason(request.id, "invalid_slot"));
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerContextWheelSelect {
+                    actor_id: p.actor_id,
+                    slot: p.slot,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.panic_call" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                kind: String,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            if cf_squad_ui::PanicKind::from_str(&p.kind).is_none() {
+                return Some(invalid_param_reason(request.id, "unknown_panic_kind"));
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerPanicCall {
+                    kind: p.kind,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.tag_target" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                target_id: u64,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerTagTarget {
+                    target_id: p.target_id,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.query_why" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                actor_id: u64,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerQueryWhy {
+                    actor_id: p.actor_id,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "observe.camera" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            let value = engine.observe_camera().await;
+            Some(success_response(request.id, value))
+        }
+        "observe.localization.current_language" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            let value = engine.observe_localization_current_language().await;
+            Some(success_response(request.id, value))
+        }
+        "observe.debug.overlays" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            let value = engine.observe_debug_overlays().await;
+            Some(success_response(request.id, value))
+        }
+        "observe.tactical_overlay" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            let value = engine.observe_tactical_overlay().await;
+            Some(success_response(request.id, value))
+        }
+        "observe.tags" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            let value = engine.observe_tags().await;
+            Some(success_response(request.id, value))
+        }
         "act.chassis.repair" => {
             let p: ActChassisRepairParams = match serde_json::from_value(params) {
                 Ok(v) => v,
@@ -1845,7 +2560,11 @@ async fn process_request<E: EngineHandle>(
             if let Some(reason) = patch.validation_error() {
                 return Some(invalid_param_reason(request.id, &reason));
             }
-            let result = engine.dispatch(ControlCommand::SettingsSet { changes: patch }).await;
+            let result = engine
+                .dispatch(ControlCommand::SettingsSet {
+                    changes: Box::new(patch),
+                })
+                .await;
             Some(ack_response(request.id, &result))
         }
         "runbundle.write" => {
@@ -2009,6 +2728,13 @@ fn missing_param_error(id: JsonRpcId, reason: &str) -> String {
         "InvalidParams",
         json!({"reason": reason, "fix_hint": "see spec/prototype-roadmap CLI Reference for the M0 method catalog"}),
     )
+}
+
+/// **M8**: shared validator for `act.ui.set_hud_layout` (and any future
+/// helper that takes an `(x, y)` point) — rejects NaN/Inf coordinates at
+/// the cfctl boundary.
+fn x_y_finite(x: f32, y: f32) -> bool {
+    x.is_finite() && y.is_finite()
 }
 
 /// Decode an M6 cfctl method's params into an [`crate::m6_actions::M6Action`].
@@ -2318,7 +3044,7 @@ mod tests {
     #[tokio::test]
     async fn settings_set_dispatches_patch() {
         struct CaptureEngine {
-            patch: Mutex<Option<SettingsPatch>>,
+            patch: Mutex<Option<Box<SettingsPatch>>>,
         }
         #[async_trait::async_trait]
         impl EngineHandle for CaptureEngine {

@@ -58,8 +58,9 @@ impl LocalizationTable {
 
     /// Bundled English baseline (loaded from `EN_TABLE_BYTES`).
     pub fn english_baseline() -> Result<Self, LocalizationLoadError> {
-        let txt = std::str::from_utf8(EN_TABLE_BYTES)
-            .map_err(|e| LocalizationLoadError::Parse(serde_json::from_str::<serde_json::Value>(&e.to_string()).unwrap_err()))?;
+        let txt = std::str::from_utf8(EN_TABLE_BYTES).map_err(|e| {
+            LocalizationLoadError::Parse(serde_json::from_str::<serde_json::Value>(&e.to_string()).unwrap_err())
+        })?;
         Self::load_from_json(txt)
     }
 
