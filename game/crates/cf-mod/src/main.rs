@@ -44,6 +44,42 @@ enum Cmd {
         #[command(subcommand)]
         action: Box<LedgerAction>,
     },
+    /// **M9A**: invoke the Tier-1 SVG asset pipeline. Wraps
+    /// `tools/asset_gen/build_placeholders.py` so engine-side tooling can
+    /// trigger a bake without shelling out manually.
+    #[command(name = "asset-gen")]
+    AssetGen {
+        #[command(subcommand)]
+        action: Box<AssetGenAction>,
+    },
+}
+
+/// **M9A**: asset-gen subcommands. Per spec § "Source / cf-mod Cargo.toml":
+/// > add `cf-mod asset-gen run` subcommand invoking the Python pipeline
+#[derive(Debug, Subcommand)]
+enum AssetGenAction {
+    /// Run the full Tier-1 bake. Equivalent to
+    /// `tools/asset_gen/.venv/bin/python tools/asset_gen/build_placeholders.py --all`.
+    Run {
+        /// Optional category filter (e.g. `WeaponSprite`).
+        #[arg(long)]
+        category: Option<String>,
+        /// Parallel worker count (0 = serial, 8 = default).
+        #[arg(long, default_value_t = 8u32)]
+        parallel: u32,
+        /// Skip the bake; only invoke the pipeline's `--check` dry-run.
+        #[arg(long)]
+        check: bool,
+        /// Print on-disk + ledger counts only.
+        #[arg(long)]
+        report: bool,
+        /// Override the path to the asset pipeline venv's python binary.
+        #[arg(long = "venv-python")]
+        venv_python: Option<PathBuf>,
+        /// Override the path to `build_placeholders.py`.
+        #[arg(long = "build-placeholders")]
+        build_placeholders: Option<PathBuf>,
+    },
 }
 
 /// **M4A** asset-ledger subcommands.
@@ -267,7 +303,88 @@ fn main() -> Result<()> {
             );
         }
         Cmd::Ledger { action } => run_ledger(action.as_ref(), cli.strict, cli.json),
+        Cmd::AssetGen { action } => run_asset_gen(action.as_ref(), cli.json),
     }
+}
+
+fn run_asset_gen(action: &AssetGenAction, json_output: bool) -> Result<()> {
+    use std::process::{Command, Stdio};
+
+    let AssetGenAction::Run {
+        category,
+        parallel,
+        check,
+        report,
+        venv_python,
+        build_placeholders,
+    } = action;
+
+    let cwd = std::env::current_dir().context("get cwd")?;
+    let workspace_root = if cwd.file_name().and_then(|n| n.to_str()) == Some("game") {
+        cwd.parent().unwrap_or(&cwd).to_path_buf()
+    } else {
+        cwd.clone()
+    };
+    let venv_py = venv_python
+        .clone()
+        .unwrap_or_else(|| workspace_root.join("tools/asset_gen/.venv/bin/python"));
+    let script = build_placeholders
+        .clone()
+        .unwrap_or_else(|| workspace_root.join("tools/asset_gen/build_placeholders.py"));
+    if !venv_py.exists() {
+        anyhow::bail!(
+            "asset-gen: venv python not found at {}; run `python3 -m venv tools/asset_gen/.venv`",
+            venv_py.display()
+        );
+    }
+    if !script.exists() {
+        anyhow::bail!("asset-gen: build_placeholders.py not found at {}", script.display());
+    }
+
+    let mut cmd = Command::new(&venv_py);
+    cmd.arg(&script);
+    if *report {
+        cmd.arg("--report");
+    } else if *check {
+        cmd.arg("--check");
+    } else if let Some(cat) = category {
+        cmd.arg("--category").arg(cat);
+        cmd.arg("--parallel").arg(parallel.to_string());
+    } else {
+        cmd.arg("--all");
+        cmd.arg("--parallel").arg(parallel.to_string());
+    }
+    cmd.current_dir(&workspace_root);
+    cmd.stdout(Stdio::inherit());
+    cmd.stderr(Stdio::inherit());
+    tracing::info!(
+        target: "cf::mod::asset_gen",
+        venv_python = %venv_py.display(),
+        script = %script.display(),
+        category = ?category,
+        parallel,
+        check,
+        report,
+        "running M9A asset pipeline"
+    );
+    let status = cmd
+        .status()
+        .with_context(|| format!("spawn {} {}", venv_py.display(), script.display()))?;
+    if json_output {
+        let exit = status.code().unwrap_or(-1);
+        println!(
+            "{}",
+            serde_json::json!({
+                "subcommand": "asset-gen",
+                "exit_code": exit,
+                "succeeded": status.success(),
+            })
+        );
+    }
+    if !status.success() {
+        anyhow::bail!("asset-gen pipeline exited with non-zero status: {:?}", status.code());
+    }
+    Ok(())
 }
 
 fn ledger_paths(override_path: Option<&PathBuf>) -> cf_asset_ledger::LedgerPaths {
