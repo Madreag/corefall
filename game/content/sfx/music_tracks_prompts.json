@@ -1,0 +1,510 @@
+{
+  "schema_version": 1,
+  "description": "M37A adaptive music track manifest — 30 base tracks (12 world ambient + 8 faction theme + 5 storyteller theme + 5 boss theme) × 4 variants (calm / buildup / climax / debrief) = 120 music files. Targets MusicGen-melody primary + Stable Audio Open fallback. Each track ships with per-faction LoRA hint, cross-fade curve, intensity thresholds. World ids align with DR-039 12-world catalog (M43 / M44). Faction ids align with game/content/factions/factions_full.json (8 launch factions). Storyteller ids align with M25 (5 directors: Cassandra / Phoebe / Randy / Ironman / Sandbox). Boss ids align with M45 (5 endgame bosses). Cross-fade engine cf-audio::adaptive_music selects {track, variant} per scenario state and intensity in [0.0, 1.0].",
+  "audio_format": {
+    "channels": 2,
+    "sample_rate_hz": 48000,
+    "bit_depth": 16,
+    "target_peak_dbfs": -8.0,
+    "target_lufs_integrated": -14.0,
+    "container": "ogg_vorbis",
+    "min_duration_sec": 60.0,
+    "max_duration_sec": 240.0,
+    "loop_points_required": true,
+    "intensity_thresholds": [0.0, 0.3, 0.6, 0.9]
+  },
+  "synthesis_backends": {
+    "primary": "audiocraft_musicgen_melody",
+    "fallback": "stable_audio_open",
+    "license_required": ["audiocraft_musicgen", "stable_audio_open"]
+  },
+  "variant_schema": {
+    "calm": "ambient bed; sparse rhythm; minimal lead; sustains scenario but does not demand attention",
+    "buildup": "tension rises; pulsing low end + rhythmic underlay added; lead motif begins; signals incoming threat",
+    "climax": "full arrangement; drums + bass + lead + harmonic tension peak; combat / boss-phase active",
+    "debrief": "reflective; sparse percussion + sustained pad + melodic recap; post-encounter wind-down"
+  },
+  "world_ambient_tracks": [
+    {
+      "id": "music_world_earth",
+      "world_id": "earth",
+      "canonical_name": "Earth Wastelands",
+      "duration_seconds": 240,
+      "tempo_bpm": 82,
+      "key": "D minor",
+      "cross_fade_curve": "logarithmic",
+      "variants": {
+        "calm": {"musicgen_prompt": "Earth post-collapse wasteland ambient, ruined-city melancholy, slow synth pad in D minor + distant wind + sparse piano motif + faint radio interference, 82 BPM, no drums, cinematic sci-fi grimdark, contemplative", "seed": 110001},
+        "buildup": {"musicgen_prompt": "Earth wasteland tension building, same synth pad in D minor + low ticking percussion + bass swell + distant industrial drone rising, 82 BPM, threat approaching", "seed": 110002},
+        "climax": {"musicgen_prompt": "Earth wasteland combat, aggressive industrial electronic in D minor + distorted bass + driving drums + ominous brass stabs + faction radio chatter, 110 BPM, urgent oppressive", "seed": 110003},
+        "debrief": {"musicgen_prompt": "Earth wasteland post-combat, sparse piano motif in D minor + sustained pad + light rain + breath of relief, 70 BPM, reflective melancholic", "seed": 110004}
+      }
+    },
+    {
+      "id": "music_world_mars",
+      "world_id": "mars",
+      "canonical_name": "Mars Dust Plains",
+      "duration_seconds": 240,
+      "tempo_bpm": 80,
+      "key": "C minor",
+      "cross_fade_curve": "logarithmic",
+      "variants": {
+        "calm": {"musicgen_prompt": "Mars rust-desert ambient, vast empty alien wasteland, low-fi synth pad in C minor + lonely synth lead + sparse percussion + dust storm wind whisper, 80 BPM, 4/4, cinematic sci-fi grimdark", "seed": 120001},
+        "buildup": {"musicgen_prompt": "Mars dust plains tension, same synth pad in C minor + rising bassline + tension percussion + heat shimmer + distant siren, 95 BPM, dust storm approaching", "seed": 120002},
+        "climax": {"musicgen_prompt": "Mars combat, full arrangement in C minor + heavy drums + synth lead + harmonic tension peak + sandstorm howl, 115 BPM, frenetic survival", "seed": 120003},
+        "debrief": {"musicgen_prompt": "Mars dust plains debrief, reflective piano outro in C minor + soft synth pad + receding wind, 60 BPM, hollow desolation", "seed": 120004}
+      }
+    },
+    {
+      "id": "music_world_moon",
+      "world_id": "moon",
+      "canonical_name": "Moon Vacuum Surface",
+      "duration_seconds": 240,
+      "tempo_bpm": 72,
+      "key": "F# minor",
+      "cross_fade_curve": "linear",
+      "variants": {
+        "calm": {"musicgen_prompt": "Moon vacuum lunar ambient, deep silence with helmet breathing + isolated synth pad in F# minor + faint suit-pump pulse + radio static fragments, 72 BPM, no drums, claustrophobic vacuum", "seed": 130001},
+        "buildup": {"musicgen_prompt": "Moon surface tension, oxygen depletion alarm rhythm + bass drone in F# minor + pulsing pad + distant explosion echoes, 85 BPM, suit damage incoming", "seed": 130002},
+        "climax": {"musicgen_prompt": "Moon vacuum combat, intense electronic in F# minor + sharp synth stabs + tight drums + alarm sweeps + EVA gunfire echo, 105 BPM, frantic vacuum survival", "seed": 130003},
+        "debrief": {"musicgen_prompt": "Moon surface debrief, slow synth pad in F# minor + suit breathing slowing + distant earth-shine + lonely chime, 55 BPM, isolated victory", "seed": 130004}
+      }
+    },
+    {
+      "id": "music_world_phobos",
+      "world_id": "phobos",
+      "canonical_name": "Phobos Microgravity Asteroid",
+      "duration_seconds": 240,
+      "tempo_bpm": 70,
+      "key": "G minor",
+      "cross_fade_curve": "logarithmic",
+      "variants": {
+        "calm": {"musicgen_prompt": "Phobos microgravity asteroid ambient, eerie silence with floating debris + creaking structural metal + faint synth drone in G minor + sparse chime, 70 BPM, no drums, weightless dread", "seed": 140001},
+        "buildup": {"musicgen_prompt": "Phobos tension, debris cascade + bass pulse in G minor + tension percussion + structural groan, 88 BPM, gravity warning", "seed": 140002},
+        "climax": {"musicgen_prompt": "Phobos combat, frantic electronic in G minor + tight drums + tumbling debris sample + sharp synth + alarms, 110 BPM, weightless combat chaos", "seed": 140003},
+        "debrief": {"musicgen_prompt": "Phobos debrief, drifting synth pad in G minor + slow chime + structural settle + distant Mars-rise, 50 BPM, weightless peace", "seed": 140004}
+      }
+    },
+    {
+      "id": "music_world_deimos",
+      "world_id": "deimos",
+      "canonical_name": "Deimos Mining Colony",
+      "duration_seconds": 240,
+      "tempo_bpm": 78,
+      "key": "B minor",
+      "cross_fade_curve": "logarithmic",
+      "variants": {
+        "calm": {"musicgen_prompt": "Deimos mining colony ambient, distant industrial machinery hum + metallic clanks + synth pad in B minor + radio chatter fragments + air recycler drone, 78 BPM, working-class space station", "seed": 150001},
+        "buildup": {"musicgen_prompt": "Deimos tension, mining drills accelerating + bass throb in B minor + percussion pulse + alarm warm-up, 92 BPM, ore vein collapse imminent", "seed": 150002},
+        "climax": {"musicgen_prompt": "Deimos combat, industrial electronic in B minor + heavy machinery samples + driving drums + distorted bass + worker shouts, 115 BPM, colony riot", "seed": 150003},
+        "debrief": {"musicgen_prompt": "Deimos debrief, slow synth pad in B minor + drill winding down + tool clatter receding + worker whistle, 65 BPM, end-of-shift weariness", "seed": 150004}
+      }
+    },
+    {
+      "id": "music_world_mimas",
+      "world_id": "mimas",
+      "canonical_name": "Mimas Methane Sea",
+      "duration_seconds": 240,
+      "tempo_bpm": 68,
+      "key": "Eb minor",
+      "cross_fade_curve": "logarithmic",
+      "variants": {
+        "calm": {"musicgen_prompt": "Mimas methane sea ambient, gentle liquid lapping + bubble synth pad in Eb minor + ethereal flute + distant rumble + atmospheric whistle, 68 BPM, no drums, alien aquatic dread", "seed": 160001},
+        "buildup": {"musicgen_prompt": "Mimas methane sea tension, deep rumble crescendo + bass pulse in Eb minor + tribal drums + sea-creature call, 85 BPM, something rising", "seed": 160002},
+        "climax": {"musicgen_prompt": "Mimas combat, flowing exotic in Eb minor + tribal drums + watery sound design + chant + bass synth + creature roar, 108 BPM, alien hostile depths", "seed": 160003},
+        "debrief": {"musicgen_prompt": "Mimas debrief, drifting synth pad in Eb minor + soft bubbles + flute solo + receding waves, 55 BPM, alien beauty", "seed": 160004}
+      }
+    },
+    {
+      "id": "music_world_europa",
+      "world_id": "europa",
+      "canonical_name": "Europa Ice Cavern Ocean",
+      "duration_seconds": 240,
+      "tempo_bpm": 72,
+      "key": "A minor",
+      "cross_fade_curve": "logarithmic",
+      "variants": {
+        "calm": {"musicgen_prompt": "Europa subsurface ice cavern ambient, dripping water + ice crystal crackle + deep underwater hum + bioluminescent creature calls + synth pad in A minor + ethereal chimes, 72 BPM, no drums, deep-ocean alien", "seed": 170001},
+        "buildup": {"musicgen_prompt": "Europa tension, sonar ping rising + bass throb in A minor + creature-vocal swell + ice crack percussion, 88 BPM, leviathan approaches", "seed": 170002},
+        "climax": {"musicgen_prompt": "Europa combat, aquatic orchestral in A minor + heavy drums + brass stabs + creature roar + bubble percussion, 110 BPM, deep-sea hunt", "seed": 170003},
+        "debrief": {"musicgen_prompt": "Europa debrief, ethereal synth pad in A minor + distant whale-song + ice settle + cathedral choir, 55 BPM, alien-ocean awe", "seed": 170004}
+      }
+    },
+    {
+      "id": "music_world_vulcan",
+      "world_id": "vulcan",
+      "canonical_name": "Vulcan Magma Forge",
+      "duration_seconds": 240,
+      "tempo_bpm": 86,
+      "key": "E minor",
+      "cross_fade_curve": "exponential",
+      "variants": {
+        "calm": {"musicgen_prompt": "Vulcan magma chamber ambient, bubbling lava + heat shimmer + rock-fall percussion + synth pad in E minor + steam vent hiss + low industrial drum, 86 BPM, infernal forge", "seed": 180001},
+        "buildup": {"musicgen_prompt": "Vulcan tension, lava surge crescendo + bass throb in E minor + driving percussion + alarm tone, 100 BPM, eruption imminent", "seed": 180002},
+        "climax": {"musicgen_prompt": "Vulcan combat, blistering industrial in E minor + thunder drums + brass + screaming lead synth + erupting magma roar, 130 BPM, hellfire combat", "seed": 180003},
+        "debrief": {"musicgen_prompt": "Vulcan debrief, smoldering synth pad in E minor + cooling lava crackle + sparse hammer + reverent organ, 65 BPM, forge-tested survival", "seed": 180004}
+      }
+    },
+    {
+      "id": "music_world_venus",
+      "world_id": "venus",
+      "canonical_name": "Venus Acid Cloud Sea",
+      "duration_seconds": 240,
+      "tempo_bpm": 76,
+      "key": "C# minor",
+      "cross_fade_curve": "logarithmic",
+      "variants": {
+        "calm": {"musicgen_prompt": "Venus high-pressure atmospheric ambient, howling wind + acid rain patter + distant lightning rumble + pressure groan + synth pad in C# minor + ominous brass, 76 BPM, hostile-atmosphere dread", "seed": 190001},
+        "buildup": {"musicgen_prompt": "Venus tension, pressure squeal rising + bass throb in C# minor + tension percussion + acid sizzle, 92 BPM, hull breach incoming", "seed": 190002},
+        "climax": {"musicgen_prompt": "Venus combat, atmospheric electronic in C# minor + heavy drums + acid-rain sample + brass + alarms + crackling lightning, 115 BPM, corrosive battlefield", "seed": 190003},
+        "debrief": {"musicgen_prompt": "Venus debrief, slow synth pad in C# minor + receding storm + dripping acid + lonely chime, 60 BPM, corrosive aftermath", "seed": 190004}
+      }
+    },
+    {
+      "id": "music_world_belt",
+      "world_id": "belt",
+      "canonical_name": "Belt Asteroid Mining",
+      "duration_seconds": 240,
+      "tempo_bpm": 92,
+      "key": "G# minor",
+      "cross_fade_curve": "logarithmic",
+      "variants": {
+        "calm": {"musicgen_prompt": "Asteroid belt mining colony ambient, distant rock impacts + ore conveyor + radio chatter + spacesuit breathing + synth pad in G# minor + clanking metal percussion, 92 BPM, industrial frontier", "seed": 200001},
+        "buildup": {"musicgen_prompt": "Belt tension, rock-impact crescendo + bass throb in G# minor + pirate radio bleed + drill spin, 105 BPM, pirate raid forming", "seed": 200002},
+        "climax": {"musicgen_prompt": "Belt combat, anarchic industrial in G# minor + distorted bass + thrashing drums + ore-crusher samples + worker chants, 130 BPM, brutal direct mining war", "seed": 200003},
+        "debrief": {"musicgen_prompt": "Belt debrief, slow synth pad in G# minor + drill winding down + distant rock clink + radio sign-off, 70 BPM, hard-won score", "seed": 200004}
+      }
+    },
+    {
+      "id": "music_world_orbital",
+      "world_id": "orbital",
+      "canonical_name": "Orbital Station Interior",
+      "duration_seconds": 240,
+      "tempo_bpm": 90,
+      "key": "F major",
+      "cross_fade_curve": "linear",
+      "variants": {
+        "calm": {"musicgen_prompt": "Orbital station interior ambient, gentle air recycler hum + computer beeps + distant footsteps + synth pad in F major + faint elevator-jazz harmonics, 90 BPM, civilian-station comfort", "seed": 210001},
+        "buildup": {"musicgen_prompt": "Orbital station tension, klaxon priming + bass throb in F minor + computer alarms + bulkhead clank, 100 BPM, hull breach warning", "seed": 210002},
+        "climax": {"musicgen_prompt": "Orbital station combat, frantic electronic in F minor + driving drums + alarm pulse + bulkhead slam + station-PA shouts, 125 BPM, zero-g station boarding", "seed": 210003},
+        "debrief": {"musicgen_prompt": "Orbital station debrief, mellow synth pad in F major + air recycler slow + computer chimes + medbay piano, 75 BPM, station recovery", "seed": 210004}
+      }
+    },
+    {
+      "id": "music_world_sol_zone",
+      "world_id": "sol_zone",
+      "canonical_name": "Sol Zone Stellar Edge",
+      "duration_seconds": 240,
+      "tempo_bpm": 80,
+      "key": "Bb major",
+      "cross_fade_curve": "exponential",
+      "variants": {
+        "calm": {"musicgen_prompt": "Sol-zone habitat near-star ambient, intense solar wind + crystalline resonance + radiation hum + synth pad in Bb major + cathedral organ + ethereal choir, 80 BPM, sacred stellar awe", "seed": 220001},
+        "buildup": {"musicgen_prompt": "Sol-zone tension, solar flare crescendo + bass swell in Bb major + radiation alarm + brass build, 95 BPM, flare incoming", "seed": 220002},
+        "climax": {"musicgen_prompt": "Sol-zone combat, triumphant orchestral in Bb major + full choir + heavy brass + thundering drums + stellar-wind howl, 120 BPM, climactic stellar wrath", "seed": 220003},
+        "debrief": {"musicgen_prompt": "Sol-zone debrief, sustained organ in Bb major + soft choir + receding solar wind + distant chime, 65 BPM, sacred relief", "seed": 220004}
+      }
+    }
+  ],
+  "faction_theme_tracks": [
+    {
+      "id": "music_faction_coalition",
+      "faction_id": "coalition",
+      "canonical_name": "Coalition Theme",
+      "duration_seconds": 180,
+      "tempo_bpm": 110,
+      "key": "C major",
+      "lora_target": "faction_coalition_lora",
+      "cross_fade_curve": "logarithmic",
+      "variants": {
+        "calm": {"musicgen_prompt": "Coalition faction theme calm, militaristic orchestral with strong brass + snare + heroic melody in C major + civilian-radio fanfare + disciplined humanity, 110 BPM, ordered hope", "seed": 310001},
+        "buildup": {"musicgen_prompt": "Coalition buildup, brass swell + tactical snare in C major + bass pulse + radio command chatter, 118 BPM, mobilization", "seed": 310002},
+        "climax": {"musicgen_prompt": "Coalition combat, modern military electronic in E minor + electric guitar + heavy drums + brass + synth + sergeant shouts, 125 BPM, aggressive precision", "seed": 310003},
+        "debrief": {"musicgen_prompt": "Coalition debrief, solemn brass in C major + slow snare roll + bugle taps + sustained pad, 70 BPM, honored fallen", "seed": 310004}
+      }
+    },
+    {
+      "id": "music_faction_frontier",
+      "faction_id": "frontier",
+      "canonical_name": "Frontier Theme",
+      "duration_seconds": 180,
+      "tempo_bpm": 95,
+      "key": "G major",
+      "lora_target": "faction_frontier_lora",
+      "cross_fade_curve": "logarithmic",
+      "variants": {
+        "calm": {"musicgen_prompt": "Frontier faction theme calm, frontier folk-electronic with acoustic guitar + harmonica + light synth + steady drum + bottle-percussion in G major, 95 BPM, hardy independent settlers", "seed": 320001},
+        "buildup": {"musicgen_prompt": "Frontier buildup, harmonica building + bass strum in G major + tom drums + outlaw whistle, 105 BPM, posse forming", "seed": 320002},
+        "climax": {"musicgen_prompt": "Frontier combat, western-electronic battle in E minor + electric guitar + heavy drums + bass synth + harmonica + holler shouts, 125 BPM, defiant outlaws", "seed": 320003},
+        "debrief": {"musicgen_prompt": "Frontier debrief, slow acoustic guitar in G major + harmonica solo + saloon piano + crickets, 65 BPM, dusty homecoming", "seed": 320004}
+      }
+    },
+    {
+      "id": "music_faction_ronin",
+      "faction_id": "ronin",
+      "canonical_name": "Ronin Theme",
+      "duration_seconds": 180,
+      "tempo_bpm": 88,
+      "key": "D minor",
+      "lora_target": "faction_ronin_lora",
+      "cross_fade_curve": "logarithmic",
+      "variants": {
+        "calm": {"musicgen_prompt": "Ronin faction theme calm, lone-wolf neo-noir with koto + electric piano + minimal synth pad in D minor + cyberpunk rain + lonely sax, 88 BPM, wandering blade-for-hire melancholy", "seed": 330001},
+        "buildup": {"musicgen_prompt": "Ronin buildup, koto pluck rising + bass pulse in D minor + taiko build + neon-flicker percussion, 100 BPM, duel imminent", "seed": 330002},
+        "climax": {"musicgen_prompt": "Ronin combat, cyberpunk samurai in D minor + driving taiko drums + electric guitar + koto + screaming synth lead, 130 BPM, blade-and-bullet ballet", "seed": 330003},
+        "debrief": {"musicgen_prompt": "Ronin debrief, solo koto in D minor + sustained pad + rain on neon + soft cello, 60 BPM, blood-stained reflection", "seed": 330004}
+      }
+    },
+    {
+      "id": "music_faction_synth",
+      "faction_id": "synth",
+      "canonical_name": "Synth Theme",
+      "duration_seconds": 180,
+      "tempo_bpm": 105,
+      "key": "A minor",
+      "lora_target": "faction_synth_lora",
+      "cross_fade_curve": "linear",
+      "variants": {
+        "calm": {"musicgen_prompt": "Synth faction theme calm, robotic drone-collective ambient, synthetic monotone choir + arpeggiated sequencer + cold synth pad in A minor + circuit-glitch percussion, 105 BPM, machine consensus", "seed": 340001},
+        "buildup": {"musicgen_prompt": "Synth buildup, sequencer accelerating + bass pulse in A minor + glitch percussion + hive-mind ping, 115 BPM, swarm coalescing", "seed": 340002},
+        "climax": {"musicgen_prompt": "Synth combat, frantic electronic in A minor + arpeggiated sequencer at full speed + heavy drums + distorted bass + robotic vocals, 140 BPM, mechanized overwhelm", "seed": 340003},
+        "debrief": {"musicgen_prompt": "Synth debrief, slow arpeggio in A minor + synthetic pad + cooling-fan whir + bell tone, 70 BPM, machine satisfaction", "seed": 340004}
+      }
+    },
+    {
+      "id": "music_faction_collective",
+      "faction_id": "collective",
+      "canonical_name": "Collective Theme",
+      "duration_seconds": 180,
+      "tempo_bpm": 95,
+      "key": "G minor",
+      "lora_target": "faction_collective_lora",
+      "cross_fade_curve": "logarithmic",
+      "variants": {
+        "calm": {"musicgen_prompt": "Collective faction theme calm, industrial proletarian electronic with metal-scrap percussion + bass + radio static + worker chants + synth pad in G minor, 95 BPM, gritty solidarity", "seed": 350001},
+        "buildup": {"musicgen_prompt": "Collective buildup, scrap-percussion accelerating + bass throb in G minor + worker drum + factory whistle, 108 BPM, strike forming", "seed": 350002},
+        "climax": {"musicgen_prompt": "Collective combat, anarchic industrial in D minor + distorted bass + thrashing drums + machinery samples + crowd chants, 130 BPM, brutal direct revolt", "seed": 350003},
+        "debrief": {"musicgen_prompt": "Collective debrief, slow factory hum in G minor + worker-choir hum + accordion + receding drum, 70 BPM, weary victory", "seed": 350004}
+      }
+    },
+    {
+      "id": "music_faction_husks",
+      "faction_id": "husks",
+      "canonical_name": "Husks Theme",
+      "duration_seconds": 180,
+      "tempo_bpm": 80,
+      "key": "B minor",
+      "lora_target": "faction_husks_lora",
+      "cross_fade_curve": "exponential",
+      "variants": {
+        "calm": {"musicgen_prompt": "Husks faction theme calm, alien-insectoid ambient with chittering + dissonant synth + drone + skittering percussion in B minor + distorted whisper, 80 BPM, unsettling hive presence", "seed": 360001},
+        "buildup": {"musicgen_prompt": "Husks buildup, skitter crescendo + bass throb in B minor + insect chitter swarming + dissonant string, 100 BPM, hive convergence", "seed": 360002},
+        "climax": {"musicgen_prompt": "Husks combat, frantic alien insectoid in F minor + skittering percussion + dissonant strings + screaming horns + chaos chant, 145 BPM, overwhelming hive frenzy", "seed": 360003},
+        "debrief": {"musicgen_prompt": "Husks debrief, eerie drone in B minor + receding chitter + distant queen-call + heartbeat pulse, 60 BPM, alien quiet", "seed": 360004}
+      }
+    },
+    {
+      "id": "music_faction_collegium",
+      "faction_id": "collegium",
+      "canonical_name": "Collegium Theme",
+      "duration_seconds": 180,
+      "tempo_bpm": 70,
+      "key": "F major",
+      "lora_target": "faction_collegium_lora",
+      "cross_fade_curve": "logarithmic",
+      "variants": {
+        "calm": {"musicgen_prompt": "Collegium faction theme calm, monastic-scholarly ambient with Gregorian chant + drone organ + bell + soft strings + synth pad in F major + scriptorium quill, 70 BPM, contemplative knowledge", "seed": 370001},
+        "buildup": {"musicgen_prompt": "Collegium buildup, chant rising + bass swell in F major + organ build + tome-slam percussion, 85 BPM, ritual preparation", "seed": 370002},
+        "climax": {"musicgen_prompt": "Collegium combat, sacred orchestral battle in D minor + male choir + brass + heavy strings + church bells + righteous chant, 110 BPM, archive defense", "seed": 370003},
+        "debrief": {"musicgen_prompt": "Collegium debrief, sustained organ in F major + soft choir + library-quiet + soft chime, 60 BPM, sacred preservation", "seed": 370004}
+      }
+    },
+    {
+      "id": "music_faction_starlight",
+      "faction_id": "starlight",
+      "canonical_name": "Starlight Theme",
+      "duration_seconds": 180,
+      "tempo_bpm": 65,
+      "key": "A major",
+      "lora_target": "faction_starlight_lora",
+      "cross_fade_curve": "logarithmic",
+      "variants": {
+        "calm": {"musicgen_prompt": "Starlight faction theme calm, solar-ritual ambient with bell tones + drone synth + cathedral organ + light percussion + synth pad in A major + ethereal choir, 65 BPM, religious science", "seed": 380001},
+        "buildup": {"musicgen_prompt": "Starlight buildup, choir building + bass swell in A major + ritual-bell crescendo + sunburst harp, 85 BPM, illumination rite", "seed": 380002},
+        "climax": {"musicgen_prompt": "Starlight combat, ritualistic orchestral in D minor + full choir + brass + tribal drums + organ + ecstatic chant, 115 BPM, fanatical fervor", "seed": 380003},
+        "debrief": {"musicgen_prompt": "Starlight debrief, sustained organ in A major + soft choir + receding bells + harp glissando, 55 BPM, illuminated peace", "seed": 380004}
+      }
+    }
+  ],
+  "storyteller_theme_tracks": [
+    {
+      "id": "music_storyteller_cassandra",
+      "storyteller_id": "cassandra_classic",
+      "canonical_name": "Cassandra Classic Theme",
+      "duration_seconds": 180,
+      "tempo_bpm": 95,
+      "key": "C minor",
+      "cross_fade_curve": "logarithmic",
+      "variants": {
+        "calm": {"musicgen_prompt": "Cassandra Classic narrative theme calm, balanced cinematic synth pad in C minor + soft strings + measured piano + steady heartbeat percussion, 95 BPM, fair storyteller pacing", "seed": 410001},
+        "buildup": {"musicgen_prompt": "Cassandra Classic buildup, strings swell + bass pulse in C minor + tension percussion + ascending piano motif, 105 BPM, the story turns", "seed": 410002},
+        "climax": {"musicgen_prompt": "Cassandra Classic event climax, orchestral in C minor + heavy strings + brass + percussion + leitmotif return, 120 BPM, dramatic incident", "seed": 410003},
+        "debrief": {"musicgen_prompt": "Cassandra Classic debrief, slow piano outro in C minor + soft strings + lone violin, 65 BPM, balanced reflection", "seed": 410004}
+      }
+    },
+    {
+      "id": "music_storyteller_phoebe",
+      "storyteller_id": "phoebe_chillax",
+      "canonical_name": "Phoebe Chillax Theme",
+      "duration_seconds": 180,
+      "tempo_bpm": 80,
+      "key": "Bb major",
+      "cross_fade_curve": "linear",
+      "variants": {
+        "calm": {"musicgen_prompt": "Phoebe Chillax narrative theme calm, mellow lofi synth pad in Bb major + soft piano + jazz brush percussion + sparse warm bass, 80 BPM, player-friendly mellow", "seed": 420001},
+        "buildup": {"musicgen_prompt": "Phoebe Chillax buildup, warm strings swelling + soft bass in Bb major + light percussion + gentle vibraphone, 90 BPM, light tension", "seed": 420002},
+        "climax": {"musicgen_prompt": "Phoebe Chillax event climax, light orchestral in Bb major + warm brass + brush drums + piano melody + uplifting choir, 105 BPM, generous challenge", "seed": 420003},
+        "debrief": {"musicgen_prompt": "Phoebe Chillax debrief, mellow piano outro in Bb major + soft strings + smiling vibraphone, 60 BPM, gentle wind-down", "seed": 420004}
+      }
+    },
+    {
+      "id": "music_storyteller_randy",
+      "storyteller_id": "randy_random",
+      "canonical_name": "Randy Random Theme",
+      "duration_seconds": 180,
+      "tempo_bpm": 110,
+      "key": "F# minor",
+      "cross_fade_curve": "exponential",
+      "variants": {
+        "calm": {"musicgen_prompt": "Randy Random narrative theme calm, chaotic-unpredictable synth pad in F# minor + glitch percussion + erratic piano stabs + random pitch sweeps, 110 BPM, anything goes", "seed": 430001},
+        "buildup": {"musicgen_prompt": "Randy Random buildup, escalating chaos in F# minor + accelerating drums + dissonant strings + alarm sweeps, 125 BPM, unpredictable cascade", "seed": 430002},
+        "climax": {"musicgen_prompt": "Randy Random event climax, frantic electronic in F# minor + double-time drums + dissonant brass + screaming synth + chaos percussion, 145 BPM, total mayhem", "seed": 430003},
+        "debrief": {"musicgen_prompt": "Randy Random debrief, surreal pad in F# minor + erratic glitch fading + soft chime + breath of relief, 75 BPM, chaos receding", "seed": 430004}
+      }
+    },
+    {
+      "id": "music_storyteller_ironman",
+      "storyteller_id": "ironman",
+      "canonical_name": "Ironman Theme",
+      "duration_seconds": 180,
+      "tempo_bpm": 88,
+      "key": "G minor",
+      "cross_fade_curve": "exponential",
+      "variants": {
+        "calm": {"musicgen_prompt": "Ironman narrative theme calm, grim permadeath ambient, low synth drone in G minor + sparse cello + military snare + ticking clock + heartbeat pulse, 88 BPM, no second chances", "seed": 440001},
+        "buildup": {"musicgen_prompt": "Ironman buildup, low strings rising + bass throb in G minor + snare roll + funeral-bell tease, 100 BPM, irreversible threat", "seed": 440002},
+        "climax": {"musicgen_prompt": "Ironman event climax, dark orchestral in G minor + heavy strings + funeral brass + drum-roll + ominous choir, 115 BPM, life-or-death stakes", "seed": 440003},
+        "debrief": {"musicgen_prompt": "Ironman debrief, solo cello in G minor + sustained drone + funeral bell + sparse piano, 55 BPM, permadeath aftermath", "seed": 440004}
+      }
+    },
+    {
+      "id": "music_storyteller_sandbox",
+      "storyteller_id": "sandbox",
+      "canonical_name": "Sandbox Theme",
+      "duration_seconds": 180,
+      "tempo_bpm": 75,
+      "key": "D major",
+      "cross_fade_curve": "linear",
+      "variants": {
+        "calm": {"musicgen_prompt": "Sandbox narrative theme calm, pure-exploration ambient with airy synth pad in D major + acoustic guitar + bird-call samples + minimal percussion + harp glissando, 75 BPM, no-pressure curiosity", "seed": 450001},
+        "buildup": {"musicgen_prompt": "Sandbox buildup, soft strings swelling + warm bass in D major + light percussion + discovery harp, 85 BPM, mild surprise", "seed": 450002},
+        "climax": {"musicgen_prompt": "Sandbox climax, exploration orchestral in D major + soaring strings + brass crescendo + uplifting drum + choir of wonder, 105 BPM, major discovery", "seed": 450003},
+        "debrief": {"musicgen_prompt": "Sandbox debrief, acoustic guitar outro in D major + soft strings + harp + gentle wind, 60 BPM, contented exploration", "seed": 450004}
+      }
+    }
+  ],
+  "boss_theme_tracks": [
+    {
+      "id": "music_boss_hollow_king",
+      "boss_id": "hollow_king",
+      "canonical_name": "The Hollow King Theme",
+      "world_id": "earth",
+      "phases": 3,
+      "duration_seconds": 240,
+      "tempo_bpm": 100,
+      "key": "D minor",
+      "cross_fade_curve": "exponential",
+      "variants": {
+        "calm": {"musicgen_prompt": "Hollow King boss arena entry, ominous building orchestral with menacing brass + tribal drums + low choir + bass + slow heartbeat in D minor, 100 BPM, confrontation looming", "seed": 510001},
+        "buildup": {"musicgen_prompt": "Hollow King phase 1 buildup, strings crescendo + brass build + tribal drums escalating in D minor + lava-crackle percussion + king's-voice chant, 115 BPM, flame king awakens", "seed": 510002},
+        "climax": {"musicgen_prompt": "Hollow King phase 2/3 combat, triumphant epic in D minor + full orchestra + battle choir + powerful brass + thundering drums + leitmotif + pyroclastic roar, 130 BPM, climactic flame king war", "seed": 510003},
+        "debrief": {"musicgen_prompt": "Hollow King defeat, somber orchestral cadence in D minor + descending strings + low brass + funeral choir + cooling-lava crackle, 70 BPM, fallen king lament", "seed": 510004}
+      }
+    },
+    {
+      "id": "music_boss_frozen_heart",
+      "boss_id": "frozen_heart",
+      "canonical_name": "The Frozen Heart Theme",
+      "world_id": "europa",
+      "phases": 3,
+      "duration_seconds": 240,
+      "tempo_bpm": 95,
+      "key": "B minor",
+      "cross_fade_curve": "exponential",
+      "variants": {
+        "calm": {"musicgen_prompt": "Frozen Heart boss arena entry, glacial dread orchestral with ice-crystal chimes + low choir + cold synth pad in B minor + creature heartbeat + sonar ping, 95 BPM, deep-cold confrontation", "seed": 520001},
+        "buildup": {"musicgen_prompt": "Frozen Heart phase 1 buildup, ice-crystal crescendo + cryogenic synth swell in B minor + driving drum + whisper choir + cold-snap percussion, 110 BPM, supercooled awakening", "seed": 520002},
+        "climax": {"musicgen_prompt": "Frozen Heart phase 2/3 combat, frigid orchestral in B minor + full strings + ice-chime + thundering drum + creature roar + screaming brass + supercooled-core whine, 125 BPM, cryogenic meltdown war", "seed": 520003},
+        "debrief": {"musicgen_prompt": "Frozen Heart defeat, mournful strings in B minor + descending chime + sparse cello + ice shatter + soft choir, 65 BPM, heart-of-ice lament", "seed": 520004}
+      }
+    },
+    {
+      "id": "music_boss_crimson_tide",
+      "boss_id": "crimson_tide",
+      "canonical_name": "The Crimson Tide Theme",
+      "world_id": "mars",
+      "phases": 4,
+      "duration_seconds": 240,
+      "tempo_bpm": 105,
+      "key": "F minor",
+      "cross_fade_curve": "exponential",
+      "variants": {
+        "calm": {"musicgen_prompt": "Crimson Tide boss arena entry, dust-storm orchestral with rust-grit percussion + heavy brass + low synth pad in F minor + Bedouin choir + sand-walker chant, 105 BPM, sandstorm-titan looms", "seed": 530001},
+        "buildup": {"musicgen_prompt": "Crimson Tide phase 1/2 buildup, sandstorm crescendo + bass throb in F minor + driving tribal drum + windswept brass + war chant, 120 BPM, swarm tide rising", "seed": 530002},
+        "climax": {"musicgen_prompt": "Crimson Tide phase 3/4 combat, furious orchestral in F minor + full tribal drums + heavy brass + dust-storm howl + war choir + creature roars + crumbling-arena rumble, 135 BPM, four-phase sand-titan war", "seed": 530003},
+        "debrief": {"musicgen_prompt": "Crimson Tide defeat, settling-dust orchestral in F minor + receding tribal drum + lone reed flute + sparse cello + wind sigh, 70 BPM, sand-buried lament", "seed": 530004}
+      }
+    },
+    {
+      "id": "music_boss_eclipse_walker",
+      "boss_id": "eclipse_walker",
+      "canonical_name": "The Eclipse Walker Theme",
+      "world_id": "mimas",
+      "phases": 3,
+      "duration_seconds": 240,
+      "tempo_bpm": 102,
+      "key": "C# minor",
+      "cross_fade_curve": "exponential",
+      "variants": {
+        "calm": {"musicgen_prompt": "Eclipse Walker boss arena entry, microgravity-eerie orchestral with floating synth pad in C# minor + ethereal choir + gravity-warp synth + slow heartbeat + reverb cello, 102 BPM, weightless cyborg presence", "seed": 540001},
+        "buildup": {"musicgen_prompt": "Eclipse Walker phase 1 buildup, cyborg-precision crescendo + bass pulse in C# minor + tight drum + glitch percussion + ascending choir, 118 BPM, gravity inversion incoming", "seed": 540002},
+        "climax": {"musicgen_prompt": "Eclipse Walker phase 2/3 combat, frantic electronic-orchestral in C# minor + full drum + brass + cyborg-vocals + gravity-warp synth lead + agile percussion, 132 BPM, microgravity duel", "seed": 540003},
+        "debrief": {"musicgen_prompt": "Eclipse Walker defeat, drifting synth pad in C# minor + receding choir + soft chime + cooling-cyborg whine, 65 BPM, weightless lament", "seed": 540004}
+      }
+    },
+    {
+      "id": "music_boss_last_star",
+      "boss_id": "last_star",
+      "canonical_name": "The Last Star Theme",
+      "world_id": "vulcan",
+      "phases": 5,
+      "duration_seconds": 300,
+      "tempo_bpm": 110,
+      "key": "A minor",
+      "cross_fade_curve": "exponential",
+      "variants": {
+        "calm": {"musicgen_prompt": "Last Star superboss arena entry, stellar-cathedral orchestral with cathedral organ + full choir + low brass + slow heartbeat + synth pad in A minor + cosmic-wind howl, 110 BPM, end-of-campaign confrontation", "seed": 550001},
+        "buildup": {"musicgen_prompt": "Last Star phase 1/2 buildup, choir crescendo + organ build + bass throb in A minor + ascending strings + ritual percussion + stellar-flare hiss, 125 BPM, sol-zone-titan awakens", "seed": 550002},
+        "climax": {"musicgen_prompt": "Last Star phase 3/4/5 combat, climactic epic orchestral in A minor + full choir + powerful brass + thundering drums + leitmotif return + screaming synth lead + cosmic-roar samples + stellar-wrath howl, 140 BPM, end-game superboss war", "seed": 550003},
+        "debrief": {"musicgen_prompt": "Last Star defeat, triumphant resolved orchestral in A major + ascending choir + warm brass + sustained organ + soft drum + dawn-chime + receding stellar wind, 90 BPM, campaign-ending triumph", "seed": 550004}
+      }
+    }
+  ],
+  "adaptive_engine_notes": {
+    "selection_logic": "cf-audio::adaptive_music selects {track, variant} per tick. Track selection priority: boss_arena > faction_engagement > world_default. Variant selection: intensity in [0.0,0.3]=calm; [0.3,0.6]=buildup; [0.6,0.9]=climax; [0.9,1.0]=climax-sustain; post-encounter=debrief.",
+    "cross_fade_durations_sec": {"linear": 2.0, "logarithmic": 3.0, "exponential": 4.0},
+    "intensity_inputs": ["mission_phase", "storyteller_intensity", "combat_density", "boss_phase", "ally_down_count"],
+    "per_faction_lora_training": "tools/audio_pipeline/music_composition/per_faction_lora_train.py reads 5+ reference seeds per faction; trains MusicGen LoRA; LoRA pinned per-track via lora_target field.",
+    "stinger_routing": "stinger SFX (alert / breakthrough / ally_lost / discovery / anomaly) route through ui_sfx bus, NOT music bus; they DUCK music -6 dB then restore over 500ms per voice priority rule"
+  }
+}

@@ -1,0 +1,84 @@
+{
+  "schema_version": 1,
+  "description": "M12A impact + combat SFX prompts — per-damage-type × per-material impact + body-hit + projectile-flyby + ricochet + armor-defeat + chassis-hit + dismemberment. Feeds Stable Audio Open synthesis. 150+ prompts.",
+  "audio_format": {
+    "channels": 1,
+    "sample_rate_hz": 48000,
+    "bit_depth": 16,
+    "target_peak_dbfs": -14.0,
+    "target_lufs_integrated": -20.0,
+    "max_duration_sec": 2.0
+  },
+  "projectile_sfx": [
+    {"id": "sfx_projectile_flyby_close", "category": "flyby", "distance_m": 1, "prompt": "bullet flyby very close to ear, sharp angry whip-crack zip, 0.2 second", "duration_target_sec": 0.2},
+    {"id": "sfx_projectile_flyby_medium", "category": "flyby", "distance_m": 3, "prompt": "bullet flyby medium distance, sharp ph-zip whoosh, 0.2 second", "duration_target_sec": 0.2},
+    {"id": "sfx_projectile_flyby_far", "category": "flyby", "distance_m": 8, "prompt": "bullet flyby distant, faint whoosh trail, 0.3 second", "duration_target_sec": 0.3},
+    {"id": "sfx_projectile_supersonic_crack", "category": "supersonic", "prompt": "supersonic bullet shock-wave crack passing overhead, sharp whip-crack, 0.15 second", "duration_target_sec": 0.15},
+    {"id": "sfx_projectile_subsonic_whoosh", "category": "subsonic", "prompt": "subsonic round in flight, hollow whooshing trail, 0.4 second", "duration_target_sec": 0.4},
+    {"id": "sfx_projectile_tracer_burn", "category": "tracer", "prompt": "tracer round burning bright, hissing burning trail, 0.5 second", "duration_target_sec": 0.5},
+    {"id": "sfx_projectile_rocket_flight", "category": "rocket", "prompt": "rocket projectile sustained flight, deep roaring exhaust trail, 1.5 second loop", "duration_target_sec": 1.5, "loops": true}
+  ],
+  "impact_sfx_by_material": [
+    {"id": "impact_concrete_small", "material": "concrete", "intensity": "small", "damage_type": "kinetic", "prompt": "bullet impacts concrete wall, sharp crack with dust puff, 0.3 second", "duration_target_sec": 0.3},
+    {"id": "impact_concrete_large", "material": "concrete", "intensity": "large", "damage_type": "kinetic", "prompt": "heavy round impacts concrete, deep thud with chunk falling, 0.5 second", "duration_target_sec": 0.5},
+    {"id": "impact_metal_small", "material": "metal", "intensity": "small", "damage_type": "kinetic", "prompt": "bullet pings off metal plate, sharp metallic tang with ricochet whine, 0.4 second", "duration_target_sec": 0.4},
+    {"id": "impact_metal_large", "material": "metal", "intensity": "large", "damage_type": "kinetic", "prompt": "heavy round impacts metal plate, deep boom with structural vibration, 0.6 second", "duration_target_sec": 0.6},
+    {"id": "impact_wood_small", "material": "wood", "intensity": "small", "damage_type": "kinetic", "prompt": "bullet impacts wood, sharp thunk with splinter pop, 0.3 second", "duration_target_sec": 0.3},
+    {"id": "impact_wood_large", "material": "wood", "intensity": "large", "damage_type": "kinetic", "prompt": "heavy round impacts wood, splintering crash with wood debris, 0.5 second", "duration_target_sec": 0.5},
+    {"id": "impact_glass_break", "material": "glass", "intensity": "any", "damage_type": "kinetic", "prompt": "glass shatters from impact, sharp crack with shard cascade, 0.6 second", "duration_target_sec": 0.6},
+    {"id": "impact_dirt_small", "material": "dirt", "intensity": "small", "damage_type": "kinetic", "prompt": "bullet impacts dirt, dull thud with soil puff, 0.25 second", "duration_target_sec": 0.25},
+    {"id": "impact_dirt_large", "material": "dirt", "intensity": "large", "damage_type": "kinetic", "prompt": "heavy round impacts dirt, dull boom with dirt cloud, 0.5 second", "duration_target_sec": 0.5},
+    {"id": "impact_water_splash", "material": "water", "intensity": "any", "damage_type": "kinetic", "prompt": "projectile impacts water, sharp splash with droplet spray, 0.5 second", "duration_target_sec": 0.5},
+    {"id": "impact_ice_crack", "material": "ice", "intensity": "any", "damage_type": "kinetic", "prompt": "projectile cracks ice, sharp crack with crystalline shatter, 0.4 second", "duration_target_sec": 0.4},
+    {"id": "impact_sand_thud", "material": "sand", "intensity": "any", "damage_type": "kinetic", "prompt": "projectile impacts sand, soft muffled thud with grain shift, 0.4 second", "duration_target_sec": 0.4},
+
+    {"id": "impact_concrete_thermal", "material": "concrete", "damage_type": "thermal", "prompt": "thermal weapon scorches concrete, sustained sizzle with cracking, 0.8 second", "duration_target_sec": 0.8},
+    {"id": "impact_metal_thermal", "material": "metal", "damage_type": "thermal", "prompt": "thermal weapon melts metal, intense hiss with metal warping, 1.0 second", "duration_target_sec": 1.0},
+    {"id": "impact_wood_thermal", "material": "wood", "damage_type": "thermal", "prompt": "wood ignites from thermal, crackling fire spreads, 1.5 second", "duration_target_sec": 1.5},
+    {"id": "impact_oil_thermal", "material": "oil", "damage_type": "thermal", "prompt": "oil ignites from thermal, whoof of fire ignition, 0.6 second", "duration_target_sec": 0.6},
+    {"id": "impact_methane_thermal", "material": "methane", "damage_type": "thermal", "prompt": "methane cloud ignites explosively, blue-white whoomph, 0.4 second", "duration_target_sec": 0.4},
+
+    {"id": "impact_metal_electric", "material": "metal", "damage_type": "electric", "prompt": "electrical discharge into metal plate, sharp zap with sustained buzz, 0.5 second", "duration_target_sec": 0.5},
+    {"id": "impact_water_electric", "material": "water", "damage_type": "electric", "prompt": "electrical discharge into water, sharp zap with bubbling crackle, 0.7 second", "duration_target_sec": 0.7},
+
+    {"id": "impact_concrete_acid", "material": "concrete", "damage_type": "chemical", "prompt": "acid eats into concrete, sustained sizzle with bubbling, 1.2 second", "duration_target_sec": 1.2},
+    {"id": "impact_metal_acid", "material": "metal", "damage_type": "chemical", "prompt": "acid corrodes metal, sustained hiss with fumes rising, 1.0 second", "duration_target_sec": 1.0},
+
+    {"id": "impact_explosive_blast_small", "damage_type": "explosive", "intensity": "small", "prompt": "small explosive detonation, sharp punchy boom with debris ping, 0.6 second", "duration_target_sec": 0.6},
+    {"id": "impact_explosive_blast_medium", "damage_type": "explosive", "intensity": "medium", "prompt": "medium explosive detonation, deep boom with shrapnel whir, 1.0 second", "duration_target_sec": 1.0},
+    {"id": "impact_explosive_blast_large", "damage_type": "explosive", "intensity": "large", "prompt": "large explosive detonation, deep ground-shaking boom with debris cascade, 2.0 second", "duration_target_sec": 2.0}
+  ],
+  "body_hit_sfx": [
+    {"id": "body_hit_flesh_small", "target": "flesh", "intensity": "small", "prompt": "bullet impacts flesh, wet meaty thud, 0.3 second", "duration_target_sec": 0.3},
+    {"id": "body_hit_flesh_large", "target": "flesh", "intensity": "large", "prompt": "heavy round impacts flesh, wet thunk with blood splatter, 0.5 second", "duration_target_sec": 0.5},
+    {"id": "body_hit_armor_glance", "target": "armor", "intensity": "glance", "prompt": "bullet glances off armor, sharp ricochet whine, 0.4 second", "duration_target_sec": 0.4},
+    {"id": "body_hit_armor_penetrate", "target": "armor", "intensity": "penetrate", "prompt": "bullet penetrates armor, sharp crack with following wet impact, 0.5 second", "duration_target_sec": 0.5},
+    {"id": "body_hit_armor_defeat", "target": "armor", "intensity": "defeat", "prompt": "round defeats heavy armor, deep crack with metallic clang, 0.6 second", "duration_target_sec": 0.6},
+    {"id": "body_hit_robot_metal", "target": "robot", "intensity": "small", "prompt": "bullet impacts robot chassis, metallic clang with circuit spark, 0.4 second", "duration_target_sec": 0.4},
+    {"id": "body_hit_robot_critical", "target": "robot", "intensity": "critical", "prompt": "heavy round impacts robot internals, electrical pop with circuit fry, 0.7 second", "duration_target_sec": 0.7},
+    {"id": "body_hit_chassis_module_break", "target": "chassis", "intensity": "module_break", "prompt": "chassis module breaks, mechanical snap with hydraulic hiss, 0.6 second", "duration_target_sec": 0.6},
+    {"id": "body_hit_chassis_armor_crack", "target": "chassis", "intensity": "armor_crack", "prompt": "chassis armor plate cracks, sharp ceramic snap, 0.4 second", "duration_target_sec": 0.4}
+  ],
+  "dismemberment_sfx": [
+    {"id": "dismember_arm", "limb": "arm", "prompt": "arm severed, wet meaty tear with bone snap + blood spray, 0.7 second", "duration_target_sec": 0.7},
+    {"id": "dismember_leg", "limb": "leg", "prompt": "leg severed, wet tear with bone snap + heavy collapse, 0.8 second", "duration_target_sec": 0.8},
+    {"id": "dismember_head", "limb": "head", "prompt": "head severed, single sharp wet thunk with spray, 0.4 second", "duration_target_sec": 0.4},
+    {"id": "dismember_robot_arm", "limb": "robot_arm", "prompt": "robot arm severed, mechanical snap with sparks and hydraulic spray, 0.6 second", "duration_target_sec": 0.6},
+    {"id": "dismember_robot_leg", "limb": "robot_leg", "prompt": "robot leg severed, heavy mechanical break with oil leak hiss, 0.7 second", "duration_target_sec": 0.7},
+    {"id": "dismember_chassis_arm", "limb": "chassis_arm", "prompt": "chassis arm modular detach, locking bolts release + heavy drop, 1.0 second", "duration_target_sec": 1.0},
+    {"id": "gib_flesh", "limb": "torso_gib", "prompt": "flesh gibbed by heavy explosion, multiple wet splats with mist, 1.0 second", "duration_target_sec": 1.0},
+    {"id": "gib_chassis", "limb": "chassis_gib", "prompt": "chassis gibbed by heavy explosion, metal explosion with debris cascade, 1.2 second", "duration_target_sec": 1.2}
+  ],
+  "death_sfx": [
+    {"id": "death_grunt_male", "target": "male_grunt", "prompt": "human male death grunt, short pained exhale, 0.6 second", "duration_target_sec": 0.6},
+    {"id": "death_grunt_female", "target": "female_grunt", "prompt": "human female death grunt, short pained exhale, 0.6 second", "duration_target_sec": 0.6},
+    {"id": "death_scream_male", "target": "male_scream", "prompt": "human male death scream, agonized cry cut short, 1.2 second", "duration_target_sec": 1.2},
+    {"id": "death_scream_female", "target": "female_scream", "prompt": "human female death scream, agonized cry cut short, 1.2 second", "duration_target_sec": 1.2},
+    {"id": "death_robot_shutdown", "target": "robot_shutdown", "prompt": "robot critical shutdown, descending whine + final electrical pop, 1.5 second", "duration_target_sec": 1.5},
+    {"id": "death_robot_explode", "target": "robot_explode", "prompt": "robot core overloads + explodes, rising whine + sharp boom + circuit fry, 1.5 second", "duration_target_sec": 1.5},
+    {"id": "death_biomech_groan", "target": "biomech", "prompt": "heavy biomech death groan, deep guttural with hydraulic hiss, 1.2 second", "duration_target_sec": 1.2},
+    {"id": "death_chassis_eject", "target": "chassis_eject", "prompt": "chassis emergency power loss + pilot eject sequence, 1.8 second", "duration_target_sec": 1.8},
+    {"id": "death_aqueous_dissolve", "target": "aqueous", "prompt": "aqueous race body dissolves into water, liquid splash with fading bubble, 1.0 second", "duration_target_sec": 1.0},
+    {"id": "death_crystalline_shatter", "target": "crystalline", "prompt": "crystalline race shatters, sharp resonant crystal break with chime tail, 1.2 second", "duration_target_sec": 1.2}
+  ]
+}
