@@ -13922,9 +13922,22 @@ impl EngineHandle for M0Engine {
                 steps,
                 source,
             } => self.dispatch_compose_plan(actor_id, steps, source, tick, sim_time_ms, state),
-            ControlCommand::ActPlayerContextWheelSelect { actor_id, slot, source } => {
-                self.dispatch_context_wheel_select(actor_id, slot, source, tick, sim_time_ms, state)
-            }
+            ControlCommand::ActPlayerContextWheelSelect {
+                actor_id,
+                slot,
+                target_kind,
+                target_id,
+                source,
+            } => self.dispatch_context_wheel_select(
+                actor_id,
+                slot,
+                target_kind,
+                target_id,
+                source,
+                tick,
+                sim_time_ms,
+                state,
+            ),
             ControlCommand::ActPlayerPanicCall { kind, source } => {
                 self.dispatch_panic_call(kind, source, tick, sim_time_ms, state)
             }

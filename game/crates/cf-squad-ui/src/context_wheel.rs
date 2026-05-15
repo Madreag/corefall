@@ -47,6 +47,57 @@ pub enum ReticleTarget {
     None,
 }
 
+impl ReticleTarget {
+    /// Canonical snake_case identifier of the variant kind (cfctl wire form).
+    pub fn kind_str(&self) -> &'static str {
+        match self {
+            ReticleTarget::Squadmate { .. } => "squadmate",
+            ReticleTarget::Door { .. } => "door",
+            ReticleTarget::Enemy { .. } => "enemy",
+            ReticleTarget::TerrainBreach { .. } => "terrain_breach",
+            ReticleTarget::Hazard { .. } => "hazard",
+            ReticleTarget::ReactorModule { .. } => "reactor_module",
+            ReticleTarget::None => "none",
+        }
+    }
+
+    /// Numeric id payload (when the variant carries one).
+    pub fn target_id(&self) -> Option<u64> {
+        match *self {
+            ReticleTarget::Squadmate { actor_id } => Some(actor_id),
+            ReticleTarget::Door { entity_id, .. } => Some(entity_id),
+            ReticleTarget::Enemy { actor_id } => Some(actor_id),
+            ReticleTarget::Hazard { hazard_id } => Some(hazard_id),
+            ReticleTarget::ReactorModule { module_id } => Some(module_id),
+            ReticleTarget::TerrainBreach { .. } | ReticleTarget::None => None,
+        }
+    }
+
+    /// Parse the cfctl wire form. `target_id` is required for kinds that
+    /// carry an id (`squadmate` / `door` / `enemy` / `hazard` /
+    /// `reactor_module`); ignored for `none` / `terrain_breach`. `door`
+    /// defaults `grenade_equipped` to false; callers that know the
+    /// player's loadout may construct the variant directly.
+    /// `terrain_breach` defaults `position` to `(0.0, 0.0)`; the wheel
+    /// slot population for that target does not depend on position.
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(kind: &str, target_id: Option<u64>) -> Option<ReticleTarget> {
+        Some(match kind {
+            "none" => ReticleTarget::None,
+            "squadmate" => ReticleTarget::Squadmate { actor_id: target_id? },
+            "door" => ReticleTarget::Door {
+                entity_id: target_id?,
+                grenade_equipped: false,
+            },
+            "enemy" => ReticleTarget::Enemy { actor_id: target_id? },
+            "terrain_breach" => ReticleTarget::TerrainBreach { position: (0.0, 0.0) },
+            "hazard" => ReticleTarget::Hazard { hazard_id: target_id? },
+            "reactor_module" => ReticleTarget::ReactorModule { module_id: target_id? },
+            _ => return None,
+        })
+    }
+}
+
 /// Context-order kinds the wheel can issue. Spec lists 25+ across the
 /// per-target tables; the enum covers every spec literal so wheels can be
 /// composed without string literals.
@@ -393,5 +444,68 @@ mod tests {
     fn wheel_slots_length_is_8() {
         let w = context_wheel_for(ReticleTarget::None);
         assert_eq!(w.slots.len(), WHEEL_SLOTS_LEN);
+    }
+
+    #[test]
+    fn target_kind_str_round_trips_via_from_str() {
+        let cases: &[(ReticleTarget, &str, Option<u64>)] = &[
+            (ReticleTarget::None, "none", None),
+            (ReticleTarget::Squadmate { actor_id: 7 }, "squadmate", Some(7)),
+            (
+                ReticleTarget::Door {
+                    entity_id: 42,
+                    grenade_equipped: false,
+                },
+                "door",
+                Some(42),
+            ),
+            (ReticleTarget::Enemy { actor_id: 9 }, "enemy", Some(9)),
+            (
+                ReticleTarget::TerrainBreach { position: (0.0, 0.0) },
+                "terrain_breach",
+                None,
+            ),
+            (ReticleTarget::Hazard { hazard_id: 3 }, "hazard", Some(3)),
+            (ReticleTarget::ReactorModule { module_id: 5 }, "reactor_module", Some(5)),
+        ];
+        for (t, kind, id) in cases {
+            assert_eq!(t.kind_str(), *kind);
+            assert_eq!(t.target_id(), *id);
+            let parsed = ReticleTarget::from_str(kind, *id).expect("known kind parses");
+            assert_eq!(parsed.kind_str(), *kind);
+            assert_eq!(parsed.target_id(), *id);
+        }
+    }
+
+    #[test]
+    fn target_from_str_rejects_unknown_kind() {
+        assert!(ReticleTarget::from_str("vehicle", Some(1)).is_none());
+    }
+
+    #[test]
+    fn target_from_str_requires_id_for_kinds_that_carry_one() {
+        assert!(ReticleTarget::from_str("squadmate", None).is_none());
+        assert!(ReticleTarget::from_str("door", None).is_none());
+        assert!(ReticleTarget::from_str("enemy", None).is_none());
+        assert!(ReticleTarget::from_str("hazard", None).is_none());
+        assert!(ReticleTarget::from_str("reactor_module", None).is_none());
+        assert!(ReticleTarget::from_str("none", None).is_some());
+        assert!(ReticleTarget::from_str("terrain_breach", None).is_some());
+    }
+
+    #[test]
+    fn door_slot_3_is_breach_kick_via_parsed_target() {
+        let target = ReticleTarget::from_str("door", Some(42)).unwrap();
+        let wheel = context_wheel_for(target);
+        assert_eq!(wheel.slots[3].order, ContextOrderKind::BreachKick);
+    }
+
+    #[test]
+    fn parsed_door_target_diverges_from_none_at_slot_0() {
+        let door = context_wheel_for(ReticleTarget::from_str("door", Some(42)).unwrap());
+        let none = context_wheel_for(ReticleTarget::None);
+        assert_ne!(door.slots[0].order, none.slots[0].order);
+        assert_eq!(door.slots[0].order, ContextOrderKind::StackLeft);
+        assert_eq!(none.slots[0].order, ContextOrderKind::Spearhead);
     }
 }

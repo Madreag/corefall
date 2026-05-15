@@ -503,10 +503,13 @@ impl M0Engine {
         CommandResult::accepted(tick.0)
     }
 
+    #[allow(clippy::too_many_arguments)]
     pub(crate) fn dispatch_context_wheel_select(
         &self,
         actor_id: u64,
         slot: u8,
+        target_kind: String,
+        target_id: Option<u64>,
         source: IntentSource,
         tick: Tick,
         sim_time_ms: f64,
@@ -518,16 +521,28 @@ impl M0Engine {
             self.record_command_rejected(tick, sim_time_ms, "act.player.context_wheel_select", "invalid_slot");
             return CommandResult::rejected("invalid_slot", tick.0);
         }
-        let wheel = context_wheel_for(ReticleTarget::None);
+        let target = ReticleTarget::from_str(&target_kind, target_id).unwrap_or(ReticleTarget::None);
+        let resolved_kind = target.kind_str();
+        let resolved_id: Value = match target.target_id() {
+            Some(id) => json!(id),
+            None => Value::Null,
+        };
+        let wheel = context_wheel_for(target);
         let order: ContextOrderKind = wheel.slots[slot as usize].order;
         drop(state);
         self.record_command_accepted(
             tick,
             sim_time_ms,
             "act.player.context_wheel_select",
-            json!({"actor_id": actor_id, "slot": slot, "order": order.as_str()}),
+            json!({
+                "actor_id": actor_id,
+                "slot": slot,
+                "order": order.as_str(),
+                "target_kind": resolved_kind,
+                "target_id": resolved_id,
+            }),
         );
-        let opened_payload = json!({"target_kind": "none", "target_id": serde_json::Value::Null});
+        let opened_payload = json!({"target_kind": resolved_kind, "target_id": resolved_id});
         #[rustfmt::skip]
         let _ = self.recorder.record(tick, sim_time_ms, "ai", "context_wheel_opened", opened_payload, None);
         let selected_payload = json!({"actor_id": actor_id, "slot": slot, "order": order.as_str()});

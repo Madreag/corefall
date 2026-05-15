@@ -11,7 +11,7 @@
 //! cfctl methods that surface here:
 //! `act.player.toggle_tactical_overlay`,
 //! `act.player.compose_plan { actor_id, steps[] }`,
-//! `act.player.context_wheel_select { actor_id, slot }`,
+//! `act.player.context_wheel_select { actor_id, slot, target_kind?, target_id? }`,
 //! `act.player.panic_call { kind: medic/engineer/grenade }`,
 //! `act.player.tag_target { target_id }`,
 //! `act.player.query_why { actor_id }` (returns reason_label),

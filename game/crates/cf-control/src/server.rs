@@ -739,9 +739,17 @@ pub enum ControlCommand {
     },
     /// **M8**: pick a slot on the Q-hold context wheel for `actor_id`.
     /// Emits `ai.context_wheel_selected`. `slot` is 0..=7.
+    /// `target_kind` selects the per-target slot ordering per spec
+    /// § Q-hold context wheel (one of `none` / `squadmate` / `door` /
+    /// `enemy` / `terrain_breach` / `hazard` / `reactor_module`). When
+    /// the kind needs an entity id (`squadmate` / `door` / `enemy` /
+    /// `hazard` / `reactor_module`) the caller supplies `target_id`.
+    /// Missing or unknown values fall back to `ReticleTarget::None`.
     ActPlayerContextWheelSelect {
         actor_id: u64,
         slot: u8,
+        target_kind: String,
+        target_id: Option<u64>,
         source: IntentSource,
     },
     /// **M8**: M / R / G panic surface. `kind` is `medic`, `engineer`,
@@ -2126,6 +2134,13 @@ async fn process_request<E: EngineHandle>(
                 schema_version: u32,
                 actor_id: u64,
                 slot: u8,
+                #[serde(default = "default_context_wheel_target_kind")]
+                target_kind: String,
+                #[serde(default)]
+                target_id: Option<u64>,
+            }
+            fn default_context_wheel_target_kind() -> String {
+                "none".to_string()
             }
             let p: P = match serde_json::from_value(params) {
                 Ok(v) => v,
@@ -2139,6 +2154,8 @@ async fn process_request<E: EngineHandle>(
                 .dispatch(ControlCommand::ActPlayerContextWheelSelect {
                     actor_id: p.actor_id,
                     slot: p.slot,
+                    target_kind: p.target_kind,
+                    target_id: p.target_id,
                     source: IntentSource::Cfctl,
                 })
                 .await;
