@@ -1490,12 +1490,14 @@ name = "cf-bench"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "blake3",
  "cf-actor",
  "cf-equipment",
  "cf-physics",
  "cf-sim-core",
  "clap",
  "criterion",
+ "serde",
  "serde_json",
  "tracing",
  "tracing-subscriber",

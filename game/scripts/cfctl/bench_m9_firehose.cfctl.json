@@ -1,0 +1,9 @@
+{
+  "scenario": "bench_m9_firehose",
+  "tick_rate_hz": 60,
+  "description": "M8A § Performance budgets — drives bench_m9_firehose for 6000 ticks; cf-bench's m9_firehose subcommand emits the JSON perf report that feeds m8a_perf_gate.sh.",
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 6000 } }
+  ]
+}
