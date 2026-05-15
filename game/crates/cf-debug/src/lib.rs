@@ -14,6 +14,7 @@ pub mod collision_overlay;
 pub mod material_overlay;
 pub mod pathfinding_overlay;
 pub mod physics_overlay;
+pub mod profiling;
 pub mod sound_overlay;
 pub mod squad_overlay;
 
