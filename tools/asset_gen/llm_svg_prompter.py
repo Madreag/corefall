@@ -1171,9 +1171,76 @@ def _compose_base_module(spec: AssetSpec, rng: random.Random) -> str:
         for i in range(3):
             parts.append(_line(base_x, base_y + base_h * (0.25 + i * 0.25),
                                base_x + base_w, base_y + base_h * (0.25 + i * 0.25), dark, 0.5))
+    elif "solar" in canonical:
+        # Solar panel array (must come before "generator" match since "base_generator_solar")
+        parts.append(_polygon([
+            (base_x + base_w * 0.10, base_y + base_h * 0.20),
+            (base_x + base_w * 0.90, base_y + base_h * 0.20),
+            (base_x + base_w * 0.95, base_y + base_h * 0.40),
+            (base_x + base_w * 0.05, base_y + base_h * 0.40),
+        ], "#2244AA", dark, 1.0))
+        for col in range(8):
+            for row in range(3):
+                cell_x = base_x + base_w * (0.12 + col * 0.10)
+                cell_y = base_y + base_h * (0.22 + row * 0.06)
+                parts.append(_rect(cell_x, cell_y, base_w * 0.08, base_h * 0.04,
+                                   "#3355CC", dark, 0.3))
+        parts.append(_rect(base_x + base_w * 0.48, base_y + base_h * 0.40,
+                           base_w * 0.04, base_h * 0.40, metal, dark, 0.5))
+        parts.append(_rect(base_x + base_w * 0.20, base_y + base_h * 0.80,
+                           base_w * 0.60, base_h * 0.08, dark))
+    elif "geothermal" in canonical:
+        # Geothermal vent (must come before "generator" match)
+        parts.append(_rect(base_x + base_w * 0.40, base_y + base_h * 0.05,
+                           base_w * 0.20, base_h * 0.75, metal, dark, 1.0))
+        for i in range(3):
+            cx_steam = base_x + base_w * (0.42 + i * 0.07)
+            for j in range(2):
+                parts.append(_circle(cx_steam, base_y + base_h * (0.02 - j * 0.08),
+                                     base_w * 0.04, "#dddddd", "#aaaaaa", 0.3))
+        parts.append(_circle(base_x + base_w * 0.50, base_y + base_h * 0.75, base_w * 0.10,
+                             accent, glow, 0.8))
+        parts.append(_circle(base_x + base_w * 0.50, base_y + base_h * 0.75, base_w * 0.06, glow))
+    elif "fusion" in canonical:
+        # Fusion: 3 concentric rings + central toroid glow
+        parts.append(_circle(cx, base_y + base_h * 0.5, base_h * 0.32, "none", accent, max(1.0, base_w * 0.012)))
+        parts.append(_circle(cx, base_y + base_h * 0.5, base_h * 0.24, "none", glow, max(1.0, base_w * 0.012)))
+        parts.append(_circle(cx, base_y + base_h * 0.5, base_h * 0.14, accent, glow, 1.0))
+        parts.append(_circle(cx, base_y + base_h * 0.5, base_h * 0.08, glow))
+        # Magnetic bottle struts
+        for ang_i in range(6):
+            import math as _mfu
+            ang = ang_i * 1.047
+            x1 = cx + _mfu.cos(ang) * base_h * 0.14
+            y1 = base_y + base_h * 0.5 + _mfu.sin(ang) * base_h * 0.14
+            x2 = cx + _mfu.cos(ang) * base_h * 0.32
+            y2 = base_y + base_h * 0.5 + _mfu.sin(ang) * base_h * 0.32
+            parts.append(_line(x1, y1, x2, y2, dark, 0.5))
+    elif "generator_diesel" in canonical or ("diesel" in canonical and "generator" in canonical):
+        # Diesel generator: piston housing + exhaust pipes
+        parts.append(_rect(base_x + base_w * 0.10, base_y + base_h * 0.30,
+                           base_w * 0.60, base_h * 0.45, body, dark, 1.0))
+        # Exhaust stack
+        parts.append(_rect(base_x + base_w * 0.72, base_y + base_h * 0.10,
+                           base_w * 0.06, base_h * 0.30, metal, dark, 0.5))
+        # Cooling vents
+        for i in range(4):
+            parts.append(_rect(base_x + base_w * 0.15, base_y + base_h * (0.36 + i * 0.10),
+                               base_w * 0.50, base_h * 0.05, dark))
+        # Output gauge
+        parts.append(_circle(base_x + base_w * 0.20, base_y + base_h * 0.85, base_w * 0.05, "#FFFFFF", dark, 0.5))
+        parts.append(_line(base_x + base_w * 0.20, base_y + base_h * 0.85,
+                           base_x + base_w * 0.22, base_y + base_h * 0.82, accent, 1.0))
     elif "generator" in canonical or "reactor" in canonical or "battery" in canonical or "capacitor" in canonical:
+        # Generic reactor torus + glow core
         parts.append(_circle(cx, base_y + base_h * 0.5, base_h * 0.22, accent, glow, 1.0))
         parts.append(_circle(cx, base_y + base_h * 0.5, base_h * 0.12, glow))
+        # Battery cells (4 stacked) for battery_array variant
+        if "battery" in canonical or "array" in canonical:
+            for i in range(4):
+                bx = base_x + base_w * (0.10 + i * 0.20)
+                parts.append(_rect(bx, base_y + base_h * 0.10, base_w * 0.16, base_h * 0.30, metal, dark, 0.5))
+                parts.append(_rect(bx + base_w * 0.04, base_y + base_h * 0.05, base_w * 0.08, base_h * 0.06, accent))
     elif "antenna" in canonical or "radar" in canonical or "sensor" in canonical:
         parts.append(_line(cx, base_y + base_h, cx, base_y - base_h * 0.4, metal, 1.5))
         parts.append(_circle(cx, base_y - base_h * 0.4, base_w * 0.15, metal))
@@ -1223,10 +1290,240 @@ def _compose_base_module(spec: AssetSpec, rng: random.Random) -> str:
             ],
             accent, dark, 0.5,
         ))
-    else:
-        # Industrial / habitat generic
+        # Add platform stripe pattern
+        parts.append(_rect(base_x + base_w * 0.05, base_y + base_h * 0.75,
+                           base_w * 0.90, base_h * 0.05, accent, dark, 0.5))
+        for i in range(4):
+            parts.append(_rect(base_x + base_w * (0.10 + i * 0.20), base_y + base_h * 0.78,
+                               base_w * 0.10, base_h * 0.02, dark))
+    elif "ammo" in canonical or "depot" in canonical:
+        # Stack of crates / ammo boxes
+        for row in range(2):
+            for col in range(3):
+                cx_box = base_x + base_w * (0.15 + col * 0.25)
+                cy_box = base_y + base_h * (0.20 + row * 0.30)
+                parts.append(_rect(cx_box, cy_box, base_w * 0.20, base_h * 0.22, metal, dark, 0.8))
+                # Ammo label stripe
+                parts.append(_rect(cx_box + base_w * 0.02, cy_box + base_h * 0.04,
+                                   base_w * 0.16, base_h * 0.04, accent))
+                parts.append(_rect(cx_box + base_w * 0.02, cy_box + base_h * 0.12,
+                                   base_w * 0.16, base_h * 0.06, dark))
+    elif "assembler" in canonical or "fabricator" in canonical or "forge" in canonical:
+        # Industrial machine with screen + lever + output chute
+        # Screen
+        parts.append(_rect(base_x + base_w * 0.05, base_y + base_h * 0.10,
+                           base_w * 0.45, base_h * 0.35, glow, dark, 0.5))
+        # Screen grid pattern
+        for i in range(4):
+            parts.append(_line(base_x + base_w * 0.05, base_y + base_h * (0.18 + i * 0.07),
+                               base_x + base_w * 0.50, base_y + base_h * (0.18 + i * 0.07),
+                               dark, 0.5))
+        # Lever
+        parts.append(_rect(base_x + base_w * 0.55, base_y + base_h * 0.10,
+                           base_w * 0.06, base_h * 0.20, dark))
+        parts.append(_circle(base_x + base_w * 0.58, base_y + base_h * 0.10, base_w * 0.04, accent))
+        # Output chute
+        parts.append(_rect(base_x + base_w * 0.65, base_y + base_h * 0.40,
+                           base_w * 0.25, base_h * 0.10, accent, dark, 0.5))
+        # Output crate
+        parts.append(_rect(base_x + base_w * 0.70, base_y + base_h * 0.55,
+                           base_w * 0.20, base_h * 0.20, metal, dark, 0.5))
+    elif "conveyor" in canonical or "belt" in canonical:
+        # Belt with rollers + items
+        parts.append(_rect(base_x, base_y + base_h * 0.40,
+                           base_w, base_h * 0.20, dark))
+        # Rollers
+        for i in range(6):
+            parts.append(_circle(base_x + base_w * (0.10 + i * 0.16), base_y + base_h * 0.50,
+                                 base_h * 0.05, metal, dark, 0.5))
+        # Items being moved
+        for i in range(3):
+            parts.append(_rect(base_x + base_w * (0.15 + i * 0.25), base_y + base_h * 0.36,
+                               base_w * 0.08, base_h * 0.06, accent, dark, 0.5))
+    elif "crate" in canonical or "rack" in canonical or "storage" in canonical:
+        # Stacked crates
+        for row in range(3):
+            for col in range(3):
+                cx_box = base_x + base_w * (0.10 + col * 0.27)
+                cy_box = base_y + base_h * (0.10 + row * 0.27)
+                parts.append(_rect(cx_box, cy_box, base_w * 0.22, base_h * 0.22, metal, dark, 0.8))
+                # Cross-strap detail
+                parts.append(_line(cx_box, cy_box + base_h * 0.11,
+                                   cx_box + base_w * 0.22, cy_box + base_h * 0.11, dark, 0.5))
+                parts.append(_line(cx_box + base_w * 0.11, cy_box,
+                                   cx_box + base_w * 0.11, cy_box + base_h * 0.22, dark, 0.5))
+    elif "cryosleep" in canonical or "pod" in canonical:
+        # Cryosleep pod: rounded chamber with glass viewport
+        parts.append(_polygon([
+            (base_x + base_w * 0.20, base_y + base_h * 0.10),
+            (base_x + base_w * 0.80, base_y + base_h * 0.10),
+            (base_x + base_w * 0.85, base_y + base_h * 0.40),
+            (base_x + base_w * 0.85, base_y + base_h * 0.60),
+            (base_x + base_w * 0.80, base_y + base_h * 0.90),
+            (base_x + base_w * 0.20, base_y + base_h * 0.90),
+            (base_x + base_w * 0.15, base_y + base_h * 0.60),
+            (base_x + base_w * 0.15, base_y + base_h * 0.40),
+        ], dark, metal, 1.0))
+        # Frosted glass viewport
+        parts.append(_rect(base_x + base_w * 0.25, base_y + base_h * 0.25,
+                           base_w * 0.50, base_h * 0.45, "#aaccee", dark, 0.5))
+        # Cooling vent stripes
+        for i in range(3):
+            parts.append(_rect(base_x + base_w * (0.05 + i * 0.10), base_y + base_h * 0.45,
+                               base_w * 0.04, base_h * 0.10, dark))
+        # Status light
+        parts.append(_circle(base_x + base_w * 0.50, base_y + base_h * 0.80, base_w * 0.03, glow))
+    elif "food" in canonical or "processor" in canonical:
+        # Vat + arm + crate
+        # Main vat
+        parts.append(_circle(base_x + base_w * 0.35, base_y + base_h * 0.50, base_h * 0.30,
+                             metal, dark, 1.0))
+        parts.append(_circle(base_x + base_w * 0.35, base_y + base_h * 0.50, base_h * 0.24,
+                             "#88AA77", dark, 0.5))
+        # Stir arm
+        parts.append(_line(base_x + base_w * 0.35, base_y + base_h * 0.25,
+                           base_x + base_w * 0.35, base_y + base_h * 0.45, metal, 2.0))
+        # Output chute
+        parts.append(_rect(base_x + base_w * 0.65, base_y + base_h * 0.55,
+                           base_w * 0.30, base_h * 0.08, metal, dark, 0.5))
+        # Receiver crate
+        parts.append(_rect(base_x + base_w * 0.75, base_y + base_h * 0.65,
+                           base_w * 0.20, base_h * 0.20, "#AA8855", dark, 0.5))
+    elif "fuel" in canonical:
+        # Fuel tank cluster with pressure gauges
+        for tank_x in [0.20, 0.50, 0.80]:
+            parts.append(_rect(base_x + base_w * (tank_x - 0.08), base_y + base_h * 0.15,
+                               base_w * 0.16, base_h * 0.65, metal, dark, 1.0))
+            # Pressure gauge
+            parts.append(_circle(base_x + base_w * tank_x, base_y + base_h * 0.25,
+                                 base_w * 0.04, "#FFFFFF", dark, 0.5))
+            parts.append(_line(base_x + base_w * tank_x, base_y + base_h * 0.25,
+                               base_x + base_w * (tank_x + 0.02), base_y + base_h * 0.23,
+                               accent, 1.0))
+            # Warning stripe
+            parts.append(_rect(base_x + base_w * (tank_x - 0.08), base_y + base_h * 0.65,
+                               base_w * 0.16, base_h * 0.05, accent))
+    elif "hab" in canonical or "bunker" in canonical:
+        # Habitat with windows + door + roof
+        # Roof
+        parts.append(_polygon([
+            (base_x, base_y + base_h * 0.10),
+            (base_x + base_w / 2, base_y),
+            (base_x + base_w, base_y + base_h * 0.10),
+        ], dark))
+        # Main building
+        parts.append(_rect(base_x, base_y + base_h * 0.10, base_w, base_h * 0.65, body, dark, 1.0))
+        # Door
+        parts.append(_rect(base_x + base_w * 0.42, base_y + base_h * 0.45,
+                           base_w * 0.16, base_h * 0.30, dark))
+        parts.append(_circle(base_x + base_w * 0.55, base_y + base_h * 0.60, base_w * 0.01, accent))
+        # Windows
         parts.append(_rect(base_x + base_w * 0.10, base_y + base_h * 0.20,
-                           base_w * 0.80, base_h * 0.40, metal, dark, 0.5))
+                           base_w * 0.20, base_h * 0.15, glow, dark, 0.5))
+        parts.append(_rect(base_x + base_w * 0.70, base_y + base_h * 0.20,
+                           base_w * 0.20, base_h * 0.15, glow, dark, 0.5))
+        # Window grids
+        for win_x in [0.10, 0.70]:
+            parts.append(_line(base_x + base_w * (win_x + 0.10), base_y + base_h * 0.20,
+                               base_x + base_w * (win_x + 0.10), base_y + base_h * 0.35,
+                               dark, 0.5))
+            parts.append(_line(base_x + base_w * win_x, base_y + base_h * 0.275,
+                               base_x + base_w * (win_x + 0.20), base_y + base_h * 0.275,
+                               dark, 0.5))
+    elif "jammer" in canonical or "dish" in canonical:
+        # Satellite dish
+        parts.append(_polygon([
+            (base_x + base_w * 0.10, base_y + base_h * 0.40),
+            (base_x + base_w * 0.90, base_y + base_h * 0.40),
+            (base_x + base_w * 0.70, base_y + base_h * 0.05),
+            (base_x + base_w * 0.30, base_y + base_h * 0.05),
+        ], metal, dark, 1.0))
+        # Dish ribs
+        for i in range(4):
+            ang = 0.39 + i * 0.78
+            import math as _mbd
+            x = (base_x + base_w * 0.50) + _mbd.cos(ang) * base_w * 0.30
+            y = (base_y + base_h * 0.22) + _mbd.sin(ang) * base_h * 0.18
+            parts.append(_line(base_x + base_w * 0.50, base_y + base_h * 0.22, x, y, dark, 0.7))
+        # Receiver in center
+        parts.append(_circle(base_x + base_w * 0.50, base_y + base_h * 0.22, base_w * 0.04, accent, dark, 0.5))
+        # Support pole
+        parts.append(_rect(base_x + base_w * 0.46, base_y + base_h * 0.40,
+                           base_w * 0.08, base_h * 0.45, metal, dark, 0.5))
+        # Base
+        parts.append(_rect(base_x + base_w * 0.30, base_y + base_h * 0.80,
+                           base_w * 0.40, base_h * 0.10, dark))
+    elif "intercept" in canonical or "array" in canonical:
+        # Array of small dishes/sensors
+        for arr_x in [0.20, 0.40, 0.60, 0.80]:
+            parts.append(_circle(base_x + base_w * arr_x, base_y + base_h * 0.30,
+                                 base_w * 0.07, metal, dark, 0.5))
+            parts.append(_line(base_x + base_w * arr_x, base_y + base_h * 0.36,
+                               base_x + base_w * arr_x, base_y + base_h * 0.70,
+                               metal, 1.5))
+        # Base mounting bar
+        parts.append(_rect(base_x + base_w * 0.10, base_y + base_h * 0.70,
+                           base_w * 0.80, base_h * 0.06, dark))
+    elif "solar" in canonical:
+        # Solar panel array
+        parts.append(_polygon([
+            (base_x + base_w * 0.10, base_y + base_h * 0.20),
+            (base_x + base_w * 0.90, base_y + base_h * 0.20),
+            (base_x + base_w * 0.95, base_y + base_h * 0.40),
+            (base_x + base_w * 0.05, base_y + base_h * 0.40),
+        ], "#2244AA", dark, 1.0))
+        # Solar cells (grid pattern on panel)
+        for col in range(8):
+            for row in range(3):
+                cell_x = base_x + base_w * (0.12 + col * 0.10)
+                cell_y = base_y + base_h * (0.22 + row * 0.06)
+                parts.append(_rect(cell_x, cell_y, base_w * 0.08, base_h * 0.04,
+                                   "#3355CC", dark, 0.3))
+        # Mounting pole
+        parts.append(_rect(base_x + base_w * 0.48, base_y + base_h * 0.40,
+                           base_w * 0.04, base_h * 0.40, metal, dark, 0.5))
+        # Base plate
+        parts.append(_rect(base_x + base_w * 0.20, base_y + base_h * 0.80,
+                           base_w * 0.60, base_h * 0.08, dark))
+    elif "geothermal" in canonical:
+        # Steam vent with pipe + glow
+        parts.append(_rect(base_x + base_w * 0.40, base_y + base_h * 0.05,
+                           base_w * 0.20, base_h * 0.75, metal, dark, 1.0))
+        # Steam coming out top
+        for i in range(3):
+            cx_steam = base_x + base_w * (0.42 + i * 0.07)
+            for j in range(2):
+                parts.append(_circle(cx_steam, base_y + base_h * (0.02 - j * 0.08),
+                                     base_w * 0.04, "#dddddd", "#aaaaaa", 0.3))
+        # Heat glow at base
+        parts.append(_circle(base_x + base_w * 0.50, base_y + base_h * 0.75, base_w * 0.10,
+                             accent, glow, 0.8))
+        parts.append(_circle(base_x + base_w * 0.50, base_y + base_h * 0.75, base_w * 0.06, glow))
+    else:
+        # Industrial / habitat enhanced fallback
+        # Main body with multiple plate sections
+        parts.append(_rect(base_x + base_w * 0.05, base_y + base_h * 0.10,
+                           base_w * 0.90, base_h * 0.55, metal, dark, 0.8))
+        # Plate seams
+        parts.append(_line(base_x + base_w * 0.35, base_y + base_h * 0.10,
+                           base_x + base_w * 0.35, base_y + base_h * 0.65, dark, 0.7))
+        parts.append(_line(base_x + base_w * 0.65, base_y + base_h * 0.10,
+                           base_x + base_w * 0.65, base_y + base_h * 0.65, dark, 0.7))
+        # Vent grilles (3)
+        for i in range(3):
+            vx = base_x + base_w * (0.10 + i * 0.30)
+            for j in range(3):
+                parts.append(_rect(vx + base_w * 0.04, base_y + base_h * (0.20 + j * 0.05),
+                                   base_w * 0.12, base_h * 0.02, dark))
+        # Control panel
+        parts.append(_rect(base_x + base_w * 0.10, base_y + base_h * 0.45,
+                           base_w * 0.25, base_h * 0.18, glow, dark, 0.5))
+        # Indicator lights
+        for i in range(3):
+            parts.append(_circle(base_x + base_w * (0.42 + i * 0.05), base_y + base_h * 0.50,
+                                 base_w * 0.012, accent if i % 2 == 0 else glow))
+        # Bottom plate
+        parts.append(_rect(base_x, base_y + base_h * 0.85, base_w, base_h * 0.05, dark))
 
     # Module state pip in top-right
     state = (spec.extra or {}).get("module_state", "nominal")
