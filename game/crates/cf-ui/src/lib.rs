@@ -64,6 +64,7 @@ pub mod reactor_hp_bar;
 pub mod reactor_pressure_line;
 pub mod timer_warnings;
 
+pub use mission_resolved_modal::{render_recap_text as render_death_recap_text, RecapEvent, MAX_RECAP_LINES};
 pub use reactor_hp_bar::{ArmorPipView, IntegrityBand, ReactorHpBarState};
 pub use reactor_pressure_line::{PressureTint, ReactorPressureLineState};
 pub use timer_warnings::{TimerColor, TimerSeverity, TimerWarning, TimerWarningsState, WARNING_THRESHOLDS};
