@@ -125,7 +125,7 @@ The full content target shipping by BP12 (every entry **functional + AI-readable
 | **M9A** | ⏳ | BP4 | Tier 1 SVG Asset Pipeline | 5000+ placeholders · Python + cairo-svg + LLM-prompted SVG · 8 faction style.json · per-origin palettes |
 | **M10** | ⏳ | BP3 | Replay Viewer + Debrief | Bundle viewer · cause-chain walker · 18-section debrief markdown · plain-language event template rendering |
 | **M11** | ⏳ | BP3 | Readability + ACC-A Floor | 12 HUD nodes / 7 zones · 200% scale · high contrast · 5-tier integrity colors · War Thunder angle widget |
-| **M11A** | ⏸ DEFERRED | BP4 | Shell UI Foundation (deferred — not in current train) | Title · main menu · pause · save-load · settings tree · credits · loading screens — *re-enters the train as its own pass when the project decides to ship the shell UI polish layer; does NOT gate M8A, M9, or any downstream feature* |
+| **M11A** | ⏳ | BP4 | Shell UI Foundation | Title · main menu · pause · save-load · settings tree · credits · loading screens |
 | **M12** | ⏳ | BP4 | Comic-Noir Aesthetic + Juice | Hand-drawn ink-line UI · 12 mission comic panels · death-recap-as-graphic-novel · juice rules per DR-055 |
 | **M12A** | ⏳ | BP4 | Tier 1 Audio Pipeline | 1200+ SFX via Stable Audio Open / AudioCraft · caption metadata |
 | **M13** | ⏳ | BP3 | Equipment + Chassis + Damage Grammar | 3 chassis archetypes · 15-zone body graph · layered armor · module state machine · pilot eject · save/load · **brain-hop API** |
