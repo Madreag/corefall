@@ -15,9 +15,13 @@
     clippy::needless_pass_by_value
 )]
 
+pub mod constants;
 pub mod debris;
 pub mod dig_preview;
+pub mod gpu_overlay;
+pub mod gpu_particles;
 pub mod overlay;
+pub mod terrain_texture_array;
 // M1 re-audit (2026-05-13): spec lists cf-render-2d/src/reticle.rs as a
 // separate file. The helper lives there now; the bloom + tool-validity
 // color logic still operates inside this lib.rs but consumers can
