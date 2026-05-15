@@ -1,0 +1,100 @@
+// M9A weapons manifest. ≥70 weapon entries × 3 variants (side / muzzle-flash /
+// magazine-attached) = ≥210 SVGs. Faction is the issuing faction; pipeline
+// looks up faction palette + style_descriptor for shape language.
+//
+// Schema: tools/asset_gen/schemas/v1/asset_manifest.schema.json
+(
+    schema_version: "1.0.0",
+    category: "WeaponSprite",
+    owner_milestone: "M9A",
+    pipeline_id: "M9A_svg_v1",
+    entries: [
+        // ─── Rifles (12) ─────────────────────────────────────────────────────
+        ( canonical_name: "rifle_iron_m1", kind: "weapon-side", faction: "hostile_corp", prompt: "industrial issue rifle, boxy receiver, picatinny rail" ),
+        ( canonical_name: "rifle_corp_assault", kind: "weapon-side", faction: "hostile_corp", prompt: "corp assault rifle, vertical foregrip, optical sight" ),
+        ( canonical_name: "rifle_scavenger_irregular", kind: "weapon-side", faction: "allied_resistance", prompt: "scavenged rifle with tape grip, mismatched accessories" ),
+        ( canonical_name: "rifle_resistance_marksman", kind: "weapon-side", faction: "allied_resistance", prompt: "marksman rifle, scope mount, bipod" ),
+        ( canonical_name: "rifle_tribal_bone", kind: "weapon-side", faction: "marauder_tribes", prompt: "tribal carbine with bone grip and totem hangs" ),
+        ( canonical_name: "rifle_marauder_chopper", kind: "weapon-side", faction: "marauder_tribes", prompt: "asymmetric chop-down rifle, leather wrap" ),
+        ( canonical_name: "rifle_order_ceremonial", kind: "weapon-side", faction: "religious_order", prompt: "ornate gilded rifle with prayer-script engraving" ),
+        ( canonical_name: "rifle_order_inquisitor", kind: "weapon-side", faction: "religious_order", prompt: "draped-cloth covered inquisitor rifle, golden trim" ),
+        ( canonical_name: "rifle_sci_pulse", kind: "weapon-side", faction: "scientist_order", prompt: "pulse-coil tube rifle, holographic sight, clean chrome" ),
+        ( canonical_name: "rifle_sci_lab", kind: "weapon-side", faction: "scientist_order", prompt: "research rifle with shielded battery pack" ),
+        ( canonical_name: "rifle_merc_modular", kind: "weapon-side", faction: "mercenary_guild", prompt: "modular tactical rifle, gold trim, quick-release plates" ),
+        ( canonical_name: "rifle_drone_swarm", kind: "weapon-side", faction: "drone_collective", prompt: "faceted hex rifle with blue glow strip" ),
+
+        // ─── SMGs (8) ────────────────────────────────────────────────────────
+        ( canonical_name: "smg_corp_burst", kind: "weapon-side", faction: "hostile_corp", prompt: "compact corp SMG with vertical mag, boxy receiver" ),
+        ( canonical_name: "smg_scavenger_sweep", kind: "weapon-side", faction: "allied_resistance", prompt: "scavenged SMG with stick mag, rust patches" ),
+        ( canonical_name: "smg_tribal_chatter", kind: "weapon-side", faction: "marauder_tribes", prompt: "asymmetric SMG with bone trinkets" ),
+        ( canonical_name: "smg_order_thurible", kind: "weapon-side", faction: "religious_order", prompt: "ornate SMG, cathedral-arch silhouette" ),
+        ( canonical_name: "smg_sci_kinetic", kind: "weapon-side", faction: "scientist_order", prompt: "research SMG with holographic display" ),
+        ( canonical_name: "smg_merc_compact", kind: "weapon-side", faction: "mercenary_guild", prompt: "compact tactical SMG, gold trim accents" ),
+        ( canonical_name: "smg_pirate_blunderbus", kind: "weapon-side", faction: "pirates", prompt: "asymmetric pirate SMG, salt-rust streaks" ),
+        ( canonical_name: "smg_drone_chitter", kind: "weapon-side", faction: "drone_collective", prompt: "faceted hex SMG with blue indicator strip" ),
+
+        // ─── Shotguns (8) ────────────────────────────────────────────────────
+        ( canonical_name: "shotgun_corp_breach", kind: "weapon-side", faction: "hostile_corp", prompt: "industrial breach shotgun, pump-action, hazard stripe" ),
+        ( canonical_name: "shotgun_resistance_pump", kind: "weapon-side", faction: "allied_resistance", prompt: "scavenged pump shotgun, taped grip" ),
+        ( canonical_name: "shotgun_tribal_blast", kind: "weapon-side", faction: "marauder_tribes", prompt: "sawn-off tribal shotgun, bone trinkets" ),
+        ( canonical_name: "shotgun_order_sermon", kind: "weapon-side", faction: "religious_order", prompt: "ornate inquisitor shotgun, draped cloth, gold trim" ),
+        ( canonical_name: "shotgun_sci_concussion", kind: "weapon-side", faction: "scientist_order", prompt: "concussion-pulse shotgun, ribbed coils, holo sight" ),
+        ( canonical_name: "shotgun_merc_doorbreak", kind: "weapon-side", faction: "mercenary_guild", prompt: "tactical doorbreak shotgun, modular accessory rails" ),
+        ( canonical_name: "shotgun_pirate_blunder", kind: "weapon-side", faction: "pirates", prompt: "blunderbuss-style pirate shotgun, salt-rust hull" ),
+        ( canonical_name: "shotgun_drone_burst", kind: "weapon-side", faction: "drone_collective", prompt: "faceted hex shotgun, swarm-rail mount" ),
+
+        // ─── Snipers (7) ─────────────────────────────────────────────────────
+        ( canonical_name: "sniper_corp_marksman", kind: "weapon-side", faction: "hostile_corp", prompt: "long-barrel corp sniper, large optic, bipod" ),
+        ( canonical_name: "sniper_resistance_irregular", kind: "weapon-side", faction: "allied_resistance", prompt: "scavenged sniper with patched bipod" ),
+        ( canonical_name: "sniper_tribal_longshot", kind: "weapon-side", faction: "marauder_tribes", prompt: "long bone-stock tribal sniper, leather wrap" ),
+        ( canonical_name: "sniper_order_witness", kind: "weapon-side", faction: "religious_order", prompt: "ornate gilded sniper, draped cloth, prayer engraving" ),
+        ( canonical_name: "sniper_sci_railprobe", kind: "weapon-side", faction: "scientist_order", prompt: "rail-coil pulse sniper with holographic optic" ),
+        ( canonical_name: "sniper_merc_marksman_v2", kind: "weapon-side", faction: "mercenary_guild", prompt: "tactical merc sniper, modular barrel, gold trim" ),
+        ( canonical_name: "sniper_drone_array", kind: "weapon-side", faction: "drone_collective", prompt: "faceted hex sniper with blue scope glow" ),
+
+        // ─── Pistols (8) ─────────────────────────────────────────────────────
+        ( canonical_name: "pistol_corp_sidearm", kind: "weapon-side", faction: "hostile_corp", prompt: "industrial corp sidearm, boxy slide" ),
+        ( canonical_name: "pistol_resistance_pop", kind: "weapon-side", faction: "allied_resistance", prompt: "scavenged compact pistol, taped grip" ),
+        ( canonical_name: "pistol_tribal_clutch", kind: "weapon-side", faction: "marauder_tribes", prompt: "asymmetric tribal pistol with bone grip" ),
+        ( canonical_name: "pistol_order_ceremonial", kind: "weapon-side", faction: "religious_order", prompt: "ornate gilded sidearm, prayer-script slide" ),
+        ( canonical_name: "pistol_sci_taser", kind: "weapon-side", faction: "scientist_order", prompt: "research-grade pulse sidearm, holo dot sight" ),
+        ( canonical_name: "pistol_merc_holster", kind: "weapon-side", faction: "mercenary_guild", prompt: "compact tactical pistol, gold trim accents" ),
+        ( canonical_name: "pistol_pirate_flint", kind: "weapon-side", faction: "pirates", prompt: "asymmetric pirate flintlock-style pistol, salt-rust" ),
+        ( canonical_name: "pistol_drone_sting", kind: "weapon-side", faction: "drone_collective", prompt: "faceted hex pistol, blue indicator dot" ),
+
+        // ─── Grenade Launchers (7) ───────────────────────────────────────────
+        ( canonical_name: "gl_corp_tube", kind: "weapon-side", faction: "hostile_corp", prompt: "industrial grenade launcher, single-shot tube" ),
+        ( canonical_name: "gl_resistance_revolver", kind: "weapon-side", faction: "allied_resistance", prompt: "scavenged revolver-style GL with patched cylinder" ),
+        ( canonical_name: "gl_tribal_lobber", kind: "weapon-side", faction: "marauder_tribes", prompt: "single-shot tribal lobber, bone trinkets" ),
+        ( canonical_name: "gl_order_censer", kind: "weapon-side", faction: "religious_order", prompt: "ornate gilded grenade-thurible launcher" ),
+        ( canonical_name: "gl_sci_plasma", kind: "weapon-side", faction: "scientist_order", prompt: "pulse-grenade launcher with holographic display" ),
+        ( canonical_name: "gl_merc_breaching", kind: "weapon-side", faction: "mercenary_guild", prompt: "tactical breaching GL, modular barrel options" ),
+        ( canonical_name: "gl_drone_swarm", kind: "weapon-side", faction: "drone_collective", prompt: "faceted hex GL with array mount" ),
+
+        // ─── Heavy / Mounted (6) ─────────────────────────────────────────────
+        ( canonical_name: "heavy_corp_mg", kind: "weapon-side", faction: "hostile_corp", prompt: "industrial belt-fed heavy MG, boxy receiver" ),
+        ( canonical_name: "heavy_resistance_mounted", kind: "weapon-side", faction: "allied_resistance", prompt: "scavenged mounted MG with welded armor shield" ),
+        ( canonical_name: "heavy_order_basilisk", kind: "weapon-side", faction: "religious_order", prompt: "ornate gilded heavy weapon, draped cloth, prayer engraving" ),
+        ( canonical_name: "heavy_sci_railcannon", kind: "weapon-side", faction: "scientist_order", prompt: "rail-coil heavy cannon with shielded battery pack" ),
+        ( canonical_name: "heavy_merc_minigun", kind: "weapon-side", faction: "mercenary_guild", prompt: "tactical minigun with modular barrel assembly" ),
+        ( canonical_name: "heavy_drone_swarmlauncher", kind: "weapon-side", faction: "drone_collective", prompt: "faceted hex swarm-launcher with multi-barrel array" ),
+
+        // ─── Special (7) ─────────────────────────────────────────────────────
+        ( canonical_name: "spec_flamer_corp", kind: "weapon-side", faction: "hostile_corp", prompt: "industrial flamer with side-tank" ),
+        ( canonical_name: "spec_drill_lance", kind: "weapon-side", faction: "mercenary_guild", prompt: "drill-tipped lance breaching tool" ),
+        ( canonical_name: "spec_resistance_molotov_launcher", kind: "weapon-side", faction: "allied_resistance", prompt: "improvised molotov-launcher, taped tube" ),
+        ( canonical_name: "spec_tribal_chain_axe", kind: "weapon-side", faction: "marauder_tribes", prompt: "chain-axe melee weapon with bone trinkets" ),
+        ( canonical_name: "spec_sci_arc_emitter", kind: "weapon-side", faction: "scientist_order", prompt: "arc-emitter with chrome coil and holo display" ),
+        ( canonical_name: "spec_pirate_grappler", kind: "weapon-side", faction: "pirates", prompt: "asymmetric grappling hook launcher, salt-rust" ),
+        ( canonical_name: "spec_drone_sticky_array", kind: "weapon-side", faction: "drone_collective", prompt: "faceted hex sticky-drone launcher" ),
+
+        // ─── Tools / Utility (7) ─────────────────────────────────────────────
+        ( canonical_name: "tool_digger_corp", kind: "weapon-side", faction: "hostile_corp", prompt: "industrial digging tool, boxy power pack" ),
+        ( canonical_name: "tool_drill_corp", kind: "weapon-side", faction: "hostile_corp", prompt: "industrial drill with cooling vanes" ),
+        ( canonical_name: "tool_charge_placer", kind: "weapon-side", faction: "mercenary_guild", prompt: "tactical charge placer with detonator" ),
+        ( canonical_name: "tool_tether_gun", kind: "weapon-side", faction: "allied_resistance", prompt: "improvised tether-line launcher" ),
+        ( canonical_name: "tool_beam_cutter_sci", kind: "weapon-side", faction: "scientist_order", prompt: "precision beam cutter, holographic guide" ),
+        ( canonical_name: "tool_repair_foam_sci", kind: "weapon-side", faction: "scientist_order", prompt: "repair foam dispenser with shielded canister" ),
+        ( canonical_name: "tool_anchor_driver", kind: "weapon-side", faction: "mercenary_guild", prompt: "tactical anchor driver, modular grip" ),
+    ],
+)

@@ -1,0 +1,17 @@
+// M9A chassis manifest. 5 archetypes × 4 weight classes × 2 facings = 40 entries
+// per spec § "Chassis 5 archetypes × 4 weight classes".
+(
+    schema_version: "1.0.0",
+    category: "ChassisSprite",
+    owner_milestone: "M9A",
+    pipeline_id: "M9A_svg_v1",
+    entries: [
+        ( canonical_name: "chassis_bipedal_humanoid", kind: "chassis-silhouette", prompt: "bipedal humanoid chassis silhouette" ),
+        ( canonical_name: "chassis_quadruped", kind: "chassis-silhouette", prompt: "quadruped chassis silhouette, four-leg walker" ),
+        ( canonical_name: "chassis_treaded", kind: "chassis-silhouette", prompt: "treaded chassis silhouette, ground-clearance hull" ),
+        ( canonical_name: "chassis_hovering", kind: "chassis-silhouette", prompt: "hovering chassis silhouette, no ground contact" ),
+        ( canonical_name: "chassis_wheeled", kind: "chassis-silhouette", prompt: "wheeled chassis silhouette, four-wheel base" ),
+    ],
+    weight_classes: ["light", "medium", "heavy", "super_heavy"],
+    facings: ["right", "left"],
+)
