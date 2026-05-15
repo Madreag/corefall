@@ -118,6 +118,14 @@ def _polyline(points: List[Tuple[float, float]], stroke: str, stroke_w: float = 
 
 
 def _compose_weapon(spec: AssetSpec, rng: random.Random) -> str:
+    """M12 polish-pass: weapon class-aware silhouettes.
+
+    Dispatches on the canonical weapon class (rifle / sniper / shotgun / smg /
+    pistol / gl / heavy / spec) parsed from the asset name. Each class has a
+    distinct silhouette + proportions + detail layer (sight, scope, drum,
+    bipod, etc.). Color richness preserved via primary + accent + metal +
+    highlight + glow palette slots.
+    """
     p = spec.palette
     body = p.primary()
     accent = p.accent()
@@ -126,74 +134,389 @@ def _compose_weapon(spec: AssetSpec, rng: random.Random) -> str:
     highlight = p.highlight()
     glow = p.glow()
 
+    name = spec.canonical_name.lower()
+    if "rifle" in name:
+        wclass = "rifle"
+    elif "sniper" in name:
+        wclass = "sniper"
+    elif "shotgun" in name:
+        wclass = "shotgun"
+    elif "smg" in name:
+        wclass = "smg"
+    elif "pistol" in name:
+        wclass = "pistol"
+    elif "gl_" in name or name.startswith("gl_") or "_gl_" in name or "grenade_launcher" in name:
+        wclass = "gl"
+    elif "heavy" in name:
+        wclass = "heavy"
+    elif "spec_flamer" in name:
+        wclass = "flamer"
+    elif "spec_drill" in name or "drill_lance" in name:
+        wclass = "drill"
+    elif "spec_grapp" in name or "grappler" in name:
+        wclass = "grappler"
+    elif "spec_drone" in name or "sticky_array" in name:
+        wclass = "drone"
+    elif "spec_" in name:
+        wclass = "spec"
+    else:
+        wclass = "rifle"
+
     parts: List[str] = []
-    cx, cy = spec.width / 2, spec.height / 2
-    barrel_len = spec.width * 0.46
-    barrel_y = cy - spec.height * 0.04
-    barrel_h = spec.height * 0.10
+    W = spec.width
+    H = spec.height
+    cx, cy = W / 2, H / 2
 
-    receiver_x = cx - spec.width * 0.05
-    receiver_y = cy - spec.height * 0.08
-    receiver_w = spec.width * 0.32
-    receiver_h = spec.height * 0.20
+    if wclass == "pistol":
+        # Compact: short barrel + no stock + tilted grip
+        barrel_y = cy - H * 0.04
+        parts.append(_rect(cx - W * 0.02, barrel_y, W * 0.28, H * 0.08, metal, dark, 0.5))  # short barrel
+        parts.append(_rect(cx + W * 0.24, barrel_y - H * 0.01, W * 0.04, H * 0.10, dark))  # muzzle ring
+        parts.append(_rect(cx - W * 0.12, barrel_y - H * 0.06, W * 0.18, H * 0.20, body, dark, 1.0))  # slide
+        parts.append(_rect(cx - W * 0.10, barrel_y - H * 0.10, W * 0.06, H * 0.04, metal, dark, 0.5))  # iron sight rear
+        parts.append(_rect(cx + W * 0.02, barrel_y - H * 0.10, W * 0.02, H * 0.04, metal, dark, 0.5))  # iron sight front
+        # Trigger guard + grip
+        parts.append(_polygon([
+            (cx - W * 0.08, cy + H * 0.10),
+            (cx - W * 0.04, cy + H * 0.10),
+            (cx - W * 0.04, cy + H * 0.20),
+            (cx - W * 0.08, cy + H * 0.20),
+        ], dark))
+        parts.append(_polygon([
+            (cx - W * 0.06, cy + H * 0.08),
+            (cx + W * 0.02, cy + H * 0.08),
+            (cx + W * 0.05, cy + H * 0.30),
+            (cx - W * 0.03, cy + H * 0.30),
+        ], body, dark, 1.0))  # grip with checkering implied
+        parts.append(_rect(cx - W * 0.04, cy + H * 0.08, W * 0.06, H * 0.20, dark))  # mag well
+        parts.append(_circle(cx + W * 0.06, cy + H * 0.04, W * 0.01, accent))  # safety pin
+    elif wclass == "smg":
+        # Folding stock + compact barrel + vertical magazine + tactical rail
+        barrel_y = cy - H * 0.04
+        parts.append(_rect(cx + W * 0.08, barrel_y, W * 0.30, H * 0.08, metal, dark, 0.5))  # barrel
+        parts.append(_rect(cx + W * 0.36, barrel_y - H * 0.01, W * 0.04, H * 0.10, dark))  # muzzle device
+        parts.append(_rect(cx - W * 0.20, barrel_y - H * 0.08, W * 0.32, H * 0.22, body, dark, 1.0))  # boxy receiver
+        parts.append(_rect(cx - W * 0.15, barrel_y - H * 0.13, W * 0.25, H * 0.04, metal, dark, 0.5))  # picatinny rail
+        parts.append(_rect(cx - W * 0.10, barrel_y - H * 0.17, W * 0.08, H * 0.05, dark))  # red dot sight
+        parts.append(_circle(cx - W * 0.07, barrel_y - H * 0.145, W * 0.012, glow))  # sight glow
+        # Vertical magazine (long)
+        parts.append(_rect(cx - W * 0.05, cy + H * 0.14, W * 0.07, H * 0.26, accent, dark, 0.5))
+        # Pistol grip
+        parts.append(_polygon([
+            (cx + W * 0.04, cy + H * 0.14),
+            (cx + W * 0.11, cy + H * 0.14),
+            (cx + W * 0.08, cy + H * 0.34),
+            (cx + W * 0.02, cy + H * 0.34),
+        ], dark, body, 0.5))
+        # Folding stock (collapsed shape)
+        parts.append(_rect(cx - W * 0.36, cy - H * 0.02, W * 0.18, H * 0.03, dark))
+        parts.append(_rect(cx - W * 0.36, cy + H * 0.02, W * 0.04, H * 0.06, body, dark, 0.5))
+    elif wclass == "rifle":
+        # Classic assault rifle: long barrel + full stock + magazine + scope rail
+        barrel_y = cy - H * 0.04
+        parts.append(_rect(cx + W * 0.08, barrel_y, W * 0.36, H * 0.08, metal, dark, 0.5))  # barrel
+        parts.append(_rect(cx + W * 0.42, barrel_y - H * 0.01, W * 0.04, H * 0.10, dark))  # muzzle device
+        parts.append(_rect(cx + W * 0.30, barrel_y - H * 0.04, W * 0.10, H * 0.04, dark))  # foregrip/handguard
+        parts.append(_rect(cx - W * 0.16, barrel_y - H * 0.10, W * 0.32, H * 0.24, body, dark, 1.0))  # receiver
+        parts.append(_rect(cx - W * 0.10, barrel_y - H * 0.14, W * 0.20, H * 0.04, metal, dark, 0.5))  # picatinny rail
+        parts.append(_rect(cx - W * 0.05, barrel_y - H * 0.20, W * 0.10, H * 0.06, dark, metal, 0.5))  # red-dot housing
+        parts.append(_circle(cx, barrel_y - H * 0.17, W * 0.015, glow))  # reticle glow
+        # Magazine (curved)
+        parts.append(_polygon([
+            (cx - W * 0.04, cy + H * 0.14),
+            (cx + W * 0.04, cy + H * 0.14),
+            (cx + W * 0.06, cy + H * 0.30),
+            (cx - W * 0.02, cy + H * 0.30),
+        ], accent, dark, 0.8))
+        # Pistol grip
+        parts.append(_polygon([
+            (cx + W * 0.06, cy + H * 0.14),
+            (cx + W * 0.12, cy + H * 0.14),
+            (cx + W * 0.10, cy + H * 0.30),
+            (cx + W * 0.04, cy + H * 0.30),
+        ], dark, body, 0.5))
+        # Full stock (heavy buttplate)
+        parts.append(_polygon([
+            (cx - W * 0.32, cy - H * 0.04),
+            (cx - W * 0.16, cy - H * 0.10),
+            (cx - W * 0.16, cy + H * 0.14),
+            (cx - W * 0.32, cy + H * 0.10),
+        ], body, dark, 1.0))
+        parts.append(_rect(cx - W * 0.36, cy - H * 0.04, W * 0.04, H * 0.16, dark))  # buttplate
+    elif wclass == "sniper":
+        # Very long barrel + heavy scope + bipod + bolt-action receiver
+        barrel_y = cy - H * 0.04
+        parts.append(_rect(cx + W * 0.05, barrel_y, W * 0.42, H * 0.06, metal, dark, 0.5))  # long barrel
+        parts.append(_rect(cx + W * 0.45, barrel_y - H * 0.02, W * 0.03, H * 0.10, dark))  # muzzle device
+        parts.append(_rect(cx - W * 0.05, barrel_y, W * 0.10, H * 0.06, dark))  # muzzle brake band
+        parts.append(_rect(cx - W * 0.20, barrel_y - H * 0.08, W * 0.30, H * 0.20, body, dark, 1.0))  # receiver
+        # Large scope
+        parts.append(_rect(cx - W * 0.12, barrel_y - H * 0.18, W * 0.24, H * 0.06, dark, metal, 0.8))
+        parts.append(_circle(cx - W * 0.12, barrel_y - H * 0.15, W * 0.03, dark))  # ocular
+        parts.append(_circle(cx + W * 0.10, barrel_y - H * 0.15, W * 0.03, dark))  # objective
+        parts.append(_circle(cx + W * 0.10, barrel_y - H * 0.15, W * 0.015, glow))  # scope glow
+        parts.append(_rect(cx - W * 0.05, barrel_y - H * 0.16, W * 0.10, H * 0.04, metal))  # scope ring
+        # Bolt
+        parts.append(_rect(cx - W * 0.02, barrel_y - H * 0.10, W * 0.06, H * 0.04, metal, dark, 0.5))
+        parts.append(_circle(cx + W * 0.05, barrel_y - H * 0.08, W * 0.01, accent))  # bolt knob
+        # Magazine (single-stack box)
+        parts.append(_rect(cx - W * 0.06, cy + H * 0.14, W * 0.06, H * 0.16, accent, dark, 0.5))
+        # Pistol grip
+        parts.append(_polygon([
+            (cx + W * 0.02, cy + H * 0.14),
+            (cx + W * 0.08, cy + H * 0.14),
+            (cx + W * 0.06, cy + H * 0.30),
+            (cx, cy + H * 0.30),
+        ], dark, body, 0.5))
+        # Long full stock with cheek-rest
+        parts.append(_polygon([
+            (cx - W * 0.40, cy - H * 0.05),
+            (cx - W * 0.20, cy - H * 0.12),
+            (cx - W * 0.20, cy + H * 0.12),
+            (cx - W * 0.40, cy + H * 0.08),
+        ], body, dark, 1.0))
+        parts.append(_rect(cx - W * 0.36, cy - H * 0.16, W * 0.10, H * 0.06, body, dark, 0.5))  # cheek riser
+        # Bipod
+        parts.append(_line(cx + W * 0.18, cy + H * 0.02, cx + W * 0.12, cy + H * 0.30, dark, 1.5))
+        parts.append(_line(cx + W * 0.18, cy + H * 0.02, cx + W * 0.24, cy + H * 0.30, dark, 1.5))
+    elif wclass == "shotgun":
+        # Thick barrel + pump action + tube magazine OR shell loop + heavy stock
+        barrel_y = cy - H * 0.04
+        parts.append(_rect(cx + W * 0.06, barrel_y, W * 0.38, H * 0.11, metal, dark, 0.5))  # thick barrel
+        parts.append(_rect(cx + W * 0.42, barrel_y - H * 0.01, W * 0.04, H * 0.13, dark))  # choke
+        # Tube magazine under barrel
+        parts.append(_rect(cx + W * 0.06, barrel_y + H * 0.13, W * 0.32, H * 0.06, accent, dark, 0.5))
+        # Pump-action grip (forward)
+        parts.append(_rect(cx + W * 0.16, barrel_y + H * 0.19, W * 0.10, H * 0.06, dark, body, 0.5))
+        # Receiver
+        parts.append(_rect(cx - W * 0.18, barrel_y - H * 0.10, W * 0.24, H * 0.24, body, dark, 1.0))
+        # Bead sight (no scope)
+        parts.append(_rect(cx + W * 0.40, barrel_y - H * 0.04, W * 0.02, H * 0.05, dark))
+        parts.append(_circle(cx + W * 0.41, barrel_y - H * 0.05, W * 0.01, glow))
+        # Pistol grip
+        parts.append(_polygon([
+            (cx, cy + H * 0.14),
+            (cx + W * 0.06, cy + H * 0.14),
+            (cx + W * 0.04, cy + H * 0.34),
+            (cx - W * 0.02, cy + H * 0.34),
+        ], dark, body, 0.5))
+        # Heavy stock with recoil pad
+        parts.append(_polygon([
+            (cx - W * 0.32, cy - H * 0.04),
+            (cx - W * 0.18, cy - H * 0.10),
+            (cx - W * 0.18, cy + H * 0.14),
+            (cx - W * 0.32, cy + H * 0.12),
+        ], body, dark, 1.0))
+        parts.append(_rect(cx - W * 0.36, cy - H * 0.04, W * 0.04, H * 0.18, dark))
+        # Shell loop on side
+        for i in range(4):
+            sx = cx - W * 0.14 + i * W * 0.04
+            parts.append(_circle(sx, cy + H * 0.06, W * 0.012, accent, dark, 0.3))
+    elif wclass == "gl":
+        # Stubby thick barrel (40mm) + drum or tube + wide receiver + heavy stock
+        barrel_y = cy - H * 0.06
+        parts.append(_rect(cx + W * 0.04, barrel_y, W * 0.28, H * 0.16, metal, dark, 0.5))  # thick stubby barrel
+        parts.append(_circle(cx + W * 0.32, barrel_y + H * 0.08, W * 0.04, dark, metal, 0.5))  # muzzle ring
+        parts.append(_circle(cx + W * 0.32, barrel_y + H * 0.08, W * 0.02, body))  # bore
+        # Receiver
+        parts.append(_rect(cx - W * 0.16, cy - H * 0.10, W * 0.20, H * 0.24, body, dark, 1.0))
+        # 6-shot drum/cylinder magazine
+        parts.append(_circle(cx - W * 0.06, cy + H * 0.02, W * 0.08, accent, dark, 1.0))
+        for i in range(6):
+            ang = i * 1.047  # 60 degrees
+            import math as _m
+            sx = cx - W * 0.06 + _m.cos(ang) * W * 0.05
+            sy = cy + H * 0.02 + _m.sin(ang) * W * 0.05
+            parts.append(_circle(sx, sy, W * 0.012, dark))
+        # Optical sight
+        parts.append(_rect(cx - W * 0.04, cy - H * 0.16, W * 0.08, H * 0.04, dark, metal, 0.5))
+        # Pistol grip + stock
+        parts.append(_polygon([
+            (cx + W * 0.04, cy + H * 0.14),
+            (cx + W * 0.10, cy + H * 0.14),
+            (cx + W * 0.08, cy + H * 0.32),
+            (cx + W * 0.02, cy + H * 0.32),
+        ], dark, body, 0.5))
+        parts.append(_polygon([
+            (cx - W * 0.30, cy - H * 0.04),
+            (cx - W * 0.16, cy - H * 0.10),
+            (cx - W * 0.16, cy + H * 0.14),
+            (cx - W * 0.30, cy + H * 0.10),
+        ], body, dark, 1.0))
+    elif wclass == "heavy":
+        # LMG / minigun: very wide receiver + box mag or belt + bipod + heat shroud
+        barrel_y = cy - H * 0.04
+        # Heat shroud over barrel
+        parts.append(_rect(cx + W * 0.04, barrel_y - H * 0.02, W * 0.36, H * 0.14, metal, dark, 0.5))
+        # Barrel through shroud
+        parts.append(_rect(cx + W * 0.04, barrel_y + H * 0.02, W * 0.40, H * 0.04, dark))
+        parts.append(_rect(cx + W * 0.42, barrel_y - H * 0.02, W * 0.04, H * 0.14, dark))  # muzzle
+        # Shroud vent slots
+        for i in range(5):
+            vx = cx + W * 0.08 + i * W * 0.06
+            parts.append(_rect(vx, barrel_y - H * 0.005, W * 0.04, H * 0.012, dark))
+        # Wide receiver
+        parts.append(_rect(cx - W * 0.22, cy - H * 0.10, W * 0.30, H * 0.26, body, dark, 1.0))
+        # Top-mounted optic + carry handle
+        parts.append(_rect(cx - W * 0.12, cy - H * 0.18, W * 0.20, H * 0.06, dark, metal, 0.5))
+        parts.append(_circle(cx + W * 0.04, cy - H * 0.15, W * 0.02, glow))
+        # Belt feed (drum on side)
+        parts.append(_circle(cx - W * 0.20, cy + H * 0.18, W * 0.10, accent, dark, 1.0))
+        parts.append(_circle(cx - W * 0.20, cy + H * 0.18, W * 0.05, dark))
+        # Pistol grip
+        parts.append(_polygon([
+            (cx + W * 0.02, cy + H * 0.16),
+            (cx + W * 0.10, cy + H * 0.16),
+            (cx + W * 0.08, cy + H * 0.32),
+            (cx, cy + H * 0.32),
+        ], dark, body, 0.5))
+        # Bipod (deployed)
+        parts.append(_line(cx + W * 0.18, cy + H * 0.04, cx + W * 0.10, cy + H * 0.32, dark, 2.0))
+        parts.append(_line(cx + W * 0.18, cy + H * 0.04, cx + W * 0.26, cy + H * 0.32, dark, 2.0))
+    elif wclass == "flamer":
+        # Fuel tank + nozzle + igniter
+        # Tank on back/side
+        parts.append(_rect(cx - W * 0.36, cy - H * 0.18, W * 0.20, H * 0.36, accent, dark, 1.0))
+        parts.append(_rect(cx - W * 0.32, cy - H * 0.22, W * 0.12, H * 0.04, dark))  # tank cap
+        # Fuel hose
+        parts.append(_line(cx - W * 0.16, cy - H * 0.04, cx - W * 0.04, cy - H * 0.04, dark, 3.0))
+        # Receiver
+        parts.append(_rect(cx - W * 0.04, cy - H * 0.08, W * 0.18, H * 0.16, body, dark, 1.0))
+        # Long thin nozzle
+        parts.append(_rect(cx + W * 0.14, cy - H * 0.02, W * 0.30, H * 0.04, metal, dark, 0.5))
+        parts.append(_rect(cx + W * 0.42, cy - H * 0.04, W * 0.04, H * 0.08, dark))  # flame collar
+        # Pilot light glow
+        parts.append(_circle(cx + W * 0.40, cy, W * 0.018, glow))
+        # Grip
+        parts.append(_polygon([
+            (cx, cy + H * 0.08),
+            (cx + W * 0.06, cy + H * 0.08),
+            (cx + W * 0.04, cy + H * 0.26),
+            (cx - W * 0.02, cy + H * 0.26),
+        ], dark, body, 0.5))
+    elif wclass == "drill":
+        # Lance: long shaft + drill bit cone + grip + power coupler
+        # Long drill shaft
+        parts.append(_rect(cx - W * 0.10, cy - H * 0.03, W * 0.40, H * 0.06, metal, dark, 0.5))
+        # Spiral cone bit (3 triangles)
+        for i in range(3):
+            ti = i * 0.06
+            parts.append(_polygon([
+                (cx + W * (0.30 + ti), cy - H * 0.05),
+                (cx + W * (0.36 + ti), cy),
+                (cx + W * (0.30 + ti), cy + H * 0.05),
+            ], dark, metal, 0.5))
+        parts.append(_polygon([
+            (cx + W * 0.42, cy - H * 0.07),
+            (cx + W * 0.48, cy),
+            (cx + W * 0.42, cy + H * 0.07),
+        ], accent, dark, 1.0))  # final tip
+        # Mid coupler
+        parts.append(_rect(cx + W * 0.06, cy - H * 0.06, W * 0.04, H * 0.12, dark))
+        # Receiver
+        parts.append(_rect(cx - W * 0.18, cy - H * 0.08, W * 0.10, H * 0.18, body, dark, 1.0))
+        # Power coupler with glow
+        parts.append(_circle(cx - W * 0.20, cy + H * 0.02, W * 0.02, glow))
+        # Grip
+        parts.append(_polygon([
+            (cx - W * 0.16, cy + H * 0.10),
+            (cx - W * 0.10, cy + H * 0.10),
+            (cx - W * 0.12, cy + H * 0.28),
+            (cx - W * 0.18, cy + H * 0.28),
+        ], dark, body, 0.5))
+    elif wclass == "grappler":
+        # Crossbow/grappling hook launcher
+        # Frame with cocked tension
+        parts.append(_rect(cx - W * 0.20, cy - H * 0.04, W * 0.40, H * 0.06, metal, dark, 0.5))
+        # Hook (front)
+        parts.append(_polygon([
+            (cx + W * 0.20, cy - H * 0.06),
+            (cx + W * 0.40, cy - H * 0.04),
+            (cx + W * 0.36, cy),
+            (cx + W * 0.40, cy + H * 0.04),
+            (cx + W * 0.30, cy + H * 0.04),
+        ], accent, dark, 1.0))
+        # 3-pronged hook tips
+        for i in range(3):
+            parts.append(_polygon([
+                (cx + W * 0.40, cy - H * 0.04 + i * H * 0.04),
+                (cx + W * 0.46, cy - H * 0.06 + i * H * 0.04),
+                (cx + W * 0.42, cy + H * 0.02 + i * H * 0.04),
+            ], dark, accent, 0.5))
+        # Tension cable / arms
+        parts.append(_line(cx - W * 0.10, cy - H * 0.14, cx + W * 0.20, cy - H * 0.04, dark, 1.5))
+        parts.append(_line(cx - W * 0.10, cy + H * 0.06, cx + W * 0.20, cy + H * 0.02, dark, 1.5))
+        # Reel housing
+        parts.append(_circle(cx - W * 0.04, cy + H * 0.10, W * 0.06, body, dark, 0.5))
+        parts.append(_circle(cx - W * 0.04, cy + H * 0.10, W * 0.03, dark))
+        # Receiver + grip
+        parts.append(_rect(cx - W * 0.20, cy - H * 0.10, W * 0.14, H * 0.18, body, dark, 1.0))
+        parts.append(_polygon([
+            (cx - W * 0.20, cy + H * 0.08),
+            (cx - W * 0.10, cy + H * 0.08),
+            (cx - W * 0.14, cy + H * 0.26),
+            (cx - W * 0.22, cy + H * 0.26),
+        ], dark, body, 0.5))
+    elif wclass == "drone":
+        # Drone deployer: sphere on rail + launcher tube
+        parts.append(_rect(cx - W * 0.10, cy - H * 0.04, W * 0.36, H * 0.10, metal, dark, 0.5))
+        # 4 small drones queued in tube
+        for i in range(4):
+            parts.append(_circle(cx + W * (0.04 + i * 0.06), cy + H * 0.01, W * 0.02, accent, dark, 0.4))
+            parts.append(_circle(cx + W * (0.04 + i * 0.06), cy + H * 0.01, W * 0.008, glow))
+        # Lead drone exiting
+        parts.append(_circle(cx + W * 0.36, cy + H * 0.01, W * 0.04, accent, dark, 0.8))
+        parts.append(_circle(cx + W * 0.36, cy + H * 0.01, W * 0.018, glow))
+        # 4 rotor stubs on lead drone
+        for ang in [0.7853, 2.3562, 3.927, 5.4978]:
+            import math as _m2
+            dx = cx + W * 0.36 + _m2.cos(ang) * W * 0.05
+            dy = cy + H * 0.01 + _m2.sin(ang) * W * 0.05
+            parts.append(_circle(dx, dy, W * 0.012, dark))
+        # Receiver
+        parts.append(_rect(cx - W * 0.18, cy - H * 0.10, W * 0.10, H * 0.20, body, dark, 1.0))
+        # Antenna
+        parts.append(_line(cx - W * 0.14, cy - H * 0.10, cx - W * 0.14, cy - H * 0.22, dark, 1.0))
+        parts.append(_circle(cx - W * 0.14, cy - H * 0.22, W * 0.01, glow))
+        # Grip
+        parts.append(_polygon([
+            (cx - W * 0.16, cy + H * 0.08),
+            (cx - W * 0.08, cy + H * 0.08),
+            (cx - W * 0.10, cy + H * 0.26),
+            (cx - W * 0.18, cy + H * 0.26),
+        ], dark, body, 0.5))
+    else:  # spec / unknown
+        # Generic compact special weapon
+        parts.append(_rect(cx - W * 0.20, cy - H * 0.08, W * 0.40, H * 0.18, body, dark, 1.0))
+        parts.append(_rect(cx + W * 0.18, cy - H * 0.04, W * 0.18, H * 0.08, metal, dark, 0.5))
+        parts.append(_circle(cx, cy, W * 0.02, glow))
 
-    # Barrel
-    parts.append(_rect(cx + spec.width * 0.20, barrel_y, barrel_len * 0.5, barrel_h, metal, dark, 0.5))
-    parts.append(_rect(cx + spec.width * 0.36, barrel_y - barrel_h * 0.1, spec.width * 0.04, barrel_h * 1.2,
-                       dark))
-    # Receiver
-    parts.append(_rect(receiver_x, receiver_y, receiver_w, receiver_h, body, dark, 1.0))
-    # Grip
-    grip_x = receiver_x + receiver_w * 0.18
-    grip_y = receiver_y + receiver_h
-    parts.append(_polygon(
-        [
-            (grip_x, grip_y),
-            (grip_x + spec.width * 0.08, grip_y),
-            (grip_x + spec.width * 0.05, grip_y + spec.height * 0.18),
-            (grip_x - spec.width * 0.01, grip_y + spec.height * 0.18),
-        ],
-        dark, body, 0.5,
-    ))
-    # Magazine
-    mag_x = receiver_x + receiver_w * 0.45
-    parts.append(_rect(mag_x, grip_y, spec.width * 0.08, spec.height * 0.16, accent, dark, 0.5))
-    # Stock
-    stock_x = receiver_x - spec.width * 0.18
-    parts.append(_polygon(
-        [
-            (stock_x, receiver_y + receiver_h * 0.15),
-            (receiver_x, receiver_y + receiver_h * 0.10),
-            (receiver_x, receiver_y + receiver_h * 0.85),
-            (stock_x, receiver_y + receiver_h * 0.95),
-        ],
-        body, dark, 1.0,
-    ))
-    # Sight / rail
-    sight_y = receiver_y - spec.height * 0.04
-    parts.append(_rect(receiver_x + receiver_w * 0.25, sight_y, receiver_w * 0.4, spec.height * 0.04,
-                       metal, dark, 0.5))
-    parts.append(_rect(receiver_x + receiver_w * 0.55, sight_y - spec.height * 0.04,
-                       receiver_w * 0.12, spec.height * 0.06, dark))
-    # Foregrip pin
-    parts.append(_circle(receiver_x + receiver_w * 0.85, receiver_y + receiver_h * 0.5,
-                         spec.width * 0.01, glow))
-    # Variant: muzzle-flash overlay
+    # Variant: muzzle-flash overlay (every weapon kind supports it)
     if spec.extra and spec.extra.get("variant") == "muzzle-flash":
-        flash_x = cx + spec.width * 0.46
-        parts.append(_polygon(
-            [
-                (flash_x, barrel_y + barrel_h / 2),
-                (flash_x + spec.width * 0.10, barrel_y - spec.height * 0.06),
-                (flash_x + spec.width * 0.14, barrel_y + barrel_h / 2),
-                (flash_x + spec.width * 0.10, barrel_y + barrel_h + spec.height * 0.06),
-            ],
-            highlight, glow, 1.0,
-        ))
+        # Position flash at the appropriate "front" for this class
+        flash_x_off = {
+            "pistol": 0.30, "smg": 0.40, "rifle": 0.46, "sniper": 0.48,
+            "shotgun": 0.46, "gl": 0.36, "heavy": 0.46, "flamer": 0.48,
+            "drill": 0.48, "grappler": 0.46, "drone": 0.40, "spec": 0.40,
+        }.get(wclass, 0.46)
+        flash_y = cy
+        parts.append(_polygon([
+            (cx + W * flash_x_off, flash_y - H * 0.06),
+            (cx + W * (flash_x_off + 0.10), flash_y - H * 0.10),
+            (cx + W * (flash_x_off + 0.14), flash_y),
+            (cx + W * (flash_x_off + 0.10), flash_y + H * 0.10),
+            (cx + W * flash_x_off, flash_y + H * 0.06),
+        ], highlight, glow, 1.0))
+        parts.append(_circle(cx + W * (flash_x_off + 0.06), flash_y, W * 0.03, glow))
     elif spec.extra and spec.extra.get("variant") == "magazine-attached":
-        # extended magazine
-        parts.append(_rect(mag_x - spec.width * 0.01, grip_y + spec.height * 0.16,
-                           spec.width * 0.10, spec.height * 0.08, accent, dark, 0.5))
+        # Extended mag for relevant classes
+        mag_x_off = {
+            "pistol": 0.0, "smg": -0.05, "rifle": 0.0, "sniper": -0.06,
+            "shotgun": 0.0, "gl": -0.04, "heavy": -0.20,
+        }.get(wclass, 0.0)
+        if wclass in ("pistol", "smg", "rifle", "sniper"):
+            parts.append(_rect(cx + W * mag_x_off - W * 0.03, cy + H * 0.30,
+                               W * 0.10, H * 0.10, accent, dark, 0.5))
     return "".join(parts)
 
 
@@ -403,61 +726,280 @@ def _compose_chassis(spec: AssetSpec, rng: random.Random) -> str:
     canonical = spec.canonical_name
     cx = spec.width / 2
 
+    # M12 polish-pass: each chassis archetype gets a detailed mech silhouette
+    # with cockpit, weapon mount, plating seams, joint articulation, faction
+    # accent decal, and weight-class scaling (light = compact; super_heavy =
+    # bulky with extra plates).
+    highlight = p.highlight()
+    glow = p.glow()
+    W = spec.width
+    H = spec.height
+    weight_class = (spec.extra or {}).get("weight_class", "medium")
+    # Weight class drives size + plating density
+    plate_density = {"light": 1, "medium": 2, "heavy": 3, "super_heavy": 4}.get(weight_class, 2)
+    bulk_mul = {"light": 0.85, "medium": 1.0, "heavy": 1.10, "super_heavy": 1.20}.get(weight_class, 1.0)
+
     if "bipedal" in canonical:
-        parts.append(_circle(cx, spec.height * 0.22, spec.width * 0.10, body, dark, 1.0))
-        parts.append(_rect(cx - spec.width * 0.17, spec.height * 0.32, spec.width * 0.34, spec.height * 0.34,
-                           body, dark, 1.0))
-        parts.append(_rect(cx - spec.width * 0.18, spec.height * 0.66, spec.width * 0.12, spec.height * 0.28,
-                           dark, metal, 0.5))
-        parts.append(_rect(cx + spec.width * 0.06, spec.height * 0.66, spec.width * 0.12, spec.height * 0.28,
-                           dark, metal, 0.5))
+        # Head / cockpit (visor with glowing eye)
+        head_r = W * 0.09 * bulk_mul
+        parts.append(_rect(cx - head_r, H * 0.14, head_r * 2, head_r * 1.4, body, dark, 1.0))  # blocky head
+        parts.append(_rect(cx - head_r * 0.85, H * 0.16, head_r * 1.7, head_r * 0.5, dark))  # visor band
+        parts.append(_rect(cx - head_r * 0.45, H * 0.18, head_r * 0.9, head_r * 0.25, glow))  # visor glow
+        parts.append(_circle(cx + head_r * 0.6, H * 0.16 + head_r * 0.6, W * 0.012, accent))  # sensor pip
+        # Antenna / sensor mast for medium+
+        if plate_density >= 2:
+            parts.append(_line(cx + head_r * 0.4, H * 0.14, cx + head_r * 0.4 + W * 0.04, H * 0.06, dark, 1.5))
+            parts.append(_circle(cx + head_r * 0.4 + W * 0.04, H * 0.06, W * 0.012, glow))
+        # Torso (broader for heavier classes)
+        torso_w = W * 0.36 * bulk_mul
+        torso_x = cx - torso_w / 2
+        parts.append(_rect(torso_x, H * 0.30, torso_w, H * 0.30, body, dark, 1.2))
+        # Plating seams on torso
+        for i in range(plate_density):
+            sy = H * (0.34 + i * 0.06)
+            parts.append(_line(torso_x + W * 0.02, sy, torso_x + torso_w - W * 0.02, sy, dark, 0.7))
+        # Chest core (faction-colored)
+        core_w = torso_w * 0.30
+        parts.append(_rect(cx - core_w / 2, H * 0.36, core_w, H * 0.12, accent, dark, 0.8))
+        parts.append(_circle(cx, H * 0.42, W * 0.018, glow))  # power core glow
+        # Shoulder pauldrons
+        parts.append(_polygon([
+            (torso_x - W * 0.04, H * 0.30),
+            (torso_x + W * 0.02, H * 0.30),
+            (torso_x + W * 0.06, H * 0.42),
+            (torso_x - W * 0.02, H * 0.42),
+        ], dark, metal, 0.5))
+        parts.append(_polygon([
+            (torso_x + torso_w - W * 0.02, H * 0.30),
+            (torso_x + torso_w + W * 0.04, H * 0.30),
+            (torso_x + torso_w + W * 0.02, H * 0.42),
+            (torso_x + torso_w - W * 0.06, H * 0.42),
+        ], dark, metal, 0.5))
+        # Weapon mount (right arm) — heavier weight = bigger weapon
+        weap_w = W * 0.08 * bulk_mul
+        parts.append(_rect(torso_x + torso_w, H * 0.36, weap_w, H * 0.06, metal, dark, 0.5))
+        parts.append(_rect(torso_x + torso_w + weap_w * 0.6, H * 0.34, W * 0.04, H * 0.10, dark))
+        # Arm (left, more compact)
+        parts.append(_rect(torso_x - W * 0.02, H * 0.42, W * 0.05, H * 0.18, body, dark, 0.8))
+        parts.append(_circle(torso_x - W * 0.005, H * 0.43, W * 0.018, dark))  # shoulder joint
+        # Hip plates
+        parts.append(_rect(cx - torso_w * 0.45, H * 0.58, torso_w * 0.90, H * 0.06, dark, metal, 0.5))
+        # Legs — hydraulic detail
+        leg_w = W * 0.11 * bulk_mul
+        leg_top_y = H * 0.62
+        for sx, name in [(cx - W * 0.16 * bulk_mul, "L"), (cx + W * 0.05 * bulk_mul, "R")]:
+            # Upper leg
+            parts.append(_rect(sx, leg_top_y, leg_w, H * 0.14, body, dark, 0.8))
+            # Knee joint (cylinder)
+            parts.append(_circle(sx + leg_w / 2, leg_top_y + H * 0.14, leg_w * 0.45, dark, metal, 0.4))
+            # Lower leg (slightly tapered)
+            parts.append(_rect(sx + leg_w * 0.05, leg_top_y + H * 0.16, leg_w * 0.9, H * 0.12, body, dark, 0.8))
+            # Foot / piston
+            parts.append(_rect(sx - leg_w * 0.10, leg_top_y + H * 0.28, leg_w * 1.20, H * 0.04, dark, metal, 0.5))
+            # Hydraulic line
+            parts.append(_line(sx + leg_w * 0.5, leg_top_y + H * 0.02,
+                               sx + leg_w * 0.5, leg_top_y + H * 0.12, accent, 1.2))
+        # Faction decal: stripe on chest
+        parts.append(_rect(torso_x + torso_w * 0.10, H * 0.50, torso_w * 0.80, H * 0.02, accent, dark, 0.3))
     elif "quadruped" in canonical:
-        parts.append(_rect(spec.width * 0.10, spec.height * 0.35, spec.width * 0.78, spec.height * 0.28,
-                           body, dark, 1.0))
-        for i in range(4):
-            wx = spec.width * (0.16 + 0.22 * i)
-            parts.append(_rect(wx, spec.height * 0.63, spec.width * 0.06, spec.height * 0.30, dark, metal, 0.5))
-        parts.append(_polygon(
-            [
-                (spec.width * 0.88, spec.height * 0.35),
-                (spec.width * 0.96, spec.height * 0.4),
-                (spec.width * 0.88, spec.height * 0.5),
-            ],
-            body, dark, 0.5,
-        ))
+        # Body chassis
+        body_w = W * 0.78 * bulk_mul
+        body_x = cx - body_w / 2
+        parts.append(_rect(body_x, H * 0.32, body_w, H * 0.20 + H * 0.02 * plate_density, body, dark, 1.2))
+        # Plating seams
+        for i in range(plate_density):
+            sx = body_x + body_w * (0.20 + 0.20 * i)
+            parts.append(_line(sx, H * 0.32, sx, H * 0.52, dark, 0.7))
+        # Front sensor head (turret-like)
+        parts.append(_rect(body_x + body_w * 0.78, H * 0.26, body_w * 0.22, H * 0.10, body, dark, 1.0))
+        parts.append(_rect(body_x + body_w * 0.82, H * 0.28, body_w * 0.16, H * 0.04, dark))  # visor band
+        parts.append(_rect(body_x + body_w * 0.86, H * 0.29, body_w * 0.10, H * 0.02, glow))  # eye glow
+        # Weapon mount on top
+        parts.append(_rect(body_x + body_w * 0.30, H * 0.22, body_w * 0.30, H * 0.10, metal, dark, 0.5))
+        parts.append(_rect(body_x + body_w * 0.55, H * 0.24, body_w * 0.10, H * 0.06, dark))
+        # Power core
+        parts.append(_circle(cx, H * 0.42, W * 0.02, glow))
+        # 4 legs with knees + claws
+        leg_xs = [body_x + body_w * 0.10, body_x + body_w * 0.32, body_x + body_w * 0.55, body_x + body_w * 0.78]
+        leg_w = W * 0.06 * bulk_mul
+        for lx in leg_xs:
+            # Upper leg (angled back)
+            parts.append(_polygon([
+                (lx - leg_w * 0.2, H * 0.52),
+                (lx + leg_w * 1.2, H * 0.52),
+                (lx + leg_w * 0.9, H * 0.66),
+                (lx + leg_w * 0.1, H * 0.66),
+            ], body, dark, 0.8))
+            # Knee
+            parts.append(_circle(lx + leg_w * 0.5, H * 0.66, leg_w * 0.4, dark, metal, 0.4))
+            # Lower leg
+            parts.append(_polygon([
+                (lx + leg_w * 0.2, H * 0.68),
+                (lx + leg_w * 0.9, H * 0.68),
+                (lx + leg_w * 0.7, H * 0.86),
+                (lx + leg_w * 0.3, H * 0.86),
+            ], body, dark, 0.8))
+            # Claw / foot
+            parts.append(_polygon([
+                (lx + leg_w * 0.2, H * 0.86),
+                (lx + leg_w * 0.8, H * 0.86),
+                (lx + leg_w * 0.5, H * 0.94),
+            ], dark, metal, 0.5))
+            # Hydraulic on knee
+            parts.append(_circle(lx + leg_w * 0.5, H * 0.66, leg_w * 0.15, accent))
+        # Faction decal stripe along side
+        parts.append(_rect(body_x + body_w * 0.10, H * 0.46, body_w * 0.50, H * 0.02, accent, dark, 0.3))
     elif "treaded" in canonical:
-        parts.append(_rect(spec.width * 0.10, spec.height * 0.35, spec.width * 0.80, spec.height * 0.32,
-                           body, dark, 1.0))
-        parts.append(_rect(spec.width * 0.10, spec.height * 0.70, spec.width * 0.80, spec.height * 0.18,
-                           dark, metal, 0.5))
-        for i in range(7):
-            wx = spec.width * (0.12 + 0.11 * i)
-            parts.append(_circle(wx, spec.height * 0.78, spec.height * 0.04, metal))
+        # Main hull
+        hull_w = W * 0.80 * bulk_mul
+        hull_x = cx - hull_w / 2
+        parts.append(_rect(hull_x, H * 0.34, hull_w, H * 0.20, body, dark, 1.2))
+        # Hull plating seams
+        for i in range(plate_density + 1):
+            sx = hull_x + hull_w * (0.10 + 0.18 * i)
+            parts.append(_line(sx, H * 0.34, sx, H * 0.54, dark, 0.7))
+        # Turret on top
+        turret_w = hull_w * 0.45
+        turret_x = hull_x + (hull_w - turret_w) / 2
+        parts.append(_rect(turret_x, H * 0.20, turret_w, H * 0.14, body, dark, 1.0))
+        # Cupola
+        parts.append(_circle(turret_x + turret_w * 0.30, H * 0.20, W * 0.018, dark, metal, 0.5))
+        parts.append(_circle(turret_x + turret_w * 0.30, H * 0.20, W * 0.008, glow))
+        # Main gun barrel
+        barrel_len = hull_w * 0.45
+        parts.append(_rect(turret_x + turret_w * 0.85, H * 0.25, barrel_len, H * 0.04, metal, dark, 0.5))
+        parts.append(_rect(turret_x + turret_w * 0.85 + barrel_len, H * 0.23, W * 0.04, H * 0.08, dark))  # muzzle brake
+        # Secondary weapon (mounted on turret) for heavy+
+        if plate_density >= 3:
+            parts.append(_rect(turret_x + turret_w * 0.10, H * 0.18, turret_w * 0.20, H * 0.04, dark))
+            parts.append(_rect(turret_x + turret_w * 0.12, H * 0.16, turret_w * 0.05, H * 0.02, metal))
+        # Tread skirt
+        parts.append(_rect(hull_x - W * 0.02, H * 0.62, hull_w + W * 0.04, H * 0.16, dark, metal, 0.5))
+        # Drive sprocket (left)
+        parts.append(_circle(hull_x + W * 0.04, H * 0.78, H * 0.08, dark, metal, 0.5))
+        parts.append(_circle(hull_x + W * 0.04, H * 0.78, H * 0.04, metal))
+        for ang_i in range(6):
+            import math as _m3
+            ang = ang_i * 1.047
+            sx = hull_x + W * 0.04 + _m3.cos(ang) * H * 0.05
+            sy = H * 0.78 + _m3.sin(ang) * H * 0.05
+            parts.append(_circle(sx, sy, W * 0.008, dark))
+        # Idler sprocket (right)
+        parts.append(_circle(hull_x + hull_w - W * 0.04, H * 0.78, H * 0.07, dark, metal, 0.5))
+        parts.append(_circle(hull_x + hull_w - W * 0.04, H * 0.78, H * 0.035, metal))
+        # Road wheels
+        for i in range(5):
+            wx = hull_x + W * 0.10 + (hull_w - W * 0.20) * i / 4
+            parts.append(_circle(wx, H * 0.78, H * 0.045, metal, dark, 0.5))
+        # Track teeth
+        for i in range(plate_density * 4 + 8):
+            tx = hull_x + (hull_w + W * 0.04) * (i / (plate_density * 4 + 8))
+            parts.append(_rect(tx, H * 0.64, W * 0.01, W * 0.01, dark))
+        # Faction decal stripe on hull side
+        parts.append(_rect(hull_x + hull_w * 0.20, H * 0.48, hull_w * 0.50, H * 0.025, accent, dark, 0.3))
     elif "hovering" in canonical:
-        parts.append(_polygon(
-            [
-                (spec.width * 0.16, spec.height * 0.45),
-                (spec.width * 0.84, spec.height * 0.45),
-                (spec.width * 0.94, spec.height * 0.55),
-                (spec.width * 0.84, spec.height * 0.65),
-                (spec.width * 0.16, spec.height * 0.65),
-                (spec.width * 0.06, spec.height * 0.55),
-            ],
-            body, dark, 1.0,
-        ))
-        parts.append(_rect(spec.width * 0.20, spec.height * 0.80, spec.width * 0.60, spec.height * 0.04,
-                           accent))
+        # Main body (lens shape)
+        parts.append(_polygon([
+            (W * 0.12, H * 0.40),
+            (W * 0.88, H * 0.40),
+            (W * 0.96, H * 0.50),
+            (W * 0.88, H * 0.60),
+            (W * 0.12, H * 0.60),
+            (W * 0.04, H * 0.50),
+        ], body, dark, 1.2))
+        # Plating seams (lens segments)
+        for i in range(plate_density + 1):
+            sx = W * (0.20 + 0.16 * i)
+            parts.append(_line(sx, H * 0.42, sx, H * 0.58, dark, 0.5))
+        # Cockpit canopy (top)
+        parts.append(_polygon([
+            (W * 0.40, H * 0.30),
+            (W * 0.60, H * 0.30),
+            (W * 0.55, H * 0.42),
+            (W * 0.45, H * 0.42),
+        ], dark, metal, 0.5))
+        parts.append(_polygon([
+            (W * 0.42, H * 0.32),
+            (W * 0.58, H * 0.32),
+            (W * 0.54, H * 0.40),
+            (W * 0.46, H * 0.40),
+        ], glow))
+        # Twin wing-tip weapon pods
+        parts.append(_rect(W * 0.06, H * 0.46, W * 0.10, H * 0.06, metal, dark, 0.5))
+        parts.append(_rect(W * 0.84, H * 0.46, W * 0.10, H * 0.06, metal, dark, 0.5))
+        parts.append(_rect(W * 0.86, H * 0.43, W * 0.08, H * 0.04, dark))
+        parts.append(_rect(W * 0.04, H * 0.43, W * 0.08, H * 0.04, dark))
+        # Hover thrust glow (under-body)
+        parts.append(_polygon([
+            (W * 0.20, H * 0.62),
+            (W * 0.80, H * 0.62),
+            (W * 0.70, H * 0.72),
+            (W * 0.30, H * 0.72),
+        ], accent, dark, 0.4))
+        parts.append(_polygon([
+            (W * 0.28, H * 0.66),
+            (W * 0.72, H * 0.66),
+            (W * 0.62, H * 0.78),
+            (W * 0.38, H * 0.78),
+        ], glow))
+        # Antenna mast
+        parts.append(_line(W * 0.50, H * 0.30, W * 0.50, H * 0.18, dark, 1.5))
+        parts.append(_circle(W * 0.50, H * 0.18, W * 0.012, glow))
+        # Faction decal on top
+        parts.append(_rect(W * 0.30, H * 0.50, W * 0.40, H * 0.02, accent, dark, 0.3))
     elif "wheeled" in canonical:
-        parts.append(_rect(spec.width * 0.10, spec.height * 0.35, spec.width * 0.80, spec.height * 0.32,
-                           body, dark, 1.0))
+        # Hull
+        hull_w = W * 0.78 * bulk_mul
+        hull_x = cx - hull_w / 2
+        parts.append(_rect(hull_x, H * 0.36, hull_w, H * 0.24, body, dark, 1.2))
+        # Plating seams
+        for i in range(plate_density + 1):
+            sx = hull_x + hull_w * (0.15 + 0.20 * i)
+            parts.append(_line(sx, H * 0.36, sx, H * 0.60, dark, 0.7))
+        # Cockpit / windshield
+        parts.append(_polygon([
+            (hull_x + hull_w * 0.60, H * 0.36),
+            (hull_x + hull_w * 0.90, H * 0.36),
+            (hull_x + hull_w * 0.88, H * 0.28),
+            (hull_x + hull_w * 0.62, H * 0.28),
+        ], dark, metal, 0.5))
+        parts.append(_polygon([
+            (hull_x + hull_w * 0.62, H * 0.30),
+            (hull_x + hull_w * 0.88, H * 0.30),
+            (hull_x + hull_w * 0.86, H * 0.34),
+            (hull_x + hull_w * 0.64, H * 0.34),
+        ], glow))
+        # Turret on top
+        parts.append(_rect(hull_x + hull_w * 0.20, H * 0.30, hull_w * 0.30, H * 0.10, body, dark, 0.8))
+        # Main gun
+        parts.append(_rect(hull_x + hull_w * 0.45, H * 0.34, hull_w * 0.35, H * 0.04, metal, dark, 0.5))
+        parts.append(_rect(hull_x + hull_w * 0.78, H * 0.32, W * 0.03, H * 0.08, dark))  # muzzle
+        # Sensor cluster
+        parts.append(_circle(hull_x + hull_w * 0.30, H * 0.32, W * 0.018, dark, metal, 0.5))
+        parts.append(_circle(hull_x + hull_w * 0.30, H * 0.32, W * 0.008, glow))
+        # 4 wheels with hubcaps
+        wheel_r = H * 0.08 * bulk_mul
         for i in range(4):
-            wx = spec.width * (0.16 + 0.22 * i)
-            parts.append(_circle(wx, spec.height * 0.78, spec.height * 0.07, dark, metal, 0.5))
-            parts.append(_circle(wx, spec.height * 0.78, spec.height * 0.04, metal))
+            wx = hull_x + hull_w * (0.10 + 0.27 * i)
+            parts.append(_circle(wx, H * 0.78, wheel_r, dark, metal, 0.5))
+            parts.append(_circle(wx, H * 0.78, wheel_r * 0.5, metal))
+            parts.append(_circle(wx, H * 0.78, wheel_r * 0.18, dark))
+            # Wheel spokes
+            for ang_i in range(4):
+                import math as _m4
+                ang = ang_i * 1.5708
+                spx = wx + _m4.cos(ang) * wheel_r * 0.35
+                spy = H * 0.78 + _m4.sin(ang) * wheel_r * 0.35
+                parts.append(_circle(spx, spy, W * 0.005, dark))
+        # Fender / wheel arch
+        parts.append(_rect(hull_x - W * 0.01, H * 0.58, hull_w + W * 0.02, H * 0.04, dark))
+        # Faction decal stripe on hull
+        parts.append(_rect(hull_x + hull_w * 0.10, H * 0.50, hull_w * 0.50, H * 0.025, accent, dark, 0.3))
     else:
-        # Fallback
-        parts.append(_rect(spec.width * 0.10, spec.height * 0.30, spec.width * 0.80, spec.height * 0.50,
-                           body, dark, 1.0))
+        # Fallback (generic chassis)
+        parts.append(_rect(W * 0.10, H * 0.30, W * 0.80, H * 0.50, body, dark, 1.0))
+        parts.append(_rect(W * 0.40, H * 0.20, W * 0.20, H * 0.12, body, dark, 1.0))
+        parts.append(_circle(W * 0.50, H * 0.42, W * 0.04, glow))
 
     weight_class = (spec.extra or {}).get("weight_class", "medium")
     pip_count = {"light": 1, "medium": 2, "heavy": 3, "super_heavy": 4}.get(weight_class, 2)
