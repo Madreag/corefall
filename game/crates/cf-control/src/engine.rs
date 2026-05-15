@@ -2762,6 +2762,16 @@ impl M0Engine {
             // emit a `terrain.terrain_penetration_threshold` + the
             // `terrain.terrain_pixel_dislodged` debris event. Failing
             // projectiles roll for stickiness and may be drawn in.
+            //
+            // **M9 § Destructible terrain — 5-tier per-pixel integrity**:
+            // every projectile-vs-terrain hit (pass OR fail) also applies
+            // per-pixel integrity damage via
+            // `ChunkedTerrain::try_penetrate_pixel`. The pixel may survive
+            // (hard material) or be destroyed (soft material), and band
+            // crossings + cascade decay are emitted as `terrain.*` events
+            // alongside the existing M2 events. Captured here as
+            // `damage_outcome` so the emit loop has both the binary
+            // pass/fail and the per-pixel ledger.
             struct TerrainHit {
                 projectile_id: u64,
                 owner: ActorId,
@@ -2776,6 +2786,7 @@ impl M0Engine {
                 stuck: bool,
                 damage: f32,
                 spawn_material: Option<cf_terrain::MaterialId>,
+                damage_outcome: Option<cf_terrain::PenetrationOutcome>,
             }
             let mut terrain_hits: Vec<TerrainHit> = Vec::new();
             if state.chunked_terrain.is_some() && state.actor_state.is_some() {
@@ -2814,11 +2825,37 @@ impl M0Engine {
                             rng_roll,
                         });
                         let pos = [proj.position.x, proj.position.y];
+                        // **M9 § Destructible terrain — per-pixel integrity**:
+                        // normalize impact energy from projectile velocity
+                        // (reference rifle round at ~150 u/s = 0.5 impact,
+                        // matching the spec's "impact_energy=0.5" scenario).
+                        // Clamp to [0, 1] so debug-spawn bullets cannot
+                        // overshoot the formula.
+                        let impact_energy = (velocity / 300.0).clamp(0.0, 1.0);
+                        let px_i = (proj.position.x - terrain.anchor[0]).floor() as i64;
+                        let py_i = (proj.position.y - terrain.anchor[1]).floor() as i64;
+                        // Apply per-pixel integrity damage. The pixel may
+                        // survive (hardness > impact) or be destroyed
+                        // (integrity reached 0). When destroyed, cascade
+                        // decay propagates to 4-neighbors below the
+                        // cascade-threshold gate (default 0.6).
+                        let damage_outcome = terrain.try_penetrate_pixel(
+                            px_i,
+                            py_i,
+                            impact_energy,
+                            cf_terrain::DamageKind::ProjectileHit,
+                            None,
+                        );
+                        // **M9** keeps the binary cf_physics::try_penetrate
+                        // decision for projectile lifecycle (lives/dies/stuck)
+                        // but stops the redundant carve — destruction is now
+                        // driven by integrity reaching 0. When the per-pixel
+                        // outcome reports `destroyed=true`, the world has
+                        // already cleared the pixel. When it reports
+                        // `destroyed=false`, the pixel survives the hit even
+                        // if cf_physics says the projectile pierced (the
+                        // pixel's residual hardness wears down per spec).
                         if outcome.passes {
-                            // Carve a 1-px hole + record dirty area; the
-                            // terrain handles the actual pixel clear via
-                            // try_carve at radius 0.6.
-                            let _ = terrain.try_carve([proj.position.x, proj.position.y], 0.6);
                             terrain_hits.push(TerrainHit {
                                 projectile_id: proj.id,
                                 owner: proj.owner,
@@ -2833,9 +2870,8 @@ impl M0Engine {
                                 stuck: false,
                                 damage: proj.damage,
                                 spawn_material: aff.spawn_material,
+                                damage_outcome,
                             });
-                            // The projectile is consumed by the carve at M2
-                            // (no fragment carry-through; M5.5 may extend).
                         } else {
                             terrain_hits.push(TerrainHit {
                                 projectile_id: proj.id,
@@ -2851,9 +2887,8 @@ impl M0Engine {
                                 stuck: outcome.stuck,
                                 damage: proj.damage,
                                 spawn_material: aff.spawn_material,
+                                damage_outcome,
                             });
-                            // Projectile dies on failure (M2 does not yet
-                            // ricochet at speed `outcome.remaining_velocity`).
                         }
                     }
                     actor_state_mut.projectiles = survivors;
@@ -2917,6 +2952,96 @@ impl M0Engine {
                         );
                         if let Ok(mut s) = self.state.write() {
                             s.total_debris_spawned = s.total_debris_spawned.saturating_add(1);
+                        }
+                    }
+                    // **M9 § Destructible terrain — 5-tier band machine +
+                    // cascade rule**: emit per-pixel band crossings and
+                    // cascade decay events. Each event carries
+                    // parent_event_id = pen_id so the M10 cause-chain
+                    // walker resolves projectile → pixel → cascade.
+                    if let Some(damage) = &hit.damage_outcome {
+                        if damage.band_crossed {
+                            self.recorder.record(
+                                tick,
+                                sim_time_ms,
+                                "terrain",
+                                "material_state_changed",
+                                json!({
+                                    "pos": damage.pos,
+                                    "material_id": damage.material_id,
+                                    "material_name": damage.material_name,
+                                    "from_band": damage.band_before.as_str(),
+                                    "to_band": damage.band_after.as_str(),
+                                    "integrity_before": damage.integrity_before,
+                                    "integrity_after": damage.integrity_after,
+                                    "cause": "projectile_hit",
+                                    "parent_event_id": pen_id.clone(),
+                                }),
+                                Some(pen_id.clone()),
+                            );
+                        }
+                        if damage.destroyed {
+                            self.recorder.record(
+                                tick,
+                                sim_time_ms,
+                                "terrain",
+                                "pixel_removed",
+                                json!({
+                                    "pos": damage.pos,
+                                    "was_material": damage.material_id,
+                                    "was_material_name": damage.material_name,
+                                    "cascade_cause": "direct_damage",
+                                    "parent_event_id": pen_id.clone(),
+                                }),
+                                Some(pen_id.clone()),
+                            );
+                        }
+                        // **M9 § Cascade rule**: one event per affected
+                        // neighbor. affected_count surfaces total cascade
+                        // reach so the M10 viewer can render a "domino"
+                        // visualization.
+                        let affected_count = damage.cascades.len() as u32;
+                        for cascade in &damage.cascades {
+                            self.recorder.record(
+                                tick,
+                                sim_time_ms,
+                                "terrain",
+                                "cascade_triggered",
+                                json!({
+                                    "from_pos": cascade.from_pos,
+                                    "to_pos": cascade.to_pos,
+                                    "cascade_depth": cascade.depth,
+                                    "cascade_threshold": cascade.threshold,
+                                    "cascade_decay_pct": cf_terrain::DEFAULT_CASCADE_DECAY_PCT,
+                                    "affected_count": affected_count,
+                                    "material_id": cascade.material_id,
+                                    "material_name": cascade.material_name,
+                                    "integrity_before": cascade.integrity_before,
+                                    "integrity_after": cascade.integrity_after,
+                                    "from_band": cascade.from_band.as_str(),
+                                    "to_band": cascade.to_band.as_str(),
+                                    "destroyed_neighbor": cascade.destroyed_neighbor,
+                                    "reason": "neighbor_destroyed",
+                                    "parent_event_id": pen_id.clone(),
+                                }),
+                                Some(pen_id.clone()),
+                            );
+                            if cascade.destroyed_neighbor {
+                                self.recorder.record(
+                                    tick,
+                                    sim_time_ms,
+                                    "terrain",
+                                    "pixel_removed",
+                                    json!({
+                                        "pos": cascade.to_pos,
+                                        "was_material": cascade.material_id,
+                                        "was_material_name": cascade.material_name,
+                                        "cascade_cause": "neighbor_destroyed",
+                                        "parent_event_id": pen_id.clone(),
+                                    }),
+                                    Some(pen_id.clone()),
+                                );
+                            }
                         }
                     }
                     // Legacy combat.projectile_expired so existing tooling
@@ -3852,25 +3977,75 @@ impl M0Engine {
                             Some(chunk_carved_id.clone()),
                         );
                         // **M9** § Cascade rule — adjacent low-hardness
-                        // pixels decay on neighbor destruction. M9 ships
-                        // cascade_depth=1; emit one event per multi-pixel
-                        // carve to surface the cascade producer.
-                        if stats.count > 1 {
-                            self.recorder.record(
-                                tick,
-                                sim_time_ms,
-                                "terrain",
-                                "cascade_triggered",
-                                json!({
-                                    "from_pos": pos_min,
-                                    "to_pos": [pos_min[0] + 1, pos_min[1]],
-                                    "cascade_depth": 1u32,
-                                    "cascade_threshold": 0.6,
-                                    "reason": "neighbor_destroyed",
-                                    "parent_event_id": chunk_carved_id.clone(),
-                                }),
-                                Some(chunk_carved_id.clone()),
-                            );
+                        // pixels decay on neighbor destruction. After the
+                        // carve clears its bbox, walk the perimeter and
+                        // apply REAL integrity decay to neighbors below
+                        // the cascade-threshold gate (default 0.6). Each
+                        // affected neighbor produces one
+                        // `terrain.cascade_triggered` event with the
+                        // before/after integrity + band. cascade_depth=1
+                        // at M9 — no recursion past direct 4-neighbors.
+                        if stats.count > 0 {
+                            // Re-acquire the engine state write lock so we
+                            // can mutate the per-pixel integrity grid. The
+                            // outer `state` was dropped before the dig
+                            // event emit loop — this matches the existing
+                            // `self.state.write()` pattern used by the
+                            // dirty-rect accumulator below.
+                            let cascades = match self.state.write() {
+                                Ok(mut s) => match s.chunked_terrain.as_mut() {
+                                    Some(t) => t.apply_cascade_to_carve_perimeter(
+                                        stats.bbox_min,
+                                        stats.bbox_max,
+                                        Some(&chunk_carved_id),
+                                    ),
+                                    None => Vec::new(),
+                                },
+                                Err(_) => Vec::new(),
+                            };
+                            let affected_count = cascades.len() as u32;
+                            for cascade in &cascades {
+                                self.recorder.record(
+                                    tick,
+                                    sim_time_ms,
+                                    "terrain",
+                                    "cascade_triggered",
+                                    json!({
+                                        "from_pos": cascade.from_pos,
+                                        "to_pos": cascade.to_pos,
+                                        "cascade_depth": cascade.depth,
+                                        "cascade_threshold": cascade.threshold,
+                                        "cascade_decay_pct": cf_terrain::DEFAULT_CASCADE_DECAY_PCT,
+                                        "affected_count": affected_count,
+                                        "material_id": cascade.material_id,
+                                        "material_name": cascade.material_name,
+                                        "integrity_before": cascade.integrity_before,
+                                        "integrity_after": cascade.integrity_after,
+                                        "from_band": cascade.from_band.as_str(),
+                                        "to_band": cascade.to_band.as_str(),
+                                        "destroyed_neighbor": cascade.destroyed_neighbor,
+                                        "reason": "neighbor_destroyed",
+                                        "parent_event_id": chunk_carved_id.clone(),
+                                    }),
+                                    Some(chunk_carved_id.clone()),
+                                );
+                                if cascade.destroyed_neighbor {
+                                    self.recorder.record(
+                                        tick,
+                                        sim_time_ms,
+                                        "terrain",
+                                        "pixel_removed",
+                                        json!({
+                                            "pos": cascade.to_pos,
+                                            "was_material": cascade.material_id,
+                                            "was_material_name": cascade.material_name,
+                                            "cascade_cause": "neighbor_destroyed",
+                                            "parent_event_id": chunk_carved_id.clone(),
+                                        }),
+                                        Some(chunk_carved_id.clone()),
+                                    );
+                                }
+                            }
                         }
                         // M2: emit a per-pixel dislodged event for the
                         // first N pixels (capped) so the cause chain
