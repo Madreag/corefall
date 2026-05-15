@@ -30,6 +30,7 @@ use cf_control::{
     EngineHandle, Settings,
 };
 use cf_render_2d::{
+    asset_loader::{load_ledger_index, AssetIndex, AssetIndexPlugin},
     ActorRenderState, ActorSpritePlugin, BreachRender, CameraFollow, CameraShake, CfRenderPlugin, ChunkUpdate,
     ChunkedTerrainPlugin, ChunkedTerrainSnapshot, DebrisSpawnQueue, DebrisSpawnRequest, DigPreviewGhost,
     DigPreviewTarget, ExplosionState, ExtractionRender, HitStop, MuzzleFlashRender, OverlayMode, OverlayModeState,
@@ -690,7 +691,15 @@ fn run_bevy(
         .add_plugins(ActorSpritePlugin)
         .add_plugins(ChunkedTerrainPlugin)
         .add_plugins(ReactorVfxPlugin)
+        // M10 § M9A asset icons resolve at runtime: install the
+        // AssetIndex resource + hydrate it from the workspace's
+        // canonical ledger.jsonl at startup so the replay viewer +
+        // death-recap modal can resolve icon paths via
+        // `AssetIndex.get(canonical_name)` without missing-asset
+        // warnings. See game/crates/cf-render-2d/src/asset_loader.rs.
+        .add_plugins(AssetIndexPlugin)
         .add_plugins(StatusStripPlugin);
+    app.add_systems(Startup, hydrate_asset_index_from_ledger);
     app.init_resource::<HoldTracker>();
     let capture_handle = CaptureStateHandle::default();
     app.add_plugins(CfCapturePlugin {
@@ -780,6 +789,76 @@ fn run_bevy(
 
 fn sync_engine_tick_to_capture_clock(holder: Res<EngineHolder>, mut clock: ResMut<CaptureClock>) {
     clock.current_tick = holder.0.current_tick().0;
+}
+
+/// **M10 § "references M9A asset icons"** — startup system that hydrates
+/// the cf-render-2d `AssetIndex` from the workspace's canonical
+/// `content/asset_ledger/ledger.jsonl`. The replay viewer + in-game
+/// death-recap modal call `AssetIndex.get(canonical_name)` to resolve
+/// the PNG / SVG path for any tier-1 placeholder asset; without this
+/// hydration every icon lookup would miss (per AGENTS.md "asset index
+/// plugin wiring" mandate).
+///
+/// Path resolution order:
+///   1. `CF_ASSET_LEDGER_PATH` env var (explicit override, dev / tests).
+///   2. Climb from `cf-app`'s `CARGO_MANIFEST_DIR`
+///      (`<repo>/game/crates/cf-app`) up three parents to
+///      `<repo>/content/asset_ledger/ledger.jsonl`.
+///   3. Fall back to `<CWD>/content/asset_ledger/ledger.jsonl` so that
+///      `cd /Users/erol/projects/corefall && cargo run` resolves it too.
+///
+/// All paths are best-effort: when the ledger is absent (e.g., during a
+/// pre-M9A bring-up scenario), the hydration is a no-op and a single
+/// `tracing::warn!` line surfaces the miss. No icon-lookup-time warnings.
+fn hydrate_asset_index_from_ledger(mut index: ResMut<AssetIndex>) {
+    use std::path::PathBuf;
+    let candidates: Vec<PathBuf> = {
+        let mut v: Vec<PathBuf> = Vec::new();
+        if let Ok(p) = std::env::var("CF_ASSET_LEDGER_PATH") {
+            v.push(PathBuf::from(p));
+        }
+        // Climb 3 parents from cf-app's CARGO_MANIFEST_DIR → repo root.
+        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        if let Some(repo) = manifest_dir.parent().and_then(|p| p.parent()).and_then(|p| p.parent()) {
+            v.push(repo.join("content").join("asset_ledger").join("ledger.jsonl"));
+        }
+        if let Ok(cwd) = std::env::current_dir() {
+            v.push(cwd.join("content").join("asset_ledger").join("ledger.jsonl"));
+            if let Some(parent) = cwd.parent() {
+                v.push(parent.join("content").join("asset_ledger").join("ledger.jsonl"));
+            }
+        }
+        v
+    };
+    for path in &candidates {
+        if !path.exists() {
+            continue;
+        }
+        match load_ledger_index(path, &mut index) {
+            Ok(n) => {
+                tracing::info!(
+                    target: "cf::asset_index",
+                    "hydrated AssetIndex from {} ({} entries)",
+                    path.display(),
+                    n
+                );
+                return;
+            }
+            Err(e) => {
+                tracing::warn!(
+                    target: "cf::asset_index",
+                    "failed to hydrate AssetIndex from {}: {}",
+                    path.display(),
+                    e
+                );
+                return;
+            }
+        }
+    }
+    tracing::warn!(
+        target: "cf::asset_index",
+        "ledger.jsonl not found at any candidate path; AssetIndex left empty (M10 death-recap icons will fall back to symbolic placeholders)"
+    );
 }
 
 /// **M2**: bridge the engine's chunked terrain into cf-render-2d. Gated on
