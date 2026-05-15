@@ -24,13 +24,15 @@ use cf_actor::{ActorId, ActorState, Status};
 use cf_ai::{
     auto_repair::{AutoRepairInitiatedEvent, AutoRepairMission, AutoRepairProgressedEvent},
     auto_triage::{AutoTriageAppliedEvent, AutoTriageInitiatedEvent, AutoTriageMission},
-    AiTickOutput, Archetype, BehaviorAction, DoctrineMode, FactionRelationships, PersonalityProfile, TaskType,
-    ThinkingContext, ThinkingStack,
+    AiTickOutput, Archetype, AutonomyMode, BehaviorAction, DoctrineMode, FactionId, FactionRelationships,
+    PersonalityProfile, PriorityTable, TaskType, ThinkingContext, ThinkingStack,
 };
+use cf_audio::{voice_id_for_archetype, ChatterCategory, ChatterCooldownTable, ChatterEmittedEvent, EmissionInfo};
 use cf_mission::{
     BossPhaseChangedEvent, BossSpecialAbilityEvent, BossState, PhaseChangedEvent, PhaseState, ReinforcementRegistry,
     ReinforcementWaveSpawnedEvent,
 };
+use cf_priority::{PersonalityModifier, QuickPresetId, RoleTemplate};
 
 // Re-export the auto-triage / auto-repair contract constants so the engine
 // (and code-search tools / mission validators) have a stable cf-control-side
@@ -40,13 +42,25 @@ pub use cf_ai::{
     ENGINEER_AUTO_REPAIR_FIRST_TICK_SECONDS, ENGINEER_AUTO_REPAIR_REACH_SECONDS, MEDIC_AUTO_TRIAGE_APPLY_SECONDS,
     MEDIC_AUTO_TRIAGE_REACH_SECONDS,
 };
+// **M7-B**: chatter cooldown is 4.0 seconds per `(actor, category)` per
+/// spec § Chatter scaffold cooldown table. Re-exported so the audit greps
+/// can find the constant on the cf-control side.
+pub use cf_ai::CHATTER_COOLDOWN_SECONDS;
 
-/// **M7-A**: per-actor AI state.
+/// **M7-A**: per-actor AI state. **M7-B** adds `personality_modifier`
+/// (one of Aggressive / Cautious / Loyal / LoneWolf / Neutral) which
+/// re-weights the priority table on top of the role template.
 #[derive(Debug, Clone)]
 pub struct BotState {
     pub archetype: Archetype,
     pub stack: ThinkingStack,
     pub personality: PersonalityProfile,
+    /// **M7-B**: personality modifier driving the priority re-weight.
+    pub personality_modifier: PersonalityModifier,
+    /// **M7-B**: per-faction allegiance assignment (defaults to AiEnemy
+    /// for spawned guards). Drives friendly-fire decisions + the matrix
+    /// when relationships shift.
+    pub faction: FactionId,
     /// In-flight auto-triage mission (Medic).
     pub auto_triage: Option<AutoTriageMission>,
     /// In-flight auto-repair mission (Engineer).
@@ -59,13 +73,17 @@ impl BotState {
             archetype,
             stack: ThinkingStack::new(archetype),
             personality: PersonalityProfile::default(),
+            personality_modifier: PersonalityModifier::Neutral,
+            faction: FactionId::AiEnemy,
             auto_triage: None,
             auto_repair: None,
         }
     }
 }
 
-/// **M7-A**: world-level AI surface owned by the engine.
+/// **M7-A**: world-level AI surface owned by the engine. **M7-B** adds the
+/// chatter cooldown table so production paths can rate-limit chatter
+/// emission without duplicating per-actor state across call sites.
 #[derive(Debug, Clone, Default)]
 pub struct M7AiWorld {
     pub bots: BTreeMap<ActorId, BotState>,
@@ -73,6 +91,8 @@ pub struct M7AiWorld {
     pub phase: Option<PhaseState>,
     pub reinforcements: ReinforcementRegistry,
     pub boss: Option<BossState>,
+    /// **M7-B**: per-actor per-category chatter cooldown gate.
+    pub chatter_cooldowns: ChatterCooldownTable,
 }
 
 impl M7AiWorld {
@@ -83,6 +103,7 @@ impl M7AiWorld {
             phase: None,
             reinforcements: ReinforcementRegistry::default(),
             boss: None,
+            chatter_cooldowns: ChatterCooldownTable::new(),
         }
     }
 
@@ -111,6 +132,174 @@ impl M7AiWorld {
         if self.phase.is_none() {
             self.phase = Some(PhaseState::new(tick));
         }
+    }
+
+    /// **M7-B**: set a single task weight on an actor's PriorityTable.
+    /// Clamps `weight` to `0..=9`. Returns `(old, new)` weights on success
+    /// or `Err(reason)` if the actor has no `BotState`.
+    pub fn set_priority(&mut self, actor: ActorId, task: TaskType, weight: u8) -> Result<(u8, u8), &'static str> {
+        let bot = self.bots.get_mut(&actor).ok_or("no_such_actor")?;
+        let old = bot.stack.priority.get(task);
+        let clamped = weight.min(9);
+        bot.stack.priority.set(task, clamped);
+        // Keep the utility scorer's cached priority in sync so the next
+        // tick uses the new weight.
+        bot.stack.utility.priority = bot.stack.priority;
+        Ok((old, clamped))
+    }
+
+    /// **M7-B**: set an actor's autonomy mode. Returns `Some(old)` on
+    /// success, `None` if the actor has no `BotState`.
+    pub fn set_autonomy(&mut self, actor: ActorId, mode: AutonomyMode) -> Option<AutonomyMode> {
+        let bot = self.bots.get_mut(&actor)?;
+        let old = bot.stack.autonomy;
+        bot.stack.autonomy = mode;
+        Some(old)
+    }
+
+    /// **M7-B**: replace an actor's PriorityTable with one of the 6
+    /// spec-mandated role templates (also re-applies the archetype +
+    /// behavior tree library). Returns `Some(())` on success.
+    pub fn apply_role_template(&mut self, actor: ActorId, template: RoleTemplate) -> Option<()> {
+        let bot = self.bots.get_mut(&actor)?;
+        let archetype = template.archetype();
+        bot.archetype = archetype;
+        bot.stack.apply_archetype(archetype);
+        Some(())
+    }
+
+    /// **M7-B**: apply a quick preset to an actor's PriorityTable. The
+    /// preset shifts task families ±2 per spec § Quick presets. Returns
+    /// `Some(())` on success.
+    pub fn apply_quick_preset(&mut self, actor: ActorId, preset: QuickPresetId) -> Option<()> {
+        let bot = self.bots.get_mut(&actor)?;
+        preset.apply_to(&mut bot.stack.priority);
+        bot.stack.utility.priority = bot.stack.priority;
+        Some(())
+    }
+
+    /// **M7-B**: apply a personality modifier on top of the actor's
+    /// current PriorityTable. Updates `bot.personality_modifier` for
+    /// future round-trips through snapshot/restore.
+    pub fn apply_personality_modifier(&mut self, actor: ActorId, modifier: PersonalityModifier) -> Option<()> {
+        let bot = self.bots.get_mut(&actor)?;
+        bot.personality_modifier = modifier;
+        modifier.apply_to(&mut bot.stack.priority);
+        bot.stack.utility.priority = bot.stack.priority;
+        Some(())
+    }
+
+    /// **M7-B**: build the JSON view of an actor's PriorityTable for the
+    /// `observe.priority_table` cfctl method. Returns `None` if the actor
+    /// has no `BotState`.
+    pub fn priority_table_view(&self, actor: ActorId) -> Option<Value> {
+        let bot = self.bots.get(&actor)?;
+        let mut weights = serde_json::Map::with_capacity(TaskType::COUNT);
+        for task in TaskType::ALL.iter() {
+            weights.insert(task.as_str().to_string(), Value::from(bot.stack.priority.get(*task)));
+        }
+        Some(json!({
+            "actor_id": actor.0,
+            "role": bot.archetype.as_str(),
+            "personality_modifier": bot.personality_modifier.as_str(),
+            "weights": weights,
+        }))
+    }
+
+    /// **M7-B**: build the JSON view of an actor's autonomy state for the
+    /// `observe.autonomy` cfctl method.
+    pub fn autonomy_view(&self, actor: ActorId) -> Option<Value> {
+        let bot = self.bots.get(&actor)?;
+        let mode = bot.stack.autonomy;
+        Some(json!({
+            "actor_id": actor.0,
+            "mode": mode.as_str(),
+            "auto_action_cap": auto_action_cap_to_value(mode.auto_action_cap()),
+            "doctrine_mode": bot.stack.doctrine_mode.as_str(),
+        }))
+    }
+
+    /// **M7-B**: build a JSON snapshot of every actor's PriorityTable for
+    /// the snapshot/restore round-trip contract. The map keys are
+    /// stringified actor ids (deterministic via BTreeMap iteration).
+    pub fn snapshot_actor_priorities(&self) -> Value {
+        let mut map = serde_json::Map::new();
+        for (actor, bot) in &self.bots {
+            map.insert(
+                actor.0.to_string(),
+                serde_json::to_value(bot.stack.priority).unwrap_or(Value::Null),
+            );
+        }
+        Value::Object(map)
+    }
+
+    /// **M7-B**: restore PriorityTables previously captured via
+    /// `snapshot_actor_priorities`. Missing actors are skipped (the
+    /// caller is expected to assign archetypes first). Returns the
+    /// number of tables restored.
+    pub fn restore_actor_priorities(&mut self, snapshot: &Value) -> usize {
+        let Some(map) = snapshot.as_object() else {
+            return 0;
+        };
+        let mut count = 0;
+        for (actor_str, value) in map {
+            let Ok(actor_id) = actor_str.parse::<u64>() else {
+                continue;
+            };
+            let bot = match self.bots.get_mut(&ActorId(actor_id)) {
+                Some(b) => b,
+                None => continue,
+            };
+            let table: PriorityTable = match serde_json::from_value(value.clone()) {
+                Ok(t) => t,
+                Err(_) => continue,
+            };
+            bot.stack.priority = table;
+            bot.stack.utility.priority = table;
+            count += 1;
+        }
+        count
+    }
+
+    /// **M7-B**: try to emit a chatter event for `(actor, category)` at
+    /// `current_tick`. Returns the event payload + caption text iff the
+    /// cooldown is open. The engine records the event via cf-replay AND
+    /// surfaces the caption via `HudState.captions`.
+    pub fn try_emit_chatter(
+        &mut self,
+        actor: ActorId,
+        category: ChatterCategory,
+        text: impl Into<String>,
+        current_tick: u64,
+        tick_rate_hz: u32,
+    ) -> Option<(ChatterEmittedEvent, EmissionInfo)> {
+        let cooldown_seconds = CHATTER_COOLDOWN_SECONDS;
+        let cooldown_ticks = (cooldown_seconds * tick_rate_hz.max(1) as f32).ceil() as u64;
+        let info = self
+            .chatter_cooldowns
+            .try_emit(actor.0, category, current_tick, cooldown_ticks)?;
+        let archetype_str = self
+            .bots
+            .get(&actor)
+            .map(|b| b.archetype.as_str().to_string())
+            .unwrap_or_else(|| "unknown".to_string());
+        let cooldown_remaining_seconds = cooldown_seconds;
+        let event = ChatterEmittedEvent {
+            actor_id: actor.0,
+            category,
+            text: text.into(),
+            voice_id: voice_id_for_archetype(&archetype_str),
+            cooldown_remaining_seconds,
+        };
+        Some((event, info))
+    }
+}
+
+fn auto_action_cap_to_value(cap: usize) -> Value {
+    if cap == usize::MAX {
+        Value::String("unbounded".to_string())
+    } else {
+        Value::from(cap as u64)
     }
 }
 
@@ -574,6 +763,138 @@ pub fn boss_special_ability(world: &M7AiWorld, ability: &str, tick: u64) -> Opti
     Some(boss_special_ability_payload(&event))
 }
 
+// **M7-B**: event payload helpers for the 9 NEW ai.* schemas. Each helper
+// is a pure function that the engine calls right before
+// `recorder.record(tick, sim_time_ms, "ai", "<event_type>", payload, parent)`.
+
+/// **M7-B**: build a JSON payload for `ai.priority_table_changed`.
+pub fn priority_table_changed_payload(actor_id: u64, task: TaskType, old_weight: u8, new_weight: u8) -> Value {
+    json!({
+        "actor_id": actor_id,
+        "task": task.as_str(),
+        "old_weight": old_weight,
+        "new_weight": new_weight,
+    })
+}
+
+/// **M7-B**: build a JSON payload for `ai.autonomy_mode_changed`.
+pub fn autonomy_mode_changed_payload(actor_id: u64, from: AutonomyMode, to: AutonomyMode) -> Value {
+    json!({
+        "actor_id": actor_id,
+        "from": from.as_str(),
+        "to": to.as_str(),
+    })
+}
+
+/// **M7-B**: build a JSON payload for `ai.role_template_applied`.
+pub fn role_template_applied_payload(actor_id: u64, template: RoleTemplate) -> Value {
+    json!({
+        "actor_id": actor_id,
+        "template_id": template.as_str(),
+    })
+}
+
+/// **M7-B**: build a JSON payload for `ai.quick_preset_applied`.
+pub fn quick_preset_applied_payload(actor_id: u64, preset: QuickPresetId) -> Value {
+    json!({
+        "actor_id": actor_id,
+        "preset_id": preset.as_str(),
+    })
+}
+
+/// **M7-B**: build a JSON payload for `ai.chatter_emitted`. Surfaces the
+/// `ChatterEmittedEvent` shape in cf-replay's wire form.
+pub fn chatter_emitted_payload(event: &ChatterEmittedEvent) -> Value {
+    json!({
+        "actor_id": event.actor_id,
+        "category": event.category.as_str(),
+        "text": event.text,
+        "voice_id": event.voice_id,
+        "cooldown_remaining_seconds": event.cooldown_remaining_seconds,
+    })
+}
+
+/// **M7-B**: build a JSON payload for `ai.personality_changed`. `traits`
+/// is the list of `PersonalityTrait` snake_case ids; `modifier` is the
+/// optional active `PersonalityModifier`.
+pub fn personality_changed_payload(
+    actor_id: u64,
+    traits: &[cf_ai::PersonalityTrait],
+    modifier: Option<PersonalityModifier>,
+    cause: &str,
+) -> Value {
+    let traits_json: Vec<Value> = traits.iter().map(|t| Value::from(t.as_str())).collect();
+    json!({
+        "actor_id": actor_id,
+        "traits": traits_json,
+        "modifier": modifier.map(|m| m.as_str()),
+        "cause": cause,
+    })
+}
+
+/// **M7-B**: build a JSON payload for `ai.mood_changed`.
+pub fn mood_changed_payload(actor_id: u64, delta: f32, new_mood: f32, cause: &str) -> Value {
+    json!({
+        "actor_id": actor_id,
+        "delta": delta,
+        "new_mood": new_mood,
+        "cause": cause,
+    })
+}
+
+/// **M7-B**: stress threshold the actor crossed. Names match the spec
+/// step changes (mood < -75 = depressed; stress > 75 = broken).
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub enum StressThreshold {
+    Calm,
+    Stressed,
+    Depressed,
+    Broken,
+}
+
+impl StressThreshold {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            StressThreshold::Calm => "calm",
+            StressThreshold::Stressed => "stressed",
+            StressThreshold::Depressed => "depressed",
+            StressThreshold::Broken => "broken",
+        }
+    }
+}
+
+/// **M7-B**: build a JSON payload for `ai.stress_threshold_crossed`.
+pub fn stress_threshold_crossed_payload(
+    actor_id: u64,
+    threshold: StressThreshold,
+    direction_entered: bool,
+    stress_value: f32,
+) -> Value {
+    json!({
+        "actor_id": actor_id,
+        "threshold": threshold.as_str(),
+        "direction": if direction_entered { "entered" } else { "exited" },
+        "stress_value": stress_value,
+    })
+}
+
+/// **M7-B**: build a JSON payload for `ai.faction_allegiance_changed`.
+pub fn faction_allegiance_changed_payload(
+    a: FactionId,
+    b: FactionId,
+    delta: i16,
+    new_value: i16,
+    cause: &str,
+) -> Value {
+    json!({
+        "a": a.as_str(),
+        "b": b.as_str(),
+        "delta": delta,
+        "new_value": new_value,
+        "cause": cause,
+    })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -638,5 +959,189 @@ mod tests {
         let r = advance_phase(&mut world, deadline_tick + 1, 60, "elapsed");
         assert!(r.is_some());
         assert_eq!(world.phase.as_ref().unwrap().current, MissionPhase::Buildup);
+    }
+
+    /// **M7-B**: `act.player.set_priority` mutates the bot's
+    /// PriorityTable AND keeps the utility scorer's cached priority in
+    /// sync so the next tick scores against the new weight.
+    #[test]
+    fn set_priority_mutates_state_and_utility_cache() {
+        let mut world = M7AiWorld::new();
+        world.assign_archetype(ActorId(7), Archetype::Medic);
+        let r = world.set_priority(ActorId(7), TaskType::TriageDownedAlly, 3);
+        assert!(r.is_ok());
+        let (old, new) = r.unwrap();
+        assert_eq!(old, 9, "Medic role template starts TriageDownedAlly at 9");
+        assert_eq!(new, 3);
+        let bot = world.bot(ActorId(7)).unwrap();
+        assert_eq!(bot.stack.priority.get(TaskType::TriageDownedAlly), 3);
+        assert_eq!(bot.stack.utility.priority.get(TaskType::TriageDownedAlly), 3);
+    }
+
+    #[test]
+    fn set_priority_clamps_to_nine() {
+        let mut world = M7AiWorld::new();
+        world.assign_archetype(ActorId(7), Archetype::Sniper);
+        let r = world.set_priority(ActorId(7), TaskType::SharpshootTarget, 250);
+        assert!(r.is_ok());
+        assert_eq!(r.unwrap().1, 9);
+    }
+
+    #[test]
+    fn set_priority_rejects_unknown_actor() {
+        let mut world = M7AiWorld::new();
+        let r = world.set_priority(ActorId(99), TaskType::EngageVisibleEnemy, 5);
+        assert!(r.is_err());
+    }
+
+    #[test]
+    fn set_autonomy_returns_old_mode() {
+        let mut world = M7AiWorld::new();
+        world.assign_archetype(ActorId(7), Archetype::Rifleman);
+        let prev = world.set_autonomy(ActorId(7), AutonomyMode::Manual);
+        assert_eq!(prev, Some(AutonomyMode::FullAuto));
+        assert_eq!(world.bot(ActorId(7)).unwrap().stack.autonomy, AutonomyMode::Manual);
+    }
+
+    #[test]
+    fn apply_role_template_swaps_priority_and_archetype() {
+        let mut world = M7AiWorld::new();
+        world.assign_archetype(ActorId(7), Archetype::Rifleman);
+        let r = world.apply_role_template(ActorId(7), RoleTemplate::Medic);
+        assert!(r.is_some());
+        let bot = world.bot(ActorId(7)).unwrap();
+        assert_eq!(bot.archetype, Archetype::Medic);
+        assert_eq!(bot.stack.priority.get(TaskType::TriageDownedAlly), 9);
+    }
+
+    #[test]
+    fn apply_quick_preset_shifts_weights() {
+        let mut world = M7AiWorld::new();
+        world.assign_archetype(ActorId(7), Archetype::Rifleman);
+        let r = world.apply_quick_preset(ActorId(7), QuickPresetId::Attack);
+        assert!(r.is_some());
+        let bot = world.bot(ActorId(7)).unwrap();
+        // Rifleman base EngageVisibleEnemy = 7; +2 = 9.
+        assert_eq!(bot.stack.priority.get(TaskType::EngageVisibleEnemy), 9);
+        // HoldCover = 6; -2 = 4.
+        assert_eq!(bot.stack.priority.get(TaskType::HoldCover), 4);
+    }
+
+    #[test]
+    fn priority_table_view_lists_all_22_weights() {
+        let mut world = M7AiWorld::new();
+        world.assign_archetype(ActorId(7), Archetype::Medic);
+        let view = world.priority_table_view(ActorId(7)).unwrap();
+        let weights = view.get("weights").unwrap().as_object().unwrap();
+        assert_eq!(weights.len(), 22);
+        assert_eq!(weights.get("triage_downed_ally").unwrap(), &json!(9));
+        assert_eq!(view.get("role").unwrap(), &json!("medic"));
+    }
+
+    #[test]
+    fn autonomy_view_carries_mode_and_cap() {
+        let mut world = M7AiWorld::new();
+        world.assign_archetype(ActorId(7), Archetype::Rifleman);
+        world.set_autonomy(ActorId(7), AutonomyMode::Standard);
+        let view = world.autonomy_view(ActorId(7)).unwrap();
+        assert_eq!(view.get("mode").unwrap(), &json!("standard"));
+        assert_eq!(view.get("auto_action_cap").unwrap(), &json!(3));
+    }
+
+    /// **M7-B**: PriorityTable persists across snapshot/restore cycles
+    /// (round-trip preserves weights). Spec § PriorityTable persists.
+    #[test]
+    fn priority_table_round_trips_through_snapshot_restore() {
+        let mut world = M7AiWorld::new();
+        world.assign_archetype(ActorId(1), Archetype::Sniper);
+        world.assign_archetype(ActorId(2), Archetype::Engineer);
+        world.set_priority(ActorId(1), TaskType::SharpshootTarget, 9).unwrap();
+        world.set_priority(ActorId(2), TaskType::SetTrap, 8).unwrap();
+        let snap = world.snapshot_actor_priorities();
+
+        // Mutate after snapshot.
+        world.set_priority(ActorId(1), TaskType::SharpshootTarget, 1).unwrap();
+        world.set_priority(ActorId(2), TaskType::SetTrap, 1).unwrap();
+
+        // Restore — weights return to snapshot values.
+        let restored = world.restore_actor_priorities(&snap);
+        assert_eq!(restored, 2);
+        assert_eq!(
+            world
+                .bot(ActorId(1))
+                .unwrap()
+                .stack
+                .priority
+                .get(TaskType::SharpshootTarget),
+            9
+        );
+        assert_eq!(world.bot(ActorId(2)).unwrap().stack.priority.get(TaskType::SetTrap), 8);
+    }
+
+    #[test]
+    fn try_emit_chatter_gates_within_cooldown_window() {
+        let mut world = M7AiWorld::new();
+        world.assign_archetype(ActorId(7), Archetype::Medic);
+        let first = world.try_emit_chatter(ActorId(7), ChatterCategory::Triage, "Treating Jenkins", 100, 60);
+        assert!(first.is_some(), "first emission opens the slot");
+        let (event, _info) = first.unwrap();
+        assert_eq!(event.text, "Treating Jenkins");
+        assert_eq!(event.voice_id, "voice.medic.default");
+        // Same category 200 ticks later (3.33s) — still in 4s cooldown.
+        let second = world.try_emit_chatter(ActorId(7), ChatterCategory::Triage, "Re-Treating", 200, 60);
+        assert!(second.is_none(), "still in cooldown");
+        // 4.0s later — boundary case (240 ticks @ 60 Hz). 100 + 240 = 340.
+        let third = world.try_emit_chatter(ActorId(7), ChatterCategory::Triage, "Treating again", 340, 60);
+        assert!(third.is_some(), "boundary-tick emission is allowed");
+    }
+
+    #[test]
+    fn personality_modifier_recorded_on_apply() {
+        let mut world = M7AiWorld::new();
+        world.assign_archetype(ActorId(7), Archetype::Rifleman);
+        let r = world.apply_personality_modifier(ActorId(7), PersonalityModifier::Aggressive);
+        assert!(r.is_some());
+        let bot = world.bot(ActorId(7)).unwrap();
+        assert_eq!(bot.personality_modifier, PersonalityModifier::Aggressive);
+        // Rifleman EngageVisibleEnemy = 7; +2 (Aggressive) = 9.
+        assert_eq!(bot.stack.priority.get(TaskType::EngageVisibleEnemy), 9);
+    }
+
+    #[test]
+    fn priority_table_changed_payload_shape() {
+        let v = priority_table_changed_payload(7, TaskType::TriageDownedAlly, 9, 3);
+        assert_eq!(v.get("actor_id").unwrap(), &json!(7));
+        assert_eq!(v.get("task").unwrap(), &json!("triage_downed_ally"));
+        assert_eq!(v.get("old_weight").unwrap(), &json!(9));
+        assert_eq!(v.get("new_weight").unwrap(), &json!(3));
+    }
+
+    #[test]
+    fn autonomy_mode_changed_payload_shape() {
+        let v = autonomy_mode_changed_payload(7, AutonomyMode::FullAuto, AutonomyMode::Manual);
+        assert_eq!(v.get("from").unwrap(), &json!("full_auto"));
+        assert_eq!(v.get("to").unwrap(), &json!("manual"));
+    }
+
+    #[test]
+    fn role_template_applied_payload_shape() {
+        let v = role_template_applied_payload(7, RoleTemplate::Medic);
+        assert_eq!(v.get("template_id").unwrap(), &json!("medic"));
+    }
+
+    #[test]
+    fn quick_preset_applied_payload_shape() {
+        let v = quick_preset_applied_payload(7, QuickPresetId::Rescue);
+        assert_eq!(v.get("preset_id").unwrap(), &json!("rescue"));
+    }
+
+    #[test]
+    fn faction_allegiance_changed_payload_shape() {
+        let v = faction_allegiance_changed_payload(FactionId::Player, FactionId::AiAllied, -30, 45, "friendly_fire");
+        assert_eq!(v.get("a").unwrap(), &json!("player"));
+        assert_eq!(v.get("b").unwrap(), &json!("ai_allied"));
+        assert_eq!(v.get("delta").unwrap(), &json!(-30));
+        assert_eq!(v.get("new_value").unwrap(), &json!(45));
+        assert_eq!(v.get("cause").unwrap(), &json!("friendly_fire"));
     }
 }

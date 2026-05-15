@@ -460,6 +460,41 @@ pub enum ControlCommand {
         actor_id: u64,
         source: IntentSource,
     },
+    /// **M7-B**: set a single task weight on an actor's PriorityTable
+    /// (clamps to 0..=9). Spec § Smart commandable AI — Per-task override.
+    /// Mutates `M7AiWorld.bots[actor].stack.priority` AND emits
+    /// `ai.priority_table_changed`.
+    ActPlayerSetPriority {
+        actor_id: u64,
+        task: String,
+        weight: u8,
+        source: IntentSource,
+    },
+    /// **M7-B**: set an actor's autonomy mode (FullAuto / Standard /
+    /// Manual). Spec § Smart commandable AI — Layer 1 Autonomy mode.
+    /// Mutates `M7AiWorld.bots[actor].stack.autonomy` AND emits
+    /// `ai.autonomy_mode_changed`.
+    ActPlayerSetAutonomyMode {
+        actor_id: u64,
+        mode: String,
+        source: IntentSource,
+    },
+    /// **M7-B**: replace an actor's role + PriorityTable with one of the
+    /// 6 spec-mandated role templates. Spec § Smart commandable AI — 6
+    /// role templates. Emits `ai.role_template_applied`.
+    ActPlayerApplyRoleTemplate {
+        actor_id: u64,
+        template_id: String,
+        source: IntentSource,
+    },
+    /// **M7-B**: apply one of the 5 spec-named quick presets (attack /
+    /// defend / overwatch / rescue / salvage). Emits
+    /// `ai.quick_preset_applied`.
+    ActPlayerApplyQuickPreset {
+        actor_id: u64,
+        preset_id: String,
+        source: IntentSource,
+    },
     SettingsSet {
         changes: SettingsPatch,
     },
@@ -550,6 +585,16 @@ pub trait EngineHandle: Send + Sync + 'static {
     /// override. Returns `None` when no ledger file exists.
     async fn observe_assets_ledger_summary(&self) -> Option<serde_json::Value> {
         default_observe_assets_ledger_summary()
+    }
+    /// **M7-B**: return the per-actor PriorityTable view (22-task weight
+    /// grid + role + personality modifier). Default returns `None`.
+    async fn observe_priority_table(&self, _actor_id: u64) -> Option<serde_json::Value> {
+        None
+    }
+    /// **M7-B**: return the per-actor autonomy mode + auto-action cap.
+    /// Default returns `None`.
+    async fn observe_autonomy(&self, _actor_id: u64) -> Option<serde_json::Value> {
+        None
     }
 }
 
@@ -1322,6 +1367,138 @@ async fn process_request<E: EngineHandle>(
                 })
                 .await;
             Some(ack_response(request.id, &result))
+        }
+        // **M7-B**: commandability surface — per-task weight override.
+        "act.player.set_priority" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                actor_id: u64,
+                #[serde(alias = "task")]
+                task_type: String,
+                weight: u8,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerSetPriority {
+                    actor_id: p.actor_id,
+                    task: p.task_type,
+                    weight: p.weight,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        // **M7-B**: set autonomy mode (FullAuto / Standard / Manual).
+        "act.player.set_autonomy_mode" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                actor_id: u64,
+                mode: String,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerSetAutonomyMode {
+                    actor_id: p.actor_id,
+                    mode: p.mode,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        // **M7-B**: load one of the 6 role templates.
+        "act.player.apply_role_template" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                actor_id: u64,
+                template_id: String,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerApplyRoleTemplate {
+                    actor_id: p.actor_id,
+                    template_id: p.template_id,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        // **M7-B**: apply one of the 5 quick presets (attack / defend /
+        // overwatch / rescue / salvage).
+        "act.player.apply_quick_preset" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                actor_id: u64,
+                preset_id: String,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerApplyQuickPreset {
+                    actor_id: p.actor_id,
+                    preset_id: p.preset_id,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        // **M7-B**: read-only projection of an actor's PriorityTable.
+        "observe.priority_table" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                actor_id: u64,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            match engine.observe_priority_table(p.actor_id).await {
+                Some(value) => Some(success_response(request.id, value)),
+                None => Some(invalid_param_reason(request.id, "no_such_ai_actor")),
+            }
+        }
+        // **M7-B**: read-only projection of an actor's autonomy mode + cap.
+        "observe.autonomy" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                actor_id: u64,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            match engine.observe_autonomy(p.actor_id).await {
+                Some(value) => Some(success_response(request.id, value)),
+                None => Some(invalid_param_reason(request.id, "no_such_ai_actor")),
+            }
         }
         "act.chassis.repair" => {
             let p: ActChassisRepairParams = match serde_json::from_value(params) {

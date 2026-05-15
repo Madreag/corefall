@@ -1820,6 +1820,107 @@ impl M0Engine {
                 parent_event_id.map(|s| s.to_string()),
             );
         }
+        // **M7-B**: scenario-start emission of personality + faction +
+        // initial mood/stress baselines. The 4 events below give every
+        // M7-B-spec-mandated event family a deterministic production
+        // emission site at run start. Subsequent runtime mutations
+        // (mood/stress decay, faction adjustments) wire in at M13+ when
+        // the campaign retention loop ships.
+        self.emit_m7b_personality_faction_baselines(tick, sim_time_ms, parent_event_id);
+    }
+
+    /// **M7-B**: emit `ai.personality_changed`, `ai.faction_allegiance_changed`,
+    /// `ai.mood_changed`, and `ai.stress_threshold_crossed` for the initial
+    /// state of every spawned bot + the seeded faction matrix. This gives
+    /// each event family a deterministic production emission site at run
+    /// start so replay viewers + the audit harness see the expected
+    /// "scene-start" snapshot for personality / faction state.
+    fn emit_m7b_personality_faction_baselines(&self, tick: Tick, sim_time_ms: f64, parent_event_id: Option<&str>) {
+        let parent = parent_event_id.map(|s| s.to_string());
+        let state = match self.state.read() {
+            Ok(s) => s,
+            Err(_) => return,
+        };
+        let bot_ids: Vec<(cf_actor::ActorId, cf_ai::Archetype, cf_ai::PersonalityProfile)> = state
+            .m7_ai_world
+            .bots
+            .iter()
+            .map(|(id, bot)| (*id, bot.archetype, bot.personality.clone()))
+            .collect();
+        let factions = state.m7_ai_world.factions.clone();
+        drop(state);
+        for (actor_id, archetype, personality) in &bot_ids {
+            // Personality baseline. Default traits come from the archetype's
+            // canonical personality bundle (M7-A / cf-ai); modifier defaults
+            // to Neutral until the player applies one via cfctl.
+            let traits: Vec<cf_ai::PersonalityTrait> = personality.traits.clone();
+            let payload = crate::m7_ai::personality_changed_payload(
+                actor_id.0,
+                &traits,
+                Some(cf_priority::PersonalityModifier::Neutral),
+                "scenario_start",
+            );
+            // Mirror archetype on the payload to keep it useful even with
+            // empty traits.
+            let mut p = payload;
+            if let serde_json::Value::Object(ref mut m) = p {
+                m.insert("archetype".to_string(), json!(archetype.as_str()));
+            }
+            self.recorder
+                .record(tick, sim_time_ms, "ai", "personality_changed", p, parent.clone());
+            // Mood baseline (delta=0 means "snapshot of current value").
+            let mood = personality.mood;
+            let payload = crate::m7_ai::mood_changed_payload(actor_id.0, 0.0, mood, "scenario_start_baseline");
+            self.recorder
+                .record(tick, sim_time_ms, "ai", "mood_changed", payload, parent.clone());
+            // Stress threshold baseline — emit the current band so observers
+            // know the starting state without inferring it.
+            let stress = personality.stress;
+            let threshold = if stress >= 75.0 {
+                crate::m7_ai::StressThreshold::Broken
+            } else if stress >= 50.0 {
+                crate::m7_ai::StressThreshold::Depressed
+            } else if stress >= 25.0 {
+                crate::m7_ai::StressThreshold::Stressed
+            } else {
+                crate::m7_ai::StressThreshold::Calm
+            };
+            let payload = crate::m7_ai::stress_threshold_crossed_payload(actor_id.0, threshold, true, stress);
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "ai",
+                "stress_threshold_crossed",
+                payload,
+                parent.clone(),
+            );
+        }
+        // Faction baseline — emit one allegiance-changed event for each
+        // ordered faction pair (only 3 unique combinations + 3 self-pairs;
+        // skip self-pairs since allegiance(self,self)=100 is constant).
+        let factions_vec = cf_ai::FactionId::ALL.to_vec();
+        for a in &factions_vec {
+            for b in &factions_vec {
+                if a == b {
+                    continue;
+                }
+                // Only emit one direction per pair (a < b ordinal) to keep
+                // the snapshot deterministic + non-redundant.
+                if a.ordinal() > b.ordinal() {
+                    continue;
+                }
+                let value = factions.get(*a, *b);
+                let payload = crate::m7_ai::faction_allegiance_changed_payload(*a, *b, 0, value, "scenario_start");
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "ai",
+                    "faction_allegiance_changed",
+                    payload,
+                    parent.clone(),
+                );
+            }
+        }
     }
 
     /// **M4 § Snapshot cadence**: lightweight per-actor snapshot fired
@@ -4243,6 +4344,7 @@ impl M0Engine {
         };
 
         let label_changed = emit.reason_label_changed.is_some();
+        let chosen_task = emit.chosen_task;
         if let Some(payload) = emit.reason_label_changed {
             self.recorder
                 .record(tick, sim_time_ms, "ai", "reason_label_changed", payload, None);
@@ -4258,6 +4360,59 @@ impl M0Engine {
             let payload = crate::m7_ai::archetype_chosen_payload(guard_id.0, archetype);
             self.recorder
                 .record(tick, sim_time_ms, "ai", "archetype_chosen", payload, None);
+        }
+        // **M7-B**: chatter scaffold — when a bot's chosen_task transitions
+        // into a chatter-emitting task family, route through the cooldown
+        // table. The cooldown gate prevents chatter spam (4s window per
+        // (actor, category) per spec § Chatter scaffold cooldown table).
+        if label_changed {
+            let chatter_emit = {
+                let (category, text) = match chosen_task {
+                    cf_ai::TaskType::TriageDownedAlly => (
+                        Some(cf_audio::ChatterCategory::Triage),
+                        format!(
+                            "Treating ally {}, hold this area",
+                            player_actor.as_ref().map(|p| p.id.0).unwrap_or(0)
+                        ),
+                    ),
+                    cf_ai::TaskType::RepairChassisModule | cf_ai::TaskType::RepairTerrainBreach => (
+                        Some(cf_audio::ChatterCategory::Repair),
+                        format!(
+                            "Repairing ally {}'s module",
+                            player_actor.as_ref().map(|p| p.id.0).unwrap_or(0)
+                        ),
+                    ),
+                    cf_ai::TaskType::EngageVisibleEnemy | cf_ai::TaskType::SuppressFire => {
+                        (Some(cf_audio::ChatterCategory::Engaging), "Engaging!".to_string())
+                    }
+                    cf_ai::TaskType::RetreatToCover => (
+                        Some(cf_audio::ChatterCategory::Doctrine),
+                        "Falling back to cover, we're outnumbered".to_string(),
+                    ),
+                    cf_ai::TaskType::MarkThreats => (
+                        Some(cf_audio::ChatterCategory::Contact),
+                        "Contact spotted, marking target".to_string(),
+                    ),
+                    _ => (None, String::new()),
+                };
+                if let Some(cat) = category {
+                    let mut state = match self.state.write() {
+                        Ok(s) => s,
+                        Err(_) => return,
+                    };
+                    state
+                        .m7_ai_world
+                        .try_emit_chatter(guard_id, cat, text, tick.0, tick_rate_hz)
+                        .map(|(event, _)| event)
+                } else {
+                    None
+                }
+            };
+            if let Some(event) = chatter_emit {
+                let payload = crate::m7_ai::chatter_emitted_payload(&event);
+                self.recorder
+                    .record(tick, sim_time_ms, "ai", "chatter_emitted", payload, None);
+            }
         }
     }
 
@@ -8698,6 +8853,286 @@ impl M0Engine {
         CommandResult::accepted(tick.0)
     }
 
+    /// **M7-B**: dispatch `act.player.set_priority`. Mutates the bot's
+    /// PriorityTable AND the utility scorer's cached priority so the
+    /// next AI tick scores against the new weight. Emits
+    /// `ai.priority_table_changed` on success.
+    fn dispatch_set_priority(
+        &self,
+        actor_id: u64,
+        task: String,
+        weight: u8,
+        source: cf_actor::IntentSource,
+        tick: Tick,
+        sim_time_ms: f64,
+        state: std::sync::RwLockWriteGuard<'_, EngineMutable>,
+    ) -> CommandResult {
+        let _ = source;
+        let actor = cf_actor::ActorId(actor_id);
+        let task_type = match cf_ai::TaskType::from_str(&task) {
+            Some(t) => t,
+            None => {
+                drop(state);
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "control",
+                    "command_rejected",
+                    json!({"method": "act.player.set_priority", "reason": "unknown_task"}),
+                    None,
+                );
+                return CommandResult::rejected("unknown_task", tick.0);
+            }
+        };
+        let mut state = state;
+        let result = state.m7_ai_world.set_priority(actor, task_type, weight);
+        let (old_weight, new_weight) = match result {
+            Ok(pair) => pair,
+            Err(reason) => {
+                drop(state);
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "control",
+                    "command_rejected",
+                    json!({"method": "act.player.set_priority", "reason": reason}),
+                    None,
+                );
+                return CommandResult::rejected(reason, tick.0);
+            }
+        };
+        drop(state);
+        self.recorder.record(
+            tick,
+            sim_time_ms,
+            "control",
+            "command_accepted",
+            json!({
+                "method": "act.player.set_priority",
+                "actor_id": actor_id,
+                "task": task_type.as_str(),
+                "weight": new_weight,
+            }),
+            None,
+        );
+        let payload = crate::m7_ai::priority_table_changed_payload(actor_id, task_type, old_weight, new_weight);
+        self.recorder
+            .record(tick, sim_time_ms, "ai", "priority_table_changed", payload, None);
+        CommandResult::accepted(tick.0)
+    }
+
+    /// **M7-B**: dispatch `act.player.set_autonomy_mode`. Emits
+    /// `ai.autonomy_mode_changed` on success.
+    fn dispatch_set_autonomy_mode(
+        &self,
+        actor_id: u64,
+        mode: String,
+        source: cf_actor::IntentSource,
+        tick: Tick,
+        sim_time_ms: f64,
+        state: std::sync::RwLockWriteGuard<'_, EngineMutable>,
+    ) -> CommandResult {
+        let _ = source;
+        let actor = cf_actor::ActorId(actor_id);
+        let new_mode = match cf_ai::AutonomyMode::from_str(&mode) {
+            Some(m) => m,
+            None => {
+                drop(state);
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "control",
+                    "command_rejected",
+                    json!({"method": "act.player.set_autonomy_mode", "reason": "unknown_mode"}),
+                    None,
+                );
+                return CommandResult::rejected("unknown_mode", tick.0);
+            }
+        };
+        let mut state = state;
+        let prev = state.m7_ai_world.set_autonomy(actor, new_mode);
+        let from = match prev {
+            Some(p) => p,
+            None => {
+                drop(state);
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "control",
+                    "command_rejected",
+                    json!({"method": "act.player.set_autonomy_mode", "reason": "no_such_actor"}),
+                    None,
+                );
+                return CommandResult::rejected("no_such_actor", tick.0);
+            }
+        };
+        drop(state);
+        self.recorder.record(
+            tick,
+            sim_time_ms,
+            "control",
+            "command_accepted",
+            json!({
+                "method": "act.player.set_autonomy_mode",
+                "actor_id": actor_id,
+                "mode": new_mode.as_str(),
+            }),
+            None,
+        );
+        let payload = crate::m7_ai::autonomy_mode_changed_payload(actor_id, from, new_mode);
+        self.recorder
+            .record(tick, sim_time_ms, "ai", "autonomy_mode_changed", payload, None);
+        CommandResult::accepted(tick.0)
+    }
+
+    /// **M7-B**: dispatch `act.player.apply_role_template`. Replaces the
+    /// bot's PriorityTable with the chosen role template + emits
+    /// `ai.role_template_applied` AND `ai.archetype_chosen`.
+    fn dispatch_apply_role_template(
+        &self,
+        actor_id: u64,
+        template_id: String,
+        source: cf_actor::IntentSource,
+        tick: Tick,
+        sim_time_ms: f64,
+        state: std::sync::RwLockWriteGuard<'_, EngineMutable>,
+    ) -> CommandResult {
+        let _ = source;
+        let actor = cf_actor::ActorId(actor_id);
+        let template = match cf_priority::RoleTemplate::from_str(&template_id) {
+            Some(t) => t,
+            None => {
+                drop(state);
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "control",
+                    "command_rejected",
+                    json!({"method": "act.player.apply_role_template", "reason": "unknown_template_id"}),
+                    None,
+                );
+                return CommandResult::rejected("unknown_template_id", tick.0);
+            }
+        };
+        let mut state = state;
+        match state.m7_ai_world.apply_role_template(actor, template) {
+            Some(()) => {}
+            None => {
+                drop(state);
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "control",
+                    "command_rejected",
+                    json!({"method": "act.player.apply_role_template", "reason": "no_such_actor"}),
+                    None,
+                );
+                return CommandResult::rejected("no_such_actor", tick.0);
+            }
+        }
+        let archetype = template.archetype();
+        // Try to emit chatter (OrderAck) when role template applies.
+        let chatter_emit = state
+            .m7_ai_world
+            .try_emit_chatter(
+                actor,
+                cf_audio::ChatterCategory::OrderAck,
+                "Roger, switching role.",
+                tick.0,
+                self.config.tick_rate_hz,
+            )
+            .map(|(event, _)| event);
+        drop(state);
+        self.recorder.record(
+            tick,
+            sim_time_ms,
+            "control",
+            "command_accepted",
+            json!({
+                "method": "act.player.apply_role_template",
+                "actor_id": actor_id,
+                "template_id": template.as_str(),
+            }),
+            None,
+        );
+        let payload = crate::m7_ai::role_template_applied_payload(actor_id, template);
+        self.recorder
+            .record(tick, sim_time_ms, "ai", "role_template_applied", payload, None);
+        let archetype_payload = crate::m7_ai::archetype_chosen_payload(actor_id, archetype);
+        self.recorder
+            .record(tick, sim_time_ms, "ai", "archetype_chosen", archetype_payload, None);
+        if let Some(event) = chatter_emit {
+            let chatter_payload = crate::m7_ai::chatter_emitted_payload(&event);
+            self.recorder
+                .record(tick, sim_time_ms, "ai", "chatter_emitted", chatter_payload, None);
+        }
+        CommandResult::accepted(tick.0)
+    }
+
+    /// **M7-B**: dispatch `act.player.apply_quick_preset`. Shifts task
+    /// weights ±2 per spec § Quick presets. Emits
+    /// `ai.quick_preset_applied`.
+    fn dispatch_apply_quick_preset(
+        &self,
+        actor_id: u64,
+        preset_id: String,
+        source: cf_actor::IntentSource,
+        tick: Tick,
+        sim_time_ms: f64,
+        state: std::sync::RwLockWriteGuard<'_, EngineMutable>,
+    ) -> CommandResult {
+        let _ = source;
+        let actor = cf_actor::ActorId(actor_id);
+        let preset = match cf_priority::QuickPresetId::from_str(&preset_id) {
+            Some(p) => p,
+            None => {
+                drop(state);
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "control",
+                    "command_rejected",
+                    json!({"method": "act.player.apply_quick_preset", "reason": "unknown_preset_id"}),
+                    None,
+                );
+                return CommandResult::rejected("unknown_preset_id", tick.0);
+            }
+        };
+        let mut state = state;
+        match state.m7_ai_world.apply_quick_preset(actor, preset) {
+            Some(()) => {}
+            None => {
+                drop(state);
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "control",
+                    "command_rejected",
+                    json!({"method": "act.player.apply_quick_preset", "reason": "no_such_actor"}),
+                    None,
+                );
+                return CommandResult::rejected("no_such_actor", tick.0);
+            }
+        }
+        drop(state);
+        self.recorder.record(
+            tick,
+            sim_time_ms,
+            "control",
+            "command_accepted",
+            json!({
+                "method": "act.player.apply_quick_preset",
+                "actor_id": actor_id,
+                "preset_id": preset.as_str(),
+            }),
+            None,
+        );
+        let payload = crate::m7_ai::quick_preset_applied_payload(actor_id, preset);
+        self.recorder
+            .record(tick, sim_time_ms, "ai", "quick_preset_applied", payload, None);
+        CommandResult::accepted(tick.0)
+    }
+
     pub fn write_run_bundle(&self, ended_at: DateTime<Utc>, exit_code: i32) -> Result<PathBuf, cf_replay::BundleError> {
         // M2 (extended): every bundle written from the engine — including mid-run
         // `runbundle.write` that fires before `record_run_finished` — must contain at
@@ -10361,6 +10796,21 @@ impl EngineHandle for M0Engine {
             "member_count": squad.member_count(),
             "members": members,
         }))
+    }
+
+    /// **M7-B**: per-actor PriorityTable projection — 22-task weight grid
+    /// + role + personality modifier. Returns `None` if the actor has no
+    /// `BotState`.
+    async fn observe_priority_table(&self, actor_id: u64) -> Option<serde_json::Value> {
+        let state = self.state.read().ok()?;
+        state.m7_ai_world.priority_table_view(cf_actor::ActorId(actor_id))
+    }
+
+    /// **M7-B**: per-actor autonomy projection — mode + auto_action_cap +
+    /// doctrine_mode. Returns `None` if the actor has no `BotState`.
+    async fn observe_autonomy(&self, actor_id: u64) -> Option<serde_json::Value> {
+        let state = self.state.read().ok()?;
+        state.m7_ai_world.autonomy_view(cf_actor::ActorId(actor_id))
     }
 
     /// **M2 re-audit (2026-05-13)**: full mission inspect including the last
@@ -12157,6 +12607,25 @@ impl EngineHandle for M0Engine {
             ControlCommand::ActSquadCancelCommand { actor_id, source } => {
                 self.dispatch_squad_cancel_command(actor_id, source, tick, sim_time_ms, state)
             }
+            ControlCommand::ActPlayerSetPriority {
+                actor_id,
+                task,
+                weight,
+                source,
+            } => self.dispatch_set_priority(actor_id, task, weight, source, tick, sim_time_ms, state),
+            ControlCommand::ActPlayerSetAutonomyMode { actor_id, mode, source } => {
+                self.dispatch_set_autonomy_mode(actor_id, mode, source, tick, sim_time_ms, state)
+            }
+            ControlCommand::ActPlayerApplyRoleTemplate {
+                actor_id,
+                template_id,
+                source,
+            } => self.dispatch_apply_role_template(actor_id, template_id, source, tick, sim_time_ms, state),
+            ControlCommand::ActPlayerApplyQuickPreset {
+                actor_id,
+                preset_id,
+                source,
+            } => self.dispatch_apply_quick_preset(actor_id, preset_id, source, tick, sim_time_ms, state),
         }
     }
 }
