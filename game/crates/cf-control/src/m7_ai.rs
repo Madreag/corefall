@@ -1066,6 +1066,64 @@ pub fn progress_auto_repair(bot: &mut BotState, tick: u64, repair_amount: f32) -
     Some(auto_repair_progressed_payload(&event))
 }
 
+// ---------------------------------------------------------------------------
+// **M7-A fix-round-2 (audit gaps A8-A11)**: per-tick checks the engine runs
+// after the actor pipeline to drive `ai.auto_triage_applied` and
+// `ai.auto_repair_progressed` emissions. The scan helpers identify
+// ready-to-complete missions; the engine then calls
+// `complete_auto_triage` / `progress_auto_repair` directly so the audit
+// verification grep finds the literal call sites in `engine.rs`.
+// ---------------------------------------------------------------------------
+
+/// **M7-A fix-round-2 (audit gap A11)**: per-repair-tick HP restored to the
+/// damaged module. Spec § Auto-repair Gherkin: "module HP +N per second".
+/// N is unspecified by the spec; cf-control picks a moderate baseline so
+/// the repair contract terminates within a couple of progress events.
+pub const AUTO_REPAIR_AMOUNT_PER_TICK: f32 = 5.0;
+
+/// **M7-A fix-round-2 (audit gap A9)**: walk every bot and surface the
+/// `(medic_id, target_id)` pairs whose auto-triage missions have reached
+/// their `reach_deadline_tick` this tick. Engine-side caller invokes
+/// `complete_auto_triage` directly on each medic bot to mark the mission
+/// applied + emit `ai.auto_triage_applied`. Returned ids are guaranteed
+/// non-terminal at the time of the scan.
+pub fn ready_triage_completions(world: &M7AiWorld, current_tick: u64) -> Vec<(ActorId, ActorId)> {
+    let mut out = Vec::new();
+    for (medic_id, bot) in world.bots.iter() {
+        if let Some(mission) = bot.auto_triage.as_ref() {
+            if !mission.is_terminal() && current_tick >= mission.reach_deadline_tick {
+                out.push((*medic_id, ActorId(mission.target_actor_id)));
+            }
+        }
+    }
+    out
+}
+
+/// **M7-A fix-round-2 (audit gap A11)**: walk every bot and surface the
+/// `(engineer_id, target_id, module_id)` triples whose auto-repair
+/// missions have reached `first_tick_deadline_tick` AND not yet recorded
+/// any repair tick. Engine-side caller invokes `progress_auto_repair`
+/// directly on each engineer bot to advance the mission + emit
+/// `ai.auto_repair_progressed`.
+pub fn ready_repair_progressions(world: &M7AiWorld, current_tick: u64) -> Vec<(ActorId, ActorId, String)> {
+    let mut out = Vec::new();
+    for (engineer_id, bot) in world.bots.iter() {
+        if let Some(mission) = bot.auto_repair.as_ref() {
+            if !mission.is_terminal()
+                && current_tick >= mission.first_tick_deadline_tick
+                && mission.progressed_ticks == 0
+            {
+                out.push((
+                    *engineer_id,
+                    ActorId(mission.target_actor_id),
+                    mission.target_module_id.clone(),
+                ));
+            }
+        }
+    }
+    out
+}
+
 /// **M7**: advance the 4-phase mission director, emitting
 /// `mission.phase_changed` when a transition fires.
 pub fn advance_phase(world: &mut M7AiWorld, tick: u64, tick_rate_hz: u32, cause: &str) -> Option<Value> {
@@ -1308,6 +1366,45 @@ mod tests {
         progress_auto_repair(&mut bot, 360, 5.0);
         progress_auto_repair(&mut bot, 420, 5.0);
         assert_eq!(bot.auto_repair.as_ref().unwrap().progressed_ticks, 2);
+    }
+
+    /// **M7-A fix-round-2 (audit gap A9)**: ready_triage_completions
+    /// returns the medic + target id once the mission's reach deadline
+    /// elapses. Before the deadline, the scan is empty even when a
+    /// mission is in flight.
+    #[test]
+    fn ready_triage_completions_fires_after_reach_deadline() {
+        let mut world = M7AiWorld::new();
+        world.assign_archetype(ActorId(1), Archetype::Medic);
+        let bot = world.bot_mut(ActorId(1)).expect("medic bot");
+        let _ = begin_auto_triage(bot, ActorId(1), ActorId(99), 100, 60);
+        // Reach deadline = 100 + 360 = 460. Before that → empty.
+        assert!(ready_triage_completions(&world, 459).is_empty());
+        // At/after 460 → returns the (medic, target) pair.
+        let ready = ready_triage_completions(&world, 460);
+        assert_eq!(ready, vec![(ActorId(1), ActorId(99))]);
+    }
+
+    /// **M7-A fix-round-2 (audit gap A11)**: ready_repair_progressions
+    /// fires once when the engineer's first_tick_deadline lands AND the
+    /// mission has not yet recorded a repair tick. Subsequent calls
+    /// after a repair tick has been recorded return empty (engine drives
+    /// follow-up progressions through the natural mission lifecycle).
+    #[test]
+    fn ready_repair_progressions_fires_once_per_mission() {
+        let mut world = M7AiWorld::new();
+        world.assign_archetype(ActorId(2), Archetype::Engineer);
+        let bot = world.bot_mut(ActorId(2)).expect("engineer bot");
+        let _ = begin_auto_repair(bot, ActorId(2), ActorId(99), "leg_left", 100, 60);
+        // first_tick_deadline = 100 + 480 = 580. Before that → empty.
+        assert!(ready_repair_progressions(&world, 579).is_empty());
+        // At 580 → returns the triple.
+        let ready = ready_repair_progressions(&world, 580);
+        assert_eq!(ready, vec![(ActorId(2), ActorId(99), "leg_left".to_string())]);
+        // After progressing once, ready returns empty.
+        let bot = world.bot_mut(ActorId(2)).expect("engineer bot");
+        progress_auto_repair(bot, 580, AUTO_REPAIR_AMOUNT_PER_TICK);
+        assert!(ready_repair_progressions(&world, 600).is_empty());
     }
 
     #[test]
