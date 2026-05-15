@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "description": "M37A NPC voice line prompt manifest. 24 named NPCs (3 per faction x 8 factions). Each NPC has ~6 voice line hooks: first_meeting / post_victory / post_loss / betrayal / quest_offer / quest_completed / death. Voice characteristics from per_faction_voice_config. Synthesis target: ElevenLabs premium for named NPCs.",
+  "audio_format": {
+    "channels": 1,
+    "sample_rate_hz": 48000,
+    "bit_depth": 16,
+    "target_peak_dbfs": -16.0,
+    "target_lufs_integrated": -22.0,
+    "max_duration_sec": 8.0
+  },
+  "synthesis_backends": {
+    "primary": "elevenlabs_v3_premium",
+    "fallback": "coqui_xtts_v2"
+  },
+  "npc_voice_prompts": [
+    {"id": "voice_marcus_hayes_first_meeting", "npc_id": "coalition_captain_marcus_hayes", "voice_id": "coalition_marcus_authoritative_male", "hook": "first_meeting", "text": "Captain Marcus Hayes, Coalition. You the new contractor? Good. We hold the line, and we hold it until we are told otherwise. Welcome to the Mars eastern front."},
+    {"id": "voice_marcus_hayes_post_victory", "npc_id": "coalition_captain_marcus_hayes", "voice_id": "coalition_marcus_authoritative_male", "hook": "post_victory", "text": "Good work. The Concordat counts that one. The brass pins will reflect."},
+    {"id": "voice_marcus_hayes_post_loss", "npc_id": "coalition_captain_marcus_hayes", "voice_id": "coalition_marcus_authoritative_male", "hook": "post_loss", "text": "Mendez is on the list now. So is the kid from Lagrange. We do not forget. We resupply, we relearn, and we redeploy."},
+    {"id": "voice_marcus_hayes_quest_offer", "npc_id": "coalition_captain_marcus_hayes", "voice_id": "coalition_marcus_authoritative_male", "hook": "quest_offer", "text": "There is a Marauder camp three klicks south of the Olympus Line. Recon says four squads. The Concordat says we cannot tolerate it. The math says we can. You in?"},
+    {"id": "voice_marcus_hayes_betrayal", "npc_id": "coalition_captain_marcus_hayes", "voice_id": "coalition_marcus_authoritative_male", "hook": "betrayal", "text": "You sold us out. Coalition records keep names. The records will keep yours."},
+    {"id": "voice_marcus_hayes_death", "npc_id": "coalition_captain_marcus_hayes", "voice_id": "coalition_marcus_authoritative_male", "hook": "death", "text": "Hold the line. Hold the... ", "emotion": "fading"},
+
+    {"id": "voice_mendez_first_meeting", "npc_id": "coalition_sergeant_ana_mendez", "voice_id": "coalition_mendez_medic_female", "hook": "first_meeting", "text": "Sergeant Mendez, medic. I keep us alive. You bleed where I tell you to bleed, and you wait where I tell you to wait. Clear?"},
+    {"id": "voice_mendez_treating_you", "npc_id": "coalition_sergeant_ana_mendez", "voice_id": "coalition_mendez_medic_female", "hook": "treating", "text": "Hold still. Pressure first. Tourniquet next. You will be fine. Or you will be a teaching example."},
+    {"id": "voice_mendez_post_victory", "npc_id": "coalition_sergeant_ana_mendez", "voice_id": "coalition_mendez_medic_female", "hook": "post_victory", "text": "All four came home. That is the number that matters."},
+    {"id": "voice_mendez_death", "npc_id": "coalition_sergeant_ana_mendez", "voice_id": "coalition_mendez_medic_female", "hook": "death", "text": "I am... not bringing this one back. I am sorry. Tell Marcus the lecture about field tourniquets was correct."},
+
+    {"id": "voice_park_first_meeting", "npc_id": "coalition_engineer_chen_park", "voice_id": "coalition_park_engineer_male", "hook": "first_meeting", "text": "Engineer Park. I build the walls you hide behind. I repair the mechs you ride. Do not break them faster than I can fix them."},
+    {"id": "voice_park_repairing", "npc_id": "coalition_engineer_chen_park", "voice_id": "coalition_park_engineer_male", "hook": "repairing", "text": "Welding now. Do not touch the hot side. Eighty percent torque, ninety, hundred. Done."},
+    {"id": "voice_park_post_victory", "npc_id": "coalition_engineer_chen_park", "voice_id": "coalition_park_engineer_male", "hook": "post_victory", "text": "Mech is alive. Pilot is alive. Both bills paid. Coffee?"},
+
+    {"id": "voice_jana_first_meeting", "npc_id": "frontier_warlord_jana_qa", "voice_id": "frontier_jana_rough_female", "hook": "first_meeting", "text": "Jana Qa. Warlord, this stretch of the Tharsis line. You here to fight Coalition, or you here to fight Marauders, or you here to fight both? Make a list before you make a request."},
+    {"id": "voice_jana_quest_offer", "npc_id": "frontier_warlord_jana_qa", "voice_id": "frontier_jana_rough_female", "hook": "quest_offer", "text": "Coalition convoy moves through our valley tomorrow. They think the salt road is patrolled. They are wrong. We could prove it."},
+    {"id": "voice_jana_post_victory", "npc_id": "frontier_warlord_jana_qa", "voice_id": "frontier_jana_rough_female", "hook": "post_victory", "text": "Good work. Drinks tonight. Tomorrow we plan the next one."},
+    {"id": "voice_jana_betrayal", "npc_id": "frontier_warlord_jana_qa", "voice_id": "frontier_jana_rough_female", "hook": "betrayal", "text": "I trusted you. The Frontier remembers names too. Sleep light."},
+
+    {"id": "voice_torres_first_meeting", "npc_id": "frontier_smith_olaf_torres", "voice_id": "frontier_torres_smith_male", "hook": "first_meeting", "text": "Torres. Ironwood Smithy. I make the blades the Coalition cannot account for. You need something custom, you pay in salvage."},
+    {"id": "voice_torres_quest_offer", "npc_id": "frontier_smith_olaf_torres", "voice_id": "frontier_torres_smith_male", "hook": "quest_offer", "text": "Need a load of Coalition-grade plate. Twelve millimeter or better. Bring it back, I will forge you something worth keeping."},
+
+    {"id": "voice_riya_first_meeting", "npc_id": "frontier_pilot_riya_chen", "voice_id": "frontier_riya_pilot_female", "hook": "first_meeting", "text": "Riya. I fly. Better than the Coalition, worse than I claim at the bar. You want to get somewhere fast? I am your ride."},
+    {"id": "voice_riya_post_victory", "npc_id": "frontier_pilot_riya_chen", "voice_id": "frontier_riya_pilot_female", "hook": "post_victory", "text": "Buggy still has fuel. Mostly. Lets go again."},
+
+    {"id": "voice_kenshiro_first_meeting", "npc_id": "ronin_blade_kenshiro", "voice_id": "ronin_kenshiro_sparse_male", "hook": "first_meeting", "text": "Kenshiro. Three Writs in good standing. My blade is for hire. My word is bound."},
+    {"id": "voice_kenshiro_quest_offer", "npc_id": "ronin_blade_kenshiro", "voice_id": "ronin_kenshiro_sparse_male", "hook": "quest_offer", "text": "I have a Writ that needs a second hand. Target is a Coalition deserter. Pay is fair. Risk is contained."},
+    {"id": "voice_kenshiro_kill_confirm", "npc_id": "ronin_blade_kenshiro", "voice_id": "ronin_kenshiro_sparse_male", "hook": "kill_confirmed", "text": "Resolved. The Hall will record it."},
+
+    {"id": "voice_yuko_first_meeting", "npc_id": "ronin_master_yuko_sato", "voice_id": "ronin_yuko_master_female", "hook": "first_meeting", "text": "Yuko Sato, Hall-master. The Phobos Ronin Hall. We do not negotiate fees. We register Writs. State your business."},
+    {"id": "voice_yuko_writ_registered", "npc_id": "ronin_master_yuko_sato", "voice_id": "ronin_yuko_master_female", "hook": "quest_offer", "text": "Writ registered. Five clauses, your blood, my witness. The Hall enforces both sides. Do not test that."},
+
+    {"id": "voice_jin_first_meeting", "npc_id": "ronin_apprentice_jin", "voice_id": "ronin_jin_apprentice_male", "hook": "first_meeting", "text": "Jin. Apprentice. I am here to learn the Code. I am not here to die quickly."},
+    {"id": "voice_jin_post_victory", "npc_id": "ronin_apprentice_jin", "voice_id": "ronin_jin_apprentice_male", "hook": "post_victory", "text": "Did I do right? Master Yuko will tell me later."},
+
+    {"id": "voice_a47_first_meeting", "npc_id": "synth_consensus_node_a47", "voice_id": "synth_node_a47_synthetic_neutral", "hook": "first_meeting", "text": "Node A-47. Consensus participant. You may address me as a single entity for protocol simplicity. My responses reflect the network's consensus at the time of query."},
+    {"id": "voice_a47_quest_offer", "npc_id": "synth_consensus_node_a47", "voice_id": "synth_node_a47_synthetic_neutral", "hook": "quest_offer", "text": "The Collective requires a salvage operation in Belt sector seven. Hostile presence: pirate. Threat level: managed. Compensation: in Collective resources."},
+
+    {"id": "voice_b12_first_meeting", "npc_id": "synth_courier_b12", "voice_id": "synth_courier_b12_synthetic", "hook": "first_meeting", "text": "Courier B-12. Optical sensor count: four. Visible range: nominal. Pleased to serve consensus."},
+
+    {"id": "voice_c08_first_meeting", "npc_id": "synth_archivist_c08", "voice_id": "synth_archivist_c08_synthetic", "hook": "first_meeting", "text": "Archivist C-08. I retain twelve thousand records of inter-faction communications. Query format: any natural language."},
+
+    {"id": "voice_aleia_first_meeting", "npc_id": "collective_kindred_priestess_aleia", "voice_id": "collective_aleia_aqueous_female", "hook": "first_meeting", "text": "Aleia. Priestess of the Aqueous Kindred. The water remembers your approach. Speak slowly and we will hear you."},
+    {"id": "voice_aleia_quest_offer", "npc_id": "collective_kindred_priestess_aleia", "voice_id": "collective_aleia_aqueous_female", "hook": "quest_offer", "text": "There is a disturbance in the methane lake near our temple. The current does not flow as before. We need eyes that walk."},
+
+    {"id": "voice_maro_first_meeting", "npc_id": "collective_diver_maro", "voice_id": "collective_maro_diver_male", "hook": "first_meeting", "text": "Maro. Methane diver. The scar on my chest was a lesson. I would rather not repeat it."},
+
+    {"id": "voice_naera_first_meeting", "npc_id": "collective_singer_naera", "voice_id": "collective_naera_singer_female", "hook": "first_meeting", "text": "Naera. I sing the Brine Song. Today my verse is about you. It is not yet finished."},
+
+    {"id": "voice_silent_one_observed", "npc_id": "husks_silent_one", "voice_id": "husks_silent_one_distorted", "hook": "encounter", "text": "Acceptable", "duration_target_sec": 1.0},
+    {"id": "voice_silent_one_resolve", "npc_id": "husks_silent_one", "voice_id": "husks_silent_one_distorted", "hook": "tango_down", "text": "Returned", "duration_target_sec": 0.8},
+
+    {"id": "voice_observer_encounter", "npc_id": "husks_observer", "voice_id": "husks_observer_distorted", "hook": "encounter", "text": "We see you. We have always seen you", "duration_target_sec": 2.4},
+
+    {"id": "voice_caretaker_encounter", "npc_id": "husks_caretaker", "voice_id": "husks_caretaker_distorted", "hook": "encounter", "text": "Your configuration is interesting. We will preserve it", "duration_target_sec": 2.8},
+
+    {"id": "voice_thomas_lee_first_meeting", "npc_id": "collegium_curator_thomas_lee", "voice_id": "collegium_thomas_lee_curator_male", "hook": "first_meeting", "text": "Curator Thomas Lee. I preserve what comes, I record what is, I add nothing, I subtract nothing. Welcome to the Archive."},
+    {"id": "voice_thomas_lee_quest_offer", "npc_id": "collegium_curator_thomas_lee", "voice_id": "collegium_thomas_lee_curator_male", "hook": "quest_offer", "text": "The Archive lacks a record of the 2118 Phobos relay event. If you were there, or know someone who was, we would compensate fairly."},
+
+    {"id": "voice_aoife_first_meeting", "npc_id": "collegium_librarian_aoife", "voice_id": "collegium_aoife_librarian_female", "hook": "first_meeting", "text": "Librarian Aoife. The reference section is closed today. The combat section is, regrettably, open."},
+
+    {"id": "voice_ines_first_meeting", "npc_id": "collegium_scribe_ines", "voice_id": "collegium_ines_scribe_female", "hook": "first_meeting", "text": "Ines. Scribe. My ink is calibrated. My hand is steady. My patience is not."},
+
+    {"id": "voice_solana_first_meeting", "npc_id": "starlight_minister_solana", "voice_id": "starlight_solana_minister_female", "hook": "first_meeting", "text": "Minister Solana. The sun watches you. I watch you. We are not the same. Yet."},
+    {"id": "voice_solana_quest_offer", "npc_id": "starlight_minister_solana", "voice_id": "starlight_solana_minister_female", "hook": "quest_offer", "text": "A Pact pilgrim has been lost on the Vulcan rim. The sun is generous, but the rocks are not. Help retrieve them."},
+
+    {"id": "voice_callum_first_meeting", "npc_id": "starlight_warden_callum", "voice_id": "starlight_callum_warden_male", "hook": "first_meeting", "text": "Warden Callum. Solar Brand at my hip. My duty is to protect the ministers. My pleasure is to ensure they do not have to ask."},
+
+    {"id": "voice_yara_first_meeting", "npc_id": "starlight_pilgrim_yara", "voice_id": "starlight_yara_pilgrim_female", "hook": "first_meeting", "text": "Pilgrim Yara. I have walked from the Mars temple to the Vulcan rim. Three weeks. The sun made me ready. The wind tried to unmake me. I prevailed."}
+  ]
+}

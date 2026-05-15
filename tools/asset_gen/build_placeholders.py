@@ -901,6 +901,232 @@ def _vfx_decal_jobs(manifest: Dict[str, object]) -> List[BakeJob]:
     return jobs
 
 
+def _portrait_jobs(manifest: Dict[str, object]) -> List[BakeJob]:
+    """NPC / storyteller / boss / faction-generic portraits — 1 entry, 1 size 384px."""
+    jobs: List[BakeJob] = []
+    for entry in manifest["entries"]:  # type: ignore[index]
+        if not isinstance(entry, dict):
+            continue
+        name = str(entry["canonical_name"])
+        prompt = str(entry.get("prompt", entry.get("kind", "portrait")))
+        kind = str(entry.get("kind", "portrait"))
+        faction = str(entry.get("faction", "scientist_order"))
+        origin = entry.get("origin")
+        canonical = f"{name}"
+        jobs.append(BakeJob(
+            category="Portrait",
+            canonical_name=canonical,
+            kind=kind,
+            prompt=prompt,
+            faction=faction,
+            origin=str(origin) if origin else None,
+            stance=None,
+            facing="right",
+            variant=None,
+            weight_class=None,
+            module_state=None,
+            integrity_band=None,
+            overlay_mode=None,
+            size=384,
+            palette_ref=faction,
+            seed=_seed_for(canonical),
+        ))
+    return jobs
+
+
+def _ui_screen_jobs(manifest: Dict[str, object]) -> List[BakeJob]:
+    """Assembled UI screen mockups — 1 entry, 1 size 1024px."""
+    jobs: List[BakeJob] = []
+    for entry in manifest["entries"]:  # type: ignore[index]
+        if not isinstance(entry, dict):
+            continue
+        name = str(entry["canonical_name"])
+        prompt = str(entry.get("prompt", entry.get("kind", "ui-screen")))
+        kind = str(entry.get("kind", "ui-screen"))
+        faction = str(entry.get("faction", "scientist_order"))
+        canonical = f"{name}"
+        jobs.append(BakeJob(
+            category="UiScreen",
+            canonical_name=canonical,
+            kind=kind,
+            prompt=prompt,
+            faction=faction,
+            origin=None,
+            stance=None,
+            facing="right",
+            variant=None,
+            weight_class=None,
+            module_state=None,
+            integrity_band=None,
+            overlay_mode=None,
+            size=1024,
+            palette_ref=faction,
+            seed=_seed_for(canonical),
+        ))
+    return jobs
+
+
+def _vfx_frame_jobs(manifest: Dict[str, object]) -> List[BakeJob]:
+    """VFX animation frames — 1 entry per (effect × frame_index), 192px."""
+    jobs: List[BakeJob] = []
+    for entry in manifest["entries"]:  # type: ignore[index]
+        if not isinstance(entry, dict):
+            continue
+        name = str(entry["canonical_name"])
+        prompt = str(entry.get("prompt", entry.get("kind", "vfx-frame")))
+        kind = str(entry.get("kind", "vfx-frame"))
+        faction = str(entry.get("faction", "scientist_order"))
+        canonical = f"{name}"
+        jobs.append(BakeJob(
+            category="VfxFrame",
+            canonical_name=canonical,
+            kind=kind,
+            prompt=prompt,
+            faction=faction,
+            origin=None,
+            stance=None,
+            facing="right",
+            variant=None,
+            weight_class=None,
+            module_state=None,
+            integrity_band=None,
+            overlay_mode=None,
+            size=192,
+            palette_ref=faction,
+            seed=_seed_for(canonical),
+        ))
+    return jobs
+
+
+def _loading_bg_jobs(manifest: Dict[str, object]) -> List[BakeJob]:
+    """Loading-screen atmospheric backgrounds — 1 entry per scene, 1024px."""
+    jobs: List[BakeJob] = []
+    for entry in manifest["entries"]:  # type: ignore[index]
+        if not isinstance(entry, dict):
+            continue
+        name = str(entry["canonical_name"])
+        prompt = str(entry.get("prompt", entry.get("kind", "loading-bg")))
+        kind = str(entry.get("kind", "loading-bg"))
+        faction = str(entry.get("faction", "scientist_order"))
+        canonical = f"{name}"
+        jobs.append(BakeJob(
+            category="LoadingBg",
+            canonical_name=canonical,
+            kind=kind,
+            prompt=prompt,
+            faction=faction,
+            origin=None,
+            stance=None,
+            facing="right",
+            variant=None,
+            weight_class=None,
+            module_state=None,
+            integrity_band=None,
+            overlay_mode=None,
+            size=1024,
+            palette_ref=faction,
+            seed=_seed_for(canonical),
+        ))
+    return jobs
+
+
+def _boss_splash_jobs(manifest: Dict[str, object]) -> List[BakeJob]:
+    """Boss intro cinematic key frames — 1 entry per boss, 768px."""
+    jobs: List[BakeJob] = []
+    for entry in manifest["entries"]:  # type: ignore[index]
+        if not isinstance(entry, dict):
+            continue
+        name = str(entry["canonical_name"])
+        prompt = str(entry.get("prompt", entry.get("kind", "boss-splash")))
+        kind = str(entry.get("kind", "boss-splash"))
+        faction = str(entry.get("faction", "scientist_order"))
+        canonical = f"{name}"
+        jobs.append(BakeJob(
+            category="BossSplash",
+            canonical_name=canonical,
+            kind=kind,
+            prompt=prompt,
+            faction=faction,
+            origin=None,
+            stance=None,
+            facing="right",
+            variant=None,
+            weight_class=None,
+            module_state=None,
+            integrity_band=None,
+            overlay_mode=None,
+            size=768,
+            palette_ref=faction,
+            seed=_seed_for(canonical),
+        ))
+    return jobs
+
+
+def _key_art_jobs(manifest: Dict[str, object]) -> List[BakeJob]:
+    """Marketing key art — 1 entry per faction + main, 1280px wide aspect."""
+    jobs: List[BakeJob] = []
+    for entry in manifest["entries"]:  # type: ignore[index]
+        if not isinstance(entry, dict):
+            continue
+        name = str(entry["canonical_name"])
+        prompt = str(entry.get("prompt", entry.get("kind", "key-art")))
+        kind = str(entry.get("kind", "key-art"))
+        faction = str(entry.get("faction", "scientist_order"))
+        canonical = f"{name}"
+        jobs.append(BakeJob(
+            category="KeyArt",
+            canonical_name=canonical,
+            kind=kind,
+            prompt=prompt,
+            faction=faction,
+            origin=None,
+            stance=None,
+            facing="right",
+            variant=None,
+            weight_class=None,
+            module_state=None,
+            integrity_band=None,
+            overlay_mode=None,
+            size=1280,
+            palette_ref=faction,
+            seed=_seed_for(canonical),
+        ))
+    return jobs
+
+
+def _animation_frame_jobs(manifest: Dict[str, object]) -> List[BakeJob]:
+    """Multi-direction animation frames — 1 entry per (archetype × frame × direction), 256px."""
+    jobs: List[BakeJob] = []
+    for entry in manifest["entries"]:  # type: ignore[index]
+        if not isinstance(entry, dict):
+            continue
+        name = str(entry["canonical_name"])
+        prompt = str(entry.get("prompt", entry.get("kind", "animation-frame")))
+        kind = str(entry.get("kind", "animation-frame"))
+        faction = str(entry.get("faction", "hostile_corp"))
+        origin = entry.get("origin")
+        canonical = f"{name}"
+        jobs.append(BakeJob(
+            category="AnimationFrame",
+            canonical_name=canonical,
+            kind=kind,
+            prompt=prompt,
+            faction=faction,
+            origin=str(origin) if origin else None,
+            stance=str(entry.get("stance", "walking")),
+            facing="right",
+            variant=None,
+            weight_class=None,
+            module_state=None,
+            integrity_band=None,
+            overlay_mode=None,
+            size=256,
+            palette_ref=faction,
+            seed=_seed_for(canonical),
+        ))
+    return jobs
+
+
 _MANIFEST_TO_BUILDER = {
     "weapons.ron": _weapon_jobs,
     "actors.ron": _actor_jobs,
@@ -915,6 +1141,13 @@ _MANIFEST_TO_BUILDER = {
     "hud_widgets.ron": _hud_widget_jobs,
     "banners.ron": _banner_jobs,
     "vfx_decals.ron": _vfx_decal_jobs,
+    "portraits.ron": _portrait_jobs,
+    "ui_screens.ron": _ui_screen_jobs,
+    "vfx_frames.ron": _vfx_frame_jobs,
+    "loading_backgrounds.ron": _loading_bg_jobs,
+    "boss_splashes.ron": _boss_splash_jobs,
+    "key_art.ron": _key_art_jobs,
+    "animation_frames.ron": _animation_frame_jobs,
 }
 
 
@@ -969,6 +1202,12 @@ def _output_dir_for(category: str) -> Path:
         "Banner": "banners",
         "VfxDecal": "vfx_decals",
         "AnimationFrame": "animation_frames",
+        "Portrait": "portraits",
+        "UiScreen": "ui_screens",
+        "VfxFrame": "vfx_frames",
+        "LoadingBg": "loading_backgrounds",
+        "BossSplash": "boss_splashes",
+        "KeyArt": "key_art",
     }.get(category, "misc")
     return PLACEHOLDER_ROOT / sub
 
@@ -1083,6 +1322,12 @@ def _bake_one(job: BakeJob) -> Dict[str, object]:
         "Banner": "UiIcon",
         "VfxDecal": "Particle",
         "AnimationFrame": "Animation",
+        "Portrait": "UiIcon",
+        "UiScreen": "UiIcon",
+        "VfxFrame": "Particle",
+        "LoadingBg": "UiIcon",
+        "BossSplash": "Cosmetic",
+        "KeyArt": "Cosmetic",
     }
     engine_category = category_to_engine.get(job.category, job.category)
     draft = ledger_writer.LedgerEntryDraft(

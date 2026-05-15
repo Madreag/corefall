@@ -2,7 +2,43 @@
 
 ## Status
 
-`active`
+`done` (re-sealed 2026-05-15 with expanded composer + manifest count)
+
+## Closure state (2026-05-15)
+
+Initial bake at commit `67a710a` produced 4735 entries. Subsequent polish-pass commits added enriched composers + new categories. As of 2026-05-15 commit b8c53e1, the ledger holds **6428 fresh entries** across 23 composers:
+
+| Composer | Dispatch | Ledger Entries | Output Dir |
+|---|---|---|---|
+| `_compose_weapon` | WeaponSprite | 210 | weapons/ |
+| `_compose_actor` | ActorSprite | 3080 | actors/ |
+| `_compose_vehicle` | VehicleSprite | 18 | vehicles/ |
+| `_compose_chassis` | ChassisSprite | 40 | chassis/ |
+| `_compose_base_module` | BaseModuleSprite | 240 | base_modules/ |
+| `_compose_ui_icon` | UiIcon | 640 | ui_icons/ |
+| `_compose_material` | MaterialSwatch | 50 | materials/ |
+| `_compose_particle` | Particle | 120 | particles/ |
+| `_compose_terrain_tile` | TerrainTile | 85 | terrain_tiles/ |
+| `_compose_cosmetic_stub` | Cosmetic | 256 | cosmetics/ |
+| `_compose_emblem` | FactionEmblem | 16 | faction_emblems/ |
+| `_compose_overlay` | CaptureGridOverlay | 24 | capture_overlays/ |
+| `_compose_shell_ui` | ShellUi | 178 | shell_ui/ |
+| `_compose_banner` | Banner | 264 | banners/ |
+| `_compose_hud_widget` | HudWidget | 400 | hud_widgets/ |
+| `_compose_vfx_decal` | VfxDecal | 96 | vfx_decals/ |
+| `_compose_animation_frame` | AnimationFrame | 144 | animation_frames/ |
+| `_compose_portrait` | Portrait | 44 | portraits/ |
+| `_compose_ui_screen` | UiScreen | 20 | ui_screens/ |
+| `_compose_vfx_frame` | VfxFrame | 64 | vfx_frames/ |
+| `_compose_loading_bg` | LoadingBg | 20 | loading_backgrounds/ |
+| `_compose_boss_splash` | BossSplash | 23 | boss_splashes/ |
+| `_compose_key_art` | KeyArt | 19 | key_art/ |
+
+Plus 242 SFX WAVs (Audio_SFX / Tier1_LLM_Audio / M12A_sfx_v1) + 120 music WAVs (Audio_Music / Tier1_LLM_Audio / M37A_music_v1) = **6428 total ledger entries**.
+
+cf-mod ledger verify --strict clean: `verify total=6428 fresh=6428 stale=0 drifted=0 missing=0 failed=0`.
+
+cf-mod validate content/ clean: `scanned=85 pass=1 warn=84 fail=0`.
 
 ## Intent
 

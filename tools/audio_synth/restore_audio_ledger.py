@@ -85,6 +85,10 @@ def rebuild_music_entries():
             row = build_music_entry(canonical_name, out_path, seed, prompt)
             row["category"] = "Audio_Music"
             row["kind"] = "music"
+            row["tier"] = "Tier1_LLM_Audio"
+            new_id = ledger_writer.compute_asset_id(row["category"], row["canonical_name"], row["tier"])
+            row["id"] = new_id
+            row["regen_command"] = f"cf-mod ledger regenerate {new_id}"
             rows.append(row)
     return rows
 

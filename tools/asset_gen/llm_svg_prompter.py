@@ -5357,8 +5357,13 @@ def _compose_animation_frame(spec: AssetSpec, rng: random.Random) -> str:
         direction = name.split("_dir_")[1].split("_")[0]
     # Direction → facing
     facing = "left" if direction in ("w", "nw", "sw") else "right"
-    # Stance based on frame index
-    stance = "running" if frame_index in (1, 3) else "walking"
+    # Stance based on frame index — 4 distinct stances cycle for visible walk-cycle
+    stance = {
+        0: "walking",
+        1: "running",
+        2: "jetting",
+        3: "crouching",
+    }.get(frame_index, "walking")
 
     # Build a synthetic AssetSpec with stance + facing patched in
     extra = dict(spec.extra or {})
@@ -5377,6 +5382,553 @@ def _compose_animation_frame(spec: AssetSpec, rng: random.Random) -> str:
         extra=extra,
     )
     return _compose_actor(patched_spec, rng)
+
+
+def _compose_portrait(spec: AssetSpec, rng: random.Random) -> str:
+    """NPC / storyteller / boss / faction-generic portrait — face + bust.
+
+    Routes by canonical_name prefix:
+        portrait_npc_<faction>_<role>_<name>
+        portrait_storyteller_<id>
+        portrait_boss_<id>
+        portrait_faction_<id>_generic
+    """
+    import math as _m
+    name = spec.canonical_name.lower()
+    p = spec.palette
+    body = p.primary()
+    accent = p.accent()
+    dark = p.dark()
+    highlight = p.highlight()
+    metal = p.metal()
+    glow = p.glow()
+    skin = (spec.origin_palette or p).primary()
+    skin_dark = (spec.origin_palette or p).dark()
+    W, H = spec.width, spec.height
+    cx = W / 2
+
+    parts: List[str] = []
+    parts.append(_rect(0, 0, W, H, dark))
+    for i in range(8):
+        ring_r = W * (0.55 - i * 0.04)
+        shade = _darken_hex(body, 0.10 + i * 0.04)
+        parts.append(_circle(cx, H * 0.42, ring_r, shade, dark_or(dark, "#000000"), 0.3))
+    parts.append(_rect(W * 0.04, H * 0.04, W * 0.92, H * 0.92, "none", accent, max(1.5, W * 0.012)))
+    parts.append(_rect(W * 0.06, H * 0.06, W * 0.88, H * 0.88, "none", dark, 0.8))
+    head_r = W * 0.16
+    head_cx, head_cy = cx, H * 0.38
+    parts.append(_circle(head_cx, head_cy, head_r * 1.05, skin_dark))
+    parts.append(_circle(head_cx, head_cy, head_r, skin, skin_dark, 0.6))
+    parts.append(_polygon([
+        (head_cx - head_r * 0.95, head_cy - head_r * 0.05),
+        (head_cx, head_cy - head_r * 0.95),
+        (head_cx + head_r * 0.95, head_cy - head_r * 0.05),
+        (head_cx + head_r * 0.85, head_cy + head_r * 0.30),
+        (head_cx - head_r * 0.85, head_cy + head_r * 0.30),
+    ], metal, dark, 1.0))
+    parts.append(_rect(head_cx - head_r * 0.55, head_cy - head_r * 0.20,
+                       head_r * 1.10, head_r * 0.40, accent, dark, 0.5))
+    parts.append(_rect(head_cx - head_r * 0.50, head_cy - head_r * 0.15,
+                       head_r * 0.40, head_r * 0.06, glow))
+    parts.append(_rect(head_cx + head_r * 0.10, head_cy - head_r * 0.15,
+                       head_r * 0.40, head_r * 0.06, glow))
+    if "_boss_" in name:
+        for j in range(6):
+            ang = (j * 60) * 3.14159 / 180
+            x1 = head_cx + head_r * 1.3 * _m.cos(ang)
+            y1 = head_cy + head_r * 1.3 * _m.sin(ang)
+            x2 = head_cx + head_r * 1.8 * _m.cos(ang)
+            y2 = head_cy + head_r * 1.8 * _m.sin(ang)
+            parts.append(_line(x1, y1, x2, y2, accent, 2.0))
+    shoulder_y = head_cy + head_r * 1.2
+    shoulder_w = W * 0.50
+    parts.append(_polygon([
+        (cx - shoulder_w * 0.55, H),
+        (cx - shoulder_w * 0.55, shoulder_y + H * 0.05),
+        (cx - shoulder_w * 0.40, shoulder_y - H * 0.02),
+        (cx, shoulder_y - H * 0.06),
+        (cx + shoulder_w * 0.40, shoulder_y - H * 0.02),
+        (cx + shoulder_w * 0.55, shoulder_y + H * 0.05),
+        (cx + shoulder_w * 0.55, H),
+    ], body, dark, 1.2))
+    parts.append(_polygon([
+        (cx - shoulder_w * 0.55, shoulder_y + H * 0.05),
+        (cx - shoulder_w * 0.30, shoulder_y - H * 0.04),
+        (cx - shoulder_w * 0.32, shoulder_y + H * 0.10),
+    ], metal, dark, 0.6))
+    parts.append(_polygon([
+        (cx + shoulder_w * 0.55, shoulder_y + H * 0.05),
+        (cx + shoulder_w * 0.30, shoulder_y - H * 0.04),
+        (cx + shoulder_w * 0.32, shoulder_y + H * 0.10),
+    ], metal, dark, 0.6))
+    parts.append(_circle(cx, shoulder_y + H * 0.10, W * 0.04, accent, dark, 0.5))
+    parts.append(_rect(W * 0.10, H * 0.85, W * 0.80, H * 0.10, dark))
+    parts.append(_rect(W * 0.10, H * 0.85, W * 0.80, H * 0.02, accent))
+    parts.append(_rect(W * 0.10, H * 0.93, W * 0.80, H * 0.02, accent))
+    parts.append(_rect(W * 0.74, H * 0.06, W * 0.20, W * 0.20, body, accent, 1.0))
+    parts.append(_circle(W * 0.84, H * 0.06 + W * 0.10, W * 0.07, accent, dark, 0.8))
+    return "".join(parts)
+
+
+def _compose_ui_screen(spec: AssetSpec, rng: random.Random) -> str:
+    """Assembled UI screen mockup (M11A shell + M11 in-mission HUD).
+
+    Routes by canonical_name prefix to produce a recognizable layout:
+        screen_title_main / screen_main_menu / screen_pause / screen_save_load
+        screen_settings_<tab> / screen_credits / screen_loading
+        screen_hud_combat / screen_briefing_comic
+    """
+    name = spec.canonical_name.lower()
+    p = spec.palette
+    body = p.primary()
+    accent = p.accent()
+    dark = p.dark()
+    highlight = p.highlight()
+    metal = p.metal()
+    glow = p.glow()
+    W, H = spec.width, spec.height
+    parts: List[str] = []
+    parts.append(_rect(0, 0, W, H, dark))
+    for i in range(5):
+        parts.append(_rect(0, H * i / 5, W, H / 5, _darken_hex(body, 0.4 + i * 0.05)))
+
+    if "title" in name or "main_menu" in name:
+        parts.append(_rect(W * 0.30, H * 0.10, W * 0.40, H * 0.25, dark, accent, 2.0))
+        parts.append(_rect(W * 0.32, H * 0.12, W * 0.36, H * 0.21, body, accent, 1.0))
+        parts.append(_rect(W * 0.34, H * 0.16, W * 0.32, H * 0.05, accent))
+        parts.append(_rect(W * 0.34, H * 0.24, W * 0.20, H * 0.03, glow))
+        menu_items = ["NEW GAME", "CONTINUE", "MULTIPLAYER", "WORKSHOP", "SETTINGS", "QUIT"]
+        for i, _ in enumerate(menu_items):
+            y = H * (0.42 + i * 0.07)
+            fill = accent if i == 0 else body
+            parts.append(_rect(W * 0.35, y, W * 0.30, H * 0.05, fill, dark, 0.8))
+            parts.append(_rect(W * 0.36, y + H * 0.018, W * 0.22, H * 0.012, dark))
+        parts.append(_rect(W * 0.04, H * 0.94, W * 0.15, H * 0.04, body, accent, 0.5))
+        parts.append(_rect(W * 0.81, H * 0.94, W * 0.15, H * 0.04, body, accent, 0.5))
+    elif "pause" in name:
+        parts.append(_rect(0, 0, W, H, dark, None, 0.0))
+        parts.append(_rect(W * 0.25, H * 0.15, W * 0.50, H * 0.70, body, accent, 2.0))
+        parts.append(_rect(W * 0.30, H * 0.20, W * 0.40, H * 0.06, accent))
+        items = ["RESUME", "SETTINGS", "SAVE", "LOAD", "SHOW ME WHY", "QUIT"]
+        for i, _ in enumerate(items):
+            y = H * (0.32 + i * 0.08)
+            parts.append(_rect(W * 0.30, y, W * 0.40, H * 0.06, _darken_hex(body, 0.2), dark, 0.5))
+            parts.append(_rect(W * 0.32, y + H * 0.022, W * 0.28, H * 0.012, accent))
+    elif "save" in name or "load" in name:
+        parts.append(_rect(W * 0.04, H * 0.04, W * 0.92, H * 0.10, body, accent, 1.5))
+        parts.append(_rect(W * 0.06, H * 0.06, W * 0.30, H * 0.06, accent))
+        for row in range(3):
+            for col in range(3):
+                sx = W * (0.06 + col * 0.32)
+                sy = H * (0.18 + row * 0.26)
+                parts.append(_rect(sx, sy, W * 0.28, H * 0.22, _darken_hex(body, 0.3), accent, 1.0))
+                parts.append(_rect(sx + W * 0.01, sy + H * 0.01, W * 0.26, H * 0.10, _darken_hex(body, 0.5)))
+                parts.append(_circle(sx + W * 0.14, sy + H * 0.06, W * 0.04, accent))
+                parts.append(_rect(sx + W * 0.01, sy + H * 0.13, W * 0.26, H * 0.015, dark))
+                parts.append(_rect(sx + W * 0.01, sy + H * 0.155, W * 0.20, H * 0.015, dark))
+                parts.append(_rect(sx + W * 0.01, sy + H * 0.18, W * 0.16, H * 0.015, glow))
+    elif "settings" in name:
+        parts.append(_rect(0, 0, W, H * 0.08, body, accent, 1.0))
+        tabs = ["DISPLAY", "AUDIO", "CONTROLS", "ACCESS", "GAMEPLAY", "LANG"]
+        for i, _ in enumerate(tabs):
+            tx = W * (0.04 + i * 0.16)
+            fill = accent if i == 2 else _darken_hex(body, 0.2)
+            parts.append(_rect(tx, H * 0.02, W * 0.14, H * 0.05, fill, dark, 0.8))
+            parts.append(_rect(tx + W * 0.02, H * 0.038, W * 0.10, H * 0.012, dark))
+        for row in range(8):
+            ry = H * (0.13 + row * 0.10)
+            parts.append(_rect(W * 0.06, ry, W * 0.88, H * 0.08, _darken_hex(body, 0.3), dark, 0.5))
+            parts.append(_rect(W * 0.08, ry + H * 0.025, W * 0.30, H * 0.025, accent))
+            parts.append(_rect(W * 0.50, ry + H * 0.030, W * 0.40, H * 0.015, dark))
+            parts.append(_circle(W * 0.50 + W * 0.20, ry + H * 0.038, W * 0.012, glow))
+    elif "credits" in name:
+        for col in range(2):
+            cxx = W * (0.10 + col * 0.45)
+            parts.append(_rect(cxx, H * 0.06, W * 0.35, H * 0.04, accent))
+            for j in range(10):
+                py = H * (0.13 + j * 0.07)
+                parts.append(_rect(cxx, py, W * 0.20, H * 0.015, _darken_hex(body, 0.4)))
+                parts.append(_rect(cxx, py + H * 0.025, W * 0.32, H * 0.012, dark))
+    elif "loading" in name:
+        parts.append(_rect(0, 0, W, H * 0.65, _darken_hex(body, 0.4)))
+        for i in range(8):
+            parts.append(_circle(rng.uniform(0, W), rng.uniform(0, H * 0.5), rng.uniform(2, 6), glow))
+        parts.append(_polygon([
+            (0, H * 0.65),
+            (W * 0.30, H * 0.50),
+            (W * 0.50, H * 0.55),
+            (W * 0.75, H * 0.45),
+            (W, H * 0.60),
+            (W, H * 0.65),
+        ], dark))
+        parts.append(_rect(W * 0.10, H * 0.78, W * 0.80, H * 0.04, body, accent, 1.0))
+        parts.append(_rect(W * 0.10, H * 0.78, W * 0.55, H * 0.04, accent))
+        parts.append(_rect(W * 0.10, H * 0.86, W * 0.80, H * 0.10, _darken_hex(body, 0.3), dark, 0.5))
+        parts.append(_rect(W * 0.12, H * 0.88, W * 0.70, H * 0.012, accent))
+        for j in range(3):
+            parts.append(_rect(W * 0.12, H * (0.91 + j * 0.020), W * 0.50, H * 0.012, dark))
+    elif "hud_combat" in name:
+        parts.append(_rect(W * 0.02, H * 0.03, W * 0.20, H * 0.10, body, accent, 1.0))
+        parts.append(_rect(W * 0.03, H * 0.06, W * 0.18, H * 0.02, _darken_hex(body, 0.4)))
+        parts.append(_rect(W * 0.03, H * 0.06, W * 0.13, H * 0.02, "#c93030"))
+        parts.append(_rect(W * 0.03, H * 0.09, W * 0.10, H * 0.015, "#dab438"))
+        parts.append(_rect(W * 0.78, H * 0.03, W * 0.20, H * 0.10, body, accent, 1.0))
+        parts.append(_rect(W * 0.80, H * 0.06, W * 0.10, H * 0.03, accent))
+        parts.append(_rect(W * 0.32, H * 0.04, W * 0.36, H * 0.06, dark, accent, 1.0))
+        parts.append(_rect(W * 0.33, H * 0.05, W * 0.34, H * 0.04, _darken_hex(body, 0.3)))
+        parts.append(_rect(W * 0.02, H * 0.30, W * 0.10, H * 0.40, body, accent, 1.0))
+        parts.append(_rect(W * 0.03, H * 0.32, W * 0.08, H * 0.08, accent))
+        for i in range(4):
+            parts.append(_rect(W * 0.03, H * (0.41 + i * 0.07), W * 0.08, H * 0.06, _darken_hex(body, 0.3)))
+        parts.append(_circle(W / 2, H / 2, W * 0.012, accent))
+        parts.append(_circle(W / 2, H / 2, W * 0.020, "none", accent, 1.5))
+        parts.append(_line(W / 2 - W * 0.04, H / 2, W / 2 - W * 0.015, H / 2, accent, 1.5))
+        parts.append(_line(W / 2 + W * 0.015, H / 2, W / 2 + W * 0.04, H / 2, accent, 1.5))
+        parts.append(_line(W / 2, H / 2 - H * 0.04, W / 2, H / 2 - H * 0.015, accent, 1.5))
+        parts.append(_line(W / 2, H / 2 + H * 0.015, W / 2, H / 2 + H * 0.04, accent, 1.5))
+        parts.append(_rect(W * 0.62, H * 0.20, W * 0.34, H * 0.30, _darken_hex(body, 0.3), accent, 1.0))
+        for i in range(4):
+            parts.append(_rect(W * 0.63, H * (0.22 + i * 0.07), W * 0.32, H * 0.05, body, dark, 0.5))
+            parts.append(_circle(W * 0.65, H * (0.245 + i * 0.07), W * 0.012, glow))
+            parts.append(_rect(W * 0.68, H * (0.235 + i * 0.07), W * 0.15, H * 0.012, accent))
+        parts.append(_rect(W * 0.62, H * 0.82, W * 0.34, H * 0.10, body, accent, 1.0))
+        parts.append(_rect(W * 0.63, H * 0.84, W * 0.32, H * 0.06, _darken_hex(body, 0.3)))
+    elif "briefing_comic" in name or "briefing" in name:
+        parts.append(_rect(W * 0.04, H * 0.04, W * 0.46, H * 0.45, body, dark, 3.0))
+        parts.append(_rect(W * 0.06, H * 0.06, W * 0.42, H * 0.41, _darken_hex(body, 0.3), dark, 1.0))
+        parts.append(_circle(W * 0.20, H * 0.20, W * 0.08, accent))
+        parts.append(_rect(W * 0.10, H * 0.30, W * 0.30, H * 0.10, dark))
+        parts.append(_rect(W * 0.52, H * 0.04, W * 0.44, H * 0.45, body, dark, 3.0))
+        parts.append(_rect(W * 0.54, H * 0.06, W * 0.40, H * 0.41, _darken_hex(body, 0.5), dark, 1.0))
+        for i in range(4):
+            parts.append(_rect(W * 0.56, H * (0.10 + i * 0.10), W * 0.36, H * 0.05, body))
+        parts.append(_rect(W * 0.04, H * 0.52, W * 0.92, H * 0.43, body, dark, 3.0))
+        parts.append(_rect(W * 0.06, H * 0.54, W * 0.88, H * 0.05, accent))
+        for i in range(6):
+            parts.append(_rect(W * 0.06, H * (0.62 + i * 0.05), W * 0.85, H * 0.015, _darken_hex(body, 0.3)))
+    else:
+        parts.append(_rect(W * 0.10, H * 0.10, W * 0.80, H * 0.80, body, accent, 2.0))
+        parts.append(_rect(W * 0.12, H * 0.12, W * 0.76, H * 0.10, accent))
+        for i in range(6):
+            parts.append(_rect(W * 0.12, H * (0.26 + i * 0.10), W * 0.76, H * 0.06, _darken_hex(body, 0.3)))
+
+    return "".join(parts)
+
+
+def _compose_vfx_frame(spec: AssetSpec, rng: random.Random) -> str:
+    """Animation frame composer for VFX (muzzle_flash / explosion / impact_burst / blood_splat).
+
+    Reads frame_index from canonical_name suffix `_frame_N`. Total frames = 4 unless
+    `_of_M` suffix specifies otherwise. Each frame shows progressive dissipation.
+    """
+    import math as _m
+    name = spec.canonical_name.lower()
+    p = spec.palette
+    body = p.primary()
+    accent = p.accent()
+    dark = p.dark()
+    glow = p.glow()
+    metal = p.metal()
+    W, H = spec.width, spec.height
+    cx, cy = W / 2, H / 2
+
+    frame_index = 0
+    if "_frame_" in name:
+        try:
+            frame_index = int(name.split("_frame_")[1].split("_")[0])
+        except (ValueError, IndexError):
+            frame_index = 0
+    fp = frame_index / 4.0
+    fade = 1.0 - fp
+
+    parts: List[str] = []
+
+    if "muzzle_flash" in name:
+        burst_r = W * (0.10 + fp * 0.20)
+        opacity_outer = 0.4 * fade
+        outer_color = "#FFCC66" if frame_index < 2 else "#996644"
+        parts.append(_circle(cx, cy, burst_r, outer_color, None, 0.0))
+        if frame_index < 3:
+            for i in range(7):
+                ang = i * (3.14159 * 2 / 7) + rng.uniform(-0.1, 0.1)
+                tip = W * (0.25 - fp * 0.05)
+                x = cx + tip * _m.cos(ang)
+                y = cy + tip * _m.sin(ang)
+                parts.append(_polygon([
+                    (cx + burst_r * 0.6 * _m.cos(ang - 0.15), cy + burst_r * 0.6 * _m.sin(ang - 0.15)),
+                    (x, y),
+                    (cx + burst_r * 0.6 * _m.cos(ang + 0.15), cy + burst_r * 0.6 * _m.sin(ang + 0.15)),
+                ], "#FFE068"))
+        if frame_index == 0:
+            parts.append(_circle(cx, cy, W * 0.08, "#FFFFFF"))
+        elif frame_index < 3:
+            parts.append(_circle(cx, cy, W * 0.06 * fade, "#FFEEAA"))
+    elif "explosion" in name:
+        radius = W * (0.10 + fp * 0.30)
+        parts.append(_circle(cx, cy, radius * 1.2, "#FF6633" if frame_index < 2 else "#664433"))
+        parts.append(_circle(cx, cy, radius, "#FFCC44" if frame_index < 3 else "#886633"))
+        if frame_index < 2:
+            parts.append(_circle(cx, cy, radius * 0.6, "#FFFFFF"))
+        for i in range(12):
+            ang = i * (3.14159 * 2 / 12) + frame_index * 0.1
+            dr = radius * (0.7 + rng.uniform(0, 0.5))
+            x = cx + dr * _m.cos(ang)
+            y = cy + dr * _m.sin(ang)
+            chunk_color = "#888888" if frame_index >= 2 else "#FFAA44"
+            parts.append(_circle(x, y, rng.uniform(2, 5), chunk_color))
+        if frame_index >= 2:
+            for j in range(6):
+                px = cx + rng.uniform(-radius, radius)
+                py = cy - radius * (1 - fade)
+                parts.append(_circle(px, py, W * 0.04, "#666666"))
+    elif "impact_burst" in name:
+        for i in range(8):
+            ang = i * (3.14159 * 2 / 8)
+            spread = W * (0.05 + fp * 0.25)
+            x = cx + spread * _m.cos(ang)
+            y = cy + spread * _m.sin(ang)
+            color = "#FFEE88" if frame_index < 2 else "#996644"
+            parts.append(_circle(x, y, max(1.0, 4 - frame_index), color))
+        if frame_index < 2:
+            parts.append(_circle(cx, cy, W * 0.05, "#FFFFFF"))
+    elif "blood_splat" in name:
+        for i in range(12):
+            ang = i * (3.14159 * 2 / 12) + rng.uniform(-0.2, 0.2)
+            d = W * (0.05 + fp * 0.30 + rng.uniform(0, 0.05))
+            x = cx + d * _m.cos(ang)
+            y = cy + d * _m.sin(ang)
+            r = max(1.0, 6 * fade * rng.uniform(0.5, 1.0))
+            parts.append(_circle(x, y, r, "#aa0000"))
+        if frame_index < 2:
+            parts.append(_circle(cx, cy, W * 0.06, "#cc1111"))
+    else:
+        for i in range(6):
+            ang = i * (3.14159 * 2 / 6)
+            x = cx + W * 0.10 * fp * _m.cos(ang)
+            y = cy + H * 0.10 * fp * _m.sin(ang)
+            parts.append(_circle(x, y, max(1.0, 5 - frame_index), accent))
+
+    return "".join(parts)
+
+
+def _compose_loading_bg(spec: AssetSpec, rng: random.Random) -> str:
+    """Atmospheric loading-screen background per world / scenario."""
+    name = spec.canonical_name.lower()
+    p = spec.palette
+    body = p.primary()
+    accent = p.accent()
+    dark = p.dark()
+    highlight = p.highlight()
+    metal = p.metal()
+    glow = p.glow()
+    W, H = spec.width, spec.height
+    parts: List[str] = []
+
+    for i in range(10):
+        sky_color = _darken_hex(highlight, 0.10 + i * 0.06) if i < 5 else _darken_hex(body, 0.20 + (i - 5) * 0.05)
+        parts.append(_rect(0, H * i / 10, W, H / 10, sky_color))
+
+    if "mars" in name or "vulcan" in name:
+        parts.append(_circle(W * 0.20, H * 0.18, W * 0.06, "#FFAA66"))
+        for i in range(40):
+            px = rng.uniform(0, W)
+            py = rng.uniform(H * 0.30, H * 0.55)
+            parts.append(_circle(px, py, rng.uniform(0.5, 2), "#FFE0AA"))
+    elif "europa" in name or "moon" in name:
+        parts.append(_circle(W * 0.78, H * 0.15, W * 0.05, "#FFFFCC"))
+        for i in range(60):
+            px = rng.uniform(0, W)
+            py = rng.uniform(0, H * 0.30)
+            parts.append(_circle(px, py, rng.uniform(0.5, 1.5), "#FFFFFF"))
+    elif "venus" in name:
+        for i in range(8):
+            parts.append(_circle(rng.uniform(0, W), rng.uniform(0, H * 0.40), W * 0.10, "#cc7733"))
+    elif "belt" in name or "orbital" in name:
+        for i in range(80):
+            px = rng.uniform(0, W)
+            py = rng.uniform(0, H * 0.50)
+            parts.append(_circle(px, py, rng.uniform(0.5, 1.2), "#FFFFFF"))
+        for i in range(6):
+            parts.append(_circle(rng.uniform(0, W), rng.uniform(H * 0.20, H * 0.45),
+                                 rng.uniform(W * 0.02, W * 0.06), metal, dark, 0.5))
+
+    horizon_y = H * 0.55
+    pts = [(0, horizon_y)]
+    for i in range(8):
+        px = W * (i + 1) / 8
+        py = horizon_y + rng.uniform(-H * 0.08, H * 0.04)
+        pts.append((px, py))
+    pts.append((W, horizon_y))
+    pts.append((W, H * 0.65))
+    pts.append((0, H * 0.65))
+    parts.append(_polygon(pts, _darken_hex(dark, 0.10)))
+
+    for i in range(3):
+        sx = W * (0.20 + i * 0.30)
+        sy = horizon_y - H * rng.uniform(0.06, 0.14)
+        sh = H * 0.18
+        parts.append(_polygon([
+            (sx - W * 0.04, horizon_y),
+            (sx, sy),
+            (sx + W * 0.04, horizon_y),
+        ], dark))
+        parts.append(_rect(sx - W * 0.03, sy + H * 0.04, W * 0.012, H * 0.012, glow))
+
+    fg_y = H * 0.78
+    parts.append(_rect(0, fg_y, W, H - fg_y, _darken_hex(dark, 0.20)))
+    for i in range(3):
+        fx = W * (0.20 + i * 0.30)
+        fy = fg_y - H * 0.08
+        parts.append(_rect(fx - W * 0.04, fy, W * 0.04, H * 0.04, dark))
+        parts.append(_circle(fx - W * 0.02, fy - H * 0.02, W * 0.012, _darken_hex(dark, 0.5)))
+        parts.append(_rect(fx - W * 0.05, fy + H * 0.04, W * 0.02, H * 0.05, dark))
+        parts.append(_rect(fx - W * 0.01, fy + H * 0.04, W * 0.02, H * 0.05, dark))
+    parts.append(_rect(W * 0.04, H * 0.92, W * 0.92, H * 0.04, "none", accent, 1.0))
+    return "".join(parts)
+
+
+def _compose_boss_splash(spec: AssetSpec, rng: random.Random) -> str:
+    """Boss intro cinematic key frame — heroic silhouette + threat aura + nameplate."""
+    import math as _m
+    name = spec.canonical_name.lower()
+    p = spec.palette
+    body = p.primary()
+    accent = p.accent()
+    dark = p.dark()
+    glow = p.glow()
+    metal = p.metal()
+    W, H = spec.width, spec.height
+    cx, cy = W / 2, H * 0.55
+    parts: List[str] = []
+    for i in range(12):
+        ring_r = W * (0.65 - i * 0.04)
+        shade = _darken_hex(accent, 0.05 + i * 0.06)
+        parts.append(_circle(cx, cy, ring_r, shade))
+    parts.append(_rect(0, 0, W, H, dark, None, 0.0))
+    parts.append(_circle(cx, cy, W * 0.50, _darken_hex(body, 0.6)))
+    for j in range(20):
+        ang = j * 18 * 3.14159 / 180
+        x1 = cx + W * 0.40 * _m.cos(ang)
+        y1 = cy + W * 0.40 * _m.sin(ang)
+        x2 = cx + W * 0.55 * _m.cos(ang)
+        y2 = cy + W * 0.55 * _m.sin(ang)
+        parts.append(_line(x1, y1, x2, y2, accent, 1.5))
+
+    head_r = W * 0.10
+    parts.append(_circle(cx, cy - H * 0.20, head_r * 1.1, dark))
+    parts.append(_circle(cx, cy - H * 0.20, head_r, _darken_hex(metal, 0.10), dark, 0.8))
+    parts.append(_polygon([
+        (cx - head_r, cy - H * 0.20),
+        (cx + head_r, cy - H * 0.20),
+        (cx + head_r * 1.4, cy - H * 0.20 + head_r * 0.4),
+        (cx + head_r, cy - H * 0.20 + head_r * 1.2),
+        (cx - head_r, cy - H * 0.20 + head_r * 1.2),
+        (cx - head_r * 1.4, cy - H * 0.20 + head_r * 0.4),
+    ], metal, dark, 0.8))
+    parts.append(_rect(cx - head_r * 0.7, cy - H * 0.20 - head_r * 0.1,
+                       head_r * 1.4, head_r * 0.4, accent))
+    parts.append(_rect(cx - head_r * 0.5, cy - H * 0.20 + head_r * 0.0,
+                       head_r * 1.0, head_r * 0.1, "#FF1100"))
+    torso_w = W * 0.30
+    torso_h = H * 0.25
+    parts.append(_rect(cx - torso_w / 2, cy - H * 0.10, torso_w, torso_h, body, dark, 1.5))
+    parts.append(_polygon([
+        (cx - torso_w / 2, cy - H * 0.10),
+        (cx - torso_w * 0.8, cy - H * 0.12),
+        (cx - torso_w * 0.7, cy - H * 0.06),
+    ], metal, dark, 0.8))
+    parts.append(_polygon([
+        (cx + torso_w / 2, cy - H * 0.10),
+        (cx + torso_w * 0.8, cy - H * 0.12),
+        (cx + torso_w * 0.7, cy - H * 0.06),
+    ], metal, dark, 0.8))
+    parts.append(_rect(cx - W * 0.01, cy - H * 0.05, W * 0.02, H * 0.05, glow))
+    for j in range(6):
+        sx = cx - torso_w * 0.4 + j * torso_w * 0.16
+        parts.append(_rect(sx, cy - H * 0.04, W * 0.012, H * 0.012, metal))
+
+    parts.append(_rect(W * 0.06, H * 0.83, W * 0.88, H * 0.10, dark))
+    parts.append(_rect(W * 0.06, H * 0.83, W * 0.88, H * 0.005, accent))
+    parts.append(_rect(W * 0.06, H * 0.925, W * 0.88, H * 0.005, accent))
+    parts.append(_rect(W * 0.10, H * 0.86, W * 0.40, H * 0.04, accent))
+    parts.append(_rect(W * 0.55, H * 0.88, W * 0.20, H * 0.02, "#aa1111"))
+    for i in range(8):
+        parts.append(_rect(W * (0.06 + i * 0.115), H * 0.96, W * 0.10, H * 0.01, _darken_hex(accent, 0.4)))
+    return "".join(parts)
+
+
+def _compose_key_art(spec: AssetSpec, rng: random.Random) -> str:
+    """Marketing key art — cinematic 3-actor composition + faction logo."""
+    import math as _m
+    name = spec.canonical_name.lower()
+    p = spec.palette
+    body = p.primary()
+    accent = p.accent()
+    dark = p.dark()
+    highlight = p.highlight()
+    metal = p.metal()
+    glow = p.glow()
+    W, H = spec.width, spec.height
+    parts: List[str] = []
+    for i in range(10):
+        gradient = _darken_hex(highlight, 0.05 + i * 0.06) if i < 5 else _darken_hex(body, 0.10 + (i - 5) * 0.08)
+        parts.append(_rect(0, H * i / 10, W, H / 10, gradient))
+    for j in range(8):
+        ang = (j - 4) * 0.15
+        x_start = W / 2
+        y_start = H * 0.30
+        x_end = W / 2 + W * 1.2 * _m.cos(ang)
+        y_end = H * 0.30 + W * 1.2 * _m.sin(ang)
+        parts.append(_line(x_start, y_start, x_end, y_end, _darken_hex(accent, 0.20), 0.5))
+    horizon_y = H * 0.62
+    pts = [(0, horizon_y)]
+    for i in range(10):
+        px = W * (i + 1) / 10
+        py = horizon_y + rng.uniform(-H * 0.10, H * 0.04)
+        pts.append((px, py))
+    pts.append((W, horizon_y))
+    pts.append((W, H * 0.72))
+    pts.append((0, H * 0.72))
+    parts.append(_polygon(pts, _darken_hex(dark, 0.10)))
+    for k in range(4):
+        bx = W * (0.20 + k * 0.20)
+        by = horizon_y - H * rng.uniform(0.08, 0.20)
+        parts.append(_rect(bx - W * 0.03, by, W * 0.06, horizon_y - by, dark))
+        for w in range(4):
+            wy = by + H * 0.03 + w * H * 0.025
+            parts.append(_rect(bx - W * 0.015, wy, W * 0.012, H * 0.012, glow))
+            parts.append(_rect(bx + W * 0.003, wy, W * 0.012, H * 0.012, glow))
+    actor_positions = [
+        (W * 0.30, H * 0.74, 1.0),
+        (W * 0.50, H * 0.70, 1.3),
+        (W * 0.70, H * 0.74, 1.0),
+    ]
+    for ax, ay, scale in actor_positions:
+        head_r = W * 0.025 * scale
+        parts.append(_circle(ax, ay - H * 0.18 * scale, head_r * 1.2, dark))
+        parts.append(_circle(ax, ay - H * 0.18 * scale, head_r, _darken_hex(metal, 0.10), dark, 0.5))
+        parts.append(_rect(ax - head_r * 0.5, ay - H * 0.18 * scale - head_r * 0.1,
+                           head_r * 1.0, head_r * 0.4, accent))
+        torso_w = W * 0.04 * scale
+        torso_h = H * 0.12 * scale
+        parts.append(_rect(ax - torso_w / 2, ay - H * 0.14 * scale, torso_w, torso_h, body, dark, 0.8))
+        parts.append(_polygon([
+            (ax - torso_w * 0.5, ay - H * 0.14 * scale),
+            (ax - torso_w * 0.8, ay - H * 0.15 * scale),
+            (ax - torso_w * 0.7, ay - H * 0.12 * scale),
+        ], metal, dark, 0.5))
+        parts.append(_rect(ax + torso_w * 0.6, ay - H * 0.13 * scale,
+                           W * 0.07 * scale, H * 0.02 * scale, _darken_hex(metal, 0.20), dark, 0.5))
+        leg_y = ay - H * 0.02 * scale
+        parts.append(_rect(ax - torso_w * 0.4, leg_y, torso_w * 0.3, H * 0.08 * scale, _darken_hex(body, 0.3), dark, 0.5))
+        parts.append(_rect(ax + torso_w * 0.1, leg_y, torso_w * 0.3, H * 0.08 * scale, _darken_hex(body, 0.3), dark, 0.5))
+    parts.append(_rect(W * 0.04, H * 0.04, W * 0.10, H * 0.06, body, accent, 1.0))
+    parts.append(_circle(W * 0.04 + W * 0.05, H * 0.04 + H * 0.03, H * 0.020, accent, dark, 0.5))
+    parts.append(_rect(W * 0.20, H * 0.06, W * 0.60, H * 0.06, body, accent, 1.0))
+    parts.append(_rect(W * 0.22, H * 0.075, W * 0.56, H * 0.03, accent))
+    parts.append(_rect(W * 0.10, H * 0.88, W * 0.80, H * 0.06, body, accent, 1.0))
+    parts.append(_rect(W * 0.12, H * 0.90, W * 0.76, H * 0.025, accent))
+    return "".join(parts)
 
 
 # ─── Dispatch ───────────────────────────────────────────────────────────────
@@ -5400,6 +5952,12 @@ _COMPOSERS = {
     "HudWidget": _compose_hud_widget,
     "VfxDecal": _compose_vfx_decal,
     "AnimationFrame": _compose_animation_frame,
+    "Portrait": _compose_portrait,
+    "UiScreen": _compose_ui_screen,
+    "VfxFrame": _compose_vfx_frame,
+    "LoadingBg": _compose_loading_bg,
+    "BossSplash": _compose_boss_splash,
+    "KeyArt": _compose_key_art,
 }
 
 
