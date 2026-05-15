@@ -77,7 +77,7 @@ mod tests {
         ];
         let mut out = vec![ProjectileComponent::default(); 2];
         step_projectiles_par_iter(&inp, &mut out, 1.0);
-        assert_eq!(out[0].x, 10.0);
-        assert_eq!(out[1].x, 0.0);
+        assert!((out[0].x - 10.0).abs() < 1e-6);
+        assert!(out[1].x.abs() < 1e-6);
     }
 }

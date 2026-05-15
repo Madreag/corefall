@@ -37,7 +37,8 @@ const SCHEMA_TERRAIN_PENETRATION_THRESHOLD: &str = include_str!("../schemas/even
 const SCHEMA_TERRAIN_DIRTY_REGION_BATCH: &str = include_str!("../schemas/event/terrain_dirty_region_batch.json");
 // M8A: semantic terrain event protocol (chunk_mutated + chunk_active_region_changed).
 const SCHEMA_TERRAIN_CHUNK_MUTATED: &str = include_str!("../schemas/event/terrain_chunk_mutated.json");
-const SCHEMA_TERRAIN_CHUNK_ACTIVE_REGION_CHANGED: &str = include_str!("../schemas/event/terrain_chunk_active_region_changed.json");
+const SCHEMA_TERRAIN_CHUNK_ACTIVE_REGION_CHANGED: &str =
+    include_str!("../schemas/event/terrain_chunk_active_region_changed.json");
 // M8A: perf_sample (cosmetic) — per-cadence per-subsystem latency samples.
 const SCHEMA_PERF_SAMPLE: &str = include_str!("../schemas/event/perf_sample.json");
 const SCHEMA_TERRAIN_PIXEL_DISLODGED: &str = include_str!("../schemas/event/terrain_pixel_dislodged.json");

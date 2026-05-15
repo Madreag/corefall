@@ -132,11 +132,7 @@ mod tests {
 
     #[test]
     fn net_frame_round_trip() {
-        let f = NetFrame::new(
-            42,
-            123456,
-            NetPayload::Ping { send_ms: 100 },
-        );
+        let f = NetFrame::new(42, 123456, NetPayload::Ping { send_ms: 100 });
         let s = serde_json::to_string(&f).unwrap();
         let back: NetFrame = serde_json::from_str(&s).unwrap();
         assert_eq!(f, back);
@@ -144,6 +140,9 @@ mod tests {
 
     #[test]
     fn protocol_version_is_locked_at_one() {
-        assert_eq!(PROTOCOL_VERSION, 1, "M8A v0.1 wire protocol is LOCKED at PROTOCOL_VERSION=1");
+        assert_eq!(
+            PROTOCOL_VERSION, 1,
+            "M8A v0.1 wire protocol is LOCKED at PROTOCOL_VERSION=1"
+        );
     }
 }

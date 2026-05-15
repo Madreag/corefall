@@ -32,13 +32,16 @@ fn m8a_ecs_components_exist() {
     // Spec § Files / cf-control — ECS component decomposition scaffold.
     // The components are zero-sized marker types at M8A; M9+ wraps them
     // with real Bevy components in cf-app.
-    use cf_control::components::*;
-    let _aw = ActorWorldComponent::default();
-    let _ct = ChunkedTerrainComponent::default();
-    let _m = MissionComponent::default();
-    let _r = RecorderComponent::default();
-    let _pp = ProjectilePoolComponent::default();
-    let _rw = ReactorWorldComponent::default();
+    use cf_control::components::{
+        ActorWorldComponent, ChunkedTerrainComponent, MissionComponent, ProjectilePoolComponent,
+        ReactorWorldComponent, RecorderComponent,
+    };
+    let _aw = ActorWorldComponent;
+    let _ct = ChunkedTerrainComponent;
+    let _m = MissionComponent;
+    let _r = RecorderComponent;
+    let _pp = ProjectilePoolComponent;
+    let _rw = ReactorWorldComponent;
 }
 
 #[test]

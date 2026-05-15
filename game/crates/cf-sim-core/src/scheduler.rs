@@ -113,21 +113,66 @@ pub struct StageDep {
 }
 
 pub const STAGE_DEPS: &[StageDep] = &[
-    StageDep { stage: SimStage::PreSim, depends_on: &[] },
-    StageDep { stage: SimStage::Input, depends_on: &[SimStage::PreSim] },
-    StageDep { stage: SimStage::ActorPrePass, depends_on: &[SimStage::Input] },
-    StageDep { stage: SimStage::ActorTick, depends_on: &[SimStage::ActorPrePass] },
-    StageDep { stage: SimStage::AITick, depends_on: &[SimStage::ActorPrePass] },
-    StageDep { stage: SimStage::ProjectileTick, depends_on: &[SimStage::ActorPrePass] },
-    StageDep { stage: SimStage::TerrainMutation, depends_on: &[SimStage::ActorTick, SimStage::AITick, SimStage::ProjectileTick] },
-    StageDep { stage: SimStage::HazardContact, depends_on: &[SimStage::TerrainMutation] },
-    StageDep { stage: SimStage::AnchorContact, depends_on: &[SimStage::TerrainMutation] },
-    StageDep { stage: SimStage::ActorPostPass, depends_on: &[SimStage::HazardContact, SimStage::AnchorContact] },
-    StageDep { stage: SimStage::MissionTick, depends_on: &[SimStage::ActorPostPass] },
-    StageDep { stage: SimStage::RecorderMerge, depends_on: &[SimStage::MissionTick] },
-    StageDep { stage: SimStage::ChecksumEmit, depends_on: &[SimStage::RecorderMerge] },
-    StageDep { stage: SimStage::PerfSampleEmit, depends_on: &[SimStage::ChecksumEmit] },
-    StageDep { stage: SimStage::GpuParticleStep, depends_on: &[SimStage::ChecksumEmit] },
+    StageDep {
+        stage: SimStage::PreSim,
+        depends_on: &[],
+    },
+    StageDep {
+        stage: SimStage::Input,
+        depends_on: &[SimStage::PreSim],
+    },
+    StageDep {
+        stage: SimStage::ActorPrePass,
+        depends_on: &[SimStage::Input],
+    },
+    StageDep {
+        stage: SimStage::ActorTick,
+        depends_on: &[SimStage::ActorPrePass],
+    },
+    StageDep {
+        stage: SimStage::AITick,
+        depends_on: &[SimStage::ActorPrePass],
+    },
+    StageDep {
+        stage: SimStage::ProjectileTick,
+        depends_on: &[SimStage::ActorPrePass],
+    },
+    StageDep {
+        stage: SimStage::TerrainMutation,
+        depends_on: &[SimStage::ActorTick, SimStage::AITick, SimStage::ProjectileTick],
+    },
+    StageDep {
+        stage: SimStage::HazardContact,
+        depends_on: &[SimStage::TerrainMutation],
+    },
+    StageDep {
+        stage: SimStage::AnchorContact,
+        depends_on: &[SimStage::TerrainMutation],
+    },
+    StageDep {
+        stage: SimStage::ActorPostPass,
+        depends_on: &[SimStage::HazardContact, SimStage::AnchorContact],
+    },
+    StageDep {
+        stage: SimStage::MissionTick,
+        depends_on: &[SimStage::ActorPostPass],
+    },
+    StageDep {
+        stage: SimStage::RecorderMerge,
+        depends_on: &[SimStage::MissionTick],
+    },
+    StageDep {
+        stage: SimStage::ChecksumEmit,
+        depends_on: &[SimStage::RecorderMerge],
+    },
+    StageDep {
+        stage: SimStage::PerfSampleEmit,
+        depends_on: &[SimStage::ChecksumEmit],
+    },
+    StageDep {
+        stage: SimStage::GpuParticleStep,
+        depends_on: &[SimStage::ChecksumEmit],
+    },
 ];
 
 #[cfg(test)]

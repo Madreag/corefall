@@ -27,10 +27,8 @@ pub const RENDER_P99_BUDGET_US: u64 = 3_500;
 /// Zero values are treated as "this subsystem not exercised by this bench"
 /// and skipped. Non-zero values exceeding the budget cause failure.
 pub fn assert_within_budget(input: &Path) -> Result<()> {
-    let body = std::fs::read_to_string(input)
-        .with_context(|| format!("read {}", input.display()))?;
-    let report: PerfReport = serde_json::from_str(&body)
-        .with_context(|| format!("parse {}", input.display()))?;
+    let body = std::fs::read_to_string(input).with_context(|| format!("read {}", input.display()))?;
+    let report: PerfReport = serde_json::from_str(&body).with_context(|| format!("parse {}", input.display()))?;
 
     let mut errs = Vec::new();
     check(&mut errs, "actor", &report.actor, ACTOR_P99_BUDGET_US);
@@ -51,10 +49,7 @@ pub fn assert_within_budget(input: &Path) -> Result<()> {
 
 fn check(errs: &mut Vec<String>, subsystem: &str, perf: &SubsystemPerf, budget: u64) {
     if perf.p99_us > 0 && perf.p99_us > budget {
-        errs.push(format!(
-            "{}: p99 {} us > budget {} us",
-            subsystem, perf.p99_us, budget
-        ));
+        errs.push(format!("{}: p99 {} us > budget {} us", subsystem, perf.p99_us, budget));
     }
 }
 
@@ -67,13 +62,41 @@ pub fn baseline_snapshot(ticks: u32) -> PerfReport {
         ticks,
         tick_rate_hz: 60,
         seed: 0,
-        actor: SubsystemPerf { p50_us: 800, p99_us: 1_200, p999_us: 1_400 },
-        ai: SubsystemPerf { p50_us: 1_800, p99_us: 2_500, p999_us: 3_800 },
-        projectile: SubsystemPerf { p50_us: 500, p99_us: 800, p999_us: 950 },
-        terrain: SubsystemPerf { p50_us: 1_500, p99_us: 2_000, p999_us: 2_400 },
-        mission: SubsystemPerf { p50_us: 80, p99_us: 150, p999_us: 190 },
-        recorder: SubsystemPerf { p50_us: 200, p99_us: 400, p999_us: 480 },
-        render: SubsystemPerf { p50_us: 2_500, p99_us: 3_400, p999_us: 3_450 },
+        actor: SubsystemPerf {
+            p50_us: 800,
+            p99_us: 1_200,
+            p999_us: 1_400,
+        },
+        ai: SubsystemPerf {
+            p50_us: 1_800,
+            p99_us: 2_500,
+            p999_us: 3_800,
+        },
+        projectile: SubsystemPerf {
+            p50_us: 500,
+            p99_us: 800,
+            p999_us: 950,
+        },
+        terrain: SubsystemPerf {
+            p50_us: 1_500,
+            p99_us: 2_000,
+            p999_us: 2_400,
+        },
+        mission: SubsystemPerf {
+            p50_us: 80,
+            p99_us: 150,
+            p999_us: 190,
+        },
+        recorder: SubsystemPerf {
+            p50_us: 200,
+            p99_us: 400,
+            p999_us: 480,
+        },
+        render: SubsystemPerf {
+            p50_us: 2_500,
+            p99_us: 3_400,
+            p999_us: 3_450,
+        },
         final_blake3: None,
     }
 }

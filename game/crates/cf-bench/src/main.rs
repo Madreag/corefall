@@ -25,9 +25,9 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 use tracing_subscriber::EnvFilter;
 
-mod m9_firehose;
 mod m15_ca_burst;
 mod m22_pathfinder_load;
+mod m9_firehose;
 mod mp_8player_lan;
 mod perf_assert;
 
@@ -129,7 +129,8 @@ fn main() -> Result<()> {
             tracing::info!(target: "cf::bench", "baseline perf snapshot -> {}", output.display());
             Ok(())
         }
-        Cmd::PerfAssert { input } => perf_assert::assert_within_budget(&input)
-            .map_err(|err| anyhow!("perf budget violation: {err}")),
+        Cmd::PerfAssert { input } => {
+            perf_assert::assert_within_budget(&input).map_err(|err| anyhow!("perf budget violation: {err}"))
+        }
     }
 }

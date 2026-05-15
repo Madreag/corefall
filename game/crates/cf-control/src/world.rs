@@ -12,8 +12,8 @@
 //! so handler migration is mechanical.
 
 use crate::components::{
-    ActorWorldComponent, ChunkedTerrainComponent, MissionComponent, ProjectilePoolComponent,
-    ReactorWorldComponent, RecorderComponent,
+    ActorWorldComponent, ChunkedTerrainComponent, MissionComponent, ProjectilePoolComponent, ReactorWorldComponent,
+    RecorderComponent,
 };
 
 /// **M8A**: Bevy World wrapper marker. M9+ wraps a real `bevy_ecs::World`
@@ -44,7 +44,7 @@ mod tests {
     #[test]
     fn engine_world_constructs_with_default_components() {
         let world = EngineWorld::new();
-        assert_eq!(world.actor_world, ActorWorldComponent::default());
-        assert_eq!(world.chunked_terrain, ChunkedTerrainComponent::default());
+        assert_eq!(world.actor_world, ActorWorldComponent);
+        assert_eq!(world.chunked_terrain, ChunkedTerrainComponent);
     }
 }

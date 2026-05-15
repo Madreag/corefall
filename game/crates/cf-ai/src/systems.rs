@@ -31,7 +31,9 @@ impl AiPreRolledRng {
         self.values.reserve(n);
         let mut state = seed.wrapping_add(0xBF58_476D_1CE4_E5B9);
         for _ in 0..n {
-            state = state.wrapping_mul(0x9E37_79B9_7F4A_7C15).wrapping_add(0xD2B7_4407_B1CE_6E93);
+            state = state
+                .wrapping_mul(0x9E37_79B9_7F4A_7C15)
+                .wrapping_add(0xD2B7_4407_B1CE_6E93);
             self.values.push(state);
         }
     }

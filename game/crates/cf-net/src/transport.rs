@@ -11,8 +11,7 @@ use crate::protocol::{NetFrame, NET_FRAME_MAX_SIZE_BYTES};
 /// **M8A § transport**: encode a NetFrame to bytes. Asserts the encoded
 /// size is within the locked 1450-byte per-frame max.
 pub fn encode_frame(frame: &NetFrame) -> crate::NetResult<Vec<u8>> {
-    let bytes = serde_json::to_vec(frame)
-        .map_err(|e| crate::NetError::Transport(format!("encode: {e}")))?;
+    let bytes = serde_json::to_vec(frame).map_err(|e| crate::NetError::Transport(format!("encode: {e}")))?;
     if bytes.len() > NET_FRAME_MAX_SIZE_BYTES {
         return Err(crate::NetError::FrameTooLarge(bytes.len()));
     }
@@ -25,8 +24,8 @@ pub fn decode_frame(bytes: &[u8]) -> crate::NetResult<NetFrame> {
     if bytes.len() > NET_FRAME_MAX_SIZE_BYTES {
         return Err(crate::NetError::FrameTooLarge(bytes.len()));
     }
-    let frame: NetFrame = serde_json::from_slice(bytes)
-        .map_err(|e| crate::NetError::Deserialize(format!("decode: {e}")))?;
+    let frame: NetFrame =
+        serde_json::from_slice(bytes).map_err(|e| crate::NetError::Deserialize(format!("decode: {e}")))?;
     crate::protocol::verify_handshake_version(frame.version)?;
     Ok(frame)
 }

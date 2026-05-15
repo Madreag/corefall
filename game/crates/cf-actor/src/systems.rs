@@ -49,7 +49,9 @@ impl PreRolledRng {
         self.values.reserve(n);
         let mut state = seed.wrapping_add(0x9E37_79B9_7F4A_7C15);
         for _ in 0..n {
-            state = state.wrapping_mul(0xBF58_476D_1CE4_E5B9).wrapping_add(0xD2B7_4407_B1CE_6E93);
+            state = state
+                .wrapping_mul(0xBF58_476D_1CE4_E5B9)
+                .wrapping_add(0xD2B7_4407_B1CE_6E93);
             self.values.push(state);
         }
     }
@@ -63,11 +65,7 @@ impl PreRolledRng {
 ///
 /// Each actor's work is per-entity isolated (no cross-actor reads). Safe
 /// to par_iter over `actors_in.iter().zip(actors_out.iter_mut())`.
-pub fn apply_intent(
-    actors_in: &[ActorBundle],
-    actors_out: &mut [ActorBundle],
-    _rng: &PreRolledRng,
-) {
+pub fn apply_intent(actors_in: &[ActorBundle], actors_out: &mut [ActorBundle], _rng: &PreRolledRng) {
     debug_assert_eq!(actors_in.len(), actors_out.len());
     for (i, prev) in actors_in.iter().enumerate() {
         actors_out[i] = prev.clone();
@@ -126,7 +124,7 @@ mod tests {
     #[test]
     fn step_kinematics_integrates_velocity() {
         let mut actors = vec![ActorBundle::default(); 3];
-        for actor in actors.iter_mut() {
+        for actor in &mut actors {
             actor.vel.x = 1.0;
         }
         step_kinematics(&mut actors, 0.5);

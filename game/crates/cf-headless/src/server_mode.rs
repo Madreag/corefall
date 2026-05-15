@@ -49,8 +49,7 @@ pub fn run_serve(args: ServeArgs) -> Result<()> {
     tracing::info!(target: "cf::headless::serve", bundle_path=%bundle_path, "server-side run bundle path");
 
     let bundle_dir = Path::new(&bundle_path);
-    std::fs::create_dir_all(bundle_dir)
-        .with_context(|| format!("create {bundle_path}"))?;
+    std::fs::create_dir_all(bundle_dir).with_context(|| format!("create {bundle_path}"))?;
     let manifest = serde_json::json!({
         "schema_version": "m8a.v0.1",
         "run_id": run_id,
@@ -72,6 +71,12 @@ pub fn run_serve(args: ServeArgs) -> Result<()> {
 }
 
 fn generate_run_id() -> String {
+    // M8A § cf-headless serve: run_id is generated at process startup,
+    // OUTSIDE the sim island (the sim never reads wall time). Per the
+    // determinism contract this site is documented in
+    // docs/plan/spec/determinism-island-contract.md § Inside vs Outside
+    // the island.
+    #[allow(clippy::disallowed_methods)]
     let now = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_secs())

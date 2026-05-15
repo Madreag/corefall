@@ -70,7 +70,13 @@ impl RecorderShard {
         }
     }
 
-    pub fn push(&mut self, tick: u64, category: impl Into<String>, event_type: impl Into<String>, payload: Vec<u8>) -> MonotonicSeq {
+    pub fn push(
+        &mut self,
+        tick: u64,
+        category: impl Into<String>,
+        event_type: impl Into<String>,
+        payload: Vec<u8>,
+    ) -> MonotonicSeq {
         let seq = self.events.len() as MonotonicSeq;
         self.events.push(ShardEvent {
             tick,
