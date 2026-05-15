@@ -627,6 +627,144 @@ def _compose_actor(spec: AssetSpec, rng: random.Random) -> str:
     parts.append(_circle(torso_x + torso_w + arm_w * 0.4 + facing_sign * arm_w * 0.2,
                          arm_y + arm_h, arm_w * 0.5, skin_light))
 
+    # Role accessories — temporary placement before legs (use only torso-scope vars)
+    role_name = spec.canonical_name.lower()
+    if "medic" in role_name:
+        # Red cross emblem on chest (larger than default), medkit on back
+        parts.append(_rect(cx - torso_w * 0.10, torso_y + torso_h * 0.30,
+                           torso_w * 0.20, torso_w * 0.20, "#FFFFFF", "#990000", 1.0))
+        parts.append(_rect(cx - torso_w * 0.03, torso_y + torso_h * 0.30,
+                           torso_w * 0.06, torso_w * 0.20, "#CC0000"))
+        parts.append(_rect(cx - torso_w * 0.10, torso_y + torso_h * 0.30 + torso_w * 0.07,
+                           torso_w * 0.20, torso_w * 0.06, "#CC0000"))
+        # Medkit on back
+        parts.append(_rect(torso_x - spec.width * 0.05, torso_y + torso_h * 0.20,
+                           spec.width * 0.06, torso_h * 0.30, "#DDDDDD", "#666666", 0.8))
+        parts.append(_rect(torso_x - spec.width * 0.05, torso_y + torso_h * 0.30,
+                           spec.width * 0.06, torso_h * 0.04, "#990000"))
+    elif "engineer" in role_name:
+        # Wrench on belt + tool pack on back
+        parts.append(_polygon([
+            (torso_x + torso_w * 0.15, torso_y + torso_h * 0.85),
+            (torso_x + torso_w * 0.30, torso_y + torso_h * 0.85),
+            (torso_x + torso_w * 0.32, torso_y + torso_h * 0.90),
+            (torso_x + torso_w * 0.13, torso_y + torso_h * 0.90),
+        ], "#999999", "#444444", 0.5))
+        # Tool pack on back (square)
+        parts.append(_rect(torso_x - spec.width * 0.06, torso_y + torso_h * 0.18,
+                           spec.width * 0.07, torso_h * 0.45, accent, armor_dark, 0.8))
+        # Bolt detail on tool pack
+        for i in range(2):
+            parts.append(_circle(torso_x - spec.width * 0.025, torso_y + torso_h * (0.28 + i * 0.20),
+                                 spec.width * 0.008, metal))
+    elif "marksman" in role_name or "sniper" in role_name:
+        # Scope on back + long-rifle hint
+        parts.append(_rect(torso_x - spec.width * 0.06, torso_y + torso_h * 0.10,
+                           spec.width * 0.06, spec.height * 0.30, armor_dark, metal, 0.5))
+        parts.append(_rect(torso_x - spec.width * 0.07, torso_y + torso_h * 0.15,
+                           spec.width * 0.08, spec.height * 0.04, "#222222"))
+        parts.append(_circle(torso_x - spec.width * 0.06, torso_y + torso_h * 0.18,
+                             spec.width * 0.015, glow))
+        # Range pip on shoulder
+        parts.append(_circle(torso_x + torso_w * 0.10, torso_y, spec.width * 0.018, accent))
+    elif "heavy" in role_name:
+        # Extra armor plates + bigger pauldrons + chest ammo belt
+        # Bigger pauldron shoulder caps
+        parts.append(_polygon([
+            (torso_x - torso_w * 0.05, torso_y),
+            (torso_x + torso_w * 0.20, torso_y - torso_h * 0.15),
+            (torso_x + torso_w * 0.10, torso_y + torso_h * 0.20),
+        ], armor, armor_dark, 0.8))
+        parts.append(_polygon([
+            (torso_x + torso_w * 1.05, torso_y),
+            (torso_x + torso_w * 0.80, torso_y - torso_h * 0.15),
+            (torso_x + torso_w * 0.90, torso_y + torso_h * 0.20),
+        ], armor, armor_dark, 0.8))
+        # Ammo belt across chest
+        parts.append(_rect(torso_x + torso_w * 0.05, torso_y + torso_h * 0.40,
+                           torso_w * 0.90, torso_h * 0.06, accent, armor_dark, 0.5))
+        for i in range(6):
+            parts.append(_rect(torso_x + torso_w * (0.10 + i * 0.13), torso_y + torso_h * 0.41,
+                               torso_w * 0.04, torso_h * 0.04, "#CC8800"))
+        # Backpack ammo case
+        parts.append(_rect(torso_x - spec.width * 0.07, torso_y + torso_h * 0.20,
+                           spec.width * 0.08, torso_h * 0.50, armor, armor_dark, 0.8))
+    elif "assault" in role_name or "berserker" in role_name:
+        # Chest grenade strap (3 grenades) + waist pouch
+        for i in range(3):
+            gx = cx - torso_w * 0.15 + i * torso_w * 0.15
+            parts.append(_circle(gx, torso_y + torso_h * 0.50, torso_w * 0.05, "#444444", "#222222", 0.5))
+            parts.append(_rect(gx - torso_w * 0.015, torso_y + torso_h * 0.46,
+                               torso_w * 0.03, torso_w * 0.02, "#666666"))
+        # Waist pouch (use torso coords, not leg)
+        parts.append(_rect(torso_x + torso_w * 0.15, torso_y + torso_h * 0.85,
+                           torso_w * 0.70, torso_h * 0.10, accent, armor_dark, 0.5))
+    elif "hunter" in role_name or "scout" in role_name or "spotter" in role_name:
+        # Binocular goggles on head + light back pack
+        parts.append(_rect(head_cx - head_r * 0.7, head_cy - head_r * 0.4 + body_yofs - head_r * 0.05,
+                           head_r * 1.4, head_r * 0.2, armor_dark, dark_or(armor_dark, "#000000"), 0.5))
+        parts.append(_circle(head_cx - head_r * 0.35, head_cy - head_r * 0.30 + body_yofs,
+                             head_r * 0.18, glow, armor_dark, 0.5))
+        parts.append(_circle(head_cx + head_r * 0.35, head_cy - head_r * 0.30 + body_yofs,
+                             head_r * 0.18, glow, armor_dark, 0.5))
+        # Light pack on back
+        parts.append(_rect(torso_x - spec.width * 0.04, torso_y + torso_h * 0.18,
+                           spec.width * 0.05, torso_h * 0.35, armor, armor_dark, 0.5))
+    elif "shaman" in role_name or "diplomat" in role_name or "chieftain" in role_name or "commander" in role_name:
+        # Ritual ornament / shoulder banner + neck adornment
+        parts.append(_polygon([
+            (torso_x + torso_w + spec.width * 0.04, torso_y - torso_h * 0.10),
+            (torso_x + torso_w + spec.width * 0.10, torso_y - torso_h * 0.18),
+            (torso_x + torso_w + spec.width * 0.08, torso_y + torso_h * 0.10),
+            (torso_x + torso_w + spec.width * 0.02, torso_y + torso_h * 0.18),
+        ], accent, armor_dark, 0.8))
+        # Neck adornment
+        parts.append(_circle(cx, torso_y - torso_h * 0.02, torso_w * 0.05, glow, accent, 0.5))
+        # Crown or ritual hat (chieftain/commander)
+        if "chieftain" in role_name or "commander" in role_name:
+            parts.append(_polygon([
+                (head_cx - head_r * 0.6, head_cy - head_r * 0.4 + body_yofs - head_r * 0.10),
+                (head_cx - head_r * 0.3, head_cy - head_r * 0.4 + body_yofs - head_r * 0.4),
+                (head_cx, head_cy - head_r * 0.4 + body_yofs - head_r * 0.20),
+                (head_cx + head_r * 0.3, head_cy - head_r * 0.4 + body_yofs - head_r * 0.4),
+                (head_cx + head_r * 0.6, head_cy - head_r * 0.4 + body_yofs - head_r * 0.10),
+            ], accent, armor_dark, 0.5))
+    elif "scientist" in role_name:
+        # Glasses + clipboard + clean lab attire
+        # Eye-glasses
+        parts.append(_circle(head_cx - head_r * 0.35, head_cy - head_r * 0.10 + body_yofs,
+                             head_r * 0.12, "none", "#222222", 1.0))
+        parts.append(_circle(head_cx + head_r * 0.35, head_cy - head_r * 0.10 + body_yofs,
+                             head_r * 0.12, "none", "#222222", 1.0))
+        parts.append(_line(head_cx - head_r * 0.23, head_cy - head_r * 0.10 + body_yofs,
+                           head_cx + head_r * 0.23, head_cy - head_r * 0.10 + body_yofs,
+                           "#222222", 1.0))
+        # Clipboard at side
+        parts.append(_rect(torso_x + torso_w * 1.05, torso_y + torso_h * 0.40,
+                           spec.width * 0.06, torso_h * 0.35, "#FFFFEE", "#666666", 0.5))
+        parts.append(_rect(torso_x + torso_w * 1.07, torso_y + torso_h * 0.45,
+                           spec.width * 0.04, torso_h * 0.02, "#222222"))
+        parts.append(_rect(torso_x + torso_w * 1.07, torso_y + torso_h * 0.50,
+                           spec.width * 0.04, torso_h * 0.02, "#222222"))
+    elif "worker" in role_name:
+        # Hard hat + tool belt
+        parts.append(_polygon([
+            (head_cx - head_r * 0.9, head_cy - head_r * 0.3 + body_yofs),
+            (head_cx + head_r * 0.9, head_cy - head_r * 0.3 + body_yofs),
+            (head_cx + head_r * 0.7, head_cy - head_r * 0.7 + body_yofs),
+            (head_cx - head_r * 0.7, head_cy - head_r * 0.7 + body_yofs),
+        ], "#FFAA22", "#995500", 1.0))
+        parts.append(_rect(head_cx - head_r * 1.0, head_cy - head_r * 0.3 + body_yofs,
+                           head_r * 2.0, head_r * 0.08, "#995500"))
+        # Tool belt across hip
+        parts.append(_rect(torso_x, torso_y + torso_h * 0.85,
+                           torso_w, torso_h * 0.10, "#886633", "#553311", 0.5))
+        # 2 tool holsters on belt
+        parts.append(_rect(torso_x + torso_w * 0.10, torso_y + torso_h * 0.95,
+                           torso_w * 0.10, torso_h * 0.10, "#553311"))
+        parts.append(_rect(torso_x + torso_w * 0.78, torso_y + torso_h * 0.95,
+                           torso_w * 0.10, torso_h * 0.10, "#553311"))
+
     # Legs
     leg_w = spec.width * 0.10
     leg_h = spec.height * 0.30
@@ -1556,66 +1694,299 @@ def _compose_particle(spec: AssetSpec, rng: random.Random) -> str:
 
 
 def _compose_terrain_tile(spec: AssetSpec, rng: random.Random) -> str:
+    """M12 polish-pass: terrain tiles with visible 64x64-scale texture.
+
+    Each material type gets a distinct visible pattern at 64x64 tile resolution:
+    proper rivets / plates / grain / cracks / facets / bubbles / circuit traces.
+    Stroke widths thickened to 1.5-2.0px (was 0.4-0.5px = sub-pixel invisible).
+    Pattern density tuned for tileable + recognizable.
+    """
     base = (spec.extra or {}).get("base_color", spec.palette.primary())
     variant = (spec.extra or {}).get("variant", "a")
     seed_offset = sum(ord(c) for c in variant)
     rng2 = random.Random(spec.seed + seed_offset)
     parts: List[str] = [_rect(0, 0, spec.width, spec.height, base)]
     name = spec.canonical_name
-    if "dirt" in name or "sand" in name or "mud" in name or "loose" in name:
+    W = spec.width
+    H = spec.height
+    dark1 = _darken_hex(base, 0.20)
+    dark2 = _darken_hex(base, 0.35)
+    light1 = _lighten_hex(base, 0.18)
+    light2 = _lighten_hex(base, 0.30)
+
+    if "dirt" in name:
+        # Heavy granular speckles + scattered pebbles + soil clumps
         for _ in range(60):
-            x = rng2.uniform(0, spec.width)
-            y = rng2.uniform(0, spec.height)
-            r = rng2.uniform(0.5, 1.6)
-            parts.append(_circle(x, y, r, _darken_hex(base, 0.2)))
-    elif "concrete" in name or "anchor" in name:
-        for i in range(0, spec.width, max(1, spec.width // 4)):
-            parts.append(_line(i, 0, i, spec.height, _darken_hex(base, 0.15), 0.4))
-            parts.append(_line(0, i, spec.width, i, _darken_hex(base, 0.15), 0.4))
+            x = rng2.uniform(0, W)
+            y = rng2.uniform(0, H)
+            parts.append(_circle(x, y, rng2.uniform(0.8, 2.2), dark1))
+        for _ in range(15):
+            x = rng2.uniform(0, W)
+            y = rng2.uniform(0, H)
+            parts.append(_circle(x, y, rng2.uniform(2.5, 4.5), dark2))
+        for _ in range(8):
+            x = rng2.uniform(0, W)
+            y = rng2.uniform(0, H)
+            parts.append(_circle(x, y, rng2.uniform(1.2, 2.0), light1))
+    elif "sand" in name:
+        # Fine grain + occasional ripple line
+        for _ in range(80):
+            x = rng2.uniform(0, W)
+            y = rng2.uniform(0, H)
+            parts.append(_circle(x, y, rng2.uniform(0.6, 1.6), dark1))
+        for _ in range(4):
+            y = rng2.uniform(8, H - 8)
+            parts.append(_polyline([
+                (0, y),
+                (W * 0.25, y + rng2.uniform(-3, 3)),
+                (W * 0.50, y + rng2.uniform(-3, 3)),
+                (W * 0.75, y + rng2.uniform(-3, 3)),
+                (W, y + rng2.uniform(-3, 3)),
+            ], light1, 1.2))
+    elif "mud" in name:
+        # Wet brown with reflective highlights + occasional dark patches
+        for _ in range(20):
+            x = rng2.uniform(0, W)
+            y = rng2.uniform(0, H)
+            parts.append(_ellipse(x, y, rng2.uniform(3, 6), rng2.uniform(2, 3), dark1))
+        for _ in range(8):
+            x = rng2.uniform(0, W)
+            y = rng2.uniform(0, H)
+            parts.append(_ellipse(x, y, rng2.uniform(2, 4), rng2.uniform(1, 2), light2))
+    elif "loose" in name:
+        # Loose rubble: visible chunks + edge fragments
+        for _ in range(18):
+            cx = rng2.uniform(4, W - 4)
+            cy = rng2.uniform(4, H - 4)
+            angle = rng2.uniform(0, 6.28)
+            import math as _ms
+            r = rng2.uniform(2, 4)
+            pts = []
+            for j in range(5):
+                a = angle + j * 1.256 + rng2.uniform(-0.3, 0.3)
+                rr = r * rng2.uniform(0.6, 1.2)
+                pts.append((cx + rr * _ms.cos(a), cy + rr * _ms.sin(a)))
+            parts.append(_polygon(pts, dark1, dark2, 0.8))
+    elif "concrete" in name:
+        # Concrete: visible plate seams + corner rivets + texture noise
+        # Main horizontal seam
+        parts.append(_line(0, H * 0.5, W, H * 0.5, dark2, 1.8))
+        # Main vertical seam
+        parts.append(_line(W * 0.5, 0, W * 0.5, H, dark2, 1.8))
+        # Rivets at quad corners
+        for ix in [0.0, 0.5, 1.0]:
+            for iy in [0.0, 0.5, 1.0]:
+                if ix in (0.5,) and iy in (0.5,):
+                    continue  # skip center
+                rx = W * ix
+                ry = H * iy
+                if 0 <= rx <= W and 0 <= ry <= H:
+                    parts.append(_circle(rx, ry, 1.5, dark2))
+                    parts.append(_circle(rx, ry, 0.8, light1))
+        # Texture noise speckles
+        for _ in range(35):
+            x = rng2.uniform(0, W)
+            y = rng2.uniform(0, H)
+            parts.append(_circle(x, y, rng2.uniform(0.5, 1.2), dark1))
+    elif "anchor" in name:
+        # Anchor rock: granite-style mineral grain + stratified bands
+        for i in range(4):
+            y = H * (0.1 + 0.25 * i) + rng2.uniform(-3, 3)
+            parts.append(_polyline([
+                (0, y), (W * 0.3, y + rng2.uniform(-2, 2)),
+                (W * 0.7, y + rng2.uniform(-2, 2)), (W, y),
+            ], dark2, 1.2))
+        # Mineral specks
+        for _ in range(40):
+            x = rng2.uniform(0, W)
+            y = rng2.uniform(0, H)
+            parts.append(_circle(x, y, rng2.uniform(0.4, 1.2), dark1 if rng2.random() < 0.6 else light1))
+        for _ in range(8):
+            x = rng2.uniform(0, W)
+            y = rng2.uniform(0, H)
+            parts.append(_circle(x, y, rng2.uniform(1.5, 2.5), light2))
     elif "metal" in name or "alloy" in name:
-        for i in range(0, spec.height, max(1, spec.height // 6)):
-            parts.append(_line(0, i, spec.width, i, _lighten_hex(base, 0.06), 0.5))
+        # Brushed metal: horizontal grain + corner rivets + central plate seam
+        for i in range(0, H, 4):
+            parts.append(_line(0, i, W, i, light1, 1.0))
+        # 4 corner rivets
+        for ix in [0.10, 0.90]:
+            for iy in [0.10, 0.90]:
+                parts.append(_circle(W * ix, H * iy, 2.0, dark2))
+                parts.append(_circle(W * ix, H * iy, 1.2, light2))
+        # Central horizontal plate seam
+        parts.append(_line(0, H * 0.5, W, H * 0.5, dark2, 1.5))
+        # Small diagonal highlights
+        for _ in range(6):
+            x = rng2.uniform(0, W)
+            y = rng2.uniform(0, H)
+            parts.append(_line(x, y, x + 4, y - 2, light2, 0.8))
     elif "hazard" in name:
-        for i in range(-spec.height, spec.width, max(2, spec.width // 5)):
-            parts.append(_polyline(
-                [(i, 0), (i + spec.height, spec.height)],
-                _darken_hex(base, 0.25), max(1.0, spec.width / 16),
-            ))
+        # Yellow + black diagonal hazard stripes (industrial caution)
+        stripe_w = max(4, W // 6)
+        for i in range(-H, W + H, stripe_w * 2):
+            parts.append(_polygon([
+                (i, 0), (i + stripe_w, 0), (i + stripe_w + H, H), (i + H, H),
+            ], dark2))
     elif "lava" in name:
+        # Glowing molten with bright spots + flowing cracks
+        # Cracks (light flows)
+        for _ in range(4):
+            x1 = rng2.uniform(0, W)
+            y1 = rng2.uniform(0, H)
+            x2 = x1 + rng2.uniform(-W * 0.4, W * 0.4)
+            y2 = y1 + rng2.uniform(-H * 0.4, H * 0.4)
+            parts.append(_line(x1, y1, x2, y2, light2, 1.5))
+        # Hot bright dots
         for _ in range(12):
-            x = rng2.uniform(0, spec.width)
-            y = rng2.uniform(0, spec.height)
-            parts.append(_circle(x, y, rng2.uniform(1, 3), _lighten_hex(base, 0.25)))
-    elif "ice" in name or "glass" in name:
-        for _ in range(10):
-            x1 = rng2.uniform(0, spec.width)
-            x2 = x1 + rng2.uniform(-spec.width / 3, spec.width / 3)
-            y1 = rng2.uniform(0, spec.height)
-            y2 = y1 + rng2.uniform(-spec.height / 3, spec.height / 3)
-            parts.append(_line(x1, y1, x2, y2, _lighten_hex(base, 0.20), 0.5))
+            x = rng2.uniform(0, W)
+            y = rng2.uniform(0, H)
+            r = rng2.uniform(1.5, 3.5)
+            parts.append(_circle(x, y, r, light2))
+            parts.append(_circle(x, y, r * 0.5, "#FFFFAA"))
+        # Cooler dark patches
+        for _ in range(8):
+            x = rng2.uniform(0, W)
+            y = rng2.uniform(0, H)
+            parts.append(_circle(x, y, rng2.uniform(2, 4), dark1))
+    elif "ice" in name:
+        # Crystalline facets: angular line clusters + bright corner reflections
+        # Polygonal facet boundaries
+        for _ in range(8):
+            cx = rng2.uniform(W * 0.2, W * 0.8)
+            cy = rng2.uniform(H * 0.2, H * 0.8)
+            import math as _mi
+            for j in range(3):
+                a1 = rng2.uniform(0, 6.28)
+                a2 = a1 + 2.094 + rng2.uniform(-0.3, 0.3)
+                r1 = rng2.uniform(3, 7)
+                r2 = rng2.uniform(3, 7)
+                parts.append(_line(
+                    cx + r1 * _mi.cos(a1), cy + r1 * _mi.sin(a1),
+                    cx + r2 * _mi.cos(a2), cy + r2 * _mi.sin(a2),
+                    light2, 1.2,
+                ))
+        # Reflective highlights
+        for _ in range(5):
+            x = rng2.uniform(0, W)
+            y = rng2.uniform(0, H)
+            parts.append(_circle(x, y, rng2.uniform(1.2, 2.0), "#FFFFFF"))
+    elif "glass" in name:
+        # Faint crystalline structure + corner light reflections
+        for i in range(4):
+            x = rng2.uniform(0, W)
+            y = rng2.uniform(0, H)
+            parts.append(_line(x, y, x + rng2.uniform(5, 12), y + rng2.uniform(5, 12), light2, 1.0))
+        # Corner reflections
+        for ix, iy in [(0.10, 0.10), (0.90, 0.10), (0.10, 0.90), (0.90, 0.90)]:
+            parts.append(_circle(W * ix, H * iy, 2.0, light2))
+            parts.append(_circle(W * ix, H * iy, 1.2, "#FFFFFF"))
     elif "wood" in name:
-        for i in range(0, spec.height, max(2, spec.height // 5)):
-            parts.append(_line(0, i, spec.width, i, _darken_hex(base, 0.20), 0.5))
+        # Wood: visible plank seams + grain lines + occasional knots
+        # Plank seams (horizontal)
+        for i in range(1, 4):
+            y = H * (i / 4.0)
+            parts.append(_line(0, y, W, y, dark2, 1.5))
+        # Grain lines per plank
+        for plank in range(4):
+            y_base = H * (plank / 4.0)
+            for _ in range(5):
+                y = y_base + rng2.uniform(2, H / 4 - 2)
+                parts.append(_line(0, y, W, y + rng2.uniform(-1, 1), dark1, 0.8))
+        # Knots
+        for _ in range(2):
+            kx = rng2.uniform(W * 0.2, W * 0.8)
+            ky = rng2.uniform(H * 0.1, H * 0.9)
+            parts.append(_circle(kx, ky, 2.5, dark2))
+            parts.append(_circle(kx, ky, 1.5, dark1))
+            parts.append(_circle(kx, ky, 0.8, light1))
     elif "snow" in name:
-        for _ in range(100):
-            x = rng2.uniform(0, spec.width)
-            y = rng2.uniform(0, spec.height)
-            parts.append(_circle(x, y, 0.6, _lighten_hex(base, 0.15)))
+        # Fluffy snow: many tiny bright dots + faint drift shadows
+        # Drift shadow base
+        for _ in range(4):
+            y = rng2.uniform(H * 0.3, H * 0.7)
+            parts.append(_polyline([
+                (0, y), (W * 0.25, y + rng2.uniform(-2, 2)),
+                (W * 0.50, y + rng2.uniform(-2, 2)),
+                (W * 0.75, y + rng2.uniform(-2, 2)),
+                (W, y + rng2.uniform(-2, 2)),
+            ], dark1, 1.2))
+        # Snow grain
+        for _ in range(80):
+            x = rng2.uniform(0, W)
+            y = rng2.uniform(0, H)
+            parts.append(_circle(x, y, rng2.uniform(0.6, 1.4), "#FFFFFF"))
+        # Sparkle reflections
+        for _ in range(6):
+            x = rng2.uniform(0, W)
+            y = rng2.uniform(0, H)
+            parts.append(_circle(x, y, rng2.uniform(0.4, 1.0), light2))
     elif "circuit" in name:
-        for i in range(0, spec.height, max(2, spec.height // 7)):
-            parts.append(_line(0, i, spec.width, i, _lighten_hex(base, 0.10), 0.4))
-            parts.append(_line(i, 0, i, spec.height, _lighten_hex(base, 0.10), 0.4))
+        # Visible circuit traces + small chip squares + LED dots
+        # Main grid
+        for i in range(0, H, 8):
+            parts.append(_line(0, i, W, i, light1, 1.0))
+            parts.append(_line(i, 0, i, H, light1, 1.0))
+        # Branch traces
+        for _ in range(6):
+            x1 = rng2.choice([8, 16, 24, 32, 40, 48, 56])
+            y1 = rng2.choice([8, 16, 24, 32, 40, 48, 56])
+            x2 = x1 + rng2.choice([-8, 8])
+            y2 = y1 + rng2.choice([-8, 8])
+            parts.append(_line(x1, y1, x2, y2, light2, 1.5))
+        # Chip pads + LEDs
+        for _ in range(4):
+            x = rng2.choice([16, 24, 40, 48])
+            y = rng2.choice([16, 24, 40, 48])
+            parts.append(_rect(x - 3, y - 3, 6, 6, dark2))
+            parts.append(_circle(x, y, 1.0, "#00FFAA"))
     elif "repair" in name:
-        for _ in range(16):
-            x = rng2.uniform(0, spec.width)
-            y = rng2.uniform(0, spec.height)
-            parts.append(_circle(x, y, rng2.uniform(1, 4), _lighten_hex(base, 0.18)))
+        # Repair foam: cellular bubble pattern with rim highlights
+        for _ in range(20):
+            x = rng2.uniform(2, W - 2)
+            y = rng2.uniform(2, H - 2)
+            r = rng2.uniform(2, 4.5)
+            parts.append(_circle(x, y, r, dark1, light1, 0.8))
+            parts.append(_circle(x, y, r * 0.6, light2))
+        # Edge cohesion outline
+        parts.append(_rect(0.5, 0.5, W - 1, H - 1, "none", dark2, 0.8))
     elif "biomatter" in name:
+        # Organic streaks + veins + occasional spore dots
         for _ in range(12):
-            cx = rng2.uniform(0, spec.width)
-            cy = rng2.uniform(0, spec.height)
-            parts.append(_ellipse(cx, cy, rng2.uniform(2, 5), rng2.uniform(1, 3),
-                                  _lighten_hex(base, 0.15)))
+            cx = rng2.uniform(0, W)
+            cy = rng2.uniform(0, H)
+            parts.append(_ellipse(cx, cy, rng2.uniform(4, 7), rng2.uniform(2, 3), light2))
+        # Vein tracery
+        for _ in range(6):
+            x1 = rng2.uniform(0, W)
+            y1 = rng2.uniform(0, H)
+            for _ in range(4):
+                x2 = x1 + rng2.uniform(-8, 8)
+                y2 = y1 + rng2.uniform(-8, 8)
+                parts.append(_line(x1, y1, x2, y2, dark2, 1.2))
+                x1, y1 = x2, y2
+        # Spore dots
+        for _ in range(8):
+            x = rng2.uniform(0, W)
+            y = rng2.uniform(0, H)
+            parts.append(_circle(x, y, rng2.uniform(1.2, 2.0), light1))
+    elif "metal_nohook" in name:
+        # Reinforced metal: heavy rivets + plate boundaries + warning chevron
+        # Plate boundaries
+        for i in range(1, 3):
+            x = W * (i / 3.0)
+            parts.append(_line(x, 0, x, H, dark2, 2.0))
+        parts.append(_line(0, H * 0.5, W, H * 0.5, dark2, 2.0))
+        # Heavy rivets
+        for ix in [0.10, 0.45, 0.55, 0.90]:
+            for iy in [0.10, 0.45, 0.55, 0.90]:
+                parts.append(_circle(W * ix, H * iy, 2.5, dark2))
+                parts.append(_circle(W * ix, H * iy, 1.8, light1))
+                parts.append(_circle(W * ix, H * iy, 0.6, dark2))
+        # Warning chevron
+        parts.append(_polygon([
+            (W * 0.4, H * 0.32), (W * 0.6, H * 0.32), (W * 0.5, H * 0.40),
+        ], dark2))
     return "".join(parts)
 
 
@@ -1657,6 +2028,354 @@ def _compose_cosmetic_stub(spec: AssetSpec, rng: random.Random) -> str:
 
 
 def _compose_emblem(spec: AssetSpec, rng: random.Random) -> str:
+    """M12 polish-pass: faction emblems as heraldic crests.
+
+    Each faction gets a faction-specific shield shape + layered border treatment
+    + iconic mark + motto banner (full variant) instead of a generic
+    circle+icon. Per Coalition / Frontier / Ronin / Synth / Crystalfold / Husks /
+    Collegium / Starlight visual identity from factions_full.json.
+    """
+    p = spec.palette
+    body = p.primary()
+    accent = p.accent()
+    dark = p.dark()
+    highlight = p.highlight()
+    glow = p.glow()
+    metal = p.metal()
+    name = spec.canonical_name
+    cx, cy = spec.width / 2, spec.height / 2
+    simple = "_simple" in name
+    W = spec.width
+    H = spec.height
+    import math as _math
+
+    parts: List[str] = []
+
+    # ─── Faction-specific shield shapes ──────────────────────────────────
+    if "hostile_corp" in name:
+        # COALITION-style heater shield (rounded top, pointed bottom)
+        shield_pts = [
+            (cx - W * 0.34, cy - H * 0.32),
+            (cx + W * 0.34, cy - H * 0.32),
+            (cx + W * 0.34, cy + H * 0.04),
+            (cx, cy + H * 0.42),
+            (cx - W * 0.34, cy + H * 0.04),
+        ]
+        parts.append(_polygon(shield_pts, dark, accent, max(2.0, W * 0.012)))
+        # Inner field
+        parts.append(_polygon([
+            (cx - W * 0.28, cy - H * 0.26),
+            (cx + W * 0.28, cy - H * 0.26),
+            (cx + W * 0.28, cy + H * 0.02),
+            (cx, cy + H * 0.34),
+            (cx - W * 0.28, cy + H * 0.02),
+        ], body, dark, 1.0))
+        # Tower-anchor motif
+        parts.append(_rect(cx - W * 0.04, cy - H * 0.18, W * 0.08, H * 0.30, accent, dark, 0.8))
+        parts.append(_rect(cx - W * 0.10, cy - H * 0.22, W * 0.20, H * 0.06, accent, dark, 0.8))
+        parts.append(_rect(cx - W * 0.14, cy - H * 0.26, W * 0.28, H * 0.04, highlight))
+        # Crenellation
+        for i in range(3):
+            xx = cx - W * 0.10 + i * W * 0.08
+            parts.append(_rect(xx, cy - H * 0.30, W * 0.05, H * 0.04, accent))
+    elif "allied_resistance" in name:
+        # COALITION-alt or FRONTIER-style: spearpoint shield
+        shield_pts = [
+            (cx - W * 0.32, cy - H * 0.34),
+            (cx + W * 0.32, cy - H * 0.34),
+            (cx + W * 0.18, cy + H * 0.10),
+            (cx, cy + H * 0.42),
+            (cx - W * 0.18, cy + H * 0.10),
+        ]
+        parts.append(_polygon(shield_pts, dark, accent, max(2.0, W * 0.012)))
+        parts.append(_polygon([
+            (cx - W * 0.26, cy - H * 0.28),
+            (cx + W * 0.26, cy - H * 0.28),
+            (cx + W * 0.14, cy + H * 0.08),
+            (cx, cy + H * 0.34),
+            (cx - W * 0.14, cy + H * 0.08),
+        ], body, dark, 1.0))
+        # Crossed wrench-and-rifle, larger + detailed
+        parts.append(_polygon([
+            (cx - W * 0.22, cy - H * 0.20),
+            (cx + W * 0.20, cy + H * 0.18),
+            (cx + W * 0.22, cy + H * 0.16),
+            (cx - W * 0.20, cy - H * 0.22),
+        ], accent, dark, 0.8))
+        parts.append(_polygon([
+            (cx - W * 0.20, cy + H * 0.18),
+            (cx + W * 0.22, cy - H * 0.20),
+            (cx + W * 0.20, cy - H * 0.22),
+            (cx - W * 0.22, cy + H * 0.16),
+        ], accent, dark, 0.8))
+        parts.append(_circle(cx, cy, W * 0.05, glow, dark, 0.5))
+    elif "marauder" in name:
+        # FRONTIER / Husks-style irregular star-burst
+        # Outer jagged shield
+        burst_pts = []
+        for i in range(10):
+            ang = _math.radians(36 * i - 90)
+            r = W * (0.36 if i % 2 == 0 else 0.24)
+            burst_pts.append((cx + r * _math.cos(ang), cy + r * _math.sin(ang)))
+        parts.append(_polygon(burst_pts, dark, accent, max(2.0, W * 0.010)))
+        # Inner pentagon
+        pent_pts = []
+        for i in range(5):
+            ang = _math.radians(72 * i - 90)
+            r = W * 0.22
+            pent_pts.append((cx + r * _math.cos(ang), cy + r * _math.sin(ang)))
+        parts.append(_polygon(pent_pts, body, dark, 1.0))
+        # Tribal mark — drill-and-thread cross
+        parts.append(_polygon([
+            (cx - W * 0.10, cy - H * 0.18),
+            (cx + W * 0.10, cy - H * 0.18),
+            (cx + W * 0.06, cy + H * 0.18),
+            (cx - W * 0.06, cy + H * 0.18),
+        ], accent, dark, 0.8))
+        # Drill-tip
+        parts.append(_polygon([
+            (cx - W * 0.06, cy + H * 0.18),
+            (cx + W * 0.06, cy + H * 0.18),
+            (cx, cy + H * 0.24),
+        ], highlight, dark, 0.5))
+        # Thread/bind dots
+        for i in range(3):
+            parts.append(_circle(cx, cy - H * 0.10 + i * H * 0.08, W * 0.015, glow))
+    elif "religious_order" in name:
+        # RONIN-style circular medallion with crossed katanas + thread loop
+        # Outer ring
+        parts.append(_circle(cx, cy, W * 0.40, dark, accent, max(2.0, W * 0.012)))
+        parts.append(_circle(cx, cy, W * 0.36, body, dark, 1.0))
+        # Crossed katanas
+        sword_a_pts = [
+            (cx - W * 0.26, cy - H * 0.20),
+            (cx + W * 0.26, cy + H * 0.20),
+            (cx + W * 0.28, cy + H * 0.16),
+            (cx - W * 0.24, cy - H * 0.24),
+        ]
+        parts.append(_polygon(sword_a_pts, metal, dark, 0.8))
+        sword_b_pts = [
+            (cx - W * 0.26, cy + H * 0.20),
+            (cx + W * 0.26, cy - H * 0.20),
+            (cx + W * 0.24, cy - H * 0.24),
+            (cx - W * 0.28, cy + H * 0.16),
+        ]
+        parts.append(_polygon(sword_b_pts, metal, dark, 0.8))
+        # Handle wraps
+        parts.append(_rect(cx - W * 0.28, cy - H * 0.22, W * 0.08, H * 0.04, accent))
+        parts.append(_rect(cx + W * 0.20, cy + H * 0.18, W * 0.08, H * 0.04, accent))
+        # Center binding ring
+        parts.append(_circle(cx, cy, W * 0.06, accent, dark, 0.8))
+        parts.append(_circle(cx, cy, W * 0.03, glow))
+        # Decorative inner ring lines
+        parts.append(_circle(cx, cy, W * 0.30, "none", accent, max(1.0, W * 0.005)))
+    elif "scientist_order" in name:
+        # SYNTH / Collegium-style: hexagonal frame with central data-mandala
+        hex_pts = []
+        for i in range(6):
+            ang = _math.radians(60 * i - 30)
+            r = W * 0.40
+            hex_pts.append((cx + r * _math.cos(ang), cy + r * _math.sin(ang)))
+        parts.append(_polygon(hex_pts, dark, accent, max(2.0, W * 0.012)))
+        # Inner hex
+        inner_hex = []
+        for i in range(6):
+            ang = _math.radians(60 * i - 30)
+            r = W * 0.32
+            inner_hex.append((cx + r * _math.cos(ang), cy + r * _math.sin(ang)))
+        parts.append(_polygon(inner_hex, body, dark, 1.0))
+        # Central atom / circuit mandala
+        parts.append(_circle(cx, cy, W * 0.08, glow, dark, 0.5))
+        parts.append(_circle(cx, cy, W * 0.04, accent))
+        # 3 orbit ellipses
+        for rot in range(3):
+            ang = _math.radians(60 * rot)
+            # Generate ellipse approx via 16-point polygon (since _ellipse doesn't rotate)
+            ell_pts = []
+            for j in range(16):
+                p_ang = _math.radians(22.5 * j)
+                x_local = W * 0.18 * _math.cos(p_ang)
+                y_local = H * 0.06 * _math.sin(p_ang)
+                x_rot = x_local * _math.cos(ang) - y_local * _math.sin(ang)
+                y_rot = x_local * _math.sin(ang) + y_local * _math.cos(ang)
+                ell_pts.append((cx + x_rot, cy + y_rot))
+            # Approximate ellipse by drawing edges between adjacent points
+            for i in range(len(ell_pts)):
+                a = ell_pts[i]
+                b = ell_pts[(i + 1) % len(ell_pts)]
+                parts.append(_line(a[0], a[1], b[0], b[1], accent, max(1.0, W * 0.005)))
+        # Corner runes
+        for i in range(6):
+            ang = _math.radians(60 * i - 30)
+            r = W * 0.28
+            px = cx + r * _math.cos(ang)
+            py = cy + r * _math.sin(ang)
+            parts.append(_circle(px, py, W * 0.012, highlight))
+    elif "mercenary_guild" in name:
+        # MERC-style: shield-shape (Norman shield: rounded top, pointed bottom, flared)
+        shield_pts = [
+            (cx - W * 0.34, cy - H * 0.30),
+            (cx + W * 0.34, cy - H * 0.30),
+            (cx + W * 0.30, cy + H * 0.16),
+            (cx, cy + H * 0.40),
+            (cx - W * 0.30, cy + H * 0.16),
+        ]
+        parts.append(_polygon(shield_pts, dark, accent, max(2.0, W * 0.012)))
+        parts.append(_polygon([
+            (cx - W * 0.28, cy - H * 0.24),
+            (cx + W * 0.28, cy - H * 0.24),
+            (cx + W * 0.24, cy + H * 0.14),
+            (cx, cy + H * 0.32),
+            (cx - W * 0.24, cy + H * 0.14),
+        ], body, dark, 1.0))
+        # Horizontal coin/bar with chevron
+        parts.append(_rect(cx - W * 0.20, cy - H * 0.04, W * 0.40, H * 0.10, accent, dark, 0.8))
+        parts.append(_rect(cx - W * 0.18, cy - H * 0.02, W * 0.36, H * 0.06, highlight))
+        # Chevron above
+        parts.append(_polygon([
+            (cx - W * 0.18, cy - H * 0.08),
+            (cx, cy - H * 0.18),
+            (cx + W * 0.18, cy - H * 0.08),
+            (cx + W * 0.14, cy - H * 0.06),
+            (cx, cy - H * 0.12),
+            (cx - W * 0.14, cy - H * 0.06),
+        ], accent, dark, 0.5))
+        # Crossed coin underneath
+        parts.append(_circle(cx, cy + H * 0.18, W * 0.06, accent, dark, 0.5))
+        parts.append(_circle(cx, cy + H * 0.18, W * 0.04, highlight))
+    elif "pirates" in name:
+        # PIRATES-style: skull with crossbones on flagpoint shield
+        # Flag/banner shape
+        parts.append(_polygon([
+            (cx - W * 0.32, cy - H * 0.36),
+            (cx + W * 0.32, cy - H * 0.36),
+            (cx + W * 0.28, cy + H * 0.28),
+            (cx, cy + H * 0.38),
+            (cx - W * 0.28, cy + H * 0.28),
+        ], dark, accent, max(2.0, W * 0.012)))
+        parts.append(_polygon([
+            (cx - W * 0.28, cy - H * 0.30),
+            (cx + W * 0.28, cy - H * 0.30),
+            (cx + W * 0.24, cy + H * 0.24),
+            (cx, cy + H * 0.32),
+            (cx - W * 0.24, cy + H * 0.24),
+        ], body, dark, 1.0))
+        # Crossbones X
+        parts.append(_polygon([
+            (cx - W * 0.20, cy + H * 0.08),
+            (cx + W * 0.20, cy - H * 0.20),
+            (cx + W * 0.22, cy - H * 0.16),
+            (cx - W * 0.18, cy + H * 0.12),
+        ], accent, dark, 0.8))
+        parts.append(_polygon([
+            (cx - W * 0.20, cy - H * 0.20),
+            (cx + W * 0.20, cy + H * 0.08),
+            (cx + W * 0.18, cy + H * 0.12),
+            (cx - W * 0.22, cy - H * 0.16),
+        ], accent, dark, 0.8))
+        # Bone ends
+        for x_off in [-0.20, 0.20]:
+            for y_off in [-0.20, 0.08]:
+                parts.append(_circle(cx + W * x_off, cy + H * y_off, W * 0.03, highlight, dark, 0.5))
+        # Skull silhouette on top
+        parts.append(_circle(cx, cy - H * 0.10, W * 0.13, highlight, dark, 0.8))
+        # Skull eyes
+        parts.append(_circle(cx - W * 0.05, cy - H * 0.10, W * 0.025, dark))
+        parts.append(_circle(cx + W * 0.05, cy - H * 0.10, W * 0.025, dark))
+        # Skull nose
+        parts.append(_polygon([
+            (cx, cy - H * 0.06),
+            (cx - W * 0.015, cy - H * 0.02),
+            (cx + W * 0.015, cy - H * 0.02),
+        ], dark))
+        # Skull teeth
+        for i in range(4):
+            tx = cx - W * 0.05 + i * W * 0.027
+            parts.append(_rect(tx, cy + H * 0.00, W * 0.02, H * 0.03, dark))
+    elif "drone_collective" in name:
+        # SYNTH-style: faceted hex + circuit-mandala
+        hex_pts = []
+        for i in range(6):
+            ang = _math.radians(60 * i)
+            r = W * 0.40
+            hex_pts.append((cx + r * _math.cos(ang), cy + r * _math.sin(ang)))
+        parts.append(_polygon(hex_pts, dark, accent, max(2.0, W * 0.012)))
+        # Inner hex
+        inner_hex = []
+        for i in range(6):
+            ang = _math.radians(60 * i)
+            r = W * 0.32
+            inner_hex.append((cx + r * _math.cos(ang), cy + r * _math.sin(ang)))
+        parts.append(_polygon(inner_hex, body, dark, 1.0))
+        # 6-armed circuit star
+        for i in range(6):
+            ang = _math.radians(60 * i)
+            x = cx + W * 0.26 * _math.cos(ang)
+            y = cy + H * 0.26 * _math.sin(ang)
+            parts.append(_line(cx, cy, x, y, accent, max(2.0, W * 0.008)))
+            parts.append(_circle(x, y, W * 0.03, glow, dark, 0.5))
+        # Central drone-eye
+        parts.append(_circle(cx, cy, W * 0.10, dark))
+        parts.append(_circle(cx, cy, W * 0.06, glow))
+        parts.append(_circle(cx, cy, W * 0.03, highlight))
+        # Hex faces — 6 inner triangle highlights
+        for i in range(6):
+            a1 = _math.radians(60 * i)
+            a2 = _math.radians(60 * (i + 1))
+            r1 = W * 0.20
+            r2 = W * 0.18
+            x1 = cx + r1 * _math.cos(a1)
+            y1 = cy + r1 * _math.sin(a1)
+            x2 = cx + r1 * _math.cos(a2)
+            y2 = cy + r1 * _math.sin(a2)
+            xm = cx + r2 * _math.cos(_math.radians(60 * i + 30))
+            ym = cy + r2 * _math.sin(_math.radians(60 * i + 30))
+            parts.append(_polygon([(x1, y1), (x2, y2), (xm, ym)], highlight, dark, 0.3))
+    else:
+        # Generic — render a star-burst
+        parts.append(_circle(cx, cy, min(W, H) * 0.40, dark, accent, max(2.0, W * 0.012)))
+        parts.append(_circle(cx, cy, min(W, H) * 0.32, body, dark, 1.0))
+        burst_pts = []
+        for i in range(10):
+            ang = _math.radians(36 * i - 90)
+            r = W * (0.24 if i % 2 == 0 else 0.10)
+            burst_pts.append((cx + r * _math.cos(ang), cy + r * _math.sin(ang)))
+        parts.append(_polygon(burst_pts, accent, dark, 0.8))
+
+    # Full variant adds motto banner + outer wreath ornament
+    if not simple:
+        # Outer wreath dots
+        for i in range(12):
+            ang = _math.radians(30 * i)
+            r = W * 0.48
+            x = cx + r * _math.cos(ang)
+            y = cy + r * _math.sin(ang)
+            parts.append(_circle(x, y, W * 0.012, accent, dark, 0.3))
+        # Motto banner ribbon at bottom
+        parts.append(_polygon([
+            (cx - W * 0.36, cy + H * 0.44),
+            (cx + W * 0.36, cy + H * 0.44),
+            (cx + W * 0.32, cy + H * 0.49),
+            (cx, cy + H * 0.46),
+            (cx - W * 0.32, cy + H * 0.49),
+        ], accent, dark, 1.0))
+        parts.append(_polygon([
+            (cx - W * 0.34, cy + H * 0.452),
+            (cx + W * 0.34, cy + H * 0.452),
+            (cx + W * 0.30, cy + H * 0.48),
+            (cx, cy + H * 0.47),
+            (cx - W * 0.30, cy + H * 0.48),
+        ], highlight, dark, 0.5))
+        # 3 stitching dots on banner
+        for i in range(3):
+            parts.append(_circle(cx - W * 0.18 + i * W * 0.18, cy + H * 0.465, W * 0.005, dark))
+
+    return "".join(parts)
+
+
+def _compose_emblem_old(spec: AssetSpec, rng: random.Random) -> str:
+    """OLD emblem composer kept for reference. Not registered. Will be removed
+    after _compose_emblem is validated."""
     p = spec.palette
     body = p.primary()
     accent = p.accent()
