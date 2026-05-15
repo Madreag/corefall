@@ -1,0 +1,30 @@
+MissionBriefing (
+    mission_id: "dust_storm_survival_mars",
+    canonical_name: "Storm Crossing",
+    faction_giver: "frontier",
+    world: "mars",
+    difficulty: "normal",
+    objective_summary: "Cross the Pavonis equatorial belt during an active dust storm to deliver emergency medical supplies to a Frontier tunnel cell cut off from the main network; navigation by terrain memory only.",
+    briefing_text: "Partner. Wrench Sandoval, Olympus crew. We've got a tunnel cell sitting under twelve meters of basalt on the Pavonis equatorial line that is, as of two hours ago, no longer connected to the main network. The cause is the dust storm. The dust storm is, by Tran's read on the weather data we paid him to share, going to last another four to six hours. The cell needs medical supplies — specifically, antitoxin, synth-blood type-O, and four units of plasma for two crew with acid burns and one who's bleeding into his abdomen — and they need them before the storm ends, because the Coalition garrison at Pavonis will, when the dust clears, sweep the equatorial belt for Frontier movement and our convoy will, at that point, be a target. Echo Bremmer is, as of this briefing, in the Magpie at the eastern edge of the storm with the supply crate strapped to the rear deck. The visibility inside the storm is, by every available reading, approximately twelve to fifteen meters. The HUD instrumentation will, inside the storm, produce intermittent readings. You'll be navigating by terrain memory and by Echo's voice on the radio. The Magpie has the route in its nav-computer; the nav-computer is not, in any current reading, reliable in the storm. Trust Echo. Trust the road. Don't, please, trust the instruments. The crossing will take approximately ninety in-game minutes if everything goes well. Approximately three hours if it doesn't. We have, by the storm forecast, four hours. Move.",
+    primary_objectives: [
+        "Cross the Pavonis equatorial belt in active dust storm",
+        "Deliver the medical supplies to the tunnel cell",
+        "Sustain no Magpie destruction",
+        "Complete the run before the storm ends",
+    ],
+    secondary_objectives: [
+        "Maintain HUD-independent navigation throughout",
+        "Avoid Coalition patrol contact (slim chance during storm)",
+        "Recover any tunnel cell wounded for evacuation",
+    ],
+    failure_conditions: [
+        "Magpie destroyed",
+        "Supplies lost",
+        "Storm ends before delivery (Coalition sweep starts)",
+        "Tunnel cell wounded die before supplies arrive",
+    ],
+    reward_summary: "Frontier reputation +30; T2 dust-rated chassis kit; Olympus crew commendation; medical reserve credit (informal favor); Doc Mukherjee's standing thanks.",
+    debrief_win: "Partner. The cell's medics are working. The bleeding-out crew member is, by Doc Mukherjee's confirmation, stable. Echo got the Magpie back to the eastern edge with twenty percent visibility and three blown tires; she has, in her own words, named the truck back to its old name to bring it luck. The Coalition swept the belt at storm-end. They found nothing. We are, in this debrief, exactly where we wanted to be. Drink something on the way back to Olympus.",
+    debrief_loss: "Partner. We lost the run. The Magpie went off the route at approximately the seventy-percent mark; Echo is, by every available account, alive but on foot, and she'll make it back to the eastern edge with the supply crate on her shoulder if we don't intercept her first. The tunnel cell lost the bleeding-out crew member. We did what we could with what we had. The cost is, in this engagement, real. We're going to remember the name. Show up tomorrow.",
+    voice_giver_id: "frontier_lead_wrench_sandoval",
+)

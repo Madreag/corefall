@@ -1,0 +1,32 @@
+WorldLore (
+    world_id: "mimas",
+    canonical_name: "Mimas Methane Sea",
+    music_anchor: "music_world_mimas",
+    entries: [
+        WorldEntry (
+            kind: "geology",
+            title: "The Drowned Moon",
+            body: "Mimas is an ice-and-rock body of approximately 396 kilometers in diameter, with a surface that is approximately one-third covered by liquid methane. The methane sea is not native; it is the result of a pre-collapse atmospheric processing project that was abandoned mid-completion and continued to vent methane into the atmosphere for two centuries after the operators left. The methane settled, pooled, and is now stable as a liquid across a temperature range of approximately ten Kelvin. The seafloor is ice-and-silicate, with deposits of clathrate hydrates that the Concordat has classified as an unrecoverable strategic resource. The surface above the sea is partly ice, partly bare rock, and partly the rusting remains of the pre-collapse processing infrastructure.",
+        ),
+        WorldEntry (
+            kind: "history",
+            title: "The Late-Found World",
+            body: "Mimas was not surveyed in the pre-collapse period and remained essentially unknown to the inhabited Sol system until the Starlight Voyager-Charter of 2126 mapped its surface. The first methane-breather settlement was contacted in 2168 during the Starlight Mimas survey; the methane-breathers had, by their own account, lived on Mimas continuously for approximately four thousand years, predating any human presence in the Sol system. The Concordat declared the methane-breathers a sentient species in 2171 over a Coalition objection that the Coalition has, in its more candid official statements, called the most embarrassing error in the post-collapse era. Mimas is, in 2241, a co-governed world; the methane-breathers hold the seafloor and the deep ice, the Concordat holds the surface ports, and Starlight administers the joint.",
+        ),
+        WorldEntry (
+            kind: "biosphere",
+            title: "The Methane Ecology",
+            body: "Mimas's methane sea hosts a complete native ecology of approximately seven thousand catalogued species, ranging from microscopic clathrate-feeders to large predatory organisms the Collegium has classified as 'methane-leviathan-equivalent'. The dominant intelligent species — the methane-breathers, who refer to themselves in their own language as 'the patient ones' — are colonial, cryogenic, and oxygen-toxic; they live in extended family groups of twelve to two hundred members, and have a recorded oral history that exceeds four thousand Earth-years. The methane-breather written script was first deciphered by the Collegium in 2189; current archive holdings include approximately seven hundred thousand methane-breather texts, the oldest of which predates the entire human presence in the Sol system.",
+        ),
+        WorldEntry (
+            kind: "culture",
+            title: "The Shore Stations",
+            body: "Human and methane-breather contact takes place at the shore stations — small Concordat-administered ports built at the ice-methane boundary, where pressurized buildings face open sea on one side and ice plateau on the other. Each shore station has a methane-breather attache, a human harbor-master, and a Starlight survey officer; the three positions rotate on staggered calendars to ensure continuity. The stations conduct trade — methane-breather organic compounds for human metals and electronics — and dispute resolution, which is conducted under the methane-breathers' ancient adjudication protocol and which, by treaty, takes precedence over Concordat law within the station perimeter. The Coalition has signed this treaty. The Coalition has, in eighty years, never appealed a ruling.",
+        ),
+        WorldEntry (
+            kind: "mystery",
+            title: "The Long Quiet Layer",
+            body: "Approximately fifteen kilometers below the surface of the methane sea, in a strip running across the planet's equator, sonar surveys detect a layer of unknown composition that does not respond to standard sonic, thermal, or magnetic probing. The methane-breathers refer to the layer as the Long Quiet and consider it sacred; their oldest oral histories describe the Long Quiet as the resting place of the world's previous tenants. The Collegium has not been permitted to sample the layer. The Concordat has, by treaty, not permitted any external research. The Synth Collective, in 2231, requested permission to conduct a single observation pass. The methane-breathers declined, in formal session, in a vote that took eleven days and produced no minority opinion. The Synth Collective has not requested again.",
+        ),
+    ],
+)

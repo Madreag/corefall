@@ -1,0 +1,32 @@
+WorldLore (
+    world_id: "earth",
+    canonical_name: "Earth Wastelands",
+    music_anchor: "music_world_earth",
+    entries: [
+        WorldEntry (
+            kind: "geology",
+            title: "The Crust That Remembers",
+            body: "Earth's surface is older than every other body in the Sol system except Vulcan, and its scars run deeper than any of them. The pre-collapse industrial era left a layer of fused metal, broken concrete, and burnt-out polymer running between thirty centimeters and four meters below the surface across the entirety of the inhabited belt. The Coalition surveys call this the Industrial Stratum; the Frontier calls it the Iron Floor; the Husks call it the bones of the world. Beneath it lies pristine continental crust, untouched since the Holocene, fertile in places and radioactive in others. Mining operations on Earth do not dig down; they dig sideways, into the strata, where the dead cities have already concentrated the metals into useful seams. The Coalition reserves the highest-yield seams for fortification material. The Frontier sells whatever it can pull up.",
+        ),
+        WorldEntry (
+            kind: "history",
+            title: "Return to the Mother",
+            body: "Earth was the first world humanity left and the last world humanity reclaimed. After the Lagrange Concordat of 2087, the Coalition declared the planet a protected reclamation zone and began the slow business of clearing the dead cities, neutralizing the orbital debris, and rebuilding the habitable belt. The work took eighty years and is, by the Coalition's own admission, two-thirds incomplete. The Husks contest every meter. The Frontier raids the supply lanes. The Synth Collective declines to participate, citing predictive yield curves that do not favor planetary reclamation. The Crystalfold occasionally visit and sing about the cities; their songs have been recorded but not, to date, translated. Earth in 2241 is home to approximately four hundred million humans, twelve million androids, and a quietly increasing number of biomech variants who claim ancestral rights to the ruins.",
+        ),
+        WorldEntry (
+            kind: "biosphere",
+            title: "Survivors of the Long Quiet",
+            body: "Earth's biosphere did not die during the collapse; it pruned. The dominant forms now are the rats that learned to read radio signatures, the corvids that learned to scavenge orbital debris, the lichens that learned to grow on fused concrete, and approximately sixteen hundred plant species the Collegium has been unable to formally re-catalog because each generation continues to change. The pre-collapse animals — the cattle, the dogs, the horses — survive in pockets, mostly under Coalition husbandry programs. The Crystalfold believe Earth's biosphere remembers something the rest of the system has forgotten. The Husks agree, and consume it whenever they can reach it. The Coalition has classified all biosphere sampling above the Industrial Stratum as a restricted research activity. The Collegium ignores the classification, politely.",
+        ),
+        WorldEntry (
+            kind: "culture",
+            title: "The Habitable Belt",
+            body: "Earth's inhabited zone is a narrow strip running between the thirtieth and forty-fifth parallels in both hemispheres, where the post-collapse atmosphere has stabilized enough to permit unprotected outdoor activity for more than four hours at a stretch. The strip contains seventeen Coalition cities, forty-one mixed settlements, and an unknown number of Husk encampments. Coalition cities are organized around a central command core, with concentric fortification rings and a single ceremonial gate facing west. Mixed settlements are organized around whatever trade pattern keeps them alive — usually a Frontier supply route and a Collegium research outpost in symbiosis. Outside the habitable belt, Earth is given over to the storms, the wastes, and the Husks. Travel between settlements is by armored convoy or air; pedestrian travel is a Frontier specialty and a Coalition felony.",
+        ),
+        WorldEntry (
+            kind: "mystery",
+            title: "The Quiet Signal",
+            body: "Since 2189, a low-frequency radio signal has been received at irregular intervals from a point on Earth's surface in the South American interior. The signal repeats a forty-seven-second pattern, has never varied, and has never been successfully traced. The Coalition declared the signal a malfunction in a pre-collapse beacon and closed the investigation in 2202. The Frontier sells maps to the signal's apparent location; none of the buyers have returned with confirmation. The Collegium has, in private, requested permission to mount a research expedition; the request has been denied four times. The Synth Collective claims the signal does not exist, which is the only public statement the Synth Collective has ever made about Earth that the Coalition has refused to enter into the record.",
+        ),
+    ],
+)

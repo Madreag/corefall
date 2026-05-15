@@ -1,0 +1,14 @@
+OriginLore (
+    origin_id: "insectoid_swarm",
+    canonical_name: "Insectoid Swarm",
+    physical_description: "Engineered insectoid sentient, manufactured from a pre-collapse experimental biotech program. Body presents as a chitinous bipedal form between 1.4 and 1.7 meters in height, with a hard exoskeleton, four arms (two primary, two secondary), and large compound eyes. Internal structure is hemolymph-based rather than blood-based; respiration is via spiracles distributed across the thorax and abdomen. Lifespan is approximately fifty Earth-years. Individual insectoids are members of a loose collective that shares no telepathic link but operates through extensive scent-marking and pheromone communication.",
+    cultural_traits: "The insectoid swarm population traces its origin to a Concordat-classified pre-collapse biotech program at the Old Geneva campus. The program produced its first viable insectoid in 2073; the Concordat declared the species sentient in 2104, after extensive ethical review. The insectoid population in 2241 is approximately eleven thousand individuals, concentrated in the Mars equatorial belt and the Belt asteroids. Insectoid culture is markedly less verbal than any other origin's; insectoids communicate primarily through chemical signaling and physical gesture, with spoken language reserved for inter-species contact. Insectoid social structure is collective but non-hierarchical — decisions are made through extended scent-mediated consensus that can take days for important matters. Insectoid art consists primarily of chemical compositions that humans cannot perceive; their music, by comparison, is rare and is performed in chitinous percussion ensembles.",
+    gameplay_strengths: "Higher poison resistance than any other origin. Higher radiation resistance. Higher resistance to blind and stun afflictions (compound eyes recover faster). Higher resistance to fear and insanity (collective cognitive distribution). Reduced fall damage (chitinous exoskeleton). Higher exhaustion resistance.",
+    gameplay_weaknesses: "Hemolymph oxygen-carrying capacity is approximately 40% of hemoglobin baseline, which produces lower stamina ceiling. Vulnerable to specialized anti-chitinous weapons. Limited compatibility with synth-blood. Reduced cold tolerance. Reduced caloric storage (must eat frequently).",
+    home_world: "Mars equatorial belt (canonical primary); secondary populations on Belt asteroid 12-Family and Old Geneva campus residential zone.",
+    notable_origins_in_corefall_universe: [
+        "Worker-Tess (Old Geneva, Collegium research subject and resident)",
+        "Numerous Frontier crews include insectoid members for low-light and toxic-environment work",
+        "The Husks have, on three documented occasions, made formal trade agreements with insectoid colonies",
+    ],
+)

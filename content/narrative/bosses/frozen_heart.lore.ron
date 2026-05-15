@@ -1,0 +1,34 @@
+BossLore (
+    boss_id: "frozen_heart",
+    canonical_name: "The Frozen Heart",
+    world: "europa",
+    biome: "deep_cavern",
+    arena_rule: "TwoWayDoor",
+    entries: [
+        BossLoreEntry (
+            kind: "origin_myth",
+            title: "The Engine That Was Left Running",
+            body: "The Frozen Heart was, before it was the Frozen Heart, the primary cryogenic-fusion engine of the Pwyll drill station. The engine was, in 2173, supposed to be powered down for the routine seasonal maintenance cycle. The station director, a Coalition major named Helena Tavares, ordered the shutdown postponed by six hours to complete a sample-extraction operation that the Collegium had paid handsomely for. The engine ran for six hours past the safe operating window. The engine, by every available reconstruction, then ran for an additional two hundred and forty-one years, the duration unaccounted for in any maintenance ledger. The Coalition does not, in any current document, list Helena Tavares as missing. The Coalition lists Helena Tavares as the engine's first sustained operator."
+        ),
+        BossLoreEntry (
+            kind: "war_history",
+            title: "The Heart's Garden",
+            body: "The Frozen Heart was first encountered in 2189 by a Starlight deep-cavern survey team that mapped its outer chambers but did not penetrate the inner ones. The first sustained engagement was in 2204, by a joint Coalition-Collegium force that lost forty-one personnel before the Heart entered what the survivors called 'phase three' and the force withdrew. Subsequent engagements have been, by Concordat policy, restricted to expeditions of at least T2 weapons rating with confirmed heat-resistance gear and approved by the Pwyll station director. The Heart has been engaged on eleven separate occasions. The Heart has been driven into temporary dormancy on four of those occasions. The Heart has never, by any available record, been truly defeated. The Pwyll station director's office maintains, in the desk's lower-right drawer, a photograph of Helena Tavares circa 2170. The director's office does not, in any current census, employ anyone who recognizes the woman in the photograph."
+        ),
+        BossLoreEntry (
+            kind: "defeat_consequences",
+            title: "What the Cooling Costs",
+            body: "Driving the Frozen Heart into dormancy produces the most consistent post-encounter reward set in the Concordat's endgame inventory: the Cryo-Plasma Rifle recipe, the Ice-Walker artifact, the deep-cavern lore unlocks. The cost is, by every recent survey, the immediate destabilization of the Pwyll station's primary cryogenic systems. Each dormancy event has produced, on a delay of approximately six to nine months, a localized environmental shift in the surrounding ice that has, on three occasions, opened new passages into the deeper cavern network. The Collegium considers this a net positive. The methane-breathers, when consulted, have expressed concern that the new passages are not, in their reckoning, supposed to be open. The Concordat has not, in any current policy, addressed the methane-breather position."
+        ),
+        BossLoreEntry (
+            kind: "phase_descriptions",
+            title: "The Three Cryos",
+            body: "Phase One: the Heart manifests as a single central crystalline structure at the cavern's center, emitting cryogenic blasts at intervals. The blasts produce localized frost zones that the player must navigate; movement through the zones at full speed produces frozen affliction. The phase ends when the central structure's outer plates fall away. Phase Two: the Heart is, in this phase, accompanied by four to six 'ice-mech adds' — partially-frozen pre-collapse robotic forms that have, by every available reading, been embedded in the cavern's ice for two centuries. The adds are tactically problematic; the Heart itself is, in this phase, largely defensive. The phase ends when the last ice-mech is destroyed. Phase Three: the Heart's supercooled core enters meltdown. The cavern's ice begins to fracture. The player must, in this phase, deliver sustained T2-or-better damage to the core while navigating an environment in active collapse. The phase ends, and the encounter concludes in temporary victory, when the core's resonance shifts to dormancy. The Heart does not, by any current method, permanently die."
+        ),
+        BossLoreEntry (
+            kind: "dropped_lore_codex",
+            title: "Helena Tavares, Maintenance Log Entry 8814",
+            body: "Recovered from a sealed drive in the Pwyll director's office, 2231. The drive's password was, by Coalition reconstruction, the maiden name of the major's mother. 'Log 8814. The engine has been running for two hundred and forty hours past the safe operating window. The Collegium got their sample. The Collegium got, in fact, several samples. I am not certain we got what they wanted. I am certain we got something else. I have been, for the past sixty hours, hearing the engine sing. The song is not, in any reading I am able to take, a mechanical artifact. The song is being produced by something that, in my professional opinion, the engine has begun to host. I will, in the next shift, attempt to shut the engine down. If the shutdown succeeds, log entry 8815 will follow. If the shutdown does not, this is my last entry, and I would like the record to show that I knew what I was doing and that I did it anyway. The Coalition trains its officers for this. Or it did. I am no longer certain what the Coalition trains its officers for. The song is, in this listening, very patient. End log.' Log entry 8815 was never recorded."
+        ),
+    ],
+)

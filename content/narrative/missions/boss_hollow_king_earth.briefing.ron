@@ -1,0 +1,29 @@
+MissionBriefing (
+    mission_id: "boss_hollow_king_earth",
+    canonical_name: "The Hollow King",
+    faction_giver: "coalition",
+    world: "earth",
+    difficulty: "veteran",
+    objective_summary: "Descend into the Earth volcanic interior, engage the Hollow King across three phases, and survive long enough to recover the Pyroclastic Armor recipe and the King's Shard artifact.",
+    briefing_text: "Captain. Hayes. This is the assignment you've heard about and the assignment the Coalition does not officially issue. The Hollow King has, in the last six in-game weeks, re-emerged in the volcanic chambers below the Atlas reclamation site. The Coalition's seismic monitors confirm the pattern. The Collegium's xenobiology team, against Tan's standing recommendation, has authorized a kill expedition. You'll be supported by a joint Coalition-Collegium force of nine personnel; you will be the operational lead. Hayes will not, in this op, be in the field. I'll be on radio. The reason is, in this briefing, classified, but you should know that the Coalition does not, by standing policy, allow field commanders with my rank to engage the King. Your gear loadout is T3 plasma weapon — minimum, no exceptions — and the heat-resistant chassis kit that Adeyemi spent three weeks fitting. Reyes is on standby with the cardiac-shock pre-treatment protocol. The arena rule is OneWayCutsceneEntry. Once you commit, you do not retreat. The third phase will be hot. The third phase will be louder than the first two combined. Three plasma rounds to the hollow core, with the player surviving the rising lava through to the strike, ends the engagement. The King will collapse inward; the arena will recede; you will, by every available account, walk out. The seventeenth survivor died fourteen months later. You should know that. You should also know that the seventeenth survivor was not, by Reyes's analysis, of typical Coalition cardiac profile. You are, in this captain's professional opinion, going to be the eighteenth. We do not, in this briefing, contemplate alternatives. Bring the recipe back. Bring yourself back.",
+    primary_objectives: [
+        "Engage the Hollow King across three phases",
+        "Survive phase three pyroclastic burst",
+        "Deliver three T3 plasma strikes to the hollow core",
+        "Recover the Pyroclastic Armor recipe",
+    ],
+    secondary_objectives: [
+        "Recover the King's Shard artifact",
+        "Recover Page 47+ of the Foreman's Journal",
+        "Sustain no more than three personnel losses from the support force",
+    ],
+    failure_conditions: [
+        "Player downed in the arena (no revival in OneWayCutsceneEntry rule)",
+        "Hollow King not reduced before timeout",
+        "T3 plasma weapon disabled before phase three",
+    ],
+    reward_summary: "Coalition reputation +60; Pyroclastic Armor recipe; Hollow King's Shard artifact; five lore unlocks (entries 1-5 of boss_hollow_king.lore.ron); Coalition senior commendation; Tan's personal consultation rights (informal favor).",
+    debrief_win: "Hayes. The King is down. The Collegium team is, as we speak, retrieving the journal. Tan is, in his office, openly relieved, which is something I have not seen in twenty years of service. Reyes has cleared you medically with a note in your file that I am not going to read out. The Husks will, by every available statistical analysis, raid the south plain in the next ninety days. We will, in this debrief, not contemplate that yet. Bring the recipe to Adeyemi. He's been waiting forty years to build Pyroclastic Armor. Don't, please, make him wait longer than he has to.",
+    debrief_loss: "Hayes. The King is not down. The arena recede did not occur. The cutscene-entry rule means we cannot extract you. The Coalition is, in this debrief, sending a recovery team. The recovery team's standing orders are to recover the gear, not the personnel. I am not, in this captain's tone of voice, going to elaborate. The Coalition will, in three weeks, hold the service. The Coalition will, in three months, restart the file. The Coalition does not stop.",
+    voice_giver_id: "coalition_captain_marcus_hayes",
+)

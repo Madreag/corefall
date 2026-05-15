@@ -1,0 +1,32 @@
+WorldLore (
+    world_id: "belt",
+    canonical_name: "Belt Asteroid Mining",
+    music_anchor: "music_world_belt",
+    entries: [
+        WorldEntry (
+            kind: "geology",
+            title: "The Scattered Stones",
+            body: "The Belt is the main asteroid belt of the Sol system, a sparse population of rocky and metallic bodies orbiting between Mars and Jupiter. The Concordat catalogs approximately two hundred and forty thousand named bodies, of which approximately sixteen hundred are actively inhabited or mined and approximately three hundred are politically significant. The largest body, Ceres, is a Coalition-administered protectorate. The remainder are a patchwork of corporate concessions, Frontier salvage zones, Synth Collective extraction nodes, and informal pirate refuges. Belt geology is dominated by the carbonaceous and silicate asteroid types; metallic asteroids are the most economically valuable and the most contested.",
+        ),
+        WorldEntry (
+            kind: "history",
+            title: "The Open Frontier",
+            body: "The Belt was the first body in the Sol system to be exploited by pre-collapse industrial concerns and is, in many ways, the body that funded the rest of human expansion. After the collapse, the Belt fragmented into approximately four hundred independent settlements; the Concordat re-imposed treaty law in 2104 but never managed to enforce it consistently. The Pirate Surge of 2129 originated in the Belt and was suppressed only after the Coalition's joint operation with the Ronin Combine and the Starlight Concordant in 2133 — the only three-faction joint operation in Concordat history. The Belt has, in the years since, settled into a stable state of distributed authority, with the Coalition holding the major lanes, the Frontier holding the smaller bodies, the Synth Collective holding the high-yield extraction nodes, and a residual pirate population holding the worst of the rest.",
+        ),
+        WorldEntry (
+            kind: "biosphere",
+            title: "Asteroid Microbes and Imported Pests",
+            body: "The Belt has a sparse native biosphere consisting almost entirely of chemoautotrophic microbes living in the carbonaceous asteroid interiors. The microbes are not economically interesting and are, by Collegium policy, sampled but not actively studied. The Belt's imported biota is more varied: every long-occupied settlement has accumulated rats, cockroaches, mold colonies, and the inevitable Belt cats — a hardy, somewhat feral lineage of domestic cat that has, by genetic drift and selection, become the dominant non-microbial fauna in the Belt over approximately one hundred years. The Coalition has classified the Belt cats as protected; the Frontier crews universally love them; the Synth Collective has, in one published paper, characterized their pack behavior as 'consistent with a developing cooperative intelligence'.",
+        ),
+        WorldEntry (
+            kind: "culture",
+            title: "The Free Lanes",
+            body: "Belt society is the most diverse in the Sol system and the most decentralized. Each settlement has its own customs, its own currency exchange, and its own informal protocols for visitor admission; the Concordat enforces only the major treaties on the Belt-wide lanes. Belt culture is famously hospitable to strangers, famously suspicious of authority, and famously prone to fiercely local political feuds. The largest Belt settlement, the Ceres Concourse, has approximately one hundred and twenty thousand permanent residents and is the only Belt body that the Concordat formally administers; the second largest, Pallas Hold, has approximately forty thousand and is, by treaty, neutral ground for all Concordat factions. Belt food is famously varied and famously inexpensive; Belt liquor is famously potent and famously illegal in the inner system.",
+        ),
+        WorldEntry (
+            kind: "mystery",
+            title: "The 47-Family Anomaly",
+            body: "In 2197, a Belt prospector named Anders Karlsson mapped a previously-unrecorded asteroid in the outer Belt and registered it under the name 47-Family-1. He returned with samples that the Collegium has, in the forty-four years since, been unable to assign to any known mineralogical category. The samples are inert, non-toxic, of unusual density, and emit a low-level neutrino flux that the Concordat's instrumentation cannot fully characterize. Karlsson returned to 47-Family-1 in 2198 with a Coalition survey team. The team did not return. The asteroid has been visited on seven subsequent occasions; on three of those occasions, the visiting crew never returned. The remaining four expeditions reported the asteroid as 'apparently empty' and have refused to speak about the visit in any detail. The Concordat has classified the asteroid as a no-go zone since 2211. The samples are stored at the Collegium's Deimos vault. The samples are not, by any current method, recoverable for further study; the Collegium has, in writing, indicated that 'the material declines to be sampled'.",
+        ),
+    ],
+)

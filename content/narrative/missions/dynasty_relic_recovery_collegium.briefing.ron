@@ -1,0 +1,30 @@
+MissionBriefing (
+    mission_id: "dynasty_relic_recovery_collegium",
+    canonical_name: "House Yamamoto's Archive",
+    faction_giver: "collegium",
+    world: "deimos",
+    difficulty: "hard",
+    objective_summary: "Recover a sealed House Yamamoto archive box from the Deimos Tech Quarter trade council vault, negotiate the handoff with a Ronin observer, and deliver the box to the Collegium's Old Geneva archive without inspecting the contents.",
+    briefing_text: "Captain. Tan. The Collegium has, by an arrangement that took eleven years to negotiate and approximately three concordat-side legal opinions to finalize, secured the right to a single sealed archive box from House Yamamoto's holdings on Deimos. The box is, by Yamamoto's standing instruction, to be transferred from the Tech Quarter trade council vault to the Collegium's Old Geneva archive without inspection by any Collegium personnel. The arrangement is, by every available reading, the most significant Collegium acquisition of pre-Concordat Yamamoto material in fifty years. The Combine has, as a condition of the transfer, assigned a Ronin observer to ride with the box for the duration of the transit. The observer is Yuki Bowstring. She has been the quartermaster of the Combine for eleven years; she is, in this op, not in her quartermaster's role, and you should not, please, address her as such. The transit is a six-day journey from Deimos to Lagrange-7 to Old Geneva. You will be in command of the Collegium escort detachment. Your role is security — the box is, by Yamamoto's standing assessment, of potential interest to the Pirates, the Husks, and at least one Frontier cell. Bowstring is, by Combine custom, not part of your command structure; she will, however, defer to your operational decisions on the security side. Do not, please, ask her about the box. Do not, please, attempt to ascertain the box's contents by any indirect means. The Collegium has signed in writing to a non-inspection clause; violation of the clause will, by every available estimate, end the Collegium-Yamamoto relationship for at least the rest of my professional lifetime. I will, in private, be very disappointed if that happens. Do the job. Return the box. The contents are not, in this briefing, your concern.",
+    primary_objectives: [
+        "Take custody of the sealed archive box on Deimos",
+        "Escort the box and the Ronin observer through transit",
+        "Deliver the box intact to the Old Geneva archive",
+        "Comply with the non-inspection clause",
+    ],
+    secondary_objectives: [
+        "Maintain professional courtesy with Yuki Bowstring throughout",
+        "Avoid combat engagement where operationally feasible",
+        "Record the transit for the Collegium's transit log",
+    ],
+    failure_conditions: [
+        "Archive box lost or destroyed",
+        "Non-inspection clause violated",
+        "Bowstring withdraws the Combine's consent to the transfer",
+        "Player or escort casualties exceed two",
+    ],
+    reward_summary: "Collegium reputation +60; Combine reputation +20 (rare cross-faction reward); access to senior research credit; Bowstring's personal acknowledgment (informal favor — substantial); Tan's standing consultation rights.",
+    debrief_win: "Tan. The box is in the Old Geneva archive. The non-inspection clause has been observed. Bowstring is, as we speak, on her return journey to the Yamamoto Halls. She left, by every account, satisfied. I will not, in this debrief, share the contents of my private correspondence with Echo of First Bloom about the box; I will, however, tell you that the box contains material that, in two centuries, will be the most important single Collegium acquisition of the post-collapse era. You did the job. The Collegium thanks you. The Combine, in its quiet way, also thanks you. Drink something on the way home.",
+    debrief_loss: "Tan. The box is, by the engagement record, not in the Old Geneva archive. The reason is, in this debrief, classified. Bowstring is, as of this briefing, en route to the Yamamoto Halls without the box. The Combine has, in writing, indicated that the Collegium-Yamamoto relationship is, for the indefinite future, under review. The Collegium will, in due course, attempt renegotiation. I have, in private, written a letter of personal apology to Bowstring; the letter will not, in this debrief, be shared. Take the loss. The Collegium does not, in this debrief, expect a different outcome from any other escort team. The box was, by every available reading, very difficult to escort. We are, in this debrief, where we are.",
+    voice_giver_id: "collegium_doctorate_halvor_tan",
+)

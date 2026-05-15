@@ -1,0 +1,30 @@
+MissionBriefing (
+    mission_id: "pirate_skiff_intercept_belt",
+    canonical_name: "Skiff Intercept",
+    faction_giver: "starlight",
+    world: "belt",
+    difficulty: "normal",
+    objective_summary: "Intercept a pirate skiff carrying stolen Starlight survey data in the outer Belt, recover the data without significant pirate casualties, and exfil before pirate reinforcements arrive.",
+    briefing_text: "Captain. Yara Solis, Voyager Corps. We have, in the last forty-two in-game hours, lost a survey package — sensor logs from a recent Tara-cavern dive — to a pirate cell operating out of asteroid 47-Family-3. The cell is, by every available analysis, a routine post-Surge holdout, three to five personnel, lightly armed. The package is, however, of substantial classification value. The Concordat does not, in any standing policy, allow the package to remain in pirate hands; the Voyager Corps does not, by any internal standard, permit the loss to stand. Your assignment is interception. The skiff will, by Tran's current navigation forecast, transit through the L-4 corridor at approximately 14:00 ship-time, on course for the cell's home asteroid. You'll be in a Starlight pursuit craft piloted by Tran himself. The intercept will be conducted using disabling fire on the skiff's engines and a boarding action on the disabled vessel. The cell members will, by Voyager Corps protocol, be offered surrender. If they decline, you may engage with lethal force, but the Voyager Corps does not, in this captain's command, prefer that outcome. Surrender is preferred. The package is, by your gear loadout, the operational priority. Don't, please, let the pirates jettison the package before you board. Tran will keep the pursuit craft on intercept course; you'll have approximately eighteen minutes from boarding to data recovery before the cell's home asteroid puts a second skiff in our path. Eighteen minutes is, in my experience, generous for this op. Use them well.",
+    primary_objectives: [
+        "Disable the pirate skiff's engines",
+        "Board the disabled skiff",
+        "Recover the survey package",
+        "Exfil before pirate reinforcements arrive",
+    ],
+    secondary_objectives: [
+        "Capture pirate cell members alive for Concordat custody",
+        "Recover any additional pirate intelligence",
+        "Maintain Starlight pursuit craft at >50% structural integrity",
+    ],
+    failure_conditions: [
+        "Package jettisoned and unrecovered",
+        "Pursuit craft destroyed",
+        "Reinforcements engage before exfil",
+        "Player downed without revival",
+    ],
+    reward_summary: "Starlight reputation +30; Voyager Corps commendation; access to the Starlight survey gear inventory; T2 vacuum-rated weapon access.",
+    debrief_win: "Solis. The package is in the captain's vault. Tran has, as we speak, plotted the return course to Lagrange-4. The cell's two surviving members are in the brig and will, by Concordat protocol, be transferred to Coalition custody within the cycle. Tran asks me to mention that the pursuit craft is, in his words, 'in nominal condition with one cosmetic dent that nobody is going to notice'. He is, in this captain's reading, lying. We're proud of you. The Voyager Corps notes the action.",
+    debrief_loss: "Solis. The package is, by every available reading, lost. Tran returned the pursuit craft to dock at slow burn. The pirate cell's home asteroid is, as of this debrief, on the Voyager Corps no-approach list. The Concordat will, in due course, attempt recovery through diplomatic channels. The diplomatic channels are, in the Voyager Corps's professional opinion, unlikely to succeed. We acknowledge the engagement. We will, in the next op, do better. Until then.",
+    voice_giver_id: "starlight_captain_yara_solis",
+)

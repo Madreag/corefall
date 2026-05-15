@@ -1,0 +1,15 @@
+OriginLore (
+    origin_id: "android_synthetic",
+    canonical_name: "Android (Synthetic-Organic Hybrid)",
+    physical_description: "Hybrid organic-synthetic individual, manufactured under Concordat patent. Body presents as human-anatomical with subtle seam lines at major joints (wrists, throat, lower spine). Internal architecture combines a synthetic-blood circulatory system (four thousand milliliters of synth-blood, slower coagulation rate than baseline human) with a modular battery system (canonical capacity 80-120 kWh). Two parallel survival resources: blood and power. Total loss of either offlines the corresponding side; total loss of both is death.",
+    cultural_traits: "Androids are a young population in cultural terms — the first manufactured androids entered the Sol system in 2161, and the first generation to be considered legally autonomous under Concordat protocol came of age in 2189. Android culture is, by every available reading, in active formation. Androids born of the same manufacturing cohort frequently form lifelong bonds analogous to siblings; androids manufactured for specific factions tend to absorb the faction culture but maintain a quiet, distinctive perspective on it. Android art, where it exists, is concerned with the question of authenticity; android humor, where it exists, is concerned with the question of expectation.",
+    gameplay_strengths: "Dual survival resources (blood and power) provide redundancy — total wound output must drain both to reach death state. Stronger concussion resistance than baseline humans (synthetic neural buffer). Stronger acid and chemical resistance than baseline humans. Stronger heat tolerance. Compatible with both organic and synthetic medical interventions.",
+    gameplay_weaknesses: "Hybrid bleeds slower than baseline humans (synth-blood coagulation rate is approximately 70% of baseline). Vulnerable to electrical attacks (battery system disruption). Vulnerable to specialized anti-synthetic weapons. Lower caloric efficiency than baseline humans (50 units vs 100). Manufacturing-cohort identity can produce psychological stress when separated from cohort.",
+    home_world: "Lagrange-4 manufacturing nodes (canonical primary); secondary distribution across Coalition, Collegium, and Synth Collective deployments.",
+    notable_origins_in_corefall_universe: [
+        "Tech-Spec Marisha Ipsen (Collegium, third-generation android program)",
+        "Officer Vera Petrov (Coalition, second-generation)",
+        "Survey-Spec Lumi Aaltonen (Starlight, first-generation)",
+        "Numerous Synth Collective node-presentations are android-class chassis but operate under different cognitive protocols",
+    ],
+)

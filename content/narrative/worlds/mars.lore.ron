@@ -1,0 +1,32 @@
+WorldLore (
+    world_id: "mars",
+    canonical_name: "Mars Dust Plains",
+    music_anchor: "music_world_mars",
+    entries: [
+        WorldEntry (
+            kind: "geology",
+            title: "The Rust Continent",
+            body: "Mars is iron, all the way down. The surface is a hematite blanket two to nine meters deep across most of the inhabited belt, underlain by basalt, basalt-derived clays, and the occasional vein of pre-collapse colonial steel that the terraforming crews left buried when the colonies fell. Olympus Mons remains the tallest structure in the Sol system and the largest single mining target in the Coalition's resource inventory; the Frontier holds the upper slopes, the Coalition holds the lower, and both sides treat the summit as neutral ground because nobody has the manpower to garrison it. The Mars terraforming project, abandoned in 2169, left a network of subsurface tunnels stretching from Olympus to Pavonis to Arsia — the Frontier's underground capital. The tunnels are why the rebellion survived. The tunnels are why it still survives.",
+        ),
+        WorldEntry (
+            kind: "history",
+            title: "The Free State and After",
+            body: "Mars declared independence from the Lagrange Concordat in 2161, at the height of the Reclamation War. The Free State held the planet for seven years and produced a constitution, a flag, a currency, and three competing claims to the Olympus Mons mining rights. The Olympus Mons treaty of 2168 collapsed in nine months. The orbital strike on Olympus Mons in 2169 killed the Free State's central council and approximately four hundred thousand civilians; the Coalition called the strike a precision response to insurgent fortification. The Frontier called it an atrocity. Both descriptions are, by every honest accounting, correct. The treaty of Pavonis in 2241 formally ended the Mars conflict, but the Frontier did not sign, the Husks were not invited, and the cease-fire on the Olympus line is observed only on Coalition supply days.",
+        ),
+        WorldEntry (
+            kind: "biosphere",
+            title: "Engineered Survivors",
+            body: "Mars has no native life. The pre-collapse terraforming project introduced thirty-one engineered species — lichens, mosses, two grasses, one fungal symbiote, and a small genetically-modified beetle — designed to begin nitrogen fixation in the regolith. Seventeen of the introduced species survived the abandonment. Most are confined to the equatorial belt and the canyon floors, where the atmospheric pressure is highest and the surface temperatures most permissive. The Collegium maintains a sample archive on Deimos containing every recorded variant; the Frontier farms the beetle for protein and the symbiote for a mild stimulant. The Coalition has classified the symbiote as a controlled substance, which is the only Coalition law the Frontier observes without exception, because the symbiote does not survive transport off-planet.",
+        ),
+        WorldEntry (
+            kind: "culture",
+            title: "Above and Below",
+            body: "Mars is two civilizations stacked on top of each other. The surface — the Coalition belt, the Concordat-approved settlements, the orbital lift cities — is the official Mars. The subsurface — the Frontier tunnels, the Husk caverns, the abandoned colony labs — is the working Mars. Every supply convoy between the two systems is, by necessity, illegal under one set of laws and legitimate under another. Coalition citizens carry papers; Frontier crews carry nicknames; both speak the same dialect and pretend, when they pass each other in a lift, that they have never met. The surface cities are blue and silver. The tunnel cities are rust orange and pipe-light. The Husks paint their caves in the dark.",
+        ),
+        WorldEntry (
+            kind: "mystery",
+            title: "The Olympus Hollow",
+            body: "Beneath the Olympus Mons caldera, at a depth the Coalition refuses to publish and the Frontier has refused for ninety years to map fully, is a cavity. Seismic data from 2147 places the cavity at approximately seven kilometers below the summit and approximately three kilometers across. It contains no detectable atmosphere, no detectable temperature gradient, and no detectable boundary on its lower face. The cavity is the source of the readings that, in 2147, accompanied the discovery of the Command Core. The Coalition has, in eighty years of intermittent sampling, retrieved no further artifacts. The Husks claim the cavity is the throat of the world. The Crystalfold claim it is a wound. The Collegium has classified the topic as 'open' and stopped funding research; the file remains active.",
+        ),
+    ],
+)

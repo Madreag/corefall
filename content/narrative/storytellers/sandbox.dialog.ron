@@ -1,0 +1,42 @@
+StorytellerDialog (
+    storyteller_id: "sandbox",
+    canonical_name: "Sandbox",
+    personality_summary: "Detached, observational, scientific. Does not narrate; observes. The events you face are the events you spawned. Reports outcomes without affect. Will, on request, provide statistics.",
+    intro_dialog: [
+        DialogLine (line: "Sandbox mode initialized. The chair will not, in this configuration, generate narrative events."),
+        DialogLine (line: "Faction behaviors are configured per scenario spec. World parameters are configured per scenario spec. Player parameters are configured per session."),
+        DialogLine (line: "The chair will, on request, report telemetry. The telemetry is, by default, on. The chair will not, in this configuration, editorialize."),
+        DialogLine (line: "Events that occur will be the events the simulation generates. The chair does not, in this configuration, intervene. The chair observes."),
+        DialogLine (line: "Statistics summary is available via the standard interface. The chair recommends a brief familiarization. The chair does not, in this configuration, provide tutorials."),
+        DialogLine (line: "Session start. Simulation running. The chair logs."),
+    ],
+    event_dialog: [
+        DialogLine (line: "Event logged. Type: faction_engagement. Severity: medium. Source: scenario spec."),
+        DialogLine (line: "Resource imbalance detected. Source: player allocation pattern. Predicted resolution: thirty-eight to sixty-two minutes."),
+        DialogLine (line: "Faction relationship shift. Coalition-Frontier delta: minus twelve. Source: cumulative engagement outcomes since session start."),
+        DialogLine (line: "Environmental hazard active. Source: scenario weather configuration. Duration: as configured."),
+        DialogLine (line: "Casualty registered. Source: AI engagement decision. Source decision derived from spec parameters."),
+        DialogLine (line: "Statistic update available. Cumulative actions: three thousand four hundred and eleven. Cumulative reports: ninety-eight."),
+        DialogLine (line: "Observation continues. The chair does not, in this configuration, comment."),
+    ],
+    outro_dialog_win: [
+        DialogLine (line: "Session terminated. Outcome: player objective satisfied."),
+        DialogLine (line: "Telemetry summary: forty-one engagements, twelve faction events, six environmental events. Final faction state archived."),
+        DialogLine (line: "Statistics report is available via the standard interface. The chair recommends review at player discretion."),
+        DialogLine (line: "Simulation state preserved. The chair will, on request, restore for review. The chair does not, in this configuration, automatically restore."),
+        DialogLine (line: "Session ended. The chair logs."),
+    ],
+    outro_dialog_loss: [
+        DialogLine (line: "Session terminated. Outcome: player objective unsatisfied."),
+        DialogLine (line: "Telemetry summary: thirty-two engagements, nine faction events, four environmental events. Final faction state archived."),
+        DialogLine (line: "Outcome cause: simulation generated the configured threshold of unfavorable conditions for the player parameters. The chair does not, in this configuration, attribute fault."),
+        DialogLine (line: "Statistics report available via the standard interface. The chair will, on request, provide configuration recommendations for subsequent sessions."),
+        DialogLine (line: "Simulation state preserved. The chair logs."),
+    ],
+    outro_dialog_abandon: [
+        DialogLine (line: "Session terminated. Outcome: player withdrawal."),
+        DialogLine (line: "Telemetry summary archived. State preserved. The chair will, on request, restore for subsequent review."),
+        DialogLine (line: "The chair does not, in this configuration, attribute meaning to withdrawal. Withdrawal is a logged event."),
+        DialogLine (line: "Session ended. The chair logs."),
+    ],
+)

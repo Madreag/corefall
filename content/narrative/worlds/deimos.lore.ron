@@ -1,0 +1,32 @@
+WorldLore (
+    world_id: "deimos",
+    canonical_name: "Deimos Mining Colony",
+    music_anchor: "music_world_deimos",
+    entries: [
+        WorldEntry (
+            kind: "geology",
+            title: "The Smaller Twin",
+            body: "Deimos is a carbonaceous chondrite of approximately 12 kilometers in maximum dimension, with a surface gravity of 0.003 g and an orbital period of 30 hours. Smaller than Phobos and less geologically interesting, Deimos was prized by the pre-collapse mining concerns for one reason: stable orbital position and easy access to the outer Sol system. Surface scans show heavy water-ice deposits in the polar regions, useful nickel-iron seams in the equatorial belt, and approximately fourteen thousand cubic meters of pre-collapse industrial slag that the original concerns left when they pulled out. The slag is, by Collegium analysis, the most valuable surface resource on the body, and is currently mined for rare-earth recovery by Synth Collective operations under a Coalition lease.",
+        ),
+        WorldEntry (
+            kind: "history",
+            title: "The Tech Quarter",
+            body: "Deimos was a working colony before the collapse; the original mining concerns ran a single integrated complex of approximately twelve thousand workers, organized into seven habitats along the equatorial axis. The collapse hit the colony hard but did not break it; the workers who stayed organized themselves into a labor council that the Coalition has, for ninety years, formally recognized as a legitimate civilian authority. The result is the Deimos Tech Quarter — a free-trade zone, jointly administered by the Coalition, the Collegium, and the local council, which operates under its own customs regime and is the primary destination for any pre-collapse technology recovered in the outer Sol system. The Collegium maintains its deepest archive here. The Frontier launders its salvage through here. The Coalition collects taxes here and pretends not to notice.",
+        ),
+        WorldEntry (
+            kind: "biosphere",
+            title: "Working Stock",
+            body: "Deimos has no native biosphere. The colony maintains imported ecologies in pressurized chambers — algae, mushrooms, hydroponics, and a single small herd of genetically-modified dwarf goats that produce milk, meat, and approximately eight thousand credits of unofficial trade revenue per Mars-year. The goats are descended from a single breeding pair shipped from Earth in 2094; the Collegium has been tracking the bloodline as a research subject, and has produced three peer-reviewed papers on micro-gravity adaptation in caprine mammals. The papers are widely cited; the goats are widely eaten. The Coalition has classified the goats as a strategic biological asset and the colony has, by tradition, sent the Coalition a wheel of cheese every Concordat Day since 2098.",
+        ),
+        WorldEntry (
+            kind: "culture",
+            title: "The Trade Council",
+            body: "Deimos society is organized around the Tech Quarter and its annual trade council. Every habitat sends one elected representative; every Concordat-recognized faction sends one observer; the council convenes for four weeks every Mars-spring and adjudicates trade disputes, technology disposition, and the disposition of the previous year's slag harvest. The council has no formal authority outside the Tech Quarter, but its rulings are observed by every faction operating on Deimos, because the alternative is to lose access to the colony's market — which is, for every faction except the Husks, a more expensive proposition than complying with the council's verdicts. Council sessions are public. The transcripts are sold. The Collegium maintains the largest subscription.",
+        ),
+        WorldEntry (
+            kind: "mystery",
+            title: "The Lab Five Vault",
+            body: "In the original mining colony, the seven habitats were numbered one through seven. There was no Lab Five. The pre-collapse records refer consistently to Lab Five — its construction schedule, its supply allocation, its staff roster of forty-seven personnel — but no physical structure has ever been located. The Collegium has searched. The Frontier has searched. The Synth Collective has, in its one private statement on the matter, indicated that the location of Lab Five 'is not currently within recoverable knowledge.' The forty-seven personnel are listed in the colony's casualty rolls under the heading 'unrecovered'. Their families, when traceable, have been compensated by the Concordat. The vault remains, somewhere, and the Coalition has stopped responding to inquiries.",
+        ),
+    ],
+)

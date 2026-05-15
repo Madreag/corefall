@@ -1,0 +1,30 @@
+MissionBriefing (
+    mission_id: "breach_assault_concrete",
+    canonical_name: "Breach the Concrete",
+    faction_giver: "frontier",
+    world: "earth",
+    difficulty: "normal",
+    objective_summary: "Use breach charges to penetrate a Coalition concrete fortification, extract a high-value target from the inner vault, and exfil before the Coalition relief column arrives.",
+    briefing_text: "Partner. Wrench Sandoval, Olympus crew. We're crossing the wire on this one, so listen close. The Coalition's holding a forward bunker on the south Atlas plain — concrete, three meters thick, alloy reinforcement at the corners, standard pattern. Inside the bunker is a Coalition supply officer who has, by every available account, the manifest for a Coalition shipment that the Frontier wants. We're not, in this op, taking the shipment. We're taking the officer. The officer will, by Frontier convention, be returned alive at the end of the run, in exchange for the manifest. The Coalition will, by every available account, comply, because the Coalition does not, in this quarter, want a publicity event over a missing supply officer. Your job: ride with Echo Bremmer in the Magpie to the south wall, plant two breach charges at the marked points, get inside, get the officer, get out. Echo will keep the Magpie running; she'll be moving the whole time, so don't, please, take more than the time you have. Don't kill the Coalition garrison if you can avoid it. The Coalition will, in this op, be expected to retaliate; the retaliation, by negotiation, will be proportional. If you kill more than two Coalition personnel, the retaliation will not be proportional, and the negotiation will, on the Frontier side, become very awkward. Use the smoke. Use the speed. Get out before the relief column arrives.",
+    primary_objectives: [
+        "Breach the bunker's south wall using exactly two charges",
+        "Extract the Coalition supply officer alive",
+        "Exfil with Echo Bremmer before the relief column arrives",
+        "Sustain no more than two crew casualties",
+    ],
+    secondary_objectives: [
+        "Recover the Coalition supply manifest",
+        "Avoid lethal force against the Coalition garrison",
+        "Maintain Magpie at >40% structural integrity",
+    ],
+    failure_conditions: [
+        "Officer killed",
+        "Relief column arrives before exfil",
+        "More than two Coalition fatalities",
+        "Magpie destroyed",
+    ],
+    reward_summary: "Frontier reputation +30; T2 weapon access; demolitions specialist commendation; access to the Olympus tunnel network black market.",
+    debrief_win: "Partner. Clean work. The officer's in the back of the Magpie, alive, slightly bruised, complaining about the upholstery. Echo's at full speed back to Olympus. The Coalition will, by Hayes's confirmed sign-off, retaliate within reason. The manifest is, in this op, ours. The shipment will, in the next three weeks, also be ours, through three layers of front companies. You did the job. Drink something on the way home. The Magpie is, in Echo's words, 'mostly fine'.",
+    debrief_loss: "Partner. We lost the officer. The Coalition is, by the Frontier's reading, not happy. The retaliation is, by every available account, going to be heavier than the negotiation contemplated. Echo got back to Olympus with the Magpie on three wheels and a fuel leak. We're going to be quiet on the south plain for a few months. That's the cost. We knew it going in. Show up tomorrow.",
+    voice_giver_id: "frontier_lead_wrench_sandoval",
+)

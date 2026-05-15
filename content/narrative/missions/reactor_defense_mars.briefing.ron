@@ -1,0 +1,30 @@
+MissionBriefing (
+    mission_id: "reactor_defense_mars",
+    canonical_name: "Reactor Defense",
+    faction_giver: "coalition",
+    world: "mars",
+    difficulty: "normal",
+    objective_summary: "Defend the Coalition fusion reactor at Pavonis North against a coordinated Frontier raid; survive three escalating waves while keeping the reactor's coolant lines intact.",
+    briefing_text: "Captain. Hayes. The Coalition's running a fusion reactor on the lower slope of Pavonis, providing power to four Coalition outposts and one Concordat-approved civilian habitat. The reactor was, until last Tuesday, a quiet posting. As of last Tuesday, the Frontier started moving probes through the southern tunnels. Adeyemi confirms the probes are reconnaissance for a larger operation. We assess the operation as a coordinated raid on the reactor, with the primary objective of disabling the coolant lines and the secondary objective of seizing the control room. Our standing orders are to defend the reactor at all costs except the lives of the personnel inside; if the coolant lines fail, evacuate first, fight second. You'll have a squad of six, Adeyemi's fortifications on the south approach, and a Collegium tech-spec named Ipsen with a drone pack. The Frontier will, in this engagement, hit you in three waves. The third wave will be heavy. Sandoval is leading the operation; she's been quiet for two months, which means she's been preparing. Don't underestimate her crew. Don't, also, kill them if you can avoid it. The Coalition's standing order on Sandoval's crew is non-lethal where possible. Don't ask why. The answer is, as far as you're concerned, above your paygrade.",
+    primary_objectives: [
+        "Defend the reactor's coolant lines through three waves",
+        "Maintain control room access",
+        "Evacuate reactor personnel if coolant lines fail",
+        "Engage Frontier raid force",
+    ],
+    secondary_objectives: [
+        "Take Frontier officer alive if encountered",
+        "Recover any Frontier explosive devices for Adeyemi's analysis",
+        "Maintain ammunition reserves above 30%",
+    ],
+    failure_conditions: [
+        "Reactor coolant lines breached without evacuation",
+        "Control room captured",
+        "Player downed without revival",
+        "Squad casualties exceed three",
+    ],
+    reward_summary: "Coalition reputation +30; T2 weapon access; Coalition reactor-defense commendation; Adeyemi's gratitude (informal favor).",
+    debrief_win: "Hayes. Reactor's intact. Coolant lines are nominal. Adeyemi's already inspecting the south wall and grumbling about the spalling pattern. We took three wounded; Reyes has them stable. Sandoval pulled her crew out clean, which is consistent with her pattern. If you took a prisoner, the Coalition intelligence directorate will want a word. If you didn't, that's also fine. Get cleaned up. The reactor needs you back on rotation in twelve hours.",
+    debrief_loss: "Hayes. Coolant lines are down. Reactor's in cold shutdown; the Coalition lost a strategic asset in the worst possible quarter. The Frontier got what they came for, and they didn't have to take you for it. We evacuated thirty-one civilians, which is, in this debrief, the part you should hold onto. Adeyemi's already planning the rebuild. He says it'll take eighteen months. He says it'll be done in twelve. Take the loss. Carry it. Show up tomorrow.",
+    voice_giver_id: "coalition_captain_marcus_hayes",
+)

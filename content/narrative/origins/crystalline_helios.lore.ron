@@ -1,0 +1,17 @@
+OriginLore (
+    origin_id: "crystalline_helios",
+    canonical_name: "Crystalline Helios",
+    physical_description: "Silicon-based sentient organism, fused to mineral nodes and capable of partial resonance-link communication with other Crystalfold individuals. Body presents as a translucent silicate humanoid form between 1.4 and 2.2 meters in height, with internal crystal lattices visible through the skin. Eyes are faceted prisms that refract ambient light into faint rainbow patches. Voice emerges from the entire body's resonance rather than from any localized organ. Crystalfold thrive on solar radiation; their biology is fundamentally different from carbon-based organisms in ways the Collegium has been characterizing for fifty years.",
+    cultural_traits: "Crystalfold culture is, in a literal sense, the song. Every Crystalfold individual maintains a continuous low-frequency resonance with the Crystalfold collective; the resonance is, by every Crystalfold account, both a communication medium and the fundamental medium of Crystalfold consciousness. New Crystalfold crystallize from existing Crystalfold under conditions of high solar radiation, low ambient temperature, and trace boron in the host substrate; the resulting new node inherits a fragment of the parent's memory. Crystalfold society is communal in a way that human society is not; the Collective is not a collection of individuals, but a continuous resonance distributed across approximately fourteen thousand bodies. Crystalfold do not, in the Concordat record, lie; the resonance link makes deception physically painful to attempt. Crystalfold mourn extensively; a single Crystalfold's death is, by their convention, a fourteen-day grief event for the entire Helios Concourse.",
+    gameplay_strengths: "Strong radiation immunity (only origin with radiation-resistance score >0.9). Strong vacuum tolerance. Strong heat tolerance. Strong cold tolerance. Strong frozen-affliction resistance. Strong psy-storm resistance. Solar radiation regenerates resources slowly. Resonance-link enables limited shared sensing in groups of three or more.",
+    gameplay_weaknesses: "Solitary Crystalfold (separated from collective for more than 4-6 hours) suffer cognitive degradation. Vulnerable to specialized anti-silicate weapons. Limited compatibility with carbon-based medical interventions. Hunger is replaced with substrate-absorption requirement (must absorb trace boron periodically). Cannot consume standard food.",
+    home_world: "Helios Concourse at the Mercury orbital boundary (canonical primary); secondary settlements on Vulcan, Phobos, Deimos, and a single inland enclave on Europa.",
+    notable_origins_in_corefall_universe: [
+        "Voice of Many (Helios Concourse elder)",
+        "Spire of Three Lights (Helios Concourse miner-priest)",
+        "Echo of First Bloom (Helios Concourse archive-keeper)",
+        "Voice of First Bloom (original Crystalfold, fragmented 2204)",
+        "Lattice the Bound (Vulcan settlement elder)",
+        "Heart of Silent Choir (Europa enclave elder, contact rarely)",
+    ],
+)
