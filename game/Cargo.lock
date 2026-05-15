@@ -1419,6 +1419,7 @@ dependencies = [
  "cf-actor",
  "cf-sim-core",
  "serde",
+ "serde_json",
  "tracing",
 ]
 
@@ -1538,6 +1539,7 @@ dependencies = [
  "cf-mission",
  "cf-perception",
  "cf-physics",
+ "cf-priority",
  "cf-replay",
  "cf-sim-core",
  "cf-squad",
@@ -1667,6 +1669,17 @@ name = "cf-physics"
 version = "0.0.1"
 dependencies = [
  "cf-chassis",
+ "serde",
+ "serde_json",
+ "tracing",
+]
+
+[[package]]
+name = "cf-priority"
+version = "0.0.1"
+dependencies = [
+ "cf-ai",
+ "ron",
  "serde",
  "serde_json",
  "tracing",

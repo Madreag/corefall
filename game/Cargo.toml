@@ -36,6 +36,7 @@ members = [
   "crates/cf-server-anti-cheat",
   "crates/cf-server-admin",
   "crates/cf-bench",
+  "crates/cf-priority",
 ]
 
 [workspace.package]
