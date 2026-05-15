@@ -1754,6 +1754,7 @@ dependencies = [
  "cf-actor",
  "cf-terrain",
  "serde",
+ "serde_json",
  "tracing",
 ]
 

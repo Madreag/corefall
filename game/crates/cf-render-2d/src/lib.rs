@@ -15,12 +15,14 @@
     clippy::needless_pass_by_value
 )]
 
+pub mod asset_loader;
 pub mod constants;
 pub mod debris;
 pub mod dig_preview;
 pub mod gpu_overlay;
 pub mod gpu_particles;
 pub mod overlay;
+pub mod palette_swap;
 pub mod terrain_texture_array;
 // M1 re-audit (2026-05-13): spec lists cf-render-2d/src/reticle.rs as a
 // separate file. The helper lives there now; the bloom + tool-validity
@@ -35,11 +37,18 @@ pub mod reactor_explosion;
 pub mod reactor_sparks;
 pub mod reactor_sprite;
 
+pub use asset_loader::{
+    category_subdir, load_ledger_index, resolve_placeholder_path, AssetIndex, AssetIndexEntry, AssetIndexPlugin,
+};
 pub use debris::{
     DebrisPlugin, DebrisSpawnQueue, DebrisSpawnRequest, LooseDebris, RenderDebrisCappedEvent, DEBRIS_CAP,
 };
 pub use dig_preview::{probe_dig_validity, DigPreviewGhost, DigPreviewPlugin, DigPreviewTarget};
 pub use overlay::{material_tint, OverlayMode, OverlayModePlugin, OverlayModeState};
+pub use palette_swap::{
+    build_role_swap, parse_hex_rgb, Palette, PaletteEntry, PaletteRegistry, PaletteSwap, OVERLAY_TINT_BUILD_REPAIR,
+    OVERLAY_TINT_HAZARD, OVERLAY_TINT_INTEGRITY, OVERLAY_TINT_MOBILITY, OVERLAY_TINT_PATHABILITY,
+};
 pub use reactor_explosion::{
     ExplosionParticle, ExplosionState, EXPLOSION_DEBRIS_CAP_PER_HIT, EXPLOSION_MAX_DURATION_MS,
 };
