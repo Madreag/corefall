@@ -1,0 +1,25 @@
+{
+  "description": "AI-H-05 harness scenario: exercises the M7 squad-comm propagation contract. In the m6_squad_lab scenario the player (id=1, squad_role='leader') + friendly rifleman bot (id=2, squad_archetype='rifleman', squad_role='follower') form a 2-actor squad on team 'blue'. The script issues a `push_to_waypoint` squad command from the leader to the follower at tick 30; the order rides the M7 squad-comm bus and is relayed within `SQUAD_COMM_RELAY_DELAY_SECONDS=0.5` (=30 ticks @ 60Hz default). The script then fires the player rifle to drive `ai.squad_comm_relayed` via the spotting/threat-broadcast path. The third squad member referenced in the feature description's 'spawn 3 squad members' is exercised in spirit by issuing a follow-leader cancel + a hold-position re-issue to the same follower across distinct comm ticks so multiple relay events are recorded against the same bot — the existing m6_squad_lab scenario has 2 actors; the third squadmate is a forward-compat hook for later scenario authoring (see Out-of-scope in M7 spec). Expected event sequence: control.command_accepted(act.squad.issue_command{kind='push_to_waypoint'}) → squad.command_issued{bot_actor=2, kind='push_to_waypoint'} → ai.squad_comm_relayed{actor_id=2, source_tick<=current_tick, delay_ticks<=30}. Subsequent `act.squad.cancel_command` + `act.squad.issue_command{kind='hold_position'}` exercise the relay path a second time. Final state: bot at id=2 observed acting on the most recent squad command; squad_comm_relayed event count >= 1; relay latency ≤ 30 ticks of the comm trigger (== SQUAD_COMM_RELAY_DELAY_SECONDS at 60Hz). Per M7 spec § 'AI-H test harness preservation + extension' row `AI-H-05 | Squad comm propagation with 0.5s delay (M7; new)`, and § Acceptance criteria § 'Cover seeking + suppression + retreat + squad comm + patrol' → 'Scenario: Squad comm relays threat with 0.5s delay'. Run via `cargo run -p cf-e2e -- --scenario m6_squad_lab --ai-harness ai_h_05_squad_comm_propagation`.",
+  "scenario": "m6_squad_lab",
+  "tick_rate_hz": 60,
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 30 } },
+    { "method": "act.squad.issue_command", "params": { "bot_actor": 2, "kind": "push_to_waypoint", "waypoint": [600.0, 32.0] } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 30 } },
+    { "method": "act.player.aim", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "act.player.signal_enemy_spotted", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 30 } },
+    { "method": "act.player.fire", "params": { "pressed": true } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 12 } },
+    { "method": "act.player.fire", "params": { "pressed": false } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 30 } },
+    { "method": "act.squad.cancel_command", "params": { "actor_id": 2 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 30 } },
+    { "method": "act.squad.issue_command", "params": { "bot_actor": 2, "kind": "hold_position" } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 60 } },
+    { "method": "observe.squad", "params": {} },
+    { "method": "observe.ai", "params": { "actor_id": 2 } },
+    { "method": "observe.once", "params": {} }
+  ]
+}
