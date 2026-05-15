@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.0.0",
+  "style_id": "powered_organic",
+  "category": "origin",
+  "version": "1.0.0",
+  "silhouette_language": "humanoid with augmentation conduits running along limbs, exposed neuromesh, asymmetric chest port",
+  "preferred_palette_roles": ["primary", "secondary", "accent", "metal", "glow"],
+  "shape_descriptors": {
+    "head_proportion": "1.0",
+    "torso_proportion": "2.4",
+    "limb_proportion": "1.85",
+    "joints": "augmented circuit-collar",
+    "augmentations": "glow conduits on outer limbs"
+  },
+  "geometric_primitives": {
+    "actor": ["rect", "ellipse", "polyline", "circle"]
+  }
+}

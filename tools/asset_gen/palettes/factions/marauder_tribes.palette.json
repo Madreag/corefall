@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0.0",
+  "palette_id": "marauder_tribes",
+  "display_name": "Marauder Tribes",
+  "category": "faction",
+  "description": "Bone + leather + tribal patterns; asymmetric scavenged tech.",
+  "colors": [
+    { "role": "primary", "hex": "#3d2a1e", "comment": "leather brown" },
+    { "role": "secondary", "hex": "#1c130d", "comment": "soot black" },
+    { "role": "accent", "hex": "#a01818", "comment": "blood red" },
+    { "role": "highlight", "hex": "#e8d6a8", "comment": "weathered bone" },
+    { "role": "light", "hex": "#c0b290", "comment": "ivory" },
+    { "role": "dark", "hex": "#0a0604", "comment": "tarred wood" },
+    { "role": "metal", "hex": "#5a4a3a", "comment": "hammered iron" },
+    { "role": "glow", "hex": "#ff9966", "comment": "ember glow" }
+  ],
+  "accent_pairs": [
+    { "fg": "#e8d6a8", "bg": "#1c130d" },
+    { "fg": "#a01818", "bg": "#3d2a1e" }
+  ]
+}

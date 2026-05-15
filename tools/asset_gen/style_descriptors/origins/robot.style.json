@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.0.0",
+  "style_id": "robot",
+  "category": "origin",
+  "version": "1.0.0",
+  "silhouette_language": "bulky industrial humanoid, blocky armor panels, large servo joints, single spotlight head",
+  "preferred_palette_roles": ["primary", "secondary", "accent", "metal", "glow"],
+  "shape_descriptors": {
+    "head_proportion": "0.75",
+    "torso_proportion": "2.6",
+    "limb_proportion": "2.0",
+    "joints": "rectangular pneumatic blocks",
+    "augmentations": "shoulder-mounted spotlight"
+  },
+  "geometric_primitives": {
+    "actor": ["rect", "polygon", "circle"]
+  }
+}

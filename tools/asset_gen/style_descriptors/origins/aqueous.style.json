@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.0.0",
+  "style_id": "aqueous",
+  "category": "origin",
+  "version": "1.0.0",
+  "silhouette_language": "translucent gel humanoid, fluid limbs, bioluminescent core, drifting tendril hair",
+  "preferred_palette_roles": ["primary", "secondary", "accent", "highlight", "glow"],
+  "shape_descriptors": {
+    "head_proportion": "1.05",
+    "torso_proportion": "2.4",
+    "limb_proportion": "2.0",
+    "joints": "fluid soft-junction",
+    "augmentations": "biolume core in torso"
+  },
+  "geometric_primitives": {
+    "actor": ["ellipse", "circle", "polyline"]
+  }
+}

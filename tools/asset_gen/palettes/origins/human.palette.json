@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0.0",
+  "palette_id": "human",
+  "display_name": "Human",
+  "category": "origin",
+  "description": "Baseline human silhouette palette; flesh + cloth + leather.",
+  "colors": [
+    { "role": "primary", "hex": "#d9a37a", "comment": "skin midtone" },
+    { "role": "secondary", "hex": "#5a3a26", "comment": "hair / cloth dark" },
+    { "role": "accent", "hex": "#c64a36", "comment": "blood / muscle" },
+    { "role": "highlight", "hex": "#f0d4a8", "comment": "skin highlight" },
+    { "role": "light", "hex": "#f5e2c8", "comment": "skin light" },
+    { "role": "dark", "hex": "#28140a", "comment": "deep shadow" },
+    { "role": "cloth", "hex": "#3a3a48", "comment": "underclothes" },
+    { "role": "glow", "hex": "#e8b070", "comment": "warm rim" }
+  ]
+}

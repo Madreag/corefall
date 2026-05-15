@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.0.0",
+  "style_id": "religious_order",
+  "category": "faction",
+  "version": "1.0.0",
+  "silhouette_language": "ornate gothic, draped fabric, organic curves, gold + ivory + deep red palette, ceremonial inscriptions",
+  "preferred_palette_roles": ["primary", "secondary", "accent", "highlight", "metal", "glow"],
+  "shape_descriptors": {
+    "weapon": "engraved barrel, draped cloth wrapping, prayer-script etched receiver, golden trim",
+    "actor": "long-coat silhouette, peaked hood, side-cape, religious icons on chest, golden gauntlets",
+    "vehicle": "cathedral chassis, stained-glass viewport, ornate ironwork, draped banners",
+    "base_module": "vault arch, pulpit, candelabra, ornate sigil panel",
+    "particle": "ember + incense smoke + glittering trail",
+    "ui_icon": "ornate frame, gilded cross-equivalent symbol, inscribed sigil"
+  },
+  "geometric_primitives": {
+    "weapon": ["rect", "ellipse", "path"],
+    "actor": ["polygon", "ellipse", "circle"],
+    "vehicle": ["rect", "ellipse"],
+    "base_module": ["rect", "ellipse", "path"],
+    "particle": ["circle", "ellipse"],
+    "ui_icon": ["polygon", "ellipse", "path"]
+  }
+}

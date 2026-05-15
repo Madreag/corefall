@@ -1,0 +1,35 @@
+{
+  "schema_version": "1.0.0",
+  "palette_id": "factions_emblems",
+  "display_name": "Faction emblem palettes",
+  "category": "emblem",
+  "description": "Two-tone emblem palettes per faction; used by the build_placeholders.py emblem generator. Each pair is (foreground, background).",
+  "colors": [
+    { "role": "hostile_corp_fg", "hex": "#d92434" },
+    { "role": "hostile_corp_bg", "hex": "#0d0f14" },
+    { "role": "allied_resistance_fg", "hex": "#f0c060" },
+    { "role": "allied_resistance_bg", "hex": "#1f1810" },
+    { "role": "marauder_tribes_fg", "hex": "#e8d6a8" },
+    { "role": "marauder_tribes_bg", "hex": "#1c130d" },
+    { "role": "religious_order_fg", "hex": "#d4a942" },
+    { "role": "religious_order_bg", "hex": "#1a0508" },
+    { "role": "scientist_order_fg", "hex": "#9bf3ff" },
+    { "role": "scientist_order_bg", "hex": "#1e2a32" },
+    { "role": "mercenary_guild_fg", "hex": "#caa353" },
+    { "role": "mercenary_guild_bg", "hex": "#08090b" },
+    { "role": "pirates_fg", "hex": "#dab06a" },
+    { "role": "pirates_bg", "hex": "#0e2236" },
+    { "role": "drone_collective_fg", "hex": "#3a8cff" },
+    { "role": "drone_collective_bg", "hex": "#04070c" }
+  ],
+  "accent_pairs": [
+    { "fg": "#d92434", "bg": "#0d0f14" },
+    { "fg": "#f0c060", "bg": "#1f1810" },
+    { "fg": "#e8d6a8", "bg": "#1c130d" },
+    { "fg": "#d4a942", "bg": "#1a0508" },
+    { "fg": "#9bf3ff", "bg": "#1e2a32" },
+    { "fg": "#caa353", "bg": "#08090b" },
+    { "fg": "#dab06a", "bg": "#0e2236" },
+    { "fg": "#3a8cff", "bg": "#04070c" }
+  ]
+}

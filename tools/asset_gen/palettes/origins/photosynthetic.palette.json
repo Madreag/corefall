@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0.0",
+  "palette_id": "photosynthetic",
+  "display_name": "Photosynthetic",
+  "category": "origin",
+  "description": "Plant-organic body; leafy plates + bark + chlorophyll glow.",
+  "colors": [
+    { "role": "primary", "hex": "#4e7c3e", "comment": "leaf body" },
+    { "role": "secondary", "hex": "#26421e", "comment": "deep moss shadow" },
+    { "role": "accent", "hex": "#e8b430", "comment": "pollen accent" },
+    { "role": "highlight", "hex": "#a8d676", "comment": "leaf highlight" },
+    { "role": "light", "hex": "#6e9a52", "comment": "lit leaf" },
+    { "role": "dark", "hex": "#0a1808", "comment": "bark shadow" },
+    { "role": "metal", "hex": "#5a4226", "comment": "bark detail" },
+    { "role": "glow", "hex": "#dcff90", "comment": "chlorophyll glow" }
+  ]
+}

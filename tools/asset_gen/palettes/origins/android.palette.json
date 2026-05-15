@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0.0",
+  "palette_id": "android",
+  "display_name": "Android",
+  "category": "origin",
+  "description": "Synthetic humanoid; polished alloy plates + visible joints.",
+  "colors": [
+    { "role": "primary", "hex": "#b8c0c8", "comment": "polished alloy" },
+    { "role": "secondary", "hex": "#5a626c", "comment": "joint metal" },
+    { "role": "accent", "hex": "#46c6b5", "comment": "indicator teal" },
+    { "role": "highlight", "hex": "#f0f4f8", "comment": "chrome shine" },
+    { "role": "light", "hex": "#d4dade", "comment": "panel light" },
+    { "role": "dark", "hex": "#181c20", "comment": "joint shadow" },
+    { "role": "metal", "hex": "#7c8a92", "comment": "exposed structure" },
+    { "role": "glow", "hex": "#8effee", "comment": "core glow" }
+  ]
+}

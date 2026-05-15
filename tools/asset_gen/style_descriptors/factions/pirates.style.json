@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.0.0",
+  "style_id": "pirates",
+  "category": "faction",
+  "version": "1.0.0",
+  "silhouette_language": "asymmetric scavenged sea-themed, flag motifs, blue + red + tarnished gold palette",
+  "preferred_palette_roles": ["primary", "secondary", "accent", "highlight", "metal", "cloth"],
+  "shape_descriptors": {
+    "weapon": "asymmetric salt-rusted hardware, rope-wrapped grip, flag-cloth wrap",
+    "actor": "tricorne-equivalent helmet, leather coat with tarnished gold trim, asymmetric pauldron, sash",
+    "vehicle": "boat-hull chassis, swept sail mast, salt-rust streaks",
+    "base_module": "barrel + plank scaffold, flag pole, lantern post",
+    "particle": "salt spray + ember + cannon-smoke",
+    "ui_icon": "asymmetric flag silhouette, jagged sea-wave stroke"
+  },
+  "geometric_primitives": {
+    "weapon": ["rect", "polyline", "circle"],
+    "actor": ["rect", "polyline", "circle"],
+    "vehicle": ["rect", "polyline", "polygon"],
+    "base_module": ["rect", "circle", "polyline"],
+    "particle": ["circle", "polyline"],
+    "ui_icon": ["polygon", "polyline"]
+  }
+}

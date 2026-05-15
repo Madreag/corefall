@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0.0",
+  "palette_id": "mercenary_guild",
+  "display_name": "Mercenary Guild",
+  "category": "faction",
+  "description": "Tactical modular plates; black + gold + neutral grays.",
+  "colors": [
+    { "role": "primary", "hex": "#16181c", "comment": "tactical black" },
+    { "role": "secondary", "hex": "#2c2f36", "comment": "panel gray" },
+    { "role": "accent", "hex": "#caa353", "comment": "guild gold" },
+    { "role": "highlight", "hex": "#f5d68a", "comment": "polished gold" },
+    { "role": "light", "hex": "#6a6e76", "comment": "neutral gray" },
+    { "role": "dark", "hex": "#08090b", "comment": "ink shadow" },
+    { "role": "metal", "hex": "#454850", "comment": "gunmetal" },
+    { "role": "glow", "hex": "#ffe7a8", "comment": "trim sheen" }
+  ],
+  "accent_pairs": [
+    { "fg": "#caa353", "bg": "#16181c" },
+    { "fg": "#f5d68a", "bg": "#08090b" }
+  ]
+}

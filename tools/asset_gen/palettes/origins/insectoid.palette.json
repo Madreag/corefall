@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0.0",
+  "palette_id": "insectoid",
+  "display_name": "Insectoid",
+  "category": "origin",
+  "description": "Chitin + exoskeleton; segmented joints; iridescent panels.",
+  "colors": [
+    { "role": "primary", "hex": "#3a4a2a", "comment": "chitin green" },
+    { "role": "secondary", "hex": "#1a2614", "comment": "deep shell shadow" },
+    { "role": "accent", "hex": "#dec830", "comment": "warning stripe" },
+    { "role": "highlight", "hex": "#a4ba7a", "comment": "iridescent edge" },
+    { "role": "light", "hex": "#586c44", "comment": "lit chitin" },
+    { "role": "dark", "hex": "#08120a", "comment": "joint shadow" },
+    { "role": "metal", "hex": "#54624a", "comment": "exoskeleton hard plate" },
+    { "role": "glow", "hex": "#f8ff90", "comment": "compound-eye glow" }
+  ]
+}

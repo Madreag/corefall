@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0.0",
+  "palette_id": "scientist_order",
+  "display_name": "Scientist Order",
+  "category": "faction",
+  "description": "Clean lab aesthetic; white + cyan + chrome; holographic visors.",
+  "colors": [
+    { "role": "primary", "hex": "#e6f2f4", "comment": "lab white" },
+    { "role": "secondary", "hex": "#b8c8cc", "comment": "soft chrome" },
+    { "role": "accent", "hex": "#1aa6c9", "comment": "data cyan" },
+    { "role": "highlight", "hex": "#9bf3ff", "comment": "holo glow" },
+    { "role": "light", "hex": "#ffffff", "comment": "pure white" },
+    { "role": "dark", "hex": "#1e2a32", "comment": "trim charcoal" },
+    { "role": "metal", "hex": "#7c8a92", "comment": "polished metal" },
+    { "role": "glow", "hex": "#e0fcff", "comment": "screen glow" }
+  ],
+  "accent_pairs": [
+    { "fg": "#1aa6c9", "bg": "#e6f2f4" },
+    { "fg": "#9bf3ff", "bg": "#1e2a32" }
+  ]
+}

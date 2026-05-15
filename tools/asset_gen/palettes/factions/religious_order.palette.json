@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0.0",
+  "palette_id": "religious_order",
+  "display_name": "Religious Order",
+  "category": "faction",
+  "description": "Ornate gothic ceremonial; gold + ivory + deep red; draped fabric and engraved metal.",
+  "colors": [
+    { "role": "primary", "hex": "#7e1d2c", "comment": "deep ceremonial red" },
+    { "role": "secondary", "hex": "#3a0a12", "comment": "wine shadow" },
+    { "role": "accent", "hex": "#d4a942", "comment": "ceremonial gold" },
+    { "role": "highlight", "hex": "#f3e2a6", "comment": "ivory" },
+    { "role": "light", "hex": "#efe5d2", "comment": "parchment" },
+    { "role": "dark", "hex": "#1a0508", "comment": "vault shadow" },
+    { "role": "metal", "hex": "#a07c2e", "comment": "tarnished gold" },
+    { "role": "glow", "hex": "#fff2c4", "comment": "candlelight" }
+  ],
+  "accent_pairs": [
+    { "fg": "#d4a942", "bg": "#7e1d2c" },
+    { "fg": "#f3e2a6", "bg": "#1a0508" }
+  ]
+}

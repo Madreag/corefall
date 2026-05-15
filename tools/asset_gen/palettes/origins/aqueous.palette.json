@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0.0",
+  "palette_id": "aqueous",
+  "display_name": "Aqueous",
+  "category": "origin",
+  "description": "Translucent aquatic body; gel-armor + bioluminescent flickers.",
+  "colors": [
+    { "role": "primary", "hex": "#3a7a8a", "comment": "translucent teal" },
+    { "role": "secondary", "hex": "#1a3a48", "comment": "deep submarine shadow" },
+    { "role": "accent", "hex": "#f08eff", "comment": "bioluminescent flash" },
+    { "role": "highlight", "hex": "#a0e0ec", "comment": "gel highlight" },
+    { "role": "light", "hex": "#6ab0c0", "comment": "lit gel" },
+    { "role": "dark", "hex": "#08161e", "comment": "deep current" },
+    { "role": "metal", "hex": "#506e7a", "comment": "shell hard part" },
+    { "role": "glow", "hex": "#fff0ff", "comment": "biolume glow" }
+  ]
+}

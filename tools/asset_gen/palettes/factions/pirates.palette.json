@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0.0",
+  "palette_id": "pirates",
+  "display_name": "Pirates",
+  "category": "faction",
+  "description": "Asymmetric sea-themed; blue + red + tarnished gold; salt + rust.",
+  "colors": [
+    { "role": "primary", "hex": "#1a3a5a", "comment": "deep ocean blue" },
+    { "role": "secondary", "hex": "#0e2236", "comment": "midnight blue" },
+    { "role": "accent", "hex": "#b22a2a", "comment": "flag red" },
+    { "role": "highlight", "hex": "#dab06a", "comment": "tarnished gold" },
+    { "role": "light", "hex": "#a8c8d0", "comment": "salt-faded blue" },
+    { "role": "dark", "hex": "#05101c", "comment": "abyss" },
+    { "role": "metal", "hex": "#3d5870", "comment": "wave metal" },
+    { "role": "cloth", "hex": "#722a18", "comment": "weathered sail" }
+  ],
+  "accent_pairs": [
+    { "fg": "#dab06a", "bg": "#1a3a5a" },
+    { "fg": "#b22a2a", "bg": "#0e2236" }
+  ]
+}

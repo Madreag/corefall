@@ -1,0 +1,105 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall.dev/schemas/v1/asset_manifest.schema.json",
+  "title": "Corefall Tier-1 SVG Asset Manifest",
+  "description": "Declarative manifest read by tools/asset_gen/build_placeholders.py. Each entry describes one canonical asset; the pipeline expands it across palette / style / size / variant axes.",
+  "type": "object",
+  "required": ["schema_version", "category", "entries"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "category": {
+      "type": "string",
+      "enum": [
+        "UiIcon",
+        "WeaponSprite",
+        "ActorSprite",
+        "VehicleSprite",
+        "ChassisSprite",
+        "BaseModuleSprite",
+        "TerrainTile",
+        "MaterialSwatch",
+        "Particle",
+        "Animation",
+        "Cosmetic"
+      ]
+    },
+    "owner_milestone": {
+      "type": "string",
+      "const": "M9A"
+    },
+    "pipeline_id": {
+      "type": "string",
+      "const": "M9A_svg_v1"
+    },
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "required": ["canonical_name", "kind", "prompt"],
+        "additionalProperties": true,
+        "properties": {
+          "canonical_name": {
+            "type": "string",
+            "pattern": "^[a-z0-9_]+$"
+          },
+          "kind": {
+            "type": "string",
+            "description": "Sub-category (weapon-side / actor-stance / ui-icon / etc)."
+          },
+          "faction": {
+            "type": "string",
+            "description": "Issuing faction id (used for palette + style)."
+          },
+          "origin": {
+            "type": "string",
+            "description": "Origin id (used for actor sprites)."
+          },
+          "stance": {
+            "type": "string",
+            "description": "Actor stance (idle / walking / running / crouching / prone / jetting / climbing)."
+          },
+          "facing": {
+            "type": "string",
+            "enum": ["right", "left", "front", "back"]
+          },
+          "variants": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "sizes": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "weight_class": {
+            "type": "string",
+            "enum": ["light", "medium", "heavy", "super_heavy"]
+          },
+          "integrity_band": {
+            "type": "string",
+            "enum": ["pristine", "scratched", "cracked", "critical", "destroyed"]
+          },
+          "module_state": {
+            "type": "string",
+            "enum": ["nominal", "degraded", "warning", "failed"]
+          },
+          "prompt": {
+            "type": "string"
+          },
+          "max_paths": {
+            "type": "integer",
+            "minimum": 1
+          }
+        }
+      }
+    }
+  }
+}

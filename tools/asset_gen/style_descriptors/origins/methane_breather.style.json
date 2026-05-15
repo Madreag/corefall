@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.0.0",
+  "style_id": "methane_breather",
+  "category": "origin",
+  "version": "1.0.0",
+  "silhouette_language": "frost-pale skin humanoid, cryo-suit plates, breath plume trailing, segmented cryo helmet",
+  "preferred_palette_roles": ["primary", "secondary", "accent", "highlight", "glow"],
+  "shape_descriptors": {
+    "head_proportion": "1.0",
+    "torso_proportion": "2.5",
+    "limb_proportion": "1.85",
+    "joints": "cryo-suit ribbed armor",
+    "augmentations": "breath plume from helmet"
+  },
+  "geometric_primitives": {
+    "actor": ["rect", "ellipse", "polyline"]
+  }
+}

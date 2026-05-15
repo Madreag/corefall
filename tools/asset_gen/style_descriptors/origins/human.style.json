@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.0.0",
+  "style_id": "human",
+  "category": "origin",
+  "version": "1.0.0",
+  "silhouette_language": "baseline humanoid proportions, two arms, two legs, head with helmet variants",
+  "preferred_palette_roles": ["primary", "secondary", "accent", "cloth"],
+  "shape_descriptors": {
+    "head_proportion": "1.0",
+    "torso_proportion": "2.4",
+    "limb_proportion": "1.8",
+    "joints": "rounded organic",
+    "augmentations": "none"
+  },
+  "geometric_primitives": {
+    "actor": ["rect", "ellipse", "circle"]
+  }
+}

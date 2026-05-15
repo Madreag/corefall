@@ -1,0 +1,43 @@
+{
+  "schema_version": "1.0.0",
+  "palette_id": "materials",
+  "display_name": "Launch material registry palette",
+  "category": "material",
+  "description": "Per-material 5-color swatch (base + scratched + cracked + critical + destroyed) for the 17 launch materials per DR-036. Each material maps to a sub-palette indexed by integrity band.",
+  "colors": [
+    { "role": "dirt_pristine", "hex": "#8B6914" },
+    { "role": "dirt_scratched", "hex": "#7a5c12" },
+    { "role": "dirt_cracked", "hex": "#69500f" },
+    { "role": "dirt_critical", "hex": "#583e0c" },
+    { "role": "dirt_destroyed", "hex": "#372608" },
+    { "role": "concrete_pristine", "hex": "#808080" },
+    { "role": "concrete_scratched", "hex": "#727272" },
+    { "role": "concrete_cracked", "hex": "#646464" },
+    { "role": "concrete_critical", "hex": "#4e4e4e" },
+    { "role": "concrete_destroyed", "hex": "#2e2e2e" },
+    { "role": "metal_nohook_pristine", "hex": "#4A4A4A" },
+    { "role": "metal_nohook_scratched", "hex": "#3e3e3e" },
+    { "role": "metal_nohook_cracked", "hex": "#323232" },
+    { "role": "metal_nohook_critical", "hex": "#262626" },
+    { "role": "metal_nohook_destroyed", "hex": "#141414" }
+  ],
+  "material_subpalettes": [
+    { "material_id": "dirt", "bands": ["#8B6914", "#7a5c12", "#69500f", "#583e0c", "#372608"] },
+    { "material_id": "concrete", "bands": ["#808080", "#727272", "#646464", "#4e4e4e", "#2e2e2e"] },
+    { "material_id": "metal_nohook", "bands": ["#4A4A4A", "#3e3e3e", "#323232", "#262626", "#141414"] },
+    { "material_id": "hazard", "bands": ["#FF4444", "#dd3838", "#b82a2a", "#8a1f1f", "#54100f"] },
+    { "material_id": "loose_fill", "bands": ["#C8A864", "#b59456", "#a08048", "#856734", "#5a4520"] },
+    { "material_id": "repair_fill", "bands": ["#44FF44", "#38d838", "#2cb02c", "#1f841f", "#0f560f"] },
+    { "material_id": "anchor", "bands": ["#6B4226", "#5e3a20", "#52321b", "#3c2412", "#1f1208"] },
+    { "material_id": "ice", "bands": ["#c8e6f4", "#b3d2e2", "#9ebed0", "#7c9cb2", "#506a80"] },
+    { "material_id": "lava", "bands": ["#ff7818", "#e85e0e", "#c84808", "#902e04", "#502000"] },
+    { "material_id": "wood", "bands": ["#8a5e35", "#74502d", "#604326", "#46301b", "#26190d"] },
+    { "material_id": "alloy", "bands": ["#9aaab8", "#8194a4", "#6a7c8c", "#4a5868", "#28323e"] },
+    { "material_id": "glass", "bands": ["#bee6ef", "#9cccd9", "#76b0bc", "#4b8290", "#2a4c54"] },
+    { "material_id": "mud", "bands": ["#5a4222", "#4d381d", "#402d18", "#2c1d10", "#170d06"] },
+    { "material_id": "sand", "bands": ["#d6c08a", "#c0aa74", "#a89460", "#7e6e44", "#4e4226"] },
+    { "material_id": "snow", "bands": ["#f0f6fa", "#dde6ed", "#c7d3dd", "#a4b3bf", "#74848f"] },
+    { "material_id": "circuit", "bands": ["#3a8054", "#317048", "#26603a", "#194028", "#0a2014"] },
+    { "material_id": "biomatter", "bands": ["#864e6c", "#74425b", "#62354b", "#48253a", "#22122a"] }
+  ]
+}
