@@ -36,8 +36,8 @@ use cf_ai::{
 };
 use cf_audio::{voice_id_for_archetype, ChatterCategory, ChatterCooldownTable, ChatterEmittedEvent, EmissionInfo};
 use cf_mission::{
-    BossPhase, BossPhaseChangedEvent, BossSpecialAbilityEvent, BossState, MissionPhase, ObjectiveBranchedEvent,
-    ObjectiveGraph, OptionalOfferedEvent, PhaseChangedEvent, PhaseState, ReinforcementRegistry,
+    BossPhase, BossPhaseChangedEvent, BossSpecialAbilityEvent, BossState, DirectorPhaseChangeEvent, MissionPhase,
+    ObjectiveBranchedEvent, ObjectiveGraph, OptionalOfferedEvent, PhaseChangedEvent, PhaseState, ReinforcementRegistry,
     ReinforcementWaveSpawnedEvent,
 };
 use cf_priority::{PersonalityModifier, QuickPresetId, RoleTemplate};
@@ -1209,22 +1209,100 @@ pub fn ready_repair_progressions(world: &M7AiWorld, current_tick: u64) -> Vec<(A
 }
 
 /// **M7**: advance the 4-phase mission director, emitting
-/// `mission.phase_changed` when a transition fires.
+/// `mission.phase_changed` when a transition fires. **M9** extends this
+/// to drive the 7-phase reactor-defense pacer; the
+/// `mission.director_phase_change` companion payload is surfaced through
+/// [`advance_phase_with_director_event`].
 pub fn advance_phase(world: &mut M7AiWorld, tick: u64, tick_rate_hz: u32, cause: &str) -> Option<Value> {
+    advance_phase_with_director_event(world, tick, tick_rate_hz, cause).map(|(legacy, _director)| legacy)
+}
+
+/// **M9** (audit fix gap 3): advance the pacer and surface BOTH the M7
+/// `mission.phase_changed` payload (back-compat) AND the M9
+/// `mission.director_phase_change` payload (with `duration_seconds` of
+/// the just-completed phase). Returns `Some((legacy_payload,
+/// director_payload))` on a transition, `None` otherwise. The director
+/// payload is the canonical surface for M10 viewer + M11 HUD strips.
+pub fn advance_phase_with_director_event(
+    world: &mut M7AiWorld,
+    tick: u64,
+    tick_rate_hz: u32,
+    cause: &str,
+) -> Option<(Value, Value)> {
     let phase = world.phase.as_mut()?;
     let deadline = phase.deadline_tick(tick_rate_hz)?;
     if tick < deadline {
         return None;
     }
     let from = phase.current;
+    let duration_seconds = phase.phase_elapsed_seconds(tick, tick_rate_hz);
     let to = phase.advance(tick)?;
-    let event = PhaseChangedEvent {
+    let phases_completed = phase.phases_completed.clone();
+    let legacy = PhaseChangedEvent {
         from,
         to,
         tick,
         cause: cause.to_string(),
     };
-    Some(phase_changed_payload(&event))
+    let director = DirectorPhaseChangeEvent {
+        from,
+        to,
+        tick,
+        cause: cause.to_string(),
+        duration_seconds,
+    };
+    Some((
+        phase_changed_payload(&legacy),
+        director_phase_change_payload(&director, &phases_completed),
+    ))
+}
+
+/// **M9**: build a JSON payload for `mission.director_phase_change`. The
+/// `phases_completed` list mirrors `PhaseState::phases_completed` so the
+/// M10 viewer can render the in-order pacer timeline without
+/// reconstructing it from the event stream.
+pub fn director_phase_change_payload(event: &DirectorPhaseChangeEvent, phases_completed: &[MissionPhase]) -> Value {
+    let phases: Vec<Value> = phases_completed.iter().map(|p| Value::from(p.as_str())).collect();
+    json!({
+        "from": event.from.as_str(),
+        "to": event.to.as_str(),
+        "tick": event.tick,
+        "cause": event.cause,
+        "duration_seconds": event.duration_seconds,
+        "phases_completed": phases,
+    })
+}
+
+/// **M9** (audit fix gap 3): event-driven advance — used by the engine
+/// to drive BuildUp → SustainPeak (when reactor pressure crosses into
+/// Critical), SustainPeak → Relax (when guard dies), and Relax →
+/// Debrief (when mission resolves). Unlike `advance_phase`, this does
+/// NOT consult the deadline tick — it advances unconditionally. Returns
+/// the (legacy, director) payload pair iff the pacer had a successor
+/// phase.
+pub fn force_advance_phase(world: &mut M7AiWorld, tick: u64, tick_rate_hz: u32, cause: &str) -> Option<(Value, Value)> {
+    let phase = world.phase.as_mut()?;
+    let from = phase.current;
+    let duration_seconds = phase.phase_elapsed_seconds(tick, tick_rate_hz);
+    let to = phase.advance(tick)?;
+    let phases_completed = phase.phases_completed.clone();
+    let legacy = PhaseChangedEvent {
+        from,
+        to,
+        tick,
+        cause: cause.to_string(),
+    };
+    let director = DirectorPhaseChangeEvent {
+        from,
+        to,
+        tick,
+        cause: cause.to_string(),
+        duration_seconds,
+    };
+    Some((
+        phase_changed_payload(&legacy),
+        director_phase_change_payload(&director, &phases_completed),
+    ))
 }
 
 /// **M7**: check whether any registered reinforcement wave should spawn

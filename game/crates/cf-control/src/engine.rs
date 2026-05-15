@@ -1248,6 +1248,14 @@ impl M0Engine {
             }
             if let Some(phase) = config.initial_phase_state.clone() {
                 world.phase = Some(phase);
+            } else if !config.initial_reactors.is_empty() {
+                // **M9** (audit fix gap 3): when the scenario carries a
+                // reactor world but no explicit phase_state, default-init
+                // the 7-phase reactor-defense pacer so guards spawn at
+                // tick ~300 + cfctl `observe.mission.director` has a real
+                // PhaseState to project. Scenarios that want M7 4-phase
+                // pacing instead still set `phase_state` explicitly.
+                world.phase = Some(cf_mission::PhaseState::new_m9_reactor_defense(0));
             }
             for wave in config.initial_reinforcement_waves.clone() {
                 world.reinforcements.push(wave);
@@ -1821,6 +1829,25 @@ impl M0Engine {
         }
         if let Some(reactors) = reactor_world {
             for r in reactors.iter() {
+                // **M9** (audit fix gap 5): scene-start reactor snapshot
+                // includes the M9 surface fields per spec § Crates /
+                // modules touched / cf-actor: "actor.snapshot includes
+                // reactor's hp + per-layer hp + pressure_state +
+                // heat_signature_k + position." Forward-compat fields
+                // (mission_critical, role) are surfaced alongside so
+                // M10/M11 consumers can resolve them deterministically.
+                let armor_layers: Vec<serde_json::Value> = r
+                    .armor_layers
+                    .iter()
+                    .map(|l| {
+                        json!({
+                            "kind": l.kind.as_str(),
+                            "hp": l.hp,
+                            "max_hp": l.max_hp,
+                            "hardness": l.hardness,
+                        })
+                    })
+                    .collect();
                 self.recorder.record(
                     tick,
                     sim_time_ms,
@@ -1833,7 +1860,14 @@ impl M0Engine {
                         "half_extents": r.half_extents,
                         "hp": r.hp,
                         "hp_max": r.max_hp,
+                        "max_hp": r.max_hp,
+                        "hp_percent": r.hp_percent(),
                         "destroyed": r.is_destroyed(),
+                        "pressure_state": r.pressure_state.as_str(),
+                        "armor_layers": armor_layers,
+                        "heat_signature_k": r.heat_signature_k,
+                        "mission_critical": r.mission_critical,
+                        "role": r.role.clone(),
                     }),
                     parent_event_id.map(|s| s.to_string()),
                 );
@@ -2207,6 +2241,62 @@ impl M0Engine {
         }
     }
 
+    /// **M9** (audit fix gap 5): per-reactor periodic snapshot. Mirrors
+    /// the scene-start payload built in `emit_initial_snapshots` so M10
+    /// timeline + M11 reactor-strip widgets keep seeing the M9-enriched
+    /// fields (pressure_state, armor_layers, heat_signature_k,
+    /// mission_critical, role) at the configured cadence. Spec § cf-actor
+    /// "actor.snapshot includes reactor's hp + per-layer hp +
+    /// pressure_state + heat_signature_k + position."
+    fn emit_periodic_snapshot_reactor(&self, tick: Tick, sim_time_ms: f64, parent_event_id: Option<String>) {
+        let reactor_world = self
+            .state
+            .read()
+            .expect("engine state poisoned")
+            .reactor_world
+            .as_ref()
+            .cloned();
+        let Some(reactors) = reactor_world else { return };
+        for r in reactors.iter() {
+            let armor_layers: Vec<serde_json::Value> = r
+                .armor_layers
+                .iter()
+                .map(|l| {
+                    json!({
+                        "kind": l.kind.as_str(),
+                        "hp": l.hp,
+                        "max_hp": l.max_hp,
+                        "hardness": l.hardness,
+                    })
+                })
+                .collect();
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "snapshot",
+                "snapshot_actor",
+                json!({
+                    "actor": r.id.clone(),
+                    "kind": "reactor",
+                    "position": r.position,
+                    "half_extents": r.half_extents,
+                    "hp": r.hp,
+                    "hp_max": r.max_hp,
+                    "max_hp": r.max_hp,
+                    "hp_percent": r.hp_percent(),
+                    "destroyed": r.is_destroyed(),
+                    "pressure_state": r.pressure_state.as_str(),
+                    "armor_layers": armor_layers,
+                    "heat_signature_k": r.heat_signature_k,
+                    "mission_critical": r.mission_critical,
+                    "role": r.role.clone(),
+                    "cadence_source": "periodic_60_ticks",
+                }),
+                parent_event_id.clone(),
+            );
+        }
+    }
+
     /// **M4 § Snapshot cadence**: terrain summary fired every ~1 second.
     /// Same payload as the scene-start version.
     fn emit_periodic_snapshot_terrain_summary(&self, tick: Tick, sim_time_ms: f64, parent_event_id: Option<String>) {
@@ -2516,6 +2606,24 @@ impl M0Engine {
                 // borrow the actor world mutably twice. The temporary `take()` of
                 // each guard releases the BTreeMap borrow so we can mutate state.rng.
                 let sim_time_ms = state.clock.sim_time_ms();
+                // **M9** (audit fix gap 3): when the M9 7-phase pacer is
+                // active, gate guard AI ticks on phase >= Launch so the
+                // player can pre-dig during Setup + Prep without taking
+                // fire. Scenarios without an M9 reactor director (M7
+                // 4-phase, M2 mission, M1 lab) keep the legacy behaviour
+                // where guards tick from tick 0.
+                let guard_ai_unlocked = state
+                    .m7_ai_world
+                    .phase
+                    .as_ref()
+                    .map(|p| {
+                        if p.phase_sequence == cf_mission::MissionPhase::M9_PACING {
+                            p.is_launch_or_later()
+                        } else {
+                            true
+                        }
+                    })
+                    .unwrap_or(true);
                 let guard_ids: Vec<ActorId> = state.reactive_guards.keys().copied().collect();
                 for guard_id in guard_ids {
                     let (self_actor, player_actor) = {
@@ -2537,6 +2645,14 @@ impl M0Engine {
                         .reactive_guards
                         .remove(&guard_id)
                         .expect("guard exists by construction");
+                    if !guard_ai_unlocked {
+                        // Guard is gated behind the M9 Prep window. Hold
+                        // its state without driving the FSM so it does
+                        // not fire, acquire targets, or react to alarms
+                        // before tick ~300.
+                        state.reactive_guards.insert(guard_id, guard);
+                        continue;
+                    }
                     let alarms_snapshot: Vec<cf_ai::AlarmInput> = state.pending_alarms.clone();
                     let report = cf_ai::step(
                         &mut guard,
@@ -2990,7 +3106,13 @@ impl M0Engine {
                             }
                             if r.aabb_contains(proj.position.x, proj.position.y) {
                                 let prev_destroyed = r.is_destroyed();
-                                let report = r.apply_damage_cascade(proj.damage);
+                                // **M9** (audit fix gap 6): consult
+                                // `engine.config.tutorial_safety` so the
+                                // reactor's lethal-damage path caps at 1
+                                // HP + Critical instead of destroying
+                                // when tutorial_safety is enabled.
+                                let report =
+                                    r.apply_damage_cascade_with_safety(proj.damage, self.config.tutorial_safety);
                                 reactor_hits.push(ReactorHit {
                                     rid: r.id.clone(),
                                     damage_applied: report.damage_applied,
@@ -4234,6 +4356,14 @@ impl M0Engine {
             }
             if summary_period > 0 && t.0 > 0 && t.0 % summary_period == 0 {
                 self.emit_periodic_snapshot_terrain_summary(t, sim_time_ms, run_started_parent.clone());
+                // **M9** (audit fix gap 5): reactor snapshot cadence
+                // tied to the 1-second summary so M10 timeline + M11
+                // reactor strip see fresh `pressure_state` +
+                // `armor_layers` every wall-clock second irrespective
+                // of tick rate. The reactor is invariant under most
+                // ticks (HP only changes on hits), so 1Hz cadence is
+                // ample for the HUD.
+                self.emit_periodic_snapshot_reactor(t, sim_time_ms, run_started_parent.clone());
             }
             // **M4 § system.critical_drop**: if any gameplay event was dropped
             // since the last tick, announce it so the canonical checker can
@@ -5104,21 +5234,28 @@ impl M0Engine {
         // crossings. Phase pacing is opt-in via the scenario manifest's
         // `phase_state` field — if the scenario didn't seed it,
         // `world.phase` is None and `advance_phase` returns None.
-        let phase_payload = {
+        //
+        // **M9** (audit fix gap 3): a M9 reactor-defense scenario seeds the
+        // 7-phase pacer in engine construction (see `m7_ai_world_seed`),
+        // so the same drive path also produces `mission.director_phase_change`
+        // events through `advance_phase_with_director_event`.
+        let phase_payloads = {
             let mut state = match self.state.write() {
                 Ok(s) => s,
                 Err(_) => return,
             };
             if state.m7_ai_world.phase.is_some() {
                 crate::m7_ai::ensure_phase_initialised(&mut state.m7_ai_world, tick.0);
-                crate::m7_ai::advance_phase(&mut state.m7_ai_world, tick.0, tick_rate_hz, "elapsed")
+                crate::m7_ai::advance_phase_with_director_event(&mut state.m7_ai_world, tick.0, tick_rate_hz, "elapsed")
             } else {
                 None
             }
         };
-        if let Some(payload) = phase_payload {
+        if let Some((legacy_payload, director_payload)) = phase_payloads {
             self.recorder
-                .record(tick, sim_time_ms, "mission", "phase_changed", payload, None);
+                .record(tick, sim_time_ms, "mission", "phase_changed", legacy_payload, None);
+            #[rustfmt::skip]
+            let _ = self.recorder.record(tick, sim_time_ms, "mission", "director_phase_change", director_payload, None);
         }
 
         // ---- Reinforcement waves (A15) ---------------------------------
@@ -12526,6 +12663,91 @@ impl EngineHandle for M0Engine {
             "total_ticks": total_ticks,
             "remaining_seconds": remaining_s,
             "color_state": color_state,
+        }))
+    }
+
+    /// **M9** (audit fix gap 2): cfctl `observe.mission.director` —
+    /// returns the M9 director projection per spec § Director state
+    /// surface. Spawn-budget and intensity ladder to M25+; at M9 they
+    /// are stable scalars (0.0 and 0 respectively) so the surface is
+    /// already round-trippable.
+    async fn observe_mission_director(&self) -> Option<serde_json::Value> {
+        let state = self.state.read().ok()?;
+        let phase = state.m7_ai_world.phase.as_ref()?;
+        let active_objectives: Vec<String> = state
+            .mission
+            .as_ref()
+            .map(|m| {
+                m.objectives
+                    .iter()
+                    .filter(|o| o.status == cf_mission::ObjectiveStatus::Active)
+                    .map(|o| o.id.clone())
+                    .collect()
+            })
+            .unwrap_or_default();
+        let phases_completed: Vec<String> = phase.phases_completed.iter().map(|p| p.as_str().to_string()).collect();
+        let tick_rate = self.config.tick_rate_hz.max(1);
+        let deadline_tick = phase.deadline_tick(tick_rate);
+        Some(json!({
+            "schema_version": SCHEMA_VERSION,
+            "current_phase": phase.current.as_str(),
+            "phase_started_at_tick": phase.entered_tick,
+            "phases_completed": phases_completed,
+            "intensity": 0.0_f32,
+            "spawn_budget": 0_u32,
+            "active_objectives": active_objectives,
+            "deadline_tick": deadline_tick,
+            "phase_sequence": phase
+                .phase_sequence
+                .iter()
+                .map(|p| p.as_str().to_string())
+                .collect::<Vec<_>>(),
+        }))
+    }
+
+    /// **M9** (audit fix gap 1): cfctl `inspect.actor.reactor` —
+    /// returns the reactor projection plus the last `last_n_events`
+    /// actor-category events. The reactor's id is a string (e.g.
+    /// `"core_reactor"`), unlike inspect.actor which keys on u64.
+    /// Returns `None` when no reactor world is loaded.
+    async fn inspect_actor_reactor(&self, last_n_events: usize) -> Option<serde_json::Value> {
+        let view = self.observe_mission_reactor().await?;
+        let reactor_id = view.get("actor_id").and_then(|v| v.as_str()).map(|s| s.to_string());
+        let events = self.recorder.snapshot_events();
+        let mut filtered: Vec<serde_json::Value> = events
+            .iter()
+            .filter(|e| e.category == "actor" || e.category == "armor" || e.category == "mission")
+            .filter(|e| match &reactor_id {
+                None => true,
+                Some(rid) => e
+                    .payload
+                    .get("reactor_id")
+                    .and_then(|v| v.as_str())
+                    .map(|p| p == rid.as_str())
+                    .or_else(|| {
+                        e.payload
+                            .get("reactor")
+                            .and_then(|v| v.as_str())
+                            .map(|p| p == rid.as_str())
+                    })
+                    .or_else(|| {
+                        e.payload
+                            .get("actor")
+                            .and_then(|v| v.as_str())
+                            .map(|p| p == rid.as_str())
+                    })
+                    .unwrap_or(false),
+            })
+            .rev()
+            .take(last_n_events)
+            .map(|e| serde_json::to_value(e).unwrap_or(serde_json::Value::Null))
+            .collect();
+        filtered.reverse();
+        Some(serde_json::json!({
+            "schema_version": SCHEMA_VERSION,
+            "actor": view,
+            "events": filtered,
+            "events_count": filtered.len(),
         }))
     }
 

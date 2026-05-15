@@ -884,6 +884,20 @@ pub trait EngineHandle: Send + Sync + 'static {
     async fn inspect_actor(&self, _target: Option<&str>, _last_n_events: usize) -> Option<serde_json::Value> {
         None
     }
+    /// **M9** (audit fix gap 1): return the reactor view plus its last `n`
+    /// actor-category events. Spec § Reactor as a non-player static actor:
+    /// "And cfctl inspect.actor.reactor returns the full ActorState".
+    /// Default returns `None`.
+    async fn inspect_actor_reactor(&self, _last_n_events: usize) -> Option<serde_json::Value> {
+        None
+    }
+    /// **M9** (audit fix gap 2): return the mission director projection
+    /// `{ current_phase, phase_started_at_tick, phases_completed,
+    /// intensity, spawn_budget, active_objectives }`. Default returns
+    /// `None`.
+    async fn observe_mission_director(&self) -> Option<serde_json::Value> {
+        None
+    }
     /// **M2**: return the full chunk material grid (RLE-friendly Vec) for the
     /// requested chunk coord. Default returns `None`.
     async fn inspect_terrain_chunk(&self, _cx: i32, _cy: i32) -> Option<serde_json::Value> {
@@ -2520,6 +2534,22 @@ async fn process_request<E: EngineHandle>(
                 None => Some(invalid_param_reason(request.id, "no_player_actor")),
             }
         }
+        // **M9** (audit fix gap 1) § cfctl `inspect.actor.reactor` —
+        // alias dispatch that returns the reactor projection (hp +
+        // max_hp + pressure_state + armor_layers + heat_signature_k +
+        // mission_critical + role + position) plus its last 30 actor-
+        // category events. Per spec § Reactor as a non-player static
+        // actor: "And cfctl inspect.actor.reactor returns the full
+        // ActorState".
+        "inspect.actor.reactor" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            match engine.inspect_actor_reactor(30).await {
+                Some(value) => Some(success_response(request.id, value)),
+                None => Some(invalid_param_reason(request.id, "no_reactor_loaded")),
+            }
+        }
         // M2 re-audit (2026-05-13): full mission projection cfctl method.
         "observe.mission" => {
             let _p: ObserveMissionParams = match serde_json::from_value(params) {
@@ -2554,6 +2584,19 @@ async fn process_request<E: EngineHandle>(
             match engine.observe_mission_timer().await {
                 Some(value) => Some(success_response(request.id, value)),
                 None => Some(invalid_param_reason(request.id, "no_mission_loaded")),
+            }
+        }
+        // **M9** (audit fix gap 2) § cfctl `observe.mission.director` —
+        // return `{ current_phase, phase_started_at_tick,
+        // phases_completed, intensity, spawn_budget, active_objectives }`
+        // per spec § Director state surface.
+        "observe.mission.director" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            match engine.observe_mission_director().await {
+                Some(value) => Some(success_response(request.id, value)),
+                None => Some(invalid_param_reason(request.id, "no_mission_director")),
             }
         }
         // M3 audit pass 7 (2026-05-13): dedicated `observe.terrain` cfctl
