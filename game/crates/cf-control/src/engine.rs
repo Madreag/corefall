@@ -3264,6 +3264,15 @@ impl M0Engine {
             if !reactor_hits.is_empty() {
                 let sim_time_ms = state.clock.sim_time_ms();
                 for hit in reactor_hits {
+                    // **M9** § Cause chains (Gap 11): thread the
+                    // projectile's spawn event id through so M10's
+                    // "show me why" walker can hop `projectile_hit →
+                    // projectile_spawned → weapon_fired → ai.tactic_chosen
+                    // → ai.target_acquired → ai.target_scored`. Falls back
+                    // to None when the spawn id is no longer in the map
+                    // (e.g. a hit fired the same tick as a reset).
+                    let projectile_spawn_parent = state.projectile_spawn_event_ids.get(&hit.projectile_id).cloned();
+                    state.projectile_spawn_event_ids.remove(&hit.projectile_id);
                     let hit_id = self.recorder.record(
                         tick,
                         sim_time_ms,
@@ -3275,8 +3284,9 @@ impl M0Engine {
                             "position": hit.position,
                             "damage": hit.damage_applied,
                             "projectile_id": hit.projectile_id,
+                            "parent_event_id": projectile_spawn_parent.clone(),
                         }),
-                        None,
+                        projectile_spawn_parent,
                     );
                     self.recorder.record(
                         tick,
@@ -4854,7 +4864,7 @@ impl M0Engine {
         // M3 audit pass 7 (2026-05-13): emit terrain.path_invalidated for
         // M22+ pathfinder consumers. Placeholder event per spec ledger.
         if let Some((bbox_min, bbox_max)) = path_bbox {
-            self.recorder.record(
+            let terrain_path_id = self.recorder.record(
                 tick,
                 sim_time_ms,
                 "terrain",
@@ -4867,6 +4877,14 @@ impl M0Engine {
                 }),
                 parent_event_id,
             );
+            // **M9** § Reactive guard targeting + path reaction:
+            // when the dirty-region bbox intersects a guard's planned
+            // pursuit line (guard → target), the AI's path is
+            // invalidated. Emit `ai.path_invalidated` (category=ai) per
+            // affected guard, followed by `ai.recovery_action` whose
+            // action comes from `cf_ai::path_reaction::pick_recovery_action`
+            // (reroute / fire_over_obstacle / give_up_and_fire_from_here).
+            self.emit_ai_path_reaction(tick, sim_time_ms, bbox_min, bbox_max, terrain_path_id);
         }
 
         // Emit forced-refresh signal if sustained pressure exceeds threshold.
@@ -4889,6 +4907,150 @@ impl M0Engine {
             if let Ok(mut s) = self.state.write() {
                 s.sustained_unupdated_ticks = 0;
             }
+        }
+    }
+
+    /// **M9** § Reactive guard targeting + path reaction: emit
+    /// `ai.path_invalidated` (category=ai) + `ai.recovery_action` per
+    /// guard whose planned pursuit line crosses the freshly-carved bbox.
+    /// The recovery action is computed by
+    /// `cf_ai::path_reaction::pick_recovery_action` from the fraction of
+    /// the path that intersects the dirty bbox, whether the guard has
+    /// line-of-sight to the target, and the remaining path length.
+    fn emit_ai_path_reaction(
+        &self,
+        tick: Tick,
+        sim_time_ms: f64,
+        bbox_min: [f32; 2],
+        bbox_max: [f32; 2],
+        parent_event_id: String,
+    ) {
+        let state = match self.state.read() {
+            Ok(s) => s,
+            Err(_) => return,
+        };
+        let guards: Vec<(ActorId, [f32; 2], Option<[f32; 2]>)> = state
+            .reactive_guards
+            .keys()
+            .filter_map(|gid| {
+                state
+                    .actor_state
+                    .as_ref()
+                    .and_then(|sim| sim.world.actors.get(gid))
+                    .map(|a| (*gid, [a.position.x, a.position.y]))
+            })
+            .map(|(gid, gpos)| {
+                let last_seen = state.reactive_guards.get(&gid).and_then(|g| g.last_player_position);
+                (gid, gpos, last_seen)
+            })
+            .collect();
+        let player_pos = state.player_actor.and_then(|pid| {
+            state
+                .actor_state
+                .as_ref()
+                .and_then(|sim| sim.world.actors.get(&pid))
+                .filter(|a| !a.status.is_dead())
+                .map(|a| [a.position.x, a.position.y])
+        });
+        let reactor_positions: Vec<[f32; 2]> = state
+            .reactor_world
+            .as_ref()
+            .map(|w| w.iter().filter(|r| !r.is_destroyed()).map(|r| r.position).collect())
+            .unwrap_or_default();
+        let terrain = state.chunked_terrain.as_ref().cloned();
+        drop(state);
+
+        if guards.is_empty() {
+            return;
+        }
+
+        let los_clear = |from: [f32; 2], to: [f32; 2]| -> bool {
+            let Some(t) = terrain.as_ref() else { return true };
+            let dx = to[0] - from[0];
+            let dy = to[1] - from[1];
+            const LOS_STEPS: u32 = 16;
+            let steps = LOS_STEPS as f32;
+            for i in 1..LOS_STEPS {
+                let f = i as f32 / steps;
+                let sx = from[0] + dx * f;
+                let sy = from[1] + dy * f;
+                let mat = t.material_at_world(sx, sy);
+                if let Some(aff) = t.registry.affordance(mat) {
+                    if aff.blocks_line_of_sight {
+                        return false;
+                    }
+                }
+            }
+            true
+        };
+
+        for (gid, gpos, last_seen) in guards {
+            let nearest_reactor = reactor_positions.iter().min_by(|a, b| {
+                let da = (a[0] - gpos[0]).powi(2) + (a[1] - gpos[1]).powi(2);
+                let db = (b[0] - gpos[0]).powi(2) + (b[1] - gpos[1]).powi(2);
+                da.partial_cmp(&db).unwrap_or(std::cmp::Ordering::Equal)
+            });
+            let target = player_pos.or(last_seen).or(nearest_reactor.copied());
+            let Some(target_xy) = target else { continue };
+
+            const PATH_SAMPLES: u32 = 32;
+            let dx = target_xy[0] - gpos[0];
+            let dy = target_xy[1] - gpos[1];
+            let total_len = (dx * dx + dy * dy).sqrt();
+            if total_len < 1.0 {
+                continue;
+            }
+            let mut dirty_hits = 0u32;
+            for i in 0..PATH_SAMPLES {
+                let f = (i as f32 + 0.5) / PATH_SAMPLES as f32;
+                let sx = gpos[0] + dx * f;
+                let sy = gpos[1] + dy * f;
+                if sx >= bbox_min[0] && sx <= bbox_max[0] && sy >= bbox_min[1] && sy <= bbox_max[1] {
+                    dirty_hits += 1;
+                }
+            }
+            if dirty_hits == 0 {
+                continue;
+            }
+            let fraction_of_path_dirty = dirty_hits as f32 / PATH_SAMPLES as f32;
+            let has_los_to_target = los_clear(gpos, target_xy);
+
+            let old_path_json = serde_json::json!([[gpos[0], gpos[1]], [target_xy[0], target_xy[1]],]);
+            let path_invalidated_id = self.recorder.record(
+                tick,
+                sim_time_ms,
+                "ai",
+                "path_invalidated",
+                serde_json::json!({
+                    "actor": gid.0,
+                    "actor_id": gid.0,
+                    "bbox": { "min": bbox_min, "max": bbox_max },
+                    "old_path": old_path_json,
+                    "reason": "terrain_dirty",
+                    "fraction_of_path_dirty": fraction_of_path_dirty,
+                }),
+                Some(parent_event_id.clone()),
+            );
+            let action =
+                cf_ai::path_reaction::pick_recovery_action(fraction_of_path_dirty, has_los_to_target, total_len);
+            let reason = match action {
+                cf_ai::path_reaction::RecoveryAction::Reroute => "terrain_dirty_reroute",
+                cf_ai::path_reaction::RecoveryAction::FireOverObstacle => "terrain_dirty_fire_over",
+                cf_ai::path_reaction::RecoveryAction::GiveUpAndFireFromHere => "terrain_dirty_give_up",
+            };
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "ai",
+                "recovery_action",
+                serde_json::json!({
+                    "actor": gid.0,
+                    "actor_id": gid.0,
+                    "action": action.as_str(),
+                    "reason": reason,
+                }),
+                Some(path_invalidated_id),
+            );
         }
     }
 
@@ -5999,6 +6161,224 @@ impl M0Engine {
         }
     }
 
+    /// **M9** § Reactive guard targeting + path reaction (DR-008 utility
+    /// scoring): build the `ai.target_scored` payload by running
+    /// `cf_ai::target_selection::score_all` against the live candidate set
+    /// (player + every non-destroyed reactor). Returns a payload with:
+    /// - `actor`: the scoring guard
+    /// - `target_actor`: the chosen target (matches `chosen_id`)
+    /// - `chosen_id`: stringified id of the highest-scored candidate
+    /// - `score`: chosen candidate's score
+    /// - `candidates`: full per-candidate breakdown
+    ///   (`[{id, score, reason, is_player, is_reactor, has_los, distance}]`)
+    /// - `rationale`: short utility-reason string
+    fn compute_target_scored_payload(&self, guard_id: ActorId, fallback_target: u64) -> serde_json::Value {
+        let state = match self.state.read() {
+            Ok(s) => s,
+            Err(_) => {
+                return json!({
+                    "actor": guard_id.0,
+                    "target_actor": fallback_target,
+                    "chosen_id": fallback_target.to_string(),
+                    "score": 0.0,
+                    "candidates": Vec::<serde_json::Value>::new(),
+                    "rationale": "state_lock_poisoned",
+                });
+            }
+        };
+        let guard_pos = state
+            .actor_state
+            .as_ref()
+            .and_then(|sim| sim.world.actors.get(&guard_id))
+            .map(|a| a.position);
+        let player_id = state.player_actor;
+        let player_pos = player_id.and_then(|pid| {
+            state
+                .actor_state
+                .as_ref()
+                .and_then(|sim| sim.world.actors.get(&pid))
+                .filter(|a| !a.status.is_dead())
+                .map(|a| a.position)
+        });
+        let reactor_candidates: Vec<(String, [f32; 2])> = state
+            .reactor_world
+            .as_ref()
+            .map(|w| {
+                w.iter()
+                    .filter(|r| !r.is_destroyed())
+                    .map(|r| (r.id.clone(), r.position))
+                    .collect()
+            })
+            .unwrap_or_default();
+        let terrain = state.chunked_terrain.as_ref().cloned();
+        drop(state);
+
+        let guard_pos = match guard_pos {
+            Some(p) => p,
+            None => {
+                return json!({
+                    "actor": guard_id.0,
+                    "target_actor": fallback_target,
+                    "chosen_id": fallback_target.to_string(),
+                    "score": 0.0,
+                    "candidates": Vec::<serde_json::Value>::new(),
+                    "rationale": "guard_not_in_world",
+                });
+            }
+        };
+
+        #[derive(Clone, Debug)]
+        enum CandKey {
+            PlayerActor(u64),
+            Reactor(String),
+        }
+        impl PartialEq for CandKey {
+            fn eq(&self, other: &Self) -> bool {
+                match (self, other) {
+                    (CandKey::PlayerActor(a), CandKey::PlayerActor(b)) => a == b,
+                    (CandKey::Reactor(a), CandKey::Reactor(b)) => a == b,
+                    _ => false,
+                }
+            }
+        }
+        let mut candidates: Vec<cf_ai::target_selection::TargetCandidate<CandKey>> = Vec::new();
+        let mut details: Vec<serde_json::Value> = Vec::new();
+
+        let los_check = |target_xy: [f32; 2]| -> bool {
+            let Some(t) = terrain.as_ref() else { return true };
+            let dx = target_xy[0] - guard_pos.x;
+            let dy = target_xy[1] - guard_pos.y;
+            const LOS_RAY_STEPS: u32 = 16;
+            let steps = LOS_RAY_STEPS as f32;
+            for i in 1..LOS_RAY_STEPS {
+                let f = i as f32 / steps;
+                let sx = guard_pos.x + dx * f;
+                let sy = guard_pos.y + dy * f;
+                let mat = t.material_at_world(sx, sy);
+                if let Some(aff) = t.registry.affordance(mat) {
+                    if aff.blocks_line_of_sight {
+                        return false;
+                    }
+                }
+            }
+            true
+        };
+
+        if let (Some(pid), Some(ppos)) = (player_id, player_pos) {
+            let dx = ppos.x - guard_pos.x;
+            let dy = ppos.y - guard_pos.y;
+            let distance = (dx * dx + dy * dy).sqrt();
+            let has_los = los_check([ppos.x, ppos.y]);
+            let cand = cf_ai::target_selection::TargetCandidate {
+                id: CandKey::PlayerActor(pid.0),
+                distance,
+                has_los,
+                is_player: true,
+                is_high_value_static: false,
+            };
+            details.push(json!({
+                "id": pid.0.to_string(),
+                "kind": "player",
+                "actor_id": pid.0,
+                "distance": distance,
+                "has_los": has_los,
+                "is_player": true,
+                "is_high_value_static": false,
+            }));
+            candidates.push(cand);
+        }
+
+        for (rid, rpos) in &reactor_candidates {
+            let dx = rpos[0] - guard_pos.x;
+            let dy = rpos[1] - guard_pos.y;
+            let distance = (dx * dx + dy * dy).sqrt();
+            let has_los = los_check(*rpos);
+            let cand = cf_ai::target_selection::TargetCandidate {
+                id: CandKey::Reactor(rid.clone()),
+                distance,
+                has_los,
+                is_player: false,
+                is_high_value_static: true,
+            };
+            details.push(json!({
+                "id": rid.clone(),
+                "kind": "reactor",
+                "reactor_id": rid.clone(),
+                "distance": distance,
+                "has_los": has_los,
+                "is_player": false,
+                "is_high_value_static": true,
+            }));
+            candidates.push(cand);
+        }
+
+        let weights = cf_ai::target_selection::TargetWeights::default();
+        let (chosen_key, scored) = match cf_ai::target_selection::score_all(&candidates, &weights) {
+            Some(r) => r,
+            None => {
+                return json!({
+                    "actor": guard_id.0,
+                    "target_actor": fallback_target,
+                    "chosen_id": fallback_target.to_string(),
+                    "score": 0.0,
+                    "candidates": Vec::<serde_json::Value>::new(),
+                    "rationale": "no_candidates",
+                });
+            }
+        };
+
+        let candidates_json: Vec<serde_json::Value> = scored
+            .iter()
+            .zip(details.iter())
+            .map(|(st, det)| {
+                let mut obj = det.as_object().cloned().unwrap_or_default();
+                obj.insert("score".to_string(), json!(st.score));
+                obj.insert("reason".to_string(), json!(st.reason.clone()));
+                serde_json::Value::Object(obj)
+            })
+            .collect();
+
+        let chosen_id_str = match &chosen_key {
+            CandKey::PlayerActor(id) => id.to_string(),
+            CandKey::Reactor(rid) => rid.clone(),
+        };
+        let chosen_target_actor = match &chosen_key {
+            CandKey::PlayerActor(id) => *id,
+            CandKey::Reactor(_) => fallback_target,
+        };
+        let chosen_score = scored
+            .iter()
+            .find(|st| st.id == chosen_key)
+            .map(|st| st.score)
+            .unwrap_or(0.0);
+        let chosen_reason = scored
+            .iter()
+            .find(|st| st.id == chosen_key)
+            .map(|st| st.reason.clone())
+            .unwrap_or_else(|| "score_all".to_string());
+        let player_aggressive = matches!(&chosen_key, CandKey::PlayerActor(_));
+        let rationale = if player_aggressive {
+            format!("player_aggressive: {}", chosen_reason)
+        } else {
+            format!("defensive_value: {}", chosen_reason)
+        };
+
+        json!({
+            "actor": guard_id.0,
+            "target_actor": chosen_target_actor,
+            "chosen_id": chosen_id_str,
+            "score": chosen_score,
+            "candidates": candidates_json,
+            "rationale": rationale,
+            "weights": {
+                "proximity": weights.proximity,
+                "los": weights.los,
+                "threat": weights.threat,
+                "value": weights.value,
+            },
+        })
+    }
+
     /// Translate a `cf_ai::EnemyTickReport` into recorder events.
     fn emit_guard_events(&self, tick: Tick, sim_time_ms: f64, guard_id: ActorId, report: &cf_ai::EnemyTickReport) {
         // Always emit ai.ai_perception (even when player_seen=false) so replay
@@ -6155,22 +6535,22 @@ impl M0Engine {
                 }),
                 last_perception_signal_id.clone(),
             );
-            // **M4 § ai.target_scored**: spec lists `target_scored` as one
-            // of the ai.* event types. Producer fires alongside
-            // target_acquired with the scoring rationale; M4 emits a thin
-            // payload (score=1.0 placeholder, M5+ tactic-scorer fills with
-            // real weights).
+            // **M9 § Reactive guard targeting + path reaction (DR-008
+            // utility scoring)**: wire `cf_ai::target_selection::score_all`
+            // into the production target-acquisition path. The scorer
+            // ranks every candidate (player + reactor) by
+            // `score = w_proximity * (1/distance) + w_los * has_los +
+            // w_threat * is_player + w_value * is_high_value_static`.
+            // Payload exposes the full candidates vec + chosen + reason
+            // so M10's death-recap can render "player scored higher than
+            // reactor" / "reactor scored higher than player".
+            let scored_payload = self.compute_target_scored_payload(guard_id, t.target_actor);
             self.recorder.record(
                 tick,
                 sim_time_ms,
                 "ai",
                 "target_scored",
-                json!({
-                    "actor": guard_id.0,
-                    "target_actor": t.target_actor,
-                    "score": 1.0,
-                    "rationale": format!("acquired_via_{}", t.via),
-                }),
+                scored_payload,
                 Some(acquired_id),
             );
         }
