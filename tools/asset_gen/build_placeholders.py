@@ -724,6 +724,183 @@ def _cosmetic_jobs(manifest: Dict[str, object]) -> List[BakeJob]:
     return jobs
 
 
+def _shell_ui_jobs(manifest: Dict[str, object]) -> List[BakeJob]:
+    """M11A shell-ui manifest expander.
+
+    Iterates entries × sizes × (optional faction variants for selected entries).
+    Default size set: [256, 512, 1024]. faction_variants list (if present in
+    manifest) gets the 8-faction per-entry recolor expansion.
+    """
+    jobs: List[BakeJob] = []
+    sizes = manifest.get("sizes")
+    if not isinstance(sizes, list) or not sizes:
+        sizes = [512]
+    sizes_int = [int(s) for s in sizes]
+    # Only bake the smaller two sizes by default so the bake stays under a
+    # few thousand entries; 1024+ are big and slow + rarely needed.
+    sizes_int = [s for s in sizes_int if s <= 512]
+    if not sizes_int:
+        sizes_int = [512]
+    faction_variants = manifest.get("faction_variants")
+    if not isinstance(faction_variants, list):
+        faction_variants = []
+    fset = {str(x) for x in faction_variants}
+    factions = ["hostile_corp", "allied_resistance", "marauder_tribes", "religious_order",
+                "scientist_order", "mercenary_guild", "pirates", "drone_collective"]
+    for entry in manifest["entries"]:  # type: ignore[index]
+        if not isinstance(entry, dict):
+            continue
+        if "canonical_name" not in entry:
+            continue
+        name = str(entry["canonical_name"])
+        prompt = str(entry.get("prompt", entry.get("kind", "shell-ui asset")))
+        kind = str(entry.get("kind", "shell-ui"))
+        # Default palette for shell UI: scientist_order (clean UI palette)
+        for sz in sizes_int:
+            canonical = f"{name}_{sz}px"
+            jobs.append(BakeJob(
+                category="ShellUi",
+                canonical_name=canonical,
+                kind=kind,
+                prompt=f"{prompt} ({sz}px)",
+                faction="scientist_order",
+                origin=None,
+                stance=None,
+                facing="right",
+                variant=None,
+                weight_class=None,
+                module_state=None,
+                integrity_band=None,
+                overlay_mode=None,
+                size=sz,
+                palette_ref="scientist_order",
+                seed=_seed_for(canonical),
+            ))
+        if name in fset:
+            for faction in factions:
+                for sz in sizes_int:
+                    canonical = f"{name}_{faction}_{sz}px"
+                    jobs.append(BakeJob(
+                        category="ShellUi",
+                        canonical_name=canonical,
+                        kind=kind,
+                        prompt=f"{prompt} ({faction} variant, {sz}px)",
+                        faction=faction,
+                        origin=None,
+                        stance=None,
+                        facing="right",
+                        variant=None,
+                        weight_class=None,
+                        module_state=None,
+                        integrity_band=None,
+                        overlay_mode=None,
+                        size=sz,
+                        palette_ref=faction,
+                        seed=_seed_for(canonical),
+                    ))
+    return jobs
+
+
+def _hud_widget_jobs(manifest: Dict[str, object]) -> List[BakeJob]:
+    """M11 HUD widget expander — 1 entry × 8 factions × 1 size."""
+    jobs: List[BakeJob] = []
+    factions = ["hostile_corp", "allied_resistance", "marauder_tribes", "religious_order",
+                "scientist_order", "mercenary_guild", "pirates", "drone_collective"]
+    for entry in manifest["entries"]:  # type: ignore[index]
+        if not isinstance(entry, dict):
+            continue
+        name = str(entry["canonical_name"])
+        prompt = str(entry["prompt"])
+        kind = str(entry.get("kind", "hud-widget"))
+        for faction in factions:
+            canonical = f"{name}_{faction}"
+            jobs.append(BakeJob(
+                category="HudWidget",
+                canonical_name=canonical,
+                kind=kind,
+                prompt=f"{prompt} ({faction})",
+                faction=faction,
+                origin=None,
+                stance=None,
+                facing="right",
+                variant=None,
+                weight_class=None,
+                module_state=None,
+                integrity_band=None,
+                overlay_mode=None,
+                size=192,
+                palette_ref=faction,
+                seed=_seed_for(canonical),
+            ))
+    return jobs
+
+
+def _banner_jobs(manifest: Dict[str, object]) -> List[BakeJob]:
+    """M11 banner expander — 1 entry × 8 factions, fixed wide aspect."""
+    jobs: List[BakeJob] = []
+    factions = ["hostile_corp", "allied_resistance", "marauder_tribes", "religious_order",
+                "scientist_order", "mercenary_guild", "pirates", "drone_collective"]
+    for entry in manifest["entries"]:  # type: ignore[index]
+        if not isinstance(entry, dict):
+            continue
+        name = str(entry["canonical_name"])
+        prompt = str(entry["prompt"])
+        kind = str(entry.get("kind", "banner"))
+        for faction in factions:
+            canonical = f"{name}_{faction}"
+            jobs.append(BakeJob(
+                category="Banner",
+                canonical_name=canonical,
+                kind=kind,
+                prompt=f"{prompt} ({faction})",
+                faction=faction,
+                origin=None,
+                stance=None,
+                facing="right",
+                variant=None,
+                weight_class=None,
+                module_state=None,
+                integrity_band=None,
+                overlay_mode=None,
+                size=256,
+                palette_ref=faction,
+                seed=_seed_for(canonical),
+            ))
+    return jobs
+
+
+def _vfx_decal_jobs(manifest: Dict[str, object]) -> List[BakeJob]:
+    """M12 VFX decal expander — single 128px size per entry (no faction recolor)."""
+    jobs: List[BakeJob] = []
+    for entry in manifest["entries"]:  # type: ignore[index]
+        if not isinstance(entry, dict):
+            continue
+        name = str(entry["canonical_name"])
+        prompt = str(entry["prompt"])
+        kind = str(entry.get("kind", "decal"))
+        for variant_idx in range(3):
+            canonical = f"{name}_v{variant_idx}"
+            jobs.append(BakeJob(
+                category="VfxDecal",
+                canonical_name=canonical,
+                kind=kind,
+                prompt=f"{prompt} (variant {variant_idx})",
+                faction="mercenary_guild",
+                origin=None,
+                stance=None,
+                facing="right",
+                variant=f"v{variant_idx}",
+                weight_class=None,
+                module_state=None,
+                integrity_band=None,
+                overlay_mode=None,
+                size=128,
+                palette_ref="mercenary_guild",
+                seed=_seed_for(canonical),
+            ))
+    return jobs
+
+
 _MANIFEST_TO_BUILDER = {
     "weapons.ron": _weapon_jobs,
     "actors.ron": _actor_jobs,
@@ -734,6 +911,10 @@ _MANIFEST_TO_BUILDER = {
     "particles.ron": _particle_jobs,
     "terrain_tiles.ron": _terrain_jobs,
     "cosmetic_placeholders.ron": _cosmetic_jobs,
+    "shell_ui.ron": _shell_ui_jobs,
+    "hud_widgets.ron": _hud_widget_jobs,
+    "banners.ron": _banner_jobs,
+    "vfx_decals.ron": _vfx_decal_jobs,
 }
 
 
@@ -783,6 +964,11 @@ def _output_dir_for(category: str) -> Path:
         "Cosmetic": "cosmetics",
         "FactionEmblem": "faction_emblems",
         "CaptureGridOverlay": "capture_overlays",
+        "ShellUi": "shell_ui",
+        "HudWidget": "hud_widgets",
+        "Banner": "banners",
+        "VfxDecal": "vfx_decals",
+        "AnimationFrame": "animation_frames",
     }.get(category, "misc")
     return PLACEHOLDER_ROOT / sub
 
@@ -886,8 +1072,21 @@ def _bake_one(job: BakeJob) -> Dict[str, object]:
 
     rel_svg = str(svg_path.resolve())
     rel_png = str(png_path.resolve())
+    # Map non-engine categories (FactionEmblem, ShellUi, HudWidget, Banner,
+    # CaptureGridOverlay) to the closest first-class engine category. The
+    # original category is preserved in the kind string for filterability.
+    category_to_engine = {
+        "FactionEmblem": "UiIcon",
+        "CaptureGridOverlay": "UiIcon",
+        "ShellUi": "UiIcon",
+        "HudWidget": "UiIcon",
+        "Banner": "UiIcon",
+        "VfxDecal": "Particle",
+        "AnimationFrame": "Animation",
+    }
+    engine_category = category_to_engine.get(job.category, job.category)
     draft = ledger_writer.LedgerEntryDraft(
-        category=job.category if job.category != "FactionEmblem" else "UiIcon",
+        category=engine_category,
         kind=job.kind,
         canonical_name=job.canonical_name,
         tier="Tier1_SVG",
@@ -906,10 +1105,7 @@ def _bake_one(job: BakeJob) -> Dict[str, object]:
             "size_bytes": int(png_size_actual),
         }],
     )
-    # FactionEmblem + CaptureGridOverlay aren't first-class engine categories
-    # in cf-asset-ledger — store them as UiIcon (kind disambiguates).
     if job.category == "CaptureGridOverlay":
-        draft.category = "UiIcon"
         draft.kind = "capture-overlay"
 
     entry = ledger_writer.build_entry(draft)

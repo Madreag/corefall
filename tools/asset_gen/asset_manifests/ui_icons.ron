@@ -27,7 +27,7 @@
         ( canonical_name: "icon_status_radiation",   kind: "ui-icon", prompt: "radiation pip icon, trefoil silhouette" ),
         ( canonical_name: "icon_status_bleed",       kind: "ui-icon", prompt: "bleed pip icon, droplet silhouette" ),
         ( canonical_name: "icon_status_stun",        kind: "ui-icon", prompt: "stun pip icon, lightning bolt" ),
-        // ─── Action prompt glyphs (10) ───────────────────────────────────────
+        // ─── Action prompt glyphs (M11 expanded set — 21 total) ──────────────
         ( canonical_name: "icon_action_use",         kind: "ui-icon", prompt: "use action glyph, hand-grip icon" ),
         ( canonical_name: "icon_action_pickup",      kind: "ui-icon", prompt: "pickup glyph, downward arrow with item" ),
         ( canonical_name: "icon_action_open",        kind: "ui-icon", prompt: "open glyph, door with arrow" ),
@@ -38,6 +38,17 @@
         ( canonical_name: "icon_action_board",       kind: "ui-icon", prompt: "board glyph, person-enters-vehicle" ),
         ( canonical_name: "icon_action_drop",        kind: "ui-icon", prompt: "drop glyph, item with down arrow" ),
         ( canonical_name: "icon_action_signal",      kind: "ui-icon", prompt: "signal glyph, antenna with rings" ),
+        ( canonical_name: "icon_action_move",        kind: "ui-icon", prompt: "move glyph, 4-direction arrows" ),
+        ( canonical_name: "icon_action_aim",         kind: "ui-icon", prompt: "aim glyph, crosshair" ),
+        ( canonical_name: "icon_action_fire",        kind: "ui-icon", prompt: "fire glyph, muzzle-flash with bullet" ),
+        ( canonical_name: "icon_action_reload",      kind: "ui-icon", prompt: "reload glyph, magazine with circular arrow" ),
+        ( canonical_name: "icon_action_swap",        kind: "ui-icon", prompt: "swap glyph, two arrows" ),
+        ( canonical_name: "icon_action_jet",         kind: "ui-icon", prompt: "jetpack glyph, jet-burst" ),
+        ( canonical_name: "icon_action_heal",        kind: "ui-icon", prompt: "heal glyph, medkit plus-sign" ),
+        ( canonical_name: "icon_action_order",       kind: "ui-icon", prompt: "order glyph, megaphone with soundwaves" ),
+        ( canonical_name: "icon_action_tag",         kind: "ui-icon", prompt: "tag glyph, label" ),
+        ( canonical_name: "icon_action_mark",        kind: "ui-icon", prompt: "mark glyph, diamond with center dot" ),
+        ( canonical_name: "icon_action_pause",       kind: "ui-icon", prompt: "pause glyph, two vertical bars" ),
         // ─── ACC-A glyphs (8) ────────────────────────────────────────────────
         ( canonical_name: "icon_acca_high_contrast", kind: "ui-icon", prompt: "ACC-A high contrast glyph, sun-and-moon" ),
         ( canonical_name: "icon_acca_text_scale",    kind: "ui-icon", prompt: "ACC-A text scale glyph, AA letters" ),

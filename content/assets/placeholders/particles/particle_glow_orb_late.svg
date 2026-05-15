@@ -1,3 +1,3 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 96" width="96" height="96" shape-rendering="crispEdges">
-<circle cx="48.00" cy="48.00" r="7.20" fill="#ff8888"/><circle cx="48.00" cy="48.00" r="4.32" fill="#ff5b62"/><circle cx="48.00" cy="48.00" r="2.40" fill="#d92434"/></svg>
+<circle cx="48.00" cy="48.00" r="8.64" fill="#ff8888" stroke="#d92434" stroke-width="0.30"/><circle cx="48.00" cy="48.00" r="5.28" fill="#ff9f9f"/><circle cx="48.00" cy="48.00" r="2.40" fill="#FFFFFF"/></svg>
