@@ -877,6 +877,86 @@ fn invoke_composer(python_bin: &str, script: &Path, run_dir: &Path) -> Result<Va
 
 /// - `enemy.<actor_id>.state` etc.
 fn lookup(value: &Value, key: &str) -> Option<Value> {
+    // **M9** § cf-e2e --expect operators — six new keys per spec
+    // § "Crates / modules touched / cf-e2e":
+    //   mission.reactor_alive          (bool — true while first reactor's hp > 0)
+    //   mission.reactor_hp_pct         (number — first reactor's hp_percent)
+    //   mission.physics_kill_count     (count of combat.projectile_hit events that
+    //                                   resulted in actor.actor_status_changed → dead)
+    //   terrain.terrain_carved.count   (already handled by event-stream resolver)
+    //   mission.timer_remaining_ticks  (already handled below)
+    //   mission.reactor_destroyed.count (already handled by event-stream resolver)
+    match key {
+        "mission.reactor_alive" => {
+            // First reactor in the snapshot. `reactors` is the run-bundle's
+            // serialized ReactorWorld; absence means no reactor → not alive.
+            if let Some(reactors) = value.get("reactors").and_then(|r| r.as_array()) {
+                let alive = reactors
+                    .iter()
+                    .next()
+                    .and_then(|r| r.get("hp").and_then(|h| h.as_f64()))
+                    .map(|hp| hp > 0.0)
+                    .unwrap_or(false);
+                return Some(Value::Bool(alive));
+            }
+            // Fall back to the mission state's `reactors_destroyed` flag.
+            if let Some(d) = value
+                .get("mission")
+                .and_then(|m| m.get("reactors_destroyed"))
+                .and_then(|d| d.as_object())
+            {
+                let any_alive = d.values().any(|v| !v.as_bool().unwrap_or(false));
+                return Some(Value::Bool(any_alive));
+            }
+            None
+        }
+        "mission.reactor_hp_pct" => value
+            .get("reactors")
+            .and_then(|r| r.as_array())
+            .and_then(|arr| arr.iter().next())
+            .and_then(|reactor| {
+                let hp = reactor.get("hp").and_then(|h| h.as_f64())?;
+                let max_hp = reactor.get("max_hp").and_then(|h| h.as_f64())?;
+                if max_hp <= 0.0 {
+                    Some(Value::from(0.0))
+                } else {
+                    Some(Value::from((hp / max_hp).clamp(0.0, 1.0)))
+                }
+            }),
+        "mission.physics_kill_count" => {
+            // Count actor.actor_status_changed events where new_status=dead
+            // and cause includes projectile_hit (physics damage path).
+            let events = value.get("events").and_then(|e| e.as_array())?;
+            let count = events
+                .iter()
+                .filter(|e| {
+                    let cat = e.get("category").and_then(|c| c.as_str()).unwrap_or("");
+                    let typ = e.get("event_type").and_then(|c| c.as_str()).unwrap_or("");
+                    let payload = e.get("payload");
+                    let new_status = payload
+                        .and_then(|p| p.get("new_status"))
+                        .and_then(|s| s.as_str())
+                        .unwrap_or("");
+                    let cause = payload
+                        .and_then(|p| p.get("cause"))
+                        .and_then(|s| s.as_str())
+                        .unwrap_or("");
+                    cat == "actor"
+                        && typ == "actor_status_changed"
+                        && (new_status == "dead" || new_status == "Dead" || new_status == "DEAD")
+                        && cause.contains("projectile")
+                })
+                .count();
+            Some(Value::from(count as u64))
+        }
+        _ => None,
+    }
+    .or_else(|| lookup_inner(value, key))
+}
+
+/// Inner walker; isolated so the M9 shortcut keys above don't need to call
+/// the full event-stream resolver.
+fn lookup_inner(value: &Value, key: &str) -> Option<Value> {
     // **M1 R2 / Gap G3**: structured event-stream operators. These are useful
     // for cfctl scripts that need to assert "K events of type X with field
     // Y = Z fired during this run." The grammar:
