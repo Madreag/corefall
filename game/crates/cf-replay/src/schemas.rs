@@ -273,6 +273,7 @@ const SCHEMA_AI_FRIENDLY_FIRE_AVOIDANCE: &str = include_str!("../schemas/event/a
 const SCHEMA_AI_HIGH_GROUND_PREFERENCE_APPLIED: &str =
     include_str!("../schemas/event/ai_high_ground_preference_applied.json");
 const SCHEMA_MISSION_PHASE_CHANGED: &str = include_str!("../schemas/event/mission_phase_changed.json");
+const SCHEMA_MISSION_DIRECTOR_PHASE_CHANGE: &str = include_str!("../schemas/event/mission_director_phase_change.json");
 const SCHEMA_MISSION_OBJECTIVE_BRANCHED: &str = include_str!("../schemas/event/mission_objective_branched.json");
 const SCHEMA_MISSION_OPTIONAL_OFFERED: &str = include_str!("../schemas/event/mission_optional_offered.json");
 const SCHEMA_MISSION_REINFORCEMENT_WAVE_SPAWNED: &str =
@@ -574,6 +575,10 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("ai", "high_ground_preference_applied") => Some(SCHEMA_AI_HIGH_GROUND_PREFERENCE_APPLIED),
         // **M7**: mission director v0.5 event surface.
         ("mission", "phase_changed") => Some(SCHEMA_MISSION_PHASE_CHANGED),
+        // **M9**: 7-phase reactor-defense pacer surfaces a distinct event so
+        // M10 viewer + M11 HUD can render dwell-aware phase strips without
+        // mixing the M7 4-phase stream.
+        ("mission", "director_phase_change") => Some(SCHEMA_MISSION_DIRECTOR_PHASE_CHANGE),
         ("mission", "objective_branched") => Some(SCHEMA_MISSION_OBJECTIVE_BRANCHED),
         ("mission", "optional_offered") => Some(SCHEMA_MISSION_OPTIONAL_OFFERED),
         ("mission", "reinforcement_wave_spawned") => Some(SCHEMA_MISSION_REINFORCEMENT_WAVE_SPAWNED),

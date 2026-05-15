@@ -2,12 +2,38 @@
   "$schema": "http://json-schema.org/draft-2020-12/schema",
   "$id": "cf-replay/event/mission_phase_changed.v1",
   "title": "mission.phase_changed",
-  "description": "Emitted when the mission director v0.5 advances its 4-phase pacing (Setup / Buildup / Climax / Debrief).",
+  "description": "Emitted when the mission director advances its pacing. M7 4-phase (setup/buildup/climax/debrief) plus M9 7-phase additions (prep/launch/build_up/sustain_peak/relax) for the reactor-defense scenario.",
   "type": "object",
   "required": ["from", "to", "tick"],
   "properties": {
-    "from": { "type": "string", "enum": ["setup", "buildup", "climax", "debrief"] },
-    "to": { "type": "string", "enum": ["setup", "buildup", "climax", "debrief"] },
+    "from": {
+      "type": "string",
+      "enum": [
+        "setup",
+        "buildup",
+        "climax",
+        "debrief",
+        "prep",
+        "launch",
+        "build_up",
+        "sustain_peak",
+        "relax"
+      ]
+    },
+    "to": {
+      "type": "string",
+      "enum": [
+        "setup",
+        "buildup",
+        "climax",
+        "debrief",
+        "prep",
+        "launch",
+        "build_up",
+        "sustain_peak",
+        "relax"
+      ]
+    },
     "tick": { "type": "integer", "minimum": 0 },
     "cause": { "type": "string" }
   }

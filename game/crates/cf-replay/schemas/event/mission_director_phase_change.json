@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/mission_director_phase_change.v1",
+  "title": "mission.director_phase_change",
+  "description": "M9: emitted at every M9 7-phase mission director transition (setup → prep → launch → build_up → sustain_peak → relax → debrief). Distinct from the legacy mission.phase_changed event so M10's viewer + M11's HUD can subscribe to the M9 pacer without parsing the M7 4-phase stream. Carries from/to/cause + the duration_seconds of the just-completed phase so dwell-aware UI can render time-in-phase strips.",
+  "type": "object",
+  "required": ["from", "to", "tick", "duration_seconds"],
+  "properties": {
+    "from": {
+      "type": "string",
+      "enum": [
+        "setup",
+        "buildup",
+        "climax",
+        "debrief",
+        "prep",
+        "launch",
+        "build_up",
+        "sustain_peak",
+        "relax"
+      ]
+    },
+    "to": {
+      "type": "string",
+      "enum": [
+        "setup",
+        "buildup",
+        "climax",
+        "debrief",
+        "prep",
+        "launch",
+        "build_up",
+        "sustain_peak",
+        "relax"
+      ]
+    },
+    "tick": { "type": "integer", "minimum": 0 },
+    "cause": { "type": "string" },
+    "duration_seconds": { "type": "number", "minimum": 0.0 },
+    "phases_completed": {
+      "type": "array",
+      "items": { "type": "string" }
+    }
+  }
+}
