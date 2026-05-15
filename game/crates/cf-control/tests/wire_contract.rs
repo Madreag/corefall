@@ -33,8 +33,8 @@ fn m8a_ecs_components_exist() {
     // The components are zero-sized marker types at M8A; M9+ wraps them
     // with real Bevy components in cf-app.
     use cf_control::components::{
-        ActorWorldComponent, ChunkedTerrainComponent, MissionComponent, ProjectilePoolComponent,
-        ReactorWorldComponent, RecorderComponent,
+        ActorWorldComponent, ChunkedTerrainComponent, MissionComponent, ProjectilePoolComponent, ReactorWorldComponent,
+        RecorderComponent,
     };
     let _aw = ActorWorldComponent;
     let _ct = ChunkedTerrainComponent;
