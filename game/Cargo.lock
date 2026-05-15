@@ -1502,6 +1502,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "cf-camera"
+version = "0.0.1"
+dependencies = [
+ "serde",
+ "tracing",
+]
+
+[[package]]
 name = "cf-capture"
 version = "0.0.1"
 dependencies = [
@@ -1558,6 +1566,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "cf-debug"
+version = "0.0.1"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tracing",
+]
+
+[[package]]
 name = "cf-e2e"
 version = "0.0.1"
 dependencies = [
@@ -1607,6 +1624,24 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "cf-killcam"
+version = "0.0.1"
+dependencies = [
+ "serde",
+ "tracing",
+]
+
+[[package]]
+name = "cf-localization"
+version = "0.0.1"
+dependencies = [
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tracing",
 ]
 
 [[package]]
@@ -1665,6 +1700,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "cf-photo"
+version = "0.0.1"
+dependencies = [
+ "image",
+ "serde",
+ "thiserror 2.0.18",
+ "tracing",
+]
+
+[[package]]
 name = "cf-physics"
 version = "0.0.1"
 dependencies = [
@@ -1709,6 +1754,14 @@ dependencies = [
  "thiserror 2.0.18",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "cf-replay-scrub"
+version = "0.0.1"
+dependencies = [
+ "serde",
+ "tracing",
 ]
 
 [[package]]
@@ -1787,6 +1840,16 @@ version = "0.0.1"
 dependencies = [
  "cf-actor",
  "serde",
+ "tracing",
+]
+
+[[package]]
+name = "cf-squad-ui"
+version = "0.0.1"
+dependencies = [
+ "cf-priority",
+ "serde",
+ "serde_json",
  "tracing",
 ]
 
