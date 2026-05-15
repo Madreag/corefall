@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ai_faction_allegiance_changed.v1",
+  "title": "ai.faction_allegiance_changed",
+  "description": "Emitted when the FactionRelationships matrix entry between two factions shifts (friendly fire -30, saving NPC +20, declared war below -50). Spec § Faction relationship dynamic shift.",
+  "type": "object",
+  "required": ["a", "b", "delta", "new_value", "cause"],
+  "properties": {
+    "a": { "type": "string" },
+    "b": { "type": "string" },
+    "delta": { "type": "integer" },
+    "new_value": { "type": "integer", "minimum": -100, "maximum": 100 },
+    "cause": { "type": "string" }
+  }
+}

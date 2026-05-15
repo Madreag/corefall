@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ai_quick_preset_applied.v1",
+  "title": "ai.quick_preset_applied",
+  "description": "Emitted when an actor's PriorityTable receives one of the 5 spec-named quick presets via act.player.apply_quick_preset. Spec § Smart commandable AI — Quick presets.",
+  "type": "object",
+  "required": ["actor_id", "preset_id"],
+  "properties": {
+    "actor_id": { "type": "integer", "minimum": 0 },
+    "preset_id": { "type": "string", "enum": ["attack", "defend", "overwatch", "rescue", "salvage"] }
+  }
+}

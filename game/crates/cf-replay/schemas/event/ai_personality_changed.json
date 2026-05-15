@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ai_personality_changed.v1",
+  "title": "ai.personality_changed",
+  "description": "Emitted when an actor's PersonalityProfile traits change (initial spawn, modifier swap, or M25 retention loop). Spec § Personality + traits.",
+  "type": "object",
+  "required": ["actor_id", "traits", "cause"],
+  "properties": {
+    "actor_id": { "type": "integer", "minimum": 0 },
+    "traits": { "type": "array" },
+    "modifier": { "type": ["string", "null"], "enum": ["neutral", "aggressive", "cautious", "loyal", "lone_wolf", null] },
+    "cause": { "type": "string" }
+  }
+}

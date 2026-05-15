@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ai_priority_table_changed.v1",
+  "title": "ai.priority_table_changed",
+  "description": "Emitted when a single task weight in an actor's PriorityTable changes via act.player.set_priority. Spec § Smart commandable AI — Per-task override.",
+  "type": "object",
+  "required": ["actor_id", "task", "old_weight", "new_weight"],
+  "properties": {
+    "actor_id": { "type": "integer", "minimum": 0 },
+    "task": { "type": "string" },
+    "old_weight": { "type": "integer", "minimum": 0, "maximum": 9 },
+    "new_weight": { "type": "integer", "minimum": 0, "maximum": 9 }
+  }
+}

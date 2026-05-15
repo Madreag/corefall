@@ -275,6 +275,20 @@ const SCHEMA_BOSS_PHASE_CHANGED: &str = include_str!("../schemas/event/boss_phas
 const SCHEMA_BOSS_SPECIAL_ABILITY_TRIGGERED: &str =
     include_str!("../schemas/event/boss_special_ability_triggered.json");
 
+// **M7-B**: commandability + chatter + personality + faction event surface.
+// Spec § Smart commandable AI — per-task override + autonomy mode + role
+// templates + quick presets + chatter scaffold + personality + mood/stress
+// + faction matrix.
+const SCHEMA_AI_PRIORITY_TABLE_CHANGED: &str = include_str!("../schemas/event/ai_priority_table_changed.json");
+const SCHEMA_AI_AUTONOMY_MODE_CHANGED: &str = include_str!("../schemas/event/ai_autonomy_mode_changed.json");
+const SCHEMA_AI_ROLE_TEMPLATE_APPLIED: &str = include_str!("../schemas/event/ai_role_template_applied.json");
+const SCHEMA_AI_QUICK_PRESET_APPLIED: &str = include_str!("../schemas/event/ai_quick_preset_applied.json");
+const SCHEMA_AI_CHATTER_EMITTED: &str = include_str!("../schemas/event/ai_chatter_emitted.json");
+const SCHEMA_AI_PERSONALITY_CHANGED: &str = include_str!("../schemas/event/ai_personality_changed.json");
+const SCHEMA_AI_MOOD_CHANGED: &str = include_str!("../schemas/event/ai_mood_changed.json");
+const SCHEMA_AI_STRESS_THRESHOLD_CROSSED: &str = include_str!("../schemas/event/ai_stress_threshold_crossed.json");
+const SCHEMA_AI_FACTION_ALLEGIANCE_CHANGED: &str = include_str!("../schemas/event/ai_faction_allegiance_changed.json");
+
 /// Look up the schema source by `(category, event_type)`. Returns `None` if
 /// no schema exists for this pair (callers treat as "no validation
 /// constraint"; the recorder envelope itself is checked by the bundle
@@ -503,6 +517,16 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("mission", "reinforcement_wave_spawned") => Some(SCHEMA_MISSION_REINFORCEMENT_WAVE_SPAWNED),
         ("boss", "phase_changed") => Some(SCHEMA_BOSS_PHASE_CHANGED),
         ("boss", "special_ability_triggered") => Some(SCHEMA_BOSS_SPECIAL_ABILITY_TRIGGERED),
+        // **M7-B**: commandability + chatter + personality + faction event surface.
+        ("ai", "priority_table_changed") => Some(SCHEMA_AI_PRIORITY_TABLE_CHANGED),
+        ("ai", "autonomy_mode_changed") => Some(SCHEMA_AI_AUTONOMY_MODE_CHANGED),
+        ("ai", "role_template_applied") => Some(SCHEMA_AI_ROLE_TEMPLATE_APPLIED),
+        ("ai", "quick_preset_applied") => Some(SCHEMA_AI_QUICK_PRESET_APPLIED),
+        ("ai", "chatter_emitted") => Some(SCHEMA_AI_CHATTER_EMITTED),
+        ("ai", "personality_changed") => Some(SCHEMA_AI_PERSONALITY_CHANGED),
+        ("ai", "mood_changed") => Some(SCHEMA_AI_MOOD_CHANGED),
+        ("ai", "stress_threshold_crossed") => Some(SCHEMA_AI_STRESS_THRESHOLD_CROSSED),
+        ("ai", "faction_allegiance_changed") => Some(SCHEMA_AI_FACTION_ALLEGIANCE_CHANGED),
         _ => None,
     }
 }

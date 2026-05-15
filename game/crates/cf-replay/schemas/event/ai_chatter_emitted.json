@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ai_chatter_emitted.v1",
+  "title": "ai.chatter_emitted",
+  "description": "Emitted when a bot speaks via the chatter scaffold (M7-B placeholder TTS; M37 swaps in real voice). Carries text + voice_id + remaining cooldown so the M11 HUD caption ticker can render distinct chatter from event ticker. Spec § Chatter scaffold.",
+  "type": "object",
+  "required": ["actor_id", "category", "text", "voice_id"],
+  "properties": {
+    "actor_id": { "type": "integer", "minimum": 0 },
+    "category": {
+      "type": "string",
+      "enum": [
+        "contact",
+        "engaging",
+        "reloading",
+        "ally_down",
+        "triage",
+        "repair",
+        "path_blocked",
+        "doctrine",
+        "tag_ack",
+        "order_ack",
+        "order_refused",
+        "hazard_spotted"
+      ]
+    },
+    "text": { "type": "string" },
+    "voice_id": { "type": "string" },
+    "cooldown_remaining_seconds": { "type": "number", "minimum": 0 }
+  }
+}

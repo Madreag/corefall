@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ai_mood_changed.v1",
+  "title": "ai.mood_changed",
+  "description": "Emitted when an actor's mood accumulator shifts (ally killed -15, kill landed +5, mission progress +5, wounded -10). Spec § Mood/stress accumulator.",
+  "type": "object",
+  "required": ["actor_id", "delta", "new_mood", "cause"],
+  "properties": {
+    "actor_id": { "type": "integer", "minimum": 0 },
+    "delta": { "type": "number" },
+    "new_mood": { "type": "number" },
+    "cause": { "type": "string" }
+  }
+}
