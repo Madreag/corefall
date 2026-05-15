@@ -346,6 +346,16 @@ const SCHEMA_TERRAIN_MATERIAL_STATE_CHANGED: &str =
 const SCHEMA_TERRAIN_PIXEL_REMOVED: &str = include_str!("../schemas/event/terrain_pixel_removed.json");
 const SCHEMA_TERRAIN_CASCADE_TRIGGERED: &str = include_str!("../schemas/event/terrain_cascade_triggered.json");
 const SCHEMA_TERRAIN_DEBRIS_SPAWNED: &str = include_str!("../schemas/event/terrain_debris_spawned.json");
+// **M9** (audit round-3 fix gaps 1+2) § Reactive guard targeting + path
+// reaction: utility-scored target selection + per-guard path invalidation.
+// Producers in `cf-control/src/engine.rs` emit `ai.target_scored` on every
+// `ai.target_acquired` (utility scorer ranks player + non-destroyed reactors)
+// and `ai.path_invalidated` per affected guard when `terrain.terrain_dirty_region_batch`
+// intersects the planned pursuit line. Distinct from terrain.path_invalidated
+// (which is the generic dirty-region flush) — these AI-category schemas carry
+// the per-guard breakdown M10 viewer + death-recap consume.
+const SCHEMA_AI_TARGET_SCORED: &str = include_str!("../schemas/event/ai_target_scored.json");
+const SCHEMA_AI_PATH_INVALIDATED: &str = include_str!("../schemas/event/ai_path_invalidated.json");
 
 /// Look up the schema source by `(category, event_type)`. Returns `None` if
 /// no schema exists for this pair (callers treat as "no validation
@@ -633,6 +643,11 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("terrain", "pixel_removed") => Some(SCHEMA_TERRAIN_PIXEL_REMOVED),
         ("terrain", "cascade_triggered") => Some(SCHEMA_TERRAIN_CASCADE_TRIGGERED),
         ("terrain", "debris_spawned") => Some(SCHEMA_TERRAIN_DEBRIS_SPAWNED),
+        // **M9** (audit round-3 fix gaps 1+2) — ai.target_scored +
+        // ai.path_invalidated for the utility-scored target selection +
+        // per-guard path reaction surface.
+        ("ai", "target_scored") => Some(SCHEMA_AI_TARGET_SCORED),
+        ("ai", "path_invalidated") => Some(SCHEMA_AI_PATH_INVALIDATED),
         _ => None,
     }
 }
@@ -1161,6 +1176,10 @@ mod tests {
             ("terrain", "pixel_removed"),
             ("terrain", "cascade_triggered"),
             ("terrain", "debris_spawned"),
+            // M9 audit round-3 fix gaps 1+2 — utility-scored target selection
+            // and per-guard path invalidation.
+            ("ai", "target_scored"),
+            ("ai", "path_invalidated"),
         ] {
             let raw = event_schema_for(cat, ty).unwrap_or_else(|| panic!("no schema for {cat}.{ty}"));
             let _parsed_value: serde_json::Value =
@@ -1763,6 +1782,94 @@ mod tests {
         assert!(err.contains("zone"), "got: {err}");
     }
 
+    /// **M9** (audit round-3 fix gap 1) — ai.target_scored validates a
+    /// representative utility-scored target payload (one player candidate +
+    /// one reactor candidate, player chosen, full weights breakdown).
+    #[test]
+    fn m9_ai_target_scored_validates_happy_path() {
+        let payload = json!({
+            "actor": 11,
+            "target_actor": 7,
+            "chosen_id": "7",
+            "score": 1.42,
+            "candidates": [
+                {
+                    "id": "7",
+                    "kind": "player",
+                    "actor_id": 7,
+                    "distance": 30.0,
+                    "has_los": true,
+                    "is_player": true,
+                    "is_high_value_static": false,
+                    "score": 1.42,
+                    "reason": "player_aggressive_los",
+                },
+                {
+                    "id": "reactor_alpha",
+                    "kind": "reactor",
+                    "reactor_id": "reactor_alpha",
+                    "distance": 80.0,
+                    "has_los": true,
+                    "is_player": false,
+                    "is_high_value_static": true,
+                    "score": 1.10,
+                    "reason": "defensive_value",
+                },
+            ],
+            "rationale": "player_aggressive: player_aggressive_los",
+            "weights": {
+                "proximity": 1.0,
+                "los": 1.0,
+                "threat": 0.7,
+                "value": 0.5,
+            },
+        });
+        validate_event_payload("ai", "target_scored", &payload).expect("ai.target_scored valid");
+    }
+
+    /// **M9** (audit round-3 fix gap 1) — missing required field is rejected.
+    #[test]
+    fn m9_ai_target_scored_requires_chosen_id() {
+        let payload = json!({
+            "actor": 11,
+            "target_actor": 7,
+            "candidates": [],
+            "rationale": "no_candidates",
+        });
+        let err = validate_event_payload("ai", "target_scored", &payload).unwrap_err();
+        assert!(err.contains("chosen_id"), "got: {err}");
+    }
+
+    /// **M9** (audit round-3 fix gap 2) — ai.path_invalidated validates a
+    /// representative payload (guard's planned pursuit line crosses a
+    /// freshly-carved bbox).
+    #[test]
+    fn m9_ai_path_invalidated_validates_happy_path() {
+        let payload = json!({
+            "actor": 9,
+            "actor_id": 9,
+            "bbox": { "min": [10.0, 20.0], "max": [40.0, 50.0] },
+            "old_path": [[5.0, 5.0], [60.0, 60.0]],
+            "reason": "terrain_dirty",
+            "fraction_of_path_dirty": 0.375,
+        });
+        validate_event_payload("ai", "path_invalidated", &payload).expect("ai.path_invalidated valid");
+    }
+
+    /// **M9** (audit round-3 fix gap 2) — missing required `bbox` is rejected.
+    #[test]
+    fn m9_ai_path_invalidated_requires_bbox() {
+        let payload = json!({
+            "actor": 9,
+            "actor_id": 9,
+            "old_path": [[5.0, 5.0]],
+            "reason": "terrain_dirty",
+            "fraction_of_path_dirty": 0.1,
+        });
+        let err = validate_event_payload("ai", "path_invalidated", &payload).unwrap_err();
+        assert!(err.contains("bbox"), "got: {err}");
+    }
+
     /// **M5**: every registered M5 schema declares `schema_version: "0.1"` as
     /// a const property — proves the M5 conformance contract per the spec's
     /// "each schema declares schema_version=\"0.1\" matching the M4 locked
@@ -1847,6 +1954,10 @@ mod tests {
             ("audio", "event_requested"),
             ("combat", "melee_hit_mo"),
             ("combat", "explosive_hit_mo"),
+            // M9 audit round-3 fix gaps 1+2 — both new AI schemas use the
+            // canonical M4 envelope shape per the M5-locked contract.
+            ("ai", "target_scored"),
+            ("ai", "path_invalidated"),
         ];
         for (cat, ty) in pairs {
             let raw = event_schema_for(cat, ty).unwrap_or_else(|| panic!("no schema for {cat}.{ty}"));

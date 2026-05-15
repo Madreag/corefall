@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/ai.target_scored.v0.1",
+  "title": "ai.target_scored",
+  "description": "M9 § Reactive guard targeting + path reaction (DR-008 utility scoring) — emitted whenever a guard's utility scorer re-ranks the candidate set (player + non-destroyed reactors) and chooses a target. Carries the full candidates breakdown so M10 viewer + death-recap can render 'player scored higher than reactor' (or vice versa). Pairs with ai.target_acquired as the immediate parent_event_id. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "ai" },
+    "event_type": { "const": "target_scored" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor": { "type": "integer", "minimum": 0 },
+        "target_actor": { "type": "integer", "minimum": 0 },
+        "chosen_id": { "type": "string" },
+        "score": { "type": "number" },
+        "candidates": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": true,
+            "properties": {
+              "id": { "type": "string" },
+              "score": { "type": "number" },
+              "distance": { "type": "number", "minimum": 0.0 },
+              "has_los": { "type": "boolean" },
+              "is_player": { "type": "boolean" },
+              "is_high_value_static": { "type": "boolean" },
+              "reason": { "type": "string" }
+            },
+            "required": ["id", "score", "distance", "has_los", "is_player", "is_high_value_static", "reason"]
+          }
+        },
+        "rationale": { "type": "string" },
+        "weights": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "proximity": { "type": "number" },
+            "los": { "type": "number" },
+            "threat": { "type": "number" },
+            "value": { "type": "number" }
+          }
+        },
+        "parent_event_id": { "type": ["string", "null"] }
+      },
+      "required": ["candidates", "chosen_id", "target_actor", "rationale"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}
