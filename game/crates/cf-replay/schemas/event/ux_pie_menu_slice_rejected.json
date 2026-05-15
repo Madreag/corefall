@@ -1,0 +1,37 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ux_pie_menu_slice_rejected.v1",
+  "title": "ux.pie_menu_slice_rejected",
+  "description": "Emitted when the player picks a slice that is disabled in the current context (e.g. ThrowGrenade with no grenade equipped, DeployBipod while standing, Pickup with arm destroyed). Carries the slice + the reason label per spec § Pie menu — Per-slice reason labels for disabled actions.",
+  "type": "object",
+  "required": ["slot", "slice", "reason"],
+  "properties": {
+    "slot": { "type": "integer", "minimum": 0, "maximum": 7 },
+    "slice": {
+      "type": "string",
+      "enum": [
+        "pickup",
+        "drop",
+        "switch_weapon",
+        "throw_grenade",
+        "melee_bash",
+        "deploy_bipod",
+        "signal_squad",
+        "use_medkit"
+      ]
+    },
+    "reason": {
+      "type": "string",
+      "enum": [
+        "no_arm",
+        "not_holding_anything",
+        "needs_digger",
+        "out_of_range",
+        "no_grenade_equipped",
+        "standing"
+      ]
+    },
+    "target_kind": { "type": "string", "enum": ["void", "nearest_actor", "door", "item"] },
+    "target_id": { "type": ["integer", "null"], "minimum": 0 }
+  }
+}

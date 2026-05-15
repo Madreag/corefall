@@ -762,6 +762,33 @@ pub enum ControlCommand {
         actor_id: u64,
         source: IntentSource,
     },
+    /// **M8**: open the T-key 8-slice pie menu with target context
+    /// (`void` / `nearest_actor` / `door` / `item`). Emits
+    /// `ux.pie_menu_opened`. Slows sim to 20% in single-player; 100% in
+    /// multiplayer.
+    ActPlayerPieMenuOpen {
+        target_kind: String,
+        target_id: Option<u64>,
+        multiplayer: bool,
+        source: IntentSource,
+    },
+    /// **M8**: select a 0..=7 slot on the open pie menu. Emits
+    /// `ux.pie_menu_slice_chosen` on a valid pick, OR
+    /// `ux.pie_menu_slice_rejected { slice, reason }` when the slice is
+    /// disabled in the current context. `reason` is optional and
+    /// supplied by the caller (cf-app keyboard layer) when it has
+    /// pre-validated the slice; otherwise the dispatcher reports
+    /// `ok=true` (valid pick) by default.
+    ActPlayerPieMenuSelect {
+        slot: u8,
+        reason: Option<String>,
+        source: IntentSource,
+    },
+    /// **M8**: close the pie menu (idempotent). Emits
+    /// `ux.pie_menu_closed` with the open-duration in ticks.
+    ActPlayerPieMenuClose {
+        source: IntentSource,
+    },
     SettingsSet {
         changes: Box<SettingsPatch>,
     },
@@ -2175,6 +2202,81 @@ async fn process_request<E: EngineHandle>(
             let result = engine
                 .dispatch(ControlCommand::ActPlayerQueryWhy {
                     actor_id: p.actor_id,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.pie_menu_open" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                #[serde(default = "default_pie_menu_target_kind")]
+                target_kind: String,
+                #[serde(default)]
+                target_id: Option<u64>,
+                #[serde(default)]
+                multiplayer: bool,
+            }
+            fn default_pie_menu_target_kind() -> String {
+                "void".to_string()
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            if cf_squad_ui::PieMenuTarget::from_str(&p.target_kind, p.target_id).is_none() {
+                return Some(invalid_param_reason(request.id, "unknown_pie_menu_target_kind"));
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerPieMenuOpen {
+                    target_kind: p.target_kind,
+                    target_id: p.target_id,
+                    multiplayer: p.multiplayer,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.pie_menu_select" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                slot: u8,
+                #[serde(default)]
+                reason: Option<String>,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            if (p.slot as usize) >= cf_squad_ui::PIE_MENU_SLICES_LEN {
+                return Some(invalid_param_reason(request.id, "invalid_slot"));
+            }
+            if let Some(r) = &p.reason {
+                if cf_squad_ui::PieMenuReason::from_str(r).is_none() {
+                    return Some(invalid_param_reason(request.id, "unknown_pie_menu_reason"));
+                }
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerPieMenuSelect {
+                    slot: p.slot,
+                    reason: p.reason,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.pie_menu_close" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerPieMenuClose {
                     source: IntentSource::Cfctl,
                 })
                 .await;

@@ -868,6 +868,12 @@ pub(crate) struct EngineMutable {
     /// **M8**: MMB tag state — tagged target ids + per-tag TTL + +0.5
     /// utility weight bonus.
     pub(crate) tag_state: cf_squad_ui::TagState,
+    /// **M8**: T-key pie menu state — 8-slice radial action wheel for
+    /// the player's own 8 actor actions (Pickup / Drop / SwitchWeapon /
+    /// ThrowGrenade / MeleeBash / DeployBipod / SignalSquad / UseMedkit)
+    /// with target context + 6 disabled-slice reason labels + sim
+    /// slowdown gate (single-player 20%, multiplayer 100%).
+    pub(crate) pie_menu: cf_squad_ui::PieMenuState,
     /// **M8**: en localization table loaded once from the bundled
     /// `content/localization/en.json` baseline. Re-loaded if `Settings.
     /// language` changes (only `en` ships at M8).
@@ -1282,6 +1288,7 @@ impl M0Engine {
                 tactical_overlay: cf_squad_ui::TacticalOverlayState::default(),
                 plans: BTreeMap::new(),
                 tag_state: cf_squad_ui::TagState::default(),
+                pie_menu: cf_squad_ui::PieMenuState::closed(),
                 localization: cf_localization::LocalizationTable::english_baseline()
                     .unwrap_or_else(|_| cf_localization::LocalizationTable::new("en")),
             }),
@@ -13787,6 +13794,18 @@ impl EngineHandle for M0Engine {
             }
             ControlCommand::ActPlayerQueryWhy { actor_id, source } => {
                 self.dispatch_query_why(actor_id, source, tick, sim_time_ms, state)
+            }
+            ControlCommand::ActPlayerPieMenuOpen {
+                target_kind,
+                target_id,
+                multiplayer,
+                source,
+            } => self.dispatch_pie_menu_open(target_kind, target_id, multiplayer, source, tick, sim_time_ms, state),
+            ControlCommand::ActPlayerPieMenuSelect { slot, reason, source } => {
+                self.dispatch_pie_menu_select(slot, reason, source, tick, sim_time_ms, state)
+            }
+            ControlCommand::ActPlayerPieMenuClose { source } => {
+                self.dispatch_pie_menu_close(source, tick, sim_time_ms, state)
             }
         }
     }

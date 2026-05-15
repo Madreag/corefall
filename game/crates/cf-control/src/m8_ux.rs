@@ -21,8 +21,9 @@ use cf_killcam::{start_slow_mo_kill_cam, KillcamPhase};
 use cf_replay_scrub::WINDOW_SECONDS;
 use cf_sim_core::Tick;
 use cf_squad_ui::{
-    context_wheel_for, ContextOrderKind, PanicCommand, PanicKind, Plan, PlanComposeError, PlanStepKind, ReticleTarget,
-    DEFAULT_TAG_TTL_TICKS, MAX_PLAN_STEPS, WHEEL_SLOTS_LEN,
+    context_wheel_for, ContextOrderKind, PanicCommand, PanicKind, PieMenuReason, PieMenuSelectError, PieMenuSlice,
+    PieMenuTarget, Plan, PlanComposeError, PlanStepKind, ReticleTarget, DEFAULT_TAG_TTL_TICKS, MAX_PLAN_STEPS,
+    PIE_MENU_SLICES_LEN, WHEEL_SLOTS_LEN,
 };
 
 use crate::engine::{EngineMutable, M0Engine};
@@ -639,6 +640,212 @@ impl M0Engine {
         let payload = json!({"actor_id": actor_id, "reason_label": label, "recent_count": recent_count});
         #[rustfmt::skip]
         let _ = self.recorder.record(tick, sim_time_ms, "ai", "reason_query_returned", payload, None);
+        CommandResult::accepted(tick.0)
+    }
+
+    /// **M8**: open the T-key 8-slice pie menu with target context per
+    /// spec § Pie menu. Slows sim to 20% in single-player; 100% in
+    /// multiplayer. Emits `ux.pie_menu_opened`.
+    pub(crate) fn dispatch_pie_menu_open(
+        &self,
+        target_kind: String,
+        target_id: Option<u64>,
+        multiplayer: bool,
+        source: IntentSource,
+        tick: Tick,
+        sim_time_ms: f64,
+        state: RwLockWriteGuard<'_, EngineMutable>,
+    ) -> CommandResult {
+        let _ = source;
+        let target = match PieMenuTarget::from_str(&target_kind, target_id) {
+            Some(t) => t,
+            None => {
+                drop(state);
+                self.record_command_rejected(tick, sim_time_ms, "act.player.pie_menu_open", "unknown_target_kind");
+                return CommandResult::rejected("unknown_target_kind", tick.0);
+            }
+        };
+        let mut state = state;
+        let opened = state.pie_menu.open(target.clone(), multiplayer, tick.0);
+        if !opened {
+            let kind = state.pie_menu.target.kind_str();
+            drop(state);
+            self.record_command_rejected(tick, sim_time_ms, "act.player.pie_menu_open", "already_open");
+            let _ = kind;
+            return CommandResult::rejected("already_open", tick.0);
+        }
+        let slowdown = state.pie_menu.slowdown_factor_pct;
+        let open_count = state.pie_menu.open_count;
+        drop(state);
+        self.record_command_accepted(
+            tick,
+            sim_time_ms,
+            "act.player.pie_menu_open",
+            json!({
+                "target_kind": target.kind_str(),
+                "target_id": target.target_id(),
+                "slowdown_factor_pct": slowdown,
+                "multiplayer": multiplayer,
+                "open_count": open_count,
+            }),
+        );
+        let payload = json!({
+            "target_kind": target.kind_str(),
+            "target_id": target.target_id(),
+            "slowdown_factor_pct": slowdown,
+            "multiplayer": multiplayer,
+            "open_count": open_count,
+            "open_tick": tick.0,
+        });
+        #[rustfmt::skip]
+        let _ = self.recorder.record(tick, sim_time_ms, "ux", "pie_menu_opened", payload, None);
+        CommandResult::accepted(tick.0)
+    }
+
+    /// **M8**: select a slot on the open pie menu. Valid slot + no
+    /// reason → `ux.pie_menu_slice_chosen`. Valid slot + supplied
+    /// `reason` → `ux.pie_menu_slice_rejected { slice, reason }`.
+    pub(crate) fn dispatch_pie_menu_select(
+        &self,
+        slot: u8,
+        reason: Option<String>,
+        source: IntentSource,
+        tick: Tick,
+        sim_time_ms: f64,
+        state: RwLockWriteGuard<'_, EngineMutable>,
+    ) -> CommandResult {
+        let _ = source;
+        if (slot as usize) >= PIE_MENU_SLICES_LEN {
+            drop(state);
+            self.record_command_rejected(tick, sim_time_ms, "act.player.pie_menu_select", "invalid_slot");
+            return CommandResult::rejected("invalid_slot", tick.0);
+        }
+        let parsed_reason: Option<PieMenuReason> = match reason.as_deref() {
+            Some(r) => match PieMenuReason::from_str(r) {
+                Some(p) => Some(p),
+                None => {
+                    drop(state);
+                    self.record_command_rejected(tick, sim_time_ms, "act.player.pie_menu_select", "unknown_reason");
+                    return CommandResult::rejected("unknown_reason", tick.0);
+                }
+            },
+            None => None,
+        };
+        let mut state = state;
+        if !state.pie_menu.open {
+            drop(state);
+            self.record_command_rejected(tick, sim_time_ms, "act.player.pie_menu_select", "menu_not_open");
+            return CommandResult::rejected("menu_not_open", tick.0);
+        }
+        let target_kind: &'static str = state.pie_menu.target.kind_str();
+        let target_id_opt: Option<u64> = state.pie_menu.target.target_id();
+        let outcome = state.pie_menu.select(slot, parsed_reason);
+        drop(state);
+        match outcome {
+            Ok(slice) => {
+                self.record_command_accepted(
+                    tick,
+                    sim_time_ms,
+                    "act.player.pie_menu_select",
+                    json!({
+                        "slot": slot,
+                        "slice": slice.as_str(),
+                        "target_kind": target_kind,
+                        "target_id": target_id_opt,
+                        "outcome": "chosen",
+                    }),
+                );
+                let payload = json!({
+                    "slot": slot,
+                    "slice": slice.as_str(),
+                    "target_kind": target_kind,
+                    "target_id": target_id_opt,
+                });
+                #[rustfmt::skip]
+                let _ = self.recorder.record(tick, sim_time_ms, "ux", "pie_menu_slice_chosen", payload, None);
+                CommandResult::accepted(tick.0)
+            }
+            Err(PieMenuSelectError::Rejected { slice, reason }) => {
+                self.record_command_accepted(
+                    tick,
+                    sim_time_ms,
+                    "act.player.pie_menu_select",
+                    json!({
+                        "slot": slot,
+                        "slice": slice.as_str(),
+                        "reason": reason.as_str(),
+                        "target_kind": target_kind,
+                        "target_id": target_id_opt,
+                        "outcome": "rejected",
+                    }),
+                );
+                let payload = json!({
+                    "slot": slot,
+                    "slice": slice.as_str(),
+                    "reason": reason.as_str(),
+                    "target_kind": target_kind,
+                    "target_id": target_id_opt,
+                });
+                #[rustfmt::skip]
+                let _ = self.recorder.record(tick, sim_time_ms, "ux", "pie_menu_slice_rejected", payload, None);
+                CommandResult::accepted(tick.0)
+            }
+            Err(PieMenuSelectError::InvalidSlot(_)) => {
+                self.record_command_rejected(tick, sim_time_ms, "act.player.pie_menu_select", "invalid_slot");
+                CommandResult::rejected("invalid_slot", tick.0)
+            }
+            Err(PieMenuSelectError::NotOpen) => {
+                self.record_command_rejected(tick, sim_time_ms, "act.player.pie_menu_select", "menu_not_open");
+                CommandResult::rejected("menu_not_open", tick.0)
+            }
+        }
+    }
+
+    /// **M8**: close the pie menu (idempotent). Emits
+    /// `ux.pie_menu_closed` with the open duration in ticks. The
+    /// `slice_chosen` field is `null` when closed without a selection.
+    pub(crate) fn dispatch_pie_menu_close(
+        &self,
+        source: IntentSource,
+        tick: Tick,
+        sim_time_ms: f64,
+        state: RwLockWriteGuard<'_, EngineMutable>,
+    ) -> CommandResult {
+        let _ = source;
+        let mut state = state;
+        if !state.pie_menu.open {
+            drop(state);
+            self.record_command_rejected(tick, sim_time_ms, "act.player.pie_menu_close", "menu_not_open");
+            return CommandResult::rejected("menu_not_open", tick.0);
+        }
+        let target_kind = state.pie_menu.target.kind_str();
+        let target_id_opt = state.pie_menu.target.target_id();
+        let opened_at = state.pie_menu.open_tick.unwrap_or(tick.0);
+        let last_slice: Option<PieMenuSlice> = state.pie_menu.slice_under_cursor.and_then(PieMenuSlice::from_slot);
+        let open_duration_ticks: u64 = tick.0.saturating_sub(opened_at);
+        let was_open = state.pie_menu.close();
+        drop(state);
+        let slice_str: Option<&'static str> = last_slice.map(PieMenuSlice::as_str);
+        self.record_command_accepted(
+            tick,
+            sim_time_ms,
+            "act.player.pie_menu_close",
+            json!({
+                "target_kind": target_kind,
+                "target_id": target_id_opt,
+                "open_duration_ticks": open_duration_ticks,
+                "slice_chosen": slice_str,
+                "was_open": was_open,
+            }),
+        );
+        let payload = json!({
+            "target_kind": target_kind,
+            "target_id": target_id_opt,
+            "open_duration_ticks": open_duration_ticks,
+            "slice_chosen": slice_str,
+        });
+        #[rustfmt::skip]
+        let _ = self.recorder.record(tick, sim_time_ms, "ux", "pie_menu_closed", payload, None);
         CommandResult::accepted(tick.0)
     }
 

@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ux_pie_menu_slice_chosen.v1",
+  "title": "ux.pie_menu_slice_chosen",
+  "description": "Emitted when the player selects a valid slice on the T-key pie menu. The slice's downstream action (Pickup, Drop, SwitchWeapon, ThrowGrenade, MeleeBash, DeployBipod, SignalSquad, UseMedkit) is dispatched separately by the engine after the menu closes.",
+  "type": "object",
+  "required": ["slot", "slice", "target_kind"],
+  "properties": {
+    "slot": { "type": "integer", "minimum": 0, "maximum": 7 },
+    "slice": {
+      "type": "string",
+      "enum": [
+        "pickup",
+        "drop",
+        "switch_weapon",
+        "throw_grenade",
+        "melee_bash",
+        "deploy_bipod",
+        "signal_squad",
+        "use_medkit"
+      ]
+    },
+    "target_kind": { "type": "string", "enum": ["void", "nearest_actor", "door", "item"] },
+    "target_id": { "type": ["integer", "null"], "minimum": 0 }
+  }
+}
