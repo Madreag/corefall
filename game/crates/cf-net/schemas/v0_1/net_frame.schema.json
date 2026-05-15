@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-net/v0.1/net_frame",
+  "title": "NetFrame v0.1",
+  "description": "M8A § Network protocol v0.1 wire frame. Locked at PROTOCOL_VERSION=1; additive-only extensions to NetPayload variants only.",
+  "type": "object",
+  "required": ["version", "seq", "timestamp_ms", "payload"],
+  "properties": {
+    "version": { "type": "integer", "const": 1 },
+    "seq": { "type": "integer", "minimum": 0 },
+    "timestamp_ms": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "required": ["kind"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "handshake", "handshake_ack", "input_command",
+            "snapshot_delta", "event_batch", "checksum_probe",
+            "ping", "pong", "disconnect"
+          ]
+        }
+      }
+    }
+  },
+  "additionalProperties": true
+}

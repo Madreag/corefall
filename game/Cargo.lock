@@ -1627,6 +1627,7 @@ dependencies = [
  "cf-actor",
  "cf-asset-ledger",
  "cf-control",
+ "cf-net",
  "cf-replay",
  "clap",
  "serde",
@@ -1696,7 +1697,12 @@ dependencies = [
 name = "cf-net"
 version = "0.0.1"
 dependencies = [
+ "blake3",
+ "cf-replay",
+ "cf-sim-core",
  "serde",
+ "serde_json",
+ "thiserror 2.0.18",
  "tracing",
 ]
 

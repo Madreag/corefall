@@ -27,6 +27,9 @@ use cf_control::{
     ControlCommand, EngineHandle, EngineState, M0Engine, M0EngineConfig,
 };
 
+mod server_mode;
+use server_mode::ServeArgs;
+
 #[derive(Debug, Parser)]
 #[command(name = "cf-headless", about = "Headless sim runner / replay verifier (M3A).")]
 struct Cli {
@@ -81,6 +84,31 @@ enum Cmd {
         #[arg(long)]
         asset_ledger_path: Option<PathBuf>,
     },
+    /// M8A § cf-net authoritative server. Runs the deterministic sim
+    /// core with no Bevy render plugin; emits a server-side run bundle
+    /// to `prototype_runs/server/<run-id>/`. Behind a feature flag at
+    /// M8A; M9+ wires the live QUIC transport.
+    Serve {
+        /// Scenario manifest path to drive the authoritative server.
+        #[arg(long)]
+        scenario: PathBuf,
+        /// Server bind address.
+        #[arg(long, default_value = "0.0.0.0")]
+        bind_addr: String,
+        /// TCP/UDP port for the server. Reference port 4040.
+        #[arg(long, default_value_t = 4040)]
+        port: u16,
+        /// Number of ticks to simulate before exiting. Useful for
+        /// determinism + integration testing.
+        #[arg(long, default_value_t = 1000)]
+        ticks: u32,
+        /// Confirm we run with no Bevy render plugin (server mode).
+        #[arg(long, default_value_t = true)]
+        no_render: bool,
+        /// Maximum LAN clients (locked at 8 for M8A acceptance criterion).
+        #[arg(long, default_value_t = 8)]
+        max_clients: u32,
+    },
 }
 
 #[derive(Debug, Clone, Copy, clap::ValueEnum)]
@@ -129,6 +157,21 @@ fn main() -> Result<()> {
                 asset_ledger_path,
             })
         }
+        Cmd::Serve {
+            scenario,
+            bind_addr,
+            port,
+            ticks,
+            no_render,
+            max_clients,
+        } => server_mode::run_serve(ServeArgs {
+            scenario,
+            bind_addr,
+            port,
+            ticks,
+            no_render,
+            max_clients,
+        }),
     }
 }
 
