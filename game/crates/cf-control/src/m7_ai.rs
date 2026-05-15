@@ -36,7 +36,8 @@ use cf_ai::{
 };
 use cf_audio::{voice_id_for_archetype, ChatterCategory, ChatterCooldownTable, ChatterEmittedEvent, EmissionInfo};
 use cf_mission::{
-    BossPhaseChangedEvent, BossSpecialAbilityEvent, BossState, PhaseChangedEvent, PhaseState, ReinforcementRegistry,
+    BossPhase, BossPhaseChangedEvent, BossSpecialAbilityEvent, BossState, MissionPhase, ObjectiveBranchedEvent,
+    ObjectiveGraph, OptionalOfferedEvent, PhaseChangedEvent, PhaseState, ReinforcementRegistry,
     ReinforcementWaveSpawnedEvent,
 };
 use cf_priority::{PersonalityModifier, QuickPresetId, RoleTemplate};
@@ -140,6 +141,31 @@ pub struct M7AiWorld {
     pub boss: Option<BossState>,
     /// **M7-B**: per-actor per-category chatter cooldown gate.
     pub chatter_cooldowns: ChatterCooldownTable,
+    /// **M7 (audit gap A15)**: cumulative count of enemy actors that
+    /// transitioned to DYING since scenario start. Drives the
+    /// reinforcement wave trigger condition `(phase + kill_count)`.
+    pub kill_count: u32,
+    /// **M7 (audit gap A17)**: per-phase latch tracking which boss
+    /// phases have already fired their canonical
+    /// `boss.special_ability_triggered` event. Prevents duplicate
+    /// emissions across ticks while the boss remains in the same phase.
+    pub boss_abilities_emitted: std::collections::BTreeSet<u8>,
+    /// **M7 (audit gap A13/A14)**: optional v0.5 mission objective graph.
+    /// When `Some`, the engine ticks `tick_objective_graph` per frame to
+    /// surface `mission.objective_branched` and `mission.optional_offered`
+    /// emissions when active set transitions land. `None` means the
+    /// scenario opts out of the v0.5 graph (M2 single-vec objective list
+    /// continues unchanged).
+    pub objective_graph: Option<ObjectiveGraph>,
+    /// **M7 (audit gap A14)**: per-objective latch for
+    /// `mission.optional_offered` so each optional objective surfaces
+    /// exactly once when its dependencies clear.
+    pub optionals_offered: std::collections::BTreeSet<String>,
+    /// **M7 (audit gap A13)**: per-branching-point latch so the
+    /// `mission.objective_branched` event fires exactly once per chosen
+    /// branch (the `chosen_branch` write to `BranchingPoint` is the
+    /// authoritative trigger).
+    pub branches_emitted: std::collections::BTreeSet<String>,
 }
 
 impl M7AiWorld {
@@ -151,6 +177,11 @@ impl M7AiWorld {
             reinforcements: ReinforcementRegistry::default(),
             boss: None,
             chatter_cooldowns: ChatterCooldownTable::new(),
+            kill_count: 0,
+            boss_abilities_emitted: std::collections::BTreeSet::new(),
+            objective_graph: None,
+            optionals_offered: std::collections::BTreeSet::new(),
+            branches_emitted: std::collections::BTreeSet::new(),
         }
     }
 
@@ -615,6 +646,39 @@ pub fn boss_special_ability_payload(event: &BossSpecialAbilityEvent) -> Value {
         "ability": event.ability,
         "tick": event.tick,
     })
+}
+
+/// **M7 (audit gap A13)**: build a JSON payload for
+/// `mission.objective_branched`.
+pub fn objective_branched_payload(event: &ObjectiveBranchedEvent) -> Value {
+    json!({
+        "branching_point_id": event.branching_point_id,
+        "chosen_branch": event.chosen_branch,
+        "other_branch": event.other_branch,
+        "tick": event.tick,
+    })
+}
+
+/// **M7 (audit gap A14)**: build a JSON payload for
+/// `mission.optional_offered`.
+pub fn optional_offered_payload(event: &OptionalOfferedEvent) -> Value {
+    json!({
+        "objective_id": event.objective_id,
+        "tick": event.tick,
+    })
+}
+
+/// **M7 (audit gap A17)**: canonical phase ability mapping per spec
+/// § Mission director v0.5 → Mini-boss. Phase 1 has no special ability
+/// (ranged baseline); Phase 2 raises a shield; Phase 3 enters enraged
+/// final stand. The string is the wire form embedded in
+/// `boss.special_ability_triggered.ability`.
+pub fn boss_ability_for_phase(phase: BossPhase) -> Option<&'static str> {
+    match phase {
+        BossPhase::Phase1 => None,
+        BossPhase::Phase2 => Some("shield"),
+        BossPhase::Phase3 => Some("enraged"),
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1180,6 +1244,212 @@ pub fn boss_special_ability(world: &M7AiWorld, ability: &str, tick: u64) -> Opti
     Some(boss_special_ability_payload(&event))
 }
 
+/// **M7 (audit gap A17)**: per-tick check of the boss state. Returns the
+/// canonical ability payload for the current phase iff that phase has not
+/// yet emitted its `boss.special_ability_triggered` event since scenario
+/// start. The world's `boss_abilities_emitted` latch is updated so the
+/// next call returns `None`.
+pub fn drain_boss_phase_ability(world: &mut M7AiWorld, tick: u64) -> Option<Value> {
+    let phase = world.boss.as_ref()?.current_phase;
+    let ability = boss_ability_for_phase(phase)?;
+    let key = phase.as_u8();
+    if world.boss_abilities_emitted.contains(&key) {
+        return None;
+    }
+    world.boss_abilities_emitted.insert(key);
+    boss_special_ability(world, ability, tick)
+}
+
+/// **M7 (audit gap A13/A14)**: per-tick scan of the v0.5 objective
+/// graph. Returns ready-to-record payloads for every optional objective
+/// that just became reachable (its dependencies cleared) and every
+/// branching point whose `chosen_branch` was set since the last scan.
+/// Mutates per-graph latches so each event fires at most once per
+/// objective_id / branching_point_id.
+pub fn drain_objective_graph_emissions(world: &mut M7AiWorld, tick: u64) -> ObjectiveGraphEmit {
+    let mut emit = ObjectiveGraphEmit::default();
+    let Some(graph) = world.objective_graph.as_ref() else {
+        return emit;
+    };
+    let active = graph.active_ids();
+    for id in &active {
+        let node = match graph.iter().find(|n| n.id == *id) {
+            Some(n) => n,
+            None => continue,
+        };
+        if !node.optional {
+            continue;
+        }
+        if world.optionals_offered.contains(id) {
+            continue;
+        }
+        let event = OptionalOfferedEvent {
+            objective_id: id.clone(),
+            tick,
+        };
+        emit.optional_offered.push(optional_offered_payload(&event));
+        world.optionals_offered.insert(id.clone());
+    }
+    for branch in &graph.branches {
+        if let Some(chosen) = branch.chosen_branch.clone() {
+            if world.branches_emitted.contains(&branch.id) {
+                continue;
+            }
+            let other = if chosen == branch.branch_a_id {
+                branch.branch_b_id.clone()
+            } else {
+                branch.branch_a_id.clone()
+            };
+            let event = ObjectiveBranchedEvent {
+                branching_point_id: branch.id.clone(),
+                chosen_branch: chosen,
+                other_branch: other,
+                tick: branch.offered_tick.unwrap_or(tick),
+            };
+            emit.objective_branched.push(objective_branched_payload(&event));
+            world.branches_emitted.insert(branch.id.clone());
+        }
+    }
+    emit
+}
+
+/// **M7 (audit gap A13/A14)**: bundle of objective-graph payloads
+/// surfaced by [`drain_objective_graph_emissions`].
+#[derive(Debug, Clone, Default)]
+pub struct ObjectiveGraphEmit {
+    pub optional_offered: Vec<Value>,
+    pub objective_branched: Vec<Value>,
+}
+
+/// **M7 (audit gap A15)**: walk the per-tick `entered_dying` outcomes
+/// and add one to `world.kill_count` for each enemy actor that is NOT
+/// the controllable player. Returns the new cumulative count. The
+/// reinforcement registry consumes this count via
+/// [`try_spawn_reinforcement`] on the same tick.
+///
+/// `is_kill` is a closure the engine passes to filter outcomes (e.g.
+/// "actor is a registered reactive guard"). Returning `false` skips
+/// the outcome (covers the player dying, friendly bots dying, etc.).
+pub fn track_kills<F>(world: &mut M7AiWorld, entered_dying_actors: &[ActorId], mut is_kill: F) -> u32
+where
+    F: FnMut(ActorId) -> bool,
+{
+    for actor in entered_dying_actors {
+        if is_kill(*actor) {
+            world.kill_count = world.kill_count.saturating_add(1);
+        }
+    }
+    world.kill_count
+}
+
+/// **M7 (audit gap A12/A15)**: ensures the phase pacer is initialised at
+/// the first tick the engine drives. Idempotent — once `world.phase` is
+/// `Some`, subsequent calls are a no-op.
+pub fn ensure_phase_initialised(world: &mut M7AiWorld, tick: u64) {
+    world.init_phase(tick);
+}
+
+/// **M7 (audit gap A16)**: convenience helper that combines
+/// [`apply_boss_damage`] with [`drain_boss_phase_ability`] so the engine
+/// can emit both `boss.phase_changed` and `boss.special_ability_triggered`
+/// for a single damage application in one call.
+pub fn apply_boss_damage_and_ability(world: &mut M7AiWorld, damage: f32, tick: u64) -> BossDamageEmit {
+    let phase_changed = apply_boss_damage(world, damage, tick);
+    let ability = if phase_changed.is_some() {
+        drain_boss_phase_ability(world, tick)
+    } else {
+        None
+    };
+    BossDamageEmit { phase_changed, ability }
+}
+
+/// **M7 (audit gap A16/A17)**: result bundle from
+/// [`apply_boss_damage_and_ability`]. `phase_changed` carries the
+/// `boss.phase_changed` payload when the damage crossed a threshold.
+/// `ability` carries the `boss.special_ability_triggered` payload when
+/// the new phase has a canonical ability and it has not yet fired.
+#[derive(Debug, Clone, Default)]
+pub struct BossDamageEmit {
+    pub phase_changed: Option<Value>,
+    pub ability: Option<Value>,
+}
+
+/// **M7 (audit gap A12)**: scenario-side declaration of a v0.5
+/// reinforcement wave. The engine flattens these into the
+/// [`ReinforcementRegistry`] at construction time.
+#[derive(Debug, Clone, PartialEq)]
+pub struct InitialReinforcementWave {
+    pub id: String,
+    pub phase: MissionPhase,
+    pub trigger_kill_count: u32,
+    pub dropship_zone: [f32; 2],
+    pub spawn_count: u32,
+}
+
+impl InitialReinforcementWave {
+    pub fn into_wave(self) -> cf_mission::ReinforcementWave {
+        let mut wave =
+            cf_mission::ReinforcementWave::new(self.id, self.phase, self.trigger_kill_count, self.dropship_zone);
+        wave.spawn_count = self.spawn_count.max(1);
+        wave
+    }
+}
+
+/// **M7 (audit gap A12)**: scenario-side declaration of the v0.5
+/// 4-phase pacing parameters. Defaults match `PhaseState::new` (30 / 60
+/// / 120 seconds). The engine consumes this in `M0Engine::new` to seed
+/// `world.phase`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct InitialPhaseState {
+    pub setup_seconds: f32,
+    pub buildup_seconds: f32,
+    pub climax_seconds: f32,
+}
+
+impl Default for InitialPhaseState {
+    fn default() -> Self {
+        Self {
+            setup_seconds: 30.0,
+            buildup_seconds: 60.0,
+            climax_seconds: 120.0,
+        }
+    }
+}
+
+impl InitialPhaseState {
+    pub fn into_phase_state(self) -> PhaseState {
+        let mut s = PhaseState::new(0);
+        s.setup_seconds = self.setup_seconds.max(0.0);
+        s.buildup_seconds = self.buildup_seconds.max(0.0);
+        s.climax_seconds = self.climax_seconds.max(0.0);
+        s
+    }
+}
+
+/// **M7 (audit gap A16)**: scenario-side declaration of the mini-boss
+/// state. The engine consumes this at construction to seed `world.boss`.
+#[derive(Debug, Clone, PartialEq)]
+pub struct InitialBossState {
+    pub actor_id: u64,
+    pub display_name: String,
+    pub max_hp: f32,
+    pub phase_2_hp_threshold: f32,
+    pub phase_3_hp_threshold: f32,
+}
+
+impl InitialBossState {
+    pub fn into_boss_state(self) -> BossState {
+        let mut b = BossState::new(ActorId(self.actor_id).0, self.display_name, self.max_hp.max(0.001));
+        if self.phase_2_hp_threshold.is_finite() && self.phase_2_hp_threshold > 0.0 {
+            b.phase_2_hp_threshold = self.phase_2_hp_threshold.clamp(0.0, 1.0);
+        }
+        if self.phase_3_hp_threshold.is_finite() && self.phase_3_hp_threshold > 0.0 {
+            b.phase_3_hp_threshold = self.phase_3_hp_threshold.clamp(0.0, 1.0);
+        }
+        b
+    }
+}
+
 // **M7-B**: event payload helpers for the 9 NEW ai.* schemas. Each helper
 // is a pure function that the engine calls right before
 // `recorder.record(tick, sim_time_ms, "ai", "<event_type>", payload, parent)`.
@@ -1415,6 +1685,171 @@ mod tests {
         let r = advance_phase(&mut world, deadline_tick + 1, 60, "elapsed");
         assert!(r.is_some());
         assert_eq!(world.phase.as_ref().unwrap().current, MissionPhase::Buildup);
+    }
+
+    /// **M7 (audit gap A15)**: track_kills increments the cumulative
+    /// counter once per filtered DYING transition.
+    #[test]
+    fn track_kills_increments_cumulative_count() {
+        let mut world = M7AiWorld::new();
+        let outcomes = vec![ActorId(2), ActorId(3), ActorId(4)];
+        let count = track_kills(&mut world, &outcomes, |id| id.0 != 4);
+        assert_eq!(count, 2);
+        assert_eq!(world.kill_count, 2);
+        let count2 = track_kills(&mut world, &outcomes, |_| true);
+        assert_eq!(count2, 5);
+    }
+
+    /// **M7 (audit gap A15)**: try_spawn_reinforcement returns Some when
+    /// the active phase + cumulative kills satisfy a registered wave.
+    /// Idempotent — a re-tick after spawn returns None.
+    #[test]
+    fn try_spawn_reinforcement_fires_once_per_wave() {
+        let mut world = M7AiWorld::new();
+        world.init_phase(0);
+        let _ = advance_phase(&mut world, 30 * 60 + 1, 60, "elapsed");
+        world.reinforcements.push(cf_mission::ReinforcementWave::new(
+            "alpha",
+            MissionPhase::Buildup,
+            3,
+            [400.0, 0.0],
+        ));
+        assert!(try_spawn_reinforcement(&mut world, 2, 1900).is_none());
+        let payload = try_spawn_reinforcement(&mut world, 3, 1900).expect("alpha wave fires");
+        assert_eq!(payload.get("wave_id").unwrap(), &json!("alpha"));
+        assert_eq!(payload.get("phase").unwrap(), &json!("buildup"));
+        assert!(try_spawn_reinforcement(&mut world, 5, 2000).is_none());
+    }
+
+    /// **M7 (audit gap A16/A17)**: apply_boss_damage_and_ability
+    /// surfaces the canonical phase-change + the canonical ability for
+    /// the new phase in one call. Phase 1 → 2 fires `shield`; the latch
+    /// prevents a second emission while still in Phase 2.
+    #[test]
+    fn boss_damage_emits_phase_and_ability_on_threshold_crossing() {
+        let mut world = M7AiWorld::new();
+        world.boss = Some(cf_mission::BossState::new(42, "spotter", 100.0));
+        let emit = apply_boss_damage_and_ability(&mut world, 30.0, 100);
+        assert!(emit.phase_changed.is_some(), "Phase 1 → 2 fires phase_changed");
+        let ability = emit.ability.expect("Phase 2 fires `shield`");
+        assert_eq!(ability.get("phase").unwrap(), &json!("phase_2"));
+        assert_eq!(ability.get("ability").unwrap(), &json!("shield"));
+        // Re-application that does not cross the next threshold fires nothing.
+        let emit2 = apply_boss_damage_and_ability(&mut world, 5.0, 110);
+        assert!(emit2.phase_changed.is_none());
+        assert!(emit2.ability.is_none());
+        // Phase 2 → 3 fires `enraged`.
+        let emit3 = apply_boss_damage_and_ability(&mut world, 50.0, 200);
+        assert_eq!(
+            emit3.ability.expect("phase 3 ability").get("ability").unwrap(),
+            &json!("enraged")
+        );
+    }
+
+    /// **M7 (audit gap A14)**: drain_objective_graph_emissions surfaces
+    /// each optional objective exactly once when its dependencies clear.
+    #[test]
+    fn objective_graph_optional_offered_emits_once_per_objective() {
+        let mut world = M7AiWorld::new();
+        let mut graph = cf_mission::ObjectiveGraph::default();
+        graph.push(cf_mission::ObjectiveNode {
+            id: "kill_engineer".into(),
+            kind: cf_mission::ExtendedObjectiveKind::Optional {
+                inner_id: "kill_engineer_inner".into(),
+            },
+            depends_on: vec![],
+            parallel: false,
+            optional: true,
+            branch_label: String::new(),
+            status: cf_mission::ObjectiveNodeStatus::Pending,
+        });
+        world.objective_graph = Some(graph);
+        let emit = drain_objective_graph_emissions(&mut world, 100);
+        assert_eq!(emit.optional_offered.len(), 1);
+        assert_eq!(
+            emit.optional_offered[0].get("objective_id").unwrap(),
+            &json!("kill_engineer")
+        );
+        // Second tick: latched, no re-emit.
+        let emit2 = drain_objective_graph_emissions(&mut world, 200);
+        assert!(emit2.optional_offered.is_empty());
+    }
+
+    /// **M7 (audit gap A13)**: drain_objective_graph_emissions surfaces
+    /// the chosen branch when a BranchingPoint has a `chosen_branch`.
+    #[test]
+    fn objective_graph_branched_emits_on_chosen_branch() {
+        let mut world = M7AiWorld::new();
+        let mut graph = cf_mission::ObjectiveGraph::default();
+        graph.branches.push(cf_mission::BranchingPoint {
+            id: "chokepoint".into(),
+            branch_a_id: "kill_path".into(),
+            branch_b_id: "sneak_path".into(),
+            chosen_branch: Some("sneak_path".into()),
+            offered_tick: Some(150),
+        });
+        world.objective_graph = Some(graph);
+        let emit = drain_objective_graph_emissions(&mut world, 200);
+        assert_eq!(emit.objective_branched.len(), 1);
+        let payload = &emit.objective_branched[0];
+        assert_eq!(payload.get("branching_point_id").unwrap(), &json!("chokepoint"));
+        assert_eq!(payload.get("chosen_branch").unwrap(), &json!("sneak_path"));
+        assert_eq!(payload.get("other_branch").unwrap(), &json!("kill_path"));
+        // Latched on the second tick.
+        let emit2 = drain_objective_graph_emissions(&mut world, 250);
+        assert!(emit2.objective_branched.is_empty());
+    }
+
+    /// **M7 (audit gap A14)**: optional objectives gated behind unmet
+    /// dependencies are NOT offered until the dependency completes.
+    #[test]
+    fn objective_graph_optional_waits_for_dependencies() {
+        let mut world = M7AiWorld::new();
+        let mut graph = cf_mission::ObjectiveGraph::default();
+        graph.push(cf_mission::ObjectiveNode {
+            id: "primary".into(),
+            kind: cf_mission::ExtendedObjectiveKind::KillN {
+                target_class: "rifleman".into(),
+                count: 1,
+            },
+            depends_on: vec![],
+            parallel: false,
+            optional: false,
+            branch_label: String::new(),
+            status: cf_mission::ObjectiveNodeStatus::Pending,
+        });
+        graph.push(cf_mission::ObjectiveNode {
+            id: "bonus".into(),
+            kind: cf_mission::ExtendedObjectiveKind::Optional {
+                inner_id: "bonus_inner".into(),
+            },
+            depends_on: vec!["primary".into()],
+            parallel: false,
+            optional: true,
+            branch_label: String::new(),
+            status: cf_mission::ObjectiveNodeStatus::Pending,
+        });
+        world.objective_graph = Some(graph);
+        let emit = drain_objective_graph_emissions(&mut world, 100);
+        assert!(
+            emit.optional_offered.is_empty(),
+            "bonus is gated until primary completes"
+        );
+        if let Some(g) = world.objective_graph.as_mut() {
+            g.mark_completed("primary");
+        }
+        let emit2 = drain_objective_graph_emissions(&mut world, 200);
+        assert_eq!(emit2.optional_offered.len(), 1);
+        assert_eq!(emit2.optional_offered[0].get("objective_id").unwrap(), &json!("bonus"));
+    }
+
+    /// **M7 (audit gap A17)**: Phase 1 has no canonical ability so
+    /// drain_boss_phase_ability returns None until a phase change.
+    #[test]
+    fn boss_phase_1_has_no_ability() {
+        let mut world = M7AiWorld::new();
+        world.boss = Some(cf_mission::BossState::new(1, "spotter", 100.0));
+        assert!(drain_boss_phase_ability(&mut world, 0).is_none());
     }
 
     /// **M7-B**: `act.player.set_priority` mutates the bot's
