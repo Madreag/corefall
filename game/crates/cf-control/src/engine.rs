@@ -9778,6 +9778,8 @@ impl M0Engine {
             mission: None,
             extraction_zone: None,
             enemies: Vec::new(),
+            reactor: None,
+            timer: None,
         };
         for guard in state.reactive_guards.values() {
             let position = state
@@ -9863,6 +9865,71 @@ impl M0Engine {
                     });
                     break;
                 }
+            }
+            // **M9**: timer projection for the HUD timer-warning widget.
+            // Matches the `observe.mission.timer` color bands (green > 30s,
+            // yellow 10-30s, red < 10s, none when expired or no timer).
+            let total_ticks = mission.loss.time_limit_ticks;
+            let mission_terminal = mission.result.is_terminal();
+            let tick_rate = self.config.tick_rate_hz.max(1) as u64;
+            if total_ticks > 0 {
+                let remaining_ticks = total_ticks.saturating_sub(tick);
+                let remaining_s = (remaining_ticks / tick_rate) as u32;
+                let color_state = if mission_terminal {
+                    "none".to_string()
+                } else if remaining_s > 30 {
+                    "green".to_string()
+                } else if remaining_s >= 10 {
+                    "yellow".to_string()
+                } else {
+                    "red".to_string()
+                };
+                snapshot.timer = Some(TimerHudView {
+                    remaining_ticks,
+                    total_ticks,
+                    remaining_seconds: remaining_s,
+                    color_state,
+                    mission_terminal,
+                });
+            } else {
+                snapshot.timer = Some(TimerHudView {
+                    remaining_ticks: 0,
+                    total_ticks: 0,
+                    remaining_seconds: 0,
+                    color_state: "none".to_string(),
+                    mission_terminal,
+                });
+            }
+        }
+        // **M9**: project the first reactor (M9 ships exactly one) into the
+        // HUD snapshot. cf-app maps `pressure_state` to the sprite variant
+        // + pressure-line tint; the armor pip layers drive the 3-armor-pip
+        // band coloring under the HP bar.
+        if let Some(world) = state.reactor_world.as_ref() {
+            if let Some(reactor) = world.iter().next() {
+                let layers: Vec<ReactorArmorLayerView> = reactor
+                    .armor_layers
+                    .iter()
+                    .map(|l| ReactorArmorLayerView {
+                        kind: l.kind.as_str().to_string(),
+                        hp: l.hp,
+                        max_hp: l.max_hp,
+                        hp_percent: l.hp_percent(),
+                        hardness: l.hardness,
+                    })
+                    .collect();
+                snapshot.reactor = Some(ReactorHudView {
+                    actor_id: reactor.id.clone(),
+                    hp: reactor.hp,
+                    max_hp: reactor.max_hp,
+                    hp_percent: reactor.hp_percent(),
+                    pressure_state: reactor.pressure_state.as_str().to_string(),
+                    position: reactor.position,
+                    mission_critical: reactor.mission_critical,
+                    destroyed: reactor.is_destroyed(),
+                    heat_signature_k: reactor.heat_signature_k,
+                    armor_layers: layers,
+                });
             }
         }
         snapshot
@@ -11631,6 +11698,56 @@ pub struct ActorRenderSnapshot {
     pub extraction_zone: Option<ExtractionZoneView>,
     /// M1.5: per-enemy state + tactic projection so the HUD doesn't fabricate values.
     pub enemies: Vec<EnemyHudView>,
+    /// **M9** § HUD readability + observability — reactor HUD projection
+    /// for the reactor zone widgets. `None` when no reactor world is
+    /// loaded.
+    pub reactor: Option<ReactorHudView>,
+    /// **M9** § Player narrative flow — mission timer projection for the
+    /// timer-warning HUD + countdown color. `None` when no mission is
+    /// loaded.
+    pub timer: Option<TimerHudView>,
+}
+
+/// **M9** § HUD readability + observability — projection of the reactor
+/// for cf-app's reactor HP bar, pressure line, and VFX sprite. Mirrors
+/// the `observe.mission.reactor` cfctl surface so cf-app does not have
+/// to call the async path each frame.
+#[derive(Debug, Clone)]
+pub struct ReactorHudView {
+    pub actor_id: String,
+    pub hp: f32,
+    pub max_hp: f32,
+    pub hp_percent: f32,
+    pub pressure_state: String,
+    pub position: [f32; 2],
+    pub mission_critical: bool,
+    pub destroyed: bool,
+    pub heat_signature_k: f32,
+    pub armor_layers: Vec<ReactorArmorLayerView>,
+}
+
+/// **M9** § Layered reactor armor — one armor pip projection per layer
+/// (External / Internal / Core). cf-app maps `hp_percent` to the 5-tier
+/// integrity band when rendering pips.
+#[derive(Debug, Clone)]
+pub struct ReactorArmorLayerView {
+    pub kind: String,
+    pub hp: f32,
+    pub max_hp: f32,
+    pub hp_percent: f32,
+    pub hardness: f32,
+}
+
+/// **M9** § Player narrative flow — projection of `observe.mission.timer`
+/// for the cf-ui timer-warning widget. cf-app reads `remaining_seconds`
+/// to push warnings + update the color band per frame.
+#[derive(Debug, Clone, Default)]
+pub struct TimerHudView {
+    pub remaining_ticks: u64,
+    pub total_ticks: u64,
+    pub remaining_seconds: u32,
+    pub color_state: String,
+    pub mission_terminal: bool,
 }
 
 /// **M2**: render-side snapshot of the chunked terrain. Carries the

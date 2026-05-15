@@ -8,6 +8,8 @@
 //! spec ("explosion VFX terminates within 1 second; no perpetual
 //! particles").
 
+use bevy::prelude::Resource;
+
 /// Per M9 spec § Sim numbers: `Explosion debris cap = 200 pixels`.
 pub const EXPLOSION_DEBRIS_CAP_PER_HIT: u32 = 200;
 
@@ -37,7 +39,11 @@ impl ExplosionParticle {
 
 /// Explosion VFX render state. Includes the flash + debris + accessibility-
 /// adjusted screen-shake magnitude.
-#[derive(Debug, Clone, Default)]
+///
+/// cf-app spawns one burst on each `mission.reactor_destroyed` event;
+/// the renderer ticks `tick(dt_ms)` per frame to advance + retire
+/// particles, terminating the whole VFX within 1 second per spec.
+#[derive(Resource, Debug, Clone, Default)]
 pub struct ExplosionState {
     pub origin: [f32; 2],
     pub flash_remaining_ms: u32,

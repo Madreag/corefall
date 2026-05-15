@@ -7,6 +7,8 @@
 //! `SPARK_CAP_PER_HIT` per event so a high-RPM stream of hits doesn't
 //! flood the renderer.
 
+use bevy::prelude::Resource;
+
 /// Maximum spark particles per impact, per M9 spec § Sim numbers:
 /// `Spark VFX cap per hit = 12 particles`.
 pub const SPARK_CAP_PER_HIT: u32 = 12;
@@ -33,7 +35,11 @@ impl SparkParticle {
 }
 
 /// Spark emitter state. Drains expired particles automatically.
-#[derive(Debug, Clone, Default)]
+///
+/// cf-app's recorder-event pump pushes a burst on every reactor
+/// `combat.projectile_hit` event (target_kind="reactor"); the renderer
+/// ticks `tick(dt_ms)` per frame to advance + retire particles.
+#[derive(Resource, Debug, Clone, Default)]
 pub struct SparkEmitterState {
     pub particles: Vec<SparkParticle>,
 }

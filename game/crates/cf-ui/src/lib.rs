@@ -64,6 +64,10 @@ pub mod reactor_hp_bar;
 pub mod reactor_pressure_line;
 pub mod timer_warnings;
 
+pub use reactor_hp_bar::{ArmorPipView, IntegrityBand, ReactorHpBarState};
+pub use reactor_pressure_line::{PressureTint, ReactorPressureLineState};
+pub use timer_warnings::{TimerColor, TimerSeverity, TimerWarning, TimerWarningsState, WARNING_THRESHOLDS};
+
 pub use action_prompt::ActionPromptState;
 pub use branching_banner::{BranchOption, BranchingBannerState};
 pub use compass::{CompassBearing, CompassState, CARDINALS};
@@ -362,6 +366,12 @@ impl Plugin for StatusStripPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<HudState>()
             .init_resource::<HudSettings>()
+            // **M9** § HUD readability + observability — reactor zone resources.
+            // cf-app's `sync_reactor_state_to_widgets` writes these per frame
+            // from the engine's `ActorRenderSnapshot::reactor / timer`.
+            .init_resource::<ReactorHpBarState>()
+            .init_resource::<ReactorPressureLineState>()
+            .init_resource::<TimerWarningsState>()
             .add_systems(Startup, (spawn_status_strip, spawn_banner_strip, spawn_caption_strip))
             .add_systems(
                 Update,

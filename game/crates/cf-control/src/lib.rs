@@ -25,7 +25,8 @@ pub use m6_actions::{ActSquadIssueCommandParams, M6Action, M6ActionParams, Squad
 pub use engine::{
     run_m0_inline, ActorRenderSnapshot, BreachRenderView, EnemyHudView, ExtractionZoneView, HudCachesSnapshot,
     InitialActorWorld, InitialBreachWorld, InitialGuard, M0Engine, M0EngineConfig, M0EngineOutcome, MissionHudView,
-    RifleHudView, TerrainChunkUpdate, TerrainDigPreview, TerrainRenderSnapshot, HUD_FOCUSABLE_NODES,
+    ReactorArmorLayerView, ReactorHudView, RifleHudView, TerrainChunkUpdate, TerrainDigPreview, TerrainRenderSnapshot,
+    TimerHudView, HUD_FOCUSABLE_NODES,
 };
 pub use envelope::{
     error_codes, JsonRpcError, JsonRpcId, JsonRpcMessage, JsonRpcNotification, JsonRpcRequest, JsonRpcResponse,

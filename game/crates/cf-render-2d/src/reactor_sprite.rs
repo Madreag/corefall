@@ -10,6 +10,8 @@
 //! at M9A bake time; M9 ships the resolver so the renderer asks for the
 //! right canonical key.
 
+use bevy::prelude::Resource;
+
 /// Reactor sprite variant. Maps from the M9 pressure-state ladder.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum ReactorSprite {
@@ -17,6 +19,28 @@ pub enum ReactorSprite {
     Cracked,
     Critical,
     Destroyed,
+}
+
+/// Current reactor sprite resource. cf-app's
+/// `sync_reactor_state_to_widgets` writes the variant per frame from the
+/// engine's `ActorRenderSnapshot::reactor.pressure_state`. Defaults to
+/// `Nominal` so scenarios without a reactor still expose a sensible
+/// resource value.
+#[derive(Resource, Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub struct ReactorSpriteState {
+    pub variant: ReactorSprite,
+    /// `true` when a reactor is loaded in the scenario. cf-app's renderer
+    /// reads this to gate visibility (no reactor → no sprite).
+    pub present: bool,
+}
+
+impl Default for ReactorSpriteState {
+    fn default() -> Self {
+        Self {
+            variant: ReactorSprite::Nominal,
+            present: false,
+        }
+    }
 }
 
 impl ReactorSprite {

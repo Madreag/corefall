@@ -40,6 +40,11 @@ pub use debris::{
 };
 pub use dig_preview::{probe_dig_validity, DigPreviewGhost, DigPreviewPlugin, DigPreviewTarget};
 pub use overlay::{material_tint, OverlayMode, OverlayModePlugin, OverlayModeState};
+pub use reactor_explosion::{
+    ExplosionParticle, ExplosionState, EXPLOSION_DEBRIS_CAP_PER_HIT, EXPLOSION_MAX_DURATION_MS,
+};
+pub use reactor_sparks::{SparkEmitterState, SparkParticle, SPARK_CAP_PER_HIT};
+pub use reactor_sprite::{ReactorSprite, ReactorSpriteState};
 pub use terrain::{
     build_chunk_image, material_rgba, ChunkRenderTag, ChunkUpdate, ChunkedTerrainRendererPlugin, ChunkedTerrainSnapshot,
 };
@@ -93,6 +98,32 @@ impl Plugin for ChunkedTerrainPlugin {
             DigPreviewPlugin,
         ));
     }
+}
+
+/// **M9** § Reactor visual feedback — wires the reactor sprite +
+/// bullet-impact spark emitter + destruction explosion VFX resources.
+/// cf-app spawns sparks on `combat.projectile_hit` (target_kind="reactor")
+/// and the explosion burst on `mission.reactor_destroyed`; this plugin's
+/// `tick_reactor_vfx` system advances + retires particles per frame so
+/// the live VFX terminates within 1s of the triggering event.
+pub struct ReactorVfxPlugin;
+
+impl Plugin for ReactorVfxPlugin {
+    fn build(&self, app: &mut App) {
+        app.init_resource::<ReactorSpriteState>()
+            .init_resource::<SparkEmitterState>()
+            .init_resource::<ExplosionState>()
+            .add_systems(Update, tick_reactor_vfx);
+    }
+}
+
+fn tick_reactor_vfx(time: Res<Time>, mut sparks: ResMut<SparkEmitterState>, mut explosion: ResMut<ExplosionState>) {
+    let dt_ms = (time.delta_secs() * 1000.0).clamp(0.0, 1000.0) as u32;
+    if dt_ms == 0 {
+        return;
+    }
+    sparks.tick(dt_ms);
+    explosion.tick(dt_ms);
 }
 
 /// Bevy 0.18 silently drops sprites whose `Handle<Image>` does not resolve to a
