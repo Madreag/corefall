@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ObserveTerrainMaterialAtParams",
+  "description": "**M9** (audit round-3 fix gap 3): `observe.terrain.material_at { x, y }`\nreturns the MaterialInfo at world-space coordinates with the nine\naffordance flags (actor_passable, projectile_passable, diggable,\nanchorable, blocks_light, contact_damage, path_cost, produces_debris,\nproduces_sound) plus integrity (from the per-pixel meta grid) plus\ncolor_hex (from the material registry). Powers spec § \"Material\naffordance tooltip\" and the integrity-overlay reticle.",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "x": {
+      "type": "number",
+      "format": "float"
+    },
+    "y": {
+      "type": "number",
+      "format": "float"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "x",
+    "y"
+  ]
+}

@@ -908,6 +908,17 @@ pub trait EngineHandle: Send + Sync + 'static {
     async fn inspect_material(&self, _id: u8) -> Option<serde_json::Value> {
         None
     }
+    /// **M9** (audit round-3 fix gap 3): return the `MaterialInfo` at
+    /// world-space `(x, y)` — the 9 affordance flags (actor_passable,
+    /// projectile_passable, diggable, anchorable, blocks_light,
+    /// contact_damage, path_cost, produces_debris, produces_sound) plus
+    /// integrity (read from the per-pixel meta grid via
+    /// `ChunkedTerrain::pixel_integrity`) plus color_hex (resolved from
+    /// the material registry). Powers spec § "Material affordance
+    /// tooltip" + the integrity-overlay reticle. Default returns `None`.
+    async fn observe_terrain_material_at(&self, _x: f32, _y: f32) -> Option<serde_json::Value> {
+        None
+    }
     /// **M4A**: return the asset-ledger summary projection (total counts +
     /// by-category / by-tier / by-status / missing-id list). Reads the
     /// canonical `content/asset_ledger/ledger.jsonl` at the workspace
@@ -2606,6 +2617,27 @@ async fn process_request<E: EngineHandle>(
             Some(value) => Some(success_response(request.id, value)),
             None => Some(invalid_param_reason(request.id, "no_terrain_world")),
         },
+        // **M9** (audit round-3 fix gap 3) § cfctl `observe.terrain.material_at
+        // { x, y }` — resolve the material at world-space `(x, y)` and
+        // return a MaterialInfo JSON with the 9 affordance flags
+        // (actor_passable, projectile_passable, diggable, anchorable,
+        // blocks_light, contact_damage, path_cost, produces_debris,
+        // produces_sound) + integrity (from the per-pixel meta grid) +
+        // color_hex (from the material registry). Powers spec §
+        // "Material affordance tooltip" + the integrity-overlay reticle.
+        "observe.terrain.material_at" => {
+            let p: crate::schemas::ObserveTerrainMaterialAtParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            if !p.x.is_finite() || !p.y.is_finite() {
+                return Some(invalid_param_reason(request.id, "non_finite_coords"));
+            }
+            match engine.observe_terrain_material_at(p.x, p.y).await {
+                Some(value) => Some(success_response(request.id, value)),
+                None => Some(invalid_param_reason(request.id, "no_terrain_world")),
+            }
+        }
         // M2 re-audit (2026-05-13): per-AI projection cfctl method.
         "observe.ai" => {
             let p: ObserveAiParams = match serde_json::from_value(params) {

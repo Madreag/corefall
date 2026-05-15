@@ -275,6 +275,18 @@ fn m9_concussion_band_for_dose(dose: f32) -> &'static str {
     }
 }
 
+/// **M9** (audit round-3 fix gap 3) § cfctl `observe.terrain.material_at`:
+/// resolve the registered `color_hex` for `material_id` from the on-disk
+/// material registry (`content/materials/material_registry.json`). Returns
+/// `None` when the registry can't be located or doesn't contain the id —
+/// caller falls back to the runtime affordance's `overlay_rgba`.
+fn registry_color_hex_for(material_id: cf_terrain::MaterialId) -> Option<String> {
+    let path = cf_material::MaterialRegistry::locate_default()?;
+    let (registry, _report) = cf_material::load_registry_from_file(&path).ok()?;
+    let def = registry.find_by_id(material_id)?;
+    Some(def.color_hex.clone())
+}
+
 impl M0EngineConfig {
     /// **TEST-ONLY** bare-bones default. Production code MUST NOT call this — it bypasses
     /// the scenario manifest (no real `seed`/`duration_ticks`/`expected_tests`/`region`)
@@ -13755,6 +13767,65 @@ impl EngineHandle for M0Engine {
             "spawn_material": aff.spawn_material.map(cf_terrain::material_name_from_id),
             "spawn_material_id": aff.spawn_material,
             "refusal_reason": aff.refusal_reason,
+        }))
+    }
+
+    /// **M9** (audit round-3 fix gap 3) § cfctl `observe.terrain.material_at
+    /// { x, y }` — resolve the material at world-space `(x, y)` against
+    /// the live chunked terrain and return a `MaterialInfo` JSON with the
+    /// 9 affordance flags (actor_passable, projectile_passable, diggable,
+    /// anchorable, blocks_light, contact_damage, path_cost,
+    /// produces_debris, produces_sound) + integrity (read from the
+    /// per-pixel meta grid via `ChunkedTerrain::pixel_integrity`) + the
+    /// material's `color_hex` (resolved from the on-disk material
+    /// registry, with a derived fallback when the registry isn't present).
+    /// Powers spec § "Material affordance tooltip" + the integrity-overlay
+    /// reticle. Returns `None` when no chunked terrain is loaded.
+    async fn observe_terrain_material_at(&self, x: f32, y: f32) -> Option<serde_json::Value> {
+        let state = self.state.read().ok()?;
+        let terrain = state.chunked_terrain.as_ref()?;
+        let anchor = terrain.anchor;
+        let width_px = terrain.width_px;
+        let height_px = terrain.height_px;
+        let material_id = terrain.material_at_world(x, y);
+        let local_x = x - anchor[0];
+        let local_y = y - anchor[1];
+        let px = local_x.floor() as i64;
+        let py = local_y.floor() as i64;
+        let in_bounds = px >= 0 && py >= 0 && (px as u64) < width_px as u64 && (py as u64) < height_px as u64;
+        let integrity = terrain.pixel_integrity(px, py);
+        let band = cf_terrain::IntegrityBand::from_integrity(integrity);
+        drop(state);
+        let aff = cf_terrain::material_affordance(material_id)?;
+        let produces_debris = aff.spawn_material.is_some();
+        let produces_sound = aff.solid;
+        let color_hex = registry_color_hex_for(material_id).unwrap_or_else(|| {
+            let [r, g, b, _] = aff.overlay_rgba;
+            format!("{:02X}{:02X}{:02X}", r, g, b)
+        });
+        Some(serde_json::json!({
+            "schema_version": 1,
+            "x": x,
+            "y": y,
+            "pixel": [px, py],
+            "in_bounds": in_bounds,
+            "material_id": material_id,
+            "material_name": aff.name,
+            "integrity": integrity,
+            "band": band.as_str(),
+            "color_hex": color_hex,
+            "affordances": {
+                "actor_passable": aff.actor_passable,
+                "projectile_passable": aff.projectile_passable,
+                "diggable": aff.diggable,
+                "anchorable": aff.anchorable,
+                "blocks_light": aff.blocks_line_of_sight,
+                "contact_damage": aff.hazard,
+                "path_cost": aff.path_cost,
+                "produces_debris": produces_debris,
+                "produces_sound": produces_sound,
+            },
+            "hardness": aff.hardness,
         }))
     }
 
