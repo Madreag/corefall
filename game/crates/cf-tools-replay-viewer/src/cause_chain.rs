@@ -135,7 +135,11 @@ pub fn trace_default_triggers<'a>(bundle: &'a Bundle, max_depth: usize) -> Vec<C
     chains
 }
 
-/// Render a cause chain as deterministic markdown.
+/// Render a cause chain as deterministic markdown. M10 § Plain-language
+/// rendering: each link now renders via [`crate::renderer::render_event_body`]
+/// instead of dumping the raw payload JSON. The compact-JSON payload
+/// remains as a `details:` suffix for AI Self-Test grading; players /
+/// death-recap consumers read the sentence above the suffix.
 pub fn render_markdown(chain: &CauseChain<'_>) -> String {
     let mut out = String::new();
     let _ = writeln!(
@@ -144,8 +148,7 @@ pub fn render_markdown(chain: &CauseChain<'_>) -> String {
         chain.trigger.event_type, chain.trigger.tick, chain.trigger.event_id
     );
     let _ = writeln!(out);
-    let payload_summary = compact_payload(&chain.trigger.payload);
-    let _ = writeln!(out, "Trigger payload: `{payload_summary}`");
+    let _ = writeln!(out, "Trigger: {}", crate::renderer::render_event_plain(chain.trigger));
     let _ = writeln!(out);
 
     if chain.links.len() <= 1 {
@@ -155,16 +158,14 @@ pub fn render_markdown(chain: &CauseChain<'_>) -> String {
         let _ = writeln!(out);
         for link in &chain.links {
             let arrow = if link.depth == 0 { "→" } else { "↑" };
+            let body = crate::renderer::render_event_body(link.event);
             let _ = writeln!(
                 out,
-                "{indent}{arrow} tick {tick} `{cat}.{ty}` (`{eid}`) `{payload}`",
+                "{indent}{arrow} {body} (`{eid}`)",
                 indent = " ".repeat(link.depth * 2),
                 arrow = arrow,
-                tick = link.event.tick,
-                cat = link.event.category,
-                ty = link.event.event_type,
+                body = body,
                 eid = link.event.event_id,
-                payload = compact_payload(&link.event.payload),
             );
         }
     }
@@ -216,10 +217,6 @@ pub fn render_markdown_multi(bundle: &Bundle, chains: &[CauseChain<'_>]) -> Stri
         }
     }
     out
-}
-
-fn compact_payload(value: &serde_json::Value) -> String {
-    crate::text::compact_json_payload(value)
 }
 
 #[cfg(test)]
@@ -417,12 +414,21 @@ mod tests {
         let trigger = bundle.first_event_of_type("actor_died").unwrap();
         let chain = trace(&bundle, trigger, DEFAULT_MAX_DEPTH);
         let md = render_markdown(&chain);
-        assert!(md.contains("actor_died"));
-        assert!(md.contains("projectile_hit"));
-        assert!(md.contains("command_accepted"));
-        assert!(md.contains("run_started"));
+        // The trigger heading still contains the literal event_type;
+        // chain links render via the plain-language renderer so they
+        // expose human-readable sentences instead of `event_type` tokens.
+        assert!(md.contains("`actor_died`"), "trigger heading missing: {md}");
+        assert!(md.contains("died"), "plain-language `died` missing: {md}");
+        assert!(md.contains("shot hit"), "plain-language projectile-hit missing: {md}");
+        assert!(
+            md.contains("control accepted"),
+            "plain-language command_accepted missing: {md}"
+        );
+        assert!(md.contains("run started"), "plain-language run_started missing: {md}");
         assert!(md.contains("Cause chain (newest → oldest):"));
         assert!(md.contains("root reached"));
+        // Raw payload tokens must NOT appear in the rendered chain.
+        assert!(!md.contains("act.player.fire"), "raw payload leaked: {md}");
     }
 
     #[test]

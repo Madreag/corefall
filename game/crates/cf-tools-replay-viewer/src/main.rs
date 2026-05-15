@@ -21,7 +21,12 @@ use cf_tools_replay_viewer::{
     debrief::{
         compose as debrief_compose, render_json as debrief_render_json, render_markdown as debrief_render_markdown,
     },
-    viewer::{render_markdown as viewer_render_markdown, ViewerState, DEFAULT_TAIL_LEN},
+    summary::SweepSummary,
+    thinking_timeline::{
+        build_timeline as thinking_build_timeline, render_json as thinking_render_json,
+        render_markdown as thinking_render_markdown, slice_window as thinking_slice_window,
+    },
+    viewer::{render_markdown as viewer_render_markdown, watch_tail, ViewerState, DEFAULT_TAIL_LEN},
 };
 
 #[derive(Debug, Parser)]
@@ -46,8 +51,9 @@ struct Cli {
 
 #[derive(Debug, Subcommand)]
 enum Cmd {
-    /// M3B-001: render the viewer shell (event tail / category filter /
-    /// tick scrubber / pause-step indicator) at the given anchor.
+    /// M3B-001 + M10: render the viewer shell (event tail / category /
+    /// actor / event-type filter / tick scrubber / pause-step indicator)
+    /// at the given anchor.
     View {
         bundle_dir: PathBuf,
         /// Inclusive tick anchor; events with tick <= at-tick are visible.
@@ -76,6 +82,28 @@ enum Cmd {
         /// "Viewer capture in bundle" evidence, which is now this PNG.
         #[arg(long)]
         png: Option<PathBuf>,
+        /// **M10 § View subcommand**: filter to events whose envelope
+        /// `actor_id`/`source_id` or payload `actor_id`/`shooter`/`target`
+        /// matches the requested integer.
+        #[arg(long)]
+        actor: Option<u64>,
+        /// **M10 § View subcommand**: filter to events whose `event_type`
+        /// exactly matches the requested string.
+        #[arg(long)]
+        event_type: Option<String>,
+        /// **M10 § View subcommand — watch mode**: tail the bundle's
+        /// `events.jsonl` and emit new events as plain-language sentences
+        /// as they're appended (Ctrl-C to exit). Bypasses the markdown
+        /// renderer.
+        #[arg(long)]
+        watch: bool,
+        /// **M10**: polling interval (ms) for `--watch` mode. Default 100ms.
+        #[arg(long, default_value_t = 100u64)]
+        watch_interval_ms: u64,
+        /// **M10**: cap the watch loop at N poll iterations (tests / CI).
+        /// Default: unbounded.
+        #[arg(long)]
+        watch_max_iterations: Option<u64>,
     },
     /// M3B-002: walk the parent_event_id chain back from a terminal event
     /// (or from every default trigger if neither --event-id nor --event-type
@@ -118,7 +146,48 @@ enum Cmd {
     },
     /// M3B-001: load + validate a run bundle, print a one-line PASS or
     /// detailed FAIL message, and exit 0 / 1.
-    Validate { bundle_dir: PathBuf },
+    Validate {
+        bundle_dir: PathBuf,
+        /// **M10**: write a structured `validation.json` to this path
+        /// instead of a single-line PASS/FAIL stdout. JSON shape:
+        /// `{ run_id, status: "pass"|"fail", error: <kind+message>|null, warnings: [...] }`.
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+    /// **M10 § Summary subcommand**: emit a one-line sweep verdict for
+    /// the bundle (`scenario @ run_id: result=..., ticks=..., ...`).
+    Summary {
+        bundle_dir: PathBuf,
+        /// Emit JSON instead of the one-line text.
+        #[arg(long, default_value_t = false)]
+        json: bool,
+        /// Optional output path; default writes to stdout.
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
+    /// **M10 § Per-bot thinking timeline panel**: render the M7 5-layer
+    /// AI thinking-stack timeline for `--actor <id>` from the bundle's
+    /// `ai.reason_label_changed` + `ai.thinking_layer_invoked` events.
+    ThinkingTimeline {
+        bundle_dir: PathBuf,
+        /// The actor whose thinking timeline to render.
+        #[arg(long)]
+        actor: u64,
+        /// Inclusive tick anchor; only entries at or before this tick
+        /// surface. Defaults to "end of run".
+        #[arg(long)]
+        at_tick: Option<u64>,
+        /// Slice the timeline to the last N entries at or before `at_tick`.
+        /// Spec § Per-bot thinking timeline: "last 10 ticks before death".
+        #[arg(long)]
+        last_n: Option<usize>,
+        /// Emit JSON instead of markdown.
+        #[arg(long, default_value_t = false)]
+        json: bool,
+        /// Optional output path; default writes to stdout.
+        #[arg(long)]
+        output: Option<PathBuf>,
+    },
 }
 
 fn init_diagnostics() {
@@ -165,7 +234,20 @@ fn main() -> Result<()> {
             paused,
             output,
             png,
+            actor,
+            event_type,
+            watch,
+            watch_interval_ms,
+            watch_max_iterations,
         } => {
+            if watch {
+                // M10 watch mode: bypass markdown, tail events.jsonl,
+                // emit plain-language sentences.
+                let events_path = bundle_dir.join("events.jsonl");
+                let mut stdout = std::io::stdout();
+                let _ = watch_tail(&events_path, &mut stdout, watch_interval_ms, watch_max_iterations);
+                return Ok(());
+            }
             let bundle = load_bundle(&bundle_dir)?;
             let state = ViewerState {
                 at_tick: at_tick.unwrap_or(u64::MAX),
@@ -173,6 +255,8 @@ fn main() -> Result<()> {
                 tail_len,
                 since_event_id,
                 paused,
+                actor_id_filter: actor,
+                event_type_filter: event_type,
             };
             let md = viewer_render_markdown(&bundle, &state);
             write_output(output.as_deref(), &md)?;
@@ -248,31 +332,94 @@ fn main() -> Result<()> {
             }
             Ok(())
         }
-        Cmd::Validate { bundle_dir } => match Bundle::load(&bundle_dir) {
+        Cmd::Validate { bundle_dir, output } => match Bundle::load(&bundle_dir) {
             Ok(bundle) => {
-                println!(
-                    "PASS bundle_dir={} run_id={} events={} ticks={}..{}",
-                    bundle.bundle_dir.display(),
-                    bundle.manifest.run_id,
-                    bundle.summary.event_counts.total,
-                    bundle
-                        .summary
-                        .first_tick
-                        .map(|t| t.to_string())
-                        .unwrap_or_else(|| "n/a".into()),
-                    bundle
-                        .summary
-                        .last_tick
-                        .map(|t| t.to_string())
-                        .unwrap_or_else(|| "n/a".into()),
-                );
+                if let Some(out_path) = output.as_deref() {
+                    let json = serde_json::json!({
+                        "run_id": bundle.manifest.run_id,
+                        "status": "pass",
+                        "error": serde_json::Value::Null,
+                        "warnings": [],
+                        "events_total": bundle.summary.event_counts.total,
+                        "first_tick": bundle.summary.first_tick,
+                        "last_tick": bundle.summary.last_tick,
+                    });
+                    write_output(Some(out_path), &serde_json::to_string_pretty(&json)?)?;
+                } else {
+                    println!(
+                        "PASS bundle_dir={} run_id={} events={} ticks={}..{}",
+                        bundle.bundle_dir.display(),
+                        bundle.manifest.run_id,
+                        bundle.summary.event_counts.total,
+                        bundle
+                            .summary
+                            .first_tick
+                            .map(|t| t.to_string())
+                            .unwrap_or_else(|| "n/a".into()),
+                        bundle
+                            .summary
+                            .last_tick
+                            .map(|t| t.to_string())
+                            .unwrap_or_else(|| "n/a".into()),
+                    );
+                }
                 Ok(())
             }
             Err(e) => {
+                if let Some(out_path) = output.as_deref() {
+                    let json = serde_json::json!({
+                        "run_id": serde_json::Value::Null,
+                        "status": "fail",
+                        "error": format!("{e}"),
+                        "warnings": [],
+                    });
+                    let _ = write_output(Some(out_path), &serde_json::to_string_pretty(&json)?);
+                }
                 eprintln!("FAIL bundle_dir={} error={}", bundle_dir.display(), e);
                 bail!("validation failed");
             }
         },
+        Cmd::Summary {
+            bundle_dir,
+            json,
+            output,
+        } => {
+            let bundle = load_bundle(&bundle_dir)?;
+            let summary = SweepSummary::from_bundle(&bundle);
+            let text = if json {
+                serde_json::to_string_pretty(&summary.render_json())?
+            } else {
+                summary.render_text()
+            };
+            // Ensure stdout always terminates with a newline so sweep
+            // pipelines that grep per line behave sensibly.
+            let text_with_nl = if text.ends_with('\n') {
+                text
+            } else {
+                format!("{text}\n")
+            };
+            write_output(output.as_deref(), &text_with_nl)?;
+            Ok(())
+        }
+        Cmd::ThinkingTimeline {
+            bundle_dir,
+            actor,
+            at_tick,
+            last_n,
+            json,
+            output,
+        } => {
+            let bundle = load_bundle(&bundle_dir)?;
+            let entries = thinking_build_timeline(&bundle, actor);
+            let sliced = thinking_slice_window(&entries, at_tick, last_n);
+            let text = if json {
+                serde_json::to_string_pretty(&thinking_render_json(actor, &sliced))?
+            } else {
+                thinking_render_markdown(actor, &sliced)
+            };
+            write_output(output.as_deref(), &text)?;
+            Ok(())
+        }
     }
 }
 
