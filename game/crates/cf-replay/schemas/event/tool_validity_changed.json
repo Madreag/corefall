@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/tool_validity_changed.v1",
+  "title": "ux.tool_validity_changed",
+  "description": "Emitted when the tool-validity reticle transitions between cyan/white/red states. reason is a snake_case explanation for invalid transitions (e.g., cannot_dig_metal).",
+  "type": "object",
+  "required": ["from", "to"],
+  "properties": {
+    "from": { "type": "string", "enum": ["ready", "valid", "invalid", "no_target"] },
+    "to": { "type": "string", "enum": ["ready", "valid", "invalid", "no_target"] },
+    "reason": { "type": "string" },
+    "parent_event_id": { "type": "string" }
+  }
+}

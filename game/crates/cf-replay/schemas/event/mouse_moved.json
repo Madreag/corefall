@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/mouse_moved.v1",
+  "title": "ux.mouse_moved",
+  "description": "Emitted on act.input.mouse_move dispatch. hover_node_id is the HUD_FOCUSABLE_NODES id under the cursor, or empty for no-hover.",
+  "type": "object",
+  "required": ["x", "y"],
+  "properties": {
+    "x": { "type": "number" },
+    "y": { "type": "number" },
+    "hover_node_id": { "type": "string" },
+    "parent_event_id": { "type": "string" }
+  }
+}

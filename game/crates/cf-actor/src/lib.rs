@@ -49,9 +49,11 @@ pub mod sim;
 pub mod stamina;
 pub mod stance;
 pub mod systems;
+pub mod ttd;
 
 pub use cover::{CoverSide, CoverState};
 pub use lean::{LeanDirection, LeanState, LEAN_MAX_DEGREES};
+pub use ttd::{AiDifficulty, InterimTtdContract, TtdAfflictionKind, TtdContract, TtdOrigin};
 pub use stamina::{Stamina, SPRINT_STAMINA_DRAIN_PER_S, SPRINT_STAMINA_RECOVERY_PER_S};
 pub use stance::{derive_stance, fire_allowed_in_stance, is_cinematic, stance_bloom_factor, StanceInputs};
 

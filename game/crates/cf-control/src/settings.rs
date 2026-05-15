@@ -151,16 +151,17 @@ impl AimAssist {
     }
 }
 
-/// **M8**: HUD density preset (`ui_density`). Spec § Accessibility tab —
-/// Compact / Normal / Spacious.
+/// **M8 / M11**: HUD density preset (`ui_density`). Spec § Accessibility tab —
+/// Compact / Comfortable / Spacious. M11 added `Comfortable` as the canonical
+/// default-density name (was `Normal` under M8 — accepted as an alias).
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema, Default)]
 #[serde(rename_all = "snake_case")]
 pub enum UiDensity {
     /// Compact — denser HUD layout.
     Compact,
-    /// Normal — default density.
+    /// Comfortable — default density (M11 canonical name; alias `normal`).
     #[default]
-    Normal,
+    Comfortable,
     /// Spacious — looser HUD spacing.
     Spacious,
 }
@@ -170,21 +171,285 @@ impl UiDensity {
     pub fn as_str(self) -> &'static str {
         match self {
             UiDensity::Compact => "compact",
-            UiDensity::Normal => "normal",
+            UiDensity::Comfortable => "comfortable",
             UiDensity::Spacious => "spacious",
         }
     }
 
-    /// Parse from the cfctl wire form.
+    /// Parse from the cfctl wire form. Accepts `normal` as an alias for
+    /// `comfortable` (M8 → M11 rename compatibility).
     #[allow(clippy::should_implement_trait)]
     pub fn from_str(value: &str) -> Option<UiDensity> {
         Some(match value {
             "compact" => UiDensity::Compact,
-            "normal" => UiDensity::Normal,
+            "comfortable" | "normal" => UiDensity::Comfortable,
             "spacious" => UiDensity::Spacious,
             _ => return None,
         })
     }
+}
+
+/// **M11**: contrast palette mode for the ACC-A floor. Replaces the legacy
+/// `high_contrast: bool` with a tri-state enum (Standard / HighContrastDark /
+/// HighContrastLight) per spec § Settings tree.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ContrastMode {
+    /// Standard palette (default).
+    #[default]
+    Standard,
+    /// High-contrast dark — pure white text on solid black.
+    HighContrastDark,
+    /// High-contrast light — pure black text on solid white.
+    HighContrastLight,
+}
+
+impl ContrastMode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ContrastMode::Standard => "standard",
+            ContrastMode::HighContrastDark => "high_contrast_dark",
+            ContrastMode::HighContrastLight => "high_contrast_light",
+        }
+    }
+
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(value: &str) -> Option<ContrastMode> {
+        Some(match value {
+            "standard" => ContrastMode::Standard,
+            "high_contrast_dark" => ContrastMode::HighContrastDark,
+            "high_contrast_light" => ContrastMode::HighContrastLight,
+            _ => return None,
+        })
+    }
+}
+
+/// **M11**: captions verbosity mode. Filters which event categories surface
+/// as captions in the HUD strip.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum CaptionMode {
+    /// Captions disabled (no caption strip rendered).
+    #[default]
+    Off,
+    /// Only critical-severity events surface.
+    CriticalOnly,
+    /// Critical + warning (default when captions are on).
+    Standard,
+    /// Critical + warning + info (verbose).
+    Expanded,
+}
+
+impl CaptionMode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            CaptionMode::Off => "off",
+            CaptionMode::CriticalOnly => "critical_only",
+            CaptionMode::Standard => "standard",
+            CaptionMode::Expanded => "expanded",
+        }
+    }
+
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(value: &str) -> Option<CaptionMode> {
+        Some(match value {
+            "off" => CaptionMode::Off,
+            "critical_only" => CaptionMode::CriticalOnly,
+            "standard" => CaptionMode::Standard,
+            "expanded" => CaptionMode::Expanded,
+            _ => return None,
+        })
+    }
+}
+
+/// **M11**: primary input profile (drives default HUD focus path).
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum InputProfile {
+    /// Keyboard + mouse (default).
+    #[default]
+    KeyboardMouse,
+    /// Controller (XInput / SDL gamepad).
+    Controller,
+    /// Keyboard only — no mouse / no controller.
+    KeyboardOnly,
+    /// Custom — player has rebound mixed inputs.
+    Custom,
+}
+
+impl InputProfile {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            InputProfile::KeyboardMouse => "keyboard_mouse",
+            InputProfile::Controller => "controller",
+            InputProfile::KeyboardOnly => "keyboard_only",
+            InputProfile::Custom => "custom",
+        }
+    }
+
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(value: &str) -> Option<InputProfile> {
+        Some(match value {
+            "keyboard_mouse" => InputProfile::KeyboardMouse,
+            "controller" => InputProfile::Controller,
+            "keyboard_only" => InputProfile::KeyboardOnly,
+            "custom" => InputProfile::Custom,
+            _ => return None,
+        })
+    }
+}
+
+/// **M11**: hold-behavior variant for the ACC-A floor (replaces tap-only).
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum HoldBehavior {
+    /// Press-and-hold semantics (default; matches `hold_to_confirm=true`).
+    #[default]
+    Hold,
+    /// Toggle on/off — press once to enable, again to disable.
+    Toggle,
+    /// Press-to-cycle — each press advances through a state ring.
+    PressToCycle,
+}
+
+impl HoldBehavior {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            HoldBehavior::Hold => "hold",
+            HoldBehavior::Toggle => "toggle",
+            HoldBehavior::PressToCycle => "press_to_cycle",
+        }
+    }
+
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(value: &str) -> Option<HoldBehavior> {
+        Some(match value {
+            "hold" => HoldBehavior::Hold,
+            "toggle" => HoldBehavior::Toggle,
+            "press_to_cycle" => HoldBehavior::PressToCycle,
+            _ => return None,
+        })
+    }
+}
+
+/// **M11**: camera-motion granularity (paired with `reduced_motion` for
+/// finer follow-camera control).
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum CameraMotion {
+    /// Reduced — suppress follow-camera + recoil-camera animation.
+    Reduced,
+    /// Standard — full camera motion (default).
+    #[default]
+    Standard,
+}
+
+impl CameraMotion {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            CameraMotion::Reduced => "reduced",
+            CameraMotion::Standard => "standard",
+        }
+    }
+
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(value: &str) -> Option<CameraMotion> {
+        Some(match value {
+            "reduced" => CameraMotion::Reduced,
+            "standard" => CameraMotion::Standard,
+            _ => return None,
+        })
+    }
+}
+
+/// **M11**: objective-help verbosity (tutorial / mission text density).
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ObjectiveHelp {
+    Minimal,
+    #[default]
+    Standard,
+    Verbose,
+}
+
+impl ObjectiveHelp {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ObjectiveHelp::Minimal => "minimal",
+            ObjectiveHelp::Standard => "standard",
+            ObjectiveHelp::Verbose => "verbose",
+        }
+    }
+
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(value: &str) -> Option<ObjectiveHelp> {
+        Some(match value {
+            "minimal" => ObjectiveHelp::Minimal,
+            "standard" => ObjectiveHelp::Standard,
+            "verbose" => ObjectiveHelp::Verbose,
+            _ => return None,
+        })
+    }
+}
+
+/// **M11**: debug-explainer verbosity (for the death recap + AI debug overlays).
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum DebugExplainerLevel {
+    /// Player-friendly plain-language explanations (default).
+    #[default]
+    Player,
+    /// Designer-level explanations with tuning numbers.
+    Designer,
+    /// Raw engine event payloads (verbose).
+    Raw,
+}
+
+impl DebugExplainerLevel {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            DebugExplainerLevel::Player => "player",
+            DebugExplainerLevel::Designer => "designer",
+            DebugExplainerLevel::Raw => "raw",
+        }
+    }
+
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(value: &str) -> Option<DebugExplainerLevel> {
+        Some(match value {
+            "player" => DebugExplainerLevel::Player,
+            "designer" => DebugExplainerLevel::Designer,
+            "raw" => DebugExplainerLevel::Raw,
+            _ => return None,
+        })
+    }
+}
+
+/// **M11**: ACC-A floor caption category vocabulary. Caption_categories may
+/// be any subset of this list. Default is `[combat, ai, mission, accessibility]`.
+pub const SUPPORTED_CAPTION_CATEGORIES: &[&str] =
+    &["combat", "ai", "terrain", "mission", "system", "accessibility"];
+
+/// **M11**: ACC-A floor key-remap groups. Restricts which UI subsystems
+/// surface their rebindable actions in the remap editor. Default is
+/// `[Gameplay]`.
+pub const SUPPORTED_REMAP_GROUPS: &[&str] = &["gameplay", "ui", "replay", "workbench", "accessibility"];
+
+/// **M11**: default caption-category subset (4 of 6 categories on).
+pub fn default_caption_categories() -> BTreeSet<String> {
+    let mut s = BTreeSet::new();
+    s.insert("combat".to_string());
+    s.insert("ai".to_string());
+    s.insert("mission".to_string());
+    s.insert("accessibility".to_string());
+    s
+}
+
+/// **M11**: default remap-group subset (gameplay-only on by default).
+pub fn default_remap_groups() -> BTreeSet<String> {
+    let mut s = BTreeSet::new();
+    s.insert("gameplay".to_string());
+    s
 }
 
 /// Default M8 mini-map zoom (1.0 = base zoom).
@@ -233,6 +498,9 @@ pub const SUPPORTED_KEY_BINDING_ACTIONS: &[&str] = &[
     "aim_right",
     "aim_up",
     "aim_down",
+    // M11: sharp_aim (ADS) added to the discrete action set so the remap
+    // surface covers ACC-A's full 18+ action floor.
+    "sharp_aim",
 ];
 
 pub const SUPPORTED_KEY_CODE_NAMES: &[&str] = &[
@@ -473,6 +741,59 @@ pub struct Settings {
     /// `DebugOverlayState` so cfctl `observe.debug.overlays` round-trips.
     #[serde(default = "default_debug_overlays")]
     pub debug_overlays: BTreeSet<String>,
+
+    // === M11 accessibility (DR-003 + DR-012 closure) extensions ===
+    /// **M11**: contrast palette mode. Tri-state replacing the legacy
+    /// `high_contrast: bool`. Standard / HighContrastDark / HighContrastLight.
+    #[serde(default)]
+    pub contrast_mode: ContrastMode,
+    /// **M11**: captions verbosity mode (Off / CriticalOnly / Standard /
+    /// Expanded). Filters which events surface as captions.
+    #[serde(default)]
+    pub caption_mode: CaptionMode,
+    /// **M11**: caption background opacity (0.0..=1.0; default 0.8).
+    #[serde(default = "default_caption_background_opacity")]
+    pub caption_background_opacity: f32,
+    /// **M11**: caption category subset (subset of
+    /// [`SUPPORTED_CAPTION_CATEGORIES`]). Default 4 of 6.
+    #[serde(default = "default_caption_categories")]
+    pub caption_categories: BTreeSet<String>,
+    /// **M11**: input profile (default keyboard+mouse).
+    #[serde(default)]
+    pub input_profile: InputProfile,
+    /// **M11**: remap-action group subset (subset of
+    /// [`SUPPORTED_REMAP_GROUPS`]). Default `[gameplay]`.
+    #[serde(default = "default_remap_groups")]
+    pub remap_groups: BTreeSet<String>,
+    /// **M11**: hold-behavior variant (default Hold).
+    #[serde(default)]
+    pub hold_behavior: HoldBehavior,
+    /// **M11**: screen-shake scale (0.0..=1.0; default 1.0 = full shake;
+    /// 0.0 = no shake). Multiplicative on camera punch + recoil shake.
+    /// Replaces the inverse-sense `reduce_camera_shake_pct`; the legacy
+    /// field is preserved for back-compat (mirror updated whenever this
+    /// changes via `apply_settings_patch`).
+    #[serde(default = "default_screen_shake_scale")]
+    pub screen_shake_scale: f32,
+    /// **M11**: camera-motion granularity (Reduced / Standard).
+    #[serde(default)]
+    pub camera_motion: CameraMotion,
+    /// **M11**: objective-help verbosity (Minimal / Standard / Verbose).
+    #[serde(default)]
+    pub objective_help: ObjectiveHelp,
+    /// **M11**: debug-explainer level (Player / Designer / Raw).
+    #[serde(default)]
+    pub debug_explainer_level: DebugExplainerLevel,
+}
+
+/// **M11**: default caption background opacity per spec.
+pub fn default_caption_background_opacity() -> f32 {
+    0.8
+}
+
+/// **M11**: default screen-shake scale (full shake = 1.0).
+pub fn default_screen_shake_scale() -> f32 {
+    1.0
 }
 
 fn default_true() -> bool {
@@ -564,6 +885,9 @@ pub fn default_key_bindings() -> BTreeMap<String, String> {
     m.insert("aim_right".into(), "ArrowRight".into());
     m.insert("aim_up".into(), "ArrowUp".into());
     m.insert("aim_down".into(), "ArrowDown".into());
+    // M11: sharp_aim (ADS) — right-click typically, but we wire a keyboard
+    // fallback so KeyboardOnly profile can still ADS.
+    m.insert("sharp_aim".into(), "ShiftLeft".into());
     m
 }
 
@@ -634,7 +958,7 @@ impl Default for Settings {
             mini_map_zoom: default_mini_map_zoom(),
             scope_zoom_fov: default_scope_zoom_fov(),
             text_scale: default_text_scale(),
-            ui_density: UiDensity::Normal,
+            ui_density: UiDensity::Comfortable,
             language: default_language(),
             speedrun_mode: false,
             permadeath: false,
@@ -647,6 +971,18 @@ impl Default for Settings {
             friendly_fire_on: false,
             debug_enabled: false,
             debug_overlays: default_debug_overlays(),
+            // === M11 ACC-A floor defaults ===
+            contrast_mode: ContrastMode::Standard,
+            caption_mode: CaptionMode::Off,
+            caption_background_opacity: default_caption_background_opacity(),
+            caption_categories: default_caption_categories(),
+            input_profile: InputProfile::KeyboardMouse,
+            remap_groups: default_remap_groups(),
+            hold_behavior: HoldBehavior::Hold,
+            screen_shake_scale: default_screen_shake_scale(),
+            camera_motion: CameraMotion::Standard,
+            objective_help: ObjectiveHelp::Standard,
+            debug_explainer_level: DebugExplainerLevel::Player,
         }
     }
 }

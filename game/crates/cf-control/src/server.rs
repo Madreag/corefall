@@ -282,6 +282,44 @@ pub struct SettingsPatch {
     /// **M8**: master debug-overlay gate (production builds).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub debug_enabled: Option<bool>,
+
+    // === M11 ACC-A floor extensions ===
+    /// **M11**: contrast palette mode (snake_case wire form
+    /// `standard | high_contrast_dark | high_contrast_light`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub contrast_mode: Option<String>,
+    /// **M11**: captions verbosity mode (snake_case wire form
+    /// `off | critical_only | standard | expanded`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub caption_mode: Option<String>,
+    /// **M11**: caption background opacity (0.0..=1.0).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub caption_background_opacity: Option<f32>,
+    /// **M11**: caption category subset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub caption_categories: Option<std::collections::BTreeSet<String>>,
+    /// **M11**: input profile (snake_case wire form
+    /// `keyboard_mouse | controller | keyboard_only | custom`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_profile: Option<String>,
+    /// **M11**: remap-action group subset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub remap_groups: Option<std::collections::BTreeSet<String>>,
+    /// **M11**: hold-behavior variant (`hold | toggle | press_to_cycle`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hold_behavior: Option<String>,
+    /// **M11**: screen-shake scale (0.0..=1.0; multiplicative).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub screen_shake_scale: Option<f32>,
+    /// **M11**: camera-motion granularity (`reduced | standard`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub camera_motion: Option<String>,
+    /// **M11**: objective-help verbosity (`minimal | standard | verbose`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub objective_help: Option<String>,
+    /// **M11**: debug-explainer level (`player | designer | raw`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub debug_explainer_level: Option<String>,
 }
 
 impl SettingsPatch {
@@ -332,6 +370,18 @@ impl SettingsPatch {
             && self.hardcore_mode.is_none()
             && self.friendly_fire_on.is_none()
             && self.debug_enabled.is_none()
+            // M11 ACC-A floor
+            && self.contrast_mode.is_none()
+            && self.caption_mode.is_none()
+            && self.caption_background_opacity.is_none()
+            && self.caption_categories.is_none()
+            && self.input_profile.is_none()
+            && self.remap_groups.is_none()
+            && self.hold_behavior.is_none()
+            && self.screen_shake_scale.is_none()
+            && self.camera_motion.is_none()
+            && self.objective_help.is_none()
+            && self.debug_explainer_level.is_none()
     }
 
     pub fn validation_error(&self) -> Option<String> {
@@ -434,6 +484,74 @@ impl SettingsPatch {
                 return Some("language_must_not_be_empty".to_string());
             }
         }
+        // M11 ACC-A enum/range validators.
+        if let Some(s) = self.contrast_mode.as_deref() {
+            if crate::settings::ContrastMode::from_str(s).is_none() {
+                return Some(format!("contrast_mode_unknown:{s}"));
+            }
+        }
+        if let Some(s) = self.caption_mode.as_deref() {
+            if crate::settings::CaptionMode::from_str(s).is_none() {
+                return Some(format!("caption_mode_unknown:{s}"));
+            }
+        }
+        if let Some(v) = self.caption_background_opacity {
+            if !v.is_finite() || !(0.0..=1.0).contains(&v) {
+                return Some("caption_background_opacity_out_of_range".to_string());
+            }
+        }
+        if let Some(cats) = self.caption_categories.as_ref() {
+            for cat in cats {
+                if !crate::settings::SUPPORTED_CAPTION_CATEGORIES.contains(&cat.as_str()) {
+                    return Some(format!("caption_categories_unknown:{cat}"));
+                }
+            }
+        }
+        if let Some(s) = self.input_profile.as_deref() {
+            if crate::settings::InputProfile::from_str(s).is_none() {
+                return Some(format!("input_profile_unknown:{s}"));
+            }
+        }
+        if let Some(groups) = self.remap_groups.as_ref() {
+            for g in groups {
+                if !crate::settings::SUPPORTED_REMAP_GROUPS.contains(&g.as_str()) {
+                    return Some(format!("remap_groups_unknown:{g}"));
+                }
+            }
+        }
+        if let Some(s) = self.hold_behavior.as_deref() {
+            if crate::settings::HoldBehavior::from_str(s).is_none() {
+                return Some(format!("hold_behavior_unknown:{s}"));
+            }
+        }
+        if let Some(v) = self.screen_shake_scale {
+            if !v.is_finite() || !(0.0..=1.0).contains(&v) {
+                return Some("screen_shake_scale_out_of_range".to_string());
+            }
+        }
+        if let Some(s) = self.camera_motion.as_deref() {
+            if crate::settings::CameraMotion::from_str(s).is_none() {
+                return Some(format!("camera_motion_unknown:{s}"));
+            }
+        }
+        if let Some(s) = self.objective_help.as_deref() {
+            if crate::settings::ObjectiveHelp::from_str(s).is_none() {
+                return Some(format!("objective_help_unknown:{s}"));
+            }
+        }
+        if let Some(s) = self.debug_explainer_level.as_deref() {
+            if crate::settings::DebugExplainerLevel::from_str(s).is_none() {
+                return Some(format!("debug_explainer_level_unknown:{s}"));
+            }
+        }
+        if let Some(v) = self.ui_scale {
+            if !v.is_finite() {
+                return Some("ui_scale_out_of_range".to_string());
+            }
+            // Existing behaviour: out-of-range ui_scale CLAMPS at the patch
+            // boundary; no rejection. The structured rejection mode is
+            // reserved for non-finite values only.
+        }
         self.key_bindings
             .as_ref()
             .and_then(|bindings| crate::settings::validate_key_bindings(bindings).err())
@@ -508,6 +626,24 @@ pub enum ControlCommand {
     /// through this same path.
     ActInputFocus {
         direction: FocusDirection,
+        source: IntentSource,
+    },
+    /// **M11**: pointer click at logical screen coords `(x, y)`. Resolves
+    /// the hit `target_node_id` via the HUD layout and emits a
+    /// `ux.mouse_clicked` event. Non-finite coords reject at the dispatch
+    /// boundary.
+    ActInputMouseClick {
+        x: f32,
+        y: f32,
+        source: IntentSource,
+    },
+    /// **M11**: pointer move at logical screen coords `(x, y)`. Resolves
+    /// the hover `hover_node_id` via the HUD layout and emits a
+    /// `ux.mouse_moved` event. Non-finite coords reject at the dispatch
+    /// boundary.
+    ActInputMouseMove {
+        x: f32,
+        y: f32,
         source: IntentSource,
     },
     /// **M5**: toggle the player actor's crouch stance.
@@ -961,6 +1097,39 @@ pub trait EngineHandle: Send + Sync + 'static {
     /// + weight_bonus + issuer_actor_id).
     async fn observe_tags(&self) -> serde_json::Value {
         json!({"schema_version": SCHEMA_VERSION, "tagged": Vec::<serde_json::Value>::new()})
+    }
+    /// **M11 / DR-012 closure**: return the full ACC-A surface projection —
+    /// 21 settings flags + key_bindings + focused_node + captions queue +
+    /// banner stack — so the replay viewer + cfctl AI agents see exactly
+    /// what the player sees in the HUD.
+    async fn observe_accessibility(&self) -> serde_json::Value {
+        let settings = self.settings_snapshot().await;
+        let v = serde_json::to_value(&settings).unwrap_or(serde_json::Value::Null);
+        json!({ "schema_version": SCHEMA_VERSION, "settings": v, "focusable_nodes": Vec::<String>::new() })
+    }
+    /// **M11**: return the live caption queue.
+    async fn observe_captions(&self) -> serde_json::Value {
+        json!({ "schema_version": SCHEMA_VERSION, "queue": Vec::<serde_json::Value>::new() })
+    }
+    /// **M11**: return the live banner stack.
+    async fn observe_accessibility_banners(&self) -> serde_json::Value {
+        json!({ "schema_version": SCHEMA_VERSION, "banners": Vec::<serde_json::Value>::new() })
+    }
+    /// **M11**: dedicated body silhouette projection (BodySilhouetteView
+    /// promoted from observe_frame). Default returns `None`.
+    async fn observe_actor_silhouette(&self, _actor_id: Option<u64>) -> Option<serde_json::Value> {
+        None
+    }
+    /// **M11**: dedicated module strip projection (ModuleStripView promoted
+    /// from observe_frame). Default returns `None`.
+    async fn observe_actor_module_strip(&self, _actor_id: Option<u64>) -> Option<serde_json::Value> {
+        None
+    }
+    /// **M11**: HUD assertion harness. Reads the projection that backs
+    /// `node_id` and applies `predicate` (e.g. `text~=DOWNED`,
+    /// `severity=critical`). Returns a JSON `{ pass: bool, observed: <val> }`.
+    async fn ui_assert(&self, _node_id: &str, _predicate: &str) -> serde_json::Value {
+        json!({ "schema_version": SCHEMA_VERSION, "pass": false, "observed": serde_json::Value::Null })
     }
 }
 
@@ -2760,6 +2929,129 @@ async fn process_request<E: EngineHandle>(
                 })
                 .await;
             Some(ack_response(request.id, &result))
+        }
+        "act.input.mouse_click" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct MouseClickParams {
+                schema_version: u32,
+                x: f32,
+                y: f32,
+            }
+            let p: MouseClickParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            if !p.x.is_finite() || !p.y.is_finite() {
+                return Some(invalid_param_reason(request.id, "non_finite"));
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActInputMouseClick {
+                    x: p.x,
+                    y: p.y,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.input.mouse_move" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct MouseMoveParams {
+                schema_version: u32,
+                x: f32,
+                y: f32,
+            }
+            let p: MouseMoveParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            if !p.x.is_finite() || !p.y.is_finite() {
+                return Some(invalid_param_reason(request.id, "non_finite"));
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActInputMouseMove {
+                    x: p.x,
+                    y: p.y,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "observe.accessibility" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            let value = engine.observe_accessibility().await;
+            Some(success_response(request.id, value))
+        }
+        "observe.captions" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            let value = engine.observe_captions().await;
+            Some(success_response(request.id, value))
+        }
+        "observe.accessibility.banners" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            let value = engine.observe_accessibility_banners().await;
+            Some(success_response(request.id, value))
+        }
+        "observe.actor.silhouette" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct SilhouetteParams {
+                schema_version: u32,
+                #[serde(default, skip_serializing_if = "Option::is_none")]
+                actor_id: Option<u64>,
+            }
+            let p: SilhouetteParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            match engine.observe_actor_silhouette(p.actor_id).await {
+                Some(value) => Some(success_response(request.id, value)),
+                None => Some(invalid_param_reason(request.id, "no_player_actor")),
+            }
+        }
+        "observe.actor.module_strip" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct ModuleStripParams {
+                schema_version: u32,
+                #[serde(default, skip_serializing_if = "Option::is_none")]
+                actor_id: Option<u64>,
+            }
+            let p: ModuleStripParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            match engine.observe_actor_module_strip(p.actor_id).await {
+                Some(value) => Some(success_response(request.id, value)),
+                None => Some(invalid_param_reason(request.id, "no_player_actor")),
+            }
+        }
+        "ui.assert" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct UiAssertParams {
+                schema_version: u32,
+                node_id: String,
+                predicate: String,
+            }
+            let p: UiAssertParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            let value = engine.ui_assert(&p.node_id, &p.predicate).await;
+            Some(success_response(request.id, value))
         }
         "act.settings.set" => {
             // Accept either a flat object {schema_version, ui_scale, ...} or a wrapped {schema_version, patch:{...}}.

@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ui_scale_applied.v1",
+  "title": "accessibility.ui_scale_applied",
+  "description": "Emitted when Settings.ui_scale is committed to Bevy's UiScale resource and the HUD has reflowed. ui_scale is the post-clamp value (range 0.5..4.0).",
+  "type": "object",
+  "required": ["ui_scale"],
+  "properties": {
+    "ui_scale": { "type": "number", "minimum": 0.5, "maximum": 4.0 },
+    "parent_event_id": { "type": "string" }
+  }
+}

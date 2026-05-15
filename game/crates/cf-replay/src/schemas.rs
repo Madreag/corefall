@@ -321,6 +321,17 @@ const SCHEMA_UX_PIE_MENU_SLICE_CHOSEN: &str = include_str!("../schemas/event/ux_
 const SCHEMA_UX_PIE_MENU_CLOSED: &str = include_str!("../schemas/event/ux_pie_menu_closed.json");
 const SCHEMA_UX_PIE_MENU_SLICE_REJECTED: &str = include_str!("../schemas/event/ux_pie_menu_slice_rejected.json");
 const SCHEMA_UX_GAME_SPEED_ASSIST_CHANGED: &str = include_str!("../schemas/event/ux_game_speed_assist_changed.json");
+// **M11**: ACC-A surface event family schemas (DR-003 + DR-012 closure).
+const SCHEMA_UX_BANNER_RAISED: &str = include_str!("../schemas/event/banner_raised.json");
+const SCHEMA_UX_BANNER_DISMISSED: &str = include_str!("../schemas/event/banner_dismissed.json");
+const SCHEMA_UX_FOCUS_MOVED: &str = include_str!("../schemas/event/focus_moved.json");
+const SCHEMA_UX_CAPTIONS_SHOWN: &str = include_str!("../schemas/event/captions_shown.json");
+const SCHEMA_UX_TOOL_VALIDITY_CHANGED: &str = include_str!("../schemas/event/tool_validity_changed.json");
+const SCHEMA_UX_MOUSE_CLICKED: &str = include_str!("../schemas/event/mouse_clicked.json");
+const SCHEMA_UX_MOUSE_MOVED: &str = include_str!("../schemas/event/mouse_moved.json");
+const SCHEMA_ACCESSIBILITY_SETTINGS_CHANGED: &str =
+    include_str!("../schemas/event/settings_changed_accessibility.json");
+const SCHEMA_ACCESSIBILITY_UI_SCALE_APPLIED: &str = include_str!("../schemas/event/ui_scale_applied.json");
 const SCHEMA_AI_PLAN_COMPOSED: &str = include_str!("../schemas/event/ai_plan_composed.json");
 const SCHEMA_AI_PLAN_EXECUTED: &str = include_str!("../schemas/event/ai_plan_executed.json");
 const SCHEMA_AI_PLAN_ABORTED: &str = include_str!("../schemas/event/ai_plan_aborted.json");
@@ -626,6 +637,16 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("ux", "pie_menu_closed") => Some(SCHEMA_UX_PIE_MENU_CLOSED),
         ("ux", "pie_menu_slice_rejected") => Some(SCHEMA_UX_PIE_MENU_SLICE_REJECTED),
         ("ux", "game_speed_assist_changed") => Some(SCHEMA_UX_GAME_SPEED_ASSIST_CHANGED),
+        // **M11**: ACC-A surface event families (DR-003 + DR-012 closure).
+        ("ux", "banner_raised") => Some(SCHEMA_UX_BANNER_RAISED),
+        ("ux", "banner_dismissed") => Some(SCHEMA_UX_BANNER_DISMISSED),
+        ("ux", "focus_moved") => Some(SCHEMA_UX_FOCUS_MOVED),
+        ("ux", "captions_shown") => Some(SCHEMA_UX_CAPTIONS_SHOWN),
+        ("ux", "tool_validity_changed") => Some(SCHEMA_UX_TOOL_VALIDITY_CHANGED),
+        ("ux", "mouse_clicked") => Some(SCHEMA_UX_MOUSE_CLICKED),
+        ("ux", "mouse_moved") => Some(SCHEMA_UX_MOUSE_MOVED),
+        ("accessibility", "settings_changed") => Some(SCHEMA_ACCESSIBILITY_SETTINGS_CHANGED),
+        ("accessibility", "ui_scale_applied") => Some(SCHEMA_ACCESSIBILITY_UI_SCALE_APPLIED),
         ("ai", "plan_composed") => Some(SCHEMA_AI_PLAN_COMPOSED),
         ("ai", "plan_executed") => Some(SCHEMA_AI_PLAN_EXECUTED),
         ("ai", "plan_aborted") => Some(SCHEMA_AI_PLAN_ABORTED),

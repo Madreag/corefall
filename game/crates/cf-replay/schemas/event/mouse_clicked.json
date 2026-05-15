@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/mouse_clicked.v1",
+  "title": "ux.mouse_clicked",
+  "description": "Emitted on act.input.mouse_click dispatch. target_node_id is the HUD_FOCUSABLE_NODES id under the click position, or empty for no-target.",
+  "type": "object",
+  "required": ["x", "y"],
+  "properties": {
+    "x": { "type": "number" },
+    "y": { "type": "number" },
+    "target_node_id": { "type": "string" },
+    "parent_event_id": { "type": "string" }
+  }
+}

@@ -1,0 +1,33 @@
+// **M11 / c4b4ea0 interim TTD floors**: data-only file consumed by
+// `cf-actor::ttd::InterimTtdContract` for the Triage Window HUD widget.
+// M17 owns the canonical TTD math; M11 ships these floors so the widget
+// renders today. Scale per difficulty: cakewalk×1.5 / tough_crowd×1.0 /
+// veteran×0.75. Schema lock: `schema_version` MUST be "1.0.0".
+TtdFloorsInterim(
+    schema_version: "1.0.0",
+    // Per-affliction × per-origin × per-difficulty TTD floor in seconds.
+    floors: [
+        // Human floors at tough_crowd baseline.
+        FloorEntry(kind: "bleed_2w", origin: "human", difficulty: "tough_crowd", seconds: 18.0),
+        FloorEntry(kind: "burning", origin: "human", difficulty: "tough_crowd", seconds: 32.0),
+        FloorEntry(kind: "concussion_grace", origin: "human", difficulty: "tough_crowd", seconds: 8.0),
+        FloorEntry(kind: "oxygen_empty", origin: "human", difficulty: "tough_crowd", seconds: 10.0),
+        FloorEntry(kind: "hypoxia", origin: "human", difficulty: "tough_crowd", seconds: 25.0),
+        // Robot floors.
+        FloorEntry(kind: "oil_empty", origin: "robot", difficulty: "tough_crowd", seconds: 60.0),
+        FloorEntry(kind: "power_drain_crit", origin: "robot", difficulty: "tough_crowd", seconds: 18.0),
+        FloorEntry(kind: "heat_overheat", origin: "robot", difficulty: "tough_crowd", seconds: 12.0),
+        FloorEntry(kind: "burning", origin: "robot", difficulty: "tough_crowd", seconds: 24.0),
+        // Android hybrid floors.
+        FloorEntry(kind: "bleed_2w", origin: "android", difficulty: "tough_crowd", seconds: 22.0),
+        FloorEntry(kind: "burning", origin: "android", difficulty: "tough_crowd", seconds: 28.0),
+        FloorEntry(kind: "oxygen_empty", origin: "android", difficulty: "tough_crowd", seconds: 14.0),
+        FloorEntry(kind: "power_drain_crit", origin: "android", difficulty: "tough_crowd", seconds: 22.0),
+    ],
+    // Multiplicative cross-affliction modifiers (applied to min(individual TTDs)).
+    compound_modifiers: [
+        CompoundModifier(a: "bleed_2w", b: "burning", multiplier: 0.75),
+        CompoundModifier(a: "concussion_grace", b: "bleed_2w", multiplier: 0.6),
+        CompoundModifier(a: "oxygen_empty", b: "hypoxia", multiplier: 0.5),
+    ],
+)

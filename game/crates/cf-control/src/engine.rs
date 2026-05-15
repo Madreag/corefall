@@ -12168,6 +12168,32 @@ enum ToolValidityUpdate {
     Refuse { reason: String, target: Option<String> },
 }
 
+/// **M11 / DR-012**: resolve which HUD focusable node lives under a logical
+/// pointer position. cf-app owns the actual hit-box geometry; this server-
+/// side helper provides a deterministic mapping based on a normalized
+/// 0..1 layout grid so cfctl `act.input.mouse_click` can target any node
+/// by name without a render loop in the loop.
+///
+/// The mapping is COARSE on purpose: cfctl ui_assert + replay-side
+/// rendering use this stub to confirm that the input round-trips through
+/// the engine; precise pointer-to-pixel mapping lives in cf-app when the
+/// pointer actually traverses the HUD.
+fn resolve_hud_node_at(x: f32, y: f32) -> Option<String> {
+    // Negative coords mean "off-screen" — emit empty target.
+    if x < 0.0 || y < 0.0 {
+        return None;
+    }
+    // The 12 HUD_FOCUSABLE_NODES occupy a 1×N vertical band on the left
+    // edge of the screen by default. The exact pixel geometry is owned by
+    // cf-ui's spawn_status_strip; this is the engine-side coarse map.
+    let bucket = (y / 24.0).floor() as usize;
+    if bucket < HUD_FOCUSABLE_NODES.len() {
+        Some(HUD_FOCUSABLE_NODES[bucket].to_string())
+    } else {
+        None
+    }
+}
+
 /// M4A: push a banner to the HUD queue, capping at `M4A_BANNER_BUFFER`.
 fn push_banner(queue: &mut VecDeque<crate::state::HudBannerView>, banner: crate::state::HudBannerView) {
     queue.push_back(banner);
@@ -12955,6 +12981,104 @@ fn apply_settings_patch(settings: &mut Settings, patch: &SettingsPatch) -> Vec<S
             changed.push("debug_enabled".to_string());
         }
     }
+    // === M11 ACC-A floor (DR-003 + DR-012 closure) ===
+    if let Some(ref s) = patch.contrast_mode {
+        if let Some(parsed) = crate::settings::ContrastMode::from_str(s) {
+            if settings.contrast_mode != parsed {
+                settings.contrast_mode = parsed;
+                // Mirror to the legacy bool so M8 surfaces keep working.
+                let want_high_contrast = !matches!(parsed, crate::settings::ContrastMode::Standard);
+                if settings.high_contrast != want_high_contrast {
+                    settings.high_contrast = want_high_contrast;
+                    changed.push("high_contrast".to_string());
+                }
+                changed.push("contrast_mode".to_string());
+            }
+        }
+    }
+    if let Some(ref s) = patch.caption_mode {
+        if let Some(parsed) = crate::settings::CaptionMode::from_str(s) {
+            if settings.caption_mode != parsed {
+                settings.caption_mode = parsed;
+                let want_captions = !matches!(parsed, crate::settings::CaptionMode::Off);
+                if settings.captions != want_captions {
+                    settings.captions = want_captions;
+                    changed.push("captions".to_string());
+                }
+                changed.push("caption_mode".to_string());
+            }
+        }
+    }
+    if let Some(v) = patch.caption_background_opacity {
+        let clamped = v.clamp(0.0, 1.0);
+        if (settings.caption_background_opacity - clamped).abs() > f32::EPSILON {
+            settings.caption_background_opacity = clamped;
+            changed.push("caption_background_opacity".to_string());
+        }
+    }
+    if let Some(ref cats) = patch.caption_categories {
+        if &settings.caption_categories != cats {
+            settings.caption_categories = cats.clone();
+            changed.push("caption_categories".to_string());
+        }
+    }
+    if let Some(ref s) = patch.input_profile {
+        if let Some(parsed) = crate::settings::InputProfile::from_str(s) {
+            if settings.input_profile != parsed {
+                settings.input_profile = parsed;
+                changed.push("input_profile".to_string());
+            }
+        }
+    }
+    if let Some(ref groups) = patch.remap_groups {
+        if &settings.remap_groups != groups {
+            settings.remap_groups = groups.clone();
+            changed.push("remap_groups".to_string());
+        }
+    }
+    if let Some(ref s) = patch.hold_behavior {
+        if let Some(parsed) = crate::settings::HoldBehavior::from_str(s) {
+            if settings.hold_behavior != parsed {
+                settings.hold_behavior = parsed;
+                changed.push("hold_behavior".to_string());
+            }
+        }
+    }
+    if let Some(v) = patch.screen_shake_scale {
+        let clamped = v.clamp(0.0, 1.0);
+        if (settings.screen_shake_scale - clamped).abs() > f32::EPSILON {
+            settings.screen_shake_scale = clamped;
+            // Mirror to the inverse-sense legacy field so cf-app's existing
+            // camera-shake path keeps working: legacy = 1.0 - scale.
+            let legacy = 1.0 - clamped;
+            settings.reduce_camera_shake_pct = legacy;
+            changed.push("screen_shake_scale".to_string());
+        }
+    }
+    if let Some(ref s) = patch.camera_motion {
+        if let Some(parsed) = crate::settings::CameraMotion::from_str(s) {
+            if settings.camera_motion != parsed {
+                settings.camera_motion = parsed;
+                changed.push("camera_motion".to_string());
+            }
+        }
+    }
+    if let Some(ref s) = patch.objective_help {
+        if let Some(parsed) = crate::settings::ObjectiveHelp::from_str(s) {
+            if settings.objective_help != parsed {
+                settings.objective_help = parsed;
+                changed.push("objective_help".to_string());
+            }
+        }
+    }
+    if let Some(ref s) = patch.debug_explainer_level {
+        if let Some(parsed) = crate::settings::DebugExplainerLevel::from_str(s) {
+            if settings.debug_explainer_level != parsed {
+                settings.debug_explainer_level = parsed;
+                changed.push("debug_explainer_level".to_string());
+            }
+        }
+    }
     changed
 }
 
@@ -13604,6 +13728,203 @@ impl EngineHandle for M0Engine {
     /// **M8**: active MMB tag list.
     async fn observe_tags(&self) -> serde_json::Value {
         self.snapshot_tags()
+    }
+
+    /// **M11 / DR-012 closure**: full ACC-A surface projection.
+    async fn observe_accessibility(&self) -> serde_json::Value {
+        let settings = self.current_settings();
+        let s = self.state.read().expect("engine state poisoned");
+        let focused_node = s.hud_focus_index.map(|i| HUD_FOCUSABLE_NODES[i].to_string());
+        let banners: Vec<serde_json::Value> = s
+            .hud_banners
+            .iter()
+            .map(|b| {
+                json!({
+                    "banner_id": b.id,
+                    "severity": b.severity,
+                    "label": b.label,
+                    "raised_at_tick": b.raised_at_tick,
+                    "accessibility_id": b.accessibility_id,
+                })
+            })
+            .collect();
+        let captions: Vec<serde_json::Value> = s
+            .hud_captions
+            .iter()
+            .map(|c| {
+                json!({
+                    "id": c.id,
+                    "label": c.label,
+                    "raised_at_tick": c.raised_at_tick,
+                    "accessibility_id": c.accessibility_id,
+                })
+            })
+            .collect();
+        let nodes: Vec<&'static str> = HUD_FOCUSABLE_NODES.iter().copied().collect();
+        let settings_value = serde_json::to_value(&settings).unwrap_or(serde_json::Value::Null);
+        json!({
+            "schema_version": SCHEMA_VERSION,
+            "settings": settings_value,
+            "focusable_nodes": nodes,
+            "focused_node": focused_node,
+            "banners": banners,
+            "captions": captions,
+            "ui_scale": settings.ui_scale,
+            "high_contrast": settings.high_contrast,
+            "contrast_mode": settings.contrast_mode.as_str(),
+            "captions_enabled": settings.captions,
+            "caption_mode": settings.caption_mode.as_str(),
+            "caption_categories": settings.caption_categories.iter().collect::<Vec<_>>(),
+            "input_profile": settings.input_profile.as_str(),
+            "hold_behavior": settings.hold_behavior.as_str(),
+            "screen_shake_scale": settings.screen_shake_scale,
+            "camera_motion": settings.camera_motion.as_str(),
+            "objective_help": settings.objective_help.as_str(),
+            "debug_explainer_level": settings.debug_explainer_level.as_str(),
+        })
+    }
+
+    /// **M11**: dedicated caption queue projection for cfctl observers.
+    async fn observe_captions(&self) -> serde_json::Value {
+        let s = self.state.read().expect("engine state poisoned");
+        let queue: Vec<serde_json::Value> = s
+            .hud_captions
+            .iter()
+            .map(|c| {
+                json!({
+                    "id": c.id,
+                    "label": c.label,
+                    "raised_at_tick": c.raised_at_tick,
+                    "accessibility_id": c.accessibility_id,
+                })
+            })
+            .collect();
+        json!({ "schema_version": SCHEMA_VERSION, "queue": queue })
+    }
+
+    /// **M11**: dedicated banner stack projection for cfctl observers.
+    async fn observe_accessibility_banners(&self) -> serde_json::Value {
+        let s = self.state.read().expect("engine state poisoned");
+        let banners: Vec<serde_json::Value> = s
+            .hud_banners
+            .iter()
+            .map(|b| {
+                json!({
+                    "banner_id": b.id,
+                    "severity": b.severity,
+                    "label": b.label,
+                    "raised_at_tick": b.raised_at_tick,
+                    "accessibility_id": b.accessibility_id,
+                    "expires_at_tick": b.expires_at_tick,
+                })
+            })
+            .collect();
+        json!({ "schema_version": SCHEMA_VERSION, "banners": banners })
+    }
+
+    /// **M11**: dedicated body-silhouette projection.
+    async fn observe_actor_silhouette(&self, actor_id: Option<u64>) -> Option<serde_json::Value> {
+        let state = self.state.read().ok()?;
+        let sim = state.actor_state.as_ref()?;
+        let target_id = actor_id.unwrap_or_else(|| sim.world.player.map(|id| id.0).unwrap_or(0));
+        let actor = sim.world.actors.get(&ActorId(target_id))?;
+        let silhouette = actor.body_silhouette();
+        Some(json!({
+            "schema_version": SCHEMA_VERSION,
+            "actor_id": target_id,
+            "head_hp_pct": silhouette.head_hp_pct,
+            "torso_hp_pct": silhouette.torso_hp_pct,
+            "arm_left_hp_pct": silhouette.arm_left_hp_pct,
+            "arm_right_hp_pct": silhouette.arm_right_hp_pct,
+            "leg_left_hp_pct": silhouette.leg_left_hp_pct,
+            "leg_right_hp_pct": silhouette.leg_right_hp_pct,
+            "placeholder": silhouette.placeholder,
+        }))
+    }
+
+    /// **M11**: dedicated module-strip projection.
+    async fn observe_actor_module_strip(&self, actor_id: Option<u64>) -> Option<serde_json::Value> {
+        let state = self.state.read().ok()?;
+        let sim = state.actor_state.as_ref()?;
+        let target_id = actor_id.unwrap_or_else(|| sim.world.player.map(|id| id.0).unwrap_or(0));
+        let actor = sim.world.actors.get(&ActorId(target_id))?;
+        let rifle = sim.rifles.get(&ActorId(target_id));
+        let module_strip = match actor.chassis_module_strip() {
+            Some(strip) => crate::state::ModuleStripView {
+                modules: strip
+                    .modules
+                    .iter()
+                    .map(|m| crate::state::ModuleStateView {
+                        id: m.id.clone(),
+                        label: m.label.clone(),
+                        state: m.state.clone(),
+                        kind: m.kind.clone(),
+                    })
+                    .collect(),
+                placeholder: strip.placeholder,
+            },
+            None => build_module_strip_view(rifle, actor.inventory.selected_item().is_rifle()),
+        };
+        Some(json!({
+            "schema_version": SCHEMA_VERSION,
+            "actor_id": target_id,
+            "modules": module_strip.modules,
+            "placeholder": module_strip.placeholder,
+        }))
+    }
+
+    /// **M11**: HUD assertion harness used by cfctl scripts + cf-e2e.
+    /// Predicate forms supported:
+    ///   - `severity=<critical|warning|info>` (matches against `hud.banners.*`)
+    ///   - `text~=<substring>` (case-insensitive contains)
+    ///   - `present=true|false` (existence check)
+    async fn ui_assert(&self, node_id: &str, predicate: &str) -> serde_json::Value {
+        let s = self.state.read().expect("engine state poisoned");
+        let observed_text = match node_id {
+            "hud.banners" => {
+                // First (highest-severity) banner's label.
+                s.hud_banners
+                    .iter()
+                    .map(|b| b.label.clone())
+                    .next()
+                    .unwrap_or_default()
+            }
+            "hud.captions" => s
+                .hud_captions
+                .iter()
+                .map(|c| c.label.clone())
+                .next()
+                .unwrap_or_default(),
+            "hud.last_event" => s
+                .hud_captions
+                .iter()
+                .last()
+                .map(|c| c.label.clone())
+                .unwrap_or_default(),
+            _ => String::new(),
+        };
+        let severity = s.hud_banners.iter().map(|b| b.severity.clone()).next().unwrap_or_default();
+        let pass = if let Some(rest) = predicate.strip_prefix("severity=") {
+            severity == rest
+        } else if let Some(rest) = predicate.strip_prefix("text~=") {
+            observed_text.to_lowercase().contains(&rest.to_lowercase())
+        } else if let Some(rest) = predicate.strip_prefix("present=") {
+            let want = rest == "true";
+            let present = !observed_text.is_empty();
+            present == want
+        } else {
+            false
+        };
+        json!({
+            "schema_version": SCHEMA_VERSION,
+            "node_id": node_id,
+            "predicate": predicate,
+            "pass": pass,
+            "observed": {
+                "text": observed_text,
+                "severity": severity,
+            },
+        })
     }
 
     /// **M2 re-audit (2026-05-13)**: full mission inspect including the last
@@ -14873,6 +15194,89 @@ impl EngineHandle for M0Engine {
                     }),
                     None,
                 );
+                // **M11 § DR-012 closure**: emit `ux.focus_moved` paired
+                // with the control event so the replay viewer can render
+                // the focus traversal as a first-class HUD event.
+                let from_node = prev_idx.map(|i| HUD_FOCUSABLE_NODES[i].to_string()).unwrap_or_default();
+                let to_node = new_node.clone().unwrap_or_default();
+                let _ = self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "ux",
+                    "focus_moved",
+                    json!({
+                        "from": from_node,
+                        "to": to_node,
+                        "direction": direction_str,
+                    }),
+                    None,
+                );
+                CommandResult::accepted(tick.0)
+            }
+            ControlCommand::ActInputMouseClick { x, y, source } => {
+                let _ = source;
+                drop(state);
+                if !x.is_finite() || !y.is_finite() {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_rejected",
+                        json!({"method": "act.input.mouse_click", "reason": "non_finite"}),
+                        None,
+                    );
+                    return CommandResult::rejected("non_finite", tick.0);
+                }
+                let target = resolve_hud_node_at(x, y).unwrap_or_default();
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "control",
+                    "command_accepted",
+                    json!({"method": "act.input.mouse_click", "x": x, "y": y, "target_node_id": target}),
+                    None,
+                );
+                let _ = self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "ux",
+                    "mouse_clicked",
+                    json!({"x": x, "y": y, "target_node_id": target}),
+                    None,
+                );
+                CommandResult::accepted(tick.0)
+            }
+            ControlCommand::ActInputMouseMove { x, y, source } => {
+                let _ = source;
+                drop(state);
+                if !x.is_finite() || !y.is_finite() {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_rejected",
+                        json!({"method": "act.input.mouse_move", "reason": "non_finite"}),
+                        None,
+                    );
+                    return CommandResult::rejected("non_finite", tick.0);
+                }
+                let hover = resolve_hud_node_at(x, y).unwrap_or_default();
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "control",
+                    "command_accepted",
+                    json!({"method": "act.input.mouse_move", "x": x, "y": y, "hover_node_id": hover}),
+                    None,
+                );
+                let _ = self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "ux",
+                    "mouse_moved",
+                    json!({"x": x, "y": y, "hover_node_id": hover}),
+                    None,
+                );
                 CommandResult::accepted(tick.0)
             }
             ControlCommand::ActPlayerCrouch { active, source } => {
@@ -15380,6 +15784,19 @@ impl EngineHandle for M0Engine {
                     "reduce_camera_shake_pct",
                     "hold_to_confirm",
                     "key_remap_enabled",
+                    "key_bindings",
+                    // M11 ACC-A surface fields.
+                    "contrast_mode",
+                    "caption_mode",
+                    "caption_background_opacity",
+                    "caption_categories",
+                    "input_profile",
+                    "remap_groups",
+                    "hold_behavior",
+                    "screen_shake_scale",
+                    "camera_motion",
+                    "objective_help",
+                    "debug_explainer_level",
                 ];
                 let prev_value = serde_json::to_value(&prev_settings).unwrap_or(serde_json::Value::Null);
                 for field in &changed {
@@ -15398,6 +15815,20 @@ impl EngineHandle for M0Engine {
                             "from": from,
                             "to": to,
                         }),
+                        None,
+                    );
+                }
+                // **M11 § DR-012 closure**: when `ui_scale` changed, emit a
+                // dedicated `accessibility.ui_scale_applied` event so the
+                // replay viewer + cf-app's UiScale binding agree on when the
+                // HUD reflowed.
+                if changed.iter().any(|f| f == "ui_scale") {
+                    let _ = self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "accessibility",
+                        "ui_scale_applied",
+                        json!({ "ui_scale": new_settings.ui_scale }),
                         None,
                     );
                 }
