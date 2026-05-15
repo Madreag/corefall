@@ -100,6 +100,23 @@ pub struct BotState {
     /// the line of fire. One emission per (actor, friendly) until the
     /// friendly clears the LOS.
     pub last_friendly_fire_avoidance_friendly: Option<ActorId>,
+    /// **M7-B fix-round-2 (audit gap A18)**: sliding window of shot ticks
+    /// fired by this bot. Trimmed to the last
+    /// [`SUSTAINED_COMBAT_WINDOW_SECONDS`] each time the bot fires. Drives
+    /// the sustained-combat stress accumulator (10+ shots in 5s pumps
+    /// stress one band per burst).
+    pub recent_shot_ticks: Vec<u64>,
+    /// **M7-B fix-round-2 (audit gap A18)**: stress band the bot currently
+    /// occupies. Transitions are surfaced as `ai.stress_threshold_crossed`
+    /// events. Initialised to [`StressThreshold::Calm`] so the first
+    /// upward crossing (Calm → Stressed) fires once at the right boundary.
+    pub last_stress_band: StressThreshold,
+    /// **M7-B fix-round-2 (audit gap A18)**: latch toggled true the first
+    /// tick the sliding window contains [`SUSTAINED_COMBAT_SHOT_COUNT`]
+    /// shots and reset to false when the window drops back below the
+    /// threshold. Prevents repeated stress pumping on every shot inside a
+    /// single sustained-combat burst.
+    pub sustained_combat_latched: bool,
 }
 
 impl BotState {
@@ -118,6 +135,9 @@ impl BotState {
             had_player_visibility: false,
             last_high_ground_emission_task: None,
             last_friendly_fire_avoidance_friendly: None,
+            recent_shot_ticks: Vec::new(),
+            last_stress_band: StressThreshold::Calm,
+            sustained_combat_latched: false,
         }
     }
 
@@ -1582,6 +1602,162 @@ pub fn faction_allegiance_changed_payload(
     })
 }
 
+// ---------------------------------------------------------------------------
+// **M7-B fix-round-2 (audit gap A18)**: per-event mood / stress / faction
+// delta helpers. M7-B already shipped baseline emission at scenario start;
+// these helpers wire the spec's Gherkin "ally killed → -15", "kill scored →
+// +5", "wounded → -10", "sustained combat pumps stress", and "friendly fire
+// shifts faction allegiance −30" deltas into runtime event surfaces. Each
+// helper mutates the relevant accumulator on `M7AiWorld` (clamping per
+// `PersonalityProfile::adjust_mood` / `adjust_stress`) and returns a
+// ready-to-record `serde_json::Value` payload for the engine to dispatch.
+// ---------------------------------------------------------------------------
+
+/// **M7-B fix-round-2 (audit gap A18)**: spec constants for the
+/// sustained-combat stress accumulator. The bot enters sustained combat
+/// once `SUSTAINED_COMBAT_SHOT_COUNT` shots land inside the sliding
+/// `SUSTAINED_COMBAT_WINDOW_SECONDS` window, and each entry pumps stress
+/// by `STRESS_BAND_STEP` (one band: Calm → Stressed → Depressed → Broken).
+pub const SUSTAINED_COMBAT_SHOT_COUNT: usize = 10;
+pub const SUSTAINED_COMBAT_WINDOW_SECONDS: f32 = 5.0;
+pub const STRESS_BAND_STEP: f32 = 25.0;
+
+/// **M7-B fix-round-2 (audit gap A18)**: spec deltas for the per-event
+/// mood accumulator. Mirrors spec § Personality traits + mood/stress
+/// "events that affect mood: ally killed (-15), kill landed (+5),
+/// mission progress (+5), wounded (-10)".
+pub const MOOD_DELTA_ALLY_KILLED: f32 = -15.0;
+pub const MOOD_DELTA_ALLY_KILL: f32 = 5.0;
+pub const MOOD_DELTA_WOUNDED: f32 = -10.0;
+
+/// **M7-B fix-round-2 (audit gap A18)**: spec delta for the
+/// friendly-fire faction-allegiance shift. Spec § Faction relationship
+/// dynamic shift: "Given player kills allied faction member / Then
+/// faction.relationship_changed fires with delta=-30".
+pub const FACTION_DELTA_FRIENDLY_FIRE: i16 = -30;
+
+/// **M7-B fix-round-2 (audit gap A18)**: classify a stress accumulator
+/// value into one of the four bands. Boundaries: ≥75 = Broken; ≥50 =
+/// Depressed; ≥25 = Stressed; otherwise Calm.
+pub fn stress_band_for(stress: f32) -> StressThreshold {
+    if stress >= 75.0 {
+        StressThreshold::Broken
+    } else if stress >= 50.0 {
+        StressThreshold::Depressed
+    } else if stress >= 25.0 {
+        StressThreshold::Stressed
+    } else {
+        StressThreshold::Calm
+    }
+}
+
+/// **M7-B fix-round-2 (audit gap A18)**: resolve the [`FactionId`] of an
+/// actor for friendly-fire / kill-observer routing. Tracked bots carry
+/// their faction directly; the player actor (identified by
+/// `player_actor`) is always [`FactionId::Player`]. Returns `None` for
+/// untracked, non-player actors (e.g. props).
+pub fn faction_for_actor(world: &M7AiWorld, actor: ActorId, player_actor: Option<ActorId>) -> Option<FactionId> {
+    if let Some(bot) = world.bots.get(&actor) {
+        return Some(bot.faction);
+    }
+    if player_actor == Some(actor) {
+        return Some(FactionId::Player);
+    }
+    None
+}
+
+/// **M7-B fix-round-2 (audit gap A18)**: apply a mood delta to one bot
+/// and return the matching `ai.mood_changed` payload. The clamp to
+/// `[-100, +100]` lives on [`PersonalityProfile::adjust_mood`]. Returns
+/// `None` when the actor is not a tracked bot (e.g. the player or a
+/// non-AI prop).
+pub fn adjust_actor_mood(world: &mut M7AiWorld, actor: ActorId, delta: f32, cause: &str) -> Option<Value> {
+    let bot = world.bots.get_mut(&actor)?;
+    bot.personality.adjust_mood(delta);
+    let new_mood = bot.personality.mood;
+    Some(mood_changed_payload(actor.0, delta, new_mood, cause))
+}
+
+/// **M7-B fix-round-2 (audit gap A18)**: per-bot stress accumulator
+/// driven by sustained combat. Appends `current_tick` to the bot's
+/// sliding window, trims entries older than
+/// `SUSTAINED_COMBAT_WINDOW_SECONDS`, and (when the window just crossed
+/// [`SUSTAINED_COMBAT_SHOT_COUNT`] and the sustained-combat latch is
+/// open) pumps stress by [`STRESS_BAND_STEP`]. Returns a ready-to-record
+/// `ai.stress_threshold_crossed` payload iff the pump moved the bot
+/// into a higher band; otherwise `None`. The latch resets the next time
+/// the window drops back below the shot threshold.
+pub fn record_shot_for_stress(
+    world: &mut M7AiWorld,
+    actor: ActorId,
+    current_tick: u64,
+    tick_rate_hz: u32,
+) -> Option<Value> {
+    let bot = world.bots.get_mut(&actor)?;
+    let rate = tick_rate_hz.max(1) as f32;
+    let window_ticks = (SUSTAINED_COMBAT_WINDOW_SECONDS * rate).round() as u64;
+    bot.recent_shot_ticks.push(current_tick);
+    let cutoff = current_tick.saturating_sub(window_ticks);
+    bot.recent_shot_ticks.retain(|t| *t >= cutoff);
+    if bot.recent_shot_ticks.len() < SUSTAINED_COMBAT_SHOT_COUNT {
+        bot.sustained_combat_latched = false;
+        return None;
+    }
+    if bot.sustained_combat_latched {
+        return None;
+    }
+    bot.sustained_combat_latched = true;
+    let old_band = bot.last_stress_band;
+    bot.personality.adjust_stress(STRESS_BAND_STEP);
+    let new_band = stress_band_for(bot.personality.stress);
+    if new_band == old_band {
+        return None;
+    }
+    bot.last_stress_band = new_band;
+    let stress_value = bot.personality.stress;
+    Some(stress_threshold_crossed_payload(actor.0, new_band, true, stress_value))
+}
+
+/// **M7-B fix-round-2 (audit gap A18)**: apply a faction-relationship
+/// delta to the world matrix and return a ready-to-record
+/// `ai.faction_allegiance_changed` payload. Adjust is symmetric (per
+/// [`FactionRelationships::adjust`]). Self-pairs are never adjusted
+/// (allegiance(a, a) is the constant `+100`); the helper returns `None`
+/// when `a == b`. `actual_delta` reflects post-clamp movement (so a
+/// matrix already pinned at `+100` / `-100` reports `0`).
+pub fn adjust_faction_relationships(
+    world: &mut M7AiWorld,
+    a: FactionId,
+    b: FactionId,
+    delta: i16,
+    cause: &str,
+) -> Option<Value> {
+    if a == b {
+        return None;
+    }
+    let old_value = world.factions.get(a, b);
+    world.factions.adjust(a, b, delta);
+    let new_value = world.factions.get(a, b);
+    let actual_delta = new_value.saturating_sub(old_value);
+    if actual_delta == 0 {
+        return None;
+    }
+    Some(faction_allegiance_changed_payload(a, b, actual_delta, new_value, cause))
+}
+
+/// **M7-B fix-round-2 (audit gap A18)**: convenience predicate the
+/// engine uses to decide whether a (shooter, target) hit counts as
+/// friendly fire. Returns true when the two factions are the same, OR
+/// when the current matrix entry between them is strictly positive
+/// (i.e. they are allied). Self-pair `(a, a)` returns true (a bot
+/// shooting another bot in its own faction is friendly fire).
+pub fn is_friendly_fire(world: &M7AiWorld, shooter: FactionId, target: FactionId) -> bool {
+    if shooter == target {
+        return true;
+    }
+    world.factions.get(shooter, target) > 0
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -2278,5 +2454,157 @@ mod tests {
         sig.self_position = [10.0, 25.0];
         let emit = detect_behavior_transitions(&mut bot, TaskType::SharpshootTarget, &sig);
         assert!(emit.high_ground_preference_applied.is_none());
+    }
+
+    // -----------------------------------------------------------------
+    // **M7-B fix-round-2 (audit gap A18)**: per-event mood / stress /
+    // faction delta coverage. Verifies the helpers mutate the world
+    // accumulators correctly and return ready-to-record payloads.
+    // -----------------------------------------------------------------
+
+    #[test]
+    fn adjust_actor_mood_applies_delta_and_returns_payload() {
+        let mut world = M7AiWorld::new();
+        world.assign_archetype(ActorId(7), Archetype::Rifleman);
+        let payload = adjust_actor_mood(&mut world, ActorId(7), MOOD_DELTA_ALLY_KILLED, "ally_killed")
+            .expect("ally_killed mood delta returns payload");
+        assert_eq!(payload.get("actor_id").unwrap(), &json!(7));
+        assert_eq!(payload.get("delta").unwrap(), &json!(MOOD_DELTA_ALLY_KILLED));
+        assert_eq!(payload.get("new_mood").unwrap(), &json!(MOOD_DELTA_ALLY_KILLED));
+        assert_eq!(payload.get("cause").unwrap(), &json!("ally_killed"));
+        let bot = world.bot(ActorId(7)).expect("bot exists");
+        assert!((bot.personality.mood - MOOD_DELTA_ALLY_KILLED).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn adjust_actor_mood_clamps_to_minus_hundred() {
+        let mut world = M7AiWorld::new();
+        world.assign_archetype(ActorId(7), Archetype::Rifleman);
+        // Bottom-out: 8 ally_killed events = -120, clamped to -100.
+        for _ in 0..8 {
+            let _ = adjust_actor_mood(&mut world, ActorId(7), MOOD_DELTA_ALLY_KILLED, "ally_killed");
+        }
+        let bot = world.bot(ActorId(7)).unwrap();
+        assert!((bot.personality.mood + 100.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn adjust_actor_mood_returns_none_for_untracked_actor() {
+        let mut world = M7AiWorld::new();
+        assert!(adjust_actor_mood(&mut world, ActorId(42), MOOD_DELTA_WOUNDED, "wounded").is_none());
+    }
+
+    #[test]
+    fn record_shot_for_stress_pumps_stress_after_ten_shots() {
+        let mut world = M7AiWorld::new();
+        world.assign_archetype(ActorId(7), Archetype::Rifleman);
+        let tick_rate = 60;
+        // First 9 shots in window: no transition yet.
+        for i in 0..9 {
+            let payload = record_shot_for_stress(&mut world, ActorId(7), 100 + i * 5, tick_rate);
+            assert!(payload.is_none(), "no threshold crossed after {} shots", i + 1);
+        }
+        // 10th shot in the same 5-second window: pumps stress one band.
+        let payload =
+            record_shot_for_stress(&mut world, ActorId(7), 145, tick_rate).expect("10th shot pumps stress band");
+        assert_eq!(payload.get("threshold").unwrap(), &json!("stressed"));
+        assert_eq!(payload.get("direction").unwrap(), &json!("entered"));
+        assert_eq!(payload.get("actor_id").unwrap(), &json!(7));
+        let stress_value = payload.get("stress_value").and_then(|v| v.as_f64()).unwrap();
+        assert!(stress_value >= 25.0);
+    }
+
+    #[test]
+    fn record_shot_for_stress_does_not_re_pump_within_same_burst() {
+        let mut world = M7AiWorld::new();
+        world.assign_archetype(ActorId(7), Archetype::Rifleman);
+        let tick_rate = 60;
+        for i in 0..10 {
+            let _ = record_shot_for_stress(&mut world, ActorId(7), 100 + i * 5, tick_rate);
+        }
+        // 11th and 12th shots inside the same burst: no re-pump.
+        let p11 = record_shot_for_stress(&mut world, ActorId(7), 152, tick_rate);
+        let p12 = record_shot_for_stress(&mut world, ActorId(7), 156, tick_rate);
+        assert!(p11.is_none(), "11th shot stays latched");
+        assert!(p12.is_none(), "12th shot stays latched");
+    }
+
+    #[test]
+    fn record_shot_for_stress_resets_latch_when_window_drains() {
+        let mut world = M7AiWorld::new();
+        world.assign_archetype(ActorId(7), Archetype::Rifleman);
+        let tick_rate = 60;
+        for i in 0..10 {
+            let _ = record_shot_for_stress(&mut world, ActorId(7), 100 + i * 5, tick_rate);
+        }
+        // Jump way past the 5-second window: latch should clear before next pump.
+        let later_tick = 100 + 5 * 60 * 10;
+        let payload = record_shot_for_stress(&mut world, ActorId(7), later_tick, tick_rate);
+        assert!(payload.is_none(), "single shot after window drain doesn't re-pump");
+        let bot = world.bot(ActorId(7)).expect("bot exists");
+        assert!(!bot.sustained_combat_latched, "latch reset by window drain");
+    }
+
+    #[test]
+    fn adjust_faction_relationships_friendly_fire_drops_player_ally_to_negative() {
+        let mut world = M7AiWorld::new();
+        // Default: Player ↔ AiAllied = +75.
+        let payload = adjust_faction_relationships(
+            &mut world,
+            FactionId::Player,
+            FactionId::AiAllied,
+            FACTION_DELTA_FRIENDLY_FIRE,
+            "friendly_fire_received",
+        )
+        .expect("friendly fire delta returns payload");
+        assert_eq!(payload.get("a").unwrap(), &json!("player"));
+        assert_eq!(payload.get("b").unwrap(), &json!("ai_allied"));
+        assert_eq!(payload.get("delta").unwrap(), &json!(FACTION_DELTA_FRIENDLY_FIRE));
+        assert_eq!(payload.get("new_value").unwrap(), &json!(45));
+        // Apply again — same factions cross into hostile territory.
+        let payload2 = adjust_faction_relationships(
+            &mut world,
+            FactionId::Player,
+            FactionId::AiAllied,
+            -100,
+            "friendly_fire_received",
+        )
+        .unwrap();
+        let new_value = payload2.get("new_value").and_then(|v| v.as_i64()).unwrap();
+        assert!(new_value <= -50, "matrix went hostile");
+    }
+
+    #[test]
+    fn adjust_faction_relationships_returns_none_on_self_pair() {
+        let mut world = M7AiWorld::new();
+        let payload =
+            adjust_faction_relationships(&mut world, FactionId::Player, FactionId::Player, -30, "self_pair_skip");
+        assert!(payload.is_none(), "self-pair never adjusts");
+    }
+
+    #[test]
+    fn is_friendly_fire_detects_same_faction_and_allies() {
+        let world = M7AiWorld::new();
+        assert!(is_friendly_fire(&world, FactionId::AiEnemy, FactionId::AiEnemy));
+        assert!(is_friendly_fire(&world, FactionId::Player, FactionId::AiAllied));
+        assert!(!is_friendly_fire(&world, FactionId::Player, FactionId::AiEnemy));
+    }
+
+    #[test]
+    fn faction_for_actor_returns_bot_or_player() {
+        let mut world = M7AiWorld::new();
+        world.assign_archetype(ActorId(7), Archetype::Rifleman);
+        if let Some(bot) = world.bot_mut(ActorId(7)) {
+            bot.faction = FactionId::AiAllied;
+        }
+        assert_eq!(
+            faction_for_actor(&world, ActorId(7), Some(ActorId(99))),
+            Some(FactionId::AiAllied)
+        );
+        assert_eq!(
+            faction_for_actor(&world, ActorId(99), Some(ActorId(99))),
+            Some(FactionId::Player)
+        );
+        assert_eq!(faction_for_actor(&world, ActorId(42), Some(ActorId(99))), None);
     }
 }

@@ -3034,6 +3034,17 @@ impl M0Engine {
             // manifest's `phase_state` / `reinforcement_waves` /
             // `boss_state` / `objective_graph` fields.
             self.emit_m7_mission_director_events(tick, sim_time_ms, &report);
+            // **M7-B fix-round-2 (audit gap A18)**: surface the
+            // per-event mood / stress / faction deltas the spec
+            // mandates beyond the scenario-start baseline emission. Ally
+            // killed (-15), kill scored (+5), and wounded (-10) on every
+            // hit; sustained-combat stress pump on each weapon fired;
+            // friendly-fire relationship shift (-30) on intra-faction
+            // hits. The helpers live on `M7AiWorld`; this method walks
+            // the per-tick `StepReport` and records the resulting
+            // `ai.mood_changed`, `ai.stress_threshold_crossed`, and
+            // `ai.faction_allegiance_changed` payloads.
+            self.emit_m7_mood_stress_faction_events(tick, sim_time_ms, &report);
         }
         // **M1.5 G2 (hearing) end-of-tick**: promote alarms staged during
         // this tick to the next-tick AI pending queue. Clear the staging
@@ -5008,6 +5019,236 @@ impl M0Engine {
                 self.recorder
                     .record(tick, sim_time_ms, "ai", "auto_repair_progressed", payload, None);
             }
+        }
+    }
+
+    /// **M7-B fix-round-2 (audit gap A18)**: drives the per-event mood /
+    /// stress / faction-allegiance accumulators that M7-B's
+    /// scenario-start baseline emission only seeded once. Spec § Mood
+    /// changes on events ("ally killed → -15", "kill scored → +5",
+    /// "wounded → -10"), § Mood stress affects performance (sustained
+    /// combat pumps stress past Calm → Stressed → Depressed → Broken),
+    /// and § Faction relationship dynamic shift ("friendly fire -30").
+    ///
+    /// The method walks `report.actor_outcomes` + `report.hits` once
+    /// per tick and dispatches the three helper families on `M7AiWorld`:
+    ///
+    /// - [`crate::m7_ai::adjust_actor_mood`] for the −15 / +5 / −10
+    ///   deltas. Each kill emits one `ai.mood_changed` per faction
+    ///   observer (not just the shooter / target).
+    /// - [`crate::m7_ai::record_shot_for_stress`] once per
+    ///   `outcome.fired` so the sliding 5 s window accumulates and
+    ///   pumps stress on threshold crossings.
+    /// - [`crate::m7_ai::adjust_faction_relationships`] for
+    ///   friendly-fire hits, surfaced as
+    ///   `ai.faction_allegiance_changed` with `cause="friendly_fire_received"`.
+    ///
+    /// Each emission is a `recorder.record(tick, sim_time_ms, "ai",
+    /// "<event_type>", payload, None)` call so the audit verification
+    /// greps for the literal call sites land on the production engine
+    /// path (not the unit tests).
+    fn emit_m7_mood_stress_faction_events(&self, tick: Tick, sim_time_ms: f64, report: &StepReport) {
+        let tick_rate_hz = self.config.tick_rate_hz;
+        let player_actor_id: Option<ActorId> = self.state.read().ok().and_then(|s| s.player_actor);
+
+        // ---- Stress accumulator (per-shot sustained-combat pump) ------
+        // Walk the actor outcomes for `fired` shooters and push each
+        // tick into the sliding window. The helper returns Some(payload)
+        // only on band transitions, so most ticks short-circuit early.
+        let mut stress_payloads: Vec<serde_json::Value> = Vec::new();
+        for outcome in &report.actor_outcomes {
+            if !outcome.fired {
+                continue;
+            }
+            let payload = {
+                let mut state = match self.state.write() {
+                    Ok(s) => s,
+                    Err(_) => return,
+                };
+                crate::m7_ai::record_shot_for_stress(&mut state.m7_ai_world, outcome.actor, tick.0, tick_rate_hz)
+            };
+            if let Some(p) = payload {
+                stress_payloads.push(p);
+            }
+        }
+        for payload in stress_payloads {
+            self.recorder
+                .record(tick, sim_time_ms, "ai", "stress_threshold_crossed", payload, None);
+        }
+
+        // Pre-compute faction lookups so the mutating loops don't need
+        // to hold a read borrow across the write borrows that follow.
+        let bot_factions: BTreeMap<ActorId, cf_ai::FactionId> = {
+            let state = match self.state.read() {
+                Ok(s) => s,
+                Err(_) => return,
+            };
+            state
+                .m7_ai_world
+                .bots
+                .iter()
+                .map(|(id, bot)| (*id, bot.faction))
+                .collect()
+        };
+        let resolve_faction = |actor: ActorId| -> Option<cf_ai::FactionId> {
+            if let Some(f) = bot_factions.get(&actor) {
+                return Some(*f);
+            }
+            if player_actor_id == Some(actor) {
+                return Some(cf_ai::FactionId::Player);
+            }
+            None
+        };
+
+        // ---- Mood deltas (wound + kill observers) AND faction shifts
+        // (friendly fire) per hit. -----------------------------------
+        let mut mood_payloads: Vec<serde_json::Value> = Vec::new();
+        let mut faction_payloads: Vec<serde_json::Value> = Vec::new();
+        for hit in &report.hits {
+            let shooter_faction = resolve_faction(hit.shooter);
+            let target_faction = resolve_faction(hit.target);
+
+            // (3) ai.mood_changed delta=-10 cause="wounded" for the
+            // wounded bot. Only fires for tracked bots (player is not
+            // mood-tracked; the M7-B baseline emission skips the
+            // player and the per-event helper does the same).
+            if bot_factions.contains_key(&hit.target) {
+                let payload = {
+                    let mut state = match self.state.write() {
+                        Ok(s) => s,
+                        Err(_) => return,
+                    };
+                    crate::m7_ai::adjust_actor_mood(
+                        &mut state.m7_ai_world,
+                        hit.target,
+                        crate::m7_ai::MOOD_DELTA_WOUNDED,
+                        "wounded",
+                    )
+                };
+                if let Some(p) = payload {
+                    mood_payloads.push(p);
+                }
+            }
+
+            // Detect this hit as the lethal one. `hit.new_status` is the
+            // post-hit status and `hit.previous_status` is the pre-hit
+            // status; transitioning into Dying / Dead counts as a kill.
+            let is_lethal = matches!(hit.new_status, cf_actor::Status::Dying | cf_actor::Status::Dead)
+                && !matches!(hit.previous_status, cf_actor::Status::Dying | cf_actor::Status::Dead);
+            if is_lethal {
+                // (1) ai.mood_changed delta=-15 cause="ally_killed" for
+                // every observer in the killed actor's faction (or in
+                // factions allied with it). Skip the killed actor
+                // itself.
+                let observer_ids: Vec<ActorId> = bot_factions.keys().copied().collect();
+                for observer_id in observer_ids {
+                    if observer_id == hit.target {
+                        continue;
+                    }
+                    let observer_faction = match bot_factions.get(&observer_id) {
+                        Some(f) => *f,
+                        None => continue,
+                    };
+
+                    if let Some(tf) = target_faction {
+                        let ally_of_victim = observer_faction == tf
+                            || self
+                                .state
+                                .read()
+                                .map(|s| s.m7_ai_world.factions.get(observer_faction, tf) > 0)
+                                .unwrap_or(false);
+                        if ally_of_victim {
+                            let payload = {
+                                let mut state = match self.state.write() {
+                                    Ok(s) => s,
+                                    Err(_) => return,
+                                };
+                                crate::m7_ai::adjust_actor_mood(
+                                    &mut state.m7_ai_world,
+                                    observer_id,
+                                    crate::m7_ai::MOOD_DELTA_ALLY_KILLED,
+                                    "ally_killed",
+                                )
+                            };
+                            if let Some(p) = payload {
+                                mood_payloads.push(p);
+                            }
+                        }
+                    }
+
+                    // (2) ai.mood_changed delta=+5 cause="ally_kill" for
+                    // every observer in the killer's faction (or allied
+                    // with it). Includes the killer themselves (self
+                    // is in their own faction). Skip when the observer
+                    // is the victim (already filtered above).
+                    if let Some(sf) = shooter_faction {
+                        let ally_of_killer = observer_faction == sf
+                            || self
+                                .state
+                                .read()
+                                .map(|s| s.m7_ai_world.factions.get(observer_faction, sf) > 0)
+                                .unwrap_or(false);
+                        if ally_of_killer {
+                            let payload = {
+                                let mut state = match self.state.write() {
+                                    Ok(s) => s,
+                                    Err(_) => return,
+                                };
+                                crate::m7_ai::adjust_actor_mood(
+                                    &mut state.m7_ai_world,
+                                    observer_id,
+                                    crate::m7_ai::MOOD_DELTA_ALLY_KILL,
+                                    "ally_kill",
+                                )
+                            };
+                            if let Some(p) = payload {
+                                mood_payloads.push(p);
+                            }
+                        }
+                    }
+                }
+            }
+
+            // (5) Friendly-fire faction shift. Trigger when shooter and
+            // target are in the same faction OR in factions whose
+            // relationship is currently positive. The helper itself
+            // refuses to act on self-pair (a == b) — symmetric pairs of
+            // distinct factions still cross.
+            if let (Some(sf), Some(tf)) = (shooter_faction, target_faction) {
+                let is_ff = {
+                    let state = match self.state.read() {
+                        Ok(s) => s,
+                        Err(_) => return,
+                    };
+                    crate::m7_ai::is_friendly_fire(&state.m7_ai_world, sf, tf)
+                };
+                if is_ff && sf != tf {
+                    let payload = {
+                        let mut state = match self.state.write() {
+                            Ok(s) => s,
+                            Err(_) => return,
+                        };
+                        crate::m7_ai::adjust_faction_relationships(
+                            &mut state.m7_ai_world,
+                            sf,
+                            tf,
+                            crate::m7_ai::FACTION_DELTA_FRIENDLY_FIRE,
+                            "friendly_fire_received",
+                        )
+                    };
+                    if let Some(p) = payload {
+                        faction_payloads.push(p);
+                    }
+                }
+            }
+        }
+        for payload in mood_payloads {
+            self.recorder
+                .record(tick, sim_time_ms, "ai", "mood_changed", payload, None);
+        }
+        for payload in faction_payloads {
+            self.recorder
+                .record(tick, sim_time_ms, "ai", "faction_allegiance_changed", payload, None);
         }
     }
 
