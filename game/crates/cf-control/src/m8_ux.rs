@@ -853,7 +853,6 @@ impl M0Engine {
     /// blow) from any engine site that detects the boss-down condition.
     /// Honors `Settings.cinematic_kills`. Emits
     /// `slow_mo.kill_cam_triggered` on success.
-    #[allow(dead_code)]
     pub(crate) fn trigger_slow_mo_kill_cam(
         &self,
         killer: u64,
@@ -884,7 +883,6 @@ impl M0Engine {
     /// **M8 helper**: trigger a regular killcam on player death.
     /// Honors `Settings.killcam_enabled`. Emits `killcam.played` on
     /// success or `killcam.skipped` on opt-out.
-    #[allow(dead_code)]
     pub(crate) fn trigger_killcam_on_death(
         &self,
         killer: Option<u64>,
@@ -935,18 +933,20 @@ impl M0Engine {
         }
     }
 
-    /// Idle helpers used by the dispatchers above to ensure killcam +
-    /// hit-stop state ticks per frame. Engine drives this from
-    /// `drive_tick`; this surface is a thin pass-through so cf-control
-    /// can opt-in (and tests can call directly).
-    #[allow(dead_code)]
-    pub(crate) fn tick_m8_state(&self, dt_ms: u32, state: &mut EngineMutable) {
+    /// Per-frame state advance for the M8 surfaces — camera hit-stop
+    /// decay, killcam playback progression (Recording → Playing → Done
+    /// → Idle), and MMB tag TTL expiry. `engine.rs::drive_tick` invokes
+    /// this once per tick via [`M0Engine::tick_m8`]; tests can call it
+    /// directly with a synthesised `EngineMutable` and explicit
+    /// `current_tick_value` so the surface is exercisable without a
+    /// full engine bootstrap.
+    pub(crate) fn tick_m8_state(&self, dt_ms: u32, current_tick_value: u64, state: &mut EngineMutable) {
         cf_camera::tick_hit_stop(&mut state.camera_state, dt_ms);
         let phase = cf_killcam::tick(&mut state.killcam, dt_ms);
         if phase == KillcamPhase::Done {
             state.killcam.reset();
         }
-        let _ = state.tag_state.expire_old(self.current_tick().0);
+        let _ = state.tag_state.expire_old(current_tick_value);
     }
 
     /// **M8**: helper for cfctl `observe.camera`.

@@ -3965,6 +3965,19 @@ impl M0Engine {
             self.tick_m6_squad(t, sim_time_ms);
         }
 
+        // **M8** (Cluster B fix): advance the per-frame state machines the
+        // M8 cfctl surfaces seed — `cf_camera::tick_hit_stop` decays the
+        // 50-200ms camera freeze pulse, `cf_killcam::tick` walks the
+        // Idle → Recording → Playing → Done playback timeline (and resets
+        // back to Idle on Done), and `cf_squad_ui::TagState::expire_old`
+        // GCs MMB tags whose TTL elapsed. See `specs/active/M8.md` §
+        // Camera + game feel / § Photo mode + Replay scrubber + Killcam /
+        // § Pie menu (MMB tag).
+        if let Some(t) = advanced {
+            let sim_time_ms = self.state.read().map(|s| s.clock.sim_time_ms()).unwrap_or(0.0);
+            self.tick_m8(t, sim_time_ms);
+        }
+
         // M3 re-open (2026-05-13): flush the per-tick coalesced
         // `terrain.terrain_dirty_region_batch`. All carves during this tick
         // pushed their dirty chunks into `state.pending_dirty_rects`; here we
@@ -4790,7 +4803,16 @@ impl M0Engine {
         // `boss.special_ability_triggered` event fires via
         // `drain_boss_phase_ability` for the new phase's canonical
         // ability when the latch is open.
-        let (boss_phase_payload, boss_ability_payload) = {
+        //
+        // **M8** (Cluster D fix): the boss-defeat transition (defeated:
+        // false → true latched by `apply_boss_damage`) is the production
+        // wiring point for `slow_mo.kill_cam_triggered`. After applying
+        // the per-tick damage, snapshot `boss.defeated` before/after,
+        // pick the shooter of the final hit on the boss as the
+        // cinematic-cam killer, and fire `trigger_slow_mo_kill_cam` so
+        // `Settings.cinematic_kills` gates the 1.5 s cinematic playback.
+        // See `specs/active/M8.md` § "Slow-mo kill cam on boss final blow".
+        let (boss_phase_payload, boss_ability_payload, boss_defeat_trigger) = {
             let boss_actor_id = match self.state.read() {
                 Ok(s) => s.m7_ai_world.boss.as_ref().map(|b| b.actor_id),
                 Err(_) => return,
@@ -4802,23 +4824,36 @@ impl M0Engine {
                     .filter(|h| h.target.0 == boss_actor_id)
                     .map(|h| h.damage)
                     .sum();
+                let final_killer: Option<u64> = report
+                    .hits
+                    .iter()
+                    .rfind(|h| h.target.0 == boss_actor_id)
+                    .map(|h| h.shooter.0);
                 if total_damage > 0.0 {
                     let mut state = match self.state.write() {
                         Ok(s) => s,
                         Err(_) => return,
                     };
+                    let was_defeated_before = state.m7_ai_world.boss.as_ref().map(|b| b.defeated).unwrap_or(false);
                     let phase_changed = crate::m7_ai::apply_boss_damage(&mut state.m7_ai_world, total_damage, tick.0);
                     let ability = if phase_changed.is_some() {
                         crate::m7_ai::drain_boss_phase_ability(&mut state.m7_ai_world, tick.0)
                     } else {
                         None
                     };
-                    (phase_changed, ability)
+                    let is_defeated_after = state.m7_ai_world.boss.as_ref().map(|b| b.defeated).unwrap_or(false);
+                    let just_defeated = !was_defeated_before && is_defeated_after;
+                    let trigger = if just_defeated {
+                        final_killer.map(|k| (k, boss_actor_id))
+                    } else {
+                        None
+                    };
+                    (phase_changed, ability, trigger)
                 } else {
-                    (None, None)
+                    (None, None, None)
                 }
             } else {
-                (None, None)
+                (None, None, None)
             }
         };
         if let Some(payload) = boss_phase_payload {
@@ -4828,6 +4863,11 @@ impl M0Engine {
         if let Some(payload) = boss_ability_payload {
             self.recorder
                 .record(tick, sim_time_ms, "boss", "special_ability_triggered", payload, None);
+        }
+        if let Some((killer, victim)) = boss_defeat_trigger {
+            if let Ok(mut state) = self.state.write() {
+                self.trigger_slow_mo_kill_cam(killer, victim, tick, sim_time_ms, &mut state);
+            }
         }
 
         // ---- Objective graph branching / optional offers (A13/A14) -----
@@ -6261,6 +6301,23 @@ impl M0Engine {
                     }
                 }
             }
+            // **M8** (Cluster C fix): the projectile-hit lethal edge is the
+            // production wiring point for `killcam.played` / `killcam.skipped`.
+            // When the projectile transitions the player from a live status
+            // into DYING / DEAD, fire `M0Engine::trigger_killcam_on_death`
+            // with the killer's actor id so `Settings.killcam_enabled` gates
+            // the 3 s killcam playback (or emits `killcam.skipped` when
+            // disabled). See `specs/active/M8.md` § "Killcam on player death".
+            let is_lethal_transition = matches!(hit.new_status, cf_actor::Status::Dying | cf_actor::Status::Dead)
+                && !matches!(hit.previous_status, cf_actor::Status::Dying | cf_actor::Status::Dead);
+            if is_lethal_transition {
+                let victim_is_player = self.state.read().ok().and_then(|s| s.player_actor) == Some(hit.target);
+                if victim_is_player {
+                    if let Ok(mut s) = self.state.write() {
+                        self.trigger_killcam_on_death(Some(hit.shooter.0), hit.target.0, tick, sim_time_ms, &mut s);
+                    }
+                }
+            }
             // M1: scalar wound surface (M5 chassis adds zone/layer detail).
             self.recorder.record(
                 tick,
@@ -6675,6 +6732,35 @@ impl M0Engine {
                 | cf_equipment::AdvancedFireMode::Pump => {}
             }
         }
+    }
+
+    /// **M8** (Cluster B fix): per-tick wrapper that wires
+    /// [`Self::tick_m8_state`] into `drive_tick`. Computes the per-frame
+    /// `dt_ms` from the configured tick rate, then acquires a fresh
+    /// state write guard so the per-frame state machines advance every
+    /// tick:
+    ///
+    /// - `cf_camera::tick_hit_stop` decays `camera_state.hit_stop_remaining_ms`
+    ///   so the 50-200ms freeze pulse seeded by `act.camera.hit_stop`
+    ///   (M8 cfctl) actually expires.
+    /// - `cf_killcam::tick` walks `killcam` through Idle → Recording →
+    ///   Playing → Done (and `tick_m8_state` resets back to Idle on Done)
+    ///   so the 3 s regular killcam + 1.5 s slow-mo cinematic kill cam
+    ///   complete on their spec-mandated durations.
+    /// - `cf_squad_ui::TagState::expire_old` purges MMB tags whose TTL
+    ///   has elapsed (`DEFAULT_TAG_TTL_TICKS`-derived deadlines).
+    ///
+    /// Tick-rate-aware: at 60 Hz this passes `dt_ms ≈ 17`; at 120 Hz it
+    /// passes `dt_ms ≈ 8`. Never hardcodes the 60-Hz cadence.
+    fn tick_m8(&self, _tick: Tick, _sim_time_ms: f64) {
+        let dt_ms_f = 1000.0_f64 / f64::from(self.config.tick_rate_hz.max(1));
+        let dt_ms = dt_ms_f.round().max(1.0) as u32;
+        let mut state = match self.state.write() {
+            Ok(s) => s,
+            Err(_) => return,
+        };
+        let current_tick_value = state.clock.tick().0;
+        self.tick_m8_state(dt_ms, current_tick_value, &mut state);
     }
 
     /// **M6**: per-tick step for every actor's M6 state machines. See
