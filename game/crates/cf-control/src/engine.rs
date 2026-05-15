@@ -6365,6 +6365,40 @@ impl M0Engine {
                     Some(projectile_hit_event_id.clone()),
                 );
             }
+            // **M8** (Cluster E fix): auto-trigger a 100 ms hit-stop pulse on
+            // an AP-round hit per spec § "Hit-stop on impact — Given melee
+            // hit OR AP round hit". At M8 baseline, an AP-round hit is
+            // detected via the closest available signal in the M6-M8
+            // codebase: either the M5 chassis armor was actually breached
+            // (`chassis_outcome.layers_breached` non-empty — literal AP
+            // behavior) OR the projectile's damage cleared the
+            // CRITICAL_DAMAGE_THRESHOLD (high-energy round indistinguishable
+            // from AP at M8; M13/M14 fills explicit AP-round tiers per
+            // `combat_projectile_hit_mo.json::ap_round_tier`). Honors
+            // `Settings.hit_stop_enabled` and emits `camera.hit_stop` with
+            // `trigger="ap_round_hit"`.
+            let pierced_armor = hit
+                .chassis_outcome
+                .as_ref()
+                .map(|c| !c.layers_breached.is_empty())
+                .unwrap_or(false);
+            let is_ap_round_hit = pierced_armor || hit.damage > CRITICAL_DAMAGE_THRESHOLD;
+            let mut ap_hit_stop_payload: Option<serde_json::Value> = None;
+            if is_ap_round_hit {
+                if let Ok(mut s) = self.state.write() {
+                    if s.settings.hit_stop_enabled {
+                        cf_camera::trigger_hit_stop(&mut s.camera_state, 100);
+                        let applied = s.camera_state.hit_stop_remaining_ms;
+                        ap_hit_stop_payload = Some(
+                            json!({"duration_ms": applied, "trigger": "ap_round_hit", "actor_id": Some(hit.target.0)}),
+                        );
+                    }
+                }
+            }
+            if let Some(payload) = ap_hit_stop_payload {
+                #[rustfmt::skip]
+                let _ = self.recorder.record(tick, sim_time_ms, "camera", "hit_stop", payload, None);
+            }
         }
         for expired in &report.expired_projectiles {
             let parent = self
@@ -9621,6 +9655,25 @@ impl M0Engine {
                 }),
                 None,
             );
+            // **M8** (Cluster E fix): auto-trigger a 50 ms hit-stop pulse on
+            // melee impact per spec § "Hit-stop on impact — Given melee hit
+            // OR AP round hit / When hit lands / Then camera.hit_stop fires".
+            // Honors `Settings.hit_stop_enabled` (skips on opt-out per the
+            // Gherkin's Settings clause). Emits `camera.hit_stop` with
+            // `trigger="melee_hit"`.
+            let mut hit_stop_payload: Option<serde_json::Value> = None;
+            if let Ok(mut s) = self.state.write() {
+                if s.settings.hit_stop_enabled {
+                    cf_camera::trigger_hit_stop(&mut s.camera_state, 50);
+                    let applied = s.camera_state.hit_stop_remaining_ms;
+                    hit_stop_payload =
+                        Some(json!({"duration_ms": applied, "trigger": "melee_hit", "actor_id": Some(emit.target)}));
+                }
+            }
+            if let Some(payload) = hit_stop_payload {
+                #[rustfmt::skip]
+                let _ = self.recorder.record(tick, sim_time_ms, "camera", "hit_stop", payload, None);
+            }
         }
         if let Some(target_id) = knockdown_emit {
             self.recorder.record(
