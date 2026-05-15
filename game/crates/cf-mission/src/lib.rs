@@ -89,7 +89,7 @@ pub use objective_graph::{
     BranchingPoint, ExtendedObjectiveKind, ObjectiveBranchedEvent, ObjectiveGraph, ObjectiveNode, ObjectiveNodeStatus,
     OptionalOfferedEvent,
 };
-pub use phases::{MissionPhase, PhaseChangedEvent, PhaseState};
+pub use phases::{DirectorPhaseChangeEvent, MissionPhase, PhaseChangedEvent, PhaseState};
 pub use reinforcement::{ReinforcementRegistry, ReinforcementWave, ReinforcementWaveSpawnedEvent};
 
 use cf_actor::{ActorId, ActorState, Status};
@@ -537,6 +537,22 @@ impl Reactor {
     /// `armor.layer_destroyed` / `mission.reactor_hp_changed` /
     /// `mission.reactor_pressure_state_changed` / `mission.reactor_destroyed`.
     pub fn apply_damage_cascade(&mut self, damage: f32) -> reactor::ReactorDamageReport {
+        self.apply_damage_cascade_with_safety(damage, false)
+    }
+
+    /// **M9** (audit fix gap 6): cascade `damage` through External →
+    /// Internal → Core armor layers and advance the pressure-state ladder,
+    /// honoring the scenario's `tutorial_safety` flag. When
+    /// `tutorial_safety = true` AND the cascade would drop the reactor's
+    /// HP to 0, the cascade caps HP at 1.0 and forces `pressure_state =
+    /// Critical` so the mission can be recovered instead of resolving as
+    /// loss. The matching cfctl script `m2.5_tutorial_safety.cfctl.json`
+    /// exercises this branch.
+    pub fn apply_damage_cascade_with_safety(
+        &mut self,
+        damage: f32,
+        tutorial_safety: bool,
+    ) -> reactor::ReactorDamageReport {
         let hp_before = self.hp;
         let pressure_before = self.pressure_state;
         if self.is_destroyed() {
@@ -578,12 +594,35 @@ impl Reactor {
         }
         let absorbed_total = damage.max(0.0) - remaining;
         self.hp = (self.hp - absorbed_total).max(0.0);
+        // **M9** spec § Tutorial safety caps reactor at 1 HP: when the
+        // cascade would otherwise destroy the reactor, hold HP at 1.0
+        // and stamp `pressure_state = Critical` instead. Restore the
+        // Core layer to at least 1 HP so subsequent damage applications
+        // don't fall through the destroyed-layer fast path.
+        let mut tutorial_safety_engaged = false;
+        if tutorial_safety && self.hp <= 0.0 {
+            self.hp = 1.0;
+            if let Some(core) = self
+                .armor_layers
+                .iter_mut()
+                .find(|l| l.kind == reactor::LayerKind::Core)
+            {
+                if core.hp <= 0.0 {
+                    core.hp = 1.0;
+                }
+            }
+            tutorial_safety_engaged = true;
+        }
         let now_destroyed = self.hp <= 0.0;
         let triggered_destruction = now_destroyed && !self.destroyed;
         if now_destroyed {
             self.destroyed = true;
         }
-        let pressure_after = reactor::pressure_state_for_hp_percent(self.hp_percent());
+        let pressure_after = if tutorial_safety_engaged {
+            reactor::PressureState::Critical
+        } else {
+            reactor::pressure_state_for_hp_percent(self.hp_percent())
+        };
         self.pressure_state = pressure_after;
         let pressure_state_change = if pressure_before == pressure_after {
             None
@@ -2381,5 +2420,56 @@ mod tests {
             },
         );
         assert!(report_after.objective_failed.is_empty(), "terminal step must be empty");
+    }
+
+    /// **M9** (audit fix gap 6): `tutorial_safety = true` blocks reactor
+    /// destruction by capping HP at 1 and forcing pressure_state=Critical.
+    #[test]
+    fn reactor_tutorial_safety_caps_hp_at_one() {
+        let mut reactor = Reactor {
+            id: "core_reactor".to_string(),
+            position: [0.0, 0.0],
+            half_extents: [16.0, 16.0],
+            hp: 100.0,
+            max_hp: 100.0,
+            ..Default::default()
+        };
+        let report = reactor.apply_damage_cascade_with_safety(500.0, true);
+        assert_eq!(reactor.hp, 1.0, "tutorial_safety caps reactor HP at 1.0");
+        assert_eq!(
+            reactor.pressure_state,
+            reactor::PressureState::Critical,
+            "tutorial_safety forces pressure_state=Critical"
+        );
+        assert!(!reactor.is_destroyed(), "tutorial_safety blocks destruction");
+        assert!(
+            !report.now_destroyed,
+            "tutorial-safety damage report must not flag now_destroyed"
+        );
+        assert!(
+            !report.triggered_destruction,
+            "tutorial-safety damage report must not trigger destruction"
+        );
+    }
+
+    /// **M9** (audit fix gap 6): when `tutorial_safety = false`, the
+    /// cascade still destroys the reactor on lethal damage (back-compat
+    /// with the legacy `apply_damage_cascade` signature).
+    #[test]
+    fn reactor_without_tutorial_safety_still_destroys() {
+        let mut reactor = Reactor {
+            id: "core_reactor".to_string(),
+            position: [0.0, 0.0],
+            half_extents: [16.0, 16.0],
+            hp: 100.0,
+            max_hp: 100.0,
+            ..Default::default()
+        };
+        let report = reactor.apply_damage_cascade_with_safety(500.0, false);
+        assert_eq!(reactor.hp, 0.0);
+        assert!(reactor.is_destroyed());
+        assert_eq!(reactor.pressure_state, reactor::PressureState::Destroyed);
+        assert!(report.now_destroyed);
+        assert!(report.triggered_destruction);
     }
 }
