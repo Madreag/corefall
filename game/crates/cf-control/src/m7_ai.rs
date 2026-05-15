@@ -24,6 +24,13 @@ use cf_actor::{ActorId, ActorState, Status};
 use cf_ai::{
     auto_repair::{AutoRepairInitiatedEvent, AutoRepairMission, AutoRepairProgressedEvent},
     auto_triage::{AutoTriageAppliedEvent, AutoTriageInitiatedEvent, AutoTriageMission},
+    cover_seeking::{CoverSeekingEvent, CoverSeekingReason},
+    friendly_fire::{FriendlyFireAvoidanceEvent, FriendlyFireKind},
+    high_ground::HighGroundEvent,
+    patrol::{PatrolRoute, PatrolWaypointReachedEvent},
+    retreat::{effective_retreat_threshold, RetreatDecisionEvent, RetreatReason},
+    squad_comm::{SquadCommPending, SquadCommRelayedEvent},
+    suppression::SuppressionEvent,
     AiTickOutput, Archetype, AutonomyMode, BehaviorAction, DoctrineMode, FactionId, FactionRelationships,
     PersonalityProfile, PriorityTable, TaskType, ThinkingContext, ThinkingStack,
 };
@@ -65,6 +72,33 @@ pub struct BotState {
     pub auto_triage: Option<AutoTriageMission>,
     /// In-flight auto-repair mission (Engineer).
     pub auto_repair: Option<AutoRepairMission>,
+    /// **M7-A fix-round-2**: previous tick's chosen task. Used by
+    /// `detect_behavior_transitions` to fire one event per transition INTO
+    /// a sub-plan task family (cover / suppression / retreat) instead of
+    /// once per tick the bot remains in that task.
+    pub last_chosen_task: Option<TaskType>,
+    /// **M7-A fix-round-2**: patrol route (waypoint loop + idle countdown).
+    /// Auto-seeded with a 2-waypoint loop on bot creation; scenarios
+    /// override via `set_patrol_route`.
+    pub patrol: PatrolRoute,
+    /// **M7-A fix-round-2**: pending squad-comm relays this bot owes its
+    /// squadmates. Each entry fires `ai.squad_comm_relayed` once its
+    /// `relay_tick` is reached (0.5 s delay per spec § Squad communication).
+    pub squad_comm_pending: Vec<SquadCommPending>,
+    /// **M7-A fix-round-2**: tracks the previous tick's player-visibility
+    /// flag so we can detect the *transition* from "lost the player" to
+    /// "spotted the player" and schedule one squad-comm relay per fresh
+    /// detection, not one per tick the player stays visible.
+    pub had_player_visibility: bool,
+    /// **M7-A fix-round-2**: tracks the last elevation gain we emitted a
+    /// `ai.high_ground_preference_applied` for. Re-emit only when the
+    /// chosen task transitions back into the high-ground task family.
+    pub last_high_ground_emission_task: Option<TaskType>,
+    /// **M7-A fix-round-2**: tracks the last friendly-fire-avoidance
+    /// emission tick so we don't spam events while the friendly stays in
+    /// the line of fire. One emission per (actor, friendly) until the
+    /// friendly clears the LOS.
+    pub last_friendly_fire_avoidance_friendly: Option<ActorId>,
 }
 
 impl BotState {
@@ -77,7 +111,20 @@ impl BotState {
             faction: FactionId::AiEnemy,
             auto_triage: None,
             auto_repair: None,
+            last_chosen_task: None,
+            patrol: PatrolRoute::new(vec![[0.0, 0.0], [10.0, 0.0]]),
+            squad_comm_pending: Vec::new(),
+            had_player_visibility: false,
+            last_high_ground_emission_task: None,
+            last_friendly_fire_avoidance_friendly: None,
         }
+    }
+
+    /// **M7-A fix-round-2**: replace the bot's patrol route. Scenarios that
+    /// declare an explicit waypoint list call this; otherwise the default
+    /// 2-waypoint loop seeded by `BotState::new` ticks the patrol contract.
+    pub fn set_patrol_route(&mut self, waypoints: Vec<[f32; 2]>) {
+        self.patrol = PatrolRoute::new(waypoints);
     }
 }
 
@@ -568,6 +615,318 @@ pub fn boss_special_ability_payload(event: &BossSpecialAbilityEvent) -> Value {
         "ability": event.ability,
         "tick": event.tick,
     })
+}
+
+// ---------------------------------------------------------------------------
+// **M7-A fix-round-2**: payload helpers for the 7 behavior sub-plan events
+// (cover_seeking_started / suppression_started / retreat_decision /
+// squad_comm_relayed / patrol_waypoint_reached / friendly_fire_avoidance /
+// high_ground_preference_applied). Each helper accepts the canonical cf-ai
+// event struct and returns a `serde_json::Value` that matches the JSON
+// schema in `cf-replay/schemas/event/ai_<event>.json`.
+// ---------------------------------------------------------------------------
+
+/// **M7-A fix-round-2**: build a JSON payload for `ai.cover_seeking_started`.
+pub fn cover_seeking_started_payload(event: &CoverSeekingEvent) -> Value {
+    json!({
+        "actor_id": event.actor_id,
+        "archetype": event.archetype.as_str(),
+        "reason": event.reason.as_str(),
+        "target_position": event.target_position,
+        "distance": quantize(event.distance),
+    })
+}
+
+/// **M7-A fix-round-2**: build a JSON payload for `ai.suppression_started`.
+pub fn suppression_started_payload(event: &SuppressionEvent) -> Value {
+    json!({
+        "actor_id": event.actor_id,
+        "target_actor_id": event.target_actor_id,
+        "flanker_actor_id": event.flanker_actor_id,
+        "duration_ticks": event.duration_ticks,
+    })
+}
+
+/// **M7-A fix-round-2**: build a JSON payload for `ai.retreat_decision`.
+pub fn retreat_decision_payload(event: &RetreatDecisionEvent) -> Value {
+    json!({
+        "actor_id": event.actor_id,
+        "reason": event.reason.as_str(),
+        "hp_fraction": quantize(event.hp_fraction),
+        "tick": event.tick,
+    })
+}
+
+/// **M7-A fix-round-2**: build a JSON payload for `ai.squad_comm_relayed`.
+pub fn squad_comm_relayed_payload(event: &SquadCommRelayedEvent) -> Value {
+    json!({
+        "originator_actor_id": event.originator_actor_id,
+        "receiver_actor_ids": event.receiver_actor_ids,
+        "target_actor_id": event.target_actor_id,
+        "target_position": event.target_position,
+        "delay_ticks": event.delay_ticks,
+    })
+}
+
+/// **M7-A fix-round-2**: build a JSON payload for `ai.patrol_waypoint_reached`.
+pub fn patrol_waypoint_reached_payload(event: &PatrolWaypointReachedEvent) -> Value {
+    json!({
+        "actor_id": event.actor_id,
+        "waypoint_index": event.waypoint_index,
+        "position": event.position,
+        "idle_seconds": quantize(event.idle_seconds),
+    })
+}
+
+/// **M7-A fix-round-2**: build a JSON payload for `ai.friendly_fire_avoidance`.
+pub fn friendly_fire_avoidance_payload(event: &FriendlyFireAvoidanceEvent) -> Value {
+    json!({
+        "actor_id": event.actor_id,
+        "friendly_actor_id": event.friendly_actor_id,
+        "kind": event.kind.as_str(),
+    })
+}
+
+/// **M7-A fix-round-2**: build a JSON payload for
+/// `ai.high_ground_preference_applied`.
+pub fn high_ground_preference_applied_payload(event: &HighGroundEvent) -> Value {
+    json!({
+        "actor_id": event.actor_id,
+        "target_position": event.target_position,
+        "elevation_gain": quantize(event.elevation_gain),
+    })
+}
+
+/// **M7-A fix-round-2**: world-state snapshot the engine collects each
+/// AI tick to drive `detect_behavior_transitions`. All fields are owned
+/// snapshots so the engine can release the world borrow before the
+/// detector mutates `BotState` (cursor advance, squad-comm scheduling,
+/// last-task tracking, etc.).
+#[derive(Debug, Clone)]
+pub struct BehaviorSignals {
+    /// Bot's own actor id.
+    pub actor_id: u64,
+    /// Bot's world-space position [x, y].
+    pub self_position: [f32; 2],
+    /// Bot's current HP / hp_max ratio (0.0..=1.0).
+    pub hp_fraction: f32,
+    /// Whether the bot has line-of-sight on the player this tick.
+    pub enemy_visible: bool,
+    /// Whether the bot has been recently shot at (last 60 ticks).
+    pub under_fire: bool,
+    /// True when the reactive layer overrode utility this tick.
+    pub reactive_override: bool,
+    /// Player actor id for suppression / squad-comm payloads, when known.
+    pub player_actor_id: Option<u64>,
+    /// Player's current world-space position for squad-comm payloads.
+    pub player_position: Option<[f32; 2]>,
+    /// IDs of every other faction-allied bot. Used as `receiver_actor_ids`
+    /// when the squad-comm relay timer expires.
+    pub squadmates: Vec<u64>,
+    /// `Some(friendly_actor_id)` when a faction-allied actor sits on the
+    /// bot's firing line right now. Populated by the engine via
+    /// `cf_ai::friendly_fire::is_friendly_in_line_of_fire`.
+    pub friendly_in_line_of_fire: Option<u64>,
+    /// Tick the engine is processing. Drives squad-comm relay timing +
+    /// the patrol idle countdown.
+    pub current_tick: u64,
+    /// Tick rate the engine is running at (configurable; do NOT hardcode
+    /// 60). Drives the squad-comm 0.5 s delay + the patrol 5-10 s pause.
+    pub tick_rate_hz: u32,
+}
+
+/// **M7-A fix-round-2**: behavior-transition emission bundle. Each field
+/// holds an optional ready-to-record JSON payload for the corresponding
+/// `ai.*` event, or `None` if the transition didn't fire this tick.
+/// `squad_comm_relayed` is `Vec` because a single tick may flush multiple
+/// pending relays from the same originator.
+#[derive(Debug, Clone, Default)]
+pub struct BotBehaviorEmit {
+    pub cover_seeking_started: Option<Value>,
+    pub suppression_started: Option<Value>,
+    pub retreat_decision: Option<Value>,
+    pub squad_comm_relayed: Vec<Value>,
+    pub patrol_waypoint_reached: Option<Value>,
+    pub friendly_fire_avoidance: Option<Value>,
+    pub high_ground_preference_applied: Option<Value>,
+}
+
+/// **M7-A fix-round-2**: detect behavior-sub-plan transitions for one bot
+/// from the per-tick chosen task + `BehaviorSignals` snapshot, emitting
+/// payloads for the 7 events covered by audit gaps A1-A7. Mutates the
+/// bot's tracking state (`last_chosen_task`, patrol cursor, squad-comm
+/// queue, visibility latch) so subsequent ticks fire one event per
+/// transition rather than one per tick.
+pub fn detect_behavior_transitions(
+    bot: &mut BotState,
+    chosen_task: TaskType,
+    signals: &BehaviorSignals,
+) -> BotBehaviorEmit {
+    let mut emit = BotBehaviorEmit::default();
+    let task = chosen_task;
+    let prev_task = bot.last_chosen_task;
+    let task_changed = prev_task != Some(task);
+
+    // ----- A3. Retreat decision (HP-threshold-crossed). Detect first so
+    // the cover-seeking branch can mark the reason as `LowHp` when the
+    // retreat trigger also implies a cover move. -----
+    let retreat_threshold = effective_retreat_threshold(&bot.personality);
+    let hp_below_threshold = signals.hp_fraction <= retreat_threshold;
+    let retreat_decided =
+        task == TaskType::RetreatToCover && task_changed && (hp_below_threshold || signals.reactive_override);
+    if retreat_decided {
+        let reason = if signals.reactive_override {
+            RetreatReason::OverWhelmed
+        } else {
+            RetreatReason::HpLow
+        };
+        let event = RetreatDecisionEvent {
+            actor_id: signals.actor_id,
+            reason,
+            hp_fraction: signals.hp_fraction,
+            tick: signals.current_tick,
+        };
+        emit.retreat_decision = Some(retreat_decision_payload(&event));
+    }
+
+    // ----- A1. Cover seeking. Fires on transition INTO HoldCover /
+    // RetreatToCover / DigCover. -----
+    let cover_task = matches!(
+        task,
+        TaskType::HoldCover | TaskType::RetreatToCover | TaskType::DigCover
+    );
+    if cover_task && task_changed {
+        let reason = if signals.reactive_override {
+            CoverSeekingReason::EmergencyDodge
+        } else if hp_below_threshold || matches!(task, TaskType::RetreatToCover) {
+            CoverSeekingReason::LowHp
+        } else if signals.under_fire {
+            CoverSeekingReason::Fired
+        } else {
+            CoverSeekingReason::SquadFlanking
+        };
+        let event = CoverSeekingEvent {
+            actor_id: signals.actor_id,
+            archetype: bot.archetype,
+            reason,
+            target_position: signals.self_position,
+            distance: 0.0,
+        };
+        emit.cover_seeking_started = Some(cover_seeking_started_payload(&event));
+    }
+
+    // ----- A2. Suppression started. Fires on transition INTO SuppressFire. -----
+    if task == TaskType::SuppressFire && task_changed {
+        let event = SuppressionEvent::build(
+            signals.actor_id,
+            signals.player_actor_id.unwrap_or(0),
+            None,
+            signals.tick_rate_hz,
+        );
+        emit.suppression_started = Some(suppression_started_payload(&event));
+    }
+
+    // ----- A6. Friendly-fire avoidance. Fires when the bot is in a
+    // shooting task AND a friendly is in line of fire. Throttled to one
+    // emission per (actor, friendly) until the friendly clears. -----
+    let shooting_task = matches!(
+        task,
+        TaskType::EngageVisibleEnemy | TaskType::SuppressFire | TaskType::SharpshootTarget | TaskType::FlankTarget
+    );
+    if let Some(friendly_id) = signals.friendly_in_line_of_fire {
+        let already_emitted = bot.last_friendly_fire_avoidance_friendly == Some(ActorId(friendly_id));
+        if shooting_task && !already_emitted {
+            let event = FriendlyFireAvoidanceEvent {
+                actor_id: signals.actor_id,
+                friendly_actor_id: friendly_id,
+                kind: FriendlyFireKind::LineOfFire,
+            };
+            emit.friendly_fire_avoidance = Some(friendly_fire_avoidance_payload(&event));
+            bot.last_friendly_fire_avoidance_friendly = Some(ActorId(friendly_id));
+        }
+    } else {
+        bot.last_friendly_fire_avoidance_friendly = None;
+    }
+
+    // ----- A7. High-ground preference applied. Fires when a Sniper /
+    // Spotter transitions INTO SharpshootTarget / MarkThreats while
+    // standing on positive elevation (y > 0). -----
+    let high_ground_archetype = matches!(bot.archetype, Archetype::Sniper | Archetype::Spotter);
+    let high_ground_task = matches!(task, TaskType::SharpshootTarget | TaskType::MarkThreats);
+    let high_ground_transition = high_ground_task && bot.last_high_ground_emission_task != Some(task);
+    if high_ground_archetype && high_ground_transition && signals.self_position[1] > 0.0 {
+        let event = HighGroundEvent {
+            actor_id: signals.actor_id,
+            target_position: signals.self_position,
+            elevation_gain: signals.self_position[1],
+        };
+        emit.high_ground_preference_applied = Some(high_ground_preference_applied_payload(&event));
+        bot.last_high_ground_emission_task = Some(task);
+    } else if !high_ground_task {
+        bot.last_high_ground_emission_task = None;
+    }
+
+    // ----- A4. Squad-comm relay. Schedule pending entries on the
+    // visibility transition (lost → spotted), then drain ready entries
+    // each tick. Receivers = every other faction-allied bot. -----
+    if signals.enemy_visible
+        && !bot.had_player_visibility
+        && !signals.squadmates.is_empty()
+        && signals.player_actor_id.is_some()
+    {
+        let pending = SquadCommPending::new(
+            signals.actor_id,
+            signals.player_actor_id.unwrap_or(0),
+            signals.player_position.unwrap_or([0.0, 0.0]),
+            signals.current_tick,
+            signals.tick_rate_hz,
+        );
+        bot.squad_comm_pending.push(pending);
+    }
+    bot.had_player_visibility = signals.enemy_visible;
+    let ready_indices: Vec<usize> = bot
+        .squad_comm_pending
+        .iter()
+        .enumerate()
+        .filter(|(_, p)| p.is_ready(signals.current_tick))
+        .map(|(i, _)| i)
+        .collect();
+    for idx in ready_indices.into_iter().rev() {
+        let pending = bot.squad_comm_pending.remove(idx);
+        let delay_ticks = pending.relay_tick.saturating_sub(pending.trigger_tick) as u32;
+        let event = SquadCommRelayedEvent {
+            originator_actor_id: pending.originator_actor_id,
+            receiver_actor_ids: signals.squadmates.clone(),
+            target_actor_id: pending.target_actor_id,
+            target_position: pending.target_position,
+            delay_ticks,
+        };
+        emit.squad_comm_relayed.push(squad_comm_relayed_payload(&event));
+    }
+
+    // ----- A5. Patrol waypoint reached. Drives the patrol cursor each
+    // tick the bot is in the Patrol task. The waypoint event fires when
+    // the idle pause expires AND the cursor advances to a fresh waypoint. -----
+    if task == TaskType::Patrol {
+        let still_idling = bot.patrol.tick_idle();
+        if !still_idling {
+            let rng_roll = ((signals.current_tick.wrapping_add(signals.actor_id) % 100) as f32) / 100.0;
+            bot.patrol.advance(signals.tick_rate_hz, rng_roll);
+            if let Some(pos) = bot.patrol.current() {
+                let idle_seconds = bot.patrol.idle_remaining_ticks as f32 / signals.tick_rate_hz.max(1) as f32;
+                let event = PatrolWaypointReachedEvent {
+                    actor_id: signals.actor_id,
+                    waypoint_index: bot.patrol.cursor,
+                    position: pos,
+                    idle_seconds,
+                };
+                emit.patrol_waypoint_reached = Some(patrol_waypoint_reached_payload(&event));
+            }
+        }
+    }
+
+    bot.last_chosen_task = Some(task);
+    emit
 }
 
 /// Quantize floats for stable replay output.
@@ -1143,5 +1502,249 @@ mod tests {
         assert_eq!(v.get("delta").unwrap(), &json!(-30));
         assert_eq!(v.get("new_value").unwrap(), &json!(45));
         assert_eq!(v.get("cause").unwrap(), &json!("friendly_fire"));
+    }
+
+    // -----------------------------------------------------------------
+    // **M7-A fix-round-2 (audit gaps A1-A7)**: payload shape + behavior
+    // transition coverage for the 7 sub-plan events the engine emits via
+    // `detect_behavior_transitions`.
+    // -----------------------------------------------------------------
+
+    fn signals_baseline(actor_id: u64) -> BehaviorSignals {
+        BehaviorSignals {
+            actor_id,
+            self_position: [0.0, 0.0],
+            hp_fraction: 1.0,
+            enemy_visible: false,
+            under_fire: false,
+            reactive_override: false,
+            player_actor_id: Some(99),
+            player_position: Some([100.0, 0.0]),
+            squadmates: vec![2, 3],
+            friendly_in_line_of_fire: None,
+            current_tick: 100,
+            tick_rate_hz: 60,
+        }
+    }
+
+    #[test]
+    fn cover_seeking_started_payload_shape() {
+        let event = CoverSeekingEvent {
+            actor_id: 7,
+            archetype: Archetype::Rifleman,
+            reason: CoverSeekingReason::Fired,
+            target_position: [1.0, 2.0],
+            distance: 3.5,
+        };
+        let v = cover_seeking_started_payload(&event);
+        assert_eq!(v.get("actor_id").unwrap(), &json!(7));
+        assert_eq!(v.get("archetype").unwrap(), &json!("rifleman"));
+        assert_eq!(v.get("reason").unwrap(), &json!("fired"));
+        assert_eq!(v.get("target_position").unwrap(), &json!([1.0, 2.0]));
+        assert_eq!(v.get("distance").unwrap(), &json!(3.5));
+    }
+
+    #[test]
+    fn suppression_started_payload_shape() {
+        let event = SuppressionEvent::build(7, 99, Some(8), 60);
+        let v = suppression_started_payload(&event);
+        assert_eq!(v.get("actor_id").unwrap(), &json!(7));
+        assert_eq!(v.get("target_actor_id").unwrap(), &json!(99));
+        assert_eq!(v.get("flanker_actor_id").unwrap(), &json!(8));
+        assert_eq!(v.get("duration_ticks").unwrap(), &json!(240));
+    }
+
+    #[test]
+    fn retreat_decision_payload_shape() {
+        let event = RetreatDecisionEvent {
+            actor_id: 7,
+            reason: RetreatReason::HpLow,
+            hp_fraction: 0.25,
+            tick: 100,
+        };
+        let v = retreat_decision_payload(&event);
+        assert_eq!(v.get("actor_id").unwrap(), &json!(7));
+        assert_eq!(v.get("reason").unwrap(), &json!("hp_low"));
+        assert_eq!(v.get("hp_fraction").unwrap(), &json!(0.25));
+        assert_eq!(v.get("tick").unwrap(), &json!(100));
+    }
+
+    #[test]
+    fn squad_comm_relayed_payload_shape() {
+        let event = SquadCommRelayedEvent {
+            originator_actor_id: 7,
+            receiver_actor_ids: vec![2, 3],
+            target_actor_id: 99,
+            target_position: [50.0, 60.0],
+            delay_ticks: 30,
+        };
+        let v = squad_comm_relayed_payload(&event);
+        assert_eq!(v.get("originator_actor_id").unwrap(), &json!(7));
+        assert_eq!(v.get("receiver_actor_ids").unwrap(), &json!([2, 3]));
+        assert_eq!(v.get("target_actor_id").unwrap(), &json!(99));
+        assert_eq!(v.get("target_position").unwrap(), &json!([50.0, 60.0]));
+        assert_eq!(v.get("delay_ticks").unwrap(), &json!(30));
+    }
+
+    #[test]
+    fn patrol_waypoint_reached_payload_shape() {
+        let event = PatrolWaypointReachedEvent {
+            actor_id: 7,
+            waypoint_index: 1,
+            position: [10.0, 0.0],
+            idle_seconds: 7.5,
+        };
+        let v = patrol_waypoint_reached_payload(&event);
+        assert_eq!(v.get("actor_id").unwrap(), &json!(7));
+        assert_eq!(v.get("waypoint_index").unwrap(), &json!(1));
+        assert_eq!(v.get("position").unwrap(), &json!([10.0, 0.0]));
+        assert_eq!(v.get("idle_seconds").unwrap(), &json!(7.5));
+    }
+
+    #[test]
+    fn friendly_fire_avoidance_payload_shape() {
+        let event = FriendlyFireAvoidanceEvent {
+            actor_id: 7,
+            friendly_actor_id: 8,
+            kind: FriendlyFireKind::LineOfFire,
+        };
+        let v = friendly_fire_avoidance_payload(&event);
+        assert_eq!(v.get("actor_id").unwrap(), &json!(7));
+        assert_eq!(v.get("friendly_actor_id").unwrap(), &json!(8));
+        assert_eq!(v.get("kind").unwrap(), &json!("line_of_fire"));
+    }
+
+    #[test]
+    fn high_ground_preference_applied_payload_shape() {
+        let event = HighGroundEvent {
+            actor_id: 7,
+            target_position: [3.0, 8.0],
+            elevation_gain: 8.0,
+        };
+        let v = high_ground_preference_applied_payload(&event);
+        assert_eq!(v.get("actor_id").unwrap(), &json!(7));
+        assert_eq!(v.get("target_position").unwrap(), &json!([3.0, 8.0]));
+        assert_eq!(v.get("elevation_gain").unwrap(), &json!(8.0));
+    }
+
+    /// **A1 production-path coverage**: cover-seeking transition fires
+    /// when the bot's chosen task flips into HoldCover under a fire
+    /// signal. Subsequent ticks at the same task do NOT re-fire.
+    #[test]
+    fn detect_emits_cover_seeking_on_transition_into_cover() {
+        let mut bot = BotState::new(Archetype::Rifleman);
+        let mut sig = signals_baseline(7);
+        sig.under_fire = true;
+        let emit = detect_behavior_transitions(&mut bot, TaskType::HoldCover, &sig);
+        assert!(emit.cover_seeking_started.is_some());
+        let emit2 = detect_behavior_transitions(&mut bot, TaskType::HoldCover, &sig);
+        assert!(
+            emit2.cover_seeking_started.is_none(),
+            "no re-fire on second tick at same task"
+        );
+    }
+
+    /// **A2 production-path coverage**: suppression-started fires on
+    /// transition into SuppressFire and carries the player as target.
+    #[test]
+    fn detect_emits_suppression_on_transition_into_suppress() {
+        let mut bot = BotState::new(Archetype::Rifleman);
+        let sig = signals_baseline(7);
+        let emit = detect_behavior_transitions(&mut bot, TaskType::SuppressFire, &sig);
+        let payload = emit.suppression_started.expect("suppression payload");
+        assert_eq!(payload.get("actor_id").unwrap(), &json!(7));
+        assert_eq!(payload.get("target_actor_id").unwrap(), &json!(99));
+    }
+
+    /// **A3 production-path coverage**: retreat-decision fires when the
+    /// bot transitions into RetreatToCover with HP below threshold.
+    #[test]
+    fn detect_emits_retreat_decision_when_hp_low() {
+        let mut bot = BotState::new(Archetype::Rifleman);
+        let mut sig = signals_baseline(7);
+        sig.hp_fraction = 0.20;
+        let emit = detect_behavior_transitions(&mut bot, TaskType::RetreatToCover, &sig);
+        let payload = emit.retreat_decision.expect("retreat payload");
+        assert_eq!(payload.get("reason").unwrap(), &json!("hp_low"));
+        assert_eq!(payload.get("actor_id").unwrap(), &json!(7));
+    }
+
+    /// **A4 production-path coverage**: squad-comm relay schedules on
+    /// the lost→spotted transition AND fires after the 0.5s delay
+    /// (30 ticks @ 60Hz) carrying the squadmates as receivers.
+    #[test]
+    fn detect_emits_squad_comm_relayed_after_delay() {
+        let mut bot = BotState::new(Archetype::Rifleman);
+        let mut sig = signals_baseline(7);
+        sig.enemy_visible = true;
+        sig.current_tick = 100;
+        let emit_first = detect_behavior_transitions(&mut bot, TaskType::EngageVisibleEnemy, &sig);
+        assert!(
+            emit_first.squad_comm_relayed.is_empty(),
+            "no relay emitted before delay elapses"
+        );
+        sig.current_tick = 130;
+        let emit_after = detect_behavior_transitions(&mut bot, TaskType::EngageVisibleEnemy, &sig);
+        assert_eq!(emit_after.squad_comm_relayed.len(), 1);
+        let payload = &emit_after.squad_comm_relayed[0];
+        assert_eq!(payload.get("originator_actor_id").unwrap(), &json!(7));
+        assert_eq!(payload.get("receiver_actor_ids").unwrap(), &json!([2, 3]));
+        assert_eq!(payload.get("delay_ticks").unwrap(), &json!(30));
+    }
+
+    /// **A5 production-path coverage**: patrol-waypoint-reached fires
+    /// on the tick the bot's idle countdown expires AND the cursor
+    /// advances. The default route has 2 waypoints.
+    #[test]
+    fn detect_emits_patrol_waypoint_when_idle_expires() {
+        let mut bot = BotState::new(Archetype::Rifleman);
+        let sig = signals_baseline(7);
+        let emit = detect_behavior_transitions(&mut bot, TaskType::Patrol, &sig);
+        let payload = emit.patrol_waypoint_reached.expect("patrol payload");
+        assert_eq!(payload.get("actor_id").unwrap(), &json!(7));
+        assert!(payload.get("position").is_some());
+    }
+
+    /// **A6 production-path coverage**: friendly-fire-avoidance fires
+    /// when the bot is shooting AND a friendly is in the line of fire.
+    /// Throttled to one emission per friendly until cleared.
+    #[test]
+    fn detect_emits_friendly_fire_avoidance_when_friend_in_los() {
+        let mut bot = BotState::new(Archetype::Rifleman);
+        let mut sig = signals_baseline(7);
+        sig.friendly_in_line_of_fire = Some(8);
+        let emit = detect_behavior_transitions(&mut bot, TaskType::EngageVisibleEnemy, &sig);
+        let payload = emit.friendly_fire_avoidance.expect("ff payload");
+        assert_eq!(payload.get("friendly_actor_id").unwrap(), &json!(8));
+        assert_eq!(payload.get("kind").unwrap(), &json!("line_of_fire"));
+        // Re-tick with the same friendly still blocking — no re-fire.
+        let emit2 = detect_behavior_transitions(&mut bot, TaskType::EngageVisibleEnemy, &sig);
+        assert!(emit2.friendly_fire_avoidance.is_none());
+    }
+
+    /// **A7 production-path coverage**: high-ground-preference-applied
+    /// fires when a Sniper transitions into SharpshootTarget while
+    /// standing on positive elevation.
+    #[test]
+    fn detect_emits_high_ground_preference_for_sniper_on_elevation() {
+        let mut bot = BotState::new(Archetype::Sniper);
+        let mut sig = signals_baseline(7);
+        sig.self_position = [10.0, 25.0];
+        let emit = detect_behavior_transitions(&mut bot, TaskType::SharpshootTarget, &sig);
+        let payload = emit.high_ground_preference_applied.expect("high-ground payload");
+        assert_eq!(payload.get("actor_id").unwrap(), &json!(7));
+        assert_eq!(payload.get("elevation_gain").unwrap(), &json!(25.0));
+    }
+
+    /// **A7 negative**: Rifleman archetype does NOT fire high-ground
+    /// even on the same transition / elevation (high-ground is
+    /// Sniper/Spotter-only per spec).
+    #[test]
+    fn detect_does_not_emit_high_ground_for_rifleman() {
+        let mut bot = BotState::new(Archetype::Rifleman);
+        let mut sig = signals_baseline(7);
+        sig.self_position = [10.0, 25.0];
+        let emit = detect_behavior_transitions(&mut bot, TaskType::SharpshootTarget, &sig);
+        assert!(emit.high_ground_preference_applied.is_none());
     }
 }

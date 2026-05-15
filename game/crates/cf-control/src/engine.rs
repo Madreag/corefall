@@ -4270,6 +4270,14 @@ impl M0Engine {
     /// resulting `ai.reason_label_changed` + `ai.thinking_layer_invoked`
     /// events. Also detects DYING-ally + DEGRADED chassis-module triggers
     /// and emits the auto-triage / auto-repair contract events.
+    ///
+    /// **M7-A fix-round-2 (audit gaps A1-A7)**: also drives
+    /// `crate::m7_ai::detect_behavior_transitions` and emits
+    /// `ai.cover_seeking_started`, `ai.suppression_started`,
+    /// `ai.retreat_decision`, `ai.squad_comm_relayed`,
+    /// `ai.patrol_waypoint_reached`, `ai.friendly_fire_avoidance`,
+    /// `ai.high_ground_preference_applied` from the engine production
+    /// path.
     fn emit_m7_ai_events(&self, tick: Tick, sim_time_ms: f64, guard_id: ActorId) {
         // Snapshot world state needed by the thinking context, then
         // exclusive-borrow the bot state and tick the stack.
@@ -4289,13 +4297,84 @@ impl M0Engine {
                     .as_ref()
                     .and_then(|s| s.world.actors.get(&pid).cloned())
             });
-            (self_actor, player_actor)
+            // **M7-A fix-round-2**: collect every other reactive-guard
+            // ActorState so we can derive the squad-comm receiver list +
+            // friendly-fire avoidance check. Reactive guards spawned by
+            // the scenario all share the AiEnemy faction by default
+            // (cf-control/src/m7_ai.rs::BotState::new).
+            let other_guards: Vec<cf_actor::ActorState> = state
+                .reactive_guards
+                .keys()
+                .filter(|id| **id != guard_id)
+                .filter_map(|id| state.actor_state.as_ref().and_then(|s| s.world.actors.get(id).cloned()))
+                .collect();
+            (self_actor, player_actor, other_guards)
         };
-        let (Some(self_actor), player_actor) = world_snapshot else {
+        let (Some(self_actor), player_actor, other_guards) = world_snapshot else {
             return;
         };
 
-        let (emit, archetype) = {
+        // **M7-A fix-round-2**: compute the engine-side signals that drive
+        // the 7 behavior-sub-plan events. All signals are pure functions
+        // of the snapshot above so they don't need a write borrow.
+        let enemy_visible = player_actor
+            .as_ref()
+            .map(|p| {
+                let dx = p.position.x - self_actor.position.x;
+                let dy = p.position.y - self_actor.position.y;
+                let d = (dx * dx + dy * dy).sqrt();
+                d <= cf_ai::Archetype::Sniper.default_sight_range()
+            })
+            .unwrap_or(false);
+        // "Under fire" = player is aiming roughly at this bot. Captures
+        // the spec scenario "When player fires Then
+        // ai.cover_seeking_started fires" without needing a per-tick
+        // damage history. Cone half-angle ≈ 32° (cos(32°) ≈ 0.85).
+        let under_fire = player_actor
+            .as_ref()
+            .map(|p| {
+                let dx = self_actor.position.x - p.position.x;
+                let dy = self_actor.position.y - p.position.y;
+                let dist = (dx * dx + dy * dy).sqrt();
+                let aim_mag = (p.aim.x * p.aim.x + p.aim.y * p.aim.y).sqrt();
+                if dist < 0.001 || aim_mag < 0.001 {
+                    return false;
+                }
+                let dot = (dx * p.aim.x + dy * p.aim.y) / (dist * aim_mag);
+                dot > 0.85
+            })
+            .unwrap_or(false);
+        // Friendly-fire detection: any other reactive guard sitting on
+        // this bot's aim line toward the player counts as in-LOS.
+        let aim_vec = player_actor
+            .as_ref()
+            .map(|p| {
+                [
+                    p.position.x - self_actor.position.x,
+                    p.position.y - self_actor.position.y,
+                ]
+            })
+            .unwrap_or([0.0, 0.0]);
+        let friendly_in_line_of_fire = if aim_vec[0].abs() + aim_vec[1].abs() > 0.001 {
+            other_guards.iter().find_map(|other| {
+                if cf_ai::friendly_fire::is_friendly_in_line_of_fire(
+                    [self_actor.position.x, self_actor.position.y],
+                    aim_vec,
+                    [other.position.x, other.position.y],
+                    cf_ai::Archetype::Sniper.default_sight_range(),
+                    2.0,
+                ) {
+                    Some(other.id.0)
+                } else {
+                    None
+                }
+            })
+        } else {
+            None
+        };
+        let squadmates: Vec<u64> = other_guards.iter().map(|a| a.id.0).collect();
+
+        let (emit, behavior_emit, archetype) = {
             let mut state = match self.state.write() {
                 Ok(s) => s,
                 Err(_) => return,
@@ -4304,15 +4383,6 @@ impl M0Engine {
                 Some(b) => b,
                 None => return,
             };
-            let enemy_visible = player_actor
-                .as_ref()
-                .map(|p| {
-                    let dx = p.position.x - self_actor.position.x;
-                    let dy = p.position.y - self_actor.position.y;
-                    let d = (dx * dx + dy * dy).sqrt();
-                    d <= bot.stack.archetype.default_sight_range()
-                })
-                .unwrap_or(false);
             let enemy_distance_normalized = player_actor
                 .as_ref()
                 .map(|p| {
@@ -4334,13 +4404,34 @@ impl M0Engine {
                 tick_rate_hz,
                 enemy_visible,
                 enemy_distance_normalized,
-                false,
+                under_fire,
                 downed_ally_within_reach,
                 false,
                 false,
                 false,
             );
-            (crate::m7_ai::tick_bot(bot, ctx), bot.archetype)
+            let tick_emit = crate::m7_ai::tick_bot(bot, ctx);
+            // **M7-A fix-round-2**: drive the 7 behavior sub-plan
+            // detections from the per-tick chosen task + engine signal
+            // snapshot. The `reactive_override` flag flows in from the
+            // ReactiveLayer's `last_decision` (Defer = no override).
+            let reactive_override = bot.stack.reactive.last_decision != cf_ai::ReactiveDecision::Defer;
+            let signals = crate::m7_ai::BehaviorSignals {
+                actor_id: guard_id.0,
+                self_position: [self_actor.position.x, self_actor.position.y],
+                hp_fraction: (self_actor.hp / self_actor.hp_max.max(0.001)).clamp(0.0, 1.0),
+                enemy_visible,
+                under_fire,
+                reactive_override,
+                player_actor_id: player_actor.as_ref().map(|p| p.id.0),
+                player_position: player_actor.as_ref().map(|p| [p.position.x, p.position.y]),
+                squadmates: squadmates.clone(),
+                friendly_in_line_of_fire,
+                current_tick: tick.0,
+                tick_rate_hz,
+            };
+            let beh = crate::m7_ai::detect_behavior_transitions(bot, tick_emit.chosen_task, &signals);
+            (tick_emit, beh, bot.archetype)
         };
 
         let label_changed = emit.reason_label_changed.is_some();
@@ -4352,6 +4443,38 @@ impl M0Engine {
         if let Some(payload) = emit.thinking_layer_invoked {
             self.recorder
                 .record(tick, sim_time_ms, "ai", "thinking_layer_invoked", payload, None);
+        }
+
+        // **M7-A fix-round-2 (audit gaps A1-A7)**: emit the 7 behavior
+        // sub-plan events whose payload helpers + cf-ai modules already
+        // existed but whose engine emission sites were missing.
+        if let Some(payload) = behavior_emit.cover_seeking_started {
+            self.recorder
+                .record(tick, sim_time_ms, "ai", "cover_seeking_started", payload, None);
+        }
+        if let Some(payload) = behavior_emit.suppression_started {
+            self.recorder
+                .record(tick, sim_time_ms, "ai", "suppression_started", payload, None);
+        }
+        if let Some(payload) = behavior_emit.retreat_decision {
+            self.recorder
+                .record(tick, sim_time_ms, "ai", "retreat_decision", payload, None);
+        }
+        for payload in behavior_emit.squad_comm_relayed {
+            self.recorder
+                .record(tick, sim_time_ms, "ai", "squad_comm_relayed", payload, None);
+        }
+        if let Some(payload) = behavior_emit.patrol_waypoint_reached {
+            self.recorder
+                .record(tick, sim_time_ms, "ai", "patrol_waypoint_reached", payload, None);
+        }
+        if let Some(payload) = behavior_emit.friendly_fire_avoidance {
+            self.recorder
+                .record(tick, sim_time_ms, "ai", "friendly_fire_avoidance", payload, None);
+        }
+        if let Some(payload) = behavior_emit.high_ground_preference_applied {
+            self.recorder
+                .record(tick, sim_time_ms, "ai", "high_ground_preference_applied", payload, None);
         }
         // **M7-A**: emit `ai.archetype_chosen` whenever the reason-label
         // flips. The first tick a bot ticks the label is fresh, so this
