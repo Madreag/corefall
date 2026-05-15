@@ -39,7 +39,45 @@ pub mod mission_resolved_modal;
 pub mod mission_timer;
 pub mod objective_banner;
 
+// M8 spec § Files: 16 new HUD widget modules + the settings menu shell.
+// Each module owns its own Bevy Resource state struct + helpers; cf-app's
+// renderer mirrors them per frame from the engine snapshot.
+pub mod action_prompt;
+pub mod branching_banner;
+pub mod compass;
+pub mod cover_pip;
+pub mod damage_direction;
+pub mod grenade_arc;
+pub mod hotbar;
+pub mod lean_pip;
+pub mod minimap;
+pub mod phase_strip;
+pub mod scope_reticle;
+pub mod settings_menu;
+pub mod squad_strip;
+pub mod stamina_bar;
+pub mod stealth_meter;
+pub mod weapon_swap_overlay;
+
+pub use action_prompt::ActionPromptState;
+pub use branching_banner::{BranchOption, BranchingBannerState};
+pub use compass::{CompassBearing, CompassState, CARDINALS};
+pub use cover_pip::{CoverLevel, CoverPipState};
+pub use damage_direction::{DamageDirectionMarker, DamageDirectionState, DEFAULT_FADE_MS};
+pub use grenade_arc::{ArcSample, GrenadeArcState};
+pub use hotbar::{HotbarSlot, HotbarState, HOTBAR_SLOTS};
+pub use lean_pip::{LeanPipState, LEAN_MAX_DEGREES, LEAN_MIN_DEGREES};
 pub use material_legend::{legend_entries, MaterialLegendEntry, MaterialLegendState};
+pub use minimap::{MinimapMarker, MinimapState, MINIMAP_SIZE_PX};
+pub use phase_strip::{MissionPhase, PhaseStripState};
+pub use scope_reticle::ScopeReticleState;
+pub use settings_menu::{SettingsMenuState, SettingsTab};
+pub use squad_strip::{SquadStripMember, SquadStripState, SQUAD_STRIP_MAX_MEMBERS};
+pub use stamina_bar::{
+    StaminaBarState, StaminaColor, STAMINA_CRITICAL_THRESHOLD, STAMINA_HIGH_THRESHOLD,
+};
+pub use stealth_meter::{StealthMeterState, SPOTTED_THRESHOLD};
+pub use weapon_swap_overlay::{WeaponSwapOverlayState, SWAP_TRANSITION_MS};
 
 /// Latest HUD model derived from the engine. The cf-app bridge writes this each
 /// frame from the same `M0Engine` snapshot it feeds to `cf-render-2d::ActorRenderState`.
