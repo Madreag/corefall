@@ -25,7 +25,63 @@
         "null"
       ]
     },
+    "aim_assist": {
+      "description": "**M8**: aim assist mode (`off | steady_aim |\nauto_aim_with_damage_penalty`).",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "captions": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "cinematic_kills": {
+      "description": "**M8**: cinematic kill cam toggle.",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "color_cue_mode": {
+      "description": "**M8**: color blind / contrast palette mode (snake_case wire form\n`default | colorblind_safe | protanopia | deuteranopia | tritanopia\n| monochrome_test`).",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "compass_enabled": {
+      "description": "**M8**: compass enable toggle.",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "damage_direction_enabled": {
+      "description": "**M8**: damage-direction indicator enable toggle.",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "damage_numbers": {
+      "description": "**M8**: damage numbers cosmetic toggle.",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "debug_enabled": {
+      "description": "**M8**: master debug-overlay gate (production builds).",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "fog_of_war_on": {
+      "description": "**M8**: fog-of-war on.",
       "type": [
         "boolean",
         "null"
@@ -38,6 +94,20 @@
       ],
       "format": "float"
     },
+    "friendly_fire_on": {
+      "description": "**M8**: friendly fire on.",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "game_speed_assist": {
+      "description": "**M8**: slow-motion accessibility mode (snake_case wire form\n`off | slowdown_75 | slowdown_25 | full_pause`).",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "gravity": {
       "type": [
         "number",
@@ -45,7 +115,21 @@
       ],
       "format": "float"
     },
+    "hardcore_mode": {
+      "description": "**M8**: hardcore composite mode.",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
     "high_contrast": {
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "hit_stop_enabled": {
+      "description": "**M8**: hit-stop toggle.",
       "type": [
         "boolean",
         "null"
@@ -91,6 +175,63 @@
         "null"
       ]
     },
+    "killcam_enabled": {
+      "description": "**M8**: killcam toggle.",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "language": {
+      "description": "**M8**: language code (`en` baseline; Tier-A 11 reserved for\nT-ACC-PLUS BP9+).",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "limited_ammo": {
+      "description": "**M8**: limited-ammo modifier.",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "mini_map_enabled": {
+      "description": "**M8**: master mini-map enable toggle.",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "mini_map_zoom": {
+      "description": "**M8**: mini-map zoom (0.25..=4.0).",
+      "type": [
+        "number",
+        "null"
+      ],
+      "format": "float"
+    },
+    "no_minimap": {
+      "description": "**M8**: hide the mini-map (overrides `mini_map_enabled`).",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "no_respawn": {
+      "description": "**M8**: no-respawn modifier.",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "permadeath": {
+      "description": "**M8**: permadeath modifier.",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
     "recoil_decay_per_tick": {
       "type": [
         "number",
@@ -124,6 +265,14 @@
         "null"
       ]
     },
+    "scope_zoom_fov": {
+      "description": "**M8**: scope ADS FOV in degrees (5..=90).",
+      "type": [
+        "number",
+        "null"
+      ],
+      "format": "float"
+    },
     "sharp_aim_build_ticks": {
       "type": [
         "integer",
@@ -131,6 +280,21 @@
       ],
       "format": "uint32",
       "minimum": 0
+    },
+    "speedrun_mode": {
+      "description": "**M8**: speedrun mode toggle.",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "text_scale": {
+      "description": "**M8**: text scale (0.5..=4.0; mirrors `ui_scale`).",
+      "type": [
+        "number",
+        "null"
+      ],
+      "format": "float"
     },
     "tick_rate_hz": {
       "description": "**M1**: tick-rate observable. Clamped to `>= 1`. The engine does not\nlive-retick on patch; this mirrors the engine's configured tick rate\nso cfctl `observe.settings` is round-trippable.",
@@ -140,6 +304,20 @@
       ],
       "format": "uint32",
       "minimum": 0
+    },
+    "time_limit": {
+      "description": "**M8**: time-limit modifier.",
+      "type": [
+        "boolean",
+        "null"
+      ]
+    },
+    "ui_density": {
+      "description": "**M8**: HUD density preset (`compact | normal | spacious`).",
+      "type": [
+        "string",
+        "null"
+      ]
     },
     "ui_scale": {
       "type": [

@@ -17,6 +17,86 @@
     "settings"
   ],
   "$defs": {
+    "AimAssist": {
+      "description": "**M8**: aim assist mode (`aim_assist`). Spec § Accessibility extras —\noff / steady_aim / auto_aim_with_damage_penalty.",
+      "oneOf": [
+        {
+          "description": "No aim assist.",
+          "type": "string",
+          "const": "off"
+        },
+        {
+          "description": "Reduces reticle wobble while aiming.",
+          "type": "string",
+          "const": "steady_aim"
+        },
+        {
+          "description": "Snaps reticle slightly toward target; -15% damage.",
+          "type": "string",
+          "const": "auto_aim_with_damage_penalty"
+        }
+      ]
+    },
+    "ColorCueMode": {
+      "description": "**M8**: color blind / contrast palette mode (`color_cue_mode`). Spec §\nAccessibility extras — Default / ColorblindSafe / Protanopia /\nDeuteranopia / Tritanopia / MonochromeTest.",
+      "oneOf": [
+        {
+          "description": "Default game palette.",
+          "type": "string",
+          "const": "default"
+        },
+        {
+          "description": "Colorblind-safe palette (yellow + blue replacing red + green).",
+          "type": "string",
+          "const": "colorblind_safe"
+        },
+        {
+          "description": "Protanopia (red-blind) palette.",
+          "type": "string",
+          "const": "protanopia"
+        },
+        {
+          "description": "Deuteranopia (green-blind) palette.",
+          "type": "string",
+          "const": "deuteranopia"
+        },
+        {
+          "description": "Tritanopia (blue-blind) palette.",
+          "type": "string",
+          "const": "tritanopia"
+        },
+        {
+          "description": "Monochrome test palette (greyscale).",
+          "type": "string",
+          "const": "monochrome_test"
+        }
+      ]
+    },
+    "GameSpeedAssist": {
+      "description": "**M8**: slow-motion accessibility (`game_speed_assist`). Spec §\nCamera + game feel — Off / Slowdown75 / Slowdown25 / FullPause.",
+      "oneOf": [
+        {
+          "description": "Sim runs at native rate.",
+          "type": "string",
+          "const": "off"
+        },
+        {
+          "description": "Sim runs at 75% speed (cosmetic; replay-deterministic).",
+          "type": "string",
+          "const": "slowdown75"
+        },
+        {
+          "description": "Sim runs at 25% speed.",
+          "type": "string",
+          "const": "slowdown25"
+        },
+        {
+          "description": "Sim runs at 0% (menu only).",
+          "type": "string",
+          "const": "full_pause"
+        }
+      ]
+    },
     "Settings": {
       "type": "object",
       "properties": {
@@ -36,8 +116,57 @@
           "type": "string",
           "default": "tough_crowd"
         },
+        "aim_assist": {
+          "description": "**M8**: aim assist mode (off / steady / auto).",
+          "$ref": "#/$defs/AimAssist",
+          "default": "off"
+        },
         "captions": {
           "type": "boolean"
+        },
+        "cinematic_kills": {
+          "description": "**M8**: cinematic kill cam on boss final blow.",
+          "type": "boolean",
+          "default": true
+        },
+        "color_cue_mode": {
+          "description": "**M8**: color blind / contrast palette mode.",
+          "$ref": "#/$defs/ColorCueMode",
+          "default": "default"
+        },
+        "compass_enabled": {
+          "description": "**M8**: master compass enable toggle.",
+          "type": "boolean",
+          "default": true
+        },
+        "damage_direction_enabled": {
+          "description": "**M8**: damage direction indicator enable toggle.",
+          "type": "boolean",
+          "default": true
+        },
+        "damage_numbers": {
+          "description": "**M8**: damage numbers cosmetic (floating \"+15\" text on hit).",
+          "type": "boolean",
+          "default": false
+        },
+        "debug_enabled": {
+          "description": "**M8**: master debug-overlay enable gate. In production builds the\n7 cf-debug overlays only render when `debug_enabled = true`. Dev\nbuilds bypass the gate.",
+          "type": "boolean",
+          "default": false
+        },
+        "debug_overlays": {
+          "description": "**M8**: set of currently-enabled cf-debug overlays (snake_case ids\nper `cf_debug::DebugOverlay::as_str`). Mirrors the cf-debug\n`DebugOverlayState` so cfctl `observe.debug.overlays` round-trips.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
+        "fog_of_war_on": {
+          "description": "**M8**: fog-of-war on (default true per spec § Difficulty modifiers).",
+          "type": "boolean",
+          "default": true
         },
         "friction": {
           "description": "**M1 Gap F1**: ground friction (units / s²). Default 1200.0 mirrors\n`cf-actor::sim::ActorTuning::default().ground_friction`.",
@@ -45,14 +174,34 @@
           "format": "float",
           "default": 1200.0
         },
+        "friendly_fire_on": {
+          "description": "**M8**: friendly fire on.",
+          "type": "boolean",
+          "default": false
+        },
+        "game_speed_assist": {
+          "description": "**M8**: slow-motion accessibility (Off / Slowdown75 / Slowdown25 /\nFullPause). Cosmetic per M4; replay-deterministic.",
+          "$ref": "#/$defs/GameSpeedAssist",
+          "default": "off"
+        },
         "gravity": {
           "description": "**M1 Gap F1**: gravity acceleration applied to the actor in\n`cf-physics` (units / s²; negative pulls toward the floor). Default\n`-980.0`.",
           "type": "number",
           "format": "float",
           "default": -980.0
         },
+        "hardcore_mode": {
+          "description": "**M8**: hardcore mode (composite of multiple modifiers).",
+          "type": "boolean",
+          "default": false
+        },
         "high_contrast": {
           "type": "boolean"
+        },
+        "hit_stop_enabled": {
+          "description": "**M8**: hit-stop pulse on impactful hits.",
+          "type": "boolean",
+          "default": true
         },
         "hold_threshold_ms": {
           "description": "M4A: hold threshold in milliseconds. Default 250 ms; clamped to\n`[50..2000]` by `apply_settings_patch`.",
@@ -85,6 +234,47 @@
           "type": "boolean",
           "default": false
         },
+        "killcam_enabled": {
+          "description": "**M8**: killcam toggle (on by default per spec § Killcam).",
+          "type": "boolean",
+          "default": true
+        },
+        "language": {
+          "description": "**M8**: active language code (en baseline; Tier-A 11 reserved for\nT-ACC-PLUS BP9+).",
+          "type": "string",
+          "default": "en"
+        },
+        "limited_ammo": {
+          "description": "**M8**: limited-ammo modifier.",
+          "type": "boolean",
+          "default": false
+        },
+        "mini_map_enabled": {
+          "description": "**M8**: master mini-map enable toggle (Settings.no_minimap inverts).",
+          "type": "boolean",
+          "default": true
+        },
+        "mini_map_zoom": {
+          "description": "**M8**: mini-map zoom (clamped 0.25..=4.0).",
+          "type": "number",
+          "format": "float",
+          "default": 1.0
+        },
+        "no_minimap": {
+          "description": "**M8**: hide the mini-map (overrides `mini_map_enabled` when true).",
+          "type": "boolean",
+          "default": false
+        },
+        "no_respawn": {
+          "description": "**M8**: no-respawn modifier.",
+          "type": "boolean",
+          "default": false
+        },
+        "permadeath": {
+          "description": "**M8**: permadeath modifier.",
+          "type": "boolean",
+          "default": false
+        },
         "recoil_decay_per_tick": {
           "description": "**M1 Gap F1**: per-tick decay of `recoil_accumulator` toward zero\n(CCCP `HDFirearm.cpp:891`). Default `0.05`.",
           "type": "number",
@@ -106,6 +296,12 @@
         "reduced_shake": {
           "type": "boolean"
         },
+        "scope_zoom_fov": {
+          "description": "**M8**: scope ADS FOV in degrees (clamped 5..=90).",
+          "type": "number",
+          "format": "float",
+          "default": 30.0
+        },
         "sharp_aim_build_ticks": {
           "description": "**M1 Gap F1**: ticks to fully build sharp aim from 0 -> 1.0 (CCCP\n`AHuman.cpp:1779`). Default `30` (~0.5s at 60Hz).",
           "type": "integer",
@@ -113,12 +309,33 @@
           "default": 30,
           "minimum": 0
         },
+        "speedrun_mode": {
+          "description": "**M8**: speedrun mode (HUD shows persistent timer + segment\nmarkers; mission resolves immediately on objectives).",
+          "type": "boolean",
+          "default": false
+        },
+        "text_scale": {
+          "description": "**M8**: text scale (mirrors ui_scale; some HUD widgets honour this\ndistinct field per spec § Settings menu Accessibility tab).",
+          "type": "number",
+          "format": "float",
+          "default": 1.0
+        },
         "tick_rate_hz": {
           "description": "**M1**: tick-rate observable. Mirrors the engine's\n`tick_rate_hz` so cfctl `observe.settings` round-trips a single\nauthoritative value. Defaults to 60.",
           "type": "integer",
           "format": "uint32",
           "default": 60,
           "minimum": 0
+        },
+        "time_limit": {
+          "description": "**M8**: time-limit modifier (mission has a hard timer).",
+          "type": "boolean",
+          "default": false
+        },
+        "ui_density": {
+          "description": "**M8**: HUD density preset.",
+          "$ref": "#/$defs/UiDensity",
+          "default": "normal"
         },
         "ui_scale": {
           "type": "number",
@@ -138,6 +355,26 @@
         "reduced_motion",
         "reduced_shake",
         "reduced_flash"
+      ]
+    },
+    "UiDensity": {
+      "description": "**M8**: HUD density preset (`ui_density`). Spec § Accessibility tab —\nCompact / Normal / Spacious.",
+      "oneOf": [
+        {
+          "description": "Compact — denser HUD layout.",
+          "type": "string",
+          "const": "compact"
+        },
+        {
+          "description": "Normal — default density.",
+          "type": "string",
+          "const": "normal"
+        },
+        {
+          "description": "Spacious — looser HUD spacing.",
+          "type": "string",
+          "const": "spacious"
+        }
       ]
     }
   }
