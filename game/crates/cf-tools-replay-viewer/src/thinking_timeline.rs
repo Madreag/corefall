@@ -256,7 +256,10 @@ fn event_actor_id(event: &Event) -> Option<u64> {
     if let Some(id) = event.actor_id {
         return Some(id);
     }
-    event.payload.get("actor_id").and_then(|v| v.as_u64())
+    if let Some(id) = event.payload.get("actor_id").and_then(|v| v.as_u64()) {
+        return Some(id);
+    }
+    event.payload.get("actor").and_then(|v| v.as_u64())
 }
 
 #[cfg(test)]
