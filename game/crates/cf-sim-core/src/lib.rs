@@ -19,6 +19,8 @@ use serde::{Deserialize, Serialize};
 
 pub mod checksum;
 pub mod ids;
+pub mod scheduler;
+pub mod snapshot;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(transparent)]

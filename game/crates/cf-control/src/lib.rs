@@ -6,6 +6,7 @@
 //! JSON-RPC error code `-32602` (`InvalidParams`) and a fix-hint per
 //! `spec/ai-control-observability-layer.md`.
 
+pub mod components;
 pub mod engine;
 pub mod envelope;
 pub mod m6_actions;
@@ -17,6 +18,7 @@ pub mod schemas;
 pub mod server;
 pub mod settings;
 pub mod state;
+pub mod world;
 
 pub use m6_actions::{ActSquadIssueCommandParams, M6Action, M6ActionParams, SquadCommandKindOverWire};
 

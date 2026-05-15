@@ -15,3 +15,6 @@ rand_core = { workspace = true }
 blake3 = { workspace = true }
 hex = { workspace = true }
 chrono = { workspace = true }
+
+[dev-dependencies]
+serde_json = { workspace = true }
