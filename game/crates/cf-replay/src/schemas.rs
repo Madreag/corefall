@@ -313,6 +313,7 @@ const SCHEMA_UX_PIE_MENU_OPENED: &str = include_str!("../schemas/event/ux_pie_me
 const SCHEMA_UX_PIE_MENU_SLICE_CHOSEN: &str = include_str!("../schemas/event/ux_pie_menu_slice_chosen.json");
 const SCHEMA_UX_PIE_MENU_CLOSED: &str = include_str!("../schemas/event/ux_pie_menu_closed.json");
 const SCHEMA_UX_PIE_MENU_SLICE_REJECTED: &str = include_str!("../schemas/event/ux_pie_menu_slice_rejected.json");
+const SCHEMA_UX_GAME_SPEED_ASSIST_CHANGED: &str = include_str!("../schemas/event/ux_game_speed_assist_changed.json");
 const SCHEMA_AI_PLAN_COMPOSED: &str = include_str!("../schemas/event/ai_plan_composed.json");
 const SCHEMA_AI_PLAN_EXECUTED: &str = include_str!("../schemas/event/ai_plan_executed.json");
 const SCHEMA_AI_PLAN_ABORTED: &str = include_str!("../schemas/event/ai_plan_aborted.json");
@@ -581,6 +582,7 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("ux", "pie_menu_slice_chosen") => Some(SCHEMA_UX_PIE_MENU_SLICE_CHOSEN),
         ("ux", "pie_menu_closed") => Some(SCHEMA_UX_PIE_MENU_CLOSED),
         ("ux", "pie_menu_slice_rejected") => Some(SCHEMA_UX_PIE_MENU_SLICE_REJECTED),
+        ("ux", "game_speed_assist_changed") => Some(SCHEMA_UX_GAME_SPEED_ASSIST_CHANGED),
         ("ai", "plan_composed") => Some(SCHEMA_AI_PLAN_COMPOSED),
         ("ai", "plan_executed") => Some(SCHEMA_AI_PLAN_EXECUTED),
         ("ai", "plan_aborted") => Some(SCHEMA_AI_PLAN_ABORTED),

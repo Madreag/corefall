@@ -39,6 +39,20 @@ impl GameSpeedAssist {
         }
     }
 
+    /// Sim-speed percentage (0..=100) the per-tick scheduler honors. Off=100
+    /// (no slowdown), Slowdown75=75 (3 of every 4 ticks advance), Slowdown25=25
+    /// (1 of every 4 ticks advance), FullPause=0 (sim halts; settings UI +
+    /// cfctl still respond). Composed via [`u8::min`] with the pie menu's
+    /// `slowdown_factor_pct` so whichever surface is more restrictive wins.
+    pub fn speed_pct(self) -> u8 {
+        match self {
+            GameSpeedAssist::Off => 100,
+            GameSpeedAssist::Slowdown75 => 75,
+            GameSpeedAssist::Slowdown25 => 25,
+            GameSpeedAssist::FullPause => 0,
+        }
+    }
+
     /// Parse from the cfctl wire form.
     #[allow(clippy::should_implement_trait)]
     pub fn from_str(value: &str) -> Option<GameSpeedAssist> {
@@ -739,5 +753,13 @@ mod tests {
         b.insert("fire".to_string(), "KeyA".to_string());
         b.insert("move_left".to_string(), "Enter".to_string());
         validate_key_bindings(&b).unwrap();
+    }
+
+    #[test]
+    fn game_speed_assist_speed_pct_matches_spec() {
+        assert_eq!(GameSpeedAssist::Off.speed_pct(), 100);
+        assert_eq!(GameSpeedAssist::Slowdown75.speed_pct(), 75);
+        assert_eq!(GameSpeedAssist::Slowdown25.speed_pct(), 25);
+        assert_eq!(GameSpeedAssist::FullPause.speed_pct(), 0);
     }
 }

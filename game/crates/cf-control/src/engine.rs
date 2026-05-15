@@ -878,6 +878,28 @@ pub(crate) struct EngineMutable {
     /// `content/localization/en.json` baseline. Re-loaded if `Settings.
     /// language` changes (only `en` ships at M8).
     pub(crate) localization: cf_localization::LocalizationTable,
+    /// **M8 game_speed_assist consumer**: deterministic tick-skip
+    /// accumulator. Each [`M0Engine::drive_tick`] call adds the
+    /// effective sim-speed percentage (0..=100) to this counter; the
+    /// sim advances only when the counter reaches 100, then 100 is
+    /// subtracted. Integer arithmetic so the spec's "all events
+    /// deterministic (replay-compatible)" + "use tick counter modulo
+    /// arithmetic, not floating-point time" requirements hold. The
+    /// effective percentage is the most-restrictive of
+    /// `settings.game_speed_assist.speed_pct()` and the pie menu's
+    /// `slowdown_factor_pct` (per the round-3 fix description:
+    /// "the pie menu can stack with game_speed_assist; whichever is
+    /// more restrictive wins").
+    pub(crate) game_speed_accumulator: u16,
+    /// **M8 game_speed_assist consumer**: true when the engine is
+    /// hosting a networked multiplayer session (M36+). `game_speed_
+    /// assist` is single-player-only per spec, so the per-tick
+    /// scheduler treats this flag as a kill-switch: multiplayer
+    /// always runs at 100% regardless of the Settings value. M8
+    /// ships with the flag pinned `false` (no multiplayer scenarios
+    /// exist yet); the persistent setter is reserved for the M36+
+    /// scenario loader.
+    pub(crate) multiplayer_session: bool,
 }
 
 /// **M6**: per-actor charge-fire annotation shipped from the M6 post-step
@@ -1291,6 +1313,8 @@ impl M0Engine {
                 pie_menu: cf_squad_ui::PieMenuState::closed(),
                 localization: cf_localization::LocalizationTable::english_baseline()
                     .unwrap_or_else(|_| cf_localization::LocalizationTable::new("en")),
+                game_speed_accumulator: 0,
+                multiplayer_session: false,
             }),
             recorder,
             current_tick,
@@ -2253,9 +2277,30 @@ impl M0Engine {
     /// every `cadence_ticks` ticks (M0 default = 60). When the engine carries an
     /// [`ActorSimState`], drives the M1 actor pipeline and emits the resulting `input.*`
     /// / `actor.*` / `equipment.*` / `combat.*` / `body.*` events.
+    ///
+    /// **M8 game_speed_assist consumer:** Before advancing the clock, the
+    /// scheduler consults [`effective_sim_speed_pct`] (composed from
+    /// `settings.game_speed_assist`, the pie menu's `slowdown_factor_pct`,
+    /// and the `multiplayer_session` kill-switch) and skips this drive
+    /// invocation via the `game_speed_accumulator` modulo gate when the
+    /// effective percentage hasn't accumulated to 100. Skipped ticks
+    /// return [`None`] without advancing the clock, so the event stream
+    /// stays replay-deterministic and cfctl/settings still respond between
+    /// invocations.
     pub fn drive_tick(&self) -> Option<Tick> {
         let start = Instant::now();
         let mut state = self.state.write().expect("engine state poisoned");
+        let effective_pct = effective_sim_speed_pct(&state.settings, &state.pie_menu, state.multiplayer_session);
+        if effective_pct == 0 {
+            return None;
+        }
+        if effective_pct < 100 {
+            state.game_speed_accumulator = state.game_speed_accumulator.saturating_add(u16::from(effective_pct));
+            if state.game_speed_accumulator < 100 {
+                return None;
+            }
+            state.game_speed_accumulator -= 100;
+        }
         let advanced = state.clock.advance();
         let mut checksum_payload: Option<(Tick, f64, String)> = None;
         let mut tick_sample_payload: Option<(Tick, f64, TickSampleStats)> = None;
@@ -11268,6 +11313,32 @@ fn discover_run_artifacts(run_bundle_dir: &Path) -> (Vec<ArtifactItem>, Option<S
     (items, link)
 }
 
+/// **M8 game_speed_assist + pie-menu sim-speed composition.** Returns the
+/// effective sim-speed percentage (0..=100) the per-tick scheduler honors
+/// for the current tick. Composes:
+///
+/// - `settings.game_speed_assist.speed_pct()` (Off=100 / Slowdown75=75 /
+///   Slowdown25=25 / FullPause=0) — single-player only; multiplayer
+///   sessions force this leg to 100 per spec.
+/// - `pie_menu.slowdown_factor_pct` (100 when closed, 20 in single-player
+///   open, 100 in multiplayer open).
+///
+/// Most-restrictive wins (per the fix description: "the pie menu can stack
+/// with game_speed_assist; whichever is more restrictive wins"). Pure
+/// function so determinism is easy to verify in unit tests.
+pub(crate) fn effective_sim_speed_pct(
+    settings: &Settings,
+    pie_menu: &cf_squad_ui::PieMenuState,
+    multiplayer_session: bool,
+) -> u8 {
+    let assist_pct = if multiplayer_session {
+        100
+    } else {
+        settings.game_speed_assist.speed_pct()
+    };
+    assist_pct.min(pie_menu.slowdown_factor_pct)
+}
+
 fn apply_settings_patch(settings: &mut Settings, patch: &SettingsPatch) -> Vec<String> {
     let mut changed = Vec::new();
     if let Some(v) = patch.ui_scale {
@@ -13797,6 +13868,25 @@ impl EngineHandle for M0Engine {
                         None,
                     );
                 }
+                // **M8 game_speed_assist consumer (Round-3 fix):** when the
+                // game_speed_assist value transitioned (Off ↔ Slowdown75 ↔
+                // Slowdown25 ↔ FullPause), surface the change as a dedicated
+                // `ux.game_speed_assist_changed` event so replay tooling can
+                // mark where the sim-tick scheduler will start skipping ticks.
+                // The schema lives at
+                // `cf-replay/schemas/event/ux_game_speed_assist_changed.json`.
+                if changed.iter().any(|f| f == "game_speed_assist") {
+                    let from_assist = prev_settings.game_speed_assist;
+                    let to_assist = new_settings.game_speed_assist;
+                    let payload = json!({
+                        "from": from_assist.as_str(),
+                        "to": to_assist.as_str(),
+                        "speed_pct": to_assist.speed_pct(),
+                    });
+                    let _ = self
+                        .recorder
+                        .record(tick, sim_time_ms, "ux", "game_speed_assist_changed", payload, None);
+                }
                 CommandResult::accepted(tick.0)
             }
             ControlCommand::RunBundleWrite { id_override } => {
@@ -14126,6 +14216,120 @@ mod tests {
     }
 
     #[test]
+    fn m8_effective_sim_speed_pct_default_is_off_no_pie_menu() {
+        let settings = Settings::default();
+        let pie = cf_squad_ui::PieMenuState::closed();
+        assert_eq!(effective_sim_speed_pct(&settings, &pie, false), 100);
+    }
+
+    #[test]
+    fn m8_effective_sim_speed_pct_slowdown75_alone() {
+        let mut settings = Settings::default();
+        settings.game_speed_assist = crate::settings::GameSpeedAssist::Slowdown75;
+        let pie = cf_squad_ui::PieMenuState::closed();
+        assert_eq!(effective_sim_speed_pct(&settings, &pie, false), 75);
+    }
+
+    #[test]
+    fn m8_effective_sim_speed_pct_slowdown25_alone() {
+        let mut settings = Settings::default();
+        settings.game_speed_assist = crate::settings::GameSpeedAssist::Slowdown25;
+        let pie = cf_squad_ui::PieMenuState::closed();
+        assert_eq!(effective_sim_speed_pct(&settings, &pie, false), 25);
+    }
+
+    #[test]
+    fn m8_effective_sim_speed_pct_full_pause_alone() {
+        let mut settings = Settings::default();
+        settings.game_speed_assist = crate::settings::GameSpeedAssist::FullPause;
+        let pie = cf_squad_ui::PieMenuState::closed();
+        assert_eq!(effective_sim_speed_pct(&settings, &pie, false), 0);
+    }
+
+    #[test]
+    fn m8_effective_sim_speed_pct_pie_menu_open_stacks_with_assist_most_restrictive_wins() {
+        let mut settings = Settings::default();
+        settings.game_speed_assist = crate::settings::GameSpeedAssist::Slowdown75;
+        let mut pie = cf_squad_ui::PieMenuState::closed();
+        pie.open(cf_squad_ui::PieMenuTarget::Void, false, 1);
+        assert_eq!(pie.slowdown_factor_pct, cf_squad_ui::SINGLE_PLAYER_SLOWDOWN_PCT);
+        assert_eq!(
+            effective_sim_speed_pct(&settings, &pie, false),
+            cf_squad_ui::SINGLE_PLAYER_SLOWDOWN_PCT,
+            "pie menu's 20% slowdown is more restrictive than game_speed_assist's 75%",
+        );
+    }
+
+    #[test]
+    fn m8_effective_sim_speed_pct_multiplayer_ignores_assist_but_honors_pie_menu() {
+        let mut settings = Settings::default();
+        settings.game_speed_assist = crate::settings::GameSpeedAssist::FullPause;
+        let pie = cf_squad_ui::PieMenuState::closed();
+        assert_eq!(
+            effective_sim_speed_pct(&settings, &pie, true),
+            100,
+            "multiplayer must ignore game_speed_assist (single-player only)",
+        );
+        let mut mp_pie = cf_squad_ui::PieMenuState::closed();
+        mp_pie.open(cf_squad_ui::PieMenuTarget::Void, true, 1);
+        assert_eq!(mp_pie.slowdown_factor_pct, 100);
+        assert_eq!(effective_sim_speed_pct(&settings, &mp_pie, true), 100);
+    }
+
+    #[test]
+    fn m8_speed_pct_75_skips_one_in_four_ticks_via_accumulator() {
+        let mut acc: u16 = 0;
+        let pct: u16 = 75;
+        let mut advances = 0;
+        let mut skips = 0;
+        for _ in 0..4 {
+            acc = acc.saturating_add(pct);
+            if acc >= 100 {
+                acc -= 100;
+                advances += 1;
+            } else {
+                skips += 1;
+            }
+        }
+        assert_eq!(advances, 3, "Slowdown75: 3 advances per 4 wall ticks");
+        assert_eq!(skips, 1, "Slowdown75: 1 skip per 4 wall ticks");
+    }
+
+    #[test]
+    fn m8_speed_pct_25_skips_three_in_four_ticks_via_accumulator() {
+        let mut acc: u16 = 0;
+        let pct: u16 = 25;
+        let mut advances = 0;
+        let mut skips = 0;
+        for _ in 0..4 {
+            acc = acc.saturating_add(pct);
+            if acc >= 100 {
+                acc -= 100;
+                advances += 1;
+            } else {
+                skips += 1;
+            }
+        }
+        assert_eq!(advances, 1, "Slowdown25: 1 advance per 4 wall ticks");
+        assert_eq!(skips, 3, "Slowdown25: 3 skips per 4 wall ticks");
+    }
+
+    #[test]
+    fn m8_speed_pct_20_pie_menu_skips_four_in_five_ticks_via_accumulator() {
+        let mut acc: u16 = 0;
+        let pct: u16 = u16::from(cf_squad_ui::SINGLE_PLAYER_SLOWDOWN_PCT);
+        let mut advances = 0;
+        for _ in 0..5 {
+            acc = acc.saturating_add(pct);
+            if acc >= 100 {
+                acc -= 100;
+                advances += 1;
+            }
+        }
+        assert_eq!(advances, 1, "Pie menu 20%: 1 advance per 5 wall ticks");
+    }
+
+    #[test]
     fn notes_addendum_includes_dr007_for_every_m2_plus_milestone() {
         // Bugbot 3212607793 + Devin 3212623450 regression: DR-007 is
         // reference documentation for the material set shape. Every M2+
@@ -14282,6 +14486,78 @@ mod tests {
         assert_eq!(cfg.expected_tests, vec!["M0-SMOKE-01".to_string()]);
         assert!((cfg.region_width - 1280.0).abs() < f32::EPSILON);
         assert!((cfg.region_height - 720.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn m8_drive_tick_full_pause_returns_none_without_advancing_clock() {
+        let scenario_path = write_test_scenario();
+        let mut cfg = load_test_scenario_and_config(scenario_path);
+        cfg.settings.game_speed_assist = crate::settings::GameSpeedAssist::FullPause;
+        cfg.run_mode = "test-game-speed-full-pause".to_string();
+        let engine = M0Engine::new(cfg);
+        let start = engine.current_tick();
+        for _ in 0..32 {
+            assert!(
+                engine.drive_tick().is_none(),
+                "FullPause must always return None from drive_tick",
+            );
+        }
+        assert_eq!(engine.current_tick(), start, "FullPause must not advance the clock",);
+    }
+
+    #[test]
+    fn m8_drive_tick_slowdown75_advances_three_in_four_ticks() {
+        let scenario_path = write_test_scenario();
+        let mut cfg = load_test_scenario_and_config(scenario_path);
+        cfg.settings.game_speed_assist = crate::settings::GameSpeedAssist::Slowdown75;
+        cfg.run_mode = "test-game-speed-slowdown75".to_string();
+        let engine = M0Engine::new(cfg);
+        let mut advances = 0;
+        let mut skips = 0;
+        for _ in 0..400 {
+            if engine.drive_tick().is_some() {
+                advances += 1;
+            } else {
+                skips += 1;
+            }
+        }
+        assert_eq!(advances, 300, "Slowdown75: 3 in 4 ticks advance (=300 of 400)");
+        assert_eq!(skips, 100, "Slowdown75: 1 in 4 ticks skipped (=100 of 400)");
+    }
+
+    #[test]
+    fn m8_drive_tick_slowdown25_advances_one_in_four_ticks() {
+        let scenario_path = write_test_scenario();
+        let mut cfg = load_test_scenario_and_config(scenario_path);
+        cfg.settings.game_speed_assist = crate::settings::GameSpeedAssist::Slowdown25;
+        cfg.run_mode = "test-game-speed-slowdown25".to_string();
+        let engine = M0Engine::new(cfg);
+        let mut advances = 0;
+        let mut skips = 0;
+        for _ in 0..400 {
+            if engine.drive_tick().is_some() {
+                advances += 1;
+            } else {
+                skips += 1;
+            }
+        }
+        assert_eq!(advances, 100, "Slowdown25: 1 in 4 ticks advance (=100 of 400)");
+        assert_eq!(skips, 300, "Slowdown25: 3 in 4 ticks skipped (=300 of 400)");
+    }
+
+    #[test]
+    fn m8_drive_tick_off_advances_every_tick() {
+        let scenario_path = write_test_scenario();
+        let mut cfg = load_test_scenario_and_config(scenario_path);
+        cfg.settings.game_speed_assist = crate::settings::GameSpeedAssist::Off;
+        cfg.run_mode = "test-game-speed-off".to_string();
+        let engine = M0Engine::new(cfg);
+        for _ in 0..64 {
+            assert!(
+                engine.drive_tick().is_some(),
+                "game_speed_assist=Off must always advance",
+            );
+        }
     }
 
     #[test]
