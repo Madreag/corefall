@@ -4243,18 +4243,59 @@ impl M0Engine {
         }
         // M4A: persist tool-validity update for the HUD + observe consumers.
         if let Some((update_tick, update)) = dig_validity_update {
+            // M11 § DR-012: snapshot pre-state so we can emit
+            // ux.tool_validity_changed for the actual transition.
+            let (from_state, prev_reason) = {
+                let s = self.state.read().expect("engine state poisoned");
+                let was_valid = s.hud_tool_validity.valid;
+                let had_carve = s.hud_tool_validity.last_carve_tick.is_some();
+                let had_refusal = s.hud_tool_validity.last_refusal_tick.is_some();
+                let from = if !had_carve && !had_refusal {
+                    "ready"
+                } else if was_valid {
+                    "valid"
+                } else {
+                    "invalid"
+                };
+                (from.to_string(), s.hud_tool_validity.last_refusal_reason.clone())
+            };
             let mut state = self.state.write().expect("engine state poisoned");
+            let to_state: &'static str;
+            let emit_reason: Option<String>;
             match update {
                 ToolValidityUpdate::Carve => {
                     state.hud_tool_validity.last_carve_tick = Some(update_tick);
                     state.hud_tool_validity.valid = true;
+                    to_state = "valid";
+                    emit_reason = None;
                 }
                 ToolValidityUpdate::Refuse { reason, target } => {
                     state.hud_tool_validity.last_refusal_tick = Some(update_tick);
-                    state.hud_tool_validity.last_refusal_reason = Some(reason);
+                    state.hud_tool_validity.last_refusal_reason = Some(reason.clone());
                     state.hud_tool_validity.last_refusal_target = target;
                     state.hud_tool_validity.valid = false;
+                    to_state = "invalid";
+                    emit_reason = Some(reason);
                 }
+            }
+            let sim_time_ms = state.clock.sim_time_ms();
+            drop(state);
+            if from_state.as_str() != to_state {
+                let mut payload = json!({
+                    "from": from_state,
+                    "to": to_state,
+                });
+                if let Some(r) = emit_reason.or(prev_reason) {
+                    payload["reason"] = json!(r);
+                }
+                self.recorder.record_cosmetic(
+                    cf_sim_core::Tick(update_tick),
+                    sim_time_ms,
+                    "ux",
+                    "tool_validity_changed",
+                    payload,
+                    None,
+                );
             }
         }
 
@@ -4677,8 +4718,9 @@ impl M0Engine {
         // have been emitted for this tick. The cache reads world state directly so it
         // does not have to scan the event log on every observe().
         if let Some(t) = advanced {
+            let sim_time_ms = self.state.read().map(|s| s.clock.sim_time_ms()).unwrap_or(0.0);
             let mut state = self.state.write().expect("engine state poisoned");
-            self.refresh_hud_caches(&mut state, t);
+            self.refresh_hud_caches(&mut state, t, sim_time_ms);
             self.refresh_hud_chassis_banners(&mut state, t);
         }
 
@@ -5129,16 +5171,44 @@ impl M0Engine {
     /// events have been emitted. Updates `hud_banners`, `hud_captions`, and the
     /// `hud_last_*` diffing cursors. The HUD + `cfctl observe` reads the cache
     /// directly during `snapshot()`.
-    fn refresh_hud_caches(&self, state: &mut EngineMutable, tick: Tick) {
-        // Drain expired banners + captions.
+    fn refresh_hud_caches(&self, state: &mut EngineMutable, tick: Tick, sim_time_ms: f64) {
+        // Drain expired banners + captions. Collect evicted ids for M11
+        // ux.banner_dismissed emission below.
         let now_tick = tick.0;
+        let pre_banner_snapshot: Vec<(String, u64)> = state
+            .hud_banners
+            .iter()
+            .map(|b| (b.id.clone(), b.raised_at_tick))
+            .collect();
         state.hud_banners.retain(|b| match b.expires_at_tick {
             Some(exp) => now_tick < exp,
             None => true,
         });
+        let post_banner_ids: std::collections::HashSet<String> =
+            state.hud_banners.iter().map(|b| b.id.clone()).collect();
+        let pre_caption_ids: std::collections::HashSet<String> =
+            state.hud_captions.iter().map(|c| c.id.clone()).collect();
         state
             .hud_captions
             .retain(|c| now_tick.saturating_sub(c.raised_at_tick) < M4A_CAPTION_EXPIRY_TICKS);
+        // M11 § DR-012: emit `ux.banner_dismissed` for each evicted banner.
+        for (banner_id, raised_at) in &pre_banner_snapshot {
+            if !post_banner_ids.contains(banner_id) {
+                self.recorder.record_cosmetic(
+                    tick,
+                    sim_time_ms,
+                    "ux",
+                    "banner_dismissed",
+                    json!({
+                        "banner_id": banner_id,
+                        "reason": "expired",
+                        "raised_at_tick": raised_at,
+                        "dismissed_at_tick": now_tick,
+                    }),
+                    None,
+                );
+            }
+        }
 
         // Status-change banners. The previous tick's status is cached in
         // `hud_last_status`; raise a banner whenever the player's status
@@ -5280,6 +5350,32 @@ impl M0Engine {
         if let Some(sim) = state.actor_state.as_ref() {
             for (id, actor) in &sim.world.actors {
                 state.hud_last_status.insert(*id, actor.status);
+            }
+        }
+        // M11 § DR-012: emit `ux.captions_shown` for each newly-surfaced
+        // caption (captions whose id was not in the pre-snapshot). The
+        // verbosity_mode mirrors the caption-buffer policy (standard at M11).
+        let caption_snapshot: Vec<(String, String, u64)> = state
+            .hud_captions
+            .iter()
+            .map(|c| (c.id.clone(), c.label.clone(), c.raised_at_tick))
+            .collect();
+        for (cid, ctext, raised_at) in &caption_snapshot {
+            if !pre_caption_ids.contains(cid) {
+                self.recorder.record_cosmetic(
+                    tick,
+                    sim_time_ms,
+                    "ux",
+                    "captions_shown",
+                    json!({
+                        "caption_text": ctext,
+                        "event_source_id": cid,
+                        "verbosity_mode": "standard",
+                        "category": "system",
+                        "raised_at_tick": raised_at,
+                    }),
+                    None,
+                );
             }
         }
     }

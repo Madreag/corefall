@@ -24,6 +24,36 @@
       "$ref": "#/$defs/AimAssist",
       "default": "off"
     },
+    "camera_motion": {
+      "description": "**M11**: camera-motion granularity (Reduced / Standard).",
+      "$ref": "#/$defs/CameraMotion",
+      "default": "standard"
+    },
+    "caption_background_opacity": {
+      "description": "**M11**: caption background opacity (0.0..=1.0; default 0.8).",
+      "type": "number",
+      "format": "float",
+      "default": 0.800000011920929
+    },
+    "caption_categories": {
+      "description": "**M11**: caption category subset (subset of\n[`SUPPORTED_CAPTION_CATEGORIES`]). Default 4 of 6.",
+      "type": "array",
+      "default": [
+        "accessibility",
+        "ai",
+        "combat",
+        "mission"
+      ],
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
+    "caption_mode": {
+      "description": "**M11**: captions verbosity mode (Off / CriticalOnly / Standard /\nExpanded). Filters which events surface as captions.",
+      "$ref": "#/$defs/CaptionMode",
+      "default": "off"
+    },
     "captions": {
       "type": "boolean"
     },
@@ -42,6 +72,11 @@
       "type": "boolean",
       "default": true
     },
+    "contrast_mode": {
+      "description": "**M11**: contrast palette mode. Tri-state replacing the legacy\n`high_contrast: bool`. Standard / HighContrastDark / HighContrastLight.",
+      "$ref": "#/$defs/ContrastMode",
+      "default": "standard"
+    },
     "damage_direction_enabled": {
       "description": "**M8**: damage direction indicator enable toggle.",
       "type": "boolean",
@@ -56,6 +91,11 @@
       "description": "**M8**: master debug-overlay enable gate. In production builds the\n7 cf-debug overlays only render when `debug_enabled = true`. Dev\nbuilds bypass the gate.",
       "type": "boolean",
       "default": false
+    },
+    "debug_explainer_level": {
+      "description": "**M11**: debug-explainer level (Player / Designer / Raw).",
+      "$ref": "#/$defs/DebugExplainerLevel",
+      "default": "player"
     },
     "debug_overlays": {
       "description": "**M8**: set of currently-enabled cf-debug overlays (snake_case ids\nper `cf_debug::DebugOverlay::as_str`). Mirrors the cf-debug\n`DebugOverlayState` so cfctl `observe.debug.overlays` round-trips.",
@@ -106,6 +146,11 @@
       "type": "boolean",
       "default": true
     },
+    "hold_behavior": {
+      "description": "**M11**: hold-behavior variant (default Hold).",
+      "$ref": "#/$defs/HoldBehavior",
+      "default": "hold"
+    },
     "hold_threshold_ms": {
       "description": "M4A: hold threshold in milliseconds. Default 250 ms; clamped to\n`[50..2000]` by `apply_settings_patch`.",
       "type": "integer",
@@ -117,6 +162,11 @@
       "description": "M4A: hold-to-press alternative for tap-to-press actions (ACC-A-05).\nWhen `true`, edge-triggered actions (jump / fire / reload / dig /\nreset / select_slot_*) require holding the key/button for\n`hold_threshold_ms` before firing instead of triggering on the press\nedge. Default: off (tap semantics). cf-app's `ingest_player_input`\nhonors this through the `HoldTracker` resource; cfctl-driven\ndispatches bypass the hold gate (control-plane is already explicit\npress/release semantics).",
       "type": "boolean",
       "default": false
+    },
+    "input_profile": {
+      "description": "**M11**: input profile (default keyboard+mouse).",
+      "$ref": "#/$defs/InputProfile",
+      "default": "keyboard_mouse"
     },
     "jump_force": {
       "description": "**M1 Gap F1**: jump impulse (units / s). Default `420.0` mirrors\n`cf-actor::sim::ActorTuning::default().jump_impulse`.",
@@ -173,6 +223,11 @@
       "type": "boolean",
       "default": false
     },
+    "objective_help": {
+      "description": "**M11**: objective-help verbosity (Minimal / Standard / Verbose).",
+      "$ref": "#/$defs/ObjectiveHelp",
+      "default": "standard"
+    },
     "permadeath": {
       "description": "**M8**: permadeath modifier.",
       "type": "boolean",
@@ -199,11 +254,28 @@
     "reduced_shake": {
       "type": "boolean"
     },
+    "remap_groups": {
+      "description": "**M11**: remap-action group subset (subset of\n[`SUPPORTED_REMAP_GROUPS`]). Default `[gameplay]`.",
+      "type": "array",
+      "default": [
+        "gameplay"
+      ],
+      "items": {
+        "type": "string"
+      },
+      "uniqueItems": true
+    },
     "scope_zoom_fov": {
       "description": "**M8**: scope ADS FOV in degrees (clamped 5..=90).",
       "type": "number",
       "format": "float",
       "default": 30.0
+    },
+    "screen_shake_scale": {
+      "description": "**M11**: screen-shake scale (0.0..=1.0; default 1.0 = full shake;\n0.0 = no shake). Multiplicative on camera punch + recoil shake.\nReplaces the inverse-sense `reduce_camera_shake_pct`; the legacy\nfield is preserved for back-compat (mirror updated whenever this\nchanges via `apply_settings_patch`).",
+      "type": "number",
+      "format": "float",
+      "default": 1.0
     },
     "sharp_aim_build_ticks": {
       "description": "**M1 Gap F1**: ticks to fully build sharp aim from 0 -> 1.0 (CCCP\n`AHuman.cpp:1779`). Default `30` (~0.5s at 60Hz).",
@@ -238,7 +310,7 @@
     "ui_density": {
       "description": "**M8**: HUD density preset.",
       "$ref": "#/$defs/UiDensity",
-      "default": "normal"
+      "default": "comfortable"
     },
     "ui_scale": {
       "type": "number",
@@ -280,6 +352,46 @@
         }
       ]
     },
+    "CameraMotion": {
+      "description": "**M11**: camera-motion granularity (paired with `reduced_motion` for\nfiner follow-camera control).",
+      "oneOf": [
+        {
+          "description": "Reduced — suppress follow-camera + recoil-camera animation.",
+          "type": "string",
+          "const": "reduced"
+        },
+        {
+          "description": "Standard — full camera motion (default).",
+          "type": "string",
+          "const": "standard"
+        }
+      ]
+    },
+    "CaptionMode": {
+      "description": "**M11**: captions verbosity mode. Filters which event categories surface\nas captions in the HUD strip.",
+      "oneOf": [
+        {
+          "description": "Captions disabled (no caption strip rendered).",
+          "type": "string",
+          "const": "off"
+        },
+        {
+          "description": "Only critical-severity events surface.",
+          "type": "string",
+          "const": "critical_only"
+        },
+        {
+          "description": "Critical + warning (default when captions are on).",
+          "type": "string",
+          "const": "standard"
+        },
+        {
+          "description": "Critical + warning + info (verbose).",
+          "type": "string",
+          "const": "expanded"
+        }
+      ]
+    },
     "ColorCueMode": {
       "description": "**M8**: color blind / contrast palette mode (`color_cue_mode`). Spec §\nAccessibility extras — Default / ColorblindSafe / Protanopia /\nDeuteranopia / Tritanopia / MonochromeTest.",
       "oneOf": [
@@ -315,6 +427,46 @@
         }
       ]
     },
+    "ContrastMode": {
+      "description": "**M11**: contrast palette mode for the ACC-A floor. Replaces the legacy\n`high_contrast: bool` with a tri-state enum (Standard / HighContrastDark /\nHighContrastLight) per spec § Settings tree.",
+      "oneOf": [
+        {
+          "description": "Standard palette (default).",
+          "type": "string",
+          "const": "standard"
+        },
+        {
+          "description": "High-contrast dark — pure white text on solid black.",
+          "type": "string",
+          "const": "high_contrast_dark"
+        },
+        {
+          "description": "High-contrast light — pure black text on solid white.",
+          "type": "string",
+          "const": "high_contrast_light"
+        }
+      ]
+    },
+    "DebugExplainerLevel": {
+      "description": "**M11**: debug-explainer verbosity (for the death recap + AI debug overlays).",
+      "oneOf": [
+        {
+          "description": "Player-friendly plain-language explanations (default).",
+          "type": "string",
+          "const": "player"
+        },
+        {
+          "description": "Designer-level explanations with tuning numbers.",
+          "type": "string",
+          "const": "designer"
+        },
+        {
+          "description": "Raw engine event payloads (verbose).",
+          "type": "string",
+          "const": "raw"
+        }
+      ]
+    },
     "GameSpeedAssist": {
       "description": "**M8**: slow-motion accessibility (`game_speed_assist`). Spec §\nCamera + game feel — Off / Slowdown75 / Slowdown25 / FullPause.",
       "oneOf": [
@@ -340,8 +492,62 @@
         }
       ]
     },
+    "HoldBehavior": {
+      "description": "**M11**: hold-behavior variant for the ACC-A floor (replaces tap-only).",
+      "oneOf": [
+        {
+          "description": "Press-and-hold semantics (default; matches `hold_to_confirm=true`).",
+          "type": "string",
+          "const": "hold"
+        },
+        {
+          "description": "Toggle on/off — press once to enable, again to disable.",
+          "type": "string",
+          "const": "toggle"
+        },
+        {
+          "description": "Press-to-cycle — each press advances through a state ring.",
+          "type": "string",
+          "const": "press_to_cycle"
+        }
+      ]
+    },
+    "InputProfile": {
+      "description": "**M11**: primary input profile (drives default HUD focus path).",
+      "oneOf": [
+        {
+          "description": "Keyboard + mouse (default).",
+          "type": "string",
+          "const": "keyboard_mouse"
+        },
+        {
+          "description": "Controller (XInput / SDL gamepad).",
+          "type": "string",
+          "const": "controller"
+        },
+        {
+          "description": "Keyboard only — no mouse / no controller.",
+          "type": "string",
+          "const": "keyboard_only"
+        },
+        {
+          "description": "Custom — player has rebound mixed inputs.",
+          "type": "string",
+          "const": "custom"
+        }
+      ]
+    },
+    "ObjectiveHelp": {
+      "description": "**M11**: objective-help verbosity (tutorial / mission text density).",
+      "type": "string",
+      "enum": [
+        "minimal",
+        "standard",
+        "verbose"
+      ]
+    },
     "UiDensity": {
-      "description": "**M8**: HUD density preset (`ui_density`). Spec § Accessibility tab —\nCompact / Normal / Spacious.",
+      "description": "**M8 / M11**: HUD density preset (`ui_density`). Spec § Accessibility tab —\nCompact / Comfortable / Spacious. M11 added `Comfortable` as the canonical\ndefault-density name (was `Normal` under M8 — accepted as an alias).",
       "oneOf": [
         {
           "description": "Compact — denser HUD layout.",
@@ -349,9 +555,9 @@
           "const": "compact"
         },
         {
-          "description": "Normal — default density.",
+          "description": "Comfortable — default density (M11 canonical name; alias `normal`).",
           "type": "string",
-          "const": "normal"
+          "const": "comfortable"
         },
         {
           "description": "Spacious — looser HUD spacing.",
