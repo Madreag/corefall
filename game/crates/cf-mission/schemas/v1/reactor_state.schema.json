@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-mission/v1/ReactorState",
+  "title": "ReactorState",
+  "description": "M9 § Reactor as DR-027 command-core predecessor — the canonical reactor projection cfctl `observe.mission.reactor` returns. The forward-compat fields (power_grid, shields, modules, uprooted_avatar, repair_pads, doors, affliction_overlay, environment_signal) round-trip as None/[] at M9 so M25+ can extend without bumping the schema.",
+  "type": "object",
+  "required": ["actor_id", "hp", "max_hp", "pressure_state", "position", "mission_critical", "role"],
+  "properties": {
+    "actor_id": { "type": "string" },
+    "kind": { "const": "Reactor" },
+    "hp": { "type": "number", "minimum": 0 },
+    "max_hp": { "type": "number", "minimum": 0 },
+    "hp_percent": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+    "pressure_state": {
+      "type": "string",
+      "enum": ["Nominal", "Stressed", "Critical", "Venting", "Destroyed"]
+    },
+    "position": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": { "type": "number" }
+    },
+    "mission_critical": {
+      "type": "boolean",
+      "description": "Per CCCP m_MissionCritical — when true, the reactor cannot be gibbed instantly."
+    },
+    "role": {
+      "type": "string",
+      "description": "M9: 'command_core_predecessor'. M25+: 'command_core'."
+    },
+    "armor_layers": {
+      "type": "array",
+      "minItems": 0,
+      "maxItems": 3,
+      "items": {
+        "type": "object",
+        "required": ["kind", "hp", "max_hp", "hardness"],
+        "properties": {
+          "kind": { "type": "string", "enum": ["External", "Internal", "Core"] },
+          "hp": { "type": "number" },
+          "max_hp": { "type": "number" },
+          "hardness": { "type": "number" },
+          "hp_percent": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+        }
+      }
+    },
+    "heat_signature_k": { "type": "number", "minimum": 0 },
+    "destroyed": { "type": "boolean" },
+    "power_grid": { "type": ["object", "null"] },
+    "shields": { "type": "array" },
+    "modules": { "type": "array" },
+    "uprooted_avatar": { "type": ["integer", "null"] },
+    "repair_pads": { "type": "array" },
+    "doors": { "type": "array" },
+    "affliction_overlay": { "type": "array" },
+    "environment_signal": { "type": ["object", "null"] }
+  }
+}

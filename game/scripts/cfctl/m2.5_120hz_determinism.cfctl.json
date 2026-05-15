@@ -1,0 +1,9 @@
+{
+  "scenario": "micro_reactor_defense",
+  "tick_rate_hz": 120,
+  "description": "M9 per-rate determinism: same micro_reactor_defense_win bundle replayed at 120 Hz. Exercises the M9 acceptance scenario '60Hz vs 120Hz determinism (per-rate)'. Final reactor.hp matches the 60Hz bundle within 1 HP rounding; per-tick checksums stable for their respective rate.",
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 7200 } }
+  ]
+}

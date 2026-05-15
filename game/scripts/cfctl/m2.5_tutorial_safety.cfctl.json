@@ -1,0 +1,10 @@
+{
+  "scenario": "micro_reactor_defense",
+  "tick_rate_hz": 60,
+  "description": "M9 tutorial-safety path: enemy fire that would drop the reactor below 1 HP is capped at 1 HP with pressure_state=Critical instead of destroying. Exercises the M9 acceptance scenario 'Tutorial safety caps reactor at 1 HP'. tutorial_safety=true is set via act.settings.set before scenario.reset.",
+  "steps": [
+    { "method": "act.settings.set", "params": { "tutorial_safety": true } },
+    { "method": "scenario.reset", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 3600 } }
+  ]
+}

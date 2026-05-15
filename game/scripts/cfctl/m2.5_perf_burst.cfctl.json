@@ -1,0 +1,10 @@
+{
+  "scenario": "micro_reactor_defense",
+  "tick_rate_hz": 60,
+  "description": "M9 Steam Deck 800p/60 perf gate: full 60-second reactor defense run at 800×450 resolution with capped perf budget. Exercises the M9 acceptance scenario 'Steam Deck 800p/60 perf gate' — summary.performance.p99_tick_ms must be ≤16.0 (60Hz floor); no frame skips; capture-grid at 800p artifact must be present in summary.json.artifacts.",
+  "steps": [
+    { "method": "act.settings.set", "params": { "resolution_x": 800, "resolution_y": 450 } },
+    { "method": "scenario.reset", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 3600 } }
+  ]
+}

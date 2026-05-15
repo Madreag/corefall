@@ -109,6 +109,12 @@ pub mod task;
 pub mod thinking_stack;
 pub mod utility;
 
+// **M9** § Reactive guard targeting + path reaction — utility scoring
+// over (reactor, player) candidate set + recovery action picker for
+// terrain dirty region intersections.
+pub mod path_reaction;
+pub mod target_selection;
+
 pub use archetype::Archetype;
 pub use auto_repair::{AutoRepairInitiatedEvent, AutoRepairMission, AutoRepairProgressedEvent, AutoRepairState};
 pub use auto_triage::{AutoTriageAppliedEvent, AutoTriageInitiatedEvent, AutoTriageMission, AutoTriageState};

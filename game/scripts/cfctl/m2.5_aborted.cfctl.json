@@ -1,0 +1,11 @@
+{
+  "scenario": "micro_reactor_defense",
+  "tick_rate_hz": 60,
+  "description": "M9 aborted path: player invokes act.player.abort mid-mission. Mission resolves Lost(Aborted) regardless of reactor or player state. Exercises the M9 acceptance scenario 'Aborted — player forfeits'.",
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 120 } },
+    { "method": "act.player.abort", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 60 } }
+  ]
+}

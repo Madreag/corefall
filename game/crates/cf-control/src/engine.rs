@@ -12456,6 +12456,79 @@ impl EngineHandle for M0Engine {
         serde_json::to_value(view).ok()
     }
 
+    /// **M9** § cfctl `observe.mission.reactor` — returns the first
+    /// reactor in the reactor world (M9 ships single-reactor scenarios; M25+
+    /// command-core may surface multiple). `None` when no reactor is loaded.
+    async fn observe_mission_reactor(&self) -> Option<serde_json::Value> {
+        let state = self.state.read().ok()?;
+        let world = state.reactor_world.as_ref()?;
+        let reactor = world.iter().next()?;
+        let layers: Vec<serde_json::Value> = reactor
+            .armor_layers
+            .iter()
+            .map(|l| {
+                json!({
+                    "kind": l.kind.as_str(),
+                    "hp": l.hp,
+                    "max_hp": l.max_hp,
+                    "hardness": l.hardness,
+                    "hp_percent": l.hp_percent(),
+                })
+            })
+            .collect();
+        Some(json!({
+            "schema_version": SCHEMA_VERSION,
+            "actor_id": reactor.id.clone(),
+            "kind": "Reactor",
+            "hp": reactor.hp,
+            "max_hp": reactor.max_hp,
+            "hp_percent": reactor.hp_percent(),
+            "pressure_state": reactor.pressure_state.as_str(),
+            "position": reactor.position,
+            "mission_critical": reactor.mission_critical,
+            "role": reactor.role.clone(),
+            "armor_layers": layers,
+            "heat_signature_k": reactor.heat_signature_k,
+            "destroyed": reactor.is_destroyed(),
+        }))
+    }
+
+    /// **M9** § cfctl `observe.mission.timer` — returns the live mission
+    /// timer projection. `color_state` follows the HUD rule from the spec:
+    /// green > 30s, yellow 10-30s, red < 10s, "none" once expired/no timer.
+    async fn observe_mission_timer(&self) -> Option<serde_json::Value> {
+        let state = self.state.read().ok()?;
+        let mission = state.mission.as_ref()?;
+        let total_ticks = mission.loss.time_limit_ticks;
+        if total_ticks == 0 {
+            return Some(json!({
+                "schema_version": SCHEMA_VERSION,
+                "remaining_ticks": 0u64,
+                "total_ticks": 0u64,
+                "remaining_seconds": 0u64,
+                "color_state": "none",
+            }));
+        }
+        let tick_now = state.clock.tick().0;
+        let remaining_ticks = total_ticks.saturating_sub(tick_now);
+        let tick_rate = self.config.tick_rate_hz.max(1) as u64;
+        let remaining_s = remaining_ticks / tick_rate;
+        let color_state = if remaining_s > 30 {
+            "green"
+        } else if remaining_s >= 10 {
+            "yellow"
+        } else {
+            "red"
+        };
+        Some(json!({
+            "schema_version": SCHEMA_VERSION,
+            "remaining_ticks": remaining_ticks,
+            "total_ticks": total_ticks,
+            "remaining_seconds": remaining_s,
+            "color_state": color_state,
+        }))
+    }
+
     /// M3 audit pass 7 (2026-05-13): dedicated `observe.terrain` cfctl
     /// method per spec literal. Returns the live `TerrainView` projection.
     async fn observe_terrain(&self) -> Option<serde_json::Value> {

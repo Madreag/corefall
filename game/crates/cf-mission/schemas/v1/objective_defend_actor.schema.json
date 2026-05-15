@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-mission/v1/ObjectiveDefendActor",
+  "title": "ObjectiveDefendActor",
+  "description": "M9 § ObjectiveKind::DefendActor — forward-compat shape for the M25+ command-core (DR-027) defense game mode. At M9 the actor_id resolves to a Reactor record; M25+ also supports chassis-modules (turrets, bunker walls) as defended actors. The `until_tick` field is the timer's expiry tick (mission resolves Won when the timer expires and the actor is still alive). `loss_on_destroyed=true` means actor destruction immediately resolves Lost (per M9 reactor-defense default).",
+  "type": "object",
+  "required": ["actor_id"],
+  "properties": {
+    "kind": {
+      "const": "defend_actor"
+    },
+    "actor_id": {
+      "type": "string",
+      "description": "Stable id of the defended actor (e.g. reactor id, command_core id, turret id)."
+    },
+    "until_tick": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "description": "Tick at which the objective resolves Completed if the actor is still alive. Optional; falls back to mission's time_limit_ticks when absent."
+    },
+    "loss_on_destroyed": {
+      "type": "boolean",
+      "default": true,
+      "description": "True (M9 default): destruction of the defended actor immediately resolves the mission as Lost with loss_reason=ReactorDestroyed (or ActorDestroyed for M25+)."
+    },
+    "tutorial_safety": {
+      "type": "boolean",
+      "default": false,
+      "description": "Per M9 spec § Outcomes — when true, the engine caps the defended actor's HP at 1 with pressure_state=Critical instead of allowing destruction. Player can recover the scenario without restart. M9 default false."
+    }
+  }
+}

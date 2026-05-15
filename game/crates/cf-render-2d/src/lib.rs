@@ -29,6 +29,12 @@ pub mod terrain_texture_array;
 pub mod reticle;
 pub mod terrain;
 
+// **M9** § Reactor visual feedback — sprite swap on pressure_state,
+// bullet-impact sparks on hit, explosion VFX on destruction.
+pub mod reactor_explosion;
+pub mod reactor_sparks;
+pub mod reactor_sprite;
+
 pub use debris::{
     DebrisPlugin, DebrisSpawnQueue, DebrisSpawnRequest, LooseDebris, RenderDebrisCappedEvent, DEBRIS_CAP,
 };

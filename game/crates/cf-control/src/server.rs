@@ -839,6 +839,20 @@ pub trait EngineHandle: Send + Sync + 'static {
     async fn observe_terrain(&self) -> Option<serde_json::Value> {
         None
     }
+    /// **M9** § cfctl `observe.mission.reactor` — return the live reactor
+    /// projection `{ actor_id, hp, max_hp, hp_percent, pressure_state,
+    /// position, mission_critical, role, armor_layers, heat_signature_k }`.
+    /// `None` when no reactor is loaded in the active scenario.
+    async fn observe_mission_reactor(&self) -> Option<serde_json::Value> {
+        None
+    }
+    /// **M9** § cfctl `observe.mission.timer` — return the mission timer
+    /// projection `{ remaining_ticks, total_ticks, remaining_seconds,
+    /// color_state }`. `color_state` is "green" / "yellow" / "red".
+    /// `None` when no mission is loaded.
+    async fn observe_mission_timer(&self) -> Option<serde_json::Value> {
+        None
+    }
     /// **M2 re-audit (2026-05-13)**: return the full `MissionState` +
     /// objectives + last N mission events.
     async fn inspect_mission(&self) -> Option<serde_json::Value> {
@@ -2513,6 +2527,31 @@ async fn process_request<E: EngineHandle>(
                 Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
             };
             match engine.observe_mission().await {
+                Some(value) => Some(success_response(request.id, value)),
+                None => Some(invalid_param_reason(request.id, "no_mission_loaded")),
+            }
+        }
+        // **M9** § cfctl `observe.mission.reactor` — dedicated projection
+        // returning `{ actor_id, hp, max_hp, hp_percent, pressure_state,
+        // position, mission_critical, role, armor_layers, heat_signature_k }`
+        // per spec § "When cfctl observe.mission.reactor runs".
+        "observe.mission.reactor" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            match engine.observe_mission_reactor().await {
+                Some(value) => Some(success_response(request.id, value)),
+                None => Some(invalid_param_reason(request.id, "no_reactor_loaded")),
+            }
+        }
+        // **M9** § cfctl `observe.mission.timer` — color-coded countdown
+        // projection per spec § "remaining_ticks / total_ticks /
+        // remaining_seconds / color_state".
+        "observe.mission.timer" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            match engine.observe_mission_timer().await {
                 Some(value) => Some(success_response(request.id, value)),
                 None => Some(invalid_param_reason(request.id, "no_mission_loaded")),
             }

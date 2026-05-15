@@ -59,6 +59,11 @@ pub mod stamina_bar;
 pub mod stealth_meter;
 pub mod weapon_swap_overlay;
 
+// **M9** § HUD readability + observability — reactor zone widgets.
+pub mod reactor_hp_bar;
+pub mod reactor_pressure_line;
+pub mod timer_warnings;
+
 pub use action_prompt::ActionPromptState;
 pub use branching_banner::{BranchOption, BranchingBannerState};
 pub use compass::{CompassBearing, CompassState, CARDINALS};
