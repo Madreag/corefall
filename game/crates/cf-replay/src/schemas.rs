@@ -35,6 +35,11 @@ const SCHEMA_ALARM_REGISTERED: &str = include_str!("../schemas/event/alarm_regis
 const SCHEMA_TERRAIN_CARVED: &str = include_str!("../schemas/event/terrain_carved.json");
 const SCHEMA_TERRAIN_PENETRATION_THRESHOLD: &str = include_str!("../schemas/event/terrain_penetration_threshold.json");
 const SCHEMA_TERRAIN_DIRTY_REGION_BATCH: &str = include_str!("../schemas/event/terrain_dirty_region_batch.json");
+// M8A: semantic terrain event protocol (chunk_mutated + chunk_active_region_changed).
+const SCHEMA_TERRAIN_CHUNK_MUTATED: &str = include_str!("../schemas/event/terrain_chunk_mutated.json");
+const SCHEMA_TERRAIN_CHUNK_ACTIVE_REGION_CHANGED: &str = include_str!("../schemas/event/terrain_chunk_active_region_changed.json");
+// M8A: perf_sample (cosmetic) — per-cadence per-subsystem latency samples.
+const SCHEMA_PERF_SAMPLE: &str = include_str!("../schemas/event/perf_sample.json");
 const SCHEMA_TERRAIN_PIXEL_DISLODGED: &str = include_str!("../schemas/event/terrain_pixel_dislodged.json");
 const SCHEMA_HAZARD_CONTACT_OR_AVOIDANCE: &str = include_str!("../schemas/event/hazard_contact_or_avoidance.json");
 const SCHEMA_ANCHOR_MATERIAL_RESULT: &str = include_str!("../schemas/event/anchor_material_result.json");
@@ -338,6 +343,11 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("terrain", "terrain_carved") => Some(SCHEMA_TERRAIN_CARVED),
         ("terrain", "terrain_penetration_threshold") => Some(SCHEMA_TERRAIN_PENETRATION_THRESHOLD),
         ("terrain", "terrain_dirty_region_batch") => Some(SCHEMA_TERRAIN_DIRTY_REGION_BATCH),
+        // M8A: semantic terrain event protocol (PR-7).
+        ("terrain", "chunk_mutated") => Some(SCHEMA_TERRAIN_CHUNK_MUTATED),
+        ("terrain", "chunk_active_region_changed") => Some(SCHEMA_TERRAIN_CHUNK_ACTIVE_REGION_CHANGED),
+        // M8A: perf_sample cosmetic per-cadence latency event (PR-8).
+        ("perf", "sample") => Some(SCHEMA_PERF_SAMPLE),
         ("terrain", "terrain_pixel_dislodged") => Some(SCHEMA_TERRAIN_PIXEL_DISLODGED),
         ("terrain", "hazard_contact_or_avoidance") => Some(SCHEMA_HAZARD_CONTACT_OR_AVOIDANCE),
         ("terrain", "anchor_material_result") => Some(SCHEMA_ANCHOR_MATERIAL_RESULT),

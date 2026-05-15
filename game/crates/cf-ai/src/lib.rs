@@ -71,9 +71,11 @@ use cf_sim_core::Rng;
 // modules so consumers that import per the spec paths
 // (`cf_ai::perception::*` / `cf_ai::guard_state::*` / `cf_ai::difficulty::*`)
 // compile cleanly.
+pub mod components;
 pub mod difficulty;
 pub mod guard_state;
 pub mod perception;
+pub mod systems;
 
 // **M7-A**: smart commandable AI surface. Modules are organised so the
 // 5-layer thinking stack (Reactive / Utility / BehaviorTree / HTN / LLM

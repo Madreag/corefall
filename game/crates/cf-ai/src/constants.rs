@@ -36,6 +36,22 @@ pub const SQUAD_COMM_RELAY_DELAY_SECONDS: f32 = 0.5;
 pub const PATROL_IDLE_MIN_SECONDS: f32 = 5.0;
 pub const PATROL_IDLE_MAX_SECONDS: f32 = 10.0;
 
+/// **M8A**: per-tick AI sim p99 latency budget (milliseconds). Retuned from
+/// the original 2.0 ms at M8A to cover the M7-shipped 5-layer thinking
+/// stack (Reactive + Utility + Behavior Tree + HTN + LLM-prior) +
+/// 16 KB BotMemory per bot + 22-task PriorityTable + deterministic
+/// reason-label structured strings. Owned by M8A's
+/// `docs/plan/spec/perf-budget-contract.md`; downstream milestones must
+/// not re-tune.
+pub const AI_SIM_P99_BUDGET_MS: f32 = 4.0;
+
+/// **M8A**: per-bot AI tick effective parallel slice (microseconds) at the
+/// 50-bot stress (16 cores, par_iter). Derived from
+/// `AI_SIM_P99_BUDGET_MS * 1000.0 / 50.0` with rounding for the 16-core
+/// effective parallel budget; the exact figure published by the spec is
+/// 80 µs. Used by archetype tuning + utility scoring complexity audits.
+pub const PER_BOT_AI_TICK_BUDGET_US: u32 = 80;
+
 /// Convert a seconds budget to ticks at the configured tick rate. Identical
 /// rounding to `seconds_to_ticks` in lib.rs (sub-tick durations round up to
 /// 1 so a configured timer can never silently disappear).

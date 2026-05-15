@@ -41,11 +41,14 @@
     clippy::needless_pass_by_value
 )]
 
+pub mod components;
+pub mod constants;
 pub mod cover;
 pub mod lean;
 pub mod sim;
 pub mod stamina;
 pub mod stance;
+pub mod systems;
 
 pub use cover::{CoverSide, CoverState};
 pub use lean::{LeanDirection, LeanState, LEAN_MAX_DEGREES};
