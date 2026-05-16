@@ -107,6 +107,7 @@ VARIANT_DRUMS = {
     "buildup": "k...h...s...h...",
     "climax": "k.h.s.h.k.h.s.h.",
     "debrief": "..........k.....",
+    "default": ".k..h...s...h...",
 }
 
 VARIANT_INTENSITY = {
@@ -114,6 +115,9 @@ VARIANT_INTENSITY = {
     "buildup": {"pad_amp": 0.30, "bass_amp": 0.30, "lead_amp": 0.18, "drum_k": 0.45, "drum_s": 0.25, "drum_h": 0.14, "noise_mul": 1.0, "counter_amp": 0.0, "lead_voice_pan": 0.15},
     "climax": {"pad_amp": 0.32, "bass_amp": 0.42, "lead_amp": 0.24, "drum_k": 0.55, "drum_s": 0.34, "drum_h": 0.18, "noise_mul": 1.3, "counter_amp": 0.15, "lead_voice_pan": 0.25},
     "debrief": {"pad_amp": 0.30, "bass_amp": 0.16, "lead_amp": 0.12, "drum_k": 0.25, "drum_s": 0.0, "drum_h": 0.0, "noise_mul": 0.4, "counter_amp": 0.0, "lead_voice_pan": 0.0},
+    # Cinematic single-track entries (M12 intro slideshow + similar): slow
+    # cinematic build, sparse drums, prominent pad + lead, hopeful arc.
+    "default": {"pad_amp": 0.32, "bass_amp": 0.22, "lead_amp": 0.16, "drum_k": 0.28, "drum_s": 0.16, "drum_h": 0.08, "noise_mul": 0.7, "counter_amp": 0.08, "lead_voice_pan": 0.10},
 }
 
 
@@ -298,7 +302,7 @@ def build_ledger_entry(canonical_name, out_path, seed, prompt):
     entry_id = hex_id(canonical_name, seed)
     return {
         "canonical_name": canonical_name,
-        "category": "Music",
+        "category": "Audio_Music",
         "generated_at_iso": deterministic_iso(canonical_name, seed),
         "generated_by_human": False,
         "generated_on_machine": "deterministic",
@@ -321,7 +325,7 @@ def build_ledger_entry(canonical_name, out_path, seed, prompt):
         "regen_inputs": [],
         "schema_version": "1.0.0",
         "seed": seed,
-        "tier": "Tier1_Audio_Placeholder",
+        "tier": "Tier1_LLM_Audio",
         "upstream_assets": [],
     }
 
@@ -345,6 +349,10 @@ def main():
     all_tracks = []
     for cat in ("world_ambient_tracks", "faction_theme_tracks", "storyteller_theme_tracks", "boss_theme_tracks"):
         all_tracks.extend(manifest.get(cat, []))
+
+    # Cinematic tracks (M12 intro slideshow + similar) ship as single-track-no-variants;
+    # baked under the canonical name itself (no "_variant" suffix).
+    cinematic_tracks = manifest.get("cinematic_tracks", [])
 
     ledger_entries = []
     failures = []
@@ -377,6 +385,31 @@ def main():
             except Exception as e:
                 failures.append((canonical_name, repr(e)))
                 print(f"[FAIL] {canonical_name}: {e!r}")
+
+    for track in cinematic_tracks:
+        tid = track["id"]
+        if args.filter_id and args.filter_id not in tid:
+            continue
+        variant_name = "default"
+        if args.filter_variant and args.filter_variant != variant_name:
+            continue
+        canonical_name = tid  # no "_variant" suffix for cinematic single-track entries
+        out_path = out_dir / f"{canonical_name}.wav"
+        try:
+            left, right, prompt = synthesize_track(track, variant_name)
+            if args.dry_run:
+                print(f"[DRY] {canonical_name}: would write {len(left)} samples / channel (cinematic)")
+            else:
+                write_stereo(str(out_path), left, right, sample_rate=SAMPLE_RATE)
+                seed = int(track["variants"][variant_name]["seed"])
+                entry = build_ledger_entry(canonical_name, out_path, seed, prompt)
+                ledger_entries.append(entry)
+                rendered_count += 1
+                total_size += os.path.getsize(out_path)
+                print(f"[OK] {canonical_name} ({os.path.getsize(out_path)} bytes, cinematic)")
+        except Exception as e:
+            failures.append((canonical_name, repr(e)))
+            print(f"[FAIL] {canonical_name}: {e!r}")
 
     if not args.dry_run and ledger_entries:
         ledger_path = Path(args.ledger)

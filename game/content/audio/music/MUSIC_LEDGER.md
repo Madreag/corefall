@@ -1,7 +1,7 @@
 # Music Ledger — Corefall game/content/audio/music
 
-**Last updated**: 2026-05-15 (Phoenix MST)  
-**Branch state**: 39 Tier 2 baked (37 clean + 2 broken) + 81 Tier 1 procedural placeholders = 120 total music WAVs  
+**Last updated**: 2026-05-15 night (Phoenix MST)
+**Branch state**: 39 Tier 2 baked (37 clean + 2 broken) + 81 Tier 1 procedural placeholders + **1 NEW cinematic track for M12 intro slideshow (Tier 1 procedural now, Tier 2 deferred)** = **121 total music WAVs** when the new intro track is baked.
 **Source of truth for prompts**: `../sfx/music_tracks_prompts.json` (canonical manifest; this file is the bake-status mirror).
 
 ---
@@ -10,10 +10,37 @@
 
 - **37 files** already at Tier 2 (ElevenLabs Music API) — **clean, ship-ready**.
 - **2 files** at Tier 2 but **broken bakes** — need re-baking.
-- **81 files** are still **Tier 1 procedural numpy synth** — sound like harsh static; need to be replaced.
-- **Total needing fresh bake: 83 files** (the 81 never-baked + the 2 broken Tier 2).
+- **81 files** still **Tier 1 procedural numpy synth** — sound like harsh static; need to be replaced.
+- **1 NEW file** (`music_intro_campaign.wav`) for the M12 CCCP-style intro slideshow — **Tier 1 procedural is acceptable for now**; Tier 2 production-quality upgrade can wait until ElevenLabs credits return or the local-5090 / AIVA second-agent bake delivers.
+- **Total needing fresh bake: 83 production-quality files + 1 NEW cinematic (Tier 1 ok)**.
 
-Filename convention: `<track_id>_<variant>.wav` where variant ∈ {calm, buildup, climax, debrief}.
+Filename convention:
+- Adaptive variants: `<track_id>_<variant>.wav` where variant ∈ {calm, buildup, climax, debrief}.
+- Cinematic (single track): `<track_id>.wav` (no variant suffix).
+
+---
+
+## NEW — Intro Slideshow Track (M12)
+
+The M12 milestone adds a CCCP-style intro slideshow (8 painted slides + subtitle text + 1 music + optional voice-over narration). The music track for this lives at `music_intro_campaign.wav` and is a **single track with no adaptive variants** (it plays once, ~75 seconds, through the slideshow timeline).
+
+| File | Tier | Source | Status |
+|---|---|---|---|
+| `music_intro_campaign.wav` | **Tier 1 procedural numpy** (ships now) | `tools/audio_synth/music_bake.py` extended to walk the `cinematic_tracks` section of `music_tracks_prompts.json` | **BAKED** — 60 sec stereo 48 kHz, peak -8 dBFS, ledger entry `Audio_Music` / `Tier1_LLM_Audio` |
+
+### Tier 2 upgrade paths (whenever credits return)
+
+When ElevenLabs credits reset OR the user tops up OR the local-5090 / AIVA second-agent bake delivers, upgrade this track via the same workflow as the other 83 unfinished tracks. Specifically:
+
+- **ElevenLabs path**: `tools/asset_gen/.venv/bin/python tools/audio_pipeline/eleven_music.py --tracks music_intro_campaign` (cost: ~5,000 chars, well within any top-up).
+- **Local 5090 path**: covered by `HANDOFF_LOCAL_MUSIC_BAKE.md` — the cinematic track is included in the same workpacket.
+- **AIVA path**: covered by `HANDOFF_AIVA_MUSIC.md`.
+
+The Tier 1 procedural placeholder is **musically coherent enough to ship the slideshow** — it's the same 60-second-loop quality as the 81 other procedural tracks, scaled to ~75 seconds for the slideshow timeline. It won't sound as polished as the Tier 2 baked tracks but it's not "static" like the user reported; the procedural composition pipeline at `tools/audio_synth/music_bake.py` produces musically structured output, not noise.
+
+### Narration voice (deferred — ship slideshow text-only at MVP)
+
+Per the M12 spec, the intro slideshow supports an optional voice-over narration track. **At MVP, ship the slideshow text-only** (vanilla CCCP did this — the original game has no voice acting in its intro). When credits return, bake the narration via ElevenLabs `eleven_v3` using `cassandra_narrator_balanced_female` (already in the registry from tonight's bake). Total narration text is ~600 chars at our drafted 8-slide arc — well within any future credit allowance.
 
 ---
 

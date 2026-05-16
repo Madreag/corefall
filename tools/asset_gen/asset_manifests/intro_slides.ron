@@ -1,0 +1,42 @@
+// M12 CCCP-style intro slideshow — 8 painted full-screen slides.
+//
+// Modeled on Cortex Command's title-screen intro
+// (Cortex-Command-Community-Project/Source/Menus/TitleScreen.cpp:256-386):
+// 8 painted slides + subtitle text fades + 1 music track + 1 optional voice
+// narration, all on a ~67 second timeline. Skippable.
+//
+// Reuses the LoadingBg composer (`_compose_loading_bg`) since intro slides
+// share the same cinematic-painting shape as world-loading screens. Tier 1
+// procedural-SVG floor ships first; Tier 2 ComfyUI upgrade follows at M32A.
+//
+// Each entry's `prompt` text feeds the SVG composer + becomes the seed for
+// the M32A Tier 2 ComfyUI re-bake when production-quality assets ship.
+//
+// Subtitle text for each slide is authored in `specs/active/M12.md::Story-telling surfaces`
+// and rendered by `cf-ui::slideshow` at runtime (kept out of the manifest so
+// narrative wording can iterate without rebaking the painted slides).
+(
+    schema_version: "1.0.0",
+    category: "LoadingBg",
+    owner_milestone: "M12",
+    pipeline_id: "M9A_svg_v1",
+    entries: [
+        ( canonical_name: "intro_slide_1_earth_collapse", kind: "intro-slide", faction: "hostile_corp",
+          prompt: "Earth at the end of the 22nd century, collapsed empire skyline, ruined skyscrapers, abandoned highways, swirling dust storms, distant emergency lighting, dystopian post-collapse aesthetic, cinematic widescreen painting" ),
+        ( canonical_name: "intro_slide_2_brain_transfer", kind: "intro-slide", faction: "scientist_order",
+          prompt: "Cortex transfer chamber laboratory, crystalline brain-jar lifting from an abandoned human body, neural cables, surgical robotic arms, sterile blue lighting, awe-and-horror cinematic frame" ),
+        ( canonical_name: "intro_slide_3_chassis_socket", kind: "intro-slide", faction: "scientist_order",
+          prompt: "Brain-jar descending into a mech chassis cockpit socket, articulated armored chassis standing tall in a hangar, hydraulic cables connecting, sparks of activation, heroic side-view cinematic frame" ),
+        ( canonical_name: "intro_slide_4_solar_system", kind: "intro-slide", faction: "drone_collective",
+          prompt: "Solar system map view, 12 highlighted celestial bodies (Earth, Mars, Moon, Phobos, Deimos, Mimas, Europa, Vulcan, Venus, belt asteroids, orbital stations, sol-zone), drop-ship trajectories curving between worlds, starfield backdrop, cinematic infographic painting" ),
+        ( canonical_name: "intro_slide_5_factions_orbit", kind: "intro-slide", faction: "hostile_corp",
+          prompt: "Eight faction emblems orbiting a central command core, heraldic crests rotating, dramatic radial composition, glowing sigils, cinematic widescreen frame" ),
+        ( canonical_name: "intro_slide_6_named_figures", kind: "intro-slide", faction: "allied_resistance",
+          prompt: "Eight faction leaders portraits in a single horizontal montage, one named figure per faction (Coalition / Frontier / Ronin / Synth / Collective / Husks / Collegium / Starlight), each in their faction's iconic silhouette + palette, cinematic ensemble shot" ),
+        ( canonical_name: "intro_slide_7_simulation_real", kind: "intro-slide", faction: "marauder_tribes",
+          prompt: "Reactor wall under sustained bombardment, gas plume venting through a breach, mech leaking oil down its armored leg, debris cascading, atmospheric pressure indicators in the corner, chaotic-but-readable cinematic frame showing the simulation is real" ),
+        ( canonical_name: "intro_slide_8_dropship_descent", kind: "intro-slide", faction: "hostile_corp",
+          prompt: "Player's command-core dropship descending into a fresh untapped world, retro-rocket plasma trail, atmospheric entry glow, an unexplored continent below, hopeful-and-foreboding cinematic frame, the player's journey beginning" ),
+    ],
+    variants: ["default"],
+)

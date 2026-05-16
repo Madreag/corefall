@@ -506,5 +506,23 @@
     "intensity_inputs": ["mission_phase", "storyteller_intensity", "combat_density", "boss_phase", "ally_down_count"],
     "per_faction_lora_training": "tools/audio_pipeline/music_composition/per_faction_lora_train.py reads 5+ reference seeds per faction; trains MusicGen LoRA; LoRA pinned per-track via lora_target field.",
     "stinger_routing": "stinger SFX (alert / breakthrough / ally_lost / discovery / anomaly) route through ui_sfx bus, NOT music bus; they DUCK music -6 dB then restore over 500ms per voice priority rule"
-  }
+  },
+  "cinematic_tracks": [
+    {
+      "id": "music_intro_campaign",
+      "kind": "intro_slideshow",
+      "canonical_name": "Corefall Intro Slideshow",
+      "duration_seconds": 75,
+      "tempo_bpm": 72,
+      "key": "D minor",
+      "cross_fade_curve": "logarithmic",
+      "ships_as": "single_track_no_variants",
+      "variants": {
+        "default": {
+          "musicgen_prompt": "Corefall intro slideshow cinematic theme, slow orchestral build, sweeping strings in D minor, distant brass swells, sparse piano motif, muted percussion entering at 30s, building to a hopeful brass-and-strings crescendo at 60s, modeled on Cortex Command's intro theme aesthetic — somber-yet-resolute, ending on a forward-looking note as the player's dropship descends to an untapped world, 75 seconds total, 72 BPM",
+          "seed": 99001
+        }
+      }
+    }
+  ]
 }
