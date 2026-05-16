@@ -1146,6 +1146,10 @@ _MANIFEST_TO_BUILDER = {
     "ui_screens.ron": _ui_screen_jobs,
     "vfx_frames.ron": _vfx_frame_jobs,
     "loading_backgrounds.ron": _loading_bg_jobs,
+    # M12: CCCP-style intro slideshow — 8 painted slides reuse the LoadingBg
+    # composer (`_compose_loading_bg`) since they share the cinematic-painting
+    # shape. Bakes into content/assets/placeholders/loading_backgrounds/.
+    "intro_slides.ron": _loading_bg_jobs,
     "boss_splashes.ron": _boss_splash_jobs,
     "key_art.ron": _key_art_jobs,
     "animation_frames.ron": _animation_frame_jobs,

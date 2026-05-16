@@ -1,0 +1,26 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "tools/audio_gen/caption_template.v1",
+  "title": "CaptionTemplate",
+  "description": "M12A § per-SFX caption template entry (matches cf_audio::caption_bridge::CaptionTemplate). Loaded into the runtime CaptionRegistry at startup; cf-audio::caption_bridge fires ux.captions_shown with the resolved template text on every audio event.",
+  "type": "object",
+  "required": ["sfx_id", "template", "severity", "categories"],
+  "properties": {
+    "sfx_id": { "type": "string", "minLength": 1 },
+    "template": { "type": "string", "minLength": 1 },
+    "severity": {
+      "type": "string",
+      "enum": ["critical", "warning", "info"]
+    },
+    "categories": {
+      "type": "array",
+      "items": { "type": "string" },
+      "minItems": 1
+    },
+    "per_language": {
+      "type": "object",
+      "description": "M38A-managed localization map; key = ISO-639 lang code, value = translated template.",
+      "additionalProperties": { "type": "string" }
+    }
+  }
+}

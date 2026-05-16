@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ux_slideshow_started.v1",
+  "title": "ux.slideshow_started",
+  "description": "Emitted when a CCCP-style slideshow begins playing (intro on New Campaign, replay-intro from main menu, or campaign-end at M49). Slot is one of {intro_campaign, ending_campaign, replay_intro}. slide_count is the number of slides queued. M12 spec § Story-telling surfaces — CCCP-style intro slideshow.",
+  "type": "object",
+  "required": ["slot", "slide_count"],
+  "properties": {
+    "slot": { "type": "string", "enum": ["intro_campaign", "ending_campaign", "replay_intro"] },
+    "slide_count": { "type": "integer", "minimum": 1, "maximum": 32 },
+    "music_track_id": { "type": "string" },
+    "voice_track_id": { "type": "string" },
+    "duration_ms": { "type": "integer", "minimum": 0 }
+  }
+}

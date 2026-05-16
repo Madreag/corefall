@@ -1,0 +1,23 @@
+{
+  "$schema": "../../schemas/v1/audio_palette.schema.json",
+  "palette_id": "mercenary_guild",
+  "display_name": "Mercenary Guild",
+  "category": "faction",
+  "description": "mottled olive / desert tan / scuffed brass \u2014 distinctive practical worn, cigar-stained, dust kicked up signature.",
+  "weapon_character": {
+    "fire_decay": "distinct",
+    "reload_mechanism": "characteristic",
+    "magazine_material": "in-faction",
+    "ejection_pitch": "mid"
+  },
+  "voice_tone": {
+    "default_register": "dry world-weary",
+    "emotion_palette": [
+      "neutral",
+      "urgent",
+      "panicked"
+    ],
+    "radio_filter": "standard"
+  },
+  "ambient_signature": "practical worn, cigar-stained, dust kicked up"
+}

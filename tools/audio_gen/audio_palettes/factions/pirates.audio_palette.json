@@ -1,0 +1,23 @@
+{
+  "$schema": "../../schemas/v1/audio_palette.schema.json",
+  "palette_id": "pirates",
+  "display_name": "Pirates",
+  "category": "faction",
+  "description": "weathered teal / brass / driftwood gray \u2014 distinctive sea-spray brine, rigging creak, salt-rusted iron signature.",
+  "weapon_character": {
+    "fire_decay": "distinct",
+    "reload_mechanism": "characteristic",
+    "magazine_material": "in-faction",
+    "ejection_pitch": "mid"
+  },
+  "voice_tone": {
+    "default_register": "roaring boisterous",
+    "emotion_palette": [
+      "neutral",
+      "urgent",
+      "panicked"
+    ],
+    "radio_filter": "standard"
+  },
+  "ambient_signature": "sea-spray brine, rigging creak, salt-rusted iron"
+}

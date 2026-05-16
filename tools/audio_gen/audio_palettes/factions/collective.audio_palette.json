@@ -1,0 +1,23 @@
+{
+  "$schema": "../../schemas/v1/audio_palette.schema.json",
+  "palette_id": "collective",
+  "display_name": "Collective",
+  "category": "faction",
+  "description": "industrial olive / steel gray \u2014 distinctive factory floor clang, slavic gritty machinery, proletarian solidarity signature.",
+  "weapon_character": {
+    "fire_decay": "distinct",
+    "reload_mechanism": "characteristic",
+    "magazine_material": "in-faction",
+    "ejection_pitch": "mid"
+  },
+  "voice_tone": {
+    "default_register": "gritty hoarse",
+    "emotion_palette": [
+      "neutral",
+      "urgent",
+      "panicked"
+    ],
+    "radio_filter": "standard"
+  },
+  "ambient_signature": "factory floor clang, slavic gritty machinery, proletarian solidarity"
+}

@@ -1,0 +1,34 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/audio_event_played.v1",
+  "title": "audio.event_played",
+  "description": "Emitted when cf-audio dispatches a single SFX / voice / music cue at runtime. Mirrors cf_audio::deterministic_replay::AudioPlaybackEvent. Always cosmetic=true (per M12A spec § Replay parity) — does not enter the determinism checksum, but MUST fire in deterministic order so replays produce the same caption + audio stream.",
+  "type": "object",
+  "required": ["canonical_name", "bus", "direction", "sequence", "gain"],
+  "properties": {
+    "canonical_name": { "type": "string", "minLength": 1 },
+    "bus": { "type": "string", "enum": ["master", "sfx", "music", "voice", "ambient"] },
+    "direction": {
+      "type": "string",
+      "enum": ["north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest", "here"]
+    },
+    "sequence": { "type": "integer", "minimum": 0 },
+    "gain": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+    "source_position": {
+      "type": "array",
+      "items": { "type": "number" },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "listener_position": {
+      "type": "array",
+      "items": { "type": "number" },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "atmosphere_density": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+    "wall_thickness_m": { "type": "number", "minimum": 0.0 },
+    "caption_template_id": { "type": "string" },
+    "caption_rendered": { "type": "string" }
+  }
+}

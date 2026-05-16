@@ -3,6 +3,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::shell_api::{IntroSlideshowSlot, SaveLoadMode, ShellApiCommand};
+
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct MainMenuView {
     pub career_arc_summary: Vec<CareerArcLine>,
@@ -39,6 +41,8 @@ pub enum QuickAction {
     MechBay,
     Base,
     Workshop,
+    /// **M12** § CCCP-style intro slideshow — Main Menu → Story → Replay Intro.
+    ReplayIntro,
 }
 
 impl QuickAction {
@@ -49,9 +53,37 @@ impl QuickAction {
             Self::MechBay => "Mech Bay",
             Self::Base => "Base",
             Self::Workshop => "Workshop",
+            Self::ReplayIntro => "Replay Intro",
+        }
+    }
+
+    /// **M12**: convert a Main Menu quick-action click into the matching
+    /// `ShellApiCommand`. cf-app's main-menu input handler routes the
+    /// click through this and writes the returned command on the
+    /// `ShellApiCommand` event bus. Returning `None` means "no scripted
+    /// command, route through gameplay layers" (used for `MechBay` and
+    /// `Base` which jump into the in-mission camera).
+    pub fn to_shell_command(&self) -> Option<ShellApiCommand> {
+        match self {
+            Self::ResumeMission => Some(ShellApiCommand::ResumeMission),
+            Self::Loadout => None,
+            Self::MechBay => None,
+            Self::Base => None,
+            Self::Workshop => Some(ShellApiCommand::OpenWorkshop),
+            // M12 § Story-telling surfaces — Main Menu → Story →
+            // "Replay Intro" replays the 8-slide CCCP-style slideshow.
+            Self::ReplayIntro => Some(ShellApiCommand::OpenIntroSlideshow {
+                slot: IntroSlideshowSlot::Replay,
+            }),
         }
     }
 }
+
+/// **M11A/M12** unused import guard — `SaveLoadMode` is re-exported so
+/// future quick-action variants can route to Save / Load without a churn
+/// of imports here.
+#[doc(hidden)]
+pub const _SAVE_LOAD_MODE_REEXPORT: Option<SaveLoadMode> = None;
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct FactionRepLine {
@@ -94,6 +126,7 @@ pub fn default_main_menu_view() -> MainMenuView {
             QuickAction::MechBay,
             QuickAction::Base,
             QuickAction::Workshop,
+            QuickAction::ReplayIntro,
         ],
         faction_top3: vec![],
         news_ticker: vec![
@@ -114,18 +147,54 @@ mod tests {
     use super::*;
 
     #[test]
-    fn default_view_has_5_quick_actions() {
+    fn default_view_has_6_quick_actions() {
         let v = default_main_menu_view();
-        assert_eq!(v.quick_actions.len(), 5);
+        // M12: ReplayIntro added — 6 quick actions total.
+        assert_eq!(v.quick_actions.len(), 6);
     }
 
     #[test]
     fn quick_action_labels_distinct() {
         let labels: Vec<_> = [
             QuickAction::ResumeMission, QuickAction::Loadout, QuickAction::MechBay,
-            QuickAction::Base, QuickAction::Workshop,
+            QuickAction::Base, QuickAction::Workshop, QuickAction::ReplayIntro,
         ].iter().map(|a| a.label()).collect();
         let unique: std::collections::HashSet<_> = labels.iter().collect();
         assert_eq!(labels.len(), unique.len());
+    }
+
+    #[test]
+    fn replay_intro_is_in_default_view() {
+        let v = default_main_menu_view();
+        assert!(v.quick_actions.contains(&QuickAction::ReplayIntro));
+    }
+
+    #[test]
+    fn replay_intro_routes_to_open_slideshow_replay() {
+        let cmd = QuickAction::ReplayIntro.to_shell_command();
+        match cmd {
+            Some(ShellApiCommand::OpenIntroSlideshow { slot }) => {
+                assert_eq!(slot, IntroSlideshowSlot::Replay);
+            }
+            other => panic!("expected OpenIntroSlideshow(Replay) got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn resume_mission_routes_to_resume_command() {
+        let cmd = QuickAction::ResumeMission.to_shell_command();
+        assert!(matches!(cmd, Some(ShellApiCommand::ResumeMission)));
+    }
+
+    #[test]
+    fn workshop_routes_to_open_workshop() {
+        let cmd = QuickAction::Workshop.to_shell_command();
+        assert!(matches!(cmd, Some(ShellApiCommand::OpenWorkshop)));
+    }
+
+    #[test]
+    fn mech_bay_and_base_have_no_scripted_command() {
+        assert!(QuickAction::MechBay.to_shell_command().is_none());
+        assert!(QuickAction::Base.to_shell_command().is_none());
     }
 }

@@ -13175,6 +13175,21 @@ fn apply_settings_patch(settings: &mut Settings, patch: &SettingsPatch) -> Vec<S
             }
         }
     }
+    // === M12 cinematic story beats ===
+    if let Some(ref s) = patch.comic_style_overlay {
+        if let Some(parsed) = crate::settings::ComicStyleOverlay::from_str(s) {
+            if settings.comic_style_overlay != parsed {
+                settings.comic_style_overlay = parsed;
+                changed.push("comic_style_overlay".to_string());
+            }
+        }
+    }
+    if let Some(v) = patch.comic_death_recap {
+        if settings.comic_death_recap != v {
+            settings.comic_death_recap = v;
+            changed.push("comic_death_recap".to_string());
+        }
+    }
     changed
 }
 

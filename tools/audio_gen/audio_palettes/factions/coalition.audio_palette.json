@@ -1,0 +1,23 @@
+{
+  "$schema": "../../schemas/v1/audio_palette.schema.json",
+  "palette_id": "coalition",
+  "display_name": "Coalition",
+  "category": "faction",
+  "description": "corporate blue / silver / red \u2014 distinctive military comms, structured radio, precision drill signature.",
+  "weapon_character": {
+    "fire_decay": "distinct",
+    "reload_mechanism": "characteristic",
+    "magazine_material": "in-faction",
+    "ejection_pitch": "mid"
+  },
+  "voice_tone": {
+    "default_register": "authoritative tactical",
+    "emotion_palette": [
+      "neutral",
+      "urgent",
+      "panicked"
+    ],
+    "radio_filter": "standard"
+  },
+  "ambient_signature": "military comms, structured radio, precision drill"
+}

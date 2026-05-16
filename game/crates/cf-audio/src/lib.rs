@@ -33,12 +33,27 @@ use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
 use tracing::trace;
 
+pub mod caption_bridge;
 pub mod chatter;
+pub mod deterministic_replay;
+pub mod loader;
+pub mod mix;
+pub mod positional;
 pub mod registry;
 
+pub use caption_bridge::{
+    caption_visible, render_caption_for_sfx, resolve_template, CaptionRegistry, CaptionSeverity, CaptionTemplate,
+};
 pub use chatter::{
     tts_stub, voice_id_for_archetype, ChatterCaption, ChatterCategory, ChatterCooldownTable, ChatterEmittedEvent,
     EmissionInfo, Phoneme, PLACEHOLDER_PHONEME_MS,
+};
+pub use deterministic_replay::{is_cosmetic_audio_event, AudioPlaybackEvent, AudioReplayQueue};
+pub use loader::{relative_to_repo_root, SfxEntry, SfxPool, MEMORY_BUDGET_BYTES};
+pub use mix::{AudioBus, MixBuses, DEFAULT_TARGET_LUFS, LUFS_TOLERANCE, PEAK_DBFS_CEILING};
+pub use positional::{
+    direction_of, distance_attenuation, occlusion_attenuation, source_gain, top_n_by_gain, AudioDirection,
+    DIRECTION_HERE_THRESHOLD_M, MAX_SIMULTANEOUS_VOICES,
 };
 pub use registry::{AudioAsset, AudioRegistry};
 
@@ -108,6 +123,21 @@ pub enum AudioCue {
         /// Caption surfaced to `HudState.captions`.
         caption: String,
     },
+    /// **M12** § Juice rule SFX cues. Each variant maps to one of the
+    /// seven canonical juice rules per `cf-render-2d::juice::JuiceKind`.
+    /// The accessibility_suppressed flag mirrors the matching
+    /// `JuicePulse.accessibility_suppressed` so a recording plugin can
+    /// see which cues were silenced by reduce_motion/reduce_flash.
+    Juice {
+        /// snake_case rule name matching `JuiceKind::as_str` (e.g.
+        /// "button_hover"). Named `rule` to avoid colliding with the
+        /// outer `#[serde(tag = "kind")]` enum-variant discriminator.
+        rule: String,
+        /// Optional HUD node id the juice targeted (e.g. "menu.new_game").
+        target_node: Option<String>,
+        /// Mirror of the `JuicePulse.accessibility_suppressed` flag.
+        accessibility_suppressed: bool,
+    },
 }
 
 impl AudioCue {
@@ -122,6 +152,7 @@ impl AudioCue {
             AudioCue::InventoryDropped { caption, .. } => caption,
             AudioCue::InventorySettled { caption, .. } => caption,
             AudioCue::StatusChanged { caption, .. } => caption,
+            AudioCue::Juice { .. } => "",
         }
     }
 
@@ -136,6 +167,7 @@ impl AudioCue {
             AudioCue::InventoryDropped { .. } => "inventory_dropped",
             AudioCue::InventorySettled { .. } => "inventory_settled",
             AudioCue::StatusChanged { .. } => "status_changed",
+            AudioCue::Juice { .. } => "juice",
         }
     }
 }
@@ -232,5 +264,34 @@ mod tests {
         let json = serde_json::to_string(&cue).expect("serialize");
         let back: AudioCue = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(cue, back);
+    }
+
+    #[test]
+    fn juice_cue_serializes_with_rule_field() {
+        let cue = AudioCue::Juice {
+            rule: "button_hover".to_string(),
+            target_node: Some("menu.new_game".to_string()),
+            accessibility_suppressed: false,
+        };
+        assert_eq!(cue.stub_tag(), "juice");
+        let json = serde_json::to_string(&cue).expect("serialize");
+        let back: AudioCue = serde_json::from_str(&json).expect("deserialize");
+        assert_eq!(cue, back);
+    }
+
+    #[test]
+    fn juice_cue_carries_accessibility_suppression() {
+        let cue = AudioCue::Juice {
+            rule: "critical_hit_punch".to_string(),
+            target_node: None,
+            accessibility_suppressed: true,
+        };
+        match cue {
+            AudioCue::Juice {
+                accessibility_suppressed,
+                ..
+            } => assert!(accessibility_suppressed),
+            _ => panic!("expected Juice variant"),
+        }
     }
 }

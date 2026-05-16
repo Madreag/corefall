@@ -1,0 +1,14 @@
+{
+  "$schema": "../../schemas/v1/audio_palette.schema.json",
+  "palette_id": "metal",
+  "display_name": "Metal",
+  "category": "material",
+  "description": "sharp clang, ringing tail, metallic",
+  "footstep_character": "sharp clang, ringing tail, metallic",
+  "impact_character": "sharp clang, ringing tail, metallic",
+  "preferred_pitch_range_hz": [
+    120,
+    800
+  ],
+  "reverb_tail_sec": 0.2
+}

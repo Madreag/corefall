@@ -52,6 +52,44 @@ enum Cmd {
         #[command(subcommand)]
         action: Box<AssetGenAction>,
     },
+    /// **M12A**: invoke the Tier-1 SFX audio pipeline. Wraps
+    /// `tools/audio_gen/generate_sfx.py` so engine-side tooling can
+    /// trigger an audio bake without shelling out manually. Mirrors the
+    /// `asset-gen` subcommand surface (run / check / report).
+    #[command(name = "audio-gen")]
+    AudioGen {
+        #[command(subcommand)]
+        action: Box<AudioGenAction>,
+    },
+}
+
+/// **M12A**: audio-gen subcommands. Per spec § Files:
+/// > `cf-mod` MODIFY — add `cf-mod audio-gen run` subcommand
+#[derive(Debug, Subcommand)]
+enum AudioGenAction {
+    /// Run the full Tier-1 SFX bake. Equivalent to
+    /// `tools/asset_gen/.venv/bin/python tools/audio_gen/generate_sfx.py --all`.
+    Run {
+        /// Optional category filter (e.g. `weapon` / `footstep` / `impact`).
+        #[arg(long)]
+        category: Option<String>,
+        /// Skip the bake; only invoke the pipeline's `--check` dry-run.
+        #[arg(long)]
+        check: bool,
+        /// Print on-disk + ledger SFX counts only.
+        #[arg(long)]
+        report: bool,
+        /// Override the path to the asset pipeline venv's python binary.
+        #[arg(long = "venv-python")]
+        venv_python: Option<PathBuf>,
+        /// Override the path to `generate_sfx.py`.
+        #[arg(long = "generate-sfx")]
+        generate_sfx: Option<PathBuf>,
+        /// Optional mod-pack id for modder authoring (passed to
+        /// `generate_sfx.py --mod <id>`).
+        #[arg(long)]
+        r#mod: Option<String>,
+    },
 }
 
 /// **M9A**: asset-gen subcommands. Per spec § "Source / cf-mod Cargo.toml":
@@ -304,7 +342,93 @@ fn main() -> Result<()> {
         }
         Cmd::Ledger { action } => run_ledger(action.as_ref(), cli.strict, cli.json),
         Cmd::AssetGen { action } => run_asset_gen(action.as_ref(), cli.json),
+        Cmd::AudioGen { action } => run_audio_gen(action.as_ref(), cli.json),
     }
+}
+
+fn run_audio_gen(action: &AudioGenAction, json_output: bool) -> Result<()> {
+    use std::process::{Command, Stdio};
+
+    let AudioGenAction::Run {
+        category,
+        check,
+        report,
+        venv_python,
+        generate_sfx,
+        r#mod,
+    } = action;
+
+    let cwd = std::env::current_dir().context("get cwd")?;
+    let workspace_root = if cwd.file_name().and_then(|n| n.to_str()) == Some("game") {
+        cwd.parent().unwrap_or(&cwd).to_path_buf()
+    } else {
+        cwd.clone()
+    };
+    let venv_py = venv_python
+        .clone()
+        .unwrap_or_else(|| workspace_root.join("tools/asset_gen/.venv/bin/python"));
+    let script = generate_sfx
+        .clone()
+        .unwrap_or_else(|| workspace_root.join("tools/audio_gen/generate_sfx.py"));
+    if !venv_py.exists() {
+        anyhow::bail!(
+            "audio-gen: venv python not found at {}; run `python3 -m venv tools/asset_gen/.venv`",
+            venv_py.display()
+        );
+    }
+    if !script.exists() {
+        anyhow::bail!(
+            "audio-gen: generate_sfx.py not found at {}; M12A pipeline missing",
+            script.display()
+        );
+    }
+
+    let mut cmd = Command::new(&venv_py);
+    cmd.arg(&script);
+    if *report {
+        cmd.arg("--report");
+    } else if *check {
+        cmd.arg("--check");
+    } else {
+        cmd.arg("--all");
+    }
+    if let Some(cat) = category {
+        cmd.arg("--category").arg(cat);
+    }
+    if let Some(mod_id) = r#mod {
+        cmd.arg("--mod").arg(mod_id);
+    }
+    cmd.current_dir(&workspace_root);
+    cmd.stdout(Stdio::inherit());
+    cmd.stderr(Stdio::inherit());
+    tracing::info!(
+        target: "cf::mod::audio_gen",
+        venv_python = %venv_py.display(),
+        script = %script.display(),
+        category = ?category,
+        check,
+        report,
+        mod_id = ?r#mod,
+        "running M12A SFX pipeline"
+    );
+    let status = cmd
+        .status()
+        .with_context(|| format!("spawn {} {}", venv_py.display(), script.display()))?;
+    if json_output {
+        let exit = status.code().unwrap_or(-1);
+        println!(
+            "{}",
+            serde_json::json!({
+                "subcommand": "audio-gen",
+                "exit_code": exit,
+                "succeeded": status.success(),
+            })
+        );
+    }
+    if !status.success() {
+        anyhow::bail!("audio-gen pipeline exited with non-zero status: {:?}", status.code());
+    }
+    Ok(())
 }
 
 fn run_asset_gen(action: &AssetGenAction, json_output: bool) -> Result<()> {

@@ -1,0 +1,14 @@
+{
+  "$schema": "../../schemas/v1/audio_palette.schema.json",
+  "palette_id": "sand",
+  "display_name": "Sand",
+  "category": "material",
+  "description": "gritty swish, slight hiss, kicked grains",
+  "footstep_character": "gritty swish, slight hiss, kicked grains",
+  "impact_character": "gritty swish, slight hiss, kicked grains",
+  "preferred_pitch_range_hz": [
+    120,
+    800
+  ],
+  "reverb_tail_sec": 0.2
+}

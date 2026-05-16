@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ux_slideshow_ended.v1",
+  "title": "ux.slideshow_ended",
+  "description": "Emitted when a CCCP-style slideshow finishes — either by reaching the final slide naturally (reason=completed) or because the player skipped (reason=skipped). M12 spec § CCCP-style intro slideshow.",
+  "type": "object",
+  "required": ["slot", "reason"],
+  "properties": {
+    "slot": { "type": "string", "enum": ["intro_campaign", "ending_campaign", "replay_intro"] },
+    "reason": { "type": "string", "enum": ["completed", "skipped"] },
+    "final_slide_index": { "type": "integer", "minimum": 0 },
+    "elapsed_ms": { "type": "integer", "minimum": 0 }
+  }
+}

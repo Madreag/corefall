@@ -1,0 +1,14 @@
+{
+  "$schema": "../../schemas/v1/audio_palette.schema.json",
+  "palette_id": "wood",
+  "display_name": "Wood",
+  "category": "material",
+  "description": "creaky pad, hollow tone, plank resonance",
+  "footstep_character": "creaky pad, hollow tone, plank resonance",
+  "impact_character": "creaky pad, hollow tone, plank resonance",
+  "preferred_pitch_range_hz": [
+    120,
+    800
+  ],
+  "reverb_tail_sec": 0.2
+}

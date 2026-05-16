@@ -1,0 +1,23 @@
+{
+  "$schema": "../../schemas/v1/audio_palette.schema.json",
+  "palette_id": "synth",
+  "display_name": "Synth",
+  "category": "faction",
+  "description": "chrome silver / electric magenta \u2014 distinctive digital crystalline, harmonic chords, swarm modulation signature.",
+  "weapon_character": {
+    "fire_decay": "distinct",
+    "reload_mechanism": "characteristic",
+    "magazine_material": "in-faction",
+    "ejection_pitch": "mid"
+  },
+  "voice_tone": {
+    "default_register": "modulated synthetic",
+    "emotion_palette": [
+      "neutral",
+      "urgent",
+      "panicked"
+    ],
+    "radio_filter": "standard"
+  },
+  "ambient_signature": "digital crystalline, harmonic chords, swarm modulation"
+}

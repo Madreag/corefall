@@ -112,6 +112,26 @@
         }
       ]
     },
+    "ComicStyleOverlay": {
+      "description": "**M12**: comic-style overlay mode mirror — `full | subtle | off`.\nDrives `cf-ui::comic_overlay::ComicOverlayMode` at runtime.",
+      "oneOf": [
+        {
+          "description": "Speech bubbles for chatter + onomatopoeia on impacts + comic-panel\nboss intros + comic death recap available behind toggle.",
+          "type": "string",
+          "const": "full"
+        },
+        {
+          "description": "Default — speech bubbles for storyteller events only; no\nonomatopoeia stamps; comic death recap available behind toggle.",
+          "type": "string",
+          "const": "subtle"
+        },
+        {
+          "description": "Disabled — no comic framing renders anywhere; chatter is plain\ncaptions; death recap is M10 timeline only.",
+          "type": "string",
+          "const": "off"
+        }
+      ]
+    },
     "ContrastMode": {
       "description": "**M11**: contrast palette mode for the ACC-A floor. Replaces the legacy\n`high_contrast: bool` with a tri-state enum (Standard / HighContrastDark /\nHighContrastLight) per spec § Settings tree.",
       "oneOf": [
@@ -297,6 +317,16 @@
           "description": "**M8**: color blind / contrast palette mode.",
           "$ref": "#/$defs/ColorCueMode",
           "default": "default"
+        },
+        "comic_death_recap": {
+          "description": "**M12**: when `true`, the death recap renders as a 4-panel comic-style\ncause chain. When `false` (default), the M10 replay viewer +\ncause-chain walker is used. Gated by `comic_style_overlay != Off`.",
+          "type": "boolean",
+          "default": false
+        },
+        "comic_style_overlay": {
+          "description": "**M12**: comic-style overlay mode (`full | subtle | off`). Drives\nspeech bubbles, onomatopoeia stamps, comic-panel boss intros, and\nthe comic death-recap availability. Default is `Subtle` per spec\n§ Comic-style framing — opt-in juice, not core identity.",
+          "$ref": "#/$defs/ComicStyleOverlay",
+          "default": "subtle"
         },
         "compass_enabled": {
           "description": "**M8**: master compass enable toggle.",

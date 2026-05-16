@@ -1,0 +1,14 @@
+{
+  "$schema": "../../schemas/v1/audio_palette.schema.json",
+  "palette_id": "basalt",
+  "display_name": "Basalt",
+  "category": "material",
+  "description": "dense thud, heavy mass, stone strike",
+  "footstep_character": "dense thud, heavy mass, stone strike",
+  "impact_character": "dense thud, heavy mass, stone strike",
+  "preferred_pitch_range_hz": [
+    120,
+    800
+  ],
+  "reverb_tail_sec": 0.2
+}

@@ -1,0 +1,14 @@
+{
+  "$schema": "../../schemas/v1/audio_palette.schema.json",
+  "palette_id": "biomech",
+  "display_name": "Biomech",
+  "category": "origin",
+  "description": "half-organic half-servo, hybrid breathing + mechanical whirs",
+  "breathing_signature": "wet servo whirs",
+  "vital_signature": "pneumatic ventilator",
+  "concussion_band_mix": {
+    "mild": "baseline",
+    "moderate": "audible_distress",
+    "severe": "critical_emphasized"
+  }
+}

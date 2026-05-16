@@ -1,0 +1,23 @@
+{
+  "$schema": "../../schemas/v1/audio_palette.schema.json",
+  "palette_id": "husks",
+  "display_name": "Husks",
+  "category": "faction",
+  "description": "rotting flesh / black ichor / sickly green \u2014 distinctive wet organic, gurgling decay, swarm whispers signature.",
+  "weapon_character": {
+    "fire_decay": "distinct",
+    "reload_mechanism": "characteristic",
+    "magazine_material": "in-faction",
+    "ejection_pitch": "mid"
+  },
+  "voice_tone": {
+    "default_register": "sibilant decayed",
+    "emotion_palette": [
+      "neutral",
+      "urgent",
+      "panicked"
+    ],
+    "radio_filter": "standard"
+  },
+  "ambient_signature": "wet organic, gurgling decay, swarm whispers"
+}

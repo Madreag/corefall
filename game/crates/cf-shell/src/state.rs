@@ -39,6 +39,10 @@ pub enum ShellScreen {
     InMission,
     /// Workshop browser (forwards to cf-mod UI).
     Workshop,
+    /// **M12**: CCCP-style intro slideshow — 8 painted slides + subtitles
+    /// + music + voice. Reached from Title → "New Game" (first run) or
+    /// Main Menu → Story → "Replay Intro". Skippable.
+    IntroSlideshow,
 }
 
 /// Settings tree tab identifier.
@@ -173,6 +177,10 @@ pub struct ShellState {
     pub show_me_why_visible: bool,
     /// Last loading-tip index for stable rotation.
     pub last_tip_index: usize,
+    /// **M12**: which intro-slideshow slot is currently playing (None when
+    /// the slideshow is not on screen). Cleared when the slideshow ends
+    /// or is skipped.
+    pub intro_slideshow_slot: Option<crate::shell_api::IntroSlideshowSlot>,
 }
 
 impl Default for ShellState {
@@ -190,6 +198,7 @@ impl Default for ShellState {
             mission_active: false,
             show_me_why_visible: false,
             last_tip_index: 0,
+            intro_slideshow_slot: None,
         }
     }
 }
@@ -307,6 +316,18 @@ impl Default for SettingsScaffold {
         keys.insert("acc.hold_to_confirm".to_string(), SettingDescriptor::toggle("Hold to confirm", "Accessibility", true));
         keys.insert("acc.hold_threshold_ms".to_string(), SettingDescriptor::slider("Hold threshold (ms)", "Accessibility", 50.0, 2000.0, 250.0));
         keys.insert("acc.color_cue_mode".to_string(), SettingDescriptor::dropdown("Color cue mode", "Accessibility", &["Default", "Colorblind-safe", "Monochrome-test"], "Default"));
+        // M12: cinematic story-beats + juice — comic-style overlays opt-in flag.
+        // Subtle = default (speech bubbles for storyteller events only, no
+        // onomatopoeia stamps, comic death recap behind toggle). Full = all
+        // comic flavor on. Off = never render any comic framing.
+        keys.insert("ux.comic_style_overlay".to_string(), SettingDescriptor::dropdown(
+            "Comic-style overlays", "Accessibility", &["full", "subtle", "off"], "subtle",
+        ));
+        // M12: death-recap rendering mode. Default false = M10 replay viewer
+        // + cause-chain walker. True = 4-panel comic-style cause chain.
+        keys.insert("ux.comic_death_recap".to_string(), SettingDescriptor::toggle(
+            "Comic death recap", "Accessibility", false,
+        ));
 
         // Gameplay tab (1 key at scaffold)
         keys.insert("gameplay.storyteller".to_string(), SettingDescriptor::dropdown("Storyteller", "Gameplay", &["Cassandra Classic", "Phoebe Chillax", "Randy Random", "Ironman", "Sandbox"], "Cassandra Classic"));

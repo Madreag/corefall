@@ -1,0 +1,14 @@
+{
+  "$schema": "../../schemas/v1/audio_palette.schema.json",
+  "palette_id": "robot",
+  "display_name": "Robot",
+  "category": "origin",
+  "description": "servo whine, joint actuators, fan-cooled cores, alarm tones",
+  "breathing_signature": "pure mechanical",
+  "vital_signature": "cpu fan",
+  "concussion_band_mix": {
+    "mild": "baseline",
+    "moderate": "audible_distress",
+    "severe": "critical_emphasized"
+  }
+}

@@ -1,0 +1,14 @@
+{
+  "$schema": "../../schemas/v1/audio_palette.schema.json",
+  "palette_id": "human",
+  "display_name": "Human",
+  "category": "origin",
+  "description": "heart-rate thud, breathing rhythm, organic vocal cords",
+  "breathing_signature": "breathing audible",
+  "vital_signature": "pumping heart",
+  "concussion_band_mix": {
+    "mild": "baseline",
+    "moderate": "audible_distress",
+    "severe": "critical_emphasized"
+  }
+}

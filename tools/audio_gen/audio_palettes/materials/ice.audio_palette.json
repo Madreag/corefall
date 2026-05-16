@@ -1,0 +1,14 @@
+{
+  "$schema": "../../schemas/v1/audio_palette.schema.json",
+  "palette_id": "ice",
+  "display_name": "Ice",
+  "category": "material",
+  "description": "brittle crunch, slight slip, crystalline",
+  "footstep_character": "brittle crunch, slight slip, crystalline",
+  "impact_character": "brittle crunch, slight slip, crystalline",
+  "preferred_pitch_range_hz": [
+    120,
+    800
+  ],
+  "reverb_tail_sec": 0.5
+}

@@ -1,0 +1,14 @@
+{
+  "$schema": "../../schemas/v1/audio_palette.schema.json",
+  "palette_id": "dirt",
+  "display_name": "Dirt",
+  "category": "material",
+  "description": "soft thud, muffled, granular crunch",
+  "footstep_character": "soft thud, muffled, granular crunch",
+  "impact_character": "soft thud, muffled, granular crunch",
+  "preferred_pitch_range_hz": [
+    120,
+    800
+  ],
+  "reverb_tail_sec": 0.2
+}

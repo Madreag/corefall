@@ -42,6 +42,7 @@ pub mod splash;
 pub mod state;
 pub mod title;
 
+pub use shell_api::{IntroSlideshowSlot, ShellApiCommand};
 pub use state::{ShellScreen, ShellState};
 
 use bevy::prelude::*;
@@ -51,6 +52,10 @@ use bevy::prelude::*;
 /// Adds the `ShellState` resource, registers the screen-state transitions,
 /// and provides systems for splash → title → main_menu → pause →
 /// save_load → settings_tree → credits → loading_screen flows.
+///
+/// **M12**: the plugin also exposes the `act.shell.OpenIntroSlideshow`
+/// command surface for cfctl + cf-shell::main_menu's "Replay Intro"
+/// quick action.
 pub struct ShellPlugin;
 
 impl Plugin for ShellPlugin {

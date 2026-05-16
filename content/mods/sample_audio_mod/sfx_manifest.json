@@ -1,0 +1,22 @@
+{
+  "$schema": "../../../tools/audio_gen/schemas/v1/sfx_manifest_entry.schema.json",
+  "mod_id": "sample_audio_mod",
+  "mod_version": "1.0.0",
+  "license": "CC0",
+  "entries": [
+    {
+      "id": "sample_mod_ui_chime_v1",
+      "category": "UI",
+      "prompt": "soft custom UI chime, brief, 0.3s",
+      "duration_ms": 300,
+      "loops": false
+    },
+    {
+      "id": "sample_mod_alert_v1",
+      "category": "Banner",
+      "prompt": "custom alert pulse, mid-frequency tone, 0.4s",
+      "duration_ms": 400,
+      "loops": false
+    }
+  ]
+}

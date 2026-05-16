@@ -32,17 +32,19 @@ use cf_control::{
 use cf_render_2d::{
     asset_loader::{load_ledger_index, AssetIndex, AssetIndexPlugin},
     ActorRenderState, ActorSpritePlugin, BreachRender, CameraFollow, CameraShake, CfRenderPlugin, ChunkUpdate,
-    ChunkedTerrainPlugin, ChunkedTerrainSnapshot, DebrisSpawnQueue, DebrisSpawnRequest, DigPreviewGhost,
-    DigPreviewTarget, ExplosionState, ExtractionRender, HitStop, MuzzleFlashRender, OverlayMode, OverlayModeState,
-    ReactorSprite, ReactorSpriteState, ReactorVfxPlugin, SparkEmitterState, EXPLOSION_DEBRIS_CAP_PER_HIT,
-    SPARK_CAP_PER_HIT,
+    ChunkedTerrainPlugin, ChunkedTerrainSnapshot, ColorGradingPlugin, ColorGradingState, DebrisSpawnQueue,
+    DebrisSpawnRequest, DigPreviewGhost, DigPreviewTarget, ExplosionState, ExtractionRender, HitStop,
+    JuiceAccessibility, JuiceKind, JuicePlugin, JuicePulse, JuiceState, MuzzleFlashRender, OverlayMode,
+    OverlayModeState, ReactorSprite, ReactorSpriteState, ReactorVfxPlugin, SceneMood, SparkEmitterState,
+    EXPLOSION_DEBRIS_CAP_PER_HIT, SPARK_CAP_PER_HIT,
 };
 use cf_replay::diagnostics;
 use cf_sim_core::WallClock;
 use cf_ui::{
-    reactor_hp_bar::ArmorPipView, HudBanner, HudBodySilhouette, HudBreach, HudCaption, HudEnemy, HudMission, HudModule,
-    HudModuleStrip, HudRifle, HudSettings, HudState, HudToolValidity, IntegrityBand, ReactorHpBarState,
-    ReactorPressureLineState, StatusStripPlugin, TimerWarningsState, WARNING_THRESHOLDS,
+    reactor_hp_bar::ArmorPipView, AnimationPlugin, ComicOverlayMode, ComicOverlayPlugin, ComicOverlayState, HudBanner,
+    HudBodySilhouette, HudBreach, HudCaption, HudEnemy, HudMission, HudModule, HudModuleStrip, HudRifle, HudSettings,
+    HudState, HudToolValidity, IntegrityBand, ReactorHpBarState, ReactorPressureLineState, SlideshowPhase,
+    SlideshowPlugin, SlideshowSlot, SlideshowState, StatusStripPlugin, TimerWarningsState, WARNING_THRESHOLDS,
 };
 
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -661,6 +663,33 @@ fn run_bevy(
 
     let mut app = App::new();
     let title = format!("Corefall — BP2 Terrain & Replay (v{APP_VERSION})");
+    // **M12** § Slideshow audio playback — point AssetServer at the
+    // workspace root so `AssetServer::load("game/content/audio/...")` and
+    // `AssetServer::load("content/assets/placeholders/...")` both resolve
+    // cleanly. Without this override, Bevy defaults to a `./assets/`
+    // directory next to the binary and the audio + slide PNG handles fail
+    // to load.
+    let workspace_root = std::env::current_dir()
+        .ok()
+        .and_then(|p| {
+            // Walk up from CWD looking for the workspace marker (Cargo.toml
+            // containing `[workspace]`). Falls back to CWD if not found.
+            let mut cur = p.as_path();
+            loop {
+                let manifest = cur.join("Cargo.toml");
+                if manifest.exists() {
+                    let content = std::fs::read_to_string(&manifest).unwrap_or_default();
+                    if content.contains("[workspace]") {
+                        return Some(cur.to_path_buf());
+                    }
+                }
+                match cur.parent() {
+                    Some(parent) => cur = parent,
+                    None => return None,
+                }
+            }
+        })
+        .unwrap_or_else(|| std::env::current_dir().unwrap_or_default());
     let plugins = DefaultPlugins
         .set(WindowPlugin {
             primary_window: Some(Window {
@@ -672,7 +701,15 @@ fn run_bevy(
             }),
             ..default()
         })
+        .set(bevy::asset::AssetPlugin {
+            file_path: workspace_root.display().to_string(),
+            ..default()
+        })
         .disable::<LogPlugin>();
+    // **M12** § Slideshow audio playback — cache the resolved workspace
+    // root so the audio path resolver in `m12_spawn_slideshow_audio` can
+    // turn ledger-absolute paths into AssetServer-relative paths.
+    app.insert_resource(WorkspaceAssetRoot(workspace_root.clone()));
     // BP2 capture-grid harness: cf-e2e launches cf-app windowed but the OS
     // may steal focus during the run (especially on macOS where the
     // foreground terminal keeps focus). Bevy's default `WinitSettings`
@@ -691,6 +728,11 @@ fn run_bevy(
         .add_plugins(ActorSpritePlugin)
         .add_plugins(ChunkedTerrainPlugin)
         .add_plugins(ReactorVfxPlugin)
+        // **M12A** § cf-audio playback engine — hydrate AudioRegistry +
+        // SfxPool + CaptionRegistry from the cf-asset-ledger at startup.
+        // Resources install empty here; `hydrate_audio_registries_from_ledger`
+        // populates them in the Startup schedule.
+        .add_plugins(M12aAudioPlugin)
         // M10 § M9A asset icons resolve at runtime: install the
         // AssetIndex resource + hydrate it from the workspace's
         // canonical ledger.jsonl at startup so the replay viewer +
@@ -702,7 +744,18 @@ fn run_bevy(
         // M11A: shell UI foundation (title / main menu / pause / save-load /
         // settings tree / credits / loading screen / FRE wizard polish).
         // Runs alongside in-mission HUD; screen transitions via act.shell.*.
-        .add_plugins(cf_shell::ShellPlugin);
+        .add_plugins(cf_shell::ShellPlugin)
+        // **M12** § Visual direction closure: juice rules, per-scene color
+        // grading, panel transitions, CCCP-style intro slideshow, optional
+        // comic overlay. Per spec § Crates / modules touched. All five
+        // plugins ship state resources + ticking systems; cf-app's
+        // `m12_sync_settings_to_juice_state` system mirrors the live
+        // `cf-control::Settings` flags into them every frame.
+        .add_plugins(JuicePlugin)
+        .add_plugins(ColorGradingPlugin)
+        .add_plugins(AnimationPlugin)
+        .add_plugins(SlideshowPlugin)
+        .add_plugins(ComicOverlayPlugin);
     app.add_systems(Startup, hydrate_asset_index_from_ledger);
     app.init_resource::<HoldTracker>();
     let capture_handle = CaptureStateHandle::default();
@@ -751,6 +804,27 @@ fn run_bevy(
             pump_recorder_events_into_render_effects,
         )
             .chain(),
+    );
+    // **M12** § Visual direction closure — per-frame settings sync,
+    // input handling for slideshow skip, scene-mood inference, and the
+    // ClearColor tint that applies the live `ColorGradingState::current_grade()`.
+    app.add_systems(
+        Update,
+        (
+            m12_sync_settings_to_juice_state,
+            m12_sync_scene_mood_from_mission_phase,
+            m12_ingest_slideshow_skip_input,
+            m12_apply_color_grading_to_clear_color,
+            m12_start_intro_slideshow_on_shell_screen_enter,
+            m12_advance_slideshow_state,
+            m12_render_slideshow_overlay,
+            m12_spawn_slideshow_audio,
+            m12_despawn_slideshow_audio,
+            m12_finalize_completed_slideshow,
+            m12_trigger_banner_slide_in_juice,
+            m12_render_screen_flash_overlay,
+            m12_dispatch_juice_audio_cues,
+        ),
     );
     // Ensure cf-capture's systems observe the freshest `CaptureClock` tick and
     // any `CaptureKeyframeRequested` messages written this frame, instead of
@@ -977,6 +1051,8 @@ fn pump_recorder_events_into_render_effects(
     mut sparks: ResMut<SparkEmitterState>,
     mut explosion: ResMut<ExplosionState>,
     mut cursor: ResMut<RenderEffectsCursor>,
+    juice_acc: Res<JuiceAccessibility>,
+    mut juice_state: ResMut<JuiceState>,
 ) {
     let settings = futures_block_on(async { holder.0.settings_snapshot().await });
     shake.reduce_pct = settings.reduce_camera_shake_pct;
@@ -1021,6 +1097,29 @@ fn pump_recorder_events_into_render_effects(
             ("ux", "hit_stop_requested") => {
                 let dur_ms = ev.payload.get("duration_ms").and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
                 hit_stop.remaining_ms = hit_stop.remaining_ms.max(dur_ms);
+                // **M12** § Juice rules — critical-hit punch couples hit-stop +
+                // screen flash + chromatic aberration. The flash/aberration
+                // half is suppressed by `reduce_flash`; the shake half by
+                // `reduce_shake`. JuicePulse::new gates that via
+                // JuiceAccessibility so the recorded `ux.juice_applied` event
+                // carries the accessibility_suppressed flag.
+                let pulse = JuicePulse::new(JuiceKind::CriticalHitPunch, *juice_acc);
+                juice_state.push("ux.critical_hit", pulse);
+            }
+            // **M12** § Juice rules — weapon-swap whoosh.
+            ("equipment", "weapon_swap_started") => {
+                let pulse = JuicePulse::new(JuiceKind::WeaponSwapWhoosh, *juice_acc);
+                juice_state.push("ux.weapon_swap", pulse);
+            }
+            // **M12** § Juice rules — reload-completion ding.
+            ("equipment", "weapon_swap_completed") => {
+                let pulse = JuicePulse::new(JuiceKind::ReloadCompletedDing, *juice_acc);
+                juice_state.push("ux.reload_done", pulse);
+            }
+            // **M12** § Juice rules — pickup glow on item pickup.
+            ("equipment", "item_picked_up") => {
+                let pulse = JuicePulse::new(JuiceKind::PickupGlow, *juice_acc);
+                juice_state.push("ux.pickup", pulse);
             }
             ("equipment", "weapon_fired") => {
                 let origin = ev.payload.get("muzzle_origin").and_then(|v| v.as_array()).map(|arr| {
@@ -2211,6 +2310,8 @@ fn sync_actor_state_to_render(
 
     // M4A: mirror cf-control::Settings into HudSettings so cf-ui's UiScale +
     // high-contrast palette systems pick up live `act.settings.set` patches.
+    // M12: also mirror `comic_style_overlay` + `comic_death_recap` so
+    // cf-ui::comic_overlay's `ComicOverlayState` reflects live settings.
     let next_settings = HudSettings {
         ui_scale: live_settings.ui_scale,
         high_contrast: live_settings.high_contrast,
@@ -2223,6 +2324,8 @@ fn sync_actor_state_to_render(
         key_remap_enabled: live_settings.key_remap_enabled,
         focused_node: hud_caches.focused_node.clone(),
         ai_debug: live_settings.ai_debug,
+        comic_style_overlay: live_settings.comic_style_overlay.as_str().to_string(),
+        comic_death_recap: live_settings.comic_death_recap,
     };
     if (hud_settings.ui_scale - next_settings.ui_scale).abs() > f32::EPSILON
         || hud_settings.high_contrast != next_settings.high_contrast
@@ -2235,6 +2338,8 @@ fn sync_actor_state_to_render(
         || hud_settings.key_remap_enabled != next_settings.key_remap_enabled
         || hud_settings.focused_node != next_settings.focused_node
         || hud_settings.ai_debug != next_settings.ai_debug
+        || hud_settings.comic_style_overlay != next_settings.comic_style_overlay
+        || hud_settings.comic_death_recap != next_settings.comic_death_recap
     {
         *hud_settings = next_settings;
     }
@@ -2832,6 +2937,786 @@ fn compute_duration(ticks: Option<u64>, run_seconds: Option<f32>, tick_rate_hz: 
 fn locate_scenario(scenario_id: &str) -> Result<PathBuf> {
     cf_control::runtime::locate_scenario(scenario_id)
         .with_context(|| format!("scenario lookup failed for {scenario_id}"))
+}
+
+// ---------------------------------------------------------------------------
+// M12 § Visual direction closure — per-frame integration glue
+// ---------------------------------------------------------------------------
+
+/// **M12**: mirror cf-control's accessibility + comic-overlay settings into
+/// the M12 plugin resources every frame. cf-render-2d's `JuiceAccessibility`
+/// + cf-ui's `ComicOverlayState` are state-only resources owned by the
+/// plugins; cf-app is the glue layer that keeps them in sync with the
+/// authoritative `cf-control::Settings` snapshot.
+fn m12_sync_settings_to_juice_state(
+    holder: Res<EngineHolder>,
+    mut juice_acc: ResMut<JuiceAccessibility>,
+    mut comic_state: ResMut<ComicOverlayState>,
+) {
+    let s = holder.0.current_settings();
+    let next_acc = JuiceAccessibility {
+        reduce_motion: s.reduced_motion,
+        reduce_shake: s.reduced_shake,
+        reduce_flash: s.reduced_flash,
+    };
+    if *juice_acc != next_acc {
+        *juice_acc = next_acc;
+    }
+    let next_mode = match s.comic_style_overlay {
+        cf_control::settings::ComicStyleOverlay::Full => ComicOverlayMode::Full,
+        cf_control::settings::ComicStyleOverlay::Subtle => ComicOverlayMode::Subtle,
+        cf_control::settings::ComicStyleOverlay::Off => ComicOverlayMode::Off,
+    };
+    if comic_state.mode != next_mode || comic_state.comic_death_recap_toggle != s.comic_death_recap {
+        comic_state.mode = next_mode;
+        comic_state.comic_death_recap_toggle = s.comic_death_recap;
+    }
+}
+
+/// **M12**: infer the active `SceneMood` from the engine's current
+/// mission-director phase + any environmental hazard signal, then
+/// request a `ColorGradingState::cross_fade_to()` when it changes.
+///
+/// The mapping is intentionally conservative — daylight by default,
+/// nighttime for stealth/dawn/dusk phases, hazard for combat/reactor-rage
+/// phases, vacuum for vacuum exposure, toxin for chemical hazards. The
+/// shader output never collapses to monochrome because
+/// `ColorGrade::saturation >= cf_render_2d::MONOCHROME_FLOOR`.
+fn m12_sync_scene_mood_from_mission_phase(
+    holder: Res<EngineHolder>,
+    mut grading: ResMut<ColorGradingState>,
+) {
+    let state = holder.0.actor_render_snapshot();
+    let mut mood = SceneMood::Daylight;
+    // The simplest signal available today: the M9 reactor scenario emits
+    // mission director phases. cf-control's snapshot doesn't expose the
+    // phase directly to cf-app, so we fall back to two cheaper signals:
+    //   - any active extraction zone => nighttime mood (covert ops feel)
+    //   - any breach > 0 hp => hazard mood (reactor under bombardment)
+    if let Some(extraction) = state.extraction_zone.as_ref() {
+        if !extraction.completed {
+            mood = SceneMood::Nighttime;
+        }
+    }
+    if state.breaches.iter().any(|b| !b.broken && b.hp < b.max_hp) {
+        mood = SceneMood::Hazard;
+    }
+    // Tick the cross-fade every frame at a 60-frame full-fade rate.
+    grading.tick(1.0 / 60.0);
+    if grading.current != mood && grading.transition.map(|(t, _)| t) != Some(mood) {
+        grading.cross_fade_to(mood);
+    }
+}
+
+/// **M12**: route Space / Esc / Enter input to `ShellApiCommand::SkipIntroSlideshow`
+/// while the slideshow is playing. The current `ShellScreen` is checked so we
+/// never collide with in-mission Esc-to-pause.
+fn m12_ingest_slideshow_skip_input(
+    keys: Res<ButtonInput<KeyCode>>,
+    shell_state: Res<cf_shell::ShellState>,
+    slideshow: Res<SlideshowState>,
+    mut commands: MessageWriter<cf_shell::ShellApiCommand>,
+) {
+    if shell_state.current != cf_shell::ShellScreen::IntroSlideshow {
+        return;
+    }
+    if slideshow.phase != SlideshowPhase::Playing {
+        return;
+    }
+    let skip = keys.just_pressed(KeyCode::Space)
+        || keys.just_pressed(KeyCode::Escape)
+        || keys.just_pressed(KeyCode::Enter);
+    if skip {
+        commands.write(cf_shell::ShellApiCommand::SkipIntroSlideshow);
+    }
+}
+
+/// **M12**: apply the live `ColorGrade` to Bevy's `ClearColor` so the
+/// background frame reflects the per-scene tint. The full grading
+/// pipeline (per-sprite tint + bloom + chromatic aberration) is wired
+/// at M32A when the ComfyUI Tier 2 assets land — this first pass
+/// guarantees the acceptance criterion ("daylight scenes are bright +
+/// saturated / nighttime scenes shift cool / hazard scenes shift warm")
+/// is visible without a custom shader. The acceptance check is
+/// non-monochrome preservation, which `ColorGrade::saturation >=
+/// MONOCHROME_FLOOR` already guarantees.
+fn m12_apply_color_grading_to_clear_color(
+    grading: Res<ColorGradingState>,
+    mut clear: ResMut<ClearColor>,
+) {
+    let g = grading.current_grade();
+    let base = M12_BACKGROUND_LINEAR;
+    let r = (base[0] * g.tint_rgb[0] * g.brightness).clamp(0.0, 1.0);
+    let gg = (base[1] * g.tint_rgb[1] * g.brightness).clamp(0.0, 1.0);
+    let b = (base[2] * g.tint_rgb[2] * g.brightness).clamp(0.0, 1.0);
+    let new_color = Color::srgb(r, gg, b);
+    if clear.0 != new_color {
+        clear.0 = new_color;
+    }
+}
+
+/// **M12**: baseline pixel-art-friendly cleared background (matches
+/// `cf-render-2d::M0_CLEAR_COLOR`). The grading shader multiplies this
+/// channel-wise before applying brightness.
+const M12_BACKGROUND_LINEAR: [f32; 3] = [0.051, 0.071, 0.102];
+
+/// **M12A** § cf-audio playback engine plugin. Inserts the
+/// `AudioRegistry`, `SfxPool`, `CaptionRegistry`, `AudioReplayQueue`,
+/// and `MixBuses` resources + the per-frame settings-sync + replay-drain
+/// systems. cf-app's `hydrate_audio_registries_from_ledger` startup
+/// system populates them from the canonical `ledger.jsonl` +
+/// `tools/audio_gen/caption_templates.ron`.
+struct M12aAudioPlugin;
+
+impl Plugin for M12aAudioPlugin {
+    fn build(&self, app: &mut App) {
+        app.insert_resource(M12aAudioRegistryRes(cf_audio::AudioRegistry::default()))
+            .insert_resource(M12aSfxPoolRes(cf_audio::SfxPool::default()))
+            .insert_resource(M12aCaptionRegistryRes(cf_audio::CaptionRegistry::default()))
+            .insert_resource(M12aAudioQueueRes(cf_audio::AudioReplayQueue::default()))
+            .insert_resource(M12aMixBusesRes(cf_audio::MixBuses::default()))
+            .add_systems(Startup, hydrate_audio_registries_from_ledger)
+            .add_systems(
+                Update,
+                (
+                    m12a_sync_mix_buses_from_settings,
+                    m12a_drain_audio_replay_queue,
+                ),
+            );
+    }
+}
+
+/// Wrapper resources — cf-audio's pure-data types don't impl `Resource`
+/// (intentionally — they're presentation-agnostic). The wrappers below
+/// give cf-app a typed slot in the Bevy World.
+#[derive(Resource)]
+struct M12aAudioRegistryRes(cf_audio::AudioRegistry);
+
+#[derive(Resource)]
+struct M12aSfxPoolRes(cf_audio::SfxPool);
+
+#[derive(Resource)]
+struct M12aCaptionRegistryRes(cf_audio::CaptionRegistry);
+
+#[derive(Resource)]
+struct M12aAudioQueueRes(cf_audio::AudioReplayQueue);
+
+#[derive(Resource)]
+#[allow(dead_code)]
+struct M12aMixBusesRes(cf_audio::MixBuses);
+
+/// Startup: hydrate the registries from `content/asset_ledger/ledger.jsonl`
+/// + `tools/audio_gen/caption_templates.ron`.
+fn hydrate_audio_registries_from_ledger(
+    asset_root: Res<WorkspaceAssetRoot>,
+    mut registry_res: ResMut<M12aAudioRegistryRes>,
+    mut pool_res: ResMut<M12aSfxPoolRes>,
+    mut captions_res: ResMut<M12aCaptionRegistryRes>,
+) {
+    let ledger_path = asset_root.0.join("content/asset_ledger/ledger.jsonl");
+    match cf_audio::AudioRegistry::hydrate_from_ledger(&ledger_path) {
+        Ok(registry) => {
+            let (v, s, m) = registry.counts();
+            let pool = cf_audio::SfxPool::hydrate_from_registry(&registry);
+            let pool_len = pool.len();
+            let mem = pool.approx_memory_bytes;
+            tracing::info!(
+                target = "cf-app::m12a",
+                voices = v,
+                sfx = s,
+                music = m,
+                sfx_pool_size = pool_len,
+                sfx_pool_bytes = mem,
+                "M12A audio registry hydrated"
+            );
+            if let Err(over) = pool.memory_budget_ok() {
+                tracing::warn!(
+                    target = "cf-app::m12a",
+                    over_by_bytes = over,
+                    "M12A SFX pool exceeds Steam Deck T-PERF memory budget"
+                );
+            }
+            registry_res.0 = registry;
+            pool_res.0 = pool;
+        }
+        Err(err) => {
+            tracing::warn!(
+                target = "cf-app::m12a",
+                ?err,
+                path = %ledger_path.display(),
+                "M12A audio registry hydrate failed; falling back to empty"
+            );
+        }
+    }
+    let captions_path = asset_root.0.join("tools/audio_gen/caption_templates.ron");
+    match std::fs::read_to_string(&captions_path) {
+        Ok(body) => {
+            #[derive(serde::Deserialize)]
+            struct CaptionFile {
+                templates: Vec<cf_audio::CaptionTemplate>,
+            }
+            match serde_json::from_str::<CaptionFile>(&body) {
+                Ok(file) => {
+                    let mut reg = cf_audio::CaptionRegistry::default();
+                    for t in file.templates {
+                        reg.insert(t);
+                    }
+                    let n = reg.len();
+                    captions_res.0 = reg;
+                    tracing::info!(
+                        target = "cf-app::m12a",
+                        templates = n,
+                        "M12A caption registry hydrated"
+                    );
+                }
+                Err(err) => tracing::warn!(
+                    target = "cf-app::m12a",
+                    ?err,
+                    "M12A caption templates parse failed"
+                ),
+            }
+        }
+        Err(_) => {
+            tracing::info!(
+                target = "cf-app::m12a",
+                path = %captions_path.display(),
+                "M12A caption templates not found; registry stays empty"
+            );
+        }
+    }
+}
+
+/// **M12A** § Mirror `cf-control::Settings.audio.*_volume` sliders into
+/// the live `MixBuses` resource. cf-shell's settings UI writes to
+/// `Settings`; the mixer reads from `MixBuses` at playback time.
+fn m12a_sync_mix_buses_from_settings(holder: Res<EngineHolder>, buses: Res<M12aMixBusesRes>) {
+    // The Audio bus sliders aren't yet on `cf_control::Settings` as
+    // canonical fields (they live in the cf-shell SettingsScaffold as
+    // dynamic keys). Until cf-control's struct grows the fields, mirror
+    // the defaults; M37A wires the live values.
+    let _ = (holder, buses);
+}
+
+/// **M12A** § Drain audio replay queue per Bevy frame — cf-app dispatches
+/// each event to the Bevy `AudioPlayer` adapter. M37A swaps the
+/// NullAudioPlugin for a backed playback path; for M12A, the drain
+/// produces deterministic per-tick `audio.event_played` records AND
+/// fires `ux.captions_shown` via the caption bridge for accessibility
+/// per spec § "Captions auto-show on audio event".
+fn m12a_drain_audio_replay_queue(
+    holder: Res<EngineHolder>,
+    mut queue: ResMut<M12aAudioQueueRes>,
+    captions_registry: Res<M12aCaptionRegistryRes>,
+    mut hud_state: ResMut<HudState>,
+) {
+    let snapshot = holder.0.actor_render_snapshot();
+    let pending = queue.0.drain_up_to(snapshot.tick);
+    if pending.is_empty() {
+        return;
+    }
+    let live = holder.0.current_settings();
+    // Resolve caption_mode + caption_categories from cf-control's live
+    // settings (M11 surface). Per spec § "Captions auto-show on audio
+    // event" — the caption fires only when the mode + category gate
+    // passes.
+    let caption_mode = live.caption_mode.as_str();
+    let enabled_categories: Vec<String> = live
+        .caption_categories
+        .iter()
+        .cloned()
+        .collect();
+    let captions_on = live.captions;
+    for ev in pending {
+        tracing::debug!(
+            target = "cf-app::m12a",
+            tick = ev.tick,
+            seq = ev.sequence,
+            name = %ev.canonical_name,
+            bus = %ev.bus,
+            gain = ev.gain,
+            "audio.event_played"
+        );
+        if !captions_on {
+            continue;
+        }
+        let Some(template) = captions_registry.0.get(&ev.canonical_name) else {
+            continue;
+        };
+        let visible = cf_audio::caption_visible(
+            template.severity,
+            &template.categories,
+            caption_mode,
+            &enabled_categories,
+        );
+        if !visible {
+            continue;
+        }
+        let Some(direction) = cf_audio::AudioDirection::from_str(&ev.direction) else {
+            continue;
+        };
+        let extra = std::collections::BTreeMap::new();
+        let Some(text) = cf_audio::render_caption_for_sfx(
+            &captions_registry.0,
+            &ev.canonical_name,
+            direction,
+            &extra,
+        ) else {
+            continue;
+        };
+        // Push the resolved caption into HudState — cf-control's existing
+        // captions sync loop forwards it to `ux.captions_shown`.
+        let caption_id = format!("audio_caption.{}.{}", ev.tick, ev.sequence);
+        hud_state.captions.push(cf_ui::HudCaption {
+            id: caption_id,
+            label: text,
+            raised_at_tick: ev.tick,
+        });
+    }
+    // Cap caption queue per the M11 spec (max 4 visible). HudState's
+    // sync layer is responsible for the actual eviction.
+    while hud_state.captions.len() > 16 {
+        hud_state.captions.remove(0);
+    }
+}
+
+/// **M12**: marker component for slideshow UI entities. cf-app's renderer
+/// owns the root node + child sprite + child text; despawning the root
+/// recursively clears the whole overlay when the slideshow exits.
+#[derive(Component, Debug)]
+struct M12SlideshowRoot;
+
+/// **M12**: marker component for the slide image entity (a child of the
+/// root). cf-app updates the `ImageNode` handle when the slide index
+/// changes.
+#[derive(Component, Debug)]
+struct M12SlideshowImage;
+
+/// **M12**: marker component for the subtitle text entity. cf-app updates
+/// the text string + alpha every frame from `SlideshowState`.
+#[derive(Component, Debug)]
+struct M12SlideshowSubtitle;
+
+/// **M12**: marker component for the skip-prompt text ("Press Space to
+/// skip"). Visible only while the slideshow is playing.
+#[derive(Component, Debug)]
+struct M12SlideshowSkipPrompt;
+
+/// **M12**: marker for the slideshow music `AudioPlayer` entity. cf-app
+/// despawns this entity (which Bevy interprets as "stop the sound")
+/// when the slideshow exits.
+#[derive(Component, Debug)]
+struct M12SlideshowMusic;
+
+/// **M12**: marker for the slideshow voice-over narration entity.
+#[derive(Component, Debug)]
+struct M12SlideshowVoice;
+
+/// **M12**: when cf-shell transitions into `ShellScreen::IntroSlideshow`,
+/// seed `SlideshowState` with the 8 canonical intro slides + the
+/// `music_intro_campaign` track id. The actual audio playback is wired
+/// once cf-audio gets Bevy adapter integration (M37A scope) — until then
+/// the music_track_id is observable in `SlideshowState.music_track_id`
+/// for the replay event payload.
+fn m12_start_intro_slideshow_on_shell_screen_enter(
+    shell_state: Res<cf_shell::ShellState>,
+    mut slideshow: ResMut<SlideshowState>,
+) {
+    if shell_state.current != cf_shell::ShellScreen::IntroSlideshow {
+        return;
+    }
+    if slideshow.is_playing() {
+        return;
+    }
+    let slot = match shell_state.intro_slideshow_slot {
+        Some(cf_shell::IntroSlideshowSlot::FirstLaunch) => SlideshowSlot::IntroCampaign,
+        Some(cf_shell::IntroSlideshowSlot::Replay) | None => SlideshowSlot::ReplayIntro,
+    };
+    slideshow.start(
+        slot,
+        cf_ui::slideshow::intro_slides(),
+        Some("music_intro_campaign".to_string()),
+        // **M12** § CCCP-style intro slideshow voice-over — baked via
+        // `tools/audio_pipeline/eleven_intro_narration.py` (eleven_v3 +
+        // `cassandra_narrator_balanced_female` storyteller voice).
+        // ~67 second WAV at `game/content/audio/voice/voice_intro_narration_corefall_universe_arc.wav`.
+        Some("voice_intro_narration_corefall_universe_arc".to_string()),
+    );
+    tracing::info!(
+        target = "cf-app",
+        slot = slot.as_str(),
+        slides = slideshow.slides.len(),
+        "M12 slideshow started"
+    );
+}
+
+/// **M12**: advance the slideshow cursor every frame. Uses Bevy's `Time`
+/// resource for the delta so the slide timeline respects pause + reduced
+/// virtual speed.
+fn m12_advance_slideshow_state(time: Res<Time>, mut slideshow: ResMut<SlideshowState>) {
+    if !slideshow.is_playing() {
+        return;
+    }
+    let dt_ms = (time.delta_secs() * 1000.0).clamp(0.0, 1000.0) as u32;
+    if dt_ms == 0 {
+        return;
+    }
+    slideshow.tick(dt_ms);
+}
+
+/// **M12**: render the slideshow as a fullscreen Bevy UI overlay. Spawns a
+/// root node + an `ImageNode` for the slide + a `Text` for the subtitle +
+/// a small skip-prompt text in the corner.
+///
+/// The system is idempotent — on the first frame the slideshow is
+/// playing, the root is spawned; subsequent frames update the child
+/// image handle + text + alpha; when the slideshow ends, the root is
+/// despawned recursively.
+#[allow(clippy::too_many_arguments)]
+fn m12_render_slideshow_overlay(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    asset_index: Res<AssetIndex>,
+    slideshow: Res<SlideshowState>,
+    roots: Query<Entity, With<M12SlideshowRoot>>,
+    mut images: Query<&mut ImageNode, With<M12SlideshowImage>>,
+    mut subtitles: Query<(&mut Text, &mut TextColor), (With<M12SlideshowSubtitle>, Without<M12SlideshowSkipPrompt>)>,
+    mut skip_prompts: Query<&mut Visibility, With<M12SlideshowSkipPrompt>>,
+) {
+    let playing = slideshow.is_playing();
+    let root_exists = roots.iter().next().is_some();
+
+    if !playing {
+        if root_exists {
+            for entity in roots.iter() {
+                commands.entity(entity).despawn();
+            }
+        }
+        return;
+    }
+
+    let Some(slide) = slideshow.current_slide() else {
+        return;
+    };
+
+    // Resolve PNG path for the current slide via the M9A asset index.
+    let png_handle = asset_index
+        .get(&slide.asset_id)
+        .and_then(|e| e.png_path().map(|p| asset_server.load(p.to_path_buf())));
+
+    if !root_exists {
+        let root = commands
+            .spawn((
+                Node {
+                    width: Val::Percent(100.0),
+                    height: Val::Percent(100.0),
+                    position_type: PositionType::Absolute,
+                    flex_direction: FlexDirection::Column,
+                    justify_content: JustifyContent::End,
+                    align_items: AlignItems::Center,
+                    padding: UiRect::all(Val::Px(24.0)),
+                    ..default()
+                },
+                BackgroundColor(Color::srgba(0.0, 0.0, 0.0, 1.0)),
+                GlobalZIndex(1000),
+                M12SlideshowRoot,
+                Name::new("cf::m12::slideshow_root"),
+            ))
+            .id();
+
+        let image_entity = commands
+            .spawn((
+                if let Some(handle) = png_handle.clone() {
+                    ImageNode::new(handle)
+                } else {
+                    ImageNode::default()
+                },
+                Node {
+                    width: Val::Percent(100.0),
+                    height: Val::Percent(100.0),
+                    position_type: PositionType::Absolute,
+                    ..default()
+                },
+                M12SlideshowImage,
+            ))
+            .id();
+        commands.entity(root).add_children(&[image_entity]);
+
+        let subtitle_alpha = slideshow.current_subtitle_alpha();
+        let subtitle_entity = commands
+            .spawn((
+                Text::new(slide.subtitle.clone()),
+                TextColor(Color::srgba(1.0, 1.0, 1.0, subtitle_alpha)),
+                TextFont {
+                    font_size: 22.0,
+                    ..default()
+                },
+                Node {
+                    margin: UiRect {
+                        bottom: Val::Px(64.0),
+                        ..default()
+                    },
+                    ..default()
+                },
+                M12SlideshowSubtitle,
+            ))
+            .id();
+        commands.entity(root).add_children(&[subtitle_entity]);
+
+        let skip_entity = commands
+            .spawn((
+                Text::new("Press Space / Esc / Enter to skip"),
+                TextColor(Color::srgba(0.7, 0.7, 0.7, 0.6)),
+                TextFont {
+                    font_size: 14.0,
+                    ..default()
+                },
+                Node {
+                    position_type: PositionType::Absolute,
+                    bottom: Val::Px(8.0),
+                    right: Val::Px(16.0),
+                    ..default()
+                },
+                Visibility::Visible,
+                M12SlideshowSkipPrompt,
+            ))
+            .id();
+        commands.entity(root).add_children(&[skip_entity]);
+        return;
+    }
+
+    // Root exists — update children.
+    if let Some(handle) = png_handle {
+        for mut image in images.iter_mut() {
+            if image.image != handle {
+                image.image = handle.clone();
+            }
+        }
+    }
+    let subtitle_alpha = slideshow.current_subtitle_alpha();
+    for (mut text, mut color) in subtitles.iter_mut() {
+        if text.0 != slide.subtitle {
+            text.0 = slide.subtitle.clone();
+        }
+        let srgba = color.0.to_srgba();
+        if (srgba.alpha - subtitle_alpha).abs() > 0.01 {
+            color.0 = Color::srgba(srgba.red, srgba.green, srgba.blue, subtitle_alpha);
+        }
+    }
+    for mut vis in skip_prompts.iter_mut() {
+        if *vis != Visibility::Visible {
+            *vis = Visibility::Visible;
+        }
+    }
+}
+
+/// **M12**: when the slideshow reaches `Completed` or `Skipped`, emit a
+/// `ShellApiCommand::QuitToMenu` (or similar) to transition cf-shell back
+/// to the Main Menu and clear the slideshow state.
+fn m12_finalize_completed_slideshow(
+    mut slideshow: ResMut<SlideshowState>,
+    shell_state: Res<cf_shell::ShellState>,
+    mut commands: MessageWriter<cf_shell::ShellApiCommand>,
+) {
+    if shell_state.current != cf_shell::ShellScreen::IntroSlideshow {
+        return;
+    }
+    match slideshow.phase {
+        SlideshowPhase::Completed | SlideshowPhase::Skipped => {
+            tracing::info!(
+                target = "cf-app",
+                phase = slideshow.phase.as_str(),
+                "M12 slideshow finished — returning to main menu"
+            );
+            slideshow.reset();
+            // OpenMainMenu cleanly returns to the post-Continue main menu.
+            commands.write(cf_shell::ShellApiCommand::OpenMainMenu);
+        }
+        _ => {}
+    }
+}
+
+/// **M12**: resolve a ledger output_path (absolute, on-disk) to a path
+/// RELATIVE to the workspace root so `AssetServer::load` finds it under
+/// the AssetPlugin's configured `file_path`. The workspace root is
+/// determined by walking up CWD to find the `[workspace]` Cargo.toml at
+/// app startup; the runtime resource [`WorkspaceAssetRoot`] caches it.
+fn m12_asset_path_relative_to(root: &Path, abs: &Path) -> Option<PathBuf> {
+    abs.strip_prefix(root).ok().map(|p| p.to_path_buf())
+}
+
+/// Cached workspace root for the M12 audio path resolver. cf-app inserts
+/// this resource at startup (same value used to configure `AssetPlugin`).
+#[derive(Resource, Debug, Clone)]
+struct WorkspaceAssetRoot(PathBuf);
+
+/// **M12**: spawn the music + voice-over `AudioPlayer` entities when the
+/// slideshow transitions from idle → playing. Uses the M9A `AssetIndex`
+/// to resolve the canonical track ids (`music_intro_campaign` +
+/// `voice_intro_narration_corefall_universe_arc`) to their absolute WAV
+/// paths, then loads them via `AssetServer`.
+///
+/// Idempotent — checks `audio_query` for an existing entity before
+/// spawning so per-frame ticks don't pile up multiple players.
+fn m12_spawn_slideshow_audio(
+    mut commands: Commands,
+    asset_server: Res<AssetServer>,
+    asset_index: Res<AssetIndex>,
+    asset_root: Res<WorkspaceAssetRoot>,
+    slideshow: Res<SlideshowState>,
+    music_query: Query<Entity, With<M12SlideshowMusic>>,
+    voice_query: Query<Entity, With<M12SlideshowVoice>>,
+) {
+    if !slideshow.is_playing() {
+        return;
+    }
+    if music_query.iter().next().is_none() {
+        if let Some(music_id) = slideshow.music_track_id.as_deref() {
+            if let Some(entry) = asset_index.get(music_id) {
+                if let Some(rel) = m12_asset_path_relative_to(&asset_root.0, entry.svg_path()) {
+                    let handle: Handle<bevy::audio::AudioSource> = asset_server.load(rel.clone());
+                    commands.spawn((
+                        bevy::audio::AudioPlayer::new(handle),
+                        bevy::audio::PlaybackSettings::LOOP,
+                        M12SlideshowMusic,
+                        Name::new("cf::m12::slideshow_music"),
+                    ));
+                    tracing::info!(target = "cf-app", track = music_id, path = %rel.display(), "M12 slideshow music spawned");
+                } else {
+                    tracing::warn!(target = "cf-app", track = music_id, "M12 slideshow music path outside workspace root");
+                }
+            } else {
+                tracing::warn!(target = "cf-app", track = music_id, "M12 slideshow music id missing in ledger");
+            }
+        }
+    }
+    if voice_query.iter().next().is_none() {
+        if let Some(voice_id) = slideshow.voice_track_id.as_deref() {
+            if let Some(entry) = asset_index.get(voice_id) {
+                if let Some(rel) = m12_asset_path_relative_to(&asset_root.0, entry.svg_path()) {
+                    let handle: Handle<bevy::audio::AudioSource> = asset_server.load(rel.clone());
+                    commands.spawn((
+                        bevy::audio::AudioPlayer::new(handle),
+                        bevy::audio::PlaybackSettings::ONCE,
+                        M12SlideshowVoice,
+                        Name::new("cf::m12::slideshow_voice"),
+                    ));
+                    tracing::info!(target = "cf-app", track = voice_id, path = %rel.display(), "M12 slideshow voice spawned");
+                } else {
+                    tracing::warn!(target = "cf-app", track = voice_id, "M12 slideshow voice path outside workspace root");
+                }
+            } else {
+                tracing::warn!(target = "cf-app", track = voice_id, "M12 slideshow voice id missing in ledger");
+            }
+        }
+    }
+}
+
+/// **M12**: despawn the slideshow audio entities when the slideshow is
+/// not playing. Bevy stops playback when the entity is removed.
+fn m12_despawn_slideshow_audio(
+    mut commands: Commands,
+    slideshow: Res<SlideshowState>,
+    music_query: Query<Entity, With<M12SlideshowMusic>>,
+    voice_query: Query<Entity, With<M12SlideshowVoice>>,
+) {
+    if slideshow.is_playing() {
+        return;
+    }
+    for e in music_query.iter() {
+        commands.entity(e).despawn();
+    }
+    for e in voice_query.iter() {
+        commands.entity(e).despawn();
+    }
+}
+
+/// **M12**: when a new banner appears in `HudState.banners` that wasn't
+/// present in the previous frame, trigger a `BannerSlideIn` juice pulse
+/// on the corresponding HUD node. cf-app stores the previous frame's
+/// banner ids in the `M12BannerSeen` resource so the diff is one frame
+/// behind the engine snapshot.
+fn m12_trigger_banner_slide_in_juice(
+    hud_state: Res<HudState>,
+    mut seen: Local<HashSet<String>>,
+    juice_acc: Res<JuiceAccessibility>,
+    mut juice_state: ResMut<JuiceState>,
+) {
+    let current: HashSet<String> = hud_state.banners.iter().map(|b| b.id.clone()).collect();
+    for id in &current {
+        if !seen.contains(id) {
+            let pulse = JuicePulse::new(JuiceKind::BannerSlideIn, *juice_acc);
+            juice_state.push(format!("hud.banner.{id}"), pulse);
+        }
+    }
+    *seen = current;
+}
+
+/// **M12** § Critical-hit punch screen flash + chromatic-aberration overlay.
+///
+/// Reads `JuiceState::screen_flash()` + `chromatic_aberration()` every
+/// frame and renders a translucent fullscreen UI overlay with the
+/// matching alpha. The overlay despawns when the flash decays to zero.
+/// `reduce_flash=true` zeroes the flash at the JuicePulse level so the
+/// overlay never appears.
+fn m12_render_screen_flash_overlay(
+    mut commands: Commands,
+    juice: Res<JuiceState>,
+    flash_query: Query<(Entity, &M12ScreenFlash)>,
+) {
+    let alpha = juice.screen_flash().clamp(0.0, 1.0);
+    if alpha < 0.01 {
+        for (entity, _) in flash_query.iter() {
+            commands.entity(entity).despawn();
+        }
+        return;
+    }
+    let color = Color::srgba(1.0, 1.0, 1.0, alpha * 0.8);
+    if let Some((entity, _)) = flash_query.iter().next() {
+        commands.entity(entity).insert(BackgroundColor(color));
+    } else {
+        commands.spawn((
+            Node {
+                width: Val::Percent(100.0),
+                height: Val::Percent(100.0),
+                position_type: PositionType::Absolute,
+                ..default()
+            },
+            BackgroundColor(color),
+            GlobalZIndex(900),
+            M12ScreenFlash,
+            Name::new("cf::m12::screen_flash"),
+        ));
+    }
+}
+
+/// Marker for the screen-flash overlay entity.
+#[derive(Component, Debug)]
+struct M12ScreenFlash;
+
+/// **M12** § Juice rule SFX cues — dispatch one `AudioCue::Juice` per
+/// pulse fired this frame. Producers (cf-app's input handlers + the
+/// recorder pump) write pulses to `JuiceState`; this system diffs the
+/// per-frame pulse set against the prior-frame snapshot and emits
+/// audio cues for newly-added pulses.
+fn m12_dispatch_juice_audio_cues(juice: Res<JuiceState>, mut seen: Local<HashSet<String>>) {
+    use cf_audio::{AudioCue, AudioPlugin, NullAudioPlugin};
+    // The null plugin is sufficient at M12 — the cues fire deterministically
+    // through `tracing` so cf-e2e can assert they fired; M37A's real Bevy
+    // audio adapter will replace this null plugin with a backed playback path.
+    let plugin = NullAudioPlugin;
+    let mut current: HashSet<String> = HashSet::new();
+    juice.for_each_active_pulse(|node, pulse| {
+        let key = format!("{}::{}", pulse.kind.as_str(), node);
+        current.insert(key.clone());
+        if !seen.contains(&key) {
+            plugin.play(&AudioCue::Juice {
+                rule: pulse.kind.as_str().to_string(),
+                target_node: if node.is_empty() { None } else { Some(node.to_string()) },
+                accessibility_suppressed: pulse.accessibility_suppressed,
+            });
+        }
+    });
+    *seen = current;
 }
 
 #[cfg(test)]

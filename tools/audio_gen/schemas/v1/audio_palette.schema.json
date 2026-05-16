@@ -1,0 +1,41 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "tools/audio_gen/audio_palette.v1",
+  "title": "AudioPalette",
+  "description": "M12A § Per-faction / per-material / per-origin audio palette. Drives prompt shaping in the adapters so SFX inherit the faction's audio signature (servo whirs for Hostile Corp; wet bubbling for Aqueous origins).",
+  "type": "object",
+  "required": ["palette_id", "category", "description"],
+  "properties": {
+    "palette_id": { "type": "string", "minLength": 1 },
+    "display_name": { "type": "string" },
+    "category": {
+      "type": "string",
+      "enum": ["faction", "material", "origin"]
+    },
+    "description": { "type": "string" },
+    "weapon_character": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    },
+    "voice_tone": {
+      "type": "object",
+      "additionalProperties": true
+    },
+    "ambient_signature": { "type": "string" },
+    "footstep_character": { "type": "string" },
+    "impact_character": { "type": "string" },
+    "preferred_pitch_range_hz": {
+      "type": "array",
+      "items": { "type": "number" },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "reverb_tail_sec": { "type": "number", "minimum": 0.0 },
+    "breathing_signature": { "type": "string" },
+    "vital_signature": { "type": "string" },
+    "concussion_band_mix": {
+      "type": "object",
+      "additionalProperties": { "type": "string" }
+    }
+  }
+}

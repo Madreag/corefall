@@ -783,6 +783,58 @@ pub struct Settings {
     /// **M11**: debug-explainer level (Player / Designer / Raw).
     #[serde(default)]
     pub debug_explainer_level: DebugExplainerLevel,
+
+    // === M12 cinematic story beats + optional comic overlay ===
+    /// **M12**: comic-style overlay mode (`full | subtle | off`). Drives
+    /// speech bubbles, onomatopoeia stamps, comic-panel boss intros, and
+    /// the comic death-recap availability. Default is `Subtle` per spec
+    /// § Comic-style framing — opt-in juice, not core identity.
+    #[serde(default)]
+    pub comic_style_overlay: ComicStyleOverlay,
+    /// **M12**: when `true`, the death recap renders as a 4-panel comic-style
+    /// cause chain. When `false` (default), the M10 replay viewer +
+    /// cause-chain walker is used. Gated by `comic_style_overlay != Off`.
+    #[serde(default)]
+    pub comic_death_recap: bool,
+}
+
+/// **M12**: comic-style overlay mode mirror — `full | subtle | off`.
+/// Drives `cf-ui::comic_overlay::ComicOverlayMode` at runtime.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ComicStyleOverlay {
+    /// Speech bubbles for chatter + onomatopoeia on impacts + comic-panel
+    /// boss intros + comic death recap available behind toggle.
+    Full,
+    /// Default — speech bubbles for storyteller events only; no
+    /// onomatopoeia stamps; comic death recap available behind toggle.
+    #[default]
+    Subtle,
+    /// Disabled — no comic framing renders anywhere; chatter is plain
+    /// captions; death recap is M10 timeline only.
+    Off,
+}
+
+impl ComicStyleOverlay {
+    /// Canonical snake_case identifier.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ComicStyleOverlay::Full => "full",
+            ComicStyleOverlay::Subtle => "subtle",
+            ComicStyleOverlay::Off => "off",
+        }
+    }
+
+    /// Parse from the snake_case wire form.
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(value: &str) -> Option<ComicStyleOverlay> {
+        Some(match value {
+            "full" => ComicStyleOverlay::Full,
+            "subtle" => ComicStyleOverlay::Subtle,
+            "off" => ComicStyleOverlay::Off,
+            _ => return None,
+        })
+    }
 }
 
 /// **M11**: default caption background opacity per spec.
@@ -982,6 +1034,9 @@ impl Default for Settings {
             camera_motion: CameraMotion::Standard,
             objective_help: ObjectiveHelp::Standard,
             debug_explainer_level: DebugExplainerLevel::Player,
+            // === M12 cinematic story beats ===
+            comic_style_overlay: ComicStyleOverlay::Subtle,
+            comic_death_recap: false,
         }
     }
 }
@@ -1096,5 +1151,31 @@ mod tests {
         assert_eq!(GameSpeedAssist::Slowdown75.speed_pct(), 75);
         assert_eq!(GameSpeedAssist::Slowdown25.speed_pct(), 25);
         assert_eq!(GameSpeedAssist::FullPause.speed_pct(), 0);
+    }
+
+    #[test]
+    fn comic_style_overlay_default_is_subtle() {
+        let s = Settings::default();
+        assert_eq!(s.comic_style_overlay, ComicStyleOverlay::Subtle);
+        assert!(!s.comic_death_recap);
+    }
+
+    #[test]
+    fn comic_style_overlay_round_trips_through_str() {
+        for mode in [ComicStyleOverlay::Full, ComicStyleOverlay::Subtle, ComicStyleOverlay::Off] {
+            assert_eq!(ComicStyleOverlay::from_str(mode.as_str()), Some(mode));
+        }
+        assert!(ComicStyleOverlay::from_str("bogus").is_none());
+    }
+
+    #[test]
+    fn comic_style_overlay_serializes_as_snake_case() {
+        let s = Settings::default();
+        let v = serde_json::to_value(&s).unwrap();
+        assert_eq!(
+            v.get("comic_style_overlay").and_then(|x| x.as_str()),
+            Some("subtle"),
+        );
+        assert_eq!(v.get("comic_death_recap").and_then(|x| x.as_bool()), Some(false));
     }
 }

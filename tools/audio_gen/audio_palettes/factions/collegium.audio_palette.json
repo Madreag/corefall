@@ -1,0 +1,23 @@
+{
+  "$schema": "../../schemas/v1/audio_palette.schema.json",
+  "palette_id": "collegium",
+  "display_name": "Collegium",
+  "category": "faction",
+  "description": "parchment cream / ink black / sigil gold \u2014 distinctive arcane chime, paper rustle, library hush signature.",
+  "weapon_character": {
+    "fire_decay": "distinct",
+    "reload_mechanism": "characteristic",
+    "magazine_material": "in-faction",
+    "ejection_pitch": "mid"
+  },
+  "voice_tone": {
+    "default_register": "scholarly hushed",
+    "emotion_palette": [
+      "neutral",
+      "urgent",
+      "panicked"
+    ],
+    "radio_filter": "standard"
+  },
+  "ambient_signature": "arcane chime, paper rustle, library hush"
+}

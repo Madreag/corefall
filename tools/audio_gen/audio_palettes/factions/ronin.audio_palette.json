@@ -1,0 +1,23 @@
+{
+  "$schema": "../../schemas/v1/audio_palette.schema.json",
+  "palette_id": "ronin",
+  "display_name": "Ronin",
+  "category": "faction",
+  "description": "iron gray / blood red / sake yellow \u2014 distinctive metal-on-metal blade ring, samurai discipline signature.",
+  "weapon_character": {
+    "fire_decay": "distinct",
+    "reload_mechanism": "characteristic",
+    "magazine_material": "in-faction",
+    "ejection_pitch": "mid"
+  },
+  "voice_tone": {
+    "default_register": "restrained intense",
+    "emotion_palette": [
+      "neutral",
+      "urgent",
+      "panicked"
+    ],
+    "radio_filter": "standard"
+  },
+  "ambient_signature": "metal-on-metal blade ring, samurai discipline"
+}

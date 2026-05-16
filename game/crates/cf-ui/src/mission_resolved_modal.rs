@@ -344,4 +344,297 @@ mod tests {
         assert!(!s.contains("deep"));
         assert!(!s.contains("{"));
     }
+
+    #[test]
+    fn comic_death_recap_renders_4_panel_text() {
+        let events = vec![
+            event(
+                "c1", None, 0, "ai", "state_changed",
+                json!({"actor_id": 7, "to": "Pursuing", "reason": "saw_player"}),
+            ),
+            event(
+                "c2", Some("c1"), 10, "ai", "tactic_chosen",
+                json!({"actor_id": 7, "tactic": "Engage"}),
+            ),
+            event(
+                "c3", Some("c2"), 14, "combat", "projectile_hit",
+                json!({"shooter_actor_id": 7, "body_zone": "torso", "damage": 15.0}),
+            ),
+            event(
+                "c4", Some("c3"), 15, "actor", "actor_died",
+                json!({"actor_id": 1, "cause": "projectile"}),
+            ),
+        ];
+        let s = render_comic_death_recap(&events, Some("c4"));
+        // Section dividers + panel headings present
+        assert!(s.contains("PANEL 1"));
+        assert!(s.contains("PANEL 2"));
+        assert!(s.contains("PANEL 3"));
+        assert!(s.contains("PANEL 4"));
+        // Plain-language content survives
+        assert!(s.contains("You died"));
+        assert!(!s.contains("{"), "raw JSON must NOT leak: {s}");
+    }
+
+    #[test]
+    fn comic_death_recap_pads_when_chain_short() {
+        let events = vec![event(
+            "lonely", None, 5, "actor", "actor_died",
+            json!({"actor_id": 1, "cause": "projectile"}),
+        )];
+        let s = render_comic_death_recap(&events, Some("lonely"));
+        // Always renders exactly 4 panel headings even when the chain is short.
+        assert_eq!(s.matches("PANEL ").count(), 4);
+    }
+
+    #[test]
+    fn comic_death_recap_with_no_events_returns_fallback() {
+        let s = render_comic_death_recap(&[], None);
+        assert!(s.contains("Cause chain not available"));
+    }
+}
+
+/// **M12** § Player death recap (optional comic flavor). Renders the same
+/// cause chain that [`render_recap_text`] produces but framed as a
+/// **4-panel comic-style cause chain** suitable for a comic-toggle modal
+/// rendering. Each panel maps to one chain link (root cause → terminal
+/// event); when the chain is shorter than 4 links, the remaining panels
+/// carry an explanatory "Earlier..." placeholder line. When longer than
+/// 4 links, the OLDEST 4 are shown so the player sees the root cause.
+///
+/// Gated by `Settings.comic_death_recap` + `Settings.comic_style_overlay
+/// != Off`; cf-ui::comic_overlay's `ComicOverlayState::allows` is the
+/// canonical gate. cf-app's death-recap renderer picks between this and
+/// the plain [`render_recap_text`] based on the gate.
+///
+/// The output is plain-text (Markdown-friendly) with explicit
+/// `PANEL N` headers so the modal renderer can lay out 4 boxes. M32A
+/// Tier 2 ComfyUI will replace each panel's text with a painted frame +
+/// the same caption; this Tier 1 fallback is text-only.
+pub fn render_comic_death_recap(events: &[RecapEvent], divergence_event_id: Option<&str>) -> String {
+    if events.is_empty() {
+        return "Cause chain not available — see replay viewer for full bundle.".to_string();
+    }
+    let Some(div_id) = divergence_event_id else {
+        return "No divergence event recorded; open the replay viewer for chronological events.".to_string();
+    };
+    let Some(start_idx) = events.iter().position(|e| e.event_id == div_id) else {
+        return format!(
+            "Divergence event `{div_id}` not in recent events; open the replay viewer for the full chain."
+        );
+    };
+    let mut by_id: std::collections::BTreeMap<&str, &RecapEvent> = std::collections::BTreeMap::new();
+    for e in events {
+        by_id.insert(e.event_id.as_str(), e);
+    }
+    let mut chain: Vec<&RecapEvent> = vec![&events[start_idx]];
+    let mut current = &events[start_idx];
+    let mut visited: std::collections::HashSet<&str> = std::collections::HashSet::new();
+    visited.insert(current.event_id.as_str());
+    while chain.len() < COMIC_DEATH_RECAP_MAX_DEPTH {
+        let Some(parent) = current.parent_event_id.as_deref() else {
+            break;
+        };
+        if visited.contains(parent) {
+            break;
+        }
+        match by_id.get(parent) {
+            Some(p) => {
+                visited.insert(p.event_id.as_str());
+                chain.push(p);
+                current = p;
+            }
+            None => break,
+        }
+    }
+    // Reverse so panel 1 = root cause (oldest), panel 4 = terminal event (death).
+    chain.reverse();
+    let mut lines = Vec::with_capacity(COMIC_DEATH_RECAP_PANELS * 2);
+    for panel in 0..COMIC_DEATH_RECAP_PANELS {
+        let body = chain
+            .get(panel)
+            .map(|link| format!("Tick {}: {}", link.tick, render_body(link)))
+            .unwrap_or_else(|| "Earlier... (chain truncated; open the replay viewer for full history)".to_string());
+        lines.push(format!("== PANEL {} ==", panel + 1));
+        lines.push(body);
+    }
+    lines.join("\n")
+}
+
+/// **M12**: comic death recap is exactly 4 panels per spec § Story-telling
+/// surfaces → "4-panel comic-style cause chain".
+pub const COMIC_DEATH_RECAP_PANELS: usize = 4;
+
+/// Internal chain-walk depth limit — same as the renderer's panel count.
+const COMIC_DEATH_RECAP_MAX_DEPTH: usize = COMIC_DEATH_RECAP_PANELS;
+
+/// **M12** § Death recap view mode. The Gherkin scenario "Death recap
+/// default is timeline (M10), not comic" specifies:
+///
+/// - When `settings.ux.comic_death_recap = false` (default): render the
+///   timeline (M10 replay viewer + cause-chain walker).
+/// - When `settings.ux.comic_death_recap = true`: render the 4-panel
+///   comic-style cause chain AND surface a "Switch back to timeline view"
+///   button.
+///
+/// This enum is the live, transient view-mode the modal renderer reads.
+/// Defaults to `FromSettings` (consult `Settings.comic_death_recap`); the
+/// "Switch View" button overrides via `ForceTimeline` / `ForceComic` for
+/// the duration of the open modal session.
+#[derive(bevy::prelude::Resource, Debug, Clone, Copy, Eq, PartialEq, Hash, Default)]
+pub enum DeathRecapViewMode {
+    /// Honor `Settings.comic_death_recap`. Default.
+    #[default]
+    FromSettings,
+    /// Force timeline view (overrides settings; transient).
+    ForceTimeline,
+    /// Force comic view (overrides settings; transient).
+    ForceComic,
+}
+
+impl DeathRecapViewMode {
+    /// Toggle between Comic and Timeline. Called by the "Switch View"
+    /// button. Idempotent for `FromSettings` — collapses to the inverse
+    /// of `settings_says_comic`.
+    pub fn toggle(self, settings_says_comic: bool) -> Self {
+        match self {
+            DeathRecapViewMode::FromSettings => {
+                if settings_says_comic {
+                    DeathRecapViewMode::ForceTimeline
+                } else {
+                    DeathRecapViewMode::ForceComic
+                }
+            }
+            DeathRecapViewMode::ForceComic => DeathRecapViewMode::ForceTimeline,
+            DeathRecapViewMode::ForceTimeline => DeathRecapViewMode::ForceComic,
+        }
+    }
+
+    /// Resolve the effective "render comic?" flag given the current
+    /// settings value.
+    pub fn render_comic(self, settings_says_comic: bool) -> bool {
+        match self {
+            DeathRecapViewMode::FromSettings => settings_says_comic,
+            DeathRecapViewMode::ForceComic => true,
+            DeathRecapViewMode::ForceTimeline => false,
+        }
+    }
+}
+
+/// **M12** § Death recap renderer entry point that honors the
+/// [`DeathRecapViewMode`] override. cf-app's death-recap modal calls
+/// this with the live view-mode + the live `Settings.comic_death_recap`
+/// flag; the helper picks between [`render_recap_text`] (timeline) and
+/// [`render_comic_death_recap`] (4-panel comic).
+pub fn render_death_recap_with_mode(
+    events: &[RecapEvent],
+    divergence_event_id: Option<&str>,
+    view_mode: DeathRecapViewMode,
+    settings_says_comic: bool,
+) -> String {
+    if view_mode.render_comic(settings_says_comic) {
+        render_comic_death_recap(events, divergence_event_id)
+    } else {
+        render_recap_text(events, divergence_event_id)
+    }
+}
+
+#[cfg(test)]
+mod view_mode_tests {
+    use super::*;
+    use serde_json::json;
+
+    fn event(
+        id: &str,
+        parent: Option<&str>,
+        tick: u64,
+        category: &str,
+        event_type: &str,
+        payload: serde_json::Value,
+    ) -> RecapEvent {
+        RecapEvent {
+            event_id: id.to_string(),
+            parent_event_id: parent.map(|s| s.to_string()),
+            tick,
+            category: category.to_string(),
+            event_type: event_type.to_string(),
+            payload,
+        }
+    }
+
+    #[test]
+    fn default_view_mode_honors_settings_false() {
+        let view = DeathRecapViewMode::default();
+        assert!(!view.render_comic(false));
+        assert!(view.render_comic(true));
+    }
+
+    #[test]
+    fn toggle_inverts_default_mode_to_force_inverse() {
+        // Settings says timeline; toggle should ForceComic.
+        let v = DeathRecapViewMode::FromSettings.toggle(false);
+        assert_eq!(v, DeathRecapViewMode::ForceComic);
+        // Settings says comic; toggle should ForceTimeline.
+        let v = DeathRecapViewMode::FromSettings.toggle(true);
+        assert_eq!(v, DeathRecapViewMode::ForceTimeline);
+    }
+
+    #[test]
+    fn toggle_flips_force_modes() {
+        assert_eq!(
+            DeathRecapViewMode::ForceComic.toggle(false),
+            DeathRecapViewMode::ForceTimeline
+        );
+        assert_eq!(
+            DeathRecapViewMode::ForceTimeline.toggle(true),
+            DeathRecapViewMode::ForceComic
+        );
+    }
+
+    #[test]
+    fn render_death_recap_with_mode_picks_timeline_by_default() {
+        let events = vec![event(
+            "lonely", None, 5, "actor", "actor_died",
+            json!({"actor_id": 1, "cause": "projectile"}),
+        )];
+        let out = render_death_recap_with_mode(
+            &events,
+            Some("lonely"),
+            DeathRecapViewMode::FromSettings,
+            false,
+        );
+        // Timeline output has no "PANEL" headers.
+        assert!(!out.contains("PANEL"));
+    }
+
+    #[test]
+    fn render_death_recap_with_mode_force_comic_overrides_settings() {
+        let events = vec![event(
+            "lonely", None, 5, "actor", "actor_died",
+            json!({"actor_id": 1, "cause": "projectile"}),
+        )];
+        let out = render_death_recap_with_mode(
+            &events,
+            Some("lonely"),
+            DeathRecapViewMode::ForceComic,
+            false,
+        );
+        // Forced comic emits 4 panel headers even when settings is false.
+        assert_eq!(out.matches("PANEL ").count(), 4);
+    }
+
+    #[test]
+    fn render_death_recap_with_mode_force_timeline_overrides_settings() {
+        let events = vec![event(
+            "lonely", None, 5, "actor", "actor_died",
+            json!({"actor_id": 1, "cause": "projectile"}),
+        )];
+        let out = render_death_recap_with_mode(
+            &events,
+            Some("lonely"),
+            DeathRecapViewMode::ForceTimeline,
+            true,
+        );
+        assert!(!out.contains("PANEL"));
+    }
 }

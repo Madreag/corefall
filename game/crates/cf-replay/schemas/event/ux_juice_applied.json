@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ux_juice_applied.v1",
+  "title": "ux.juice_applied",
+  "description": "Emitted when a M12 juice rule fires on a UI surface or in-mission surface — hover, click, swap, banner-slide, hit-stop, critical-punch, reload-ding, pickup-glow. kind is a snake_case identifier of the rule. accessibility_suppressed is true when reduce_motion / reduce_shake / reduce_flash short-circuits the animation. M12 spec § Juice rules.",
+  "type": "object",
+  "required": ["kind"],
+  "properties": {
+    "kind": { "type": "string", "enum": [
+      "button_hover", "click_punch", "banner_slide_in", "critical_hit_punch",
+      "reload_completed_ding", "weapon_swap_whoosh", "pickup_glow"
+    ] },
+    "target_node": { "type": "string" },
+    "duration_ms": { "type": "integer", "minimum": 0, "maximum": 5000 },
+    "accessibility_suppressed": { "type": "boolean" }
+  }
+}

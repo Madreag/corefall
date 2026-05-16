@@ -1,0 +1,14 @@
+{
+  "$schema": "../../schemas/v1/audio_palette.schema.json",
+  "palette_id": "methane_breather",
+  "display_name": "Methane Breather",
+  "category": "origin",
+  "description": "wet hiss, gas-filter ventilator, deep slow exhalation",
+  "breathing_signature": "methane filter",
+  "vital_signature": "pressurized hiss",
+  "concussion_band_mix": {
+    "mild": "baseline",
+    "moderate": "audible_distress",
+    "severe": "critical_emphasized"
+  }
+}

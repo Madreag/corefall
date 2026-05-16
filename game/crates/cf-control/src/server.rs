@@ -320,6 +320,19 @@ pub struct SettingsPatch {
     /// **M11**: debug-explainer level (`player | designer | raw`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub debug_explainer_level: Option<String>,
+
+    // === M12 cinematic story beats + optional comic overlay ===
+    /// **M12**: comic-style overlay mode (`full | subtle | off`). Defaults to
+    /// `subtle` in `Settings`; the patch lets the player drop to `off` or
+    /// escalate to `full` from the settings UI. Per spec § Comic-style
+    /// framing — opt-in juice, not core identity.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub comic_style_overlay: Option<String>,
+    /// **M12**: comic death-recap toggle. When `true`, the death recap
+    /// renders as a 4-panel comic-style cause chain; when `false` (default),
+    /// the M10 replay viewer + cause-chain walker is used.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub comic_death_recap: Option<bool>,
 }
 
 impl SettingsPatch {
@@ -382,6 +395,9 @@ impl SettingsPatch {
             && self.camera_motion.is_none()
             && self.objective_help.is_none()
             && self.debug_explainer_level.is_none()
+            // M12 cinematic story beats
+            && self.comic_style_overlay.is_none()
+            && self.comic_death_recap.is_none()
     }
 
     pub fn validation_error(&self) -> Option<String> {
@@ -542,6 +558,12 @@ impl SettingsPatch {
         if let Some(s) = self.debug_explainer_level.as_deref() {
             if crate::settings::DebugExplainerLevel::from_str(s).is_none() {
                 return Some(format!("debug_explainer_level_unknown:{s}"));
+            }
+        }
+        // M12 cinematic story-beats validators.
+        if let Some(s) = self.comic_style_overlay.as_deref() {
+            if crate::settings::ComicStyleOverlay::from_str(s).is_none() {
+                return Some(format!("comic_style_overlay_unknown:{s}"));
             }
         }
         if let Some(v) = self.ui_scale {

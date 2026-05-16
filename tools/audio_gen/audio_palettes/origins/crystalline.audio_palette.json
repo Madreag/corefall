@@ -1,0 +1,14 @@
+{
+  "$schema": "../../schemas/v1/audio_palette.schema.json",
+  "palette_id": "crystalline",
+  "display_name": "Crystalline",
+  "category": "origin",
+  "description": "glass chime, resonant ringing, harmonic overtones",
+  "breathing_signature": "crystal hum",
+  "vital_signature": "tonal vibration",
+  "concussion_band_mix": {
+    "mild": "baseline",
+    "moderate": "audible_distress",
+    "severe": "critical_emphasized"
+  }
+}

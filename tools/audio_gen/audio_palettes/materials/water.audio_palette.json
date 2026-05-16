@@ -1,0 +1,14 @@
+{
+  "$schema": "../../schemas/v1/audio_palette.schema.json",
+  "palette_id": "water",
+  "display_name": "Water",
+  "category": "material",
+  "description": "splash, droplet trail, wet impact",
+  "footstep_character": "splash, droplet trail, wet impact",
+  "impact_character": "splash, droplet trail, wet impact",
+  "preferred_pitch_range_hz": [
+    120,
+    800
+  ],
+  "reverb_tail_sec": 0.2
+}

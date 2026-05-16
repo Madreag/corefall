@@ -18,10 +18,10 @@
 [![Windows](https://img.shields.io/badge/Windows-supported-0078D6?style=flat-square&logo=windows&logoColor=white)](#)
 
 [![Status](https://img.shields.io/badge/status-prealpha-orange?style=flat-square)](#project-status)
-[![Milestones](https://img.shields.io/badge/milestones-15%20done%20%2F%2059%20active-2EA043?style=flat-square)](#roadmap)
+[![Milestones](https://img.shields.io/badge/milestones-17%20done%20%2F%2057%20active-2EA043?style=flat-square)](#roadmap)
 [![Crates](https://img.shields.io/badge/crates-44-blueviolet?style=flat-square)](#workspace)
-[![Lib tests](https://img.shields.io/badge/lib%20tests-1248%20passing-2EA043?style=flat-square)](#ci)
-[![Ledger](https://img.shields.io/badge/ledger-6718%20fresh-2EA043?style=flat-square)](#asset-ledger)
+[![Lib tests](https://img.shields.io/badge/lib%20tests-1300%2B%20passing-2EA043?style=flat-square)](#ci)
+[![Ledger](https://img.shields.io/badge/ledger-7710%20fresh-2EA043?style=flat-square)](#asset-ledger)
 
 **[Pillars](#headline-systems) · [Roadmap](#roadmap) · [Workspace](#workspace) · [Performance](#performance--determinism-contract) · [Getting started](#getting-started) · [CLI](#cli-reference)**
 
@@ -36,7 +36,7 @@ A 2D side-view physics sandbox where every gas, grain, bullet, body, world, tran
 It's a **best-of-genre synthesis** that takes Cortex Command's command-core / dropship / chassis / digging fantasy and sets it on top of Stationeers-grade-or-better atmospherics, ONI-grade closed-loop life support, Noita-grade systemic materials, full collision physics, universal gravity, ACRE2-tier voice + radio simulation, and War Thunder-grade armor + spalling. AI bots are first-class teammates and rivals. Replay is deterministic. Modding is data-first. Accessibility is a floor, not an afterthought.
 
 > [!important]
-> **Where we are (2026-05-15).** 15 milestones closed (`M1`-`M11A` train + `M3A`/`M4A`/`M8A`/`M9A`). Tier 1 production backbone shipped: **6,718 fresh ledger entries** spanning 6,114 visual SVG/PNG assets across 23 composers + 242 SFX + 242 voice lines + 120 music WAVs + 83 narrative bible files. **Tier 2 ElevenLabs bake shipped** (`M12A` + `M37A` in flight): 242/242 SFX upgraded, 242/242 voice lines baked via `eleven_v3`, 39/120 music tracks baked via `music_v1`. New `cf-shell` crate (12 modules, 56 tests) + new `cf-audio::AudioRegistry` ship the shell UI foundation + adaptive-music index. Next up: `M12` (vivid color-rich illustrated juice + comic-panel transitions). Handoff docs for the remaining 81 music tracks live at `HANDOFF_LOCAL_MUSIC_BAKE.md` (RTX 5090 / ACE-Step v1.5) and `HANDOFF_AIVA_MUSIC.md` (AIVA Pro Playwright).
+> **Where we are (2026-05-16).** 17 milestones closed (`M1`-`M11A` train + `M3A`/`M4A`/`M8A`/`M9A` + **`M12` + `M12A`**). Tier 1 production backbone shipped: **7,710 fresh ledger entries** spanning 6,122 visual SVG/PNG assets across 23 composers + 1,222 SFX + 243 voice lines + 121 music WAVs + 8 painted intro slides + 2 sample mod SFX + 83 narrative bible files. **M12 closure**: cinematic story-beats + juice + CCCP-style intro slideshow (8 painted slides + ElevenLabs narration via `cassandra_narrator_balanced_female` + `music_intro_campaign`) + optional comic overlay + 4-panel comic death recap with timeline toggle + `bevy_audio` workspace feature enabled for runtime playback. **M12A closure**: 1,222 SFX baked through the canonical `tools/audio_gen/` pipeline (procedural Tier 1 numpy synth + 242 most-played already Tier 2 ElevenLabs) + 5 new cf-audio modules (loader / positional / caption_bridge / mix / deterministic_replay) + `cf-mod audio-gen run` subcommand + OGG Vorbis runtime format (WAV preserved as master) + `audio.event_played` replay schema + 15 faction / 11 material / 8 origin audio palettes. Total Audio_* + Mod_Custom entries: 1,588. Next up: `M13` (Equipment + Chassis + Damage Grammar).
 
 ---
 

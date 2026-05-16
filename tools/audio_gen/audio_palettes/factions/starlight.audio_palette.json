@@ -1,0 +1,23 @@
+{
+  "$schema": "../../schemas/v1/audio_palette.schema.json",
+  "palette_id": "starlight",
+  "display_name": "Starlight",
+  "category": "faction",
+  "description": "cosmic indigo / nebula pink / star white \u2014 distinctive space ambient, gravitational chord, glittering reverb signature.",
+  "weapon_character": {
+    "fire_decay": "distinct",
+    "reload_mechanism": "characteristic",
+    "magazine_material": "in-faction",
+    "ejection_pitch": "mid"
+  },
+  "voice_tone": {
+    "default_register": "breathy ethereal",
+    "emotion_palette": [
+      "neutral",
+      "urgent",
+      "panicked"
+    ],
+    "radio_filter": "standard"
+  },
+  "ambient_signature": "space ambient, gravitational chord, glittering reverb"
+}

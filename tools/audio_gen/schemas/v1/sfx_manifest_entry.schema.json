@@ -1,0 +1,95 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "tools/audio_gen/sfx_manifest_entry.v1",
+  "title": "SfxManifestEntry",
+  "description": "M12A § SFX manifest entry schema (locked v1). One entry per SFX in the M49-launch roster. Consumed by tools/audio_gen/generate_sfx.py to drive Stable Audio Open / AudioCraft / ElevenLabs / procedural Tier 1 synthesis.",
+  "type": "object",
+  "required": [
+    "id",
+    "category",
+    "prompt",
+    "duration_ms",
+    "seed",
+    "target_loudness_lufs",
+    "caption_template",
+    "caption_severity",
+    "caption_categories",
+    "package_source",
+    "license"
+  ],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "canonical_name": { "type": "string" },
+    "category": {
+      "type": "string",
+      "enum": [
+        "WeaponFire",
+        "WeaponReload",
+        "WeaponJam",
+        "WeaponSwap",
+        "WeaponMagazine",
+        "Footstep",
+        "Locomotion",
+        "Impact",
+        "Projectile",
+        "BodyHit",
+        "Dismember",
+        "Death",
+        "Grenade",
+        "Melee",
+        "Tool",
+        "UI",
+        "Banner",
+        "Reactor",
+        "Mission",
+        "Atmospheric",
+        "Hazard",
+        "Chassis",
+        "Fluid",
+        "Power",
+        "Crafting",
+        "VoiceGrunt",
+        "Pet",
+        "Storyteller",
+        "Ambient",
+        "Weather",
+        "Chatter"
+      ]
+    },
+    "prompt": { "type": "string", "minLength": 1 },
+    "negative_prompt": { "type": "string" },
+    "duration_ms": { "type": "integer", "minimum": 50, "maximum": 60000 },
+    "seed": { "type": "integer", "minimum": 0 },
+    "target_loudness_lufs": { "type": "number" },
+    "envelope": {
+      "type": "object",
+      "properties": {
+        "attack_ms": { "type": "number", "minimum": 0.0 },
+        "decay_ms": { "type": "number", "minimum": 0.0 },
+        "sustain_db": { "type": "number" },
+        "release_ms": { "type": "number", "minimum": 0.0 }
+      }
+    },
+    "caption_template": { "type": "string", "minLength": 1 },
+    "caption_severity": {
+      "type": "string",
+      "enum": ["critical", "warning", "info"]
+    },
+    "caption_categories": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "occlusion_curve": {
+      "type": "string",
+      "enum": ["linear", "exponential", "stepped"]
+    },
+    "propagation_range_m": { "type": "number", "minimum": 0.0 },
+    "package_source": { "type": "string" },
+    "license": { "type": "string" },
+    "loops": { "type": "boolean" },
+    "material": { "type": "string" },
+    "state": { "type": "string" },
+    "faction": { "type": "string" },
+    "origin": { "type": "string" }
+  }
+}

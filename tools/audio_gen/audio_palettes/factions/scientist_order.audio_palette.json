@@ -1,0 +1,23 @@
+{
+  "$schema": "../../schemas/v1/audio_palette.schema.json",
+  "palette_id": "scientist_order",
+  "display_name": "Scientist Order",
+  "category": "faction",
+  "description": "lab white / electric cyan / brass accents \u2014 distinctive electric arc, precision instruments, quiet hum signature.",
+  "weapon_character": {
+    "fire_decay": "distinct",
+    "reload_mechanism": "characteristic",
+    "magazine_material": "in-faction",
+    "ejection_pitch": "mid"
+  },
+  "voice_tone": {
+    "default_register": "academic measured",
+    "emotion_palette": [
+      "neutral",
+      "urgent",
+      "panicked"
+    ],
+    "radio_filter": "standard"
+  },
+  "ambient_signature": "electric arc, precision instruments, quiet hum"
+}

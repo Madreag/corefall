@@ -1,0 +1,14 @@
+{
+  "$schema": "../../schemas/v1/audio_palette.schema.json",
+  "palette_id": "loose_fill",
+  "display_name": "Loose Fill",
+  "category": "material",
+  "description": "shuffle, granular, gravel scatter",
+  "footstep_character": "shuffle, granular, gravel scatter",
+  "impact_character": "shuffle, granular, gravel scatter",
+  "preferred_pitch_range_hz": [
+    120,
+    800
+  ],
+  "reverb_tail_sec": 0.2
+}

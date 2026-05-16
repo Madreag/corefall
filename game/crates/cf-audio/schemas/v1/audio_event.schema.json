@@ -1,0 +1,79 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-audio/audio_event.v1",
+  "title": "AudioPlaybackEvent",
+  "description": "M12A § Audio event surface — one playback dispatch from cf-audio. Mirrors cf_audio::deterministic_replay::AudioPlaybackEvent and the cf-replay audio.event_played event payload. The event is always cosmetic per M12A spec § Replay parity contract (cosmetic=true means the event does NOT enter the determinism checksum, but MUST fire in deterministic order per tick).",
+  "type": "object",
+  "required": [
+    "tick",
+    "sequence",
+    "canonical_name",
+    "bus",
+    "direction",
+    "gain",
+    "cosmetic"
+  ],
+  "properties": {
+    "tick": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Sim tick at which the event fires."
+    },
+    "sequence": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Monotonic per-tick sequence number used to break ties between cues firing on the same tick."
+    },
+    "canonical_name": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Canonical name from the cf-asset-ledger (e.g. sfx_pistol_fire)."
+    },
+    "bus": {
+      "type": "string",
+      "enum": ["master", "sfx", "music", "voice", "ambient"]
+    },
+    "direction": {
+      "type": "string",
+      "enum": ["north", "northeast", "east", "southeast", "south", "southwest", "west", "northwest", "here"]
+    },
+    "gain": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "description": "Pre-computed effective gain (distance × occlusion × bus volume)."
+    },
+    "cosmetic": {
+      "type": "boolean",
+      "const": true,
+      "description": "Always true for audio events per M12A § Replay parity."
+    },
+    "source_position": {
+      "type": "array",
+      "items": { "type": "number" },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "listener_position": {
+      "type": "array",
+      "items": { "type": "number" },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "atmosphere_density": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0
+    },
+    "wall_thickness_m": {
+      "type": "number",
+      "minimum": 0.0
+    },
+    "caption_template_id": {
+      "type": "string"
+    },
+    "caption_rendered": {
+      "type": "string"
+    }
+  }
+}

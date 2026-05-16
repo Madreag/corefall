@@ -31,6 +31,23 @@ pub enum ShellApiCommand {
     ResumeMission,
     AdvanceFreStep,
     BackFreStep,
+    /// **M12**: open the CCCP-style intro slideshow. `slot` distinguishes
+    /// the first-launch intro from the Main Menu → Story → "Replay Intro"
+    /// re-watch. Per spec § CCCP-style intro slideshow.
+    OpenIntroSlideshow {
+        slot: IntroSlideshowSlot,
+    },
+    /// **M12**: skip the currently-playing slideshow.
+    SkipIntroSlideshow,
+}
+
+/// **M12**: slot identifying which slideshow surface is being opened.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum IntroSlideshowSlot {
+    /// First-launch intro slideshow (8 slides — "you will now join the frontier").
+    FirstLaunch,
+    /// Main Menu → Story → "Replay Intro" re-watch.
+    Replay,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -173,6 +190,32 @@ pub fn handle_shell_api_commands(
                     }
                 }
             }
+            ShellApiCommand::OpenIntroSlideshow { slot } => {
+                state.intro_slideshow_slot = Some(*slot);
+                transitions.write(ShellTransition {
+                    to: ShellScreen::IntroSlideshow,
+                    source: TransitionSource::ScriptedApi,
+                });
+            }
+            ShellApiCommand::SkipIntroSlideshow => {
+                if state.current == ShellScreen::IntroSlideshow {
+                    let next = match state.intro_slideshow_slot {
+                        Some(IntroSlideshowSlot::FirstLaunch) => {
+                            if state.fre_completed {
+                                ShellScreen::MainMenu
+                            } else {
+                                ShellScreen::FreWizard(FreStep::default())
+                            }
+                        }
+                        _ => ShellScreen::MainMenu,
+                    };
+                    state.intro_slideshow_slot = None;
+                    transitions.write(ShellTransition {
+                        to: next,
+                        source: TransitionSource::UserInput,
+                    });
+                }
+            }
         }
     }
 }
@@ -275,6 +318,75 @@ mod tests {
         app.update();
         let state = app.world().resource::<ShellState>();
         assert!(state.fre_completed);
+        assert_eq!(state.current, ShellScreen::MainMenu);
+    }
+
+    #[test]
+    fn open_intro_slideshow_transitions_to_slideshow_screen() {
+        let mut app = build_test_app();
+        app.world_mut()
+            .resource_mut::<Messages<ShellApiCommand>>()
+            .write(ShellApiCommand::OpenIntroSlideshow {
+                slot: IntroSlideshowSlot::Replay,
+            });
+        app.update();
+        let state = app.world().resource::<ShellState>();
+        assert_eq!(state.current, ShellScreen::IntroSlideshow);
+        assert_eq!(state.intro_slideshow_slot, Some(IntroSlideshowSlot::Replay));
+    }
+
+    #[test]
+    fn skip_intro_slideshow_returns_to_main_menu_for_replay_slot() {
+        let mut app = build_test_app();
+        // Open then skip.
+        app.world_mut()
+            .resource_mut::<Messages<ShellApiCommand>>()
+            .write(ShellApiCommand::OpenIntroSlideshow {
+                slot: IntroSlideshowSlot::Replay,
+            });
+        app.update();
+        app.world_mut()
+            .resource_mut::<Messages<ShellApiCommand>>()
+            .write(ShellApiCommand::SkipIntroSlideshow);
+        app.update();
+        let state = app.world().resource::<ShellState>();
+        assert_eq!(state.current, ShellScreen::MainMenu);
+        assert!(state.intro_slideshow_slot.is_none());
+    }
+
+    #[test]
+    fn skip_intro_slideshow_routes_first_launch_to_fre_wizard_when_incomplete() {
+        let mut app = build_test_app();
+        app.world_mut()
+            .resource_mut::<Messages<ShellApiCommand>>()
+            .write(ShellApiCommand::OpenIntroSlideshow {
+                slot: IntroSlideshowSlot::FirstLaunch,
+            });
+        app.update();
+        // FRE not completed yet — skip should route to FreWizard step 1.
+        app.world_mut()
+            .resource_mut::<Messages<ShellApiCommand>>()
+            .write(ShellApiCommand::SkipIntroSlideshow);
+        app.update();
+        let state = app.world().resource::<ShellState>();
+        assert!(matches!(state.current, ShellScreen::FreWizard(_)));
+    }
+
+    #[test]
+    fn skip_intro_slideshow_routes_first_launch_to_main_menu_after_fre() {
+        let mut app = build_test_app();
+        app.world_mut().resource_mut::<ShellState>().fre_completed = true;
+        app.world_mut()
+            .resource_mut::<Messages<ShellApiCommand>>()
+            .write(ShellApiCommand::OpenIntroSlideshow {
+                slot: IntroSlideshowSlot::FirstLaunch,
+            });
+        app.update();
+        app.world_mut()
+            .resource_mut::<Messages<ShellApiCommand>>()
+            .write(ShellApiCommand::SkipIntroSlideshow);
+        app.update();
+        let state = app.world().resource::<ShellState>();
         assert_eq!(state.current, ShellScreen::MainMenu);
     }
 }

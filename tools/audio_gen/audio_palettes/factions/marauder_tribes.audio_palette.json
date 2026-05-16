@@ -1,0 +1,23 @@
+{
+  "$schema": "../../schemas/v1/audio_palette.schema.json",
+  "palette_id": "marauder_tribes",
+  "display_name": "Marauder Tribes",
+  "category": "faction",
+  "description": "bone white / blood red / fur trim \u2014 distinctive tribal, drum-based, banged-up scrap metal, war-howl signature.",
+  "weapon_character": {
+    "fire_decay": "distinct",
+    "reload_mechanism": "characteristic",
+    "magazine_material": "in-faction",
+    "ejection_pitch": "mid"
+  },
+  "voice_tone": {
+    "default_register": "snarl ragged",
+    "emotion_palette": [
+      "neutral",
+      "urgent",
+      "panicked"
+    ],
+    "radio_filter": "standard"
+  },
+  "ambient_signature": "tribal, drum-based, banged-up scrap metal, war-howl"
+}

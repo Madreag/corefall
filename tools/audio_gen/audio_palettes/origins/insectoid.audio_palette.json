@@ -1,0 +1,14 @@
+{
+  "$schema": "../../schemas/v1/audio_palette.schema.json",
+  "palette_id": "insectoid",
+  "display_name": "Insectoid",
+  "category": "origin",
+  "description": "chitin clack, mandible click, swarm-buzz wing harmonics",
+  "breathing_signature": "chitin clacks",
+  "vital_signature": "wing hum",
+  "concussion_band_mix": {
+    "mild": "baseline",
+    "moderate": "audible_distress",
+    "severe": "critical_emphasized"
+  }
+}

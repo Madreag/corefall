@@ -1,0 +1,14 @@
+{
+  "$schema": "../../schemas/v1/audio_palette.schema.json",
+  "palette_id": "aqueous",
+  "display_name": "Aqueous",
+  "category": "origin",
+  "description": "wet bubbling, fluid-filled gills, hollow underwater resonance",
+  "breathing_signature": "bubble percolation",
+  "vital_signature": "liquid pumps",
+  "concussion_band_mix": {
+    "mild": "baseline",
+    "moderate": "audible_distress",
+    "severe": "critical_emphasized"
+  }
+}

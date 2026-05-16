@@ -1,0 +1,14 @@
+{
+  "$schema": "../../schemas/v1/audio_palette.schema.json",
+  "palette_id": "glass",
+  "display_name": "Glass",
+  "category": "material",
+  "description": "high-pitched tinkle, fragile shatter, sharp shard",
+  "footstep_character": "high-pitched tinkle, fragile shatter, sharp shard",
+  "impact_character": "high-pitched tinkle, fragile shatter, sharp shard",
+  "preferred_pitch_range_hz": [
+    120,
+    800
+  ],
+  "reverb_tail_sec": 0.5
+}

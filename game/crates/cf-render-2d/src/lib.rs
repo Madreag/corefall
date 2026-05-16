@@ -37,6 +37,11 @@ pub mod reactor_explosion;
 pub mod reactor_sparks;
 pub mod reactor_sprite;
 
+// **M12** § Juice rules + dynamic color grading. Per spec § Juice rules
+// (per DR-055 + DR-046) + Dynamic color grading per scene-mood.
+pub mod color_grading;
+pub mod juice;
+
 pub use asset_loader::{
     category_subdir, load_ledger_index, resolve_placeholder_path, AssetIndex, AssetIndexEntry, AssetIndexPlugin,
 };
@@ -54,6 +59,13 @@ pub use reactor_explosion::{
 };
 pub use reactor_sparks::{SparkEmitterState, SparkParticle, SPARK_CAP_PER_HIT};
 pub use reactor_sprite::{ReactorSprite, ReactorSpriteState};
+pub use color_grading::{
+    grade_for_mood, ColorGrade, ColorGradingPlugin, ColorGradingState, SceneMood, MONOCHROME_FLOOR,
+};
+pub use juice::{
+    chromatic_aberration_amplitude, glow_halo_alpha, scale_at, screen_flash_alpha, slide_offset, tick_juice,
+    weapon_swap_streak_intensity, JuiceAccessibility, JuiceKind, JuicePlugin, JuicePulse, JuiceState,
+};
 pub use terrain::{
     build_chunk_image, material_rgba, ChunkRenderTag, ChunkUpdate, ChunkedTerrainRendererPlugin, ChunkedTerrainSnapshot,
 };

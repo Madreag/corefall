@@ -1,0 +1,19 @@
+{
+  "$schema": "../../schemas/v1/audio_palette.schema.json",
+  "palette_id": "hostile_corp",
+  "display_name": "Hostile Corp",
+  "category": "faction",
+  "description": "Sterile blue / silver / red accents — corporate weaponry sounds clean, mechanical, industrial. Servo-driven, precision-engineered, no organic warmth.",
+  "weapon_character": {
+    "fire_decay": "sharp tight quick",
+    "reload_mechanism": "servo-assisted whir + magnetic snap",
+    "magazine_material": "polymer-aluminum",
+    "ejection_pitch": "high crisp"
+  },
+  "voice_tone": {
+    "default_register": "corporate clipped",
+    "emotion_palette": ["disciplined", "neutral", "warning-without-panic"],
+    "radio_filter": "high-fidelity comms"
+  },
+  "ambient_signature": "filtered-air hum, server-room whisper, precision tooling clicks"
+}

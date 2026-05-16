@@ -368,6 +368,20 @@ const SCHEMA_TERRAIN_DEBRIS_SPAWNED: &str = include_str!("../schemas/event/terra
 const SCHEMA_AI_TARGET_SCORED: &str = include_str!("../schemas/event/ai_target_scored.json");
 const SCHEMA_AI_PATH_INVALIDATED: &str = include_str!("../schemas/event/ai_path_invalidated.json");
 
+// **M12**: cinematic story-beats + juice + CCCP-style slideshow event surface.
+// Spec § Acceptance criteria (CCCP-style intro slideshow plays on New
+// Campaign / Comic-style overlays can be disabled / All juice respects
+// accessibility) + Crates / modules touched (cf-ui::slideshow + cf-render-2d::juice
+// + cf-replay event additions).
+const SCHEMA_UX_SLIDESHOW_STARTED: &str = include_str!("../schemas/event/ux_slideshow_started.json");
+const SCHEMA_UX_SLIDESHOW_ENDED: &str = include_str!("../schemas/event/ux_slideshow_ended.json");
+const SCHEMA_UX_JUICE_APPLIED: &str = include_str!("../schemas/event/ux_juice_applied.json");
+
+// **M12A**: cf-audio dispatched a single SFX / voice / music cue. Mirrors
+// `cf_audio::deterministic_replay::AudioPlaybackEvent`. Always cosmetic
+// per M12A spec § Replay parity.
+const SCHEMA_AUDIO_EVENT_PLAYED: &str = include_str!("../schemas/event/audio_event_played.json");
+
 /// Look up the schema source by `(category, event_type)`. Returns `None` if
 /// no schema exists for this pair (callers treat as "no validation
 /// constraint"; the recorder envelope itself is checked by the bundle
@@ -669,6 +683,12 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         // per-guard path reaction surface.
         ("ai", "target_scored") => Some(SCHEMA_AI_TARGET_SCORED),
         ("ai", "path_invalidated") => Some(SCHEMA_AI_PATH_INVALIDATED),
+        // **M12**: cinematic story-beats + juice + CCCP-style slideshow.
+        ("ux", "slideshow_started") => Some(SCHEMA_UX_SLIDESHOW_STARTED),
+        ("ux", "slideshow_ended") => Some(SCHEMA_UX_SLIDESHOW_ENDED),
+        ("ux", "juice_applied") => Some(SCHEMA_UX_JUICE_APPLIED),
+        // **M12A**: per-cue audio playback event.
+        ("audio", "event_played") => Some(SCHEMA_AUDIO_EVENT_PLAYED),
         _ => None,
     }
 }

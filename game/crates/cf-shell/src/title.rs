@@ -4,6 +4,7 @@
 //! / Workshop / Tutorials / Settings / Credits / Quit). Continue only
 //! visible if a save exists.
 
+use crate::shell_api::{IntroSlideshowSlot, ShellApiCommand};
 use crate::state::ShellState;
 use serde::{Deserialize, Serialize};
 
@@ -46,6 +47,28 @@ impl TitleMenuOption {
             Self::Settings => "S",
             Self::Credits => "R",
             Self::Quit => "Q",
+        }
+    }
+
+    /// **M12**: convert a title-screen menu click into the matching
+    /// `ShellApiCommand`. Per spec § CCCP-style intro slideshow,
+    /// "New Game" routes to the 8-slide intro slideshow (first-launch
+    /// slot) before the FRE wizard / mission selector.
+    pub fn to_shell_command(self) -> Option<ShellApiCommand> {
+        match self {
+            Self::Continue => Some(ShellApiCommand::ResumeMission),
+            Self::NewGame => Some(ShellApiCommand::OpenIntroSlideshow {
+                slot: IntroSlideshowSlot::FirstLaunch,
+            }),
+            Self::LoadGame => Some(ShellApiCommand::OpenSaveLoad {
+                mode: crate::shell_api::SaveLoadMode::Load,
+            }),
+            Self::Multiplayer => None,
+            Self::Workshop => Some(ShellApiCommand::OpenWorkshop),
+            Self::Tutorials => None,
+            Self::Settings => Some(ShellApiCommand::OpenSettings { tab: None }),
+            Self::Credits => Some(ShellApiCommand::OpenCredits),
+            Self::Quit => Some(ShellApiCommand::QuitToDesktop),
         }
     }
 }
@@ -120,5 +143,40 @@ mod tests {
         let shortcuts: Vec<_> = opts.iter().map(|o| o.keyboard_shortcut()).collect();
         let unique: std::collections::HashSet<_> = shortcuts.iter().collect();
         assert_eq!(shortcuts.len(), unique.len(), "keyboard shortcuts must be unique");
+    }
+
+    #[test]
+    fn new_game_routes_to_intro_slideshow_first_launch() {
+        let cmd = TitleMenuOption::NewGame.to_shell_command();
+        match cmd {
+            Some(ShellApiCommand::OpenIntroSlideshow { slot }) => {
+                assert_eq!(slot, IntroSlideshowSlot::FirstLaunch);
+            }
+            other => panic!("expected OpenIntroSlideshow(FirstLaunch), got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn continue_routes_to_resume_mission() {
+        assert!(matches!(
+            TitleMenuOption::Continue.to_shell_command(),
+            Some(ShellApiCommand::ResumeMission)
+        ));
+    }
+
+    #[test]
+    fn settings_routes_to_open_settings() {
+        assert!(matches!(
+            TitleMenuOption::Settings.to_shell_command(),
+            Some(ShellApiCommand::OpenSettings { tab: None })
+        ));
+    }
+
+    #[test]
+    fn quit_routes_to_quit_to_desktop() {
+        assert!(matches!(
+            TitleMenuOption::Quit.to_shell_command(),
+            Some(ShellApiCommand::QuitToDesktop)
+        ));
     }
 }

@@ -1,0 +1,23 @@
+{
+  "$schema": "../../schemas/v1/audio_palette.schema.json",
+  "palette_id": "allied_resistance",
+  "display_name": "Allied Resistance",
+  "category": "faction",
+  "description": "olive drab / khaki / red star \u2014 distinctive underground broadcast crackle, makeshift tools, defiant signature.",
+  "weapon_character": {
+    "fire_decay": "distinct",
+    "reload_mechanism": "characteristic",
+    "magazine_material": "in-faction",
+    "ejection_pitch": "mid"
+  },
+  "voice_tone": {
+    "default_register": "determined defiant",
+    "emotion_palette": [
+      "neutral",
+      "urgent",
+      "panicked"
+    ],
+    "radio_filter": "standard"
+  },
+  "ambient_signature": "underground broadcast crackle, makeshift tools, defiant"
+}

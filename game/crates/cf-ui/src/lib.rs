@@ -79,7 +79,17 @@ pub mod priority_indicator;
 pub mod silhouette;
 pub mod triage_window;
 
-pub use mission_resolved_modal::{render_recap_text as render_death_recap_text, RecapEvent, MAX_RECAP_LINES};
+// **M12** § cinematic story beats + juice + comic-style overlay (optional).
+// Per spec § Crates / modules touched: cf-ui::animation (NEW), cf-ui::slideshow
+// (NEW), cf-ui::comic_overlay (NEW optional rendering layer).
+pub mod animation;
+pub mod comic_overlay;
+pub mod slideshow;
+
+pub use mission_resolved_modal::{
+    render_comic_death_recap, render_death_recap_with_mode, render_recap_text as render_death_recap_text,
+    DeathRecapViewMode, RecapEvent, COMIC_DEATH_RECAP_PANELS, MAX_RECAP_LINES,
+};
 pub use reactor_hp_bar::{ArmorPipView, IntegrityBand, ReactorHpBarState};
 pub use reactor_pressure_line::{PressureTint, ReactorPressureLineState};
 pub use timer_warnings::{TimerColor, TimerSeverity, TimerWarning, TimerWarningsState, WARNING_THRESHOLDS};
@@ -113,6 +123,17 @@ pub use stamina_bar::{StaminaBarState, StaminaColor, STAMINA_CRITICAL_THRESHOLD,
 pub use stealth_meter::{StealthMeterState, SPOTTED_THRESHOLD};
 pub use triage_window::{TriageAffliction, TriageVerdict, TriageWindowState};
 pub use weapon_swap_overlay::{WeaponSwapOverlayState, SWAP_TRANSITION_MS};
+pub use animation::{
+    ease_in_out, ease_out_cubic, panel_skew_radians, panel_slide_offset, tick_animations, AnimationHook,
+    AnimationPlugin, AnimationPulse, AnimationState,
+};
+pub use comic_overlay::{
+    onomatopoeia_for, ComicOverlayMode, ComicOverlayPlugin, ComicOverlayState, ComicSurface, ONOMATOPOEIA_VOCABULARY,
+};
+pub use slideshow::{
+    intro_slides, slideshow_duration_ms, subtitle_alpha, SlideshowPhase, SlideshowPlugin, SlideshowSlide,
+    SlideshowSlot, SlideshowState, INTRO_NARRATIVE, SUBTITLE_FADE_IN_MS, SUBTITLE_FADE_OUT_MS,
+};
 
 /// Latest HUD model derived from the engine. The cf-app bridge writes this each
 /// frame from the same `M0Engine` snapshot it feeds to `cf-render-2d::ActorRenderState`.
@@ -177,6 +198,14 @@ pub struct HudSettings {
     /// into this field; `act.settings.set { ai_debug: ... }` mutates it
     /// at runtime.
     pub ai_debug: bool,
+    /// **M12**: comic-style overlay mode mirror — `"full" | "subtle" | "off"`.
+    /// cf-app writes this from `cf_control::settings::ComicStyleOverlay::as_str()`.
+    /// cf-ui's `ComicOverlayState` reads it to gate speech bubbles +
+    /// onomatopoeia stamps + comic death-recap renderer.
+    pub comic_style_overlay: String,
+    /// **M12**: comic death-recap toggle mirror. Drives the
+    /// `ComicSurface::DeathRecap` allow-check.
+    pub comic_death_recap: bool,
 }
 
 impl Default for HudSettings {
@@ -193,6 +222,9 @@ impl Default for HudSettings {
             key_remap_enabled: false,
             focused_node: None,
             ai_debug: false,
+            // M12 defaults match the Settings struct defaults.
+            comic_style_overlay: "subtle".to_string(),
+            comic_death_recap: false,
         }
     }
 }

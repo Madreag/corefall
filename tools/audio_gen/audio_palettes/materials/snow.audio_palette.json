@@ -1,0 +1,14 @@
+{
+  "$schema": "../../schemas/v1/audio_palette.schema.json",
+  "palette_id": "snow",
+  "display_name": "Snow",
+  "category": "material",
+  "description": "soft powder crunch, muted, drifting",
+  "footstep_character": "soft powder crunch, muted, drifting",
+  "impact_character": "soft powder crunch, muted, drifting",
+  "preferred_pitch_range_hz": [
+    120,
+    800
+  ],
+  "reverb_tail_sec": 0.2
+}
