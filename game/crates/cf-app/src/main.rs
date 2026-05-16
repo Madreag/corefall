@@ -698,7 +698,11 @@ fn run_bevy(
         // `AssetIndex.get(canonical_name)` without missing-asset
         // warnings. See game/crates/cf-render-2d/src/asset_loader.rs.
         .add_plugins(AssetIndexPlugin)
-        .add_plugins(StatusStripPlugin);
+        .add_plugins(StatusStripPlugin)
+        // M11A: shell UI foundation (title / main menu / pause / save-load /
+        // settings tree / credits / loading screen / FRE wizard polish).
+        // Runs alongside in-mission HUD; screen transitions via act.shell.*.
+        .add_plugins(cf_shell::ShellPlugin);
     app.add_systems(Startup, hydrate_asset_index_from_ledger);
     app.init_resource::<HoldTracker>();
     let capture_handle = CaptureStateHandle::default();

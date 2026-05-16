@@ -1437,6 +1437,7 @@ dependencies = [
  "cf-equipment",
  "cf-render-2d",
  "cf-replay",
+ "cf-shell",
  "cf-sim-core",
  "cf-terrain",
  "cf-ui",
@@ -1834,6 +1835,17 @@ name = "cf-server-persistence"
 version = "0.0.1"
 dependencies = [
  "serde",
+ "tracing",
+]
+
+[[package]]
+name = "cf-shell"
+version = "0.0.1"
+dependencies = [
+ "bevy",
+ "ron",
+ "serde",
+ "serde_json",
  "tracing",
 ]
 

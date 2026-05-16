@@ -1,0 +1,86 @@
+// M11A shell-widget state variants — 4 states per interactive element x per-style.
+// Routes through ShellUi composer (already exists). Output category is engine-mapped to UiIcon.
+(
+    schema_version: "1.0.0",
+    category: "ShellUi",
+    owner_milestone: "M11A",
+    pipeline_id: "M9A_svg_v1",
+    entries: [
+        // Primary action button (4 states)
+        ( canonical_name: "menu_button_primary_normal", kind: "shell-button", prompt: "primary action button normal state, faction-colored fill, ink outline" ),
+        ( canonical_name: "menu_button_primary_hover", kind: "shell-button", prompt: "primary action button hover state, glow halo + scale 1.05" ),
+        ( canonical_name: "menu_button_primary_pressed", kind: "shell-button", prompt: "primary action button pressed state, scale 0.95 + brighter flash" ),
+        ( canonical_name: "menu_button_primary_disabled", kind: "shell-button", prompt: "primary action button disabled state, desaturated + reduced opacity" ),
+
+        // Secondary button (4 states)
+        ( canonical_name: "menu_button_secondary_normal", kind: "shell-button", prompt: "secondary action button normal state, dark fill + accent border" ),
+        ( canonical_name: "menu_button_secondary_hover", kind: "shell-button", prompt: "secondary action button hover state" ),
+        ( canonical_name: "menu_button_secondary_pressed", kind: "shell-button", prompt: "secondary action button pressed state" ),
+        ( canonical_name: "menu_button_secondary_disabled", kind: "shell-button", prompt: "secondary action button disabled state" ),
+
+        // Destructive button (4 states)
+        ( canonical_name: "menu_button_destructive_normal", kind: "shell-button", prompt: "destructive action button normal state, red-tinted with warning chevrons" ),
+        ( canonical_name: "menu_button_destructive_hover", kind: "shell-button", prompt: "destructive action button hover state" ),
+        ( canonical_name: "menu_button_destructive_pressed", kind: "shell-button", prompt: "destructive action button pressed state" ),
+        ( canonical_name: "menu_button_destructive_disabled", kind: "shell-button", prompt: "destructive action button disabled state" ),
+
+        // Slider component
+        ( canonical_name: "menu_slider_track", kind: "shell-slider", prompt: "slider track horizontal bar with tick marks" ),
+        ( canonical_name: "menu_slider_knob_normal", kind: "shell-slider", prompt: "slider knob normal state" ),
+        ( canonical_name: "menu_slider_knob_hover", kind: "shell-slider", prompt: "slider knob hover state with glow" ),
+        ( canonical_name: "menu_slider_knob_dragging", kind: "shell-slider", prompt: "slider knob dragging state with scale + glow" ),
+        ( canonical_name: "menu_slider_fill", kind: "shell-slider", prompt: "slider filled portion accent color" ),
+
+        // Toggle
+        ( canonical_name: "menu_toggle_off", kind: "shell-toggle", prompt: "toggle switch off state, knob left, dark track" ),
+        ( canonical_name: "menu_toggle_on", kind: "shell-toggle", prompt: "toggle switch on state, knob right, accent track" ),
+        ( canonical_name: "menu_toggle_disabled_off", kind: "shell-toggle", prompt: "toggle switch disabled off state" ),
+        ( canonical_name: "menu_toggle_disabled_on", kind: "shell-toggle", prompt: "toggle switch disabled on state" ),
+
+        // Dropdown
+        ( canonical_name: "menu_dropdown_normal", kind: "shell-dropdown", prompt: "dropdown closed state with chevron pointing down" ),
+        ( canonical_name: "menu_dropdown_hover", kind: "shell-dropdown", prompt: "dropdown hover state" ),
+        ( canonical_name: "menu_dropdown_open", kind: "shell-dropdown", prompt: "dropdown open state with chevron pointing up + dropdown panel" ),
+
+        // Checkbox
+        ( canonical_name: "menu_checkbox_unchecked", kind: "shell-checkbox", prompt: "checkbox unchecked state, empty box with border" ),
+        ( canonical_name: "menu_checkbox_checked", kind: "shell-checkbox", prompt: "checkbox checked state with X-mark" ),
+        ( canonical_name: "menu_checkbox_partial", kind: "shell-checkbox", prompt: "checkbox partial-state with dash" ),
+
+        // Tab (3 states for the 6 settings tabs)
+        ( canonical_name: "menu_tab_normal", kind: "shell-tab", prompt: "tab strip element normal state" ),
+        ( canonical_name: "menu_tab_active", kind: "shell-tab", prompt: "tab strip element active state with bottom highlight" ),
+        ( canonical_name: "menu_tab_hover", kind: "shell-tab", prompt: "tab strip element hover state" ),
+
+        // Save slot card (3 states: empty / filled / corrupt)
+        ( canonical_name: "menu_save_slot_empty", kind: "shell-save-slot", prompt: "empty save slot card with placeholder" ),
+        ( canonical_name: "menu_save_slot_filled", kind: "shell-save-slot", prompt: "filled save slot card with thumbnail + metadata" ),
+        ( canonical_name: "menu_save_slot_autosave", kind: "shell-save-slot", prompt: "auto-save slot with rotating-disk icon" ),
+        ( canonical_name: "menu_save_slot_corrupt", kind: "shell-save-slot", prompt: "corrupt save slot with warning indicator" ),
+
+        // Cloud sync indicators
+        ( canonical_name: "menu_cloud_synced", kind: "shell-cloud", prompt: "cloud synced indicator with check mark" ),
+        ( canonical_name: "menu_cloud_syncing", kind: "shell-cloud", prompt: "cloud syncing indicator with rotating arrows" ),
+        ( canonical_name: "menu_cloud_conflict", kind: "shell-cloud", prompt: "cloud conflict indicator with warning triangle" ),
+        ( canonical_name: "menu_cloud_local_only", kind: "shell-cloud", prompt: "local-only indicator with dashed border" ),
+
+        // Loading bar segments
+        ( canonical_name: "menu_loading_bar_segment_empty", kind: "shell-loading", prompt: "loading bar segment empty state" ),
+        ( canonical_name: "menu_loading_bar_segment_filled", kind: "shell-loading", prompt: "loading bar segment filled state" ),
+        ( canonical_name: "menu_loading_bar_segment_active", kind: "shell-loading", prompt: "loading bar segment active state with pulse" ),
+
+        // Focus ring overlay
+        ( canonical_name: "menu_focus_ring", kind: "shell-focus", prompt: "focus ring overlay with accent color outline + corner indicators" ),
+
+        // FRE wizard step indicators
+        ( canonical_name: "menu_fre_step_complete", kind: "shell-fre", prompt: "FRE wizard step complete dot with check mark" ),
+        ( canonical_name: "menu_fre_step_active", kind: "shell-fre", prompt: "FRE wizard step active dot with pulse" ),
+        ( canonical_name: "menu_fre_step_pending", kind: "shell-fre", prompt: "FRE wizard step pending dot empty" ),
+
+        // Brand logo (placeholder)
+        ( canonical_name: "menu_brand_logo_full", kind: "shell-brand", prompt: "Corefall full brand logo with wordmark + emblem" ),
+        ( canonical_name: "menu_brand_logo_compact", kind: "shell-brand", prompt: "Corefall compact brand mark only" ),
+        ( canonical_name: "menu_brand_studio", kind: "shell-brand", prompt: "studio brand splash with motto" ),
+    ],
+    variants: ["default"],
+)

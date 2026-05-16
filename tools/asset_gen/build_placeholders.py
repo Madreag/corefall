@@ -1138,6 +1138,7 @@ _MANIFEST_TO_BUILDER = {
     "terrain_tiles.ron": _terrain_jobs,
     "cosmetic_placeholders.ron": _cosmetic_jobs,
     "shell_ui.ron": _shell_ui_jobs,
+    "shell_widgets.ron": _shell_ui_jobs,
     "hud_widgets.ron": _hud_widget_jobs,
     "banners.ron": _banner_jobs,
     "vfx_decals.ron": _vfx_decal_jobs,

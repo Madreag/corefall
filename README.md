@@ -24,9 +24,9 @@ A 2D side-view physics sandbox where every gas, grain, bullet, body, world, tran
 [![Server Tier](https://img.shields.io/badge/Server-Apple_M4_Pro_%2F_Linux_VPS-555?style=flat-square&logoColor=white)](#)
 
 [![Status](https://img.shields.io/badge/status-prealpha-orange?style=flat-square)](#project-status)
-[![Milestone](https://img.shields.io/badge/milestone-M11%20done%20%2F%20M11A%20next-2EA043?style=flat-square)](#roadmap)
-[![Tier 1 Assets](https://img.shields.io/badge/Tier_1_assets-6428%20baked-2EA043?style=flat-square)](#asset-pipeline)
-[![Specs](https://img.shields.io/badge/milestones-15%20done%20%2F%2076%20planned-blueviolet?style=flat-square)](#roadmap)
+[![Milestone](https://img.shields.io/badge/milestone-M11A%20done%20%2F%20M12%20next-2EA043?style=flat-square)](#roadmap)
+[![Tier 1 Assets](https://img.shields.io/badge/Tier_1_assets-6476%20baked-2EA043?style=flat-square)](#asset-pipeline)
+[![Specs](https://img.shields.io/badge/milestones-16%20done%20%2F%2076%20planned-blueviolet?style=flat-square)](#roadmap)
 [![Releases](https://img.shields.io/github/v/release/Madreag/corefall?include_prereleases&sort=semver&style=flat-square&label=release)](https://github.com/Madreag/corefall/releases)
 
 > [!important]
@@ -34,9 +34,11 @@ A 2D side-view physics sandbox where every gas, grain, bullet, body, world, tran
 >
 > **Tier 1 production backbone shipped (2026-05-15):** 6428 fresh ledger entries — 6066 visual SVG/PNG placeholders across 23 composers (weapons / chassis / actors / vehicles / base modules / particles / terrain tiles / UI icons / faction emblems / shell UI / banners / HUD widgets / VFX decals / animation frames / portraits / UI screens / VFX frames / loading backgrounds / boss splashes / key art / cosmetics / materials / capture overlays) + 242 SFX WAVs (procedural numpy synthesis) + 120 music WAVs (12 worlds + 8 factions + 5 storytellers + 5 bosses × 4 variants). Plus 83 narrative bible files (8 factions + 12 worlds + 24 NPCs + 5 storytellers + 5 bosses + 12 missions + 10 origins + 300 codex + 75 achievements + 60 loading tips + credits template) and 4 voice prompt manifests (chatter / NPC / storyteller-boss / mission-tutorial).
 >
-> **Next up:** `M11A` (Shell UI Foundation — splash + title + main menu + pause + 6-tab settings + save/load + credits + loading screens + FRE polish). Prerequisites all ready (M11 done, M12/M37A Tier 1 backbones shipped, M25A narrative authored). Full ordered milestone table in [Roadmap](#roadmap); shipped-code detail in [Project status](#project-status); release policy in [Releases](#releases).
+> **M11A shipped (2026-05-15):** Shell UI Foundation done. New `cf-shell` crate (12 modules: splash / title / attract_mode / main_menu / pause_menu / save_load / save_slot_preview / settings_tree / credits / loading_screen / fre_wizard / shell_api / state) with 56 unit tests. ShellPlugin wired into cf-app. Auto-generated settings tree from M38 schema scaffold (21 keys covering 9 ACC-A floor + 12 core). Credits template substitution from cf-asset-ledger + git log. FRE wizard 6-step state machine with per-origin starter-world recommendation. 48 additional shell-widget SVG entries baked (button states + sliders + toggles + dropdowns + checkboxes + save slots + cloud sync + loading bar + focus ring + FRE step dots + brand logo).
 >
-> **Where to play:** today, build from source via [Getting started](#getting-started). First friend-handoff release (`.dmg` / `.msi` / AppImage — double-click to play, no Terminal) lands once `M11A` + release engineering close per the [Double-Click Playability Hard Gate](#releases).
+> **Next up:** `M12` (vivid color-rich illustrated aesthetic + juice implementation — Tier 1 visual backbone already baked at 6066 entries; M12 ships the runtime juice rules + animation system + comic-panel transitions). Full ordered milestone table in [Roadmap](#roadmap); shipped-code detail in [Project status](#project-status); release policy in [Releases](#releases).
+>
+> **Where to play:** today, build from source via [Getting started](#getting-started). First friend-handoff release (`.dmg` / `.msi` / AppImage — double-click to play, no Terminal) lands per the [Double-Click Playability Hard Gate](#releases).
 
 **[Pillars](#headline-systems) · [Roadmap](#roadmap) · [Content](#launch-content-roster) · [Inspirations](#inspirations-and-credits) · [AWAW Layer](#awaw-inspired-grand-strategy-layer) · [Project status](#project-status) · [Releases](#releases) · [Getting started](#getting-started)**
 
@@ -108,10 +110,10 @@ The full content target shipping by BP12 (every entry **functional + AI-readable
 ## Roadmap
 
 > [!tip]
-> **Where we are (2026-05-15):** `M11` (Readability + ACC-A Floor) closed — 25-scenario verdict table all PASS / IMPLEMENTED, 165/165 cf-control lib tests pass, cf-mod ledger verify clean (6428 fresh entries / 0 failed). M1 → M11 + M3A + M4A + M8A + M9A all done; **15 milestones in `specs/done/`**. Tier 1 production backbone shipped across visual (6066 SVG/PNG placeholders across 23 composers) + audio (242 procedural SFX + 120 procedural music tracks) + narrative (83 lore files + 300 codex + 75 achievements) + voice prompts (4 manifest files spanning chatter/NPC/storyteller-boss/mission-tutorial). Next up: `M11A` (Shell UI Foundation) — prerequisites all ready (M11 done; M12 + M37A Tier 1 backbones shipped; M25A narrative authored). One ordered table below — read top to bottom. Spec files in [`specs/active/`](specs/active/) · closed specs in [`specs/done/`](specs/done/).
+> **Where we are (2026-05-15):** `M11A` (Shell UI Foundation) closed — full cf-shell crate shipped with 12 modules + 56 unit tests + ShellPlugin wired into cf-app + 48 additional shell-widget SVG entries baked. M1 → M11A + M3A + M4A + M8A + M9A all done; **16 milestones in `specs/done/`**. Ledger at 6476 fresh entries (6114 visual SVG/PNG + 242 procedural SFX + 120 procedural music). Tier 1 production backbone shipped across visual (23 composers covering weapons / chassis / actors / vehicles / base modules / particles / terrain tiles / UI icons / shell UI / banners / HUD widgets / VFX decals / animation frames / portraits / UI screens / VFX frames / loading backgrounds / boss splashes / key art / cosmetics / materials / capture overlays + faction emblems) + audio (242 SFX + 120 music WAVs via procedural numpy synthesis) + narrative (83 lore files + 300 codex + 75 achievements + 60 loading tips + credits template) + voice prompts (4 manifest files spanning chatter/NPC/storyteller-boss/mission-tutorial). Next up: `M12` (juice + animation system — Tier 1 visual backbone already baked; implementation of runtime juice rules + comic panel transitions remains). One ordered table below — read top to bottom. Spec files in [`specs/active/`](specs/active/) · closed specs in [`specs/done/`](specs/done/).
 
 **Legend:** ✅ done · 🔄 in progress · ⏳ planned · 🚀 launch GA
-**Workspace:** 42 crates · 165+ tests in cf-control alone · 57 closed/directional DRs · 76 milestones across 13 Build Points (BP0..BP12).
+**Workspace:** 43 crates · 165 cf-control + 56 cf-shell lib tests · 57 closed/directional DRs · 76 milestones across 13 Build Points (BP0..BP12).
 
 | # | ⬤ | BP | Milestone | What it ships |
 |---|:---:|---|---|---|
@@ -129,7 +131,7 @@ The full content target shipping by BP12 (every entry **functional + AI-readable
 | **M9A** | ✅ | BP4 | Tier 1 SVG Asset Pipeline | 6428 fresh entries (5728 visual SVG/PNG across 23 composers + 242 SFX WAVs + 120 music WAVs + new categories: Portrait/UiScreen/VfxFrame/LoadingBg/BossSplash/KeyArt/AnimationFrame) · Python + cairo-svg + procedural SVG · 8 faction style.json · per-origin palettes |
 | **M10** | ✅ | BP3 | Replay Viewer + Debrief | Bundle viewer · cause-chain walker · 18-section debrief markdown · plain-language event template rendering |
 | **M11** | ✅ | BP3 | Readability + ACC-A Floor | 12 HUD nodes / 7 zones · 200% scale · high contrast · 5-tier integrity colors · War Thunder angle widget · **3 missing schema emissions wired (ux.banner_dismissed / captions_shown / tool_validity_changed)** · 25-scenario verdict table all PASS / IMPLEMENTED |
-| **M11A** | 🔄 | BP4 | Shell UI Foundation | Title · main menu · pause · save-load · settings tree (6 tabs) · credits · loading screens · FRE polish · **prerequisites ready (M11 done, 20 UI screen mockups baked, 19 marketing key art, 60 loading tips, credits template authored)** |
+| **M11A** | ✅ | BP4 | Shell UI Foundation | Title · main menu · pause · save-load · settings tree (6 tabs) · credits · loading screens · FRE polish · **cf-shell crate shipped (12 modules + 56 lib tests + ShellPlugin wired into cf-app) + 48 shell-widget SVG entries baked (button states / sliders / toggles / dropdowns / save slots / cloud sync / FRE step dots / brand logo)** |
 | **M12** | 🔄 | BP4 | Vivid Color-Rich Illustrated Aesthetic + Juice | Hand-drawn ink-accent UI · 12 mission comic panels · death-recap-as-graphic-novel · juice rules per DR-055 · **Tier 1 visual placeholder backbone shipped (6066 baked entries cover all M12 surfaces); juice + animation system implementation remaining** |
 | **M12A** | 🔄 | BP4 | Tier 1 Audio Pipeline | 1200+ SFX via Stable Audio Open / AudioCraft · caption metadata · **Tier 1 procedural placeholder bake landed: 242 WAVs across weapon / movement / impact / ambient via numpy + scipy synthesis; production-grade Stable Audio Open replacement remains** |
 | **M13** | ⏳ | BP3 | Equipment + Chassis + Damage Grammar | 3 chassis archetypes · 15-zone body graph · layered armor · module state machine · pilot eject · save/load · **brain-hop API** |

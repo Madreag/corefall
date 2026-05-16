@@ -44,6 +44,7 @@ members = [
   "crates/cf-replay-scrub",
   "crates/cf-killcam",
   "crates/cf-squad-ui",
+  "crates/cf-shell",
 ]
 
 [workspace.package]
