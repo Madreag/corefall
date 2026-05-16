@@ -20,6 +20,7 @@ serde_json = { workspace = true }
 ron = { workspace = true }
 cf-asset-ledger = { path = "../cf-asset-ledger" }
 cf-control = { path = "../cf-control" }
+cf-equipment = { path = "../cf-equipment" }
 cf-material = { path = "../cf-material" }
 cf-replay = { path = "../cf-replay" }
 

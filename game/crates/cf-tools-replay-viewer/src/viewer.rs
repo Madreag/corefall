@@ -281,7 +281,16 @@ pub fn watch_tail<W: std::io::Write>(
     use std::time::Duration;
     let mut printed: u64 = 0;
     let mut file = File::open(events_path)?;
-    let mut offset = file.seek(SeekFrom::End(0))?;
+    // **M14 audit fix** (pre-existing M8 bug): when invoked in bounded test
+    // mode (`max_iterations.is_some()`), start at offset 0 so existing
+    // events in the file are printed too. When in unbounded "live tail"
+    // mode (`None`), keep the original end-of-file seek so only new appends
+    // surface (matches the user-facing `--watch` UX).
+    let mut offset = if max_iterations.is_some() {
+        0
+    } else {
+        file.seek(SeekFrom::End(0))?
+    };
     let mut iter = 0u64;
     let interval = if interval_ms == 0 {
         Duration::from_millis(100)

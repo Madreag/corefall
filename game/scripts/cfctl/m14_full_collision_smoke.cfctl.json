@@ -1,0 +1,27 @@
+{
+  "description": "M14 full-collision smoke: fire enough rounds at an actor to drive a projectile-hit + per-organ routing + (eventually) DYING transition so the ragdoll-activated + impulse-propagated + bullet-sharpness-decay event surface ladders up in the run bundle. Verifies the M14 producer wiring end-to-end against the m1_actor_range scenario.",
+  "scenario": "m1_actor_range",
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+    { "method": "act.player.aim", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "act.player.fire", "params": { "pressed": true } },
+    { "method": "sim.step", "params": { "ticks": 6 } },
+    { "method": "act.player.fire", "params": { "pressed": false } },
+    { "method": "sim.step", "params": { "ticks": 1 } },
+    { "method": "act.player.fire", "params": { "pressed": true } },
+    { "method": "sim.step", "params": { "ticks": 6 } },
+    { "method": "act.player.fire", "params": { "pressed": false } },
+    { "method": "sim.step", "params": { "ticks": 1 } },
+    { "method": "act.player.fire", "params": { "pressed": true } },
+    { "method": "sim.step", "params": { "ticks": 6 } },
+    { "method": "act.player.fire", "params": { "pressed": false } },
+    { "method": "sim.step", "params": { "ticks": 1 } },
+    { "method": "act.player.reload", "params": {} },
+    { "method": "sim.step", "params": { "ticks": 90 } },
+    { "method": "act.player.fire", "params": { "pressed": true } },
+    { "method": "sim.step", "params": { "ticks": 60 } },
+    { "method": "act.player.fire", "params": { "pressed": false } },
+    { "method": "sim.step", "params": { "ticks": 60 } },
+    { "method": "observe.once", "params": {} }
+  ]
+}

@@ -91,14 +91,17 @@ use crate::{
         METHOD_OBSERVE_FRAME,
     },
     schemas::{
-        ActChassisClearJamParams, ActChassisRepairParams, ActChassisSalvageParams, ActInputCaptureControlsParams,
-        ActMissionPauseParams, ActMissionResumeParams, ActPlayerAbortParams, ActPlayerAimParams, ActPlayerAnchorParams,
-        ActPlayerClimbParams, ActPlayerCrouchParams, ActPlayerDigParams, ActPlayerEjectParams, ActPlayerFireParams,
-        ActPlayerJetParams, ActPlayerJumpParams, ActPlayerMoveParams, ActPlayerReloadParams, ActPlayerResetParams,
-        ActPlayerSelectItemParams, ActPlayerSharpAimParams, InspectActorParams, InspectAiParams,
-        InspectEquipmentParams, InspectMissionParams, ObserveActorParams, ObserveAiParams, ObserveMissionParams,
-        ObserveOnceParams, ObservePerceptionParams, ObserveSubscribeParams, RunBundleWriteParams, RunForTicksParams,
-        ScenarioLoadParams, StepParams, SystemShutdownParams,
+        ActChassisClearJamParams, ActChassisRepairParams, ActChassisSalvageParams, ActInputCameraAnchorParams,
+        ActInputCaptureControlsParams, ActMissionPauseParams, ActMissionResumeParams, ActPlayerAbortParams,
+        ActPlayerActivateAbilityParams, ActPlayerAimParams, ActPlayerAnchorParams, ActPlayerAttachModifierParams,
+        ActPlayerBoardParams, ActPlayerBrainHopParams, ActPlayerClimbParams, ActPlayerCrouchParams,
+        ActPlayerDetachModifierParams, ActPlayerDigParams, ActPlayerDisembarkParams, ActPlayerEjectParams,
+        ActPlayerFireParams, ActPlayerJetParams, ActPlayerJumpParams, ActPlayerMoveParams, ActPlayerReloadParams,
+        ActPlayerResetParams, ActPlayerSelectItemParams, ActPlayerSetDroneModeParams, ActPlayerSharpAimParams,
+        InspectActorParams, InspectAiParams, InspectChassisParams, InspectEquipmentParams, InspectMissionParams,
+        ObserveActorParams, ObserveAiParams, ObserveChassisSilhouetteParams, ObserveMissionParams,
+        ObserveOnceParams, ObservePerceptionParams, ObserveSubscribeParams, RunBundleWriteParams,
+        RunForTicksParams, ScenarioLoadParams, StepParams, SystemShutdownParams,
     },
     schemas::{SCHEMA_VERSION, SCHEMA_VERSION_MIN},
     state::{ControlEnvelopeStatus, ObserveFrame, ObserveSettings},
@@ -668,6 +671,18 @@ pub enum ControlCommand {
         y: f32,
         source: IntentSource,
     },
+    /// **M11 audit pass (GAP-M11-01 HIGH fix)**: keyed action press for the
+    /// BP3 self-play floor + pause-overlay cycling. Per the M11 spec
+    /// § "Pause + slowdown overlay": "Triggered via `act.input.key_press
+    /// { action: 'pause' }` (cycles through modes)". `action` is one of
+    /// `pause`, `game_speed_cycle`, `accessibility_overlay`, `tactical_overlay`,
+    /// `photo_mode`, `debug_overlay`, `mini_map_toggle`, `compass_toggle`,
+    /// `damage_direction_toggle`, `captions_toggle`. Unknown actions reject
+    /// with reason `unknown_key_action`.
+    ActInputKeyPress {
+        action: String,
+        source: IntentSource,
+    },
     /// **M5**: toggle the player actor's crouch stance.
     ActPlayerCrouch {
         active: bool,
@@ -705,6 +720,49 @@ pub enum ControlCommand {
     },
     /// **M5**: manually clear a weapon jam.
     ActChassisClearJam {
+        source: IntentSource,
+    },
+    /// **M13** § "Brain hopping" — transfer control to a different
+    /// friendly actor; the prior actor stays at its position as a
+    /// mission-critical AI fallback.
+    ActPlayerBrainHop {
+        target_actor_id: u64,
+        source: IntentSource,
+    },
+    /// **M13** § "Chassis ability slots" — activate one ability.
+    ActPlayerActivateAbility {
+        ability: String,
+        source: IntentSource,
+    },
+    /// **M13** § "Cockpit camera anchor" — switch camera anchor mode.
+    ActInputCameraAnchor {
+        mode: String,
+        source: IntentSource,
+    },
+    /// **M13** § "Drone allies" — switch drone ally mode.
+    ActPlayerSetDroneMode {
+        mode: String,
+        source: IntentSource,
+    },
+    /// **M13** § "Weapon modifier slots" — attach a Noita-style modifier.
+    ActPlayerAttachModifier {
+        modifier: String,
+        source: IntentSource,
+    },
+    /// **M13** § "Weapon modifier slots" — detach a modifier.
+    ActPlayerDetachModifier {
+        modifier: String,
+        source: IntentSource,
+    },
+    /// **M13** § "Boarding / disembarking transitions" — start boarding into
+    /// a chassis actor (1500ms transition).
+    ActPlayerBoard {
+        chassis_actor_id: u64,
+        source: IntentSource,
+    },
+    /// **M13** § "Boarding / disembarking transitions" — start disembarking
+    /// out of the current chassis (1500ms transition).
+    ActPlayerDisembark {
         source: IntentSource,
     },
     /// **M1**: sticky sharp-aim hold (CCCP AHuman.cpp:1779). `active=true`
@@ -1040,6 +1098,22 @@ pub trait EngineHandle: Send + Sync + 'static {
     /// **M1 Gap B3**: return the actor view plus its last `n` actor-category
     /// events. Default returns `None`.
     async fn inspect_actor(&self, _target: Option<&str>, _last_n_events: usize) -> Option<serde_json::Value> {
+        None
+    }
+    /// **M13**: return the full chassis body graph (15 zones + 14 joints + 5
+    /// sockets), per-zone integrity (per-layer HP), per-module state, pilot
+    /// state and eject window for the requested actor (`"player"` / empty =
+    /// the controllable actor). Returns `None` when the actor has no chassis
+    /// attached.
+    async fn inspect_chassis(&self, _target: Option<&str>) -> Option<serde_json::Value> {
+        None
+    }
+
+    /// **M13** § "Pilot-inside-chassis dual silhouette" — chassis-side
+    /// silhouette projection (per-chassis-zone HP). Surfaces the chassis
+    /// half of the dual-layer HUD silhouette so the pilot can stay on
+    /// `observe.actor.silhouette`.
+    async fn observe_chassis_silhouette(&self, _actor_id: Option<u64>) -> Option<serde_json::Value> {
         None
     }
     /// **M9** (audit fix gap 1): return the reactor view plus its last `n`
@@ -2610,6 +2684,126 @@ async fn process_request<E: EngineHandle>(
                 .await;
             Some(ack_response(request.id, &result))
         }
+        // **M13** § "Brain hopping / multi-actor control".
+        "act.player.brain_hop" => {
+            let p: ActPlayerBrainHopParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerBrainHop {
+                    target_actor_id: p.target_actor_id,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        // **M13** § "Chassis ability slots".
+        "act.player.activate_ability" => {
+            let p: ActPlayerActivateAbilityParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerActivateAbility {
+                    ability: p.ability,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        // **M13** § "Cockpit camera anchor".
+        "act.input.camera_anchor" => {
+            let p: ActInputCameraAnchorParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActInputCameraAnchor {
+                    mode: p.mode,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        // **M13** § "Drone allies — 4 modes + autonomous behavior".
+        "act.player.set_drone_mode" => {
+            let p: ActPlayerSetDroneModeParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerSetDroneMode {
+                    mode: p.mode,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        // **M13** § "Weapon modifier slots".
+        "act.player.attach_modifier" => {
+            let p: ActPlayerAttachModifierParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerAttachModifier {
+                    modifier: p.modifier,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.detach_modifier" => {
+            let p: ActPlayerDetachModifierParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerDetachModifier {
+                    modifier: p.modifier,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        // **M13** § "Boarding / disembarking transitions".
+        "act.player.board" => {
+            let p: ActPlayerBoardParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerBoard {
+                    chassis_actor_id: p.chassis_actor_id,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.disembark" => {
+            let _p: ActPlayerDisembarkParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerDisembark {
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        // **M13** § "Pilot-inside-chassis dual silhouette" — chassis side.
+        "observe.chassis.silhouette" => {
+            let p: ObserveChassisSilhouetteParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            match engine.observe_chassis_silhouette(p.actor_id).await {
+                Some(value) => Some(success_response(request.id, value)),
+                None => Some(invalid_param_reason(request.id, "no_chassis_attached")),
+            }
+        }
         "act.player.sharp_aim" => {
             let p: ActPlayerSharpAimParams = match serde_json::from_value(params) {
                 Ok(v) => v,
@@ -2734,6 +2928,21 @@ async fn process_request<E: EngineHandle>(
             match engine.inspect_actor(p.target.as_deref(), 30).await {
                 Some(value) => Some(success_response(request.id, value)),
                 None => Some(invalid_param_reason(request.id, "no_player_actor")),
+            }
+        }
+        // **M13** § cfctl `inspect.chassis` — return the full body graph
+        // (15 zones + 14 joints + 5 sockets) plus per-zone integrity,
+        // per-module state, pilot state and the eject window for the
+        // requested actor's chassis. Spec § "Body graph is inspectable
+        // via cfctl".
+        "inspect.chassis" => {
+            let p: InspectChassisParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            match engine.inspect_chassis(p.target.as_deref()).await {
+                Some(value) => Some(success_response(request.id, value)),
+                None => Some(invalid_param_reason(request.id, "no_chassis_attached")),
             }
         }
         // **M9** (audit fix gap 1) § cfctl `inspect.actor.reactor` —
@@ -2997,6 +3206,46 @@ async fn process_request<E: EngineHandle>(
                 .dispatch(ControlCommand::ActInputMouseMove {
                     x: p.x,
                     y: p.y,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        // **M11 audit pass (GAP-M11-01 HIGH fix)**: keyed action press
+        // surface for the BP3 self-play floor + pause-overlay cycling.
+        "act.input.key_press" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct KeyPressParams {
+                schema_version: u32,
+                action: String,
+            }
+            let p: KeyPressParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            // Whitelist of supported actions per spec § "Pause + slowdown
+            // overlay" + the M11 BP3 self-play floor.
+            const SUPPORTED_KEY_ACTIONS: &[&str] = &[
+                "pause",
+                "game_speed_cycle",
+                "accessibility_overlay",
+                "tactical_overlay",
+                "photo_mode",
+                "debug_overlay",
+                "mini_map_toggle",
+                "compass_toggle",
+                "damage_direction_toggle",
+                "captions_toggle",
+            ];
+            if !SUPPORTED_KEY_ACTIONS.contains(&p.action.as_str()) {
+                let reason = format!("unknown_key_action:{}", p.action);
+                return Some(invalid_param_reason(request.id, &reason));
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActInputKeyPress {
+                    action: p.action,
                     source: IntentSource::Cfctl,
                 })
                 .await;

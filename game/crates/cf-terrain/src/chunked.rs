@@ -101,6 +101,13 @@ pub struct MaterialAffordance {
     /// Per-pixel stickiness chance (0..=1). When a projectile fails to
     /// penetrate, a roll < stickiness draws it into the terrain instead of
     /// bouncing (CCCP `Material.Stickiness`). M2 uses engine RNG.
+    ///
+    /// **M14 audit pass 3 (GAP-M3-01)**: the canonical source for these
+    /// values is `content/materials/material_registry.json` (each material
+    /// entry carries `"stickiness": <f32>`). The const `MATERIAL_TABLE`
+    /// below mirrors the JSON. When editing one, edit the other —
+    /// M15+ active material kernel will collapse the two into a single
+    /// JSON-driven loader.
     pub stickiness: f32,
     /// Restitution coefficient for bouncing projectiles (0..=1). M2 wires
     /// this into `try_penetrate` for ricochets.

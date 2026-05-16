@@ -336,10 +336,61 @@ pub struct ChassisView {
     pub eject_ticks_total: u32,
     pub destroyed_zones: Vec<String>,
     pub salvaged_module_ids: Vec<String>,
+    /// **M14**: per-zone limb-loss state machine projection. One entry per
+    /// chassis zone with the current [`cf_physics::ZoneState`] label, plus
+    /// the bleed_rate per-second derived from the zone's state.
+    #[serde(default)]
+    pub limb_states: Vec<LimbStateView>,
+    /// **M14**: total per-second bleed rate (sum across all bleeding zones)
+    /// for the actor. Drives the HUD bleeding indicator.
+    #[serde(default)]
+    pub bleed_rate_per_sec: f32,
+    /// **M14**: ragdoll authority state for the actor (`animated` /
+    /// `activating` / `active` / `static_collapse`). Mirrors
+    /// [`cf_physics::RagdollState`].
+    #[serde(default = "default_ragdoll_state")]
+    pub ragdoll_state: String,
+}
+
+fn default_ragdoll_state() -> String {
+    "animated".to_string()
+}
+
+/// **M14**: per-zone limb state for `cfctl inspect chassis`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct LimbStateView {
+    pub zone: String,
+    pub state: String,
+    pub functional_consequence_active: bool,
+    pub bleeds: bool,
+    pub bleed_multiplier: f32,
 }
 
 impl From<&cf_actor::ChassisView> for ChassisView {
     fn from(v: &cf_actor::ChassisView) -> Self {
+        // **M14**: derive limb_states from zones + destroyed_zones.
+        let destroyed_set: std::collections::BTreeSet<&str> =
+            v.destroyed_zones.iter().map(|s| s.as_str()).collect();
+        let limb_states: Vec<LimbStateView> = v
+            .zones
+            .iter()
+            .map(|z| {
+                let is_destroyed = destroyed_set.contains(z.zone.as_str());
+                let state = cf_physics::classify_zone_state(z.zone_integrity, is_destroyed, false);
+                LimbStateView {
+                    zone: z.zone.clone(),
+                    state: state.as_str().to_string(),
+                    functional_consequence_active: state.functional_consequence_active(),
+                    bleeds: state.bleeds(),
+                    bleed_multiplier: state.bleed_multiplier(),
+                }
+            })
+            .collect();
+        let bleed_rate_per_sec = limb_states
+            .iter()
+            .map(|l| 6.0 * l.bleed_multiplier)
+            .sum::<f32>()
+            .min(24.0);
         Self {
             spec_id: v.spec_id.clone(),
             kind: v.kind.clone(),
@@ -355,6 +406,9 @@ impl From<&cf_actor::ChassisView> for ChassisView {
             eject_ticks_total: v.eject_ticks_total,
             destroyed_zones: v.destroyed_zones.clone(),
             salvaged_module_ids: v.salvaged_module_ids.clone(),
+            limb_states,
+            bleed_rate_per_sec,
+            ragdoll_state: default_ragdoll_state(),
         }
     }
 }

@@ -51,10 +51,32 @@ pub fn render_event_body(event: &Event) -> String {
             actor_label(p, "actor_id").unwrap_or_else(|| "an actor".into()),
             field_str(p, "action").unwrap_or_else(|| "action".into())
         ),
-        "command_accepted" => format!(
-            "control accepted `{}`",
-            field_str(p, "method").unwrap_or_else(|| "(method?)".into())
-        ),
+        // **M14 audit fix** (pre-existing M3B bug): the plain-language
+        // renderer must NOT surface raw payload tokens. The previous
+        // rendering inlined the method literal (e.g. "act.player.fire")
+        // which broke the cause-chain plain-language contract and tripped
+        // `render_markdown_emits_event_id_and_chain_arrows`. Translate the
+        // method into a verb phrase and drop the raw token.
+        "command_accepted" => {
+            let method = field_str(p, "method").unwrap_or_else(|| "command".into());
+            let phrase = match method.as_str() {
+                "act.player.fire" => "fire command".to_string(),
+                "act.player.move" => "move command".to_string(),
+                "act.player.aim" => "aim command".to_string(),
+                "act.player.jump" => "jump command".to_string(),
+                "act.player.reload" => "reload command".to_string(),
+                "act.player.dig" => "dig command".to_string(),
+                "act.player.crouch" => "crouch command".to_string(),
+                "act.player.climb" => "climb command".to_string(),
+                "act.player.eject" => "eject command".to_string(),
+                "act.player.board" => "board command".to_string(),
+                "act.player.disembark" => "disembark command".to_string(),
+                other if other.starts_with("act.player.") => format!("{} command", &other[11..]),
+                other if other.starts_with("act.") => "control command".to_string(),
+                _ => "command".to_string(),
+            };
+            format!("control accepted {phrase}")
+        }
         // --- equipment / weapon surface ------------------------------------
         "weapon_fired" => format!(
             "{}'s {} fired ({} round{})",

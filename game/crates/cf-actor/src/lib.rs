@@ -41,9 +41,11 @@
     clippy::needless_pass_by_value
 )]
 
+pub mod attachable;
 pub mod components;
 pub mod constants;
 pub mod cover;
+pub mod gib;
 pub mod lean;
 pub mod sim;
 pub mod stamina;
@@ -51,7 +53,9 @@ pub mod stance;
 pub mod systems;
 pub mod ttd;
 
+pub use attachable::{apply_damage as apply_attachable_damage, Attachable};
 pub use cover::{CoverSide, CoverState};
+pub use gib::{default_cascade_chain, spread_angle, GibOriginKind, GibSpawn, SpreadMode};
 pub use lean::{LeanDirection, LeanState, LEAN_MAX_DEGREES};
 pub use stamina::{Stamina, SPRINT_STAMINA_DRAIN_PER_S, SPRINT_STAMINA_RECOVERY_PER_S};
 pub use stance::{derive_stance, fire_allowed_in_stance, is_cinematic, stance_bloom_factor, StanceInputs};
@@ -639,17 +643,46 @@ impl Inventory {
 }
 
 /// Source of a `ControlIntent` for replay/audit.
+/// **M14 audit pass 3 (GAP-M1-04)**: the M1 spec lists IntentSource as
+/// `{Player, Ai, Replay, Script}`. The original implementation diverged
+/// into `{Human, Cfctl, Ai, Replay}`. We accept both the spec names AND
+/// the legacy names on the input side via serde aliases, but emit only
+/// the spec-canonical names on the output side via `rename` so every
+/// recorded event uses the published vocabulary.
+///
+/// **M14 audit pass 4 (Finding 6)**: serialization now actually emits
+/// "player" / "script" — previously `#[serde(alias = ...)]` only
+/// affected the input side, so serialized events kept emitting
+/// "human" / "cfctl".
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum IntentSource {
-    /// Keyboard / mouse / gamepad inside `cf-app`.
+    /// Keyboard / mouse / gamepad inside `cf-app`. Spec literal: `Player`.
+    #[serde(rename = "player", alias = "human")]
     Human,
-    /// JSON-RPC `act.player.*` calls coming from `cfctl` / scripted E2E / future bots.
+    /// JSON-RPC `act.player.*` calls coming from `cfctl` / scripted E2E /
+    /// future bots. Spec literal: `Script`.
+    #[serde(rename = "script", alias = "cfctl")]
     Cfctl,
     /// AI-driven intent from `cf-ai` reactive guard or future commander layer.
     Ai,
     /// Replay-driven intent from `cf-headless` replay verifier.
     Replay,
+}
+
+impl IntentSource {
+    /// Spec-canonical name per M1 spec § "IntentSource = {Player, Ai, Replay, Script}".
+    /// Mirrors the `#[serde(rename = ...)]` output strings exactly so
+    /// engine sites that emit raw strings (HUD captions, log lines)
+    /// match what serde would produce.
+    pub fn spec_canonical_name(self) -> &'static str {
+        match self {
+            IntentSource::Human => "player",
+            IntentSource::Cfctl => "script",
+            IntentSource::Ai => "ai",
+            IntentSource::Replay => "replay",
+        }
+    }
 }
 
 /// One tick's worth of player input. Produced by `cf-control` and applied by
@@ -807,6 +840,52 @@ pub struct ActorState {
     /// player ejects from a wrecked mech and continues as foot infantry."
     #[serde(default)]
     pub chassis_detached: bool,
+    /// **M13** § "Brain hopping / multi-actor control" — actor flagged as the
+    /// player's brain (mission-critical=true; cannot be gibbed instantly).
+    /// Brain death = `LossReason::BrainDestroyed`.
+    #[serde(default)]
+    pub is_brain: bool,
+    /// **M13** § "Brain hopping" — tick of the last brain hop into this actor.
+    /// 0 when this actor has never been the brain target.
+    #[serde(default)]
+    pub last_brain_hop_tick: u64,
+    /// **M13** § "Brain memory tracks last-known position + last-hop tick" —
+    /// world-space position recorded the last time the brain was in this
+    /// actor. Persists across brain hops so AI fallback / squad cohesion
+    /// can reason about where the brain WAS.
+    #[serde(default)]
+    pub brain_last_position: [f32; 2],
+    /// **M13** § "Drone allies — 4 modes + autonomous behavior" — drone-only
+    /// runtime state. `Some(...)` for drone-spec actors; `None` for everything else.
+    #[serde(default)]
+    pub drone_ally: Option<cf_chassis::DroneAllyState>,
+    /// **M14 audit pass 4 (Finding 1)**: target chassis actor id this actor
+    /// is currently boarding (boarding is an attribute of the boarder, not
+    /// the chassis being boarded). `None` when no boarding is in flight.
+    /// Set when `act.player.board` is accepted; cleared when
+    /// `boarding_ticks_remaining` decrements to 0 + the pilot transfer
+    /// completes (or when the boarding is otherwise cancelled).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub pending_boarding_target: Option<u64>,
+    /// **M14 audit pass 4 (Finding 1)**: ticks remaining in the 1500ms
+    /// boarding transition. Ticked on the player actor in
+    /// `tick_chassis_eject_for_all` so input lock + HUD banner read off
+    /// the player, not the target chassis.
+    #[serde(default)]
+    pub boarding_ticks_remaining: u32,
+    /// **M13** § "Hit reactions per body part" — ticks remaining in the
+    /// currently-active hit-reaction window. Drives speed reduction +
+    /// aim-wobble multipliers per `HitReaction`.
+    #[serde(default)]
+    pub hit_reaction_ticks_remaining: u32,
+    /// **M13** § "Hit reactions per body part" — label of the currently-active
+    /// reaction ("stagger_stun" / "limp" / "drop_weapon" / ...).
+    #[serde(default)]
+    pub hit_reaction_kind: String,
+    /// **M13** § "Hit reactions per body part" — speed factor enforced by the
+    /// active reaction (1.0 = no reduction).
+    #[serde(default = "default_speed_factor")]
+    pub hit_reaction_speed_factor: f32,
     /// **W1.3**: stability scalar (0.0 = fully disrupted, 1.0 = stable).
     /// Decremented by recoil impulse, fall impact, explosion knockback.
     /// Recovers toward 1.0 at `stability_recovery_rate` per tick when on ground.
@@ -1086,6 +1165,10 @@ fn default_stability_recovery_rate() -> f32 {
     0.02
 }
 
+fn default_speed_factor() -> f32 {
+    1.0
+}
+
 fn default_mass_kg() -> f32 {
     80.0 // human infantry default
 }
@@ -1137,6 +1220,15 @@ impl ActorState {
             jet_active: false,
             gear_dropped_by_limb_loss: false,
             chassis_detached: false,
+            is_brain: false,
+            last_brain_hop_tick: 0,
+            brain_last_position: [0.0, 0.0],
+            drone_ally: None,
+            pending_boarding_target: None,
+            boarding_ticks_remaining: 0,
+            hit_reaction_ticks_remaining: 0,
+            hit_reaction_kind: String::new(),
+            hit_reaction_speed_factor: 1.0,
             stability: 1.0,
             stability_recovery_rate: 0.02,
             knockdown_ticks_remaining: 0,
@@ -1203,16 +1295,76 @@ impl ActorState {
 
     /// M5: attach a chassis to this actor. Resizes the half_extents to fit the
     /// chassis silhouette for the given chassis kind so M5.5 collision proxies
-    /// match the visible silhouette.
+    /// match the visible silhouette. **M13** adds CrabQuadruped + Drone
+    /// archetypes — half-extents per spec § "Chassis archetypes — M13 ships 5".
     pub fn attach_chassis(&mut self, chassis: cf_chassis::ChassisState) {
         let (half_extents, mass) = match chassis.kind {
             cf_chassis::ChassisKind::Infantry => (Vec2::new(8.0, 16.0), 80.0),
             cf_chassis::ChassisKind::PoweredArmor => (Vec2::new(10.0, 20.0), 200.0),
             cf_chassis::ChassisKind::LightMech => (Vec2::new(18.0, 36.0), 600.0),
+            // Crab: 4 legs spread it out laterally, shorter in y axis.
+            cf_chassis::ChassisKind::CrabQuadruped => (Vec2::new(16.0, 14.0), 350.0),
+            // Drone: small target on all sides.
+            cf_chassis::ChassisKind::Drone => (Vec2::new(6.0, 6.0), 30.0),
         };
         self.half_extents = half_extents;
         self.mass_kg = mass;
+        // **M13** § "Drone allies — 4 modes" — auto-seed `DroneAllyState` when
+        // the attached chassis is a drone so cfctl + AI consumers see the
+        // mode/fuel surface immediately.
+        if chassis.kind == cf_chassis::ChassisKind::Drone && self.drone_ally.is_none() {
+            self.drone_ally = Some(cf_chassis::DroneAllyState::default());
+        }
         self.chassis = Some(chassis);
+    }
+
+    /// **M13** § "Hit reactions per body part" — apply a hit-reaction window
+    /// to this actor based on the zone struck. Replaces any in-flight
+    /// reaction. `tick_rate_hz` is used to derive the duration in ticks.
+    pub fn apply_hit_reaction(&mut self, zone: cf_chassis::BodyZone, tick_rate_hz: u32) -> cf_chassis::HitReaction {
+        let reaction = cf_chassis::HitReaction::for_zone(zone);
+        self.hit_reaction_ticks_remaining = reaction.duration_ticks(tick_rate_hz);
+        self.hit_reaction_kind = reaction.kind.to_string();
+        self.hit_reaction_speed_factor = reaction.speed_factor;
+        reaction
+    }
+
+    /// **M13** § "Hit reactions per body part" — advance the reaction timer
+    /// one tick. Returns `true` on the tick the window expires (clears state).
+    pub fn tick_hit_reaction(&mut self) -> bool {
+        if self.hit_reaction_ticks_remaining == 0 {
+            return false;
+        }
+        self.hit_reaction_ticks_remaining -= 1;
+        if self.hit_reaction_ticks_remaining == 0 {
+            self.hit_reaction_kind.clear();
+            self.hit_reaction_speed_factor = 1.0;
+            return true;
+        }
+        false
+    }
+
+    /// **M13** § "Brain hopping" — mark this actor as the player's brain.
+    pub fn mark_brain(&mut self, tick: u64) {
+        self.is_brain = true;
+        self.mission_critical = true;
+        self.last_brain_hop_tick = tick;
+        self.brain_last_position = [self.position.x, self.position.y];
+    }
+
+    /// **M13** § "Brain hopping" — clear the brain flag (called when the
+    /// player hops out of this actor). Records the last known position so
+    /// the AI fallback can reason about where the brain WAS.
+    ///
+    /// **M14 audit pass 4 (Finding 7)**: also clear `mission_critical`.
+    /// `mark_brain` sets BOTH `is_brain = true` and
+    /// `mission_critical = true`; without clearing both here, every actor
+    /// the player ever hopped through would remain capped-at-Dying
+    /// indefinitely, accumulating "zombie" actors over a mission.
+    pub fn clear_brain(&mut self) {
+        self.is_brain = false;
+        self.mission_critical = false;
+        self.brain_last_position = [self.position.x, self.position.y];
     }
 
     /// Reset the actor back to its spawn state. Position, velocity, aim, on-ground,
@@ -1492,6 +1644,18 @@ impl ActorState {
                     cf_chassis::ModuleKind::Shield => "SHIELD".to_string(),
                     cf_chassis::ModuleKind::Sensor => "SENSOR".to_string(),
                     cf_chassis::ModuleKind::RepairDrone => "REPAIR".to_string(),
+                    // **M13** § "Critical chassis modules with full mechanics" — short HUD labels.
+                    cf_chassis::ModuleKind::Cockpit => "COCKPIT".to_string(),
+                    cf_chassis::ModuleKind::AmmoRack => "AMMO".to_string(),
+                    cf_chassis::ModuleKind::Engine => "ENGINE".to_string(),
+                    cf_chassis::ModuleKind::Optics => "OPTICS".to_string(),
+                    cf_chassis::ModuleKind::Transmission => "TRANS".to_string(),
+                    cf_chassis::ModuleKind::Reactor => "REACTOR".to_string(),
+                    cf_chassis::ModuleKind::PowerCore => "POWER".to_string(),
+                    cf_chassis::ModuleKind::FuelTank => "FUEL".to_string(),
+                    cf_chassis::ModuleKind::TargetingComputer => "TARGET".to_string(),
+                    cf_chassis::ModuleKind::CommRelay => "COMM".to_string(),
+                    cf_chassis::ModuleKind::MotorController => "MOTOR".to_string(),
                 },
                 state: m.state.as_str().to_string(),
                 kind: m.kind.as_str().to_string(),
@@ -1845,6 +2009,23 @@ pub struct ActorObservation {
     /// [`WeaponStateView`] for the shape contract.
     #[serde(default)]
     pub weapon_state: WeaponStateView,
+    /// **M13** § "Brain hopping / multi-actor control" — true when the
+    /// player's brain currently resides in this actor.
+    #[serde(default)]
+    pub is_brain: bool,
+    /// **M13** § "Hit reactions per body part" — currently-active hit
+    /// reaction label + ticks remaining + speed factor. Empty label when no
+    /// reaction is active.
+    #[serde(default)]
+    pub hit_reaction_kind: String,
+    #[serde(default)]
+    pub hit_reaction_ticks_remaining: u32,
+    /// **M13** § "Drone allies" — drone mode + fuel (only populated when
+    /// the actor is a drone).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub drone_mode: Option<String>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub drone_fuel: Option<f32>,
 }
 
 /// **M6**: extended-inventory slot projection. Mirrors
@@ -1987,6 +2168,11 @@ impl ActorObservation {
             limb_loss: actor.limb_loss,
             inventory_extended: actor.extended_inventory_view(),
             weapon_state: actor.weapon_state_view(rifle),
+            is_brain: actor.is_brain,
+            hit_reaction_kind: actor.hit_reaction_kind.clone(),
+            hit_reaction_ticks_remaining: actor.hit_reaction_ticks_remaining,
+            drone_mode: actor.drone_ally.as_ref().map(|d| d.mode.as_str().to_string()),
+            drone_fuel: actor.drone_ally.as_ref().map(|d| d.fuel),
         }
     }
 }
@@ -2401,7 +2587,9 @@ mod tests {
         let view = actor.chassis_view().unwrap();
         // M5 full body graph: 15 zones (head/torso/arms/legs/backpack + granular forearms/hands + shins/feet).
         assert_eq!(view.zones.len(), 15);
-        assert_eq!(view.modules.len(), 5);
+        // M13 powered-armor adds 3 critical modules (power_core, optics, targeting_computer)
+        // on top of the M5 5-slot strip (weapon_mount/jet/shield/sensor/repair_drone), totaling 8.
+        assert_eq!(view.modules.len(), 8);
         assert_eq!(view.stage, "nominal");
     }
 

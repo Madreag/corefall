@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/faction.relationship_changed.v0.1",
+  "title": "faction.relationship_changed",
+  "description": "M14 audit pass 3 (GAP-M7-01): spec-canonical alias for ai.faction_allegiance_changed. Producer dual-emits both categories so consumers reading the M7 spec literal taxonomy find this under `faction.relationship_changed`. Same payload.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "faction" },
+    "event_type": { "const": "relationship_changed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "from_relationship": { "type": "string" },
+        "to_relationship": { "type": "string" }
+      },
+      "required": ["actor_id", "to_relationship"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

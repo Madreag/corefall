@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ActPlayerDisembarkParams",
+  "description": "**M13** § \"Boarding / disembarking transitions\" — start the 1500ms\ndisembarking transition.",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema_version"
+  ]
+}

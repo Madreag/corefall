@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "cf-tools-replay-viewer/validation_report.v1",
+  "title": "cf-tools-replay-viewer validation report",
+  "description": "M14 audit pass 3 (GAP-M10-03): JSON output of `cfctl replay validate <bundle>`. Lists every per-event schema check + structural-invariant result.",
+  "type": "object",
+  "required": ["bundle_dir", "result", "events_checked", "errors"],
+  "properties": {
+    "bundle_dir": { "type": "string", "description": "Absolute path of the validated run bundle." },
+    "result": {
+      "type": "string",
+      "enum": ["ok", "errors", "warnings"],
+      "description": "Top-line result; `ok` only when zero errors AND zero warnings."
+    },
+    "events_checked": { "type": "integer", "minimum": 0 },
+    "schemas_resolved": { "type": "integer", "minimum": 0 },
+    "schemas_missing": { "type": "integer", "minimum": 0 },
+    "errors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["category", "event_type", "message"],
+        "properties": {
+          "category": { "type": "string" },
+          "event_type": { "type": "string" },
+          "tick": { "type": "integer", "minimum": 0 },
+          "event_id": { "type": "string" },
+          "message": { "type": "string" }
+        }
+      }
+    },
+    "warnings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["category", "event_type", "message"],
+        "properties": {
+          "category": { "type": "string" },
+          "event_type": { "type": "string" },
+          "message": { "type": "string" }
+        }
+      }
+    }
+  }
+}

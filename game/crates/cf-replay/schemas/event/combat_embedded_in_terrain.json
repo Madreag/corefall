@@ -1,0 +1,31 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/combat.embedded_in_terrain.v0.1",
+  "title": "combat.embedded_in_terrain",
+  "description": "M14 § Projectile becomes embedded in stickiness material per CCCP SceneMan::TryPenetrate stickiness check. Fires after a failed penetration when the seeded RNG roll < material.stickiness. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "combat" },
+    "event_type": { "const": "embedded_in_terrain" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "projectile_id": { "type": "integer" },
+        "owner_id": { "type": "integer" },
+        "position": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+        "material_id": { "type": "integer" },
+        "material": { "type": "string" },
+        "stickiness": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "rng_roll": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "source_event_id": { "type": "string" }
+      },
+      "required": ["projectile_id", "owner_id", "position", "material_id", "material", "stickiness", "rng_roll", "source_event_id"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

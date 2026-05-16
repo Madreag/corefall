@@ -37,10 +37,28 @@
 // `cf_physics::hazard::*`) resolve cleanly.
 pub mod authority;
 pub mod constants;
+pub mod facing_routing;
 pub mod hazard;
+pub mod joint;
 pub mod parallel;
 pub mod penetration;
+pub mod penetration_ray;
+pub mod ragdoll;
+pub mod sharpness;
+pub mod swept;
+pub mod zone_state;
 pub use authority::{AuthorityKind, AuthorityTransition};
+pub use facing_routing::{classify_hit_direction, exposed_zones, mirror_local_x, HitDirection};
+pub use joint::{evaluate_joint, explosion_impulse, fall_impulse_chain, severance_probability, severance_roll, Joint, JointEval};
+pub use penetration_ray::{
+    apfsds_energy_through_module, era_pre_detonates_heat, he_damage_at_distance, heat_jet_modules_penetrated,
+    spalling_fragment_count, spalling_fragment_damage_fraction, traverse_ray, HeWave, InteriorModule, ModuleHit,
+    PenetrationRayResult,
+};
+pub use ragdoll::{step_ragdoll, Ragdoll, RagdollState};
+pub use sharpness::{decay_damage, DecayBand, SharpnessInputs, SharpnessOutcome};
+pub use swept::{prioritize_swept_collisions, SweptHitCandidate, SweptHitResolved};
+pub use zone_state::{bleed_per_tick, classify as classify_zone_state, ZoneState};
 
 use serde::{Deserialize, Serialize};
 

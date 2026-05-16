@@ -172,10 +172,33 @@ pub enum ObjectiveKind {
     /// M2.5: defend a reactor (named static actor) until either the mission
     /// timer expires (success) or the reactor's hp reaches zero (failure).
     /// `target` is the reactor id. The `defend_actor` JSON discriminator
-    /// (M2 spec literal) is accepted as an alias.
-    #[serde(alias = "defend_actor")]
+    /// (M2 spec literal) is NOT aliased here — see the dedicated
+    /// `DefendActor` variant below for the M9-canonical generic form.
     DefendReactor {
         target: String,
+    },
+    /// **M14 audit pass 3 (GAP-M9-01)**: M9 spec § "ObjectiveKind enum"
+    /// lists `DefendActor { actor_id, until_tick }` as the generic
+    /// command-core / Bunker-Defense surface (forward-compat for M25+).
+    /// Distinct from `DefendReactor` (which is the M2.5 reactor-specific
+    /// specialization keyed by reactor name); `DefendActor` is keyed by
+    /// actor id + `until_tick` deadline.
+    ///
+    /// **M14 audit pass 4 (Finding 4)**: schema-code drift — fields
+    /// match published `cf-mission/v1/ObjectiveDefendActor` schema:
+    ///   - `actor_id: String` (matches schema type "string")
+    ///   - `until_tick: Option<u64>` (schema marks as optional; falls
+    ///     back to mission's time_limit_ticks when absent)
+    ///   - `loss_on_destroyed: bool` (schema default true)
+    ///   - `tutorial_safety: bool` (schema default false)
+    DefendActor {
+        actor_id: String,
+        #[serde(default)]
+        until_tick: Option<u64>,
+        #[serde(default = "default_loss_on_destroyed")]
+        loss_on_destroyed: bool,
+        #[serde(default)]
+        tutorial_safety: bool,
     },
     /// **M2 re-audit (2026-05-13)**: spec literal — "ObjectiveKind enum:
     /// ReachZone, KillActor, SurviveTimer, DefendActor, EscortActor". The
@@ -200,6 +223,7 @@ impl ObjectiveKind {
             ObjectiveKind::NeutralizeActor { .. } => "neutralize_actor",
             ObjectiveKind::ReachZone { .. } => "reach_zone",
             ObjectiveKind::DefendReactor { .. } => "defend_reactor",
+            ObjectiveKind::DefendActor { .. } => "defend_actor",
             ObjectiveKind::SurviveTimer { .. } => "survive_timer",
             ObjectiveKind::EscortActor { .. } => "escort_actor",
         }
@@ -258,6 +282,10 @@ pub enum LossReason {
     },
     /// M2: player-initiated mission abandonment via `act.player.abort`.
     Aborted,
+    /// **M13** § "Brain hopping" — the player's brain actor was destroyed.
+    /// Brain death = mission lost regardless of which actor is currently
+    /// being puppeted.
+    BrainDestroyed,
 }
 
 impl LossReason {
@@ -268,6 +296,7 @@ impl LossReason {
             LossReason::ReactorDestroyed => "reactor_destroyed",
             LossReason::ObjectiveFailed { .. } => "objective_failed",
             LossReason::Aborted => "aborted",
+            LossReason::BrainDestroyed => "brain_destroyed",
         }
     }
 
@@ -369,6 +398,10 @@ pub struct LossConditions {
 }
 
 fn default_true() -> bool {
+    true
+}
+
+fn default_loss_on_destroyed() -> bool {
     true
 }
 
@@ -1097,6 +1130,24 @@ pub fn step(state: &mut MissionState, inputs: MissionTickInputs<'_>) -> MissionT
             return report;
         }
     }
+    // **M13** § "Brain hopping" — brain death = mission lost regardless of
+    // which actor is currently being puppeted. Scans every actor flagged
+    // `is_brain == true` and checks for `Dead` status / hp ≤ 0. This runs
+    // BEFORE reactor_destroyed because brain death is mission-critical
+    // even when a defend_reactor objective is in flight.
+    let brain_dead = inputs
+        .actors
+        .values()
+        .any(|a| a.is_brain && (a.status.is_dead() || a.hp <= 0.0));
+    if brain_dead {
+        state.result = MissionResult::Lost {
+            reason: LossReason::BrainDestroyed,
+        };
+        state.last_event_tick = inputs.tick;
+        state.last_event_label = "mission_lost_brain_destroyed".to_string();
+        report.final_result = Some(state.result.clone());
+        return report;
+    }
     // Reactor destruction loses immediately for any active `defend_reactor`
     // objective. M2.5's micro reactor defense needs `mission.loss_reason =
     // reactor_destroyed` to be the visible failure label. The check runs BEFORE
@@ -1134,6 +1185,61 @@ pub fn step(state: &mut MissionState, inputs: MissionTickInputs<'_>) -> MissionT
         };
         state.last_event_tick = inputs.tick;
         state.last_event_label = format!("mission_lost_reactor_destroyed:{target}");
+        report.objective_failed.push(obj_id);
+        report.final_result = Some(state.result.clone());
+        return report;
+    }
+
+    // **M14 audit pass 4 (Finding 4)**: DefendActor loss-on-destroyed path.
+    // When `loss_on_destroyed` is true (schema default) and the defended
+    // actor is destroyed before the deadline, immediately resolve the
+    // mission as Lost. Reactors map to `LossReason::ReactorDestroyed`;
+    // numeric actor ids map to `LossReason::PlayerDied` for M14 baseline
+    // (M25+ command-core will introduce ActorDestroyed).
+    let defend_actor_destroyed_match: Option<(usize, String, String, bool)> =
+        state.objectives.iter().enumerate().find_map(|(idx, obj)| {
+            if matches!(obj.status, ObjectiveStatus::Completed | ObjectiveStatus::Failed) {
+                return None;
+            }
+            if let ObjectiveKind::DefendActor {
+                actor_id,
+                loss_on_destroyed,
+                tutorial_safety,
+                ..
+            } = &obj.kind
+            {
+                if !*loss_on_destroyed || *tutorial_safety {
+                    return None;
+                }
+                let destroyed_reactor = inputs
+                    .reactors_destroyed
+                    .get(actor_id)
+                    .copied()
+                    .unwrap_or(false);
+                let destroyed_actor = actor_id.parse::<u64>().ok().is_some_and(|n| {
+                    inputs
+                        .actors
+                        .get(&ActorId(n))
+                        .map(|a| a.status == Status::Dead)
+                        .unwrap_or(false)
+                });
+                if destroyed_reactor || destroyed_actor {
+                    return Some((idx, obj.id.clone(), actor_id.clone(), destroyed_reactor));
+                }
+            }
+            None
+        });
+    if let Some((idx, obj_id, target, was_reactor)) = defend_actor_destroyed_match {
+        state.objectives[idx].status = ObjectiveStatus::Failed;
+        state.result = MissionResult::Lost {
+            reason: if was_reactor {
+                LossReason::ReactorDestroyed
+            } else {
+                LossReason::PlayerDead
+            },
+        };
+        state.last_event_tick = inputs.tick;
+        state.last_event_label = format!("mission_lost_defend_actor_destroyed:{target}");
         report.objective_failed.push(obj_id);
         report.final_result = Some(state.result.clone());
         return report;
@@ -1271,6 +1377,37 @@ pub fn step(state: &mut MissionState, inputs: MissionTickInputs<'_>) -> MissionT
                 // DefendReactor only completes via the timer-expired branch
                 // above; passive ticks never auto-complete it.
                 false
+            }
+            // **M14 audit pass 3 (GAP-M9-01)**: DefendActor completes when
+            // current_tick >= until_tick (or mission time_limit_ticks when
+            // until_tick is None) AND the defended actor is still alive.
+            // Loss-on-destroy is handled in the fail-sensor pre-pass.
+            //
+            // **M14 audit pass 4 (Finding 4)**: actor_id is a String per
+            // schema; resolve via reactors_destroyed map first (M9
+            // command-core / reactor case), then fall back to parsing as
+            // a u64 actor id (M25+ turret / chassis-module case).
+            ObjectiveKind::DefendActor {
+                actor_id,
+                until_tick,
+                ..
+            } => {
+                let deadline = until_tick.unwrap_or(state.time_limit_ticks);
+                if inputs.tick < deadline {
+                    false
+                } else if inputs.reactors_destroyed.contains_key(actor_id) {
+                    !inputs
+                        .reactors_destroyed
+                        .get(actor_id)
+                        .copied()
+                        .unwrap_or(false)
+                } else if let Ok(numeric) = actor_id.parse::<u64>() {
+                    inputs.actors.get(&ActorId(numeric)).is_some_and(|a| {
+                        a.status != Status::Dead && a.status != Status::Dying
+                    })
+                } else {
+                    false
+                }
             }
             // M2 re-audit (2026-05-13): SurviveTimer completes when the
             // window has elapsed AND the player is still alive. The fail
@@ -1846,6 +1983,41 @@ mod tests {
             }
         ));
         assert!(report.final_result.is_some());
+    }
+
+    /// **M13** § "Brain hopping" — `LossReason::BrainDestroyed` fires when
+    /// the actor flagged `is_brain == true` is dead, regardless of which
+    /// actor is currently being puppeted by the player pointer.
+    #[test]
+    fn brain_dead_loses_immediately_via_loss_reason_brain_destroyed() {
+        let mut state = build_state();
+        let player = player_at(120.0, 32.0);
+        let mut brain_actor = player_at(200.0, 32.0);
+        brain_actor.id = ActorId(2);
+        brain_actor.is_brain = true;
+        brain_actor.status = Status::Dead;
+        brain_actor.hp = 0.0;
+        let mut actors = mk_actors(player, false);
+        actors.insert(brain_actor.id, brain_actor);
+        let report = step(
+            &mut state,
+            MissionTickInputs {
+                tick: 30,
+                player: actors.get(&ActorId(1)),
+                actors: &actors,
+                breaches_broken: &BTreeMap::new(),
+                reactors_destroyed: &BTreeMap::new(),
+                breaches_progress: &BTreeMap::new(),
+            },
+        );
+        assert!(matches!(
+            state.result,
+            MissionResult::Lost {
+                reason: LossReason::BrainDestroyed
+            }
+        ));
+        assert!(report.final_result.is_some());
+        assert_eq!(state.last_event_label, "mission_lost_brain_destroyed");
     }
 
     #[test]

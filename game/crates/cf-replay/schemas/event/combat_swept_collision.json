@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/combat.swept_collision.v0.1",
+  "title": "combat.swept_collision",
+  "description": "M14 § Full swept-collision pipeline (per CCCP Atom::Travel + MovableObject::CollideAtPoint). Fires for each actor hit in priority order (closer first) when a projectile traces a swept path across multiple actors in one tick. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "combat" },
+    "event_type": { "const": "swept_collision" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "projectile_id": { "type": "integer" },
+        "shooter_id": { "type": "integer" },
+        "target_id": { "type": "integer" },
+        "priority_index": { "type": "integer", "minimum": 0 },
+        "priority_total": { "type": "integer", "minimum": 1 },
+        "entry_point": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+        "ray_origin": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+        "ray_direction": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+        "entry_t": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "distance_traveled": { "type": "number", "minimum": 0.0 },
+        "zone": { "type": "string" },
+        "stance": { "type": "string" },
+        "facing": { "type": "string", "enum": ["left", "right"] },
+        "damage": { "type": "number", "minimum": 0.0 },
+        "energy_remaining": { "type": "number", "minimum": 0.0 },
+        "source_event_id": { "type": "string" }
+      },
+      "required": ["projectile_id", "shooter_id", "target_id", "priority_index", "priority_total", "entry_point", "ray_origin", "ray_direction", "zone", "damage", "source_event_id"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

@@ -1,0 +1,34 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/attachable.detached.v0.1",
+  "title": "attachable.detached",
+  "description": "M14 § Limb detachment via joint impulse per CCCP Attachable::Update. Fires when joint_impulse > joint_strength AND joint_impulse <= gib_impulse_limit (clean detach, not gib). The detached attachable becomes a physical debris object subject to gravity + terrain collision. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "attachable" },
+    "event_type": { "const": "detached" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "attachable_id": { "type": "string" },
+        "parent_zone": { "type": "string" },
+        "joint_impulse": { "type": "number", "minimum": 0.0 },
+        "joint_strength": { "type": "number", "minimum": 0.0 },
+        "gib_impulse_limit": { "type": "number", "minimum": 0.0 },
+        "detach_position": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+        "detach_velocity": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+        "damage_multiplier": { "type": "number", "minimum": 0.0 },
+        "source_event_id": { "type": "string" },
+        "cause": { "type": "string" }
+      },
+      "required": ["actor_id", "attachable_id", "parent_zone", "joint_impulse", "joint_strength", "gib_impulse_limit", "detach_position", "detach_velocity", "damage_multiplier", "source_event_id", "cause"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

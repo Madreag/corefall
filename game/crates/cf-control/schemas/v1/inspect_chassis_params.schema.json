@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "InspectChassisParams",
+  "description": "**M13**: `inspect.chassis` — return the full body graph (15 zones + 14\njoints + 5 sockets) plus per-zone integrity, per-module state, pilot state\nand the eject window for an actor's chassis. `target` is `\"player\"` (or\nempty) for the controllable actor, or a stringified actor id.",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "target": {
+      "type": [
+        "string",
+        "null"
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema_version"
+  ]
+}

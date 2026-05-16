@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/physics.impulse_propagated.v0.1",
+  "title": "physics.impulse_propagated",
+  "description": "M14 § Impulse propagation through joints. Damage routes upward through the body graph using m_DamageMultiplier weighting (per CCCP Attachable::Update). One event per joint that absorbs / re-emits the impulse. Used by falling-damage chain, ramming chain, sniper-round chain. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "physics" },
+    "event_type": { "const": "impulse_propagated" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "from_zone": { "type": "string" },
+        "to_zone": { "type": "string" },
+        "impulse_in": { "type": "number", "minimum": 0.0 },
+        "impulse_absorbed": { "type": "number", "minimum": 0.0 },
+        "impulse_out": { "type": "number", "minimum": 0.0 },
+        "joint_strength": { "type": "number", "minimum": 0.0 },
+        "damage_multiplier": { "type": "number", "minimum": 0.0 },
+        "kind": { "type": "string", "enum": ["fall", "ram", "explosion", "kinetic", "melee"] },
+        "source_event_id": { "type": "string" }
+      },
+      "required": ["actor_id", "from_zone", "to_zone", "impulse_in", "impulse_absorbed", "impulse_out", "joint_strength", "damage_multiplier", "kind", "source_event_id"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

@@ -10,6 +10,7 @@ members = [
   "crates/cf-environment",
   "crates/cf-actor",
   "crates/cf-chassis",
+  "crates/cf-internal",
   "crates/cf-equipment",
   "crates/cf-perception",
   "crates/cf-squad",

@@ -6,7 +6,7 @@
   "required": ["actor", "source", "move_x", "aim_x", "aim_y", "jump", "fire", "reload"],
   "properties": {
     "actor": {"type": "integer", "minimum": 0},
-    "source": {"type": "string", "enum": ["human", "cfctl", "ai", "replay"]},
+    "source": {"type": "string", "enum": ["player", "script", "ai", "replay", "human", "cfctl"]},
     "move_x": {"type": "number"},
     "aim_x": {"type": "number"},
     "aim_y": {"type": "number"},

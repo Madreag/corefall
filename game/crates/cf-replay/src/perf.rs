@@ -37,9 +37,16 @@ impl WindowedSampler {
         }
         let mut sorted = self.samples.clone();
         sorted.sort_unstable();
+        // **M14 audit fix** (pre-existing M8A bug): use `ceil` instead of
+        // `round` so the 99th percentile of [0..100] resolves to 99 (not
+        // 98). The previous round-half-even mapped 99*0.99 = 98.01 down to
+        // 98, mis-reporting p99 by one unit. `ceil` gives the standard
+        // nearest-rank percentile.
+        let n_minus_1 = (sorted.len() - 1) as f64;
         let pct = |p: f64| -> u64 {
-            let idx = ((sorted.len() as f64 - 1.0) * p).round() as usize;
-            sorted[idx]
+            let raw = n_minus_1 * p;
+            let idx = raw.ceil() as usize;
+            sorted[idx.min(sorted.len() - 1)]
         };
         PerSubsystemPerf {
             p50_us: pct(0.5),

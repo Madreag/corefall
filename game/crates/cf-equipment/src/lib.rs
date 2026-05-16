@@ -486,8 +486,9 @@ impl FiringProfile {
 }
 
 /// A loadout is a named set of role records (e.g., "infantry default" = rifle +
-/// medkit). M5 ships LOAD-A (Loadout A) fixture stubs; M8+ owns mod-loadable
-/// loadouts.
+/// medkit). M5 ships LOAD-A (Loadout A) fixture stubs; **M13** ships the
+/// data-driven loader (`load_loadout_from_json` / `load_loadouts_from_dir`)
+/// so `content/equipment/loadouts/*.json` is the runtime source of truth.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Loadout {
     pub id: String,
@@ -496,6 +497,143 @@ pub struct Loadout {
     /// primary weapon by AI doctrine.
     pub role_ids: Vec<String>,
     pub provenance: String,
+}
+
+/// **M13** JSON DTO for `content/equipment/loadouts/*.json`. The on-disk
+/// shape is intentionally permissive: `schema_version` is required so
+/// downstream migrations can step the field set forward; `description` is
+/// optional flavour text consumed by mod-tools and stripped by the runtime
+/// loader. All canonical Loadout fields round-trip 1:1.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct LoadoutFile {
+    pub schema_version: u32,
+    pub id: String,
+    pub display_name: String,
+    pub role_ids: Vec<String>,
+    pub provenance: String,
+    /// Optional human-readable summary. Ignored by the runtime loader.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub description: Option<String>,
+}
+
+impl LoadoutFile {
+    /// Convert to the runtime [`Loadout`] (drops `description` + `schema_version`).
+    pub fn into_loadout(self) -> Loadout {
+        Loadout {
+            id: self.id,
+            display_name: self.display_name,
+            role_ids: self.role_ids,
+            provenance: self.provenance,
+        }
+    }
+}
+
+/// **M13** schema version stamp for `content/equipment/loadouts/*.json`.
+/// Bumped only on breaking field changes; additive fields (like `description`)
+/// keep the version stable.
+pub const LOADOUT_SCHEMA_VERSION: u32 = 1;
+
+/// **M13** JSON-loadout parse errors.
+#[derive(Debug)]
+pub enum LoadoutLoadError {
+    /// `serde_json` deserialization failed.
+    Parse(String),
+    /// The on-disk `schema_version` does not match [`LOADOUT_SCHEMA_VERSION`].
+    SchemaVersionMismatch { expected: u32, actual: u32 },
+    /// The on-disk `id` does not match the registry slot the caller asked for.
+    IdMismatch { expected: String, actual: String },
+    /// `role_ids` was empty — every loadout must reference at least one role.
+    EmptyRoleIds,
+    /// A `role_ids` entry does not resolve via [`role_record`].
+    UnknownRoleId(String),
+}
+
+impl std::fmt::Display for LoadoutLoadError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LoadoutLoadError::Parse(e) => write!(f, "loadout json parse failed: {e}"),
+            LoadoutLoadError::SchemaVersionMismatch { expected, actual } => {
+                write!(f, "loadout schema_version mismatch: expected {expected}, got {actual}")
+            }
+            LoadoutLoadError::IdMismatch { expected, actual } => {
+                write!(f, "loadout id mismatch: expected {expected}, got {actual}")
+            }
+            LoadoutLoadError::EmptyRoleIds => write!(f, "loadout role_ids must not be empty"),
+            LoadoutLoadError::UnknownRoleId(id) => write!(f, "loadout references unknown role id `{id}`"),
+        }
+    }
+}
+
+impl std::error::Error for LoadoutLoadError {}
+
+/// **M13** parse a single loadout from a JSON string. Validates the schema
+/// version + role-id references against [`role_record`]. The `expected_id`
+/// argument lets the caller assert filename↔id parity at load time; pass
+/// `None` for free-form parsing.
+pub fn load_loadout_from_json(
+    json: &str,
+    expected_id: Option<&str>,
+) -> Result<Loadout, LoadoutLoadError> {
+    let file: LoadoutFile =
+        serde_json::from_str(json).map_err(|e| LoadoutLoadError::Parse(e.to_string()))?;
+    if file.schema_version != LOADOUT_SCHEMA_VERSION {
+        return Err(LoadoutLoadError::SchemaVersionMismatch {
+            expected: LOADOUT_SCHEMA_VERSION,
+            actual: file.schema_version,
+        });
+    }
+    if let Some(id) = expected_id {
+        if file.id != id {
+            return Err(LoadoutLoadError::IdMismatch {
+                expected: id.to_string(),
+                actual: file.id.clone(),
+            });
+        }
+    }
+    if file.role_ids.is_empty() {
+        return Err(LoadoutLoadError::EmptyRoleIds);
+    }
+    for role_id in &file.role_ids {
+        if role_record(role_id).is_none() {
+            return Err(LoadoutLoadError::UnknownRoleId(role_id.clone()));
+        }
+    }
+    Ok(file.into_loadout())
+}
+
+/// **M13** load every `*.json` loadout in `dir`. Returns a registry keyed by
+/// loadout id. Files whose `schema_version`, `role_ids`, or id don't validate
+/// return an error so cf-mod / scenario.load can surface a typed reason.
+pub fn load_loadouts_from_dir(
+    dir: &std::path::Path,
+) -> Result<BTreeMap<String, Loadout>, LoadoutLoadError> {
+    let mut out = BTreeMap::new();
+    let entries = match std::fs::read_dir(dir) {
+        Ok(it) => it,
+        Err(e) => {
+            return Err(LoadoutLoadError::Parse(format!(
+                "read_dir {} failed: {e}",
+                dir.display()
+            )))
+        }
+    };
+    for entry in entries.flatten() {
+        let path = entry.path();
+        if path.extension().and_then(|s| s.to_str()) != Some("json") {
+            continue;
+        }
+        let stem = path
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or_default()
+            .to_string();
+        let raw = std::fs::read_to_string(&path)
+            .map_err(|e| LoadoutLoadError::Parse(format!("read {} failed: {e}", path.display())))?;
+        let loadout = load_loadout_from_json(&raw, Some(&stem))?;
+        out.insert(loadout.id.clone(), loadout);
+    }
+    Ok(out)
 }
 
 fn rifle_m1_default() -> RifleSpec {
@@ -1188,6 +1326,106 @@ mod tests {
         assert!(loadout("load_a_powered_armor").is_some());
         assert!(loadout("load_a_light_mech").is_some());
         assert!(loadout("missing").is_none());
+    }
+
+    #[test]
+    fn load_loadout_from_json_round_trips_canonical_payload() {
+        let json = r#"{
+            "schema_version": 1,
+            "id": "load_a_infantry",
+            "display_name": "Infantry Standard",
+            "role_ids": ["rifle_m1_default"],
+            "provenance": "spec/equipment-loadout#LOAD-A.infantry"
+        }"#;
+        let loaded = load_loadout_from_json(json, Some("load_a_infantry")).unwrap();
+        assert_eq!(loaded.id, "load_a_infantry");
+        assert_eq!(loaded.role_ids, vec!["rifle_m1_default".to_string()]);
+        // Mirrors the hardcoded fixture in [`loadouts`] so a scenario that
+        // swaps between JSON and Rust-seed paths stays identical.
+        let canonical = loadout("load_a_infantry").unwrap();
+        assert_eq!(loaded, canonical);
+    }
+
+    #[test]
+    fn load_loadout_from_json_rejects_schema_drift() {
+        let json = r#"{
+            "schema_version": 99,
+            "id": "load_a_infantry",
+            "display_name": "x",
+            "role_ids": ["rifle_m1_default"],
+            "provenance": "p"
+        }"#;
+        let err = load_loadout_from_json(json, None).unwrap_err();
+        assert!(matches!(err, LoadoutLoadError::SchemaVersionMismatch { .. }));
+    }
+
+    #[test]
+    fn load_loadout_from_json_rejects_unknown_role() {
+        let json = r#"{
+            "schema_version": 1,
+            "id": "load_a_infantry",
+            "display_name": "x",
+            "role_ids": ["nonexistent_role"],
+            "provenance": "p"
+        }"#;
+        let err = load_loadout_from_json(json, None).unwrap_err();
+        match err {
+            LoadoutLoadError::UnknownRoleId(id) => assert_eq!(id, "nonexistent_role"),
+            other => panic!("expected UnknownRoleId, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn load_loadout_from_json_rejects_id_mismatch() {
+        let json = r#"{
+            "schema_version": 1,
+            "id": "load_a_infantry",
+            "display_name": "x",
+            "role_ids": ["rifle_m1_default"],
+            "provenance": "p"
+        }"#;
+        let err = load_loadout_from_json(json, Some("not_matching")).unwrap_err();
+        assert!(matches!(err, LoadoutLoadError::IdMismatch { .. }));
+    }
+
+    #[test]
+    fn load_loadout_from_json_rejects_empty_role_ids() {
+        let json = r#"{
+            "schema_version": 1,
+            "id": "load_a_infantry",
+            "display_name": "x",
+            "role_ids": [],
+            "provenance": "p"
+        }"#;
+        let err = load_loadout_from_json(json, None).unwrap_err();
+        assert!(matches!(err, LoadoutLoadError::EmptyRoleIds));
+    }
+
+    #[test]
+    fn load_loadouts_from_dir_loads_canonical_load_a_files() {
+        // The canonical content directory lives under the workspace `game/`
+        // root. The crate runs from `game/crates/cf-equipment` so the
+        // relative path back up is `../../content/equipment/loadouts`.
+        let dir = std::path::PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("../..")
+            .join("content/equipment/loadouts");
+        if !dir.exists() {
+            // Skip cleanly if the content dir hasn't been checked out — the
+            // test is informational on standalone crate checks.
+            return;
+        }
+        let registry = load_loadouts_from_dir(&dir).expect("loadouts dir parses");
+        for required in ["load_a_infantry", "load_a_powered_armor", "load_a_light_mech"] {
+            assert!(
+                registry.contains_key(required),
+                "loadouts dir missing canonical id {required}"
+            );
+            // Each loaded loadout must agree with the in-Rust seed fixture so
+            // both code paths produce identical runtime objects.
+            let canonical = loadout(required).unwrap();
+            let on_disk = registry.get(required).unwrap();
+            assert_eq!(on_disk, &canonical, "{required} drift");
+        }
     }
 
     #[test]

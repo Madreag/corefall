@@ -44,6 +44,15 @@ impl Default for HearingProbe {
 
 /// Returns true if the receiver reacts to the emission given their hearing
 /// range and any active deafen affliction.
+///
+/// **M14 audit fix** (pre-existing M6 bug): occlusion attenuation is now
+/// non-linear. Heavy walls (occlusion ≈ 0.2) drop the signal far enough
+/// below the reaction threshold that a closed-door listener doesn't
+/// react to a gunshot the way an open-air listener does. The previous
+/// linear multiplication left occlusion = 0.2 at eff = 0.12, just above
+/// the 0.1 trigger — making "occluded" hearing identical to "open" for
+/// reaction purposes. Squaring the occlusion factor matches the dB-style
+/// logarithmic attenuation of sound through walls.
 #[must_use]
 pub fn hearing_reaction(probe: HearingProbe) -> bool {
     if probe.deafened {
@@ -51,7 +60,8 @@ pub fn hearing_reaction(probe: HearingProbe) -> bool {
     }
     let att = distance_attenuation(probe.distance, probe.hearing_range);
     let occ = probe.occlusion_factor.clamp(0.0, 1.0);
-    let eff = (probe.raw_loudness * att * occ).clamp(0.0, 1.0);
+    let occ_sq = occ * occ;
+    let eff = (probe.raw_loudness * att * occ_sq).clamp(0.0, 1.0);
     eff > 0.1
 }
 

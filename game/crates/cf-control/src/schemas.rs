@@ -271,6 +271,96 @@ pub struct InspectActorParams {
     pub target: Option<String>,
 }
 
+/// **M13**: `inspect.chassis` — return the full body graph (15 zones + 14
+/// joints + 5 sockets) plus per-zone integrity, per-module state, pilot state
+/// and the eject window for an actor's chassis. `target` is `"player"` (or
+/// empty) for the controllable actor, or a stringified actor id.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct InspectChassisParams {
+    pub schema_version: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target: Option<String>,
+}
+
+/// **M13** § "Brain hopping" — `act.player.brain_hop { target_actor_id }`
+/// transfers control to a different friendly actor and updates the brain flag.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerBrainHopParams {
+    pub schema_version: u32,
+    pub target_actor_id: u64,
+}
+
+/// **M13** § "Chassis ability slots" — activate one of the chassis's
+/// ability slots.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerActivateAbilityParams {
+    pub schema_version: u32,
+    pub ability: String,
+}
+
+/// **M13** § "Cockpit camera anchor" — switch between third-person follow and
+/// first-person cockpit camera anchors.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActInputCameraAnchorParams {
+    pub schema_version: u32,
+    pub mode: String,
+}
+
+/// **M13** § "Drone allies" — switch the player's drone ally mode.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerSetDroneModeParams {
+    pub schema_version: u32,
+    pub mode: String,
+}
+
+/// **M13** § "Weapon modifier slots" — attach a Noita-style weapon modifier.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerAttachModifierParams {
+    pub schema_version: u32,
+    pub modifier: String,
+}
+
+/// **M13** § "Weapon modifier slots" — detach an attached weapon modifier.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerDetachModifierParams {
+    pub schema_version: u32,
+    pub modifier: String,
+}
+
+/// **M13** § "Boarding / disembarking transitions" — start the 1500ms
+/// boarding transition into a chassis actor.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerBoardParams {
+    pub schema_version: u32,
+    pub chassis_actor_id: u64,
+}
+
+/// **M13** § "Boarding / disembarking transitions" — start the 1500ms
+/// disembarking transition.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerDisembarkParams {
+    pub schema_version: u32,
+}
+
+/// **M13** § "Pilot-inside-chassis dual silhouette" — chassis silhouette
+/// projection (per-zone HP for the chassis side of the dual layer).
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ObserveChassisSilhouetteParams {
+    pub schema_version: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub actor_id: Option<u64>,
+}
+
 /// **M2 re-audit (2026-05-13)**: `observe.mission` — return the full
 /// `MissionState` projection. No params required.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -482,6 +572,16 @@ pub fn dump_v1() -> BTreeMap<String, String> {
         entry::<InspectEquipmentParams>("inspect_equipment_params"),
         entry::<ObserveActorParams>("observe_actor_params"),
         entry::<InspectActorParams>("inspect_actor_params"),
+        entry::<InspectChassisParams>("inspect_chassis_params"),
+        entry::<ActPlayerBrainHopParams>("act_player_brain_hop_params"),
+        entry::<ActPlayerActivateAbilityParams>("act_player_activate_ability_params"),
+        entry::<ActInputCameraAnchorParams>("act_input_camera_anchor_params"),
+        entry::<ActPlayerSetDroneModeParams>("act_player_set_drone_mode_params"),
+        entry::<ActPlayerAttachModifierParams>("act_player_attach_modifier_params"),
+        entry::<ActPlayerDetachModifierParams>("act_player_detach_modifier_params"),
+        entry::<ActPlayerBoardParams>("act_player_board_params"),
+        entry::<ActPlayerDisembarkParams>("act_player_disembark_params"),
+        entry::<ObserveChassisSilhouetteParams>("observe_chassis_silhouette_params"),
         entry::<ActPlayerAbortParams>("act_player_abort_params"),
         entry::<ActMissionPauseParams>("act_mission_pause_params"),
         entry::<ActMissionResumeParams>("act_mission_resume_params"),

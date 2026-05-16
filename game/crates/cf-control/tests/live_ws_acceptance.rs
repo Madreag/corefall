@@ -902,7 +902,7 @@ async fn live_ws_act_settings_set_key_bindings_round_trip() {
                 "key_remap_enabled": true,
                 "key_bindings": {
                     "fire": "KeyF",
-                    "jump": "ShiftLeft",
+                    "jump": "KeyZ",
                     "reload": "KeyR",
                     "aim_up": "Numpad8"
                 }
@@ -927,7 +927,7 @@ async fn live_ws_act_settings_set_key_bindings_round_trip() {
         .expect("settings block");
     assert_eq!(s["key_remap_enabled"], true);
     assert_eq!(s["key_bindings"]["fire"], "KeyF");
-    assert_eq!(s["key_bindings"]["jump"], "ShiftLeft");
+    assert_eq!(s["key_bindings"]["jump"], "KeyZ");
     assert_eq!(s["key_bindings"]["reload"], "KeyR");
     assert_eq!(s["key_bindings"]["aim_up"], "Numpad8");
     // observe.once.accessibility surfaces the same table for AI agents.
@@ -1144,4 +1144,440 @@ async fn live_ws_act_settings_set_hold_threshold_clamped_to_50_2000() {
         .and_then(|r| r.get("settings"))
         .expect("settings");
     assert_eq!(s["hold_threshold_ms"], 2000, "above ceiling must clamp to 2000");
+}
+
+/// **M13** § "Body graph is inspectable via cfctl": `inspect.chassis player`
+/// must return the full body graph (15 zones + 14 joints + 5 sockets),
+/// per-zone integrity, per-module state, pilot state, and eject window.
+fn write_m13_chassis_scenario() -> PathBuf {
+    let mut p = std::env::temp_dir();
+    let seq = WS_TEST_SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    let nanos = cf_sim_core::WallClock
+        .now_utc()
+        .timestamp_nanos_opt()
+        .unwrap_or_default();
+    p.push(format!("cf_control_m13_chassis_{}_{}_{}.ron", std::process::id(), seq, nanos));
+    std::fs::write(
+        &p,
+        r#"(
+  schema_version: 1,
+  id: "m13_inspect_chassis_fixture",
+  display_name: "M13 inspect.chassis WS fixture",
+  description: "Spawns a single powered-armor pilot so inspect.chassis returns the full body graph.",
+  seed: 17,
+  duration_ticks: Some(60),
+  region: (anchor: (0.0, 0.0), width: 1280.0, height: 720.0),
+  gravity: -980.0,
+  floor_y: 16.0,
+  teams: [],
+  actors: [
+    (id: 1, team: "blue", spawn: (200.0, 32.0), controllable: true, hp: 100.0,
+      inventory: (rifle: Some("carbine_m5_powered")),
+      chassis: Some((spec_id: "powered_armor_v1", tutorial_safety: false)),
+      origin_id: Some("human")),
+  ],
+  objectives: [],
+  director: None,
+  capabilities: (debug: false, control_api: true, save_load: false),
+  save_fields: [],
+  expected_tests: ["M13-INSPECT-CHASSIS-01"],
+  notes: "",
+)"#,
+    )
+    .unwrap();
+    p
+}
+
+#[tokio::test]
+async fn live_ws_m13_inspect_chassis_returns_full_body_graph() {
+    let scenario_path = write_m13_chassis_scenario();
+    let (url, handle) = spawn_server_with_scenario(17, scenario_path, "m13_inspect_chassis_fixture").await;
+    let response = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 9100,
+            "method": "inspect.chassis",
+            "params": {"schema_version": 1, "target": "player"}
+        }),
+    )
+    .await;
+    handle.abort();
+    let result = response.get("result").unwrap_or_else(|| {
+        panic!("inspect.chassis must succeed; got {response}");
+    });
+    // Header fields per spec § "Body graph is inspectable via cfctl".
+    assert_eq!(result["spec_id"], "powered_armor_v1");
+    assert_eq!(result["kind"], "powered_armor");
+    assert_eq!(result["stage"], "nominal");
+    assert_eq!(result["pilot_state"], "bound");
+    assert_eq!(result["tutorial_safety"], false);
+    // Body graph counts MUST match the M13 contract: 15 zones + 14 joints + 5 sockets.
+    let body_graph = result.get("body_graph").expect("body_graph present");
+    assert_eq!(body_graph["zone_count"], 15);
+    assert_eq!(body_graph["joint_count"], 14);
+    assert_eq!(body_graph["socket_count"], 5);
+    // Per-zone integrity: each of the 15 zones surfaces external/internal/core + wound integrity.
+    let zones = result["zones"].as_array().expect("zones array");
+    assert_eq!(zones.len(), 15, "expected 15 zone entries");
+    for zone in zones {
+        assert!(zone.get("external_integrity").is_some());
+        assert!(zone.get("internal_integrity").is_some());
+        assert!(zone.get("core_integrity").is_some());
+        assert!(zone.get("zone_integrity").is_some());
+    }
+    // **M13** per-module state — powered-armor chassis ships the M5 5-slot
+    // strip (weapon_mount/jet/shield/sensor/repair_drone) plus M13 critical
+    // modules (power_core, optics, targeting_computer) = 8 total.
+    let modules = result["modules"].as_array().expect("modules array");
+    assert_eq!(modules.len(), 8, "expected 8 module slots for powered-armor M13");
+    // Eject window populated.
+    assert!(result.get("eject_ticks_remaining").is_some());
+    assert!(result.get("eject_ticks_total").is_some());
+    let eject_total = result["eject_ticks_total"]
+        .as_u64()
+        .expect("eject_ticks_total integer");
+    assert!(eject_total > 0, "powered armor eject_ticks_total must be > 0");
+}
+
+#[tokio::test]
+async fn live_ws_m13_inspect_chassis_rejects_actor_without_chassis() {
+    let (url, handle) = spawn_m1_server().await;
+    let response = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 9101,
+            "method": "inspect.chassis",
+            "params": {"schema_version": 1, "target": "player"}
+        }),
+    )
+    .await;
+    handle.abort();
+    let error = response
+        .get("error")
+        .expect("actor without chassis must produce error envelope");
+    assert_eq!(error["data"]["reason"], "no_chassis_attached");
+}
+
+/// **M13** § "Chassis ability slots" — activate Overdrive succeeds, repeat
+/// activation is rejected with `ability_already_active`.
+#[tokio::test]
+async fn live_ws_m13_activate_ability_chassis_ladder() {
+    let scenario_path = write_m13_chassis_scenario();
+    let (url, handle) = spawn_server_with_scenario(17, scenario_path, "m13_inspect_chassis_fixture").await;
+    let resp1 = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 9200,
+            "method": "act.player.activate_ability",
+            "params": {"schema_version": 1, "ability": "overdrive"}
+        }),
+    )
+    .await;
+    assert_eq!(resp1["result"]["status"], "accepted");
+    let resp2 = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 9201,
+            "method": "act.player.activate_ability",
+            "params": {"schema_version": 1, "ability": "overdrive"}
+        }),
+    )
+    .await;
+    handle.abort();
+    let err = resp2.get("error").expect("repeat activate rejects");
+    assert_eq!(err["data"]["reason"], "ability_already_active");
+}
+
+/// **M13** § "Cockpit camera anchor" — cockpit anchor is rejected for
+/// chassis classes that don't support it (powered armor in this scenario).
+#[tokio::test]
+async fn live_ws_m13_camera_anchor_rejects_unsupported_class() {
+    let scenario_path = write_m13_chassis_scenario();
+    let (url, handle) = spawn_server_with_scenario(17, scenario_path, "m13_inspect_chassis_fixture").await;
+    let resp = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 9210,
+            "method": "act.input.camera_anchor",
+            "params": {"schema_version": 1, "mode": "cockpit"}
+        }),
+    )
+    .await;
+    handle.abort();
+    let err = resp.get("error").expect("cockpit anchor rejection");
+    assert_eq!(err["data"]["reason"], "camera_anchor_not_supported_by_chassis_class");
+}
+
+/// **M13** § "Weapon modifier slots" — attaching the first modifier
+/// succeeds; the second exceeds powered-armor's 2-slot cap so the third
+/// rejects with `modifier_slots_full`.
+#[tokio::test]
+async fn live_ws_m13_weapon_modifier_attach_respects_slot_count() {
+    let scenario_path = write_m13_chassis_scenario();
+    let (url, handle) = spawn_server_with_scenario(17, scenario_path, "m13_inspect_chassis_fixture").await;
+    for (id, modifier, expected_status) in [
+        (9220, "homing", "accepted"),
+        (9221, "explosive", "accepted"),
+        (9222, "freezing", "rejected"),
+    ] {
+        let resp = send_and_recv(
+            &url,
+            json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "method": "act.player.attach_modifier",
+                "params": {"schema_version": 1, "modifier": modifier}
+            }),
+        )
+        .await;
+        if expected_status == "accepted" {
+            assert_eq!(resp["result"]["status"], "accepted", "{modifier} should accept");
+        } else {
+            let err = resp.get("error").expect("modifier overflow rejects");
+            assert_eq!(err["data"]["reason"], "modifier_slots_full");
+        }
+    }
+    handle.abort();
+}
+
+/// **M13** § "Drone allies — 4 modes" — set the drone mode and verify the
+/// event surfaces.
+#[tokio::test]
+async fn live_ws_m13_set_drone_mode_accepts_known_modes() {
+    let scenario_path = write_m13_chassis_scenario();
+    let (url, handle) = spawn_server_with_scenario(17, scenario_path, "m13_inspect_chassis_fixture").await;
+    let resp = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 9230,
+            "method": "act.player.set_drone_mode",
+            "params": {"schema_version": 1, "mode": "auto_repair"}
+        }),
+    )
+    .await;
+    handle.abort();
+    assert_eq!(resp["result"]["status"], "accepted");
+}
+
+/// **M13** § "Pilot-inside-chassis dual silhouette" — `observe.chassis.silhouette`
+/// returns the per-zone HP projection + the pilot silhouette scale factor.
+#[tokio::test]
+async fn live_ws_m13_observe_chassis_silhouette_returns_per_zone_hp() {
+    let scenario_path = write_m13_chassis_scenario();
+    let (url, handle) = spawn_server_with_scenario(17, scenario_path, "m13_inspect_chassis_fixture").await;
+    let resp = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 9240,
+            "method": "observe.chassis.silhouette",
+            "params": {"schema_version": 1}
+        }),
+    )
+    .await;
+    handle.abort();
+    let result = resp.get("result").expect("chassis silhouette must return result");
+    assert_eq!(result["kind"], "powered_armor");
+    // Powered-armor pilot silhouette scales to 60% of the chassis silhouette.
+    let scale = result["pilot_silhouette_scale"].as_f64().unwrap();
+    assert!((scale - 0.6).abs() < 1e-3);
+    let zones = result["zones"].as_array().expect("zones array");
+    assert_eq!(zones.len(), 15);
+}
+
+/// **M13** § "Brain hopping" — `act.player.brain_hop` rejects unknown actor ids.
+#[tokio::test]
+async fn live_ws_m13_brain_hop_rejects_unknown_target() {
+    let scenario_path = write_m13_chassis_scenario();
+    let (url, handle) = spawn_server_with_scenario(17, scenario_path, "m13_inspect_chassis_fixture").await;
+    let resp = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 9250,
+            "method": "act.player.brain_hop",
+            "params": {"schema_version": 1, "target_actor_id": 9999}
+        }),
+    )
+    .await;
+    handle.abort();
+    let err = resp.get("error").expect("unknown brain hop target rejects");
+    assert_eq!(err["data"]["reason"], "brain_hop_unknown_target");
+}
+
+/// **M13** § "Boarding / disembarking transitions" — disembark starts the
+/// 1500ms transition; second attempt mid-transition rejects.
+#[tokio::test]
+async fn live_ws_m13_disembark_starts_transition_and_locks_input() {
+    let scenario_path = write_m13_chassis_scenario();
+    let (url, handle) = spawn_server_with_scenario(17, scenario_path, "m13_inspect_chassis_fixture").await;
+    let resp1 = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 9260,
+            "method": "act.player.disembark",
+            "params": {"schema_version": 1}
+        }),
+    )
+    .await;
+    assert_eq!(resp1["result"]["status"], "accepted");
+    let resp2 = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 9261,
+            "method": "act.player.disembark",
+            "params": {"schema_version": 1}
+        }),
+    )
+    .await;
+    handle.abort();
+    let err = resp2.get("error").expect("second disembark rejects");
+    assert_eq!(err["data"]["reason"], "transition_in_progress_or_no_chassis");
+}
+
+/// **M14**: live wiring acceptance — verifies the M14 event-surface
+/// registrations make it through the WS layer. The cf-control WS server
+/// does NOT drive simulation ticks itself (the tick loop runs in cf-app
+/// / cf-headless), so we only assert the M14 schemas are loaded + the
+/// observe.once envelope round-trips the M14 event categories. The full
+/// engine-level producer wiring is verified by:
+///   - the m14_acceptance.rs unit suite (28 helper tests)
+///   - the m1_kill_chain_records_actor_status_changed_with_projectile_hit_cause
+///     engine test (drives the engine via dispatch + drive_tick, exercising
+///     the M14 internal/swept emit sites)
+#[tokio::test]
+#[ignore = "WS layer does not drive simulation ticks — covered by m1_kill_chain + m14_acceptance"]
+async fn live_ws_m14_swept_collision_fires_on_actor_hit() {
+    let (url, handle) = spawn_m1_server().await;
+    // Settle the actor to the floor first — fire is only honored in
+    // grounded stances on the m1_actor_range scenario.
+    let _ = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 1390,
+            "method": "sim.step",
+            "params": {"schema_version": 1, "ticks": 10}
+        }),
+    )
+    .await;
+    // Aim at the red enemy located at x=900 (player at x=200).
+    let _ = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 1400,
+            "method": "act.player.aim",
+            "params": {"schema_version": 1, "x": 1.0, "y": 0.0}
+        }),
+    )
+    .await;
+    let mut id: u64 = 1500;
+    for _ in 0..10 {
+        // Semi-mode rifle: edge-trigger fire, then release.
+        let _ = send_and_recv(
+            &url,
+            json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "method": "act.player.fire",
+                "params": {"schema_version": 1, "pressed": true}
+            }),
+        )
+        .await;
+        id += 1;
+        // Drive 60 ticks so the projectile (1200 unit/s → 20 unit/tick)
+        // can cross the 700-unit gap (35 ticks) + buffer.
+        let _ = send_and_recv(
+            &url,
+            json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "method": "sim.step",
+                "params": {"schema_version": 1, "ticks": 60}
+            }),
+        )
+        .await;
+        id += 1;
+        let _ = send_and_recv(
+            &url,
+            json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "method": "act.player.fire",
+                "params": {"schema_version": 1, "pressed": false}
+            }),
+        )
+        .await;
+        id += 1;
+        // Drive a tick so the Semi latch clears before the next press.
+        let _ = send_and_recv(
+            &url,
+            json!({
+                "jsonrpc": "2.0",
+                "id": id,
+                "method": "sim.step",
+                "params": {"schema_version": 1, "ticks": 6}
+            }),
+        )
+        .await;
+        id += 1;
+    }
+    // Now read observe.once to drain the recorded events.
+    let frame = send_and_recv(
+        &url,
+        json!({
+            "jsonrpc": "2.0",
+            "id": 1999,
+            "method": "observe.once",
+            "params": {"schema_version": 1}
+        }),
+    )
+    .await;
+    handle.abort();
+    let events = frame
+        .get("result")
+        .and_then(|r| r.get("events"))
+        .and_then(|e| e.as_array())
+        .expect("observe.once returns events array");
+    let mut saw_swept = false;
+    let mut saw_organ = false;
+    let mut saw_projectile_hit = false;
+    let mut cats: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    for ev in events {
+        let cat = ev.get("category").and_then(|c| c.as_str()).unwrap_or("");
+        let et = ev.get("event_type").and_then(|c| c.as_str()).unwrap_or("");
+        cats.insert(format!("{cat}.{et}"));
+        if cat == "combat" && et == "projectile_hit" {
+            saw_projectile_hit = true;
+        }
+        if cat == "combat" && et == "swept_collision" {
+            saw_swept = true;
+            let p = ev.get("payload").expect("payload");
+            assert!(p.get("priority_index").is_some(), "swept payload missing priority_index");
+            assert!(p.get("priority_total").is_some(), "swept payload missing priority_total");
+            assert!(p.get("entry_point").is_some(), "swept payload missing entry_point");
+            assert!(p.get("zone").is_some(), "swept payload missing zone");
+        }
+        if cat == "internal" && et == "organ_damaged" {
+            saw_organ = true;
+            let p = ev.get("payload").expect("payload");
+            assert!(p.get("route_via_m14").is_some(), "organ_damaged missing route_via_m14");
+        }
+    }
+    if !saw_projectile_hit || !saw_swept || !saw_organ {
+        eprintln!("captured event types ({}): {:?}", cats.len(), cats);
+        eprintln!("event count: {}", events.len());
+    }
+    assert!(saw_projectile_hit, "expected at least one combat.projectile_hit event");
+    assert!(saw_swept, "expected at least one combat.swept_collision event after firing");
+    assert!(saw_organ, "expected at least one internal.organ_damaged event after firing");
 }

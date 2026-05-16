@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/physics.ragdoll_activated.v0.1",
+  "title": "physics.ragdoll_activated",
+  "description": "M14 § Ragdoll-on-death per CCCP physics-authority transition. Fires when an actor's body becomes a physical debris object (DYING entry or DEAD). Subject to gravity + terrain collision. When Settings.reduced_motion=true the renderer skips the ragdoll animation but the event still fires (state is gameplay; the animation skip is cosmetic). Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "physics" },
+    "event_type": { "const": "ragdoll_activated" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "status": { "type": "string", "enum": ["dying", "dead"] },
+        "position": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+        "velocity": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+        "mass_kg": { "type": "number", "minimum": 0.0 },
+        "reduced_motion_skip": { "type": "boolean" },
+        "source_event_id": { "type": "string" }
+      },
+      "required": ["actor_id", "status", "position", "velocity", "mass_kg", "reduced_motion_skip", "source_event_id"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

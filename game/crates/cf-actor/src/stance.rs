@@ -174,9 +174,20 @@ pub fn is_cinematic(stance: Stance) -> bool {
     )
 }
 
-/// Per-stance bloom multiplier (lower = tighter cone). Mirrors the rule
-/// table in M6 spec § "Crouch reduces bloom + improves aim": crouch=0.6
-/// (40% reduction), prone=0.4, running=1.0 (baseline), airborne=3.0, etc.
+/// Per-stance bloom multiplier (lower = tighter cone). Implements the
+/// literal table from M1 spec § "Movement accuracy bloom" + M6 spec
+/// § "Crouch reduces bloom + improves aim":
+/// - Standing/Walking = 1.0× (baseline)
+/// - Crouching = 0.6× / Prone = 0.4× (M6 crouch/prone bonuses)
+/// - Running/Jumping = 7.0× (per OpenSoldat `Sprites.pas:4870` + spec line 244)
+/// - Jetting = 7.0× (per spec line 244)
+/// - Airborne / Prone-transition = 3.0×
+/// - Slide/Vault/Dive = cinematic transition penalties
+///
+/// **M14 audit pass 3 (GAP-M1-01)**: bumped Running from 1.4× to 7.0× and
+/// Jetting from 3.0× to 7.0× to match the literal spec table; previously
+/// the implementation was internally consistent but visibly drifted from
+/// the spec's OpenSoldat-baseline values.
 #[must_use]
 pub fn stance_bloom_factor(stance: Stance) -> f32 {
     match stance {
@@ -185,9 +196,17 @@ pub fn stance_bloom_factor(stance: Stance) -> f32 {
         Stance::Prone => 0.4,
         Stance::ProneWalk => 0.55,
         Stance::Lean => 0.8,
-        Stance::Running => 1.4,
-        Stance::Sprint | Stance::Climbing | Stance::RopeClimb | Stance::LadderClimb | Stance::PipeClimb => 2.0,
-        Stance::Airborne | Stance::Jetting => 3.0,
+        // Running / Jumping share the M1 spec line 244 literal (7.0×).
+        Stance::Running => 7.0,
+        // Sprint sits between Running and the cinematic stances. Spec line
+        // 444 lumps "running/jumping/jetting=7×"; Sprint as a separate
+        // stance carries the same 7.0× penalty.
+        Stance::Sprint => 7.0,
+        Stance::Climbing | Stance::RopeClimb | Stance::LadderClimb | Stance::PipeClimb => 2.0,
+        // Jetting matches spec literal 7.0×.
+        Stance::Jetting => 7.0,
+        // Airborne + prone-transition = 3.0× per spec line 444.
+        Stance::Airborne => 3.0,
         Stance::Slide => 0.9,
         Stance::Dive | Stance::Vault => 2.5,
         _ => 1.0,

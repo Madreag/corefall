@@ -56,6 +56,10 @@ pub enum M6Action {
     MeleeBash,
     /// Edge-trigger close-range kick.
     MeleeKick,
+    /// **M14 audit pass 3 (GAP-M6-01)**: edge-trigger sprint-fueled
+    /// shoulder check. Distinct from kick because it requires the actor
+    /// to be in Sprint stance and delivers a higher knockdown probability.
+    MeleeShoulderCheck,
     /// Edge-trigger use the equipped tool by id.
     UseTool { tool_kind: String },
     /// Edge-trigger attach a suppressor to the currently selected weapon.
@@ -100,6 +104,7 @@ impl M6Action {
             M6Action::ThrowGrenade => "act.player.throw_grenade",
             M6Action::MeleeBash => "act.player.melee_bash",
             M6Action::MeleeKick => "act.player.melee_kick",
+            M6Action::MeleeShoulderCheck => "act.player.melee_shoulder_check",
             M6Action::UseTool { .. } => "act.player.use_tool",
             M6Action::AttachSuppressor => "act.player.attach_suppressor",
             M6Action::DetachSuppressor => "act.player.detach_suppressor",
@@ -190,6 +195,7 @@ mod tests {
             M6Action::ThrowGrenade,
             M6Action::MeleeBash,
             M6Action::MeleeKick,
+            M6Action::MeleeShoulderCheck,
             M6Action::UseTool {
                 tool_kind: "drill".into(),
             },

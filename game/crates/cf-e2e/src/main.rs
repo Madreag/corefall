@@ -1517,6 +1517,39 @@ mod tests {
         assert_eq!(lookup(&obs, "actor.player.hp"), Some(Value::from(80)));
     }
 
+    /// **M13** § "cf-e2e: `--expect actor.<id|player>.chassis.pilot_state=<value>`
+    /// lookup support". The actor-by-id resolver already supports nested chassis
+    /// paths; this test pins the contract so a future refactor can't silently
+    /// regress the dotted path drill-down used by cf-e2e scripts.
+    #[test]
+    fn actor_player_chassis_pilot_state_resolves_via_actor_resolver() {
+        let obs = serde_json::json!({
+            "actors": [{
+                "id": 1,
+                "chassis": {
+                    "spec_id": "powered_armor_v1",
+                    "stage": "eject",
+                    "pilot_state": "ejecting",
+                    "weapon_jammed": false
+                }
+            }],
+            "player_actor_id": 1,
+            "events": [],
+        });
+        assert_eq!(
+            lookup(&obs, "actor.player.chassis.pilot_state"),
+            Some(Value::String("ejecting".into()))
+        );
+        assert_eq!(
+            lookup(&obs, "actor.1.chassis.pilot_state"),
+            Some(Value::String("ejecting".into()))
+        );
+        assert_eq!(
+            lookup(&obs, "actor.player.chassis.stage"),
+            Some(Value::String("eject".into()))
+        );
+    }
+
     #[test]
     fn bare_prefix_preserves_mission_field_paths() {
         let obs = serde_json::json!({

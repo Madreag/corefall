@@ -1,0 +1,38 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/body.gib_created.v0.1",
+  "title": "body.gib_created",
+  "description": "M14 § Gib spawning with authored data per CCCP MOSRotating::CreateGibsWhenGibbing. One event per gib spawn batch (m_GibParticle * m_Count copies at random angles within m_Spread, m_MinVelocity..m_MaxVelocity speed range). Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "body" },
+    "event_type": { "const": "gib_created" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "parent_zone": { "type": "string" },
+        "gib_particle": { "type": "string" },
+        "count": { "type": "integer", "minimum": 1 },
+        "spread_radians": { "type": "number", "minimum": 0.0 },
+        "min_velocity": { "type": "number", "minimum": 0.0 },
+        "max_velocity": { "type": "number", "minimum": 0.0 },
+        "life_variation": { "type": "number", "minimum": 0.0 },
+        "spread_mode": { "type": "string", "enum": ["SpreadRandom", "SpreadEven", "SpreadSpiral"] },
+        "inherits_velocity": { "type": "boolean" },
+        "inherits_angular_velocity": { "type": "boolean" },
+        "ignores_team_hits": { "type": "boolean" },
+        "origin_kind": { "type": "string" },
+        "spawn_position": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+        "source_event_id": { "type": "string" }
+      },
+      "required": ["actor_id", "parent_zone", "gib_particle", "count", "spread_radians", "min_velocity", "max_velocity", "spread_mode", "origin_kind", "spawn_position", "source_event_id"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

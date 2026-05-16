@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "id": "load_a_powered_armor",
+  "display_name": "Powered Armor Combat",
+  "role_ids": ["carbine_m5_powered"],
+  "provenance": "spec/equipment-loadout#LOAD-A.powered_armor",
+  "description": "M13 LOAD-A powered-armor loadout. Powered carbine on the right-hand socket; chassis carries jet/shield/sensor modules per powered_armor_v1 chassis spec."
+}

@@ -316,6 +316,12 @@
       "description": "**M5**: chassis projection for `cfctl observe` / `inspect`.",
       "type": "object",
       "properties": {
+        "bleed_rate_per_sec": {
+          "description": "**M14**: total per-second bleed rate (sum across all bleeding zones)\nfor the actor. Drives the HUD bleeding indicator.",
+          "type": "number",
+          "format": "float",
+          "default": 0.0
+        },
         "destroyed_zones": {
           "type": "array",
           "items": {
@@ -339,6 +345,14 @@
         "kind": {
           "type": "string"
         },
+        "limb_states": {
+          "description": "**M14**: per-zone limb-loss state machine projection. One entry per\nchassis zone with the current [`cf_physics::ZoneState`] label, plus\nthe bleed_rate per-second derived from the zone's state.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/LimbStateView"
+          }
+        },
         "mass_kg": {
           "type": "number",
           "format": "float"
@@ -351,6 +365,11 @@
         },
         "pilot_state": {
           "type": "string"
+        },
+        "ragdoll_state": {
+          "description": "**M14**: ragdoll authority state for the actor (`animated` /\n`activating` / `active` / `static_collapse`). Mirrors\n[`cf_physics::RagdollState`].",
+          "type": "string",
+          "default": "animated"
         },
         "salvaged_module_ids": {
           "type": "array",
@@ -432,6 +451,35 @@
         "wound_integrity",
         "destroyed",
         "zone_integrity"
+      ]
+    },
+    "LimbStateView": {
+      "description": "**M14**: per-zone limb state for `cfctl inspect chassis`.",
+      "type": "object",
+      "properties": {
+        "bleed_multiplier": {
+          "type": "number",
+          "format": "float"
+        },
+        "bleeds": {
+          "type": "boolean"
+        },
+        "functional_consequence_active": {
+          "type": "boolean"
+        },
+        "state": {
+          "type": "string"
+        },
+        "zone": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "zone",
+        "state",
+        "functional_consequence_active",
+        "bleeds",
+        "bleed_multiplier"
       ]
     },
     "ModuleStateView": {

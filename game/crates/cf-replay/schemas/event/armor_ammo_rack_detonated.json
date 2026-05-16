@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/armor.ammo_rack_detonated.v0.1",
+  "title": "armor.ammo_rack_detonated",
+  "description": "M14 § Ammo rack catastrophic detonation per CCCP MOSRotating::GibThis. Fires when a ray-traversal hit lands on a module with kind=AmmoRack and the damage is sufficient to cook off the round stockpile. Producer fills at M14. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "armor" },
+    "event_type": { "const": "ammo_rack_detonated" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "module_id": { "type": "string" },
+        "damage": { "type": "number", "minimum": 0.0 },
+        "source_event_id": { "type": "string" }
+      },
+      "required": ["actor_id", "module_id", "damage", "source_event_id"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

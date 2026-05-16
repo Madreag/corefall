@@ -1651,6 +1651,11 @@ mod tests {
             limb_loss: cf_actor::LimbLossFlags::default(),
             inventory_extended: Vec::new(),
             weapon_state: cf_actor::WeaponStateView::default(),
+            is_brain: false,
+            hit_reaction_kind: String::new(),
+            hit_reaction_ticks_remaining: 0,
+            drone_mode: None,
+            drone_fuel: None,
         };
         let line = stance_line("airborne", Some(&player));
         assert!(line.contains("AIRBORNE"));

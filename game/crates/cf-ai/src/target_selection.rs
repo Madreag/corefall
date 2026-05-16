@@ -21,11 +21,19 @@ impl Default for TargetWeights {
     fn default() -> Self {
         // Defaults match the spec's reactive_guard behavior: prefer the
         // player when in LOS, fall back to the reactor.
+        //
+        // **M14 audit fix** (pre-existing M9 bug): `threat` (player-aliveness)
+        // MUST dominate `value` (reactor-aliveness) when both are visible —
+        // otherwise the AI ignores the player and snipes the reactor through
+        // the player's body. Swap the two weights so the
+        // `player_in_los_outscores_reactor` regression test holds while
+        // `reactor_wins_when_player_out_of_los` (player out of LOS) still
+        // resolves to the reactor.
         Self {
             proximity: 0.4,
             los: 0.3,
-            threat: 0.2,
-            value: 0.4,
+            threat: 0.4,
+            value: 0.2,
         }
     }
 }

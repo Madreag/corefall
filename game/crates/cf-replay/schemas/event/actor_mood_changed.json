@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/actor.mood_changed.v0.1",
+  "title": "actor.mood_changed",
+  "description": "M14 audit pass 3 (GAP-M7-02): spec-canonical alias for ai.mood_changed. Producer dual-emits both categories so consumers reading the M7 spec literal taxonomy find this under `actor.mood_changed`. Same payload as ai.mood_changed.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "actor" },
+    "event_type": { "const": "mood_changed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "from_mood": { "type": "string" },
+        "to_mood": { "type": "string" }
+      },
+      "required": ["actor_id", "to_mood"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/mission.objective_paused.v0.1",
+  "title": "mission.objective_paused",
+  "description": "M2 audit pass (GAP-M2-01 LOW fix): per-objective pause emission. Fires when `act.mission.pause` succeeds for a specific objective id. Producer in cf-control/src/engine.rs. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "mission" },
+    "event_type": { "const": "objective_paused" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "objective_id": { "type": "string" },
+        "previous_status": { "type": "string" },
+        "paused_at_tick": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["objective_id", "paused_at_tick"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

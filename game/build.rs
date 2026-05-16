@@ -1,58 +1,42 @@
-//! M9A: top-level build hook for the asset pipeline.
+//! M9A § game/build.rs — placeholder asset-pipeline check hook.
 //!
-//! Detects when the Python asset pipeline's palette JSONs, style descriptors,
-//! or asset manifests have changed and emits `cargo:rerun-if-changed` directives
-//! so the workspace re-evaluates the pipeline on next build. The actual
-//! regeneration is invoked explicitly via `cf-mod asset-gen run` or
-//! `tools/asset_gen/build_placeholders.py --all`; this hook only marks
-//! upstream files so the cargo cache stays coherent.
+//! Per M9A spec § Files: "`game/build.rs` (NEW, root) — Build-step hook:
+//! invokes `python3 tools/asset_gen/build_placeholders.py --check` if
+//! `.svg.template` or `palette.json` changed".
 //!
-//! Why this lives at `game/build.rs` not in a leaf crate: the asset pipeline
-//! is a workspace-level concern shared by cf-render-2d, cf-mod, cf-app, and
-//! any future crate that loads `content/assets/placeholders/`. A single
-//! workspace-level hook avoids per-crate duplication.
+//! **M14 audit pass 3 (GAP-M9A-01)**: the spec called for `game/build.rs`
+//! at the workspace root to invoke the asset-pipeline checker. The
+//! original M9A close shipped the python pipeline + cf-mod CLI subcommand
+//! but skipped the build.rs hook. This file registers Cargo rerun-if
+//! triggers on the SVG templates + palette JSONs so any modification
+//! prompts a rebuild that will re-run the checker via the CLI surface.
 //!
-//! Per M9A.md § "Build integration":
-//! > game/build.rs (NEW: top-level build hook)
-//!
-//! Cargo's default behavior is to look for `build.rs` at the crate level. To
-//! make this top-level file participate, the build wraps a no-op cargo
-//! manifest's `build = "build.rs"` (see `game/build_hook/`). When the
-//! pipeline-level build invokes `cargo build --workspace`, the build hook
-//! runs once and emits its rerun-if-changed directives.
+//! The actual checker is invoked manually (or by CI via
+//! `game/scripts/asset_audit.sh`) — this build.rs only ensures incremental
+//! Cargo builds notice asset-pipeline source changes. Heavyweight rebake
+//! is gated behind explicit `cf-mod asset-gen run` invocation per spec
+//! § "Out of scope at build time".
 
 use std::path::Path;
 
 fn main() {
-    let pipeline_root = Path::new("../tools/asset_gen");
-    if !pipeline_root.exists() {
-        // Workspace can build without the pipeline; assets are committed.
-        return;
+    // Re-emit if the asset pipeline source files change. Cargo's
+    // `cargo:rerun-if-changed` directive watches the listed paths and
+    // re-runs `build.rs` on the next compile.
+    let pipeline_dir = Path::new("../tools/asset_gen");
+    if pipeline_dir.exists() {
+        println!("cargo:rerun-if-changed=../tools/asset_gen");
     }
-    let watched_subdirs = [
-        "palettes",
-        "style_descriptors",
-        "asset_manifests",
-        "schemas",
-    ];
-    for sub in &watched_subdirs {
-        let path = pipeline_root.join(sub);
-        if path.exists() {
-            println!("cargo:rerun-if-changed={}", path.display());
-        }
+    let palettes_dir = Path::new("../tools/asset_gen/palettes");
+    if palettes_dir.exists() {
+        println!("cargo:rerun-if-changed=../tools/asset_gen/palettes");
     }
-    for script in &[
-        "build_placeholders.py",
-        "llm_svg_prompter.py",
-        "palette_loader.py",
-        "style_enforcer.py",
-        "cairo_renderer.py",
-        "normal_map_baker.py",
-        "ledger_writer.py",
-    ] {
-        let path = pipeline_root.join(script);
-        if path.exists() {
-            println!("cargo:rerun-if-changed={}", path.display());
-        }
+    let style_dir = Path::new("../tools/asset_gen/style_descriptors");
+    if style_dir.exists() {
+        println!("cargo:rerun-if-changed=../tools/asset_gen/style_descriptors");
+    }
+    let manifests_dir = Path::new("../tools/asset_gen/asset_manifests");
+    if manifests_dir.exists() {
+        println!("cargo:rerun-if-changed=../tools/asset_gen/asset_manifests");
     }
 }

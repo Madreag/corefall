@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "id": "load_a_light_mech",
+  "display_name": "Light Mech Strike",
+  "role_ids": ["rifle_m5_mech_heavy"],
+  "provenance": "spec/equipment-loadout#LOAD-A.light_mech",
+  "description": "M13 LOAD-A light-mech loadout. Mech autocannon on the right-hand socket; chassis carries jet/shield/sensor/repair_drone modules per light_mech_v1 chassis spec."
+}

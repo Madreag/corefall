@@ -410,6 +410,31 @@ pub struct HitOutcome {
     /// `chassis.armor_layer_damaged` / `module_state_changed` events.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub chassis_outcome: Option<cf_chassis::ZoneDamageOutcome>,
+    /// **M14 audit pass 3 (Finding 4)**: entry parameter `t` from the
+    /// swept-segment intersection, in [0, 1]. Lets the engine emit
+    /// accurate `combat.swept_collision.entry_t` even when the hit
+    /// resolves multiple ticks after the projectile spawn.
+    #[serde(default)]
+    pub entry_t: f32,
+    /// **M14 audit pass 3 (Finding 4)**: world-space ray-origin position
+    /// (projectile start of this tick). Lets the engine emit
+    /// `combat.swept_collision.ray_origin` accurately even for delayed hits.
+    #[serde(default)]
+    pub ray_origin: Vec2,
+    /// **M14 audit pass 3 (Finding 4)**: normalized ray direction at the
+    /// instant of hit. Lets the engine emit
+    /// `combat.swept_collision.ray_direction` accurately for delayed hits.
+    #[serde(default = "default_ray_direction")]
+    pub ray_direction: Vec2,
+    /// **M14 audit pass 3 (Finding 4)**: distance from ray_origin to the
+    /// hit_position along the ray. Lets the engine emit
+    /// `combat.swept_collision.distance_traveled` without reconstruction.
+    #[serde(default)]
+    pub distance_traveled: f32,
+}
+
+fn default_ray_direction() -> Vec2 {
+    Vec2::new(1.0, 0.0)
 }
 
 fn default_hit_zone() -> String {
@@ -1343,10 +1368,25 @@ fn step_projectiles(state: &mut ActorSimState, deps: StepDeps, report: &mut Step
         if projectile.remaining_ticks > 0 {
             projectile.remaining_ticks -= 1;
         }
-        // Swept segment-vs-AABB so fast projectiles cannot tunnel through actors that
-        // sit between two sampled positions; we pick the earliest entry along the segment
-        // (BTreeMap iteration order breaks ties by ActorId for determinism).
-        let mut hit_target: Option<(ActorId, Vec2, f32, f32)> = None;
+        // **M14 audit pass 3 (Findings 3 + 4)**: swept-collision priority
+        // queue. Collect EVERY actor whose AABB the segment crosses this
+        // tick, sort by entry-t ascending (ties: ActorId), then resolve
+        // hits in priority order. The projectile carries `damage` as
+        // energy; each hit absorbs energy + the projectile continues
+        // through actors as long as energy > 0 (per CCCP Atom::Travel +
+        // MovableObject::CollideAtPoint). Without this, every projectile
+        // could only ever hit one actor per tick — even though the M14
+        // swept-collision priority queue helper expects multi-actor hits.
+        //
+        // The ray origin + direction + entry_t + distance_traveled are
+        // latched on each HitOutcome so the engine emits the
+        // `combat.swept_collision` event with accurate metadata even when
+        // a multi-tick projectile resolves its hits on later ticks.
+        let seg_dx = end.x - start.x;
+        let seg_dy = end.y - start.y;
+        let seg_len = (seg_dx * seg_dx + seg_dy * seg_dy).sqrt().max(f32::EPSILON);
+        let ray_dir = Vec2::new(seg_dx / seg_len, seg_dy / seg_len);
+        let mut candidates: Vec<(ActorId, f32, Vec2)> = Vec::new();
         for actor in state.world.actors.values() {
             if actor.id == projectile.owner {
                 continue;
@@ -1355,30 +1395,52 @@ fn step_projectiles(state: &mut ActorSimState, deps: StepDeps, report: &mut Step
                 continue;
             }
             if let Some(t) = segment_hits_aabb(start, end, actor.position, actor.half_extents) {
-                let hit_pos = Vec2::new(start.x + (end.x - start.x) * t, start.y + (end.y - start.y) * t);
-                match hit_target {
-                    Some((_, _, _, best_t)) if t >= best_t => {}
-                    _ => hit_target = Some((actor.id, hit_pos, projectile.damage, t)),
-                }
+                let hit_pos = Vec2::new(start.x + seg_dx * t, start.y + seg_dy * t);
+                candidates.push((actor.id, t, hit_pos));
             }
         }
-        let hit_target = hit_target.map(|(id, pos, dmg, _)| (id, pos, dmg));
-        if let Some((target_id, hit_pos, damage)) = hit_target {
+        candidates.sort_by(|a, b| {
+            a.1.partial_cmp(&b.1)
+                .unwrap_or(std::cmp::Ordering::Equal)
+                .then_with(|| a.0.cmp(&b.0))
+        });
+
+        let mut any_hit = false;
+        let mut remaining_damage = projectile.damage;
+        let candidate_count = candidates.len();
+        for (idx, (target_id, entry_t, hit_pos)) in candidates.into_iter().enumerate() {
+            if remaining_damage <= 0.0 {
+                break;
+            }
+            let distance_traveled = seg_len * entry_t;
             let target = state
                 .world
                 .actors
                 .get_mut(&target_id)
                 .expect("hit target must exist by construction");
             let previous_status = target.status;
-            // **M5**: when the target has a chassis, route through layered armor;
-            // otherwise fall back to the legacy flat-HP path so M1.5 and pre-M5
-            // scenarios keep their hit semantics.
+            // **M14**: passthrough energy decays per hit. The projectile
+            // either STOPS in the target (delivers full remaining damage)
+            // OR passes through (60% absorbed by the actor, 40% continues
+            // to the next actor in priority order).
+            //
+            // **M14 audit pass 4 (Finding 5)**: energy is conserved across
+            // passthroughs (was 1.66× over-applied), AND when there's only
+            // ONE candidate (the common single-target case), the entire
+            // remaining damage lands on that one actor — the 60/40 split
+            // applies ONLY to actual passthroughs.
+            let is_last_candidate = idx + 1 == candidate_count;
+            let damage_this_hit = if is_last_candidate {
+                remaining_damage
+            } else {
+                remaining_damage * 0.6
+            };
             let (chassis_outcome, zone_label) = if target.chassis.is_some() {
                 let zone = zone_from_hit(target.position, target.half_extents, hit_pos);
-                let (_, outcome) = target.apply_zone_damage(zone, damage, "projectile_hit");
+                let (_, outcome) = target.apply_zone_damage(zone, damage_this_hit, "projectile_hit");
                 (Some(outcome), zone.as_str().to_string())
             } else {
-                let _ = target.apply_damage(damage);
+                let _ = target.apply_damage(damage_this_hit);
                 (None, "torso".to_string())
             };
             let new_status = target.status;
@@ -1387,12 +1449,27 @@ fn step_projectiles(state: &mut ActorSimState, deps: StepDeps, report: &mut Step
                 shooter: projectile.owner,
                 target: target_id,
                 hit_position: hit_pos,
-                damage,
+                damage: damage_this_hit,
                 previous_status,
                 new_status,
                 zone: zone_label,
                 chassis_outcome,
+                entry_t,
+                ray_origin: start,
+                ray_direction: ray_dir,
+                distance_traveled,
             });
+            any_hit = true;
+            if is_last_candidate {
+                remaining_damage = 0.0;
+            } else {
+                remaining_damage = (remaining_damage - damage_this_hit).max(0.0);
+            }
+            if remaining_damage < 0.5 {
+                break;
+            }
+        }
+        if any_hit {
             continue;
         }
         let oob = projectile.position.x < deps.region_min_x - 64.0
@@ -2185,6 +2262,108 @@ mod tests {
             "settled item must rest at floor; got y={} floor_y={}",
             item.position.y,
             state.world.floor_y
+        );
+    }
+
+    /// **M14 audit pass 3 (Finding 3)**: a single projectile that crosses
+    /// multiple actor AABBs in one tick MUST emit multiple HitOutcomes —
+    /// one per actor — in priority (entry-t ascending) order. This is the
+    /// canonical regression for the swept-collision priority queue's
+    /// production wiring.
+    #[test]
+    fn projectile_crosses_multiple_actors_emits_one_hit_per_actor_in_priority_order() {
+        let mut state = ActorSimState::new(ActorWorld {
+            floor_y: 0.0,
+            ..Default::default()
+        });
+        // Three target dummies in a row at x=100/200/300, y=64.
+        for (id, x) in [(2u64, 100.0_f32), (3, 200.0), (4, 300.0)] {
+            let a = ActorState::player(
+                ActorId(id),
+                "red",
+                Vec2::new(x, 64.0),
+                100.0,
+                Inventory::default(),
+            );
+            state.world.actors.insert(ActorId(id), a);
+        }
+        // Shooter at x=0, y=64, firing right.
+        let shooter = ActorId(1);
+        let sa = ActorState::player(
+            shooter,
+            "blue",
+            Vec2::new(0.0, 64.0),
+            100.0,
+            Inventory::default(),
+        );
+        state.world.actors.insert(shooter, sa);
+        // Spawn a high-velocity projectile that crosses all three dummies in one tick.
+        state.projectiles.push(Projectile {
+            id: 99,
+            owner: shooter,
+            origin: Vec2::new(0.0, 64.0),
+            position: Vec2::new(0.0, 64.0),
+            velocity: Vec2::new(24000.0, 0.0),
+            damage: 25.0,
+            remaining_ticks: 60,
+        });
+        let mut intents: BTreeMap<ActorId, ControlIntent> = BTreeMap::new();
+        let report = step_no_rng(&mut state, &mut intents, deps());
+        // Must record THREE hits — one per actor along the swept path.
+        let hits_for_proj: Vec<&HitOutcome> = report.hits.iter().filter(|h| h.projectile_id == 99).collect();
+        assert_eq!(
+            hits_for_proj.len(),
+            3,
+            "swept projectile must record one hit per crossed actor; got {} hits",
+            hits_for_proj.len()
+        );
+        // Entry-t monotonic (closest first).
+        for w in hits_for_proj.windows(2) {
+            assert!(
+                w[0].entry_t <= w[1].entry_t,
+                "hits must be ordered by entry_t ascending"
+            );
+        }
+        // Targets in priority order: ActorId(2)=x100 first, ActorId(4)=x300 last.
+        assert_eq!(hits_for_proj[0].target, ActorId(2));
+        assert_eq!(hits_for_proj[1].target, ActorId(3));
+        assert_eq!(hits_for_proj[2].target, ActorId(4));
+        // Ray metadata populated from sim (not reconstructed).
+        for hit in &hits_for_proj {
+            assert!((hit.ray_direction.x - 1.0).abs() < 1e-3, "ray direction must be +x");
+            assert!((hit.ray_origin.x - 0.0).abs() < 1.0, "ray origin near projectile start");
+            assert!(hit.distance_traveled > 0.0, "distance_traveled must be set");
+        }
+        // **M14 audit pass 4 (Finding 5)**: energy is conserved across
+        // passthroughs. Each non-last hit absorbs 60% of the projectile's
+        // remaining damage (40% continues). The LAST actor in priority
+        // order stops the projectile and absorbs whatever is left.
+        let original = 25.0_f32;
+        assert!(
+            (hits_for_proj[0].damage - original * 0.6).abs() < 0.01,
+            "first hit must absorb 60% of original damage: {} vs {}",
+            hits_for_proj[0].damage,
+            original * 0.6
+        );
+        // After first hit: remaining = 25 - 15 = 10. Second hit (not last)
+        // absorbs 6.0; remaining = 10 - 6.0 = 4.0.
+        assert!(
+            (hits_for_proj[1].damage - 6.0).abs() < 0.01,
+            "second hit must absorb 60% of (10.0) = 6.0; got {}",
+            hits_for_proj[1].damage
+        );
+        // Third hit IS the last candidate → absorbs the full remaining 4.0.
+        assert!(
+            (hits_for_proj[2].damage - 4.0).abs() < 0.01,
+            "third (last) hit must stop the projectile and absorb 4.0; got {}",
+            hits_for_proj[2].damage
+        );
+        let total: f32 = hits_for_proj.iter().map(|h| h.damage).sum();
+        assert!(
+            (total - original).abs() < 0.01,
+            "total damage ({}) must equal projectile original damage ({})",
+            total,
+            original
         );
     }
 }

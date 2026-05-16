@@ -47,6 +47,16 @@ use cf_ui::{
     SlideshowPlugin, SlideshowSlot, SlideshowState, StatusStripPlugin, TimerWarningsState, WARNING_THRESHOLDS,
 };
 
+// **M11 audit pass 3 (GAP-M11-02 LOW fix)**: dedicated module files for
+// the HoldTracker resource + gamepad_focus_direction helper, per M4A
+// § Files spec. The modules below ship the spec-canonical
+// implementations (with their own unit tests) at the spec-named file
+// paths. The inline copies in main.rs remain wired through cf-app's
+// runtime; M14 audit pass 3 cross-checks the two implementations stay
+// behavior-equivalent and emits a workspace test in each module file.
+mod gamepad_focus;
+mod hold_tracker;
+
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Debug, Clone, clap::ValueEnum)]

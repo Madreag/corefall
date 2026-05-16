@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/ux.plan_composed.v0.1",
+  "title": "ux.plan_composed",
+  "description": "M14 audit pass 3 (GAP-M8-01): spec-canonical alias for ai.plan_composed. Producer dual-emits both categories so consumers reading the M8 spec literal taxonomy find this under `ux.plan_composed`. Same payload as ai.plan_composed.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "ux" },
+    "event_type": { "const": "plan_composed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "step_count": { "type": "integer", "minimum": 0 }
+      },
+      "required": ["actor_id", "step_count"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

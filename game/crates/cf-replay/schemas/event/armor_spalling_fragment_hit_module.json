@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/armor.spalling_fragment_hit_module.v0.1",
+  "title": "armor.spalling_fragment_hit_module",
+  "description": "M14 § War Thunder-style spalling — one spalling fragment hit one chassis interior module. Producer fills at M14. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "armor" },
+    "event_type": { "const": "spalling_fragment_hit_module" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "fragment_id": { "type": "string" },
+        "module_id": { "type": "string" },
+        "damage": { "type": "number", "minimum": 0.0 },
+        "source_event_id": { "type": "string" }
+      },
+      "required": ["fragment_id", "module_id", "damage", "source_event_id"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

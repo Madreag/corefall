@@ -1,0 +1,8 @@
+{
+  "schema_version": 1,
+  "id": "load_a_infantry",
+  "display_name": "Infantry Standard",
+  "role_ids": ["rifle_m1_default"],
+  "provenance": "spec/equipment-loadout#LOAD-A.infantry",
+  "description": "M13 LOAD-A infantry baseline. Service rifle on the right-hand socket; no chassis modules. Canonical seed mirrors cf_equipment::loadout(\"load_a_infantry\")."
+}

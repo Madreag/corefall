@@ -1624,6 +1624,7 @@ dependencies = [
  "cf-chassis",
  "cf-debug",
  "cf-equipment",
+ "cf-internal",
  "cf-killcam",
  "cf-localization",
  "cf-material",
@@ -1692,6 +1693,7 @@ name = "cf-equipment"
 version = "0.0.1"
 dependencies = [
  "serde",
+ "serde_json",
  "tracing",
 ]
 
@@ -1711,6 +1713,15 @@ dependencies = [
  "tokio",
  "tracing",
  "tracing-subscriber",
+]
+
+[[package]]
+name = "cf-internal"
+version = "0.0.1"
+dependencies = [
+ "serde",
+ "serde_json",
+ "tracing",
 ]
 
 [[package]]
@@ -1759,6 +1770,7 @@ dependencies = [
  "blake3",
  "cf-asset-ledger",
  "cf-control",
+ "cf-equipment",
  "cf-material",
  "cf-replay",
  "clap",

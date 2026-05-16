@@ -968,6 +968,14 @@ fn walk(dir: &Path, report: &mut ValidationReport) {
             || (path.extension().and_then(|s| s.to_str()) == Some("json")
                 && path.components().any(|c| c.as_os_str() == "materials"))
             || path.file_name().and_then(|s| s.to_str()) == Some("ledger.jsonl")
+            // **M13**: `content/equipment/loadouts/*.json` loadout
+            // descriptors validated against `cf_equipment::LoadoutFile`.
+            || (path.extension().and_then(|s| s.to_str()) == Some("json")
+                && path.parent().and_then(|p| p.file_name()).and_then(|s| s.to_str()) == Some("loadouts"))
+            // **M13**: top-level `content/equipment/roles.json` mod-tooling export.
+            || (path.extension().and_then(|s| s.to_str()) == Some("json")
+                && path.file_name().and_then(|s| s.to_str()) == Some("roles.json")
+                && path.parent().and_then(|p| p.file_name()).and_then(|s| s.to_str()) == Some("equipment"))
             // **M5**: cf-mod validate <cf-replay/schemas/> covers all per-event
             // JSON schemas — every <family>_<type>.json under schemas/event/
             // plus the envelope schemas under schemas/v0_1/ + schemas/v1/.
@@ -1114,8 +1122,38 @@ fn validate_one(path: &Path, report: &mut ValidationReport) {
                 validate_tool_registry(path, report);
                 return;
             }
+            Some("roles.json") => {
+                // M13: roles.json mirrors cf_equipment::role_records(). The
+                // file is presentation-only (mod tools + scenario editors);
+                // structural validation only checks well-formed JSON +
+                // top-level shape so an edit doesn't accidentally break the
+                // export tool. Live role definitions remain authoritative
+                // in cf_equipment::role_records().
+                validate_roles_json(path, report);
+                return;
+            }
             _ => {}
         }
+    }
+    // **M13**: validate `content/equipment/loadouts/*.json` against the
+    // canonical [`cf_equipment::LoadoutFile`] schema (schema_version, role-id
+    // resolution, id↔filename parity). See spec § "Equipment loadouts are
+    // data-driven".
+    if path
+        .parent()
+        .and_then(|p| p.file_name())
+        .and_then(|s| s.to_str())
+        == Some("loadouts")
+        && path
+            .parent()
+            .and_then(|p| p.parent())
+            .and_then(|p| p.file_name())
+            .and_then(|s| s.to_str())
+            == Some("equipment")
+        && path.extension().and_then(|s| s.to_str()) == Some("json")
+    {
+        validate_loadout_file(path, report);
+        return;
     }
     if path.parent().and_then(|p| p.file_name()).and_then(|s| s.to_str()) == Some("scenarios")
         || path
@@ -1861,6 +1899,91 @@ fn validate_tool_registry(path: &Path, report: &mut ValidationReport) {
     } else {
         report.add_error(path.to_path_buf(), messages.join("; "));
     }
+}
+
+/// **M13**: validate one `content/equipment/loadouts/*.json` file.
+/// Verifies the schema_version, id↔filename parity, non-empty `role_ids`,
+/// and that every referenced role id resolves through `cf_equipment::role_record`.
+fn validate_loadout_file(path: &Path, report: &mut ValidationReport) {
+    let raw = match fs::read_to_string(path) {
+        Ok(t) => t,
+        Err(err) => {
+            report.add_error(path.to_path_buf(), format!("read failed: {err}"));
+            return;
+        }
+    };
+    let stem = path
+        .file_stem()
+        .and_then(|s| s.to_str())
+        .unwrap_or_default()
+        .to_string();
+    match cf_equipment::load_loadout_from_json(&raw, Some(&stem)) {
+        Ok(loadout) => report.add_pass(
+            path.to_path_buf(),
+            format!(
+                "loadout {} ({} role{})",
+                loadout.id,
+                loadout.role_ids.len(),
+                if loadout.role_ids.len() == 1 { "" } else { "s" }
+            ),
+        ),
+        Err(err) => report.add_error(path.to_path_buf(), format!("{err}")),
+    }
+}
+
+/// **M13**: validate the `content/equipment/roles.json` mod-tooling export.
+/// Authoritative roles live in `cf_equipment::role_records()`; the JSON file
+/// is presentation-only. Validation only checks well-formed JSON with a
+/// top-level `schema_version` integer + a `roles` array.
+fn validate_roles_json(path: &Path, report: &mut ValidationReport) {
+    let raw = match fs::read_to_string(path) {
+        Ok(t) => t,
+        Err(err) => {
+            report.add_error(path.to_path_buf(), format!("read failed: {err}"));
+            return;
+        }
+    };
+    let value: serde_json::Value = match serde_json::from_str(&raw) {
+        Ok(v) => v,
+        Err(err) => {
+            report.add_error(path.to_path_buf(), format!("json parse failed: {err}"));
+            return;
+        }
+    };
+    let Some(obj) = value.as_object() else {
+        report.add_error(path.to_path_buf(), "roles.json must be a JSON object".to_string());
+        return;
+    };
+    if obj.get("schema_version").and_then(|v| v.as_u64()).is_none() {
+        report.add_error(
+            path.to_path_buf(),
+            "roles.json must declare an integer schema_version".to_string(),
+        );
+        return;
+    }
+    let Some(roles) = obj.get("roles").and_then(|v| v.as_array()) else {
+        report.add_error(path.to_path_buf(), "roles.json must declare a `roles` array".to_string());
+        return;
+    };
+    let mut unknown: Vec<String> = Vec::new();
+    for entry in roles {
+        if let Some(id) = entry.get("id").and_then(|v| v.as_str()) {
+            if cf_equipment::role_record(id).is_none() {
+                unknown.push(id.to_string());
+            }
+        }
+    }
+    if !unknown.is_empty() {
+        report.add_warn(
+            path.to_path_buf(),
+            format!(
+                "roles.json references {} role id(s) not present in cf_equipment::role_records(): {}",
+                unknown.len(),
+                unknown.join(", ")
+            ),
+        );
+    }
+    report.add_pass(path.to_path_buf(), format!("roles.json ({} entries)", roles.len()));
 }
 
 /// **M4A**: validate every JSONL line in a ledger file against the locked

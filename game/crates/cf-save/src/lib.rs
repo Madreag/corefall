@@ -217,4 +217,63 @@ mod tests {
             .unwrap();
         assert!(external.hp < external.hp_max);
     }
+
+    /// **M13** § "Save round-trips actor M13 extension fields": prove
+    /// `crouch_active`, `climb_active`, `jet_active`, `gear_dropped_by_limb_loss`,
+    /// `chassis_detached`, and `afflictions` survive the round-trip with
+    /// non-default values (serde defaults make the round-trip free when the
+    /// fields are absent; this test pins the active-fields path).
+    #[test]
+    fn save_blob_round_trips_m13_actor_extension_fields() {
+        let mut original = blob(true);
+        original.crouch_active = true;
+        original.climb_active = false;
+        original.jet_active = true;
+        original.gear_dropped_by_limb_loss = true;
+        original.chassis_detached = true;
+        original.afflictions = vec!["bleeding".to_string(), "concussion".to_string()];
+        let (json, hex) = original.serialize().unwrap();
+        let recovered = SaveBlob::deserialize(&json, Some(&hex)).unwrap();
+        assert_eq!(recovered, original);
+        assert!(recovered.crouch_active);
+        assert!(!recovered.climb_active);
+        assert!(recovered.jet_active);
+        assert!(recovered.gear_dropped_by_limb_loss);
+        assert!(recovered.chassis_detached);
+        assert_eq!(recovered.afflictions, vec!["bleeding", "concussion"]);
+    }
+
+    /// **M13** § "Save round-trips actor M13 extension fields" — serde-default
+    /// migration path: old saves that pre-date M13 fields still load via the
+    /// `#[serde(default)]` attributes. Construct a JSON payload without the
+    /// extension fields and verify it deserializes with defaults.
+    #[test]
+    fn save_blob_deserializes_legacy_payload_via_serde_defaults() {
+        let json = serde_json::json!({
+            "schema_version": SAVE_BLOB_VERSION,
+            "actor_id": 1u64,
+            "team": "blue",
+            "origin_id": "human",
+            "position": [0.0, 0.0],
+            "velocity": [0.0, 0.0],
+            "aim": [1.0, 0.0],
+            "hp": 100.0,
+            "hp_max": 100.0,
+            "on_ground": true,
+            "status": "stable",
+            "selected_slot": 0u32,
+            "rifle_preset": null,
+            "rifle_ammo": null,
+            "rifle_reload_remaining_ticks": null,
+            "chassis": null,
+        });
+        let raw = serde_json::to_string(&json).unwrap();
+        let recovered = SaveBlob::deserialize(&raw, None).unwrap();
+        assert!(!recovered.crouch_active);
+        assert!(!recovered.climb_active);
+        assert!(!recovered.jet_active);
+        assert!(!recovered.gear_dropped_by_limb_loss);
+        assert!(!recovered.chassis_detached);
+        assert!(recovered.afflictions.is_empty());
+    }
 }

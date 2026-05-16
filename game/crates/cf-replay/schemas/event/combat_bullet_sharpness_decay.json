@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/combat.bullet_sharpness_decay.v0.1",
+  "title": "combat.bullet_sharpness_decay",
+  "description": "M14 § Bullet sharpness decay over distance per CCCP MOPixel::Update lethality range. Fires when a projectile's effective damage is reduced because it has traveled past a threshold within (or past) the weapon's effective range. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "combat" },
+    "event_type": { "const": "bullet_sharpness_decay" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "projectile_id": { "type": "integer" },
+        "owner_id": { "type": "integer" },
+        "distance_traveled": { "type": "number", "minimum": 0.0 },
+        "effective_range": { "type": "number", "minimum": 0.0 },
+        "base_damage": { "type": "number", "minimum": 0.0 },
+        "decayed_damage": { "type": "number", "minimum": 0.0 },
+        "sharpness_before": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "sharpness_after": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "expired": { "type": "boolean" },
+        "source_event_id": { "type": "string" }
+      },
+      "required": ["projectile_id", "owner_id", "distance_traveled", "effective_range", "base_damage", "decayed_damage", "sharpness_before", "sharpness_after", "expired", "source_event_id"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

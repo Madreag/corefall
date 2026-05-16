@@ -67,10 +67,17 @@ use serde::{Deserialize, Serialize};
 pub const POWERED_ARMOR_ID: &str = "powered_armor_v1";
 pub const LIGHT_MECH_ID: &str = "light_mech_v1";
 pub const INFANTRY_ID: &str = "infantry_v1";
+/// **M13** § "Chassis archetypes — M13 ships 5" — non-humanoid quadruped
+/// archetype: 4 legs + 2 claws + carapace + sensor cluster; no jet.
+pub const CRAB_QUADRUPED_ID: &str = "crab_quadruped_v1";
+/// **M13** § "Chassis archetypes — M13 ships 5" — autonomous miniature
+/// chassis: 4 zones (chassis core + 2 arms + sensor pod); no pilot.
+pub const DRONE_ID: &str = "drone_v1";
 
-/// One of the launch chassis archetypes. `Infantry` is the "no chassis" baseline a
-/// pilot ejects INTO; `PoweredArmor` is the Spartan-ish bulky-but-still-human-shaped
-/// suit; `LightMech` is the ~3x-human bipedal walker.
+/// **M13** § "Chassis archetypes — M13 ships 5". Discriminants `Infantry=0`
+/// through `LightMech=2` are pinned for cross-milestone determinism; the new
+/// `CrabQuadruped=3` + `Drone=4` are appended so the repr(u8) byte layout
+/// stays stable.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -78,6 +85,10 @@ pub enum ChassisKind {
     Infantry = 0,
     PoweredArmor = 1,
     LightMech = 2,
+    /// **M13** non-humanoid quadruped (crab-like) chassis.
+    CrabQuadruped = 3,
+    /// **M13** autonomous drone chassis (no pilot binding).
+    Drone = 4,
 }
 
 impl ChassisKind {
@@ -86,15 +97,91 @@ impl ChassisKind {
             ChassisKind::Infantry => "infantry",
             ChassisKind::PoweredArmor => "powered_armor",
             ChassisKind::LightMech => "light_mech",
+            ChassisKind::CrabQuadruped => "crab_quadruped",
+            ChassisKind::Drone => "drone",
         }
     }
 
-    /// Reference ids (`POWERED_ARMOR_ID`, `LIGHT_MECH_ID`, `INFANTRY_ID`).
+    /// Reference ids (`POWERED_ARMOR_ID`, `LIGHT_MECH_ID`, `INFANTRY_ID`,
+    /// `CRAB_QUADRUPED_ID`, `DRONE_ID`).
     pub fn default_spec_id(self) -> &'static str {
         match self {
             ChassisKind::Infantry => INFANTRY_ID,
             ChassisKind::PoweredArmor => POWERED_ARMOR_ID,
             ChassisKind::LightMech => LIGHT_MECH_ID,
+            ChassisKind::CrabQuadruped => CRAB_QUADRUPED_ID,
+            ChassisKind::Drone => DRONE_ID,
+        }
+    }
+
+    /// **M13** § "Per-chassis ability slot count (Light=1, Medium=2, Heavy=3,
+    /// Drone=1)". Used by [`ChassisAbilitySlots`] to bound the active
+    /// ability roster.
+    pub fn ability_slot_count(self) -> u8 {
+        match self {
+            ChassisKind::Infantry | ChassisKind::Drone => 1,
+            ChassisKind::PoweredArmor | ChassisKind::CrabQuadruped => 2,
+            ChassisKind::LightMech => 3,
+        }
+    }
+
+    /// **M13** § "Weapon modifier slots (Noita-style combinatorial)". Per
+    /// the spec's per-chassis-tier table (Infantry 0-1, Powered armor 1-2,
+    /// Light mech 2-3, Heavy mech future 3-4). We surface the max for each.
+    pub fn weapon_modifier_slot_count(self) -> u8 {
+        match self {
+            ChassisKind::Infantry | ChassisKind::Drone => 1,
+            ChassisKind::PoweredArmor | ChassisKind::CrabQuadruped => 2,
+            ChassisKind::LightMech => 3,
+        }
+    }
+
+    /// **M13** § "Pilot-inside-chassis dual silhouette" — weight class drives
+    /// the pilot silhouette size scaling (Light 60% / Medium 40% / Heavy 25%).
+    /// Returns the scale factor (0..1) for the pilot inset overlay.
+    pub fn pilot_silhouette_scale(self) -> f32 {
+        match self {
+            ChassisKind::Infantry | ChassisKind::Drone => 1.0,
+            ChassisKind::PoweredArmor => 0.6,
+            ChassisKind::CrabQuadruped => 0.4,
+            ChassisKind::LightMech => 0.25,
+        }
+    }
+
+    /// **M13** § "Cockpit camera anchor" — only Medium + Heavy classes
+    /// support the cockpit anchor (Light has third-person only). Returns
+    /// `true` when [`crate::CameraAnchor::Cockpit`] is a valid request.
+    pub fn supports_cockpit_anchor(self) -> bool {
+        matches!(self, ChassisKind::LightMech | ChassisKind::CrabQuadruped)
+    }
+}
+
+/// **M13** § "Cockpit camera anchor (first-person mech view)". Tracks the
+/// current camera anchor request driven by `act.input.camera_anchor`.
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum CameraAnchor {
+    /// Default third-person follow camera.
+    #[default]
+    Default = 0,
+    /// First-person inside chassis cockpit (Medium + Heavy classes only).
+    Cockpit = 1,
+}
+
+impl CameraAnchor {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            CameraAnchor::Default => "default",
+            CameraAnchor::Cockpit => "cockpit",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<CameraAnchor> {
+        match s.to_ascii_lowercase().as_str() {
+            "default" | "follow" | "third_person" => Some(CameraAnchor::Default),
+            "cockpit" | "first_person" => Some(CameraAnchor::Cockpit),
+            _ => None,
         }
     }
 }
@@ -129,6 +216,21 @@ pub enum BodyZone {
     ShinRight = 12,
     FootLeft = 13,
     FootRight = 14,
+    // **M13** § "Quadruped=11 zones (4 legs + 2 claws + torso + sensor cluster + carapace)".
+    // Front-left/right + rear-left/right legs; left/right claws; carapace shell; sensor cluster.
+    LegFrontLeft = 15,
+    LegFrontRight = 16,
+    LegRearLeft = 17,
+    LegRearRight = 18,
+    ClawLeft = 19,
+    ClawRight = 20,
+    Carapace = 21,
+    SensorCluster = 22,
+    // **M13** § "Drone=4 zones (chassis + 2 arms + sensor pod)".
+    DroneCore = 23,
+    DroneArmLeft = 24,
+    DroneArmRight = 25,
+    DroneSensorPod = 26,
 }
 
 impl BodyZone {
@@ -149,10 +251,24 @@ impl BodyZone {
             BodyZone::ShinRight => "shin_right",
             BodyZone::FootLeft => "foot_left",
             BodyZone::FootRight => "foot_right",
+            BodyZone::LegFrontLeft => "leg_front_left",
+            BodyZone::LegFrontRight => "leg_front_right",
+            BodyZone::LegRearLeft => "leg_rear_left",
+            BodyZone::LegRearRight => "leg_rear_right",
+            BodyZone::ClawLeft => "claw_left",
+            BodyZone::ClawRight => "claw_right",
+            BodyZone::Carapace => "carapace",
+            BodyZone::SensorCluster => "sensor_cluster",
+            BodyZone::DroneCore => "drone_core",
+            BodyZone::DroneArmLeft => "drone_arm_left",
+            BodyZone::DroneArmRight => "drone_arm_right",
+            BodyZone::DroneSensorPod => "drone_sensor_pod",
         }
     }
 
-    /// Canonical iteration order for events + checksums. Stable across milestones.
+    /// Canonical iteration order for events + checksums. Humanoid zones first
+    /// (stable since M5); quadruped + drone zones appended at the end so
+    /// existing checksums for chassis-less + humanoid actors stay byte-identical.
     pub fn all() -> &'static [BodyZone] {
         &[
             BodyZone::Head,
@@ -170,15 +286,33 @@ impl BodyZone {
             BodyZone::ShinRight,
             BodyZone::FootLeft,
             BodyZone::FootRight,
+            BodyZone::LegFrontLeft,
+            BodyZone::LegFrontRight,
+            BodyZone::LegRearLeft,
+            BodyZone::LegRearRight,
+            BodyZone::ClawLeft,
+            BodyZone::ClawRight,
+            BodyZone::Carapace,
+            BodyZone::SensorCluster,
+            BodyZone::DroneCore,
+            BodyZone::DroneArmLeft,
+            BodyZone::DroneArmRight,
+            BodyZone::DroneSensorPod,
         ]
     }
 
     /// Parent zone in the kinematic chain. `Head` and `Torso` and `Backpack`
     /// have no parent; the chains are torso → arm/leg (upper) → forearm/shin →
-    /// hand/foot.
+    /// hand/foot. Quadruped legs root in carapace; claws root in their leg.
+    /// Drone arms root in the drone core; sensor pod is a leaf on the core.
     pub fn parent(self) -> Option<BodyZone> {
         match self {
-            BodyZone::Head | BodyZone::Torso | BodyZone::Backpack => None,
+            BodyZone::Head
+            | BodyZone::Torso
+            | BodyZone::Backpack
+            | BodyZone::Carapace
+            | BodyZone::SensorCluster
+            | BodyZone::DroneCore => None,
             BodyZone::ArmLeft | BodyZone::ArmRight | BodyZone::LegLeft | BodyZone::LegRight => Some(BodyZone::Torso),
             BodyZone::ForearmLeft => Some(BodyZone::ArmLeft),
             BodyZone::ForearmRight => Some(BodyZone::ArmRight),
@@ -188,7 +322,37 @@ impl BodyZone {
             BodyZone::ShinRight => Some(BodyZone::LegRight),
             BodyZone::FootLeft => Some(BodyZone::ShinLeft),
             BodyZone::FootRight => Some(BodyZone::ShinRight),
+            BodyZone::LegFrontLeft
+            | BodyZone::LegFrontRight
+            | BodyZone::LegRearLeft
+            | BodyZone::LegRearRight => Some(BodyZone::Carapace),
+            BodyZone::ClawLeft => Some(BodyZone::LegFrontLeft),
+            BodyZone::ClawRight => Some(BodyZone::LegFrontRight),
+            BodyZone::DroneArmLeft | BodyZone::DroneArmRight | BodyZone::DroneSensorPod => Some(BodyZone::DroneCore),
         }
+    }
+
+    /// True iff this zone is one of the M13 quadruped-only zones.
+    pub fn is_quadruped_zone(self) -> bool {
+        matches!(
+            self,
+            BodyZone::LegFrontLeft
+                | BodyZone::LegFrontRight
+                | BodyZone::LegRearLeft
+                | BodyZone::LegRearRight
+                | BodyZone::ClawLeft
+                | BodyZone::ClawRight
+                | BodyZone::Carapace
+                | BodyZone::SensorCluster
+        )
+    }
+
+    /// True iff this zone is one of the M13 drone-only zones.
+    pub fn is_drone_zone(self) -> bool {
+        matches!(
+            self,
+            BodyZone::DroneCore | BodyZone::DroneArmLeft | BodyZone::DroneArmRight | BodyZone::DroneSensorPod
+        )
     }
 
     /// True for the right-side arm chain (upper / forearm / hand).
@@ -365,7 +529,9 @@ impl ZoneState {
 }
 
 /// Kind of chassis module. Each module has a state machine + can be bound to a body
-/// zone so module health follows the zone.
+/// zone so module health follows the zone. Discriminants 0..4 are the M5 set
+/// (stable for cross-milestone determinism). M13 appends six "critical chassis
+/// modules" per the spec § "Critical chassis modules with full mechanics".
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -375,6 +541,28 @@ pub enum ModuleKind {
     Shield = 2,
     Sensor = 3,
     RepairDrone = 4,
+    /// **M13** § "Cockpit module (pilot inside; mech weight class only)".
+    Cockpit = 5,
+    /// **M13** § "Ammo rack module (explosive cascade)".
+    AmmoRack = 6,
+    /// **M13** § "Engine module (fire risk)".
+    Engine = 7,
+    /// **M13** § "Optics module (vision impairment)".
+    Optics = 8,
+    /// **M13** § "Transmission module (mobility)".
+    Transmission = 9,
+    /// **M13** § "Reactor module (catastrophic if destroyed)".
+    Reactor = 10,
+    /// **M13** § "Per-chassis module positions" — power core (drone + powered armor).
+    PowerCore = 11,
+    /// **M13** § "Per-chassis module positions" — internal fuel tank.
+    FuelTank = 12,
+    /// **M13** § "Per-chassis module positions" — targeting computer.
+    TargetingComputer = 13,
+    /// **M13** § "Per-chassis module positions" — comm relay.
+    CommRelay = 14,
+    /// **M13** § "Per-chassis module positions" — per-leg motor controller.
+    MotorController = 15,
 }
 
 impl ModuleKind {
@@ -385,6 +573,104 @@ impl ModuleKind {
             ModuleKind::Shield => "shield",
             ModuleKind::Sensor => "sensor",
             ModuleKind::RepairDrone => "repair_drone",
+            ModuleKind::Cockpit => "cockpit",
+            ModuleKind::AmmoRack => "ammo_rack",
+            ModuleKind::Engine => "engine",
+            ModuleKind::Optics => "optics",
+            ModuleKind::Transmission => "transmission",
+            ModuleKind::Reactor => "reactor",
+            ModuleKind::PowerCore => "power_core",
+            ModuleKind::FuelTank => "fuel_tank",
+            ModuleKind::TargetingComputer => "targeting_computer",
+            ModuleKind::CommRelay => "comm_relay",
+            ModuleKind::MotorController => "motor_controller",
+        }
+    }
+
+    /// **M13** § "Critical chassis modules with full mechanics". True for
+    /// modules whose destruction triggers a chassis-wide catastrophic
+    /// cascade (`AmmoRack` cook-off, `Reactor` overpressure, `Cockpit`
+    /// pilot loss, `Engine` immobilization + fire). The engine wires
+    /// these through `ChassisState::apply_module_damage`.
+    pub fn is_critical(self) -> bool {
+        matches!(
+            self,
+            ModuleKind::Cockpit
+                | ModuleKind::AmmoRack
+                | ModuleKind::Engine
+                | ModuleKind::Reactor
+                | ModuleKind::Optics
+                | ModuleKind::Transmission
+        )
+    }
+}
+
+/// **M13** § "Per-module positioning + War Thunder-style module ray traversal".
+/// Axis-aligned bounding box in chassis local space (origin = chassis center;
+/// units = world pixels). Used to resolve which module a penetrating ray
+/// strikes; identity Aabb (size 0) means "module has no positioned hitbox
+/// and is treated as bound-zone-coincident".
+#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
+pub struct Aabb {
+    pub min_x: f32,
+    pub min_y: f32,
+    pub max_x: f32,
+    pub max_y: f32,
+}
+
+impl Aabb {
+    pub fn new(min_x: f32, min_y: f32, max_x: f32, max_y: f32) -> Self {
+        Self { min_x, min_y, max_x, max_y }
+    }
+
+    /// True iff the local point `(x, y)` lies inside (boundary inclusive).
+    pub fn contains(&self, x: f32, y: f32) -> bool {
+        x >= self.min_x && x <= self.max_x && y >= self.min_y && y <= self.max_y
+    }
+
+    /// True iff the box has non-zero area.
+    pub fn is_positioned(&self) -> bool {
+        (self.max_x - self.min_x).abs() > f32::EPSILON && (self.max_y - self.min_y).abs() > f32::EPSILON
+    }
+}
+
+/// **M13** § "Critical chassis modules with full mechanics". Per-module
+/// behavior the engine triggers when a module reaches `Failed`. The
+/// `engine.rs` event emitters key off these to surface module-specific
+/// `chassis.*` / `module.*` events.
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FailureCascade {
+    /// No special cascade — module simply stops functioning.
+    #[default]
+    None = 0,
+    /// **AmmoRack**: first-failure cooks 1/3 of remaining ammo; severe
+    /// failure detonates the rack catastrophically.
+    AmmoCookoff = 1,
+    /// **Engine**: oil leak fires + cascading fuel ignition if fuel tank
+    /// adjacent + chassis immobilized when fully destroyed.
+    EngineFire = 2,
+    /// **Cockpit**: cockpit penetration deals damage directly to the pilot.
+    PilotDirectDamage = 3,
+    /// **Optics**: damaged → sight × 0.5; destroyed → blind.
+    SightImpairment = 4,
+    /// **Transmission**: damaged → speed × 0.6; destroyed → immobile.
+    MobilityLoss = 5,
+    /// **Reactor**: overpressure cascade per M9 reactor model.
+    ReactorOverpressure = 6,
+}
+
+impl FailureCascade {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            FailureCascade::None => "none",
+            FailureCascade::AmmoCookoff => "ammo_cookoff",
+            FailureCascade::EngineFire => "engine_fire",
+            FailureCascade::PilotDirectDamage => "pilot_direct_damage",
+            FailureCascade::SightImpairment => "sight_impairment",
+            FailureCascade::MobilityLoss => "mobility_loss",
+            FailureCascade::ReactorOverpressure => "reactor_overpressure",
         }
     }
 }
@@ -439,6 +725,54 @@ pub struct ChassisModule {
     /// `bound_zone_destroyed`, `armor_breached`, `direct_hit`, `overheated`,
     /// `jammed`, `repaired`, `salvaged`, or a mod-supplied string.
     pub last_reason: String,
+    /// **M13** § "Per-module positioning + War Thunder-style module ray
+    /// traversal". Chassis-local AABB describing this module's hitbox for
+    /// ray traversal. Empty (`is_positioned() == false`) when the module
+    /// has no positioned geometry; ray traversal then falls back to
+    /// bound-zone presence.
+    #[serde(default)]
+    pub local_aabb: Aabb,
+    /// **M13** § "Critical chassis modules" — what cascade fires when this
+    /// module reaches `Failed`.
+    #[serde(default)]
+    pub failure_cascade: FailureCascade,
+    /// **M13** AmmoRack-only: rounds remaining in the rack. Drives the
+    /// `module.ammo_rack_cooking` / `module.ammo_rack_detonated` event
+    /// cascade. Zero for modules whose kind != `AmmoRack`.
+    #[serde(default)]
+    pub ammo_quantity_remaining: u32,
+    /// **M13** AmmoRack-only: cumulative `rounds_cooked_off` counter.
+    #[serde(default)]
+    pub rounds_cooked_off: u32,
+    /// **M13** Engine-only: oil reservoir (0..1). 1.0 = full; below 0.3
+    /// raises fire-risk on engine penetration.
+    #[serde(default = "default_fluid_level")]
+    pub oil_level: f32,
+    /// **M13** Engine-only: coolant reservoir (0..1).
+    #[serde(default = "default_fluid_level")]
+    pub coolant_level: f32,
+    /// **M13** Reactor-only: pressure tier 0..4 (per M9 5-tier signature).
+    /// 0 = nominal, 4 = critical (volatile release imminent).
+    #[serde(default)]
+    pub pressure_state: u8,
+    /// **M14 audit pass 4 (Finding 8)**: highest `ModuleStateKind` for which
+    /// this module has already emitted its tier-crossing cascade events
+    /// (AmmoCooking / EngineOilLeak / EngineFire / ReactorPressureAdvanced /
+    /// OpticsImpaired / MobilityReduced). Used to prevent redundant
+    /// cascade emission when multiple zone hits in the same tick each
+    /// trigger `apply_critical_module_damage` for the same module while
+    /// the module's state hasn't actually crossed a tier this call.
+    /// Initialized to `Nominal` (no cascade has fired yet).
+    #[serde(default = "default_module_state_kind")]
+    pub last_cascade_emitted_state: ModuleStateKind,
+}
+
+fn default_module_state_kind() -> ModuleStateKind {
+    ModuleStateKind::Nominal
+}
+
+fn default_fluid_level() -> f32 {
+    1.0
 }
 
 impl ChassisModule {
@@ -451,7 +785,36 @@ impl ChassisModule {
             hp: hp_max.max(0.0),
             hp_max: hp_max.max(0.0),
             last_reason: String::new(),
+            local_aabb: Aabb::default(),
+            failure_cascade: FailureCascade::None,
+            ammo_quantity_remaining: 0,
+            rounds_cooked_off: 0,
+            oil_level: default_fluid_level(),
+            coolant_level: default_fluid_level(),
+            pressure_state: 0,
+            last_cascade_emitted_state: ModuleStateKind::Nominal,
         }
+    }
+
+    /// **M13**: builder helper that attaches a chassis-local hitbox to the module.
+    pub fn with_local_aabb(mut self, aabb: Aabb) -> Self {
+        self.local_aabb = aabb;
+        self
+    }
+
+    /// **M13**: builder helper that wires the failure cascade onto the module.
+    pub fn with_failure_cascade(mut self, cascade: FailureCascade) -> Self {
+        self.failure_cascade = cascade;
+        self
+    }
+
+    /// **M13** AmmoRack-only: pre-seed the rounds remaining + cascade.
+    pub fn with_ammo(mut self, rounds: u32) -> Self {
+        self.ammo_quantity_remaining = rounds;
+        if self.kind == ModuleKind::AmmoRack && self.failure_cascade == FailureCascade::None {
+            self.failure_cascade = FailureCascade::AmmoCookoff;
+        }
+        self
     }
 
     pub fn not_present(id: impl Into<String>, kind: ModuleKind) -> Self {
@@ -463,6 +826,14 @@ impl ChassisModule {
             hp: 0.0,
             hp_max: 0.0,
             last_reason: String::new(),
+            local_aabb: Aabb::default(),
+            failure_cascade: FailureCascade::None,
+            ammo_quantity_remaining: 0,
+            rounds_cooked_off: 0,
+            oil_level: 0.0,
+            coolant_level: 0.0,
+            pressure_state: 0,
+            last_cascade_emitted_state: ModuleStateKind::NotPresent,
         }
     }
 
@@ -479,6 +850,10 @@ impl ChassisModule {
             self.hp = self.hp_max;
             self.state = ModuleStateKind::Nominal;
             self.last_reason.clear();
+            self.rounds_cooked_off = 0;
+            self.oil_level = default_fluid_level();
+            self.coolant_level = default_fluid_level();
+            self.pressure_state = 0;
         }
     }
 }
@@ -705,6 +1080,670 @@ impl Default for EjectWindow {
     }
 }
 
+/// **M13** § "Armor mounting angles per chassis archetype". Per-zone mount
+/// angles drive the M9 angled-armor math: incoming projectiles that strike
+/// at a glancing angle effectively thicken the armor.
+#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
+pub struct ArmorMountAngles {
+    /// Forward-facing armor angle (degrees from vertical).
+    pub front_degrees: f32,
+    /// Lateral / side armor angle (degrees).
+    pub side_degrees: f32,
+    /// Rear armor angle (degrees).
+    pub back_degrees: f32,
+}
+
+impl ArmorMountAngles {
+    pub const fn new(front: f32, side: f32, back: f32) -> Self {
+        Self {
+            front_degrees: front,
+            side_degrees: side,
+            back_degrees: back,
+        }
+    }
+}
+
+/// **M13** § "Chassis ability slots — Time stop, Time slow, and 6 other launch
+/// abilities". Eight launch abilities + per-chassis slot count.
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ChassisAbility {
+    TimeStop = 0,
+    TimeSlow = 1,
+    ShieldBurst = 2,
+    Overdrive = 3,
+    RepairPulse = 4,
+    Cloak = 5,
+    EmpPulse = 6,
+    GravityWell = 7,
+}
+
+impl ChassisAbility {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ChassisAbility::TimeStop => "time_stop",
+            ChassisAbility::TimeSlow => "time_slow",
+            ChassisAbility::ShieldBurst => "shield_burst",
+            ChassisAbility::Overdrive => "overdrive",
+            ChassisAbility::RepairPulse => "repair_pulse",
+            ChassisAbility::Cloak => "cloak",
+            ChassisAbility::EmpPulse => "EMP_pulse",
+            ChassisAbility::GravityWell => "gravity_well",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<ChassisAbility> {
+        match s {
+            "time_stop" => Some(ChassisAbility::TimeStop),
+            "time_slow" => Some(ChassisAbility::TimeSlow),
+            "shield_burst" => Some(ChassisAbility::ShieldBurst),
+            "overdrive" => Some(ChassisAbility::Overdrive),
+            "repair_pulse" => Some(ChassisAbility::RepairPulse),
+            "cloak" => Some(ChassisAbility::Cloak),
+            "EMP_pulse" | "emp_pulse" => Some(ChassisAbility::EmpPulse),
+            "gravity_well" => Some(ChassisAbility::GravityWell),
+            _ => None,
+        }
+    }
+
+    /// Per spec § "Chassis ability slots" table. (effect_seconds, cooldown_seconds).
+    pub fn defaults(self) -> (f32, f32) {
+        match self {
+            ChassisAbility::TimeStop => (1.5, 30.0),
+            ChassisAbility::TimeSlow => (5.0, 25.0),
+            ChassisAbility::ShieldBurst => (8.0, 20.0),
+            ChassisAbility::Overdrive => (6.0, 30.0),
+            ChassisAbility::RepairPulse => (0.1, 45.0),
+            ChassisAbility::Cloak => (5.0, 60.0),
+            ChassisAbility::EmpPulse => (4.0, 40.0),
+            ChassisAbility::GravityWell => (4.0, 50.0),
+        }
+    }
+
+    /// Canonical iteration order for events + checksums.
+    pub fn all() -> &'static [ChassisAbility] {
+        &[
+            ChassisAbility::TimeStop,
+            ChassisAbility::TimeSlow,
+            ChassisAbility::ShieldBurst,
+            ChassisAbility::Overdrive,
+            ChassisAbility::RepairPulse,
+            ChassisAbility::Cloak,
+            ChassisAbility::EmpPulse,
+            ChassisAbility::GravityWell,
+        ]
+    }
+}
+
+/// **M13** § "Chassis ability slots" — one slot's runtime state.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct AbilitySlotState {
+    pub ability: ChassisAbility,
+    /// Ticks remaining on the cooldown (0 = ready).
+    pub cooldown_remaining_ticks: u32,
+    /// Cooldown duration in ticks at the chassis tick rate.
+    pub cooldown_total_ticks: u32,
+    /// Ticks remaining in the active effect window (0 = effect ended).
+    pub effect_remaining_ticks: u32,
+    /// Effect duration in ticks at the chassis tick rate.
+    pub effect_total_ticks: u32,
+}
+
+impl AbilitySlotState {
+    pub fn new(ability: ChassisAbility, tick_rate_hz: u32) -> Self {
+        let (effect_s, cooldown_s) = ability.defaults();
+        let tr = tick_rate_hz.max(1) as f32;
+        Self {
+            ability,
+            cooldown_remaining_ticks: 0,
+            cooldown_total_ticks: (cooldown_s * tr).round() as u32,
+            effect_remaining_ticks: 0,
+            effect_total_ticks: (effect_s * tr).round() as u32,
+        }
+    }
+
+    pub fn is_ready(&self) -> bool {
+        self.cooldown_remaining_ticks == 0 && self.effect_remaining_ticks == 0
+    }
+
+    pub fn is_active(&self) -> bool {
+        self.effect_remaining_ticks > 0
+    }
+}
+
+/// **M13** § "Chassis ability slots" — per-chassis active ability roster.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct ChassisAbilitySlots {
+    /// Maximum ability slot count for this chassis (derived from kind).
+    pub max_slots: u8,
+    /// Active slot roster (length ≤ max_slots).
+    pub slots: Vec<AbilitySlotState>,
+}
+
+impl ChassisAbilitySlots {
+    pub fn new(kind: ChassisKind, tick_rate_hz: u32) -> Self {
+        let max_slots = kind.ability_slot_count();
+        // Default loadout per chassis kind. Light mech = 3 most-versatile slots;
+        // powered armor = 2; infantry = 1; drone = 1; crab = 2.
+        let default_loadout: &[ChassisAbility] = match kind {
+            ChassisKind::Infantry => &[ChassisAbility::ShieldBurst],
+            ChassisKind::PoweredArmor => &[ChassisAbility::Overdrive, ChassisAbility::ShieldBurst],
+            ChassisKind::LightMech => &[ChassisAbility::TimeSlow, ChassisAbility::Overdrive, ChassisAbility::ShieldBurst],
+            ChassisKind::CrabQuadruped => &[ChassisAbility::ShieldBurst, ChassisAbility::EmpPulse],
+            ChassisKind::Drone => &[ChassisAbility::Cloak],
+        };
+        let slots: Vec<AbilitySlotState> = default_loadout
+            .iter()
+            .take(max_slots as usize)
+            .map(|a| AbilitySlotState::new(*a, tick_rate_hz))
+            .collect();
+        Self { max_slots, slots }
+    }
+
+    /// Find a slot by ability kind.
+    pub fn find(&self, ability: ChassisAbility) -> Option<&AbilitySlotState> {
+        self.slots.iter().find(|s| s.ability == ability)
+    }
+
+    pub fn find_mut(&mut self, ability: ChassisAbility) -> Option<&mut AbilitySlotState> {
+        self.slots.iter_mut().find(|s| s.ability == ability)
+    }
+
+    /// Tick every slot's cooldown + effect timers. Returns the abilities whose
+    /// effect window ended this tick (for `ability.effect_ended` events) and
+    /// the abilities whose cooldown ended this tick (for `ability.cooldown_expired`).
+    pub fn tick(&mut self) -> AbilityTickOutcome {
+        let mut outcome = AbilityTickOutcome::default();
+        for slot in &mut self.slots {
+            if slot.effect_remaining_ticks > 0 {
+                slot.effect_remaining_ticks -= 1;
+                if slot.effect_remaining_ticks == 0 {
+                    outcome.effects_ended.push(slot.ability);
+                    // Effect-ended starts the cooldown.
+                    slot.cooldown_remaining_ticks = slot.cooldown_total_ticks;
+                }
+            } else if slot.cooldown_remaining_ticks > 0 {
+                slot.cooldown_remaining_ticks -= 1;
+                if slot.cooldown_remaining_ticks == 0 {
+                    outcome.cooldowns_expired.push(slot.ability);
+                }
+            }
+        }
+        outcome
+    }
+
+    /// Attempt to activate `ability`. Returns `Ok(slot_state)` on success or
+    /// the typed reason on rejection.
+    pub fn activate(&mut self, ability: ChassisAbility) -> Result<AbilitySlotState, AbilityRejectReason> {
+        let slot = self.find_mut(ability).ok_or(AbilityRejectReason::NotEquipped)?;
+        if slot.cooldown_remaining_ticks > 0 {
+            return Err(AbilityRejectReason::OnCooldown);
+        }
+        if slot.effect_remaining_ticks > 0 {
+            return Err(AbilityRejectReason::AlreadyActive);
+        }
+        slot.effect_remaining_ticks = slot.effect_total_ticks.max(1);
+        Ok(*slot)
+    }
+}
+
+/// Per-tick outcome of [`ChassisAbilitySlots::tick`].
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct AbilityTickOutcome {
+    pub effects_ended: Vec<ChassisAbility>,
+    pub cooldowns_expired: Vec<ChassisAbility>,
+}
+
+/// Typed rejection reasons surfaced by [`ChassisAbilitySlots::activate`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AbilityRejectReason {
+    NotEquipped,
+    OnCooldown,
+    AlreadyActive,
+}
+
+impl AbilityRejectReason {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AbilityRejectReason::NotEquipped => "ability_not_equipped",
+            AbilityRejectReason::OnCooldown => "ability_on_cooldown",
+            AbilityRejectReason::AlreadyActive => "ability_already_active",
+        }
+    }
+}
+
+/// **M13** § "Drone allies — 4 modes + autonomous behavior".
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum DroneMode {
+    #[default]
+    Follow = 0,
+    AutoMine = 1,
+    AutoRepair = 2,
+    AutoCarry = 3,
+}
+
+impl DroneMode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            DroneMode::Follow => "follow",
+            DroneMode::AutoMine => "auto_mine",
+            DroneMode::AutoRepair => "auto_repair",
+            DroneMode::AutoCarry => "auto_carry",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<DroneMode> {
+        match s.to_ascii_lowercase().as_str() {
+            "follow" => Some(DroneMode::Follow),
+            "auto_mine" | "auto-mine" | "mine" => Some(DroneMode::AutoMine),
+            "auto_repair" | "auto-repair" | "repair" => Some(DroneMode::AutoRepair),
+            "auto_carry" | "auto-carry" | "carry" => Some(DroneMode::AutoCarry),
+            _ => None,
+        }
+    }
+}
+
+/// **M13** § "Drone allies — Drone has limited fuel + battery (drains while
+/// active; ~5 minutes per full charge)". Runtime drone ally state.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct DroneAllyState {
+    pub mode: DroneMode,
+    /// Fuel level 0..1. Drains roughly 1.0 / 300 s while active.
+    pub fuel: f32,
+    /// True after at least one `drone.task_completed` event has been emitted.
+    #[serde(default)]
+    pub task_completed: bool,
+    /// True after the drone took terminal damage.
+    #[serde(default)]
+    pub destroyed: bool,
+}
+
+impl Default for DroneAllyState {
+    fn default() -> Self {
+        Self {
+            mode: DroneMode::Follow,
+            fuel: 1.0,
+            task_completed: false,
+            destroyed: false,
+        }
+    }
+}
+
+impl DroneAllyState {
+    /// Drain fuel by one tick; returns `true` iff the drone just crossed the
+    /// 0.2 low-fuel threshold (emit `drone.fuel_low` once).
+    pub fn tick_fuel(&mut self, tick_rate_hz: u32) -> bool {
+        if self.destroyed {
+            return false;
+        }
+        let prev = self.fuel;
+        // Full charge = 300s (~5 minutes); per-tick drain = 1.0 / (300 * tick_rate).
+        let drain = 1.0 / (300.0 * tick_rate_hz.max(1) as f32);
+        self.fuel = (self.fuel - drain).max(0.0);
+        prev > 0.2 && self.fuel <= 0.2
+    }
+}
+
+/// **M13** § "Weapon modifier slots (Noita-style combinatorial)" — 30+ launch
+/// modifiers stackable on the same weapon. Discriminants are stable so the
+/// modifier registry remains deterministic across milestones.
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum WeaponModifier {
+    Homing = 0,
+    Explosive = 1,
+    Freezing = 2,
+    Electric = 3,
+    Poisoning = 4,
+    Bouncing = 5,
+    Piercing = 6,
+    Ricochet = 7,
+    Bleed = 8,
+    Stun = 9,
+    FireChain = 10,
+    DoubleTap = 11,
+    TripleShot = 12,
+    FastFire = 13,
+    SlowFire = 14,
+    SlowMotionOnKill = 15,
+    SummonMinion = 16,
+    GravityWell = 17,
+    Vortex = 18,
+    Magnet = 19,
+    TimeSlowOnHit = 20,
+    HealingBurst = 21,
+    LifeSteal = 22,
+    ManaBurst = 23,
+    ShieldBreak = 24,
+    ArmorPiercingRandom = 25,
+    Knockback = 26,
+    Weighted = 27,
+    Magnetic = 28,
+    ChainLightning = 29,
+    FrostAura = 30,
+}
+
+impl WeaponModifier {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            WeaponModifier::Homing => "homing",
+            WeaponModifier::Explosive => "explosive",
+            WeaponModifier::Freezing => "freezing",
+            WeaponModifier::Electric => "electric",
+            WeaponModifier::Poisoning => "poisoning",
+            WeaponModifier::Bouncing => "bouncing",
+            WeaponModifier::Piercing => "piercing",
+            WeaponModifier::Ricochet => "ricochet",
+            WeaponModifier::Bleed => "bleed",
+            WeaponModifier::Stun => "stun",
+            WeaponModifier::FireChain => "fire_chain",
+            WeaponModifier::DoubleTap => "double_tap",
+            WeaponModifier::TripleShot => "triple_shot",
+            WeaponModifier::FastFire => "fast_fire",
+            WeaponModifier::SlowFire => "slow_fire",
+            WeaponModifier::SlowMotionOnKill => "slow_motion_on_kill",
+            WeaponModifier::SummonMinion => "summon_minion",
+            WeaponModifier::GravityWell => "gravity_well",
+            WeaponModifier::Vortex => "vortex",
+            WeaponModifier::Magnet => "magnet",
+            WeaponModifier::TimeSlowOnHit => "time_slow_on_hit",
+            WeaponModifier::HealingBurst => "healing_burst",
+            WeaponModifier::LifeSteal => "life_steal",
+            WeaponModifier::ManaBurst => "mana_burst",
+            WeaponModifier::ShieldBreak => "shield_break",
+            WeaponModifier::ArmorPiercingRandom => "armor_piercing_random",
+            WeaponModifier::Knockback => "knockback",
+            WeaponModifier::Weighted => "weighted",
+            WeaponModifier::Magnetic => "magnetic",
+            WeaponModifier::ChainLightning => "chain_lightning",
+            WeaponModifier::FrostAura => "frost_aura",
+        }
+    }
+
+    pub fn parse(s: &str) -> Option<WeaponModifier> {
+        for m in WeaponModifier::all() {
+            if m.as_str() == s {
+                return Some(*m);
+            }
+        }
+        None
+    }
+
+    pub fn all() -> &'static [WeaponModifier] {
+        &[
+            WeaponModifier::Homing,
+            WeaponModifier::Explosive,
+            WeaponModifier::Freezing,
+            WeaponModifier::Electric,
+            WeaponModifier::Poisoning,
+            WeaponModifier::Bouncing,
+            WeaponModifier::Piercing,
+            WeaponModifier::Ricochet,
+            WeaponModifier::Bleed,
+            WeaponModifier::Stun,
+            WeaponModifier::FireChain,
+            WeaponModifier::DoubleTap,
+            WeaponModifier::TripleShot,
+            WeaponModifier::FastFire,
+            WeaponModifier::SlowFire,
+            WeaponModifier::SlowMotionOnKill,
+            WeaponModifier::SummonMinion,
+            WeaponModifier::GravityWell,
+            WeaponModifier::Vortex,
+            WeaponModifier::Magnet,
+            WeaponModifier::TimeSlowOnHit,
+            WeaponModifier::HealingBurst,
+            WeaponModifier::LifeSteal,
+            WeaponModifier::ManaBurst,
+            WeaponModifier::ShieldBreak,
+            WeaponModifier::ArmorPiercingRandom,
+            WeaponModifier::Knockback,
+            WeaponModifier::Weighted,
+            WeaponModifier::Magnetic,
+            WeaponModifier::ChainLightning,
+            WeaponModifier::FrostAura,
+        ]
+    }
+}
+
+/// **M13** § "Weapon modifier slots" — per-weapon modifier set bounded by the
+/// chassis tier's slot count (see `ChassisKind::weapon_modifier_slot_count`).
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+pub struct WeaponModifierSet {
+    pub max_slots: u8,
+    pub modifiers: Vec<WeaponModifier>,
+}
+
+impl WeaponModifierSet {
+    pub fn new(kind: ChassisKind) -> Self {
+        Self {
+            max_slots: kind.weapon_modifier_slot_count(),
+            modifiers: Vec::new(),
+        }
+    }
+
+    pub fn attach(&mut self, m: WeaponModifier) -> Result<(), &'static str> {
+        if self.modifiers.contains(&m) {
+            return Err("modifier_already_attached");
+        }
+        if self.modifiers.len() as u8 >= self.max_slots {
+            return Err("modifier_slots_full");
+        }
+        self.modifiers.push(m);
+        Ok(())
+    }
+
+    pub fn detach(&mut self, m: WeaponModifier) -> bool {
+        if let Some(idx) = self.modifiers.iter().position(|x| *x == m) {
+            self.modifiers.remove(idx);
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn contains(&self, m: WeaponModifier) -> bool {
+        self.modifiers.contains(&m)
+    }
+
+    pub fn is_combined(&self) -> bool {
+        self.modifiers.len() >= 2
+    }
+}
+
+/// **M13** § "Hit zone determination — how a 2D side-view projectile picks a
+/// limb". Per-stance AABB tables that map (`local_x`, `local_y`) in normalized
+/// actor-local space to a `BodyZone`. The lookup is fully deterministic — no
+/// RNG, just AABB containment tests in spec-locked iteration order.
+pub mod hit_zone {
+    use super::BodyZone;
+
+    /// Resolver result for a single hit.
+    #[derive(Debug, Clone, Copy, PartialEq)]
+    pub struct HitZoneResolution {
+        pub zone: BodyZone,
+        pub local_x: f32,
+        pub local_y: f32,
+    }
+
+    /// Stance discriminator used for AABB-table lookup. Mirrors the M6
+    /// `cf_actor::Stance` taxonomy for the four stances the spec tabulates.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+    pub enum HitZoneStance {
+        Standing,
+        Crouching,
+        Prone,
+        Crawl,
+    }
+
+    /// One (zone, x_range, y_range) entry from the M13 spec.
+    #[derive(Debug, Clone, Copy)]
+    struct ZoneAabb {
+        zone: BodyZone,
+        x_min: f32,
+        y_min: f32,
+        x_max: f32,
+        y_max: f32,
+    }
+
+    impl ZoneAabb {
+        const fn new(zone: BodyZone, x_min: f32, x_max: f32, y_min: f32, y_max: f32) -> Self {
+            Self {
+                zone,
+                x_min,
+                y_min,
+                x_max,
+                y_max,
+            }
+        }
+
+        fn contains(&self, x: f32, y: f32) -> bool {
+            x >= self.x_min && x <= self.x_max && y >= self.y_min && y <= self.y_max
+        }
+    }
+
+    // **STANDING** zone AABB table (per M13 spec § "STANDING:"). Order matters
+    // — smaller / higher-priority zones come first so the first containment
+    // hit wins. Local space convention: `local_x` ∈ [-0.5, +0.5] (negative =
+    // near side after facing flip); `local_y` ∈ [0.0, 1.0] (0 = feet, 1 = head crown).
+    const STANDING_TABLE: &[ZoneAabb] = &[
+        ZoneAabb::new(BodyZone::Head, -0.15, 0.15, 0.85, 1.00),
+        ZoneAabb::new(BodyZone::Backpack, 0.15, 0.30, 0.55, 0.85),
+        ZoneAabb::new(BodyZone::HandLeft, -0.40, -0.25, 0.30, 0.50),
+        ZoneAabb::new(BodyZone::HandRight, 0.25, 0.40, 0.30, 0.50),
+        ZoneAabb::new(BodyZone::ForearmLeft, -0.40, -0.20, 0.35, 0.55),
+        ZoneAabb::new(BodyZone::ForearmRight, 0.20, 0.40, 0.35, 0.55),
+        ZoneAabb::new(BodyZone::ArmLeft, -0.40, -0.15, 0.45, 0.80),
+        ZoneAabb::new(BodyZone::ArmRight, 0.15, 0.40, 0.45, 0.80),
+        ZoneAabb::new(BodyZone::Torso, -0.30, 0.30, 0.45, 0.85),
+        ZoneAabb::new(BodyZone::ShinLeft, -0.18, 0.0, 0.08, 0.15),
+        ZoneAabb::new(BodyZone::ShinRight, 0.0, 0.18, 0.08, 0.15),
+        ZoneAabb::new(BodyZone::FootLeft, -0.18, 0.0, 0.0, 0.08),
+        ZoneAabb::new(BodyZone::FootRight, 0.0, 0.18, 0.0, 0.08),
+        ZoneAabb::new(BodyZone::LegLeft, -0.20, 0.0, 0.10, 0.45),
+        ZoneAabb::new(BodyZone::LegRight, 0.0, 0.20, 0.10, 0.45),
+    ];
+
+    const CROUCHING_TABLE: &[ZoneAabb] = &[
+        ZoneAabb::new(BodyZone::Head, -0.15, 0.15, 0.70, 0.85),
+        ZoneAabb::new(BodyZone::ArmRight, 0.15, 0.40, 0.50, 0.70),
+        ZoneAabb::new(BodyZone::ArmLeft, -0.40, -0.15, 0.50, 0.70),
+        ZoneAabb::new(BodyZone::Torso, -0.30, 0.30, 0.40, 0.70),
+        ZoneAabb::new(BodyZone::FootLeft, -0.18, 0.0, 0.0, 0.10),
+        ZoneAabb::new(BodyZone::FootRight, 0.0, 0.18, 0.0, 0.10),
+        ZoneAabb::new(BodyZone::LegLeft, -0.20, 0.0, 0.10, 0.40),
+        ZoneAabb::new(BodyZone::LegRight, 0.0, 0.20, 0.10, 0.40),
+    ];
+
+    const PRONE_TABLE: &[ZoneAabb] = &[
+        ZoneAabb::new(BodyZone::Head, -0.40, -0.30, 0.05, 0.25),
+        ZoneAabb::new(BodyZone::Backpack, -0.20, 0.20, 0.20, 0.30),
+        ZoneAabb::new(BodyZone::Torso, -0.30, 0.30, 0.05, 0.30),
+        ZoneAabb::new(BodyZone::ArmLeft, -0.30, 0.0, 0.10, 0.25),
+        ZoneAabb::new(BodyZone::ArmRight, 0.0, 0.30, 0.10, 0.25),
+        ZoneAabb::new(BodyZone::FootLeft, 0.30, 0.40, 0.0, 0.10),
+        ZoneAabb::new(BodyZone::FootRight, 0.30, 0.40, 0.0, 0.10),
+        ZoneAabb::new(BodyZone::LegLeft, 0.10, 0.40, 0.05, 0.25),
+        ZoneAabb::new(BodyZone::LegRight, 0.10, 0.40, 0.05, 0.25),
+    ];
+
+    const CRAWL_TABLE: &[ZoneAabb] = &[
+        ZoneAabb::new(BodyZone::Head, -0.40, -0.30, 0.05, 0.20),
+        ZoneAabb::new(BodyZone::Torso, -0.30, 0.30, 0.05, 0.30),
+        ZoneAabb::new(BodyZone::LegLeft, 0.10, 0.40, 0.05, 0.20),
+        ZoneAabb::new(BodyZone::LegRight, 0.10, 0.40, 0.05, 0.20),
+    ];
+
+    fn table_for(stance: HitZoneStance) -> &'static [ZoneAabb] {
+        match stance {
+            HitZoneStance::Standing => STANDING_TABLE,
+            HitZoneStance::Crouching => CROUCHING_TABLE,
+            HitZoneStance::Prone => PRONE_TABLE,
+            HitZoneStance::Crawl => CRAWL_TABLE,
+        }
+    }
+
+    /// **M13** § "PROJECTILE-VS-ACTOR HIT DETECTION (deterministic; no RNG)".
+    /// Resolves the body zone at the given local-space coordinate.
+    /// `local_x` is post-facing-flip (positive = near side); `local_y` is
+    /// normalized 0..1 from feet to crown.
+    pub fn resolve(stance: HitZoneStance, local_x: f32, local_y: f32) -> Option<HitZoneResolution> {
+        let table = table_for(stance);
+        for entry in table {
+            if entry.contains(local_x, local_y) {
+                return Some(HitZoneResolution {
+                    zone: entry.zone,
+                    local_x,
+                    local_y,
+                });
+            }
+        }
+        None
+    }
+
+    /// Spec § "Per-stance hit probability distributions (designer reference)".
+    /// Tabulated expected distribution percentages — used by tests + AI
+    /// hint surfaces; NOT used at runtime to bias the resolver (which is
+    /// purely AABB-driven).
+    pub fn expected_distribution_standing_horizontal() -> [(BodyZone, f32); 5] {
+        [
+            (BodyZone::Head, 0.12),
+            (BodyZone::Torso, 0.50),
+            (BodyZone::ArmRight, 0.15),
+            (BodyZone::LegRight, 0.20),
+            (BodyZone::FootRight, 0.03),
+        ]
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+
+        #[test]
+        fn standing_head_zone_resolves() {
+            let r = resolve(HitZoneStance::Standing, 0.0, 0.92).unwrap();
+            assert_eq!(r.zone, BodyZone::Head);
+        }
+
+        #[test]
+        fn standing_torso_zone_resolves_at_mid_height() {
+            let r = resolve(HitZoneStance::Standing, 0.0, 0.65).unwrap();
+            assert_eq!(r.zone, BodyZone::Torso);
+        }
+
+        #[test]
+        fn standing_leg_resolves_at_low_height() {
+            let r = resolve(HitZoneStance::Standing, -0.10, 0.25).unwrap();
+            assert_eq!(r.zone, BodyZone::LegLeft);
+        }
+
+        #[test]
+        fn crouching_head_is_lower_than_standing() {
+            let r = resolve(HitZoneStance::Crouching, 0.0, 0.80).unwrap();
+            assert_eq!(r.zone, BodyZone::Head);
+            // A shot at standing-head height (0.92) would miss the crouching actor.
+            assert!(resolve(HitZoneStance::Crouching, 0.0, 0.95).is_none());
+        }
+
+        #[test]
+        fn prone_head_is_at_facing_front() {
+            let r = resolve(HitZoneStance::Prone, -0.35, 0.10).unwrap();
+            assert_eq!(r.zone, BodyZone::Head);
+        }
+
+        #[test]
+        fn crawl_table_has_minimal_silhouette() {
+            // Crawl skips arms — those points return None.
+            let r = resolve(HitZoneStance::Crawl, 0.0, 0.50);
+            assert!(r.is_none(), "crawl has flat profile; mid-height arms gap");
+        }
+    }
+}
+
 /// Chassis spec — the immutable design data for one archetype. Scenarios reference
 /// these by id; the runtime clones to a [`ChassisState`] for each actor.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -721,6 +1760,10 @@ pub struct ChassisSpec {
     /// Tick rate this spec was instantiated with (used to size [`EjectWindow`]).
     /// Independent of the runtime tick rate; resolved on insertion.
     pub mass_kg: f32,
+    /// **M13** § "Armor mounting angles per chassis archetype". Per-zone
+    /// armor mount angles drive M9 angled-armor math.
+    #[serde(default)]
+    pub armor_angles: ArmorMountAngles,
 }
 
 /// Runtime mutable chassis state.
@@ -751,6 +1794,30 @@ pub struct ChassisState {
     pub last_stage_reason: String,
     /// Modules salvaged after wreck (populated by [`ChassisState::salvage`]).
     pub salvaged_modules: Vec<ChassisModule>,
+    /// **M13** § "Armor mounting angles per chassis archetype".
+    #[serde(default)]
+    pub armor_angles: ArmorMountAngles,
+    /// **M13** § "Chassis ability slots" — active ability roster.
+    #[serde(default)]
+    pub abilities: ChassisAbilitySlots,
+    /// **M13** § "Weapon modifier slots (Noita-style combinatorial)".
+    #[serde(default)]
+    pub weapon_modifiers: WeaponModifierSet,
+    /// **M13** § "Cockpit camera anchor" — current camera anchor request.
+    #[serde(default)]
+    pub camera_anchor: CameraAnchor,
+    /// **M13** § "Boarding / disembarking transitions" — ticks remaining in
+    /// the 1500ms boarding transition (0 = idle).
+    #[serde(default)]
+    pub boarding_ticks_remaining: u32,
+    /// **M13** § "Boarding / disembarking transitions" — ticks remaining in
+    /// the 1500ms disembarking transition.
+    #[serde(default)]
+    pub disembarking_ticks_remaining: u32,
+    /// **M13** § "Boarding / disembarking transitions" — full transition
+    /// budget in ticks at the chassis tick rate (1500ms).
+    #[serde(default)]
+    pub transition_ticks_total: u32,
 }
 
 impl ChassisState {
@@ -758,6 +1825,8 @@ impl ChassisState {
     pub fn from_spec(spec: &ChassisSpec, tick_rate_hz: u32, tutorial_safety: bool) -> Self {
         let tick_rate = tick_rate_hz.max(1);
         let eject_ticks = ((spec.eject_window_seconds.max(0.1)) * tick_rate as f32).round() as u32;
+        // 1500ms transition window per spec § "Boarding / disembarking transitions".
+        let transition_ticks_total = ((1.5_f32) * tick_rate as f32).round() as u32;
         Self {
             spec_id: spec.id.clone(),
             kind: spec.kind,
@@ -777,7 +1846,90 @@ impl ChassisState {
             weapon_jammed: false,
             last_stage_reason: String::new(),
             salvaged_modules: Vec::new(),
+            armor_angles: spec.armor_angles,
+            abilities: ChassisAbilitySlots::new(spec.kind, tick_rate),
+            weapon_modifiers: WeaponModifierSet::new(spec.kind),
+            camera_anchor: CameraAnchor::Default,
+            boarding_ticks_remaining: 0,
+            disembarking_ticks_remaining: 0,
+            transition_ticks_total: transition_ticks_total.max(1),
         }
+    }
+
+    /// **M13** § "Cockpit camera anchor" — switch the active camera anchor.
+    /// Returns `Ok(prev_anchor)` on success or a typed reason on rejection.
+    pub fn set_camera_anchor(&mut self, anchor: CameraAnchor) -> Result<CameraAnchor, &'static str> {
+        if anchor == CameraAnchor::Cockpit && !self.kind.supports_cockpit_anchor() {
+            return Err("camera_anchor_not_supported_by_chassis_class");
+        }
+        let prev = self.camera_anchor;
+        self.camera_anchor = anchor;
+        Ok(prev)
+    }
+
+    /// **M13** § "Boarding / disembarking transitions" — kick off the
+    /// 1500ms boarding transition. Returns `true` when accepted (was idle).
+    pub fn begin_boarding(&mut self) -> bool {
+        if self.boarding_ticks_remaining > 0 || self.disembarking_ticks_remaining > 0 {
+            return false;
+        }
+        self.boarding_ticks_remaining = self.transition_ticks_total;
+        true
+    }
+
+    /// **M13** § "Boarding / disembarking transitions" — kick off the 1500ms
+    /// disembarking transition.
+    pub fn begin_disembarking(&mut self) -> bool {
+        if self.boarding_ticks_remaining > 0 || self.disembarking_ticks_remaining > 0 {
+            return false;
+        }
+        self.disembarking_ticks_remaining = self.transition_ticks_total;
+        true
+    }
+
+    /// **M13** § "Boarding / disembarking transitions" — true iff the chassis
+    /// is mid-transition (input rejected during).
+    pub fn is_in_transition(&self) -> bool {
+        self.boarding_ticks_remaining > 0 || self.disembarking_ticks_remaining > 0
+    }
+
+    /// **M13** § "Boarding / disembarking transitions" — tick the transition
+    /// timers. Returns the side that just completed (if any).
+    pub fn tick_transitions(&mut self) -> Option<TransitionCompleted> {
+        if self.boarding_ticks_remaining > 0 {
+            self.boarding_ticks_remaining -= 1;
+            if self.boarding_ticks_remaining == 0 {
+                return Some(TransitionCompleted::Boarded);
+            }
+        } else if self.disembarking_ticks_remaining > 0 {
+            self.disembarking_ticks_remaining -= 1;
+            if self.disembarking_ticks_remaining == 0 {
+                return Some(TransitionCompleted::Disembarked);
+            }
+        }
+        None
+    }
+
+    /// **M13** § "Chassis ability slots" — activate one ability slot.
+    pub fn activate_ability(&mut self, ability: ChassisAbility) -> Result<AbilitySlotState, AbilityRejectReason> {
+        self.abilities.activate(ability)
+    }
+
+    /// **M13** § "Chassis ability slots" — tick every slot's cooldown + effect.
+    pub fn tick_abilities(&mut self) -> AbilityTickOutcome {
+        self.abilities.tick()
+    }
+
+    /// **M13** § "Weapon modifier slots" — attach a modifier to the active weapon.
+    pub fn attach_weapon_modifier(&mut self, m: WeaponModifier) -> Result<bool, &'static str> {
+        let before_len = self.weapon_modifiers.modifiers.len();
+        self.weapon_modifiers.attach(m)?;
+        Ok(self.weapon_modifiers.modifiers.len() > before_len)
+    }
+
+    /// **M13** § "Weapon modifier slots" — detach a modifier.
+    pub fn detach_weapon_modifier(&mut self, m: WeaponModifier) -> bool {
+        self.weapon_modifiers.detach(m)
     }
 
     pub fn zone(&self, zone: BodyZone) -> Option<&ZoneState> {
@@ -901,6 +2053,12 @@ impl ChassisState {
         outcome.zone_destroyed = zone_destroyed;
         let _ = wound_destroyed; // tracked for future routing into actor HP coefficient
         outcome.actor_hp_damage = remaining.max(0.0);
+        // **M13** § "Limb loss functional consequences" — head/torso loss is
+        // INSTANT DEATH per CCCP decapitation rule. Tutorial-safety overrides
+        // (`tutorial_safety=true` caps damage at PilotInjured) suppress lethal.
+        if zone_destroyed && !self.tutorial_safety && matches!(zone, BodyZone::Head | BodyZone::Torso) {
+            outcome.lethal = true;
+        }
 
         // Propagate to module health bound to this zone.
         if zone_destroyed {
@@ -987,6 +2145,197 @@ impl ChassisState {
         } else {
             None
         }
+    }
+
+    /// **M13** § "Critical chassis modules with full mechanics" — apply
+    /// damage to a module and surface its cascade outcome (ammo cookoff,
+    /// engine fire, optics blind, etc.). The engine wires this into
+    /// `module.ammo_rack_cooking` / `module.ammo_rack_detonated` /
+    /// `module.spalling_damage` event emitters.
+    pub fn apply_critical_module_damage(
+        &mut self,
+        module_id: &str,
+        damage: f32,
+        cause: &str,
+    ) -> Option<CriticalModuleOutcome> {
+        let transition = self.apply_module_damage(module_id, damage, cause);
+        let module = self.module(module_id)?;
+        let mut cascade_events: Vec<CriticalModuleEvent> = Vec::new();
+        let module_id = module.id.clone();
+        let module_kind = module.kind;
+        let module_state = module.state;
+        let cascade = module.failure_cascade;
+        let ammo_remaining = module.ammo_quantity_remaining;
+        // **M14 audit pass 4 (Finding 8)**: tier-crossing cascades fire
+        // ONLY when the module's `state` has advanced past its previous
+        // `last_cascade_emitted_state` — otherwise multiple zone hits in a
+        // single tick (or any other rapid succession of calls while
+        // already inside Warning) would re-cook ammo, re-leak oil,
+        // re-advance pressure, etc. once per call. PilotDirectHit is
+        // intentionally per-hit (damage-amount-bearing event) and gates
+        // on damage > 0 instead.
+        let last_emitted = module
+            .last_cascade_emitted_state;
+        let tier_advanced = (module_state as u8) > (last_emitted as u8);
+        // Per spec § "Ammo rack module (explosive cascade)" — first-hit cooks
+        // 1/3 of remaining ammo; severe-hit (Failed state) detonates the rack.
+        if cascade == FailureCascade::AmmoCookoff && tier_advanced {
+            match module_state {
+                ModuleStateKind::Warning if ammo_remaining > 0 => {
+                    let cook = ammo_remaining / 3;
+                    // borrow again to mutate counters
+                    if let Some(m) = self.module_mut(&module_id) {
+                        m.rounds_cooked_off = m.rounds_cooked_off.saturating_add(cook);
+                        m.ammo_quantity_remaining = m.ammo_quantity_remaining.saturating_sub(cook);
+                    }
+                    cascade_events.push(CriticalModuleEvent::AmmoCooking { rounds_cooked: cook });
+                }
+                ModuleStateKind::Failed => {
+                    let detonated = ammo_remaining;
+                    if let Some(m) = self.module_mut(&module_id) {
+                        m.rounds_cooked_off = m.rounds_cooked_off.saturating_add(detonated);
+                        m.ammo_quantity_remaining = 0;
+                    }
+                    cascade_events.push(CriticalModuleEvent::AmmoDetonated {
+                        rounds_detonated: detonated,
+                    });
+                    // Catastrophic — flag chassis as gibbed unless tutorial-safe.
+                    if !self.tutorial_safety {
+                        self.stage = ChassisStage::Gibbed;
+                        self.pilot_state = PilotState::Lost;
+                        self.last_stage_reason = "ammo_rack_detonated".to_string();
+                    }
+                }
+                _ => {}
+            }
+        }
+        // Per spec § "Engine module (fire risk)" — penetrated engine spills
+        // oil; destroyed engine cascades fire. Tier-gated.
+        if cascade == FailureCascade::EngineFire && tier_advanced {
+            if matches!(module_state, ModuleStateKind::Warning | ModuleStateKind::Failed) {
+                if let Some(m) = self.module_mut(&module_id) {
+                    m.oil_level = (m.oil_level - 0.5).max(0.0);
+                }
+                cascade_events.push(CriticalModuleEvent::EngineOilLeak);
+            }
+            if module_state == ModuleStateKind::Failed {
+                cascade_events.push(CriticalModuleEvent::EngineFire);
+            }
+        }
+        // Per spec § "Reactor module" — pressure_state advances per damage tier.
+        // Reactor pressure has its own internal crossed flag below (it only
+        // emits when `pressure` > prior `pressure_state`); leave that as the
+        // authoritative dedupe for reactors.
+        if cascade == FailureCascade::ReactorOverpressure {
+            let pressure = match module_state {
+                ModuleStateKind::Nominal => 0,
+                ModuleStateKind::Degraded => 1,
+                ModuleStateKind::Warning => 2,
+                ModuleStateKind::Failed => 4,
+                ModuleStateKind::NotPresent => 0,
+            };
+            let mut crossed = false;
+            if let Some(m) = self.module_mut(&module_id) {
+                if pressure > m.pressure_state {
+                    m.pressure_state = pressure;
+                    crossed = true;
+                }
+            }
+            if crossed {
+                cascade_events.push(CriticalModuleEvent::ReactorPressureAdvanced { tier: pressure });
+            }
+        }
+        // Per spec § "Cockpit module" — penetration deals direct damage to pilot.
+        // Per-hit cascade (carries damage payload); gates on damage>0 instead
+        // of tier_advanced so multiple hits all surface their damage.
+        if cascade == FailureCascade::PilotDirectDamage
+            && damage > 0.0
+            && matches!(module_state, ModuleStateKind::Warning | ModuleStateKind::Failed)
+        {
+            cascade_events.push(CriticalModuleEvent::PilotDirectHit { damage });
+            // Promote pilot to Injured when cockpit takes damage.
+            if matches!(self.pilot_state, PilotState::Bound) {
+                self.pilot_state = PilotState::Injured;
+            }
+        }
+        // Per spec § "Optics module" — damaged → sight × 0.5; destroyed → blind.
+        if cascade == FailureCascade::SightImpairment
+            && tier_advanced
+            && matches!(module_state, ModuleStateKind::Warning | ModuleStateKind::Failed)
+        {
+            cascade_events.push(CriticalModuleEvent::OpticsImpaired {
+                blind: module_state == ModuleStateKind::Failed,
+            });
+        }
+        // Per spec § "Transmission module" — damaged → speed × 0.6; destroyed → immobile.
+        if cascade == FailureCascade::MobilityLoss
+            && tier_advanced
+            && matches!(module_state, ModuleStateKind::Warning | ModuleStateKind::Failed)
+        {
+            cascade_events.push(CriticalModuleEvent::MobilityReduced {
+                immobile: module_state == ModuleStateKind::Failed,
+            });
+        }
+        // **M14 audit pass 4 (Finding 8)**: latch the high-water mark so
+        // subsequent same-state calls don't refire the tier-gated cascades.
+        if tier_advanced {
+            if let Some(m) = self.module_mut(&module_id) {
+                m.last_cascade_emitted_state = module_state;
+            }
+        }
+        if transition.is_none() && cascade_events.is_empty() {
+            return None;
+        }
+        Some(CriticalModuleOutcome {
+            module_id,
+            module_kind,
+            transition,
+            cascade_events,
+        })
+    }
+
+    /// **M13** § "Spalling integration with chassis modules" — given an
+    /// impact point in chassis-local space, fire 1-3 deterministic spalling
+    /// fragments into the chassis and report each fragment's module hit.
+    /// `seed` is the caller-supplied deterministic PRNG seed (NO thread_rng).
+    pub fn spawn_spalling_fragments(
+        &mut self,
+        impact_local: (f32, f32),
+        fragment_count: u32,
+        original_damage: f32,
+        seed: u64,
+    ) -> Vec<SpallingFragmentOutcome> {
+        let mut outcomes: Vec<SpallingFragmentOutcome> = Vec::new();
+        let count = fragment_count.clamp(1, 3);
+        for i in 0..count {
+            // Deterministic fragment direction within ±30° cone (per spec).
+            let frag_seed = seed.wrapping_mul(0x9E3779B97F4A7C15).wrapping_add(i as u64);
+            let angle_norm = ((frag_seed % 1024) as f32 / 1024.0) - 0.5; // -0.5..+0.5
+            let angle_rad = angle_norm * std::f32::consts::PI * (60.0 / 180.0);
+            let dx = angle_rad.cos();
+            let dy = angle_rad.sin();
+            // Per spec: per-fragment damage = 20-50% of original.
+            let damage_frac = 0.2 + ((frag_seed >> 10) % 30) as f32 / 100.0;
+            let damage = original_damage * damage_frac;
+            // Pick the first module whose local_aabb is on the ray. Stub
+            // walks the module list and returns the first positioned hit.
+            let target_id: Option<String> = self
+                .modules
+                .iter()
+                .find(|m| m.state.is_present() && m.local_aabb.is_positioned())
+                .map(|m| m.id.clone());
+            let _ = (dx, dy, impact_local);
+            if let Some(id) = target_id {
+                let transition = self.apply_module_damage(&id, damage, "spalling_fragment");
+                outcomes.push(SpallingFragmentOutcome {
+                    fragment_id: format!("frag_{i}"),
+                    module_id: id,
+                    damage,
+                    transition,
+                });
+            }
+        }
+        outcomes
     }
 
     /// Stage transition pass — call once per tick (or right after damage application).
@@ -1159,6 +2508,13 @@ impl ChassisState {
                 let prev = m.state;
                 m.hp = m.hp_max;
                 m.state = ModuleStateKind::Nominal;
+                // **M14 audit pass 4 (Finding 8)**: reset cascade
+                // emission high-water mark so re-damage re-fires its
+                // tier-crossing cascades.
+                m.last_cascade_emitted_state = ModuleStateKind::Nominal;
+                m.pressure_state = 0;
+                m.oil_level = 1.0;
+                m.coolant_level = 1.0;
                 m.last_reason = format!("repaired_via:{reason}");
                 if prev != ModuleStateKind::Nominal {
                     Some(m.id.clone())
@@ -1204,6 +2560,15 @@ impl ChassisState {
         let prev = module.state;
         module.hp = module.hp_max;
         module.state = ModuleStateKind::Nominal;
+        // **M14 audit pass 4 (Finding 8)**: reset the cascade-emitted
+        // high-water mark on repair so future damage that re-crosses a
+        // tier emits its cascade event again.
+        module.last_cascade_emitted_state = ModuleStateKind::Nominal;
+        // Repair also restores reactor pressure_state + oil/coolant so
+        // the cascade pipeline resumes at full nominal reserves.
+        module.pressure_state = 0;
+        module.oil_level = 1.0;
+        module.coolant_level = 1.0;
         module.last_reason = format!("repaired:{reason}");
         if prev != ModuleStateKind::Nominal {
             Some(ModuleTransition {
@@ -1321,6 +2686,206 @@ impl ChassisState {
     }
 }
 
+/// **M13** § "Critical chassis modules with full mechanics" — typed cascade
+/// event surfaced by [`ChassisState::apply_critical_module_damage`].
+#[derive(Debug, Clone, PartialEq)]
+pub enum CriticalModuleEvent {
+    AmmoCooking { rounds_cooked: u32 },
+    AmmoDetonated { rounds_detonated: u32 },
+    EngineOilLeak,
+    EngineFire,
+    ReactorPressureAdvanced { tier: u8 },
+    PilotDirectHit { damage: f32 },
+    OpticsImpaired { blind: bool },
+    MobilityReduced { immobile: bool },
+}
+
+impl CriticalModuleEvent {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            CriticalModuleEvent::AmmoCooking { .. } => "ammo_rack_cooking",
+            CriticalModuleEvent::AmmoDetonated { .. } => "ammo_rack_detonated",
+            CriticalModuleEvent::EngineOilLeak => "engine_oil_leak",
+            CriticalModuleEvent::EngineFire => "engine_fire",
+            CriticalModuleEvent::ReactorPressureAdvanced { .. } => "reactor_pressure_advanced",
+            CriticalModuleEvent::PilotDirectHit { .. } => "pilot_direct_hit",
+            CriticalModuleEvent::OpticsImpaired { .. } => "optics_impaired",
+            CriticalModuleEvent::MobilityReduced { .. } => "mobility_reduced",
+        }
+    }
+}
+
+/// Aggregate outcome from [`ChassisState::apply_critical_module_damage`].
+#[derive(Debug, Clone, PartialEq)]
+pub struct CriticalModuleOutcome {
+    pub module_id: String,
+    pub module_kind: ModuleKind,
+    pub transition: Option<ModuleTransition>,
+    pub cascade_events: Vec<CriticalModuleEvent>,
+}
+
+/// **M13** § "Spalling integration with chassis modules" — per-fragment outcome.
+#[derive(Debug, Clone, PartialEq)]
+pub struct SpallingFragmentOutcome {
+    pub fragment_id: String,
+    pub module_id: String,
+    pub damage: f32,
+    pub transition: Option<ModuleTransition>,
+}
+
+/// **M13** § "Boarding / disembarking transitions" — which side of the
+/// transition completed this tick.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum TransitionCompleted {
+    Boarded,
+    Disembarked,
+}
+
+impl TransitionCompleted {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            TransitionCompleted::Boarded => "boarded",
+            TransitionCompleted::Disembarked => "disembarked",
+        }
+    }
+}
+
+/// **M13** § "Hit reactions per body part (per CCCP MOSRotating::CollideAtPoint)".
+/// Tabulated per-zone reaction (kind label + duration in seconds + concussion dose).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct HitReaction {
+    pub kind: &'static str,
+    pub duration_seconds: f32,
+    pub concussion_dose: u32,
+    pub drop_chance: f32,
+    pub speed_factor: f32,
+}
+
+impl HitReaction {
+    pub const fn new(kind: &'static str, duration_seconds: f32) -> Self {
+        Self {
+            kind,
+            duration_seconds,
+            concussion_dose: 0,
+            drop_chance: 0.0,
+            speed_factor: 1.0,
+        }
+    }
+
+    /// Hit reactions per body zone (per spec § "Hit reactions per body part" table).
+    pub fn for_zone(zone: BodyZone) -> Self {
+        match zone {
+            BodyZone::Head => HitReaction {
+                kind: "stagger_stun",
+                duration_seconds: 0.5,
+                concussion_dose: 15,
+                drop_chance: 0.0,
+                speed_factor: 1.0,
+            },
+            BodyZone::Torso => HitReaction {
+                kind: "knockback",
+                duration_seconds: 0.8,
+                concussion_dose: 0,
+                drop_chance: 0.0,
+                speed_factor: 1.0,
+            },
+            BodyZone::ArmLeft | BodyZone::ArmRight => HitReaction {
+                kind: "reduced_grip",
+                duration_seconds: 1.2,
+                concussion_dose: 0,
+                drop_chance: 0.0,
+                speed_factor: 1.0,
+            },
+            BodyZone::ForearmLeft | BodyZone::ForearmRight => HitReaction {
+                kind: "grip_penalty",
+                duration_seconds: 0.8,
+                concussion_dose: 0,
+                drop_chance: 0.10,
+                speed_factor: 1.0,
+            },
+            BodyZone::HandLeft | BodyZone::HandRight => HitReaction {
+                kind: "drop_weapon",
+                duration_seconds: 0.6,
+                concussion_dose: 0,
+                drop_chance: 0.40,
+                speed_factor: 1.0,
+            },
+            BodyZone::LegLeft | BodyZone::LegRight => HitReaction {
+                kind: "limp",
+                duration_seconds: 2.0,
+                concussion_dose: 0,
+                drop_chance: 0.0,
+                speed_factor: 0.7,
+            },
+            BodyZone::ShinLeft | BodyZone::ShinRight => HitReaction {
+                kind: "brief_limp",
+                duration_seconds: 0.8,
+                concussion_dose: 0,
+                drop_chance: 0.0,
+                speed_factor: 0.85,
+            },
+            BodyZone::FootLeft | BodyZone::FootRight => HitReaction {
+                kind: "minimal",
+                duration_seconds: 0.2,
+                concussion_dose: 0,
+                drop_chance: 0.0,
+                speed_factor: 1.0,
+            },
+            BodyZone::Backpack => HitReaction {
+                kind: "module_damage",
+                duration_seconds: 0.4,
+                concussion_dose: 0,
+                drop_chance: 0.0,
+                speed_factor: 1.0,
+            },
+            // Quadruped + drone zones — generic reactions; M14+ tunes.
+            BodyZone::LegFrontLeft
+            | BodyZone::LegFrontRight
+            | BodyZone::LegRearLeft
+            | BodyZone::LegRearRight => HitReaction {
+                kind: "limp",
+                duration_seconds: 1.5,
+                concussion_dose: 0,
+                drop_chance: 0.0,
+                speed_factor: 0.7,
+            },
+            BodyZone::ClawLeft | BodyZone::ClawRight => HitReaction {
+                kind: "grip_penalty",
+                duration_seconds: 0.8,
+                concussion_dose: 0,
+                drop_chance: 0.30,
+                speed_factor: 1.0,
+            },
+            BodyZone::Carapace | BodyZone::SensorCluster => HitReaction {
+                kind: "knockback",
+                duration_seconds: 0.6,
+                concussion_dose: 0,
+                drop_chance: 0.0,
+                speed_factor: 1.0,
+            },
+            BodyZone::DroneCore => HitReaction {
+                kind: "destabilize",
+                duration_seconds: 0.5,
+                concussion_dose: 0,
+                drop_chance: 0.0,
+                speed_factor: 0.6,
+            },
+            BodyZone::DroneArmLeft | BodyZone::DroneArmRight | BodyZone::DroneSensorPod => HitReaction {
+                kind: "minimal",
+                duration_seconds: 0.3,
+                concussion_dose: 0,
+                drop_chance: 0.0,
+                speed_factor: 1.0,
+            },
+        }
+    }
+
+    /// Duration in ticks at the actor's tick rate.
+    pub fn duration_ticks(self, tick_rate_hz: u32) -> u32 {
+        (self.duration_seconds * tick_rate_hz.max(1) as f32).round() as u32
+    }
+}
+
 /// Outcome of [`ChassisState::attempt_eject`].
 #[derive(Debug, Clone, PartialEq)]
 pub struct EjectAccepted {
@@ -1393,6 +2958,12 @@ pub struct ZoneDamageOutcome {
     pub module_transitions: Vec<ModuleTransition>,
     pub joints_severed: Vec<String>,
     pub actor_hp_damage: f32,
+    /// **M13** § "Limb loss functional consequences" — head/torso loss is
+    /// INSTANT DEATH (per CCCP decapitation rule). True iff the destroyed
+    /// zone is `Head` or `Torso` and the chassis is NOT tutorial-safe.
+    /// Engine consumers should set actor.hp = 0 immediately.
+    #[serde(default)]
+    pub lethal: bool,
 }
 
 impl ZoneDamageOutcome {
@@ -1405,6 +2976,7 @@ impl ZoneDamageOutcome {
             || self.zone_destroyed
             || self.wound_damage > 0.0
             || self.actor_hp_damage > 0.0
+            || self.lethal
     }
 }
 
@@ -1425,7 +2997,14 @@ fn stage_from_integrity(integrity: f32) -> ModuleStateKind {
 
 /// Build the canonical Infantry body graph (no chassis, just the body).
 fn infantry_body_graph() -> BodyGraph {
-    let zones = BodyZone::all().to_vec();
+    // **M13** preserves the M5 15-zone humanoid contract — quadruped + drone
+    // zones do NOT appear in the humanoid body graph (they belong to the
+    // crab_body_graph / drone_body_graph functions instead).
+    let zones: Vec<BodyZone> = BodyZone::all()
+        .iter()
+        .filter(|z| !z.is_quadruped_zone() && !z.is_drone_zone())
+        .copied()
+        .collect();
     let joints = vec![
         Joint {
             id: "neck".to_string(),
@@ -1748,6 +3327,8 @@ pub fn infantry_spec() -> ChassisSpec {
         modules,
         eject_window_seconds: 0.0,
         mass_kg: 90.0,
+        // Infantry has no armor mount slope (per spec table: 0° / 0° / 0°).
+        armor_angles: ArmorMountAngles::new(0.0, 0.0, 0.0),
     }
 }
 
@@ -1777,6 +3358,16 @@ pub fn powered_armor_spec() -> ChassisSpec {
         ChassisModule::new("shield.bubble", ModuleKind::Shield, BodyZone::Torso, 50.0),
         ChassisModule::new("sensor.scope", ModuleKind::Sensor, BodyZone::Head, 25.0),
         ChassisModule::not_present("repair_drone.none", ModuleKind::RepairDrone),
+        // **M13** § "Per-chassis module positions" — Powered Armor: +
+        // power_core (torso center), targeting_computer (head),
+        // gun_mount (arm), shield_emitter (chest).
+        ChassisModule::new("power_core.cell", ModuleKind::PowerCore, BodyZone::Torso, 50.0)
+            .with_local_aabb(Aabb::new(-3.0, 4.0, 3.0, 12.0)),
+        ChassisModule::new("targeting_computer.optics", ModuleKind::Optics, BodyZone::Head, 25.0)
+            .with_local_aabb(Aabb::new(-2.0, 16.0, 2.0, 20.0))
+            .with_failure_cascade(FailureCascade::SightImpairment),
+        ChassisModule::new("targeting_computer.cpu", ModuleKind::TargetingComputer, BodyZone::Head, 20.0)
+            .with_local_aabb(Aabb::new(-1.5, 14.0, 1.5, 17.0)),
     ];
     ChassisSpec {
         id: POWERED_ARMOR_ID.to_string(),
@@ -1787,6 +3378,8 @@ pub fn powered_armor_spec() -> ChassisSpec {
         modules,
         eject_window_seconds: 1.0,
         mass_kg: 350.0,
+        // Powered Armor (Spartan-ish): 15° front slope, 0° side, 15° back slope.
+        armor_angles: ArmorMountAngles::new(15.0, 0.0, 15.0),
     }
 }
 
@@ -1816,6 +3409,39 @@ pub fn light_mech_spec() -> ChassisSpec {
         ChassisModule::new("shield.heavy", ModuleKind::Shield, BodyZone::Torso, 100.0),
         ChassisModule::new("sensor.array", ModuleKind::Sensor, BodyZone::Head, 50.0),
         ChassisModule::new("repair_drone.bay", ModuleKind::RepairDrone, BodyZone::Torso, 50.0),
+        // **M13** § "Per-chassis module positions" — Light Mech (cockpit + frame):
+        // cockpit (top-front), reactor (torso center), fuel_tank (torso back),
+        // ammo_rack (torso side; explosive), engine (torso back; fire-risk),
+        // transmission (between torso + leg), motor_controller_per_leg,
+        // optics_pod (head), comm_relay (head), targeting_computer (chest).
+        ChassisModule::new("cockpit.main", ModuleKind::Cockpit, BodyZone::Head, 120.0)
+            .with_local_aabb(Aabb::new(-4.0, 28.0, 4.0, 36.0))
+            .with_failure_cascade(FailureCascade::PilotDirectDamage),
+        ChassisModule::new("reactor.core", ModuleKind::Reactor, BodyZone::Torso, 180.0)
+            .with_local_aabb(Aabb::new(-6.0, 8.0, 6.0, 20.0))
+            .with_failure_cascade(FailureCascade::ReactorOverpressure),
+        ChassisModule::new("fuel_tank.rear", ModuleKind::FuelTank, BodyZone::Torso, 80.0)
+            .with_local_aabb(Aabb::new(2.0, 4.0, 8.0, 16.0)),
+        ChassisModule::new("ammo_rack.main", ModuleKind::AmmoRack, BodyZone::Torso, 60.0)
+            .with_local_aabb(Aabb::new(-8.0, 6.0, -3.0, 14.0))
+            .with_ammo(15),
+        ChassisModule::new("engine.main", ModuleKind::Engine, BodyZone::Torso, 100.0)
+            .with_local_aabb(Aabb::new(0.0, 2.0, 6.0, 10.0))
+            .with_failure_cascade(FailureCascade::EngineFire),
+        ChassisModule::new("transmission.main", ModuleKind::Transmission, BodyZone::Torso, 60.0)
+            .with_local_aabb(Aabb::new(-3.0, -2.0, 3.0, 4.0))
+            .with_failure_cascade(FailureCascade::MobilityLoss),
+        ChassisModule::new("motor_controller.left", ModuleKind::MotorController, BodyZone::LegLeft, 40.0)
+            .with_failure_cascade(FailureCascade::MobilityLoss),
+        ChassisModule::new("motor_controller.right", ModuleKind::MotorController, BodyZone::LegRight, 40.0)
+            .with_failure_cascade(FailureCascade::MobilityLoss),
+        ChassisModule::new("optics_pod.main", ModuleKind::Optics, BodyZone::Head, 35.0)
+            .with_local_aabb(Aabb::new(-2.5, 30.0, 2.5, 34.0))
+            .with_failure_cascade(FailureCascade::SightImpairment),
+        ChassisModule::new("comm_relay.head", ModuleKind::CommRelay, BodyZone::Head, 25.0)
+            .with_local_aabb(Aabb::new(-2.0, 33.0, 2.0, 36.0)),
+        ChassisModule::new("targeting_computer.chest", ModuleKind::TargetingComputer, BodyZone::Torso, 35.0)
+            .with_local_aabb(Aabb::new(-3.0, 18.0, 3.0, 22.0)),
     ];
     ChassisSpec {
         id: LIGHT_MECH_ID.to_string(),
@@ -1826,16 +3452,427 @@ pub fn light_mech_spec() -> ChassisSpec {
         modules,
         eject_window_seconds: 1.5,
         mass_kg: 1800.0,
+        // Light Mech (cockpit): 30° front slope, 0° side, 15° back slope.
+        armor_angles: ArmorMountAngles::new(30.0, 0.0, 15.0),
     }
 }
 
-/// Stable registry of every launch chassis spec.
+/// **M13** § "Chassis archetypes — M13 ships 5" — non-humanoid quadruped
+/// body graph: 4 legs + 2 claws + torso + sensor cluster + carapace = 11 zones.
+fn crab_body_graph() -> BodyGraph {
+    let zones = vec![
+        BodyZone::Torso,
+        BodyZone::Carapace,
+        BodyZone::SensorCluster,
+        BodyZone::LegFrontLeft,
+        BodyZone::LegFrontRight,
+        BodyZone::LegRearLeft,
+        BodyZone::LegRearRight,
+        BodyZone::ClawLeft,
+        BodyZone::ClawRight,
+        BodyZone::Head,
+        BodyZone::Backpack,
+    ];
+    let joints = vec![
+        Joint {
+            id: "carapace_to_torso".to_string(),
+            parent: BodyZone::Torso,
+            child: BodyZone::Carapace,
+            intact: true,
+        },
+        Joint {
+            id: "sensor_to_carapace".to_string(),
+            parent: BodyZone::Carapace,
+            child: BodyZone::SensorCluster,
+            intact: true,
+        },
+        Joint {
+            id: "leg_front_left".to_string(),
+            parent: BodyZone::Carapace,
+            child: BodyZone::LegFrontLeft,
+            intact: true,
+        },
+        Joint {
+            id: "leg_front_right".to_string(),
+            parent: BodyZone::Carapace,
+            child: BodyZone::LegFrontRight,
+            intact: true,
+        },
+        Joint {
+            id: "leg_rear_left".to_string(),
+            parent: BodyZone::Carapace,
+            child: BodyZone::LegRearLeft,
+            intact: true,
+        },
+        Joint {
+            id: "leg_rear_right".to_string(),
+            parent: BodyZone::Carapace,
+            child: BodyZone::LegRearRight,
+            intact: true,
+        },
+        Joint {
+            id: "claw_left".to_string(),
+            parent: BodyZone::LegFrontLeft,
+            child: BodyZone::ClawLeft,
+            intact: true,
+        },
+        Joint {
+            id: "claw_right".to_string(),
+            parent: BodyZone::LegFrontRight,
+            child: BodyZone::ClawRight,
+            intact: true,
+        },
+    ];
+    let sockets = vec![
+        EquipmentSocket {
+            id: "claw_left".to_string(),
+            zone: BodyZone::ClawLeft,
+            occupied: false,
+            mounted_role: None,
+        },
+        EquipmentSocket {
+            id: "claw_right".to_string(),
+            zone: BodyZone::ClawRight,
+            occupied: false,
+            mounted_role: None,
+        },
+        EquipmentSocket {
+            id: SOCKET_TORSO_HARDPOINT.to_string(),
+            zone: BodyZone::Torso,
+            occupied: false,
+            mounted_role: None,
+        },
+    ];
+    let movement_contributions = vec![
+        MovementContribution {
+            zone: BodyZone::Carapace,
+            move_speed_factor_when_destroyed: 0.0,
+            jump_impulse_factor_when_destroyed: 0.0,
+            disables_rifle_when_destroyed: true,
+            forces_crawl_when_destroyed: true,
+            drops_gear_when_destroyed: true,
+            disables_jet_when_destroyed: true,
+        },
+        MovementContribution {
+            zone: BodyZone::LegFrontLeft,
+            move_speed_factor_when_destroyed: 0.75,
+            jump_impulse_factor_when_destroyed: 0.75,
+            ..MovementContribution::neutral(BodyZone::LegFrontLeft)
+        },
+        MovementContribution {
+            zone: BodyZone::LegFrontRight,
+            move_speed_factor_when_destroyed: 0.75,
+            jump_impulse_factor_when_destroyed: 0.75,
+            ..MovementContribution::neutral(BodyZone::LegFrontRight)
+        },
+        MovementContribution {
+            zone: BodyZone::LegRearLeft,
+            move_speed_factor_when_destroyed: 0.75,
+            jump_impulse_factor_when_destroyed: 0.75,
+            ..MovementContribution::neutral(BodyZone::LegRearLeft)
+        },
+        MovementContribution {
+            zone: BodyZone::LegRearRight,
+            move_speed_factor_when_destroyed: 0.75,
+            jump_impulse_factor_when_destroyed: 0.75,
+            ..MovementContribution::neutral(BodyZone::LegRearRight)
+        },
+        MovementContribution {
+            zone: BodyZone::ClawLeft,
+            move_speed_factor_when_destroyed: 1.0,
+            jump_impulse_factor_when_destroyed: 1.0,
+            disables_rifle_when_destroyed: true,
+            forces_crawl_when_destroyed: false,
+            drops_gear_when_destroyed: true,
+            disables_jet_when_destroyed: false,
+        },
+        MovementContribution {
+            zone: BodyZone::ClawRight,
+            move_speed_factor_when_destroyed: 1.0,
+            jump_impulse_factor_when_destroyed: 1.0,
+            disables_rifle_when_destroyed: true,
+            forces_crawl_when_destroyed: false,
+            drops_gear_when_destroyed: true,
+            disables_jet_when_destroyed: false,
+        },
+        MovementContribution {
+            zone: BodyZone::SensorCluster,
+            move_speed_factor_when_destroyed: 1.0,
+            jump_impulse_factor_when_destroyed: 1.0,
+            disables_rifle_when_destroyed: false,
+            forces_crawl_when_destroyed: false,
+            drops_gear_when_destroyed: false,
+            disables_jet_when_destroyed: false,
+        },
+    ];
+    BodyGraph {
+        zones,
+        joints,
+        sockets,
+        movement_contributions,
+    }
+}
+
+/// **M13** § "Crab / quadruped" chassis spec. 11-zone non-humanoid; no jet.
+pub fn crab_quadruped_spec() -> ChassisSpec {
+    let zones = vec![
+        make_zone(BodyZone::Torso, 120.0, 8.0, 80.0, 4.0, 100.0, 30.0),
+        make_zone(BodyZone::Carapace, 200.0, 12.0, 100.0, 6.0, 140.0, 40.0),
+        make_zone(BodyZone::SensorCluster, 30.0, 4.0, 18.0, 2.0, 24.0, 10.0),
+        make_zone(BodyZone::LegFrontLeft, 60.0, 6.0, 40.0, 3.0, 50.0, 16.0),
+        make_zone(BodyZone::LegFrontRight, 60.0, 6.0, 40.0, 3.0, 50.0, 16.0),
+        make_zone(BodyZone::LegRearLeft, 60.0, 6.0, 40.0, 3.0, 50.0, 16.0),
+        make_zone(BodyZone::LegRearRight, 60.0, 6.0, 40.0, 3.0, 50.0, 16.0),
+        make_zone(BodyZone::ClawLeft, 40.0, 5.0, 26.0, 2.0, 30.0, 12.0),
+        make_zone(BodyZone::ClawRight, 40.0, 5.0, 26.0, 2.0, 30.0, 12.0),
+        // Head zone retained for HUD silhouette parity; "head" zone on a crab
+        // is the sensor-tower top.
+        make_zone(BodyZone::Head, 25.0, 4.0, 15.0, 2.0, 20.0, 10.0),
+        // No backpack on crab; emit empty zone so iteration order remains stable.
+        make_zone(BodyZone::Backpack, 0.0, 0.0, 0.0, 0.0, 0.0, 4.0),
+    ];
+    let modules = vec![
+        ChassisModule::new("sensor_cluster.array", ModuleKind::Sensor, BodyZone::SensorCluster, 60.0),
+        ChassisModule::new("carapace_core.reactor", ModuleKind::Reactor, BodyZone::Carapace, 140.0)
+            .with_local_aabb(Aabb::new(-6.0, 4.0, 6.0, 14.0))
+            .with_failure_cascade(FailureCascade::ReactorOverpressure),
+        ChassisModule::new("motor_controller.fl", ModuleKind::MotorController, BodyZone::LegFrontLeft, 40.0)
+            .with_failure_cascade(FailureCascade::MobilityLoss),
+        ChassisModule::new("motor_controller.fr", ModuleKind::MotorController, BodyZone::LegFrontRight, 40.0)
+            .with_failure_cascade(FailureCascade::MobilityLoss),
+        ChassisModule::new("motor_controller.rl", ModuleKind::MotorController, BodyZone::LegRearLeft, 40.0)
+            .with_failure_cascade(FailureCascade::MobilityLoss),
+        ChassisModule::new("motor_controller.rr", ModuleKind::MotorController, BodyZone::LegRearRight, 40.0)
+            .with_failure_cascade(FailureCascade::MobilityLoss),
+        ChassisModule::new("fuel_tank.back", ModuleKind::FuelTank, BodyZone::Carapace, 60.0)
+            .with_local_aabb(Aabb::new(2.0, 6.0, 8.0, 12.0)),
+        ChassisModule::new("weapon_mount.left", ModuleKind::WeaponMount, BodyZone::ClawLeft, 50.0),
+        ChassisModule::new("weapon_mount.right", ModuleKind::WeaponMount, BodyZone::ClawRight, 50.0),
+        // No jet on crab per spec.
+        ChassisModule::not_present("jet.none", ModuleKind::Jet),
+        ChassisModule::not_present("shield.none", ModuleKind::Shield),
+        ChassisModule::not_present("repair_drone.none", ModuleKind::RepairDrone),
+    ];
+    ChassisSpec {
+        id: CRAB_QUADRUPED_ID.to_string(),
+        kind: ChassisKind::CrabQuadruped,
+        display_name: "Crab Quadruped CQ-1".to_string(),
+        body_graph: crab_body_graph(),
+        zones,
+        modules,
+        eject_window_seconds: 1.2,
+        mass_kg: 1200.0,
+        // Crab / quadruped: 30° front, 30° side, 30° back.
+        armor_angles: ArmorMountAngles::new(30.0, 30.0, 30.0),
+    }
+}
+
+/// **M13** § "Drone" body graph: 4 zones (chassis core + 2 arms + sensor pod).
+fn drone_body_graph() -> BodyGraph {
+    let zones = vec![
+        BodyZone::DroneCore,
+        BodyZone::DroneArmLeft,
+        BodyZone::DroneArmRight,
+        BodyZone::DroneSensorPod,
+    ];
+    let joints = vec![
+        Joint {
+            id: "arm_left_to_core".to_string(),
+            parent: BodyZone::DroneCore,
+            child: BodyZone::DroneArmLeft,
+            intact: true,
+        },
+        Joint {
+            id: "arm_right_to_core".to_string(),
+            parent: BodyZone::DroneCore,
+            child: BodyZone::DroneArmRight,
+            intact: true,
+        },
+        Joint {
+            id: "sensor_pod_to_core".to_string(),
+            parent: BodyZone::DroneCore,
+            child: BodyZone::DroneSensorPod,
+            intact: true,
+        },
+    ];
+    let sockets = vec![
+        EquipmentSocket {
+            id: "drone_arm_left".to_string(),
+            zone: BodyZone::DroneArmLeft,
+            occupied: false,
+            mounted_role: None,
+        },
+        EquipmentSocket {
+            id: "drone_arm_right".to_string(),
+            zone: BodyZone::DroneArmRight,
+            occupied: false,
+            mounted_role: None,
+        },
+    ];
+    let movement_contributions = vec![
+        MovementContribution {
+            zone: BodyZone::DroneCore,
+            move_speed_factor_when_destroyed: 0.0,
+            jump_impulse_factor_when_destroyed: 0.0,
+            disables_rifle_when_destroyed: true,
+            forces_crawl_when_destroyed: true,
+            drops_gear_when_destroyed: true,
+            disables_jet_when_destroyed: true,
+        },
+        MovementContribution {
+            zone: BodyZone::DroneArmLeft,
+            move_speed_factor_when_destroyed: 1.0,
+            jump_impulse_factor_when_destroyed: 1.0,
+            disables_rifle_when_destroyed: false,
+            forces_crawl_when_destroyed: false,
+            drops_gear_when_destroyed: true,
+            disables_jet_when_destroyed: false,
+        },
+        MovementContribution {
+            zone: BodyZone::DroneArmRight,
+            move_speed_factor_when_destroyed: 1.0,
+            jump_impulse_factor_when_destroyed: 1.0,
+            disables_rifle_when_destroyed: true,
+            forces_crawl_when_destroyed: false,
+            drops_gear_when_destroyed: true,
+            disables_jet_when_destroyed: false,
+        },
+        MovementContribution {
+            zone: BodyZone::DroneSensorPod,
+            ..MovementContribution::neutral(BodyZone::DroneSensorPod)
+        },
+    ];
+    BodyGraph {
+        zones,
+        joints,
+        sockets,
+        movement_contributions,
+    }
+}
+
+/// **M13** § "Drone" chassis spec. 4-zone autonomous miniature chassis; no pilot.
+pub fn drone_spec() -> ChassisSpec {
+    let zones = vec![
+        make_zone(BodyZone::DroneCore, 40.0, 4.0, 24.0, 2.0, 30.0, 16.0),
+        make_zone(BodyZone::DroneArmLeft, 20.0, 2.0, 12.0, 1.0, 14.0, 8.0),
+        make_zone(BodyZone::DroneArmRight, 20.0, 2.0, 12.0, 1.0, 14.0, 8.0),
+        make_zone(BodyZone::DroneSensorPod, 15.0, 2.0, 10.0, 1.0, 12.0, 6.0),
+    ];
+    let modules = vec![
+        ChassisModule::new("power_core.cell", ModuleKind::PowerCore, BodyZone::DroneCore, 40.0)
+            .with_local_aabb(Aabb::new(-2.0, 0.0, 2.0, 4.0)),
+        ChassisModule::new("sensor_pod.main", ModuleKind::Sensor, BodyZone::DroneSensorPod, 25.0),
+        ChassisModule::new("motor_controller.l", ModuleKind::MotorController, BodyZone::DroneArmLeft, 18.0)
+            .with_failure_cascade(FailureCascade::MobilityLoss),
+        ChassisModule::new("motor_controller.r", ModuleKind::MotorController, BodyZone::DroneArmRight, 18.0)
+            .with_failure_cascade(FailureCascade::MobilityLoss),
+        ChassisModule::new("comm_relay.main", ModuleKind::CommRelay, BodyZone::DroneCore, 18.0),
+        ChassisModule::not_present("jet.none", ModuleKind::Jet),
+        ChassisModule::not_present("weapon_mount.none", ModuleKind::WeaponMount),
+        ChassisModule::not_present("shield.none", ModuleKind::Shield),
+        ChassisModule::not_present("repair_drone.none", ModuleKind::RepairDrone),
+    ];
+    ChassisSpec {
+        id: DRONE_ID.to_string(),
+        kind: ChassisKind::Drone,
+        display_name: "Recon Drone DR-1".to_string(),
+        body_graph: drone_body_graph(),
+        zones,
+        modules,
+        eject_window_seconds: 0.5,
+        mass_kg: 60.0,
+        // Drone: small target; flat armor mount on all faces.
+        armor_angles: ArmorMountAngles::new(0.0, 0.0, 0.0),
+    }
+}
+
+/// Stable registry of every launch chassis spec. **M13** ships 5 archetypes:
+/// Infantry, Powered Armor, Light Mech, Crab Quadruped, Drone.
 pub fn chassis_specs() -> BTreeMap<&'static str, ChassisSpec> {
     let mut m = BTreeMap::new();
     m.insert(INFANTRY_ID, infantry_spec());
     m.insert(POWERED_ARMOR_ID, powered_armor_spec());
     m.insert(LIGHT_MECH_ID, light_mech_spec());
+    m.insert(CRAB_QUADRUPED_ID, crab_quadruped_spec());
+    m.insert(DRONE_ID, drone_spec());
     m
+}
+
+/// **M13** § "Engineer auto-repair contract" — per-module-class repair time
+/// table (seconds per HP point + tool requirement + Engineer priority weight).
+/// Consumed by M7's Engineer-role utility scorer.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ModuleRepairCost {
+    /// Module classification id.
+    pub class: &'static str,
+    /// Seconds of repair work per HP point restored.
+    pub seconds_per_hp: f32,
+    /// Tool requirement, comma-joined ("welder+plate", "toolkit", etc.).
+    pub tool_required: &'static str,
+    /// Engineer auto-repair priority weight (0..10).
+    pub engineer_priority: u8,
+}
+
+impl ModuleRepairCost {
+    /// Spec § "Engineer auto-repair contract" canonical table.
+    pub fn for_module(kind: ModuleKind) -> Self {
+        match kind {
+            ModuleKind::Jet => ModuleRepairCost {
+                class: "jet",
+                seconds_per_hp: 0.6,
+                tool_required: "toolkit+power",
+                engineer_priority: 8,
+            },
+            ModuleKind::WeaponMount => ModuleRepairCost {
+                class: "weapon_mount",
+                seconds_per_hp: 0.4,
+                tool_required: "toolkit",
+                engineer_priority: 7,
+            },
+            ModuleKind::Sensor | ModuleKind::Optics => ModuleRepairCost {
+                class: "sensor",
+                seconds_per_hp: 0.3,
+                tool_required: "toolkit",
+                engineer_priority: 6,
+            },
+            ModuleKind::PowerCore | ModuleKind::Reactor => ModuleRepairCost {
+                class: "power_cell",
+                seconds_per_hp: 1.2,
+                tool_required: "toolkit+capacitor",
+                engineer_priority: 9,
+            },
+            _ => ModuleRepairCost {
+                class: "generic",
+                seconds_per_hp: 0.5,
+                tool_required: "toolkit",
+                engineer_priority: 5,
+            },
+        }
+    }
+
+    /// Armor-zone repair cost per layer (Engineer auto-repair contract table).
+    pub fn for_armor_layer(layer: ArmorLayerKind) -> Self {
+        match layer {
+            ArmorLayerKind::External => ModuleRepairCost {
+                class: "armor_external",
+                seconds_per_hp: 0.3,
+                tool_required: "welder+plate",
+                engineer_priority: 9,
+            },
+            ArmorLayerKind::Internal => ModuleRepairCost {
+                class: "armor_internal",
+                seconds_per_hp: 0.5,
+                tool_required: "welder+plate",
+                engineer_priority: 8,
+            },
+            ArmorLayerKind::Core => ModuleRepairCost {
+                class: "armor_core",
+                seconds_per_hp: 0.8,
+                tool_required: "welder+plate+power",
+                engineer_priority: 7,
+            },
+        }
+    }
 }
 
 pub fn chassis_spec(spec_id: &str) -> Option<ChassisSpec> {
@@ -2108,5 +4145,270 @@ mod tests {
         assert!(chassis_spec(LIGHT_MECH_ID).is_some());
         assert!(chassis_spec(INFANTRY_ID).is_some());
         assert!(chassis_spec("nonexistent").is_none());
+    }
+
+    /// **M13** § "Chassis archetypes — M13 ships 5": crab + drone archetypes
+    /// must be in the canonical registry alongside the 3 humanoid kinds.
+    #[test]
+    fn registry_ships_five_chassis_archetypes() {
+        assert!(chassis_spec(CRAB_QUADRUPED_ID).is_some());
+        assert!(chassis_spec(DRONE_ID).is_some());
+        assert_eq!(chassis_specs().len(), 5, "M13 ships 5 chassis archetypes");
+    }
+
+    /// **M13** § "Quadruped=11 zones": crab body graph zone count contract.
+    #[test]
+    fn crab_quadruped_has_eleven_zones() {
+        let s = crab_quadruped_spec();
+        assert_eq!(s.kind, ChassisKind::CrabQuadruped);
+        assert_eq!(s.zones.len(), 11);
+        for zone in [
+            BodyZone::Carapace,
+            BodyZone::SensorCluster,
+            BodyZone::LegFrontLeft,
+            BodyZone::LegFrontRight,
+            BodyZone::LegRearLeft,
+            BodyZone::LegRearRight,
+            BodyZone::ClawLeft,
+            BodyZone::ClawRight,
+        ] {
+            assert!(s.zones.iter().any(|z| z.zone == zone), "missing crab zone {zone:?}");
+        }
+        // No jet on crab.
+        let jet = s.modules.iter().find(|m| m.kind == ModuleKind::Jet).unwrap();
+        assert_eq!(jet.state, ModuleStateKind::NotPresent);
+    }
+
+    /// **M13** § "Drone=4 zones": drone body graph zone count contract.
+    #[test]
+    fn drone_has_four_zones() {
+        let s = drone_spec();
+        assert_eq!(s.kind, ChassisKind::Drone);
+        assert_eq!(s.zones.len(), 4);
+        for zone in [
+            BodyZone::DroneCore,
+            BodyZone::DroneArmLeft,
+            BodyZone::DroneArmRight,
+            BodyZone::DroneSensorPod,
+        ] {
+            assert!(s.zones.iter().any(|z| z.zone == zone), "missing drone zone {zone:?}");
+        }
+    }
+
+    /// **M13** § "Armor mounting angles per chassis archetype": per-chassis
+    /// angles match the spec table.
+    #[test]
+    fn armor_mount_angles_match_spec() {
+        assert_eq!(infantry_spec().armor_angles, ArmorMountAngles::new(0.0, 0.0, 0.0));
+        assert_eq!(powered_armor_spec().armor_angles, ArmorMountAngles::new(15.0, 0.0, 15.0));
+        assert_eq!(light_mech_spec().armor_angles, ArmorMountAngles::new(30.0, 0.0, 15.0));
+        assert_eq!(
+            crab_quadruped_spec().armor_angles,
+            ArmorMountAngles::new(30.0, 30.0, 30.0)
+        );
+        assert_eq!(drone_spec().armor_angles, ArmorMountAngles::new(0.0, 0.0, 0.0));
+    }
+
+    /// **M13** § "Chassis ability slots": per-chassis slot count + activate.
+    #[test]
+    fn chassis_ability_slots_count_per_kind() {
+        assert_eq!(ChassisKind::Infantry.ability_slot_count(), 1);
+        assert_eq!(ChassisKind::PoweredArmor.ability_slot_count(), 2);
+        assert_eq!(ChassisKind::LightMech.ability_slot_count(), 3);
+        assert_eq!(ChassisKind::Drone.ability_slot_count(), 1);
+    }
+
+    #[test]
+    fn chassis_ability_activate_advances_and_cools_down() {
+        let mut state = ChassisState::from_spec(&powered_armor_spec(), 60, false);
+        let result = state.activate_ability(ChassisAbility::Overdrive);
+        assert!(result.is_ok());
+        // Activating again while active fails.
+        let err = state.activate_ability(ChassisAbility::Overdrive).unwrap_err();
+        assert_eq!(err, AbilityRejectReason::AlreadyActive);
+        // Tick out the effect — engine should drain effect ticks.
+        for _ in 0..state.abilities.find(ChassisAbility::Overdrive).unwrap().effect_total_ticks {
+            state.tick_abilities();
+        }
+        // Now cooling down.
+        let err = state.activate_ability(ChassisAbility::Overdrive).unwrap_err();
+        assert_eq!(err, AbilityRejectReason::OnCooldown);
+    }
+
+    /// **M13** § "Weapon modifier slots": attach/detach respects max slot count.
+    #[test]
+    fn weapon_modifier_slot_count_per_chassis_tier() {
+        let mut set = WeaponModifierSet::new(ChassisKind::Infantry);
+        assert_eq!(set.max_slots, 1);
+        set.attach(WeaponModifier::Homing).unwrap();
+        assert!(set.attach(WeaponModifier::Explosive).is_err());
+        let mut mech = WeaponModifierSet::new(ChassisKind::LightMech);
+        assert_eq!(mech.max_slots, 3);
+        mech.attach(WeaponModifier::Homing).unwrap();
+        mech.attach(WeaponModifier::Explosive).unwrap();
+        mech.attach(WeaponModifier::Freezing).unwrap();
+        assert!(mech.is_combined());
+        assert!(mech.attach(WeaponModifier::ChainLightning).is_err());
+    }
+
+    /// **M13** § "30+ launch modifiers": registry has at least 30 modifiers.
+    #[test]
+    fn weapon_modifier_registry_has_thirty_plus() {
+        assert!(WeaponModifier::all().len() >= 30);
+        assert_eq!(WeaponModifier::parse("homing"), Some(WeaponModifier::Homing));
+        assert_eq!(WeaponModifier::parse("nonsense"), None);
+    }
+
+    /// **M13** § "Drone allies — 4 modes": parse + fuel drain.
+    #[test]
+    fn drone_modes_round_trip_and_drain_fuel() {
+        assert_eq!(DroneMode::parse("auto_mine"), Some(DroneMode::AutoMine));
+        assert_eq!(DroneMode::parse("auto-carry"), Some(DroneMode::AutoCarry));
+        let mut drone = DroneAllyState::default();
+        assert!((drone.fuel - 1.0).abs() < 1e-6);
+        for _ in 0..18000 {
+            drone.tick_fuel(60);
+        }
+        assert!(drone.fuel < 1.0, "5 minutes of fuel drain should reduce charge");
+    }
+
+    /// **M13** § "Cockpit camera anchor — Medium + Heavy classes only".
+    #[test]
+    fn cockpit_anchor_rejects_unsupported_chassis() {
+        let mut infantry = ChassisState::from_spec(&infantry_spec(), 60, false);
+        assert!(infantry.set_camera_anchor(CameraAnchor::Cockpit).is_err());
+        let mut mech = ChassisState::from_spec(&light_mech_spec(), 60, false);
+        assert!(mech.set_camera_anchor(CameraAnchor::Cockpit).is_ok());
+        assert_eq!(mech.camera_anchor, CameraAnchor::Cockpit);
+    }
+
+    /// **M13** § "Boarding / disembarking transitions": 1500ms transitions
+    /// are tick-rate-stable.
+    #[test]
+    fn boarding_transitions_match_1500ms_at_any_tick_rate() {
+        let mut at_60 = ChassisState::from_spec(&powered_armor_spec(), 60, false);
+        let at_120 = ChassisState::from_spec(&powered_armor_spec(), 120, false);
+        assert_eq!(at_60.transition_ticks_total, 90); // 1.5s * 60Hz
+        assert_eq!(at_120.transition_ticks_total, 180); // 1.5s * 120Hz
+        assert!(at_60.begin_boarding());
+        assert!(at_60.is_in_transition());
+        // Cannot start a second transition while one is in flight.
+        assert!(!at_60.begin_disembarking());
+        // Tick until completion.
+        let mut completed = None;
+        for _ in 0..at_60.transition_ticks_total {
+            completed = at_60.tick_transitions();
+        }
+        assert_eq!(completed, Some(TransitionCompleted::Boarded));
+        assert!(!at_60.is_in_transition());
+        let _ = at_120;
+    }
+
+    /// **M13** § "Hit reactions per body part": tabulated reactions per zone.
+    #[test]
+    fn hit_reactions_match_spec_table() {
+        let head = HitReaction::for_zone(BodyZone::Head);
+        assert_eq!(head.kind, "stagger_stun");
+        assert!((head.duration_seconds - 0.5).abs() < 1e-6);
+        assert_eq!(head.concussion_dose, 15);
+        let hand = HitReaction::for_zone(BodyZone::HandRight);
+        assert_eq!(hand.kind, "drop_weapon");
+        assert!((hand.drop_chance - 0.40).abs() < 1e-6);
+        let leg = HitReaction::for_zone(BodyZone::LegLeft);
+        assert!((leg.speed_factor - 0.7).abs() < 1e-6);
+        let head_ticks = head.duration_ticks(60);
+        assert_eq!(head_ticks, 30);
+    }
+
+    /// **M13** § "Critical chassis modules with full mechanics": ammo rack
+    /// cooking + detonation cascade.
+    #[test]
+    fn ammo_rack_cascade_cooks_then_detonates() {
+        let mut state = ChassisState::from_spec(&light_mech_spec(), 60, false);
+        // Apply damage to drive AmmoRack toward Warning then Failed.
+        let warn = state.apply_critical_module_damage("ammo_rack.main", 50.0, "shaped_charge").unwrap();
+        assert!(matches!(
+            warn.cascade_events.first(),
+            Some(CriticalModuleEvent::AmmoCooking { .. })
+        ));
+        // Now finish off the rack.
+        let finish = state.apply_critical_module_damage("ammo_rack.main", 50.0, "second_hit").unwrap();
+        assert!(finish
+            .cascade_events
+            .iter()
+            .any(|e| matches!(e, CriticalModuleEvent::AmmoDetonated { .. })));
+        assert_eq!(state.stage, ChassisStage::Gibbed);
+    }
+
+    /// **M13** § "Spalling integration": deterministic fragment routing.
+    #[test]
+    fn spalling_fragments_are_deterministic_given_same_seed() {
+        let mut a = ChassisState::from_spec(&light_mech_spec(), 60, false);
+        let mut b = ChassisState::from_spec(&light_mech_spec(), 60, false);
+        let frags_a = a.spawn_spalling_fragments((0.0, 0.0), 3, 30.0, 42);
+        let frags_b = b.spawn_spalling_fragments((0.0, 0.0), 3, 30.0, 42);
+        assert_eq!(frags_a.len(), 3);
+        assert_eq!(frags_a.len(), frags_b.len());
+        for (fa, fb) in frags_a.iter().zip(frags_b.iter()) {
+            assert_eq!(fa.module_id, fb.module_id);
+            assert!((fa.damage - fb.damage).abs() < 1e-3);
+        }
+    }
+
+    /// **M13** § "Limb loss functional consequences" — head destruction
+    /// flags `lethal=true` (instant death per CCCP decapitation rule).
+    #[test]
+    fn head_destruction_flags_lethal_when_not_tutorial_safe() {
+        let spec = powered_armor_spec();
+        let mut state = ChassisState::from_spec(&spec, 60, false);
+        let outcome = state.apply_zone_damage(BodyZone::Head, 1000.0, "headshot");
+        assert!(outcome.zone_destroyed, "head zone must be destroyed by 1000 dmg");
+        assert!(outcome.lethal, "head destruction must flag lethal=true");
+    }
+
+    /// **M13** § "Tutorial-safety scenario variant" — head destruction does
+    /// NOT flag lethal when tutorial_safety=true.
+    #[test]
+    fn head_destruction_skips_lethal_in_tutorial_safety() {
+        let spec = powered_armor_spec();
+        let mut state = ChassisState::from_spec(&spec, 60, true);
+        let outcome = state.apply_zone_damage(BodyZone::Head, 1000.0, "headshot");
+        assert!(outcome.zone_destroyed);
+        assert!(!outcome.lethal, "tutorial_safety must suppress lethal");
+    }
+
+    /// **M13** § "Torso loss = INSTANT DEATH": torso destruction flags lethal.
+    #[test]
+    fn torso_destruction_flags_lethal() {
+        let spec = powered_armor_spec();
+        let mut state = ChassisState::from_spec(&spec, 60, false);
+        let outcome = state.apply_zone_damage(BodyZone::Torso, 2000.0, "shaped_charge");
+        assert!(outcome.zone_destroyed);
+        assert!(outcome.lethal);
+    }
+
+    /// **M13** § "Arm loss" — destroying an arm does NOT flag lethal (only
+    /// head/torso do).
+    #[test]
+    fn arm_destruction_does_not_flag_lethal() {
+        let spec = powered_armor_spec();
+        let mut state = ChassisState::from_spec(&spec, 60, false);
+        let outcome = state.apply_zone_damage(BodyZone::ArmLeft, 1000.0, "explosion");
+        assert!(outcome.zone_destroyed);
+        assert!(!outcome.lethal, "arm destruction must NOT flag lethal");
+    }
+
+    /// **M13** § "Engineer auto-repair contract" — per-module repair cost
+    /// table matches the spec values.
+    #[test]
+    fn engineer_auto_repair_table_matches_spec() {
+        let jet = ModuleRepairCost::for_module(ModuleKind::Jet);
+        assert!((jet.seconds_per_hp - 0.6).abs() < 1e-6);
+        assert_eq!(jet.engineer_priority, 8);
+        let core = ModuleRepairCost::for_module(ModuleKind::PowerCore);
+        assert_eq!(core.engineer_priority, 9);
+        let ext = ModuleRepairCost::for_armor_layer(ArmorLayerKind::External);
+        assert!((ext.seconds_per_hp - 0.3).abs() < 1e-6);
+        assert_eq!(ext.engineer_priority, 9);
     }
 }

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/body.gib_cascade_triggered.v0.1",
+  "title": "body.gib_cascade_triggered",
+  "description": "M14 § Gib cascade per CCCP RemoveAttachablesWhenGibbing — when a parent attachable gibs, each child attachable gibs independently per its own spawn data. One event per cascaded child. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "body" },
+    "event_type": { "const": "gib_cascade_triggered" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "parent_zone": { "type": "string" },
+        "child_zone": { "type": "string" },
+        "cascade_depth": { "type": "integer", "minimum": 1 },
+        "source_event_id": { "type": "string" },
+        "reason": { "type": "string" }
+      },
+      "required": ["actor_id", "parent_zone", "child_zone", "cascade_depth", "source_event_id", "reason"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

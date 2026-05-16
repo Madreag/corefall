@@ -1,0 +1,21 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ActPlayerAttachModifierParams",
+  "description": "**M13** § \"Weapon modifier slots\" — attach a Noita-style weapon modifier.",
+  "type": "object",
+  "properties": {
+    "modifier": {
+      "type": "string"
+    },
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "modifier"
+  ]
+}

@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/armor.spalling_fragment_spawned.v0.1",
+  "title": "armor.spalling_fragment_spawned",
+  "description": "M14 § War Thunder-style spalling — one spalling fragment spawned at the impact point after a successful armor breach. Each fragment is a sub-projectile with reduced damage (20-50% of original) that hits 1-2 interior modules. Producer fills at M14. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "armor" },
+    "event_type": { "const": "spalling_fragment_spawned" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "fragment_id": { "type": "string" },
+        "direction": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+        "damage": { "type": "number", "minimum": 0.0 },
+        "source_event_id": { "type": "string" }
+      },
+      "required": ["fragment_id", "direction", "damage", "source_event_id"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

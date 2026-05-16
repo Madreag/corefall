@@ -382,6 +382,41 @@ const SCHEMA_UX_JUICE_APPLIED: &str = include_str!("../schemas/event/ux_juice_ap
 // per M12A spec § Replay parity.
 const SCHEMA_AUDIO_EVENT_PLAYED: &str = include_str!("../schemas/event/audio_event_played.json");
 
+// **M14**: full collision + impulse routing event surface. Producers in
+// cf-control/src/engine.rs fire on swept-collision priority queue, bullet
+// sharpness decay over distance, projectile embedding in stickiness
+// material, attachable detach + gib threshold, gib spawn + cascade,
+// ragdoll activation on DYING/DEAD, and per-joint impulse propagation.
+const SCHEMA_COMBAT_SWEPT_COLLISION: &str = include_str!("../schemas/event/combat_swept_collision.json");
+const SCHEMA_COMBAT_BULLET_SHARPNESS_DECAY: &str =
+    include_str!("../schemas/event/combat_bullet_sharpness_decay.json");
+const SCHEMA_COMBAT_EMBEDDED_IN_TERRAIN: &str = include_str!("../schemas/event/combat_embedded_in_terrain.json");
+const SCHEMA_ATTACHABLE_DETACHED: &str = include_str!("../schemas/event/attachable_detached.json");
+const SCHEMA_ATTACHABLE_GIB_THRESHOLD_CROSSED: &str =
+    include_str!("../schemas/event/attachable_gib_threshold_crossed.json");
+const SCHEMA_BODY_GIB_CREATED: &str = include_str!("../schemas/event/body_gib_created.json");
+const SCHEMA_BODY_GIB_CASCADE_TRIGGERED: &str = include_str!("../schemas/event/body_gib_cascade_triggered.json");
+const SCHEMA_PHYSICS_RAGDOLL_ACTIVATED: &str = include_str!("../schemas/event/physics_ragdoll_activated.json");
+const SCHEMA_PHYSICS_IMPULSE_PROPAGATED: &str = include_str!("../schemas/event/physics_impulse_propagated.json");
+const SCHEMA_ARMOR_SPALLING_FRAGMENT_SPAWNED: &str =
+    include_str!("../schemas/event/armor_spalling_fragment_spawned.json");
+const SCHEMA_ARMOR_SPALLING_FRAGMENT_HIT_MODULE: &str =
+    include_str!("../schemas/event/armor_spalling_fragment_hit_module.json");
+const SCHEMA_ARMOR_AMMO_RACK_DETONATED: &str = include_str!("../schemas/event/armor_ammo_rack_detonated.json");
+// **M2 audit pass (GAP-M2-01)**: schemas for per-objective pause/resume.
+const SCHEMA_OBJECTIVE_PAUSED: &str = include_str!("../schemas/event/mission_objective_paused.json");
+const SCHEMA_OBJECTIVE_RESUMED: &str = include_str!("../schemas/event/mission_objective_resumed.json");
+// **M9 audit pass (GAP-M9-02)**: schema for Sniper scope-settle event.
+const SCHEMA_AI_SCOPE_SETTLE: &str = include_str!("../schemas/event/ai_scope_settle.json");
+// **M7 audit pass (GAP-M7-01, GAP-M7-02)**: spec-canonical aliases.
+const SCHEMA_ACTOR_MOOD_CHANGED: &str = include_str!("../schemas/event/actor_mood_changed.json");
+const SCHEMA_FACTION_RELATIONSHIP_CHANGED: &str =
+    include_str!("../schemas/event/faction_relationship_changed.json");
+// **M8 audit pass (GAP-M8-01)**: spec-canonical ux.* aliases for plan events.
+const SCHEMA_UX_PLAN_COMPOSED: &str = include_str!("../schemas/event/ux_plan_composed.json");
+const SCHEMA_UX_PLAN_EXECUTED: &str = include_str!("../schemas/event/ux_plan_executed.json");
+const SCHEMA_UX_PLAN_ABORTED: &str = include_str!("../schemas/event/ux_plan_aborted.json");
+
 /// Look up the schema source by `(category, event_type)`. Returns `None` if
 /// no schema exists for this pair (callers treat as "no validation
 /// constraint"; the recorder envelope itself is checked by the bundle
@@ -689,6 +724,31 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("ux", "juice_applied") => Some(SCHEMA_UX_JUICE_APPLIED),
         // **M12A**: per-cue audio playback event.
         ("audio", "event_played") => Some(SCHEMA_AUDIO_EVENT_PLAYED),
+        // **M14**: full collision + impulse routing event surface.
+        ("combat", "swept_collision") => Some(SCHEMA_COMBAT_SWEPT_COLLISION),
+        ("combat", "bullet_sharpness_decay") => Some(SCHEMA_COMBAT_BULLET_SHARPNESS_DECAY),
+        ("combat", "embedded_in_terrain") => Some(SCHEMA_COMBAT_EMBEDDED_IN_TERRAIN),
+        ("attachable", "detached") => Some(SCHEMA_ATTACHABLE_DETACHED),
+        ("attachable", "gib_threshold_crossed") => Some(SCHEMA_ATTACHABLE_GIB_THRESHOLD_CROSSED),
+        ("body", "gib_created") => Some(SCHEMA_BODY_GIB_CREATED),
+        ("body", "gib_cascade_triggered") => Some(SCHEMA_BODY_GIB_CASCADE_TRIGGERED),
+        ("physics", "ragdoll_activated") => Some(SCHEMA_PHYSICS_RAGDOLL_ACTIVATED),
+        ("physics", "impulse_propagated") => Some(SCHEMA_PHYSICS_IMPULSE_PROPAGATED),
+        ("armor", "spalling_fragment_spawned") => Some(SCHEMA_ARMOR_SPALLING_FRAGMENT_SPAWNED),
+        ("armor", "spalling_fragment_hit_module") => Some(SCHEMA_ARMOR_SPALLING_FRAGMENT_HIT_MODULE),
+        ("armor", "ammo_rack_detonated") => Some(SCHEMA_ARMOR_AMMO_RACK_DETONATED),
+        // **M2 audit pass (GAP-M2-01)**: per-objective pause/resume schemas.
+        ("mission", "objective_paused") => Some(SCHEMA_OBJECTIVE_PAUSED),
+        ("mission", "objective_resumed") => Some(SCHEMA_OBJECTIVE_RESUMED),
+        // **M9 audit pass (GAP-M9-02)**: Sniper scope-settle event.
+        ("ai", "scope_settle") => Some(SCHEMA_AI_SCOPE_SETTLE),
+        // **M7 audit pass (GAP-M7-01, GAP-M7-02)**: spec-canonical aliases.
+        ("actor", "mood_changed") => Some(SCHEMA_ACTOR_MOOD_CHANGED),
+        ("faction", "relationship_changed") => Some(SCHEMA_FACTION_RELATIONSHIP_CHANGED),
+        // **M8 audit pass (GAP-M8-01)**: spec-canonical ux.* aliases.
+        ("ux", "plan_composed") => Some(SCHEMA_UX_PLAN_COMPOSED),
+        ("ux", "plan_executed") => Some(SCHEMA_UX_PLAN_EXECUTED),
+        ("ux", "plan_aborted") => Some(SCHEMA_UX_PLAN_ABORTED),
         _ => None,
     }
 }

@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/ai.scope_settle.v0.1",
+  "title": "ai.scope_settle",
+  "description": "M9 audit pass (GAP-M9-02 LOW fix): Sniper archetype scope-settle event. Fires when a Sniper enters EngageVisibleEnemy and begins the 1.5s settle window before firing. Producer in cf-control/src/engine.rs::emit_m7_ai_events. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "ai" },
+    "event_type": { "const": "scope_settle" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "settle_duration_ticks": { "type": "integer", "minimum": 0 },
+        "archetype": { "type": "string" }
+      },
+      "required": ["actor_id", "settle_duration_ticks", "archetype"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

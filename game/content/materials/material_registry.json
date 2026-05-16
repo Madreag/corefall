@@ -37,6 +37,7 @@
       "hazard": false,
       "path_cost": 1.0,
       "density": 1.5,
+      "stickiness": 0.05,
       "color_hex": "8B6914",
       "description": "Default destructible terrain. Digger carves easily; tether anchors."
     },
@@ -75,8 +76,9 @@
       "hazard": false,
       "path_cost": 999.0,
       "density": 7.8,
+      "stickiness": 0.70,
       "color_hex": "4A4A4A",
-      "description": "Hard undiggable metal. Tether/anchor refuses with reason label."
+      "description": "Hard undiggable metal. Tether/anchor refuses with reason label. High stickiness — projectiles stick on failed penetration."
     },
     {
       "id": 4,
@@ -113,6 +115,7 @@
       "hazard": false,
       "path_cost": 2.0,
       "density": 1.2,
+      "stickiness": 0.10,
       "color_hex": "C8A864",
       "description": "Soft fill. Movement slowdown; low structural support."
     },
@@ -132,6 +135,7 @@
       "hazard": false,
       "path_cost": 1.0,
       "density": 0.8,
+      "stickiness": 0.20,
       "color_hex": "44FF44",
       "description": "Player-placed repair material. Creates cover and restores pathability."
     },
@@ -151,6 +155,7 @@
       "hazard": false,
       "path_cost": 1.0,
       "density": 2.6,
+      "stickiness": 0.50,
       "color_hex": "6B4226",
       "description": "Hard anchorable surface. Tether attaches; drill/charge can breach."
     }

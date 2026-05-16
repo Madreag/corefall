@@ -27,6 +27,7 @@ cf-actor = { path = "../cf-actor" }
 cf-physics = { path = "../cf-physics" }
 cf-equipment = { path = "../cf-equipment" }
 cf-chassis = { path = "../cf-chassis" }
+cf-internal = { path = "../cf-internal" }
 cf-mission = { path = "../cf-mission" }
 cf-terrain = { path = "../cf-terrain" }
 cf-material = { path = "../cf-material" }

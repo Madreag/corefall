@@ -484,7 +484,13 @@ impl M0Engine {
         );
         let composed_payload = json!({"actor_id": actor_id, "step_count": count, "steps": label_steps});
         #[rustfmt::skip]
-        let _ = self.recorder.record(tick, sim_time_ms, "ai", "plan_composed", composed_payload, None);
+        let _ = self.recorder.record(tick, sim_time_ms, "ai", "plan_composed", composed_payload.clone(), None);
+        // **M14 audit pass 3 (GAP-M8-01)**: M8 spec § Event families lists
+        // `ux.plan_composed/plan_executed/plan_aborted`. Dual-emit under
+        // the spec-canonical `ux.*` category so spec-literal-checking
+        // consumers find the event under either namespace.
+        #[rustfmt::skip]
+        let _ = self.recorder.record(tick, sim_time_ms, "ux", "plan_composed", composed_payload, None);
         // M8 basic stub: empty step lists clear the bot's plan (abort);
         // non-empty step lists immediately execute the queued plan. M33+
         // adds a separate `act.player.execute_plan` cfctl method gated by
@@ -494,11 +500,15 @@ impl M0Engine {
         if count == 0 {
             let aborted_payload = json!({"plan_count": 1, "actor_ids": [actor_id]});
             #[rustfmt::skip]
-            let _ = self.recorder.record(tick, sim_time_ms, "ai", "plan_aborted", aborted_payload, None);
+            let _ = self.recorder.record(tick, sim_time_ms, "ai", "plan_aborted", aborted_payload.clone(), None);
+            #[rustfmt::skip]
+            let _ = self.recorder.record(tick, sim_time_ms, "ux", "plan_aborted", aborted_payload, None);
         } else {
             let executed_payload = json!({"plan_count": 1, "actor_ids": [actor_id]});
             #[rustfmt::skip]
-            let _ = self.recorder.record(tick, sim_time_ms, "ai", "plan_executed", executed_payload, None);
+            let _ = self.recorder.record(tick, sim_time_ms, "ai", "plan_executed", executed_payload.clone(), None);
+            #[rustfmt::skip]
+            let _ = self.recorder.record(tick, sim_time_ms, "ux", "plan_executed", executed_payload, None);
         }
         CommandResult::accepted(tick.0)
     }

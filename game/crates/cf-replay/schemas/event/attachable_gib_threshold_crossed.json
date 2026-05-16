@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/attachable.gib_threshold_crossed.v0.1",
+  "title": "attachable.gib_threshold_crossed",
+  "description": "M14 § Attachable joint impulse exceeded the gib_impulse_limit per CCCP Attachable::GibThis. The attachable will gib (shatter into authored particles) instead of cleanly detaching. Always paired with a subsequent body.gib_created event. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "attachable" },
+    "event_type": { "const": "gib_threshold_crossed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "attachable_id": { "type": "string" },
+        "parent_zone": { "type": "string" },
+        "joint_impulse": { "type": "number", "minimum": 0.0 },
+        "gib_impulse_limit": { "type": "number", "minimum": 0.0 },
+        "source_event_id": { "type": "string" },
+        "cause": { "type": "string" }
+      },
+      "required": ["actor_id", "attachable_id", "parent_zone", "joint_impulse", "gib_impulse_limit", "source_event_id", "cause"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

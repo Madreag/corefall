@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/ux.plan_aborted.v0.1",
+  "title": "ux.plan_aborted",
+  "description": "M14 audit pass 3 (GAP-M8-01): spec-canonical alias for ai.plan_aborted.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "ux" },
+    "event_type": { "const": "plan_aborted" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "plan_count": { "type": "integer", "minimum": 0 },
+        "actor_ids": { "type": "array", "items": { "type": "integer" } }
+      },
+      "required": ["plan_count", "actor_ids"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

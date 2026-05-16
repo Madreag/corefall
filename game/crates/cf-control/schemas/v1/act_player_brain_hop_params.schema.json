@@ -1,0 +1,23 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ActPlayerBrainHopParams",
+  "description": "**M13** § \"Brain hopping\" — `act.player.brain_hop { target_actor_id }`\ntransfers control to a different friendly actor and updates the brain flag.",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "target_actor_id": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "target_actor_id"
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "cf-tools-replay-viewer/cause_chain_report.v1",
+  "title": "cf-tools-replay-viewer cause-chain report",
+  "description": "M14 audit pass 3 (GAP-M10-03): JSON output of `cfctl replay cause-chain <bundle>`. Walks the parent_event_id graph from a terminal event back to its root.",
+  "type": "object",
+  "required": ["trigger_event_id", "chain_links", "termination"],
+  "properties": {
+    "trigger_event_id": { "type": "string", "description": "Event id where the chain begins (terminal event)." },
+    "trigger_tick": { "type": "integer", "minimum": 0 },
+    "chain_links": {
+      "type": "array",
+      "description": "Ordered from trigger (index 0) → root (last index). Each link includes the resolved event + parent_event_id used to traverse.",
+      "items": {
+        "type": "object",
+        "required": ["event_id", "category", "event_type"],
+        "properties": {
+          "event_id": { "type": "string" },
+          "category": { "type": "string" },
+          "event_type": { "type": "string" },
+          "tick": { "type": "integer", "minimum": 0 },
+          "parent_event_id": { "type": ["string", "null"] },
+          "plain_language": { "type": "string" }
+        }
+      }
+    },
+    "termination": {
+      "type": "string",
+      "enum": ["root_reached", "parent_missing_from_bundle", "max_depth_reached", "cycle_detected"],
+      "description": "Why the chain walker stopped."
+    },
+    "max_depth": { "type": "integer", "minimum": 1 }
+  }
+}

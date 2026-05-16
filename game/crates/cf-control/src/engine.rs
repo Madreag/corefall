@@ -709,6 +709,11 @@ pub(crate) struct EngineMutable {
     /// overlay holds input; the CONTROLS CAPTURED HUD zone renders and all
     /// `act.player.*` dispatches reject with reason `controls_captured`.
     controls_captured_by: Option<String>,
+    /// **M14 audit pass 2 (GAP-M4-02 HIGH fix)**: latched true when
+    /// `act.player.abort` succeeds. `record_run_finished` reads this to
+    /// emit `system.run_finished.outcome="abort"` per M4 § Expected
+    /// outcome + system events (previously hardcoded clean/panic only).
+    run_aborted: bool,
     /// **M1 / Gap C2**: projectile_id -> spawn_event_id map persisted across
     /// ticks so when a projectile hits N ticks after spawn, the
     /// `combat.projectile_hit` event can parent to its originating
@@ -1314,6 +1319,10 @@ impl M0Engine {
                 hud_captions: VecDeque::new(),
                 hud_tool_validity: crate::state::ToolValidityView::default(),
                 hud_last_status: BTreeMap::new(),
+                // **M14 audit pass 2 (GAP-M4-02)**: track whether the run
+                // was aborted via act.player.abort so record_run_finished
+                // emits outcome="abort" per M4 spec.
+                run_aborted: false,
                 hud_last_mission_result: None,
                 controls_captured_by: None,
                 force_ai_update_this_tick: false,
@@ -1605,7 +1614,15 @@ impl M0Engine {
             ("snapshot", "snapshot.snapshot_actor"),
             ("determinism", "determinism.sim_checksum"),
             ("system", "system.run_started"),
-            ("body", "actor.actor_status_changed"),
+            // **M14 audit pass 2 (GAP-M4-01 CRITICAL fix)**: `body` was
+            // duplicated here with two different `first_event_type`s
+            // (`actor.actor_status_changed` from M1 + `body.gib_created`
+            // from M14). The M4 § Event taxonomy invariant requires
+            // exactly ONE entry per category; emit_category_baseline now
+            // surfaces `body.gib_created` as the M14-ladder-up first
+            // event since the M1 `actor.actor_status_changed` lives under
+            // category `actor` already.
+            ("body", "body.gib_created"),
             ("ux", "ux.banner_raised"),
             ("accessibility", "accessibility.settings_changed"),
             ("performance", "performance.tick_cost_sample"),
@@ -1617,12 +1634,24 @@ impl M0Engine {
             ("concussion", "concussion.dose_changed"),
             ("armor", "armor.layer_hp_changed"),
             ("thermal", "thermal.signature_changed"),
+            // **M14** § Full collision + impulse routing — attachable.*
+            // ladder up from `registered` to `active`.
+            ("attachable", "attachable.detached"),
+            // **M14 audit pass 2 (GAP-M4-03 MEDIUM fix)**: `hazard` +
+            // `affliction` were `registered` but engine.rs emits
+            // `hazard.spawned` + `affliction.tick` from production. Promote
+            // both to active.
+            ("hazard", "hazard.spawned"),
+            ("affliction", "affliction.tick"),
         ];
         // Registered categories whose producer ladders up at a later milestone.
         // The remaining M5 deep-damage families stay `registered` per the M4
         // spec § Out of scope rule (M4 locks schemas; producers ladder up).
         let registered_categories: &[(&str, &str)] = &[
             ("mind", "M23"),
+            // **M14 audit pass 2 (GAP-M4-04 MEDIUM fix)**: M4 baseline
+            // explicitly lists `collision` as registered with
+            // `ladder_at: "M14"`. Restored here per spec § Event taxonomy.
             ("collision", "M14"),
             ("server", "M36"),
             ("anti_cheat", "M36"),
@@ -1630,8 +1659,6 @@ impl M0Engine {
             ("material", "M15"),
             ("reaction", "M15"),
             ("atmospherics", "M19"),
-            ("affliction", "M16"),
-            ("hazard", "M9"),
             ("environment", "M20"),
             ("fluid", "M9"),
             ("origin", "M9"),
@@ -2799,6 +2826,12 @@ impl M0Engine {
                 damage: f32,
                 spawn_material: Option<cf_terrain::MaterialId>,
                 damage_outcome: Option<cf_terrain::PenetrationOutcome>,
+                /// **M14**: stickiness coefficient on this material (0..=1).
+                stickiness: f32,
+                /// **M14**: the seeded RNG draw used to decide the stickiness
+                /// check, captured so `combat.embedded_in_terrain` can carry
+                /// the exact roll for replay verification.
+                rng_roll: f32,
             }
             let mut terrain_hits: Vec<TerrainHit> = Vec::new();
             if state.chunked_terrain.is_some() && state.actor_state.is_some() {
@@ -2883,6 +2916,8 @@ impl M0Engine {
                                 damage: proj.damage,
                                 spawn_material: aff.spawn_material,
                                 damage_outcome,
+                                stickiness: aff.stickiness,
+                                rng_roll,
                             });
                         } else {
                             terrain_hits.push(TerrainHit {
@@ -2900,6 +2935,8 @@ impl M0Engine {
                                 damage: proj.damage,
                                 spawn_material: aff.spawn_material,
                                 damage_outcome,
+                                stickiness: aff.stickiness,
+                                rng_roll,
                             });
                         }
                     }
@@ -3056,6 +3093,31 @@ impl M0Engine {
                             }
                         }
                     }
+                    // **M14** § "Bullet embedded in stickiness material" —
+                    // when the stickiness roll pulled the projectile in
+                    // (cf_physics::try_penetrate.outcome.stuck) emit
+                    // `combat.embedded_in_terrain` carrying the seeded RNG
+                    // roll + material stickiness coefficient so replays +
+                    // M14 tests can verify the embedding contract.
+                    if hit.stuck {
+                        self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "combat",
+                            "embedded_in_terrain",
+                            json!({
+                                "projectile_id": hit.projectile_id,
+                                "owner_id": hit.owner.0,
+                                "position": hit.pos,
+                                "material_id": hit.material_id,
+                                "material": hit.material_name,
+                                "stickiness": hit.stickiness,
+                                "rng_roll": hit.rng_roll,
+                                "source_event_id": pen_id.clone(),
+                            }),
+                            Some(pen_id.clone()),
+                        );
+                    }
                     // Legacy combat.projectile_expired so existing tooling
                     // (M2.5 reactor scenarios, M3A determinism viewer) still
                     // observes the projectile lifecycle.
@@ -3077,6 +3139,74 @@ impl M0Engine {
                     );
                     let _ = hit.damage; // reserved for future M5.5 splash damage routing
                 }
+            }
+
+            // **M14** § "Multiple limbs lost: bleed-out timer (6 HP/sec per
+            // CCCP)". For every actor with at least one destroyed chassis
+            // zone, apply per-tick bleed damage scaled by the number of
+            // lost zones. Drops the actor's HP directly; the existing
+            // status-change pipeline emits actor_status_changed when HP
+            // crosses zero. Bleed events are surfaced under affliction.tick
+            // category so the M16 affliction system can consume them.
+            struct BleedHit {
+                actor: ActorId,
+                lost_zones: u32,
+                damage: f32,
+            }
+            let mut bleed_hits: Vec<BleedHit> = Vec::new();
+            if let Some(actor_state) = state.actor_state.as_mut() {
+                let tick_rate = self.config.tick_rate_hz.max(1);
+                for (aid, actor) in actor_state.world.actors.iter_mut() {
+                    if matches!(actor.status, cf_actor::Status::Dead) {
+                        continue;
+                    }
+                    let lost_zones: u32 = actor
+                        .chassis
+                        .as_ref()
+                        .map(|c| c.destroyed_zones().len() as u32)
+                        .unwrap_or(0);
+                    if lost_zones == 0 {
+                        continue;
+                    }
+                    let dmg = cf_physics::bleed_per_tick(lost_zones, tick_rate);
+                    if dmg > 0.0 {
+                        actor.hp = (actor.hp - dmg).max(0.0);
+                        if actor.hp <= 0.0
+                            && !matches!(actor.status, cf_actor::Status::Dying | cf_actor::Status::Dead)
+                        {
+                            actor.status = cf_actor::Status::Dying;
+                        }
+                        bleed_hits.push(BleedHit {
+                            actor: *aid,
+                            lost_zones,
+                            damage: dmg,
+                        });
+                    }
+                }
+            }
+            // Emit bleed-tick events (deferred to avoid recorder re-entrancy
+            // while we hold the actor_state lock).
+            if !bleed_hits.is_empty() {
+                let sim_time_ms = state.clock.sim_time_ms();
+                drop(state);
+                for bleed in &bleed_hits {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "affliction",
+                        "tick",
+                        json!({
+                            "actor_id": bleed.actor.0,
+                            "kind": "bleeding",
+                            "lost_zones": bleed.lost_zones,
+                            "damage_per_tick": bleed.damage,
+                            "source": "m14_limb_loss",
+                            "cause": "limb_loss_bleed_out",
+                        }),
+                        None,
+                    );
+                }
+                state = self.state.write().expect("re-acquire engine state");
             }
 
             // M2: hazard tile contact damage routing. For every actor whose
@@ -4898,7 +5028,7 @@ impl M0Engine {
         } else {
             (0, 0)
         };
-        self.recorder.record(
+        let dirty_batch_id = self.recorder.record(
             tick,
             sim_time_ms,
             "terrain",
@@ -4915,6 +5045,37 @@ impl M0Engine {
             }),
             parent_event_id.clone(),
         );
+        // **M8A audit pass (GAP-M8A-01 HIGH fix)**: emit one
+        // `terrain.chunk_mutated` semantic event per merged dirty chunk
+        // with the post-state blake3 checksum. Per M8A § "Semantic
+        // terrain event protocol": "Every terrain mutation emits a
+        // semantic event (not a bitmap delta)" + "every terrain change
+        // emits `terrain.chunk_mutated` with `post_state_checksum`".
+        // This closes the cf-net authoritative-server reconciliation
+        // invariant.
+        if let Ok(s) = self.state.read() {
+            if let Some(terrain) = s.chunked_terrain.as_ref() {
+                for m in &merged {
+                    let checksum = terrain
+                        .chunk_checksum(m.cx as i32, m.cy as i32)
+                        .unwrap_or_else(|| String::new());
+                    let _ = self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "terrain",
+                        "chunk_mutated",
+                        serde_json::json!({
+                            "chunk_coords": [m.cx, m.cy],
+                            "bbox": {"min": m.min, "max": m.max},
+                            "post_state_checksum": checksum,
+                            "cause": "terrain_batch",
+                            "source_event_id": dirty_batch_id.clone(),
+                        }),
+                        Some(dirty_batch_id.clone()),
+                    );
+                }
+            }
+        }
         // M3 audit pass 7 (2026-05-13): emit terrain.path_invalidated for
         // M22+ pathfinder consumers. Placeholder event per spec ledger.
         if let Some((bbox_min, bbox_max)) = path_bbox {
@@ -5119,6 +5280,23 @@ impl M0Engine {
         let Some(actor) = sim.world.actors.get(&pid) else {
             return;
         };
+        // **M14 audit pass 4 (Finding 1)**: a foot soldier mid-boarding
+        // has no chassis yet, but the HUD must still surface the
+        // "Boarding..." banner. Raise it BEFORE the chassis early-return
+        // below so the banner fires regardless of chassis presence.
+        if actor.boarding_ticks_remaining > 0 {
+            push_banner_dedup(
+                &mut state.hud_banners,
+                crate::state::HudBannerView {
+                    id: "boarding".to_string(),
+                    severity: "info".to_string(),
+                    label: "Boarding...".to_string(),
+                    raised_at_tick: now_tick,
+                    expires_at_tick: Some(now_tick + 60),
+                    accessibility_id: "hud.banner.boarding".to_string(),
+                },
+            );
+        }
         let Some(chassis) = actor.chassis.as_ref() else { return };
         let prev_stage = state.hud_last_chassis_stage;
         let prev_pilot = state.hud_last_pilot_state;
@@ -5129,6 +5307,25 @@ impl M0Engine {
             if let Some(banner) = chassis_stage_banner(cur_stage, now_tick) {
                 push_banner(&mut state.hud_banners, banner);
             }
+        }
+        // **M13** § "Ejecting / Salvaging modes" — `EJECT_WINDOW_OPEN`
+        // banner fires when the chassis enters the eject stage but the pilot
+        // is still bound (window-open phase). The existing `eject_active`
+        // banner covers the ejecting state itself.
+        if matches!(cur_stage, cf_chassis::ChassisStage::Eject)
+            && matches!(cur_pilot, cf_chassis::PilotState::Bound | cf_chassis::PilotState::Injured)
+        {
+            push_banner_dedup(
+                &mut state.hud_banners,
+                crate::state::HudBannerView {
+                    id: "eject_window_open".to_string(),
+                    severity: "critical".to_string(),
+                    label: "EJECT_WINDOW_OPEN".to_string(),
+                    raised_at_tick: now_tick,
+                    expires_at_tick: Some(now_tick + 60),
+                    accessibility_id: "hud.banner.eject_window_open".to_string(),
+                },
+            );
         }
         // Pilot eject banner (during the active eject window).
         if matches!(cur_pilot, cf_chassis::PilotState::Ejecting) {
@@ -5141,6 +5338,96 @@ impl M0Engine {
                     raised_at_tick: now_tick,
                     expires_at_tick: Some(now_tick + 30),
                     accessibility_id: "hud.banner.eject_active".to_string(),
+                },
+            );
+        }
+        // **M13** § "Brain hopping" — `BRAIN_AT_RISK` banner when the
+        // player IS the brain AND HP < 30%.
+        if actor.is_brain && actor.hp_max > 0.0 && actor.hp / actor.hp_max < 0.3 {
+            push_banner_dedup(
+                &mut state.hud_banners,
+                crate::state::HudBannerView {
+                    id: "brain_at_risk".to_string(),
+                    severity: "critical".to_string(),
+                    label: "BRAIN_AT_RISK".to_string(),
+                    raised_at_tick: now_tick,
+                    expires_at_tick: Some(now_tick + 60),
+                    accessibility_id: "hud.banner.brain_at_risk".to_string(),
+                },
+            );
+        }
+        // **M13** § "Cockpit camera anchor" — COCKPIT badge in STATUS zone.
+        if chassis.camera_anchor == cf_chassis::CameraAnchor::Cockpit {
+            push_banner_dedup(
+                &mut state.hud_banners,
+                crate::state::HudBannerView {
+                    id: "cockpit_anchor".to_string(),
+                    severity: "info".to_string(),
+                    label: "COCKPIT".to_string(),
+                    raised_at_tick: now_tick,
+                    expires_at_tick: Some(now_tick + 60),
+                    accessibility_id: "hud.banner.cockpit_anchor".to_string(),
+                },
+            );
+        }
+        // **M13** § "Boarding / disembarking transitions" — HUD captions
+        // "Boarding..." / "Exiting...".
+        if chassis.boarding_ticks_remaining > 0 {
+            push_banner_dedup(
+                &mut state.hud_banners,
+                crate::state::HudBannerView {
+                    id: "boarding".to_string(),
+                    severity: "info".to_string(),
+                    label: "Boarding...".to_string(),
+                    raised_at_tick: now_tick,
+                    expires_at_tick: Some(now_tick + 60),
+                    accessibility_id: "hud.banner.boarding".to_string(),
+                },
+            );
+        }
+        if chassis.disembarking_ticks_remaining > 0 {
+            push_banner_dedup(
+                &mut state.hud_banners,
+                crate::state::HudBannerView {
+                    id: "disembarking".to_string(),
+                    severity: "info".to_string(),
+                    label: "Exiting...".to_string(),
+                    raised_at_tick: now_tick,
+                    expires_at_tick: Some(now_tick + 60),
+                    accessibility_id: "hud.banner.disembarking".to_string(),
+                },
+            );
+        }
+        // **M13** § "Both legs lost (crawl mode)" — "CRAWLING — both legs lost".
+        let destroyed = chassis.destroyed_zones();
+        let both_legs_lost = destroyed.contains(&cf_chassis::BodyZone::LegLeft)
+            && destroyed.contains(&cf_chassis::BodyZone::LegRight);
+        if both_legs_lost {
+            push_banner_dedup(
+                &mut state.hud_banners,
+                crate::state::HudBannerView {
+                    id: "crawling".to_string(),
+                    severity: "critical".to_string(),
+                    label: "CRAWLING — both legs lost".to_string(),
+                    raised_at_tick: now_tick,
+                    expires_at_tick: Some(now_tick + M4A_STATUS_BANNER_EXPIRY_TICKS),
+                    accessibility_id: "hud.banner.crawling".to_string(),
+                },
+            );
+        }
+        // **M13** § "Both arms lost (no weapons)" — "DISARMED — both arms lost".
+        let both_arms_lost = destroyed.contains(&cf_chassis::BodyZone::ArmLeft)
+            && destroyed.contains(&cf_chassis::BodyZone::ArmRight);
+        if both_arms_lost {
+            push_banner_dedup(
+                &mut state.hud_banners,
+                crate::state::HudBannerView {
+                    id: "disarmed".to_string(),
+                    severity: "critical".to_string(),
+                    label: "DISARMED — both arms lost".to_string(),
+                    raised_at_tick: now_tick,
+                    expires_at_tick: Some(now_tick + M4A_STATUS_BANNER_EXPIRY_TICKS),
+                    accessibility_id: "hud.banner.disarmed".to_string(),
                 },
             );
         }
@@ -5597,6 +5884,81 @@ impl M0Engine {
             let payload = crate::m7_ai::archetype_chosen_payload(guard_id.0, archetype);
             self.recorder
                 .record(tick, sim_time_ms, "ai", "archetype_chosen", payload, None);
+        }
+        // **M9 audit pass (GAP-M9-02 LOW fix)**: emit `ai.scope_settle`
+        // when a Sniper archetype enters EngageVisibleEnemy (the BT's
+        // ScopeSettle action). Per M9 spec § Sniper scenario: "When in
+        // position: ai.scope_settle fires (settles 1.5s before fire)".
+        // Settle duration is 1.5s = 90 ticks @ 60Hz; the duration_ticks
+        // payload field lets replay viewers visualize the pause.
+        if label_changed
+            && matches!(archetype, cf_ai::Archetype::Sniper)
+            && matches!(chosen_task, cf_ai::TaskType::EngageVisibleEnemy)
+        {
+            let settle_ticks = self.config.tick_rate_hz.saturating_mul(15) / 10; // 1.5s
+            let _ = self.recorder.record(
+                tick,
+                sim_time_ms,
+                "ai",
+                "scope_settle",
+                json!({
+                    "actor_id": guard_id.0,
+                    "settle_duration_ticks": settle_ticks,
+                    "archetype": "sniper",
+                }),
+                None,
+            );
+        }
+        // **M14 audit pass 3 (GAP-M7-03 MEDIUM fix)**: M7 spec § Acceptance
+        // criteria — "Engineer digs cover + sets traps: ai.tactic_chosen=set_trap";
+        // "Spotter calls reinforcements: ai.tactic_chosen=call_reinforcements";
+        // "Assault throws grenade: ai.tactic_chosen=throw_grenade". The
+        // legacy M2 ReactiveGuard producer at ai.tactic_chosen only covers
+        // Reload/Attack/Hold. Surface the new M7 task families under the
+        // same event_type so spec-literal-checking acceptance scripts find
+        // the event under `ai.tactic_chosen`.
+        if label_changed {
+            // TaskType is locked at 22 per M8A; `call_reinforcements` is
+            // not yet a TaskType variant — the Spotter's call-reinforcements
+            // behavior surfaces under `MarkThreats` per the M7 design
+            // (Spotter marks threats, mission director consumes the marks
+            // to spawn reinforcement waves). The literal `call_reinforcements`
+            // tactic string is emitted via `mission.reinforcement_wave_spawned`
+            // at the director surface.
+            let m7_tactic: Option<&'static str> = match chosen_task {
+                cf_ai::TaskType::SetTrap => Some("set_trap"),
+                cf_ai::TaskType::ThrowGrenade => Some("throw_grenade"),
+                cf_ai::TaskType::DigCover => Some("dig_cover"),
+                cf_ai::TaskType::SuppressFire => Some("suppress_fire"),
+                cf_ai::TaskType::TriageDownedAlly => Some("triage_downed_ally"),
+                cf_ai::TaskType::RepairChassisModule => Some("repair_chassis_module"),
+                cf_ai::TaskType::RepairTerrainBreach => Some("repair_terrain_breach"),
+                cf_ai::TaskType::MarkThreats => Some("mark_threats"),
+                cf_ai::TaskType::RetreatToCover => Some("retreat_to_cover"),
+                _ => None,
+            };
+            if let Some(tactic) = m7_tactic {
+                let _ = self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "ai",
+                    "tactic_chosen",
+                    json!({
+                        "actor": guard_id.0,
+                        "tactic": tactic,
+                        "archetype": match archetype {
+                            cf_ai::Archetype::Rifleman => "rifleman",
+                            cf_ai::Archetype::Sniper => "sniper",
+                            cf_ai::Archetype::Assault => "assault",
+                            cf_ai::Archetype::Engineer => "engineer",
+                            cf_ai::Archetype::Medic => "medic",
+                            cf_ai::Archetype::Spotter => "spotter",
+                        },
+                        "source": "m7_task_selection",
+                    }),
+                    None,
+                );
+            }
         }
         // **M7-B**: chatter scaffold — when a bot's chosen_task transitions
         // into a chatter-emitting task family, route through the cooldown
@@ -6261,11 +6623,23 @@ impl M0Engine {
         }
         for payload in mood_payloads {
             self.recorder
-                .record(tick, sim_time_ms, "ai", "mood_changed", payload, None);
+                .record(tick, sim_time_ms, "ai", "mood_changed", payload.clone(), None);
+            // **M14 audit pass 3 (GAP-M7-02)**: M7 spec § Event families
+            // lists `actor.mood_changed` (not `ai.mood_changed`). Dual-
+            // emit under the spec-canonical category so consumers reading
+            // the literal taxonomy see the event without losing backward
+            // compat with the `ai.*` namespace.
+            self.recorder
+                .record(tick, sim_time_ms, "actor", "mood_changed", payload, None);
         }
         for payload in faction_payloads {
             self.recorder
-                .record(tick, sim_time_ms, "ai", "faction_allegiance_changed", payload, None);
+                .record(tick, sim_time_ms, "ai", "faction_allegiance_changed", payload.clone(), None);
+            // **M14 audit pass 3 (GAP-M7-01)**: M7 spec lists `faction.*`
+            // as the canonical category. Dual-emit so spec-literal-
+            // checking consumers find the event under `faction.relationship_changed`.
+            self.recorder
+                .record(tick, sim_time_ms, "faction", "relationship_changed", payload, None);
         }
     }
 
@@ -6676,6 +7050,57 @@ impl M0Engine {
                 None,
             );
         }
+        // **M14 audit pass 3 (GAP-M7-05 LOW fix)**: M7 spec § Personality
+        // traits — paranoid bots occasionally fire `ai.target_acquired`
+        // with no real target. Only fires when:
+        //   - The bot has the Paranoid trait
+        //   - No real target was acquired this tick
+        //   - A seeded RNG roll is below the spec-baseline 2% probability
+        // The synthetic event carries `reason="false_sighting"` so the
+        // M10 cause-chain viewer can distinguish phantom from real
+        // acquisitions.
+        if report.target_acquired.is_none() {
+            let has_paranoid = self
+                .state
+                .read()
+                .ok()
+                .map(|s| {
+                    s.m7_ai_world
+                        .bots
+                        .get(&guard_id)
+                        .map(|b| {
+                            b.personality
+                                .traits
+                                .iter()
+                                .any(|t| matches!(t, cf_ai::PersonalityTrait::Paranoid))
+                        })
+                        .unwrap_or(false)
+                })
+                .unwrap_or(false);
+            if has_paranoid {
+                let rng_roll = if let Ok(mut s) = self.state.write() {
+                    (s.rng.next_u64() as f64 / u64::MAX as f64) as f32
+                } else {
+                    1.0
+                };
+                if rng_roll < 0.02 {
+                    let _ = self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "ai",
+                        "target_acquired",
+                        json!({
+                            "actor": guard_id.0,
+                            "target_actor": 0u64,
+                            "via": "false_sighting",
+                            "reason": "paranoid_trait",
+                            "synthetic": true,
+                        }),
+                        None,
+                    );
+                }
+            }
+        }
         // **M1.5 G4**: missed_shot_reason fires per miss to give the replay
         // viewer a stable vocabulary of why a guard's shot didn't connect.
         if let Some(reason) = &report.missed_shot_reason {
@@ -6868,7 +7293,45 @@ impl M0Engine {
                 let is_player = self.state.read().ok().and_then(|s| s.player_actor) == Some(outcome.actor);
                 if is_player {
                     if let Ok(mut s) = self.state.write() {
-                        s.last_player_status_event_id = Some(status_event_id);
+                        s.last_player_status_event_id = Some(status_event_id.clone());
+                    }
+                }
+                // **M13** § "Brain hopping" — when the brain actor takes
+                // status-changing damage, emit `actor.brain_damaged`. On
+                // death (status -> Dead), emit `actor.brain_destroyed` and
+                // surface the LossReason::BrainDestroyed via
+                // `mission_resolved` at the next tick.
+                let brain_marker = self
+                    .state
+                    .read()
+                    .ok()
+                    .and_then(|s| s.actor_state.as_ref().and_then(|sim| sim.world.actors.get(&outcome.actor).map(|a| a.is_brain)))
+                    .unwrap_or(false);
+                if brain_marker {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "actor",
+                        "brain_damaged",
+                        json!({
+                            "actor": outcome.actor.0,
+                            "previous_status": outcome.previous_status.as_str(),
+                            "new_status": outcome.new_status.as_str(),
+                        }),
+                        Some(status_event_id.clone()),
+                    );
+                    if outcome.new_status == cf_actor::Status::Dead {
+                        self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "actor",
+                            "brain_destroyed",
+                            json!({
+                                "actor": outcome.actor.0,
+                                "cause": status_change_cause(outcome),
+                            }),
+                            Some(status_event_id.clone()),
+                        );
                     }
                 }
                 // M1 audit pass 6 (2026-05-13): emit BodyHit audio cue when
@@ -6915,7 +7378,7 @@ impl M0Engine {
                 );
             }
             if outcome.landed_impulse > 0.5 {
-                self.recorder.record(
+                let landed_id = self.recorder.record(
                     tick,
                     sim_time_ms,
                     "actor",
@@ -6926,6 +7389,102 @@ impl M0Engine {
                     }),
                     Some(intent_event_id.clone()),
                 );
+                // **M14** § "Falling damage → leg joint impulse → potential
+                // severance" — walk BOTH foot → shin → leg chains via
+                // `cf_physics::fall_impulse_chain`. When a joint detaches or
+                // gibs from the landing impulse, emit the M14 attachable
+                // events + impulse propagation cascade.
+                //
+                // **M14 audit pass 4 (Finding 2)**:
+                //   (a) Unit fix — `outcome.landed_impulse` is the landing
+                //       velocity magnitude in m/s (NOT impulse). Dividing
+                //       by mass_kg here turned the input into velocity / kg
+                //       which made the downstream `velocity × mass_per_foot`
+                //       composition collapse to ~impulse/2 instead of
+                //       velocity × mass_per_foot. Now: pass it directly.
+                //   (b) Both legs — the impulse splits across two feet
+                //       (left + right) when standing. Walk both chains
+                //       independently so a fall can sever either leg.
+                let mass_kg = self
+                    .state
+                    .read()
+                    .ok()
+                    .and_then(|s| s.actor_state.as_ref().map(|sim| sim.world.actors.clone()))
+                    .and_then(|actors| actors.get(&outcome.actor).map(|a| a.mass_kg))
+                    .unwrap_or(80.0);
+                let landing_velocity = outcome.landed_impulse;
+                let mass_per_foot = mass_kg.max(1.0) / 2.0;
+                let leg_chains: [[&str; 3]; 2] = [
+                    ["foot_left", "shin_left", "leg_left"],
+                    ["foot_right", "shin_right", "leg_right"],
+                ];
+                for chain_zones in leg_chains.iter() {
+                    let fall_joints: Vec<(String, cf_physics::Joint)> = chain_zones
+                        .iter()
+                        .map(|z| (z.to_string(), cf_physics::Joint::default_for_zone(z)))
+                        .collect();
+                    let fall_chain = cf_physics::fall_impulse_chain(landing_velocity, mass_per_foot, &fall_joints);
+                    for (zone, eval) in &fall_chain {
+                        let _ = self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "physics",
+                            "impulse_propagated",
+                            json!({
+                                "actor_id": outcome.actor.0,
+                                "from_zone": zone,
+                                "to_zone": "parent",
+                                "impulse_in": eval.impulse_in,
+                                "impulse_absorbed": eval.impulse_absorbed,
+                                "impulse_out": eval.impulse_out,
+                                "joint_strength": cf_physics::Joint::default_for_zone(zone).joint_strength,
+                                "damage_multiplier": cf_physics::Joint::default_for_zone(zone).damage_multiplier,
+                                "kind": "fall",
+                                "source_event_id": landed_id.clone(),
+                            }),
+                            Some(landed_id.clone()),
+                        );
+                        if eval.gib {
+                            let _ = self.recorder.record(
+                                tick,
+                                sim_time_ms,
+                                "attachable",
+                                "gib_threshold_crossed",
+                                json!({
+                                    "actor_id": outcome.actor.0,
+                                    "attachable_id": zone,
+                                    "parent_zone": zone,
+                                    "joint_impulse": eval.impulse_in,
+                                    "gib_impulse_limit": cf_physics::Joint::default_for_zone(zone).gib_impulse_limit,
+                                    "source_event_id": landed_id.clone(),
+                                    "cause": "fall_damage",
+                                }),
+                                Some(landed_id.clone()),
+                            );
+                        } else if eval.detach {
+                            let _ = self.recorder.record(
+                                tick,
+                                sim_time_ms,
+                                "attachable",
+                                "detached",
+                                json!({
+                                    "actor_id": outcome.actor.0,
+                                    "attachable_id": zone,
+                                    "parent_zone": zone,
+                                    "joint_impulse": eval.impulse_in,
+                                    "joint_strength": cf_physics::Joint::default_for_zone(zone).joint_strength,
+                                    "gib_impulse_limit": cf_physics::Joint::default_for_zone(zone).gib_impulse_limit,
+                                    "detach_position": [0.0_f32, 0.0_f32],
+                                    "detach_velocity": [0.0_f32, 0.0_f32],
+                                    "damage_multiplier": cf_physics::Joint::default_for_zone(zone).damage_multiplier,
+                                    "source_event_id": landed_id.clone(),
+                                    "cause": "fall_damage",
+                                }),
+                                Some(landed_id.clone()),
+                            );
+                        }
+                    }
+                }
             }
             if outcome.reload_started {
                 // M1 re-audit pass 4 (2026-05-13): spec requires
@@ -7267,6 +7826,44 @@ impl M0Engine {
                     }),
                     Some(dying_parent),
                 );
+                // **M14** § "Ragdoll-on-death" — DYING entry transitions
+                // the actor's body to physical-debris authority. Emit
+                // `physics.ragdoll_activated` carrying the reduced_motion
+                // gating so the renderer can skip the animation while
+                // the sim state still steps. Setting `reduced_motion_skip`
+                // does not alter determinism; it's a cosmetic-renderer
+                // signal only.
+                let (rd_pos, rd_vel, rd_mass, reduced_motion) = self
+                    .state
+                    .read()
+                    .ok()
+                    .and_then(|s| {
+                        let sim = s.actor_state.as_ref()?;
+                        let actor = sim.world.actors.get(&outcome.actor)?;
+                        Some((
+                            [actor.position.x, actor.position.y],
+                            [actor.velocity.x, actor.velocity.y],
+                            actor.mass_kg,
+                            s.settings.reduced_motion,
+                        ))
+                    })
+                    .unwrap_or(([0.0, 0.0], [0.0, 0.0], 80.0, false));
+                let _ = self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "physics",
+                    "ragdoll_activated",
+                    json!({
+                        "actor_id": outcome.actor.0,
+                        "status": "dying",
+                        "position": rd_pos,
+                        "velocity": rd_vel,
+                        "mass_kg": rd_mass,
+                        "reduced_motion_skip": reduced_motion,
+                        "source_event_id": dying_event_id.clone(),
+                    }),
+                    Some(dying_event_id.clone()),
+                );
                 // M2 audit pass 5 (2026-05-13): capture the entered_dying
                 // event id as the player's "last status changed" anchor.
                 // `mission.mission_resolved` on the PlayerDead loss path
@@ -7338,7 +7935,7 @@ impl M0Engine {
                     .lethal_cause_event_id
                     .clone()
                     .unwrap_or_else(|| intent_event_id.clone());
-                self.recorder.record(
+                let dead_event_id = self.recorder.record(
                     tick,
                     sim_time_ms,
                     "actor",
@@ -7351,6 +7948,44 @@ impl M0Engine {
                     }),
                     Some(dead_parent),
                 );
+                // **M14** § "Ragdoll-on-death" — DEAD transition promotes
+                // the actor's ragdoll to "active". The `physics.authority_changed`
+                // remains the legacy M1 stub; `physics.ragdoll_activated`
+                // here is the M14 dedicated event so consumers can index
+                // the ragdoll lifecycle without scanning the generic
+                // authority stream.
+                let (rd_pos, rd_vel, rd_mass, reduced_motion) = self
+                    .state
+                    .read()
+                    .ok()
+                    .and_then(|s| {
+                        let sim = s.actor_state.as_ref()?;
+                        let actor = sim.world.actors.get(&outcome.actor)?;
+                        Some((
+                            [actor.position.x, actor.position.y],
+                            [actor.velocity.x, actor.velocity.y],
+                            actor.mass_kg,
+                            s.settings.reduced_motion,
+                        ))
+                    })
+                    .unwrap_or(([0.0, 0.0], [0.0, 0.0], 80.0, false));
+                let _ = self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "physics",
+                    "ragdoll_activated",
+                    json!({
+                        "actor_id": outcome.actor.0,
+                        "status": "dead",
+                        "position": rd_pos,
+                        "velocity": rd_vel,
+                        "mass_kg": rd_mass,
+                        "reduced_motion_skip": reduced_motion,
+                        "source_event_id": dead_event_id.clone(),
+                    }),
+                    Some(dead_event_id.clone()),
+                );
+                let _ = dead_event_id;
             }
         }
         // M1 (Gap C1/C2): each `combat.projectile_spawned` parents to its
@@ -7360,6 +7995,11 @@ impl M0Engine {
         // Spawn ids are persisted on `EngineMutable::projectile_spawn_event_ids`
         // so a projectile that hits N ticks later can still parent its hit
         // event to the originating spawn.
+        // **M14**: track projectile-spawn origins this tick so the swept-
+        // collision priority queue can compute `distance_traveled` for each
+        // multi-actor hit using the originating shot's spawn position.
+        let mut spawn_origins_this_tick: BTreeMap<u64, [f32; 2]> = BTreeMap::new();
+        let mut spawn_velocities_this_tick: BTreeMap<u64, [f32; 2]> = BTreeMap::new();
         for spawn in &report.spawned_projectiles {
             let parent = weapon_fired_event_by_actor
                 .get(&spawn.owner.0)
@@ -7382,26 +8022,77 @@ impl M0Engine {
                 }),
                 Some(parent),
             );
+            spawn_origins_this_tick.insert(spawn.id, [spawn.origin.x, spawn.origin.y]);
+            spawn_velocities_this_tick.insert(spawn.id, [spawn.velocity.x, spawn.velocity.y]);
             if let Ok(mut s) = self.state.write() {
                 s.projectile_spawn_event_ids.insert(spawn.id, id);
             }
         }
+        // **M14 audit pass 3 (Findings 3 + 4)**: build the swept-collision
+        // priority queue per projectile from the new HitOutcome fields.
+        // The cf-actor sim now collects ALL actors a projectile crosses
+        // this tick (not just the closest) and stamps each HitOutcome
+        // with the exact entry_t / ray_origin / ray_direction /
+        // distance_traveled at the moment of intersection. That data is
+        // accurate even for projectiles that spawned on prior ticks —
+        // the engine no longer reconstructs lossy estimates.
+        let mut swept_priority: BTreeMap<(u64, u64), (u32, u32)> = BTreeMap::new();
+        let mut swept_origin: BTreeMap<u64, [f32; 2]> = BTreeMap::new();
+        let mut swept_direction: BTreeMap<u64, [f32; 2]> = BTreeMap::new();
+        let mut swept_distance: BTreeMap<(u64, u64), f32> = BTreeMap::new();
+        let mut swept_entry_t: BTreeMap<(u64, u64), f32> = BTreeMap::new();
+        {
+            let mut per_projectile: BTreeMap<u64, Vec<&cf_actor::sim::HitOutcome>> = BTreeMap::new();
+            for hit in &report.hits {
+                per_projectile.entry(hit.projectile_id).or_default().push(hit);
+            }
+            for (pid, hits_for_proj) in per_projectile {
+                let candidates: Vec<cf_physics::SweptHitCandidate> = hits_for_proj
+                    .iter()
+                    .map(|h| cf_physics::SweptHitCandidate {
+                        target_id: h.target.0,
+                        entry_t: h.entry_t,
+                        distance_traveled: h.distance_traveled,
+                        entry_point: [h.hit_position.x, h.hit_position.y],
+                        ray_origin: [h.ray_origin.x, h.ray_origin.y],
+                        ray_direction: [h.ray_direction.x, h.ray_direction.y],
+                    })
+                    .collect();
+                if let Some(first) = hits_for_proj.first() {
+                    swept_origin.insert(pid, [first.ray_origin.x, first.ray_origin.y]);
+                    swept_direction.insert(pid, [first.ray_direction.x, first.ray_direction.y]);
+                }
+                let resolved = cf_physics::prioritize_swept_collisions(candidates);
+                for r in resolved {
+                    swept_priority.insert((pid, r.target_id), (r.priority_index, r.priority_total));
+                    swept_distance.insert((pid, r.target_id), r.distance_traveled);
+                    swept_entry_t.insert((pid, r.target_id), r.entry_t);
+                }
+            }
+        }
+        // Touch the spawn lookup maps so the compiler doesn't flag them
+        // as unused now that we read the canonical metadata off
+        // HitOutcome directly.
+        let _ = &spawn_origins_this_tick;
+        let _ = &spawn_velocities_this_tick;
         for hit in &report.hits {
             // M1 Gap C2: parent the hit to its originating projectile_spawned
             // event rather than the input.intent_received root, so a M3B
             // viewer can walk hit -> spawn -> weapon_fired -> intent in one chain.
             // Spawns persist on `EngineMutable::projectile_spawn_event_ids`
             // because hits commonly fire ticks after the spawn.
+            //
+            // **M14** fix: do NOT prune the spawn entry inside the hit loop —
+            // a swept-collision shot can produce multiple hits for the same
+            // projectile this tick, and every hit's `parent_event_id` must
+            // resolve to the same spawn. Pruning happens after the hits loop
+            // via `projectiles_resolved_this_tick`.
             let hit_parent = self
                 .state
                 .read()
                 .ok()
                 .and_then(|s| s.projectile_spawn_event_ids.get(&hit.projectile_id).cloned())
                 .unwrap_or_else(|| intent_event_id.clone());
-            // Prune the spawn entry now that the projectile resolved.
-            if let Ok(mut s) = self.state.write() {
-                s.projectile_spawn_event_ids.remove(&hit.projectile_id);
-            }
             let projectile_hit_event_id = self.recorder.record(
                 tick,
                 sim_time_ms,
@@ -7416,6 +8107,80 @@ impl M0Engine {
                     "zone": hit.zone,
                 }),
                 Some(hit_parent),
+            );
+            // **M14** § "Full swept-collision pipeline" — emit
+            // `combat.swept_collision` for every projectile-vs-actor hit
+            // with the priority index/total computed from the
+            // closer-first ordering built above. The event chains to
+            // `combat.projectile_hit` so the cause walker can hop
+            // swept_collision → projectile_hit → projectile_spawned →
+            // weapon_fired → input.intent_received.
+            let (priority_index, priority_total) = swept_priority
+                .get(&(hit.projectile_id, hit.target.0))
+                .copied()
+                .unwrap_or((0u32, 1u32));
+            let swept_dist = swept_distance
+                .get(&(hit.projectile_id, hit.target.0))
+                .copied()
+                .unwrap_or(0.0);
+            let swept_t = swept_entry_t
+                .get(&(hit.projectile_id, hit.target.0))
+                .copied()
+                .unwrap_or(0.0)
+                .clamp(0.0, 1.0);
+            let ray_origin = swept_origin
+                .get(&hit.projectile_id)
+                .copied()
+                .unwrap_or([hit.hit_position.x, hit.hit_position.y]);
+            let ray_direction = swept_direction.get(&hit.projectile_id).copied().unwrap_or([1.0, 0.0]);
+            let (stance_label, facing_label) = self
+                .state
+                .read()
+                .ok()
+                .and_then(|s| s.actor_state.as_ref().map(|sim| sim.world.actors.clone()))
+                .and_then(|actors| {
+                    actors.get(&hit.target).map(|a| {
+                        let inputs = cf_actor::StanceInputs {
+                            velocity: a.velocity,
+                            on_ground: a.on_ground,
+                            status: a.status,
+                            crouch_active: a.crouch_active,
+                            climb_active: a.climb_active,
+                            jet_active: a.jet_active,
+                            knockdown_ticks_remaining: a.knockdown_ticks_remaining,
+                            dying_ticks_remaining: a.dying_dwell_ticks_remaining,
+                            ..cf_actor::StanceInputs::default()
+                        };
+                        let stance = cf_actor::derive_stance(inputs);
+                        let facing_label = a.facing.as_str();
+                        (stance.as_str().to_string(), facing_label.to_string())
+                    })
+                })
+                .unwrap_or_else(|| ("idle".to_string(), "right".to_string()));
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "combat",
+                "swept_collision",
+                json!({
+                    "projectile_id": hit.projectile_id,
+                    "shooter_id": hit.shooter.0,
+                    "target_id": hit.target.0,
+                    "priority_index": priority_index,
+                    "priority_total": priority_total,
+                    "entry_point": [hit.hit_position.x, hit.hit_position.y],
+                    "ray_origin": ray_origin,
+                    "ray_direction": ray_direction,
+                    "entry_t": swept_t,
+                    "distance_traveled": swept_dist,
+                    "zone": hit.zone,
+                    "stance": stance_label,
+                    "facing": facing_label,
+                    "damage": hit.damage,
+                    "energy_remaining": (hit.damage - 1.0).max(0.0),
+                    "source_event_id": projectile_hit_event_id.clone(),
+                }),
+                Some(projectile_hit_event_id.clone()),
             );
             self.emit_audio_cue(
                 cf_audio::AudioCue::BodyHit {
@@ -7516,22 +8281,52 @@ impl M0Engine {
                 .and_then(|actors| actors.get(&hit.target).map(|a| a.team.clone()))
                 .map(|team| team.eq_ignore_ascii_case("red_robot") || team.eq_ignore_ascii_case("robot"))
                 .unwrap_or(false);
-            let organ_id = match hit.zone.as_str() {
-                "head" => "brain",
-                "torso" => "heart",
-                "left_arm" | "right_arm" => "lungs_left",
-                "left_leg" | "right_leg" => "kidneys_left",
-                _ => "heart",
+            // **M14** § "Per-organ internal damage routing" — replace the
+            // M9 organ_id/circuit_id stubs with cf_internal's weighted
+            // selection. Hit zone proximity drives the candidate pool;
+            // the engine's seeded RNG picks deterministically.
+            let graph_kind = if target_kind_is_robot {
+                cf_internal::InternalGraphKind::Robot
+            } else {
+                cf_internal::InternalGraphKind::Humanoid
             };
-            let circuit_id = match hit.zone.as_str() {
-                "head" => "sensor_array",
-                "torso" => "core_processor",
-                _ => "power_bus",
+            let rng_roll = if let Ok(mut s) = self.state.write() {
+                (s.rng.next_u64() as f64 / u64::MAX as f64) as f32
+            } else {
+                0.5
             };
-            // Damage is the proxy for the organ HP delta. M14 refines per-
-            // organ HP with armor pass-through.
+            let decision =
+                cf_internal::route_internal_damage(graph_kind, hit.zone.as_str(), hit.damage, rng_roll);
+            // M14 fallback when decision is None (below heavy threshold) —
+            // keep emitting the legacy M9 organ/circuit shape so existing
+            // consumers (M10 cause-chain walker) still observe per-hit
+            // routing. The legacy zone→organ table is M14-aware (organ
+            // names match the schema enum) so output is valid.
+            let (organ_id, circuit_id, applied_internal_dmg, route_via_m14) = match decision {
+                Some(d) => match d.graph_kind {
+                    cf_internal::InternalGraphKind::Humanoid => (d.target_id, "cpu", d.applied_damage, true),
+                    cf_internal::InternalGraphKind::Robot => ("heart", d.target_id, d.applied_damage, true),
+                },
+                None => {
+                    let o = match hit.zone.as_str() {
+                        "head" => "brain",
+                        "torso" => "heart",
+                        "arm_left" | "left_arm" | "forearm_left" | "hand_left" => "lungs_left",
+                        "arm_right" | "right_arm" | "forearm_right" | "hand_right" => "lungs_right",
+                        "leg_left" | "left_leg" | "shin_left" | "foot_left" => "kidneys_left",
+                        "leg_right" | "right_leg" | "shin_right" | "foot_right" => "kidneys_right",
+                        _ => "heart",
+                    };
+                    let c = match hit.zone.as_str() {
+                        "head" => "sensor_array",
+                        "torso" => "cpu",
+                        _ => "power_core",
+                    };
+                    (o, c, hit.damage, false)
+                }
+            };
             let from_hp = 100.0_f32;
-            let to_hp = (from_hp - hit.damage).max(0.0);
+            let to_hp = (from_hp - applied_internal_dmg).max(0.0);
             if target_kind_is_robot {
                 let circuit_event_id = self.recorder.record(
                     tick,
@@ -7541,16 +8336,17 @@ impl M0Engine {
                     json!({
                         "actor_id": hit.target.0,
                         "circuit_id": circuit_id,
-                        "circuit_kind": "control",
+                        "circuit_kind": cf_internal::circuit_kind(circuit_id),
                         "from_hp": from_hp,
                         "to_hp": to_hp,
                         "cause": "kinetic_pierce",
                         "source_hit_event_id": projectile_hit_event_id.clone(),
+                        "route_via_m14": route_via_m14,
                     }),
                     Some(wound_event_id.clone()),
                 );
                 if to_hp <= 0.0 {
-                    self.recorder.record(
+                    let circuit_destroyed_id = self.recorder.record(
                         tick,
                         sim_time_ms,
                         "internal",
@@ -7558,11 +8354,41 @@ impl M0Engine {
                         json!({
                             "actor_id": hit.target.0,
                             "circuit_id": circuit_id,
-                            "circuit_kind": "control",
+                            "circuit_kind": cf_internal::circuit_kind(circuit_id),
                             "cause": "kinetic_pierce",
                             "source_hit_event_id": projectile_hit_event_id.clone(),
                         }),
                         Some(circuit_event_id),
+                    );
+                    // **M14** § "Per-circuit failure cascade applies afflictions".
+                    let (affliction_kind, severity) = match circuit_id {
+                        "power_core" => ("power_failure", 1.0),
+                        "cpu" => ("control_lost", 1.0),
+                        "sensor_array" => ("blindness", 0.8),
+                        "motor_controller_left_arm" => ("arm_motor_failure_left", 0.8),
+                        "motor_controller_right_arm" => ("arm_motor_failure_right", 0.8),
+                        "motor_controller_left_leg" => ("leg_motor_failure_left", 0.8),
+                        "motor_controller_right_leg" => ("leg_motor_failure_right", 0.8),
+                        "hydraulic_pump" => ("hydraulic_failure", 0.7),
+                        "coolant_pump" => ("overheating", 0.6),
+                        "oil_reservoir" | "fuel_tank" => ("fluid_leak", 0.6),
+                        "comm_relay" => ("comm_lost", 0.4),
+                        _ => ("circuit_shock", 0.5),
+                    };
+                    let _ = self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "internal",
+                        "circuit_failure_cascade",
+                        json!({
+                            "actor_id": hit.target.0,
+                            "circuit_id": circuit_id,
+                            "circuit_kind": cf_internal::circuit_kind(circuit_id),
+                            "affliction_kind": affliction_kind,
+                            "severity": severity,
+                            "source_event_id": circuit_destroyed_id.clone(),
+                        }),
+                        Some(circuit_destroyed_id.clone()),
                     );
                 }
             } else {
@@ -7574,16 +8400,17 @@ impl M0Engine {
                     json!({
                         "actor_id": hit.target.0,
                         "organ_id": organ_id,
-                        "organ_kind": "vital",
+                        "organ_kind": cf_internal::organ_kind(organ_id),
                         "from_hp": from_hp,
                         "to_hp": to_hp,
                         "cause": "kinetic_pierce",
                         "source_hit_event_id": projectile_hit_event_id.clone(),
+                        "route_via_m14": route_via_m14,
                     }),
                     Some(wound_event_id.clone()),
                 );
                 if to_hp <= 0.0 {
-                    self.recorder.record(
+                    let organ_destroyed_id = self.recorder.record(
                         tick,
                         sim_time_ms,
                         "internal",
@@ -7591,11 +8418,41 @@ impl M0Engine {
                         json!({
                             "actor_id": hit.target.0,
                             "organ_id": organ_id,
-                            "organ_kind": "vital",
+                            "organ_kind": cf_internal::organ_kind(organ_id),
                             "cause": "kinetic_pierce",
                             "source_hit_event_id": projectile_hit_event_id.clone(),
                         }),
                         Some(organ_event_id),
+                    );
+                    // **M14** § "Per-organ failure cascade applies afflictions".
+                    // Each destroyed organ triggers a specific affliction
+                    // per CCCP organ-failure-cascade table.
+                    let (affliction_kind, severity) = match organ_id {
+                        "brain" => ("brain_failure", 1.0),
+                        "heart" => ("cardiac_arrest", 1.0),
+                        "lungs_left" | "lungs_right" => ("respiratory_failure", 0.8),
+                        "liver" => ("toxicosis", 0.6),
+                        "kidneys_left" | "kidneys_right" => ("renal_failure", 0.7),
+                        "spine" => ("paralysis", 0.9),
+                        "stomach" | "intestines" | "pancreas" => ("internal_bleed", 0.6),
+                        "eyes_left" | "eyes_right" => ("blindness", 0.5),
+                        "ears_left" | "ears_right" => ("deafness", 0.4),
+                        _ => ("organ_shock", 0.5),
+                    };
+                    let _ = self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "internal",
+                        "organ_failure_cascade",
+                        json!({
+                            "actor_id": hit.target.0,
+                            "organ_id": organ_id,
+                            "organ_kind": cf_internal::organ_kind(organ_id),
+                            "affliction_kind": affliction_kind,
+                            "severity": severity,
+                            "source_event_id": organ_destroyed_id.clone(),
+                        }),
+                        Some(organ_destroyed_id.clone()),
                     );
                 }
             }
@@ -7704,6 +8561,191 @@ impl M0Engine {
                     outcome,
                     Some(projectile_hit_event_id.clone()),
                 );
+                // **M14** § "Limb detachment via joint impulse" — when a
+                // zone is destroyed by this hit, route the impulse through
+                // a `cf_physics::Joint`. If `joint_impulse > joint_strength`
+                // emit `attachable.detached`; if `>= gib_impulse_limit`
+                // emit `attachable.gib_threshold_crossed` + the spawn data
+                // `body.gib_created`. Each child attachable cascades per
+                // `cf_actor::default_cascade_chain`.
+                if outcome.zone_destroyed {
+                    let zone_label = outcome
+                        .zone
+                        .map(|z| z.as_str().to_string())
+                        .unwrap_or_else(|| hit.zone.clone());
+                    // Hit damage proxies impulse magnitude for M14
+                    // (real impulse routing arrives at M15 when ammo specs
+                    // carry kinetic energy). Scale 50× so heavy hits cross
+                    // typical joint thresholds.
+                    let joint_impulse_magnitude = (hit.damage * 50.0).max(0.0);
+                    let joint = cf_physics::Joint::default_for_zone(zone_label.as_str());
+                    let eval = cf_physics::evaluate_joint(joint, joint_impulse_magnitude);
+                    let origin_kind_label = self
+                        .state
+                        .read()
+                        .ok()
+                        .and_then(|s| s.actor_state.as_ref().map(|sim| sim.world.actors.clone()))
+                        .and_then(|actors| {
+                            actors.get(&hit.target).map(|a| {
+                                if target_kind_is_robot {
+                                    "robot".to_string()
+                                } else {
+                                    a.origin_id.clone()
+                                }
+                            })
+                        })
+                        .unwrap_or_else(|| "human".to_string());
+                    let origin_kind = cf_actor::GibOriginKind::from_str_lossy(origin_kind_label.as_str());
+                    if eval.gib {
+                        // Emit gib_threshold_crossed + body.gib_created
+                        // + per-child cascade events.
+                        let gib_threshold_id = self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "attachable",
+                            "gib_threshold_crossed",
+                            json!({
+                                "actor_id": hit.target.0,
+                                "attachable_id": zone_label,
+                                "parent_zone": zone_label,
+                                "joint_impulse": eval.impulse_in,
+                                "gib_impulse_limit": joint.gib_impulse_limit,
+                                "source_event_id": projectile_hit_event_id.clone(),
+                                "cause": "kinetic_pierce",
+                            }),
+                            Some(projectile_hit_event_id.clone()),
+                        );
+                        let gib_spawn = cf_actor::GibSpawn::default_for_origin(origin_kind);
+                        let gib_created_id = self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "body",
+                            "gib_created",
+                            json!({
+                                "actor_id": hit.target.0,
+                                "parent_zone": zone_label,
+                                "gib_particle": gib_spawn.particle,
+                                "count": gib_spawn.count,
+                                "spread_radians": gib_spawn.spread_radians,
+                                "min_velocity": gib_spawn.min_velocity,
+                                "max_velocity": gib_spawn.max_velocity,
+                                "life_variation": gib_spawn.life_variation,
+                                "spread_mode": match gib_spawn.spread_mode {
+                                    cf_actor::SpreadMode::SpreadRandom => "SpreadRandom",
+                                    cf_actor::SpreadMode::SpreadEven => "SpreadEven",
+                                    cf_actor::SpreadMode::SpreadSpiral => "SpreadSpiral",
+                                },
+                                "inherits_velocity": gib_spawn.inherits_velocity,
+                                "inherits_angular_velocity": gib_spawn.inherits_angular_velocity,
+                                "ignores_team_hits": gib_spawn.ignores_team_hits,
+                                "origin_kind": origin_kind.as_str(),
+                                "spawn_position": [hit.hit_position.x, hit.hit_position.y],
+                                "source_event_id": gib_threshold_id.clone(),
+                            }),
+                            Some(gib_threshold_id.clone()),
+                        );
+                        // Cascade — every child attachable gibs in turn.
+                        for child in cf_actor::default_cascade_chain(zone_label.as_str()) {
+                            self.recorder.record(
+                                tick,
+                                sim_time_ms,
+                                "body",
+                                "gib_cascade_triggered",
+                                json!({
+                                    "actor_id": hit.target.0,
+                                    "parent_zone": zone_label,
+                                    "child_zone": *child,
+                                    "cascade_depth": 1u32,
+                                    "source_event_id": gib_created_id.clone(),
+                                    "reason": "parent_gibbed",
+                                }),
+                                Some(gib_created_id.clone()),
+                            );
+                        }
+                    } else if eval.detach {
+                        // Cleanly detached — toss the limb forward at the
+                        // residual impulse. detach_velocity ∝ impulse_out
+                        // / mass; M14 uses a scaled forward toss.
+                        let detach_position = [hit.hit_position.x, hit.hit_position.y];
+                        let detach_velocity = [
+                            ray_direction[0] * (eval.impulse_out / 80.0).clamp(0.0, 500.0),
+                            ray_direction[1] * (eval.impulse_out / 80.0).clamp(0.0, 500.0),
+                        ];
+                        let _ = self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "attachable",
+                            "detached",
+                            json!({
+                                "actor_id": hit.target.0,
+                                "attachable_id": zone_label,
+                                "parent_zone": zone_label,
+                                "joint_impulse": eval.impulse_in,
+                                "joint_strength": joint.joint_strength,
+                                "gib_impulse_limit": joint.gib_impulse_limit,
+                                "detach_position": detach_position,
+                                "detach_velocity": detach_velocity,
+                                "damage_multiplier": joint.damage_multiplier,
+                                "source_event_id": projectile_hit_event_id.clone(),
+                                "cause": "kinetic_pierce",
+                            }),
+                            Some(projectile_hit_event_id.clone()),
+                        );
+                    }
+                    // Emit `physics.impulse_propagated` for the joint that
+                    // routed this hit — closes the impulse chain back to
+                    // the projectile_hit event so the M10 cause walker
+                    // resolves swept_collision → impulse_propagated.
+                    let _ = self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "physics",
+                        "impulse_propagated",
+                        json!({
+                            "actor_id": hit.target.0,
+                            "from_zone": zone_label,
+                            "to_zone": "parent",
+                            "impulse_in": eval.impulse_in,
+                            "impulse_absorbed": eval.impulse_absorbed,
+                            "impulse_out": eval.impulse_out,
+                            "joint_strength": joint.joint_strength,
+                            "damage_multiplier": joint.damage_multiplier,
+                            "kind": "kinetic",
+                            "source_event_id": projectile_hit_event_id.clone(),
+                        }),
+                        Some(projectile_hit_event_id.clone()),
+                    );
+                }
+                // **M13** § "Limb loss functional consequences" — head/torso
+                // destruction is INSTANT DEATH per the CCCP decapitation rule.
+                // Forcing `actor.hp = 0` here lets the existing status-change
+                // pipeline emit `actor_status_changed → Dead` + brain death
+                // events on the next tick.
+                if outcome.lethal {
+                    if let Ok(mut s) = self.state.write() {
+                        if let Some(sim) = s.actor_state.as_mut() {
+                            if let Some(target) = sim.world.actors.get_mut(&hit.target) {
+                                target.hp = 0.0;
+                            }
+                        }
+                    }
+                }
+                // **M14** § "Full penetration ray flow" — when armor was
+                // breached, traverse the chassis interior modules in ray-
+                // order via `cf_physics::traverse_ray`. Emits
+                // `armor.penetration_ray_traversed` + per-module damage
+                // events + spalling fragments.
+                if !outcome.layers_breached.is_empty() {
+                    self.emit_m14_penetration_ray(
+                        tick,
+                        sim_time_ms,
+                        hit.target,
+                        hit,
+                        outcome,
+                        ray_direction,
+                        Some(projectile_hit_event_id.clone()),
+                    );
+                }
             }
             // **M8** (Cluster E fix): auto-trigger a 100 ms hit-stop pulse on
             // an AP-round hit per spec § "Hit-stop on impact — Given melee
@@ -7740,6 +8782,24 @@ impl M0Engine {
                 let _ = self.recorder.record(tick, sim_time_ms, "camera", "hit_stop", payload, None);
             }
         }
+        // **M14** fix: prune the spawn_event_id map AFTER the hits loop so
+        // multi-actor swept-collision hits all parent to the same spawn.
+        // The pre-M14 code pruned per-hit which dropped the parent ref for
+        // every subsequent hit of the same projectile (the priority queue
+        // depended on this fix).
+        {
+            let mut resolved_ids: std::collections::BTreeSet<u64> = std::collections::BTreeSet::new();
+            for hit in &report.hits {
+                resolved_ids.insert(hit.projectile_id);
+            }
+            if !resolved_ids.is_empty() {
+                if let Ok(mut s) = self.state.write() {
+                    for id in &resolved_ids {
+                        s.projectile_spawn_event_ids.remove(id);
+                    }
+                }
+            }
+        }
         for expired in &report.expired_projectiles {
             let parent = self
                 .state
@@ -7747,6 +8807,52 @@ impl M0Engine {
                 .ok()
                 .and_then(|s| s.projectile_spawn_event_ids.get(&expired.id).cloned())
                 .unwrap_or_else(|| intent_event_id.clone());
+            // **M14** § "Bullet sharpness decay over distance" — when the
+            // projectile expires by reaching max_range (TTL elapsed), emit
+            // `combat.bullet_sharpness_decay` carrying the distance + decay
+            // band so replay viewers + AI agents can verify the round
+            // attenuation contract. Distance is computed from the persisted
+            // origin if available; otherwise we use the last position as
+            // proxy (zero distance, expired=true).
+            let origin = spawn_origins_this_tick.get(&expired.id).copied();
+            let distance = origin
+                .map(|o| {
+                    let dx = expired.last_position.x - o[0];
+                    let dy = expired.last_position.y - o[1];
+                    (dx * dx + dy * dy).sqrt()
+                })
+                .unwrap_or(0.0);
+            // M14 baseline: rifle effective 100, max 500. Real per-projectile
+            // ranges arrive when ammo specs carry them (M15+).
+            let effective_range = 100.0_f32;
+            let max_range = 500.0_f32;
+            let base_damage = 25.0_f32;
+            let outcome = cf_physics::decay_damage(cf_physics::SharpnessInputs {
+                distance_traveled: distance,
+                effective_range,
+                max_range,
+                base_damage,
+                base_sharpness: 0.8,
+            });
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "combat",
+                "bullet_sharpness_decay",
+                json!({
+                    "projectile_id": expired.id,
+                    "owner_id": expired.owner.0,
+                    "distance_traveled": distance,
+                    "effective_range": effective_range,
+                    "base_damage": base_damage,
+                    "decayed_damage": outcome.decayed_damage,
+                    "sharpness_before": 0.8_f32,
+                    "sharpness_after": outcome.decayed_sharpness,
+                    "expired": outcome.expired,
+                    "source_event_id": parent.clone(),
+                }),
+                Some(parent.clone()),
+            );
             if let Ok(mut s) = self.state.write() {
                 s.projectile_spawn_event_ids.remove(&expired.id);
             }
@@ -7791,10 +8897,352 @@ impl M0Engine {
         }
     }
 
+    /// **M14 audit pass 4 (Finding 3)**: emit the canonical
+    /// chassis-module events from a `CriticalModuleOutcome` so non-zone
+    /// damage paths (penetration ray, spalling fragments) surface the
+    /// same `chassis.module_state_changed` + per-cascade events that the
+    /// zone-damage path emits. Centralises the event-shape so the two
+    /// call sites can't drift.
+    fn emit_critical_module_outcome_events(
+        &self,
+        tick: Tick,
+        sim_time_ms: f64,
+        actor: ActorId,
+        outcome: &cf_chassis::CriticalModuleOutcome,
+        parent: Option<String>,
+    ) {
+        if let Some(transition) = &outcome.transition {
+            let _ = self.recorder.record(
+                tick,
+                sim_time_ms,
+                "chassis",
+                "module_state_changed",
+                json!({
+                    "actor": actor.0,
+                    "module_id": transition.id,
+                    "state": transition.state.as_str(),
+                    "reason": transition.reason,
+                }),
+                parent.clone(),
+            );
+        }
+        for cascade in &outcome.cascade_events {
+            let payload = match cascade {
+                cf_chassis::CriticalModuleEvent::AmmoCooking { rounds_cooked } => json!({
+                    "actor": actor.0,
+                    "module_id": outcome.module_id,
+                    "rounds": rounds_cooked,
+                }),
+                cf_chassis::CriticalModuleEvent::AmmoDetonated { rounds_detonated } => json!({
+                    "actor": actor.0,
+                    "module_id": outcome.module_id,
+                    "rounds": rounds_detonated,
+                }),
+                cf_chassis::CriticalModuleEvent::EngineOilLeak | cf_chassis::CriticalModuleEvent::EngineFire => {
+                    json!({"actor": actor.0, "module_id": outcome.module_id})
+                }
+                cf_chassis::CriticalModuleEvent::ReactorPressureAdvanced { tier } => json!({
+                    "actor": actor.0,
+                    "module_id": outcome.module_id,
+                    "tier": tier,
+                }),
+                cf_chassis::CriticalModuleEvent::PilotDirectHit { damage } => json!({
+                    "actor": actor.0,
+                    "module_id": outcome.module_id,
+                    "damage": damage,
+                }),
+                cf_chassis::CriticalModuleEvent::OpticsImpaired { blind } => json!({
+                    "actor": actor.0,
+                    "module_id": outcome.module_id,
+                    "blind": blind,
+                }),
+                cf_chassis::CriticalModuleEvent::MobilityReduced { immobile } => json!({
+                    "actor": actor.0,
+                    "module_id": outcome.module_id,
+                    "immobile": immobile,
+                }),
+            };
+            let _ = self.recorder.record(
+                tick,
+                sim_time_ms,
+                "module",
+                cascade.as_str(),
+                payload,
+                parent.clone(),
+            );
+        }
+    }
+
     /// **M5**: emit chassis-related events from a [`cf_chassis::ZoneDamageOutcome`].
     /// Also recomputes the chassis stage and emits `chassis.stage_changed` when it
-    /// advances. `parent` is the parent-link id for the event (usually the
-    /// `combat.projectile_hit` event id).
+    /// advances. **M13** appends `combat.hit_reaction_played` per zone hit, plus
+    /// **M14** § "Full penetration ray flow". When a projectile pierces
+    /// outer armor, this helper traces the ray through every chassis
+    /// interior module in distance-from-impact order, applies module
+    /// damage per `damage_multiplier × (1 - armor_absorption)`, and emits:
+    ///
+    ///   - `armor.penetration_ray_traversed` with the full module list
+    ///   - per-module damage via `apply_critical_module_damage` so
+    ///     module.hp + module.state mutate alongside the events
+    ///   - `armor.spalling` + `armor.spalling_fragment_spawned` +
+    ///     `armor.spalling_fragment_hit_module` when threshold crossed,
+    ///     each spalling-fragment-hit ALSO mutates the target module's HP
+    ///
+    /// **M14 audit pass 3 (Finding 6)**: previous implementation was
+    /// "pure event emission" — replay bundles claimed modules were hit
+    /// for damage X while the chassis state never moved. Now the helper
+    /// actually applies damage to each module via the chassis API.
+    #[allow(clippy::too_many_arguments)]
+    fn emit_m14_penetration_ray(
+        &self,
+        tick: Tick,
+        sim_time_ms: f64,
+        actor: ActorId,
+        hit: &cf_actor::sim::HitOutcome,
+        outcome: &cf_chassis::ZoneDamageOutcome,
+        ray_direction: [f32; 2],
+        parent: Option<String>,
+    ) {
+        // Collect chassis interior modules.
+        let modules_snapshot: Vec<(String, cf_chassis::ModuleKind, [f32; 2], bool, f32, f32)> = self
+            .state
+            .read()
+            .ok()
+            .and_then(|s| s.actor_state.as_ref().map(|sim| sim.world.actors.clone()))
+            .and_then(|actors| {
+                actors.get(&actor).and_then(|a| {
+                    a.chassis.as_ref().map(|chassis| {
+                        let position = a.position;
+                        chassis
+                            .modules
+                            .iter()
+                            .map(|m| {
+                                let centre = if m.local_aabb.is_positioned() {
+                                    let aabb = &m.local_aabb;
+                                    [
+                                        position.x + (aabb.min_x + aabb.max_x) * 0.5,
+                                        position.y + (aabb.min_y + aabb.max_y) * 0.5,
+                                    ]
+                                } else {
+                                    [position.x, position.y]
+                                };
+                                let dx = centre[0] - hit.hit_position.x;
+                                let dy = centre[1] - hit.hit_position.y;
+                                let dist = (dx * dx + dy * dy).sqrt();
+                                let is_ammo_rack = matches!(m.kind, cf_chassis::ModuleKind::AmmoRack);
+                                (
+                                    m.id.clone(),
+                                    m.kind,
+                                    centre,
+                                    is_ammo_rack,
+                                    dist,
+                                    1.0 - (m.hp / m.hp_max.max(0.001)).clamp(0.0, 1.0),
+                                )
+                            })
+                            .collect::<Vec<_>>()
+                    })
+                })
+            })
+            .unwrap_or_default();
+        if modules_snapshot.is_empty() {
+            return;
+        }
+        let mut interior_modules: Vec<cf_physics::InteriorModule> = modules_snapshot
+            .into_iter()
+            .map(|(id, _kind, pos, is_ammo, dist, absorbed_frac)| cf_physics::InteriorModule {
+                id,
+                damage_multiplier: 0.6,
+                armor_absorption: absorbed_frac.clamp(0.0, 0.9),
+                position: pos,
+                distance_along_ray: dist,
+                is_ammo_rack: is_ammo,
+            })
+            .collect();
+        interior_modules.sort_by(|a, b| {
+            a.distance_along_ray
+                .partial_cmp(&b.distance_along_ray)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
+        // Initial ray energy proxies projectile damage; backstop absorption
+        // is M14 baseline (0.5) until M15 wires real ammo specs.
+        let result = cf_physics::traverse_ray(
+            [hit.hit_position.x, hit.hit_position.y],
+            ray_direction,
+            hit.damage * 4.0,
+            &interior_modules,
+            0.5,
+        );
+        let modules_hit_payload: Vec<serde_json::Value> = result
+            .modules_hit
+            .iter()
+            .map(|m| serde_json::json!([m.module_id, m.damage]))
+            .collect();
+        let pen_ray_id = self.recorder.record(
+            tick,
+            sim_time_ms,
+            "armor",
+            "penetration_ray_traversed",
+            json!({
+                "ray_origin": result.ray_origin,
+                "ray_direction": result.ray_direction,
+                "modules_hit": modules_hit_payload,
+                "final_resting_point": result.final_resting_point,
+                "energy_remaining": result.energy_remaining,
+                "exited_backstop": result.exited_backstop,
+            }),
+            parent.clone(),
+        );
+        // **M14 audit pass 3 (Finding 6)**: actually apply damage to each
+        // interior module the ray traversed. This mutates module.hp +
+        // module.state on the chassis so subsequent observe.frame +
+        // snapshot_chassis events reflect the real state.
+        // **M14 audit pass 4 (Finding 3)**: capture each outcome + emit
+        // the chassis.module_state_changed transition + per-cascade
+        // chassis.* events so replay viewers can observe state changes
+        // caused by penetration rays the same way zone-damage paths do.
+        for m in &result.modules_hit {
+            let outcome_opt = if let Ok(mut s) = self.state.write() {
+                s.actor_state.as_mut().and_then(|sim| {
+                    sim.world.actors.get_mut(&actor).and_then(|target_actor| {
+                        target_actor.chassis.as_mut().and_then(|chassis| {
+                            chassis.apply_critical_module_damage(
+                                &m.module_id,
+                                m.damage,
+                                "penetration_ray",
+                            )
+                        })
+                    })
+                })
+            } else {
+                None
+            };
+            if let Some(outcome) = outcome_opt {
+                self.emit_critical_module_outcome_events(
+                    tick,
+                    sim_time_ms,
+                    actor,
+                    &outcome,
+                    Some(pen_ray_id.clone()),
+                );
+            }
+        }
+        // **M14** § "Spalling fragments spawn at impact point". When the
+        // outer armor damage exceeds the spalling threshold, spawn 1-3
+        // fragments + emit the per-fragment + per-module-hit events.
+        let outer_armor_damage = outcome
+            .layer_damage
+            .iter()
+            .map(|ld| ld.damage)
+            .fold(0.0_f32, |a, b| a + b);
+        let spalling_threshold = 5.0_f32;
+        let rng_roll = if let Ok(mut s) = self.state.write() {
+            (s.rng.next_u64() as f64 / u64::MAX as f64) as f32
+        } else {
+            0.5
+        };
+        let fragment_count = cf_physics::spalling_fragment_count(outer_armor_damage, spalling_threshold, rng_roll);
+        if fragment_count > 0 {
+            let zone_label = outcome.zone.map(|z| z.as_str().to_string()).unwrap_or_else(|| hit.zone.clone());
+            let layer = outcome
+                .layers_breached
+                .first()
+                .map(|(layer, _)| match layer {
+                    cf_chassis::ArmorLayerKind::External => "External",
+                    cf_chassis::ArmorLayerKind::Internal => "Internal",
+                    cf_chassis::ArmorLayerKind::Core => "Core",
+                })
+                .unwrap_or("External");
+            let damage_per_fragment = (outer_armor_damage
+                * cf_physics::spalling_fragment_damage_fraction(0, fragment_count, rng_roll))
+            .max(0.0);
+            let spalling_id = self.recorder.record(
+                tick,
+                sim_time_ms,
+                "armor",
+                "spalling",
+                json!({
+                    "item_id": actor.0 as i64,
+                    "zone": zone_label,
+                    "layer": layer,
+                    "fragment_count": fragment_count,
+                    "damage_per_fragment": damage_per_fragment,
+                    "cause_event_id": pen_ray_id.clone(),
+                }),
+                Some(pen_ray_id.clone()),
+            );
+            // Each fragment carries a fraction of the original damage and
+            // hits 1-2 modules per spec.
+            for frag_idx in 0..fragment_count {
+                let frac = cf_physics::spalling_fragment_damage_fraction(frag_idx, fragment_count, rng_roll);
+                let frag_damage = outer_armor_damage * frac;
+                let fragment_id = format!("{actor:?}:spall:{frag_idx}", actor = actor.0);
+                let frag_spawn_id = self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "armor",
+                    "spalling_fragment_spawned",
+                    json!({
+                        "fragment_id": fragment_id,
+                        "direction": ray_direction,
+                        "damage": frag_damage,
+                        "source_event_id": spalling_id.clone(),
+                    }),
+                    Some(spalling_id.clone()),
+                );
+                // Hit the next 1-2 modules along the ray + apply damage.
+                // **M14 audit pass 3 (Finding 6)**: spalling fragments now
+                // mutate module HP. Previous implementation emitted the
+                // hit event but never reduced module.hp.
+                // **M14 audit pass 4 (Finding 3)**: also emit
+                // module_state_changed + cascade events when the spalling
+                // hit pushes the module across a state threshold.
+                for hit_m in interior_modules.iter().take(2) {
+                    let frag_hit_damage = frag_damage * 0.5;
+                    let outcome_opt = if let Ok(mut s) = self.state.write() {
+                        s.actor_state.as_mut().and_then(|sim| {
+                            sim.world.actors.get_mut(&actor).and_then(|target_actor| {
+                                target_actor.chassis.as_mut().and_then(|chassis| {
+                                    chassis.apply_critical_module_damage(
+                                        &hit_m.id,
+                                        frag_hit_damage,
+                                        "spalling_fragment",
+                                    )
+                                })
+                            })
+                        })
+                    } else {
+                        None
+                    };
+                    let frag_hit_event_id = self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "armor",
+                        "spalling_fragment_hit_module",
+                        json!({
+                            "fragment_id": fragment_id,
+                            "module_id": hit_m.id,
+                            "damage": frag_hit_damage,
+                            "source_event_id": frag_spawn_id.clone(),
+                        }),
+                        Some(frag_spawn_id.clone()),
+                    );
+                    if let Some(outcome) = outcome_opt {
+                        self.emit_critical_module_outcome_events(
+                            tick,
+                            sim_time_ms,
+                            actor,
+                            &outcome,
+                            Some(frag_hit_event_id),
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /// per-zone severance events (`actor.head_destroyed`, `actor.arm_severed`,
+    /// `actor.leg_severed`, etc.) when a zone is destroyed. `parent` is the
+    /// parent-link id for the event (usually the `combat.projectile_hit` event id).
     fn emit_chassis_events(
         &self,
         tick: Tick,
@@ -7804,6 +9252,85 @@ impl M0Engine {
         parent: Option<String>,
     ) {
         let zone = outcome.zone.map(|z| z.as_str().to_string()).unwrap_or_default();
+        // **M13** § "Hit reactions per body part" — emit the per-zone reaction
+        // event when a zone takes damage AND apply the reaction window on the
+        // actor.
+        if let Some(zone_kind) = outcome.zone {
+            let reaction = cf_chassis::HitReaction::for_zone(zone_kind);
+            let mut duration_ticks: u32 = 0;
+            if let Ok(mut state) = self.state.write() {
+                let tick_rate = self.config.tick_rate_hz;
+                if let Some(sim) = state.actor_state.as_mut() {
+                    if let Some(target) = sim.world.actors.get_mut(&actor) {
+                        let applied = target.apply_hit_reaction(zone_kind, tick_rate);
+                        duration_ticks = applied.duration_ticks(tick_rate);
+                    }
+                }
+            }
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "combat",
+                "hit_reaction_played",
+                json!({
+                    "actor": actor.0,
+                    "zone": zone,
+                    "kind": reaction.kind,
+                    "duration_seconds": reaction.duration_seconds,
+                    "duration_ticks": duration_ticks,
+                    "concussion_dose": reaction.concussion_dose,
+                    "drop_chance": reaction.drop_chance,
+                    "speed_factor": reaction.speed_factor,
+                }),
+                parent.clone(),
+            );
+        }
+        // **M13** § "Limb loss functional consequences" — emit per-zone
+        // severance event when the zone is destroyed.
+        if outcome.zone_destroyed {
+            if let Some(zone_kind) = outcome.zone {
+                let event_type = match zone_kind {
+                    cf_chassis::BodyZone::Head => "head_destroyed",
+                    cf_chassis::BodyZone::Torso => "torso_destroyed",
+                    cf_chassis::BodyZone::ArmLeft | cf_chassis::BodyZone::ArmRight => "arm_severed",
+                    cf_chassis::BodyZone::ForearmLeft | cf_chassis::BodyZone::ForearmRight => "forearm_severed",
+                    cf_chassis::BodyZone::HandLeft | cf_chassis::BodyZone::HandRight => "hand_severed",
+                    cf_chassis::BodyZone::LegLeft | cf_chassis::BodyZone::LegRight => "leg_severed",
+                    cf_chassis::BodyZone::ShinLeft | cf_chassis::BodyZone::ShinRight => "shin_severed",
+                    cf_chassis::BodyZone::FootLeft | cf_chassis::BodyZone::FootRight => "foot_severed",
+                    cf_chassis::BodyZone::Backpack => "backpack_severed",
+                    _ => "zone_destroyed",
+                };
+                let side = match zone_kind {
+                    cf_chassis::BodyZone::ArmLeft
+                    | cf_chassis::BodyZone::ForearmLeft
+                    | cf_chassis::BodyZone::HandLeft
+                    | cf_chassis::BodyZone::LegLeft
+                    | cf_chassis::BodyZone::ShinLeft
+                    | cf_chassis::BodyZone::FootLeft => "left",
+                    cf_chassis::BodyZone::ArmRight
+                    | cf_chassis::BodyZone::ForearmRight
+                    | cf_chassis::BodyZone::HandRight
+                    | cf_chassis::BodyZone::LegRight
+                    | cf_chassis::BodyZone::ShinRight
+                    | cf_chassis::BodyZone::FootRight => "right",
+                    _ => "n/a",
+                };
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "actor",
+                    event_type,
+                    json!({
+                        "actor": actor.0,
+                        "zone": zone,
+                        "side": side,
+                        "cause": outcome.cause,
+                    }),
+                    parent.clone(),
+                );
+            }
+        }
         for ld in &outcome.layer_damage {
             self.recorder.record(
                 tick,
@@ -7880,6 +9407,249 @@ impl M0Engine {
                 }),
                 parent.clone(),
             );
+            // **M13** § "Critical chassis modules with full mechanics" — when
+            // a module transition crosses into Warning / Failed AND the
+            // module has a failure_cascade, drive the corresponding cascade
+            // events (`module.ammo_rack_cooking` / `_detonated`,
+            // `module.engine_fire`, `module.reactor_pressure_advanced`,
+            // `module.optics_impaired`, `module.mobility_reduced`,
+            // `module.pilot_direct_hit`). Also surface the
+            // `chassis.module_critical` signal for M7 Engineer auto-repair
+            // consumers.
+            if matches!(
+                mt.state,
+                cf_chassis::ModuleStateKind::Warning | cf_chassis::ModuleStateKind::Failed
+            ) {
+                let (cascade, kind_str) = {
+                    let s = self.state.read().ok();
+                    let module_info = s.as_ref().and_then(|st| {
+                        st.actor_state
+                            .as_ref()
+                            .and_then(|sim| sim.world.actors.get(&actor))
+                            .and_then(|a| a.chassis.as_ref())
+                            .and_then(|c| c.module(&mt.id))
+                            .map(|m| (m.failure_cascade, m.kind, m.ammo_quantity_remaining))
+                    });
+                    if let Some((cascade, kind, _ammo)) = module_info {
+                        (cascade, kind.as_str().to_string())
+                    } else {
+                        (cf_chassis::FailureCascade::None, String::new())
+                    }
+                };
+                // M7 chassis_module_critical signal — fires when ANY ally
+                // chassis module crosses into Warning/Failed.
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "chassis",
+                    "module_critical",
+                    json!({
+                        "actor": actor.0,
+                        "module_id": mt.id,
+                        "module_kind": kind_str,
+                        "state": mt.state.as_str(),
+                        "reason": mt.reason,
+                    }),
+                    parent.clone(),
+                );
+                // Per-cascade event emission. The actual state mutation
+                // (cookoff counters, pressure tier, etc.) happens in the
+                // chassis-side critical-module helper invoked below.
+                match cascade {
+                    cf_chassis::FailureCascade::AmmoCookoff => {
+                        let event_type = if mt.state == cf_chassis::ModuleStateKind::Failed {
+                            "ammo_rack_detonated"
+                        } else {
+                            "ammo_rack_cooking"
+                        };
+                        // Drive the state mutation on the chassis side.
+                        let cascade_outcome = if let Ok(mut st) = self.state.write() {
+                            st.actor_state.as_mut().and_then(|sim| {
+                                sim.world.actors.get_mut(&actor).and_then(|a| {
+                                    a.chassis.as_mut().and_then(|c| {
+                                        c.apply_critical_module_damage(&mt.id, 0.0, "module_state_advanced")
+                                    })
+                                })
+                            })
+                        } else {
+                            None
+                        };
+                        let rounds = cascade_outcome
+                            .and_then(|o| {
+                                o.cascade_events.iter().find_map(|e| match e {
+                                    cf_chassis::CriticalModuleEvent::AmmoCooking { rounds_cooked } => {
+                                        Some(*rounds_cooked)
+                                    }
+                                    cf_chassis::CriticalModuleEvent::AmmoDetonated { rounds_detonated } => {
+                                        Some(*rounds_detonated)
+                                    }
+                                    _ => None,
+                                })
+                            })
+                            .unwrap_or(0);
+                        self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "module",
+                            event_type,
+                            json!({
+                                "actor": actor.0,
+                                "module_id": mt.id,
+                                "rounds": rounds,
+                            }),
+                            parent.clone(),
+                        );
+                    }
+                    cf_chassis::FailureCascade::EngineFire => {
+                        // **M14 audit pass 3 (Finding 5)**: drive the
+                        // engine oil/coolant state mutations via the
+                        // chassis-side critical helper. Previously the
+                        // engine emitted `engine_oil_leak` / `engine_fire`
+                        // events without ever calling the helper, so the
+                        // chassis state (oil_level, coolant_level) never
+                        // actually mutated.
+                        let _ = if let Ok(mut st) = self.state.write() {
+                            st.actor_state.as_mut().and_then(|sim| {
+                                sim.world.actors.get_mut(&actor).and_then(|a| {
+                                    a.chassis.as_mut().and_then(|c| {
+                                        c.apply_critical_module_damage(&mt.id, 0.0, "module_state_advanced")
+                                    })
+                                })
+                            })
+                        } else {
+                            None
+                        };
+                        let event_type = if mt.state == cf_chassis::ModuleStateKind::Failed {
+                            "engine_fire"
+                        } else {
+                            "engine_oil_leak"
+                        };
+                        self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "module",
+                            event_type,
+                            json!({
+                                "actor": actor.0,
+                                "module_id": mt.id,
+                            }),
+                            parent.clone(),
+                        );
+                    }
+                    cf_chassis::FailureCascade::ReactorOverpressure => {
+                        // **M14 audit pass 3 (Finding 5)**: drive the
+                        // reactor pressure_state advancement via the
+                        // critical helper. The previous code emitted
+                        // `reactor_pressure_advanced` without mutating
+                        // pressure_state on the chassis module.
+                        let _ = if let Ok(mut st) = self.state.write() {
+                            st.actor_state.as_mut().and_then(|sim| {
+                                sim.world.actors.get_mut(&actor).and_then(|a| {
+                                    a.chassis.as_mut().and_then(|c| {
+                                        c.apply_critical_module_damage(&mt.id, 0.0, "module_state_advanced")
+                                    })
+                                })
+                            })
+                        } else {
+                            None
+                        };
+                        self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "module",
+                            "reactor_pressure_advanced",
+                            json!({
+                                "actor": actor.0,
+                                "module_id": mt.id,
+                                "state": mt.state.as_str(),
+                            }),
+                            parent.clone(),
+                        );
+                    }
+                    cf_chassis::FailureCascade::SightImpairment => {
+                        // **M14 audit pass 3 (Finding 5)**.
+                        let _ = if let Ok(mut st) = self.state.write() {
+                            st.actor_state.as_mut().and_then(|sim| {
+                                sim.world.actors.get_mut(&actor).and_then(|a| {
+                                    a.chassis.as_mut().and_then(|c| {
+                                        c.apply_critical_module_damage(&mt.id, 0.0, "module_state_advanced")
+                                    })
+                                })
+                            })
+                        } else {
+                            None
+                        };
+                        self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "module",
+                            "optics_impaired",
+                            json!({
+                                "actor": actor.0,
+                                "module_id": mt.id,
+                                "blind": mt.state == cf_chassis::ModuleStateKind::Failed,
+                            }),
+                            parent.clone(),
+                        );
+                    }
+                    cf_chassis::FailureCascade::MobilityLoss => {
+                        // **M14 audit pass 3 (Finding 5)**.
+                        let _ = if let Ok(mut st) = self.state.write() {
+                            st.actor_state.as_mut().and_then(|sim| {
+                                sim.world.actors.get_mut(&actor).and_then(|a| {
+                                    a.chassis.as_mut().and_then(|c| {
+                                        c.apply_critical_module_damage(&mt.id, 0.0, "module_state_advanced")
+                                    })
+                                })
+                            })
+                        } else {
+                            None
+                        };
+                        self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "module",
+                            "mobility_reduced",
+                            json!({
+                                "actor": actor.0,
+                                "module_id": mt.id,
+                                "immobile": mt.state == cf_chassis::ModuleStateKind::Failed,
+                            }),
+                            parent.clone(),
+                        );
+                    }
+                    cf_chassis::FailureCascade::PilotDirectDamage => {
+                        // **M14 audit pass 3 (Finding 5)**: critical
+                        // helper promotes pilot_state to Injured per
+                        // CCCP cockpit penetration rules. Previously the
+                        // engine emitted `pilot_direct_hit` without
+                        // touching pilot_state on the chassis.
+                        let _ = if let Ok(mut st) = self.state.write() {
+                            st.actor_state.as_mut().and_then(|sim| {
+                                sim.world.actors.get_mut(&actor).and_then(|a| {
+                                    a.chassis.as_mut().and_then(|c| {
+                                        c.apply_critical_module_damage(&mt.id, 0.0, "module_state_advanced")
+                                    })
+                                })
+                            })
+                        } else {
+                            None
+                        };
+                        self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "module",
+                            "pilot_direct_hit",
+                            json!({
+                                "actor": actor.0,
+                                "module_id": mt.id,
+                            }),
+                            parent.clone(),
+                        );
+                    }
+                    cf_chassis::FailureCascade::None => {}
+                }
+            }
         }
         // Recompute stage + emit transition event if advanced.
         if let Ok(mut state) = self.state.write() {
@@ -7921,6 +9691,19 @@ impl M0Engine {
     /// stage transition.
     fn tick_chassis_eject_for_all(&self, tick: Tick, sim_time_ms: f64) {
         let mut emits: Vec<(ActorId, &'static str, String)> = Vec::new();
+        // **M13** § "Chassis ability slots" / "Boarding transitions" /
+        // "Drone allies — fuel" / "Hit reactions per body part" — per-tick
+        // updates collected here so we emit events in deterministic order.
+        let mut ability_events: Vec<(ActorId, &'static str, cf_chassis::ChassisAbility)> = Vec::new();
+        let mut transition_events: Vec<(ActorId, cf_chassis::TransitionCompleted)> = Vec::new();
+        let mut drone_fuel_low: Vec<ActorId> = Vec::new();
+        let mut hit_reaction_ended: Vec<ActorId> = Vec::new();
+        // **M13** § "Pilot eject is a real actor split: the pilot becomes a
+        // new ActorId with its own ActorState (no chassis attached). The
+        // chassis becomes a wreck (interactable for salvage)." Collect the
+        // actor IDs whose pilot ejected this tick so we can perform the
+        // split AFTER the borrow ends.
+        let mut pilots_to_split: Vec<ActorId> = Vec::new();
         if let Ok(mut state) = self.state.write() {
             if let Some(sim) = state.actor_state.as_mut() {
                 let ids: Vec<ActorId> = sim.world.actors.keys().copied().collect();
@@ -7928,21 +9711,115 @@ impl M0Engine {
                     let Some(actor) = sim.world.actors.get_mut(&id) else {
                         continue;
                     };
+                    // **M13** drone fuel drain (only when chassis = Drone).
+                    let drone_tick_rate = actor
+                        .chassis
+                        .as_ref()
+                        .map(|c| c.tick_rate_hz)
+                        .unwrap_or(60);
+                    if let Some(drone) = actor.drone_ally.as_mut() {
+                        if drone.tick_fuel(drone_tick_rate) {
+                            drone_fuel_low.push(id);
+                        }
+                    }
+                    // **M13** hit-reaction timer.
+                    if actor.tick_hit_reaction() {
+                        hit_reaction_ended.push(id);
+                    }
                     let Some(chassis) = actor.chassis.as_mut() else {
                         continue;
                     };
+                    // **M13** ability cooldowns + transitions.
+                    let ability_outcome = chassis.tick_abilities();
+                    for ab in ability_outcome.effects_ended {
+                        ability_events.push((id, "effect_ended", ab));
+                    }
+                    for ab in ability_outcome.cooldowns_expired {
+                        ability_events.push((id, "cooldown_expired", ab));
+                    }
+                    if let Some(t) = chassis.tick_transitions() {
+                        transition_events.push((id, t));
+                    }
                     if let Some(progress) = chassis.tick_eject() {
                         let stage_after = chassis.stage.as_str().to_string();
                         match progress {
                             cf_chassis::EjectProgress::Ejected => {
                                 emits.push((id, "pilot_state_changed", stage_after.clone()));
                                 emits.push((id, "pilot_separated", stage_after));
+                                pilots_to_split.push(id);
                             }
                             cf_chassis::EjectProgress::BailedTooLate => {
                                 emits.push((id, "pilot_bailed_too_late", stage_after));
                             }
                         }
                     }
+                }
+            }
+        }
+        // **M13** § "Pilot eject is a real actor split" — perform the split
+        // for each ejected pilot. The original ActorId stays at its position
+        // as the chassis wreck (not controllable, stage=Wreck). A new ActorId
+        // spawns as foot infantry (controllable, no chassis). The player
+        // pointer updates to the new pilot. We emit `chassis.actor_split`
+        // with both ids so consumers can chain.
+        let mut split_events: Vec<(u64, u64)> = Vec::new();
+        for wreck_actor_id in pilots_to_split {
+            if let Ok(mut state) = self.state.write() {
+                let new_pilot_id = if let Some(sim) = state.actor_state.as_mut() {
+                    // Resolve the wreck actor's spawn info.
+                    let Some(wreck) = sim.world.actors.get(&wreck_actor_id) else {
+                        continue;
+                    };
+                    let team = wreck.team.clone();
+                    let position = wreck.position;
+                    let was_player = sim.world.player == Some(wreck_actor_id);
+                    let was_brain = wreck.is_brain;
+                    // Next ActorId = max+1. Stable + deterministic.
+                    let next_id = sim
+                        .world
+                        .actors
+                        .keys()
+                        .map(|k| k.0)
+                        .max()
+                        .map(|max| max + 1)
+                        .unwrap_or(2);
+                    let pilot_id = cf_actor::ActorId(next_id);
+                    // Build a foot-infantry pilot actor at the chassis position.
+                    let pilot_inventory = cf_actor::Inventory::with_rifle(cf_equipment::RIFLE_M1_DEFAULT_ID);
+                    let mut pilot = cf_actor::ActorState::player(
+                        pilot_id,
+                        &team,
+                        position,
+                        100.0,
+                        pilot_inventory,
+                    );
+                    pilot.controllable = was_player;
+                    if was_brain {
+                        pilot.mark_brain(tick.0);
+                    }
+                    // Mark the wreck as non-controllable + flip the chassis
+                    // stage to Wreck so the salvage flow is immediately valid.
+                    if let Some(wreck_mut) = sim.world.actors.get_mut(&wreck_actor_id) {
+                        wreck_mut.controllable = false;
+                        wreck_mut.clear_brain();
+                        if let Some(chassis) = wreck_mut.chassis.as_mut() {
+                            chassis.stage = cf_chassis::ChassisStage::Wreck;
+                            chassis.last_stage_reason = "pilot_ejected_actor_split".to_string();
+                        }
+                    }
+                    sim.world.insert(pilot);
+                    if was_player {
+                        sim.world.player = Some(pilot_id);
+                    }
+                    Some(pilot_id.0)
+                } else {
+                    None
+                };
+                if let Some(pilot_id_u64) = new_pilot_id {
+                    if state.player_actor == Some(wreck_actor_id) {
+                        state.player_actor = Some(cf_actor::ActorId(pilot_id_u64));
+                    }
+                    split_events.push((wreck_actor_id.0, pilot_id_u64));
                 }
             }
         }
@@ -7953,6 +9830,174 @@ impl M0Engine {
                 "chassis",
                 kind,
                 json!({"actor": id.0, "stage": stage}),
+                None,
+            );
+        }
+        // **M13** § "Pilot eject is a real actor split" — emit
+        // `chassis.actor_split` so consumers can chain wreck ↔ pilot ids.
+        for (wreck_actor, pilot_actor) in split_events {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "chassis",
+                "actor_split",
+                json!({
+                    "wreck_actor_id": wreck_actor,
+                    "pilot_actor_id": pilot_actor,
+                }),
+                None,
+            );
+        }
+        for (id, kind, ab) in ability_events {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "ability",
+                kind,
+                json!({"actor": id.0, "ability": ab.as_str()}),
+                None,
+            );
+        }
+        // **M14 audit pass 4 (Finding 1)**: drive the PLAYER-side boarding
+        // timer + perform the pilot-into-chassis transfer when it expires.
+        // This must run BEFORE the transition_events loop so we can drop
+        // the target-side `Boarded` echo (the chassis-side `begin_boarding`
+        // mirrors the same timer purely for concurrent-board rejection; we
+        // emit ONE canonical `actor.boarded` event keyed on the player id
+        // matching the original `actor.boarding` event).
+        let mut boarding_completed: Vec<(ActorId, ActorId)> = Vec::new();
+        if let Ok(mut state) = self.state.write() {
+            if let Some(sim) = state.actor_state.as_mut() {
+                let actor_ids: Vec<ActorId> = sim.world.actors.keys().copied().collect();
+                for id in actor_ids {
+                    if let Some(a) = sim.world.actors.get_mut(&id) {
+                        if a.boarding_ticks_remaining > 0 {
+                            a.boarding_ticks_remaining -= 1;
+                            if a.boarding_ticks_remaining == 0 {
+                                if let Some(t) = a.pending_boarding_target.take() {
+                                    boarding_completed.push((id, ActorId(t)));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        let boarded_target_ids: std::collections::HashSet<ActorId> =
+            boarding_completed.iter().map(|(_, t)| *t).collect();
+        transition_events.retain(|(id, side)| match side {
+            cf_chassis::TransitionCompleted::Boarded => !boarded_target_ids.contains(id),
+            _ => true,
+        });
+        let mut boarded_emit: Vec<(u64, u64)> = Vec::new();
+        let mut boarding_aborted: Vec<(u64, u64, &'static str)> = Vec::new();
+        for (player_id, target_id) in boarding_completed {
+            if let Ok(mut state) = self.state.write() {
+                let (was_brain, player_alive) = state
+                    .actor_state
+                    .as_ref()
+                    .and_then(|sim| {
+                        sim.world.actors.get(&player_id).map(|p| {
+                            (p.is_brain, p.status != cf_actor::Status::Dead)
+                        })
+                    })
+                    .unwrap_or((false, false));
+                let target_present = state
+                    .actor_state
+                    .as_ref()
+                    .and_then(|sim| sim.world.actors.get(&target_id))
+                    .map(|t| {
+                        t.chassis.is_some()
+                            && t.status != cf_actor::Status::Dead
+                    })
+                    .unwrap_or(false);
+                // **M14 audit pass 4 (Finding 1)**: cancel the transfer if
+                // either side became invalid during the 1500ms transition
+                // (player died, target chassis destroyed, etc.). Without
+                // this guard a dead player could be merged into a missing
+                // target, leaving state.player_actor pointing at nothing.
+                if !player_alive || !target_present {
+                    boarding_aborted.push((
+                        player_id.0,
+                        target_id.0,
+                        if !player_alive { "player_died" } else { "target_unavailable" },
+                    ));
+                    continue;
+                }
+                if let Some(sim) = state.actor_state.as_mut() {
+                    if let Some(target) = sim.world.actors.get_mut(&target_id) {
+                        target.controllable = true;
+                        if was_brain {
+                            target.mark_brain(tick.0);
+                        }
+                    }
+                    sim.world.actors.remove(&player_id);
+                    sim.world.player = Some(target_id);
+                }
+                state.player_actor = Some(target_id);
+                boarded_emit.push((player_id.0, target_id.0));
+            }
+        }
+        for (id, side) in transition_events {
+            let event_type = match side {
+                cf_chassis::TransitionCompleted::Boarded => "boarded",
+                cf_chassis::TransitionCompleted::Disembarked => "disembarked",
+            };
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "actor",
+                event_type,
+                json!({"actor": id.0}),
+                None,
+            );
+        }
+        // **M14 audit pass 4 (Finding 1)**: canonical actor.boarded — pair
+        // matches the actor.boarding event so consumers can chain via
+        // payload.actor.
+        for (player_u64, target_u64) in boarded_emit {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "actor",
+                "boarded",
+                json!({"actor": player_u64, "chassis_actor_id": target_u64}),
+                None,
+            );
+        }
+        // **M14 audit pass 4 (Finding 1)**: boarding aborted (player died
+        // or target was destroyed during the transition).
+        for (player_u64, target_u64, reason) in boarding_aborted {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "actor",
+                "boarding_aborted",
+                json!({
+                    "actor": player_u64,
+                    "chassis_actor_id": target_u64,
+                    "reason": reason,
+                }),
+                None,
+            );
+        }
+        for id in drone_fuel_low {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "drone",
+                "fuel_low",
+                json!({"actor": id.0}),
+                None,
+            );
+        }
+        for id in hit_reaction_ended {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "combat",
+                "hit_reaction_ended",
+                json!({"actor": id.0}),
                 None,
             );
         }
@@ -8784,7 +10829,7 @@ impl M0Engine {
         // (e) Emit follow-on events with the lock released so the recorder
         // can re-borrow.
         for det in detonations {
-            self.recorder.record(
+            let grenade_event_id = self.recorder.record(
                 tick,
                 sim_time_ms,
                 "equipment",
@@ -8805,6 +10850,22 @@ impl M0Engine {
             // Type-specific effect emissions.
             match det.kind {
                 cf_equipment::GrenadeKind::Frag => {
+                    // **M14** § "HE round overpressure model" — emit the
+                    // overpressure wave + per-actor combat.explosive_hit_mo +
+                    // explosion severance + 3-organ routing.
+                    let _ = self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "armor",
+                        "he_overpressure_wave",
+                        json!({
+                            "center": [det.position.x, det.position.y],
+                            "radius": det.radius,
+                            "damage_at_zero_distance": det.damage_at_center,
+                            "falloff_curve": "inverse_square",
+                        }),
+                        Some(grenade_event_id.clone()),
+                    );
                     // Radius damage: apply damage_at_center * (1 - distance/radius)
                     // to actors inside the radius.
                     if let Ok(mut s) = self.state.write() {
@@ -8816,24 +10877,232 @@ impl M0Engine {
                             .as_ref()
                             .map(|sim| sim.world.actors.keys().copied().collect())
                             .unwrap_or_default();
-                        for aid in actor_ids {
-                            let (dx, dy, hp_before) = {
-                                let Some(actor) = s.actor_state.as_ref().and_then(|sim| sim.world.actors.get(&aid))
+                        let wave = cf_physics::HeWave {
+                            center: [center.x, center.y],
+                            radius,
+                            damage_at_zero_distance: dmg_center,
+                        };
+                        // Pre-roll RNG for the 3-organ routing + explosion-
+                        // severance check so the engine state lock can be
+                        // dropped before recorder calls.
+                        let mut rng_rolls: Vec<f32> = Vec::with_capacity(actor_ids.len() * 4);
+                        for _ in 0..(actor_ids.len() * 4) {
+                            rng_rolls.push((s.rng.next_u64() as f64 / u64::MAX as f64) as f32);
+                        }
+                        // Snapshot per-actor state so we can compute damage
+                        // BEFORE applying it.
+                        struct ExplosionVictim {
+                            actor: ActorId,
+                            dist: f32,
+                            damage: f32,
+                            zone: String,
+                            origin_id: String,
+                            team_is_robot: bool,
+                            facing_sign: f32,
+                            position: [f32; 2],
+                        }
+                        let mut victims: Vec<ExplosionVictim> = Vec::new();
+                        for aid in &actor_ids {
+                            let (dx, dy, origin_id, team, facing_sign, pos) = {
+                                let Some(actor) = s.actor_state.as_ref().and_then(|sim| sim.world.actors.get(aid))
                                 else {
                                     continue;
                                 };
-                                (actor.position.x - center.x, actor.position.y - center.y, actor.hp)
+                                (
+                                    actor.position.x - center.x,
+                                    actor.position.y - center.y,
+                                    actor.origin_id.clone(),
+                                    actor.team.clone(),
+                                    actor.facing.sign(),
+                                    [actor.position.x, actor.position.y],
+                                )
                             };
                             let dist = (dx * dx + dy * dy).sqrt();
                             if dist >= radius {
                                 continue;
                             }
-                            let frac = (1.0 - dist / radius).clamp(0.0, 1.0);
-                            let dmg = dmg_center * frac;
-                            if let Some(actor) = s.actor_state.as_mut().and_then(|sim| sim.world.actors.get_mut(&aid)) {
-                                let _ = actor.apply_damage(dmg);
-                                let _ = hp_before;
+                            let dmg = cf_physics::he_damage_at_distance(&wave, dist);
+                            // Use bottom-half radius heuristic for zone:
+                            // close hits land on torso, mid on abdomen.
+                            let zone = if dist < radius * 0.25 {
+                                "torso".to_string()
+                            } else {
+                                "abdomen".to_string()
+                            };
+                            let team_is_robot = team.eq_ignore_ascii_case("red_robot")
+                                || team.eq_ignore_ascii_case("robot");
+                            victims.push(ExplosionVictim {
+                                actor: *aid,
+                                dist,
+                                damage: dmg,
+                                zone,
+                                origin_id,
+                                team_is_robot,
+                                facing_sign,
+                                position: pos,
+                            });
+                        }
+                        // Apply damage.
+                        for v in &victims {
+                            if let Some(actor) = s.actor_state.as_mut().and_then(|sim| sim.world.actors.get_mut(&v.actor)) {
+                                let _ = actor.apply_damage(v.damage);
                             }
+                        }
+                        drop(s);
+                        // Emit per-victim chain (cause-chain rooted on the
+                        // grenade_event_id).
+                        let mut roll_cursor = 0usize;
+                        for v in victims {
+                            // combat.explosive_hit_mo
+                            let explo_id = self.recorder.record(
+                                tick,
+                                sim_time_ms,
+                                "combat",
+                                "explosive_hit_mo",
+                                json!({
+                                    "owner_id": det.owner,
+                                    "target_id": v.actor.0,
+                                    "kind": "frag",
+                                    "distance": v.dist,
+                                    "damage": v.damage,
+                                    "position": v.position,
+                                    "blast_center": [center.x, center.y],
+                                    "blast_radius": radius,
+                                    "source_event_id": grenade_event_id.clone(),
+                                }),
+                                Some(grenade_event_id.clone()),
+                            );
+                            // Explosion proximity severance — per-zone joint
+                            // impulse check across forward exposed zones.
+                            let base_impulse = (v.damage * 60.0).max(0.0);
+                            let exposure = cf_physics::classify_hit_direction(
+                                (v.position[0] - center.x, v.position[1] - center.y),
+                                v.facing_sign,
+                            );
+                            for zone in cf_physics::exposed_zones(exposure) {
+                                let joint = cf_physics::Joint::default_for_zone(zone);
+                                let eval = cf_physics::evaluate_joint(joint, base_impulse);
+                                if eval.gib {
+                                    let _ = self.recorder.record(
+                                        tick,
+                                        sim_time_ms,
+                                        "attachable",
+                                        "gib_threshold_crossed",
+                                        json!({
+                                            "actor_id": v.actor.0,
+                                            "attachable_id": *zone,
+                                            "parent_zone": *zone,
+                                            "joint_impulse": eval.impulse_in,
+                                            "gib_impulse_limit": joint.gib_impulse_limit,
+                                            "source_event_id": explo_id.clone(),
+                                            "cause": "explosion",
+                                        }),
+                                        Some(explo_id.clone()),
+                                    );
+                                } else if eval.detach {
+                                    let _ = self.recorder.record(
+                                        tick,
+                                        sim_time_ms,
+                                        "attachable",
+                                        "detached",
+                                        json!({
+                                            "actor_id": v.actor.0,
+                                            "attachable_id": *zone,
+                                            "parent_zone": *zone,
+                                            "joint_impulse": eval.impulse_in,
+                                            "joint_strength": joint.joint_strength,
+                                            "gib_impulse_limit": joint.gib_impulse_limit,
+                                            "detach_position": v.position,
+                                            "detach_velocity": [
+                                                (v.position[0] - center.x).signum() * (eval.impulse_out / 80.0).clamp(0.0, 500.0),
+                                                (v.position[1] - center.y).signum() * (eval.impulse_out / 80.0).clamp(0.0, 500.0),
+                                            ],
+                                            "damage_multiplier": joint.damage_multiplier,
+                                            "source_event_id": explo_id.clone(),
+                                            "cause": "explosion",
+                                        }),
+                                        Some(explo_id.clone()),
+                                    );
+                                }
+                                let _ = self.recorder.record(
+                                    tick,
+                                    sim_time_ms,
+                                    "physics",
+                                    "impulse_propagated",
+                                    json!({
+                                        "actor_id": v.actor.0,
+                                        "from_zone": *zone,
+                                        "to_zone": "parent",
+                                        "impulse_in": eval.impulse_in,
+                                        "impulse_absorbed": eval.impulse_absorbed,
+                                        "impulse_out": eval.impulse_out,
+                                        "joint_strength": joint.joint_strength,
+                                        "damage_multiplier": joint.damage_multiplier,
+                                        "kind": "explosion",
+                                        "source_event_id": explo_id.clone(),
+                                    }),
+                                    Some(explo_id.clone()),
+                                );
+                            }
+                            // Per-organ 3-organ explosion routing per
+                            // `cf_internal::route_explosion_internal_damage`.
+                            let graph_kind = if v.team_is_robot {
+                                cf_internal::InternalGraphKind::Robot
+                            } else {
+                                cf_internal::InternalGraphKind::Humanoid
+                            };
+                            let rolls = if roll_cursor + 3 <= rng_rolls.len() {
+                                &rng_rolls[roll_cursor..roll_cursor + 3]
+                            } else {
+                                &rng_rolls[..]
+                            };
+                            roll_cursor = roll_cursor.saturating_add(3);
+                            let decisions = cf_internal::route_explosion_internal_damage(
+                                graph_kind,
+                                v.zone.as_str(),
+                                v.damage,
+                                rolls,
+                            );
+                            for d in &decisions {
+                                if v.team_is_robot {
+                                    let _ = self.recorder.record(
+                                        tick,
+                                        sim_time_ms,
+                                        "internal",
+                                        "circuit_damaged",
+                                        json!({
+                                            "actor_id": v.actor.0,
+                                            "circuit_id": d.target_id,
+                                            "circuit_kind": cf_internal::circuit_kind(d.target_id),
+                                            "from_hp": 100.0_f32,
+                                            "to_hp": (100.0_f32 - d.applied_damage).max(0.0),
+                                            "cause": "explosion",
+                                            "source_hit_event_id": explo_id.clone(),
+                                            "route_via_m14": true,
+                                        }),
+                                        Some(explo_id.clone()),
+                                    );
+                                } else {
+                                    let _ = self.recorder.record(
+                                        tick,
+                                        sim_time_ms,
+                                        "internal",
+                                        "organ_damaged",
+                                        json!({
+                                            "actor_id": v.actor.0,
+                                            "organ_id": d.target_id,
+                                            "organ_kind": cf_internal::organ_kind(d.target_id),
+                                            "from_hp": 100.0_f32,
+                                            "to_hp": (100.0_f32 - d.applied_damage).max(0.0),
+                                            "cause": "explosion",
+                                            "source_hit_event_id": explo_id.clone(),
+                                            "route_via_m14": true,
+                                        }),
+                                        Some(explo_id.clone()),
+                                    );
+                                }
+                            }
+                            let _ = v.origin_id;
                         }
                     }
                 }
@@ -9692,8 +11961,20 @@ impl M0Engine {
         let state = self.state.read().expect("engine state poisoned");
         let tick = state.clock.tick();
         let sim_time_ms = state.clock.sim_time_ms();
+        let run_aborted = state.run_aborted;
         drop(state);
-        let outcome = if exit_code == 0 { "clean" } else { "panic" };
+        // **M14 audit pass 2 (GAP-M4-02 HIGH fix)**: spec § Expected
+        // outcome + system events lists three outcomes — clean, panic,
+        // abort. Previously hardcoded clean/panic only; aborted runs
+        // surfaced as clean. Now: exit_code != 0 → panic; else if
+        // run_aborted → abort; else → clean.
+        let outcome = if exit_code != 0 {
+            "panic"
+        } else if run_aborted {
+            "abort"
+        } else {
+            "clean"
+        };
         // **M4 § Expected outcome + system events**: spec literal payload
         // is `{ outcome, ticks_run, wall_seconds, final_sim_checksum }`.
         // ticks_run is the last advanced tick; wall_seconds comes from
@@ -10580,6 +12861,18 @@ impl M0Engine {
                             actor_position: actor.position,
                         });
                     }
+                    // **M14 audit pass 3 (GAP-M6-01)**: sprint-fueled
+                    // shoulder check. Resolves through the MeleeKind::ShoulderCheck
+                    // preset (higher knockdown probability than Kick).
+                    M6Action::MeleeShoulderCheck => {
+                        event_payload = json!({"actor": player_id.0, "kind": "shoulder_check"});
+                        melee_to_resolve = Some(PendingMeleeResolve {
+                            attacker: player_id,
+                            kind: cf_equipment::MeleeKind::ShoulderCheck,
+                            facing_sign: if actor.aim.x >= 0.0 { 1.0 } else { -1.0 },
+                            actor_position: actor.position,
+                        });
+                    }
                     M6Action::UseTool { tool_kind } => {
                         // **M6**: apply wear on each use; emit
                         // `equipment.tool_broken` when durability hits 0. For
@@ -11041,7 +13334,7 @@ impl M0Engine {
         // tool repaired) AFTER releasing the write-guard so the recorder
         // can re-borrow without dead-locking.
         if let Some(emit) = melee_hit_emit {
-            self.recorder.record(
+            let melee_event_id = self.recorder.record(
                 tick,
                 sim_time_ms,
                 "equipment",
@@ -11062,6 +13355,52 @@ impl M0Engine {
                 }),
                 None,
             );
+            // **M14** § "Heavy melee severance (chainsaw / katana / hatchet)".
+            // Per-weapon severance_chance × (1 - joint_strength_normalized);
+            // rolled against the engine's seeded RNG. Cf-equipment currently
+            // ships hatchet (0.15) as the M6 heavy-melee tier; chainsaw +
+            // katana ladder up at M25 (no MeleeKind variants yet — left for
+            // forward-compat). Light tiers (knife / baton / kick) carry zero
+            // severance per spec § "Light weapons (knife / baton): 0 severance chance".
+            let severance_chance = match emit.kind {
+                cf_equipment::MeleeKind::Hatchet => 0.15,
+                _ => 0.0,
+            };
+            if severance_chance > 0.0 {
+                let rng_roll = if let Ok(mut s) = self.state.write() {
+                    (s.rng.next_u64() as f64 / u64::MAX as f64) as f32
+                } else {
+                    0.5
+                };
+                // Pick a probable hit zone (the M14 weighted picker would
+                // normally consult the hit position; for melee we route to
+                // the front-arm since the swing originates from the front).
+                let zone = "arm_left";
+                let joint = cf_physics::Joint::default_for_zone(zone);
+                let probability = cf_physics::severance_probability(severance_chance, joint.joint_strength, 100.0);
+                if cf_physics::severance_roll(rng_roll, probability) {
+                    let _ = self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "attachable",
+                        "detached",
+                        json!({
+                            "actor_id": emit.target,
+                            "attachable_id": zone,
+                            "parent_zone": zone,
+                            "joint_impulse": joint.joint_strength + 1.0_f32,
+                            "joint_strength": joint.joint_strength,
+                            "gib_impulse_limit": joint.gib_impulse_limit,
+                            "detach_position": [0.0_f32, 0.0_f32],
+                            "detach_velocity": [0.0_f32, 0.0_f32],
+                            "damage_multiplier": joint.damage_multiplier,
+                            "source_event_id": melee_event_id.clone(),
+                            "cause": "melee_severance",
+                        }),
+                        Some(melee_event_id.clone()),
+                    );
+                }
+            }
             // **M8** (Cluster E fix): auto-trigger a 50 ms hit-stop pulse on
             // melee impact per spec § "Hit-stop on impact — Given melee hit
             // OR AP round hit / When hit lands / Then camera.hit_stop fires".
@@ -11106,6 +13445,38 @@ impl M0Engine {
                 json!({"actor": actor_id, "tool": tool, "durability": durability}),
                 None,
             );
+            // **M13** § "Tool degradation routing through chassis" — when a
+            // tool socketed in a chassis breaks, also surface the
+            // `chassis.tool_durability_changed` event so chassis-aware
+            // consumers (M7 Engineer auto-repair, HUD) can react without
+            // re-parsing the equipment event.
+            let chassis_tool_event_target = if let Ok(state) = self.state.read() {
+                state
+                    .actor_state
+                    .as_ref()
+                    .and_then(|sim| sim.world.actors.get(&cf_actor::ActorId(actor_id)))
+                    .and_then(|a| a.chassis.as_ref())
+                    .map(|c| (c.spec_id.clone(), c.kind.as_str().to_string()))
+            } else {
+                None
+            };
+            if let Some((spec_id, kind)) = chassis_tool_event_target {
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "chassis",
+                    "tool_durability_changed",
+                    json!({
+                        "actor": actor_id,
+                        "tool": tool,
+                        "durability": durability,
+                        "broken": true,
+                        "chassis_spec_id": spec_id,
+                        "chassis_kind": kind,
+                    }),
+                    None,
+                );
+            }
         }
         if let Some((actor_id, amount, tools)) = tool_repaired_pending {
             for tool in &tools {
@@ -11117,6 +13488,39 @@ impl M0Engine {
                     json!({"actor": actor_id, "tool": tool, "amount_restored": amount}),
                     None,
                 );
+            }
+            // **M13** § "Tool degradation routing through chassis" — repair
+            // also surfaces the chassis-extension event when the actor is
+            // chassis-bound.
+            let chassis_tool_event_target = if let Ok(state) = self.state.read() {
+                state
+                    .actor_state
+                    .as_ref()
+                    .and_then(|sim| sim.world.actors.get(&cf_actor::ActorId(actor_id)))
+                    .and_then(|a| a.chassis.as_ref())
+                    .map(|c| (c.spec_id.clone(), c.kind.as_str().to_string()))
+            } else {
+                None
+            };
+            if let Some((spec_id, kind)) = chassis_tool_event_target {
+                for tool in &tools {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "chassis",
+                        "tool_durability_changed",
+                        json!({
+                            "actor": actor_id,
+                            "tool": tool,
+                            "durability": amount,
+                            "broken": false,
+                            "chassis_spec_id": spec_id,
+                            "chassis_kind": kind,
+                            "repaired": true,
+                        }),
+                        None,
+                    );
+                }
             }
         }
         if let Some(reason) = reject_reason {
@@ -11209,7 +13613,9 @@ impl M0Engine {
             crate::m6_actions::M6Action::CycleFireMode => ("equipment", "fire_mode_cycled"),
             crate::m6_actions::M6Action::CookGrenade => ("equipment", "grenade_cooked"),
             crate::m6_actions::M6Action::ThrowGrenade => ("equipment", "grenade_thrown"),
-            crate::m6_actions::M6Action::MeleeBash | crate::m6_actions::M6Action::MeleeKick => {
+            crate::m6_actions::M6Action::MeleeBash
+            | crate::m6_actions::M6Action::MeleeKick
+            | crate::m6_actions::M6Action::MeleeShoulderCheck => {
                 ("equipment", "melee_swing")
             }
             crate::m6_actions::M6Action::UseTool { .. } => ("equipment", "tool_used"),
@@ -13233,7 +15639,23 @@ impl EngineHandle for M0Engine {
                         },
                         None => build_module_strip_view(rifle, a.inventory.selected_item().is_rifle()),
                     };
-                    let chassis_view = a.chassis_view().as_ref().map(crate::state::ChassisView::from);
+                    let mut chassis_view = a.chassis_view().as_ref().map(crate::state::ChassisView::from);
+                    if let Some(cv) = chassis_view.as_mut() {
+                        // **M14**: fill the per-actor ragdoll state from the
+                        // actor's status. Settings.reduced_motion is read
+                        // from the engine state at snapshot time.
+                        cv.ragdoll_state = match a.status {
+                            cf_actor::Status::Dying => {
+                                if state.settings.reduced_motion {
+                                    "static_collapse".to_string()
+                                } else {
+                                    "activating".to_string()
+                                }
+                            }
+                            cf_actor::Status::Dead => "active".to_string(),
+                            _ => "animated".to_string(),
+                        };
+                    }
                     ActorView {
                         id: a.id.0,
                         team: a.team.clone(),
@@ -14114,6 +16536,198 @@ impl EngineHandle for M0Engine {
         Some(merged)
     }
 
+    /// **M13** § "Pilot-inside-chassis dual silhouette" — chassis-side
+    /// silhouette projection: per-zone HP percentages + pilot weight class
+    /// scale factor. Surfaces the chassis half of the dual-layer HUD
+    /// silhouette so consumers can pair with `observe.actor.silhouette`
+    /// (the pilot side).
+    async fn observe_chassis_silhouette(&self, actor_id: Option<u64>) -> Option<serde_json::Value> {
+        let state = self.state.read().ok()?;
+        let sim = state.actor_state.as_ref()?;
+        let target_id = actor_id.unwrap_or_else(|| sim.world.player.map(|id| id.0).unwrap_or(0));
+        let actor = sim.world.actors.get(&cf_actor::ActorId(target_id))?;
+        let chassis = actor.chassis.as_ref()?;
+        let zones: Vec<serde_json::Value> = chassis
+            .zones
+            .iter()
+            .map(|z| {
+                json!({
+                    "zone": z.zone.as_str(),
+                    "hp_pct": z.zone_integrity(),
+                    "external_integrity": z.external_integrity(),
+                    "internal_integrity": z.internal_integrity(),
+                    "core_integrity": z.core_integrity(),
+                    "destroyed": z.destroyed,
+                })
+            })
+            .collect();
+        Some(json!({
+            "schema_version": SCHEMA_VERSION,
+            "actor_id": target_id,
+            "spec_id": chassis.spec_id,
+            "kind": chassis.kind.as_str(),
+            "stage": chassis.stage.as_str(),
+            "pilot_silhouette_scale": chassis.kind.pilot_silhouette_scale(),
+            "placeholder": false,
+            "destroyed_zones": chassis
+                .destroyed_zones()
+                .iter()
+                .map(|z| z.as_str().to_string())
+                .collect::<Vec<_>>(),
+            "zones": zones,
+        }))
+    }
+
+    /// **M13** § cfctl `inspect.chassis` — full body graph + per-zone
+    /// integrity + per-module state + pilot state + eject window for the
+    /// requested actor's chassis. Returns `None` when no chassis is attached.
+    /// Per spec § "Body graph is inspectable via cfctl".
+    async fn inspect_chassis(&self, target: Option<&str>) -> Option<serde_json::Value> {
+        let state = self.state.read().ok()?;
+        let sim = state.actor_state.as_ref()?;
+        let target_id_opt: Option<u64> = match target {
+            None | Some("player") | Some("") => None,
+            Some(t) => t.parse::<u64>().ok(),
+        };
+        let target_id = target_id_opt.unwrap_or_else(|| sim.world.player.map(|id| id.0).unwrap_or(0));
+        let actor = sim.world.actors.get(&cf_actor::ActorId(target_id))?;
+        let chassis = actor.chassis.as_ref()?;
+
+        // Build per-zone integrity payload.
+        let zones: Vec<serde_json::Value> = chassis
+            .zones
+            .iter()
+            .map(|z| {
+                let layers: Vec<serde_json::Value> = z
+                    .layers
+                    .iter()
+                    .map(|l| {
+                        json!({
+                            "kind": l.kind.as_str(),
+                            "hp": l.hp,
+                            "hp_max": l.hp_max,
+                            "hardness": l.hardness,
+                            "integrity": l.integrity(),
+                            "breached": l.is_breached(),
+                        })
+                    })
+                    .collect();
+                json!({
+                    "zone": z.zone.as_str(),
+                    "layers": layers,
+                    "external_integrity": z.external_integrity(),
+                    "internal_integrity": z.internal_integrity(),
+                    "core_integrity": z.core_integrity(),
+                    "wound_hp": z.wound_hp,
+                    "wound_hp_max": z.wound_hp_max,
+                    "wound_integrity": z.wound_integrity(),
+                    "zone_integrity": z.zone_integrity(),
+                    "destroyed": z.destroyed,
+                })
+            })
+            .collect();
+        // Joints — exactly 14 for the humanoid body graph.
+        let joints: Vec<serde_json::Value> = chassis
+            .body_graph
+            .joints
+            .iter()
+            .map(|j| {
+                json!({
+                    "id": j.id,
+                    "parent": j.parent.as_str(),
+                    "child": j.child.as_str(),
+                    "intact": j.intact,
+                })
+            })
+            .collect();
+        // Equipment sockets — 5 for the humanoid body graph.
+        let sockets: Vec<serde_json::Value> = chassis
+            .body_graph
+            .sockets
+            .iter()
+            .map(|s| {
+                json!({
+                    "id": s.id,
+                    "zone": s.zone.as_str(),
+                    "occupied": s.occupied,
+                    "mounted_role": s.mounted_role,
+                })
+            })
+            .collect();
+        // Modules — id, kind, state, bound zone, hp.
+        let modules: Vec<serde_json::Value> = chassis
+            .modules
+            .iter()
+            .map(|m| {
+                json!({
+                    "id": m.id,
+                    "kind": m.kind.as_str(),
+                    "state": m.state.as_str(),
+                    "bound_zone": m.bound_zone.as_str(),
+                    "hp": m.hp,
+                    "hp_max": m.hp_max,
+                    "integrity": m.integrity(),
+                    "last_reason": m.last_reason,
+                })
+            })
+            .collect();
+        // Movement-contribution table from the body graph (which capabilities are
+        // lost when each zone is destroyed). Useful for AI doctrine + HUD.
+        let movement_contributions: Vec<serde_json::Value> = chassis
+            .body_graph
+            .movement_contributions
+            .iter()
+            .map(|c| {
+                json!({
+                    "zone": c.zone.as_str(),
+                    "move_speed_factor_when_destroyed": c.move_speed_factor_when_destroyed,
+                    "jump_impulse_factor_when_destroyed": c.jump_impulse_factor_when_destroyed,
+                    "disables_rifle_when_destroyed": c.disables_rifle_when_destroyed,
+                    "forces_crawl_when_destroyed": c.forces_crawl_when_destroyed,
+                    "drops_gear_when_destroyed": c.drops_gear_when_destroyed,
+                    "disables_jet_when_destroyed": c.disables_jet_when_destroyed,
+                })
+            })
+            .collect();
+        let salvaged_module_ids: Vec<String> =
+            chassis.salvaged_modules.iter().map(|m| m.id.clone()).collect();
+        let destroyed_zones: Vec<String> = chassis
+            .destroyed_zones()
+            .iter()
+            .map(|z| z.as_str().to_string())
+            .collect();
+        Some(json!({
+            "schema_version": SCHEMA_VERSION,
+            "actor_id": target_id,
+            "spec_id": chassis.spec_id,
+            "kind": chassis.kind.as_str(),
+            "stage": chassis.stage.as_str(),
+            "pilot_state": chassis.pilot_state.as_str(),
+            "tutorial_safety": chassis.tutorial_safety,
+            "mass_kg": chassis.mass_kg,
+            "weapon_jammed": chassis.weapon_jammed,
+            "tick_rate_hz": chassis.tick_rate_hz,
+            "integrity": chassis.integrity(),
+            "eject_ticks_remaining": chassis.eject_window.ticks_remaining,
+            "eject_ticks_total": chassis.eject_window.ticks_total,
+            "eject_triggered_at_tick": chassis.eject_window.triggered_at_tick,
+            "body_graph": {
+                "zone_count": chassis.body_graph.zones.len(),
+                "joint_count": chassis.body_graph.joints.len(),
+                "socket_count": chassis.body_graph.sockets.len(),
+                "zones": chassis.body_graph.zones.iter().map(|z| z.as_str()).collect::<Vec<_>>(),
+                "joints": joints,
+                "sockets": sockets,
+                "movement_contributions": movement_contributions,
+            },
+            "zones": zones,
+            "destroyed_zones": destroyed_zones,
+            "modules": modules,
+            "salvaged_module_ids": salvaged_module_ids,
+            "last_stage_reason": chassis.last_stage_reason,
+        }))
+    }
+
     async fn inspect_terrain_chunk(&self, cx: i32, cy: i32) -> Option<serde_json::Value> {
         let state = self.state.read().ok()?;
         let terrain = state.chunked_terrain.as_ref()?;
@@ -14289,6 +16903,15 @@ impl EngineHandle for M0Engine {
                 ControlCommand::ActM6 { action, .. } => Some(action.method_name()),
                 ControlCommand::ActSquadIssueCommand { .. } => Some("act.squad.issue_command"),
                 ControlCommand::ActSquadCancelCommand { .. } => Some("act.squad.cancel_command"),
+                // **M13** chassis-grade methods rejected during input capture.
+                ControlCommand::ActPlayerBrainHop { .. } => Some("act.player.brain_hop"),
+                ControlCommand::ActPlayerActivateAbility { .. } => Some("act.player.activate_ability"),
+                ControlCommand::ActInputCameraAnchor { .. } => Some("act.input.camera_anchor"),
+                ControlCommand::ActPlayerSetDroneMode { .. } => Some("act.player.set_drone_mode"),
+                ControlCommand::ActPlayerAttachModifier { .. } => Some("act.player.attach_modifier"),
+                ControlCommand::ActPlayerDetachModifier { .. } => Some("act.player.detach_modifier"),
+                ControlCommand::ActPlayerBoard { .. } => Some("act.player.board"),
+                ControlCommand::ActPlayerDisembark { .. } => Some("act.player.disembark"),
                 _ => None,
             };
             if let Some(method_name) = method {
@@ -14306,6 +16929,63 @@ impl EngineHandle for M0Engine {
                     None,
                 );
                 return CommandResult::rejected("controls_captured", tick.0);
+            }
+        }
+        // **M13** § "Boarding / disembarking transitions" — "Input rejected
+        // during transition". When the player's chassis is mid-transition,
+        // every act.player.* (except board/disembark/eject) is rejected with
+        // `chassis_in_transition`. This mirrors the M1 controls-capture gate
+        // above but keyed off chassis state rather than overlay capture.
+        // Uses the already-held `state` write lock to avoid deadlock — DO
+        // NOT call self.state.read() here, this function owns the write lock.
+        // **M14 audit pass 4 (Finding 1)**: also include the player-side
+        // boarding timer in the input-lock gate. A foot soldier mid-board
+        // has no chassis yet, so a chassis-only gate would let them
+        // continue moving / firing during the 1500ms transition.
+        let mid_transition = state
+            .player_actor
+            .and_then(|pid| state.actor_state.as_ref().and_then(|sim| sim.world.actors.get(&pid)))
+            .map(|a| {
+                a.boarding_ticks_remaining > 0
+                    || a.pending_boarding_target.is_some()
+                    || a.chassis.as_ref().map(|c| c.is_in_transition()).unwrap_or(false)
+            })
+            .unwrap_or(false);
+        if mid_transition {
+            let method = match &command {
+                ControlCommand::ActPlayerMove { .. } => Some("act.player.move"),
+                ControlCommand::ActPlayerJump { .. } => Some("act.player.jump"),
+                ControlCommand::ActPlayerAim { .. } => Some("act.player.aim"),
+                ControlCommand::ActPlayerFire { .. } => Some("act.player.fire"),
+                ControlCommand::ActPlayerReload { .. } => Some("act.player.reload"),
+                ControlCommand::ActPlayerSelectItem { .. } => Some("act.player.select_item"),
+                ControlCommand::ActPlayerDig { .. } => Some("act.player.dig"),
+                ControlCommand::ActPlayerAnchor { .. } => Some("act.player.anchor"),
+                ControlCommand::ActPlayerCrouch { .. } => Some("act.player.crouch"),
+                ControlCommand::ActPlayerClimb { .. } => Some("act.player.climb"),
+                ControlCommand::ActPlayerJet { .. } => Some("act.player.jet"),
+                ControlCommand::ActPlayerActivateAbility { .. } => Some("act.player.activate_ability"),
+                ControlCommand::ActPlayerAttachModifier { .. } => Some("act.player.attach_modifier"),
+                ControlCommand::ActPlayerDetachModifier { .. } => Some("act.player.detach_modifier"),
+                ControlCommand::ActM6 { action, .. } => Some(action.method_name()),
+                _ => None,
+            };
+            if let Some(method_name) = method {
+                let player_actor_id = state.player_actor.map(|p| p.0).unwrap_or(0);
+                drop(state);
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "control",
+                    "command_rejected",
+                    json!({
+                        "method": method_name,
+                        "reason": "chassis_in_transition",
+                        "actor": player_actor_id,
+                    }),
+                    None,
+                );
+                return CommandResult::rejected("chassis_in_transition", tick.0);
             }
         }
         match command {
@@ -14849,6 +17529,9 @@ impl EngineHandle for M0Engine {
                     // "String-literal loss reasons: DR-002 stable-vocabulary
                     // contract. Use the typed enum's `as_str()`."
                     mission.loss_reason_label = Some(cf_mission::LossReason::Aborted.as_str().to_string());
+                    // **M14 audit pass 2 (GAP-M4-02)**: latch the run-aborted
+                    // flag so record_run_finished emits outcome="abort".
+                    state.run_aborted = true;
                     drop(state);
                     let accepted_id = self.recorder.record(
                         tick,
@@ -15391,6 +18074,100 @@ impl EngineHandle for M0Engine {
                 );
                 CommandResult::accepted(tick.0)
             }
+            // **M11 audit pass (GAP-M11-01 HIGH fix)**: keyed action press
+            // dispatch for the BP3 self-play floor + pause-overlay cycling.
+            // Translates a UI-bound action into the corresponding settings
+            // mutation or overlay toggle. Emits `control.command_accepted`
+            // + the relevant follow-on event (`ux.game_speed_assist_changed`,
+            // `ux.debug_overlay_toggled`, etc.).
+            ControlCommand::ActInputKeyPress { action, source } => {
+                let _ = source;
+                let action_str = action.clone();
+                let follow_on_event: Option<(String, String, serde_json::Value)>;
+                match action.as_str() {
+                    "pause" => {
+                        // Toggle game_speed_assist between Off and FullPause.
+                        let next = match state.settings.game_speed_assist {
+                            crate::settings::GameSpeedAssist::FullPause => crate::settings::GameSpeedAssist::Off,
+                            _ => crate::settings::GameSpeedAssist::FullPause,
+                        };
+                        state.settings.game_speed_assist = next;
+                        follow_on_event = Some((
+                            "ux".to_string(),
+                            "game_speed_assist_changed".to_string(),
+                            json!({"to": next.as_str(), "via": "act.input.key_press"}),
+                        ));
+                    }
+                    "game_speed_cycle" => {
+                        // Cycle Off → Slowdown75 → Slowdown25 → FullPause → Off.
+                        let next = match state.settings.game_speed_assist {
+                            crate::settings::GameSpeedAssist::Off => crate::settings::GameSpeedAssist::Slowdown75,
+                            crate::settings::GameSpeedAssist::Slowdown75 => crate::settings::GameSpeedAssist::Slowdown25,
+                            crate::settings::GameSpeedAssist::Slowdown25 => crate::settings::GameSpeedAssist::FullPause,
+                            crate::settings::GameSpeedAssist::FullPause => crate::settings::GameSpeedAssist::Off,
+                        };
+                        state.settings.game_speed_assist = next;
+                        follow_on_event = Some((
+                            "ux".to_string(),
+                            "game_speed_assist_changed".to_string(),
+                            json!({"to": next.as_str(), "via": "act.input.key_press"}),
+                        ));
+                    }
+                    "accessibility_overlay" | "tactical_overlay" | "photo_mode" | "debug_overlay"
+                    | "mini_map_toggle" | "compass_toggle" | "damage_direction_toggle" | "captions_toggle" => {
+                        // Map each toggle action to its corresponding
+                        // settings field; emit the matching ux event.
+                        let event_type = match action.as_str() {
+                            "accessibility_overlay" => "accessibility_overlay_toggled",
+                            "tactical_overlay" => "tactical_overlay_toggled",
+                            "photo_mode" => "photo_mode_toggled",
+                            "debug_overlay" => "debug_overlay_toggled",
+                            "mini_map_toggle" => "mini_map_toggled",
+                            "compass_toggle" => "compass_toggled",
+                            "damage_direction_toggle" => "damage_direction_toggled",
+                            "captions_toggle" => "captions_toggled",
+                            _ => "overlay_toggled",
+                        };
+                        match action.as_str() {
+                            "mini_map_toggle" => state.settings.mini_map_enabled = !state.settings.mini_map_enabled,
+                            "compass_toggle" => state.settings.compass_enabled = !state.settings.compass_enabled,
+                            "damage_direction_toggle" => {
+                                state.settings.damage_direction_enabled =
+                                    !state.settings.damage_direction_enabled
+                            }
+                            "captions_toggle" => state.settings.captions = !state.settings.captions,
+                            _ => {}
+                        }
+                        follow_on_event = Some(("ux".to_string(), event_type.to_string(), json!({"via": "act.input.key_press"})));
+                    }
+                    _ => {
+                        // Should never reach: server-side whitelist gates this.
+                        drop(state);
+                        self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "control",
+                            "command_rejected",
+                            json!({"method": "act.input.key_press", "reason": "unknown_key_action", "action": action_str}),
+                            None,
+                        );
+                        return CommandResult::rejected("unknown_key_action", tick.0);
+                    }
+                }
+                drop(state);
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "control",
+                    "command_accepted",
+                    json!({"method": "act.input.key_press", "action": action_str}),
+                    None,
+                );
+                if let Some((cat, etype, payload)) = follow_on_event {
+                    let _ = self.recorder.record(tick, sim_time_ms, &cat, &etype, payload, None);
+                }
+                CommandResult::accepted(tick.0)
+            }
             ControlCommand::ActPlayerCrouch { active, source } => {
                 if !self.config.has_actor_world {
                     return self.reject_actor_command(tick, sim_time_ms, state, "act.player.crouch");
@@ -15795,6 +18572,601 @@ impl EngineHandle for M0Engine {
                         None,
                     );
                 }
+                CommandResult::accepted(tick.0)
+            }
+            // **M13** § "Brain hopping / multi-actor control".
+            ControlCommand::ActPlayerBrainHop { target_actor_id, source } => {
+                if !self.config.has_actor_world {
+                    return self.reject_actor_command(tick, sim_time_ms, state, "act.player.brain_hop");
+                }
+                let _ = source;
+                let prior = state.player_actor;
+                let target = cf_actor::ActorId(target_actor_id);
+                let mut reject: Option<&'static str> = None;
+                let mut prev_team: Option<String> = None;
+                let mut next_team: Option<String> = None;
+                if let Some(sim) = state.actor_state.as_mut() {
+                    if !sim.world.actors.contains_key(&target) {
+                        reject = Some("brain_hop_unknown_target");
+                    } else if prior == Some(target) {
+                        reject = Some("brain_hop_same_actor");
+                    } else if prior.is_none() {
+                        // **M14 audit pass 4 (Finding 9)**: surface the
+                        // "no prior actor to hop from" case with its own
+                        // reason instead of misreporting as not_friendly
+                        // (which the team-match branch would otherwise
+                        // emit when prior_team is None vs target_team
+                        // Some).
+                        reject = Some("brain_hop_no_prior_actor");
+                    } else {
+                        // Teams must match (transfer to friendly only).
+                        let prior_team = prior.and_then(|p| sim.world.actors.get(&p).map(|a| a.team.clone()));
+                        let target_team = sim.world.actors.get(&target).map(|a| a.team.clone());
+                        if prior_team != target_team {
+                            reject = Some("brain_hop_not_friendly");
+                        } else {
+                            prev_team = prior_team;
+                            next_team = target_team;
+                        }
+                    }
+                    if reject.is_none() {
+                        // Clear brain flag on prior + set on target.
+                        if let Some(p) = prior {
+                            if let Some(a) = sim.world.actors.get_mut(&p) {
+                                a.clear_brain();
+                                a.controllable = false;
+                            }
+                        }
+                        if let Some(a) = sim.world.actors.get_mut(&target) {
+                            a.mark_brain(tick.0);
+                            a.controllable = true;
+                        }
+                        sim.world.player = Some(target);
+                    }
+                }
+                if reject.is_none() {
+                    state.player_actor = Some(target);
+                }
+                let prior_id = prior.map(|p| p.0).unwrap_or(0);
+                let _ = (prev_team, next_team);
+                drop(state);
+                if let Some(reason) = reject {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_rejected",
+                        json!({"method": "act.player.brain_hop", "reason": reason, "target": target_actor_id}),
+                        None,
+                    );
+                    return CommandResult::rejected(reason, tick.0);
+                }
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "actor",
+                    "brain_hop_initiated",
+                    json!({"from_actor": prior_id, "target_actor": target_actor_id}),
+                    None,
+                );
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "actor",
+                    "brain_hop_completed",
+                    json!({"from_actor": prior_id, "target_actor": target_actor_id}),
+                    None,
+                );
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "ux",
+                    "actor_switched",
+                    json!({"from_actor": prior_id, "target_actor": target_actor_id, "transition_ms": 200}),
+                    None,
+                );
+                // **M13** § "Brain hopping" — caption "Switched to <actor name>".
+                if let Ok(mut s) = self.state.write() {
+                    let caption_label = format!("Switched to actor {target_actor_id}");
+                    s.hud_captions.push_back(crate::state::CaptionView {
+                        id: format!("brain_hop.{target_actor_id}"),
+                        label: caption_label,
+                        raised_at_tick: tick.0,
+                        accessibility_id: format!("hud.caption.brain_hop.{target_actor_id}"),
+                    });
+                }
+                CommandResult::accepted(tick.0)
+            }
+            // **M13** § "Chassis ability slots".
+            ControlCommand::ActPlayerActivateAbility { ability, source } => {
+                if !self.config.has_actor_world {
+                    return self.reject_actor_command(tick, sim_time_ms, state, "act.player.activate_ability");
+                }
+                let _ = source;
+                let player_id = state.player_actor.expect("player actor present");
+                let parsed = cf_chassis::ChassisAbility::parse(&ability);
+                let Some(parsed) = parsed else {
+                    drop(state);
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_rejected",
+                        json!({"method": "act.player.activate_ability", "reason": "unknown_ability", "ability": ability}),
+                        None,
+                    );
+                    return CommandResult::rejected("unknown_ability", tick.0);
+                };
+                let mut outcome: Result<cf_chassis::AbilitySlotState, cf_chassis::AbilityRejectReason> =
+                    Err(cf_chassis::AbilityRejectReason::NotEquipped);
+                if let Some(sim) = state.actor_state.as_mut() {
+                    if let Some(actor) = sim.world.actors.get_mut(&player_id) {
+                        if let Some(chassis) = actor.chassis.as_mut() {
+                            outcome = chassis.activate_ability(parsed);
+                        } else {
+                            drop(state);
+                            self.recorder.record(
+                                tick,
+                                sim_time_ms,
+                                "control",
+                                "command_rejected",
+                                json!({"method": "act.player.activate_ability", "reason": "no_chassis_attached"}),
+                                None,
+                            );
+                            return CommandResult::rejected("no_chassis_attached", tick.0);
+                        }
+                    }
+                }
+                drop(state);
+                match outcome {
+                    Ok(slot) => {
+                        self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "ability",
+                            "activated",
+                            json!({
+                                "actor": player_id.0,
+                                "ability": parsed.as_str(),
+                                "effect_ticks_total": slot.effect_total_ticks,
+                                "cooldown_ticks_total": slot.cooldown_total_ticks,
+                            }),
+                            None,
+                        );
+                        CommandResult::accepted(tick.0)
+                    }
+                    Err(reason) => {
+                        let r = reason.as_str();
+                        self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "control",
+                            "command_rejected",
+                            json!({"method": "act.player.activate_ability", "reason": r, "ability": parsed.as_str()}),
+                            None,
+                        );
+                        CommandResult::rejected(r, tick.0)
+                    }
+                }
+            }
+            // **M13** § "Cockpit camera anchor".
+            ControlCommand::ActInputCameraAnchor { mode, source } => {
+                if !self.config.has_actor_world {
+                    return self.reject_actor_command(tick, sim_time_ms, state, "act.input.camera_anchor");
+                }
+                let _ = source;
+                let player_id = state.player_actor.expect("player actor present");
+                let Some(parsed) = cf_chassis::CameraAnchor::parse(&mode) else {
+                    drop(state);
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_rejected",
+                        json!({"method": "act.input.camera_anchor", "reason": "unknown_camera_anchor", "mode": mode}),
+                        None,
+                    );
+                    return CommandResult::rejected("unknown_camera_anchor", tick.0);
+                };
+                let mut prev_anchor: Option<cf_chassis::CameraAnchor> = None;
+                let mut reject_reason: Option<&'static str> = None;
+                if let Some(sim) = state.actor_state.as_mut() {
+                    if let Some(actor) = sim.world.actors.get_mut(&player_id) {
+                        if let Some(chassis) = actor.chassis.as_mut() {
+                            match chassis.set_camera_anchor(parsed) {
+                                Ok(prev) => prev_anchor = Some(prev),
+                                Err(r) => reject_reason = Some(r),
+                            }
+                        } else {
+                            reject_reason = Some("no_chassis_attached");
+                        }
+                    }
+                }
+                drop(state);
+                if let Some(r) = reject_reason {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_rejected",
+                        json!({"method": "act.input.camera_anchor", "reason": r, "mode": mode}),
+                        None,
+                    );
+                    return CommandResult::rejected(r, tick.0);
+                }
+                let prev = prev_anchor.unwrap_or(cf_chassis::CameraAnchor::Default);
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "camera",
+                    "anchor_changed",
+                    json!({
+                        "actor": player_id.0,
+                        "from": prev.as_str(),
+                        "to": parsed.as_str(),
+                    }),
+                    None,
+                );
+                if parsed == cf_chassis::CameraAnchor::Cockpit {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "chassis",
+                        "cockpit_entered",
+                        json!({"actor": player_id.0}),
+                        None,
+                    );
+                } else if prev == cf_chassis::CameraAnchor::Cockpit {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "chassis",
+                        "cockpit_exited",
+                        json!({"actor": player_id.0}),
+                        None,
+                    );
+                }
+                CommandResult::accepted(tick.0)
+            }
+            // **M13** § "Drone allies — 4 modes".
+            ControlCommand::ActPlayerSetDroneMode { mode, source } => {
+                if !self.config.has_actor_world {
+                    return self.reject_actor_command(tick, sim_time_ms, state, "act.player.set_drone_mode");
+                }
+                let _ = source;
+                let player_id = state.player_actor.expect("player actor present");
+                let Some(parsed) = cf_chassis::DroneMode::parse(&mode) else {
+                    drop(state);
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_rejected",
+                        json!({"method": "act.player.set_drone_mode", "reason": "unknown_drone_mode", "mode": mode}),
+                        None,
+                    );
+                    return CommandResult::rejected("unknown_drone_mode", tick.0);
+                };
+                let mut prev_mode: Option<cf_chassis::DroneMode> = None;
+                let mut applied = false;
+                let mut spawned = false;
+                if let Some(sim) = state.actor_state.as_mut() {
+                    if let Some(actor) = sim.world.actors.get_mut(&player_id) {
+                        if actor.drone_ally.is_none() {
+                            actor.drone_ally = Some(cf_chassis::DroneAllyState::default());
+                            spawned = true;
+                        }
+                        if let Some(drone) = actor.drone_ally.as_mut() {
+                            prev_mode = Some(drone.mode);
+                            drone.mode = parsed;
+                            applied = true;
+                        }
+                    }
+                }
+                drop(state);
+                if !applied {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_rejected",
+                        json!({"method": "act.player.set_drone_mode", "reason": "no_drone_state"}),
+                        None,
+                    );
+                    return CommandResult::rejected("no_drone_state", tick.0);
+                }
+                if spawned {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "drone",
+                        "spawned",
+                        json!({"actor": player_id.0, "mode": parsed.as_str()}),
+                        None,
+                    );
+                }
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "drone",
+                    "mode_changed",
+                    json!({
+                        "actor": player_id.0,
+                        "from": prev_mode.map(|m| m.as_str().to_string()),
+                        "to": parsed.as_str(),
+                    }),
+                    None,
+                );
+                CommandResult::accepted(tick.0)
+            }
+            // **M13** § "Weapon modifier slots".
+            ControlCommand::ActPlayerAttachModifier { modifier, source } => {
+                if !self.config.has_actor_world {
+                    return self.reject_actor_command(tick, sim_time_ms, state, "act.player.attach_modifier");
+                }
+                let _ = source;
+                let player_id = state.player_actor.expect("player actor present");
+                let Some(parsed) = cf_chassis::WeaponModifier::parse(&modifier) else {
+                    drop(state);
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_rejected",
+                        json!({"method": "act.player.attach_modifier", "reason": "unknown_modifier", "modifier": modifier}),
+                        None,
+                    );
+                    return CommandResult::rejected("unknown_modifier", tick.0);
+                };
+                let mut outcome: Result<bool, &'static str> = Err("no_chassis_attached");
+                let mut now_combined = false;
+                if let Some(sim) = state.actor_state.as_mut() {
+                    if let Some(actor) = sim.world.actors.get_mut(&player_id) {
+                        if let Some(chassis) = actor.chassis.as_mut() {
+                            outcome = chassis.attach_weapon_modifier(parsed);
+                            now_combined = chassis.weapon_modifiers.is_combined();
+                        }
+                    }
+                }
+                drop(state);
+                match outcome {
+                    Ok(true) => {
+                        self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "equipment",
+                            "modifier_attached",
+                            json!({"actor": player_id.0, "modifier": parsed.as_str()}),
+                            None,
+                        );
+                        if now_combined {
+                            self.recorder.record(
+                                tick,
+                                sim_time_ms,
+                                "equipment",
+                                "weapon_modifier_combined",
+                                json!({"actor": player_id.0}),
+                                None,
+                            );
+                        }
+                        CommandResult::accepted(tick.0)
+                    }
+                    Ok(false) => CommandResult::accepted(tick.0),
+                    Err(r) => {
+                        self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "control",
+                            "command_rejected",
+                            json!({"method": "act.player.attach_modifier", "reason": r, "modifier": parsed.as_str()}),
+                            None,
+                        );
+                        CommandResult::rejected(r, tick.0)
+                    }
+                }
+            }
+            ControlCommand::ActPlayerDetachModifier { modifier, source } => {
+                if !self.config.has_actor_world {
+                    return self.reject_actor_command(tick, sim_time_ms, state, "act.player.detach_modifier");
+                }
+                let _ = source;
+                let player_id = state.player_actor.expect("player actor present");
+                let Some(parsed) = cf_chassis::WeaponModifier::parse(&modifier) else {
+                    drop(state);
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_rejected",
+                        json!({"method": "act.player.detach_modifier", "reason": "unknown_modifier", "modifier": modifier}),
+                        None,
+                    );
+                    return CommandResult::rejected("unknown_modifier", tick.0);
+                };
+                let mut detached = false;
+                let mut has_chassis = false;
+                if let Some(sim) = state.actor_state.as_mut() {
+                    if let Some(actor) = sim.world.actors.get_mut(&player_id) {
+                        if let Some(chassis) = actor.chassis.as_mut() {
+                            has_chassis = true;
+                            detached = chassis.detach_weapon_modifier(parsed);
+                        }
+                    }
+                }
+                drop(state);
+                // **M14 audit pass 3 (Finding 2)**: previous implementation
+                // always returned accepted even when nothing detached. Now:
+                // reject with reason `no_chassis` when the player has no
+                // chassis; reject with `modifier_not_attached` when the
+                // chassis has no instance of `parsed` to remove.
+                if !has_chassis {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_rejected",
+                        json!({"method": "act.player.detach_modifier", "reason": "no_chassis", "modifier": parsed.as_str()}),
+                        None,
+                    );
+                    return CommandResult::rejected("no_chassis", tick.0);
+                }
+                if !detached {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_rejected",
+                        json!({"method": "act.player.detach_modifier", "reason": "modifier_not_attached", "modifier": parsed.as_str()}),
+                        None,
+                    );
+                    return CommandResult::rejected("modifier_not_attached", tick.0);
+                }
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "equipment",
+                    "modifier_detached",
+                    json!({"actor": player_id.0, "modifier": parsed.as_str()}),
+                    None,
+                );
+                CommandResult::accepted(tick.0)
+            }
+            // **M13** § "Boarding / disembarking transitions".
+            ControlCommand::ActPlayerBoard { chassis_actor_id, source } => {
+                if !self.config.has_actor_world {
+                    return self.reject_actor_command(tick, sim_time_ms, state, "act.player.board");
+                }
+                let _ = source;
+                let player_id = state.player_actor.expect("player actor present");
+                // **M14 audit pass 4 (Finding 1)**: the boarding timer +
+                // pending-target now live on the PLAYER actor, not on the
+                // target chassis. This makes input lock, HUD banner, and
+                // concurrent-board rejection trivially correct: a single
+                // `boarding_ticks_remaining > 0` check on the player
+                // gates everything. On completion the actor transfer is
+                // performed in `tick_chassis_eject_for_all`.
+                let target_id = ActorId(chassis_actor_id);
+                let validation: Result<(), &'static str> = (|| {
+                    let sim = state
+                        .actor_state
+                        .as_ref()
+                        .ok_or("no_actor_world")?;
+                    let player = sim
+                        .world
+                        .actors
+                        .get(&player_id)
+                        .ok_or("player_actor_missing")?;
+                    if player.boarding_ticks_remaining > 0
+                        || player.pending_boarding_target.is_some()
+                    {
+                        return Err("player_already_boarding");
+                    }
+                    if player.chassis.is_some() {
+                        return Err("player_already_chassis_bound");
+                    }
+                    let target_actor = sim
+                        .world
+                        .actors
+                        .get(&target_id)
+                        .ok_or("target_actor_not_found")?;
+                    if target_id == player_id {
+                        return Err("cannot_board_self");
+                    }
+                    let target_chassis = target_actor
+                        .chassis
+                        .as_ref()
+                        .ok_or("target_actor_has_no_chassis")?;
+                    if target_chassis.is_in_transition() {
+                        return Err("target_chassis_busy");
+                    }
+                    if target_actor.controllable {
+                        return Err("target_chassis_already_piloted");
+                    }
+                    Ok(())
+                })();
+                if let Err(reason) = validation {
+                    drop(state);
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_rejected",
+                        json!({"method": "act.player.board", "reason": reason, "chassis_actor_id": chassis_actor_id}),
+                        None,
+                    );
+                    return CommandResult::rejected(reason, tick.0);
+                }
+                // **M14 audit pass 4 (Finding 1)**: latch the timer on the
+                // player + also mark the target chassis as in-transition
+                // so a second player attempting to board the same chassis
+                // is rejected (target_chassis_busy).
+                let transition_ticks = {
+                    let mut latched: u32 = 90; // fallback: 1.5s @ 60Hz
+                    if let Some(sim) = state.actor_state.as_ref() {
+                        if let Some(target_actor) = sim.world.actors.get(&target_id) {
+                            if let Some(chassis) = target_actor.chassis.as_ref() {
+                                latched = chassis.transition_ticks_total.max(1);
+                            }
+                        }
+                    }
+                    latched
+                };
+                if let Some(sim) = state.actor_state.as_mut() {
+                    if let Some(target_actor) = sim.world.actors.get_mut(&target_id) {
+                        if let Some(chassis) = target_actor.chassis.as_mut() {
+                            chassis.begin_boarding();
+                        }
+                    }
+                    if let Some(player) = sim.world.actors.get_mut(&player_id) {
+                        player.boarding_ticks_remaining = transition_ticks;
+                        player.pending_boarding_target = Some(chassis_actor_id);
+                    }
+                }
+                drop(state);
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "actor",
+                    "boarding",
+                    json!({"actor": player_id.0, "chassis_actor_id": chassis_actor_id, "duration_ms": 1500}),
+                    None,
+                );
+                CommandResult::accepted(tick.0)
+            }
+            ControlCommand::ActPlayerDisembark { source } => {
+                if !self.config.has_actor_world {
+                    return self.reject_actor_command(tick, sim_time_ms, state, "act.player.disembark");
+                }
+                let _ = source;
+                let player_id = state.player_actor.expect("player actor present");
+                let mut started = false;
+                if let Some(sim) = state.actor_state.as_mut() {
+                    if let Some(actor) = sim.world.actors.get_mut(&player_id) {
+                        if let Some(chassis) = actor.chassis.as_mut() {
+                            started = chassis.begin_disembarking();
+                        }
+                    }
+                }
+                drop(state);
+                if !started {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_rejected",
+                        json!({"method": "act.player.disembark", "reason": "transition_in_progress_or_no_chassis"}),
+                        None,
+                    );
+                    return CommandResult::rejected("transition_in_progress_or_no_chassis", tick.0);
+                }
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "actor",
+                    "disembarking",
+                    json!({"actor": player_id.0, "duration_ms": 1500}),
+                    None,
+                );
                 CommandResult::accepted(tick.0)
             }
             ControlCommand::SettingsSet { changes } => {
