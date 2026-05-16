@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-2020-12/schema",
   "$id": "cf-ai/v1/DifficultyPreset",
   "title": "DifficultyPreset",
-  "description": "M2 AI difficulty preset shape. Each preset maps to a DifficultyParams record consumed by ReactiveGuard. The launch registry at content/ai/difficulty.json carries cakewalk / tough_crowd / veteran. Custom presets can be added by mods at the same path.",
+  "description": "AI difficulty preset shape. Two registry shapes are accepted: (1) the M2 baseline shape with three legacy ids (cakewalk / tough_crowd / veteran) and the M2 tuning fields; (2) the M7 extension shape with archetype_id + difficulty_id keys and 5 archetypes x 3 difficulties = 15 entries, each carrying the M7 spec fields cover_seek_radius / retreat_hp_threshold / squad_comm_delay_ticks plus the M2 fields. Mods supply additional entries at the same path. cf-mod validate keeps both shapes alive so existing M2 mods do not break.",
   "type": "object",
   "required": ["schema_version", "presets"],
   "properties": {
@@ -12,29 +12,55 @@
       "minItems": 3,
       "items": {
         "type": "object",
-        "required": [
-          "id",
-          "hp",
-          "aim_settle_ticks",
-          "miss_chance",
-          "sight_range",
-          "hearing_radius",
-          "memory_decay_ticks",
-          "reload_ms"
-        ],
+        "required": ["id"],
         "properties": {
           "id": {
             "type": "string",
-            "enum": ["cakewalk", "tough_crowd", "veteran"],
-            "description": "Built-in preset id. Custom mod presets MUST use a different id."
+            "minLength": 1,
+            "description": "Stable preset id. M2 baseline shape uses one of cakewalk / tough_crowd / veteran; M7 extension shape uses an <archetype_id>_<difficulty_id> composite (e.g. `rifleman_cakewalk`)."
           },
+          "archetype_id": {
+            "type": "string",
+            "enum": ["rifleman", "sniper", "assault", "engineer", "medic"],
+            "description": "M7 extension: which of the five enemy archetypes this preset tunes."
+          },
+          "difficulty_id": {
+            "type": "string",
+            "enum": ["cakewalk", "tough_crowd", "veteran"],
+            "description": "M7 extension: which of the three difficulty bands this preset belongs to."
+          },
+          "name": { "type": "string", "minLength": 1 },
+          "display_name": { "type": "string" },
           "hp": { "type": "number", "minimum": 0.0 },
+          "hp_multiplier": { "type": "number", "exclusiveMinimum": 0.0 },
+          "damage_multiplier": { "type": "number", "exclusiveMinimum": 0.0 },
           "aim_settle_ticks": { "type": "integer", "minimum": 0 },
+          "reaction_time_ticks": { "type": "integer", "minimum": 0 },
           "miss_chance": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
           "sight_range": { "type": "number", "minimum": 0.0 },
+          "sight_fov_degrees": { "type": "number", "minimum": 0.0, "maximum": 360.0 },
+          "fov_degrees": { "type": "number", "minimum": 0.0, "maximum": 360.0 },
           "hearing_radius": { "type": "number", "minimum": 0.0 },
+          "hearing_range": { "type": "number", "minimum": 0.0 },
           "memory_decay_ticks": { "type": "integer", "minimum": 0 },
-          "reload_ms": { "type": "integer", "minimum": 0 }
+          "reload_ms": { "type": "integer", "minimum": 0 },
+          "retreat_hp_pct": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+          "retreat_hp_threshold": {
+            "type": "number",
+            "minimum": 0.15,
+            "maximum": 0.50,
+            "description": "M7: fraction of max HP at which the archetype prefers retreat over engagement. Spec range 0.15..=0.50."
+          },
+          "cover_seek_radius": {
+            "type": "number",
+            "exclusiveMinimum": 0.0,
+            "description": "M7: world-unit search radius the archetype scans for cover after taking fire. Larger values favour high-ground / long sight lines (Sniper); smaller values favour aggressive close-quarters commitment (Assault)."
+          },
+          "squad_comm_delay_ticks": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "M7: per-archetype radio relay latency in sim ticks (baseline 60 Hz). Lower values mean faster squad-wide threat propagation."
+          }
         }
       }
     }

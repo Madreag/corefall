@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0.0",
+  "palette_id": "methane_breather",
+  "display_name": "Methane Breather",
+  "category": "origin",
+  "description": "Cryo / methane-atmosphere body; pale skin + frozen breath plumes.",
+  "colors": [
+    { "role": "primary", "hex": "#a8c4d8", "comment": "frost-pale skin" },
+    { "role": "secondary", "hex": "#5a7090", "comment": "shadow blue" },
+    { "role": "accent", "hex": "#a0d4ff", "comment": "frost glow" },
+    { "role": "highlight", "hex": "#e8f4ff", "comment": "ice sheen" },
+    { "role": "light", "hex": "#c8dcec", "comment": "lit skin" },
+    { "role": "dark", "hex": "#1a2c40", "comment": "deep cryo shadow" },
+    { "role": "metal", "hex": "#7088a0", "comment": "cryo plate" },
+    { "role": "glow", "hex": "#dafaff", "comment": "breath plume" }
+  ]
+}

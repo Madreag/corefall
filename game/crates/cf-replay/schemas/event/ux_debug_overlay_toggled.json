@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ux_debug_overlay_toggled.v1",
+  "title": "ux.debug_overlay_toggled",
+  "description": "Emitted when the player toggles one of the 7 cf-debug overlays via act.debug.toggle_overlay (F1..F7 in dev builds).",
+  "type": "object",
+  "required": ["overlay", "enabled"],
+  "properties": {
+    "overlay": { "type": "string", "enum": ["ai_state", "pathfinding", "collision", "material", "physics", "sound", "squad"] },
+    "enabled": { "type": "boolean" }
+  }
+}

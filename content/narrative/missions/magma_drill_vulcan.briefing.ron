@@ -1,0 +1,30 @@
+MissionBriefing (
+    mission_id: "magma_drill_vulcan",
+    canonical_name: "The Crucible Drill",
+    faction_giver: "collegium",
+    world: "vulcan",
+    difficulty: "hard",
+    objective_summary: "Operate a Collegium experimental drill in a Vulcan magma vent to obtain a sample of pre-Crystalfold silicate substrate from the deep heat zone; survive the active vent's eruption cycle.",
+    briefing_text: "Captain. Halvor Tan, xenobiology. Welcome to the Crucible. The Collegium has, with substantial Crystalfold consultation and one very tedious round of Concordat permits, been authorized to drill a single sample core from a designated Vulcan magma vent on the terminator-zone night-side. The vent has, by every available reading, been producing pre-Crystalfold silicate biota for the last sixty-three days. The window of stability we have been authorized to exploit is, by my own analysis, approximately fourteen hours; it will, in your experience, feel longer. The drill is experimental. The drill is, in fact, Ipsen's design from the last three years. I have authorized it for field deployment in the full knowledge that it has, in the laboratory, succeeded in eleven of fourteen test runs. The failures, I should say, were not catastrophic. The drill will be operated by your team; Ipsen will provide remote support from the Crucible habitat. You will need to maintain the drill's operating temperature within a narrow band, manage the vent's eruption cycle, and extract the core sample within the eight-minute stability window that follows each eruption. There will be, in this op, three windows. We need one successful extraction. If the first window fails, the second; if the second fails, the third. After the third, by Crystalfold agreement, we close the drill and depart. You will, in this op, encounter native Vulcan magma fauna. The fauna are non-hostile if you do not approach. Do not, please, approach. The drill is not a weapon. Do not, please, attempt to use it as one. The samples are the priority. Your team is the secondary priority. The drill is, by my own preference, the tertiary priority. Ipsen disagrees about the ordering. We will, in this op, not resolve that dispute.",
+    primary_objectives: [
+        "Operate the experimental drill across three eruption-window cycles",
+        "Extract a viable pre-Crystalfold silicate sample",
+        "Maintain drill operating temperature",
+        "Sustain no more than two personnel losses",
+    ],
+    secondary_objectives: [
+        "Recover any Vulcan magma fauna observations",
+        "Preserve the drill for return to Ipsen's laboratory",
+        "Sustain no faceplate breaches in the heat zone",
+    ],
+    failure_conditions: [
+        "All three extraction windows fail",
+        "Drill destroyed before any window completes",
+        "Player downed without revival",
+        "Vulcan magma fauna engagement provoked",
+    ],
+    reward_summary: "Collegium reputation +50; access to Crystalfold-co-signed research credit; T3 heat-resistant gear unlock; Ipsen's drone-pack design files (informal favor); Tan's personal consultation rights.",
+    debrief_win: "Tan. The sample is in the sealed transport case. Ipsen is, on the radio, openly delighted; I have not heard her speak in this register before, and I am preserving the audio for archival purposes. The Crystalfold attache will, in three days, sing for the sample. We will, in three weeks, publish. The drill is, in Ipsen's words, 'recoverable with minor refurbishment', which is, in her register, the highest praise the drill can receive. You have my personal thanks. The Old Geneva archive will, in my private correspondence with you, share what the sample teaches us. The correspondence is, of course, off the record.",
+    debrief_loss: "Tan. We did not extract a viable sample. The third window's eruption cycle was, by every available reading, anomalous; the magma fauna density doubled in the last minute of the window, which is not, in any prior dataset, a behavior we have recorded. The Crystalfold attache will sing for the failed sample regardless; the sample's potential, by their convention, is mourned even unrealized. Ipsen has, on the radio, accepted the loss with extreme grace, which is, in this researcher's professional opinion, a poor sign for her cognitive substrate. Take the loss. We will, in due course, try again.",
+    voice_giver_id: "collegium_doctorate_halvor_tan",
+)

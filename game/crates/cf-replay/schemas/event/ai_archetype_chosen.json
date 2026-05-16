@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ai_archetype_chosen.v1",
+  "title": "ai.archetype_chosen",
+  "description": "Emitted when an actor is assigned an archetype role (Rifleman / Sniper / Assault / Engineer / Spotter / Medic). Spec § M7-A 6 archetypes.",
+  "type": "object",
+  "required": ["actor_id", "archetype"],
+  "properties": {
+    "actor_id": { "type": "integer", "minimum": 0 },
+    "archetype": {
+      "type": "string",
+      "enum": ["rifleman", "sniper", "assault", "engineer", "spotter", "medic"]
+    }
+  }
+}

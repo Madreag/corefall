@@ -1,0 +1,30 @@
+MissionBriefing (
+    mission_id: "ice_cavern_expedition_europa",
+    canonical_name: "Tara Cavern Expedition",
+    faction_giver: "starlight",
+    world: "europa",
+    difficulty: "hard",
+    objective_summary: "Lead a Starlight dive expedition into the Tara cavern, collect a sample from the 2,000-meter band without provoking a leviathan-zone encounter, and surface with the package intact.",
+    briefing_text: "Captain. Mireille Bouchard, dive team. The Collegium has, in writing, requested a water sample from the 2,000-meter pressure band of the Tara cavern, in the leviathan-zone overlap region. The captain has, with reservations, signed off. I have, with reservations, accepted the assignment. Your role is dive support; you'll descend with my team to 1,800 meters, hold the support position there, and provide cover if the leviathan-zone activates. The sample collection will be conducted by myself and a junior surveyor; we'll descend to 2,000, collect, return. The cavern is, in this dive, currently in a low-activity state — the Tara Whale was last sighted nine days ago, and the dive team's harmonic readings indicate the local leviathan-zone density is below the threshold that requires a hold. Do not, please, mistake low activity for safe. The cavern at 1,800 meters is, by every Concordat dive guide, the most psychologically demanding environment in the human-explored Sol system. Your O2 reserves will allow for approximately ninety minutes at the support position. We need eighty for the collection. The margin is twelve minutes for unexpected events. Hold the position. Watch the harmonic readings. If the readings shift to the leviathan-zone threshold, signal hold and stop moving. The Tara Whale is, by my private experience, not hostile if you do not move. Do not move. Do not, in any circumstance, fire a weapon in the leviathan-zone. I will, in this dive, sing a sub-vocal hum throughout. The hum is, in the team's convention, the signal that the dive is proceeding normally. If the hum stops, you signal me, immediately.",
+    primary_objectives: [
+        "Hold support position at 1,800 meters for the duration of the dive",
+        "Maintain communication with the dive team",
+        "Avoid leviathan-zone provocation",
+        "Surface with the sample intact",
+    ],
+    secondary_objectives: [
+        "Record harmonic data for the dive team's archive",
+        "Recover any additional cavern samples opportunistically",
+        "Sustain no faceplate breaches",
+    ],
+    failure_conditions: [
+        "Sample lost or contaminated",
+        "Leviathan-zone activated by player action",
+        "Player O2 reserves depleted at depth",
+        "Dive team separated from support position",
+    ],
+    reward_summary: "Starlight reputation +40; Voyager Corps deep-cavern commendation; Europa survey patch (rare); Bouchard's personal endorsement (informal favor); Collegium research credit.",
+    debrief_win: "Bouchard. Sample is sealed in the captain's vault. The Tara Whale was, in this dive, present but not in active engagement; the harmonic readings show, in my assessment, that the Whale is becoming accustomed to our schedule. The Collegium will publish in three weeks; the publication will not, by Tan's standing arrangement, mention the harmonic readings. You held the position. The dive team thanks you. Get cleaned up. The captain wants a word about your patch.",
+    debrief_loss: "Bouchard. We surfaced without the sample. The leviathan-zone activated at approximately 1,950 meters. The dive team withdrew without incident; the support position held; the Tara Whale was, by every available reading, courteous. The Collegium will be disappointed. The Voyager Corps is not. The Concordat protocol on leviathan-zone provocation is, in my own framing, more important than the sample. Get cleaned up. The captain's debrief is in twenty.",
+    voice_giver_id: "starlight_survey_spec_mireille_bouchard",
+)

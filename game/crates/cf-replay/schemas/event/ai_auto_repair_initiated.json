@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ai_auto_repair_initiated.v1",
+  "title": "ai.auto_repair_initiated",
+  "description": "Emitted when an Engineer-role bot picks up an auto-repair mission for a DEGRADED/FAILED chassis module. Spec § Auto-repair Gherkin. reach_seconds=6.0; first_tick_seconds=8.0.",
+  "type": "object",
+  "required": ["engineer_actor_id", "target_actor_id", "target_module_id", "triggered_tick"],
+  "properties": {
+    "engineer_actor_id": { "type": "integer", "minimum": 0 },
+    "target_actor_id": { "type": "integer", "minimum": 0 },
+    "target_module_id": { "type": "string" },
+    "triggered_tick": { "type": "integer", "minimum": 0 },
+    "reach_deadline_tick": { "type": "integer", "minimum": 0 },
+    "first_tick_deadline_tick": { "type": "integer", "minimum": 0 },
+    "reach_seconds": { "type": "number" },
+    "first_tick_seconds": { "type": "number" }
+  }
+}

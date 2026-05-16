@@ -35,6 +35,12 @@ const SCHEMA_ALARM_REGISTERED: &str = include_str!("../schemas/event/alarm_regis
 const SCHEMA_TERRAIN_CARVED: &str = include_str!("../schemas/event/terrain_carved.json");
 const SCHEMA_TERRAIN_PENETRATION_THRESHOLD: &str = include_str!("../schemas/event/terrain_penetration_threshold.json");
 const SCHEMA_TERRAIN_DIRTY_REGION_BATCH: &str = include_str!("../schemas/event/terrain_dirty_region_batch.json");
+// M8A: semantic terrain event protocol (chunk_mutated + chunk_active_region_changed).
+const SCHEMA_TERRAIN_CHUNK_MUTATED: &str = include_str!("../schemas/event/terrain_chunk_mutated.json");
+const SCHEMA_TERRAIN_CHUNK_ACTIVE_REGION_CHANGED: &str =
+    include_str!("../schemas/event/terrain_chunk_active_region_changed.json");
+// M8A: perf_sample (cosmetic) — per-cadence per-subsystem latency samples.
+const SCHEMA_PERF_SAMPLE: &str = include_str!("../schemas/event/perf_sample.json");
 const SCHEMA_TERRAIN_PIXEL_DISLODGED: &str = include_str!("../schemas/event/terrain_pixel_dislodged.json");
 const SCHEMA_HAZARD_CONTACT_OR_AVOIDANCE: &str = include_str!("../schemas/event/hazard_contact_or_avoidance.json");
 const SCHEMA_ANCHOR_MATERIAL_RESULT: &str = include_str!("../schemas/event/anchor_material_result.json");
@@ -196,6 +202,171 @@ const SCHEMA_AUDIO_EVENT_REQUESTED: &str = include_str!("../schemas/event/audio_
 // projectile_hit_mo for M6 melee + grenade hits.
 const SCHEMA_COMBAT_MELEE_HIT_MO: &str = include_str!("../schemas/event/combat_melee_hit_mo.json");
 const SCHEMA_COMBAT_EXPLOSIVE_HIT_MO: &str = include_str!("../schemas/event/combat_explosive_hit_mo.json");
+// M6 actor / combat / equipment / inventory / perception / squad event
+// schema registrations. The 41 schema files were authored alongside the M6
+// dispatch surface but never wired into the validator registry — without
+// these include_str! lines + match arms the M5-locked envelope validator
+// silently bypasses every M6 event payload.
+const SCHEMA_ACTOR_ACTION_REJECTED: &str = include_str!("../schemas/event/actor_action_rejected.json");
+const SCHEMA_ACTOR_CLIMB_STARTED: &str = include_str!("../schemas/event/actor_climb_started.json");
+const SCHEMA_ACTOR_DIVE_STARTED: &str = include_str!("../schemas/event/actor_dive_started.json");
+const SCHEMA_ACTOR_FACING_CHANGED: &str = include_str!("../schemas/event/actor_facing_changed.json");
+const SCHEMA_ACTOR_LEAN_CHANGED: &str = include_str!("../schemas/event/actor_lean_changed.json");
+const SCHEMA_ACTOR_SLIDE_STARTED: &str = include_str!("../schemas/event/actor_slide_started.json");
+const SCHEMA_ACTOR_STAMINA_CHANGED: &str = include_str!("../schemas/event/actor_stamina_changed.json");
+const SCHEMA_ACTOR_STANCE_CHANGED: &str = include_str!("../schemas/event/actor_stance_changed.json");
+const SCHEMA_ACTOR_VAULT_STARTED: &str = include_str!("../schemas/event/actor_vault_started.json");
+const SCHEMA_COMBAT_KNIFE_THROW_LANDED: &str = include_str!("../schemas/event/combat_knife_throw_landed.json");
+const SCHEMA_COMBAT_KNIFE_THROW_STARTED: &str = include_str!("../schemas/event/combat_knife_throw_started.json");
+const SCHEMA_COMBAT_STEALTH_KILL_EXECUTED: &str = include_str!("../schemas/event/combat_stealth_kill_executed.json");
+const SCHEMA_EQUIPMENT_BEACON_DROPPED: &str = include_str!("../schemas/event/equipment_beacon_dropped.json");
+const SCHEMA_EQUIPMENT_BIPOD_DEPLOYED: &str = include_str!("../schemas/event/equipment_bipod_deployed.json");
+const SCHEMA_EQUIPMENT_BIPOD_STOWED: &str = include_str!("../schemas/event/equipment_bipod_stowed.json");
+const SCHEMA_EQUIPMENT_DRILL_OVERHEATED: &str = include_str!("../schemas/event/equipment_drill_overheated.json");
+const SCHEMA_EQUIPMENT_FIRE_MODE_CYCLED: &str = include_str!("../schemas/event/equipment_fire_mode_cycled.json");
+const SCHEMA_EQUIPMENT_GRENADE_COOKED: &str = include_str!("../schemas/event/equipment_grenade_cooked.json");
+const SCHEMA_EQUIPMENT_GRENADE_DETONATED: &str = include_str!("../schemas/event/equipment_grenade_detonated.json");
+const SCHEMA_EQUIPMENT_GRENADE_THROWN: &str = include_str!("../schemas/event/equipment_grenade_thrown.json");
+const SCHEMA_EQUIPMENT_ITEM_DROPPED: &str = include_str!("../schemas/event/equipment_item_dropped.json");
+const SCHEMA_EQUIPMENT_ITEM_PICKED_UP: &str = include_str!("../schemas/event/equipment_item_picked_up.json");
+const SCHEMA_EQUIPMENT_MAGAZINE_CHANGED: &str = include_str!("../schemas/event/equipment_magazine_changed.json");
+const SCHEMA_EQUIPMENT_MELEE_SWING: &str = include_str!("../schemas/event/equipment_melee_swing.json");
+const SCHEMA_EQUIPMENT_MELEE_HIT_MO: &str = include_str!("../schemas/event/equipment_melee_hit_mo.json");
+const SCHEMA_EQUIPMENT_SENSOR_PULSE_FIRED: &str = include_str!("../schemas/event/equipment_sensor_pulse_fired.json");
+const SCHEMA_EQUIPMENT_SHELL_EJECTED: &str = include_str!("../schemas/event/equipment_shell_ejected.json");
+const SCHEMA_EQUIPMENT_SUPPRESSOR_ATTACHED: &str = include_str!("../schemas/event/equipment_suppressor_attached.json");
+const SCHEMA_EQUIPMENT_TOOL_BROKEN: &str = include_str!("../schemas/event/equipment_tool_broken.json");
+const SCHEMA_EQUIPMENT_TOOL_REPAIRED: &str = include_str!("../schemas/event/equipment_tool_repaired.json");
+const SCHEMA_EQUIPMENT_TOOL_USED: &str = include_str!("../schemas/event/equipment_tool_used.json");
+const SCHEMA_EQUIPMENT_WEAPON_SWAP_COMPLETED: &str =
+    include_str!("../schemas/event/equipment_weapon_swap_completed.json");
+const SCHEMA_EQUIPMENT_WEAPON_SWAP_STARTED: &str = include_str!("../schemas/event/equipment_weapon_swap_started.json");
+const SCHEMA_INVENTORY_TANK_SLOT_RESERVED: &str = include_str!("../schemas/event/inventory_tank_slot_reserved.json");
+const SCHEMA_INVENTORY_WEIGHT_CHANGED: &str = include_str!("../schemas/event/inventory_weight_changed.json");
+const SCHEMA_PERCEPTION_ACTOR_SIGNAL: &str = include_str!("../schemas/event/perception_actor_signal.json");
+const SCHEMA_PERCEPTION_FOOTSTEP_EMITTED: &str = include_str!("../schemas/event/perception_footstep_emitted.json");
+const SCHEMA_PERCEPTION_OCCLUSION_APPLIED: &str = include_str!("../schemas/event/perception_occlusion_applied.json");
+const SCHEMA_PERCEPTION_STEALTH_METER_CHANGED: &str =
+    include_str!("../schemas/event/perception_stealth_meter_changed.json");
+const SCHEMA_SQUAD_COMMAND_ISSUED: &str = include_str!("../schemas/event/squad_command_issued.json");
+const SCHEMA_SQUAD_MEMBER_ADDED: &str = include_str!("../schemas/event/squad_member_added.json");
+const SCHEMA_SQUAD_WAYPOINT_MARKED: &str = include_str!("../schemas/event/squad_waypoint_marked.json");
+
+// **M7-A**: smart commandable AI surface — reason labels, layer invocations,
+// archetype assignment, auto-triage / auto-repair contracts, cover seeking,
+// suppression, retreat, squad-comm relays, patrol, friendly-fire avoidance,
+// high-ground preference. Mission director v0.5 adds phase changes,
+// branching, optional offerings, reinforcement waves, mini-boss phases.
+const SCHEMA_AI_REASON_LABEL_CHANGED: &str = include_str!("../schemas/event/ai_reason_label_changed.json");
+const SCHEMA_AI_THINKING_LAYER_INVOKED: &str = include_str!("../schemas/event/ai_thinking_layer_invoked.json");
+const SCHEMA_AI_ARCHETYPE_CHOSEN: &str = include_str!("../schemas/event/ai_archetype_chosen.json");
+const SCHEMA_AI_AUTO_TRIAGE_INITIATED: &str = include_str!("../schemas/event/ai_auto_triage_initiated.json");
+const SCHEMA_AI_AUTO_TRIAGE_APPLIED: &str = include_str!("../schemas/event/ai_auto_triage_applied.json");
+const SCHEMA_AI_AUTO_REPAIR_INITIATED: &str = include_str!("../schemas/event/ai_auto_repair_initiated.json");
+const SCHEMA_AI_AUTO_REPAIR_PROGRESSED: &str = include_str!("../schemas/event/ai_auto_repair_progressed.json");
+const SCHEMA_AI_COVER_SEEKING_STARTED: &str = include_str!("../schemas/event/ai_cover_seeking_started.json");
+const SCHEMA_AI_SUPPRESSION_STARTED: &str = include_str!("../schemas/event/ai_suppression_started.json");
+const SCHEMA_AI_RETREAT_DECISION: &str = include_str!("../schemas/event/ai_retreat_decision.json");
+const SCHEMA_AI_SQUAD_COMM_RELAYED: &str = include_str!("../schemas/event/ai_squad_comm_relayed.json");
+const SCHEMA_AI_PATROL_WAYPOINT_REACHED: &str = include_str!("../schemas/event/ai_patrol_waypoint_reached.json");
+const SCHEMA_AI_FRIENDLY_FIRE_AVOIDANCE: &str = include_str!("../schemas/event/ai_friendly_fire_avoidance.json");
+const SCHEMA_AI_HIGH_GROUND_PREFERENCE_APPLIED: &str =
+    include_str!("../schemas/event/ai_high_ground_preference_applied.json");
+const SCHEMA_MISSION_PHASE_CHANGED: &str = include_str!("../schemas/event/mission_phase_changed.json");
+const SCHEMA_MISSION_DIRECTOR_PHASE_CHANGE: &str = include_str!("../schemas/event/mission_director_phase_change.json");
+const SCHEMA_MISSION_OBJECTIVE_BRANCHED: &str = include_str!("../schemas/event/mission_objective_branched.json");
+const SCHEMA_MISSION_OPTIONAL_OFFERED: &str = include_str!("../schemas/event/mission_optional_offered.json");
+const SCHEMA_MISSION_REINFORCEMENT_WAVE_SPAWNED: &str =
+    include_str!("../schemas/event/mission_reinforcement_wave_spawned.json");
+const SCHEMA_BOSS_PHASE_CHANGED: &str = include_str!("../schemas/event/boss_phase_changed.json");
+const SCHEMA_BOSS_SPECIAL_ABILITY_TRIGGERED: &str =
+    include_str!("../schemas/event/boss_special_ability_triggered.json");
+
+// **M7-B**: commandability + chatter + personality + faction event surface.
+// Spec § Smart commandable AI — per-task override + autonomy mode + role
+// templates + quick presets + chatter scaffold + personality + mood/stress
+// + faction matrix.
+const SCHEMA_AI_PRIORITY_TABLE_CHANGED: &str = include_str!("../schemas/event/ai_priority_table_changed.json");
+const SCHEMA_AI_AUTONOMY_MODE_CHANGED: &str = include_str!("../schemas/event/ai_autonomy_mode_changed.json");
+const SCHEMA_AI_ROLE_TEMPLATE_APPLIED: &str = include_str!("../schemas/event/ai_role_template_applied.json");
+const SCHEMA_AI_QUICK_PRESET_APPLIED: &str = include_str!("../schemas/event/ai_quick_preset_applied.json");
+const SCHEMA_AI_CHATTER_EMITTED: &str = include_str!("../schemas/event/ai_chatter_emitted.json");
+const SCHEMA_AI_PERSONALITY_CHANGED: &str = include_str!("../schemas/event/ai_personality_changed.json");
+const SCHEMA_AI_MOOD_CHANGED: &str = include_str!("../schemas/event/ai_mood_changed.json");
+const SCHEMA_AI_STRESS_THRESHOLD_CROSSED: &str = include_str!("../schemas/event/ai_stress_threshold_crossed.json");
+const SCHEMA_AI_FACTION_ALLEGIANCE_CHANGED: &str = include_str!("../schemas/event/ai_faction_allegiance_changed.json");
+
+// **M8**: camera + photo mode + replay scrubber + killcam + UX widgets +
+// smart commandable AI player UX surfaces. Spec §§ Camera + game feel,
+// Photo mode, Replay scrubber, Killcam, Settings menu tree, Smart
+// commandable AI player UX (Tab tactical overlay + plan composer +
+// context wheel + panic surfaces + MMB tag + Why? key).
+const SCHEMA_CAMERA_HIT_STOP: &str = include_str!("../schemas/event/camera_hit_stop.json");
+const SCHEMA_CAMERA_MODE_CHANGED: &str = include_str!("../schemas/event/camera_mode_changed.json");
+const SCHEMA_PHOTO_MODE_ENTERED: &str = include_str!("../schemas/event/photo_mode_entered.json");
+const SCHEMA_PHOTO_MODE_EXITED: &str = include_str!("../schemas/event/photo_mode_exited.json");
+const SCHEMA_PHOTO_MODE_FILTER_CHANGED: &str = include_str!("../schemas/event/photo_mode_filter_changed.json");
+const SCHEMA_PHOTO_MODE_SHOT_TAKEN: &str = include_str!("../schemas/event/photo_mode_shot_taken.json");
+const SCHEMA_REPLAY_SCRUB_OFFSET_CHANGED: &str = include_str!("../schemas/event/replay_scrub_offset_changed.json");
+const SCHEMA_REPLAY_BOOKMARK_ADDED: &str = include_str!("../schemas/event/replay_bookmark_added.json");
+const SCHEMA_KILLCAM_PLAYED: &str = include_str!("../schemas/event/killcam_played.json");
+const SCHEMA_KILLCAM_SKIPPED: &str = include_str!("../schemas/event/killcam_skipped.json");
+const SCHEMA_SLOW_MO_KILL_CAM_TRIGGERED: &str = include_str!("../schemas/event/slow_mo_kill_cam_triggered.json");
+const SCHEMA_UX_HUD_LAYOUT_CHANGED: &str = include_str!("../schemas/event/ux_hud_layout_changed.json");
+const SCHEMA_UX_PRESET_SAVED: &str = include_str!("../schemas/event/ux_preset_saved.json");
+const SCHEMA_UX_DEBUG_OVERLAY_TOGGLED: &str = include_str!("../schemas/event/ux_debug_overlay_toggled.json");
+const SCHEMA_UX_TACTICAL_OVERLAY_TOGGLED: &str = include_str!("../schemas/event/ux_tactical_overlay_toggled.json");
+const SCHEMA_UX_PIE_MENU_OPENED: &str = include_str!("../schemas/event/ux_pie_menu_opened.json");
+const SCHEMA_UX_PIE_MENU_SLICE_CHOSEN: &str = include_str!("../schemas/event/ux_pie_menu_slice_chosen.json");
+const SCHEMA_UX_PIE_MENU_CLOSED: &str = include_str!("../schemas/event/ux_pie_menu_closed.json");
+const SCHEMA_UX_PIE_MENU_SLICE_REJECTED: &str = include_str!("../schemas/event/ux_pie_menu_slice_rejected.json");
+const SCHEMA_UX_GAME_SPEED_ASSIST_CHANGED: &str = include_str!("../schemas/event/ux_game_speed_assist_changed.json");
+// **M11**: ACC-A surface event family schemas (DR-003 + DR-012 closure).
+const SCHEMA_UX_BANNER_RAISED: &str = include_str!("../schemas/event/banner_raised.json");
+const SCHEMA_UX_BANNER_DISMISSED: &str = include_str!("../schemas/event/banner_dismissed.json");
+const SCHEMA_UX_FOCUS_MOVED: &str = include_str!("../schemas/event/focus_moved.json");
+const SCHEMA_UX_CAPTIONS_SHOWN: &str = include_str!("../schemas/event/captions_shown.json");
+const SCHEMA_UX_TOOL_VALIDITY_CHANGED: &str = include_str!("../schemas/event/tool_validity_changed.json");
+const SCHEMA_UX_MOUSE_CLICKED: &str = include_str!("../schemas/event/mouse_clicked.json");
+const SCHEMA_UX_MOUSE_MOVED: &str = include_str!("../schemas/event/mouse_moved.json");
+const SCHEMA_ACCESSIBILITY_SETTINGS_CHANGED: &str =
+    include_str!("../schemas/event/settings_changed_accessibility.json");
+const SCHEMA_ACCESSIBILITY_UI_SCALE_APPLIED: &str = include_str!("../schemas/event/ui_scale_applied.json");
+const SCHEMA_AI_PLAN_COMPOSED: &str = include_str!("../schemas/event/ai_plan_composed.json");
+const SCHEMA_AI_PLAN_EXECUTED: &str = include_str!("../schemas/event/ai_plan_executed.json");
+const SCHEMA_AI_PLAN_ABORTED: &str = include_str!("../schemas/event/ai_plan_aborted.json");
+const SCHEMA_AI_CONTEXT_WHEEL_OPENED: &str = include_str!("../schemas/event/ai_context_wheel_opened.json");
+const SCHEMA_AI_CONTEXT_WHEEL_SELECTED: &str = include_str!("../schemas/event/ai_context_wheel_selected.json");
+const SCHEMA_AI_PANIC_CALL_EMITTED: &str = include_str!("../schemas/event/ai_panic_call_emitted.json");
+const SCHEMA_AI_TARGET_TAGGED: &str = include_str!("../schemas/event/ai_target_tagged.json");
+const SCHEMA_AI_REASON_QUERY_RETURNED: &str = include_str!("../schemas/event/ai_reason_query_returned.json");
+
+// **M9**: reactor defense + 5-tier integrity machine event surface lock.
+// Spec § Schemas (scenario-specific) + Acceptance criteria. Producers fire
+// at runtime from cf-control/src/engine.rs reactor hit + mission timer +
+// per-pixel terrain integrity paths. Schemas pair with M5's deep-damage
+// families (armor.* / internal.* / concussion.*) that M9 also wires.
+const SCHEMA_MISSION_REACTOR_HP_CHANGED: &str = include_str!("../schemas/event/mission_reactor_hp_changed.json");
+const SCHEMA_MISSION_REACTOR_DESTROYED: &str = include_str!("../schemas/event/mission_reactor_destroyed.json");
+const SCHEMA_MISSION_REACTOR_PRESSURE_STATE_CHANGED: &str =
+    include_str!("../schemas/event/mission_reactor_pressure_state_changed.json");
+const SCHEMA_MISSION_TIMER_WARNING_THRESHOLD: &str =
+    include_str!("../schemas/event/mission_timer_warning_threshold.json");
+const SCHEMA_TERRAIN_MATERIAL_STATE_CHANGED: &str =
+    include_str!("../schemas/event/terrain_material_state_changed.json");
+const SCHEMA_TERRAIN_PIXEL_REMOVED: &str = include_str!("../schemas/event/terrain_pixel_removed.json");
+const SCHEMA_TERRAIN_CASCADE_TRIGGERED: &str = include_str!("../schemas/event/terrain_cascade_triggered.json");
+const SCHEMA_TERRAIN_DEBRIS_SPAWNED: &str = include_str!("../schemas/event/terrain_debris_spawned.json");
+// **M9** (audit round-3 fix gaps 1+2) § Reactive guard targeting + path
+// reaction: utility-scored target selection + per-guard path invalidation.
+// Producers in `cf-control/src/engine.rs` emit `ai.target_scored` on every
+// `ai.target_acquired` (utility scorer ranks player + non-destroyed reactors)
+// and `ai.path_invalidated` per affected guard when `terrain.terrain_dirty_region_batch`
+// intersects the planned pursuit line. Distinct from terrain.path_invalidated
+// (which is the generic dirty-region flush) — these AI-category schemas carry
+// the per-guard breakdown M10 viewer + death-recap consume.
+const SCHEMA_AI_TARGET_SCORED: &str = include_str!("../schemas/event/ai_target_scored.json");
+const SCHEMA_AI_PATH_INVALIDATED: &str = include_str!("../schemas/event/ai_path_invalidated.json");
 
 /// Look up the schema source by `(category, event_type)`. Returns `None` if
 /// no schema exists for this pair (callers treat as "no validation
@@ -212,6 +383,11 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("terrain", "terrain_carved") => Some(SCHEMA_TERRAIN_CARVED),
         ("terrain", "terrain_penetration_threshold") => Some(SCHEMA_TERRAIN_PENETRATION_THRESHOLD),
         ("terrain", "terrain_dirty_region_batch") => Some(SCHEMA_TERRAIN_DIRTY_REGION_BATCH),
+        // M8A: semantic terrain event protocol (PR-7).
+        ("terrain", "chunk_mutated") => Some(SCHEMA_TERRAIN_CHUNK_MUTATED),
+        ("terrain", "chunk_active_region_changed") => Some(SCHEMA_TERRAIN_CHUNK_ACTIVE_REGION_CHANGED),
+        // M8A: perf_sample cosmetic per-cadence latency event (PR-8).
+        ("perf", "sample") => Some(SCHEMA_PERF_SAMPLE),
         ("terrain", "terrain_pixel_dislodged") => Some(SCHEMA_TERRAIN_PIXEL_DISLODGED),
         ("terrain", "hazard_contact_or_avoidance") => Some(SCHEMA_HAZARD_CONTACT_OR_AVOIDANCE),
         ("terrain", "anchor_material_result") => Some(SCHEMA_ANCHOR_MATERIAL_RESULT),
@@ -357,6 +533,142 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         // + grenade hits + M13 HE rounds.
         ("combat", "melee_hit_mo") => Some(SCHEMA_COMBAT_MELEE_HIT_MO),
         ("combat", "explosive_hit_mo") => Some(SCHEMA_COMBAT_EXPLOSIVE_HIT_MO),
+        // M6 actor / combat / equipment / inventory / perception / squad
+        // event payload schemas. Event types match the literals the cf-control
+        // engine records via `recorder.record(tick, sim_time_ms, category,
+        // event_type, payload, parent)` for each M6 dispatch path.
+        ("actor", "action_rejected") => Some(SCHEMA_ACTOR_ACTION_REJECTED),
+        ("actor", "climb_started") => Some(SCHEMA_ACTOR_CLIMB_STARTED),
+        ("actor", "dive_started") => Some(SCHEMA_ACTOR_DIVE_STARTED),
+        ("actor", "facing_changed") => Some(SCHEMA_ACTOR_FACING_CHANGED),
+        ("actor", "lean_changed") => Some(SCHEMA_ACTOR_LEAN_CHANGED),
+        ("actor", "slide_started") => Some(SCHEMA_ACTOR_SLIDE_STARTED),
+        ("actor", "stamina_changed") => Some(SCHEMA_ACTOR_STAMINA_CHANGED),
+        ("actor", "stance_changed") => Some(SCHEMA_ACTOR_STANCE_CHANGED),
+        ("actor", "vault_started") => Some(SCHEMA_ACTOR_VAULT_STARTED),
+        ("combat", "knife_throw_landed") => Some(SCHEMA_COMBAT_KNIFE_THROW_LANDED),
+        ("combat", "knife_throw_started") => Some(SCHEMA_COMBAT_KNIFE_THROW_STARTED),
+        ("combat", "stealth_kill_executed") => Some(SCHEMA_COMBAT_STEALTH_KILL_EXECUTED),
+        ("equipment", "beacon_dropped") => Some(SCHEMA_EQUIPMENT_BEACON_DROPPED),
+        ("equipment", "bipod_deployed") => Some(SCHEMA_EQUIPMENT_BIPOD_DEPLOYED),
+        ("equipment", "bipod_stowed") => Some(SCHEMA_EQUIPMENT_BIPOD_STOWED),
+        ("equipment", "drill_overheated") => Some(SCHEMA_EQUIPMENT_DRILL_OVERHEATED),
+        ("equipment", "fire_mode_cycled") => Some(SCHEMA_EQUIPMENT_FIRE_MODE_CYCLED),
+        ("equipment", "grenade_cooked") => Some(SCHEMA_EQUIPMENT_GRENADE_COOKED),
+        ("equipment", "grenade_detonated") => Some(SCHEMA_EQUIPMENT_GRENADE_DETONATED),
+        ("equipment", "grenade_thrown") => Some(SCHEMA_EQUIPMENT_GRENADE_THROWN),
+        ("equipment", "item_dropped") => Some(SCHEMA_EQUIPMENT_ITEM_DROPPED),
+        ("equipment", "item_picked_up") => Some(SCHEMA_EQUIPMENT_ITEM_PICKED_UP),
+        ("equipment", "magazine_changed") => Some(SCHEMA_EQUIPMENT_MAGAZINE_CHANGED),
+        ("equipment", "melee_swing") => Some(SCHEMA_EQUIPMENT_MELEE_SWING),
+        ("equipment", "melee_hit_mo") => Some(SCHEMA_EQUIPMENT_MELEE_HIT_MO),
+        ("equipment", "sensor_pulse_fired") => Some(SCHEMA_EQUIPMENT_SENSOR_PULSE_FIRED),
+        ("equipment", "shell_ejected") => Some(SCHEMA_EQUIPMENT_SHELL_EJECTED),
+        ("equipment", "suppressor_attached") => Some(SCHEMA_EQUIPMENT_SUPPRESSOR_ATTACHED),
+        ("equipment", "tool_broken") => Some(SCHEMA_EQUIPMENT_TOOL_BROKEN),
+        ("equipment", "tool_repaired") => Some(SCHEMA_EQUIPMENT_TOOL_REPAIRED),
+        ("equipment", "tool_used") => Some(SCHEMA_EQUIPMENT_TOOL_USED),
+        ("equipment", "weapon_swap_completed") => Some(SCHEMA_EQUIPMENT_WEAPON_SWAP_COMPLETED),
+        ("equipment", "weapon_swap_started") => Some(SCHEMA_EQUIPMENT_WEAPON_SWAP_STARTED),
+        ("inventory", "tank_slot_reserved") => Some(SCHEMA_INVENTORY_TANK_SLOT_RESERVED),
+        ("inventory", "weight_changed") => Some(SCHEMA_INVENTORY_WEIGHT_CHANGED),
+        ("perception", "actor_signal") => Some(SCHEMA_PERCEPTION_ACTOR_SIGNAL),
+        ("perception", "footstep_emitted") => Some(SCHEMA_PERCEPTION_FOOTSTEP_EMITTED),
+        ("perception", "occlusion_applied") => Some(SCHEMA_PERCEPTION_OCCLUSION_APPLIED),
+        ("perception", "stealth_meter_changed") => Some(SCHEMA_PERCEPTION_STEALTH_METER_CHANGED),
+        ("squad", "command_issued") => Some(SCHEMA_SQUAD_COMMAND_ISSUED),
+        ("squad", "member_added") => Some(SCHEMA_SQUAD_MEMBER_ADDED),
+        ("squad", "waypoint_marked") => Some(SCHEMA_SQUAD_WAYPOINT_MARKED),
+        // **M7-A**: smart commandable AI event surface.
+        ("ai", "reason_label_changed") => Some(SCHEMA_AI_REASON_LABEL_CHANGED),
+        ("ai", "thinking_layer_invoked") => Some(SCHEMA_AI_THINKING_LAYER_INVOKED),
+        ("ai", "archetype_chosen") => Some(SCHEMA_AI_ARCHETYPE_CHOSEN),
+        ("ai", "auto_triage_initiated") => Some(SCHEMA_AI_AUTO_TRIAGE_INITIATED),
+        ("ai", "auto_triage_applied") => Some(SCHEMA_AI_AUTO_TRIAGE_APPLIED),
+        ("ai", "auto_repair_initiated") => Some(SCHEMA_AI_AUTO_REPAIR_INITIATED),
+        ("ai", "auto_repair_progressed") => Some(SCHEMA_AI_AUTO_REPAIR_PROGRESSED),
+        ("ai", "cover_seeking_started") => Some(SCHEMA_AI_COVER_SEEKING_STARTED),
+        ("ai", "suppression_started") => Some(SCHEMA_AI_SUPPRESSION_STARTED),
+        ("ai", "retreat_decision") => Some(SCHEMA_AI_RETREAT_DECISION),
+        ("ai", "squad_comm_relayed") => Some(SCHEMA_AI_SQUAD_COMM_RELAYED),
+        ("ai", "patrol_waypoint_reached") => Some(SCHEMA_AI_PATROL_WAYPOINT_REACHED),
+        ("ai", "friendly_fire_avoidance") => Some(SCHEMA_AI_FRIENDLY_FIRE_AVOIDANCE),
+        ("ai", "high_ground_preference_applied") => Some(SCHEMA_AI_HIGH_GROUND_PREFERENCE_APPLIED),
+        // **M7**: mission director v0.5 event surface.
+        ("mission", "phase_changed") => Some(SCHEMA_MISSION_PHASE_CHANGED),
+        // **M9**: 7-phase reactor-defense pacer surfaces a distinct event so
+        // M10 viewer + M11 HUD can render dwell-aware phase strips without
+        // mixing the M7 4-phase stream.
+        ("mission", "director_phase_change") => Some(SCHEMA_MISSION_DIRECTOR_PHASE_CHANGE),
+        ("mission", "objective_branched") => Some(SCHEMA_MISSION_OBJECTIVE_BRANCHED),
+        ("mission", "optional_offered") => Some(SCHEMA_MISSION_OPTIONAL_OFFERED),
+        ("mission", "reinforcement_wave_spawned") => Some(SCHEMA_MISSION_REINFORCEMENT_WAVE_SPAWNED),
+        ("boss", "phase_changed") => Some(SCHEMA_BOSS_PHASE_CHANGED),
+        ("boss", "special_ability_triggered") => Some(SCHEMA_BOSS_SPECIAL_ABILITY_TRIGGERED),
+        // **M7-B**: commandability + chatter + personality + faction event surface.
+        ("ai", "priority_table_changed") => Some(SCHEMA_AI_PRIORITY_TABLE_CHANGED),
+        ("ai", "autonomy_mode_changed") => Some(SCHEMA_AI_AUTONOMY_MODE_CHANGED),
+        ("ai", "role_template_applied") => Some(SCHEMA_AI_ROLE_TEMPLATE_APPLIED),
+        ("ai", "quick_preset_applied") => Some(SCHEMA_AI_QUICK_PRESET_APPLIED),
+        ("ai", "chatter_emitted") => Some(SCHEMA_AI_CHATTER_EMITTED),
+        ("ai", "personality_changed") => Some(SCHEMA_AI_PERSONALITY_CHANGED),
+        ("ai", "mood_changed") => Some(SCHEMA_AI_MOOD_CHANGED),
+        ("ai", "stress_threshold_crossed") => Some(SCHEMA_AI_STRESS_THRESHOLD_CROSSED),
+        ("ai", "faction_allegiance_changed") => Some(SCHEMA_AI_FACTION_ALLEGIANCE_CHANGED),
+        // **M8**: camera + photo + replay scrub + killcam + UX + smart-AI
+        // player UX surfaces.
+        ("camera", "hit_stop") => Some(SCHEMA_CAMERA_HIT_STOP),
+        ("camera", "mode_changed") => Some(SCHEMA_CAMERA_MODE_CHANGED),
+        ("photo_mode", "entered") => Some(SCHEMA_PHOTO_MODE_ENTERED),
+        ("photo_mode", "exited") => Some(SCHEMA_PHOTO_MODE_EXITED),
+        ("photo_mode", "filter_changed") => Some(SCHEMA_PHOTO_MODE_FILTER_CHANGED),
+        ("photo_mode", "shot_taken") => Some(SCHEMA_PHOTO_MODE_SHOT_TAKEN),
+        ("replay", "scrub_offset_changed") => Some(SCHEMA_REPLAY_SCRUB_OFFSET_CHANGED),
+        ("replay", "bookmark_added") => Some(SCHEMA_REPLAY_BOOKMARK_ADDED),
+        ("killcam", "played") => Some(SCHEMA_KILLCAM_PLAYED),
+        ("killcam", "skipped") => Some(SCHEMA_KILLCAM_SKIPPED),
+        ("slow_mo", "kill_cam_triggered") => Some(SCHEMA_SLOW_MO_KILL_CAM_TRIGGERED),
+        ("ux", "hud_layout_changed") => Some(SCHEMA_UX_HUD_LAYOUT_CHANGED),
+        ("ux", "preset_saved") => Some(SCHEMA_UX_PRESET_SAVED),
+        ("ux", "debug_overlay_toggled") => Some(SCHEMA_UX_DEBUG_OVERLAY_TOGGLED),
+        ("ux", "tactical_overlay_toggled") => Some(SCHEMA_UX_TACTICAL_OVERLAY_TOGGLED),
+        ("ux", "pie_menu_opened") => Some(SCHEMA_UX_PIE_MENU_OPENED),
+        ("ux", "pie_menu_slice_chosen") => Some(SCHEMA_UX_PIE_MENU_SLICE_CHOSEN),
+        ("ux", "pie_menu_closed") => Some(SCHEMA_UX_PIE_MENU_CLOSED),
+        ("ux", "pie_menu_slice_rejected") => Some(SCHEMA_UX_PIE_MENU_SLICE_REJECTED),
+        ("ux", "game_speed_assist_changed") => Some(SCHEMA_UX_GAME_SPEED_ASSIST_CHANGED),
+        // **M11**: ACC-A surface event families (DR-003 + DR-012 closure).
+        ("ux", "banner_raised") => Some(SCHEMA_UX_BANNER_RAISED),
+        ("ux", "banner_dismissed") => Some(SCHEMA_UX_BANNER_DISMISSED),
+        ("ux", "focus_moved") => Some(SCHEMA_UX_FOCUS_MOVED),
+        ("ux", "captions_shown") => Some(SCHEMA_UX_CAPTIONS_SHOWN),
+        ("ux", "tool_validity_changed") => Some(SCHEMA_UX_TOOL_VALIDITY_CHANGED),
+        ("ux", "mouse_clicked") => Some(SCHEMA_UX_MOUSE_CLICKED),
+        ("ux", "mouse_moved") => Some(SCHEMA_UX_MOUSE_MOVED),
+        ("accessibility", "settings_changed") => Some(SCHEMA_ACCESSIBILITY_SETTINGS_CHANGED),
+        ("accessibility", "ui_scale_applied") => Some(SCHEMA_ACCESSIBILITY_UI_SCALE_APPLIED),
+        ("ai", "plan_composed") => Some(SCHEMA_AI_PLAN_COMPOSED),
+        ("ai", "plan_executed") => Some(SCHEMA_AI_PLAN_EXECUTED),
+        ("ai", "plan_aborted") => Some(SCHEMA_AI_PLAN_ABORTED),
+        ("ai", "context_wheel_opened") => Some(SCHEMA_AI_CONTEXT_WHEEL_OPENED),
+        ("ai", "context_wheel_selected") => Some(SCHEMA_AI_CONTEXT_WHEEL_SELECTED),
+        ("ai", "panic_call_emitted") => Some(SCHEMA_AI_PANIC_CALL_EMITTED),
+        ("ai", "target_tagged") => Some(SCHEMA_AI_TARGET_TAGGED),
+        ("ai", "reason_query_returned") => Some(SCHEMA_AI_REASON_QUERY_RETURNED),
+        // **M9**: reactor defense + 5-tier integrity event surface.
+        ("mission", "reactor_hp_changed") => Some(SCHEMA_MISSION_REACTOR_HP_CHANGED),
+        ("mission", "reactor_destroyed") => Some(SCHEMA_MISSION_REACTOR_DESTROYED),
+        ("mission", "reactor_pressure_state_changed") => Some(SCHEMA_MISSION_REACTOR_PRESSURE_STATE_CHANGED),
+        ("mission", "timer_warning_threshold") => Some(SCHEMA_MISSION_TIMER_WARNING_THRESHOLD),
+        ("terrain", "material_state_changed") => Some(SCHEMA_TERRAIN_MATERIAL_STATE_CHANGED),
+        ("terrain", "pixel_removed") => Some(SCHEMA_TERRAIN_PIXEL_REMOVED),
+        ("terrain", "cascade_triggered") => Some(SCHEMA_TERRAIN_CASCADE_TRIGGERED),
+        ("terrain", "debris_spawned") => Some(SCHEMA_TERRAIN_DEBRIS_SPAWNED),
+        // **M9** (audit round-3 fix gaps 1+2) — ai.target_scored +
+        // ai.path_invalidated for the utility-scored target selection +
+        // per-guard path reaction surface.
+        ("ai", "target_scored") => Some(SCHEMA_AI_TARGET_SCORED),
+        ("ai", "path_invalidated") => Some(SCHEMA_AI_PATH_INVALIDATED),
         _ => None,
     }
 }
@@ -834,6 +1146,61 @@ mod tests {
             // M5-A2: combat melee + explosive hit_mo siblings.
             ("combat", "melee_hit_mo"),
             ("combat", "explosive_hit_mo"),
+            // M6 actor / combat / equipment / inventory / perception / squad.
+            ("actor", "action_rejected"),
+            ("actor", "climb_started"),
+            ("actor", "dive_started"),
+            ("actor", "facing_changed"),
+            ("actor", "lean_changed"),
+            ("actor", "slide_started"),
+            ("actor", "stamina_changed"),
+            ("actor", "stance_changed"),
+            ("actor", "vault_started"),
+            ("combat", "knife_throw_landed"),
+            ("combat", "knife_throw_started"),
+            ("combat", "stealth_kill_executed"),
+            ("equipment", "beacon_dropped"),
+            ("equipment", "bipod_deployed"),
+            ("equipment", "bipod_stowed"),
+            ("equipment", "drill_overheated"),
+            ("equipment", "fire_mode_cycled"),
+            ("equipment", "grenade_cooked"),
+            ("equipment", "grenade_detonated"),
+            ("equipment", "grenade_thrown"),
+            ("equipment", "item_dropped"),
+            ("equipment", "item_picked_up"),
+            ("equipment", "magazine_changed"),
+            ("equipment", "melee_swing"),
+            ("equipment", "sensor_pulse_fired"),
+            ("equipment", "shell_ejected"),
+            ("equipment", "suppressor_attached"),
+            ("equipment", "tool_broken"),
+            ("equipment", "tool_repaired"),
+            ("equipment", "tool_used"),
+            ("equipment", "weapon_swap_completed"),
+            ("equipment", "weapon_swap_started"),
+            ("inventory", "tank_slot_reserved"),
+            ("inventory", "weight_changed"),
+            ("perception", "actor_signal"),
+            ("perception", "footstep_emitted"),
+            ("perception", "occlusion_applied"),
+            ("perception", "stealth_meter_changed"),
+            ("squad", "command_issued"),
+            ("squad", "member_added"),
+            ("squad", "waypoint_marked"),
+            // **M9** reactor defense + 5-tier integrity event surface.
+            ("mission", "reactor_hp_changed"),
+            ("mission", "reactor_destroyed"),
+            ("mission", "reactor_pressure_state_changed"),
+            ("mission", "timer_warning_threshold"),
+            ("terrain", "material_state_changed"),
+            ("terrain", "pixel_removed"),
+            ("terrain", "cascade_triggered"),
+            ("terrain", "debris_spawned"),
+            // M9 audit round-3 fix gaps 1+2 — utility-scored target selection
+            // and per-guard path invalidation.
+            ("ai", "target_scored"),
+            ("ai", "path_invalidated"),
         ] {
             let raw = event_schema_for(cat, ty).unwrap_or_else(|| panic!("no schema for {cat}.{ty}"));
             let _parsed_value: serde_json::Value =
@@ -1436,6 +1803,94 @@ mod tests {
         assert!(err.contains("zone"), "got: {err}");
     }
 
+    /// **M9** (audit round-3 fix gap 1) — ai.target_scored validates a
+    /// representative utility-scored target payload (one player candidate +
+    /// one reactor candidate, player chosen, full weights breakdown).
+    #[test]
+    fn m9_ai_target_scored_validates_happy_path() {
+        let payload = json!({
+            "actor": 11,
+            "target_actor": 7,
+            "chosen_id": "7",
+            "score": 1.42,
+            "candidates": [
+                {
+                    "id": "7",
+                    "kind": "player",
+                    "actor_id": 7,
+                    "distance": 30.0,
+                    "has_los": true,
+                    "is_player": true,
+                    "is_high_value_static": false,
+                    "score": 1.42,
+                    "reason": "player_aggressive_los",
+                },
+                {
+                    "id": "reactor_alpha",
+                    "kind": "reactor",
+                    "reactor_id": "reactor_alpha",
+                    "distance": 80.0,
+                    "has_los": true,
+                    "is_player": false,
+                    "is_high_value_static": true,
+                    "score": 1.10,
+                    "reason": "defensive_value",
+                },
+            ],
+            "rationale": "player_aggressive: player_aggressive_los",
+            "weights": {
+                "proximity": 1.0,
+                "los": 1.0,
+                "threat": 0.7,
+                "value": 0.5,
+            },
+        });
+        validate_event_payload("ai", "target_scored", &payload).expect("ai.target_scored valid");
+    }
+
+    /// **M9** (audit round-3 fix gap 1) — missing required field is rejected.
+    #[test]
+    fn m9_ai_target_scored_requires_chosen_id() {
+        let payload = json!({
+            "actor": 11,
+            "target_actor": 7,
+            "candidates": [],
+            "rationale": "no_candidates",
+        });
+        let err = validate_event_payload("ai", "target_scored", &payload).unwrap_err();
+        assert!(err.contains("chosen_id"), "got: {err}");
+    }
+
+    /// **M9** (audit round-3 fix gap 2) — ai.path_invalidated validates a
+    /// representative payload (guard's planned pursuit line crosses a
+    /// freshly-carved bbox).
+    #[test]
+    fn m9_ai_path_invalidated_validates_happy_path() {
+        let payload = json!({
+            "actor": 9,
+            "actor_id": 9,
+            "bbox": { "min": [10.0, 20.0], "max": [40.0, 50.0] },
+            "old_path": [[5.0, 5.0], [60.0, 60.0]],
+            "reason": "terrain_dirty",
+            "fraction_of_path_dirty": 0.375,
+        });
+        validate_event_payload("ai", "path_invalidated", &payload).expect("ai.path_invalidated valid");
+    }
+
+    /// **M9** (audit round-3 fix gap 2) — missing required `bbox` is rejected.
+    #[test]
+    fn m9_ai_path_invalidated_requires_bbox() {
+        let payload = json!({
+            "actor": 9,
+            "actor_id": 9,
+            "old_path": [[5.0, 5.0]],
+            "reason": "terrain_dirty",
+            "fraction_of_path_dirty": 0.1,
+        });
+        let err = validate_event_payload("ai", "path_invalidated", &payload).unwrap_err();
+        assert!(err.contains("bbox"), "got: {err}");
+    }
+
     /// **M5**: every registered M5 schema declares `schema_version: "0.1"` as
     /// a const property — proves the M5 conformance contract per the spec's
     /// "each schema declares schema_version=\"0.1\" matching the M4 locked
@@ -1520,6 +1975,10 @@ mod tests {
             ("audio", "event_requested"),
             ("combat", "melee_hit_mo"),
             ("combat", "explosive_hit_mo"),
+            // M9 audit round-3 fix gaps 1+2 — both new AI schemas use the
+            // canonical M4 envelope shape per the M5-locked contract.
+            ("ai", "target_scored"),
+            ("ai", "path_invalidated"),
         ];
         for (cat, ty) in pairs {
             let raw = event_schema_for(cat, ty).unwrap_or_else(|| panic!("no schema for {cat}.{ty}"));

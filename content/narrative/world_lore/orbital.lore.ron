@@ -1,0 +1,32 @@
+WorldLore (
+    world_id: "orbital",
+    canonical_name: "Orbital Station Interior",
+    music_anchor: "music_world_orbital",
+    entries: [
+        WorldEntry (
+            kind: "geology",
+            title: "The Manufactured Worlds",
+            body: "Orbital stations are not natural bodies; they are the manufactured habitats that hang at the Lagrange points and the high-orbit slots above the inner planets. The Concordat catalogs approximately forty-two stations of habitat-class size — defined as a sustained population in excess of one thousand — and approximately three hundred smaller installations. The largest are the Lagrange Concordat stations themselves, the original Lagrange-1 through Lagrange-5 platforms; the smaller include the Coalition's orbital fortresses, the Collegium's research platforms, and the Synth Collective's eleven manufacturing nodes. Station construction is dominated by alloy hulls, modular pressure compartments, and the long radiator fins that mark active heat dissipation. Stations are, in every sense, the most efficient inhabited environments in the Sol system.",
+        ),
+        WorldEntry (
+            kind: "history",
+            title: "The Concordat Halls",
+            body: "The original Lagrange Concordat was signed aboard Lagrange-7 station in 2087, and the station has, in the one hundred and fifty-four years since, served as the formal seat of the Concordat's diplomatic and legislative functions. The station holds approximately eleven thousand permanent residents, approximately forty thousand transient personnel at any given time, and the largest single collection of Concordat-era archives in human possession. Other major orbital stations — Lagrange-2, Lagrange-4, the Phobos Fortress, the Earth-Orbit Concourse — each maintain their own historical roles, but Lagrange-7 is, by tradition and treaty, the senior of them all. The first amendment to the Concordat was negotiated in its main hall in 2147, after the Synth Collective's awakening; the third amendment, in 2171, recognized the methane-breathers; the seventh, in 2231, formalized the Crystalfold Collective's territorial claims.",
+        ),
+        WorldEntry (
+            kind: "biosphere",
+            title: "The Engineered Ecologies",
+            body: "Orbital stations maintain engineered ecologies in their hydroponic decks and air-recycler chambers; these ecologies are, by every measure, the cleanest and most carefully-tended biospheres in human possession. Each station maintains its own characteristic mix of plant species, microbial cultures, and small fauna — usually rats or small birds, sometimes cats. The Lagrange-7 station has, by tradition, kept a colony of imported Earth songbirds in the main hall's atrium since 2098; the songbirds are descendents of a single breeding pair shipped by the original Concordat negotiators, and their continued presence is the only ceremony the Concordat has refused to allow to lapse. Smaller stations maintain smaller ecologies; the Synth Collective's manufacturing nodes maintain none, which the other factions have, in private, noted as the only consistent aesthetic failure of the Collective.",
+        ),
+        WorldEntry (
+            kind: "culture",
+            title: "The Hall Routines",
+            body: "Orbital culture is shaped by close quarters, long shifts, and the constant ambient hum of the air recyclers. Station residents speak quietly, walk lightly, and observe a strict set of unwritten rules about elevator priority, mess-hall queueing, and the disposition of personal property in shared spaces. Concordat civil servants are recruited heavily from the orbital stations; the long-haul diplomatic services of the Coalition, the Collegium, and the Concordat are, by any objective measure, dominated by personnel who grew up on Lagrange-class platforms. Station children are notoriously well-spoken, notoriously polite, and notoriously prone to motion sickness on planetary surfaces.",
+        ),
+        WorldEntry (
+            kind: "mystery",
+            title: "The Sealed Decks",
+            body: "Every long-occupied orbital station has at least one sealed deck — a section of the original construction that was, at some point in the station's history, closed off and never reopened. Lagrange-7 has three. Lagrange-2 has eleven. The Phobos Fortress has, by every available account, seven. The official explanations vary: structural fatigue, environmental contamination, decommissioned manufacturing equipment, and so on. The unofficial explanations are uniformly more interesting. The Concordat has, for fifty years, declined to authorize a comprehensive survey of the sealed decks across all stations; the Coalition has, for fifty years, declined to comment on why. The deck doors are, by every visible inspection, ordinary pressure bulkheads. The Synth Collective has, on three occasions, asked permission to examine the seals. Permission has, on three occasions, been denied without explanation.",
+        ),
+    ],
+)

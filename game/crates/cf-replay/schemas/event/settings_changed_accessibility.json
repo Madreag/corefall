@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/settings_changed_accessibility.v1",
+  "title": "accessibility.settings_changed",
+  "description": "Emitted by the engine once per changed Settings field that lives on the ACC-A floor surface (ui_scale, high_contrast, captions, reduced_motion, reduced_shake, reduced_flash, etc.). One event per field change.",
+  "type": "object",
+  "required": ["field"],
+  "properties": {
+    "field": { "type": "string" },
+    "from": {},
+    "to": {},
+    "parent_event_id": { "type": "string" }
+  }
+}

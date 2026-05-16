@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0.0",
+  "palette_id": "heavy_biomech",
+  "display_name": "Heavy Biomech",
+  "category": "origin",
+  "description": "Heavy biomechanical chassis with exposed musculature; armored plates + sinew.",
+  "colors": [
+    { "role": "primary", "hex": "#544040", "comment": "armored carapace" },
+    { "role": "secondary", "hex": "#2a1e1e", "comment": "deep plate shadow" },
+    { "role": "accent", "hex": "#a63030", "comment": "exposed muscle" },
+    { "role": "highlight", "hex": "#8b7474", "comment": "plate highlight" },
+    { "role": "light", "hex": "#705c5c", "comment": "lit plate" },
+    { "role": "dark", "hex": "#0c0606", "comment": "sinew shadow" },
+    { "role": "metal", "hex": "#454040", "comment": "alloy bolt" },
+    { "role": "glow", "hex": "#ff9090", "comment": "heat vent glow" }
+  ]
+}

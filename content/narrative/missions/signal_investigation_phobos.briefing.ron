@@ -1,0 +1,30 @@
+MissionBriefing (
+    mission_id: "signal_investigation_phobos",
+    canonical_name: "The Stickney Drum",
+    faction_giver: "starlight",
+    world: "phobos",
+    difficulty: "easy",
+    objective_summary: "Investigate the source of an anomalous low-frequency vibration in the Phobos Stickney cavity; record acoustic data, do not attempt physical contact with the object, return safely.",
+    briefing_text: "Captain. Yara Solis, Voyager Corps. The Starlight Concordant has been, by long-standing arrangement with the Frontier crews in the Stickney cavity, paying a small annual fee for permission to maintain acoustic monitoring equipment in the chamber where the metallic object known to the Frontier as the Stickney Drum resides. The arrangement has, for forty years, produced unremarkable readings. In the last seven Earth-days, the readings have shifted. The fourteen-hour cycle has, by the Voyager Corps's monitoring records, changed to a thirteen-hour-fifty-four-minute cycle. The shift is, by Tran's navigation-cadence analysis, statistically significant. The Voyager Corps does not have, in any current Concordat document, a working theory of the Drum's nature, and I am not, in this briefing, going to speculate. Your assignment is investigative. You will descend with a Frontier guide into the Stickney cavity, proceed to the Drum's chamber, set up additional acoustic monitoring equipment, record approximately thirty minutes of high-resolution data, and return. Do not, please, attempt to physically contact the Drum. Do not, please, attempt to scan it with active instruments. The Frontier crews who have, over the decades, attempted to scan the Drum have, in three of seven recorded cases, had their equipment wiped without apparent cause; the cases have all involved active scanning. Passive acoustic monitoring is, by every available record, safe. Stay passive. Stay quiet. The Frontier guide is named Mukherjee — Doc Mukherjee. He'll meet you at the lift platform. He is, by Voyager Corps assessment, the most reliable Frontier-affiliated guide in the cavity. Listen to him.",
+    primary_objectives: [
+        "Descend with the Frontier guide to the Drum chamber",
+        "Set up the supplied acoustic monitoring equipment",
+        "Record thirty minutes of high-resolution acoustic data",
+        "Return without physical contact with the Drum",
+    ],
+    secondary_objectives: [
+        "Record visual data of the Drum (passive only)",
+        "Confirm the precise cycle duration shift",
+        "Maintain professional courtesy with the Frontier guide",
+    ],
+    failure_conditions: [
+        "Acoustic equipment activated as active scanner",
+        "Physical contact with the Drum",
+        "Recording duration not achieved",
+        "Player or guide downed in the cavity",
+    ],
+    reward_summary: "Starlight reputation +20; Voyager Corps investigative commendation; Phobos survey patch; access to the Stickney chamber for future research; informal Frontier crew goodwill (Mukherjee's endorsement).",
+    debrief_win: "Solis. The recording is in the Voyager Corps archive, encrypted, dual-keyed with the Concordat security committee. Tran is, in his office, running the cycle-shift analysis. Mukherjee returned safely; he asks that I extend, on the Frontier side, an invitation to dinner. The dinner is, by Frontier convention, informal. Take the invitation. The dinner is, by every available account, the part of this assignment you will remember in twenty years. The Drum, in twenty years, will be its own story.",
+    debrief_loss: "Solis. The recording is partial. The acoustic equipment was, by the data we recovered, switched to active mode at approximately the seventeen-minute mark. The Drum's response is, in the recording's final segment, a sustained tone that the Voyager Corps's instrumentation has been unable to characterize. Mukherjee returned safely. The equipment is lost. The Voyager Corps will, in due course, restart the monitoring program with new instruments. The Concordat will, in due course, reclassify the Stickney chamber as restricted-access. Take the loss. We were, in this captain's professional opinion, very fortunate that no one was seriously hurt.",
+    voice_giver_id: "starlight_captain_yara_solis",
+)

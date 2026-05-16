@@ -1,0 +1,144 @@
+CreditsTemplate (
+    schema_version: 1,
+    description: "M11A credits template. Auto-generated rendering at runtime substitutes __PLACEHOLDERS__ with values from cf-asset-ledger + git log + Workshop subscribers.",
+    sections: [
+        CreditsSection (
+            title: "Engine",
+            entries: [
+                CreditsEntry (role: "Engine Lead", names: ["__GIT_AUTHOR_PRIMARY__"]),
+                CreditsEntry (role: "Crate Authors", names: ["__GIT_AUTHORS_ENGINE__"]),
+                CreditsEntry (role: "Core Crates", names: ["cf-sim-core", "cf-physics", "cf-material", "cf-atmos", "cf-ai", "cf-terrain", "cf-render-2d", "cf-render-3d", "cf-control", "cf-ui", "cf-shell", "cf-replay", "cf-net", "cf-mod", "cf-audio", "cf-content"]),
+                CreditsEntry (role: "Determinism Architecture", names: ["DR-001 (parallel-deterministic sim)", "DR-002 (byte-identical replay)", "DR-004 (M4 event schema)", "DR-005 (ledger contract)"]),
+            ]
+        ),
+        CreditsSection (
+            title: "Gameplay Systems",
+            entries: [
+                CreditsEntry (role: "M1-M11 Foundations", names: ["__GIT_AUTHORS_M1_M11__"]),
+                CreditsEntry (role: "M13 Combat + Chassis", names: ["__GIT_AUTHORS_M13__"]),
+                CreditsEntry (role: "M15-M17 Simulation Depth", names: ["__GIT_AUTHORS_M15_M17__"]),
+                CreditsEntry (role: "M18-M22 Survival Track", names: ["__GIT_AUTHORS_M18_M22__"]),
+                CreditsEntry (role: "M25-M30 Endgame", names: ["__GIT_AUTHORS_M25_M30__"]),
+                CreditsEntry (role: "M40-M50 Polish + Multiplayer", names: ["__GIT_AUTHORS_M40_M50__"]),
+            ]
+        ),
+        CreditsSection (
+            title: "Production Track",
+            entries: [
+                CreditsEntry (role: "M9A Visual Asset Pipeline", names: ["__BAKED_M9A_COUNT__ tier-1 SVG placeholders"]),
+                CreditsEntry (role: "M12A Audio Pipeline", names: ["__BAKED_M12A_COUNT__ tier-1 SFX placeholders"]),
+                CreditsEntry (role: "M37A Music Composition", names: ["__BAKED_M37A_COUNT__ adaptive music tracks across 30 base tracks x 4 variants"]),
+                CreditsEntry (role: "M25A Narrative Bible", names: ["__BAKED_M25A_WORD_COUNT__ words across 8 factions, 12 worlds, 24 named NPCs, 5 storytellers, 5 bosses, 12 missions, 10 origins, 300 codex entries, 75 achievements, 60 loading tips"]),
+                CreditsEntry (role: "M32A NPC Pipeline", names: ["__BAKED_M32A_COUNT__ NPC dossiers + portraits"]),
+                CreditsEntry (role: "M48A Cinematic Capture", names: ["__BAKED_M48A_COUNT__ cinematic captures"]),
+                CreditsEntry (role: "M48B Marketing Assets", names: ["__BAKED_M48B_COUNT__ marketing assets"]),
+                CreditsEntry (role: "M18A Companion Lore", names: ["__BAKED_M18A_COUNT__ companion strings"]),
+                CreditsEntry (role: "M24A Particle Library", names: ["__BAKED_M24A_COUNT__ particle effects"]),
+                CreditsEntry (role: "M33A Tutorial Authoring", names: ["__BAKED_M33A_COUNT__ tutorial steps"]),
+                CreditsEntry (role: "M38A Localization", names: ["19 languages translated through LLM-assisted pipeline"]),
+                CreditsEntry (role: "M45A Cosmetic Trophies", names: ["__BAKED_M45A_COUNT__ boss-defeat cosmetics"]),
+            ]
+        ),
+        CreditsSection (
+            title: "Audio Production",
+            entries: [
+                CreditsEntry (role: "SFX Synthesis", names: ["Stable Audio Open (Tier 2 production bake)", "AudioCraft MusicGen sound effects (Tier 2 fallback)", "procedural numpy / scipy (Tier 1 placeholder)"]),
+                CreditsEntry (role: "Voice Synthesis", names: ["ElevenLabs (premium named NPCs)", "Coqui XTTS v2 (faction voice presets)", "Suno Bark (background chatter, multilingual)", "Mimic3 (offline fallback)"]),
+                CreditsEntry (role: "Music Composition", names: ["MusicGen-melody (primary Tier 2 bake)", "Stable Audio Open (fallback Tier 2)", "procedural pad / bass / drum / melody (Tier 1 placeholder)"]),
+                CreditsEntry (role: "Adaptive Music Engine", names: ["cf-audio::adaptive_music with cross-fade per intensity threshold [0.0, 0.3, 0.6, 0.9]"]),
+                CreditsEntry (role: "Voice Priority Ducking", names: ["cf-audio::per_bus_mix (-6 dB music duck, -3 dB SFX duck on voice trigger)"]),
+            ]
+        ),
+        CreditsSection (
+            title: "Visual Production",
+            entries: [
+                CreditsEntry (role: "Tier 1 SVG Composer", names: ["tools/asset_gen/llm_svg_prompter.py (procedural composition)"]),
+                CreditsEntry (role: "Tier 2 AI Image Synthesis", names: ["SDXL 1.0 (Stability AI)", "Flux.1-dev (Black Forest Labs)", "AnimateDiff (Hugging Face)"]),
+                CreditsEntry (role: "Style Direction", names: ["DR-019 (vivid color-rich illustrated comic) - per Hades / Streets of Rage 4 / Into the Breach / Cuphead / Hyper Light Drifter"]),
+                CreditsEntry (role: "Per-Faction Palettes", names: ["8 launch faction 8-color palettes, hand-curated"]),
+                CreditsEntry (role: "Comic Panel System", names: ["cf-ui::comic_panels (mission briefing + death recap)"]),
+            ]
+        ),
+        CreditsSection (
+            title: "Narrative",
+            entries: [
+                CreditsEntry (role: "Story Bible Authors", names: ["__M25A_BIBLE_AUTHOR__"]),
+                CreditsEntry (role: "Voice Lines", names: ["__BAKED_VOICE_COUNT__ voice clips across 80 voice presets (10 origins x 8 factions)"]),
+                CreditsEntry (role: "Mission Briefings", names: ["__MISSION_COUNT__ briefings + per-mission debrief-win + debrief-loss"]),
+                CreditsEntry (role: "Dynamic Radio Chatter", names: ["per-faction LLM-authored chatter pools, voice-synthesized + procedurally recombined"]),
+                CreditsEntry (role: "Codex Entries", names: ["300 entries: 50 materials + 30 anomalies + 20 artifacts + 30 afflictions + 60 factions/organizations + 50 worlds + 30 vehicles + 30 weapons"]),
+            ]
+        ),
+        CreditsSection (
+            title: "Localization",
+            entries: [
+                CreditsEntry (role: "Translation Pipeline (M38A)", names: ["19 launch languages: English, Spanish, French, German, Italian, Portuguese-BR, Russian, Polish, Czech, Turkish, Japanese, Korean, Chinese-Simplified, Chinese-Traditional, Thai, Vietnamese, Arabic, Hindi, Indonesian"]),
+                CreditsEntry (role: "Per-Language Voice Synthesis", names: ["ElevenLabs multilingual", "Bark multilingual", "XTTS multilingual"]),
+                CreditsEntry (role: "Per-Language Translation Review", names: ["__TRANSLATION_REVIEWERS__"]),
+            ]
+        ),
+        CreditsSection (
+            title: "Modding Community",
+            entries: [
+                CreditsEntry (role: "Featured Mods", names: ["__WORKSHOP_FEATURED__"]),
+                CreditsEntry (role: "Top Mod Authors", names: ["__WORKSHOP_TOP_AUTHORS__"]),
+                CreditsEntry (role: "Most-Subscribed Mods", names: ["__WORKSHOP_TOP_50__"]),
+                CreditsEntry (role: "Mod Manager (M33)", names: ["Lua + IC10 scripting integration"]),
+            ]
+        ),
+        CreditsSection (
+            title: "AI Models",
+            entries: [
+                CreditsEntry (role: "Image Synthesis", names: ["SDXL 1.0 (Stability AI)", "Flux.1-dev (Black Forest Labs)", "AnimateDiff (Hugging Face)"]),
+                CreditsEntry (role: "Audio Synthesis", names: ["Stable Audio Open 1.0 (Stability AI)", "AudioCraft MusicGen-melody (Meta)", "Suno Bark (Suno)", "ElevenLabs (commercial API)", "Mimic3 (Mycroft)", "Coqui XTTS v2 (Coqui)"]),
+                CreditsEntry (role: "Language Models", names: ["Claude 3.5 / 4 (Anthropic)", "GPT-4 / GPT-5 (OpenAI)", "Llama 3 70B (Meta)"]),
+                CreditsEntry (role: "Engineering Assistance", names: ["Factory Droid", "Claude Code", "GitHub Copilot"]),
+            ]
+        ),
+        CreditsSection (
+            title: "Comparable Games Attribution",
+            entries: [
+                CreditsEntry (role: "Foundational Inspiration", names: ["Cortex Command (Data Realms — micro-physics + module-based mechs + brain-hop)", "OpenSoldat (2D networked physics + Soldat tradition)", "Powder Toy (cellular-automata material chemistry)"]),
+                CreditsEntry (role: "Tactical / Strategy", names: ["Helldivers 2 (Arrowhead — tactical squad UX + voice chatter)", "Into the Breach (Subset Games — readable detailed sprites)", "Hades (Supergiant — vivid color + ink-line accents)", "Streets of Rage 4 (Dotemu — comic-book impact + animation)"]),
+                CreditsEntry (role: "Simulation Lineage", names: ["Noita (Nolla Games — simulated every-pixel chemistry)", "RimWorld (Ludeon — colonist priority + storyteller pacing)", "Dwarf Fortress (Bay 12 — emergent narrative + simulation depth)", "Barotrauma (FakeFish — submarine survival + medical priorities)"]),
+                CreditsEntry (role: "Combat Design Reference", names: ["Squad (Offworld — medic priorities)", "ACE3 mod for Arma (medical depth)", "Project Reality (PR-DOG — squad coordination)", "Ready or Not (VOID Interactive — Q-context wheel + queued orders)"]),
+                CreditsEntry (role: "World-Building", names: ["S.T.A.L.K.E.R. (GSC Game World — anomalies + artifacts)", "Stationeers (RocketWerkz — atmospherics + multi-world)", "Astroneer (System Era — multi-world progression)"]),
+                CreditsEntry (role: "Visual Direction", names: ["Hyper Light Drifter (Heart Machine — color palettes)", "Cuphead (Studio MDHR — comic-line accents)", "Slay the Spire (Mega Crit — readable iconography)"]),
+            ]
+        ),
+        CreditsSection (
+            title: "Open Source Dependencies",
+            entries: [
+                CreditsEntry (role: "Engine Core", names: ["Rust (Rust Foundation)", "Bevy (Bevy contributors)", "wgpu (gfx-rs)", "winit (rust-windowing)", "tokio (tokio-rs)", "tracing (tokio-rs)"]),
+                CreditsEntry (role: "Simulation + Math", names: ["nalgebra (sebcrozet)", "rapier (Dimforge — physics)", "rayon (rayon-rs — parallelism)"]),
+                CreditsEntry (role: "Serialization", names: ["serde (serde-rs)", "ron (ron-rs)", "json-schema (rust-json-schema)"]),
+                CreditsEntry (role: "Audio", names: ["rodio (rodio-rs)", "kira (tesselode)", "Steam Audio (Valve)"]),
+                CreditsEntry (role: "Asset Pipeline", names: ["cairo-svg (Cairographics)", "numpy (NumFOCUS)", "scipy (SciPy contributors)", "soundfile (libsndfile bindings)"]),
+                CreditsEntry (role: "Networking", names: ["quinn (quinn-rs — QUIC)", "rustls (rustls-rs)", "Steam Networking (Valve)"]),
+            ]
+        ),
+        CreditsSection (
+            title: "Special Thanks",
+            entries: [
+                CreditsEntry (role: "Original Cortex Command Team", names: ["Daniel Tabar", "Data Realms"]),
+                CreditsEntry (role: "Soldat / OpenSoldat", names: ["Michal Marcinkowski", "OpenSoldat contributors"]),
+                CreditsEntry (role: "Cortex Community Project", names: ["CCCP team and contributors"]),
+                CreditsEntry (role: "Powder Toy", names: ["Stanislaw K Skowronek (Skylark)"]),
+                CreditsEntry (role: "Noita", names: ["Nolla Games team — Petri Purho, Olli Harjola, Arvi Teikari"]),
+                CreditsEntry (role: "Playtesters", names: ["__PLAYTESTER_LIST__"]),
+                CreditsEntry (role: "Community Discord", names: ["__DISCORD_MEMBER_COUNT__ members across launch"]),
+                CreditsEntry (role: "Steam Workshop", names: ["__WORKSHOP_SUBSCRIBER_COUNT__ mod subscribers"]),
+                CreditsEntry (role: "Beta Builds", names: ["__BETA_TESTER_COUNT__ closed-beta participants"]),
+            ]
+        ),
+        CreditsSection (
+            title: "And Finally",
+            entries: [
+                CreditsEntry (role: "Dedicated to", names: ["Everyone who waited for it.", "Made on a 9950X3D + RTX 5090 + 48GB.", "Player count at credit-roll: __LIVE_PLAYER_COUNT__"]),
+                CreditsEntry (role: "Made in", names: ["Phoenix, Arizona"]),
+                CreditsEntry (role: "Build Hash", names: ["__BUILD_GIT_SHA__"]),
+                CreditsEntry (role: "Build Date", names: ["__BUILD_TIMESTAMP_MST__"]),
+            ]
+        ),
+    ]
+)

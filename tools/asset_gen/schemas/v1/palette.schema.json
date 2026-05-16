@@ -1,0 +1,65 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall.dev/schemas/v1/palette.schema.json",
+  "title": "Corefall Tier-1 SVG Palette",
+  "description": "Palette JSON read by tools/asset_gen/palette_loader.py. A palette is a small ordered list of hex colors; pipeline tools substitute palette indices into SVG templates.",
+  "type": "object",
+  "required": ["schema_version", "palette_id", "colors"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "palette_id": {
+      "type": "string",
+      "description": "Stable palette identifier (faction id / material id / origin id)."
+    },
+    "display_name": {
+      "type": "string"
+    },
+    "description": {
+      "type": "string"
+    },
+    "category": {
+      "type": "string",
+      "enum": ["faction", "material", "origin", "emblem", "system"]
+    },
+    "colors": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 16,
+      "items": {
+        "type": "object",
+        "required": ["role", "hex"],
+        "properties": {
+          "role": {
+            "type": "string",
+            "description": "Semantic role: primary / secondary / accent / dark / light / shadow / glow / metal / cloth / etc."
+          },
+          "hex": {
+            "type": "string",
+            "pattern": "^#?[0-9a-fA-F]{6}$"
+          },
+          "comment": {
+            "type": "string"
+          }
+        }
+      }
+    },
+    "accent_pairs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["fg", "bg"],
+        "properties": {
+          "fg": {
+            "type": "string"
+          },
+          "bg": {
+            "type": "string"
+          }
+        }
+      }
+    }
+  }
+}

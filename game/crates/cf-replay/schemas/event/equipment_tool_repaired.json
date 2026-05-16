@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/equipment.tool_repaired.v0.1",
+  "title": "equipment.tool_repaired",
+  "type": "object",
+  "required": ["actor", "tool"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "tool": {"type": "string"},
+    "amount_restored": {"type": "number"}
+  },
+  "additionalProperties": true
+}

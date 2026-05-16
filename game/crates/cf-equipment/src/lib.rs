@@ -24,7 +24,15 @@
     clippy::doc_markdown,
     clippy::struct_excessive_bools,
     clippy::derivable_impls,
-    clippy::missing_const_for_fn
+    clippy::missing_const_for_fn,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_precision_loss,
+    clippy::cast_lossless,
+    clippy::cast_possible_wrap,
+    clippy::float_cmp,
+    clippy::manual_is_multiple_of,
+    clippy::similar_names
 )]
 
 use std::collections::BTreeMap;
@@ -38,6 +46,54 @@ pub mod digger;
 pub mod projectile;
 pub use digger::DiggerTool;
 pub use projectile::ProjectileSpawnParams;
+
+// M6 modules — see spec § Files for the canonical list.
+pub mod bipod;
+pub mod durability;
+pub mod fire_modes;
+pub mod grenade;
+pub mod inventory;
+pub mod knife_throw;
+pub mod magazine;
+pub mod melee;
+pub mod shell;
+pub mod stealth_kill;
+pub mod suppressor;
+pub mod tool;
+pub mod weapon;
+pub mod weapon_swap;
+
+pub use bipod::{Bipod, BipodState, BIPOD_BLOOM_FACTOR, BIPOD_RECOIL_FACTOR};
+pub use durability::{Durability, DURABILITY_MAX};
+pub use fire_modes::{
+    charge_damage_multiplier, charge_fraction, AdvancedFireMode, FireModeSet, BURST3_INTER_SHOT_SECONDS,
+    BURST3_ROUND_COUNT, SNIPER_CHARGE_MAX_SECONDS, SNIPER_MISFIRE_BELOW,
+};
+pub use grenade::{cook_grenade, m6_grenade_presets, GrenadeKind, GrenadePreset};
+pub use inventory::{
+    ExtendedInventory, ExtendedSlot, SlotKind, SlotState, ACTIVE_SLOT_COUNT, TANK_SLOT_COUNT, TANK_SLOT_LOCKED_REASON,
+    TOTAL_SLOT_COUNT, WEIGHT_FORCE_CRAWL_KG, WEIGHT_FORCE_WALK_KG,
+};
+pub use knife_throw::{KnifeProjectile, KnifeThrowState, KNIFE_THROW_DAMAGE_FACTOR, KNIFE_THROW_MAX_FLIGHT_SECONDS};
+pub use magazine::{Magazine, PoppedRound, RoundKind};
+pub use melee::{
+    m6_melee_presets, MeleeKind, MeleePreset, BATON_M6_DEFAULT_ID, HATCHET_M6_DEFAULT_ID, KNIFE_M6_DEFAULT_ID,
+    RIFLE_BASH_M6_DEFAULT_ID,
+};
+pub use shell::{ShellEjection, ShellKind};
+pub use stealth_kill::{
+    evaluate_attempt, StealthKillAttempt, StealthKillRejection, STEALTH_KILL_ANIMATION_SECONDS, STEALTH_KILL_METER_MAX,
+    STEALTH_KILL_REACH,
+};
+pub use suppressor::{Suppressor, SUPPRESSOR_LOUDNESS_FACTOR};
+pub use tool::{
+    drill::{DRILL_HEAT_DECAY_PER_S, DRILL_HEAT_PER_USE, DRILL_HEAT_RATE_PER_S, DRILL_JAM_HEAT_THRESHOLD},
+    m6_tool_presets,
+    sensor_pulse::{SENSOR_PULSE_REVEAL_RADIUS, SENSOR_PULSE_REVEAL_SECONDS},
+    ToolKind, ToolPreset,
+};
+pub use weapon::{m6_weapon_presets, WeaponClass, WeaponPreset};
+pub use weapon_swap::{swap_duration_for_target, WeaponSwap, PISTOL_SWAP_SECONDS, WEAPON_SWAP_SECONDS};
 
 /// **M1**: how the weapon's fire button is consumed.
 ///
@@ -671,6 +727,32 @@ pub fn loadout(loadout_id: &str) -> Option<Loadout> {
 #[must_use]
 pub fn rifle_preset(preset_id: &str) -> Option<RifleSpec> {
     rifle_presets().get(preset_id).cloned()
+}
+
+/// **M6**: resolve the available [`AdvancedFireMode`] list for a given
+/// weapon preset id. M1 rifle presets default to the full Single / Burst3 /
+/// Auto ladder per spec § "Weapons" (M1 rifle table row "Single / Burst-3 /
+/// Auto"). M6 launch-weapon presets surface their declared
+/// [`WeaponPreset::available_modes`]. Unknown presets fall back to
+/// `[Single]` so `act.player.cycle_fire_mode` is always well-defined for any
+/// equipped weapon — the engine never panics on an unknown preset.
+#[must_use]
+pub fn available_fire_modes_for(preset_id: &str) -> Vec<AdvancedFireMode> {
+    match preset_id {
+        RIFLE_M1_DEFAULT_ID | RIFLE_M1_TRACER_ID | CARBINE_M5_POWERED_ID | RIFLE_M5_MECH_HEAVY_ID => vec![
+            AdvancedFireMode::Single,
+            AdvancedFireMode::Burst3,
+            AdvancedFireMode::Auto,
+        ],
+        SHOTGUN_M1_DEFAULT_ID => vec![AdvancedFireMode::Single, AdvancedFireMode::Pump],
+        _ => {
+            if let Some(preset) = m6_weapon_presets().into_iter().find(|p| p.id == preset_id) {
+                preset.available_modes
+            } else {
+                vec![AdvancedFireMode::Single]
+            }
+        }
+    }
 }
 
 /// Per-actor rifle state machine. Carries the configured `tick_rate_hz` so timings

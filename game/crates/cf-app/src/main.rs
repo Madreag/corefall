@@ -30,15 +30,19 @@ use cf_control::{
     EngineHandle, Settings,
 };
 use cf_render_2d::{
+    asset_loader::{load_ledger_index, AssetIndex, AssetIndexPlugin},
     ActorRenderState, ActorSpritePlugin, BreachRender, CameraFollow, CameraShake, CfRenderPlugin, ChunkUpdate,
     ChunkedTerrainPlugin, ChunkedTerrainSnapshot, DebrisSpawnQueue, DebrisSpawnRequest, DigPreviewGhost,
-    DigPreviewTarget, ExtractionRender, HitStop, MuzzleFlashRender, OverlayMode, OverlayModeState,
+    DigPreviewTarget, ExplosionState, ExtractionRender, HitStop, MuzzleFlashRender, OverlayMode, OverlayModeState,
+    ReactorSprite, ReactorSpriteState, ReactorVfxPlugin, SparkEmitterState, EXPLOSION_DEBRIS_CAP_PER_HIT,
+    SPARK_CAP_PER_HIT,
 };
 use cf_replay::diagnostics;
 use cf_sim_core::WallClock;
 use cf_ui::{
-    HudBanner, HudBodySilhouette, HudBreach, HudCaption, HudEnemy, HudMission, HudModule, HudModuleStrip, HudRifle,
-    HudSettings, HudState, HudToolValidity, StatusStripPlugin,
+    reactor_hp_bar::ArmorPipView, HudBanner, HudBodySilhouette, HudBreach, HudCaption, HudEnemy, HudMission, HudModule,
+    HudModuleStrip, HudRifle, HudSettings, HudState, HudToolValidity, IntegrityBand, ReactorHpBarState,
+    ReactorPressureLineState, StatusStripPlugin, TimerWarningsState, WARNING_THRESHOLDS,
 };
 
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -548,6 +552,9 @@ fn build_config(cli: &Cli, scenario_path: PathBuf) -> Result<M0EngineConfig> {
             walk_threshold: 1.5,
             ai_difficulty: "tough_crowd".to_string(),
             ai_debug: cli.ai_debug,
+            // M8 settings — defaults from Settings::default() let cf-app
+            // pick them up without per-CLI plumbing.
+            ..Settings::default()
         },
         seed_override: cli.seed,
         duration_ticks_override: if cli_duration > 0 { Some(cli_duration) } else { None },
@@ -683,7 +690,20 @@ fn run_bevy(
         .add_plugins(CfRenderPlugin::default())
         .add_plugins(ActorSpritePlugin)
         .add_plugins(ChunkedTerrainPlugin)
-        .add_plugins(StatusStripPlugin);
+        .add_plugins(ReactorVfxPlugin)
+        // M10 § M9A asset icons resolve at runtime: install the
+        // AssetIndex resource + hydrate it from the workspace's
+        // canonical ledger.jsonl at startup so the replay viewer +
+        // death-recap modal can resolve icon paths via
+        // `AssetIndex.get(canonical_name)` without missing-asset
+        // warnings. See game/crates/cf-render-2d/src/asset_loader.rs.
+        .add_plugins(AssetIndexPlugin)
+        .add_plugins(StatusStripPlugin)
+        // M11A: shell UI foundation (title / main menu / pause / save-load /
+        // settings tree / credits / loading screen / FRE wizard polish).
+        // Runs alongside in-mission HUD; screen transitions via act.shell.*.
+        .add_plugins(cf_shell::ShellPlugin);
+    app.add_systems(Startup, hydrate_asset_index_from_ledger);
     app.init_resource::<HoldTracker>();
     let capture_handle = CaptureStateHandle::default();
     app.add_plugins(CfCapturePlugin {
@@ -725,6 +745,7 @@ fn run_bevy(
             ingest_focus_input,
             sync_actor_state_to_render,
             sync_terrain_state_to_render,
+            sync_reactor_state_to_widgets,
             sync_engine_tick_to_capture_clock,
             pump_recorder_events_into_capture_keyframes,
             pump_recorder_events_into_render_effects,
@@ -772,6 +793,76 @@ fn run_bevy(
 
 fn sync_engine_tick_to_capture_clock(holder: Res<EngineHolder>, mut clock: ResMut<CaptureClock>) {
     clock.current_tick = holder.0.current_tick().0;
+}
+
+/// **M10 § "references M9A asset icons"** — startup system that hydrates
+/// the cf-render-2d `AssetIndex` from the workspace's canonical
+/// `content/asset_ledger/ledger.jsonl`. The replay viewer + in-game
+/// death-recap modal call `AssetIndex.get(canonical_name)` to resolve
+/// the PNG / SVG path for any tier-1 placeholder asset; without this
+/// hydration every icon lookup would miss (per AGENTS.md "asset index
+/// plugin wiring" mandate).
+///
+/// Path resolution order:
+///   1. `CF_ASSET_LEDGER_PATH` env var (explicit override, dev / tests).
+///   2. Climb from `cf-app`'s `CARGO_MANIFEST_DIR`
+///      (`<repo>/game/crates/cf-app`) up three parents to
+///      `<repo>/content/asset_ledger/ledger.jsonl`.
+///   3. Fall back to `<CWD>/content/asset_ledger/ledger.jsonl` so that
+///      `cd /Users/erol/projects/corefall && cargo run` resolves it too.
+///
+/// All paths are best-effort: when the ledger is absent (e.g., during a
+/// pre-M9A bring-up scenario), the hydration is a no-op and a single
+/// `tracing::warn!` line surfaces the miss. No icon-lookup-time warnings.
+fn hydrate_asset_index_from_ledger(mut index: ResMut<AssetIndex>) {
+    use std::path::PathBuf;
+    let candidates: Vec<PathBuf> = {
+        let mut v: Vec<PathBuf> = Vec::new();
+        if let Ok(p) = std::env::var("CF_ASSET_LEDGER_PATH") {
+            v.push(PathBuf::from(p));
+        }
+        // Climb 3 parents from cf-app's CARGO_MANIFEST_DIR → repo root.
+        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        if let Some(repo) = manifest_dir.parent().and_then(|p| p.parent()).and_then(|p| p.parent()) {
+            v.push(repo.join("content").join("asset_ledger").join("ledger.jsonl"));
+        }
+        if let Ok(cwd) = std::env::current_dir() {
+            v.push(cwd.join("content").join("asset_ledger").join("ledger.jsonl"));
+            if let Some(parent) = cwd.parent() {
+                v.push(parent.join("content").join("asset_ledger").join("ledger.jsonl"));
+            }
+        }
+        v
+    };
+    for path in &candidates {
+        if !path.exists() {
+            continue;
+        }
+        match load_ledger_index(path, &mut index) {
+            Ok(n) => {
+                tracing::info!(
+                    target: "cf::asset_index",
+                    "hydrated AssetIndex from {} ({} entries)",
+                    path.display(),
+                    n
+                );
+                return;
+            }
+            Err(e) => {
+                tracing::warn!(
+                    target: "cf::asset_index",
+                    "failed to hydrate AssetIndex from {}: {}",
+                    path.display(),
+                    e
+                );
+                return;
+            }
+        }
+    }
+    tracing::warn!(
+        target: "cf::asset_index",
+        "ledger.jsonl not found at any candidate path; AssetIndex left empty (M10 death-recap icons will fall back to symbolic placeholders)"
+    );
 }
 
 /// **M2**: bridge the engine's chunked terrain into cf-render-2d. Gated on
@@ -883,6 +974,8 @@ fn pump_recorder_events_into_render_effects(
     mut hit_stop: ResMut<HitStop>,
     mut state: ResMut<ActorRenderState>,
     mut debris_queue: ResMut<DebrisSpawnQueue>,
+    mut sparks: ResMut<SparkEmitterState>,
+    mut explosion: ResMut<ExplosionState>,
     mut cursor: ResMut<RenderEffectsCursor>,
 ) {
     let settings = futures_block_on(async { holder.0.settings_snapshot().await });
@@ -941,6 +1034,38 @@ fn pump_recorder_events_into_render_effects(
                         remaining_ticks: 3,
                     });
                 }
+            }
+            // **M9** § Bullet-impact sparks on reactor — every reactor hit
+            // spawns a brief spark burst at the impact point. Capped at
+            // `SPARK_CAP_PER_HIT` per event by the emitter.
+            ("combat", "projectile_hit") => {
+                let is_reactor = ev
+                    .payload
+                    .get("target_kind")
+                    .and_then(|v| v.as_str())
+                    .is_some_and(|s| s == "reactor");
+                if !is_reactor {
+                    continue;
+                }
+                let pos = ev.payload.get("position").and_then(|v| v.as_array());
+                let x = pos.and_then(|arr| arr.first()).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+                let y = pos.and_then(|arr| arr.get(1)).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+                sparks.spawn_burst([x, y], SPARK_CAP_PER_HIT, 180);
+            }
+            // **M9** § Explosion VFX on reactor destruction — flash + debris
+            // scatter (capped) + shake scaled by accessibility's
+            // `reduce_camera_shake_pct`. cf-render-2d's tick_reactor_vfx
+            // retires the burst within 1s per spec.
+            ("mission", "reactor_destroyed") => {
+                let pos = ev.payload.get("position").and_then(|v| v.as_array());
+                let x = pos.and_then(|arr| arr.first()).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+                let y = pos.and_then(|arr| arr.get(1)).and_then(|v| v.as_f64()).unwrap_or(0.0) as f32;
+                explosion.spawn([x, y], EXPLOSION_DEBRIS_CAP_PER_HIT, settings.reduce_camera_shake_pct);
+                // Couple a brief camera shake to the destruction event so
+                // accessibility's reduce_camera_shake_pct gates both at the
+                // same source.
+                let shake_scale = (1.0 - settings.reduce_camera_shake_pct.clamp(0.0, 1.0)).max(0.0);
+                shake.magnitude_px = (shake.magnitude_px + 18.0 * shake_scale).clamp(0.0, 40.0);
             }
             _ => {}
         }
@@ -2307,6 +2432,78 @@ fn sync_actor_state_to_render(
         }
     } else {
         hud_state.breach = None;
+    }
+}
+
+/// **M9** § HUD readability + observability + Reactor visual feedback —
+/// mirror the engine's reactor + timer projections into the cf-ui
+/// widgets + cf-render-2d sprite resource so the HUD reactor strip + the
+/// timer-warning captions + the reactor sprite swap all reflect the
+/// live sim state. Pulls from `ActorRenderSnapshot::reactor / timer`
+/// (sync read; same lock the existing `sync_actor_state_to_render`
+/// path already takes) so cf-app does not bounce off the async
+/// cfctl path each frame.
+fn sync_reactor_state_to_widgets(
+    holder: Res<EngineHolder>,
+    mut hp_bar: ResMut<ReactorHpBarState>,
+    mut pressure_line: ResMut<ReactorPressureLineState>,
+    mut timer_warnings: ResMut<TimerWarningsState>,
+    mut sprite_state: ResMut<ReactorSpriteState>,
+) {
+    let snapshot = holder.0.actor_render_snapshot();
+
+    match snapshot.reactor {
+        Some(reactor) => {
+            let pips: Vec<ArmorPipView> = reactor
+                .armor_layers
+                .iter()
+                .map(|l| {
+                    let kind: &'static str = match l.kind.as_str() {
+                        "External" => "External",
+                        "Internal" => "Internal",
+                        "Core" => "Core",
+                        _ => "External",
+                    };
+                    ArmorPipView {
+                        kind,
+                        hp: l.hp,
+                        max_hp: l.max_hp,
+                        hp_percent: l.hp_percent,
+                        band: IntegrityBand::from_hp_percent(l.hp_percent),
+                    }
+                })
+                .collect();
+            hp_bar.update(reactor.hp, reactor.max_hp, &reactor.pressure_state, pips);
+            pressure_line.update(&reactor.pressure_state);
+            sprite_state.variant = ReactorSprite::from_pressure_state(&reactor.pressure_state);
+            sprite_state.present = true;
+        }
+        None => {
+            // No reactor in this scenario — keep resources at default so HUD
+            // widgets render an inert state rather than stale data.
+            *hp_bar = ReactorHpBarState::default();
+            *pressure_line = ReactorPressureLineState::default();
+            sprite_state.variant = ReactorSprite::Nominal;
+            sprite_state.present = false;
+        }
+    }
+
+    match snapshot.timer {
+        Some(timer) if timer.total_ticks > 0 && !timer.mission_terminal => {
+            let remaining_s = timer.remaining_seconds;
+            for (threshold_s, _severity, _caption) in WARNING_THRESHOLDS {
+                if remaining_s <= *threshold_s {
+                    let _ = timer_warnings.push_threshold(*threshold_s, remaining_s);
+                }
+            }
+            timer_warnings.update_color(remaining_s);
+        }
+        _ => {
+            // No active timer — leave already-fired warnings in place (they're
+            // single-shot per run by contract) but clear the color band so the
+            // HUD doesn't render a stale tint over a terminal mission.
+            timer_warnings.last_color = None;
+        }
     }
 }
 

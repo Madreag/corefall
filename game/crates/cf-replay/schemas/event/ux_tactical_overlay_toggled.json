@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ux_tactical_overlay_toggled.v1",
+  "title": "ux.tactical_overlay_toggled",
+  "description": "Emitted when the player toggles the Tab tactical overlay (Layer 2 of the smart commandable AI player UX).",
+  "type": "object",
+  "required": ["open", "sim_speed_pct"],
+  "properties": {
+    "open": { "type": "boolean" },
+    "sim_speed_pct": { "type": "integer", "minimum": 0, "maximum": 100 },
+    "focused_actor_id": { "type": ["integer", "null"], "minimum": 0 },
+    "open_count": { "type": "integer", "minimum": 0 }
+  }
+}

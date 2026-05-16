@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/mission_objective_branched.v1",
+  "title": "mission.objective_branched",
+  "description": "Emitted when the player picks one of two branches at a branching objective.",
+  "type": "object",
+  "required": ["branching_point_id", "chosen_branch"],
+  "properties": {
+    "branching_point_id": { "type": "string" },
+    "chosen_branch": { "type": "string" },
+    "other_branch": { "type": "string" },
+    "tick": { "type": "integer", "minimum": 0 }
+  }
+}

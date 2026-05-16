@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/replay_bookmark_added.v1",
+  "title": "replay.bookmark_added",
+  "description": "Emitted when the player drops a replay bookmark. Forward-compat for M33+ replay browser.",
+  "type": "object",
+  "required": ["tick", "label"],
+  "properties": {
+    "tick": { "type": "integer", "minimum": 0 },
+    "label": { "type": "string" }
+  }
+}

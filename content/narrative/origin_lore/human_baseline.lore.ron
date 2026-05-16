@@ -1,0 +1,19 @@
+OriginLore (
+    origin_id: "human_baseline",
+    canonical_name: "Human (Baseline)",
+    physical_description: "Anatomically modern Homo sapiens, post-collapse genetic baseline. Bipedal, omnivorous, oxygen-breathing, average height between 1.55 and 1.95 meters, average body mass between 55 and 95 kilograms. Skin pigmentation ranges across the full pre-collapse spectrum. Five thousand milliliters of blood as canonical survival resource; one hundred caloric units; vacuum-vulnerable; concussion-susceptible.",
+    cultural_traits: "The baseline humans are, by every Concordat census, the most populous origin in the Sol system, the most politically diverse, and the most prone to faction-switching across a career. Human culture inherits, on Earth, the long tail of pre-collapse traditions; on Mars and the Belt, the harder edge of post-collapse practicality; on the outer worlds, the survival-focused cultures of the long-isolated colonies. Humans speak more languages, sing more songs, and form more contradictory political opinions than any other origin. Human ceremonies are, by every available account, the most varied in the Sol system; baseline human funerals on the Moon are conducted in vacuum, on Earth in soil, on Mars in lava, and in the Belt in open vacuum at sustained orbital velocity.",
+    gameplay_strengths: "Adaptable across worlds — no environmental immunity loss, no tech tradition restriction. Standard caloric and stamina economy. Compatible with all faction-standard equipment. Compatible with synth-blood transfusion (cross-origin field rescue). Recovers fully from non-critical wounds with standard medical care.",
+    gameplay_weaknesses: "No environmental immunity bonuses. Vacuum-vulnerable (22-second TTD in unprotected vacuum). Concussion-susceptible. Standard hunger and thirst meters. Limited radiation tolerance compared to robotic or crystalline origins.",
+    home_world: "Earth (canonical); secondary homes across Mars, Moon, and the inhabited belt.",
+    notable_origins_in_corefall_universe: [
+        "Captain Marcus Hayes (Coalition)",
+        "Wrench Sandoval (Frontier)",
+        "Doctorate Halvor Tan (Collegium)",
+        "Captain Yara Solis (Starlight)",
+        "Three-Scars (Husks)",
+        "Doctorate Imara Reyes (Coalition)",
+        "Doc Lash Mukherjee (Frontier)",
+        "Yuki Bowstring (Ronin)",
+    ],
+)

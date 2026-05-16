@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0.0",
+  "palette_id": "powered_organic",
+  "display_name": "Powered Organic",
+  "category": "origin",
+  "description": "Biomechanical augmented organic; flesh fused with circuit conduits.",
+  "colors": [
+    { "role": "primary", "hex": "#825c54", "comment": "fleshy midtone" },
+    { "role": "secondary", "hex": "#3e2a25", "comment": "scar shadow" },
+    { "role": "accent", "hex": "#82d860", "comment": "augmentation glow" },
+    { "role": "highlight", "hex": "#c0d4a0", "comment": "skin highlight" },
+    { "role": "light", "hex": "#a98075", "comment": "skin light" },
+    { "role": "dark", "hex": "#1c100c", "comment": "deep flesh shadow" },
+    { "role": "metal", "hex": "#5a6a72", "comment": "implant alloy" },
+    { "role": "glow", "hex": "#aaff80", "comment": "circuit glow" }
+  ]
+}

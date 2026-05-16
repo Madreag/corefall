@@ -1,0 +1,30 @@
+MissionBriefing (
+    mission_id: "acid_rain_extraction_venus",
+    canonical_name: "Sky-Station Extraction",
+    faction_giver: "collegium",
+    world: "venus",
+    difficulty: "veteran",
+    objective_summary: "Extract a Collegium research team from a compromised Venus sky-station before the platform's atmospheric anchor fails, navigating through acid-rain conditions at altitude.",
+    briefing_text: "Captain. Tan. The Collegium's sky-station Acidshore-7 has, in the last six hours, sustained a hull breach at its atmospheric anchor mount. The platform is, as of this briefing, descending at a controlled rate of approximately forty meters per minute through the sulfuric cloud layer. The anchor has, by station engineering's analysis, somewhere between five and seven hours of remaining stability. After that, the platform will descend below the survivable altitude band and reach the surface. Our research team — three personnel: Researcher Anikka Boutros, Tech-Spec Felipe Mwangi, and a junior assistant whose name is on the manifest in your packet — is, as of this briefing, still aboard, attempting to recover six months of unique chemoautotroph samples that the Collegium cannot, by Concordat policy, abandon. The Coalition will not, in this op, provide air-recovery assets; the Venus atmosphere is too hostile for routine Coalition gear. The Collegium has authorized a single-purpose extraction craft — a modified Starlight pursuit chassis fitted with acid-resistant cladding — that Tran has volunteered to pilot. Your role is the extraction team. You will board the descending platform via the upper-deck hatch, locate the research team, recover the samples if operationally feasible, and return to the extraction craft within ninety minutes. Acid-rain exposure is, in this op, continuous; you will be operating with sealed gear in conditions that, by every available reading, the gear was not, in fact, designed for. The cladding will hold for approximately one hundred and ten minutes. Plan accordingly. The samples are, by Collegium policy, the priority below the research team. Do not, please, attempt heroic recovery if the platform's stability drops below the engineering team's threshold. The platform will, in that case, be considered lost.",
+    primary_objectives: [
+        "Board Acidshore-7 platform",
+        "Locate the three Collegium research team members",
+        "Extract the research team to the pursuit craft",
+        "Return to base before cladding failure",
+    ],
+    secondary_objectives: [
+        "Recover the chemoautotroph sample crate",
+        "Recover the platform's primary archive drive",
+        "Maintain pursuit craft cladding integrity above 30%",
+    ],
+    failure_conditions: [
+        "Platform descends below survivable altitude before extraction",
+        "Pursuit craft cladding fails",
+        "Research team casualties exceed one",
+        "Player downed without revival",
+    ],
+    reward_summary: "Collegium reputation +60; T3 acid-resistant gear unlock; Venus sky-station survey patch (rare); Tran's personal endorsement (informal favor); Collegium senior research credit.",
+    debrief_win: "Tan. All three personnel are in the Old Geneva infirmary, alive, with chemical burns Reyes is treating personally. The samples are in the secured lab. The archive drive is, by Boutros's own confirmation, intact. Tran returned the pursuit craft to dock at twelve percent cladding integrity, which is, by his standard, 'within nominal'. The Collegium will, in due course, publish the chemoautotroph monograph that this assignment made possible; the monograph will, by my own request, list you in the acknowledgments. The Coalition will, in due course, not list you anywhere; this is, in this researcher's professional opinion, a feature, not a bug.",
+    debrief_loss: "Tan. We did not extract the team in time. Acidshore-7 descended below the survivable altitude band approximately fourteen minutes before the cladding would have failed. The pursuit craft returned. The samples are lost. The research team is lost. The Collegium will, in due course, hold the service. I will, in private, ask that you do not, in this debrief, hear what I have to say to the assistant's family. The Collegium does not, by any reasonable standard, prepare its researchers for this kind of loss. I am, in private, very tired.",
+    voice_giver_id: "collegium_doctorate_halvor_tan",
+)

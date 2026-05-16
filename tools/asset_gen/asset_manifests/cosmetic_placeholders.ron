@@ -1,0 +1,63 @@
+// M9A cosmetic placeholders. Per-faction × per-type stubs (8 factions × 8
+// cosmetic types = 64 entries) per spec § "Cosmetic placeholders ...
+// per-faction cosmetic stub". M45A fills with Tier 2 ComfyUI variants.
+//
+// Plus per-faction emblems + capture-grid overlays at the bottom of this file.
+(
+    schema_version: "1.0.0",
+    category: "Cosmetic",
+    owner_milestone: "M9A",
+    pipeline_id: "M9A_svg_v1",
+    entries: [
+        ( canonical_name: "cosmetic_helmet_decal", kind: "cosmetic-stub", prompt: "helmet decal placeholder, faction crest" ),
+        ( canonical_name: "cosmetic_pauldron_stripe", kind: "cosmetic-stub", prompt: "pauldron stripe placeholder, faction color stripe" ),
+        ( canonical_name: "cosmetic_chest_emblem", kind: "cosmetic-stub", prompt: "chest emblem placeholder, faction symbol" ),
+        ( canonical_name: "cosmetic_arm_band", kind: "cosmetic-stub", prompt: "arm band placeholder, faction trim" ),
+        ( canonical_name: "cosmetic_leg_stripe", kind: "cosmetic-stub", prompt: "leg stripe placeholder, faction color trim" ),
+        ( canonical_name: "cosmetic_back_banner", kind: "cosmetic-stub", prompt: "back banner placeholder, faction banner silhouette" ),
+        ( canonical_name: "cosmetic_weapon_skin", kind: "cosmetic-stub", prompt: "weapon skin placeholder, faction color overlay" ),
+        ( canonical_name: "cosmetic_vehicle_skin", kind: "cosmetic-stub", prompt: "vehicle skin placeholder, faction color overlay" ),
+    ],
+    factions: [
+        "hostile_corp", "allied_resistance", "marauder_tribes", "religious_order",
+        "scientist_order", "mercenary_guild", "pirates", "drone_collective",
+    ],
+    // Emblems + capture-grid overlays handled in build_placeholders.py via this
+    // manifest's emblem and overlay arrays.
+    faction_emblems: [
+        "hostile_corp_full",
+        "hostile_corp_simple",
+        "allied_resistance_full",
+        "allied_resistance_simple",
+        "marauder_tribes_full",
+        "marauder_tribes_simple",
+        "religious_order_full",
+        "religious_order_simple",
+        "scientist_order_full",
+        "scientist_order_simple",
+        "mercenary_guild_full",
+        "mercenary_guild_simple",
+        "pirates_full",
+        "pirates_simple",
+        "drone_collective_full",
+        "drone_collective_simple",
+    ],
+    capture_grid_overlays: [
+        "overlay_capture_frame_default",
+        "overlay_capture_frame_bp1",
+        "overlay_capture_frame_bp2",
+        "overlay_capture_frame_bp3",
+        "overlay_capture_frame_bp4",
+        "overlay_capture_frame_m6",
+        "overlay_capture_frame_m7",
+        "overlay_capture_frame_m8",
+        "overlay_capture_frame_m9",
+        "overlay_capture_frame_m9a",
+        "overlay_capture_frame_m10",
+        "overlay_capture_frame_m11",
+        "overlay_logo_watermark_corner",
+        "overlay_seed_watermark_topright",
+        "overlay_tick_watermark_bottom",
+        "overlay_version_watermark_bottomleft",
+    ],
+)

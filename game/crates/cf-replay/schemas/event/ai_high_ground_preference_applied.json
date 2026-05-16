@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ai_high_ground_preference_applied.v1",
+  "title": "ai.high_ground_preference_applied",
+  "description": "Emitted when a Sniper / Spotter picks a high-ground waypoint before firing. Spec § High-ground preference.",
+  "type": "object",
+  "required": ["actor_id", "target_position"],
+  "properties": {
+    "actor_id": { "type": "integer", "minimum": 0 },
+    "target_position": { "type": "array", "minItems": 2, "maxItems": 2 },
+    "elevation_gain": { "type": "number" }
+  }
+}

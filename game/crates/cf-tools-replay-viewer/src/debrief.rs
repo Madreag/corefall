@@ -441,8 +441,141 @@ pub fn render_markdown(debrief: &Debrief<'_>) -> String {
             .map(|t| t.to_string())
             .unwrap_or_else(|| "—".into()),
     );
+    let _ = writeln!(out);
+
+    // ---- Cause chain (for losses only) — M10 § 18-section debrief ----
+    let _ = writeln!(out, "## Cause Chain");
+    let _ = writeln!(out);
+    let lost = debrief.outcome.result.as_deref().map(|r| r == "lost").unwrap_or(false);
+    if !lost {
+        let _ = writeln!(
+            out,
+            "_N/A — mission did not end in a loss; no failure chain to explain._"
+        );
+    } else {
+        let trigger = debrief.bundle.first_event_of_type("mission_resolved");
+        match trigger {
+            Some(trigger) => {
+                let chain = crate::cause_chain::trace(debrief.bundle, trigger, crate::cause_chain::DEFAULT_MAX_DEPTH);
+                let _ = writeln!(
+                    out,
+                    "Walk from `mission_resolved` back to the root cause (plain language):"
+                );
+                let _ = writeln!(out);
+                for link in &chain.links {
+                    let body = crate::renderer::render_event_body(link.event);
+                    let _ = writeln!(out, "- tick {} — {}", link.event.tick, body);
+                }
+                let term_label = match chain.terminated_reason {
+                    crate::cause_chain::ChainTermination::RootReached => "root reached",
+                    crate::cause_chain::ChainTermination::ParentMissingFromBundle => {
+                        "parent missing from bundle (partial bundle?)"
+                    }
+                    crate::cause_chain::ChainTermination::MaxDepthReached => "depth limit reached",
+                    crate::cause_chain::ChainTermination::CycleDetected => "cycle detected (corrupt bundle)",
+                };
+                let _ = writeln!(out, "\nChain depth: {} · termination: {term_label}.", chain.links.len());
+            }
+            None => {
+                let _ = writeln!(
+                    out,
+                    "_mission was lost per `result=lost` but no `mission_resolved` event was located_"
+                );
+            }
+        }
+    }
+    let _ = writeln!(out);
+
+    // ---- Accessibility surface — M10 § DR-012 audit trail ----
+    let _ = writeln!(out, "## Accessibility Surface");
+    let _ = writeln!(out);
+    let s = &debrief.bundle.manifest.settings;
+    let _ = writeln!(out, "- UI scale: `{}`", s.ui_scale);
+    let _ = writeln!(out, "- High contrast: `{}`", s.high_contrast);
+    let _ = writeln!(out, "- Captions: `{}`", s.captions);
+    let _ = writeln!(out, "- Reduced motion: `{}`", s.reduced_motion);
+    let _ = writeln!(out, "- Reduced shake: `{}`", s.reduced_shake);
+    let _ = writeln!(out, "- Reduced flash: `{}`", s.reduced_flash);
+    let _ = writeln!(out, "- Hold-to-confirm: `{}`", s.hold_to_confirm);
+    let _ = writeln!(out, "- Hold threshold ms: `{}`", s.hold_threshold_ms);
+    let _ = writeln!(out, "- Key remap enabled: `{}`", s.key_remap_enabled);
+    let _ = writeln!(out, "- Key bindings: {}", s.key_bindings.len());
+    let _ = writeln!(out);
+
+    // ---- Recorder health — M10 § 18-section debrief ----
+    let _ = writeln!(out, "## Recorder Health");
+    let _ = writeln!(out);
+    let _ = writeln!(
+        out,
+        "- Total events: {}",
+        debrief
+            .key_events
+            .by_category
+            .values()
+            .sum::<u64>()
+            .max(debrief.bundle.summary.event_counts.total)
+    );
+    let _ = writeln!(out, "- Dropped events: {}", debrief.key_events.dropped_total);
+    let _ = writeln!(out, "- Error severity events: {}", debrief.key_events.error_count);
+    let _ = writeln!(out, "- Warning severity events: {}", debrief.key_events.warn_count);
+    let categories_active = debrief.key_events.by_category.len();
+    let _ = writeln!(out, "- Categories with events: {}", categories_active);
+    if debrief.key_events.dropped_total > 0 {
+        let _ = writeln!(
+            out,
+            "- ⚠ Recorder dropped events under backpressure (cosmetic drops are expected)."
+        );
+    } else {
+        let _ = writeln!(out, "- Recorder under capacity (0 drops)");
+    }
+    let _ = writeln!(out);
+
+    // ---- Thinking timeline (per-bot AI panel) — M10 § smart-AI surface ----
+    let _ = writeln!(out, "## Thinking Timeline");
+    let _ = writeln!(out);
+    let died_actor = thinking_timeline_actor_id(debrief.bundle);
+    match died_actor {
+        Some(actor_id) => {
+            let entries = crate::thinking_timeline::build_timeline(debrief.bundle, actor_id);
+            // Spec: "render the killed actor's full thinking timeline for the
+            // last 10 ticks before death". Use the death tick as the upper
+            // bound and slice to last 10.
+            let died_at_tick = debrief
+                .bundle
+                .events
+                .iter()
+                .find(|e| e.event_type == "actor_died" && event_actor_id(e) == Some(actor_id))
+                .map(|e| e.tick);
+            let entries = crate::thinking_timeline::slice_window(&entries, died_at_tick, Some(10));
+            let panel = crate::thinking_timeline::render_markdown(actor_id, &entries);
+            out.push_str(&panel);
+        }
+        None => {
+            let _ = writeln!(out, "_no `actor_died` events in this bundle_");
+        }
+    }
 
     out
+}
+
+fn thinking_timeline_actor_id(bundle: &crate::bundle::Bundle) -> Option<u64> {
+    bundle
+        .events
+        .iter()
+        .filter(|e| e.event_type == "actor_died")
+        .find_map(event_actor_id)
+}
+
+fn event_actor_id(event: &cf_replay::Event) -> Option<u64> {
+    if let Some(id) = event.actor_id {
+        return Some(id);
+    }
+    // Engine emits both "actor_id" and the shorter "actor" key on
+    // various lifecycle events — see cf-control/src/engine.rs grep.
+    if let Some(id) = event.payload.get("actor_id").and_then(|v| v.as_u64()) {
+        return Some(id);
+    }
+    event.payload.get("actor").and_then(|v| v.as_u64())
 }
 
 /// Render a debrief as JSON for tooling. Used by `--json` flag.
@@ -673,6 +806,10 @@ mod tests {
             "## Terrain Changes",
             "## Key Events",
             "## Checksum Status",
+            "## Cause Chain",
+            "## Accessibility Surface",
+            "## Recorder Health",
+            "## Thinking Timeline",
         ] {
             assert!(md.contains(h), "debrief markdown missing heading {h}");
         }

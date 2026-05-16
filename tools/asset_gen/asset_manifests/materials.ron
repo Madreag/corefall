@@ -1,0 +1,32 @@
+// M9A materials manifest. 17 materials × 5 integrity bands (pristine /
+// scratched / cracked / critical / destroyed) = 85 swatches per spec §
+// "Material swatches with integrity bands".
+// Also generates 5 overlay-mode tints per material (integrity / pathability /
+// mobility / hazard / build-repair) for the M3 5-mode overlay = 85 tints.
+(
+    schema_version: "1.0.0",
+    category: "MaterialSwatch",
+    owner_milestone: "M9A",
+    pipeline_id: "M9A_svg_v1",
+    entries: [
+        ( canonical_name: "dirt", kind: "material-swatch", prompt: "dirt material swatch, granular noise" ),
+        ( canonical_name: "concrete", kind: "material-swatch", prompt: "concrete material swatch, uniform speckle" ),
+        ( canonical_name: "metal_nohook", kind: "material-swatch", prompt: "reinforced metal swatch, plate seams" ),
+        ( canonical_name: "hazard", kind: "material-swatch", prompt: "hazard tile swatch, diagonal stripes" ),
+        ( canonical_name: "loose_fill", kind: "material-swatch", prompt: "loose fill rubble swatch, scattered chunks" ),
+        ( canonical_name: "repair_fill", kind: "material-swatch", prompt: "repair foam swatch, bubbly pattern" ),
+        ( canonical_name: "anchor", kind: "material-swatch", prompt: "anchor rock swatch, layered strata" ),
+        ( canonical_name: "ice", kind: "material-swatch", prompt: "ice swatch, crystalline facets" ),
+        ( canonical_name: "lava", kind: "material-swatch", prompt: "lava swatch, glowing flow lines" ),
+        ( canonical_name: "wood", kind: "material-swatch", prompt: "wood swatch, grain lines" ),
+        ( canonical_name: "alloy", kind: "material-swatch", prompt: "alloy plate swatch, brushed metal" ),
+        ( canonical_name: "glass", kind: "material-swatch", prompt: "glass swatch, translucent panels" ),
+        ( canonical_name: "mud", kind: "material-swatch", prompt: "mud swatch, wet earth blobs" ),
+        ( canonical_name: "sand", kind: "material-swatch", prompt: "sand swatch, fine grain stipple" ),
+        ( canonical_name: "snow", kind: "material-swatch", prompt: "snow swatch, soft drift" ),
+        ( canonical_name: "circuit", kind: "material-swatch", prompt: "circuit substrate swatch, trace patterns" ),
+        ( canonical_name: "biomatter", kind: "material-swatch", prompt: "biomatter swatch, organic streaks" ),
+    ],
+    integrity_bands: ["pristine", "scratched", "cracked", "critical", "destroyed"],
+    overlay_modes: ["integrity", "pathability", "mobility", "hazard", "build_repair"],
+)

@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ai_autonomy_mode_changed.v1",
+  "title": "ai.autonomy_mode_changed",
+  "description": "Emitted when an actor's autonomy mode changes via act.player.set_autonomy_mode. Spec § Smart commandable AI — Layer 1 Autonomy mode.",
+  "type": "object",
+  "required": ["actor_id", "from", "to"],
+  "properties": {
+    "actor_id": { "type": "integer", "minimum": 0 },
+    "from": { "type": "string", "enum": ["full_auto", "standard", "manual"] },
+    "to": { "type": "string", "enum": ["full_auto", "standard", "manual"] }
+  }
+}

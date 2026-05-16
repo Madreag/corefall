@@ -289,6 +289,17 @@ pub struct ObserveAiParams {
     pub actor_id: u64,
 }
 
+/// **M6**: `observe.perception` — return per-actor perception projection
+/// (sight cone + hearing radius + stealth meter + last footstep loudness
+/// band + last occlusion factor). `actor_id=None` resolves to the player.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ObservePerceptionParams {
+    pub schema_version: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub actor_id: Option<u64>,
+}
+
 /// **M2 re-audit (2026-05-13)**: `inspect.mission` — return the full
 /// `MissionState` + objectives[] + commander stub. No params required.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
@@ -380,6 +391,21 @@ pub struct InspectMaterialParams {
     pub id: u8,
 }
 
+/// **M9** (audit round-3 fix gap 3): `observe.terrain.material_at { x, y }`
+/// returns the MaterialInfo at world-space coordinates with the nine
+/// affordance flags (actor_passable, projectile_passable, diggable,
+/// anchorable, blocks_light, contact_damage, path_cost, produces_debris,
+/// produces_sound) plus integrity (from the per-pixel meta grid) plus
+/// color_hex (from the material registry). Powers spec § "Material
+/// affordance tooltip" and the integrity-overlay reticle.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ObserveTerrainMaterialAtParams {
+    pub schema_version: u32,
+    pub x: f32,
+    pub y: f32,
+}
+
 fn default_true() -> bool {
     true
 }
@@ -442,6 +468,7 @@ pub fn dump_v1() -> BTreeMap<String, String> {
         entry::<ActPlayerAnchorParams>("act_player_anchor_params"),
         entry::<ObserveMissionParams>("observe_mission_params"),
         entry::<ObserveAiParams>("observe_ai_params"),
+        entry::<ObservePerceptionParams>("observe_perception_params"),
         entry::<InspectMissionParams>("inspect_mission_params"),
         entry::<InspectAiParams>("inspect_ai_params"),
         entry::<ActPlayerCrouchParams>("act_player_crouch_params"),
@@ -462,6 +489,7 @@ pub fn dump_v1() -> BTreeMap<String, String> {
         entry::<ActToggleMaterialOverlayParams>("act_toggle_material_overlay_params"),
         entry::<InspectTerrainChunkParams>("inspect_terrain_chunk_params"),
         entry::<InspectMaterialParams>("inspect_material_params"),
+        entry::<ObserveTerrainMaterialAtParams>("observe_terrain_material_at_params"),
         entry::<RunBundleWriteParams>("run_bundle_write_params"),
         entry::<SystemShutdownParams>("system_shutdown_params"),
         entry::<SettingsPatch>("settings_patch"),

@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/perception.occlusion_applied.v0.1",
+  "title": "perception.occlusion_applied",
+  "type": "object",
+  "required": ["actor", "factor"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "factor": {"type": "number", "minimum": 0.0, "maximum": 1.0}
+  },
+  "additionalProperties": true
+}

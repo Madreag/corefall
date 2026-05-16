@@ -1,0 +1,10 @@
+{
+  "scenario": "micro_reactor_defense",
+  "tick_rate_hz": 60,
+  "description": "M9 veteran difficulty: faster-firing guard, tighter perf bar, lower reactor HP. Per M9 spec § Sim numbers (Veteran column): Reactor max_hp=60, Guard fire_interval_ms=500, Guard damage per shot=8, Trench-shape threshold=300 pixels.",
+  "steps": [
+    { "method": "act.settings.set", "params": { "difficulty": "veteran" } },
+    { "method": "scenario.reset", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 3600 } }
+  ]
+}

@@ -8,6 +8,7 @@ publish.workspace = true
 
 [dependencies]
 serde = { workspace = true }
+serde_json = { workspace = true }
 tracing = { workspace = true }
 bevy = { workspace = true }
 cf-actor = { path = "../cf-actor" }

@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.0.0",
+  "style_id": "heavy_biomech",
+  "category": "origin",
+  "version": "1.0.0",
+  "silhouette_language": "oversized chassis, heavy armor plates, exposed musculature stripes, shoulder-mounted intake vents",
+  "preferred_palette_roles": ["primary", "secondary", "accent", "metal", "glow"],
+  "shape_descriptors": {
+    "head_proportion": "1.2",
+    "torso_proportion": "3.0",
+    "limb_proportion": "2.2",
+    "joints": "thick plate-and-piston",
+    "augmentations": "vent ports on torso + shoulders"
+  },
+  "geometric_primitives": {
+    "actor": ["rect", "polygon", "circle"]
+  }
+}

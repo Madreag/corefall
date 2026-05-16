@@ -42,7 +42,24 @@
     clippy::ref_option,
     clippy::too_many_lines,
     clippy::trivially_copy_pass_by_ref,
-    clippy::large_enum_variant
+    clippy::large_enum_variant,
+    // M7-A additions — the 5-layer thinking stack + archetype + memory
+    // surface trips a few additional pedantic lints whose intent doesn't
+    // apply here (e.g. `from_str` is an inherent constructor distinct
+    // from the FromStr trait; the M7-A enums use the inherent form by spec).
+    clippy::should_implement_trait,
+    clippy::explicit_iter_loop,
+    clippy::needless_lifetimes,
+    clippy::redundant_closure,
+    clippy::match_same_arms,
+    clippy::similar_names,
+    clippy::map_unwrap_or,
+    clippy::assigning_clones,
+    clippy::needless_range_loop,
+    clippy::manual_clamp,
+    clippy::unused_self,
+    clippy::struct_field_names,
+    clippy::elidable_lifetime_names
 )]
 
 use serde::{Deserialize, Serialize};
@@ -54,9 +71,85 @@ use cf_sim_core::Rng;
 // modules so consumers that import per the spec paths
 // (`cf_ai::perception::*` / `cf_ai::guard_state::*` / `cf_ai::difficulty::*`)
 // compile cleanly.
+pub mod components;
 pub mod difficulty;
 pub mod guard_state;
 pub mod perception;
+pub mod systems;
+
+// **M7-A**: smart commandable AI surface. Modules are organised so the
+// 5-layer thinking stack (Reactive / Utility / BehaviorTree / HTN / LLM
+// prior) is composable + testable in isolation; the engine drives the
+// stack via `ThinkingStack::tick` once per AI tick per bot. M7-B will
+// refactor the PriorityTable + autonomy/role cfctl surface into the
+// dedicated `cf-priority` crate.
+pub mod archetype;
+pub mod auto_repair;
+pub mod auto_triage;
+pub mod autonomy;
+pub mod behavior_tree;
+pub mod bot_memory;
+pub mod cf_mind;
+pub mod constants;
+pub mod cover_seeking;
+pub mod faction;
+pub mod friendly_fire;
+pub mod high_ground;
+pub mod htn;
+pub mod llm_prior;
+pub mod patrol;
+pub mod personality;
+pub mod priority;
+pub mod reactive;
+pub mod reason_label;
+pub mod retreat;
+pub mod squad_comm;
+pub mod suppression;
+pub mod task;
+pub mod thinking_stack;
+pub mod utility;
+
+// **M9** § Reactive guard targeting + path reaction — utility scoring
+// over (reactor, player) candidate set + recovery action picker for
+// terrain dirty region intersections.
+pub mod path_reaction;
+pub mod target_selection;
+
+pub use archetype::Archetype;
+pub use auto_repair::{AutoRepairInitiatedEvent, AutoRepairMission, AutoRepairProgressedEvent, AutoRepairState};
+pub use auto_triage::{AutoTriageAppliedEvent, AutoTriageInitiatedEvent, AutoTriageMission, AutoTriageState};
+pub use autonomy::{AutonomyMode, DoctrineMode};
+pub use behavior_tree::{BehaviorAction, BehaviorTreeLayer, BtNode};
+pub use bot_memory::{
+    AllyMemoryRecord, BotMemory, PerceptionCell, RecentEvent, RecentEventKind, RecentEventRing, ThreatMemoryRecord,
+    ThreatWeaponClass, ALLY_MEMORY_CAPACITY, PERCEPTION_GRID_CELLS, PERCEPTION_GRID_DIM, RECENT_EVENTS_RING_DEPTH,
+    THREAT_MEMORY_CAPACITY,
+};
+pub use cf_mind::{Doctrine, LlmMind, MindContext, NullLlmMind};
+pub use constants::{
+    seconds_to_ticks_for, CHATTER_COOLDOWN_SECONDS, ENGINEER_AUTO_REPAIR_FIRST_TICK_SECONDS,
+    ENGINEER_AUTO_REPAIR_REACH_SECONDS, MEDIC_AUTO_TRIAGE_APPLY_SECONDS, MEDIC_AUTO_TRIAGE_REACH_SECONDS,
+    PATROL_IDLE_MAX_SECONDS, PATROL_IDLE_MIN_SECONDS, SQUAD_COMM_RELAY_DELAY_SECONDS,
+};
+pub use cover_seeking::{CoverSeekingEvent, CoverSeekingReason};
+pub use faction::{FactionId, FactionRelationships, RelationshipChangedEvent};
+pub use friendly_fire::{FriendlyFireAvoidanceEvent, FriendlyFireKind};
+pub use high_ground::HighGroundEvent;
+pub use htn::{HtnGoal, HtnLayer, HtnRootGoal};
+pub use llm_prior::{DoctrinePrior, LlmPriorLayer};
+pub use patrol::{PatrolRoute, PatrolWaypointReachedEvent};
+pub use personality::{MoodChangedEvent, PersonalityProfile, PersonalityTrait};
+pub use priority::{PriorityTable, QuickPreset};
+pub use reactive::{ReactiveDecision, ReactiveLayer};
+pub use reason_label::{ReasonLabel, ReasonLabelRing, REASON_LABEL_RING_DEPTH};
+pub use retreat::{effective_retreat_threshold, RetreatDecisionEvent, RetreatReason};
+pub use squad_comm::{SquadCommPending, SquadCommRelayedEvent};
+pub use suppression::SuppressionEvent;
+pub use task::TaskType;
+pub use thinking_stack::{
+    format_task_camel, AiTickOutput, Layer, LayerKind, LayerOutput, ThinkingContext, ThinkingStack,
+};
+pub use utility::{base_utility, situational_bonus, ScoredTask, UtilityLayer};
 
 /// Tunable parameters for the M1.5 reactive guard.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]

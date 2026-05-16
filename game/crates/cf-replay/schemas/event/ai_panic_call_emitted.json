@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ai_panic_call_emitted.v1",
+  "title": "ai.panic_call_emitted",
+  "description": "Emitted when the player presses M / R / G (medic / engineer / grenade) panic surface. Spec § Single-key panic commands.",
+  "type": "object",
+  "required": ["kind", "issuer_actor_id", "responder_found"],
+  "properties": {
+    "kind": { "type": "string", "enum": ["medic", "engineer", "grenade"] },
+    "issuer_actor_id": { "type": "integer", "minimum": 0 },
+    "responder_found": { "type": "boolean" },
+    "responder_actor_id": { "type": ["integer", "null"], "minimum": 0 }
+  }
+}

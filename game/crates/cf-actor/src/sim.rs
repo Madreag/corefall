@@ -291,6 +291,31 @@ pub struct ActorTickOutcome {
     /// `control.command_rejected reason="reloading"`.
     #[serde(default)]
     pub fire_denied_reloading: bool,
+    /// **M6**: latched when the player pressed fire this tick but the
+    /// actor's weapon swap was still in flight. Engine emits
+    /// `actor.action_rejected reason="swap_in_progress"`.
+    #[serde(default)]
+    pub fire_denied_by_swap: bool,
+    /// **M6**: bipod state at fire time. When deployed, the engine reports
+    /// reduced recoil/bloom via [`outcome.recoil_applied`] +
+    /// [`outcome.bloom_factor`] (already multiplied by the bipod factors)
+    /// and surfaces the flag in the `equipment.weapon_fired` event for
+    /// replay consumers.
+    #[serde(default)]
+    pub bipod_deployed_at_fire: bool,
+    /// **M6**: suppressor state at fire time. When attached, the engine
+    /// already multiplied `loudness_radius` by the suppressor factor; this
+    /// flag is surfaced so the `equipment.alarm_registered` event can
+    /// carry `suppressed=true`.
+    #[serde(default)]
+    pub suppressor_attached_at_fire: bool,
+    /// **M6**: round popped from the magazine on this tick's shot. None
+    /// when no shot fired.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub popped_round: Option<cf_equipment::PoppedRound>,
+    /// **M6**: shell ejection emitted by the shot. None when no shot fired.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub shell_ejection: Option<cf_equipment::ShellEjection>,
     pub fired: bool,
     pub dry_fire: bool,
     pub muzzle_origin: Option<Vec2>,
@@ -609,6 +634,11 @@ fn step_one_actor<R: FnMut() -> u64>(
             loudness_radius: 0.0,
             bloom_factor: actor.bloom_factor,
             travel_impulse_damage: false,
+            fire_denied_by_swap: false,
+            bipod_deployed_at_fire: false,
+            suppressor_attached_at_fire: false,
+            popped_round: None,
+            shell_ejection: None,
         };
 
         if intent.reset {
@@ -815,16 +845,27 @@ fn step_one_actor<R: FnMut() -> u64>(
     // **M5**: a destroyed `HandRight` / `ForearmRight` / `ArmRight` zone with
     // `disables_rifle_when_destroyed=true` in the BodyGraph movement contribution
     // gates the fire path so a player with a blown-off rifle arm cannot keep shooting.
-    let (rifle_selected, rifle_disabled_by_limb_loss, weapon_jammed) = {
+    //
+    // **M6**: `ActorState::weapon_fire_mode` selects between Single / Burst3 /
+    // Charge / Arc / Auto. The cf-control engine pre-processes Charge holds
+    // (accumulating `weapon_charge_fraction` up to
+    // [`cf_equipment::SNIPER_CHARGE_MAX_SECONDS`]) and post-processes the
+    // fired projectile with [`cf_equipment::charge_damage_multiplier`] +
+    // burst-3 follow-up + GL Arc conversion. The sim itself remains M1-shape;
+    // the fire-mode hooks live in the engine because they cross multiple
+    // sim ticks.
+    let (rifle_selected, rifle_disabled_by_limb_loss, weapon_jammed, swap_in_progress) = {
         let actor = state.world.actors.get(&actor_id);
         let selected = actor.is_some_and(|a| a.inventory.selected_item().is_rifle());
+        let swap = actor.is_some_and(|a| a.weapon_swap_in_progress);
         let (rifle_off, jammed) = actor.and_then(|a| a.chassis.as_ref()).map_or((false, false), |c| {
             let (_, _, disable_rifle, _, _, _) = c.body_graph.movement_factor(&c.destroyed_zones());
             (disable_rifle, c.weapon_jammed)
         });
-        (selected, rifle_off, jammed)
+        (selected, rifle_off, jammed, swap)
     };
-    let can_fire = rifle_selected && !rifle_disabled_by_limb_loss && !weapon_jammed;
+    let can_fire = rifle_selected && !rifle_disabled_by_limb_loss && !weapon_jammed && !swap_in_progress;
+    outcome.fire_denied_by_swap = swap_in_progress && (intent.fire || intent.fire_held);
     let rifle_outcomes = if let Some(rifle) = state.rifles.get_mut(&actor_id) {
         let inputs = RifleTickInputs {
             // Fire is honored on either the edge `intent.fire` or the sticky
@@ -847,12 +888,70 @@ fn step_one_actor<R: FnMut() -> u64>(
 
     if rifle_outcomes.fired_this_tick {
         outcome.fired = true;
-        outcome.recoil_applied = rifle_outcomes.recoil_impulse_applied;
+        // **M6**: read bipod + suppressor state from the actor BEFORE the
+        // recoil scaling so we can attribute the multiplied impulse and
+        // loudness to the correct attachment. The bipod bloom multiplier
+        // is applied later (after the per-stance multiplier) in the bloom
+        // assignment below so it composes with stance + sharp aim + reload
+        // contributions instead of being overwritten by the final
+        // `outcome.bloom_factor = bloom` assignment.
+        let (bipod_recoil_factor, bipod_deployed, suppressor_factor, suppressor_attached) =
+            state.world.actors.get(&actor_id).map_or((1.0, false, 1.0, false), |a| {
+                (
+                    a.bipod.recoil_factor(),
+                    a.bipod.equipped && a.bipod.state == cf_equipment::BipodState::Deployed,
+                    a.suppressor.loudness_factor(),
+                    a.suppressor.attached && a.suppressor.integrity > 0.0,
+                )
+            });
+        let effective_recoil = rifle_outcomes.recoil_impulse_applied * bipod_recoil_factor;
+        outcome.recoil_applied = effective_recoil;
+        outcome.bipod_deployed_at_fire = bipod_deployed;
+        outcome.suppressor_attached_at_fire = suppressor_attached;
         let (spec, max_flight) = state
             .rifles
             .get(&actor_id)
             .map(|r| (r.spec.clone(), r.projectile_max_flight_ticks()))
             .expect("fired rifle must have a state");
+
+        // **M6**: surface the deterministic Magazine::pop_next_round + shell
+        // ejection so the engine can emit equipment.magazine_changed +
+        // equipment.shell_ejected. The M1 RifleState.ammo_in_mag decrement
+        // remains the source of truth for the tracer cadence (preserved in
+        // outcomes.fired_is_tracer); the Magazine struct here exposes the
+        // same CCCP `Magazine::PopNextRound` semantics for the new event
+        // family while remaining byte-compatible with M1's tracer pattern.
+        let (popped_round, shell_ejection) = {
+            let _mag_capacity = spec.mag_capacity.max(1);
+            let mag_remaining = state.rifles.get(&actor_id).map_or(0, |r| r.ammo_in_mag);
+            let round_kind = if rifle_outcomes.fired_is_tracer {
+                cf_equipment::RoundKind::Tracer
+            } else {
+                cf_equipment::RoundKind::Regular
+            };
+            let popped = cf_equipment::PoppedRound {
+                round_kind,
+                remaining_in_mag: mag_remaining,
+            };
+            let shell_id = state.allocate_projectile_id();
+            let facing_sign =
+                state
+                    .world
+                    .actors
+                    .get(&actor_id)
+                    .map_or(1.0_f32, |a| if a.aim.x >= 0.0 { 1.0_f32 } else { -1.0_f32 });
+            let position = state.world.actors.get(&actor_id).map_or(Vec2::ZERO, |a| a.position);
+            let shell = cf_equipment::ShellEjection::default_for(
+                cf_equipment::ShellKind::Rifle,
+                shell_id,
+                position.x,
+                position.y + 4.0,
+                facing_sign,
+            );
+            (popped, shell)
+        };
+        outcome.popped_round = Some(popped_round);
+        outcome.shell_ejection = Some(shell_ejection);
 
         // Reborrow actor briefly to apply recoil + read aim/position.
         let (muzzle, aim, base_velocity, damage) = {
@@ -864,12 +963,7 @@ fn step_one_actor<R: FnMut() -> u64>(
             // M1 re-audit (2026-05-13): use mass-aware F=ma form.
             // mass_kg=80 (baseline) → same Δv as legacy apply_recoil.
             // mass_kg=160 (heavy) → half the Δv; mass_kg=40 (light) → 2× Δv.
-            actor.velocity.x = apply_recoil_with_mass(
-                actor.velocity.x,
-                actor.aim.x,
-                rifle_outcomes.recoil_impulse_applied,
-                actor.mass_kg,
-            );
+            actor.velocity.x = apply_recoil_with_mass(actor.velocity.x, actor.aim.x, effective_recoil, actor.mass_kg);
             let aim = if actor.aim == Vec2::ZERO {
                 Vec2::new(1.0, 0.0)
             } else {
@@ -901,7 +995,9 @@ fn step_one_actor<R: FnMut() -> u64>(
         };
         outcome.muzzle_origin = Some(muzzle);
         // Loudness radius (CCCP HDFirearm.cpp:948): scaled by spec.loudness too.
-        let loudness_radius = 480.0_f32 * (damage / 10.0).clamp(1.0, 3.0) * spec.loudness.max(0.1);
+        // **M6**: when a suppressor is attached + intact, loudness × 0.4 per
+        // [`cf_equipment::SUPPRESSOR_LOUDNESS_FACTOR`].
+        let loudness_radius = 480.0_f32 * (damage / 10.0).clamp(1.0, 3.0) * spec.loudness.max(0.1) * suppressor_factor;
         outcome.loudness_radius = loudness_radius;
 
         // Per-particle spawn loop. Particle count >= 1; >1 produces a spread
@@ -979,7 +1075,7 @@ fn step_one_actor<R: FnMut() -> u64>(
                 .get_mut(&actor_id)
                 .expect("actor id exists by construction");
             let sign = if actor.recoil_alternation_sign >= 0 { 1.0 } else { -1.0 };
-            let contribution = rifle_outcomes.recoil_impulse_applied / 100.0;
+            let contribution = effective_recoil / 100.0;
             actor.recoil_accumulator += sign * contribution;
             actor.recoil_alternation_sign = -actor.recoil_alternation_sign;
             if actor.recoil_alternation_sign == 0 {
@@ -1134,6 +1230,15 @@ fn step_one_actor<R: FnMut() -> u64>(
         // Sharp aim tightens the reticle (scaled by progress).
         let sharp_tighten = 1.0 - 0.6 * actor.sharp_aim_progress;
         bloom *= sharp_tighten.max(0.4);
+        // M6: per-stance bloom multiplier (crouch=0.6×, prone=0.4×, etc.).
+        bloom *= crate::stance::stance_bloom_factor(actor.stance());
+        // M6: deployed bipod attenuates bloom by BIPOD_BLOOM_FACTOR (0.5).
+        // Applied here (before the final assignments below) so the
+        // attenuation composes with the stance multiplier and survives
+        // through to `actor.bloom_factor` + `outcome.bloom_factor`.
+        if actor.bipod.equipped && actor.bipod.state == cf_equipment::BipodState::Deployed {
+            bloom *= cf_equipment::BIPOD_BLOOM_FACTOR;
+        }
         actor.bloom_factor = bloom;
         outcome.bloom_factor = bloom;
 

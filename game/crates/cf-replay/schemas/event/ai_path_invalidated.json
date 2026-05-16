@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/ai.path_invalidated.v0.1",
+  "title": "ai.path_invalidated",
+  "description": "M9 § Reactive guard targeting + path reaction — emitted when a freshly-carved terrain dirty-region bbox crosses a guard's planned pursuit line, invalidating its cached path. Distinct from terrain.path_invalidated (which signals a generic dirty-region flush) by carrying a per-guard payload with actor + old_path + fraction_of_path_dirty so M10 viewer can render 'the AI noticed the carve'. Parent event chain points back at the originating terrain.terrain_dirty_region_batch. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "ai" },
+    "event_type": { "const": "path_invalidated" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor": { "type": "integer", "minimum": 0 },
+        "actor_id": { "type": "integer", "minimum": 0 },
+        "bbox": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "min": { "type": "array", "minItems": 2, "maxItems": 2 },
+            "max": { "type": "array", "minItems": 2, "maxItems": 2 }
+          },
+          "required": ["min", "max"]
+        },
+        "old_path": {
+          "type": "array",
+          "items": { "type": "array", "minItems": 2, "maxItems": 2 }
+        },
+        "reason": { "type": "string" },
+        "fraction_of_path_dirty": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "parent_event_id": { "type": ["string", "null"] }
+      },
+      "required": ["actor", "actor_id", "bbox", "old_path", "reason", "fraction_of_path_dirty"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

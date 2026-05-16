@@ -57,12 +57,16 @@
 // modules so consumers that import per the spec paths
 // (`cf_terrain::breach::*`, `cf_terrain::chunk::*`, `cf_terrain::dirty::*`,
 // `cf_terrain::carve::*`, `cf_terrain::checksum::*`) compile cleanly.
+pub mod active_region;
 pub mod breach;
 pub mod carve;
 pub mod checksum;
 pub mod chunk;
 pub mod chunked;
+pub mod constants;
 pub mod dirty;
+pub mod integrity;
+pub mod parallel;
 
 pub use chunked::{
     material_affordance, material_id_from_name, material_name_from_id, Chunk, ChunkCoord, ChunkedCarveNoOp,
@@ -70,6 +74,11 @@ pub use chunked::{
     ChunkedTerrainSnapshotChunk, MaterialAffordance, MaterialId, MaterialRegistry, TerrainStamp, CHUNK_SIZE,
     MATERIAL_AIR, MATERIAL_ANCHOR, MATERIAL_CONCRETE, MATERIAL_DIRT, MATERIAL_HAZARD, MATERIAL_LOOSE_FILL,
     MATERIAL_METAL_NOHOOK, MATERIAL_REPAIR_FILL, MATERIAL_SCHEMA_VERSION,
+};
+pub use integrity::{
+    apply_damage_formula, normalized_hardness, BandCrossing, CascadeEvent, DamageKind, IntegrityBand,
+    PenetrationOutcome, PixelMeta, PixelMetaGrid, PixelMetaKey, DEFAULT_CASCADE_DECAY_PCT, DEFAULT_CASCADE_DEPTH,
+    DEFAULT_CASCADE_THRESHOLD,
 };
 
 use std::collections::BTreeMap;

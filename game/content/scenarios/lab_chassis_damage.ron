@@ -9,6 +9,6 @@
   actors: [(id: 1, team: "blue", spawn: (100.0, 32.0), controllable: true, hp: 100.0, inventory: (rifle: Some("rifle_m1_default")), half_extents: Some((8.0, 16.0)))],
   objectives: [], director: None,
   capabilities: (debug: false, control_api: true, save_load: false),
-  save_fields: [], expected_tests: [], notes: "Lab sandbox for lab_chassis_damage.",
+  save_fields: [], expected_tests: ["DR023-LAB-CHASSIS-DAMAGE-01"], notes: "Lab sandbox for lab_chassis_damage.",
   scenario_tags: ["lab"],
 )

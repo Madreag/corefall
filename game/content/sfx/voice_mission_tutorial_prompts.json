@@ -1,0 +1,108 @@
+{
+  "schema_version": 1,
+  "description": "M37A mission briefing + debrief + tutorial narration voice prompts. 12 missions x (briefing + debrief_win + debrief_loss) = 36 mission lines + 8 tutorial labs x 8-12 beats = 80 tutorial lines.",
+  "audio_format": {
+    "channels": 1,
+    "sample_rate_hz": 48000,
+    "bit_depth": 16,
+    "target_peak_dbfs": -16.0,
+    "target_lufs_integrated": -22.0,
+    "max_duration_sec": 30.0
+  },
+  "synthesis_backends": {
+    "primary": "elevenlabs_v3_premium",
+    "fallback": "coqui_xtts_v2"
+  },
+  "mission_voice_prompts": [
+    {"id": "voice_briefing_first_contract_coalition", "mission_id": "first_contract_coalition", "voice_id": "coalition_marcus_authoritative_male", "hook": "briefing", "text": "Welcome to the Coalition contractor program. Your first job: clear hostiles from a perimeter outpost. Standard issue rifle. Two squadmates. Mendez will brief medical. Park will brief engineering. Move out when ready."},
+    {"id": "voice_debrief_win_first_contract_coalition", "mission_id": "first_contract_coalition", "voice_id": "coalition_marcus_authoritative_male", "hook": "debrief_win", "text": "Clean run. Your file is updated. The Concordat is satisfied. Next contract available in twelve hours."},
+    {"id": "voice_debrief_loss_first_contract_coalition", "mission_id": "first_contract_coalition", "voice_id": "coalition_marcus_authoritative_male", "hook": "debrief_loss", "text": "Not the start we hoped for. Your file is updated. Recover, refit, retry."},
+
+    {"id": "voice_briefing_reactor_defense_mars", "mission_id": "reactor_defense_mars", "voice_id": "coalition_marcus_authoritative_male", "hook": "briefing", "text": "Mars Reactor Site Three is under coordinated assault. Marauder Tribes plus salvage opportunists. The reactor cannot fall. You and your team hold it for thirty minutes. Resupply at fifteen and twenty-five. Engineer Park is in support."},
+    {"id": "voice_debrief_win_reactor_defense_mars", "mission_id": "reactor_defense_mars", "voice_id": "coalition_marcus_authoritative_male", "hook": "debrief_win", "text": "Reactor held. Coalition Mars Command logs your name. Park sends his thanks."},
+    {"id": "voice_debrief_loss_reactor_defense_mars", "mission_id": "reactor_defense_mars", "voice_id": "coalition_marcus_authoritative_male", "hook": "debrief_loss", "text": "Reactor lost. Initial estimates: four thousand Concordat units of damage. Mars Command will absorb. You will hear about it."},
+
+    {"id": "voice_briefing_breach_assault_concrete", "mission_id": "breach_assault_concrete", "voice_id": "coalition_marcus_authoritative_male", "hook": "briefing", "text": "Marauder bunker, sub-surface concrete construction. Three breach points identified. You will take the south breach. Coalition Combat Engineering provides charges. Park rated the wall at twelve MPa. The charges are rated for fifteen."},
+    {"id": "voice_debrief_win_breach_assault_concrete", "mission_id": "breach_assault_concrete", "voice_id": "coalition_marcus_authoritative_male", "hook": "debrief_win", "text": "Bunker secured. Hostiles neutralized or surrendered. The Concordat will hold the position."},
+    {"id": "voice_debrief_loss_breach_assault_concrete", "mission_id": "breach_assault_concrete", "voice_id": "coalition_marcus_authoritative_male", "hook": "debrief_loss", "text": "Bunker remains hostile-occupied. We will return with heavier ordnance and a different team."},
+
+    {"id": "voice_briefing_micro_pressure_orbital", "mission_id": "micro_pressure_hold_orbital", "voice_id": "coalition_marcus_authoritative_male", "hook": "briefing", "text": "Coalition orbital station Lagrange-3 has a hull breach on deck four. Atmospheric pressure must be maintained for the science team in deck five. You have six minutes to seal. Park will guide. Mendez stands by for casualties."},
+    {"id": "voice_debrief_win_micro_pressure_orbital", "mission_id": "micro_pressure_hold_orbital", "voice_id": "coalition_marcus_authoritative_male", "hook": "debrief_win", "text": "Pressure held. Science team intact. Coalition Naval Office sends commendation."},
+    {"id": "voice_debrief_loss_micro_pressure_orbital", "mission_id": "micro_pressure_hold_orbital", "voice_id": "coalition_marcus_authoritative_male", "hook": "debrief_loss", "text": "Pressure lost. Deck five evacuated. Two science personnel KIA. Coalition Naval Office withholds further contracts."},
+
+    {"id": "voice_briefing_boss_hollow_king", "mission_id": "boss_hollow_king_earth", "voice_id": "coalition_marcus_authoritative_male", "hook": "briefing", "text": "Earth volcanic biome. Coordinates classified. The Hollow King. T3 plasma weapon required. You are not coming back without him or without your shield."},
+    {"id": "voice_debrief_win_boss_hollow_king", "mission_id": "boss_hollow_king_earth", "voice_id": "coalition_marcus_authoritative_male", "hook": "debrief_win", "text": "The King is down. Pyroclastic Armor recipe yours. Lore unlock yours. The mountain is quiet for the first time in eighty years."},
+    {"id": "voice_debrief_loss_boss_hollow_king", "mission_id": "boss_hollow_king_earth", "voice_id": "coalition_marcus_authoritative_male", "hook": "debrief_loss", "text": "Not this time. The King still reigns. The Coalition adds your name to the Hollow King wall."},
+
+    {"id": "voice_briefing_pirate_skiff_intercept_belt", "mission_id": "pirate_skiff_intercept_belt", "voice_id": "coalition_marcus_authoritative_male", "hook": "briefing", "text": "Pirate raid intercepted in Belt sector four. Three skiffs incoming. Coalition cargo Freighter K-44 cannot defend itself. You can. Drop in on the skiffs and break their formation."},
+    {"id": "voice_debrief_win_pirate_skiff_intercept_belt", "mission_id": "pirate_skiff_intercept_belt", "voice_id": "coalition_marcus_authoritative_male", "hook": "debrief_win", "text": "Skiffs broken. Freighter K-44 home. Coalition Naval thanks. Pirate captain reduced to escape pod."},
+    {"id": "voice_debrief_loss_pirate_skiff_intercept_belt", "mission_id": "pirate_skiff_intercept_belt", "voice_id": "coalition_marcus_authoritative_male", "hook": "debrief_loss", "text": "Freighter lost. Cargo lost. Pirates richer. Coalition Civil Affairs files complaint."},
+
+    {"id": "voice_briefing_ice_cavern_europa", "mission_id": "ice_cavern_expedition_europa", "voice_id": "coalition_marcus_authoritative_male", "hook": "briefing", "text": "Europa cave expedition. Survey site sigma-eleven. Collegium archaeology team needs escort. T2 weapons plus heat-resistance gear. Mendez prepped you for the cold."},
+    {"id": "voice_debrief_win_ice_cavern_europa", "mission_id": "ice_cavern_expedition_europa", "voice_id": "coalition_marcus_authoritative_male", "hook": "debrief_win", "text": "Site sigma-eleven cleared. Curator Thomas Lee sends his thanks. The Archive has new entries."},
+    {"id": "voice_debrief_loss_ice_cavern_europa", "mission_id": "ice_cavern_expedition_europa", "voice_id": "coalition_marcus_authoritative_male", "hook": "debrief_loss", "text": "Site sigma-eleven not cleared. The Collegium expedition is in trouble. Recovery team dispatched."},
+
+    {"id": "voice_briefing_magma_drill_vulcan", "mission_id": "magma_drill_vulcan", "voice_id": "coalition_marcus_authoritative_male", "hook": "briefing", "text": "Vulcan magma chamber. Frontier salvage team requests Coalition backup. Drill platform threatened by lava breach. T2 mech recommended. Temperature spec for suits: 200 Celsius for 11 minutes."},
+    {"id": "voice_debrief_win_magma_drill_vulcan", "mission_id": "magma_drill_vulcan", "voice_id": "coalition_marcus_authoritative_male", "hook": "debrief_win", "text": "Platform held. Frontier sends thanks plus a barrel of something they brewed. Park requested the analysis."},
+    {"id": "voice_debrief_loss_magma_drill_vulcan", "mission_id": "magma_drill_vulcan", "voice_id": "coalition_marcus_authoritative_male", "hook": "debrief_loss", "text": "Platform lost. Frontier team evacuated. Coalition liability office files paperwork."},
+
+    {"id": "voice_briefing_acid_rain_venus", "mission_id": "acid_rain_extraction_venus", "voice_id": "coalition_marcus_authoritative_male", "hook": "briefing", "text": "Venus surface extraction. Coalition Naval lost a vessel three days ago. We need the black box. T2 weapons. Acid-rated suit mandatory. Mission window: ninety minutes. Then we lose the next pressure cycle."},
+    {"id": "voice_debrief_win_acid_rain_venus", "mission_id": "acid_rain_extraction_venus", "voice_id": "coalition_marcus_authoritative_male", "hook": "debrief_win", "text": "Black box recovered. Coalition Naval thanks. Three families get closure."},
+    {"id": "voice_debrief_loss_acid_rain_venus", "mission_id": "acid_rain_extraction_venus", "voice_id": "coalition_marcus_authoritative_male", "hook": "debrief_loss", "text": "Black box not recovered. The next pressure cycle takes the wreck deeper. Coalition Naval reclassifies."},
+
+    {"id": "voice_briefing_dust_storm_mars", "mission_id": "dust_storm_survival_mars", "voice_id": "coalition_marcus_authoritative_male", "hook": "briefing", "text": "Mars dust storm incoming. Three hour duration. Coalition Outpost Theta cannot evacuate. You and your team escort them to backup shelter. Visibility under four meters. Local Marauder presence likely."},
+    {"id": "voice_debrief_win_dust_storm_mars", "mission_id": "dust_storm_survival_mars", "voice_id": "coalition_marcus_authoritative_male", "hook": "debrief_win", "text": "Outpost Theta evacuated. Storm passed. Park notes the wall designs survived the test. Mendez notes one trooper has dust pneumonia."},
+    {"id": "voice_debrief_loss_dust_storm_mars", "mission_id": "dust_storm_survival_mars", "voice_id": "coalition_marcus_authoritative_male", "hook": "debrief_loss", "text": "Outpost Theta lost. Coalition will rebuild from the next budget."},
+
+    {"id": "voice_briefing_signal_phobos", "mission_id": "signal_investigation_phobos", "voice_id": "coalition_marcus_authoritative_male", "hook": "briefing", "text": "Phobos receiving an unknown signal. Originates from a sealed cavity in the asteroid. Coalition Naval Intelligence wants eyes. Bring back the source. Bring back yourself."},
+    {"id": "voice_debrief_win_signal_phobos", "mission_id": "signal_investigation_phobos", "voice_id": "coalition_marcus_authoritative_male", "hook": "debrief_win", "text": "Source recovered. Naval Intelligence has classified it. You will not hear about it again."},
+    {"id": "voice_debrief_loss_signal_phobos", "mission_id": "signal_investigation_phobos", "voice_id": "coalition_marcus_authoritative_male", "hook": "debrief_loss", "text": "Source not recovered. The signal stopped two hours after you were extracted."},
+
+    {"id": "voice_briefing_dynasty_relic_collegium", "mission_id": "dynasty_relic_recovery_collegium", "voice_id": "coalition_marcus_authoritative_male", "hook": "briefing", "text": "Collegium request. Quietus Curator believes a pre-collapse relic exists in a Moon ruin. The Pact also claims it. The Marauders also visit the area. Get there first."},
+    {"id": "voice_debrief_win_dynasty_relic_collegium", "mission_id": "dynasty_relic_recovery_collegium", "voice_id": "coalition_marcus_authoritative_male", "hook": "debrief_win", "text": "Relic in Collegium custody. Pact filed a protest. The Collegium ignored. Coalition stood between them. Standard outcome."},
+    {"id": "voice_debrief_loss_dynasty_relic_collegium", "mission_id": "dynasty_relic_recovery_collegium", "voice_id": "coalition_marcus_authoritative_male", "hook": "debrief_loss", "text": "Relic missing. Pact thinks the Marauders took it. Coalition is investigating."}
+  ],
+  "tutorial_voice_prompts": [
+    {"id": "voice_tut_lab1_intro", "lab_id": "lab1_movement", "voice_id": "tutorial_narrator_calm_female", "step": "intro", "text": "Welcome to the training labs. We will start with the basics. Press the movement keys to walk. Press shift to sprint. Press control to crouch. The HUD will show you when each is engaged."},
+    {"id": "voice_tut_lab1_walk", "lab_id": "lab1_movement", "voice_id": "tutorial_narrator_calm_female", "step": "walk", "text": "Good. Walking is the default. Stamina does not deplete at this pace."},
+    {"id": "voice_tut_lab1_sprint", "lab_id": "lab1_movement", "voice_id": "tutorial_narrator_calm_female", "step": "sprint", "text": "Sprinting consumes stamina. Watch the indicator on the bottom of the screen."},
+    {"id": "voice_tut_lab1_jump", "lab_id": "lab1_movement", "voice_id": "tutorial_narrator_calm_female", "step": "jump", "text": "The jump key. The jet-pack will activate when you hold it in mid-air."},
+    {"id": "voice_tut_lab1_crouch", "lab_id": "lab1_movement", "voice_id": "tutorial_narrator_calm_female", "step": "crouch", "text": "Crouching reduces your silhouette and improves accuracy."},
+    {"id": "voice_tut_lab1_complete", "lab_id": "lab1_movement", "voice_id": "tutorial_narrator_calm_female", "step": "complete", "text": "Movement complete. Combat is next."},
+
+    {"id": "voice_tut_lab2_intro", "lab_id": "lab2_combat", "voice_id": "tutorial_narrator_calm_female", "step": "intro", "text": "Combat training. The targets are static. Try the weapon. Press fire. Hold for sustained, tap for single shot."},
+    {"id": "voice_tut_lab2_reload", "lab_id": "lab2_combat", "voice_id": "tutorial_narrator_calm_female", "step": "reload", "text": "Your magazine is empty. Press R to reload. Your character will take cover briefly during the cycle."},
+    {"id": "voice_tut_lab2_aim", "lab_id": "lab2_combat", "voice_id": "tutorial_narrator_calm_female", "step": "aim", "text": "Hold right-click to aim. Your shots will be more accurate. Your movement will be slower."},
+    {"id": "voice_tut_lab2_complete", "lab_id": "lab2_combat", "voice_id": "tutorial_narrator_calm_female", "step": "complete", "text": "Combat training complete. Move to medical."},
+
+    {"id": "voice_tut_lab3_intro", "lab_id": "lab3_medical", "voice_id": "tutorial_narrator_calm_female", "step": "intro", "text": "Medical training. Your squadmate Mendez is down. Approach and press the use key to revive."},
+    {"id": "voice_tut_lab3_medkit", "lab_id": "lab3_medical", "voice_id": "tutorial_narrator_calm_female", "step": "medkit", "text": "Medkits restore health over time. Each medkit takes four seconds to apply. You cannot move while applying."},
+    {"id": "voice_tut_lab3_triage", "lab_id": "lab3_medical", "voice_id": "tutorial_narrator_calm_female", "step": "triage", "text": "When a squadmate is in critical condition, the triage window opens. The number shows time until death without intervention."},
+    {"id": "voice_tut_lab3_complete", "lab_id": "lab3_medical", "voice_id": "tutorial_narrator_calm_female", "step": "complete", "text": "Medical training complete. Move to engineering."},
+
+    {"id": "voice_tut_lab4_intro", "lab_id": "lab4_engineering", "voice_id": "tutorial_narrator_calm_female", "step": "intro", "text": "Engineering training. The wall in front of you is breached. Use the welding tool to repair. Approach and hold the use key."},
+    {"id": "voice_tut_lab4_module", "lab_id": "lab4_engineering", "voice_id": "tutorial_narrator_calm_female", "step": "module", "text": "Chassis modules can be repaired in the field. The HUD shows degraded modules in yellow, failed modules in red."},
+    {"id": "voice_tut_lab4_complete", "lab_id": "lab4_engineering", "voice_id": "tutorial_narrator_calm_female", "step": "complete", "text": "Engineering training complete. Move to AI command."},
+
+    {"id": "voice_tut_lab5_intro", "lab_id": "lab5_ai_command", "voice_id": "tutorial_narrator_calm_female", "step": "intro", "text": "AI command training. Your squadmates have their own intelligence. You can issue orders. Press Tab to open the command overlay."},
+    {"id": "voice_tut_lab5_priority", "lab_id": "lab5_ai_command", "voice_id": "tutorial_narrator_calm_female", "step": "priority", "text": "The priority table sets your bot's preferred tasks. One through nine, with one being most preferred. Try adjusting the priorities."},
+    {"id": "voice_tut_lab5_qwheel", "lab_id": "lab5_ai_command", "voice_id": "tutorial_narrator_calm_female", "step": "qwheel", "text": "Press Q to open the order wheel. From here, you can issue specific orders to specific bots. Orders queue."},
+    {"id": "voice_tut_lab5_complete", "lab_id": "lab5_ai_command", "voice_id": "tutorial_narrator_calm_female", "step": "complete", "text": "AI command training complete. Move to hazards."},
+
+    {"id": "voice_tut_lab6_intro", "lab_id": "lab6_hazards", "voice_id": "tutorial_narrator_calm_female", "step": "intro", "text": "Hazard training. The environment can kill you. The HUD warns you. Watch for fire, acid, electrical fields, vacuum."},
+    {"id": "voice_tut_lab6_fire", "lab_id": "lab6_hazards", "voice_id": "tutorial_narrator_calm_female", "step": "fire", "text": "Fire spreads. Avoid it. If you are on fire, drop to prone and roll."},
+    {"id": "voice_tut_lab6_acid", "lab_id": "lab6_hazards", "voice_id": "tutorial_narrator_calm_female", "step": "acid", "text": "Acid pools eat through armor. Approach with caution. Acid-resistant suits buy time but not invincibility."},
+    {"id": "voice_tut_lab6_vacuum", "lab_id": "lab6_hazards", "voice_id": "tutorial_narrator_calm_female", "step": "vacuum", "text": "Vacuum kills in two minutes. Watch your helmet seal indicator. Patch breaches immediately."},
+    {"id": "voice_tut_lab6_complete", "lab_id": "lab6_hazards", "voice_id": "tutorial_narrator_calm_female", "step": "complete", "text": "Hazard training complete. Move to inventory."},
+
+    {"id": "voice_tut_lab7_intro", "lab_id": "lab7_inventory", "voice_id": "tutorial_narrator_calm_female", "step": "intro", "text": "Inventory training. Press I to open. Your loadout has weapon slots, equipment, ammunition, consumables."},
+    {"id": "voice_tut_lab7_swap", "lab_id": "lab7_inventory", "voice_id": "tutorial_narrator_calm_female", "step": "swap", "text": "Drag items to swap. Some slots are restricted to specific item types. The HUD shows the restriction."},
+    {"id": "voice_tut_lab7_craft", "lab_id": "lab7_inventory", "voice_id": "tutorial_narrator_calm_female", "step": "craft", "text": "Open the crafting tab. Recipes use materials in your inventory. Tier one recipes are immediately available."},
+    {"id": "voice_tut_lab7_complete", "lab_id": "lab7_inventory", "voice_id": "tutorial_narrator_calm_female", "step": "complete", "text": "Inventory training complete. Move to objectives."},
+
+    {"id": "voice_tut_lab8_intro", "lab_id": "lab8_objectives", "voice_id": "tutorial_narrator_calm_female", "step": "intro", "text": "Objectives training. Every mission has primary and secondary objectives. The HUD shows them top-center."},
+    {"id": "voice_tut_lab8_timer", "lab_id": "lab8_objectives", "voice_id": "tutorial_narrator_calm_female", "step": "timer", "text": "Some objectives have a timer. The color changes as time runs out. Red means urgent."},
+    {"id": "voice_tut_lab8_failure", "lab_id": "lab8_objectives", "voice_id": "tutorial_narrator_calm_female", "step": "failure", "text": "Mission failure is not the end. Most missions can be retried. The death recap shows the cause chain."},
+    {"id": "voice_tut_lab8_complete", "lab_id": "lab8_objectives", "voice_id": "tutorial_narrator_calm_female", "step": "complete", "text": "Objectives training complete. You are ready for your first contract. Captain Hayes is expecting you."}
+  ]
+}

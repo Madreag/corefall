@@ -15,7 +15,13 @@
 pub mod bundle;
 pub mod cause_chain;
 pub mod debrief;
+pub mod renderer;
+pub mod summary;
 mod text;
+pub mod thinking_timeline;
 pub mod viewer;
 
 pub use bundle::{Bundle, BundleError};
+pub use renderer::{render_event_body, render_event_plain, MAX_SENTENCE_LEN};
+pub use summary::SweepSummary;
+pub use thinking_timeline::{build_timeline, slice_window, ThinkingTimelineEntry};

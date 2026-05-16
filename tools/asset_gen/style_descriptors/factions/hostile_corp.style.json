@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.0.0",
+  "style_id": "hostile_corp",
+  "category": "faction",
+  "version": "1.0.0",
+  "silhouette_language": "blocky, industrial, riveted plates, sharp 90 degree angles, dark steel palette, glowing red accents on sensors",
+  "preferred_palette_roles": ["primary", "secondary", "accent", "metal", "glow"],
+  "shape_descriptors": {
+    "weapon": "boxy receiver, rectangular magazine, picatinny rails, vertical foregrip",
+    "actor": "wide-shoulder armor pauldrons, full-face helmet with red visor, exoskeleton joints visible",
+    "vehicle": "tracked or 6-wheeled, riveted hull, smokestack exhaust, slanted armor plates",
+    "base_module": "concrete + steel beams, industrial conduits, hazard stripe accents",
+    "particle": "angular sparks, fragmented impact debris",
+    "ui_icon": "thick stroke, hexagonal frame, red sensor dot"
+  },
+  "geometric_primitives": {
+    "weapon": ["rect", "polygon", "line"],
+    "actor": ["rect", "polygon", "circle"],
+    "vehicle": ["rect", "polygon", "circle"],
+    "base_module": ["rect", "polyline"],
+    "particle": ["polygon", "polyline"],
+    "ui_icon": ["polygon", "circle", "line"]
+  }
+}

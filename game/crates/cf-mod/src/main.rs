@@ -44,6 +44,42 @@ enum Cmd {
         #[command(subcommand)]
         action: Box<LedgerAction>,
     },
+    /// **M9A**: invoke the Tier-1 SVG asset pipeline. Wraps
+    /// `tools/asset_gen/build_placeholders.py` so engine-side tooling can
+    /// trigger a bake without shelling out manually.
+    #[command(name = "asset-gen")]
+    AssetGen {
+        #[command(subcommand)]
+        action: Box<AssetGenAction>,
+    },
+}
+
+/// **M9A**: asset-gen subcommands. Per spec § "Source / cf-mod Cargo.toml":
+/// > add `cf-mod asset-gen run` subcommand invoking the Python pipeline
+#[derive(Debug, Subcommand)]
+enum AssetGenAction {
+    /// Run the full Tier-1 bake. Equivalent to
+    /// `tools/asset_gen/.venv/bin/python tools/asset_gen/build_placeholders.py --all`.
+    Run {
+        /// Optional category filter (e.g. `WeaponSprite`).
+        #[arg(long)]
+        category: Option<String>,
+        /// Parallel worker count (0 = serial, 8 = default).
+        #[arg(long, default_value_t = 8u32)]
+        parallel: u32,
+        /// Skip the bake; only invoke the pipeline's `--check` dry-run.
+        #[arg(long)]
+        check: bool,
+        /// Print on-disk + ledger counts only.
+        #[arg(long)]
+        report: bool,
+        /// Override the path to the asset pipeline venv's python binary.
+        #[arg(long = "venv-python")]
+        venv_python: Option<PathBuf>,
+        /// Override the path to `build_placeholders.py`.
+        #[arg(long = "build-placeholders")]
+        build_placeholders: Option<PathBuf>,
+    },
 }
 
 /// **M4A** asset-ledger subcommands.
@@ -267,7 +303,88 @@ fn main() -> Result<()> {
             );
         }
         Cmd::Ledger { action } => run_ledger(action.as_ref(), cli.strict, cli.json),
+        Cmd::AssetGen { action } => run_asset_gen(action.as_ref(), cli.json),
     }
+}
+
+fn run_asset_gen(action: &AssetGenAction, json_output: bool) -> Result<()> {
+    use std::process::{Command, Stdio};
+
+    let AssetGenAction::Run {
+        category,
+        parallel,
+        check,
+        report,
+        venv_python,
+        build_placeholders,
+    } = action;
+
+    let cwd = std::env::current_dir().context("get cwd")?;
+    let workspace_root = if cwd.file_name().and_then(|n| n.to_str()) == Some("game") {
+        cwd.parent().unwrap_or(&cwd).to_path_buf()
+    } else {
+        cwd.clone()
+    };
+    let venv_py = venv_python
+        .clone()
+        .unwrap_or_else(|| workspace_root.join("tools/asset_gen/.venv/bin/python"));
+    let script = build_placeholders
+        .clone()
+        .unwrap_or_else(|| workspace_root.join("tools/asset_gen/build_placeholders.py"));
+    if !venv_py.exists() {
+        anyhow::bail!(
+            "asset-gen: venv python not found at {}; run `python3 -m venv tools/asset_gen/.venv`",
+            venv_py.display()
+        );
+    }
+    if !script.exists() {
+        anyhow::bail!("asset-gen: build_placeholders.py not found at {}", script.display());
+    }
+
+    let mut cmd = Command::new(&venv_py);
+    cmd.arg(&script);
+    if *report {
+        cmd.arg("--report");
+    } else if *check {
+        cmd.arg("--check");
+    } else if let Some(cat) = category {
+        cmd.arg("--category").arg(cat);
+        cmd.arg("--parallel").arg(parallel.to_string());
+    } else {
+        cmd.arg("--all");
+        cmd.arg("--parallel").arg(parallel.to_string());
+    }
+    cmd.current_dir(&workspace_root);
+    cmd.stdout(Stdio::inherit());
+    cmd.stderr(Stdio::inherit());
+    tracing::info!(
+        target: "cf::mod::asset_gen",
+        venv_python = %venv_py.display(),
+        script = %script.display(),
+        category = ?category,
+        parallel,
+        check,
+        report,
+        "running M9A asset pipeline"
+    );
+    let status = cmd
+        .status()
+        .with_context(|| format!("spawn {} {}", venv_py.display(), script.display()))?;
+    if json_output {
+        let exit = status.code().unwrap_or(-1);
+        println!(
+            "{}",
+            serde_json::json!({
+                "subcommand": "asset-gen",
+                "exit_code": exit,
+                "succeeded": status.success(),
+            })
+        );
+    }
+    if !status.success() {
+        anyhow::bail!("asset-gen pipeline exited with non-zero status: {:?}", status.code());
+    }
+    Ok(())
 }
 
 fn ledger_paths(override_path: Option<&PathBuf>) -> cf_asset_ledger::LedgerPaths {
@@ -823,6 +940,25 @@ fn validate_one(path: &Path, report: &mut ValidationReport) {
         validate_ledger_jsonl(path, report);
         return;
     }
+    // **M4A**: validate the per-pipeline regen manifest at
+    // `content/asset_ledger/regen_manifest.ron` against its locked v1.0.0
+    // schema (`cf-asset-ledger/schemas/v1/regen_manifest.schema.json`). Each
+    // pipeline entry must declare pipeline_id / regen_command / model_version
+    // / deterministic; the rest of the schema's fields are optional.
+    if path.file_name().and_then(|s| s.to_str()) == Some("regen_manifest.ron") {
+        validate_regen_manifest(path, report);
+        return;
+    }
+    // **M11**: validate the M11 interim TTD floors at
+    // `content/balance/ttd_floors_interim.ron` against the minimal
+    // shape locked in cf-actor::ttd. The validator only confirms the
+    // schema_version and that floors/compound_modifiers are non-empty
+    // tagged tuples per the file's documented schema; the canonical
+    // structural validator is the live cf-actor M17 loader.
+    if path.file_name().and_then(|s| s.to_str()) == Some("ttd_floors_interim.ron") {
+        validate_ttd_floors_interim(path, report);
+        return;
+    }
     // **M5**: per-event JSON schema files under cf-replay/schemas/event/.
     if is_event_schema_file(path) {
         validate_event_schema_file(path, report);
@@ -832,6 +968,30 @@ fn validate_one(path: &Path, report: &mut ValidationReport) {
     if is_envelope_schema_file(path) {
         validate_envelope_schema_file(path, report);
         return;
+    }
+    // **M6**: validate the four equipment registries under `content/equipment/`.
+    // This must come BEFORE the scenarios fallthrough so the registry RONs
+    // aren't mis-routed to `validate_scenario`.
+    if path.parent().and_then(|p| p.file_name()).and_then(|s| s.to_str()) == Some("equipment") {
+        match path.file_name().and_then(|s| s.to_str()) {
+            Some("weapon_registry.ron") => {
+                validate_weapon_registry(path, report);
+                return;
+            }
+            Some("grenade_registry.ron") => {
+                validate_grenade_registry(path, report);
+                return;
+            }
+            Some("melee_registry.ron") => {
+                validate_melee_registry(path, report);
+                return;
+            }
+            Some("tool_registry.ron") => {
+                validate_tool_registry(path, report);
+                return;
+            }
+            _ => {}
+        }
     }
     if path.parent().and_then(|p| p.file_name()).and_then(|s| s.to_str()) == Some("scenarios")
         || path
@@ -1124,11 +1284,25 @@ fn validate_material_registry(path: &Path, report: &mut ValidationReport) {
     }
 }
 
-/// **M1.5**: cf-mod validator for `content/ai/difficulty.json`. Confirms the
-/// schema version, the three required preset ids (cakewalk, tough_crowd,
-/// veteran), and that every preset carries the required AI tuning fields.
-/// Acceptance criterion in `specs/done/M1.5.md` under "Validation + scenario
-/// manifest > cf-mod validates difficulty.json".
+/// **M1.5 (baseline) + M7 (extension)**: cf-mod validator for
+/// `content/ai/difficulty.json`. Two registry shapes are accepted:
+///
+/// 1. **M2 baseline shape** — entries carry the three legacy ids
+///    (`cakewalk`, `tough_crowd`, `veteran`) and the M2 AI tuning fields
+///    (hp, aim_settle_ticks, miss_chance, sight_range, hearing_radius,
+///    memory_decay_ticks, reload_ms). This shape pre-dates the M7 friend-
+///    feedback expansion; the schema check stays in place so older mods
+///    keep validating.
+///
+/// 2. **M7 extension shape** — entries declare `archetype_id` +
+///    `difficulty_id` and the registry contains exactly **5 archetypes ×
+///    3 difficulties = 15 entries**. The spec at `specs/active/M7.md`
+///    § "AI difficulty preset registry" mandates each entry carries the
+///    M2 fields plus the three new M7 fields: `cover_seek_radius`,
+///    `retreat_hp_threshold` (0.15..=0.50), `squad_comm_delay_ticks`.
+///    The five archetype ids are rifleman / sniper / assault / engineer /
+///    medic; the three difficulty ids are the legacy trio. Every
+///    (archetype_id, difficulty_id) pair MUST appear exactly once.
 fn validate_difficulty_json(path: &Path, report: &mut ValidationReport) {
     let text = match fs::read_to_string(path) {
         Ok(t) => t,
@@ -1158,16 +1332,58 @@ fn validate_difficulty_json(path: &Path, report: &mut ValidationReport) {
             return;
         }
     };
-    const REQUIRED_IDS: &[&str] = &["cakewalk", "tough_crowd", "veteran"];
-    const REQUIRED_FIELDS: &[&str] = &[
-        "hp",
-        "aim_settle_ticks",
-        "miss_chance",
-        "sight_range",
-        "hearing_radius",
-        "memory_decay_ticks",
-        "reload_ms",
-    ];
+    let shape = detect_difficulty_shape(presets);
+    match shape {
+        DifficultyRegistryShape::M7Extension => {
+            validate_difficulty_m7_shape(presets, &mut messages);
+        }
+        DifficultyRegistryShape::M2Baseline => {
+            validate_difficulty_m2_shape(presets, &mut messages);
+        }
+    }
+    if messages.is_empty() {
+        let shape_label = match shape {
+            DifficultyRegistryShape::M7Extension => "M7 extension shape",
+            DifficultyRegistryShape::M2Baseline => "M2 baseline shape",
+        };
+        report.add_pass(
+            path.to_path_buf(),
+            format!("difficulty.json ({} presets, {shape_label})", presets.len()),
+        );
+    } else {
+        report.add_error(path.to_path_buf(), messages.join("; "));
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum DifficultyRegistryShape {
+    M2Baseline,
+    M7Extension,
+}
+
+fn detect_difficulty_shape(presets: &[serde_json::Value]) -> DifficultyRegistryShape {
+    if presets
+        .iter()
+        .any(|p| p.get("archetype_id").and_then(|v| v.as_str()).is_some())
+    {
+        DifficultyRegistryShape::M7Extension
+    } else {
+        DifficultyRegistryShape::M2Baseline
+    }
+}
+
+const M2_DIFFICULTY_REQUIRED_IDS: &[&str] = &["cakewalk", "tough_crowd", "veteran"];
+const M2_DIFFICULTY_REQUIRED_FIELDS: &[&str] = &[
+    "hp",
+    "aim_settle_ticks",
+    "miss_chance",
+    "sight_range",
+    "hearing_radius",
+    "memory_decay_ticks",
+    "reload_ms",
+];
+
+fn validate_difficulty_m2_shape(presets: &[serde_json::Value], messages: &mut Vec<String>) {
     let mut found_ids: Vec<String> = Vec::new();
     for (i, preset) in presets.iter().enumerate() {
         let id = preset.get("id").and_then(|v| v.as_str()).unwrap_or("");
@@ -1176,21 +1392,347 @@ fn validate_difficulty_json(path: &Path, report: &mut ValidationReport) {
             continue;
         }
         found_ids.push(id.to_string());
-        for field in REQUIRED_FIELDS {
+        for field in M2_DIFFICULTY_REQUIRED_FIELDS {
             if preset.get(*field).is_none() {
                 messages.push(format!("presets[{i}={id}].{field} missing"));
             }
         }
     }
-    for required in REQUIRED_IDS {
+    for required in M2_DIFFICULTY_REQUIRED_IDS {
         if !found_ids.iter().any(|id| id == required) {
             messages.push(format!("required preset id `{required}` missing"));
         }
     }
+}
+
+const M7_DIFFICULTY_ARCHETYPE_IDS: &[&str] = &["rifleman", "sniper", "assault", "engineer", "medic"];
+const M7_DIFFICULTY_DIFFICULTY_IDS: &[&str] = &["cakewalk", "tough_crowd", "veteran"];
+const M7_DIFFICULTY_REQUIRED_FIELDS: &[&str] = &[
+    "id",
+    "archetype_id",
+    "difficulty_id",
+    "name",
+    "hp",
+    "hp_multiplier",
+    "damage_multiplier",
+    "aim_settle_ticks",
+    "reaction_time_ticks",
+    "miss_chance",
+    "sight_range",
+    "sight_fov_degrees",
+    "fov_degrees",
+    "hearing_radius",
+    "hearing_range",
+    "memory_decay_ticks",
+    "reload_ms",
+    "retreat_hp_threshold",
+    "cover_seek_radius",
+    "squad_comm_delay_ticks",
+];
+
+fn validate_difficulty_m7_shape(presets: &[serde_json::Value], messages: &mut Vec<String>) {
+    let expected_total = M7_DIFFICULTY_ARCHETYPE_IDS.len() * M7_DIFFICULTY_DIFFICULTY_IDS.len();
+    if presets.len() != expected_total {
+        messages.push(format!(
+            "M7 difficulty registry must have exactly {expected_total} entries \
+             ({} archetypes x {} difficulties); got {}",
+            M7_DIFFICULTY_ARCHETYPE_IDS.len(),
+            M7_DIFFICULTY_DIFFICULTY_IDS.len(),
+            presets.len()
+        ));
+    }
+    let mut seen_pairs: Vec<(String, String)> = Vec::new();
+    for (i, preset) in presets.iter().enumerate() {
+        let arch = preset.get("archetype_id").and_then(|v| v.as_str()).unwrap_or("");
+        let diff = preset.get("difficulty_id").and_then(|v| v.as_str()).unwrap_or("");
+        let id = preset.get("id").and_then(|v| v.as_str()).unwrap_or("");
+        let label = if id.is_empty() {
+            format!("[{i}]")
+        } else {
+            format!("[{i}={id}]")
+        };
+        if arch.is_empty() {
+            messages.push(format!("presets{label}.archetype_id missing"));
+        } else if !M7_DIFFICULTY_ARCHETYPE_IDS.contains(&arch) {
+            messages.push(format!(
+                "presets{label}.archetype_id `{arch}` not in {M7_DIFFICULTY_ARCHETYPE_IDS:?}"
+            ));
+        }
+        if diff.is_empty() {
+            messages.push(format!("presets{label}.difficulty_id missing"));
+        } else if !M7_DIFFICULTY_DIFFICULTY_IDS.contains(&diff) {
+            messages.push(format!(
+                "presets{label}.difficulty_id `{diff}` not in {M7_DIFFICULTY_DIFFICULTY_IDS:?}"
+            ));
+        }
+        if !arch.is_empty() && !diff.is_empty() {
+            let pair = (arch.to_string(), diff.to_string());
+            if seen_pairs.contains(&pair) {
+                messages.push(format!(
+                    "presets{label}: duplicate (archetype_id, difficulty_id) pair `({arch}, {diff})`"
+                ));
+            } else {
+                seen_pairs.push(pair);
+            }
+        }
+        for field in M7_DIFFICULTY_REQUIRED_FIELDS {
+            if preset.get(*field).is_none() {
+                messages.push(format!("presets{label}.{field} missing"));
+            }
+        }
+        if let Some(rht) = preset.get("retreat_hp_threshold").and_then(|v| v.as_f64()) {
+            if !(0.15..=0.50).contains(&rht) {
+                messages.push(format!("presets{label}.retreat_hp_threshold {rht} outside 0.15..=0.50"));
+            }
+        }
+        if let Some(csr) = preset.get("cover_seek_radius").and_then(|v| v.as_f64()) {
+            if csr <= 0.0 {
+                messages.push(format!("presets{label}.cover_seek_radius {csr} must be > 0"));
+            }
+        }
+        if let Some(delay) = preset.get("squad_comm_delay_ticks").and_then(|v| v.as_i64()) {
+            if delay < 0 {
+                messages.push(format!("presets{label}.squad_comm_delay_ticks {delay} must be >= 0"));
+            }
+        }
+        if let Some(mc) = preset.get("miss_chance").and_then(|v| v.as_f64()) {
+            if !(0.0..=1.0).contains(&mc) {
+                messages.push(format!("presets{label}.miss_chance {mc} outside 0.0..=1.0"));
+            }
+        }
+        if let Some(hpm) = preset.get("hp_multiplier").and_then(|v| v.as_f64()) {
+            if hpm <= 0.0 {
+                messages.push(format!("presets{label}.hp_multiplier {hpm} must be > 0"));
+            }
+        }
+        if let Some(dm) = preset.get("damage_multiplier").and_then(|v| v.as_f64()) {
+            if dm <= 0.0 {
+                messages.push(format!("presets{label}.damage_multiplier {dm} must be > 0"));
+            }
+        }
+    }
+    for arch in M7_DIFFICULTY_ARCHETYPE_IDS {
+        for diff in M7_DIFFICULTY_DIFFICULTY_IDS {
+            let pair = ((*arch).to_string(), (*diff).to_string());
+            if !seen_pairs.contains(&pair) {
+                messages.push(format!(
+                    "required (archetype_id, difficulty_id) pair `({arch}, {diff})` missing"
+                ));
+            }
+        }
+    }
+}
+
+/// **M6**: shared shape for one entry in a M6 equipment registry RON.
+/// Every entry MUST declare a non-empty `id` and a non-empty `kind` (or
+/// `class` for weapons). Display name is optional in this minimal contract.
+#[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct M6WeaponEntry {
+    id: String,
+    class: String,
+    #[serde(default)]
+    #[allow(dead_code)]
+    display_name: Option<String>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct M6WeaponRegistry {
+    schema_version: u32,
+    weapons: Vec<M6WeaponEntry>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct M6GrenadeEntry {
+    id: String,
+    kind: String,
+    #[serde(default)]
+    #[allow(dead_code)]
+    display_name: Option<String>,
+    #[serde(default)]
+    #[allow(dead_code)]
+    fuse_seconds: Option<f32>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct M6GrenadeRegistry {
+    schema_version: u32,
+    grenades: Vec<M6GrenadeEntry>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct M6MeleeEntry {
+    id: String,
+    kind: String,
+    #[serde(default)]
+    #[allow(dead_code)]
+    display_name: Option<String>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct M6MeleeRegistry {
+    schema_version: u32,
+    melees: Vec<M6MeleeEntry>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct M6ToolEntry {
+    id: String,
+    kind: String,
+    #[serde(default)]
+    #[allow(dead_code)]
+    display_name: Option<String>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct M6ToolRegistry {
+    schema_version: u32,
+    tools: Vec<M6ToolEntry>,
+}
+
+fn validate_m6_registry_common(
+    path: &Path,
+    schema_version: u32,
+    entry_ids: Vec<String>,
+    entry_kinds: Vec<String>,
+    expected_label: &str,
+) -> Vec<String> {
+    let mut messages: Vec<String> = Vec::new();
+    if schema_version != 1 {
+        messages.push(format!(
+            "{expected_label}.schema_version must be 1 (got {schema_version})"
+        ));
+    }
+    if entry_ids.is_empty() {
+        messages.push(format!("{expected_label} registry must have at least 1 entry"));
+    }
+    for (i, id) in entry_ids.iter().enumerate() {
+        if id.trim().is_empty() {
+            messages.push(format!("{expected_label}[{i}].id must be non-empty"));
+        }
+    }
+    for (i, k) in entry_kinds.iter().enumerate() {
+        if k.trim().is_empty() {
+            messages.push(format!("{expected_label}[{i}].kind/class must be non-empty"));
+        }
+    }
+    let _ = path;
+    messages
+}
+
+fn validate_weapon_registry(path: &Path, report: &mut ValidationReport) {
+    let raw = match fs::read_to_string(path) {
+        Ok(t) => t,
+        Err(err) => {
+            report.add_error(path.to_path_buf(), format!("read failed: {err}"));
+            return;
+        }
+    };
+    let parsed: M6WeaponRegistry = match ron::from_str(&raw) {
+        Ok(v) => v,
+        Err(err) => {
+            report.add_error(path.to_path_buf(), format!("ron parse failed: {err}"));
+            return;
+        }
+    };
+    let ids: Vec<String> = parsed.weapons.iter().map(|w| w.id.clone()).collect();
+    let kinds: Vec<String> = parsed.weapons.iter().map(|w| w.class.clone()).collect();
+    let messages = validate_m6_registry_common(path, parsed.schema_version, ids, kinds, "weapon_registry");
     if messages.is_empty() {
         report.add_pass(
             path.to_path_buf(),
-            format!("difficulty.json ({} presets)", presets.len()),
+            format!("weapon_registry ({} entries)", parsed.weapons.len()),
+        );
+    } else {
+        report.add_error(path.to_path_buf(), messages.join("; "));
+    }
+}
+
+fn validate_grenade_registry(path: &Path, report: &mut ValidationReport) {
+    let raw = match fs::read_to_string(path) {
+        Ok(t) => t,
+        Err(err) => {
+            report.add_error(path.to_path_buf(), format!("read failed: {err}"));
+            return;
+        }
+    };
+    let parsed: M6GrenadeRegistry = match ron::from_str(&raw) {
+        Ok(v) => v,
+        Err(err) => {
+            report.add_error(path.to_path_buf(), format!("ron parse failed: {err}"));
+            return;
+        }
+    };
+    let ids: Vec<String> = parsed.grenades.iter().map(|g| g.id.clone()).collect();
+    let kinds: Vec<String> = parsed.grenades.iter().map(|g| g.kind.clone()).collect();
+    let messages = validate_m6_registry_common(path, parsed.schema_version, ids, kinds, "grenade_registry");
+    if messages.is_empty() {
+        report.add_pass(
+            path.to_path_buf(),
+            format!("grenade_registry ({} entries)", parsed.grenades.len()),
+        );
+    } else {
+        report.add_error(path.to_path_buf(), messages.join("; "));
+    }
+}
+
+fn validate_melee_registry(path: &Path, report: &mut ValidationReport) {
+    let raw = match fs::read_to_string(path) {
+        Ok(t) => t,
+        Err(err) => {
+            report.add_error(path.to_path_buf(), format!("read failed: {err}"));
+            return;
+        }
+    };
+    let parsed: M6MeleeRegistry = match ron::from_str(&raw) {
+        Ok(v) => v,
+        Err(err) => {
+            report.add_error(path.to_path_buf(), format!("ron parse failed: {err}"));
+            return;
+        }
+    };
+    let ids: Vec<String> = parsed.melees.iter().map(|m| m.id.clone()).collect();
+    let kinds: Vec<String> = parsed.melees.iter().map(|m| m.kind.clone()).collect();
+    let messages = validate_m6_registry_common(path, parsed.schema_version, ids, kinds, "melee_registry");
+    if messages.is_empty() {
+        report.add_pass(
+            path.to_path_buf(),
+            format!("melee_registry ({} entries)", parsed.melees.len()),
+        );
+    } else {
+        report.add_error(path.to_path_buf(), messages.join("; "));
+    }
+}
+
+fn validate_tool_registry(path: &Path, report: &mut ValidationReport) {
+    let raw = match fs::read_to_string(path) {
+        Ok(t) => t,
+        Err(err) => {
+            report.add_error(path.to_path_buf(), format!("read failed: {err}"));
+            return;
+        }
+    };
+    let parsed: M6ToolRegistry = match ron::from_str(&raw) {
+        Ok(v) => v,
+        Err(err) => {
+            report.add_error(path.to_path_buf(), format!("ron parse failed: {err}"));
+            return;
+        }
+    };
+    let ids: Vec<String> = parsed.tools.iter().map(|t| t.id.clone()).collect();
+    let kinds: Vec<String> = parsed.tools.iter().map(|t| t.kind.clone()).collect();
+    let messages = validate_m6_registry_common(path, parsed.schema_version, ids, kinds, "tool_registry");
+    if messages.is_empty() {
+        report.add_pass(
+            path.to_path_buf(),
+            format!("tool_registry ({} entries)", parsed.tools.len()),
         );
     } else {
         report.add_error(path.to_path_buf(), messages.join("; "));
@@ -1263,6 +1805,58 @@ fn validate_scenario(path: &Path, report: &mut ValidationReport) {
             if scenario.expected_tests.is_empty() {
                 messages.push("scenario.expected_tests must reference at least one acceptance test id".to_string());
             }
+            // **M9** § cf-mod validate micro_reactor_defense — extra rules per
+            // spec § "When `cargo run -p cf-mod -- validate content/scenarios/`
+            // runs Then the validator confirms: 1 reactor with mission_critical=true
+            // + hp>0 + AABB defined, 1 player spawn, 1 guard slot, timer in
+            // [1800, 10800] ticks (30-180s @60Hz), objectives[] includes
+            // defend_reactor".
+            if scenario.id == "micro_reactor_defense" {
+                if scenario.reactors.len() != 1 {
+                    messages.push(format!(
+                        "M9 micro_reactor_defense must declare exactly 1 reactor (got {})",
+                        scenario.reactors.len()
+                    ));
+                }
+                if let Some(r) = scenario.reactors.first() {
+                    if r.hp <= 0.0 {
+                        messages.push(format!("M9 reactor.hp must be > 0 (got {})", r.hp));
+                    }
+                    if r.half_extents.0 <= 0.0 || r.half_extents.1 <= 0.0 {
+                        messages.push("M9 reactor.half_extents must define a positive AABB".to_string());
+                    }
+                }
+                let controllable_count = scenario.actors.iter().filter(|a| a.controllable).count();
+                if controllable_count != 1 {
+                    messages.push(format!(
+                        "M9 micro_reactor_defense must declare exactly 1 controllable player spawn (got {controllable_count})"
+                    ));
+                }
+                let guard_count = scenario.actors.iter().filter(|a| a.enemy.is_some()).count();
+                if guard_count < 1 {
+                    messages
+                        .push("M9 micro_reactor_defense must declare at least 1 reactive_guard enemy slot".to_string());
+                }
+                if let Some(mission) = scenario.mission.as_ref() {
+                    if mission.time_limit_ticks < 1800 || mission.time_limit_ticks > 10800 {
+                        messages.push(format!(
+                            "M9 micro_reactor_defense mission.time_limit_ticks must be in [1800, 10800] (got {})",
+                            mission.time_limit_ticks
+                        ));
+                    }
+                } else {
+                    messages.push("M9 micro_reactor_defense must declare a mission timer block".to_string());
+                }
+                let has_defend_reactor = scenario
+                    .objectives
+                    .iter()
+                    .any(|o| matches!(&o.kind, cf_control::ScenarioObjectiveKind::DefendReactor { .. }));
+                if !has_defend_reactor {
+                    messages.push(
+                        "M9 micro_reactor_defense must declare at least one defend_reactor objective".to_string(),
+                    );
+                }
+            }
             if !messages.is_empty() {
                 report.add_error(path.to_path_buf(), messages.join("; "));
             } else {
@@ -1272,6 +1866,173 @@ fn validate_scenario(path: &Path, report: &mut ValidationReport) {
         Err(err) => {
             report.add_error(path.to_path_buf(), format!("scenario load failed: {err}"));
         }
+    }
+}
+
+/// **M4A**: minimal structural mirror of `content/asset_ledger/regen_manifest.ron`,
+/// kept in this binary so the validator does not pull a serde dep into
+/// `cf-asset-ledger` itself. Matches the locked v1.0.0 schema at
+/// `cf-asset-ledger/schemas/v1/regen_manifest.schema.json`.
+#[derive(Debug, serde::Deserialize)]
+struct RegenManifestV1 {
+    schema_version: String,
+    pipelines: Vec<RegenPipelineEntry>,
+}
+
+#[derive(Debug, serde::Deserialize)]
+#[allow(dead_code)]
+struct RegenPipelineEntry {
+    pipeline_id: String,
+    #[serde(default)]
+    owner_milestone: String,
+    regen_command: String,
+    model_version: String,
+    deterministic: bool,
+    #[serde(default)]
+    freeze_path_suffix: String,
+    #[serde(default)]
+    notes: String,
+}
+
+/// **M11**: minimal structural check for `content/balance/ttd_floors_interim.ron`.
+/// Verifies the file is RON-parseable, declares `schema_version: "1.0.0"`,
+/// and has at least one floor entry. The canonical M17 loader will replace
+/// this with a strict validator once M17 ships.
+fn validate_ttd_floors_interim(path: &Path, report: &mut ValidationReport) {
+    let raw = match fs::read_to_string(path) {
+        Ok(t) => t,
+        Err(err) => {
+            report.add_error(path.to_path_buf(), format!("read failed: {err}"));
+            return;
+        }
+    };
+    #[derive(serde::Deserialize)]
+    struct FloorEntry {
+        kind: String,
+        origin: String,
+        difficulty: String,
+        seconds: f32,
+    }
+    #[derive(serde::Deserialize)]
+    struct CompoundModifier {
+        a: String,
+        b: String,
+        multiplier: f32,
+    }
+    #[derive(serde::Deserialize)]
+    struct TtdFloorsInterim {
+        schema_version: String,
+        floors: Vec<FloorEntry>,
+        #[serde(default)]
+        compound_modifiers: Vec<CompoundModifier>,
+    }
+    let v: TtdFloorsInterim = match ron::from_str(&raw) {
+        Ok(v) => v,
+        Err(err) => {
+            report.add_error(path.to_path_buf(), format!("ttd_floors_interim parse: {err}"));
+            return;
+        }
+    };
+    let mut messages: Vec<String> = Vec::new();
+    if v.schema_version != "1.0.0" {
+        messages.push(format!(
+            "ttd_floors_interim.schema_version must be \"1.0.0\" (got {:?})",
+            v.schema_version
+        ));
+    }
+    if v.floors.is_empty() {
+        messages.push("ttd_floors_interim.floors must contain at least one entry".to_string());
+    }
+    for (i, f) in v.floors.iter().enumerate() {
+        if f.kind.trim().is_empty() {
+            messages.push(format!("floors[{i}].kind must be non-empty"));
+        }
+        if f.origin.trim().is_empty() {
+            messages.push(format!("floors[{i}].origin must be non-empty"));
+        }
+        if f.difficulty.trim().is_empty() {
+            messages.push(format!("floors[{i}].difficulty must be non-empty"));
+        }
+        if !f.seconds.is_finite() || f.seconds < 0.0 {
+            messages.push(format!(
+                "floors[{i}].seconds must be a finite non-negative float (got {})",
+                f.seconds
+            ));
+        }
+    }
+    for (i, cm) in v.compound_modifiers.iter().enumerate() {
+        if !cm.multiplier.is_finite() || cm.multiplier < 0.0 {
+            messages.push(format!(
+                "compound_modifiers[{i}].multiplier must be finite and non-negative (got {})",
+                cm.multiplier
+            ));
+        }
+        if cm.a.trim().is_empty() || cm.b.trim().is_empty() {
+            messages.push(format!("compound_modifiers[{i}].a and b must be non-empty"));
+        }
+    }
+    if messages.is_empty() {
+        report.add_pass(
+            path.to_path_buf(),
+            format!(
+                "ttd_floors_interim v{} ({} floors, {} compound)",
+                v.schema_version,
+                v.floors.len(),
+                v.compound_modifiers.len()
+            ),
+        );
+    } else {
+        report.add_error(path.to_path_buf(), messages.join("; "));
+    }
+}
+
+fn validate_regen_manifest(path: &Path, report: &mut ValidationReport) {
+    let raw = match fs::read_to_string(path) {
+        Ok(t) => t,
+        Err(err) => {
+            report.add_error(path.to_path_buf(), format!("read failed: {err}"));
+            return;
+        }
+    };
+    let manifest: RegenManifestV1 = match ron::from_str(&raw) {
+        Ok(m) => m,
+        Err(err) => {
+            report.add_error(path.to_path_buf(), format!("regen_manifest parse: {err}"));
+            return;
+        }
+    };
+    let mut messages: Vec<String> = Vec::new();
+    if manifest.schema_version != "1.0.0" {
+        messages.push(format!(
+            "regen_manifest.schema_version must be \"1.0.0\" (got {:?})",
+            manifest.schema_version
+        ));
+    }
+    if manifest.pipelines.is_empty() {
+        messages.push("regen_manifest.pipelines must contain at least one entry".to_string());
+    }
+    for (i, entry) in manifest.pipelines.iter().enumerate() {
+        if entry.pipeline_id.trim().is_empty() {
+            messages.push(format!("pipelines[{i}].pipeline_id must be non-empty"));
+        }
+        if entry.regen_command.trim().is_empty() {
+            messages.push(format!("pipelines[{i}].regen_command must be non-empty"));
+        }
+        if entry.model_version.trim().is_empty() {
+            messages.push(format!("pipelines[{i}].model_version must be non-empty"));
+        }
+    }
+    if messages.is_empty() {
+        report.add_pass(
+            path.to_path_buf(),
+            format!(
+                "regen_manifest v{} ({} pipelines)",
+                manifest.schema_version,
+                manifest.pipelines.len()
+            ),
+        );
+    } else {
+        report.add_error(path.to_path_buf(), messages.join("; "));
     }
 }
 
@@ -1431,6 +2192,123 @@ mod tests {
         let _ = fs::remove_file(&path);
         assert_eq!(report.fail(), 1, "expected one FAIL entry");
         assert!(report.entries[0].message.contains("reload_ms"));
+    }
+
+    fn m7_difficulty_entry(arch: &str, diff: &str, retreat: f64, cover: f64, squad_delay: i64) -> serde_json::Value {
+        serde_json::json!({
+            "id": format!("{arch}_{diff}"),
+            "archetype_id": arch,
+            "difficulty_id": diff,
+            "name": format!("{arch} - {diff}"),
+            "display_name": format!("{arch} - {diff}"),
+            "hp": 80.0,
+            "hp_multiplier": 1.0,
+            "damage_multiplier": 1.0,
+            "aim_settle_ticks": 12,
+            "reaction_time_ticks": 12,
+            "miss_chance": 0.1,
+            "sight_range": 320.0,
+            "sight_fov_degrees": 180.0,
+            "fov_degrees": 180.0,
+            "hearing_radius": 480.0,
+            "hearing_range": 480.0,
+            "memory_decay_ticks": 300,
+            "reload_ms": 1800,
+            "retreat_hp_pct": retreat,
+            "retreat_hp_threshold": retreat,
+            "cover_seek_radius": cover,
+            "squad_comm_delay_ticks": squad_delay,
+        })
+    }
+
+    fn m7_full_registry() -> serde_json::Value {
+        let archetypes = ["rifleman", "sniper", "assault", "engineer", "medic"];
+        let difficulties = ["cakewalk", "tough_crowd", "veteran"];
+        let mut presets = Vec::new();
+        for a in &archetypes {
+            for d in &difficulties {
+                presets.push(m7_difficulty_entry(a, d, 0.30, 48.0, 30));
+            }
+        }
+        serde_json::json!({ "schema": 1, "presets": presets })
+    }
+
+    #[test]
+    fn m7_difficulty_json_accepts_15_archetype_difficulty_entries() {
+        let body = m7_full_registry();
+        let path = write_tmp("m7_difficulty_pass.json", &body.to_string());
+        let mut report = ValidationReport::default();
+        validate_difficulty_json(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.pass(), 1, "expected PASS, got entries: {:?}", report.entries);
+        assert_eq!(report.fail(), 0);
+        assert!(report.entries[0].message.contains("M7 extension shape"));
+        assert!(report.entries[0].message.contains("15 presets"));
+    }
+
+    #[test]
+    fn m7_difficulty_json_rejects_short_registry() {
+        let mut body = m7_full_registry();
+        let presets = body["presets"].as_array_mut().unwrap();
+        presets.truncate(14);
+        let path = write_tmp("m7_difficulty_short.json", &body.to_string());
+        let mut report = ValidationReport::default();
+        validate_difficulty_json(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+        assert!(report.entries[0].message.contains("exactly 15"));
+    }
+
+    #[test]
+    fn m7_difficulty_json_rejects_unknown_archetype() {
+        let mut body = m7_full_registry();
+        body["presets"][0]["archetype_id"] = serde_json::json!("paladin");
+        let path = write_tmp("m7_difficulty_bad_archetype.json", &body.to_string());
+        let mut report = ValidationReport::default();
+        validate_difficulty_json(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+        assert!(report.entries[0].message.contains("paladin"));
+    }
+
+    #[test]
+    fn m7_difficulty_json_rejects_retreat_hp_threshold_out_of_range() {
+        let mut body = m7_full_registry();
+        body["presets"][0]["retreat_hp_threshold"] = serde_json::json!(0.95);
+        let path = write_tmp("m7_difficulty_bad_retreat.json", &body.to_string());
+        let mut report = ValidationReport::default();
+        validate_difficulty_json(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+        assert!(report.entries[0].message.contains("retreat_hp_threshold"));
+        assert!(report.entries[0].message.contains("0.15..=0.50"));
+    }
+
+    #[test]
+    fn m7_difficulty_json_rejects_missing_cover_seek_radius() {
+        let mut body = m7_full_registry();
+        body["presets"][0].as_object_mut().unwrap().remove("cover_seek_radius");
+        let path = write_tmp("m7_difficulty_missing_cover.json", &body.to_string());
+        let mut report = ValidationReport::default();
+        validate_difficulty_json(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+        assert!(report.entries[0].message.contains("cover_seek_radius missing"));
+    }
+
+    #[test]
+    fn m7_difficulty_json_rejects_duplicate_pair() {
+        let mut body = m7_full_registry();
+        let arch = body["presets"][1]["archetype_id"].clone();
+        let diff = body["presets"][1]["difficulty_id"].clone();
+        body["presets"][0]["archetype_id"] = arch;
+        body["presets"][0]["difficulty_id"] = diff;
+        let path = write_tmp("m7_difficulty_dup_pair.json", &body.to_string());
+        let mut report = ValidationReport::default();
+        validate_difficulty_json(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+        assert!(report.entries[0].message.contains("duplicate"));
     }
 
     #[test]
@@ -1850,5 +2728,241 @@ mod tests {
         assert_eq!(report.fail(), 1);
         let msg = &report.entries[0].message;
         assert!(msg.contains("id_drift"), "expected id_drift but got: {msg}");
+    }
+
+    #[test]
+    fn validate_regen_manifest_accepts_well_formed() {
+        let body = r#"(
+            schema_version: "1.0.0",
+            pipelines: [
+                (
+                    pipeline_id: "M9A_svg_v1",
+                    owner_milestone: "M9A",
+                    regen_command: "cf-tools-svg-gen --asset-id $ASSET_ID",
+                    model_version: "llm:gpt-4o-mini@2026-05",
+                    deterministic: true,
+                    freeze_path_suffix: ".frozen",
+                    notes: "ok",
+                ),
+            ],
+        )"#;
+        let path = write_tmp("regen_manifest.ron", body);
+        let mut report = ValidationReport::default();
+        validate_regen_manifest(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.pass(), 1, "expected PASS, got {:?}", report.entries);
+        assert_eq!(report.fail(), 0);
+    }
+
+    #[test]
+    fn validate_regen_manifest_accepts_missing_optional_fields() {
+        let body = r#"(
+            schema_version: "1.0.0",
+            pipelines: [
+                (
+                    pipeline_id: "minimal_v1",
+                    regen_command: "cf-tools-minimal",
+                    model_version: "v1",
+                    deterministic: false,
+                ),
+            ],
+        )"#;
+        let path = write_tmp("regen_manifest.ron", body);
+        let mut report = ValidationReport::default();
+        validate_regen_manifest(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.pass(), 1, "expected PASS, got {:?}", report.entries);
+    }
+
+    #[test]
+    fn validate_regen_manifest_rejects_wrong_schema_version() {
+        let body = r#"(
+            schema_version: "2.0.0",
+            pipelines: [
+                (
+                    pipeline_id: "x",
+                    regen_command: "y",
+                    model_version: "z",
+                    deterministic: true,
+                ),
+            ],
+        )"#;
+        let path = write_tmp("regen_manifest.ron", body);
+        let mut report = ValidationReport::default();
+        validate_regen_manifest(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+        assert!(report.entries[0].message.contains("schema_version"));
+    }
+
+    #[test]
+    fn validate_regen_manifest_rejects_empty_pipelines() {
+        let body = r#"(
+            schema_version: "1.0.0",
+            pipelines: [],
+        )"#;
+        let path = write_tmp("regen_manifest.ron", body);
+        let mut report = ValidationReport::default();
+        validate_regen_manifest(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+        assert!(report.entries[0].message.contains("pipelines"));
+    }
+
+    #[test]
+    fn validate_regen_manifest_rejects_empty_pipeline_id() {
+        let body = r#"(
+            schema_version: "1.0.0",
+            pipelines: [
+                (
+                    pipeline_id: "",
+                    regen_command: "y",
+                    model_version: "z",
+                    deterministic: true,
+                ),
+            ],
+        )"#;
+        let path = write_tmp("regen_manifest.ron", body);
+        let mut report = ValidationReport::default();
+        validate_regen_manifest(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+        assert!(report.entries[0].message.contains("pipeline_id"));
+    }
+
+    #[test]
+    fn validate_regen_manifest_rejects_malformed_ron() {
+        let body = "this is not valid ron";
+        let path = write_tmp("regen_manifest.ron", body);
+        let mut report = ValidationReport::default();
+        validate_regen_manifest(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+        assert!(report.entries[0].message.contains("regen_manifest parse"));
+    }
+
+    #[test]
+    fn weapon_registry_accepts_minimal_valid_input() {
+        let body = r#"(
+  schema_version: 1,
+  weapons: [
+    (id: "rifle_m1_default", class: "rifle"),
+    (id: "smg_m6_default", class: "smg"),
+  ],
+)"#;
+        let path = write_tmp("weapon_registry.ron", body);
+        let mut report = ValidationReport::default();
+        validate_weapon_registry(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.pass(), 1);
+        assert_eq!(report.fail(), 0);
+    }
+
+    #[test]
+    fn weapon_registry_rejects_empty_id() {
+        let body = r#"(
+  schema_version: 1,
+  weapons: [
+    (id: "", class: "rifle"),
+  ],
+)"#;
+        let path = write_tmp("weapon_registry.ron", body);
+        let mut report = ValidationReport::default();
+        validate_weapon_registry(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+    }
+
+    #[test]
+    fn grenade_registry_accepts_minimal_valid_input() {
+        let body = r#"(
+  schema_version: 1,
+  grenades: [
+    (id: "grenade_frag_m6", kind: "frag"),
+  ],
+)"#;
+        let path = write_tmp("grenade_registry.ron", body);
+        let mut report = ValidationReport::default();
+        validate_grenade_registry(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.pass(), 1);
+        assert_eq!(report.fail(), 0);
+    }
+
+    #[test]
+    fn grenade_registry_rejects_empty_registry() {
+        let body = r#"(
+  schema_version: 1,
+  grenades: [],
+)"#;
+        let path = write_tmp("grenade_registry.ron", body);
+        let mut report = ValidationReport::default();
+        validate_grenade_registry(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+        assert!(report.entries[0].message.contains("at least 1 entry"));
+    }
+
+    #[test]
+    fn melee_registry_accepts_minimal_valid_input() {
+        let body = r#"(
+  schema_version: 1,
+  melees: [
+    (id: "melee_knife_m6", kind: "knife"),
+  ],
+)"#;
+        let path = write_tmp("melee_registry.ron", body);
+        let mut report = ValidationReport::default();
+        validate_melee_registry(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.pass(), 1);
+        assert_eq!(report.fail(), 0);
+    }
+
+    #[test]
+    fn melee_registry_rejects_bad_schema_version() {
+        let body = r#"(
+  schema_version: 2,
+  melees: [
+    (id: "melee_knife_m6", kind: "knife"),
+  ],
+)"#;
+        let path = write_tmp("melee_registry.ron", body);
+        let mut report = ValidationReport::default();
+        validate_melee_registry(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+        assert!(report.entries[0].message.contains("schema_version"));
+    }
+
+    #[test]
+    fn tool_registry_accepts_minimal_valid_input() {
+        let body = r#"(
+  schema_version: 1,
+  tools: [
+    (id: "tool_repair_m6", kind: "repair"),
+  ],
+)"#;
+        let path = write_tmp("tool_registry.ron", body);
+        let mut report = ValidationReport::default();
+        validate_tool_registry(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.pass(), 1);
+        assert_eq!(report.fail(), 0);
+    }
+
+    #[test]
+    fn tool_registry_rejects_empty_kind() {
+        let body = r#"(
+  schema_version: 1,
+  tools: [
+    (id: "tool_repair_m6", kind: ""),
+  ],
+)"#;
+        let path = write_tmp("tool_registry.ron", body);
+        let mut report = ValidationReport::default();
+        validate_tool_registry(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
     }
 }

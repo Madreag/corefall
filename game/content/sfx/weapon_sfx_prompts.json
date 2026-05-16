@@ -1,0 +1,89 @@
+{
+  "schema_version": 1,
+  "description": "M12A weapon SFX prompt registry — per-weapon-class × per-action prompt strings for Stable Audio Open / AudioCraft synthesis. Each entry has prompt + duration_target + format + tag mapping (manifest.json cue tag). M37 will replace with full library; M12A initial bake uses these prompts. Output target: 16-bit PCM WAV @ 48kHz / mono / -12 dBFS peak / -18 LUFS integrated.",
+  "audio_format": {
+    "channels": 1,
+    "sample_rate_hz": 48000,
+    "bit_depth": 16,
+    "target_peak_dbfs": -12.0,
+    "target_lufs_integrated": -18.0,
+    "max_duration_sec": 3.0
+  },
+  "synthesis_backends": {
+    "primary": "stable_audio_open",
+    "fallback": "audiocraft_musicgen_sound_effects",
+    "license_required": ["stable_audio_open", "audiocraft"]
+  },
+  "weapon_action_sfx": [
+    {"id": "sfx_pistol_fire", "weapon_class": "pistol", "action": "fire", "tag": "weapon_fired", "prompt": "9mm pistol single shot, dry indoor acoustic, crisp report with brass case ejection ping, 0.4 second duration", "duration_target_sec": 0.4, "loops": false},
+    {"id": "sfx_pistol_dry", "weapon_class": "pistol", "action": "dry_fire", "tag": "weapon_dry_fire", "prompt": "pistol dry fire click, hammer striking empty chamber, mechanical click, 0.15 second", "duration_target_sec": 0.15, "loops": false},
+    {"id": "sfx_pistol_reload_start", "weapon_class": "pistol", "action": "reload_start", "tag": "reload_started", "prompt": "pistol magazine release, single metallic click, magazine drops out gently, 0.5 second", "duration_target_sec": 0.5, "loops": false},
+    {"id": "sfx_pistol_reload_end", "weapon_class": "pistol", "action": "reload_end", "tag": "reload_completed", "prompt": "pistol magazine inserted, slide racked forward, sharp metallic chk-chk, 0.6 second", "duration_target_sec": 0.6, "loops": false},
+    {"id": "sfx_pistol_jam", "weapon_class": "pistol", "action": "jam", "tag": "weapon_jam", "prompt": "pistol mechanism jam, harsh metallic grinding stop, 0.3 second", "duration_target_sec": 0.3, "loops": false},
+    {"id": "sfx_pistol_swap", "weapon_class": "pistol", "action": "swap", "tag": "weapon_swap", "prompt": "holstering then drawing pistol, light leather rustle plus metallic clink, 0.4 second", "duration_target_sec": 0.4, "loops": false},
+
+    {"id": "sfx_smg_fire_burst", "weapon_class": "smg", "action": "fire_burst", "tag": "weapon_fired", "prompt": "submachine gun 5-round burst, tight rapid 9mm reports with shell ejections, indoor room reverb, 0.6 second", "duration_target_sec": 0.6, "loops": false},
+    {"id": "sfx_smg_fire_auto", "weapon_class": "smg", "action": "fire_auto", "tag": "weapon_fired_auto", "prompt": "submachine gun full auto, sustained rapid 9mm fire 12 rounds, brass ejection clatter, 1.0 second", "duration_target_sec": 1.0, "loops": true},
+    {"id": "sfx_smg_reload_start", "weapon_class": "smg", "action": "reload_start", "tag": "reload_started", "prompt": "SMG magazine release, plastic-and-metal magazine drops to ground, 0.4 second", "duration_target_sec": 0.4, "loops": false},
+    {"id": "sfx_smg_reload_end", "weapon_class": "smg", "action": "reload_end", "tag": "reload_completed", "prompt": "SMG magazine inserted with click + charging handle pulled and released, 0.8 second", "duration_target_sec": 0.8, "loops": false},
+
+    {"id": "sfx_rifle_fire", "weapon_class": "rifle", "action": "fire", "tag": "weapon_fired", "prompt": "5.56mm assault rifle single shot, sharp crack with brass casing ping, outdoor open-field acoustic, 0.4 second", "duration_target_sec": 0.4, "loops": false},
+    {"id": "sfx_rifle_fire_auto", "weapon_class": "rifle", "action": "fire_auto", "tag": "weapon_fired_auto", "prompt": "5.56mm assault rifle full auto burst, 8 rapid sharp cracks with brass ejection clatter, 1.0 second", "duration_target_sec": 1.0, "loops": true},
+    {"id": "sfx_rifle_reload_start", "weapon_class": "rifle", "action": "reload_start", "tag": "reload_started", "prompt": "assault rifle magazine release, metallic clank + magazine drop, 0.5 second", "duration_target_sec": 0.5, "loops": false},
+    {"id": "sfx_rifle_reload_end", "weapon_class": "rifle", "action": "reload_end", "tag": "reload_completed", "prompt": "assault rifle magazine inserted, bolt released forward with metallic chunk, 0.7 second", "duration_target_sec": 0.7, "loops": false},
+
+    {"id": "sfx_sniper_fire", "weapon_class": "sniper", "action": "fire", "tag": "weapon_fired", "prompt": "high-powered sniper rifle .50 cal single shot, deep booming crack with extended echo, outdoor mountain acoustic, 1.5 second", "duration_target_sec": 1.5, "loops": false},
+    {"id": "sfx_sniper_bolt_pull", "weapon_class": "sniper", "action": "bolt_pull", "tag": "weapon_bolt", "prompt": "bolt-action rifle bolt pull, two-step metallic mechanism with brass case ejection, 1.2 second", "duration_target_sec": 1.2, "loops": false},
+    {"id": "sfx_sniper_reload_start", "weapon_class": "sniper", "action": "reload_start", "tag": "reload_started", "prompt": "sniper rifle magazine release, heavy metallic clunk, 0.6 second", "duration_target_sec": 0.6, "loops": false},
+    {"id": "sfx_sniper_reload_end", "weapon_class": "sniper", "action": "reload_end", "tag": "reload_completed", "prompt": "sniper rifle box magazine inserted with deep click, 0.8 second", "duration_target_sec": 0.8, "loops": false},
+    {"id": "sfx_sniper_scope_settle", "weapon_class": "sniper", "action": "scope_settle", "tag": "weapon_scope_settle", "prompt": "rifle scope adjustment, subtle mechanical click + breath holding, 1.5 second", "duration_target_sec": 1.5, "loops": false},
+
+    {"id": "sfx_shotgun_fire", "weapon_class": "shotgun", "action": "fire", "tag": "weapon_fired", "prompt": "12-gauge shotgun pump action fire, thunderous boom with low rumble, 0.8 second", "duration_target_sec": 0.8, "loops": false},
+    {"id": "sfx_shotgun_pump", "weapon_class": "shotgun", "action": "pump", "tag": "weapon_pump", "prompt": "shotgun pump action cycled, two-stroke metallic chuck-chuck, shell ejected, 1.0 second", "duration_target_sec": 1.0, "loops": false},
+    {"id": "sfx_shotgun_reload_shell", "weapon_class": "shotgun", "action": "reload_shell", "tag": "reload_step", "prompt": "shotgun shell loaded into tube magazine, single dull thunk, 0.5 second", "duration_target_sec": 0.5, "loops": false},
+
+    {"id": "sfx_gl_fire", "weapon_class": "gl", "action": "fire", "tag": "weapon_fired", "prompt": "40mm grenade launcher fire, hollow muffled thump with brief whistle, 0.7 second", "duration_target_sec": 0.7, "loops": false},
+    {"id": "sfx_gl_cylinder_rotate", "weapon_class": "gl", "action": "cylinder_rotate", "tag": "weapon_cylinder", "prompt": "grenade launcher cylinder rotates and locks, metallic ratchet with click, 0.6 second", "duration_target_sec": 0.6, "loops": false},
+    {"id": "sfx_gl_reload_start", "weapon_class": "gl", "action": "reload_start", "tag": "reload_started", "prompt": "grenade launcher break-open with metallic clank, 0.8 second", "duration_target_sec": 0.8, "loops": false},
+    {"id": "sfx_gl_reload_end", "weapon_class": "gl", "action": "reload_end", "tag": "reload_completed", "prompt": "grenade launcher closed and locked with heavy thunk, 0.5 second", "duration_target_sec": 0.5, "loops": false},
+
+    {"id": "sfx_heavy_fire_burst", "weapon_class": "heavy", "action": "fire_burst", "tag": "weapon_fired_auto", "prompt": "heavy machine gun .50 cal burst fire, 6 rounds, devastating booming reports with mechanical rattle, 1.2 second", "duration_target_sec": 1.2, "loops": true},
+    {"id": "sfx_heavy_belt_feed", "weapon_class": "heavy", "action": "belt_feed", "tag": "weapon_belt", "prompt": "heavy MG belt feed cycle, metallic clinking of ammo links, 0.8 second", "duration_target_sec": 0.8, "loops": true},
+    {"id": "sfx_heavy_barrel_swap", "weapon_class": "heavy", "action": "barrel_swap", "tag": "weapon_barrel_swap", "prompt": "heavy MG barrel swap, locking mechanism release + heat shimmer + barrel removal hiss, 2.5 second", "duration_target_sec": 2.5, "loops": false},
+
+    {"id": "sfx_flamer_fire", "weapon_class": "flamer", "action": "fire", "tag": "weapon_fired", "prompt": "flamethrower sustained roar, fuel ignition with crackling fire, 1.5 second", "duration_target_sec": 1.5, "loops": true},
+    {"id": "sfx_flamer_ignite", "weapon_class": "flamer", "action": "ignite", "tag": "weapon_ignite", "prompt": "flamethrower pilot light ignition click + soft whoof of fuel ignition, 0.5 second", "duration_target_sec": 0.5, "loops": false},
+    {"id": "sfx_flamer_tank_refill", "weapon_class": "flamer", "action": "tank_refill", "tag": "reload_step", "prompt": "flamethrower fuel tank fill, liquid gurgle into metal tank, 2.0 second", "duration_target_sec": 2.0, "loops": false},
+
+    {"id": "sfx_drill_spin", "weapon_class": "drill", "action": "spin", "tag": "weapon_drill_spin", "prompt": "industrial drill spool up, electric motor whir rising in pitch, 1.5 second", "duration_target_sec": 1.5, "loops": false},
+    {"id": "sfx_drill_into_metal", "weapon_class": "drill", "action": "into_metal", "tag": "weapon_drill_metal", "prompt": "drill bit grinding into steel, harsh metallic shriek with sparks, 2.0 second", "duration_target_sec": 2.0, "loops": true},
+    {"id": "sfx_drill_into_concrete", "weapon_class": "drill", "action": "into_concrete", "tag": "weapon_drill_concrete", "prompt": "drill bit grinding into concrete, dusty grinding with chunks falling, 2.0 second", "duration_target_sec": 2.0, "loops": true},
+    {"id": "sfx_drill_into_dirt", "weapon_class": "drill", "action": "into_dirt", "tag": "weapon_drill_dirt", "prompt": "drill bit digging into earth, soft thudding with soil falling, 1.5 second", "duration_target_sec": 1.5, "loops": true},
+
+    {"id": "sfx_grappler_fire", "weapon_class": "grappler", "action": "fire", "tag": "weapon_fired", "prompt": "grappling hook launcher, twang of crossbow tension release + line whir, 0.6 second", "duration_target_sec": 0.6, "loops": false},
+    {"id": "sfx_grappler_anchor", "weapon_class": "grappler", "action": "anchor", "tag": "weapon_grappler_anchor", "prompt": "grappling hook impacts and embeds in surface, metallic clink with anchor catch, 0.5 second", "duration_target_sec": 0.5, "loops": false},
+    {"id": "sfx_grappler_reel", "weapon_class": "grappler", "action": "reel", "tag": "weapon_grappler_reel", "prompt": "grappling hook reel winding, mechanical clicking cable retract, 1.2 second", "duration_target_sec": 1.2, "loops": true},
+
+    {"id": "sfx_drone_deploy", "weapon_class": "drone_deployer", "action": "deploy", "tag": "weapon_drone_deploy", "prompt": "drone deployer launches micro-drone, electronic whir + small motor spool-up, 0.8 second", "duration_target_sec": 0.8, "loops": false},
+    {"id": "sfx_drone_hover", "weapon_class": "drone_deployer", "action": "hover", "tag": "weapon_drone_hover", "prompt": "small drone hover, 4 quadrotor whir, 2.0 second", "duration_target_sec": 2.0, "loops": true},
+    {"id": "sfx_drone_target_lock", "weapon_class": "drone_deployer", "action": "target_lock", "tag": "weapon_drone_lock", "prompt": "drone target lock chirp, two-tone electronic ascending beep, 0.4 second", "duration_target_sec": 0.4, "loops": false},
+
+    {"id": "sfx_melee_knife_swing", "weapon_class": "melee", "action": "knife_swing", "tag": "melee_swing", "prompt": "knife swing through air, whoosh of fabric and blade, 0.4 second", "duration_target_sec": 0.4, "loops": false},
+    {"id": "sfx_melee_knife_hit", "weapon_class": "melee", "action": "knife_hit", "tag": "melee_hit", "prompt": "knife stabbing into flesh, wet meaty puncture sound, 0.3 second", "duration_target_sec": 0.3, "loops": false},
+    {"id": "sfx_melee_baton_swing", "weapon_class": "melee", "action": "baton_swing", "tag": "melee_swing", "prompt": "baton swung through air, faint whoosh with handle creak, 0.4 second", "duration_target_sec": 0.4, "loops": false},
+    {"id": "sfx_melee_baton_hit", "weapon_class": "melee", "action": "baton_hit", "tag": "melee_hit", "prompt": "baton impact on armor, dull thwack with metallic ring, 0.4 second", "duration_target_sec": 0.4, "loops": false},
+    {"id": "sfx_melee_rifle_bash", "weapon_class": "melee", "action": "rifle_bash", "tag": "melee_hit", "prompt": "rifle butt impact, heavy metallic thud with grunt, 0.5 second", "duration_target_sec": 0.5, "loops": false},
+    {"id": "sfx_melee_hatchet_swing", "weapon_class": "melee", "action": "hatchet_swing", "tag": "melee_swing", "prompt": "hatchet swing through air, heavy whoosh with handle creak, 0.5 second", "duration_target_sec": 0.5, "loops": false},
+    {"id": "sfx_melee_hatchet_hit", "weapon_class": "melee", "action": "hatchet_hit", "tag": "melee_hit", "prompt": "hatchet impact into bone, wet crack with following thud, 0.5 second", "duration_target_sec": 0.5, "loops": false},
+    {"id": "sfx_melee_kick", "weapon_class": "melee", "action": "kick", "tag": "melee_hit", "prompt": "boot to body impact, dull leather slap with grunt, 0.4 second", "duration_target_sec": 0.4, "loops": false},
+    {"id": "sfx_melee_shoulder_check", "weapon_class": "melee", "action": "shoulder_check", "tag": "melee_hit", "prompt": "shoulder check body impact, heavy thud with armor scrape, 0.5 second", "duration_target_sec": 0.5, "loops": false},
+
+    {"id": "sfx_grenade_pin_pull", "weapon_class": "grenade", "action": "pin_pull", "tag": "grenade_pin", "prompt": "grenade safety pin pulled, sharp metallic click + spring release, 0.3 second", "duration_target_sec": 0.3, "loops": false},
+    {"id": "sfx_grenade_throw", "weapon_class": "grenade", "action": "throw", "tag": "grenade_throw", "prompt": "grenade thrown overhand, fabric rustle plus brief whoosh, 0.5 second", "duration_target_sec": 0.5, "loops": false},
+    {"id": "sfx_grenade_bounce", "weapon_class": "grenade", "action": "bounce", "tag": "grenade_bounce", "prompt": "grenade bouncing on metal floor, multiple small dull clinks, 1.0 second", "duration_target_sec": 1.0, "loops": false},
+    {"id": "sfx_grenade_frag_explode", "weapon_class": "grenade", "action": "explode_frag", "tag": "grenade_explode_frag", "prompt": "fragmentation grenade explosion, sharp ear-splitting crack with shrapnel whiz, 1.0 second", "duration_target_sec": 1.0, "loops": false},
+    {"id": "sfx_grenade_smoke_pop", "weapon_class": "grenade", "action": "smoke_pop", "tag": "grenade_smoke", "prompt": "smoke grenade ignites, hissing fizz with cloud emission, 2.5 second", "duration_target_sec": 2.5, "loops": false},
+    {"id": "sfx_grenade_flash_pop", "weapon_class": "grenade", "action": "flash_pop", "tag": "grenade_flash", "prompt": "flashbang detonation, blinding white-noise crack with high-pitch ring, 0.5 second", "duration_target_sec": 0.5, "loops": false},
+    {"id": "sfx_grenade_stick_attach", "weapon_class": "grenade", "action": "stick_attach", "tag": "grenade_stick", "prompt": "sticky grenade attaches to surface, wet plop with adhesive squelch, 0.4 second", "duration_target_sec": 0.4, "loops": false}
+  ]
+}

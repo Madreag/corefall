@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/banner_dismissed.v1",
+  "title": "ux.banner_dismissed",
+  "description": "Emitted when a banner leaves the HUD banner stack (expiry, eviction, or dismiss-condition event). reason is a snake_case identifier of the dismissal cause.",
+  "type": "object",
+  "required": ["banner_id", "reason"],
+  "properties": {
+    "banner_id": { "type": "string", "minLength": 1 },
+    "reason": { "type": "string", "enum": ["expired", "evicted", "resolved", "dismissed_by_user"] },
+    "raised_at_tick": { "type": "integer", "minimum": 0 },
+    "dismissed_at_tick": { "type": "integer", "minimum": 0 },
+    "parent_event_id": { "type": "string" }
+  }
+}

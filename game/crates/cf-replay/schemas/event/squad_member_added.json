@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/squad.member_added.v0.1",
+  "title": "squad.member_added",
+  "type": "object",
+  "required": ["actor"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "role": {"type": "string", "enum": ["leader", "follower"]},
+    "display_name": {"type": "string"}
+  },
+  "additionalProperties": true
+}

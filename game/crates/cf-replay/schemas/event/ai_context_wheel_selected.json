@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ai_context_wheel_selected.v1",
+  "title": "ai.context_wheel_selected",
+  "description": "Emitted when the player picks a slot on the Q-hold context wheel.",
+  "type": "object",
+  "required": ["actor_id", "slot", "order"],
+  "properties": {
+    "actor_id": { "type": "integer", "minimum": 0 },
+    "slot": { "type": "integer", "minimum": 0, "maximum": 7 },
+    "order": { "type": "string" }
+  }
+}

@@ -1,0 +1,99 @@
+// M11A Shell UI manifest — title / main menu / pause / save-load / settings / credits / loading screens.
+// Designed to integrate with M9A's M9A_svg_v1 pipeline (Python + cairo-svg + LLM SVG prompter).
+// Style baseline: comic-noir per DR-055 (ink-line silhouettes, high contrast, 4-color factional palettes).
+// Every prompt specifies: composition, palette anchor, silhouette shape, mood, focal element.
+// All assets ACC-A-compliant: keyboard-navigable, high-contrast safe, color-blind safe.
+(
+    schema_version: "1.0.0",
+    category: "ShellUi",
+    owner_milestone: "M11A",
+    pipeline_id: "M9A_svg_v1",
+    entries: [
+        // ─── Title screen splash variants (8) — attract mode rotates through these ──
+        ( canonical_name: "title_splash_command_core_silhouette", kind: "shell-splash", prompt: "ink-line comic-noir splash, distant horizon with command-core silhouette dominating frame center, layered black-gray-amber palette, scratched dramatic sky, faint debris falling, two tiny actor silhouettes mid-foreground for scale, COREFALL wordmark space top-third reserved for logo overlay" ),
+        ( canonical_name: "title_splash_breach_combat", kind: "shell-splash", prompt: "ink-line comic-noir splash, broken bunker wall mid-breach, dust + rubble + sparks in frame, two-tone factional palette (coalition blue / frontier amber), dramatic backlight through breach, COREFALL wordmark reserved bottom-third" ),
+        ( canonical_name: "title_splash_chassis_silhouettes", kind: "shell-splash", prompt: "ink-line comic-noir splash, three chassis silhouettes (infantry + powered armor + light mech) in heroic three-quarter pose against burning horizon, scale gradient, COREFALL wordmark reserved top-center" ),
+        ( canonical_name: "title_splash_reactor_cascade", kind: "shell-splash", prompt: "ink-line comic-noir splash, reactor core mid-cascade with three armor layers (External/Internal/Core) visible cracking outward, electric arcs + heat-shimmer + flying debris, color shifts red-amber-white, COREFALL wordmark reserved" ),
+        ( canonical_name: "title_splash_dropship_descent", kind: "shell-splash", prompt: "ink-line comic-noir splash, dropship descending through atmospheric layers (vacuum-blue → cloud-white → ground-orange), retro-rocket flares + ground-impact sparks, two-tone coalition palette, COREFALL wordmark space" ),
+        ( canonical_name: "title_splash_subsurface_drill", kind: "shell-splash", prompt: "ink-line comic-noir splash, vertical cross-section view of subsurface drill operation, layered geological strata (ice-blue / brine-cyan / basalt-black / magma-orange), drill silhouette mid-frame, debris cascade upward through chamber, faction-neutral palette" ),
+        ( canonical_name: "title_splash_atmospheric_breach", kind: "shell-splash", prompt: "ink-line comic-noir splash, room atmosphere venting through bullet-punched aperture, swirling gas vortex (smoke-white / acid-yellow / O2-cyan), suit-clad actor mid-frame bracing against pressure differential, scale + drama emphasized" ),
+        ( canonical_name: "title_splash_brain_hop_moment", kind: "shell-splash", prompt: "ink-line comic-noir splash, two side-view actor silhouettes with luminous brain-transfer arc connecting their head zones, ghostly trail effect, fading body + manifesting body simultaneously visible, color-shift cyan-to-amber" ),
+
+        // ─── Main menu backgrounds (8) — atmospheric environment backdrops ──────
+        ( canonical_name: "menu_bg_earth_command_core", kind: "shell-backdrop", prompt: "ink-line comic-noir background, Earth-faction command core compound at dusk, fortified perimeter, distant lights, scale + horizon depth, layered amber + blue palette, low-frequency texture (no fine detail that distracts menu text)" ),
+        ( canonical_name: "menu_bg_mars_outpost", kind: "shell-backdrop", prompt: "ink-line comic-noir background, Mars dust-red landscape with frontier outpost silhouette, two suns or distant Mars dust storm on horizon, rust-orange palette, low-frequency texture for menu legibility" ),
+        ( canonical_name: "menu_bg_europa_subsurface", kind: "shell-backdrop", prompt: "ink-line comic-noir background, Europa subsurface ocean cavern, ice-blue palette, distant bioluminescent vents, frozen ceiling above water surface, layered cold tones" ),
+        ( canonical_name: "menu_bg_mimas_methane_seas", kind: "shell-backdrop", prompt: "ink-line comic-noir background, Mimas methane lake horizon under Saturn-ring sky, pale-green palette, methane-breather race silhouettes in distance, ringed-gas-giant arc dominating sky" ),
+        ( canonical_name: "menu_bg_vulcan_magma", kind: "shell-backdrop", prompt: "ink-line comic-noir background, Vulcan volcanic plain with magma flows, basalt rock silhouettes, heat-shimmer + glowing-red palette, faint silhouette of distant fortification" ),
+        ( canonical_name: "menu_bg_orbital_station", kind: "shell-backdrop", prompt: "ink-line comic-noir background, exterior orbital station against starfield, Earth or Mars partially visible, station rotation gives sense of scale, cool palette with single warm anchor light" ),
+        ( canonical_name: "menu_bg_belt_asteroid", kind: "shell-backdrop", prompt: "ink-line comic-noir background, asteroid belt mining colony, irregular rock silhouettes with embedded structures, distant sun providing rim-lighting, gray-amber palette" ),
+        ( canonical_name: "menu_bg_sol_zone_habitat", kind: "shell-backdrop", prompt: "ink-line comic-noir background, Sol-zone habitat exterior with crystalline structures, white-yellow palette, intense sun above, heat-shimmer halo, crystalline-race silhouettes in distance" ),
+
+        // ─── Loading screen art (15) — mission-specific themed loading scenes ────
+        ( canonical_name: "loading_breach_prep", kind: "shell-loading", prompt: "ink-line comic-noir loading scene, squad gearing up at staging area before breach, weapons / loadout silhouettes visible, faction palette, mission-prep mood" ),
+        ( canonical_name: "loading_dropship_inbound", kind: "shell-loading", prompt: "ink-line comic-noir loading scene, dropship approaching landing zone from above, atmospheric perspective + ground details rapidly resolving, motion-blur direction" ),
+        ( canonical_name: "loading_reactor_walkthrough", kind: "shell-loading", prompt: "ink-line comic-noir loading scene, technician walking around a reactor with three armor layers exposed, schematic-overlay aesthetic" ),
+        ( canonical_name: "loading_bunker_corridor", kind: "shell-loading", prompt: "ink-line comic-noir loading scene, fortified bunker corridor receding into distance, alternating amber lights, scale + dread mood" ),
+        ( canonical_name: "loading_subsurface_traverse", kind: "shell-loading", prompt: "ink-line comic-noir loading scene, actors descending into ice-cavern via rope+anchor, layered ice strata visible behind, cold palette" ),
+        ( canonical_name: "loading_dust_storm_approach", kind: "shell-loading", prompt: "ink-line comic-noir loading scene, approaching dust storm wall on Mars horizon, silhouetted dropship + small actors in foreground, ominous scale" ),
+        ( canonical_name: "loading_command_core_briefing", kind: "shell-loading", prompt: "ink-line comic-noir loading scene, command-core briefing room with holographic map projection center-frame, squad silhouettes around table, planning mood" ),
+        ( canonical_name: "loading_atmospheric_failure", kind: "shell-loading", prompt: "ink-line comic-noir loading scene, breached habitat with suit-clad survivors bracing against vacuum decompression, danger + urgency mood" ),
+        ( canonical_name: "loading_extraction_zone", kind: "shell-loading", prompt: "ink-line comic-noir loading scene, friendly dropship landed at extraction zone with squad converging, hope + tension mood, perimeter under attack" ),
+        ( canonical_name: "loading_chassis_bay", kind: "shell-loading", prompt: "ink-line comic-noir loading scene, mech-bay with three chassis archetypes mounted on service cradles, technicians working, scale + tech mood" ),
+        ( canonical_name: "loading_material_lab", kind: "shell-loading", prompt: "ink-line comic-noir loading scene, material lab workbench with flasks bubbling and stamp-tools laid out, scientific + creative mood" ),
+        ( canonical_name: "loading_mining_operation", kind: "shell-loading", prompt: "ink-line comic-noir loading scene, deep mining operation with drill rigs + ore conveyors, geological strata visible, industrial mood" ),
+        ( canonical_name: "loading_storm_shelter", kind: "shell-loading", prompt: "ink-line comic-noir loading scene, weather-storm-shelter exterior with anchored cables + bracing struts, atmospheric pressure storm visible above" ),
+        ( canonical_name: "loading_factory_floor", kind: "shell-loading", prompt: "ink-line comic-noir loading scene, fabrication factory interior with assembly lines + crafting stations, faction-coherent industrial palette" ),
+        ( canonical_name: "loading_orbital_dock", kind: "shell-loading", prompt: "ink-line comic-noir loading scene, orbital docking bay with cargo transports, station spinning above, weightless mood" ),
+
+        // ─── Faction emblems (8 launch factions × full crest treatment) ──────────
+        ( canonical_name: "emblem_coalition_crest", kind: "shell-emblem", prompt: "factional emblem crest, COALITION shield form, two-tone primary 2266CC + secondary 88BBFF, central anchor-and-tower motif with motto banner 'Protect. Fortify. Endure.' below, ink-line border treatment" ),
+        ( canonical_name: "emblem_frontier_crest", kind: "shell-emblem", prompt: "factional emblem crest, FRONTIER spearpoint form, two-tone primary CC6622 + secondary FFAA55, central drill-and-rocket motif with motto banner 'Strike. Breach. Vanish.' below, ink-line border treatment, dynamic motion lines" ),
+        ( canonical_name: "emblem_ronin_crest", kind: "shell-emblem", prompt: "factional emblem crest, RONIN circular form, two-tone red 990033 + gold DDAA22, central crossed-katanas-and-thread motif with motto banner 'Bind. Cut. Carry.' below, ink-line border, asymmetric calligraphy" ),
+        ( canonical_name: "emblem_synth_crest", kind: "shell-emblem", prompt: "factional emblem crest, SYNTH hexagonal form, two-tone cyan 22AAEE + silver CCDDEE, central circuit-mandala motif with motto banner 'Calculate. Persist. Optimize.' below, ink-line geometric precision" ),
+        ( canonical_name: "emblem_collective_crest", kind: "shell-emblem", prompt: "factional emblem crest, COLLECTIVE star-burst form, two-tone violet 6644AA + lavender CCAAEE, central many-hands-clasped motif with motto banner 'Together. Always. Forward.' below, ink-line border, communal symmetry" ),
+        ( canonical_name: "emblem_husks_crest", kind: "shell-emblem", prompt: "factional emblem crest, HUSKS irregular fractured form, two-tone bone-white EEDDCC + ash-gray 555544, central broken-helmet-and-skull motif with motto banner 'We remember.' below, ink-line jagged edges" ),
+        ( canonical_name: "emblem_collegium_crest", kind: "shell-emblem", prompt: "factional emblem crest, COLLEGIUM laurel-wreath form, two-tone deep-green 226633 + gold DDCC44, central open-book-and-quill motif with motto banner 'Knowledge is shield.' below, ink-line academic" ),
+        ( canonical_name: "emblem_starlight_crest", kind: "shell-emblem", prompt: "factional emblem crest, STARLIGHT compass-rose form, two-tone deep-blue 113366 + starlight-yellow FFEEAA, central sextant-and-constellation motif with motto banner 'We chart the unknown.' below, ink-line celestial" ),
+
+        // ─── Menu button glyphs (12) — universal ───────────────────────────────
+        ( canonical_name: "btn_play_glyph", kind: "shell-button", prompt: "menu button glyph, forward-triangle play icon, ink-line border, ACC-A high contrast safe" ),
+        ( canonical_name: "btn_continue_glyph", kind: "shell-button", prompt: "menu button glyph, forward-arrow-with-mark continue icon, ink-line border" ),
+        ( canonical_name: "btn_settings_glyph", kind: "shell-button", prompt: "menu button glyph, gear settings icon, ink-line border" ),
+        ( canonical_name: "btn_save_glyph", kind: "shell-button", prompt: "menu button glyph, floppy-disk save icon, ink-line border" ),
+        ( canonical_name: "btn_load_glyph", kind: "shell-button", prompt: "menu button glyph, folder-with-arrow load icon, ink-line border" ),
+        ( canonical_name: "btn_quit_glyph", kind: "shell-button", prompt: "menu button glyph, exit-door quit icon, ink-line border" ),
+        ( canonical_name: "btn_mods_glyph", kind: "shell-button", prompt: "menu button glyph, puzzle-piece mods icon, ink-line border" ),
+        ( canonical_name: "btn_credits_glyph", kind: "shell-button", prompt: "menu button glyph, scroll credits icon, ink-line border" ),
+        ( canonical_name: "btn_replay_glyph", kind: "shell-button", prompt: "menu button glyph, rewind replay icon, ink-line border" ),
+        ( canonical_name: "btn_photo_glyph", kind: "shell-button", prompt: "menu button glyph, camera photo icon, ink-line border" ),
+        ( canonical_name: "btn_help_glyph", kind: "shell-button", prompt: "menu button glyph, question-mark help icon, ink-line border" ),
+        ( canonical_name: "btn_workshop_glyph", kind: "shell-button", prompt: "menu button glyph, anvil-and-hammer workshop icon, ink-line border" ),
+
+        // ─── Save slot frame variants (3 — empty / occupied / corrupted) ────────
+        ( canonical_name: "save_slot_frame_empty", kind: "shell-frame", prompt: "save slot frame, empty state, ink-line dashed border, faint placeholder text-region, ACC-A focusable visual" ),
+        ( canonical_name: "save_slot_frame_occupied", kind: "shell-frame", prompt: "save slot frame, occupied state, ink-line solid border with mission-thumb-mounting region center + metadata strip below (timestamp / mission name / playtime)" ),
+        ( canonical_name: "save_slot_frame_corrupted", kind: "shell-frame", prompt: "save slot frame, corrupted state, ink-line red broken border with warning glyph, integrity-issue caption region" ),
+
+        // ─── Settings tab icons (6 — graphics / audio / controls / accessibility / gameplay / language) ──
+        ( canonical_name: "settings_tab_graphics", kind: "shell-tab", prompt: "settings tab icon, monitor + slider graphics icon, ink-line border" ),
+        ( canonical_name: "settings_tab_audio", kind: "shell-tab", prompt: "settings tab icon, speaker + wave audio icon, ink-line border" ),
+        ( canonical_name: "settings_tab_controls", kind: "shell-tab", prompt: "settings tab icon, keyboard + mouse controls icon, ink-line border" ),
+        ( canonical_name: "settings_tab_accessibility", kind: "shell-tab", prompt: "settings tab icon, eye + ear + hand accessibility icon, ink-line border" ),
+        ( canonical_name: "settings_tab_gameplay", kind: "shell-tab", prompt: "settings tab icon, dice-and-difficulty gameplay icon, ink-line border" ),
+        ( canonical_name: "settings_tab_language", kind: "shell-tab", prompt: "settings tab icon, globe + speech-bubble language icon, ink-line border" ),
+
+        // ─── First-Run Experience wizard frames (5) ─────────────────────────────
+        ( canonical_name: "fre_step_welcome", kind: "shell-fre", prompt: "first-run welcome scene, ink-line comic-noir, COREFALL logo center-frame + 'Welcome' caption space + faction-neutral palette" ),
+        ( canonical_name: "fre_step_origin_select", kind: "shell-fre", prompt: "first-run origin selection scene, ink-line comic-noir, 10 race silhouettes arranged in arc with rotation indicator, callsign-input region below" ),
+        ( canonical_name: "fre_step_faction_select", kind: "shell-fre", prompt: "first-run faction selection scene, ink-line comic-noir, 8 faction emblem cards in 4x2 grid layout, brief lore-line space below each" ),
+        ( canonical_name: "fre_step_difficulty_select", kind: "shell-fre", prompt: "first-run difficulty selection scene, ink-line comic-noir, four difficulty cards (cakewalk / tough_crowd / veteran / hardcore) with risk + reward icons" ),
+        ( canonical_name: "fre_step_tutorial_offer", kind: "shell-fre", prompt: "first-run tutorial offer scene, ink-line comic-noir, training-grounds silhouette center, 'Recommended for new pilots' badge, skip-tutorial alternative below" ),
+    ],
+    sizes: [256, 512, 1024, 1920, 3840],
+    faction_variants: [
+        "menu_bg_earth_command_core",
+        "menu_bg_mars_outpost",
+        "save_slot_frame_occupied",
+    ],
+)

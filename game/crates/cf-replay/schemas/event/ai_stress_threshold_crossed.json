@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ai_stress_threshold_crossed.v1",
+  "title": "ai.stress_threshold_crossed",
+  "description": "Emitted when an actor's stress accumulator crosses one of the spec-mandated thresholds (e.g. mood < -75 = depressed; retreat threshold raised dramatically). Spec § Mood stress affects performance.",
+  "type": "object",
+  "required": ["actor_id", "threshold", "direction"],
+  "properties": {
+    "actor_id": { "type": "integer", "minimum": 0 },
+    "threshold": { "type": "string", "enum": ["stressed", "depressed", "calm", "broken"] },
+    "direction": { "type": "string", "enum": ["entered", "exited"] },
+    "stress_value": { "type": "number" }
+  }
+}

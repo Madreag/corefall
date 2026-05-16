@@ -1,0 +1,22 @@
+{
+  "description": "AI-H-02 harness scenario: player closes from spawn (96, 32) toward the reactive guard (id=2, hp=80, team='red') in micro_breach until LOS is established within the guard's sight cone, then opens sustained fire. The guard's M7 cf-ai cover-seeking layer reacts to the incoming threat: `ai.cover_seeking_started` fires once the bot's tick detects active incoming fire with a known origin (per M7 spec § 'Cover seeking + suppression' → 'Scenario: Rifleman seeks cover when fired upon'), and `ai.suppression_started` fires as the bot's return-fire path engages (per M7 spec § 'Suppression fire'). Per M7 spec § 'AI-H test harness preservation + extension' table row `AI-H-02 | Cover seeking under fire (M7; new)`. Expected event sequence: control.command_accepted(act.player.fire) → ai.cover_seeking_started{actor_id=2, reason=incoming_fire} → ai.suppression_started{suppressor=2, target=1}. Final state: guard at id=2 observed in a covered / repositioned stance, alive and engaged; player at id=1 still firing under guard return-fire pressure. Run via `cargo run -p cf-e2e -- --scenario micro_breach --ai-harness ai_h_02_cover_seeking_under_fire`.",
+  "scenario": "micro_breach",
+  "tick_rate_hz": 60,
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+    { "method": "act.player.aim", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "act.player.move", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 360 } },
+    { "method": "act.player.move", "params": { "x": 0.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 12 } },
+    { "method": "act.player.fire", "params": { "pressed": true } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 30 } },
+    { "method": "act.player.fire", "params": { "pressed": false } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 30 } },
+    { "method": "act.player.fire", "params": { "pressed": true } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 30 } },
+    { "method": "act.player.fire", "params": { "pressed": false } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 60 } },
+    { "method": "observe.once", "params": {} }
+  ]
+}

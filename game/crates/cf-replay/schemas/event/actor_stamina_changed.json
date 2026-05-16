@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/actor.stamina_changed.v0.1",
+  "title": "actor.stamina_changed",
+  "type": "object",
+  "required": ["actor", "stamina"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "stamina": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+    "sprinting": {"type": "boolean"}
+  },
+  "additionalProperties": true
+}

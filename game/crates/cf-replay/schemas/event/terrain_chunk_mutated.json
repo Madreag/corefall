@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/terrain_chunk_mutated.v1",
+  "title": "terrain.chunk_mutated",
+  "description": "M8A § Semantic terrain event protocol. Emitted on every chunk-level mutation (dig / blast / fill / settle / stamp / door_toggle / hazard_burn) with the post-state checksum that downstream clients use to verify their predicted chunk state. Replaces CCCP-style raw bitmap deltas.",
+  "type": "object",
+  "required": ["cause", "chunk_coords", "bbox", "delta_materials", "post_state_checksum"],
+  "properties": {
+    "cause": {
+      "type": "string",
+      "enum": ["dig", "blast", "fill", "settle", "stamp", "door_toggle", "hazard_burn"],
+      "description": "What kind of mutation occurred. Replay tooling routes by cause."
+    },
+    "chunk_coords": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": { "type": "integer" },
+      "description": "(cx, cy) — the chunk index in M3's chunked-terrain indexing."
+    },
+    "bbox": {
+      "type": "array",
+      "minItems": 4,
+      "maxItems": 4,
+      "items": { "type": "integer", "minimum": 0 },
+      "description": "(x, y, w, h) — dirty-rect within the chunk."
+    },
+    "delta_materials": {
+      "type": "array",
+      "description": "Per-pixel material changes. Each entry carries local-to-chunk coords + old + new material id.",
+      "items": {
+        "type": "object",
+        "required": ["px", "py", "old_material", "new_material"],
+        "properties": {
+          "px": { "type": "integer", "minimum": 0 },
+          "py": { "type": "integer", "minimum": 0 },
+          "old_material": { "type": "integer", "minimum": 0 },
+          "new_material": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "post_state_checksum": {
+      "type": "string",
+      "description": "blake3 hex of the chunk's material grid AFTER the mutation. Downstream clients verify their predicted state matches."
+    },
+    "cause_event_id": {
+      "type": ["string", "null"],
+      "description": "Forward link to the higher-level event (e.g., explosion, weapon fire) that caused the mutation."
+    },
+    "tick": {
+      "type": "integer",
+      "minimum": 0
+    }
+  }
+}

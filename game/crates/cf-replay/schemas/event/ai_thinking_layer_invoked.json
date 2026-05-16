@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ai_thinking_layer_invoked.v1",
+  "title": "ai.thinking_layer_invoked",
+  "description": "Emitted once per AI tick per bot listing which of the 5 thinking-stack layers fired (Reactive / Utility / BehaviorTree / Htn / LlmPrior). Spec § M7-A 5-layer thinking stack.",
+  "type": "object",
+  "required": ["actor_id", "layers"],
+  "properties": {
+    "actor_id": { "type": "integer", "minimum": 0 },
+    "layers": { "type": "array", "minItems": 1 },
+    "reactive_override": { "type": "boolean" },
+    "chosen_task": { "type": "string" }
+  }
+}

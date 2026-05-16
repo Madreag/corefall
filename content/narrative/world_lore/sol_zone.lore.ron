@@ -1,0 +1,32 @@
+WorldLore (
+    world_id: "sol_zone",
+    canonical_name: "Sol Zone Stellar Edge",
+    music_anchor: "music_world_sol_zone",
+    entries: [
+        WorldEntry (
+            kind: "geology",
+            title: "The Approach",
+            body: "The Sol Zone is not a world; it is a region. The Concordat defines the Sol Zone as the volume of space between Mercury's orbital perihelion and approximately twenty solar radii from the sun's surface, where solar irradiance exceeds 50 kilowatts per square meter and solar wind density exceeds standard interplanetary values by a factor of forty. The region contains no natural bodies of inhabitable size; what it contains is the engineered habitats — the radiation-baffled platforms, the sun-shielded research stations, and the heavy industrial nodes — that human industry has placed there since the post-collapse period. The largest Sol Zone installation, the Helios Concourse, was constructed jointly by the Concordat and the Crystalfold Collective between 2191 and 2207 and remains the most ambitious engineering project in human history.",
+        ),
+        WorldEntry (
+            kind: "history",
+            title: "The Crystalfold Cradle",
+            body: "The Sol Zone is where the Crystalfold awakened. The original radiation-baffle assembly at the Mercury orbital boundary — the survey site of 2189 — produced the first Crystalfold node, Voice of First Bloom, and is, in 2241, the most senior Crystalfold settlement in existence. The Sol Zone is, by treaty and by sentiment, the Crystalfold's home territory; every other faction operates here under sufferance and under Crystalfold supervision. The Concordat has, in the years since, expanded the Sol Zone's infrastructure significantly — the Helios Concourse, the Bell Solar Forge, the Mercury Inner Lift — but every expansion has been negotiated with the Crystalfold first, and every expansion has been delivered on the Crystalfold's timeline rather than the Concordat's. The Coalition has, in private, accepted that the Sol Zone is not its territory and will not be.",
+        ),
+        WorldEntry (
+            kind: "biosphere",
+            title: "The Silicon Bloom",
+            body: "The Sol Zone is the only region of the Sol system where silicon-based life is the dominant biota. The Crystalfold themselves are the obvious example; less obviously, the inner solar magnetic-field zones host a population of microscopic silicate organisms that the Collegium has classified as 'pre-Crystalfold' and the Crystalfold themselves refer to as 'the unborn'. The microscopic biota is non-sentient by every available measure but exhibits clear, organized behavior; it migrates with the solar wind, aggregates in radiation maxima, and, on irregular cycles measured in Earth-decades, produces what the Crystalfold call a Bloom — a localized concentration of silicate growth that, under the right conditions, has historically produced a new Crystalfold settlement. The Concordat has agreed by treaty not to interfere with the Bloom process.",
+        ),
+        WorldEntry (
+            kind: "culture",
+            title: "The Sacred Stations",
+            body: "Sol Zone culture is sacred culture. The Crystalfold treat the entire region as a sustained ritual space, and the human personnel who operate the Concordat installations there have, over forty years, adopted a corresponding set of practices. Stations observe periods of silence corresponding to Crystalfold rituals. Workers wear ceremonial radiation badges in addition to the functional ones. The food in the mess halls is, by tradition, vegetarian on Concordat holy days. The Sol Zone is the only region of the Sol system where the Coalition garrison has agreed by standing order not to fire its main weapons except on direct threat, and the only region where the Coalition's salutes are conducted in silence. The Sol Zone is, by every available measure, the most quietly religious environment in human civilization.",
+        ),
+        WorldEntry (
+            kind: "mystery",
+            title: "The Threshold Mark",
+            body: "Approximately twelve solar radii from the sun's surface, in the deepest sustained Crystalfold settlement — a structure the Collective calls the Threshold and the Concordat calls the Bell — sits a single crystal pillar that, by every available measure, predates the first Crystalfold. The pillar is approximately eight meters tall, silicate in composition, and faceted in a geometry that the Collegium has been unable to match to any natural crystal lattice. The Crystalfold consider the pillar to be the oldest thing in their territory and have, in eighty years, declined to permit any external examination. The pillar emits a low-frequency resonance that is the harmonic foundation of the Crystalfold song; remove the pillar, the song collapses. The pillar was, by Crystalfold account, present when Voice of First Bloom became conscious. No one knows who put it there. The Crystalfold have, in their oldest oral histories, no record of it being placed. It was simply there, when they became aware enough to notice. It is there still.",
+        ),
+    ],
+)

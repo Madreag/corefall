@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/inventory.tank_slot_reserved.v0.1",
+  "title": "inventory.tank_slot_reserved",
+  "type": "object",
+  "required": ["actor", "slot_kind"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "slot_kind": {"type": "string", "enum": ["tank_primary", "tank_secondary", "tank_utility"]},
+    "slot_state": {"type": "string", "enum": ["locked"]}
+  },
+  "additionalProperties": true
+}

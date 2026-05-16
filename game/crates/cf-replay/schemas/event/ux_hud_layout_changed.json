@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ux_hud_layout_changed.v1",
+  "title": "ux.hud_layout_changed",
+  "description": "Emitted when the player drags a HUD widget to a new position via the basic custom-HUD-layout surface. M33+ ships the full editor.",
+  "type": "object",
+  "required": ["node", "x", "y"],
+  "properties": {
+    "node": { "type": "string" },
+    "x": { "type": "number" },
+    "y": { "type": "number" }
+  }
+}

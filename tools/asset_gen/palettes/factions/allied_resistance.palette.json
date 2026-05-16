@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0.0",
+  "palette_id": "allied_resistance",
+  "display_name": "Allied Resistance",
+  "category": "faction",
+  "description": "Scavenged irregular forces; mismatched gear with rust + olive + tan palette.",
+  "colors": [
+    { "role": "primary", "hex": "#6b5733", "comment": "scavenged tan" },
+    { "role": "secondary", "hex": "#4a3d22", "comment": "olive drab" },
+    { "role": "accent", "hex": "#c47a2d", "comment": "rust orange" },
+    { "role": "highlight", "hex": "#f0c060", "comment": "brass" },
+    { "role": "light", "hex": "#b09c70", "comment": "weathered canvas" },
+    { "role": "dark", "hex": "#1f1810", "comment": "deep shadow" },
+    { "role": "metal", "hex": "#8a6f3f", "comment": "rust metal" },
+    { "role": "cloth", "hex": "#6e3a1a", "comment": "leather strap" }
+  ],
+  "accent_pairs": [
+    { "fg": "#f0c060", "bg": "#1f1810" },
+    { "fg": "#c47a2d", "bg": "#4a3d22" }
+  ]
+}

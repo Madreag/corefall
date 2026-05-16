@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.0.0",
+  "style_id": "photosynthetic",
+  "category": "origin",
+  "version": "1.0.0",
+  "silhouette_language": "leafy plant-limbed humanoid, bark torso, chlorophyll vein glow, branching shoulder fronds",
+  "preferred_palette_roles": ["primary", "secondary", "accent", "highlight", "glow"],
+  "shape_descriptors": {
+    "head_proportion": "1.0",
+    "torso_proportion": "2.5",
+    "limb_proportion": "1.8",
+    "joints": "branching bark-knuckle",
+    "augmentations": "leaf cluster on shoulders"
+  },
+  "geometric_primitives": {
+    "actor": ["polygon", "ellipse", "polyline"]
+  }
+}

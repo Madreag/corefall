@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.0.0",
+  "style_id": "marauder_tribes",
+  "category": "faction",
+  "version": "1.0.0",
+  "silhouette_language": "bone and leather and tribal patterns, asymmetric, scavenged tech, organic curves, ember accents",
+  "preferred_palette_roles": ["primary", "secondary", "accent", "highlight", "metal"],
+  "shape_descriptors": {
+    "weapon": "bone-handled, hammered metal, tribal etchings, asymmetric grip",
+    "actor": "bone-fragment helmet, leather wrap armor, war paint streaks, hunched silhouette",
+    "vehicle": "bone-and-iron chassis, asymmetric wheels, totem spike rails",
+    "base_module": "totem post, bone shrine, leather tarp, ember pit",
+    "particle": "ember spark, smoke wisp, ash cloud",
+    "ui_icon": "asymmetric tribal mark, jagged bone outline"
+  },
+  "geometric_primitives": {
+    "weapon": ["polygon", "polyline", "circle"],
+    "actor": ["polygon", "circle", "polyline"],
+    "vehicle": ["polygon", "circle"],
+    "base_module": ["polygon", "polyline"],
+    "particle": ["circle", "polyline"],
+    "ui_icon": ["polygon", "polyline"]
+  }
+}

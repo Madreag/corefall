@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ai_context_wheel_opened.v1",
+  "title": "ai.context_wheel_opened",
+  "description": "Emitted when the Q-hold context wheel opens. The target_kind drives slot population per spec § Q-hold context wheel.",
+  "type": "object",
+  "required": ["target_kind"],
+  "properties": {
+    "target_kind": { "type": "string", "enum": ["squadmate", "door", "enemy", "terrain_breach", "hazard", "reactor_module", "none"] },
+    "target_id": { "type": ["integer", "null"], "minimum": 0 }
+  }
+}

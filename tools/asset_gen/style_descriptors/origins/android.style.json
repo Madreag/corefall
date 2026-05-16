@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.0.0",
+  "style_id": "android",
+  "category": "origin",
+  "version": "1.0.0",
+  "silhouette_language": "humanoid proportions with visible mechanical joints, smooth chrome plates, slim profile",
+  "preferred_palette_roles": ["primary", "secondary", "accent", "highlight", "metal"],
+  "shape_descriptors": {
+    "head_proportion": "0.95",
+    "torso_proportion": "2.4",
+    "limb_proportion": "1.85",
+    "joints": "exposed servo cylinders",
+    "augmentations": "core glow on chest"
+  },
+  "geometric_primitives": {
+    "actor": ["rect", "circle", "ellipse", "line"]
+  }
+}

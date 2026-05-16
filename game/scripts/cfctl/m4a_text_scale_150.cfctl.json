@@ -1,0 +1,12 @@
+{
+  "description": "M11 ACC-A floor: apply ui_scale=1.5 (intermediate; spec § review_grid_150.png), confirm round-trip via observe.accessibility + observe.once, then restore.",
+  "scenario": "m1_actor_range",
+  "steps": [
+    { "method": "observe.accessibility", "params": {} },
+    { "method": "act.settings.set", "params": { "ui_scale": 1.5 } },
+    { "method": "observe.accessibility", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 30 } },
+    { "method": "observe.once", "params": {} },
+    { "method": "act.settings.set", "params": { "ui_scale": 1.0 } }
+  ]
+}

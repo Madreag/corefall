@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/captions_shown.v1",
+  "title": "ux.captions_shown",
+  "description": "Emitted when a caption surface enters the HUD caption queue. verbosity_mode mirrors Settings.caption_mode.",
+  "type": "object",
+  "required": ["caption_text"],
+  "properties": {
+    "caption_text": { "type": "string" },
+    "event_source_id": { "type": "string" },
+    "verbosity_mode": { "type": "string", "enum": ["off", "critical_only", "standard", "expanded"] },
+    "category": { "type": "string", "enum": ["combat", "ai", "terrain", "mission", "system", "accessibility"] },
+    "raised_at_tick": { "type": "integer", "minimum": 0 },
+    "parent_event_id": { "type": "string" }
+  }
+}

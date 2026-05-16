@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ai_role_template_applied.v1",
+  "title": "ai.role_template_applied",
+  "description": "Emitted when an actor's PriorityTable is replaced with one of the 6 spec-mandated role templates via act.player.apply_role_template. Spec § Smart commandable AI — 6 role templates.",
+  "type": "object",
+  "required": ["actor_id", "template_id"],
+  "properties": {
+    "actor_id": { "type": "integer", "minimum": 0 },
+    "template_id": { "type": "string", "enum": ["rifleman", "sniper", "assault", "engineer", "spotter", "medic"] }
+  }
+}

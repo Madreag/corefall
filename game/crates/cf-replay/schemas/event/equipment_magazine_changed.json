@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/equipment.magazine_changed.v0.1",
+  "title": "equipment.magazine_changed",
+  "type": "object",
+  "required": ["actor", "remaining"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "remaining": {"type": "integer", "minimum": 0},
+    "capacity": {"type": "integer", "minimum": 0},
+    "round_kind": {"type": "string"}
+  },
+  "additionalProperties": true
+}

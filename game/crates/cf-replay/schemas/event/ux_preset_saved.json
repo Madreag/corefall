@@ -1,0 +1,11 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ux_preset_saved.v1",
+  "title": "ux.preset_saved",
+  "description": "Emitted when the player saves a HUD layout preset via act.ui.save_preset.",
+  "type": "object",
+  "required": ["name"],
+  "properties": {
+    "name": { "type": "string" }
+  }
+}

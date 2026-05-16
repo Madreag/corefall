@@ -1,0 +1,29 @@
+{
+  "description": "AI-H-06 harness scenario: exercises the M7 'Friendly fire awareness' contract. In the m6_squad_lab scenario the player (id=1, squad_role='leader') and the friendly rifleman bot (id=2, squad_archetype='rifleman', squad_role='follower') are both on team 'blue'. The script applies the `rifleman` role template to the player so its M7 utility scorer carries Rifleman defaults (PriorityTable: EngageVisibleEnemy=7, SuppressFire=7), then drives the player + the friendly bot via squad commands so that one ally ends up in the firing line of the other. Specifically: (1) bot is push-to-waypoint'd east to a forward position; (2) player remains west; (3) player aims east through the bot's body silhouette and presses fire. The engine's per-shot LOS check (M7 friendly_fire.rs payload + per-bot tick wire) detects a friendly in the muzzle path and emits `ai.friendly_fire_avoidance` against the bot (id=2 as the imperilled friendly); the bot then triggers a repositioning step that surfaces as `ai.cover_seeking_started{reason='friendly_fire_avoidance'}` or an updated squad_state.position. The 'spawn 2 allies in line of fire of a third' shape in the feature description is exercised with the current 2-actor scenario by treating the player as the firing ally + the bot as the imperilled friendly; the third actor is a forward-compat hook for a future 3-actor lab scenario. Expected event sequence: control.command_accepted(act.squad.issue_command{kind='push_to_waypoint'}) → squad.command_issued{bot_actor=2, kind='push_to_waypoint'} → control.command_accepted(act.player.aim) → control.command_accepted(act.player.fire) → ai.friendly_fire_avoidance{firer=1, friendly=2} → ai.cover_seeking_started{actor_id=2, reason='friendly_fire_avoidance'}. Final state: bot at id=2 observed at a repositioned location off the player's firing line; friendly_fire_avoidance event recorded; no actor.damage_dealt event against id=2 from the player's shot. Per M7 spec § 'AI-H test harness preservation + extension' row `AI-H-06 | Friendly-fire avoidance + repositioning (M7; new)`, and § Acceptance criteria § 'Cover seeking + suppression + retreat + squad comm + patrol' → 'Scenario: Friendly fire awareness'. Run via `cargo run -p cf-e2e -- --scenario m6_squad_lab --ai-harness ai_h_06_friendly_fire_avoidance_and_repositioning`.",
+  "scenario": "m6_squad_lab",
+  "tick_rate_hz": 60,
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+    { "method": "act.player.apply_role_template", "params": { "schema_version": 2, "actor_id": 1, "template_id": "rifleman" } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
+    { "method": "act.player.apply_role_template", "params": { "schema_version": 2, "actor_id": 2, "template_id": "rifleman" } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
+    { "method": "act.player.set_autonomy_mode", "params": { "schema_version": 2, "actor_id": 2, "mode": "full_auto" } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
+    { "method": "act.squad.issue_command", "params": { "bot_actor": 2, "kind": "push_to_waypoint", "waypoint": [500.0, 32.0] } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 360 } },
+    { "method": "act.player.aim", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 12 } },
+    { "method": "act.player.fire", "params": { "pressed": true } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 30 } },
+    { "method": "act.player.fire", "params": { "pressed": false } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 30 } },
+    { "method": "act.player.fire", "params": { "pressed": true } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 30 } },
+    { "method": "act.player.fire", "params": { "pressed": false } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 60 } },
+    { "method": "observe.actor", "params": { "actor_id": 2 } },
+    { "method": "observe.squad", "params": {} },
+    { "method": "observe.once", "params": {} }
+  ]
+}

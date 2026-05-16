@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall.dev/schemas/v1/style_descriptor.schema.json",
+  "title": "Corefall Tier-1 Style Descriptor",
+  "description": "Per-faction or per-origin silhouette-language descriptor read by tools/asset_gen/style_enforcer.py. The shape_descriptors entries are used by llm_svg_prompter.py as procedural shape hints.",
+  "type": "object",
+  "required": ["schema_version", "style_id", "category", "silhouette_language", "preferred_palette_roles"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1.0.0"
+    },
+    "style_id": {
+      "type": "string"
+    },
+    "category": {
+      "type": "string",
+      "enum": ["faction", "origin"]
+    },
+    "version": {
+      "type": "string"
+    },
+    "silhouette_language": {
+      "type": "string",
+      "description": "Free-text descriptor of the faction's overall visual identity (e.g. 'blocky, industrial, riveted plates, sharp 90° angles')."
+    },
+    "preferred_palette_roles": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "shape_descriptors": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      },
+      "description": "Per-kind shape vocabulary. Keys: weapon, actor, vehicle, base_module, particle, etc."
+    },
+    "geometric_primitives": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "array",
+        "items": {
+          "type": "string",
+          "enum": ["rect", "circle", "ellipse", "line", "polyline", "polygon", "path"]
+        }
+      }
+    }
+  }
+}

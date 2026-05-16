@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ux_pie_menu_closed.v1",
+  "title": "ux.pie_menu_closed",
+  "description": "Emitted when the T-key pie menu closes (either after a slice_chosen / slice_rejected resolution, or via an explicit close without selection). The sim resumes full speed.",
+  "type": "object",
+  "required": ["target_kind", "open_duration_ticks"],
+  "properties": {
+    "target_kind": { "type": "string", "enum": ["void", "nearest_actor", "door", "item"] },
+    "target_id": { "type": ["integer", "null"], "minimum": 0 },
+    "open_duration_ticks": { "type": "integer", "minimum": 0 },
+    "slice_chosen": {
+      "type": ["string", "null"],
+      "enum": [
+        "pickup",
+        "drop",
+        "switch_weapon",
+        "throw_grenade",
+        "melee_bash",
+        "deploy_bipod",
+        "signal_squad",
+        "use_medkit",
+        null
+      ]
+    }
+  }
+}

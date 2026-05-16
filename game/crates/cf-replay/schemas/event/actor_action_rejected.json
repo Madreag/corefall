@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/actor.action_rejected.v0.1",
+  "title": "actor.action_rejected",
+  "type": "object",
+  "required": ["actor", "action", "reason"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "action": {"type": "string"},
+    "reason": {"type": "string"}
+  },
+  "additionalProperties": true
+}

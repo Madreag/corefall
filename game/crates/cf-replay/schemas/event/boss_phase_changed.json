@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/boss_phase_changed.v1",
+  "title": "boss.phase_changed",
+  "description": "Emitted when a mini-boss transitions between its HP-threshold-driven phases.",
+  "type": "object",
+  "required": ["actor_id", "from", "to"],
+  "properties": {
+    "actor_id": { "type": "integer", "minimum": 0 },
+    "from": { "type": "string", "enum": ["phase_1", "phase_2", "phase_3"] },
+    "to": { "type": "string", "enum": ["phase_1", "phase_2", "phase_3"] },
+    "hp_fraction": { "type": "number" },
+    "tick": { "type": "integer", "minimum": 0 }
+  }
+}

@@ -1,0 +1,29 @@
+MissionBriefing (
+    mission_id: "first_contract_coalition",
+    canonical_name: "First Contract",
+    faction_giver: "coalition",
+    world: "earth",
+    difficulty: "tutorial",
+    objective_summary: "Hold a Coalition supply position on the Earth wastelands for one in-game hour against scavenger probes; learn the basics of fortification, suppressing fire, and squad coordination.",
+    briefing_text: "Listen up, Captain. Hayes. Field commander, Squad 14 detached. Welcome to the wire. The Coalition's signed for you, which means I've signed for you, which means the next hour is going to teach you something about the line we hold or something about the ground you're going to bleed on; preference is up to you. Position is a small Coalition fuel depot, three kilometers north of the Atlas reclamation site, currently understaffed because the main garrison rotated out last week and the relief column hasn't crossed the supply lane yet. Scavengers know the depot is light. Scavengers will, in the next sixty in-game minutes, send three probes to test the perimeter. Our job is to keep them off the depot until the relief column arrives. Adeyemi has set up two firing positions on the south wall and a fall-back inside the main building. Use them. Don't try to be clever; clever gets you shot. Suppressing fire is, in this engagement, your single most useful tool, and it is more important than aim. If you take a casualty, Reyes is on the line; she'll handle triage. Stay on the radio. Don't go for the loot until the column is in. We hold the line, Captain. That is, broadly, all there is to it.",
+    primary_objectives: [
+        "Hold the south wall of the depot",
+        "Repel three scavenger probes",
+        "Sustain no more than one squad casualty",
+        "Wait for the relief column",
+    ],
+    secondary_objectives: [
+        "Recover scavenger gear for the depot quartermaster",
+        "Maintain ammunition reserves above 40% at the end of the engagement",
+        "Identify any scavenger officer for Coalition intelligence",
+    ],
+    failure_conditions: [
+        "Depot main building breached",
+        "Squad casualties exceed two",
+        "Player downed without revival",
+    ],
+    reward_summary: "Coalition reputation +15; Coalition basic field kit; tutorial completion bonus; access to the Coalition quartermaster's standard inventory.",
+    debrief_win: "Hayes here. Clean op. Depot's intact, column's coming up the lane, and the scavengers gave you the kind of fight you can learn from without it costing more than it taught. Adeyemi says the south wall held; he wants me to tell you the wall held, and not you. He's not wrong, but he's also not right. The wall held because somebody was standing behind it. That somebody was you. Welcome to the line.",
+    debrief_loss: "Hayes here. The depot didn't hold. We lost two; we'll lose more before the relief column gets up the lane. That's the line, Captain — it asks for more than you've got on the first try, and most of the time you find out what you've got by failing once and showing up again. Get to medical. Don't, please, ask if I'm angry. I'm not. Get to medical.",
+    voice_giver_id: "coalition_captain_marcus_hayes",
+)

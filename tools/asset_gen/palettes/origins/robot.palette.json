@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0.0",
+  "palette_id": "robot",
+  "display_name": "Robot",
+  "category": "origin",
+  "description": "Industrial robot; matte armor plates + hard servos.",
+  "colors": [
+    { "role": "primary", "hex": "#52606c", "comment": "industrial gray" },
+    { "role": "secondary", "hex": "#222a32", "comment": "frame steel" },
+    { "role": "accent", "hex": "#f08020", "comment": "warning orange" },
+    { "role": "highlight", "hex": "#a4b0bc", "comment": "panel highlight" },
+    { "role": "light", "hex": "#7a8896", "comment": "lit panel" },
+    { "role": "dark", "hex": "#0c1116", "comment": "servo shadow" },
+    { "role": "metal", "hex": "#3e4954", "comment": "exposed armature" },
+    { "role": "glow", "hex": "#ffd07a", "comment": "spotlight" }
+  ]
+}

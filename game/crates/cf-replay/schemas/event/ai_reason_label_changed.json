@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ai_reason_label_changed.v1",
+  "title": "ai.reason_label_changed",
+  "description": "Emitted whenever a bot's most recent reason_label differs from the previous tick. Spec § M7-A reason labels. Carries the full canonical label string + structured fields; replay viewers render the structured fields for debug overlays.",
+  "type": "object",
+  "required": ["actor_id", "label", "chosen_task"],
+  "properties": {
+    "actor_id": { "type": "integer", "minimum": 0 },
+    "label": { "type": "string" },
+    "chosen_task": { "type": "string" },
+    "chosen_target": { "type": ["string", "null"] },
+    "score": { "type": "number" },
+    "doctrine": { "type": "string" },
+    "role": { "type": "string" },
+    "htn_goal_stack": { "type": "string" },
+    "behavior_tree_node": { "type": "string" }
+  }
+}

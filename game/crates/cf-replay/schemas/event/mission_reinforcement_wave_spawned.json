@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/mission_reinforcement_wave_spawned.v1",
+  "title": "mission.reinforcement_wave_spawned",
+  "description": "Emitted when the mission director spawns a dynamic reinforcement wave at the configured dropship zone.",
+  "type": "object",
+  "required": ["wave_id", "phase", "spawn_count"],
+  "properties": {
+    "wave_id": { "type": "string" },
+    "phase": { "type": "string", "enum": ["setup", "buildup", "climax", "debrief"] },
+    "spawn_count": { "type": "integer", "minimum": 0 },
+    "dropship_zone": { "type": "array", "minItems": 2, "maxItems": 2 },
+    "tick": { "type": "integer", "minimum": 0 }
+  }
+}

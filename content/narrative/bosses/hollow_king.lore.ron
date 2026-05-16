@@ -1,0 +1,34 @@
+BossLore (
+    boss_id: "hollow_king",
+    canonical_name: "The Hollow King",
+    world: "earth",
+    biome: "volcanic_interior",
+    arena_rule: "OneWayCutsceneEntry",
+    entries: [
+        BossLoreEntry (
+            kind: "origin_myth",
+            title: "What the King Was Before",
+            body: "Before the collapse, there was a man. The Coalition has a name on file. The file is sealed. The man was, by every available account, the foreman of the Earth volcanic-interior reclamation project — a deep-drilling operation that began in 2061 and was, in 2089, declared abandoned, with all personnel listed as lost. The foreman did not lose. The foreman, by the Coalition's reconstruction, descended into the lava chambers in the final week of the operation and did not return. The Husks have, in their oldest oral histories, the name of a man who walked into the fire and did not come out. The Husks do not, however, consider the man a Husk. The Husks consider the man something else, and they have refused, for two hundred years, to explain what."
+        ),
+        BossLoreEntry (
+            kind: "war_history",
+            title: "The Seventeen Returns",
+            body: "The Hollow King has, in the Concordat's records, been killed seventeen times. The first kill was in 2104, by a Coalition strike team that lost eleven of fourteen members. The seventeenth was in 2238, by a joint Coalition-Frontier expedition that lost twenty-three. The kills do not stick. The pattern is, in the Collegium's analysis, consistent: approximately every seven to nine years, the King re-emerges in the volcanic chambers, sometimes in a slightly different configuration, always in the same role. The Coalition has classified the pattern as an environmental phenomenon. The Collegium has classified it as something else. The seventeenth survivor — the only one — died fourteen months after the engagement, alone, of cardiac shock. The Coalition closed the casket and did not, in any subsequent report, mention the case again."
+        ),
+        BossLoreEntry (
+            kind: "defeat_consequences",
+            title: "What the Killing Costs",
+            body: "Killing the Hollow King is, in the Concordat's actuarial records, the most expensive single act a player can perform in the Earth campaign. The arena seals when the player enters; the King's pyroclastic burst in the third phase produces a localized thermal cascade that, depending on the player's gear tier, can take days of in-game time to extract from. The reward — the Pyroclastic Armor recipe, the Hollow King's Shard artifact, and five lore unlocks — is, by every Concordat consensus, worth the cost. The Husks disagree. The Husks consider the killing an offense against the record, and a Husk raid is, in the Coalition's experience, statistically more likely in the 90-day window following a King kill than in any other 90-day window of the Earth campaign."
+        ),
+        BossLoreEntry (
+            kind: "phase_descriptions",
+            title: "The Three Faces",
+            body: "Phase One: the King appears as a tall, robed figure at the far edge of the arena, throwing arcs of liquid flame across the floor. The flame is, by Coalition analysis, true magma — not a projectile but an emanation. The phase ends when the King's outer robe burns away, revealing the second face. Phase Two: the King is a skeletal silhouette of fused basalt, summoning ten to twelve lava-minion adds at irregular intervals. The minions are tactically dangerous; the King during this phase is, by every Coalition guide, the most manageable. The phase ends when the King's basalt structure cracks. Phase Three: the King is a hollow form, larger than the arena's central column, expressing the final pyroclastic burst pattern. The arena fills with rising lava; the player must, in this phase, both kill the King and survive the rising terrain. The phase ends when the King's hollow core is struck three times by a T3 plasma weapon, at which point the King collapses inward and the arena's lava recedes."
+        ),
+        BossLoreEntry (
+            kind: "dropped_lore_codex",
+            title: "Page 47 of the Foreman's Journal (Recovered 2238)",
+            body: "The journal was recovered from the King's chamber after the seventeenth kill. The page is partially burned. The legible portion reads: 'Day 414. The chamber is hotter than the readings indicate. The readings are, in any case, no longer reliable. The thermal probes report what I tell them to report. I am, in this state, the only thermal probe. I do not yet understand what I have become, but I understand that I am not alone in becoming it. The chamber is older than the readings suggest. The chamber predates the project. The chamber predates the surface. I will continue logging. The next entry will be after the next ascent. I do not yet know if there will be a next ascent. The fire is, in this chamber, very patient.' The remainder of the journal is, by Coalition policy, classified. The journal has, in eighty years, never been read in full by anyone outside the Coalition's restricted archive committee."
+        ),
+    ],
+)

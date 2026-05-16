@@ -36,7 +36,9 @@
 // (`cf_physics::authority::*`, `cf_physics::penetration::*`,
 // `cf_physics::hazard::*`) resolve cleanly.
 pub mod authority;
+pub mod constants;
 pub mod hazard;
+pub mod parallel;
 pub mod penetration;
 pub use authority::{AuthorityKind, AuthorityTransition};
 

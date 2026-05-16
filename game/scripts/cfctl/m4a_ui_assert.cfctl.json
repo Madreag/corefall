@@ -1,0 +1,12 @@
+{
+  "description": "M11 ACC-A floor: drive cfctl ui.assert against HUD banners + captions. Uses the predicate forms severity=, text~=, present=.",
+  "scenario": "m1_actor_range",
+  "steps": [
+    { "method": "ui.assert", "params": { "node_id": "hud.banners", "predicate": "present=false" } },
+    { "method": "act.settings.set", "params": { "high_contrast": true } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
+    { "method": "ui.assert", "params": { "node_id": "hud.banners", "predicate": "severity=info" } },
+    { "method": "ui.assert", "params": { "node_id": "hud.banners", "predicate": "text~=run" } },
+    { "method": "observe.accessibility", "params": {} }
+  ]
+}

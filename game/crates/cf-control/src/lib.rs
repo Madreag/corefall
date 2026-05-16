@@ -6,26 +6,34 @@
 //! JSON-RPC error code `-32602` (`InvalidParams`) and a fix-hint per
 //! `spec/ai-control-observability-layer.md`.
 
+pub mod components;
 pub mod engine;
 pub mod envelope;
+pub mod m6_actions;
+pub mod m7_ai;
+pub mod m8_ux;
 pub mod runtime;
 pub mod scenario;
 pub mod schemas;
 pub mod server;
 pub mod settings;
 pub mod state;
+pub mod world;
+
+pub use m6_actions::{ActSquadIssueCommandParams, M6Action, M6ActionParams, SquadCommandKindOverWire};
 
 pub use engine::{
     run_m0_inline, ActorRenderSnapshot, BreachRenderView, EnemyHudView, ExtractionZoneView, HudCachesSnapshot,
     InitialActorWorld, InitialBreachWorld, InitialGuard, M0Engine, M0EngineConfig, M0EngineOutcome, MissionHudView,
-    RifleHudView, TerrainChunkUpdate, TerrainDigPreview, TerrainRenderSnapshot, HUD_FOCUSABLE_NODES,
+    ReactorArmorLayerView, ReactorHudView, RifleHudView, TerrainChunkUpdate, TerrainDigPreview, TerrainRenderSnapshot,
+    TimerHudView, HUD_FOCUSABLE_NODES,
 };
 pub use envelope::{
     error_codes, JsonRpcError, JsonRpcId, JsonRpcMessage, JsonRpcNotification, JsonRpcRequest, JsonRpcResponse,
     METHOD_OBSERVE_FRAME,
 };
 pub use runtime::{build_engine_config, locate_scenario, ConfigBuildError, ConfigInputs};
-pub use scenario::{Scenario, ScenarioCapabilities, ScenarioLoadError, ScenarioRegion};
+pub use scenario::{Scenario, ScenarioCapabilities, ScenarioLoadError, ScenarioObjectiveKind, ScenarioRegion};
 pub use schemas::{SCHEMA_VERSION, SCHEMA_VERSION_MIN};
 pub use server::{
     async_trait, CommandResult, ControlCommand, ControlServer, ControlServerConfig, EngineHandle, FocusDirection,

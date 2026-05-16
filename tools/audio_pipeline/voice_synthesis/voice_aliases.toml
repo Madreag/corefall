@@ -1,0 +1,38 @@
+# Voice alias map — for voice_ids in the manifests that cannot be designed
+# because the ElevenLabs account hit its 30-voice cap. Each entry maps an
+# internal voice_id to an existing voice_id in `per_npc_voice_registry.toml`.
+# At bake time, voice_lines.py first checks the registry; on miss it falls
+# back to this alias map and uses the aliased voice (logged + ledger-tagged
+# so we know the line was baked with a pooled voice rather than its own).
+#
+# Pooling rationale: indie game voice work commonly pools minor NPCs onto a
+# faction's "voice pool" with shared base voice + per-NPC line differentiation
+# coming from text + ambient processing (radio EQ, pitch shift) at runtime.
+
+[starlight_solana_minister_female]
+alias_of = "cassandra_narrator_balanced_female"
+reason   = "warm authoritative female; closest faction-leader cadence available"
+
+[starlight_callum_warden_male]
+alias_of = "ironman_narrator_grim_male"
+reason   = "grim male warden; closest serious-elder male available"
+
+[starlight_yara_pilgrim_female]
+alias_of = "phoebe_narrator_warm_female"
+reason   = "soft female pilgrim; phoebe warm-mentor energy matches"
+
+[synth_node_a47_synthetic_neutral]
+alias_of = "eclipse_walker_boss_synthetic"
+reason   = "synthetic neutral; eclipse_walker is our only other synthetic-cyborg voice"
+
+[synth_archivist_c08_synthetic]
+alias_of = "eclipse_walker_boss_synthetic"
+reason   = "synthetic archivist; shares synthetic timbre"
+
+[synth_courier_b12_synthetic]
+alias_of = "husks_caretaker_distorted"
+reason   = "synthetic courier; distorted alien gets closest to robotic non-human delivery"
+
+[tutorial_narrator_calm_female]
+alias_of = "cassandra_narrator_balanced_female"
+reason   = "calm tutorial narrator; cassandra is balanced female narrator already designed"

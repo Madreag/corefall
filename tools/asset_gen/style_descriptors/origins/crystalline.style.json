@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.0.0",
+  "style_id": "crystalline",
+  "category": "origin",
+  "version": "1.0.0",
+  "silhouette_language": "faceted crystal limbs, semi-translucent body, prismatic refraction highlights",
+  "preferred_palette_roles": ["primary", "secondary", "accent", "highlight", "glow"],
+  "shape_descriptors": {
+    "head_proportion": "1.1",
+    "torso_proportion": "2.5",
+    "limb_proportion": "1.9",
+    "joints": "faceted hex prism",
+    "augmentations": "embedded inner-light core"
+  },
+  "geometric_primitives": {
+    "actor": ["polygon", "rect"]
+  }
+}

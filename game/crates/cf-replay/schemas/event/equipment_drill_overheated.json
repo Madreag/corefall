@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/equipment.drill_overheated.v0.1",
+  "title": "equipment.drill_overheated",
+  "type": "object",
+  "required": ["actor"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "heat": {"type": "number"}
+  },
+  "additionalProperties": true
+}

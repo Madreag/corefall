@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ai_auto_triage_initiated.v1",
+  "title": "ai.auto_triage_initiated",
+  "description": "Emitted when a Medic-role bot picks up an auto-triage mission for a DYING squadmate. Spec § Auto-triage Gherkin. reach_seconds=6.0; apply_seconds=8.0.",
+  "type": "object",
+  "required": ["medic_actor_id", "target_actor_id", "dying_tick"],
+  "properties": {
+    "medic_actor_id": { "type": "integer", "minimum": 0 },
+    "target_actor_id": { "type": "integer", "minimum": 0 },
+    "dying_tick": { "type": "integer", "minimum": 0 },
+    "reach_deadline_tick": { "type": "integer", "minimum": 0 },
+    "apply_deadline_tick": { "type": "integer", "minimum": 0 },
+    "reach_seconds": { "type": "number" },
+    "apply_seconds": { "type": "number" }
+  }
+}

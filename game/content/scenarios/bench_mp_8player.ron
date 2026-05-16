@@ -1,0 +1,33 @@
+(
+  schema_version: 1,
+  id: "bench_mp_8player",
+  display_name: "M8A 8-player LAN bench",
+  description: "M8A 8-player LAN lockstep bench scaffold. Drives cf-bench's mp_8player_lan subcommand. M8A's mp_lan_room.ron has the multi-actor declaration that triggers a single-controllable-actor baseline drift; this bench scenario is the M8A evolution of that surface and lives behind the bench subcommand so it does not enter the cf-mod validate floor. Note: M1's single-controllable-actor invariant is preserved; the LAN bench drives 8 separate client simulations via the cf-net lockstep harness, each with its own canonical actor.",
+  seed: 8888,
+  duration_ticks: Some(1000),
+  region: (anchor: (0.0, 0.0), width: 1280.0, height: 720.0),
+  gravity: -980.0,
+  floor_y: 16.0,
+  teams: [],
+  actors: [
+    (
+      id: 1,
+      team: "blue",
+      spawn: (200.0, 32.0),
+      controllable: true,
+      hp: 100.0,
+      inventory: (rifle: Some("rifle_m1_default")),
+      half_extents: Some((8.0, 16.0)),
+    ),
+  ],
+  objectives: [],
+  director: None,
+  capabilities: (
+    debug: false,
+    control_api: true,
+    save_load: false,
+  ),
+  save_fields: [],
+  expected_tests: ["M8A-BENCH-MP-01"],
+  notes: "M8A 8-client LAN bench scaffold. The cf-bench mp_8player_lan harness drives 8 synthetic client sim ticks per server tick; M8A's per-tick blake3 across the 1 server + 8 clients must match.",
+)

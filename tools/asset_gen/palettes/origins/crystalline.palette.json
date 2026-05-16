@@ -1,0 +1,17 @@
+{
+  "schema_version": "1.0.0",
+  "palette_id": "crystalline",
+  "display_name": "Crystalline",
+  "category": "origin",
+  "description": "Lattice + facets; semi-translucent crystal body with refractive highlights.",
+  "colors": [
+    { "role": "primary", "hex": "#6a92c4", "comment": "core crystal blue" },
+    { "role": "secondary", "hex": "#2c4a72", "comment": "deep facet shadow" },
+    { "role": "accent", "hex": "#c8a8ff", "comment": "amethyst flash" },
+    { "role": "highlight", "hex": "#e4f4ff", "comment": "facet sparkle" },
+    { "role": "light", "hex": "#aaccea", "comment": "lit facet" },
+    { "role": "dark", "hex": "#0c1a30", "comment": "inner shadow" },
+    { "role": "metal", "hex": "#7a90a8", "comment": "matrix metal" },
+    { "role": "glow", "hex": "#ffffff", "comment": "refraction" }
+  ]
+}

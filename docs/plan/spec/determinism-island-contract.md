@@ -119,3 +119,104 @@ ships the matrix.
 7. Cosmetic events are flagged `cosmetic: true` and excluded from `sim_state_v1` hashing
 8. Recorder hooks emit inert data only (no callbacks, no mutation)
 9. Stable `RecordId(u64)` registry; raw pointers / MOIDs never serialized
+
+## M8A extensions (added 5/15/2026 by m8a-impl)
+
+The M8A milestone introduces parallel sim, GPU cosmetic offload, and the
+`cf-net` authoritative-server stack. These additions extend the determinism
+island with 10 architecture rules that the CI gate at
+`game/scripts/ci/m8a_determinism_lint.sh` enforces.
+
+### 10 architecture rules (M8A § Notes for the implementer / Architecture rules)
+
+1. **No `f64` in sim crates.** Use `f32` only. f64 hardware-acceleration paths
+   diverge subtly across vendors. Quantize via `quantize_f32` for checksum
+   bytes. Allowed boundary uses (must produce f32 outputs and never enter the
+   tick checksum):
+   - `cf-ai/src/lib.rs:378,381,1473-1477` and `cf-ai/src/constants.rs:49,52` —
+     53-bit-mantissa trick for uniform f32 in [0, 1]; result cast to f32 at
+     call site.
+   - `cf-material/src/loader.rs:192,214` — JSON parse-time only; never enters
+     tick path.
+   - `cf-sim-core/src/lib.rs:57,167` (`tick_dt_ms`, `sim_time_ms`) — display /
+     event-payload only; non-tick-path.
+2. **No `thread_rng()`.** Every RNG call in a sim crate uses
+   `cf_sim_core::Rng` seeded from the engine seed. Pre-roll RNG into a
+   `Vec<u64>` of length N BEFORE entering a `par_iter` block; workers index by
+   stable entity id.
+3. **No `HashMap` with default `RandomState` hasher in sim state.** Use
+   `BTreeMap` (deterministic iteration) OR `FxHashMap` (only when iteration
+   order does not cross the checksum boundary). Audit every cf-* crate.
+4. **No FMA / wide AVX-512 intrinsics that vary by hardware.** Use the stable
+   f32 code path. Workspace `RUSTFLAGS` includes `-C target-feature=+sse2,+sse4.2`
+   on x86_64; LLVM `-ffast-math` is disabled.
+5. **No `Instant::now()` / `SystemTime::now()` in sim code.** Real time is
+   non-deterministic. Use the engine's `Clock::tick().0` for any time-like
+   value.
+6. **No `format!()` / `String::from()` allocations in tick-hot paths.** Use
+   `tracing::Span` with structured fields.
+7. **No `Vec::new()` / `HashMap::new()` per tick in hot paths.** Pre-allocate
+   in the relevant ECS resource at engine init. Clear-and-reuse.
+8. **Recorder events crossing the determinism boundary MUST have stable
+   `event_id`s.** Per-shard `event_id = (tick, shard_id, monotonic_seq)`
+   re-stamps to canonical `(tick, canonical_seq)` at merge time.
+9. **Cross-thread state mutation MUST be either (a) per-worker buffer with
+   deterministic merge, or (b) explicit single-threaded post-pass.**
+   Atomic-CAS loops on shared sim state are FORBIDDEN.
+10. **No `std::sync::Mutex` in sim hot paths.** Use Bevy ECS query system for
+    lock-free disjoint access. Allowed: `std::sync::Mutex` outside the sim
+    island (e.g. cf-audio plugin, cf-control's audio_plugin field).
+
+### Smart-AI 4.0 ms p99 budget (added 5/15/2026)
+
+M8A retunes the AI sim CPU budget from 2.0 ms p99 to **4.0 ms p99** to cover
+the M7-shipped 5-layer thinking stack (Reactive + Utility + Behavior Tree +
+HTN + LLM-prior), 16 KB BotMemory per bot, 22-task PriorityTable, and
+deterministic reason-label structured strings.
+
+Per-bot 80 µs effective parallel slice covers:
+
+- Perception update + memory grid write (15-20 µs)
+- Memory aging + event ingestion (5-10 µs)
+- Utility scoring × 22 candidate tasks × priority weight multiply (20-25 µs)
+- Behavior tree traversal (10-15 µs; 3-5 nodes deep)
+- HTN sub-goal evaluation (5-10 µs; cached unless goal changes)
+- Reason-label structured-string construction (5-10 µs)
+- Chatter selection (2-5 µs; lookup + cooldown check)
+
+LLM mind layer (M23, optional) runs out-of-band in a separate process at 5 s
+tick per bot. Sim sees only the cached doctrine string. 0% sim cost when LLM
+disabled. The total per-tick budget remains ≤ 15.5 ms (under the 16.6 ms 60 Hz
+wall budget).
+
+### Recorder shard merge contract
+
+Per-thread `RecorderShard`s emit events with `event_id = (tick,
+monotonic_seq_in_shard)`. At the `RecorderMerge` stage:
+
+1. Each shard sorts its events by `monotonic_seq_in_shard` (already in
+   insertion order).
+2. Cross-shard merge orders events by `(tick, shard_id,
+   monotonic_seq_in_shard)`. `shard_id` is a stable per-system-stage
+   assignment, NOT the runtime thread id.
+3. After merge, every event is re-stamped with a canonical `event_id = (tick,
+   canonical_seq)` where `canonical_seq` is the post-merge position.
+4. `parent_event_id` references are re-mapped from shard-local ids to
+   canonical ids during merge.
+
+This preserves determinism across thread-scheduling variance.
+
+### CI gate
+
+The `game/scripts/ci/m8a_determinism_lint.sh` script enforces these rules:
+
+- Runs `cargo clippy --workspace --all-targets -- -D warnings` (the existing
+  clippy gate already rejects `rand::thread_rng`, `Instant::now`,
+  `SystemTime::now` via `clippy.toml`'s `disallowed-methods` list).
+- Greps each sim crate (`cf-sim-core`, `cf-actor`, `cf-ai`, `cf-physics`,
+  `cf-material`, `cf-terrain`, `cf-atmos`) for `f64` outside the documented
+  boundary-use lines; exits non-zero on hit.
+- Greps for `std::sync::Mutex` and `HashMap::new` in sim hot paths.
+
+The gate is invoked from `game/scripts/ci/m8a_close_gates.sh` as the first
+check before the perf gate / cross-OS gate / backfill gate.

@@ -1,0 +1,32 @@
+WorldLore (
+    world_id: "europa",
+    canonical_name: "Europa Ice Cavern Ocean",
+    music_anchor: "music_world_europa",
+    entries: [
+        WorldEntry (
+            kind: "geology",
+            title: "The Frozen Shell, the Living Ocean",
+            body: "Europa is an ice-shell world, with a surface crust of water ice approximately twenty to thirty kilometers thick over a salt-water ocean estimated at one hundred kilometers in depth. The crust is cracked, refrozen, and recracked on geological timescales by the tidal stress of the orbit; the surface is laced with chaos terrain, cycloidal cracks, and the long linear ridges that mark zones of active resurfacing. Pre-collapse drilling operations established three deep boreholes through the crust to the ocean below; two are now operated as Collegium research stations and the third is held by the Coalition for reasons the Coalition has not formally explained. The ocean is liquid, salty, and oxygenated by the surface ice's photolysis. It is also, by every recent survey, inhabited.",
+        ),
+        WorldEntry (
+            kind: "history",
+            title: "The Drill Stations",
+            body: "Europa's three pre-collapse drill stations — Conamara, Pwyll, and Tara — were originally established as resource-extraction facilities and have since become the most heavily-defended research installations in the Sol system. The Coalition holds Pwyll. The Collegium holds Conamara and Tara, under Coalition oversight. The Starlight Concordant maintains a single permanent survey berth at Conamara and conducts the deep-cavern expeditions that have produced approximately eighty percent of the human-readable knowledge about Europa's ocean. The drill stations are connected by a surface rail line that the Coalition operates and the Frontier raids approximately once per Mars-year, on a schedule the Coalition has, in private, accepted as preferable to the alternative of continuous low-level raiding.",
+        ),
+        WorldEntry (
+            kind: "biosphere",
+            title: "The Deep Ones",
+            body: "Europa's ocean hosts an ecology of at least three thousand catalogued species, organized into a food web that runs from the hydrothermal vents on the seafloor up to the underside of the ice crust. The largest catalogued species — the leviathan-class organisms known to the Collegium as 'pelagic chordates of unusual size' — reach approximately one hundred meters in length and have been the subject of every Concordat-classified marine biology paper published in the last forty years. None have been killed. None have been captured. The Collegium has photographed seventeen and named one — the Tara Whale, sighted in 2189 and again in 2204, both times from the same drill station. The Crystalfold consider Europa's ocean a sacred site. The Starlight crews who dive into it consider it the most beautiful and the most terrifying place in the Sol system, in approximately equal measure.",
+        ),
+        WorldEntry (
+            kind: "culture",
+            title: "The Submerged Routine",
+            body: "Europa's human population is small — approximately six thousand active personnel — and almost entirely either Coalition or Collegium. The drill stations operate on a thirty-hour shift cycle, with three rotating crews per station; the long shifts allow the dive teams to complete deep-cavern expeditions without surfacing. The dive teams are recruited from across the Concordat and trained at the joint Starlight-Collegium academy on Deimos; the academy has a one-in-six attrition rate and produces, by every objective measure, the finest deep-water operators in human history. Off-duty culture on Europa is quiet, indoor, and centered on the station mess halls; the standard greeting between station personnel is the question 'come up dry?' and the standard reply, when honest, is 'mostly'.",
+        ),
+        WorldEntry (
+            kind: "mystery",
+            title: "The Tara Signal",
+            body: "Since 2204, the Tara station has detected a periodic sonic signal originating from approximately seventy kilometers below the ice crust, at a depth and a temperature gradient consistent with the seafloor hydrothermal vent zone. The signal is a single tone, twelve seconds long, repeating at irregular intervals between forty-one and forty-nine hours. The Collegium has spent thirty-seven years attempting to characterize the signal; the analysis has produced six published papers and no consensus. The methane-breathers, when consulted, declined to comment, which the Collegium has interpreted as a meaningful answer. The Husks, when asked, simply walked away from the table. The Crystalfold, in 2231, sang a song that the Collegium has translated as 'a memory of the world before this world'. The signal continues.",
+        ),
+    ],
+)

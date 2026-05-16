@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/mission.reactor_destroyed.v0.1",
+  "title": "mission.reactor_destroyed",
+  "description": "M9 § Player narrative flow — emitted exactly once when the defended reactor's hp reaches 0. parent_event_id chains back to the final hit's combat.projectile_hit_mo so M10 cause-chain walker resolves: mission_resolved → mission.reactor_destroyed → mission.reactor_hp_changed (last hit) → combat.wound_added → combat.projectile_hit_mo. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "mission" },
+    "event_type": { "const": "reactor_destroyed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "reactor_id": { "type": "string" },
+        "position": { "type": "array", "minItems": 2, "maxItems": 2 },
+        "final_pressure_state": { "type": "string", "enum": ["Nominal", "Stressed", "Critical", "Venting", "Destroyed"] },
+        "source_actor_id": { "type": ["integer", "null"] },
+        "cause": { "type": "string" },
+        "parent_event_id": { "type": ["string", "null"] }
+      },
+      "required": ["reactor_id", "position", "final_pressure_state", "cause"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

@@ -22,3 +22,4 @@ cf-asset-ledger = { path = "../cf-asset-ledger" }
 cf-control = { path = "../cf-control" }
 cf-replay = { path = "../cf-replay" }
 cf-actor = { path = "../cf-actor" }
+cf-net = { path = "../cf-net" }

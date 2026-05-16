@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0.0",
+  "palette_id": "hostile_corp",
+  "display_name": "Hostile Corp",
+  "category": "faction",
+  "description": "Blocky industrial corporate enforcer aesthetic; dark steel + red sensor glow.",
+  "colors": [
+    { "role": "primary", "hex": "#2a2f3a", "comment": "dark steel" },
+    { "role": "secondary", "hex": "#1a1d24", "comment": "shadow steel" },
+    { "role": "accent", "hex": "#d92434", "comment": "warning red" },
+    { "role": "highlight", "hex": "#ff5b62", "comment": "glow red" },
+    { "role": "light", "hex": "#9aa3b3", "comment": "panel highlight" },
+    { "role": "dark", "hex": "#0d0f14", "comment": "rivet shadow" },
+    { "role": "metal", "hex": "#535864", "comment": "exposed metal" },
+    { "role": "glow", "hex": "#ff8888", "comment": "sensor lamp" }
+  ],
+  "accent_pairs": [
+    { "fg": "#ff5b62", "bg": "#0d0f14" },
+    { "fg": "#d92434", "bg": "#2a2f3a" }
+  ]
+}

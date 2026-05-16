@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.0.0",
+  "style_id": "allied_resistance",
+  "category": "faction",
+  "version": "1.0.0",
+  "silhouette_language": "mismatched scavenged gear, improvised armor, irregular silhouette, rust and olive and tan palette",
+  "preferred_palette_roles": ["primary", "secondary", "accent", "metal", "cloth"],
+  "shape_descriptors": {
+    "weapon": "tape-wrapped grip, mismatched accessories, exposed receiver, scavenged optic",
+    "actor": "patchwork jacket, scavenged helmet, mismatched limb armor, asymmetric loadout straps",
+    "vehicle": "scavenged truck chassis, plate-armor bolted on, improvised gunmount",
+    "base_module": "wood + sheet-metal cover, improvised barricade, hazard tape",
+    "particle": "ash and ember, dust puff",
+    "ui_icon": "hand-drawn stroke, irregular outline, rust badge"
+  },
+  "geometric_primitives": {
+    "weapon": ["rect", "polyline", "circle"],
+    "actor": ["rect", "polygon", "circle"],
+    "vehicle": ["rect", "polygon"],
+    "base_module": ["rect", "polyline"],
+    "particle": ["circle", "polyline"],
+    "ui_icon": ["polygon", "polyline"]
+  }
+}

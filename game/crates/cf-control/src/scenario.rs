@@ -14,7 +14,10 @@ use serde::{Deserialize, Serialize};
 use cf_actor::{ActorId, ActorState, Inventory, InventoryItem, ItemSlot, Vec2};
 use cf_ai::ReactiveGuardParams;
 use cf_equipment::{rifle_preset, RifleState};
-use cf_mission::{LossConditions, Objective, ObjectiveKind, ObjectiveStatus, Reactor};
+use cf_mission::{
+    BossState, BranchingPoint, ExtendedObjectiveKind, LossConditions, MissionPhase, Objective, ObjectiveGraph,
+    ObjectiveKind, ObjectiveNode, ObjectiveNodeStatus, ObjectiveStatus, PhaseState, Reactor, ReinforcementWave,
+};
 use cf_terrain::{material_id_from_name, BreachStrip, ChunkedTerrain, MaterialId, TerrainStamp};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -91,6 +94,30 @@ pub struct Scenario {
     /// path; M1.5+ tutorials act on it.
     #[serde(default)]
     pub tutorial_safety: bool,
+    /// **M7 director v0.5 (audit gap A12)**: opt-in 4-phase pacing for the
+    /// mission director. When `Some`, the engine seeds `M7AiWorld.phase`
+    /// at scenario start and emits `mission.phase_changed` per the
+    /// configured second budgets. `None` means the scenario opts out of
+    /// the v0.5 phase pacer.
+    #[serde(default)]
+    pub phase_state: Option<ScenarioPhaseState>,
+    /// **M7 director v0.5 (audit gap A15)**: opt-in reinforcement-wave
+    /// declarations. Empty means no waves; the engine still ticks
+    /// `try_spawn_reinforcement` but the registry produces no events.
+    #[serde(default)]
+    pub reinforcement_waves: Vec<ScenarioReinforcementWave>,
+    /// **M7 director v0.5 (audit gap A16/A17)**: opt-in mini-boss state.
+    /// When `Some`, the engine seeds `M7AiWorld.boss` at scenario start
+    /// and routes hits against `actor_id` into `apply_boss_damage`.
+    #[serde(default)]
+    pub boss_state: Option<ScenarioBossState>,
+    /// **M7 director v0.5 (audit gap A13/A14)**: opt-in v0.5 objective
+    /// graph (DiGraph + branching points + optional/parallel objectives).
+    /// When `Some`, the engine seeds `M7AiWorld.objective_graph` at
+    /// scenario start and emits `mission.objective_branched` /
+    /// `mission.optional_offered` per `drain_objective_graph_emissions`.
+    #[serde(default)]
+    pub objective_graph: Option<ScenarioObjectiveGraph>,
 }
 
 /// One actor entry in `Scenario.actors`. M1 only models the player + simple dummies
@@ -127,6 +154,19 @@ pub struct ScenarioActor {
     /// **M5**: optional origin tag (`human`, `robot`, `android`).
     #[serde(default)]
     pub origin_id: Option<String>,
+    /// **M6**: optional squad role. When set, the engine adds this actor to
+    /// the [`cf_squad::Squad`] at scenario init and emits one
+    /// `squad.member_added` event. Accepted values: `"leader"` /
+    /// `"follower"`. `None` for non-squad actors (enemies, dummies).
+    #[serde(default)]
+    pub squad_role: Option<String>,
+    /// **M6**: optional friendly-AI hint surfaced by the engine for
+    /// squad followers. Currently unused beyond influencing the bot's
+    /// default `current_command` (FollowLeader); M7 expands to full
+    /// archetypes. Free-form string tag (`"rifleman"` / `"medic"` /
+    /// `"engineer"` etc).
+    #[serde(default)]
+    pub squad_archetype: Option<String>,
 }
 
 /// **M5** scenario manifest entry for chassis attachment. Resolves to a
@@ -412,14 +452,19 @@ pub struct ScenarioReactor {
 
 impl ScenarioReactor {
     pub fn build_reactor(&self) -> Reactor {
-        Reactor {
+        let mut r = Reactor {
             id: self.id.clone(),
             position: [self.position.0, self.position.1],
             half_extents: [self.half_extents.0, self.half_extents.1],
             hp: self.hp.max(0.0),
             max_hp: self.hp.max(0.0),
             destroyed: false,
-        }
+            ..Reactor::default()
+        };
+        // **M9**: populate the 3-layer armor cascade at scenario load so the
+        // engine never has to lazy-init it on the first projectile hit.
+        r.ensure_armor_layers();
+        r
     }
 }
 
@@ -479,6 +524,280 @@ impl ScenarioBreach {
             refusal_reason: self.refusal_reason.clone(),
             broken: false,
         }
+    }
+}
+
+/// **M7 director v0.5 (audit gap A12)**: scenario-side declaration of
+/// the 4-phase pacing parameters consumed by `M7AiWorld.phase`. All
+/// three durations default to spec defaults (30s / 60s / 120s).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScenarioPhaseState {
+    #[serde(default = "default_setup_seconds")]
+    pub setup_seconds: f32,
+    #[serde(default = "default_buildup_seconds")]
+    pub buildup_seconds: f32,
+    #[serde(default = "default_climax_seconds")]
+    pub climax_seconds: f32,
+}
+
+fn default_setup_seconds() -> f32 {
+    30.0
+}
+
+fn default_buildup_seconds() -> f32 {
+    60.0
+}
+
+fn default_climax_seconds() -> f32 {
+    120.0
+}
+
+impl ScenarioPhaseState {
+    pub fn build_phase_state(&self) -> PhaseState {
+        let mut s = PhaseState::new(0);
+        s.setup_seconds = self.setup_seconds.max(0.0);
+        s.buildup_seconds = self.buildup_seconds.max(0.0);
+        s.climax_seconds = self.climax_seconds.max(0.0);
+        s
+    }
+}
+
+/// **M7 director v0.5 (audit gap A15)**: scenario-side declaration of
+/// one reinforcement wave. Waves trigger when the active phase + the
+/// cumulative kill count both match the wave's spec.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScenarioReinforcementWave {
+    pub id: String,
+    pub phase: ScenarioMissionPhase,
+    pub trigger_kill_count: u32,
+    pub dropship_zone: (f32, f32),
+    #[serde(default = "default_spawn_count")]
+    pub spawn_count: u32,
+}
+
+fn default_spawn_count() -> u32 {
+    3
+}
+
+impl ScenarioReinforcementWave {
+    pub fn build_wave(&self) -> ReinforcementWave {
+        let mut w = ReinforcementWave::new(
+            self.id.clone(),
+            self.phase.into_phase(),
+            self.trigger_kill_count,
+            [self.dropship_zone.0, self.dropship_zone.1],
+        );
+        w.spawn_count = self.spawn_count.max(1);
+        w
+    }
+}
+
+/// **M7 director v0.5**: wire-form mirror of `cf_mission::MissionPhase`
+/// so RON manifests can author phases without depending on cf-mission.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ScenarioMissionPhase {
+    Setup,
+    Buildup,
+    Climax,
+    Debrief,
+}
+
+impl ScenarioMissionPhase {
+    pub fn into_phase(self) -> MissionPhase {
+        match self {
+            ScenarioMissionPhase::Setup => MissionPhase::Setup,
+            ScenarioMissionPhase::Buildup => MissionPhase::Buildup,
+            ScenarioMissionPhase::Climax => MissionPhase::Climax,
+            ScenarioMissionPhase::Debrief => MissionPhase::Debrief,
+        }
+    }
+}
+
+/// **M7 director v0.5 (audit gap A16/A17)**: scenario-side declaration
+/// of the mini-boss state. The engine seeds `M7AiWorld.boss` from this
+/// at scenario start and routes hits whose `target == actor_id` into
+/// `apply_boss_damage`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScenarioBossState {
+    pub actor_id: u64,
+    pub display_name: String,
+    pub max_hp: f32,
+    #[serde(default = "default_boss_phase_2_threshold")]
+    pub phase_2_hp_threshold: f32,
+    #[serde(default = "default_boss_phase_3_threshold")]
+    pub phase_3_hp_threshold: f32,
+}
+
+fn default_boss_phase_2_threshold() -> f32 {
+    0.75
+}
+
+fn default_boss_phase_3_threshold() -> f32 {
+    0.25
+}
+
+impl ScenarioBossState {
+    pub fn build_boss_state(&self) -> BossState {
+        let mut b = BossState::new(self.actor_id, self.display_name.clone(), self.max_hp.max(0.001));
+        b.phase_2_hp_threshold = self.phase_2_hp_threshold.clamp(0.0, 1.0);
+        b.phase_3_hp_threshold = self.phase_3_hp_threshold.clamp(0.0, 1.0);
+        b
+    }
+}
+
+/// **M7 director v0.5 (audit gap A13/A14)**: scenario-side declaration
+/// of the v0.5 objective DiGraph. Nodes carry their `kind` + dependency
+/// list + optional/parallel/branch-label flags. Branching points are
+/// listed separately so the engine knows which `(branch_a, branch_b)`
+/// pairs are mutually exclusive.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct ScenarioObjectiveGraph {
+    #[serde(default)]
+    pub nodes: Vec<ScenarioObjectiveGraphNode>,
+    #[serde(default)]
+    pub branches: Vec<ScenarioObjectiveGraphBranch>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScenarioObjectiveGraphNode {
+    pub id: String,
+    pub kind: ScenarioExtendedObjectiveKind,
+    #[serde(default)]
+    pub depends_on: Vec<String>,
+    #[serde(default)]
+    pub parallel: bool,
+    #[serde(default)]
+    pub optional: bool,
+    #[serde(default)]
+    pub branch_label: String,
+}
+
+impl ScenarioObjectiveGraphNode {
+    pub fn build_node(&self) -> ObjectiveNode {
+        ObjectiveNode {
+            id: self.id.clone(),
+            kind: self.kind.clone().build_kind(),
+            depends_on: self.depends_on.clone(),
+            parallel: self.parallel,
+            optional: self.optional,
+            branch_label: self.branch_label.clone(),
+            status: ObjectiveNodeStatus::Pending,
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "snake_case")]
+pub enum ScenarioExtendedObjectiveKind {
+    KillN {
+        target_class: String,
+        count: u32,
+    },
+    DefendActor {
+        target: u64,
+        survive_ticks: u64,
+    },
+    RetrieveItem {
+        item_id: String,
+    },
+    PlantItem {
+        item_id: String,
+        target_zone: (f32, f32, f32, f32),
+    },
+    DetectAlarm {
+        alarm_id: String,
+    },
+    SneakStealth {
+        zone_id: String,
+        no_alarm_within_ticks: u64,
+    },
+    RescueDowned {
+        target: u64,
+    },
+    BreachContainer {
+        container_id: String,
+    },
+    Optional {
+        inner_id: String,
+    },
+    Branching {
+        branch_a_id: String,
+        branch_b_id: String,
+    },
+}
+
+impl ScenarioExtendedObjectiveKind {
+    pub fn build_kind(self) -> ExtendedObjectiveKind {
+        match self {
+            ScenarioExtendedObjectiveKind::KillN { target_class, count } => {
+                ExtendedObjectiveKind::KillN { target_class, count }
+            }
+            ScenarioExtendedObjectiveKind::DefendActor { target, survive_ticks } => {
+                ExtendedObjectiveKind::DefendActor { target, survive_ticks }
+            }
+            ScenarioExtendedObjectiveKind::RetrieveItem { item_id } => ExtendedObjectiveKind::RetrieveItem { item_id },
+            ScenarioExtendedObjectiveKind::PlantItem { item_id, target_zone } => ExtendedObjectiveKind::PlantItem {
+                item_id,
+                target_zone: [target_zone.0, target_zone.1, target_zone.2, target_zone.3],
+            },
+            ScenarioExtendedObjectiveKind::DetectAlarm { alarm_id } => ExtendedObjectiveKind::DetectAlarm { alarm_id },
+            ScenarioExtendedObjectiveKind::SneakStealth {
+                zone_id,
+                no_alarm_within_ticks,
+            } => ExtendedObjectiveKind::SneakStealth {
+                zone_id,
+                no_alarm_within_ticks,
+            },
+            ScenarioExtendedObjectiveKind::RescueDowned { target } => ExtendedObjectiveKind::RescueDowned { target },
+            ScenarioExtendedObjectiveKind::BreachContainer { container_id } => {
+                ExtendedObjectiveKind::BreachContainer { container_id }
+            }
+            ScenarioExtendedObjectiveKind::Optional { inner_id } => ExtendedObjectiveKind::Optional { inner_id },
+            ScenarioExtendedObjectiveKind::Branching {
+                branch_a_id,
+                branch_b_id,
+            } => ExtendedObjectiveKind::Branching {
+                branch_a_id,
+                branch_b_id,
+            },
+        }
+    }
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScenarioObjectiveGraphBranch {
+    pub id: String,
+    pub branch_a_id: String,
+    pub branch_b_id: String,
+    #[serde(default)]
+    pub chosen_branch: Option<String>,
+    #[serde(default)]
+    pub offered_tick: Option<u64>,
+}
+
+impl ScenarioObjectiveGraphBranch {
+    pub fn build_branch(&self) -> BranchingPoint {
+        BranchingPoint {
+            id: self.id.clone(),
+            branch_a_id: self.branch_a_id.clone(),
+            branch_b_id: self.branch_b_id.clone(),
+            chosen_branch: self.chosen_branch.clone(),
+            offered_tick: self.offered_tick,
+        }
+    }
+}
+
+impl ScenarioObjectiveGraph {
+    pub fn build_graph(&self) -> ObjectiveGraph {
+        let mut g = ObjectiveGraph::default();
+        for node in &self.nodes {
+            g.push(node.build_node());
+        }
+        for branch in &self.branches {
+            g.branches.push(branch.build_branch());
+        }
+        g
     }
 }
 
@@ -986,6 +1305,10 @@ mod tests {
             loss_reason_vocabulary: vec![],
             milestone_override: None,
             tutorial_safety: false,
+            phase_state: None,
+            reinforcement_waves: vec![],
+            boss_state: None,
+            objective_graph: None,
         };
         assert!(matches!(
             scenario.validate("t.ron"),

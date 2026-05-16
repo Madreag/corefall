@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/camera_hit_stop.v1",
+  "title": "camera.hit_stop",
+  "description": "Emitted when act.camera.hit_stop fires a 50-200ms cosmetic frame freeze pulse on impactful hits. M8 spec § Camera + game feel — Hit-stop.",
+  "type": "object",
+  "required": ["duration_ms", "trigger"],
+  "properties": {
+    "duration_ms": { "type": "integer", "minimum": 50, "maximum": 200 },
+    "trigger": { "type": "string", "enum": ["melee_hit", "ap_round_hit", "boss_final_blow", "manual"] },
+    "actor_id": { "type": ["integer", "null"], "minimum": 0 }
+  }
+}

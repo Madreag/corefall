@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/terrain.material_state_changed.v0.1",
+  "title": "terrain.material_state_changed",
+  "description": "M9 § Destructible terrain — 5-tier HP color states — emitted on every band crossing (Pristine → Scratched → Cracked → Critical → Destroyed). Powers the material overlay integrity tinting + the trench-wall erosion visual. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "terrain" },
+    "event_type": { "const": "material_state_changed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "pos": { "type": "array", "minItems": 2, "maxItems": 2 },
+        "material_id": { "type": "integer", "minimum": 0 },
+        "material_name": { "type": "string" },
+        "from_band": { "type": "string", "enum": ["Pristine", "Scratched", "Cracked", "Critical", "Destroyed"] },
+        "to_band": { "type": "string", "enum": ["Pristine", "Scratched", "Cracked", "Critical", "Destroyed"] },
+        "integrity_before": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "integrity_after": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "cause": { "type": "string" },
+        "parent_event_id": { "type": ["string", "null"] }
+      },
+      "required": ["pos", "material_id", "from_band", "to_band", "integrity_after", "cause"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

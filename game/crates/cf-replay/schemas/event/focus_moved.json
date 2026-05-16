@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/focus_moved.v1",
+  "title": "ux.focus_moved",
+  "description": "Emitted on every focus traversal event. from / to are HUD_FOCUSABLE_NODES ids or empty string for cleared focus.",
+  "type": "object",
+  "required": ["from", "to", "direction"],
+  "properties": {
+    "from": { "type": "string" },
+    "to": { "type": "string" },
+    "direction": { "type": "string", "enum": ["next", "prev", "up", "down", "left", "right", "set", "clear"] },
+    "parent_event_id": { "type": "string" }
+  }
+}

@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.0.0",
+  "style_id": "mercenary_guild",
+  "category": "faction",
+  "version": "1.0.0",
+  "silhouette_language": "tactical, modular, swappable plates, black + gold + neutral grays",
+  "preferred_palette_roles": ["primary", "secondary", "accent", "highlight", "metal"],
+  "shape_descriptors": {
+    "weapon": "modular receiver with quick-release plates, gold trim accents, picatinny optic mount",
+    "actor": "modular plate-carrier silhouette, balaclava, gold-trim gauntlets, knee-pad set",
+    "vehicle": "armored APC profile, swappable side modules, gold-trim hazard accents",
+    "base_module": "modular cabinet stack, plate-screw fasteners, gold-trim signage",
+    "particle": "tactical dust + ejected casing",
+    "ui_icon": "shield-shaped frame, gold trim, neutral fill"
+  },
+  "geometric_primitives": {
+    "weapon": ["rect", "polygon", "line"],
+    "actor": ["rect", "polygon", "circle"],
+    "vehicle": ["rect", "polygon"],
+    "base_module": ["rect", "polygon"],
+    "particle": ["polygon", "polyline"],
+    "ui_icon": ["polygon", "line"]
+  }
+}

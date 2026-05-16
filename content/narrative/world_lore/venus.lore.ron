@@ -1,0 +1,32 @@
+WorldLore (
+    world_id: "venus",
+    canonical_name: "Venus Acid Cloud Sea",
+    music_anchor: "music_world_venus",
+    entries: [
+        WorldEntry (
+            kind: "geology",
+            title: "The Pressure World",
+            body: "Venus is a terrestrial body of approximately Earth's size, with a surface atmospheric pressure of approximately ninety bars, an ambient surface temperature in excess of 740 Kelvin, and a surface composition dominated by basalt and basaltic lava plains. The atmosphere is approximately ninety-six percent carbon dioxide, with a sulfuric acid cloud layer between forty-five and seventy kilometers altitude. The surface is, by every recent survey, geologically active and dotted with the partly-melted remains of the original Concordat survey landers. Pre-collapse mining concerns considered Venus economically unrecoverable; the post-collapse Concordat reclassified the planet as a strategic research site in 2167, after the discovery of the first cloud-borne ecosystem.",
+        ),
+        WorldEntry (
+            kind: "history",
+            title: "The Sky Stations",
+            body: "Venus has no surface settlements and, by Concordat policy, never will. Human habitation on Venus consists of approximately thirty cloud-station platforms, anchored to atmospheric balloons at altitudes between fifty-five and sixty-five kilometers, where the temperature is approximately 300 Kelvin and the pressure is approximately one bar — a habitable zone in every respect except the corrosive acid that surrounds it. The sky stations were established in 2174 under joint Coalition-Collegium administration and have, in the seventy years since, never been fully connected by a single political authority. Each station is independently administered, independently supplied, and independently armed. The Frontier maintains an unofficial presence on two of the stations; the Husks have, by every recent intelligence assessment, never managed to reach Venus and never will.",
+        ),
+        WorldEntry (
+            kind: "biosphere",
+            title: "The Cloud Microbes",
+            body: "Venus has a native biosphere — confined to the acid cloud layer, dominated by airborne microbial colonies that the Collegium has classified as 'extremophile chemoautotrophs of unique acid-tolerance profile'. The microbes feed on the sulfuric acid droplets, produce metabolic byproducts that the Concordat industrial sector has, in the last forty years, learned to extract for pharmaceutical and synthetic purposes, and are, by every available account, the most economically valuable native ecosystem in the Sol system. The Collegium's Venus microbe archive contains approximately sixteen thousand strains, of which approximately four hundred are commercially productive and the remainder are research specimens. Venus microbe-derived pharmaceuticals fund approximately twelve percent of the Collegium's annual budget.",
+        ),
+        WorldEntry (
+            kind: "culture",
+            title: "The Sky-Crews",
+            body: "Venusian sky-crews are a small, technically-specialized, and somewhat eccentric population of approximately fourteen thousand active personnel. Crews are recruited from across the Concordat — heavy on aqueous-origin and methane-breather populations, light on humans — and are paid in research credits and Coalition currency at approximately three times the system average. Sky-crew culture is centered on the station's promenade — the single open-air walkway that runs around each station's outer ring, weather permitting — and on the long-form dinner conversations that are the dominant form of social activity. Sky-crews are reputed to produce the finest poetry, the worst music, and the most paranoid romance novels in the system. The Concordat publishing arm prints small editions.",
+        ),
+        WorldEntry (
+            kind: "mystery",
+            title: "The Surface Light",
+            body: "On the night-side surface of Venus, at a location that has been mapped to within a square kilometer, is a single point source of light that has been visible to orbital survey instruments since 2189. The light is approximately the spectral signature of an open flame, sustained at a temperature approximately consistent with a hydrogen-oxygen combustion reaction, and unchanged in intensity for fifty-two years. The location is, by every available terrain map, a flat basaltic plain with no features. No probe has been able to reach the location and return data; the closest approach was made by a Collegium robotic lander in 2212, which transmitted three hundred seconds of telemetry showing the light approaching the lander and then went silent. The Coalition has classified all subsequent investigation as restricted. The light continues to burn.",
+        ),
+    ],
+)

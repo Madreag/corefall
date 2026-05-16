@@ -1,0 +1,32 @@
+WorldLore (
+    world_id: "moon",
+    canonical_name: "Moon Vacuum Surface",
+    music_anchor: "music_world_moon",
+    entries: [
+        WorldEntry (
+            kind: "geology",
+            title: "The Bone Garden",
+            body: "The Moon is regolith all the way to the magnetic anomaly belts. Surface dust is fine, abrasive, and electrostatic; it adheres to vacuum suits, scratches faceplates, and corrupts seal gaskets at a rate that surprises every newcomer and resigns every veteran. Beneath the dust lies anorthosite crust, then basaltic mare, then the deep highland fractures that the Coalition's old mining operations exploited in the 2050s. Helium-3 deposits remain the planet's primary economic justification, though the Frontier has begun to demonstrate that scavenged pre-collapse hardware is a higher-margin export. The far side is dotted with abandoned radio observatories; the near side is dotted with abandoned mining colonies. Both are, by Coalition policy, off-limits without permit. Both are, by Frontier policy, fair game.",
+        ),
+        WorldEntry (
+            kind: "history",
+            title: "The First Outpost",
+            body: "The Moon was humanity's first sustained off-world settlement and remains, by treaty and by sentiment, the senior colony of the Sol system. The original Coalition mountain-top observatory at Tycho has been continuously occupied since 2089, which makes it the longest-running human habitation outside Earth. The Moon survived the collapse better than any other body because its colonies were small, self-sufficient, and geographically dispersed; the Husks have a foothold here but a small one, and the Frontier has never managed to recruit lunar locals in significant numbers. Lunar citizens are notoriously parochial. They consider the Coalition foreign, the Frontier foreign, and the Synth Collective interesting but not relevant. They consider Earth the old country, and visit when they can.",
+        ),
+        WorldEntry (
+            kind: "biosphere",
+            title: "The Garden Domes",
+            body: "The Moon has no native biosphere and no engineered surface biota; the surface remains as sterile as it has been since the planet's formation. All lunar agriculture is conducted in pressurized domes, which the locals call gardens regardless of what they actually grow. The largest dome network, the Tycho Greenway, supports a population of approximately eight thousand under glass and is, by Concordat-wide reputation, the source of the best wine in the Sol system. The Collegium has been unable to identify why. The lunar gardeners refuse to disclose. The wine ships to Earth and Mars in bonded crates, with a tax stamp the Coalition does not bother to verify.",
+        ),
+        WorldEntry (
+            kind: "culture",
+            title: "The Quiet Cities",
+            body: "Lunar cities are pressurized, buried, and quiet. Outside the gardens, ambient sound is suppressed by Coalition ordinance, partly to preserve the radio observatories' working environment and partly because the original colonists, traumatized by the collapse, simply preferred silence. Lunar children grow up speaking in whispers and learn to read lips before they learn to read text. Lunar funerals are conducted on the surface, in vacuum, with the body left to settle into the regolith over the course of a lunar day. The Coalition has, three times, attempted to standardize lunar funeral practices; the locals have, three times, ignored the attempt. The cemetery at Tycho contains approximately eleven thousand markers, set in concentric rings around the original 2089 outpost.",
+        ),
+        WorldEntry (
+            kind: "mystery",
+            title: "The Far-Side Receiver",
+            body: "On the far side of the Moon, in the shadow of the Korolev crater, sits a radio observatory dish that has not been operational since 2092. The dish is, by every official record, decommissioned. It is, by Coalition resource allocation, still drawing power. The Frontier has tried twice to investigate; both expeditions returned with their equipment wiped and their crews unwilling to discuss what they had seen. The Collegium has not requested permission to investigate, which the Coalition has privately noted as the most suspicious aspect of the entire situation. The Synth Collective has, on one occasion, mentioned the dish in a routine communication and then deleted the reference from its public archive. The dish remains powered. The Coalition does not know who is paying for the electricity.",
+        ),
+    ],
+)

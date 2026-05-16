@@ -15,9 +15,15 @@
     clippy::needless_pass_by_value
 )]
 
+pub mod asset_loader;
+pub mod constants;
 pub mod debris;
 pub mod dig_preview;
+pub mod gpu_overlay;
+pub mod gpu_particles;
 pub mod overlay;
+pub mod palette_swap;
+pub mod terrain_texture_array;
 // M1 re-audit (2026-05-13): spec lists cf-render-2d/src/reticle.rs as a
 // separate file. The helper lives there now; the bloom + tool-validity
 // color logic still operates inside this lib.rs but consumers can
@@ -25,11 +31,29 @@ pub mod overlay;
 pub mod reticle;
 pub mod terrain;
 
+// **M9** § Reactor visual feedback — sprite swap on pressure_state,
+// bullet-impact sparks on hit, explosion VFX on destruction.
+pub mod reactor_explosion;
+pub mod reactor_sparks;
+pub mod reactor_sprite;
+
+pub use asset_loader::{
+    category_subdir, load_ledger_index, resolve_placeholder_path, AssetIndex, AssetIndexEntry, AssetIndexPlugin,
+};
 pub use debris::{
     DebrisPlugin, DebrisSpawnQueue, DebrisSpawnRequest, LooseDebris, RenderDebrisCappedEvent, DEBRIS_CAP,
 };
 pub use dig_preview::{probe_dig_validity, DigPreviewGhost, DigPreviewPlugin, DigPreviewTarget};
 pub use overlay::{material_tint, OverlayMode, OverlayModePlugin, OverlayModeState};
+pub use palette_swap::{
+    build_role_swap, parse_hex_rgb, Palette, PaletteEntry, PaletteRegistry, PaletteSwap, OVERLAY_TINT_BUILD_REPAIR,
+    OVERLAY_TINT_HAZARD, OVERLAY_TINT_INTEGRITY, OVERLAY_TINT_MOBILITY, OVERLAY_TINT_PATHABILITY,
+};
+pub use reactor_explosion::{
+    ExplosionParticle, ExplosionState, EXPLOSION_DEBRIS_CAP_PER_HIT, EXPLOSION_MAX_DURATION_MS,
+};
+pub use reactor_sparks::{SparkEmitterState, SparkParticle, SPARK_CAP_PER_HIT};
+pub use reactor_sprite::{ReactorSprite, ReactorSpriteState};
 pub use terrain::{
     build_chunk_image, material_rgba, ChunkRenderTag, ChunkUpdate, ChunkedTerrainRendererPlugin, ChunkedTerrainSnapshot,
 };
@@ -83,6 +107,32 @@ impl Plugin for ChunkedTerrainPlugin {
             DigPreviewPlugin,
         ));
     }
+}
+
+/// **M9** § Reactor visual feedback — wires the reactor sprite +
+/// bullet-impact spark emitter + destruction explosion VFX resources.
+/// cf-app spawns sparks on `combat.projectile_hit` (target_kind="reactor")
+/// and the explosion burst on `mission.reactor_destroyed`; this plugin's
+/// `tick_reactor_vfx` system advances + retires particles per frame so
+/// the live VFX terminates within 1s of the triggering event.
+pub struct ReactorVfxPlugin;
+
+impl Plugin for ReactorVfxPlugin {
+    fn build(&self, app: &mut App) {
+        app.init_resource::<ReactorSpriteState>()
+            .init_resource::<SparkEmitterState>()
+            .init_resource::<ExplosionState>()
+            .add_systems(Update, tick_reactor_vfx);
+    }
+}
+
+fn tick_reactor_vfx(time: Res<Time>, mut sparks: ResMut<SparkEmitterState>, mut explosion: ResMut<ExplosionState>) {
+    let dt_ms = (time.delta_secs() * 1000.0).clamp(0.0, 1000.0) as u32;
+    if dt_ms == 0 {
+        return;
+    }
+    sparks.tick(dt_ms);
+    explosion.tick(dt_ms);
 }
 
 /// Bevy 0.18 silently drops sprites whose `Handle<Image>` does not resolve to a

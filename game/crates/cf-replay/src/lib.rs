@@ -41,8 +41,10 @@ pub const EVENT_ENVELOPE_VERSION: u32 = 1;
 
 pub mod bundle_paths;
 pub mod diagnostics;
+pub mod perf;
 pub mod record_id;
 pub mod schemas;
+pub mod shard;
 
 pub use bundle_paths::{default_run_bundle_root, resolve_run_bundle_root};
 pub use record_id::{EntityKind, RecordId, RecordIdRegistry};
@@ -365,6 +367,13 @@ pub struct PerformanceBlock {
     /// cumulative across the run. See `specs/active/M3.md` § Re-opened gaps.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub terrain: Option<TerrainPerfBlock>,
+    /// **M8A § per-subsystem latency budgets** — additive-only extension
+    /// of the M4 v0.1 envelope. Existing M1-M8 bundle readers ignore the
+    /// optional field; M8A producers populate per-subsystem
+    /// p50/p99/p999 (microseconds). Consumed by `cf-mod validate-bundle`
+    /// and `m8a_perf_gate.sh`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subsystems: Option<crate::perf::M8aPerfSummary>,
 }
 
 /// **M3 re-open (2026-05-13)**: terrain coalesce-cost roll-up for
@@ -403,6 +412,7 @@ impl From<PerfSample> for PerformanceBlock {
             wall_seconds: s.wall_seconds,
             tick_rate_hz: s.tick_rate_hz,
             terrain: s.terrain,
+            subsystems: None,
         }
     }
 }
@@ -944,6 +954,7 @@ pub fn write_run_bundle(bundle_dir: &Path, inputs: BundleInputs<'_>) -> Result<R
             wall_seconds: duration_sec,
             tick_rate_hz: inputs.manifest.tick_rate_hz,
             terrain: None,
+            subsystems: None,
         },
     };
     let summary = RunSummary {

@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/perf_sample.v1",
+  "title": "perf.sample",
+  "description": "M8A § Performance budgets — per-cadence per-subsystem latency sample. Emitted by the PerfSampler at the cadence configured via cfctl srv.set_cvar perf.sample.cadence_ticks. Cosmetic: true (dropped under recorder backpressure).",
+  "type": "object",
+  "required": ["tick", "subsystem", "p50_us", "p99_us", "p999_us"],
+  "properties": {
+    "tick": { "type": "integer", "minimum": 0 },
+    "subsystem": {
+      "type": "string",
+      "enum": ["actor", "ai", "projectile", "terrain", "mission", "recorder", "render"]
+    },
+    "p50_us": { "type": "integer", "minimum": 0 },
+    "p99_us": { "type": "integer", "minimum": 0 },
+    "p999_us": { "type": "integer", "minimum": 0 },
+    "cosmetic": { "type": "boolean" }
+  }
+}

@@ -1,0 +1,33 @@
+{
+  "description": "AI-H-03 harness scenario: exercises the M7 'AI suppresses while squadmate flanks' contract. In the micro_breach scenario the reactive guard (id=2, team='red') plays the role of Rifleman A (the suppressor); the player (id=1) plays the role of Rifleman B (the flanker) by holding suppressive fire on the guard while strafing laterally to a flank position. Applies the `rifleman` role template + the `attack` quick preset to the player so the M7 utility scorer biases the player's bot-state toward Suppress/Flank tasks (PriorityTable: EngageVisibleEnemy=7, SuppressFire=7, FlankTarget shifted up by the attack preset). Then the script fires bursts while strafing east to flank. Expected event sequence: control.command_accepted(act.player.apply_role_template/rifleman) → ai.role_template_applied{actor_id=1, template_id=rifleman} → ai.quick_preset_applied{actor_id=1, preset_id=attack} → ai.suppression_started{suppressor=2, target=1} (guard returns fire on the engaged target) → ai.squad_comm_relayed (within SQUAD_COMM_RELAY_DELAY_SECONDS=0.5s = 30 ticks @ 60Hz of any comm-trigger event). Final state: PriorityTable + autonomy mode visible via observe.priority_table / observe.autonomy; suppression event recorded against the guard; no friendly-fire incident registered (the flanking actor never crossed the suppressor's line of fire on a squadmate). Per M7 spec § 'AI-H test harness preservation + extension' row `AI-H-03 | Suppression while squadmate flanks (M7; new)`, and § Acceptance criteria § 'Cover seeking + suppression + retreat + squad comm + patrol' → 'Scenario: AI suppresses while squadmate flanks'. Run via `cargo run -p cf-e2e -- --scenario micro_breach --ai-harness ai_h_03_suppression_while_squadmate_flanks`.",
+  "scenario": "micro_breach",
+  "tick_rate_hz": 60,
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+    { "method": "act.player.apply_role_template", "params": { "schema_version": 2, "actor_id": 1, "template_id": "rifleman" } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
+    { "method": "act.player.apply_quick_preset", "params": { "schema_version": 2, "actor_id": 1, "preset_id": "attack" } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
+    { "method": "act.player.set_autonomy_mode", "params": { "schema_version": 2, "actor_id": 1, "mode": "standard" } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
+    { "method": "act.player.aim", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "act.player.move", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 360 } },
+    { "method": "act.player.move", "params": { "x": 0.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
+    { "method": "act.player.fire", "params": { "pressed": true } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 24 } },
+    { "method": "act.player.fire", "params": { "pressed": false } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
+    { "method": "act.player.move", "params": { "x": 1.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 60 } },
+    { "method": "act.player.fire", "params": { "pressed": true } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 24 } },
+    { "method": "act.player.fire", "params": { "pressed": false } },
+    { "method": "act.player.move", "params": { "x": 0.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 30 } },
+    { "method": "observe.priority_table", "params": { "schema_version": 2, "actor_id": 1 } },
+    { "method": "observe.autonomy", "params": { "schema_version": 2, "actor_id": 1 } },
+    { "method": "observe.once", "params": {} }
+  ]
+}

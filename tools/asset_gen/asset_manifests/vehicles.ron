@@ -1,0 +1,29 @@
+// M9A vehicles manifest. ≥18 vehicle archetypes × 3 states (side / boarding /
+// boarded) = ≥54 SVGs per spec § "Vehicles".
+(
+    schema_version: "1.0.0",
+    category: "VehicleSprite",
+    owner_milestone: "M9A",
+    pipeline_id: "M9A_svg_v1",
+    entries: [
+        ( canonical_name: "corp_apc_treaded", kind: "vehicle-side", faction: "hostile_corp", prompt: "treaded armored personnel carrier, riveted hull, side hatch" ),
+        ( canonical_name: "corp_truck_supply", kind: "vehicle-side", faction: "hostile_corp", prompt: "six-wheel supply truck, slatted armor side" ),
+        ( canonical_name: "corp_tank_light", kind: "vehicle-side", faction: "hostile_corp", prompt: "light tank, sloped front armor, mounted main gun" ),
+        ( canonical_name: "resistance_pickup", kind: "vehicle-side", faction: "allied_resistance", prompt: "scavenged pickup truck with welded plate armor and gun mount" ),
+        ( canonical_name: "resistance_buggy", kind: "vehicle-side", faction: "allied_resistance", prompt: "open-frame buggy, roll cage, gun mount" ),
+        ( canonical_name: "resistance_motorcycle", kind: "vehicle-side", faction: "allied_resistance", prompt: "irregular motorcycle, taped fairings" ),
+        ( canonical_name: "marauder_warbuggy", kind: "vehicle-side", faction: "marauder_tribes", prompt: "tribal war-buggy with bone spikes and totem rails" ),
+        ( canonical_name: "marauder_warwagon", kind: "vehicle-side", faction: "marauder_tribes", prompt: "tribal war wagon, bone-and-iron chassis" ),
+        ( canonical_name: "order_cathedral_ad", kind: "vehicle-side", faction: "religious_order", prompt: "cathedral assault drone, ornate gold trim" ),
+        ( canonical_name: "order_relic_carrier", kind: "vehicle-side", faction: "religious_order", prompt: "relic carrier, draped banners, gold-trim hull" ),
+        ( canonical_name: "sci_research_apc", kind: "vehicle-side", faction: "scientist_order", prompt: "research APC, dish-and-strut roof, clean chrome" ),
+        ( canonical_name: "sci_data_rover", kind: "vehicle-side", faction: "scientist_order", prompt: "data rover, holo emitter mast" ),
+        ( canonical_name: "merc_modular_apc", kind: "vehicle-side", faction: "mercenary_guild", prompt: "tactical modular APC, swappable side plates" ),
+        ( canonical_name: "merc_recovery_truck", kind: "vehicle-side", faction: "mercenary_guild", prompt: "modular recovery truck, winch" ),
+        ( canonical_name: "pirate_skiff", kind: "vehicle-side", faction: "pirates", prompt: "salt-rust skiff with mast and sail" ),
+        ( canonical_name: "pirate_armored_boat", kind: "vehicle-side", faction: "pirates", prompt: "armored sea-boat, flag mast" ),
+        ( canonical_name: "drone_hex_carrier", kind: "vehicle-side", faction: "drone_collective", prompt: "faceted hex carrier, no wheels, hover indicator" ),
+        ( canonical_name: "drone_hex_assault", kind: "vehicle-side", faction: "drone_collective", prompt: "faceted hex assault frame, mounted weapon array" ),
+    ],
+    variants: ["side", "boarding", "boarded"],
+)

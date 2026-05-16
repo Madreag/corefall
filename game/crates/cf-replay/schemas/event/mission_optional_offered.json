@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/mission_optional_offered.v1",
+  "title": "mission.optional_offered",
+  "description": "Emitted when an optional bonus objective is offered to the player.",
+  "type": "object",
+  "required": ["objective_id"],
+  "properties": {
+    "objective_id": { "type": "string" },
+    "tick": { "type": "integer", "minimum": 0 }
+  }
+}

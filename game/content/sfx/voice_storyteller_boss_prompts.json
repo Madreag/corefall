@@ -1,0 +1,76 @@
+{
+  "schema_version": 1,
+  "description": "M37A storyteller + boss voice line prompts. 5 storytellers (intro/event/outro) + 5 bosses (intro + 3 phase taunts + death).",
+  "audio_format": {
+    "channels": 1,
+    "sample_rate_hz": 48000,
+    "bit_depth": 16,
+    "target_peak_dbfs": -16.0,
+    "target_lufs_integrated": -22.0,
+    "max_duration_sec": 10.0
+  },
+  "synthesis_backends": {
+    "primary": "elevenlabs_v3_premium",
+    "fallback": "coqui_xtts_v2"
+  },
+  "storyteller_voice_prompts": [
+    {"id": "voice_cassandra_intro", "storyteller_id": "cassandra_classic", "voice_id": "cassandra_narrator_balanced_female", "hook": "intro", "text": "Welcome. I am Cassandra. The story I tell will be fair, the pacing measured, the stakes earned. We will rise together and fall together. Begin when you are ready."},
+    {"id": "voice_cassandra_event", "storyteller_id": "cassandra_classic", "voice_id": "cassandra_narrator_balanced_female", "hook": "event", "text": "And now, the unexpected. But not the unprepared."},
+    {"id": "voice_cassandra_outro_win", "storyteller_id": "cassandra_classic", "voice_id": "cassandra_narrator_balanced_female", "hook": "outro_win", "text": "The campaign closes well. The cost was real. The reward, earned. Until next time."},
+    {"id": "voice_cassandra_outro_loss", "storyteller_id": "cassandra_classic", "voice_id": "cassandra_narrator_balanced_female", "hook": "outro_loss", "text": "Not every story ends as the heroes hoped. The records will remember. The next attempt will be wiser."},
+
+    {"id": "voice_phoebe_intro", "storyteller_id": "phoebe_chillax", "voice_id": "phoebe_narrator_warm_female", "hook": "intro", "text": "Hey there. Phoebe here. I am going to take it easy on you, mostly. We will have fun. Some things will go wrong, but nothing too rough. Lets play."},
+    {"id": "voice_phoebe_event", "storyteller_id": "phoebe_chillax", "voice_id": "phoebe_narrator_warm_female", "hook": "event", "text": "Heads up, small wrinkle. You got this."},
+    {"id": "voice_phoebe_outro_win", "storyteller_id": "phoebe_chillax", "voice_id": "phoebe_narrator_warm_female", "hook": "outro_win", "text": "Nice. Everyone home. Crack open a beer."},
+    {"id": "voice_phoebe_outro_loss", "storyteller_id": "phoebe_chillax", "voice_id": "phoebe_narrator_warm_female", "hook": "outro_loss", "text": "Aw, that one stung. Take a break. We will run another one when you are ready."},
+
+    {"id": "voice_randy_intro", "storyteller_id": "randy_random", "voice_id": "randy_narrator_chaotic_male", "hook": "intro", "text": "Randy Random! I have plans. I will not tell you the plans. The plans are going to be fun for me and a little less fun for you. Lets see what happens!"},
+    {"id": "voice_randy_event", "storyteller_id": "randy_random", "voice_id": "randy_narrator_chaotic_male", "hook": "event", "text": "And now, the chaos! Anything could happen and it probably will!"},
+    {"id": "voice_randy_outro_win", "storyteller_id": "randy_random", "voice_id": "randy_narrator_chaotic_male", "hook": "outro_win", "text": "You did it! Against the math. Against the universe. Against me. Great show!"},
+    {"id": "voice_randy_outro_loss", "storyteller_id": "randy_random", "voice_id": "randy_narrator_chaotic_male", "hook": "outro_loss", "text": "Oof. The universe wins. Statistically inevitable. But we had fun, right?"},
+
+    {"id": "voice_ironman_intro", "storyteller_id": "ironman", "voice_id": "ironman_narrator_grim_male", "hook": "intro", "text": "Ironman. No respawns. No second chances. Every death is permanent. Every loss is the loss. Stay alive. Stay disciplined. Do not flinch."},
+    {"id": "voice_ironman_event", "storyteller_id": "ironman", "voice_id": "ironman_narrator_grim_male", "hook": "event", "text": "Discipline now. Or pay the price forever."},
+    {"id": "voice_ironman_outro_win", "storyteller_id": "ironman", "voice_id": "ironman_narrator_grim_male", "hook": "outro_win", "text": "You held the line. Every name on the roster, intact. That is rare. That is good."},
+    {"id": "voice_ironman_outro_loss", "storyteller_id": "ironman", "voice_id": "ironman_narrator_grim_male", "hook": "outro_loss", "text": "The campaign ended. Names will be added to the wall. The next pilot will read them and choose better."},
+
+    {"id": "voice_sandbox_intro", "storyteller_id": "sandbox", "voice_id": "sandbox_narrator_observational_female", "hook": "intro", "text": "Sandbox mode active. No events will be initiated unless you summon them. The world is yours. Observe. Experiment. Take notes."},
+    {"id": "voice_sandbox_event", "storyteller_id": "sandbox", "voice_id": "sandbox_narrator_observational_female", "hook": "event", "text": "You requested an event. It has occurred. Observe the consequences."},
+    {"id": "voice_sandbox_outro_win", "storyteller_id": "sandbox", "voice_id": "sandbox_narrator_observational_female", "hook": "outro_win", "text": "Session concluded. Data preserved. Curiosity served."},
+    {"id": "voice_sandbox_outro_loss", "storyteller_id": "sandbox", "voice_id": "sandbox_narrator_observational_female", "hook": "outro_loss", "text": "Session concluded. The experiment produced a result. The result is also data."}
+  ],
+  "boss_voice_prompts": [
+    {"id": "voice_hollow_king_intro", "boss_id": "hollow_king", "voice_id": "hollow_king_boss_deep_male", "hook": "intro", "text": "You came to the heart of the mountain. You came to me. Many have. Few have left. The lava remembers."},
+    {"id": "voice_hollow_king_phase1_taunt", "boss_id": "hollow_king", "voice_id": "hollow_king_boss_deep_male", "hook": "phase1_taunt", "text": "Burn"},
+    {"id": "voice_hollow_king_phase2_taunt", "boss_id": "hollow_king", "voice_id": "hollow_king_boss_deep_male", "hook": "phase2_taunt", "text": "Come closer. The earth answers me."},
+    {"id": "voice_hollow_king_phase3_taunt", "boss_id": "hollow_king", "voice_id": "hollow_king_boss_deep_male", "hook": "phase3_taunt", "text": "ENOUGH!"},
+    {"id": "voice_hollow_king_death", "boss_id": "hollow_king", "voice_id": "hollow_king_boss_deep_male", "hook": "death", "text": "The mountain ... will outlive ... us both", "emotion": "fading"},
+
+    {"id": "voice_frozen_heart_intro", "boss_id": "frozen_heart", "voice_id": "frozen_heart_boss_cold_female", "hook": "intro", "text": "Welcome to the deep. The cold does not punish. It simply is. Soon, you will simply not be."},
+    {"id": "voice_frozen_heart_phase1_taunt", "boss_id": "frozen_heart", "voice_id": "frozen_heart_boss_cold_female", "hook": "phase1_taunt", "text": "Slower"},
+    {"id": "voice_frozen_heart_phase2_taunt", "boss_id": "frozen_heart", "voice_id": "frozen_heart_boss_cold_female", "hook": "phase2_taunt", "text": "My children are awake"},
+    {"id": "voice_frozen_heart_phase3_taunt", "boss_id": "frozen_heart", "voice_id": "frozen_heart_boss_cold_female", "hook": "phase3_taunt", "text": "The core is mine. So is the cold."},
+    {"id": "voice_frozen_heart_death", "boss_id": "frozen_heart", "voice_id": "frozen_heart_boss_cold_female", "hook": "death", "text": "The ice ... cannot melt forever ...", "emotion": "fading"},
+
+    {"id": "voice_crimson_tide_intro", "boss_id": "crimson_tide", "voice_id": "crimson_tide_boss_distorted", "hook": "intro", "text": "Mars eats. The dust remembers every footprint that was. The Tide is the dust. The Tide is hungry."},
+    {"id": "voice_crimson_tide_phase1_taunt", "boss_id": "crimson_tide", "voice_id": "crimson_tide_boss_distorted", "hook": "phase1_taunt", "text": "Come"},
+    {"id": "voice_crimson_tide_phase2_taunt", "boss_id": "crimson_tide", "voice_id": "crimson_tide_boss_distorted", "hook": "phase2_taunt", "text": "The wind is mine"},
+    {"id": "voice_crimson_tide_phase3_taunt", "boss_id": "crimson_tide", "voice_id": "crimson_tide_boss_distorted", "hook": "phase3_taunt", "text": "We are many"},
+    {"id": "voice_crimson_tide_phase4_taunt", "boss_id": "crimson_tide", "voice_id": "crimson_tide_boss_distorted", "hook": "phase4_taunt", "text": "We are one again"},
+    {"id": "voice_crimson_tide_death", "boss_id": "crimson_tide", "voice_id": "crimson_tide_boss_distorted", "hook": "death", "text": "Dust ... to ...", "emotion": "fading"},
+
+    {"id": "voice_eclipse_walker_intro", "boss_id": "eclipse_walker", "voice_id": "eclipse_walker_boss_synthetic", "hook": "intro", "text": "Gravity is a choice. Yours and mine. We will see whose choice is heavier."},
+    {"id": "voice_eclipse_walker_phase1_taunt", "boss_id": "eclipse_walker", "voice_id": "eclipse_walker_boss_synthetic", "hook": "phase1_taunt", "text": "Predictable"},
+    {"id": "voice_eclipse_walker_phase2_taunt", "boss_id": "eclipse_walker", "voice_id": "eclipse_walker_boss_synthetic", "hook": "phase2_taunt", "text": "Down is wherever I say"},
+    {"id": "voice_eclipse_walker_phase3_taunt", "boss_id": "eclipse_walker", "voice_id": "eclipse_walker_boss_synthetic", "hook": "phase3_taunt", "text": "Conclusion approaches"},
+    {"id": "voice_eclipse_walker_death", "boss_id": "eclipse_walker", "voice_id": "eclipse_walker_boss_synthetic", "hook": "death", "text": "Gravity ... won this time ...", "emotion": "fading"},
+
+    {"id": "voice_last_star_intro", "boss_id": "last_star", "voice_id": "last_star_boss_ascendant", "hook": "intro", "text": "You have walked to the edge of the Sol system. You have walked to the edge of yourself. Both edges meet here. Few have stood here. None have left whole."},
+    {"id": "voice_last_star_phase1_taunt", "boss_id": "last_star", "voice_id": "last_star_boss_ascendant", "hook": "phase1_taunt", "text": "The corona lights you"},
+    {"id": "voice_last_star_phase2_taunt", "boss_id": "last_star", "voice_id": "last_star_boss_ascendant", "hook": "phase2_taunt", "text": "Sunward, my servants"},
+    {"id": "voice_last_star_phase3_taunt", "boss_id": "last_star", "voice_id": "last_star_boss_ascendant", "hook": "phase3_taunt", "text": "You burn well"},
+    {"id": "voice_last_star_phase4_taunt", "boss_id": "last_star", "voice_id": "last_star_boss_ascendant", "hook": "phase4_taunt", "text": "Nova"},
+    {"id": "voice_last_star_phase5_climax", "boss_id": "last_star", "voice_id": "last_star_boss_ascendant", "hook": "phase5_climax", "text": "I AM THE LAST STAR. THIS IS THE LAST WORD."},
+    {"id": "voice_last_star_death", "boss_id": "last_star", "voice_id": "last_star_boss_ascendant", "hook": "death", "text": "The sun ... still rises ... without me", "emotion": "fading_triumphant"}
+  ]
+}

@@ -97,8 +97,8 @@ use crate::{
         ActPlayerJetParams, ActPlayerJumpParams, ActPlayerMoveParams, ActPlayerReloadParams, ActPlayerResetParams,
         ActPlayerSelectItemParams, ActPlayerSharpAimParams, InspectActorParams, InspectAiParams,
         InspectEquipmentParams, InspectMissionParams, ObserveActorParams, ObserveAiParams, ObserveMissionParams,
-        ObserveOnceParams, ObserveSubscribeParams, RunBundleWriteParams, RunForTicksParams, ScenarioLoadParams,
-        StepParams, SystemShutdownParams,
+        ObserveOnceParams, ObservePerceptionParams, ObserveSubscribeParams, RunBundleWriteParams, RunForTicksParams,
+        ScenarioLoadParams, StepParams, SystemShutdownParams,
     },
     schemas::{SCHEMA_VERSION, SCHEMA_VERSION_MIN},
     state::{ControlEnvelopeStatus, ObserveFrame, ObserveSettings},
@@ -200,6 +200,126 @@ pub struct SettingsPatch {
     /// state when omitted (Option-based settings patch).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ai_debug: Option<bool>,
+
+    // === M8 accessibility / camera / debug / locale extensions ===
+    /// **M8**: slow-motion accessibility mode (snake_case wire form
+    /// `off | slowdown_75 | slowdown_25 | full_pause`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub game_speed_assist: Option<String>,
+    /// **M8**: color blind / contrast palette mode (snake_case wire form
+    /// `default | colorblind_safe | protanopia | deuteranopia | tritanopia
+    /// | monochrome_test`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub color_cue_mode: Option<String>,
+    /// **M8**: aim assist mode (`off | steady_aim |
+    /// auto_aim_with_damage_penalty`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub aim_assist: Option<String>,
+    /// **M8**: damage numbers cosmetic toggle.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub damage_numbers: Option<bool>,
+    /// **M8**: killcam toggle.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub killcam_enabled: Option<bool>,
+    /// **M8**: hit-stop toggle.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hit_stop_enabled: Option<bool>,
+    /// **M8**: cinematic kill cam toggle.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cinematic_kills: Option<bool>,
+    /// **M8**: master mini-map enable toggle.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mini_map_enabled: Option<bool>,
+    /// **M8**: compass enable toggle.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub compass_enabled: Option<bool>,
+    /// **M8**: damage-direction indicator enable toggle.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub damage_direction_enabled: Option<bool>,
+    /// **M8**: mini-map zoom (0.25..=4.0).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub mini_map_zoom: Option<f32>,
+    /// **M8**: scope ADS FOV in degrees (5..=90).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scope_zoom_fov: Option<f32>,
+    /// **M8**: text scale (0.5..=4.0; mirrors `ui_scale`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub text_scale: Option<f32>,
+    /// **M8**: HUD density preset (`compact | normal | spacious`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ui_density: Option<String>,
+    /// **M8**: language code (`en` baseline; Tier-A 11 reserved for
+    /// T-ACC-PLUS BP9+).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub language: Option<String>,
+    /// **M8**: speedrun mode toggle.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub speedrun_mode: Option<bool>,
+    /// **M8**: permadeath modifier.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub permadeath: Option<bool>,
+    /// **M8**: no-respawn modifier.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub no_respawn: Option<bool>,
+    /// **M8**: fog-of-war on.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fog_of_war_on: Option<bool>,
+    /// **M8**: limited-ammo modifier.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub limited_ammo: Option<bool>,
+    /// **M8**: time-limit modifier.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub time_limit: Option<bool>,
+    /// **M8**: hide the mini-map (overrides `mini_map_enabled`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub no_minimap: Option<bool>,
+    /// **M8**: hardcore composite mode.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hardcore_mode: Option<bool>,
+    /// **M8**: friendly fire on.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub friendly_fire_on: Option<bool>,
+    /// **M8**: master debug-overlay gate (production builds).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub debug_enabled: Option<bool>,
+
+    // === M11 ACC-A floor extensions ===
+    /// **M11**: contrast palette mode (snake_case wire form
+    /// `standard | high_contrast_dark | high_contrast_light`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub contrast_mode: Option<String>,
+    /// **M11**: captions verbosity mode (snake_case wire form
+    /// `off | critical_only | standard | expanded`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub caption_mode: Option<String>,
+    /// **M11**: caption background opacity (0.0..=1.0).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub caption_background_opacity: Option<f32>,
+    /// **M11**: caption category subset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub caption_categories: Option<std::collections::BTreeSet<String>>,
+    /// **M11**: input profile (snake_case wire form
+    /// `keyboard_mouse | controller | keyboard_only | custom`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub input_profile: Option<String>,
+    /// **M11**: remap-action group subset.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub remap_groups: Option<std::collections::BTreeSet<String>>,
+    /// **M11**: hold-behavior variant (`hold | toggle | press_to_cycle`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hold_behavior: Option<String>,
+    /// **M11**: screen-shake scale (0.0..=1.0; multiplicative).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub screen_shake_scale: Option<f32>,
+    /// **M11**: camera-motion granularity (`reduced | standard`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub camera_motion: Option<String>,
+    /// **M11**: objective-help verbosity (`minimal | standard | verbose`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub objective_help: Option<String>,
+    /// **M11**: debug-explainer level (`player | designer | raw`).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub debug_explainer_level: Option<String>,
 }
 
 impl SettingsPatch {
@@ -225,6 +345,43 @@ impl SettingsPatch {
             && self.walk_threshold.is_none()
             && self.ai_difficulty.is_none()
             && self.ai_debug.is_none()
+            && self.game_speed_assist.is_none()
+            && self.color_cue_mode.is_none()
+            && self.aim_assist.is_none()
+            && self.damage_numbers.is_none()
+            && self.killcam_enabled.is_none()
+            && self.hit_stop_enabled.is_none()
+            && self.cinematic_kills.is_none()
+            && self.mini_map_enabled.is_none()
+            && self.compass_enabled.is_none()
+            && self.damage_direction_enabled.is_none()
+            && self.mini_map_zoom.is_none()
+            && self.scope_zoom_fov.is_none()
+            && self.text_scale.is_none()
+            && self.ui_density.is_none()
+            && self.language.is_none()
+            && self.speedrun_mode.is_none()
+            && self.permadeath.is_none()
+            && self.no_respawn.is_none()
+            && self.fog_of_war_on.is_none()
+            && self.limited_ammo.is_none()
+            && self.time_limit.is_none()
+            && self.no_minimap.is_none()
+            && self.hardcore_mode.is_none()
+            && self.friendly_fire_on.is_none()
+            && self.debug_enabled.is_none()
+            // M11 ACC-A floor
+            && self.contrast_mode.is_none()
+            && self.caption_mode.is_none()
+            && self.caption_background_opacity.is_none()
+            && self.caption_categories.is_none()
+            && self.input_profile.is_none()
+            && self.remap_groups.is_none()
+            && self.hold_behavior.is_none()
+            && self.screen_shake_scale.is_none()
+            && self.camera_motion.is_none()
+            && self.objective_help.is_none()
+            && self.debug_explainer_level.is_none()
     }
 
     pub fn validation_error(&self) -> Option<String> {
@@ -284,6 +441,116 @@ impl SettingsPatch {
             if cf_ai::DifficultyPreset::builtin(id).is_none() {
                 return Some(format!("ai_difficulty_unknown: {id}"));
             }
+        }
+        // M8: validate the new enum strings + numeric ranges so cfctl
+        // rejects unknown values at the dispatch boundary.
+        if let Some(s) = self.game_speed_assist.as_deref() {
+            if crate::settings::GameSpeedAssist::from_str(s).is_none() {
+                return Some(format!("game_speed_assist_unknown: {s}"));
+            }
+        }
+        if let Some(s) = self.color_cue_mode.as_deref() {
+            if crate::settings::ColorCueMode::from_str(s).is_none() {
+                return Some(format!("color_cue_mode_unknown: {s}"));
+            }
+        }
+        if let Some(s) = self.aim_assist.as_deref() {
+            if crate::settings::AimAssist::from_str(s).is_none() {
+                return Some(format!("aim_assist_unknown: {s}"));
+            }
+        }
+        if let Some(s) = self.ui_density.as_deref() {
+            if crate::settings::UiDensity::from_str(s).is_none() {
+                return Some(format!("ui_density_unknown: {s}"));
+            }
+        }
+        if let Some(v) = self.mini_map_zoom {
+            if !v.is_finite() {
+                return Some("mini_map_zoom_must_be_finite".to_string());
+            }
+        }
+        if let Some(v) = self.scope_zoom_fov {
+            if !v.is_finite() {
+                return Some("scope_zoom_fov_must_be_finite".to_string());
+            }
+        }
+        if let Some(v) = self.text_scale {
+            if !v.is_finite() {
+                return Some("text_scale_must_be_finite".to_string());
+            }
+        }
+        if let Some(s) = self.language.as_deref() {
+            if s.is_empty() {
+                return Some("language_must_not_be_empty".to_string());
+            }
+        }
+        // M11 ACC-A enum/range validators.
+        if let Some(s) = self.contrast_mode.as_deref() {
+            if crate::settings::ContrastMode::from_str(s).is_none() {
+                return Some(format!("contrast_mode_unknown:{s}"));
+            }
+        }
+        if let Some(s) = self.caption_mode.as_deref() {
+            if crate::settings::CaptionMode::from_str(s).is_none() {
+                return Some(format!("caption_mode_unknown:{s}"));
+            }
+        }
+        if let Some(v) = self.caption_background_opacity {
+            if !v.is_finite() || !(0.0..=1.0).contains(&v) {
+                return Some("caption_background_opacity_out_of_range".to_string());
+            }
+        }
+        if let Some(cats) = self.caption_categories.as_ref() {
+            for cat in cats {
+                if !crate::settings::SUPPORTED_CAPTION_CATEGORIES.contains(&cat.as_str()) {
+                    return Some(format!("caption_categories_unknown:{cat}"));
+                }
+            }
+        }
+        if let Some(s) = self.input_profile.as_deref() {
+            if crate::settings::InputProfile::from_str(s).is_none() {
+                return Some(format!("input_profile_unknown:{s}"));
+            }
+        }
+        if let Some(groups) = self.remap_groups.as_ref() {
+            for g in groups {
+                if !crate::settings::SUPPORTED_REMAP_GROUPS.contains(&g.as_str()) {
+                    return Some(format!("remap_groups_unknown:{g}"));
+                }
+            }
+        }
+        if let Some(s) = self.hold_behavior.as_deref() {
+            if crate::settings::HoldBehavior::from_str(s).is_none() {
+                return Some(format!("hold_behavior_unknown:{s}"));
+            }
+        }
+        if let Some(v) = self.screen_shake_scale {
+            if !v.is_finite() || !(0.0..=1.0).contains(&v) {
+                return Some("screen_shake_scale_out_of_range".to_string());
+            }
+        }
+        if let Some(s) = self.camera_motion.as_deref() {
+            if crate::settings::CameraMotion::from_str(s).is_none() {
+                return Some(format!("camera_motion_unknown:{s}"));
+            }
+        }
+        if let Some(s) = self.objective_help.as_deref() {
+            if crate::settings::ObjectiveHelp::from_str(s).is_none() {
+                return Some(format!("objective_help_unknown:{s}"));
+            }
+        }
+        if let Some(s) = self.debug_explainer_level.as_deref() {
+            if crate::settings::DebugExplainerLevel::from_str(s).is_none() {
+                return Some(format!("debug_explainer_level_unknown:{s}"));
+            }
+        }
+        if let Some(v) = self.ui_scale {
+            if !v.is_finite() {
+                return Some("ui_scale_out_of_range".to_string());
+            }
+            // Existing behaviour: out-of-range ui_scale CLAMPS at the patch
+            // boundary; no rejection. The structured rejection mode is
+            // reserved for non-finite values only.
         }
         self.key_bindings
             .as_ref()
@@ -361,6 +628,24 @@ pub enum ControlCommand {
         direction: FocusDirection,
         source: IntentSource,
     },
+    /// **M11**: pointer click at logical screen coords `(x, y)`. Resolves
+    /// the hit `target_node_id` via the HUD layout and emits a
+    /// `ux.mouse_clicked` event. Non-finite coords reject at the dispatch
+    /// boundary.
+    ActInputMouseClick {
+        x: f32,
+        y: f32,
+        source: IntentSource,
+    },
+    /// **M11**: pointer move at logical screen coords `(x, y)`. Resolves
+    /// the hover `hover_node_id` via the HUD layout and emits a
+    /// `ux.mouse_moved` event. Non-finite coords reject at the dispatch
+    /// boundary.
+    ActInputMouseMove {
+        x: f32,
+        y: f32,
+        source: IntentSource,
+    },
     /// **M5**: toggle the player actor's crouch stance.
     ActPlayerCrouch {
         active: bool,
@@ -435,8 +720,221 @@ pub enum ControlCommand {
         mode: Option<String>,
         source: IntentSource,
     },
+    /// **M6**: umbrella dispatch for the 26 new tactical-controller actions
+    /// (sprint, slide, vault, lean, stealth kill, knife throw, weapon swap,
+    /// drop / pickup, signals, mark waypoint, deploy bipod, cycle fire mode,
+    /// cook / throw grenade, melee bash / kick, use tool, suppressor
+    /// attach / detach, set facing). Engine reads the inner action + updates
+    /// `ActorState` flags + records the matching control event.
+    ActM6 {
+        action: crate::m6_actions::M6Action,
+        source: IntentSource,
+    },
+    /// **M6**: issue one of the 4 squad commands to a bot. `bot_actor=None`
+    /// broadcasts to all followers.
+    ActSquadIssueCommand {
+        bot_actor: Option<u64>,
+        kind: crate::m6_actions::SquadCommandKindOverWire,
+        waypoint: Option<(f32, f32)>,
+        source: IntentSource,
+    },
+    /// **M6**: cancel the named squad member's current command, returning
+    /// them to the default `FollowLeader`. Re-emits `squad.command_issued`
+    /// with `kind="follow_leader"` so the replay stream stays linear.
+    ActSquadCancelCommand {
+        actor_id: u64,
+        source: IntentSource,
+    },
+    /// **M7-B**: set a single task weight on an actor's PriorityTable
+    /// (clamps to 0..=9). Spec § Smart commandable AI — Per-task override.
+    /// Mutates `M7AiWorld.bots[actor].stack.priority` AND emits
+    /// `ai.priority_table_changed`.
+    ActPlayerSetPriority {
+        actor_id: u64,
+        task: String,
+        weight: u8,
+        source: IntentSource,
+    },
+    /// **M7-B**: set an actor's autonomy mode (FullAuto / Standard /
+    /// Manual). Spec § Smart commandable AI — Layer 1 Autonomy mode.
+    /// Mutates `M7AiWorld.bots[actor].stack.autonomy` AND emits
+    /// `ai.autonomy_mode_changed`.
+    ActPlayerSetAutonomyMode {
+        actor_id: u64,
+        mode: String,
+        source: IntentSource,
+    },
+    /// **M7-B**: replace an actor's role + PriorityTable with one of the
+    /// 6 spec-mandated role templates. Spec § Smart commandable AI — 6
+    /// role templates. Emits `ai.role_template_applied`.
+    ActPlayerApplyRoleTemplate {
+        actor_id: u64,
+        template_id: String,
+        source: IntentSource,
+    },
+    /// **M7-B**: apply one of the 5 spec-named quick presets (attack /
+    /// defend / overwatch / rescue / salvage). Emits
+    /// `ai.quick_preset_applied`.
+    ActPlayerApplyQuickPreset {
+        actor_id: u64,
+        preset_id: String,
+        source: IntentSource,
+    },
+    // === M8 cfctl surface ===
+    /// **M8**: switch the camera mode (`follow | scope | free_look`).
+    ActCameraSetMode {
+        mode: String,
+        source: IntentSource,
+    },
+    /// **M8**: trigger a hit-stop pulse (50..200ms; clamped). `trigger`
+    /// records the cause label (`melee_hit`, `ap_round_hit`, etc.).
+    ActCameraHitStop {
+        duration_ms: u32,
+        trigger: String,
+        actor_id: Option<u64>,
+        source: IntentSource,
+    },
+    /// **M8**: enter sniper scope ADS at the configured `scope_zoom_fov`.
+    /// Equivalent to `act.camera.set_mode { mode: "scope" }` but encodes
+    /// player intent specifically.
+    ActCameraScopeZoom {
+        source: IntentSource,
+    },
+    /// **M8**: toggle free-look (RMB hold). When `active=true` the camera
+    /// transitions to FreeLook anchored at `cursor`; when false it
+    /// returns to Follow.
+    ActCameraFreeLookToggle {
+        active: bool,
+        cursor: Option<(f32, f32)>,
+        max_distance: f32,
+        source: IntentSource,
+    },
+    /// **M8**: enter photo mode. cf-photo's PhotoModeState becomes active;
+    /// cf-control mirrors the sim pause + emits `photo_mode.entered`.
+    ActPhotoEnter {
+        source: IntentSource,
+    },
+    /// **M8**: exit photo mode.
+    ActPhotoExit {
+        source: IntentSource,
+    },
+    /// **M8**: cycle to the next photo filter (none / sepia / b&w /
+    /// color_grade / cyberpunk_neon).
+    ActPhotoCycleFilter {
+        source: IntentSource,
+    },
+    /// **M8**: capture a photo (records the `photo_mode.shot_taken` event;
+    /// the actual PNG export happens in cf-app via cf-photo::export_png).
+    ActPhotoShoot {
+        source: IntentSource,
+    },
+    /// **M8**: scrub the replay timeline by `delta_seconds` (negative =
+    /// rewind, positive = forward).
+    ActReplayScrub {
+        delta_seconds: f32,
+        source: IntentSource,
+    },
+    /// **M8**: drop a replay bookmark with the supplied label.
+    ActReplayBookmark {
+        label: String,
+        source: IntentSource,
+    },
+    /// **M8**: toggle one of the 7 cf-debug overlays (`ai_state |
+    /// pathfinding | collision | material | physics | sound | squad`).
+    ActDebugToggleOverlay {
+        overlay: String,
+        source: IntentSource,
+    },
+    /// **M8**: set a HUD widget's draggable position; emits
+    /// `ux.hud_layout_changed`.
+    ActUiSetHudLayout {
+        node: String,
+        x: f32,
+        y: f32,
+        source: IntentSource,
+    },
+    /// **M8**: save the current HUD layout under `name`; emits
+    /// `ux.preset_saved`.
+    ActUiSavePreset {
+        name: String,
+        source: IntentSource,
+    },
+    /// **M8**: toggle the Tab tactical overlay; emits
+    /// `ux.tactical_overlay_toggled`. `multiplayer` controls the
+    /// sim-speed cap (single-player pauses; multiplayer = 25%).
+    ActPlayerToggleTacticalOverlay {
+        multiplayer: bool,
+        source: IntentSource,
+    },
+    /// **M8**: drop a multi-step plan onto a squadmate (max 8 steps).
+    /// Emits `ai.plan_composed`.
+    ActPlayerComposePlan {
+        actor_id: u64,
+        steps: Vec<String>,
+        source: IntentSource,
+    },
+    /// **M8**: pick a slot on the Q-hold context wheel for `actor_id`.
+    /// Emits `ai.context_wheel_selected`. `slot` is 0..=7.
+    /// `target_kind` selects the per-target slot ordering per spec
+    /// § Q-hold context wheel (one of `none` / `squadmate` / `door` /
+    /// `enemy` / `terrain_breach` / `hazard` / `reactor_module`). When
+    /// the kind needs an entity id (`squadmate` / `door` / `enemy` /
+    /// `hazard` / `reactor_module`) the caller supplies `target_id`.
+    /// Missing or unknown values fall back to `ReticleTarget::None`.
+    ActPlayerContextWheelSelect {
+        actor_id: u64,
+        slot: u8,
+        target_kind: String,
+        target_id: Option<u64>,
+        source: IntentSource,
+    },
+    /// **M8**: M / R / G panic surface. `kind` is `medic`, `engineer`,
+    /// or `grenade`. Emits `ai.panic_call_emitted`.
+    ActPlayerPanicCall {
+        kind: String,
+        source: IntentSource,
+    },
+    /// **M8**: MMB tag drop on `target_id`. Emits `ai.target_tagged` +
+    /// engine raises Utility weight by +0.5 for engaging the target.
+    ActPlayerTagTarget {
+        target_id: u64,
+        source: IntentSource,
+    },
+    /// **M8**: 'Why?' (Y) key — surfaces the bot's `reason_label_recent`
+    /// ringbuffer head as a HUD popup. Emits `ai.reason_query_returned`.
+    ActPlayerQueryWhy {
+        actor_id: u64,
+        source: IntentSource,
+    },
+    /// **M8**: open the T-key 8-slice pie menu with target context
+    /// (`void` / `nearest_actor` / `door` / `item`). Emits
+    /// `ux.pie_menu_opened`. Slows sim to 20% in single-player; 100% in
+    /// multiplayer.
+    ActPlayerPieMenuOpen {
+        target_kind: String,
+        target_id: Option<u64>,
+        multiplayer: bool,
+        source: IntentSource,
+    },
+    /// **M8**: select a 0..=7 slot on the open pie menu. Emits
+    /// `ux.pie_menu_slice_chosen` on a valid pick, OR
+    /// `ux.pie_menu_slice_rejected { slice, reason }` when the slice is
+    /// disabled in the current context. `reason` is optional and
+    /// supplied by the caller (cf-app keyboard layer) when it has
+    /// pre-validated the slice; otherwise the dispatcher reports
+    /// `ok=true` (valid pick) by default.
+    ActPlayerPieMenuSelect {
+        slot: u8,
+        reason: Option<String>,
+        source: IntentSource,
+    },
+    /// **M8**: close the pie menu (idempotent). Emits
+    /// `ux.pie_menu_closed` with the open-duration in ticks.
+    ActPlayerPieMenuClose {
+        source: IntentSource,
+    },
     SettingsSet {
-        changes: SettingsPatch,
+        changes: Box<SettingsPatch>,
     },
     RunBundleWrite {
         id_override: Option<String>,
@@ -477,6 +975,20 @@ pub trait EngineHandle: Send + Sync + 'static {
     async fn observe_terrain(&self) -> Option<serde_json::Value> {
         None
     }
+    /// **M9** § cfctl `observe.mission.reactor` — return the live reactor
+    /// projection `{ actor_id, hp, max_hp, hp_percent, pressure_state,
+    /// position, mission_critical, role, armor_layers, heat_signature_k }`.
+    /// `None` when no reactor is loaded in the active scenario.
+    async fn observe_mission_reactor(&self) -> Option<serde_json::Value> {
+        None
+    }
+    /// **M9** § cfctl `observe.mission.timer` — return the mission timer
+    /// projection `{ remaining_ticks, total_ticks, remaining_seconds,
+    /// color_state }`. `color_state` is "green" / "yellow" / "red".
+    /// `None` when no mission is loaded.
+    async fn observe_mission_timer(&self) -> Option<serde_json::Value> {
+        None
+    }
     /// **M2 re-audit (2026-05-13)**: return the full `MissionState` +
     /// objectives + last N mission events.
     async fn inspect_mission(&self) -> Option<serde_json::Value> {
@@ -490,9 +1002,36 @@ pub trait EngineHandle: Send + Sync + 'static {
     async fn observe_actor(&self, _actor_id: Option<u64>) -> Option<serde_json::Value> {
         None
     }
+    /// **M6**: per-actor perception projection — sight cone + hearing radius
+    /// + stealth_meter + last footstep loudness band + last occlusion
+    /// factor + spotted flag. `actor_id=None` resolves to the player. Default
+    /// returns `None` for handlers without a perception kernel.
+    async fn observe_perception(&self, _actor_id: Option<u64>) -> Option<serde_json::Value> {
+        None
+    }
+    /// **M6**: squad-of-two projection — leader id + members[] each with
+    /// per-member current_command + hp + waypoint. Default returns `None`
+    /// when no squad is loaded.
+    async fn observe_squad(&self) -> Option<serde_json::Value> {
+        None
+    }
     /// **M1 Gap B3**: return the actor view plus its last `n` actor-category
     /// events. Default returns `None`.
     async fn inspect_actor(&self, _target: Option<&str>, _last_n_events: usize) -> Option<serde_json::Value> {
+        None
+    }
+    /// **M9** (audit fix gap 1): return the reactor view plus its last `n`
+    /// actor-category events. Spec § Reactor as a non-player static actor:
+    /// "And cfctl inspect.actor.reactor returns the full ActorState".
+    /// Default returns `None`.
+    async fn inspect_actor_reactor(&self, _last_n_events: usize) -> Option<serde_json::Value> {
+        None
+    }
+    /// **M9** (audit fix gap 2): return the mission director projection
+    /// `{ current_phase, phase_started_at_tick, phases_completed,
+    /// intensity, spawn_budget, active_objectives }`. Default returns
+    /// `None`.
+    async fn observe_mission_director(&self) -> Option<serde_json::Value> {
         None
     }
     /// **M2**: return the full chunk material grid (RLE-friendly Vec) for the
@@ -505,6 +1044,17 @@ pub trait EngineHandle: Send + Sync + 'static {
     async fn inspect_material(&self, _id: u8) -> Option<serde_json::Value> {
         None
     }
+    /// **M9** (audit round-3 fix gap 3): return the `MaterialInfo` at
+    /// world-space `(x, y)` — the 9 affordance flags (actor_passable,
+    /// projectile_passable, diggable, anchorable, blocks_light,
+    /// contact_damage, path_cost, produces_debris, produces_sound) plus
+    /// integrity (read from the per-pixel meta grid via
+    /// `ChunkedTerrain::pixel_integrity`) plus color_hex (resolved from
+    /// the material registry). Powers spec § "Material affordance
+    /// tooltip" + the integrity-overlay reticle. Default returns `None`.
+    async fn observe_terrain_material_at(&self, _x: f32, _y: f32) -> Option<serde_json::Value> {
+        None
+    }
     /// **M4A**: return the asset-ledger summary projection (total counts +
     /// by-category / by-tier / by-status / missing-id list). Reads the
     /// canonical `content/asset_ledger/ledger.jsonl` at the workspace
@@ -512,6 +1062,74 @@ pub trait EngineHandle: Send + Sync + 'static {
     /// override. Returns `None` when no ledger file exists.
     async fn observe_assets_ledger_summary(&self) -> Option<serde_json::Value> {
         default_observe_assets_ledger_summary()
+    }
+    /// **M7-B**: return the per-actor PriorityTable view (22-task weight
+    /// grid + role + personality modifier). Default returns `None`.
+    async fn observe_priority_table(&self, _actor_id: u64) -> Option<serde_json::Value> {
+        None
+    }
+    /// **M7-B**: return the per-actor autonomy mode + auto-action cap.
+    /// Default returns `None`.
+    async fn observe_autonomy(&self, _actor_id: u64) -> Option<serde_json::Value> {
+        None
+    }
+    /// **M8**: return the live `cf_camera::CameraState` projection
+    /// (mode + position + hit_stop_remaining_ms + fov_degrees +
+    /// free_look_max_distance + free_look_cursor + deadzone_radius).
+    async fn observe_camera(&self) -> serde_json::Value {
+        json!({"schema_version": SCHEMA_VERSION, "mode": "follow", "fov_degrees": cf_camera::FOLLOW_FOV_DEGREES, "hit_stop_remaining_ms": 0_u32})
+    }
+    /// **M8**: return the active language code per cf-localization +
+    /// `Settings.language`.
+    async fn observe_localization_current_language(&self) -> serde_json::Value {
+        json!({"schema_version": SCHEMA_VERSION, "language": "en"})
+    }
+    /// **M8**: return the cf-debug overlay registry — every overlay's
+    /// snake_case id + whether it's currently enabled.
+    async fn observe_debug_overlays(&self) -> serde_json::Value {
+        json!({"schema_version": SCHEMA_VERSION, "enabled": Vec::<String>::new(), "available": cf_debug::DebugOverlay::ALL.iter().map(|o| o.as_str()).collect::<Vec<_>>()})
+    }
+    /// **M8**: return the Tab tactical overlay state.
+    async fn observe_tactical_overlay(&self) -> serde_json::Value {
+        json!({"schema_version": SCHEMA_VERSION, "open": false, "sim_speed_pct": 100_u8, "focused_actor_id": serde_json::Value::Null, "open_count": 0_u32})
+    }
+    /// **M8**: return the active MMB tag list (target_id + expires_at_tick
+    /// + weight_bonus + issuer_actor_id).
+    async fn observe_tags(&self) -> serde_json::Value {
+        json!({"schema_version": SCHEMA_VERSION, "tagged": Vec::<serde_json::Value>::new()})
+    }
+    /// **M11 / DR-012 closure**: return the full ACC-A surface projection —
+    /// 21 settings flags + key_bindings + focused_node + captions queue +
+    /// banner stack — so the replay viewer + cfctl AI agents see exactly
+    /// what the player sees in the HUD.
+    async fn observe_accessibility(&self) -> serde_json::Value {
+        let settings = self.settings_snapshot().await;
+        let v = serde_json::to_value(&settings).unwrap_or(serde_json::Value::Null);
+        json!({ "schema_version": SCHEMA_VERSION, "settings": v, "focusable_nodes": Vec::<String>::new() })
+    }
+    /// **M11**: return the live caption queue.
+    async fn observe_captions(&self) -> serde_json::Value {
+        json!({ "schema_version": SCHEMA_VERSION, "queue": Vec::<serde_json::Value>::new() })
+    }
+    /// **M11**: return the live banner stack.
+    async fn observe_accessibility_banners(&self) -> serde_json::Value {
+        json!({ "schema_version": SCHEMA_VERSION, "banners": Vec::<serde_json::Value>::new() })
+    }
+    /// **M11**: dedicated body silhouette projection (BodySilhouetteView
+    /// promoted from observe_frame). Default returns `None`.
+    async fn observe_actor_silhouette(&self, _actor_id: Option<u64>) -> Option<serde_json::Value> {
+        None
+    }
+    /// **M11**: dedicated module strip projection (ModuleStripView promoted
+    /// from observe_frame). Default returns `None`.
+    async fn observe_actor_module_strip(&self, _actor_id: Option<u64>) -> Option<serde_json::Value> {
+        None
+    }
+    /// **M11**: HUD assertion harness. Reads the projection that backs
+    /// `node_id` and applies `predicate` (e.g. `text~=DOWNED`,
+    /// `severity=critical`). Returns a JSON `{ pass: bool, observed: <val> }`.
+    async fn ui_assert(&self, _node_id: &str, _predicate: &str) -> serde_json::Value {
+        json!({ "schema_version": SCHEMA_VERSION, "pass": false, "observed": serde_json::Value::Null })
     }
 }
 
@@ -1201,6 +1819,729 @@ async fn process_request<E: EngineHandle>(
                 .await;
             Some(ack_response(request.id, &result))
         }
+        m6_method
+            if matches!(
+                m6_method,
+                "act.player.sprint"
+                    | "act.player.prone"
+                    | "act.player.slide"
+                    | "act.player.vault"
+                    | "act.player.climb_up"
+                    | "act.player.climb_down"
+                    | "act.player.dive"
+                    | "act.player.lean"
+                    | "act.player.stealth_kill"
+                    | "act.player.knife_throw"
+                    | "act.player.weapon_swap"
+                    | "act.player.drop_item"
+                    | "act.player.pickup"
+                    | "act.player.signal_friendly"
+                    | "act.player.signal_enemy_spotted"
+                    | "act.player.mark_waypoint"
+                    | "act.player.deploy_bipod"
+                    | "act.player.stow_bipod"
+                    | "act.player.cycle_fire_mode"
+                    | "act.player.cook_grenade"
+                    | "act.player.throw_grenade"
+                    | "act.player.melee_bash"
+                    | "act.player.melee_kick"
+                    | "act.player.use_tool"
+                    | "act.player.attach_suppressor"
+                    | "act.player.detach_suppressor"
+                    | "act.player.set_facing"
+                    | "act.player.aim_set_facing"
+            ) =>
+        {
+            let action = match decode_m6_action(m6_method, params) {
+                Ok(a) => a,
+                Err(err) => return Some(missing_param_error(request.id, &err)),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActM6 {
+                    action,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.squad.issue_command" => {
+            let p: crate::m6_actions::ActSquadIssueCommandParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            if p.kind.requires_waypoint() && p.waypoint.is_none() {
+                return Some(invalid_param_reason(request.id, "squad_command_requires_waypoint"));
+            }
+            if let Some((x, y)) = p.waypoint {
+                if !x.is_finite() || !y.is_finite() {
+                    return Some(invalid_param_reason(request.id, "non_finite_waypoint"));
+                }
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActSquadIssueCommand {
+                    bot_actor: p.bot_actor,
+                    kind: p.kind,
+                    waypoint: p.waypoint,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        // M6: cancel a named squad member's current command, returning them
+        // to the default FollowLeader. Re-emits squad.command_issued with
+        // kind=follow_leader.
+        "act.squad.cancel_command" => {
+            let p: crate::m6_actions::ActSquadCancelCommandParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActSquadCancelCommand {
+                    actor_id: p.actor_id,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        // **M7-B**: commandability surface — per-task weight override.
+        "act.player.set_priority" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                actor_id: u64,
+                #[serde(alias = "task")]
+                task_type: String,
+                weight: u8,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerSetPriority {
+                    actor_id: p.actor_id,
+                    task: p.task_type,
+                    weight: p.weight,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        // **M7-B**: set autonomy mode (FullAuto / Standard / Manual).
+        "act.player.set_autonomy_mode" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                actor_id: u64,
+                mode: String,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerSetAutonomyMode {
+                    actor_id: p.actor_id,
+                    mode: p.mode,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        // **M7-B**: load one of the 6 role templates.
+        "act.player.apply_role_template" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                actor_id: u64,
+                template_id: String,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerApplyRoleTemplate {
+                    actor_id: p.actor_id,
+                    template_id: p.template_id,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        // **M7-B**: apply one of the 5 quick presets (attack / defend /
+        // overwatch / rescue / salvage).
+        "act.player.apply_quick_preset" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                actor_id: u64,
+                preset_id: String,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerApplyQuickPreset {
+                    actor_id: p.actor_id,
+                    preset_id: p.preset_id,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        // **M7-B**: read-only projection of an actor's PriorityTable.
+        "observe.priority_table" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                actor_id: u64,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            match engine.observe_priority_table(p.actor_id).await {
+                Some(value) => Some(success_response(request.id, value)),
+                None => Some(invalid_param_reason(request.id, "no_such_ai_actor")),
+            }
+        }
+        // **M7-B**: read-only projection of an actor's autonomy mode + cap.
+        "observe.autonomy" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                actor_id: u64,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            match engine.observe_autonomy(p.actor_id).await {
+                Some(value) => Some(success_response(request.id, value)),
+                None => Some(invalid_param_reason(request.id, "no_such_ai_actor")),
+            }
+        }
+        // === M8 cfctl surface ===
+        "act.camera.set_mode" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                mode: String,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            if cf_camera::CameraMode::from_str(&p.mode).is_none() {
+                return Some(invalid_param_reason(request.id, "unknown_camera_mode"));
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActCameraSetMode {
+                    mode: p.mode,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.camera.hit_stop" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                #[serde(default)]
+                duration_ms: Option<u32>,
+                #[serde(default)]
+                trigger: Option<String>,
+                #[serde(default)]
+                actor_id: Option<u64>,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            let result = engine
+                .dispatch(ControlCommand::ActCameraHitStop {
+                    duration_ms: p.duration_ms.unwrap_or(0),
+                    trigger: p.trigger.unwrap_or_else(|| "manual".to_string()),
+                    actor_id: p.actor_id,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.camera.scope_zoom" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActCameraScopeZoom {
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.camera.free_look_toggle" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                active: bool,
+                #[serde(default)]
+                cursor_x: Option<f32>,
+                #[serde(default)]
+                cursor_y: Option<f32>,
+                #[serde(default = "default_free_look_distance")]
+                max_distance: f32,
+            }
+            fn default_free_look_distance() -> f32 {
+                200.0
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            let cursor = match (p.cursor_x, p.cursor_y) {
+                (Some(x), Some(y)) => Some((x, y)),
+                _ => None,
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActCameraFreeLookToggle {
+                    active: p.active,
+                    cursor,
+                    max_distance: p.max_distance,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.photo.enter" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActPhotoEnter {
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.photo.exit" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActPhotoExit {
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.photo.cycle_filter" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActPhotoCycleFilter {
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.photo.shoot" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActPhotoShoot {
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.replay.scrub" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                delta_seconds: f32,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            let result = engine
+                .dispatch(ControlCommand::ActReplayScrub {
+                    delta_seconds: p.delta_seconds,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.replay.bookmark" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                label: String,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            let result = engine
+                .dispatch(ControlCommand::ActReplayBookmark {
+                    label: p.label,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.debug.toggle_overlay" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                overlay: String,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            if cf_debug::DebugOverlay::from_str(&p.overlay).is_none() {
+                return Some(invalid_param_reason(request.id, "unknown_overlay"));
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActDebugToggleOverlay {
+                    overlay: p.overlay,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.ui.set_hud_layout" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                node: String,
+                x: f32,
+                y: f32,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            if !x_y_finite(p.x, p.y) {
+                return Some(invalid_param_reason(request.id, "hud_layout_xy_must_be_finite"));
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActUiSetHudLayout {
+                    node: p.node,
+                    x: p.x,
+                    y: p.y,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.ui.save_preset" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                name: String,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            if p.name.is_empty() {
+                return Some(invalid_param_reason(request.id, "preset_name_must_not_be_empty"));
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActUiSavePreset {
+                    name: p.name,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.toggle_tactical_overlay" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                #[serde(default)]
+                multiplayer: bool,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerToggleTacticalOverlay {
+                    multiplayer: p.multiplayer,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.compose_plan" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                actor_id: u64,
+                steps: Vec<String>,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            if p.steps.len() > cf_squad_ui::MAX_PLAN_STEPS {
+                return Some(invalid_param_reason(request.id, "plan_full"));
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerComposePlan {
+                    actor_id: p.actor_id,
+                    steps: p.steps,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.context_wheel_select" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                actor_id: u64,
+                slot: u8,
+                #[serde(default = "default_context_wheel_target_kind")]
+                target_kind: String,
+                #[serde(default)]
+                target_id: Option<u64>,
+            }
+            fn default_context_wheel_target_kind() -> String {
+                "none".to_string()
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            if (p.slot as usize) >= cf_squad_ui::WHEEL_SLOTS_LEN {
+                return Some(invalid_param_reason(request.id, "invalid_slot"));
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerContextWheelSelect {
+                    actor_id: p.actor_id,
+                    slot: p.slot,
+                    target_kind: p.target_kind,
+                    target_id: p.target_id,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.panic_call" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                kind: String,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            if cf_squad_ui::PanicKind::from_str(&p.kind).is_none() {
+                return Some(invalid_param_reason(request.id, "unknown_panic_kind"));
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerPanicCall {
+                    kind: p.kind,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.tag_target" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                target_id: u64,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerTagTarget {
+                    target_id: p.target_id,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.query_why" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                actor_id: u64,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerQueryWhy {
+                    actor_id: p.actor_id,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.pie_menu_open" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                #[serde(default = "default_pie_menu_target_kind")]
+                target_kind: String,
+                #[serde(default)]
+                target_id: Option<u64>,
+                #[serde(default)]
+                multiplayer: bool,
+            }
+            fn default_pie_menu_target_kind() -> String {
+                "void".to_string()
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            if cf_squad_ui::PieMenuTarget::from_str(&p.target_kind, p.target_id).is_none() {
+                return Some(invalid_param_reason(request.id, "unknown_pie_menu_target_kind"));
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerPieMenuOpen {
+                    target_kind: p.target_kind,
+                    target_id: p.target_id,
+                    multiplayer: p.multiplayer,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.pie_menu_select" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                slot: u8,
+                #[serde(default)]
+                reason: Option<String>,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            if (p.slot as usize) >= cf_squad_ui::PIE_MENU_SLICES_LEN {
+                return Some(invalid_param_reason(request.id, "invalid_slot"));
+            }
+            if let Some(r) = &p.reason {
+                if cf_squad_ui::PieMenuReason::from_str(r).is_none() {
+                    return Some(invalid_param_reason(request.id, "unknown_pie_menu_reason"));
+                }
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerPieMenuSelect {
+                    slot: p.slot,
+                    reason: p.reason,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.pie_menu_close" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerPieMenuClose {
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "observe.camera" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            let value = engine.observe_camera().await;
+            Some(success_response(request.id, value))
+        }
+        "observe.localization.current_language" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            let value = engine.observe_localization_current_language().await;
+            Some(success_response(request.id, value))
+        }
+        "observe.debug.overlays" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            let value = engine.observe_debug_overlays().await;
+            Some(success_response(request.id, value))
+        }
+        "observe.tactical_overlay" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            let value = engine.observe_tactical_overlay().await;
+            Some(success_response(request.id, value))
+        }
+        "observe.tags" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            let value = engine.observe_tags().await;
+            Some(success_response(request.id, value))
+        }
         "act.chassis.repair" => {
             let p: ActChassisRepairParams = match serde_json::from_value(params) {
                 Ok(v) => v,
@@ -1373,6 +2714,22 @@ async fn process_request<E: EngineHandle>(
                 None => Some(invalid_param_reason(request.id, "no_player_actor")),
             }
         }
+        // **M9** (audit fix gap 1) § cfctl `inspect.actor.reactor` —
+        // alias dispatch that returns the reactor projection (hp +
+        // max_hp + pressure_state + armor_layers + heat_signature_k +
+        // mission_critical + role + position) plus its last 30 actor-
+        // category events. Per spec § Reactor as a non-player static
+        // actor: "And cfctl inspect.actor.reactor returns the full
+        // ActorState".
+        "inspect.actor.reactor" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            match engine.inspect_actor_reactor(30).await {
+                Some(value) => Some(success_response(request.id, value)),
+                None => Some(invalid_param_reason(request.id, "no_reactor_loaded")),
+            }
+        }
         // M2 re-audit (2026-05-13): full mission projection cfctl method.
         "observe.mission" => {
             let _p: ObserveMissionParams = match serde_json::from_value(params) {
@@ -1384,6 +2741,44 @@ async fn process_request<E: EngineHandle>(
                 None => Some(invalid_param_reason(request.id, "no_mission_loaded")),
             }
         }
+        // **M9** § cfctl `observe.mission.reactor` — dedicated projection
+        // returning `{ actor_id, hp, max_hp, hp_percent, pressure_state,
+        // position, mission_critical, role, armor_layers, heat_signature_k }`
+        // per spec § "When cfctl observe.mission.reactor runs".
+        "observe.mission.reactor" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            match engine.observe_mission_reactor().await {
+                Some(value) => Some(success_response(request.id, value)),
+                None => Some(invalid_param_reason(request.id, "no_reactor_loaded")),
+            }
+        }
+        // **M9** § cfctl `observe.mission.timer` — color-coded countdown
+        // projection per spec § "remaining_ticks / total_ticks /
+        // remaining_seconds / color_state".
+        "observe.mission.timer" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            match engine.observe_mission_timer().await {
+                Some(value) => Some(success_response(request.id, value)),
+                None => Some(invalid_param_reason(request.id, "no_mission_loaded")),
+            }
+        }
+        // **M9** (audit fix gap 2) § cfctl `observe.mission.director` —
+        // return `{ current_phase, phase_started_at_tick,
+        // phases_completed, intensity, spawn_budget, active_objectives }`
+        // per spec § Director state surface.
+        "observe.mission.director" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            match engine.observe_mission_director().await {
+                Some(value) => Some(success_response(request.id, value)),
+                None => Some(invalid_param_reason(request.id, "no_mission_director")),
+            }
+        }
         // M3 audit pass 7 (2026-05-13): dedicated `observe.terrain` cfctl
         // method per spec literal "When cfctl observe.terrain runs".
         // Returns the live `TerrainView` projection.
@@ -1391,6 +2786,27 @@ async fn process_request<E: EngineHandle>(
             Some(value) => Some(success_response(request.id, value)),
             None => Some(invalid_param_reason(request.id, "no_terrain_world")),
         },
+        // **M9** (audit round-3 fix gap 3) § cfctl `observe.terrain.material_at
+        // { x, y }` — resolve the material at world-space `(x, y)` and
+        // return a MaterialInfo JSON with the 9 affordance flags
+        // (actor_passable, projectile_passable, diggable, anchorable,
+        // blocks_light, contact_damage, path_cost, produces_debris,
+        // produces_sound) + integrity (from the per-pixel meta grid) +
+        // color_hex (from the material registry). Powers spec §
+        // "Material affordance tooltip" + the integrity-overlay reticle.
+        "observe.terrain.material_at" => {
+            let p: crate::schemas::ObserveTerrainMaterialAtParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            if !p.x.is_finite() || !p.y.is_finite() {
+                return Some(invalid_param_reason(request.id, "non_finite_coords"));
+            }
+            match engine.observe_terrain_material_at(p.x, p.y).await {
+                Some(value) => Some(success_response(request.id, value)),
+                None => Some(invalid_param_reason(request.id, "no_terrain_world")),
+            }
+        }
         // M2 re-audit (2026-05-13): per-AI projection cfctl method.
         "observe.ai" => {
             let p: ObserveAiParams = match serde_json::from_value(params) {
@@ -1400,6 +2816,31 @@ async fn process_request<E: EngineHandle>(
             match engine.observe_ai(p.actor_id).await {
                 Some(value) => Some(success_response(request.id, value)),
                 None => Some(invalid_param_reason(request.id, "no_such_ai_actor")),
+            }
+        }
+        // M6: per-actor perception projection (sight cone + hearing radius +
+        // stealth meter + last footstep loudness band + last occlusion
+        // factor). Spec § "Crates / modules touched / cf-control" lists
+        // `observe.perception` alongside `observe.squad`.
+        "observe.perception" => {
+            let p: ObservePerceptionParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            match engine.observe_perception(p.actor_id).await {
+                Some(value) => Some(success_response(request.id, value)),
+                None => Some(invalid_param_reason(request.id, "no_player_actor")),
+            }
+        }
+        // M6: squad-of-two projection (leader + members[] + per-member
+        // current_command). Spec § "1 friendly bot + 4 squad commands".
+        "observe.squad" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            match engine.observe_squad().await {
+                Some(value) => Some(success_response(request.id, value)),
+                None => Some(invalid_param_reason(request.id, "no_squad_loaded")),
             }
         }
         // M4A: asset-ledger summary projection. Returns total + per-category +
@@ -1489,6 +2930,129 @@ async fn process_request<E: EngineHandle>(
                 .await;
             Some(ack_response(request.id, &result))
         }
+        "act.input.mouse_click" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct MouseClickParams {
+                schema_version: u32,
+                x: f32,
+                y: f32,
+            }
+            let p: MouseClickParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            if !p.x.is_finite() || !p.y.is_finite() {
+                return Some(invalid_param_reason(request.id, "non_finite"));
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActInputMouseClick {
+                    x: p.x,
+                    y: p.y,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.input.mouse_move" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct MouseMoveParams {
+                schema_version: u32,
+                x: f32,
+                y: f32,
+            }
+            let p: MouseMoveParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            if !p.x.is_finite() || !p.y.is_finite() {
+                return Some(invalid_param_reason(request.id, "non_finite"));
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActInputMouseMove {
+                    x: p.x,
+                    y: p.y,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "observe.accessibility" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            let value = engine.observe_accessibility().await;
+            Some(success_response(request.id, value))
+        }
+        "observe.captions" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            let value = engine.observe_captions().await;
+            Some(success_response(request.id, value))
+        }
+        "observe.accessibility.banners" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            let value = engine.observe_accessibility_banners().await;
+            Some(success_response(request.id, value))
+        }
+        "observe.actor.silhouette" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct SilhouetteParams {
+                schema_version: u32,
+                #[serde(default, skip_serializing_if = "Option::is_none")]
+                actor_id: Option<u64>,
+            }
+            let p: SilhouetteParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            match engine.observe_actor_silhouette(p.actor_id).await {
+                Some(value) => Some(success_response(request.id, value)),
+                None => Some(invalid_param_reason(request.id, "no_player_actor")),
+            }
+        }
+        "observe.actor.module_strip" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct ModuleStripParams {
+                schema_version: u32,
+                #[serde(default, skip_serializing_if = "Option::is_none")]
+                actor_id: Option<u64>,
+            }
+            let p: ModuleStripParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            match engine.observe_actor_module_strip(p.actor_id).await {
+                Some(value) => Some(success_response(request.id, value)),
+                None => Some(invalid_param_reason(request.id, "no_player_actor")),
+            }
+        }
+        "ui.assert" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct UiAssertParams {
+                schema_version: u32,
+                node_id: String,
+                predicate: String,
+            }
+            let p: UiAssertParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            let value = engine.ui_assert(&p.node_id, &p.predicate).await;
+            Some(success_response(request.id, value))
+        }
         "act.settings.set" => {
             // Accept either a flat object {schema_version, ui_scale, ...} or a wrapped {schema_version, patch:{...}}.
             let patch_value = if params.get("patch").is_some() {
@@ -1521,7 +3085,11 @@ async fn process_request<E: EngineHandle>(
             if let Some(reason) = patch.validation_error() {
                 return Some(invalid_param_reason(request.id, &reason));
             }
-            let result = engine.dispatch(ControlCommand::SettingsSet { changes: patch }).await;
+            let result = engine
+                .dispatch(ControlCommand::SettingsSet {
+                    changes: Box::new(patch),
+                })
+                .await;
             Some(ack_response(request.id, &result))
         }
         "runbundle.write" => {
@@ -1685,6 +3253,125 @@ fn missing_param_error(id: JsonRpcId, reason: &str) -> String {
         "InvalidParams",
         json!({"reason": reason, "fix_hint": "see spec/prototype-roadmap CLI Reference for the M0 method catalog"}),
     )
+}
+
+/// **M8**: shared validator for `act.ui.set_hud_layout` (and any future
+/// helper that takes an `(x, y)` point) — rejects NaN/Inf coordinates at
+/// the cfctl boundary.
+fn x_y_finite(x: f32, y: f32) -> bool {
+    x.is_finite() && y.is_finite()
+}
+
+/// Decode an M6 cfctl method's params into an [`crate::m6_actions::M6Action`].
+fn decode_m6_action(method: &str, params: serde_json::Value) -> Result<crate::m6_actions::M6Action, String> {
+    use crate::m6_actions::M6Action;
+    let p = if params.is_null() {
+        serde_json::json!({})
+    } else {
+        params
+    };
+    match method {
+        "act.player.sprint" => {
+            let active = p
+                .get("active")
+                .and_then(serde_json::Value::as_bool)
+                .ok_or_else(|| "missing_active".to_string())?;
+            Ok(M6Action::Sprint { active })
+        }
+        "act.player.prone" => {
+            let active = p
+                .get("active")
+                .and_then(serde_json::Value::as_bool)
+                .ok_or_else(|| "missing_active".to_string())?;
+            Ok(M6Action::Prone { active })
+        }
+        "act.player.slide" => Ok(M6Action::Slide),
+        "act.player.vault" => Ok(M6Action::Vault),
+        "act.player.climb_up" => Ok(M6Action::ClimbUp),
+        "act.player.climb_down" => Ok(M6Action::ClimbDown),
+        "act.player.dive" => Ok(M6Action::Dive),
+        "act.player.lean" => {
+            let direction = p.get("direction").and_then(serde_json::Value::as_f64).unwrap_or(0.0) as f32;
+            if !direction.is_finite() {
+                return Err("non_finite_direction".to_string());
+            }
+            Ok(M6Action::Lean { direction })
+        }
+        "act.player.stealth_kill" => Ok(M6Action::StealthKill),
+        "act.player.knife_throw" => Ok(M6Action::KnifeThrow),
+        "act.player.weapon_swap" => {
+            let slot = p
+                .get("slot")
+                .and_then(serde_json::Value::as_u64)
+                .ok_or_else(|| "missing_slot".to_string())?;
+            // **M6**: 1-8 hotbar keys target the 8 active slots (indices
+            // 0..=7). Tank slots (9-11 / indices 8..=10) reject with the
+            // spec-locked reason `tank_slot_locked_at_m2_2a` so the M17
+            // unlock has a stable contract to clear.
+            if slot >= 11 {
+                return Err("slot_out_of_range".to_string());
+            }
+            if slot >= 8 {
+                return Err(cf_equipment::TANK_SLOT_LOCKED_REASON.to_string());
+            }
+            Ok(M6Action::WeaponSwap { slot: slot as u8 })
+        }
+        "act.player.drop_item" => {
+            let slot = p.get("slot").and_then(serde_json::Value::as_u64).map(|v| v as u8);
+            Ok(M6Action::DropItem { slot })
+        }
+        "act.player.pickup" => Ok(M6Action::Pickup),
+        "act.player.signal_friendly" => Ok(M6Action::SignalFriendly),
+        "act.player.signal_enemy_spotted" => Ok(M6Action::SignalEnemySpotted),
+        "act.player.mark_waypoint" => {
+            let x = p.get("x").and_then(serde_json::Value::as_f64).unwrap_or(0.0) as f32;
+            let y = p.get("y").and_then(serde_json::Value::as_f64).unwrap_or(0.0) as f32;
+            if !x.is_finite() || !y.is_finite() {
+                return Err("non_finite_waypoint".to_string());
+            }
+            Ok(M6Action::MarkWaypoint { x, y })
+        }
+        "act.player.deploy_bipod" => Ok(M6Action::DeployBipod),
+        "act.player.stow_bipod" => Ok(M6Action::StowBipod),
+        "act.player.cycle_fire_mode" => Ok(M6Action::CycleFireMode),
+        "act.player.cook_grenade" => Ok(M6Action::CookGrenade),
+        "act.player.throw_grenade" => Ok(M6Action::ThrowGrenade),
+        "act.player.melee_bash" => Ok(M6Action::MeleeBash),
+        "act.player.melee_kick" => Ok(M6Action::MeleeKick),
+        "act.player.use_tool" => {
+            let tool_kind = p
+                .get("kind")
+                .and_then(serde_json::Value::as_str)
+                .ok_or_else(|| "missing_kind".to_string())?
+                .to_string();
+            Ok(M6Action::UseTool { tool_kind })
+        }
+        "act.player.attach_suppressor" => Ok(M6Action::AttachSuppressor),
+        "act.player.detach_suppressor" => Ok(M6Action::DetachSuppressor),
+        "act.player.set_facing" => {
+            let facing = p
+                .get("facing")
+                .and_then(serde_json::Value::as_str)
+                .ok_or_else(|| "missing_facing".to_string())?
+                .to_string();
+            if facing != "left" && facing != "right" {
+                return Err("invalid_facing".to_string());
+            }
+            Ok(M6Action::SetFacing { facing })
+        }
+        "act.player.aim_set_facing" => {
+            let facing = p
+                .get("facing")
+                .and_then(serde_json::Value::as_str)
+                .ok_or_else(|| "missing_facing".to_string())?
+                .to_string();
+            if facing != "left" && facing != "right" {
+                return Err("invalid_facing".to_string());
+            }
+            Ok(M6Action::AimSetFacing { facing })
+        }
+        _ => Err(format!("unknown_m6_method:{method}")),
+    }
 }
 
 fn invalid_param_reason(id: JsonRpcId, reason: &str) -> String {
@@ -1882,7 +3569,7 @@ mod tests {
     #[tokio::test]
     async fn settings_set_dispatches_patch() {
         struct CaptureEngine {
-            patch: Mutex<Option<SettingsPatch>>,
+            patch: Mutex<Option<Box<SettingsPatch>>>,
         }
         #[async_trait::async_trait]
         impl EngineHandle for CaptureEngine {

@@ -1,0 +1,30 @@
+MissionBriefing (
+    mission_id: "micro_pressure_hold_orbital",
+    canonical_name: "Micro-Pressure Hold",
+    faction_giver: "coalition",
+    world: "orbital",
+    difficulty: "hard",
+    objective_summary: "Hold a breached pressure compartment on Lagrange-7 station against a Husk boarding party while the station's engineering crew restores compartment seal; sustained vacuum exposure scenario.",
+    briefing_text: "Captain. Hayes. The Coalition garrison aboard Lagrange-7 has, in the last forty-five minutes, taken a Husk boarding from a vessel that was, by every available reading, not on the station's manifest. The Husks came in through compartment 4-B-17, which is a low-traffic engineering deck on the outer ring. The compartment is, as of this briefing, breached. The seal failed. Atmosphere is venting. Engineering is, as we speak, attempting to restore the seal from the adjacent compartment, but they need ninety in-game minutes and they need the breached compartment held against the Husk party. Your squad will deploy in pressurized suits — we are not, in this op, opening another compartment. You'll be working in active vacuum the entire engagement. Watch your O2 reserve. Watch your seal integrity. If you take a faceplate hit, retreat to the adjacent compartment's emergency hatch immediately. Reyes is on standby in the medical bay with the synth-blood requisition pre-cleared. The Husk party is, by intelligence estimate, six to nine personnel. Three-Scars is, by every available reading, not present; this is a junior Husk operation, which is good news in some ways and bad news in others. Hold the compartment. Don't, please, expand the engagement. We are losing atmosphere; every minute is, in this op, measurable in O2 reserve.",
+    primary_objectives: [
+        "Hold compartment 4-B-17 for ninety in-game minutes",
+        "Repel Husk boarding party",
+        "Maintain squad vacuum suit integrity",
+        "Allow engineering to restore the seal",
+    ],
+    secondary_objectives: [
+        "Recover Husk equipment for Coalition intelligence",
+        "Preserve compartment 4-B-17 structural integrity",
+        "Sustain no faceplate breaches",
+    ],
+    failure_conditions: [
+        "Compartment captured by Husk party",
+        "Squad O2 reserves depleted before seal restored",
+        "Two or more squad faceplate breaches without retreat",
+        "Engineering crew driven from adjacent compartment",
+    ],
+    reward_summary: "Coalition reputation +40; T2 vacuum gear access; vacuum-rated commendation; Reyes's standing thanks (informal favor).",
+    debrief_win: "Hayes. Compartment's sealed. The Husks pulled out through the same hole they came in by, and engineering is, as we speak, plating over the breach. You held a vacuum compartment for ninety minutes with three suit alarms going off. That is, in this captain's professional opinion, the kind of operation that gets you into the senior rotation. Reyes wants a word; she has, by her own reckoning, your radiation count to discuss. Don't, please, skip the appointment.",
+    debrief_loss: "Hayes. Compartment's lost. Engineering pulled back, the Husks took 4-B-17 for approximately seventeen minutes before the station's secondary perimeter held them at the next bulkhead. We've lost the deck for the next quarter. The Husks left, by every available reading, with three ancestor-shards' worth of fallen — two of yours, one of theirs. Reyes has the wounded stable. Get cleaned up. Don't, please, ask if I'm angry. I'm not. Get cleaned up.",
+    voice_giver_id: "coalition_captain_marcus_hayes",
+)

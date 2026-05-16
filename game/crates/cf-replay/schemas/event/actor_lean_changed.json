@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/actor.lean_changed.v0.1",
+  "title": "actor.lean_changed",
+  "type": "object",
+  "required": ["actor", "direction"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "direction": {"type": "string", "enum": ["none", "left", "right"]},
+    "angle_degrees": {"type": "number"}
+  },
+  "additionalProperties": true
+}

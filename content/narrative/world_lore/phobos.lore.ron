@@ -1,0 +1,32 @@
+WorldLore (
+    world_id: "phobos",
+    canonical_name: "Phobos Microgravity Asteroid",
+    music_anchor: "music_world_phobos",
+    entries: [
+        WorldEntry (
+            kind: "geology",
+            title: "The Hollow Moonlet",
+            body: "Phobos is a carbonaceous chondrite of approximately 22 kilometers in maximum dimension, with a surface gravity of 0.0057 g — too low to stand on, sufficient to lose tools to. The interior is, by every recent survey, partially hollow; the Stickney crater on the leading hemisphere is the surface expression of a cavity system that runs approximately four kilometers into the body's interior. Pre-collapse mining concerns exploited the cavity for ore extraction; the Frontier inherited the workings and the Coalition inherited the orbital fortress that overlooks them. The relationship between the two has been, by Coalition admission, an ongoing operational embarrassment for sixty years.",
+        ),
+        WorldEntry (
+            kind: "history",
+            title: "The Crater Habitats",
+            body: "Phobos was the second-most-developed colony in the Sol system before the collapse, after Mars itself; the original mining concerns had buried twelve habitats in the Stickney cavity and connected them by lift to the surface. Six survived the collapse. Three are still inhabited by Frontier crews, two by mixed civilians, and one by a Coalition garrison whose primary function is to observe the others. The crater habitats are pressurized, lit by recycled phosphor, and connected by a network of low-gravity walking tubes whose mag-rails have not been fully serviced since 2197. The Frontier maintains them informally; the Coalition refuses to officially fund the maintenance and informally pays the Frontier crews who do it.",
+        ),
+        WorldEntry (
+            kind: "biosphere",
+            title: "Imported Ecologies",
+            body: "Phobos has no native life and no engineered surface biota. All habitat ecologies are imported from Mars or Earth and maintained by hand. The crater habitats grow algae, mushrooms, and a single hardy strain of pre-collapse wheat that is reputed to taste like cardboard and is, by Frontier consensus, considered preferable to the alternatives. The largest fauna on Phobos is the rat population in the Stickney lift shaft, which arrived with the original mining concerns and has, in the absence of natural predators, evolved into a docile and somewhat intelligent variety the locals call 'lift rats'. The Coalition has classified the lift rats as an invasive species and declined to authorize a pest-control program. The Frontier feeds them.",
+        ),
+        WorldEntry (
+            kind: "culture",
+            title: "The Long Shift",
+            body: "Phobos society runs on twelve-hour shifts, divided into work, sleep, and dwell. The work shift is mining or maintenance; the sleep shift is sleep; the dwell shift is whatever the inhabitants choose, which is usually trade, gambling, or — for the older crews — the slow construction of personal projects that nobody else will ever see finished. The crater habitats have no formal currency; barter is the dominant medium of exchange, and the most stable units of account are tobacco, sugar, and gun oil. The Frontier crews on Phobos are organized along craft lines rather than crew lines; the senior driller, the senior welder, and the senior medic are the de facto council of each habitat, and rotate at three-year intervals by tradition.",
+        ),
+        WorldEntry (
+            kind: "mystery",
+            title: "The Stickney Drum",
+            body: "Approximately four kilometers into the Stickney cavity, in a chamber that the Frontier has mapped but not commercialized, hangs a metallic object of unknown provenance. The object is roughly cylindrical, three meters in diameter, eleven meters long, and constructed of a material the Collegium has been unable to characterize using non-destructive sampling. It produces a faint, low-frequency vibration on a fourteen-hour cycle that the Frontier crews have learned to ignore but newcomers find disturbing. The drum is older than the colony. The drum is older than the mining concerns. The drum is, by the Synth Collective's one published assessment, 'consistent with an artifact of non-Sol-system origin'. The Coalition has not investigated. The Frontier charges admission.",
+        ),
+    ],
+)

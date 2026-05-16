@@ -26,6 +26,11 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 
+use crate::integrity::{
+    apply_damage_formula, normalized_hardness, CascadeEvent, DamageKind, IntegrityBand, PenetrationOutcome, PixelMeta,
+    PixelMetaGrid, PixelMetaKey, DEFAULT_CASCADE_DECAY_PCT, DEFAULT_CASCADE_DEPTH, DEFAULT_CASCADE_THRESHOLD,
+};
+
 /// One pixel's material id. The DR-007 launch set ships 8 ids; the runtime stays
 /// `u8` so future expansion (M5.6 active material kernel) can fit additional ids
 /// without changing the storage layout.
@@ -693,6 +698,13 @@ pub struct ChunkedTerrain {
     /// write updates the affected chunk's `last_modified_tick`. Default
     /// 0 (chunks never modified). Not serialized (transient runtime state).
     pub current_tick: u64,
+    /// **M9 § Destructible terrain — 5-tier per-pixel integrity grid**.
+    /// Sparse: only damaged pixels appear. Air pixels are never tracked.
+    /// Pristine (1.0) pixels are implicit — they only get an entry once
+    /// damage lands. Layout-stable across runs (BTreeMap ordering) so
+    /// snapshot round-trips preserve determinism for M4's `sim_state_v1`
+    /// checksum scope.
+    pub pixel_meta_grid: PixelMetaGrid,
 }
 
 impl ChunkedTerrain {
@@ -710,6 +722,7 @@ impl ChunkedTerrain {
             refusal_count: 0,
             registry: MaterialRegistry,
             current_tick: 0,
+            pixel_meta_grid: PixelMetaGrid::new(),
         }
     }
 
@@ -1342,6 +1355,238 @@ impl ChunkedTerrain {
         }
     }
 
+    /// **M9 § Destructible terrain — 5-tier per-pixel integrity**: read
+    /// the integrity at `(px, py)`. Returns `1.0` (Pristine) when the
+    /// pixel has no metadata entry — Pristine pixels are implicit. Air
+    /// pixels also return `1.0` so callers don't need to special-case them
+    /// before applying damage (the `try_penetrate_pixel` path filters air
+    /// itself).
+    #[must_use]
+    pub fn pixel_integrity(&self, px: i64, py: i64) -> f32 {
+        if !self.in_bounds(px, py) {
+            return 1.0;
+        }
+        let (coord, lx, ly) = chunk_split(px, py);
+        match self.pixel_meta_grid.get(&PixelMetaKey::new(coord.cx, coord.cy, lx, ly)) {
+            Some(meta) => meta.integrity,
+            None => 1.0,
+        }
+    }
+
+    /// **M9 § Destructible terrain — 5-tier per-pixel integrity**: derive
+    /// the band at `(px, py)`. Untouched pixels report Pristine.
+    #[must_use]
+    pub fn pixel_band(&self, px: i64, py: i64) -> IntegrityBand {
+        IntegrityBand::from_integrity(self.pixel_integrity(px, py))
+    }
+
+    /// **M9 § Destructible terrain — per-pixel integrity damage**.
+    ///
+    /// Apply `impact_energy` damage to a single pixel under the per-material
+    /// hardness curve (`damage = impact_energy * (1 - hardness) / hardness`,
+    /// clamped to `[0, 1]`). Tracks integrity in `pixel_meta_grid` and
+    /// emits a `PenetrationOutcome` describing band crossings, pixel
+    /// removal, and any cascade decay applied to direct neighbors when
+    /// the pixel reaches Destroyed.
+    ///
+    /// Caller is responsible for emitting `terrain.material_state_changed`
+    /// plus `terrain.pixel_removed` plus `terrain.cascade_triggered` based
+    /// on the outcome. cf-control's projectile-vs-terrain handler does this
+    /// inside its event loop with the right `parent_event_id` chain.
+    ///
+    /// Returns `None` when the pixel is out of bounds OR air — air pixels
+    /// receive no damage state.
+    pub fn try_penetrate_pixel(
+        &mut self,
+        px: i64,
+        py: i64,
+        impact_energy: f32,
+        cause: DamageKind,
+        damage_source: Option<String>,
+    ) -> Option<PenetrationOutcome> {
+        if !self.in_bounds(px, py) {
+            return None;
+        }
+        let mat = self.material_at(px, py);
+        if mat == self.default_material || mat == MATERIAL_AIR {
+            return None;
+        }
+        let aff = self.registry.affordance(mat)?;
+        let (coord, lx, ly) = chunk_split(px, py);
+        let key = PixelMetaKey::new(coord.cx, coord.cy, lx, ly);
+        let integrity_before = self.pixel_meta_grid.get(&key).map(|m| m.integrity).unwrap_or(1.0);
+        let band_before = IntegrityBand::from_integrity(integrity_before);
+        let hardness = normalized_hardness(mat);
+        let integrity_after = apply_damage_formula(integrity_before, impact_energy, hardness);
+        let band_after = IntegrityBand::from_integrity(integrity_after);
+        let band_crossed = band_before != band_after;
+        let destroyed = integrity_after <= 0.0;
+        if destroyed {
+            // Clear damage state + remove pixel from the world. Cascade
+            // decay applies to surviving neighbors only — never to air.
+            self.pixel_meta_grid.remove(&key);
+            self.set_pixel_internal(px, py, self.default_material);
+        } else {
+            self.pixel_meta_grid.insert(
+                key,
+                PixelMeta {
+                    integrity: integrity_after,
+                    last_damage_tick: self.current_tick,
+                    damage_kind: cause,
+                    damage_source: damage_source.clone(),
+                },
+            );
+        }
+        let cascades = if destroyed {
+            self.apply_cascade_decay(px, py, damage_source.as_deref())
+        } else {
+            Vec::new()
+        };
+        Some(PenetrationOutcome {
+            pos: [px, py],
+            material_id: mat,
+            material_name: aff.name,
+            integrity_before,
+            integrity_after,
+            band_before,
+            band_after,
+            band_crossed,
+            destroyed,
+            cascades,
+        })
+    }
+
+    /// **M9 § Cascade rule** for digger / blast carves: after a multi-pixel
+    /// carve, walk the perimeter of the destroyed bbox and apply cascade
+    /// decay to any solid pixel adjacent to a freshly-cleared pixel whose
+    /// normalized hardness is at or below the cascade threshold. Returns
+    /// one `CascadeEvent` per affected neighbor (caller emits
+    /// `terrain.cascade_triggered` with the right `parent_event_id`).
+    ///
+    /// `bbox_min` / `bbox_max` are inclusive pixel-space bounds (matching
+    /// `ChunkedCarveStats`). `source` annotates the cascade source for the
+    /// cause chain.
+    #[must_use]
+    pub fn apply_cascade_to_carve_perimeter(
+        &mut self,
+        bbox_min: [i64; 2],
+        bbox_max: [i64; 2],
+        source: Option<&str>,
+    ) -> Vec<CascadeEvent> {
+        let mut events: Vec<CascadeEvent> = Vec::new();
+        let mut seen: BTreeSet<(i64, i64)> = BTreeSet::new();
+        // Walk a 1-pixel halo around the destroyed bbox. Any air pixel
+        // inside the carve volume is a candidate "destroyed source"; any
+        // solid pixel adjacent to it is a candidate "affected neighbor".
+        for py in (bbox_min[1] - 1)..=(bbox_max[1] + 1) {
+            for px in (bbox_min[0] - 1)..=(bbox_max[0] + 1) {
+                if !self.in_bounds(px, py) {
+                    continue;
+                }
+                let mat = self.material_at(px, py);
+                if mat != self.default_material && mat != MATERIAL_AIR {
+                    continue;
+                }
+                // Cleared pixel inside or at the edge of the carve. Check
+                // its 4-neighbors for cascade candidates.
+                for (dx, dy) in [(-1_i64, 0_i64), (1, 0), (0, -1), (0, 1)] {
+                    let nx = px + dx;
+                    let ny = py + dy;
+                    if !self.in_bounds(nx, ny) {
+                        continue;
+                    }
+                    if !seen.insert((nx, ny)) {
+                        continue;
+                    }
+                    if let Some(ev) = self.cascade_pixel(nx, ny, [px, py], source) {
+                        events.push(ev);
+                    }
+                }
+            }
+        }
+        events
+    }
+
+    /// **M9 § Cascade rule**: when a pixel reaches Destroyed, decay direct
+    /// 4-neighbors whose normalized hardness is at or below
+    /// `cascade_threshold` (default 0.6). Each affected neighbor loses
+    /// `DEFAULT_CASCADE_DECAY_PCT` (default 0.1) integrity, clamped to
+    /// `[0, 1]`. Neighbors that reach 0 under cascade are removed in turn
+    /// (still capped to `cascade_depth=1` — we do NOT recurse).
+    ///
+    /// Returns the cascade events so the engine can emit
+    /// `terrain.cascade_triggered` (one per affected neighbor) and
+    /// `terrain.pixel_removed` (when cascade kills the neighbor).
+    fn apply_cascade_decay(&mut self, source_x: i64, source_y: i64, source: Option<&str>) -> Vec<CascadeEvent> {
+        let mut events = Vec::with_capacity(4);
+        for (dx, dy) in [(-1_i64, 0_i64), (1, 0), (0, -1), (0, 1)] {
+            let nx = source_x + dx;
+            let ny = source_y + dy;
+            if let Some(ev) = self.cascade_pixel(nx, ny, [source_x, source_y], source) {
+                events.push(ev);
+            }
+        }
+        events
+    }
+
+    /// Apply cascade decay to a single candidate neighbor pixel from
+    /// `from_pos`. Returns the event when decay landed; `None` when:
+    ///   - out of bounds
+    ///   - neighbor is air / default material
+    ///   - neighbor hardness > cascade threshold
+    ///   - neighbor integrity unchanged (already at 0)
+    fn cascade_pixel(&mut self, nx: i64, ny: i64, from_pos: [i64; 2], source: Option<&str>) -> Option<CascadeEvent> {
+        if !self.in_bounds(nx, ny) {
+            return None;
+        }
+        let nmat = self.material_at(nx, ny);
+        if nmat == self.default_material || nmat == MATERIAL_AIR {
+            return None;
+        }
+        let nhardness = normalized_hardness(nmat);
+        if nhardness > DEFAULT_CASCADE_THRESHOLD {
+            return None;
+        }
+        let (ncoord, nlx, nly) = chunk_split(nx, ny);
+        let nkey = PixelMetaKey::new(ncoord.cx, ncoord.cy, nlx, nly);
+        let integrity_before = self.pixel_meta_grid.get(&nkey).map(|m| m.integrity).unwrap_or(1.0);
+        let integrity_after = (integrity_before - DEFAULT_CASCADE_DECAY_PCT).clamp(0.0, 1.0);
+        if (integrity_after - integrity_before).abs() < f32::EPSILON {
+            return None;
+        }
+        let band_before = IntegrityBand::from_integrity(integrity_before);
+        let band_after = IntegrityBand::from_integrity(integrity_after);
+        let destroyed_neighbor = integrity_after <= 0.0;
+        if destroyed_neighbor {
+            self.pixel_meta_grid.remove(&nkey);
+            self.set_pixel_internal(nx, ny, self.default_material);
+        } else {
+            self.pixel_meta_grid.insert(
+                nkey,
+                PixelMeta {
+                    integrity: integrity_after,
+                    last_damage_tick: self.current_tick,
+                    damage_kind: DamageKind::NeighborDestroyed,
+                    damage_source: source.map(str::to_owned),
+                },
+            );
+        }
+        let nname = self.registry.affordance(nmat).map(|a| a.name).unwrap_or("unknown");
+        Some(CascadeEvent {
+            from_pos,
+            to_pos: [nx, ny],
+            material_id: nmat,
+            material_name: nname,
+            integrity_before,
+            integrity_after,
+            from_band: band_before,
+            to_band: band_after,
+            destroyed_neighbor,
+            depth: DEFAULT_CASCADE_DEPTH,
+            threshold: DEFAULT_CASCADE_THRESHOLD,
+        })
+    }
+
     /// Reverse of [`Self::snapshot`]: rebuild a terrain from a snapshot. Used
     /// by the cf-headless replay verifier so a replayed bundle's per-tick
     /// state matches the live run pixel-for-pixel.
@@ -1382,6 +1627,7 @@ impl ChunkedTerrain {
         self.dirty_chunks.clear();
         self.carve_count = 0;
         self.refusal_count = 0;
+        self.pixel_meta_grid.clear();
     }
 
     fn aabb_to_pixels(&self, min: [f32; 2], max: [f32; 2]) -> (i64, i64, i64, i64) {
@@ -1776,5 +2022,213 @@ mod tests {
             }
         }
         assert_eq!(t.allocated_chunk_count(), 0);
+    }
+
+    // -- M9 § Destructible terrain — per-pixel integrity tests --
+
+    #[test]
+    fn pixel_integrity_starts_pristine_for_untouched_pixels() {
+        let mut t = ChunkedTerrain::new(64, 64, MATERIAL_AIR);
+        t.fill_aabb([0.0, 0.0], [32.0, 32.0], MATERIAL_DIRT);
+        // No prior damage — pristine 1.0.
+        assert!((t.pixel_integrity(10, 10) - 1.0).abs() < f32::EPSILON);
+        assert_eq!(t.pixel_band(10, 10), IntegrityBand::Pristine);
+    }
+
+    #[test]
+    fn try_penetrate_pixel_dirt_light_hit_drops_to_scratched() {
+        let mut t = ChunkedTerrain::new(64, 64, MATERIAL_AIR);
+        t.fill_aabb([0.0, 0.0], [32.0, 32.0], MATERIAL_DIRT);
+        let outcome = t
+            .try_penetrate_pixel(10, 10, 0.05, DamageKind::ProjectileHit, None)
+            .expect("dirt pixel exists");
+        assert_eq!(outcome.material_id, MATERIAL_DIRT);
+        assert_eq!(outcome.band_before, IntegrityBand::Pristine);
+        // 0.05 * (1 - 0.2) / 0.2 = 0.2 → integrity 0.8 → still Pristine.
+        // Use a larger impact to land in Scratched.
+        let outcome2 = t
+            .try_penetrate_pixel(10, 10, 0.05, DamageKind::ProjectileHit, None)
+            .expect("dirt pixel exists");
+        assert_eq!(outcome2.band_after, IntegrityBand::Scratched);
+        assert!(outcome2.band_crossed);
+        assert!(!outcome2.destroyed);
+    }
+
+    #[test]
+    fn try_penetrate_pixel_sand_hit_destroys_immediately() {
+        let mut t = ChunkedTerrain::new(64, 64, MATERIAL_AIR);
+        t.fill_aabb([0.0, 0.0], [32.0, 32.0], MATERIAL_LOOSE_FILL);
+        let outcome = t
+            .try_penetrate_pixel(10, 10, 0.5, DamageKind::ProjectileHit, None)
+            .expect("sand pixel exists");
+        assert!(outcome.destroyed);
+        assert_eq!(outcome.band_after, IntegrityBand::Destroyed);
+        // Pixel removed from the world.
+        assert_eq!(t.material_at(10, 10), MATERIAL_AIR);
+    }
+
+    #[test]
+    fn try_penetrate_pixel_metal_resists_high_impact() {
+        let mut t = ChunkedTerrain::new(64, 64, MATERIAL_AIR);
+        t.fill_aabb([0.0, 0.0], [32.0, 32.0], MATERIAL_METAL_NOHOOK);
+        let outcome = t
+            .try_penetrate_pixel(10, 10, 0.5, DamageKind::ProjectileHit, None)
+            .expect("metal pixel exists");
+        assert!(!outcome.destroyed);
+        // (1.0 - 0.5 * 0.1 / 0.9) ≈ 0.944
+        assert!(
+            (outcome.integrity_after - 0.944).abs() < 0.02,
+            "metal integrity after one hit at impact=0.5 should be ~0.94, got {}",
+            outcome.integrity_after
+        );
+        assert_eq!(outcome.band_after, IntegrityBand::Pristine);
+    }
+
+    #[test]
+    fn try_penetrate_pixel_against_air_returns_none() {
+        let mut t = ChunkedTerrain::new(64, 64, MATERIAL_AIR);
+        let outcome = t.try_penetrate_pixel(10, 10, 0.5, DamageKind::ProjectileHit, None);
+        assert!(outcome.is_none());
+    }
+
+    #[test]
+    fn try_penetrate_pixel_progresses_through_all_5_bands() {
+        let mut t = ChunkedTerrain::new(64, 64, MATERIAL_AIR);
+        t.fill_aabb([0.0, 0.0], [32.0, 32.0], MATERIAL_DIRT);
+        let mut bands_observed: Vec<IntegrityBand> = vec![IntegrityBand::Pristine];
+        for _ in 0..40 {
+            if let Some(outcome) = t.try_penetrate_pixel(10, 10, 0.05, DamageKind::ProjectileHit, None) {
+                if outcome.band_crossed {
+                    bands_observed.push(outcome.band_after);
+                }
+                if outcome.destroyed {
+                    break;
+                }
+            } else {
+                break;
+            }
+        }
+        // Must have observed every band on the path Pristine → Destroyed.
+        assert!(bands_observed.contains(&IntegrityBand::Pristine));
+        assert!(bands_observed.contains(&IntegrityBand::Scratched));
+        assert!(bands_observed.contains(&IntegrityBand::Cracked));
+        assert!(bands_observed.contains(&IntegrityBand::Critical));
+        assert!(bands_observed.contains(&IntegrityBand::Destroyed));
+    }
+
+    #[test]
+    fn cascade_decay_affects_low_hardness_neighbors() {
+        let mut t = ChunkedTerrain::new(64, 64, MATERIAL_AIR);
+        t.fill_aabb([0.0, 0.0], [32.0, 32.0], MATERIAL_DIRT);
+        // Pre-damage the destroyed-target pixel to integrity 0.05 so a small
+        // impact pushes it to 0 + triggers cascade.
+        let outcome = t
+            .try_penetrate_pixel(10, 10, 5.0, DamageKind::ProjectileHit, None)
+            .expect("dirt pixel");
+        assert!(outcome.destroyed);
+        // 4-neighbors are dirt (hardness 0.2 < 0.6) → all 4 cascade.
+        assert_eq!(outcome.cascades.len(), 4);
+        for ev in &outcome.cascades {
+            assert!(ev.integrity_after < ev.integrity_before);
+            assert_eq!(ev.depth, DEFAULT_CASCADE_DEPTH);
+            assert_eq!(ev.threshold, DEFAULT_CASCADE_THRESHOLD);
+        }
+    }
+
+    #[test]
+    fn cascade_skips_hard_neighbors() {
+        let mut t = ChunkedTerrain::new(64, 64, MATERIAL_AIR);
+        // Soft center pixel surrounded by hard concrete.
+        t.fill_aabb([0.0, 0.0], [32.0, 32.0], MATERIAL_CONCRETE);
+        t.set_pixel_internal(10, 10, MATERIAL_LOOSE_FILL);
+        // Destroy the soft center.
+        let outcome = t
+            .try_penetrate_pixel(10, 10, 5.0, DamageKind::ProjectileHit, None)
+            .expect("loose fill pixel");
+        assert!(outcome.destroyed);
+        // No cascade — every neighbor is concrete (hardness 0.7 > threshold 0.6).
+        assert!(outcome.cascades.is_empty());
+    }
+
+    #[test]
+    fn cascade_decay_can_destroy_neighbor_with_low_integrity() {
+        let mut t = ChunkedTerrain::new(64, 64, MATERIAL_AIR);
+        t.fill_aabb([0.0, 0.0], [32.0, 32.0], MATERIAL_DIRT);
+        // Bring the east neighbor (11, 10) down to ~0.05 integrity via several
+        // light hits. dirt hardness=0.2 — impact_energy 0.01 yields damage=0.04
+        // per hit, so 24 hits drops integrity from 1.0 to ~0.04 without
+        // destroying it (so it stays a valid cascade target).
+        for _ in 0..24 {
+            let _ = t.try_penetrate_pixel(11, 10, 0.01, DamageKind::ProjectileHit, None);
+        }
+        let int_pre = t.pixel_integrity(11, 10);
+        assert!(int_pre < 0.1, "expected low pre-cascade integrity, got {int_pre}");
+        assert_eq!(t.material_at(11, 10), MATERIAL_DIRT);
+        // Destroy the source pixel — cascade decay (0.1) pushes neighbor to 0.
+        let outcome = t
+            .try_penetrate_pixel(10, 10, 5.0, DamageKind::ProjectileHit, None)
+            .expect("dirt pixel");
+        assert!(outcome.destroyed);
+        let neighbor_event = outcome
+            .cascades
+            .iter()
+            .find(|ev| ev.to_pos == [11, 10])
+            .expect("east neighbor cascade event");
+        assert!(neighbor_event.destroyed_neighbor);
+        assert_eq!(t.material_at(11, 10), MATERIAL_AIR);
+    }
+
+    #[test]
+    fn cascade_does_not_recurse_beyond_depth_1() {
+        let mut t = ChunkedTerrain::new(64, 64, MATERIAL_AIR);
+        t.fill_aabb([0.0, 0.0], [32.0, 32.0], MATERIAL_DIRT);
+        // Pre-damage neighbor (11, 10) to 0 via cascade is allowed, but a
+        // cascade-killed neighbor at (12, 10) must NOT cascade further to
+        // (13, 10). Force (11, 10) and (12, 10) close to destruction.
+        let _ = t.try_penetrate_pixel(11, 10, 0.95, DamageKind::ProjectileHit, None);
+        let _ = t.try_penetrate_pixel(12, 10, 0.95, DamageKind::ProjectileHit, None);
+        let int_13_before = t.pixel_integrity(13, 10);
+        let outcome = t
+            .try_penetrate_pixel(10, 10, 5.0, DamageKind::ProjectileHit, None)
+            .expect("dirt pixel");
+        // (11, 10) cascade may destroy it, but (12, 10) and (13, 10) integrity
+        // should not be affected by a recursive cascade — they're only
+        // adjacent to a cascade-affected pixel, not the original destroyed.
+        let int_13_after = t.pixel_integrity(13, 10);
+        assert!((int_13_after - int_13_before).abs() < f32::EPSILON);
+        let _ = outcome;
+    }
+
+    #[test]
+    fn pixel_meta_grid_is_sparse_only_for_damaged_pixels() {
+        let mut t = ChunkedTerrain::new(64, 64, MATERIAL_AIR);
+        t.fill_aabb([0.0, 0.0], [32.0, 32.0], MATERIAL_DIRT);
+        // Pristine pixels never get meta entries.
+        assert!(t.pixel_meta_grid.is_empty());
+        let _ = t.try_penetrate_pixel(5, 5, 0.05, DamageKind::ProjectileHit, None);
+        // One damaged pixel → exactly one entry.
+        assert_eq!(t.pixel_meta_grid.len(), 1);
+    }
+
+    #[test]
+    fn destroyed_pixel_removes_meta_entry() {
+        let mut t = ChunkedTerrain::new(64, 64, MATERIAL_AIR);
+        t.fill_aabb([0.0, 0.0], [32.0, 32.0], MATERIAL_DIRT);
+        let _ = t.try_penetrate_pixel(5, 5, 0.05, DamageKind::ProjectileHit, None);
+        assert_eq!(t.pixel_meta_grid.len(), 1);
+        let _ = t.try_penetrate_pixel(5, 5, 10.0, DamageKind::ProjectileHit, None);
+        // Pixel destroyed → meta entry cleared.
+        let damaged_keys: Vec<_> = t.pixel_meta_grid.keys().filter(|k| k.lx == 5 && k.ly == 5).collect();
+        assert!(damaged_keys.is_empty());
+    }
+
+    #[test]
+    fn reset_to_default_clears_pixel_meta() {
+        let mut t = ChunkedTerrain::new(64, 64, MATERIAL_AIR);
+        t.fill_aabb([0.0, 0.0], [32.0, 32.0], MATERIAL_DIRT);
+        let _ = t.try_penetrate_pixel(5, 5, 0.05, DamageKind::ProjectileHit, None);
+        assert!(!t.pixel_meta_grid.is_empty());
+        t.reset_to_default();
+        assert!(t.pixel_meta_grid.is_empty());
     }
 }

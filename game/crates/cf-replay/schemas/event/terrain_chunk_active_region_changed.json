@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/terrain_chunk_active_region_changed.v1",
+  "title": "terrain.chunk_active_region_changed",
+  "description": "M8A § Active region state machine. Emitted on wake-on-edit (chunk + 1-chunk-radius neighbors transition to Awake) and sleep-after-300-ticks (chunks idle 300+ ticks transition to Sleeping). M15 forward-compat: the CA chemistry kernel only ticks `Awake` chunks.",
+  "type": "object",
+  "required": ["chunk_coords", "from_state", "to_state", "tick"],
+  "properties": {
+    "chunk_coords": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": { "type": "integer" }
+    },
+    "from_state": {
+      "type": "string",
+      "enum": ["sleeping", "awake"]
+    },
+    "to_state": {
+      "type": "string",
+      "enum": ["sleeping", "awake"]
+    },
+    "tick": {
+      "type": "integer",
+      "minimum": 0
+    }
+  }
+}

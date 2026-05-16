@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/equipment.shell_ejected.v0.1",
+  "title": "equipment.shell_ejected",
+  "type": "object",
+  "required": ["actor", "shell_id"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "shell_id": {"type": "integer", "minimum": 0},
+    "kind": {"type": "string"}
+  },
+  "additionalProperties": true
+}

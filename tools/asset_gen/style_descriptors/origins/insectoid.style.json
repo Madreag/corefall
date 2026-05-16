@@ -1,0 +1,18 @@
+{
+  "schema_version": "1.0.0",
+  "style_id": "insectoid",
+  "category": "origin",
+  "version": "1.0.0",
+  "silhouette_language": "segmented exoskeleton, double-knee jointed legs, compound-eye head, mandible protrusions",
+  "preferred_palette_roles": ["primary", "secondary", "accent", "highlight", "glow"],
+  "shape_descriptors": {
+    "head_proportion": "0.9",
+    "torso_proportion": "2.2",
+    "limb_proportion": "2.2",
+    "joints": "segmented chitin double-knee",
+    "augmentations": "compound-eye cluster"
+  },
+  "geometric_primitives": {
+    "actor": ["polygon", "ellipse", "circle"]
+  }
+}

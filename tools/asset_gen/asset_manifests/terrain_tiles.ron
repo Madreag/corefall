@@ -1,0 +1,28 @@
+// M9A terrain tiles manifest. 17 materials × 5 variants per material = 85
+// tile SVGs per spec § "Terrain tiles 17 materials × variations".
+(
+    schema_version: "1.0.0",
+    category: "TerrainTile",
+    owner_milestone: "M9A",
+    pipeline_id: "M9A_svg_v1",
+    entries: [
+        ( canonical_name: "tile_dirt", kind: "terrain-tile", prompt: "dirt tile, granular ground" ),
+        ( canonical_name: "tile_concrete", kind: "terrain-tile", prompt: "concrete tile, slab seam" ),
+        ( canonical_name: "tile_metal_nohook", kind: "terrain-tile", prompt: "reinforced metal tile, plate seam" ),
+        ( canonical_name: "tile_hazard", kind: "terrain-tile", prompt: "hazard tile, diagonal stripes" ),
+        ( canonical_name: "tile_loose_fill", kind: "terrain-tile", prompt: "loose fill tile, rubble scatter" ),
+        ( canonical_name: "tile_repair_fill", kind: "terrain-tile", prompt: "repair foam tile, bubble pattern" ),
+        ( canonical_name: "tile_anchor", kind: "terrain-tile", prompt: "anchor rock tile, layered strata" ),
+        ( canonical_name: "tile_ice", kind: "terrain-tile", prompt: "ice tile, crystalline facets" ),
+        ( canonical_name: "tile_lava", kind: "terrain-tile", prompt: "lava tile, glowing flow" ),
+        ( canonical_name: "tile_wood", kind: "terrain-tile", prompt: "wood tile, plank seam" ),
+        ( canonical_name: "tile_alloy", kind: "terrain-tile", prompt: "alloy plate tile, brushed metal" ),
+        ( canonical_name: "tile_glass", kind: "terrain-tile", prompt: "glass tile, translucent" ),
+        ( canonical_name: "tile_mud", kind: "terrain-tile", prompt: "mud tile, wet ground" ),
+        ( canonical_name: "tile_sand", kind: "terrain-tile", prompt: "sand tile, fine grain" ),
+        ( canonical_name: "tile_snow", kind: "terrain-tile", prompt: "snow tile, soft drift" ),
+        ( canonical_name: "tile_circuit", kind: "terrain-tile", prompt: "circuit substrate tile, traces" ),
+        ( canonical_name: "tile_biomatter", kind: "terrain-tile", prompt: "biomatter tile, organic streaks" ),
+    ],
+    variants: ["a", "b", "c", "d", "e"],
+)

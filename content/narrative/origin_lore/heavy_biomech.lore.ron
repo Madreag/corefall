@@ -1,0 +1,16 @@
+OriginLore (
+    origin_id: "heavy_biomech",
+    canonical_name: "Heavy Biomech",
+    physical_description: "Heavily modified human-derived biomech, characterized by bone-grafting, integrated armor plating, and slow-clotting biological fluid replacing standard blood. Average body mass between 95 and 140 kilograms. Internal structure includes reinforced skeletal mounting points for tool and weapon integration, and a single large bio-fluid reservoir of approximately eight thousand milliliters with substantially slower coagulation than baseline human blood. Lifespan is approximately fifteen percent longer than baseline human; aging is more visible in the late stages.",
+    cultural_traits: "Heavy biomech populations are concentrated in two distinct cultural traditions. The first is the Husk lineage — pre-collapse colony remnants who underwent biomech modification as a survival adaptation in the post-collapse era. The second is the Coalition's heavy infantry corps, a much smaller and more recent population (post-2191) of voluntary modifications administered through the Collegium's biomech surgical program. The two populations do not, by every Concordat reading, consider themselves the same culture; the Husks consider the Coalition variant a corruption of the ritual; the Coalition variant considers the Husks a curiosity. Both populations share a heavy bone-grafting aesthetic, a tendency toward physical ritual, and a slower-than-baseline emotional cadence that the Collegium has characterized as 'patient even by Crystalfold standards'.",
+    gameplay_strengths: "Substantially higher bio-fluid reserves than baseline humans (8000 mL vs 5000 mL). Higher resistance to poison (slower metabolism). Higher resistance to broken bones (reinforced skeletal mounting). Higher caloric storage (high bio-energy efficiency). Stronger melee damage output than baseline humans.",
+    gameplay_weaknesses: "Slower clot rate (twice as long to stabilize bleeding). Heavier body mass produces slower movement speed and higher fall damage. Vulnerable to specialized anti-biomech weapons. Reduced agility in microgravity environments. Limited compatibility with android medical interventions.",
+    home_world: "No fixed canonical home. Husk biomech populations are concentrated in Mars, Vulcan, and the deep Europa caverns. Coalition biomech infantry are distributed across the heavy-combat rotation, with concentration at the Phobos Fortress and the Earth-Orbit Concourse.",
+    notable_origins_in_corefall_universe: [
+        "Three-Scars (Husks, ritual lineage)",
+        "Memory-Drinker (Husks, shard-priest variant)",
+        "Bone-Crown (Husks, senior matriarch lineage)",
+        "Major Helena Tavares (Coalition, pre-modification, posthumous designation)",
+        "Various Coalition heavy infantry serving the Phobos Fortress rotation",
+    ],
+)

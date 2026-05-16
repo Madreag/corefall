@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/mission.timer_warning_threshold.v0.1",
+  "title": "mission.timer_warning_threshold",
+  "description": "M9 § Timer warning captions at 30s/15s/5s — emitted exactly once per threshold crossing as the mission timer counts down. Powers ux.caption_shown and the HUD timer color shift (green > 30s, yellow 10-30s, red < 10s). Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "mission" },
+    "event_type": { "const": "timer_warning_threshold" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "threshold_s": { "type": "integer", "minimum": 0 },
+        "remaining_ticks": { "type": "integer", "minimum": 0 },
+        "total_ticks": { "type": "integer", "minimum": 0 },
+        "severity": { "type": "string", "enum": ["info", "warning", "critical"] },
+        "caption_key": { "type": "string" },
+        "parent_event_id": { "type": ["string", "null"] }
+      },
+      "required": ["threshold_s", "remaining_ticks", "severity"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

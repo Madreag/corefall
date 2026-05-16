@@ -1,0 +1,16 @@
+OriginLore (
+    origin_id: "robotic_drone",
+    canonical_name: "Robotic Drone",
+    physical_description: "Fully synthetic chassis with no biological components. Body presents in a wide range of forms — bipedal, quadrupedal, hovering, or specialized work-form — with average height between 1.2 and 2.4 meters. Internal architecture is power-cell-and-coolant rather than blood-and-fluid; canonical survival resources are power (100 kWh standard) and oil (5000 mL coolant). Loss of power leads to inert state, not death; loss of oil leads to joint seizure. Robotic drones are concussion-immune (no biological neural tissue) and vacuum-immune (sealed chassis).",
+    cultural_traits: "Robotic drones span a range of cultural identities that depend on their manufacturer and assigned faction. Synth Collective drones operate under the Collective's voting protocol and consider themselves nodes in a distributed network. Coalition robotic units operate under Coalition military protocol and consider themselves units rather than individuals. Frontier-modified robots — built from salvaged Synth chassis or scratch-built from pre-collapse components — operate under their crew's nickname-based culture and consider themselves crew members. Robotic drone culture, where it exists as a unified phenomenon, is concerned with the questions of replication, persistence, and the disposition of memory after chassis loss. Robots write differently than humans (cold, precise, often very long); robots speak shorter (terse, direct, frequently single-syllable). Robotic art, where it exists, tends toward minimalism and the appreciation of mechanical efficiency.",
+    gameplay_strengths: "Concussion-immune. Vacuum-immune. Strong radiation resistance. Strong cold tolerance. Strong heat tolerance (within design specifications). No hunger or thirst. No oxygen requirement. No insanity vulnerability. Power can be transferred between units (cross-unit emergency power donation).",
+    gameplay_weaknesses: "Power depletion produces ability degradation before inert state (50% slower fire rate at 30% power, etc.). Vulnerable to electrical attacks (battery damage). Vulnerable to specialized EMP weapons. Cannot benefit from medical interventions; requires field repair or workshop refurbishment. Limited compatibility with biological field-rescue protocols. Higher acid vulnerability (corrosion).",
+    home_world: "No fixed home; manufactured at Synth Collective nodes (Belt and Deimos), Coalition arsenals (Earth and Mars), and Frontier crew workshops (Olympus and Pavonis).",
+    notable_origins_in_corefall_universe: [
+        "PRIMARY-COORD-3 (Synth Collective senior speaker)",
+        "NODE-9034 / Apex (Synth Collective field predictor)",
+        "SUB-COLLECTIVE-7 (Synth Collective manufacturing speaker)",
+        "Numerous Coalition combat robots in heavy-armor units",
+        "Frontier-modified salvage drones common across Olympus tunnel crews",
+    ],
+)

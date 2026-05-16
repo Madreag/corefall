@@ -10,7 +10,473 @@
 
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
+
+/// **M8**: slow-motion accessibility (`game_speed_assist`). Spec §
+/// Camera + game feel — Off / Slowdown75 / Slowdown25 / FullPause.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum GameSpeedAssist {
+    /// Sim runs at native rate.
+    #[default]
+    Off,
+    /// Sim runs at 75% speed (cosmetic; replay-deterministic).
+    Slowdown75,
+    /// Sim runs at 25% speed.
+    Slowdown25,
+    /// Sim runs at 0% (menu only).
+    FullPause,
+}
+
+impl GameSpeedAssist {
+    /// Canonical snake_case identifier.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            GameSpeedAssist::Off => "off",
+            GameSpeedAssist::Slowdown75 => "slowdown_75",
+            GameSpeedAssist::Slowdown25 => "slowdown_25",
+            GameSpeedAssist::FullPause => "full_pause",
+        }
+    }
+
+    /// Sim-speed percentage (0..=100) the per-tick scheduler honors. Off=100
+    /// (no slowdown), Slowdown75=75 (3 of every 4 ticks advance), Slowdown25=25
+    /// (1 of every 4 ticks advance), FullPause=0 (sim halts; settings UI +
+    /// cfctl still respond). Composed via [`u8::min`] with the pie menu's
+    /// `slowdown_factor_pct` so whichever surface is more restrictive wins.
+    pub fn speed_pct(self) -> u8 {
+        match self {
+            GameSpeedAssist::Off => 100,
+            GameSpeedAssist::Slowdown75 => 75,
+            GameSpeedAssist::Slowdown25 => 25,
+            GameSpeedAssist::FullPause => 0,
+        }
+    }
+
+    /// Parse from the cfctl wire form.
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(value: &str) -> Option<GameSpeedAssist> {
+        Some(match value {
+            "off" => GameSpeedAssist::Off,
+            "slowdown_75" => GameSpeedAssist::Slowdown75,
+            "slowdown_25" => GameSpeedAssist::Slowdown25,
+            "full_pause" => GameSpeedAssist::FullPause,
+            _ => return None,
+        })
+    }
+}
+
+/// **M8**: color blind / contrast palette mode (`color_cue_mode`). Spec §
+/// Accessibility extras — Default / ColorblindSafe / Protanopia /
+/// Deuteranopia / Tritanopia / MonochromeTest.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ColorCueMode {
+    /// Default game palette.
+    #[default]
+    Default,
+    /// Colorblind-safe palette (yellow + blue replacing red + green).
+    ColorblindSafe,
+    /// Protanopia (red-blind) palette.
+    Protanopia,
+    /// Deuteranopia (green-blind) palette.
+    Deuteranopia,
+    /// Tritanopia (blue-blind) palette.
+    Tritanopia,
+    /// Monochrome test palette (greyscale).
+    MonochromeTest,
+}
+
+impl ColorCueMode {
+    /// Canonical snake_case identifier.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ColorCueMode::Default => "default",
+            ColorCueMode::ColorblindSafe => "colorblind_safe",
+            ColorCueMode::Protanopia => "protanopia",
+            ColorCueMode::Deuteranopia => "deuteranopia",
+            ColorCueMode::Tritanopia => "tritanopia",
+            ColorCueMode::MonochromeTest => "monochrome_test",
+        }
+    }
+
+    /// Parse from the cfctl wire form.
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(value: &str) -> Option<ColorCueMode> {
+        Some(match value {
+            "default" => ColorCueMode::Default,
+            "colorblind_safe" => ColorCueMode::ColorblindSafe,
+            "protanopia" => ColorCueMode::Protanopia,
+            "deuteranopia" => ColorCueMode::Deuteranopia,
+            "tritanopia" => ColorCueMode::Tritanopia,
+            "monochrome_test" => ColorCueMode::MonochromeTest,
+            _ => return None,
+        })
+    }
+}
+
+/// **M8**: aim assist mode (`aim_assist`). Spec § Accessibility extras —
+/// off / steady_aim / auto_aim_with_damage_penalty.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum AimAssist {
+    /// No aim assist.
+    #[default]
+    Off,
+    /// Reduces reticle wobble while aiming.
+    SteadyAim,
+    /// Snaps reticle slightly toward target; -15% damage.
+    AutoAimWithDamagePenalty,
+}
+
+impl AimAssist {
+    /// Canonical snake_case identifier.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            AimAssist::Off => "off",
+            AimAssist::SteadyAim => "steady_aim",
+            AimAssist::AutoAimWithDamagePenalty => "auto_aim_with_damage_penalty",
+        }
+    }
+
+    /// Parse from the cfctl wire form.
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(value: &str) -> Option<AimAssist> {
+        Some(match value {
+            "off" => AimAssist::Off,
+            "steady_aim" => AimAssist::SteadyAim,
+            "auto_aim_with_damage_penalty" => AimAssist::AutoAimWithDamagePenalty,
+            _ => return None,
+        })
+    }
+}
+
+/// **M8 / M11**: HUD density preset (`ui_density`). Spec § Accessibility tab —
+/// Compact / Comfortable / Spacious. M11 added `Comfortable` as the canonical
+/// default-density name (was `Normal` under M8 — accepted as an alias).
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum UiDensity {
+    /// Compact — denser HUD layout.
+    Compact,
+    /// Comfortable — default density (M11 canonical name; alias `normal`).
+    #[default]
+    Comfortable,
+    /// Spacious — looser HUD spacing.
+    Spacious,
+}
+
+impl UiDensity {
+    /// Canonical snake_case identifier.
+    pub fn as_str(self) -> &'static str {
+        match self {
+            UiDensity::Compact => "compact",
+            UiDensity::Comfortable => "comfortable",
+            UiDensity::Spacious => "spacious",
+        }
+    }
+
+    /// Parse from the cfctl wire form. Accepts `normal` as an alias for
+    /// `comfortable` (M8 → M11 rename compatibility).
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(value: &str) -> Option<UiDensity> {
+        Some(match value {
+            "compact" => UiDensity::Compact,
+            "comfortable" | "normal" => UiDensity::Comfortable,
+            "spacious" => UiDensity::Spacious,
+            _ => return None,
+        })
+    }
+}
+
+/// **M11**: contrast palette mode for the ACC-A floor. Replaces the legacy
+/// `high_contrast: bool` with a tri-state enum (Standard / HighContrastDark /
+/// HighContrastLight) per spec § Settings tree.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ContrastMode {
+    /// Standard palette (default).
+    #[default]
+    Standard,
+    /// High-contrast dark — pure white text on solid black.
+    HighContrastDark,
+    /// High-contrast light — pure black text on solid white.
+    HighContrastLight,
+}
+
+impl ContrastMode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ContrastMode::Standard => "standard",
+            ContrastMode::HighContrastDark => "high_contrast_dark",
+            ContrastMode::HighContrastLight => "high_contrast_light",
+        }
+    }
+
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(value: &str) -> Option<ContrastMode> {
+        Some(match value {
+            "standard" => ContrastMode::Standard,
+            "high_contrast_dark" => ContrastMode::HighContrastDark,
+            "high_contrast_light" => ContrastMode::HighContrastLight,
+            _ => return None,
+        })
+    }
+}
+
+/// **M11**: captions verbosity mode. Filters which event categories surface
+/// as captions in the HUD strip.
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum CaptionMode {
+    /// Captions disabled (no caption strip rendered).
+    #[default]
+    Off,
+    /// Only critical-severity events surface.
+    CriticalOnly,
+    /// Critical + warning (default when captions are on).
+    Standard,
+    /// Critical + warning + info (verbose).
+    Expanded,
+}
+
+impl CaptionMode {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            CaptionMode::Off => "off",
+            CaptionMode::CriticalOnly => "critical_only",
+            CaptionMode::Standard => "standard",
+            CaptionMode::Expanded => "expanded",
+        }
+    }
+
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(value: &str) -> Option<CaptionMode> {
+        Some(match value {
+            "off" => CaptionMode::Off,
+            "critical_only" => CaptionMode::CriticalOnly,
+            "standard" => CaptionMode::Standard,
+            "expanded" => CaptionMode::Expanded,
+            _ => return None,
+        })
+    }
+}
+
+/// **M11**: primary input profile (drives default HUD focus path).
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum InputProfile {
+    /// Keyboard + mouse (default).
+    #[default]
+    KeyboardMouse,
+    /// Controller (XInput / SDL gamepad).
+    Controller,
+    /// Keyboard only — no mouse / no controller.
+    KeyboardOnly,
+    /// Custom — player has rebound mixed inputs.
+    Custom,
+}
+
+impl InputProfile {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            InputProfile::KeyboardMouse => "keyboard_mouse",
+            InputProfile::Controller => "controller",
+            InputProfile::KeyboardOnly => "keyboard_only",
+            InputProfile::Custom => "custom",
+        }
+    }
+
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(value: &str) -> Option<InputProfile> {
+        Some(match value {
+            "keyboard_mouse" => InputProfile::KeyboardMouse,
+            "controller" => InputProfile::Controller,
+            "keyboard_only" => InputProfile::KeyboardOnly,
+            "custom" => InputProfile::Custom,
+            _ => return None,
+        })
+    }
+}
+
+/// **M11**: hold-behavior variant for the ACC-A floor (replaces tap-only).
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum HoldBehavior {
+    /// Press-and-hold semantics (default; matches `hold_to_confirm=true`).
+    #[default]
+    Hold,
+    /// Toggle on/off — press once to enable, again to disable.
+    Toggle,
+    /// Press-to-cycle — each press advances through a state ring.
+    PressToCycle,
+}
+
+impl HoldBehavior {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            HoldBehavior::Hold => "hold",
+            HoldBehavior::Toggle => "toggle",
+            HoldBehavior::PressToCycle => "press_to_cycle",
+        }
+    }
+
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(value: &str) -> Option<HoldBehavior> {
+        Some(match value {
+            "hold" => HoldBehavior::Hold,
+            "toggle" => HoldBehavior::Toggle,
+            "press_to_cycle" => HoldBehavior::PressToCycle,
+            _ => return None,
+        })
+    }
+}
+
+/// **M11**: camera-motion granularity (paired with `reduced_motion` for
+/// finer follow-camera control).
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum CameraMotion {
+    /// Reduced — suppress follow-camera + recoil-camera animation.
+    Reduced,
+    /// Standard — full camera motion (default).
+    #[default]
+    Standard,
+}
+
+impl CameraMotion {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            CameraMotion::Reduced => "reduced",
+            CameraMotion::Standard => "standard",
+        }
+    }
+
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(value: &str) -> Option<CameraMotion> {
+        Some(match value {
+            "reduced" => CameraMotion::Reduced,
+            "standard" => CameraMotion::Standard,
+            _ => return None,
+        })
+    }
+}
+
+/// **M11**: objective-help verbosity (tutorial / mission text density).
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum ObjectiveHelp {
+    Minimal,
+    #[default]
+    Standard,
+    Verbose,
+}
+
+impl ObjectiveHelp {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ObjectiveHelp::Minimal => "minimal",
+            ObjectiveHelp::Standard => "standard",
+            ObjectiveHelp::Verbose => "verbose",
+        }
+    }
+
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(value: &str) -> Option<ObjectiveHelp> {
+        Some(match value {
+            "minimal" => ObjectiveHelp::Minimal,
+            "standard" => ObjectiveHelp::Standard,
+            "verbose" => ObjectiveHelp::Verbose,
+            _ => return None,
+        })
+    }
+}
+
+/// **M11**: debug-explainer verbosity (for the death recap + AI debug overlays).
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize, JsonSchema, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum DebugExplainerLevel {
+    /// Player-friendly plain-language explanations (default).
+    #[default]
+    Player,
+    /// Designer-level explanations with tuning numbers.
+    Designer,
+    /// Raw engine event payloads (verbose).
+    Raw,
+}
+
+impl DebugExplainerLevel {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            DebugExplainerLevel::Player => "player",
+            DebugExplainerLevel::Designer => "designer",
+            DebugExplainerLevel::Raw => "raw",
+        }
+    }
+
+    #[allow(clippy::should_implement_trait)]
+    pub fn from_str(value: &str) -> Option<DebugExplainerLevel> {
+        Some(match value {
+            "player" => DebugExplainerLevel::Player,
+            "designer" => DebugExplainerLevel::Designer,
+            "raw" => DebugExplainerLevel::Raw,
+            _ => return None,
+        })
+    }
+}
+
+/// **M11**: ACC-A floor caption category vocabulary. Caption_categories may
+/// be any subset of this list. Default is `[combat, ai, mission, accessibility]`.
+pub const SUPPORTED_CAPTION_CATEGORIES: &[&str] = &["combat", "ai", "terrain", "mission", "system", "accessibility"];
+
+/// **M11**: ACC-A floor key-remap groups. Restricts which UI subsystems
+/// surface their rebindable actions in the remap editor. Default is
+/// `[Gameplay]`.
+pub const SUPPORTED_REMAP_GROUPS: &[&str] = &["gameplay", "ui", "replay", "workbench", "accessibility"];
+
+/// **M11**: default caption-category subset (4 of 6 categories on).
+pub fn default_caption_categories() -> BTreeSet<String> {
+    let mut s = BTreeSet::new();
+    s.insert("combat".to_string());
+    s.insert("ai".to_string());
+    s.insert("mission".to_string());
+    s.insert("accessibility".to_string());
+    s
+}
+
+/// **M11**: default remap-group subset (gameplay-only on by default).
+pub fn default_remap_groups() -> BTreeSet<String> {
+    let mut s = BTreeSet::new();
+    s.insert("gameplay".to_string());
+    s
+}
+
+/// Default M8 mini-map zoom (1.0 = base zoom).
+pub fn default_mini_map_zoom() -> f32 {
+    1.0
+}
+
+/// Default M8 scope FOV in degrees per spec § Camera + game feel
+/// "Scope zoom (sniper ADS — 30° FOV)". Mirrors cf_camera::SCOPE_FOV_DEGREES.
+pub fn default_scope_zoom_fov() -> f32 {
+    30.0
+}
+
+/// Default M8 language code per spec § Localization (en baseline).
+pub fn default_language() -> String {
+    "en".to_string()
+}
+
+/// Default text-scale (mirrors `ui_scale`).
+pub fn default_text_scale() -> f32 {
+    1.0
+}
+
+/// Default debug overlay set (empty until the player toggles individual
+/// overlays via `act.debug.toggle_overlay`).
+pub fn default_debug_overlays() -> BTreeSet<String> {
+    BTreeSet::new()
+}
 
 pub const SUPPORTED_KEY_BINDING_ACTIONS: &[&str] = &[
     "jump",
@@ -31,6 +497,9 @@ pub const SUPPORTED_KEY_BINDING_ACTIONS: &[&str] = &[
     "aim_right",
     "aim_up",
     "aim_down",
+    // M11: sharp_aim (ADS) added to the discrete action set so the remap
+    // surface covers ACC-A's full 18+ action floor.
+    "sharp_aim",
 ];
 
 pub const SUPPORTED_KEY_CODE_NAMES: &[&str] = &[
@@ -182,6 +651,152 @@ pub struct Settings {
     /// { ai_debug: true }` through cfctl.
     #[serde(default)]
     pub ai_debug: bool,
+
+    // === M8 accessibility / camera / debug / locale extensions ===
+    /// **M8**: slow-motion accessibility (Off / Slowdown75 / Slowdown25 /
+    /// FullPause). Cosmetic per M4; replay-deterministic.
+    #[serde(default)]
+    pub game_speed_assist: GameSpeedAssist,
+    /// **M8**: color blind / contrast palette mode.
+    #[serde(default)]
+    pub color_cue_mode: ColorCueMode,
+    /// **M8**: aim assist mode (off / steady / auto).
+    #[serde(default)]
+    pub aim_assist: AimAssist,
+    /// **M8**: damage numbers cosmetic (floating "+15" text on hit).
+    #[serde(default)]
+    pub damage_numbers: bool,
+    /// **M8**: killcam toggle (on by default per spec § Killcam).
+    #[serde(default = "default_true")]
+    pub killcam_enabled: bool,
+    /// **M8**: hit-stop pulse on impactful hits.
+    #[serde(default = "default_true")]
+    pub hit_stop_enabled: bool,
+    /// **M8**: cinematic kill cam on boss final blow.
+    #[serde(default = "default_true")]
+    pub cinematic_kills: bool,
+    /// **M8**: master mini-map enable toggle (Settings.no_minimap inverts).
+    #[serde(default = "default_true")]
+    pub mini_map_enabled: bool,
+    /// **M8**: master compass enable toggle.
+    #[serde(default = "default_true")]
+    pub compass_enabled: bool,
+    /// **M8**: damage direction indicator enable toggle.
+    #[serde(default = "default_true")]
+    pub damage_direction_enabled: bool,
+    /// **M8**: mini-map zoom (clamped 0.25..=4.0).
+    #[serde(default = "default_mini_map_zoom")]
+    pub mini_map_zoom: f32,
+    /// **M8**: scope ADS FOV in degrees (clamped 5..=90).
+    #[serde(default = "default_scope_zoom_fov")]
+    pub scope_zoom_fov: f32,
+    /// **M8**: text scale (mirrors ui_scale; some HUD widgets honour this
+    /// distinct field per spec § Settings menu Accessibility tab).
+    #[serde(default = "default_text_scale")]
+    pub text_scale: f32,
+    /// **M8**: HUD density preset.
+    #[serde(default)]
+    pub ui_density: UiDensity,
+    /// **M8**: active language code (en baseline; Tier-A 11 reserved for
+    /// T-ACC-PLUS BP9+).
+    #[serde(default = "default_language")]
+    pub language: String,
+    /// **M8**: speedrun mode (HUD shows persistent timer + segment
+    /// markers; mission resolves immediately on objectives).
+    #[serde(default)]
+    pub speedrun_mode: bool,
+    // === M8 difficulty modifiers (granular per scenario) ===
+    /// **M8**: permadeath modifier.
+    #[serde(default)]
+    pub permadeath: bool,
+    /// **M8**: no-respawn modifier.
+    #[serde(default)]
+    pub no_respawn: bool,
+    /// **M8**: fog-of-war on (default true per spec § Difficulty modifiers).
+    #[serde(default = "default_true")]
+    pub fog_of_war_on: bool,
+    /// **M8**: limited-ammo modifier.
+    #[serde(default)]
+    pub limited_ammo: bool,
+    /// **M8**: time-limit modifier (mission has a hard timer).
+    #[serde(default)]
+    pub time_limit: bool,
+    /// **M8**: hide the mini-map (overrides `mini_map_enabled` when true).
+    #[serde(default)]
+    pub no_minimap: bool,
+    /// **M8**: hardcore mode (composite of multiple modifiers).
+    #[serde(default)]
+    pub hardcore_mode: bool,
+    /// **M8**: friendly fire on.
+    #[serde(default)]
+    pub friendly_fire_on: bool,
+    /// **M8**: master debug-overlay enable gate. In production builds the
+    /// 7 cf-debug overlays only render when `debug_enabled = true`. Dev
+    /// builds bypass the gate.
+    #[serde(default)]
+    pub debug_enabled: bool,
+    /// **M8**: set of currently-enabled cf-debug overlays (snake_case ids
+    /// per `cf_debug::DebugOverlay::as_str`). Mirrors the cf-debug
+    /// `DebugOverlayState` so cfctl `observe.debug.overlays` round-trips.
+    #[serde(default = "default_debug_overlays")]
+    pub debug_overlays: BTreeSet<String>,
+
+    // === M11 accessibility (DR-003 + DR-012 closure) extensions ===
+    /// **M11**: contrast palette mode. Tri-state replacing the legacy
+    /// `high_contrast: bool`. Standard / HighContrastDark / HighContrastLight.
+    #[serde(default)]
+    pub contrast_mode: ContrastMode,
+    /// **M11**: captions verbosity mode (Off / CriticalOnly / Standard /
+    /// Expanded). Filters which events surface as captions.
+    #[serde(default)]
+    pub caption_mode: CaptionMode,
+    /// **M11**: caption background opacity (0.0..=1.0; default 0.8).
+    #[serde(default = "default_caption_background_opacity")]
+    pub caption_background_opacity: f32,
+    /// **M11**: caption category subset (subset of
+    /// [`SUPPORTED_CAPTION_CATEGORIES`]). Default 4 of 6.
+    #[serde(default = "default_caption_categories")]
+    pub caption_categories: BTreeSet<String>,
+    /// **M11**: input profile (default keyboard+mouse).
+    #[serde(default)]
+    pub input_profile: InputProfile,
+    /// **M11**: remap-action group subset (subset of
+    /// [`SUPPORTED_REMAP_GROUPS`]). Default `[gameplay]`.
+    #[serde(default = "default_remap_groups")]
+    pub remap_groups: BTreeSet<String>,
+    /// **M11**: hold-behavior variant (default Hold).
+    #[serde(default)]
+    pub hold_behavior: HoldBehavior,
+    /// **M11**: screen-shake scale (0.0..=1.0; default 1.0 = full shake;
+    /// 0.0 = no shake). Multiplicative on camera punch + recoil shake.
+    /// Replaces the inverse-sense `reduce_camera_shake_pct`; the legacy
+    /// field is preserved for back-compat (mirror updated whenever this
+    /// changes via `apply_settings_patch`).
+    #[serde(default = "default_screen_shake_scale")]
+    pub screen_shake_scale: f32,
+    /// **M11**: camera-motion granularity (Reduced / Standard).
+    #[serde(default)]
+    pub camera_motion: CameraMotion,
+    /// **M11**: objective-help verbosity (Minimal / Standard / Verbose).
+    #[serde(default)]
+    pub objective_help: ObjectiveHelp,
+    /// **M11**: debug-explainer level (Player / Designer / Raw).
+    #[serde(default)]
+    pub debug_explainer_level: DebugExplainerLevel,
+}
+
+/// **M11**: default caption background opacity per spec.
+pub fn default_caption_background_opacity() -> f32 {
+    0.8
+}
+
+/// **M11**: default screen-shake scale (full shake = 1.0).
+pub fn default_screen_shake_scale() -> f32 {
+    1.0
+}
+
+fn default_true() -> bool {
+    true
 }
 
 fn default_ai_difficulty() -> String {
@@ -269,6 +884,9 @@ pub fn default_key_bindings() -> BTreeMap<String, String> {
     m.insert("aim_right".into(), "ArrowRight".into());
     m.insert("aim_up".into(), "ArrowUp".into());
     m.insert("aim_down".into(), "ArrowDown".into());
+    // M11: sharp_aim (ADS) — right-click typically, but we wire a keyboard
+    // fallback so KeyboardOnly profile can still ADS.
+    m.insert("sharp_aim".into(), "ShiftLeft".into());
     m
 }
 
@@ -326,6 +944,44 @@ impl Default for Settings {
             walk_threshold: default_walk_threshold(),
             ai_difficulty: default_ai_difficulty(),
             ai_debug: false,
+            game_speed_assist: GameSpeedAssist::Off,
+            color_cue_mode: ColorCueMode::Default,
+            aim_assist: AimAssist::Off,
+            damage_numbers: false,
+            killcam_enabled: true,
+            hit_stop_enabled: true,
+            cinematic_kills: true,
+            mini_map_enabled: true,
+            compass_enabled: true,
+            damage_direction_enabled: true,
+            mini_map_zoom: default_mini_map_zoom(),
+            scope_zoom_fov: default_scope_zoom_fov(),
+            text_scale: default_text_scale(),
+            ui_density: UiDensity::Comfortable,
+            language: default_language(),
+            speedrun_mode: false,
+            permadeath: false,
+            no_respawn: false,
+            fog_of_war_on: true,
+            limited_ammo: false,
+            time_limit: false,
+            no_minimap: false,
+            hardcore_mode: false,
+            friendly_fire_on: false,
+            debug_enabled: false,
+            debug_overlays: default_debug_overlays(),
+            // === M11 ACC-A floor defaults ===
+            contrast_mode: ContrastMode::Standard,
+            caption_mode: CaptionMode::Off,
+            caption_background_opacity: default_caption_background_opacity(),
+            caption_categories: default_caption_categories(),
+            input_profile: InputProfile::KeyboardMouse,
+            remap_groups: default_remap_groups(),
+            hold_behavior: HoldBehavior::Hold,
+            screen_shake_scale: default_screen_shake_scale(),
+            camera_motion: CameraMotion::Standard,
+            objective_help: ObjectiveHelp::Standard,
+            debug_explainer_level: DebugExplainerLevel::Player,
         }
     }
 }
@@ -432,5 +1088,13 @@ mod tests {
         b.insert("fire".to_string(), "KeyA".to_string());
         b.insert("move_left".to_string(), "Enter".to_string());
         validate_key_bindings(&b).unwrap();
+    }
+
+    #[test]
+    fn game_speed_assist_speed_pct_matches_spec() {
+        assert_eq!(GameSpeedAssist::Off.speed_pct(), 100);
+        assert_eq!(GameSpeedAssist::Slowdown75.speed_pct(), 75);
+        assert_eq!(GameSpeedAssist::Slowdown25.speed_pct(), 25);
+        assert_eq!(GameSpeedAssist::FullPause.speed_pct(), 0);
     }
 }

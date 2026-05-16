@@ -1,0 +1,9 @@
+{
+  "scenario": "bench_mp_8player",
+  "tick_rate_hz": 60,
+  "description": "M8A 8-player LAN lockstep bench. cf-bench's mp_8player_lan subcommand drives 8 synthetic client sim ticks per server tick; per-tick blake3 across 1 server + 8 clients must match.",
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 1000 } }
+  ]
+}

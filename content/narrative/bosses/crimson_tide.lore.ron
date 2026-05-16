@@ -1,0 +1,34 @@
+BossLore (
+    boss_id: "crimson_tide",
+    canonical_name: "The Crimson Tide",
+    world: "mars",
+    biome: "dust_storm_arena",
+    arena_rule: "TimedRetreat",
+    entries: [
+        BossLoreEntry (
+            kind: "origin_myth",
+            title: "The Storm That Became a Thing",
+            body: "The Crimson Tide is, by every Concordat measurement, a weather phenomenon. The Crimson Tide is also, by every Concordat eyewitness account, not a weather phenomenon. The first recorded sighting was in 2197, during a Frontier salvage operation on the Pavonis plains; the operation's crew reported, in their after-action, that the dust storm they were sheltering in 'turned around' and pursued them across approximately fourteen kilometers of open ground. Only three of nine crew members survived. The Coalition classified the report as observational error. The Frontier's senior demolition leads classified the report as a contract that, if offered, would not be accepted at any price. The pre-collapse Mars Free State, in its final months in 2169, had a name for a similar phenomenon in the same general area. The name does not, in any public Concordat document, appear."
+        ),
+        BossLoreEntry (
+            kind: "war_history",
+            title: "The Six Engagements",
+            body: "The Crimson Tide has been formally engaged on six occasions by Concordat forces. The first three engagements were by Coalition strike teams; all three withdrew before completing the encounter and reported the Tide as 'environmentally implausible'. The fourth was by a Frontier crew under Wrench Sandoval, in 2231, that drove the Tide into temporary dispersal and recovered the first confirmed sand-fragment samples. The fifth, in 2236, was by a joint Coalition-Collegium expedition that brought T2 weapons and a full ammo stockpile and completed the encounter through to phase four; the after-action report describes the Tide as 'a coherent intelligence operating through localized atmospheric phenomena, of unknown origin'. The sixth engagement was in 2240 and remains, in Concordat records, unresolved; the team withdrew at the timed retreat threshold without making contact. The Tide has, on every available recording, never pursued a withdrawing force across the timed-retreat boundary. The Tide has, on every available recording, made certain to be visible just inside the boundary for the duration of the withdrawal."
+        ),
+        BossLoreEntry (
+            kind: "defeat_consequences",
+            title: "What Driving the Tide Costs",
+            body: "Driving the Crimson Tide into dispersal produces the Dust-Rated Chassis recipe, the Storm-Walker artifact, and three lore unlocks specific to the Mars campaign. The cost is mechanically simple: the arena seals after five minutes, and any player still in the arena when the seal closes is automatically defeated. The narrative cost is more interesting. Every confirmed dispersal of the Tide has been followed, within ninety days of in-game time, by a corresponding intensification of dust storm activity across the entire Mars equatorial belt. The Coalition's meteorology directorate denies a causal link. The Frontier's underground crews, in private, do not deny it. The Husks, in private, consider every dispersal of the Tide an offense, and a Husk raid on Frontier tunnels is, statistically, more likely in the 90-day window following a dispersal than in any other window."
+        ),
+        BossLoreEntry (
+            kind: "phase_descriptions",
+            title: "The Four Storms",
+            body: "Phase One: the Tide manifests as a sand-walker swarm — approximately twenty to thirty small dust-form actors that converge on the player's position. The swarm is, by Coalition guides, the most manageable of the four phases. The phase ends when the swarm's density crosses a visible threshold. Phase Two: the storm itself intensifies; visibility drops to approximately fifteen meters; the player's HUD instruments produce intermittent readings as the dust interferes with electronics. The phase requires the player to navigate by sound and by memory. The phase ends when the dust column at the arena's center reaches its maximum height. Phase Three: the Tide splits into three mini-bosses — designated by the Coalition's analysts as Tide-Alpha, Tide-Beta, and Tide-Gamma — that operate independently and pursue the player across the arena. The mini-bosses are, by tactical reading, the most dangerous phase. The phase ends when any one mini-boss is destroyed. Phase Four: the surviving mini-bosses reform into a single Tide and produce a final coherent assault, larger and faster than any prior phase. The phase ends, and the encounter concludes in temporary dispersal, when the reformed Tide is reduced below a damage threshold."
+        ),
+        BossLoreEntry (
+            kind: "dropped_lore_codex",
+            title: "Captain Hawthorne, Personal Log 2230",
+            body: "Recovered from a Starlight survey log, archived 2230. Hawthorne was the captain of the Vulcan day-side expedition; the log entry pre-dates the expedition by eleven months and was archived as 'personal philosophy, non-operational'. 'I have been thinking about Mars. About the storms. About the survivors who walked out of dust-storm engagements with stories that, on first telling, sound like delirium. The storms do not, in my reading, behave as storms. The storms behave as something that has decided to behave as storms. The distinction matters. The first behavior is meteorological. The second is intentional. The intention is, in my reading, an emergent property of the system; the system itself, by every available reading, predates the colonization. The Husks, by their own oldest oral histories, know the storms as the breath of the world. The world, in my reading, may not be metaphorical. We have, since 2087, treated Mars as a planet. Mars may, in some narrow technical sense, not be a planet. Mars may be something else. The storms may be its respiratory system. I have not, in any official capacity, said this. I will not. The Voyager Corps would, in this captain's professional opinion, not accept the framing. The Voyager Corps may, in eighty years, be the only Concordat institution that does.' The log was sealed at Hawthorne's request after the Vulcan expedition. The seal expires in 2289. Hawthorne is, as of 2241, still alive and, by Concordat policy, still has not commented on the matter."
+        ),
+    ],
+)

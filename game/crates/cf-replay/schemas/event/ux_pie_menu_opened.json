@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ux_pie_menu_opened.v1",
+  "title": "ux.pie_menu_opened",
+  "description": "Emitted when the player opens the T-key 8-slice pie menu (player's own action wheel; distinct from the Q-hold context wheel). In single-player the sim slows to slowdown_factor_pct=20; in multiplayer slowdown_factor_pct=100 (no slowdown).",
+  "type": "object",
+  "required": ["target_kind", "slowdown_factor_pct", "open_count"],
+  "properties": {
+    "target_kind": { "type": "string", "enum": ["void", "nearest_actor", "door", "item"] },
+    "target_id": { "type": ["integer", "null"], "minimum": 0 },
+    "slowdown_factor_pct": { "type": "integer", "minimum": 0, "maximum": 100 },
+    "multiplayer": { "type": "boolean" },
+    "open_count": { "type": "integer", "minimum": 0 },
+    "open_tick": { "type": "integer", "minimum": 0 }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "schema_version": "1.0.0",
+  "palette_id": "drone_collective",
+  "display_name": "Drone Collective",
+  "category": "faction",
+  "description": "Geometric swarm aesthetic; blue glow + hard edges; no flesh.",
+  "colors": [
+    { "role": "primary", "hex": "#1c2230", "comment": "dark chassis" },
+    { "role": "secondary", "hex": "#0a0e16", "comment": "deep void" },
+    { "role": "accent", "hex": "#3a8cff", "comment": "data blue" },
+    { "role": "highlight", "hex": "#9ecdff", "comment": "data glow" },
+    { "role": "light", "hex": "#4a5870", "comment": "panel light" },
+    { "role": "dark", "hex": "#04070c", "comment": "ink void" },
+    { "role": "metal", "hex": "#2a3a52", "comment": "alloy" },
+    { "role": "glow", "hex": "#c0e8ff", "comment": "circuitry glow" }
+  ],
+  "accent_pairs": [
+    { "fg": "#3a8cff", "bg": "#0a0e16" },
+    { "fg": "#9ecdff", "bg": "#1c2230" }
+  ]
+}

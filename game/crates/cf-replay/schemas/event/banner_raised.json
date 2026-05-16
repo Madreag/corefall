@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/banner_raised.v1",
+  "title": "ux.banner_raised",
+  "description": "Emitted when a status banner enters the HUD banner stack. Severity is one of {critical, warning, info}. parent_event_id links back to the triggering event so the replay viewer can render a cause chain.",
+  "type": "object",
+  "required": ["banner_id", "severity"],
+  "properties": {
+    "banner_id": { "type": "string", "minLength": 1 },
+    "severity": { "type": "string", "enum": ["critical", "warning", "info"] },
+    "label": { "type": "string" },
+    "scenario_id": { "type": "string" },
+    "message": { "type": "string" },
+    "accessibility_id": { "type": "string" },
+    "raised_at_tick": { "type": "integer", "minimum": 0 },
+    "parent_event_id": { "type": "string" }
+  }
+}

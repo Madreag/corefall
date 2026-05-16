@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/equipment.item_dropped.v0.1",
+  "title": "equipment.item_dropped",
+  "type": "object",
+  "required": ["actor"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "slot": {"type": "integer", "minimum": 0},
+    "item_id": {"type": "string"}
+  },
+  "additionalProperties": true
+}

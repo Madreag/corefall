@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.0.0",
+  "style_id": "drone_collective",
+  "category": "faction",
+  "version": "1.0.0",
+  "silhouette_language": "geometric swarm aesthetic, blue glow accents, hard edges, no flesh",
+  "preferred_palette_roles": ["primary", "secondary", "accent", "highlight", "metal", "glow"],
+  "shape_descriptors": {
+    "weapon": "hexagonal coil receiver, faceted barrel, blue-LED indicator strip",
+    "actor": "drone chassis silhouette, segmented limb stubs, faceted head, blue eye-array",
+    "vehicle": "faceted hex-tile fuselage, no wheels (hover indicator), array-of-eye sensors",
+    "base_module": "hex-tile panel stack, modular drop-in cells, blue indicator bar",
+    "particle": "geometric data flicker + spark cascade",
+    "ui_icon": "hexagon frame, faceted inner mark, blue glow"
+  },
+  "geometric_primitives": {
+    "weapon": ["polygon", "rect", "line"],
+    "actor": ["polygon", "rect"],
+    "vehicle": ["polygon", "rect"],
+    "base_module": ["polygon", "rect"],
+    "particle": ["polygon", "line"],
+    "ui_icon": ["polygon", "line"]
+  }
+}

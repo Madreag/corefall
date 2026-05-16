@@ -15,6 +15,9 @@ anyhow = { workspace = true }
 clap = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+blake3 = { workspace = true }
 cf-actor = { path = "../cf-actor" }
 cf-physics = { path = "../cf-physics" }
 cf-equipment = { path = "../cf-equipment" }
@@ -22,7 +25,6 @@ cf-sim-core = { path = "../cf-sim-core" }
 
 [dev-dependencies]
 criterion = "0.5"
-serde_json = { workspace = true }
 
 [[bench]]
 name = "m1_hot_path"

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/terrain.debris_spawned.v0.1",
+  "title": "terrain.debris_spawned",
+  "description": "M9 § Destructible terrain — emitted when pixel destruction sheds debris particles (sand=slough, dirt=crumble, concrete=spall, metal=spark). Capped at material-specific count per pixel; flagged cosmetic=false in payload (replay determinism requires it to be in scope). Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "terrain" },
+    "event_type": { "const": "debris_spawned" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "pos": { "type": "array", "minItems": 2, "maxItems": 2 },
+        "material_id": { "type": "integer", "minimum": 0 },
+        "material_name": { "type": "string" },
+        "debris_count": { "type": "integer", "minimum": 0 },
+        "kind": { "type": "string" },
+        "parent_event_id": { "type": ["string", "null"] }
+      },
+      "required": ["pos", "material_id", "debris_count"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

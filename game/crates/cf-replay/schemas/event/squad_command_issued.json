@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/squad.command_issued.v0.1",
+  "title": "squad.command_issued",
+  "type": "object",
+  "required": ["kind"],
+  "properties": {
+    "bot_actor": {"type": ["integer", "null"], "minimum": 0},
+    "kind": {"type": "string", "enum": ["follow_leader", "hold_position", "defend_point", "push_to_waypoint"]},
+    "waypoint": {
+      "type": ["object", "null"],
+      "properties": {
+        "x": {"type": "number"},
+        "y": {"type": "number"}
+      }
+    }
+  },
+  "additionalProperties": true
+}

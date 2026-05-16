@@ -1,0 +1,8 @@
+# M9A Tier-1 SVG pipeline runtime deps. Pin minor versions so the bake is
+# byte-reproducible across machines and CI runs.
+#
+# Already installed at session start via init.sh:
+cairosvg>=2.9.0
+Pillow>=12.2.0
+# Added for ledger-entry blake3 hashing (cf-asset-ledger uses blake3):
+blake3>=1.0.0

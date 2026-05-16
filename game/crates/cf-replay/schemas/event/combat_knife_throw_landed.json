@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/combat.knife_throw_landed.v0.1",
+  "title": "combat.knife_throw_landed",
+  "type": "object",
+  "required": ["actor"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "stuck_target": {"type": "string", "enum": ["wall", "actor"]}
+  },
+  "additionalProperties": true
+}

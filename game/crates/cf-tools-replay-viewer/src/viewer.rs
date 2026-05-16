@@ -33,6 +33,13 @@ pub struct ViewerState {
     /// human / agent readers can confirm the state. The actual stepping is
     /// driven by re-invoking the CLI with a higher `at_tick`.
     pub paused: bool,
+    /// **M10 § View subcommand**: filter to events whose envelope
+    /// `actor_id`/`source_id`/payload-`actor_id` matches the requested
+    /// integer. `None` means no actor filter.
+    pub actor_id_filter: Option<u64>,
+    /// **M10 § View subcommand**: filter to events whose `event_type`
+    /// matches the requested string. `None` means no type filter.
+    pub event_type_filter: Option<String>,
 }
 
 impl Default for ViewerState {
@@ -43,6 +50,8 @@ impl Default for ViewerState {
             tail_len: DEFAULT_TAIL_LEN,
             since_event_id: None,
             paused: true,
+            actor_id_filter: None,
+            event_type_filter: None,
         }
     }
 }
@@ -125,6 +134,12 @@ pub fn render_markdown(bundle: &Bundle, state: &ViewerState) -> String {
         .map(|s| s.iter().cloned().collect::<Vec<_>>().join(","))
         .unwrap_or_else(|| "(all categories)".into());
     let _ = writeln!(out, "- Filter: `{filter_label}`");
+    if let Some(id) = state.actor_id_filter {
+        let _ = writeln!(out, "- Actor filter: `actor #{id}`");
+    }
+    if let Some(ty) = state.event_type_filter.as_deref() {
+        let _ = writeln!(out, "- Event-type filter: `{ty}`");
+    }
     let _ = writeln!(out, "- Tail length: {}", state.tail_len);
     let _ = writeln!(out);
 
@@ -134,6 +149,14 @@ pub fn render_markdown(bundle: &Bundle, state: &ViewerState) -> String {
         .filter(|e| e.tick <= state.at_tick)
         .filter(|e| match state.filter.as_ref() {
             Some(set) => set.contains(&e.category),
+            None => true,
+        })
+        .filter(|e| match state.actor_id_filter {
+            Some(id) => event_matches_actor(e, id),
+            None => true,
+        })
+        .filter(|e| match state.event_type_filter.as_deref() {
+            Some(ty) => e.event_type == ty,
             None => true,
         })
         .collect();
@@ -212,6 +235,97 @@ pub fn render_markdown(bundle: &Bundle, state: &ViewerState) -> String {
 
 fn compact_payload(value: &serde_json::Value) -> String {
     crate::text::compact_json_payload(value)
+}
+
+/// Match an event against an `actor_id` filter. The envelope-level
+/// `actor_id` / `source_id` are checked first, then the payload's
+/// well-known actor identifiers (`actor_id`, `target_actor_id`,
+/// `shooter_actor_id`, etc.). Used by `view --actor` filtering.
+pub(crate) fn event_matches_actor(event: &cf_replay::Event, actor_id: u64) -> bool {
+    if event.actor_id == Some(actor_id) || event.source_id == Some(actor_id) {
+        return true;
+    }
+    const KEYS: &[&str] = &[
+        "actor_id",
+        "actor",
+        "target_actor_id",
+        "shooter_actor_id",
+        "shooter",
+        "target",
+        "source_actor_id",
+        "owner_actor_id",
+    ];
+    for key in KEYS {
+        if event.payload.get(*key).and_then(|v| v.as_u64()) == Some(actor_id) {
+            return true;
+        }
+    }
+    false
+}
+
+/// **M10 § View subcommand — Watch mode**: tail an active `events.jsonl`
+/// + print new events as plain-language sentences as they appear.
+///
+/// `max_iterations` caps the poll loop so tests + finite runs terminate
+/// deterministically. `interval_ms` defaults to 100ms when zero.
+///
+/// Returns the number of plain-language event lines emitted on `writer`.
+pub fn watch_tail<W: std::io::Write>(
+    events_path: &std::path::Path,
+    writer: &mut W,
+    interval_ms: u64,
+    max_iterations: Option<u64>,
+) -> std::io::Result<u64> {
+    use std::fs::File;
+    use std::io::{BufRead, BufReader, Seek, SeekFrom};
+    use std::time::Duration;
+    let mut printed: u64 = 0;
+    let mut file = File::open(events_path)?;
+    let mut offset = file.seek(SeekFrom::End(0))?;
+    let mut iter = 0u64;
+    let interval = if interval_ms == 0 {
+        Duration::from_millis(100)
+    } else {
+        Duration::from_millis(interval_ms)
+    };
+    loop {
+        if let Some(max) = max_iterations {
+            if iter >= max {
+                break;
+            }
+        }
+        iter += 1;
+        let len = file.metadata()?.len();
+        if len > offset {
+            file.seek(SeekFrom::Start(offset))?;
+            let reader = BufReader::new(&file);
+            for line in reader.lines() {
+                let line = line?;
+                offset += (line.len() + 1) as u64; // +1 for newline
+                if line.trim().is_empty() {
+                    continue;
+                }
+                match serde_json::from_str::<cf_replay::Event>(&line) {
+                    Ok(event) => {
+                        writeln!(writer, "{}", crate::renderer::render_event_plain(&event))?;
+                        printed += 1;
+                    }
+                    Err(_) => {
+                        writeln!(writer, "[watch] skipping malformed line: {}", line)?;
+                    }
+                }
+            }
+        }
+        // If max_iterations is None, the loop blocks indefinitely. Callers
+        // are expected to manage Ctrl-C themselves; the default --watch
+        // flow does NOT pass a max.
+        if max_iterations.is_some() {
+            // tests use the bounded shape; never sleep in tests
+            continue;
+        }
+        std::thread::sleep(interval);
+    }
+    Ok(printed)
 }
 
 /// Parse an `event_id` string of the form `<run_id>:<tick>:<seq>` into the
@@ -388,6 +502,119 @@ mod tests {
         assert_eq!(parse_event_id_tick_seq("foo:abc:0"), None);
         // Missing seq → None.
         assert_eq!(parse_event_id_tick_seq("foo:1"), None);
+    }
+
+    #[test]
+    fn event_matches_actor_inspects_envelope_and_payload() {
+        // Envelope actor_id matches.
+        let mut event = cf_replay::Event {
+            schema_version: cf_replay::EVENT_SCHEMA_VERSION.to_string(),
+            run_id: "test".into(),
+            tick: 0,
+            sim_time_ms: 0.0,
+            event_id: "test:0:0".into(),
+            category: "system".into(),
+            event_type: "run_started".into(),
+            payload: serde_json::json!({}),
+            parent_event_id: None,
+            actor_id: Some(7),
+            source_id: None,
+            team: None,
+            pos: None,
+            bbox: None,
+            dropped_count: None,
+            cosmetic: None,
+            asset_ref: None,
+        };
+        assert!(event_matches_actor(&event, 7));
+        assert!(!event_matches_actor(&event, 9));
+        // Falls back to payload actor_id.
+        event.actor_id = None;
+        event.payload = serde_json::json!({"actor_id": 11});
+        assert!(event_matches_actor(&event, 11));
+        // Also matches `shooter_actor_id`.
+        event.payload = serde_json::json!({"shooter_actor_id": 13});
+        assert!(event_matches_actor(&event, 13));
+    }
+
+    #[test]
+    fn view_actor_filter_excludes_other_actors() {
+        let bundle = synthetic_bundle("actor_filter");
+        let state = ViewerState {
+            actor_id_filter: Some(1),
+            ..Default::default()
+        };
+        let md = render_markdown(&bundle, &state);
+        // weapon_fired in the synthetic bundle has shooter=1; it must appear.
+        assert!(md.contains("weapon_fired"), "rendered: {md}");
+        // run_started has no actor; it must NOT appear (filter is strict).
+        assert!(!md.contains("run_started"));
+    }
+
+    #[test]
+    fn view_event_type_filter_narrows_to_single_event_type() {
+        let bundle = synthetic_bundle("event_type_filter");
+        let state = ViewerState {
+            event_type_filter: Some("command_accepted".to_string()),
+            ..Default::default()
+        };
+        let md = render_markdown(&bundle, &state);
+        assert!(md.contains("command_accepted"));
+        assert!(!md.contains("weapon_fired"));
+        assert!(!md.contains("run_finished"));
+    }
+
+    #[test]
+    fn watch_tail_emits_new_events_with_plain_language() {
+        use std::io::Write;
+        let mut p = std::env::temp_dir();
+        p.push(format!("cf_replay_viewer_watch_{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&p);
+        std::fs::create_dir_all(&p).unwrap();
+        let path = p.join("events.jsonl");
+        std::fs::write(&path, "").unwrap();
+        // Append two events.
+        let mut f = std::fs::OpenOptions::new().append(true).open(&path).unwrap();
+        writeln!(
+            f,
+            "{}",
+            serde_json::to_string(&serde_json::json!({
+                "schema_version": "prototype-recorder-event.v0.1",
+                "run_id": "watch_test",
+                "tick": 0,
+                "sim_time_ms": 0.0,
+                "event_id": "watch_test:0:0",
+                "category": "system",
+                "event_type": "run_started",
+                "payload": {}
+            }))
+            .unwrap()
+        )
+        .unwrap();
+        writeln!(
+            f,
+            "{}",
+            serde_json::to_string(&serde_json::json!({
+                "schema_version": "prototype-recorder-event.v0.1",
+                "run_id": "watch_test",
+                "tick": 1,
+                "sim_time_ms": 16.0,
+                "event_id": "watch_test:1:1",
+                "category": "actor",
+                "event_type": "actor_died",
+                "payload": {"actor_id": 7, "cause": "projectile"}
+            }))
+            .unwrap()
+        )
+        .unwrap();
+        drop(f);
+        let mut out: Vec<u8> = Vec::new();
+        let printed = watch_tail(&path, &mut out, 0, Some(1)).unwrap();
+        let s = String::from_utf8(out).unwrap();
+        assert_eq!(printed, 2);
+        assert!(s.contains("run started"));
+        assert!(s.contains("died"));
+        let _ = std::fs::remove_dir_all(&p);
     }
 
     #[test]

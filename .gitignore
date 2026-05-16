@@ -125,3 +125,8 @@ Desktop.ini
 # canonical artifacts — the iconset/ dir is a multi-size PNG set we hand to
 # `iconutil -c icns` and is regenerated on demand by `generate_icons.py`.
 game/tools/release/icon.iconset/
+
+# cf-asset-ledger cross-process flock advisory file (Tier 2 audio bake uses
+# fcntl on this path during concurrent voice/sfx/music writes; the file is
+# transient and ephemeral, never carries content).
+content/asset_ledger/.ledger.lock

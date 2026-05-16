@@ -41,11 +41,164 @@
     clippy::needless_pass_by_value
 )]
 
+pub mod components;
+pub mod constants;
+pub mod cover;
+pub mod lean;
 pub mod sim;
+pub mod stamina;
+pub mod stance;
+pub mod systems;
+pub mod ttd;
+
+pub use cover::{CoverSide, CoverState};
+pub use lean::{LeanDirection, LeanState, LEAN_MAX_DEGREES};
+pub use stamina::{Stamina, SPRINT_STAMINA_DRAIN_PER_S, SPRINT_STAMINA_RECOVERY_PER_S};
+pub use stance::{derive_stance, fire_allowed_in_stance, is_cinematic, stance_bloom_factor, StanceInputs};
+pub use ttd::{AiDifficulty, InterimTtdContract, TtdAfflictionKind, TtdContract, TtdOrigin};
+
+/// **M6**: side-view facing direction. Updated when the player aims; the
+/// sprite renderer flips horizontally on change. M13 chassis adds armor
+/// zone visibility per facing direction (spec § "Side-view facing direction
+/// + limb-loss action restrictions (M13 forward-compat)").
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum FacingDirection {
+    Left = 0,
+    Right = 1,
+}
+
+impl Default for FacingDirection {
+    fn default() -> Self {
+        FacingDirection::Right
+    }
+}
+
+impl FacingDirection {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            FacingDirection::Left => "left",
+            FacingDirection::Right => "right",
+        }
+    }
+
+    /// Flip the facing direction.
+    pub fn flipped(self) -> Self {
+        match self {
+            FacingDirection::Left => FacingDirection::Right,
+            FacingDirection::Right => FacingDirection::Left,
+        }
+    }
+
+    /// Derive facing from an aim vector. Right-half-plane returns Right.
+    pub fn from_aim(aim: Vec2) -> Self {
+        if aim.x >= 0.0 {
+            FacingDirection::Right
+        } else {
+            FacingDirection::Left
+        }
+    }
+
+    pub fn sign(self) -> f32 {
+        match self {
+            FacingDirection::Left => -1.0,
+            FacingDirection::Right => 1.0,
+        }
+    }
+}
+
+/// **M6 (M13 forward-compat)**: per-limb loss tracking. M6 only sets these
+/// flags via scenario seed / debug commands so the action-rejection surface
+/// can be tested before M13 chassis ships full limb damage routing. Each
+/// flag rejects a specific action category per spec § "Limb-loss action
+/// restrictions".
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct LimbLossFlags {
+    pub both_arms_lost: bool,
+    pub single_arm_lost: bool,
+    pub both_legs_lost: bool,
+    pub single_leg_lost: bool,
+    pub both_hands_lost: bool,
+    pub backpack_lost: bool,
+    pub head_destroyed: bool,
+    pub torso_destroyed: bool,
+}
+
+impl LimbLossFlags {
+    /// True when the actor cannot fire any weapon (both arms lost or both
+    /// hands lost).
+    pub fn weapon_fire_disabled(self) -> bool {
+        self.both_arms_lost || self.both_hands_lost
+    }
+
+    /// True when two-hand weapons are rejected (single arm lost).
+    pub fn two_hand_weapon_disabled(self) -> bool {
+        self.single_arm_lost
+    }
+
+    /// True when sprint / jump / vault / climb are rejected.
+    pub fn movement_disabled(self) -> bool {
+        self.both_legs_lost
+    }
+
+    /// True when sprint / jump are rejected (but reduced-mobility movement still ok).
+    pub fn sprint_disabled(self) -> bool {
+        self.both_legs_lost || self.single_leg_lost
+    }
+
+    /// True for instant-death conditions.
+    pub fn instant_death(self) -> bool {
+        self.head_destroyed || self.torso_destroyed
+    }
+
+    /// Short reason label per spec § "Limb-loss action restrictions".
+    /// Returns the most-specific reason that applies for the given action.
+    pub fn reject_reason_for(self, action: &str) -> Option<&'static str> {
+        match action {
+            "fire" | "throw_grenade" | "knife_throw" => {
+                if self.both_hands_lost {
+                    Some("no_hands_for_grip")
+                } else if self.both_arms_lost {
+                    Some("no_arms_for_weapon")
+                } else {
+                    None
+                }
+            }
+            "two_hand_fire" => {
+                if self.single_arm_lost {
+                    Some("single_arm_two_hand_weapon_rejected")
+                } else {
+                    None
+                }
+            }
+            "sprint" | "jump" | "vault" | "climb_up" | "climb_down" => {
+                if self.both_legs_lost {
+                    Some("no_legs_for_movement")
+                } else if self.single_leg_lost {
+                    Some("single_leg_reduced_mobility")
+                } else {
+                    None
+                }
+            }
+            "deploy_jet" => {
+                if self.backpack_lost {
+                    Some("backpack_lost_no_jet")
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+}
 
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
+
+use cf_equipment::{AdvancedFireMode, BipodState};
 
 /// Stable per-actor id. Allocated by the scenario loader; future networking will
 /// reuse the same id space across the wire.
@@ -151,6 +304,39 @@ pub enum Stance {
     /// W1.3: temporarily stunned by stability loss. Actor cannot accept input
     /// but is not Downed (will recover in knockdown_ticks_remaining ticks).
     KnockedDown = 10,
+    /// M6: explicit upright-stationary stance (modern tactical shooter
+    /// surface; distinct from `Idle` so HUD/AI can name it directly).
+    Stand = 11,
+    /// M6: sprinting (faster than running; depletes stamina).
+    Sprint = 12,
+    /// M6: crouch-walking (speed below run threshold while crouched).
+    CrouchWalk = 13,
+    /// M6: prone-stationary (lowest silhouette; bipod-deployable).
+    Prone = 14,
+    /// M6: prone-crawling (moving while prone).
+    ProneWalk = 15,
+    /// M6: sprint-to-crouch transition (600 ms with i-frames).
+    Slide = 16,
+    /// M6: vaulting over low cover (800 ms; transitions to other side).
+    Vault = 17,
+    /// M6: forward-roll evasive (600 ms; brief i-frames).
+    Dive = 18,
+    /// M6: leaning around corner (lean_angle in `ActorState::lean_angle`).
+    Lean = 19,
+    /// M6: explicit DYING dwell stance (visually distinct from Downed).
+    Dying = 20,
+    /// M6: rope climbing (reserved; ladder takes priority for M6).
+    RopeClimb = 21,
+    /// M6: ladder climbing (1500 ms transition to top).
+    LadderClimb = 22,
+    /// M6: pipe climbing.
+    PipeClimb = 23,
+    /// M6: stealth-kill animation in progress (instant kill once landed).
+    StealthAttack = 24,
+    /// M6: knife throw windup + release.
+    KnifeThrow = 25,
+    /// M16+ reserved: aquatic locomotion.
+    Swim = 26,
 }
 
 impl Stance {
@@ -174,7 +360,41 @@ impl Stance {
             Stance::Jetting => "jetting",
             Stance::Ejecting => "ejecting",
             Stance::KnockedDown => "knocked_down",
+            Stance::Stand => "stand",
+            Stance::Sprint => "sprint",
+            Stance::CrouchWalk => "crouch_walk",
+            Stance::Prone => "prone",
+            Stance::ProneWalk => "prone_walk",
+            Stance::Slide => "slide",
+            Stance::Vault => "vault",
+            Stance::Dive => "dive",
+            Stance::Lean => "lean",
+            Stance::Dying => "dying",
+            Stance::RopeClimb => "rope_climb",
+            Stance::LadderClimb => "ladder_climb",
+            Stance::PipeClimb => "pipe_climb",
+            Stance::StealthAttack => "stealth_attack",
+            Stance::KnifeThrow => "knife_throw",
+            Stance::Swim => "swim",
         }
+    }
+
+    /// M6: returns true when this stance prevents the actor from firing
+    /// (slide/vault/dive/stealth attack/knife throw + dead/downed/dying/knockdown).
+    pub fn locks_fire(self) -> bool {
+        matches!(
+            self,
+            Stance::Slide
+                | Stance::Vault
+                | Stance::Dive
+                | Stance::StealthAttack
+                | Stance::KnifeThrow
+                | Stance::Dead
+                | Stance::Downed
+                | Stance::Dying
+                | Stance::KnockedDown
+                | Stance::Ejecting
+        )
     }
 
     /// Derive stance from kinematic + status state. Pure; no clock reads.
@@ -372,8 +592,13 @@ pub struct Inventory {
 
 impl Default for Inventory {
     fn default() -> Self {
+        // M6: 8 active slots per spec § Inventory. M1 / M1.5 / M2 scenarios
+        // populate slot 0 with the rifle and leave 1..=7 empty; M6+ scenarios
+        // can hand-author all 8 active slots. The 3 reserved tank slots are
+        // surfaced only through `ActorObservation::inventory_extended`
+        // (locked at M6; M17 fills GasTank instances).
         Self {
-            items: vec![InventoryItem::Empty; 4],
+            items: vec![InventoryItem::Empty; 8],
             selected: ItemSlot(0),
         }
     }
@@ -671,6 +896,129 @@ pub struct ActorState {
     /// at M5 baseline; serde-default preserves backward compat.
     #[serde(default)]
     pub afflictions: Vec<Affliction>,
+    /// **M6**: side-view facing direction. Updates on aim; flips sprite.
+    #[serde(default)]
+    pub facing: FacingDirection,
+    /// **M6**: stamina pool driving Sprint stance.
+    #[serde(default)]
+    pub stamina: Stamina,
+    /// **M6**: lean angle + direction (for "lean around corner").
+    #[serde(default)]
+    pub lean_state: LeanState,
+    /// **M6**: current cover state (side + effectiveness).
+    #[serde(default)]
+    pub cover_state: CoverState,
+    /// **M6**: sticky sprint intent (toggled by act.player.sprint).
+    #[serde(default)]
+    pub sprint_active: bool,
+    /// **M6**: sticky prone intent (toggled by act.player.prone).
+    #[serde(default)]
+    pub prone_active: bool,
+    /// **M6**: animation-bound stance ticks remaining (slide / vault / dive / climb).
+    /// 0 when no animation is playing.
+    #[serde(default)]
+    pub cinematic_ticks_remaining: u32,
+    /// **M6**: which cinematic stance is currently playing.
+    #[serde(default)]
+    pub cinematic_kind: Option<Stance>,
+    /// **M6**: latched stealth-meter value (0..1).
+    #[serde(default)]
+    pub stealth_meter: f32,
+    /// **M6 (M13 forward-compat)**: limb-loss tracking + action restriction surface.
+    /// Per spec § "Limb-loss action restrictions": M6 reserves the surface;
+    /// M13 chassis fills physics-driven limb damage.
+    #[serde(default)]
+    pub limb_loss: LimbLossFlags,
+    /// **M6**: total inventory weight (kg). Recomputed each tick; > 30 kg
+    /// forces Walk per spec § "Weight system".
+    #[serde(default)]
+    pub inventory_weight_kg: f32,
+    /// **M6**: bipod attachment + deployment state on the equipped weapon.
+    /// When deployed, the firing path multiplies recoil by
+    /// [`cf_equipment::BIPOD_RECOIL_FACTOR`] and bloom by
+    /// [`cf_equipment::BIPOD_BLOOM_FACTOR`].
+    #[serde(default = "default_bipod_equipped")]
+    pub bipod: cf_equipment::Bipod,
+    /// **M6**: suppressor attachment state on the equipped weapon. When
+    /// attached, the firing path multiplies loudness by
+    /// [`cf_equipment::SUPPRESSOR_LOUDNESS_FACTOR`].
+    #[serde(default)]
+    pub suppressor: cf_equipment::Suppressor,
+    /// **M6**: per-tool durability map (tool kind → Durability). Filled
+    /// lazily on first `act.player.use_tool` so existing scenarios serialize
+    /// cleanly.
+    #[serde(default)]
+    pub tool_durability: std::collections::BTreeMap<String, cf_equipment::Durability>,
+    /// **M6**: true while a [`cf_equipment::WeaponSwap`] is in flight for
+    /// this actor. The firing path in `sim::fire_actor` gates on this so
+    /// fire/reload intent is rejected during the swap window.
+    #[serde(default)]
+    pub weapon_swap_in_progress: bool,
+    /// **M6**: cook-time accumulator (seconds) for the currently-held
+    /// grenade. Reset on throw or grenade swap.
+    #[serde(default)]
+    pub grenade_cook_seconds: f32,
+    /// **M6**: which grenade kind is currently equipped (held). `None`
+    /// when no grenade slot is selected. Defaults to Frag at spawn so the
+    /// spec's "Cook grenade for shorter fuse" Gherkin reproduces.
+    #[serde(default = "default_grenade_kind")]
+    pub grenade_held_kind: Option<cf_equipment::GrenadeKind>,
+    /// **M6**: remaining fuse on the held grenade after cooking. Initial
+    /// value is the grenade's base fuse; cook_grenade subtracts elapsed
+    /// cook time.
+    #[serde(default)]
+    pub grenade_held_fuse_remaining: f32,
+    /// **M6**: drill heat accumulator (0..1). Above
+    /// `cf_equipment::DRILL_JAM_HEAT_THRESHOLD` the drill jams + emits
+    /// `equipment.drill_overheated`. Decays at
+    /// `cf_equipment::DRILL_HEAT_DECAY_PER_S` per second when idle.
+    #[serde(default)]
+    pub drill_heat: f32,
+    /// **M6**: tick at which sensor-pulse reveal expires for this actor.
+    /// 0 when not revealed. Set by `act.player.use_tool { kind:
+    /// "sensor_pulse" }` for hostile actors within the reveal radius.
+    #[serde(default)]
+    pub reveal_until_tick: u64,
+    /// **M6**: cached [`AdvancedFireMode`] for the actor's currently
+    /// selected weapon. `act.player.cycle_fire_mode` rotates this through
+    /// the weapon's `FireModeSet::available` list; the firing path consults
+    /// it to gate Burst3 / Charge / Arc semantics. Default `Single` matches
+    /// the cold-start weapon state.
+    #[serde(default)]
+    pub weapon_fire_mode: cf_equipment::AdvancedFireMode,
+    /// **M6**: charge-mode accumulator scalar in `0..=1`. Ticks up while
+    /// the trigger is held under `AdvancedFireMode::Charge`; clamps to 1.0
+    /// at full charge (per [`cf_equipment::SNIPER_CHARGE_MAX_SECONDS`]).
+    /// Reset to 0 on trigger release.
+    #[serde(default)]
+    pub weapon_charge_fraction: f32,
+    /// **M6**: queued follow-up shots for `AdvancedFireMode::Burst3`. Seeded
+    /// to `BURST3_ROUND_COUNT - 1` when the first round of a 3-round burst
+    /// fires through the M1 path; decremented as each follow-up round
+    /// fires from the M6 tick scheduler.
+    #[serde(default)]
+    pub burst3_remaining_shots: u32,
+    /// **M6**: seconds remaining until the next burst-3 follow-up shot
+    /// fires. Reset to [`cf_equipment::BURST3_INTER_SHOT_SECONDS`] each
+    /// time a follow-up round leaves the muzzle so the 3-round burst
+    /// completes within 100 ms per spec § "SMG burst-3 fire mode".
+    #[serde(default)]
+    pub burst3_next_fire_at_seconds: f32,
+    /// **M6**: trigger-state edge tracker for Charge-mode release detection.
+    /// `true` the tick after the player begins holding fire; transitions
+    /// to `false` on release, at which point the engine fires one
+    /// charge-scaled shot.
+    #[serde(default)]
+    pub fire_held_prev: bool,
+}
+
+fn default_bipod_equipped() -> cf_equipment::Bipod {
+    cf_equipment::Bipod::equipped_default()
+}
+
+#[allow(clippy::unnecessary_wraps)]
+fn default_grenade_kind() -> Option<cf_equipment::GrenadeKind> {
+    Some(cf_equipment::GrenadeKind::Frag)
 }
 
 /// **M5.8 forward-hook (DR-040 ResourceAccumulators)**: per-actor resource
@@ -807,6 +1155,31 @@ impl ActorState {
             bloom_factor: default_bloom_factor(),
             resources: ResourceAccumulators::default(),
             afflictions: Vec::new(),
+            facing: FacingDirection::Right,
+            stamina: Stamina::full(),
+            lean_state: LeanState::default(),
+            cover_state: CoverState::open(),
+            sprint_active: false,
+            prone_active: false,
+            cinematic_ticks_remaining: 0,
+            cinematic_kind: None,
+            stealth_meter: 0.0,
+            limb_loss: LimbLossFlags::default(),
+            inventory_weight_kg: 0.0,
+            bipod: cf_equipment::Bipod::equipped_default(),
+            suppressor: cf_equipment::Suppressor::default(),
+            tool_durability: std::collections::BTreeMap::new(),
+            weapon_swap_in_progress: false,
+            grenade_cook_seconds: 0.0,
+            grenade_held_kind: Some(cf_equipment::GrenadeKind::Frag),
+            grenade_held_fuse_remaining: 5.0,
+            drill_heat: 0.0,
+            reveal_until_tick: 0,
+            weapon_fire_mode: cf_equipment::AdvancedFireMode::Single,
+            weapon_charge_fraction: 0.0,
+            burst3_remaining_shots: 0,
+            burst3_next_fire_at_seconds: 0.0,
+            fire_held_prev: false,
         }
     }
 
@@ -871,6 +1244,30 @@ impl ActorState {
         if let Some(chassis) = self.chassis.as_mut() {
             chassis.reset();
         }
+        self.facing = FacingDirection::Right;
+        self.stamina.reset();
+        self.lean_state.reset();
+        self.cover_state = CoverState::open();
+        self.sprint_active = false;
+        self.prone_active = false;
+        self.cinematic_ticks_remaining = 0;
+        self.cinematic_kind = None;
+        self.stealth_meter = 0.0;
+        self.inventory_weight_kg = 0.0;
+        self.bipod = cf_equipment::Bipod::equipped_default();
+        self.suppressor = cf_equipment::Suppressor::default();
+        self.tool_durability.clear();
+        self.weapon_swap_in_progress = false;
+        self.grenade_cook_seconds = 0.0;
+        self.grenade_held_kind = Some(cf_equipment::GrenadeKind::Frag);
+        self.grenade_held_fuse_remaining = 5.0;
+        self.drill_heat = 0.0;
+        self.reveal_until_tick = 0;
+        self.weapon_fire_mode = cf_equipment::AdvancedFireMode::Single;
+        self.weapon_charge_fraction = 0.0;
+        self.burst3_remaining_shots = 0;
+        self.burst3_next_fire_at_seconds = 0.0;
+        self.fire_held_prev = false;
     }
 
     /// Apply damage with a cause string. Returns the new status if it changed.
@@ -1395,10 +1792,155 @@ pub struct ActorObservation {
     /// 1.0 = standing/walking; >1 = movement / airborne / sharp-aim breakup.
     #[serde(default = "default_bloom_factor")]
     pub bloom_factor: f32,
+    /// **M6**: side-view facing direction.
+    #[serde(default)]
+    pub facing: String,
+    /// **M6**: stamina pool current value (0..1).
+    #[serde(default)]
+    pub stamina: f32,
+    /// **M6**: stamina pool capacity (>=1.0 if extended).
+    #[serde(default)]
+    pub stamina_max: f32,
+    /// **M6**: sticky sprint intent.
+    #[serde(default)]
+    pub sprint_active: bool,
+    /// **M6**: sticky prone intent.
+    #[serde(default)]
+    pub prone_active: bool,
+    /// **M6**: current lean angle (degrees; negative=left, positive=right).
+    #[serde(default)]
+    pub lean_angle_degrees: f32,
+    /// **M6**: current lean direction (none/left/right).
+    #[serde(default)]
+    pub lean_direction: String,
+    /// **M6**: latched stealth meter (0..1).
+    #[serde(default)]
+    pub stealth_meter: f32,
+    /// **M6**: HUD spotted-caption flag.
+    #[serde(default)]
+    pub spotted: bool,
+    /// **M6**: cover side (none/left/right/both).
+    #[serde(default)]
+    pub cover_side: String,
+    /// **M6**: cover effectiveness 0..1.
+    #[serde(default)]
+    pub cover_effectiveness: f32,
+    /// **M6**: total inventory weight (kg).
+    #[serde(default)]
+    pub inventory_weight_kg: f32,
+    /// **M6**: true when weight forces walking (>30kg).
+    #[serde(default)]
+    pub weight_forces_walk: bool,
+    /// **M6 (M13 forward-compat)**: per-limb loss flags surfaced for the HUD
+    /// + action-rejection contract.
+    #[serde(default)]
+    pub limb_loss: LimbLossFlags,
+    /// **M6**: extended inventory slots (8 active + 3 reserved tank).
+    /// Each entry includes kind + state ("empty" / "occupied" / "locked")
+    /// + the locked tooltip on the reserved slots.
+    #[serde(default)]
+    pub inventory_extended: Vec<ExtendedInventorySlotView>,
+    /// **M6**: weapon-state projection (mag_remaining, fire_mode, bipod_state,
+    /// suppressor_attached, reload_state, charge_fraction). See
+    /// [`WeaponStateView`] for the shape contract.
+    #[serde(default)]
+    pub weapon_state: WeaponStateView,
 }
 
-impl From<&ActorState> for ActorObservation {
-    fn from(actor: &ActorState) -> Self {
+/// **M6**: extended-inventory slot projection. Mirrors
+/// `cf_equipment::inventory::ExtendedSlot` but lives here so observe.actor
+/// stays a pure cf-actor projection.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct ExtendedInventorySlotView {
+    pub kind: String,
+    pub state: String,
+    #[serde(default)]
+    pub item_id: String,
+    #[serde(default)]
+    pub weight_kg: f32,
+    #[serde(default)]
+    pub locked_tooltip: Option<String>,
+}
+
+/// **M6**: high-level reload-state projection for [`WeaponStateView`].
+///
+/// `Idle` covers both "ready to fire" and "between shots / pump-action
+/// chamber" — anything that is not actively in a multi-tick reload animation.
+/// `Reloading` covers the multi-tick reload window driven by the M1
+/// `cf_equipment::RifleState::reload_remaining_ticks` counter (plus any
+/// future weapon-specific reload state machines).
+#[repr(u8)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Default, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ReloadState {
+    #[default]
+    Idle = 0,
+    Reloading = 1,
+}
+
+impl ReloadState {
+    pub fn as_str(self) -> &'static str {
+        match self {
+            ReloadState::Idle => "idle",
+            ReloadState::Reloading => "reloading",
+        }
+    }
+}
+
+/// **M6**: per-actor weapon-state observation projection (the spec § "Crates
+/// / modules touched / cf-actor" bullet "ActorObservation extensions
+/// (cover_state, stamina, lean_angle, weapon_state)" weapon_state field).
+///
+/// Six fields are surfaced, all live:
+///
+/// - `mag_remaining` — current rounds in the chambered magazine, read from
+///   the live [`cf_equipment::RifleState::ammo_in_mag`] when the engine
+///   passes a rifle handle; falls back to the rifle preset's `mag_capacity`
+///   when no rifle state is available (e.g. test paths).
+/// - `fire_mode` — extended fire-mode discriminator
+///   ([`cf_equipment::AdvancedFireMode`]) reflecting the live
+///   `ActorState::weapon_fire_mode`. Rotated by
+///   `act.player.cycle_fire_mode`.
+/// - `bipod_state` — current [`cf_equipment::BipodState`] (`Stowed` /
+///   `Deployed`) read from `ActorState::bipod.state`.
+/// - `suppressor_attached` — true when `ActorState::suppressor.attached`
+///   is set on the actor's currently-equipped weapon.
+/// - `reload_state` — [`ReloadState`] reload-window discriminator (`Idle`
+///   vs `Reloading`), derived from
+///   [`cf_equipment::RifleState::reload_remaining_ticks`] (`Reloading` when
+///   `> 0`, otherwise `Idle`). Defaults to `Idle` when no rifle handle is
+///   threaded through.
+/// - `charge_fraction` — charge-mode (e.g. sniper) accumulator scalar
+///   `0..1` from `ActorState::weapon_charge_fraction`. 0.0 when the
+///   weapon is not in `AdvancedFireMode::Charge` mode or the trigger
+///   has not been held this trigger cycle.
+///
+/// The shape is deliberately additive — every field carries a default so the
+/// observation surface remains consistent for the conversion paths that
+/// only see [`ActorState`]. Engine code that has the per-actor
+/// [`cf_equipment::RifleState`] in hand should use
+/// [`ActorObservation::from_actor_and_rifle`] so the magazine + reload
+/// fields reflect the live tick state.
+#[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct WeaponStateView {
+    pub mag_remaining: u32,
+    pub fire_mode: AdvancedFireMode,
+    pub bipod_state: BipodState,
+    pub suppressor_attached: bool,
+    pub reload_state: ReloadState,
+    pub charge_fraction: f32,
+}
+
+impl ActorObservation {
+    /// **M6**: build an [`ActorObservation`] with the per-actor rifle state
+    /// threaded through so [`WeaponStateView::mag_remaining`] and
+    /// [`WeaponStateView::reload_state`] reflect the live tick values from
+    /// the engine's [`crate::sim::RifleStates`] map. Pass `None` from
+    /// contexts that don't track rifle state (tests, benches, and any
+    /// pre-rifle-allocation path); the magazine field falls back to the
+    /// rifle preset's `mag_capacity` and reload reports `Idle`.
+    pub fn from_actor_and_rifle(actor: &ActorState, rifle: Option<&cf_equipment::RifleState>) -> Self {
         Self {
             id: actor.id.0,
             team: actor.team.clone(),
@@ -1429,6 +1971,124 @@ impl From<&ActorState> for ActorObservation {
             dying_dwell_ticks_remaining: actor.dying_dwell_ticks_remaining,
             mission_critical: actor.mission_critical,
             bloom_factor: actor.bloom_factor,
+            facing: actor.facing.as_str().to_string(),
+            stamina: actor.stamina.current,
+            stamina_max: actor.stamina.max,
+            sprint_active: actor.sprint_active,
+            prone_active: actor.prone_active,
+            lean_angle_degrees: actor.lean_state.angle_degrees,
+            lean_direction: actor.lean_state.direction.as_str().to_string(),
+            stealth_meter: actor.stealth_meter,
+            spotted: actor.stealth_meter >= 0.5,
+            cover_side: actor.cover_state.side.as_str().to_string(),
+            cover_effectiveness: actor.cover_state.effectiveness,
+            inventory_weight_kg: actor.inventory_weight_kg,
+            weight_forces_walk: actor.inventory_weight_kg > 30.0,
+            limb_loss: actor.limb_loss,
+            inventory_extended: actor.extended_inventory_view(),
+            weapon_state: actor.weapon_state_view(rifle),
+        }
+    }
+}
+
+impl From<&ActorState> for ActorObservation {
+    fn from(actor: &ActorState) -> Self {
+        Self::from_actor_and_rifle(actor, None)
+    }
+}
+
+impl ActorState {
+    /// **M6**: build the extended-inventory projection (8 active slots + 3
+    /// tank slots, with the tank slots reporting `state="locked"`).
+    ///
+    /// Slots 0..=7 mirror the actor's `Inventory.items` (8-slot vec on
+    /// M6+; legacy 4-slot vecs naturally project as empty for the upper
+    /// 4 slots). Slots 8..=10 are the M17 forward-compat tank slots and
+    /// always report `state="locked"`.
+    pub fn extended_inventory_view(&self) -> Vec<ExtendedInventorySlotView> {
+        let slot_kinds = [
+            "primary",
+            "secondary",
+            "sidearm",
+            "tool1",
+            "tool2",
+            "grenade",
+            "medical",
+            "special",
+        ];
+        let tank_kinds = [
+            ("tank_primary", "Reserved — see M17 for tank ladder"),
+            ("tank_secondary", "Reserved — see M17 for tank ladder"),
+            ("tank_utility", "Reserved — see M17 for tank ladder"),
+        ];
+        let mut out = Vec::with_capacity(slot_kinds.len() + tank_kinds.len());
+        for (i, name) in slot_kinds.iter().enumerate() {
+            let item = self.inventory.items.get(i).cloned().unwrap_or(InventoryItem::Empty);
+            let (state, item_id, weight) = match &item {
+                InventoryItem::Empty => ("empty", String::new(), 0.0),
+                InventoryItem::Rifle { preset } => ("occupied", preset.clone(), 3.5),
+            };
+            out.push(ExtendedInventorySlotView {
+                kind: (*name).to_string(),
+                state: state.to_string(),
+                item_id,
+                weight_kg: weight,
+                locked_tooltip: None,
+            });
+        }
+        for (name, tooltip) in &tank_kinds {
+            out.push(ExtendedInventorySlotView {
+                kind: (*name).to_string(),
+                state: "locked".to_string(),
+                item_id: String::new(),
+                weight_kg: 0.0,
+                locked_tooltip: Some((*tooltip).to_string()),
+            });
+        }
+        out
+    }
+
+    /// **M6**: project a [`WeaponStateView`] for the actor's currently
+    /// selected weapon. All six fields are now live:
+    ///
+    /// - `mag_remaining` reads from
+    ///   [`cf_equipment::RifleState::ammo_in_mag`] when the caller threads
+    ///   the per-actor rifle state; otherwise falls back to the rifle
+    ///   preset's `mag_capacity` (and `0` when the active slot is not a
+    ///   rifle).
+    /// - `fire_mode` reads [`ActorState::weapon_fire_mode`] (rotated by
+    ///   `act.player.cycle_fire_mode`).
+    /// - `bipod_state` reads [`ActorState::bipod.state`].
+    /// - `suppressor_attached` reads [`ActorState::suppressor.attached`].
+    /// - `reload_state` is derived from
+    ///   [`cf_equipment::RifleState::reload_remaining_ticks`] (`Reloading`
+    ///   when `> 0`, `Idle` otherwise). When the caller passes `None`,
+    ///   `Idle` is reported.
+    /// - `charge_fraction` reads
+    ///   [`ActorState::weapon_charge_fraction`] (filled by the
+    ///   Charge-mode firing path).
+    ///
+    /// See the [`WeaponStateView`] doc comment for the full shape
+    /// contract.
+    pub fn weapon_state_view(&self, rifle: Option<&cf_equipment::RifleState>) -> WeaponStateView {
+        let mag_remaining = match (self.inventory.selected_item(), rifle) {
+            (InventoryItem::Rifle { .. }, Some(r)) => r.ammo_in_mag,
+            (InventoryItem::Rifle { preset }, None) => {
+                cf_equipment::rifle_preset(preset).map_or(0, |spec| spec.mag_capacity)
+            }
+            (InventoryItem::Empty, _) => 0,
+        };
+        let reload_state = match rifle {
+            Some(r) if r.reload_remaining_ticks > 0 => ReloadState::Reloading,
+            _ => ReloadState::Idle,
+        };
+        WeaponStateView {
+            mag_remaining,
+            fire_mode: self.weapon_fire_mode,
+            bipod_state: self.bipod.state,
+            suppressor_attached: self.suppressor.attached,
+            reload_state,
+            charge_fraction: self.weapon_charge_fraction.clamp(0.0, 1.0),
         }
     }
 }

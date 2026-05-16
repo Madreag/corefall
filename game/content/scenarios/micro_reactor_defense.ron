@@ -2,7 +2,7 @@
   schema_version: 1,
   id: "micro_reactor_defense",
   display_name: "Micro Reactor Defense",
-  description: "M2.5 fun-proof slice per spec/native-implementation-backlog M2.5-001..M2.5-006. Spawn west of the reactor; preserve the dirt shield mound or carve through it using M2 chunked terrain; survive a 30-second wave from one reactive guard who fires at the reactor. Win = reactor survives the timer; loss = reactor destroyed. Mission timer is 1800 ticks at 60 Hz (30 s wall time); the 60-90 s player-feel target lives in the manual-playtest gate. Reuses M1.5 cf-mission + cf-ai unchanged; the M2 chunked-terrain dirt shield is the reason the loop is fun.",
+  description: "M9 fun-proof reactor defense slice. Spawn west of the reactor; dig a trench in the dirt shield mound or hold cover; survive a 60-second wave from one reactive guard who fires at the reactor. Win = reactor survives the timer; loss = reactor destroyed. Mission timer is 3600 ticks at 60 Hz (60 s wall time). M9 reactor is forward-compat for the DR-027 command-core: mission_critical=true, role='command_core_predecessor', 3-layer External/Internal/Core armor cascade. Reuses M1.5 cf-mission + cf-ai unchanged; the M2 chunked-terrain dirt shield is the reason the loop is fun.",
   seed: 47,
   duration_ticks: Some(7200),
   region: (anchor: (0.0, 0.0), width: 1280.0, height: 720.0),
@@ -26,7 +26,10 @@
       ))),
   ],
   reactors: [
-    (id: "core_reactor", position: (640.0, 32.0), half_extents: (16.0, 16.0), hp: 80.0),
+    // M9: 100 HP per tough_crowd difficulty preset; cascades through
+    // External 60 / Internal 30 / Core 10 armor layers (loaded by the
+    // engine via Reactor::ensure_armor_layers on scenario load).
+    (id: "core_reactor", position: (640.0, 32.0), half_extents: (16.0, 16.0), hp: 100.0),
   ],
   terrain: Some((
     width_px: 1280,
@@ -51,10 +54,13 @@
   objectives: [
     (id: "defend_reactor", kind: { "kind": "defend_reactor", "target": "core_reactor" }),
   ],
-  mission: Some((time_limit_ticks: 1800, player_dead_loses: true)),
+  // M9: 60-second timer (3600 ticks @ 60 Hz). 120 Hz scenarios at the same
+  // wall-clock budget should use 7200; the engine's tick_rate_hz multiplier
+  // handles per-rate determinism.
+  mission: Some((time_limit_ticks: 3600, player_dead_loses: true)),
   director: None,
   capabilities: (debug: false, control_api: true, save_load: false),
   save_fields: [],
-  expected_tests: ["M2.5-WIN-01", "M2.5-LOSS-01"],
-  notes: "M2.5 micro reactor defense: dig a trench, hold the reactor through the timer. Win = reactor survives the wave; loss = reactor destroyed.",
+  expected_tests: ["M2.5-WIN-01", "M2.5-LOSS-01", "M9-REACTOR-DEFENSE-01"],
+  notes: "M9 micro reactor defense: dig a trench, hold the reactor through the 60-second timer. Win = reactor survives the wave; loss = reactor destroyed OR player dies OR player aborts. Reactor uses 3-layer armor cascade (External / Internal / Core); mission_critical=true blocks instant gib.",
 )

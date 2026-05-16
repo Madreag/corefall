@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/equipment.tool_broken.v0.1",
+  "title": "equipment.tool_broken",
+  "type": "object",
+  "required": ["actor", "tool"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "tool": {"type": "string"},
+    "durability": {"type": "number"}
+  },
+  "additionalProperties": true
+}

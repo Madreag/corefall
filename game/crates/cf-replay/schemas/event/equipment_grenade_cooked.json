@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/equipment.grenade_cooked.v0.1",
+  "title": "equipment.grenade_cooked",
+  "type": "object",
+  "required": ["actor"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "cook_seconds": {"type": "number", "minimum": 0.0}
+  },
+  "additionalProperties": true
+}

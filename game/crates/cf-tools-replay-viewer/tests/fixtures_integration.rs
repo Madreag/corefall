@@ -54,11 +54,18 @@ fn actor_died_cause_chain_walks_back_through_projectile_to_run_started() {
         ]
     );
     let md = render_markdown(&chain);
-    assert!(md.contains("actor_died"));
-    assert!(md.contains("projectile_hit"));
-    assert!(md.contains("weapon_fired"));
-    assert!(md.contains("command_accepted"));
-    assert!(md.contains("run_started"));
+    // M10 plain-language renderer: chain links render as sentences,
+    // not raw event_type tokens. The trigger heading still contains
+    // the literal event_type so it is grep-able.
+    assert!(md.contains("`actor_died`"), "trigger heading missing");
+    assert!(md.contains("died"), "plain-language `died` missing");
+    assert!(md.contains("shot hit"), "plain-language `shot hit` missing");
+    assert!(md.contains("fired"), "plain-language weapon-fired missing");
+    assert!(
+        md.contains("control accepted"),
+        "plain-language command_accepted missing"
+    );
+    assert!(md.contains("run started"), "plain-language run_started missing");
     assert!(md.contains("root reached"));
 }
 

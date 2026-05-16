@@ -1,0 +1,32 @@
+WorldLore (
+    world_id: "vulcan",
+    canonical_name: "Vulcan Magma Forge",
+    music_anchor: "music_world_vulcan",
+    entries: [
+        WorldEntry (
+            kind: "geology",
+            title: "The Inner Forge",
+            body: "Vulcan is a small, tidally-locked rocky body in the inner Sol orbit, approximately 2,800 kilometers in diameter, with a day-side surface temperature in excess of 700 Kelvin and a night-side temperature below 200 Kelvin. The day side is partially molten in places; basaltic magma vents reach the surface through fissures that open and close on cycles measured in Earth-decades. The night side is a frozen rock plain dotted with the cooled remnants of older eruptions. The terminator zone — the narrow ring of perpetual twilight between day and night — is the only inhabitable region, and even there, ambient temperatures swing by 150 Kelvin over a single Vulcan rotation. Pre-collapse mining concerns identified Vulcan as the richest source of rare-earth metals in the inner Sol system. The mines remain operational under heavy environmental shielding.",
+        ),
+        WorldEntry (
+            kind: "history",
+            title: "The Forge Treaty",
+            body: "Vulcan was not surveyed until the late pre-collapse period and was not commercially exploited until 2061, when the original mining concerns established the Forge — a heavily-armored extraction facility in the terminator zone, on the trailing hemisphere. The Forge survived the collapse intact and was, after the Lagrange Concordat, the only pre-collapse facility in the inner system to be transferred to Coalition administration without a fight. The arrangement was, by every account, a relief to the surviving workers, who had been operating under increasingly authoritarian corporate management. The modern Forge is jointly operated by the Coalition, the Crystalfold, and a small Husk presence in the deeper caverns that the Coalition has, by tacit agreement, declined to clear. The treaty governing the Forge is the longest continuously-observed document in Concordat history.",
+        ),
+        WorldEntry (
+            kind: "biosphere",
+            title: "The Magma Fauna",
+            body: "Vulcan has a native biosphere. The discovery, in 2161, of organisms in the surface magma vents — silicate-based, thermophilic, and structurally unlike anything else in the catalogued Sol system — produced the only sustained shift in Concordat-wide research priorities in the post-collapse era. The Vulcan magma fauna includes approximately two hundred catalogued species, the largest of which is the so-called Magma Worm, a silicate organism of approximately four meters in length that lives in the lava flows themselves and feeds on dissolved heavy metals. The Crystalfold consider the Vulcan magma fauna to be distant kin, and have, on three occasions, refused to allow the Collegium to sample them. The Husks have, by every available account, learned to eat them.",
+        ),
+        WorldEntry (
+            kind: "culture",
+            title: "The Cavern Towns",
+            body: "Vulcan's habitable settlements are entirely subsurface, dug into the terminator zone's basalt strata and connected by short transit tubes. Each settlement is a working town — the Forge, the Smelter, the Crucible, and approximately twenty smaller crew habitats — and each is organized around a single industrial function. The dominant culture on Vulcan is craft-driven and shift-based; workers identify by their trade before their faction, and disputes are mediated by a council of senior craftsmen that has, by tradition, declined to recognize the authority of any Concordat body. The Coalition garrison on Vulcan is small and largely ceremonial; the Frontier presence is moderate and concentrated on the salvage of pre-collapse equipment from the deeper caverns. The Crystalfold sing in the deep heat.",
+        ),
+        WorldEntry (
+            kind: "mystery",
+            title: "The Last Star Site",
+            body: "On the day-side surface of Vulcan, in a permanently-illuminated region where the magma vents are most active, sits a structure of unknown provenance. The structure is approximately one kilometer across, partially buried in cooled basalt, and visible only during the eruption cycles when the surrounding lava flows recede. It has been observed by Concordat surveys on seventeen separate occasions, sampled by remote drone on three, and successfully approached by ground expedition exactly once. The expedition team, a Starlight survey party of seven, returned with footage, no samples, and a single recorded statement: 'It is not finished.' The footage shows what appears to be an open archway. The expedition leader, Captain Hawthorne, has, in the years since, refused to discuss the matter. The Collegium has classified the file as restricted. The site is, by Coalition policy, off-limits indefinitely.",
+        ),
+    ],
+)

@@ -1,0 +1,24 @@
+{
+  "schema_version": "1.0.0",
+  "style_id": "scientist_order",
+  "category": "faction",
+  "version": "1.0.0",
+  "silhouette_language": "clean lines, lab coats, holographic visors, white + cyan + chrome palette",
+  "preferred_palette_roles": ["primary", "secondary", "accent", "highlight", "metal", "glow"],
+  "shape_descriptors": {
+    "weapon": "polished tube barrel, ribbed energy coils, clean rectilinear receiver, holographic sight",
+    "actor": "lab-coat skirted silhouette, full-visor helmet with cyan glow, glove-mounted controls",
+    "vehicle": "shielded mobile lab, dish-and-strut roof, glass viewport",
+    "base_module": "polished panel cabinet, holographic dial, clean rounded edges",
+    "particle": "data flicker, hologram fragment",
+    "ui_icon": "clean stroke, circular frame, cyan inner dot"
+  },
+  "geometric_primitives": {
+    "weapon": ["rect", "ellipse", "circle"],
+    "actor": ["rect", "ellipse", "circle"],
+    "vehicle": ["rect", "ellipse"],
+    "base_module": ["rect", "circle", "ellipse"],
+    "particle": ["circle", "ellipse"],
+    "ui_icon": ["circle", "ellipse", "line"]
+  }
+}

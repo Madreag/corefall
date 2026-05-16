@@ -1,0 +1,14 @@
+OriginLore (
+    origin_id: "aqueous_kindred",
+    canonical_name: "Aqueous Kindred",
+    physical_description: "Engineered or naturalized aquatic-adapted humanoid. Average height comparable to baseline humans (1.55 to 1.95 meters), but elongated limbs, webbing between fingers and at knees, skin tone shifts from pale gold in dry settings to deep blue in submerged conditions. Lungs can extract dissolved oxygen from oxygenated water; secondary respiration is conventional atmospheric. Blood is hemocyanin-based rather than hemoglobin-based, which produces a slight blue-green tint in the bloodstream. Vacuum-vulnerable (comparable to baseline humans); drowning-immune.",
+    cultural_traits: "The aqueous kindred trace their lineage to a late pre-collapse genetic engineering program designed to colonize Earth's submerged regions after the partial coastal inundation events of 2071-2089. The program produced approximately twelve thousand modified individuals in its initial cohort and an estimated additional fifty thousand through subsequent voluntary modification over the following century. The aqueous kindred concentrate on Earth-Pacific reef colonies, the Mimas methane-breather contact stations, and the Europa drill stations, where their submerged-environment capabilities are operationally invaluable. Aqueous kindred culture is notably water-centric — naming traditions reference specific bodies of water, social rituals involve immersion, and aqueous-kindred funerals are conducted by returning the body to deep water. They tend to be quiet, observant, and deeply protective of their submerged territories.",
+    gameplay_strengths: "Drowning-immune. Strong cold resistance (cryogenic-tolerant). Stronger underwater combat performance than any other origin. Faster recovery in pressurized humid environments. Compatible with most baseline human medical interventions (with hemocyanin substitution protocols).",
+    gameplay_weaknesses: "Vulnerable to dehydration in dry environments (slow-acting; produces stamina loss and reduced regeneration). Reduced efficiency in vacuum (faceplate sealing requirements are higher than baseline human). Reduced fire resistance. Limited compatibility with synth-blood transfusion (hemocyanin-hemoglobin mismatch).",
+    home_world: "Mara Reef (Earth-Pacific, canonical primary); secondary populations on Europa drill stations and Mimas shore stations.",
+    notable_origins_in_corefall_universe: [
+        "Survey-Spec Mireille Bouchard (Starlight, deep-cavern dive specialist)",
+        "Reef-Elder Tess Aleani (Earth-Pacific aqueous kindred, ceremonial)",
+        "Numerous Starlight dive teams include aqueous-kindred members",
+    ],
+)

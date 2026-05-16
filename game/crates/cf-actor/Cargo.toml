@@ -12,3 +12,6 @@ tracing = { workspace = true }
 cf-physics = { path = "../cf-physics" }
 cf-equipment = { path = "../cf-equipment" }
 cf-chassis = { path = "../cf-chassis" }
+
+[dev-dependencies]
+serde_json = { workspace = true }

@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ux_game_speed_assist_changed.v1",
+  "title": "ux.game_speed_assist_changed",
+  "description": "Emitted when settings.game_speed_assist transitions between Off / Slowdown75 / Slowdown25 / FullPause. The per-tick scheduler in cf-control's drive_tick reads game_speed_assist and skips ticks deterministically (tick-counter modulo arithmetic) so 75% / 25% / 0% sim-speed pacing is replay-stable. Multiplayer sessions ignore game_speed_assist (single-player only).",
+  "type": "object",
+  "required": ["from", "to", "speed_pct"],
+  "properties": {
+    "from": { "type": "string", "enum": ["off", "slowdown_75", "slowdown_25", "full_pause"] },
+    "to": { "type": "string", "enum": ["off", "slowdown_75", "slowdown_25", "full_pause"] },
+    "speed_pct": { "type": "integer", "minimum": 0, "maximum": 100 }
+  }
+}

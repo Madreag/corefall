@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ai_auto_triage_applied.v1",
+  "title": "ai.auto_triage_applied",
+  "description": "Emitted when the Medic reaches the target and applies stabilization within the 8-second contract window. Spec § Auto-triage Gherkin.",
+  "type": "object",
+  "required": ["medic_actor_id", "target_actor_id", "dying_tick", "applied_tick"],
+  "properties": {
+    "medic_actor_id": { "type": "integer", "minimum": 0 },
+    "target_actor_id": { "type": "integer", "minimum": 0 },
+    "dying_tick": { "type": "integer", "minimum": 0 },
+    "applied_tick": { "type": "integer", "minimum": 0 },
+    "elapsed_seconds": { "type": "number" }
+  }
+}

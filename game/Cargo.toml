@@ -11,6 +11,8 @@ members = [
   "crates/cf-actor",
   "crates/cf-chassis",
   "crates/cf-equipment",
+  "crates/cf-perception",
+  "crates/cf-squad",
   "crates/cf-ai",
   "crates/cf-mission",
   "crates/cf-replay",
@@ -34,6 +36,15 @@ members = [
   "crates/cf-server-anti-cheat",
   "crates/cf-server-admin",
   "crates/cf-bench",
+  "crates/cf-priority",
+  "crates/cf-camera",
+  "crates/cf-debug",
+  "crates/cf-localization",
+  "crates/cf-photo",
+  "crates/cf-replay-scrub",
+  "crates/cf-killcam",
+  "crates/cf-squad-ui",
+  "crates/cf-shell",
 ]
 
 [workspace.package]

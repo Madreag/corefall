@@ -39,7 +39,80 @@ pub mod mission_resolved_modal;
 pub mod mission_timer;
 pub mod objective_banner;
 
+// M8 spec § Files: 16 new HUD widget modules + the settings menu shell.
+// Each module owns its own Bevy Resource state struct + helpers; cf-app's
+// renderer mirrors them per frame from the engine snapshot.
+pub mod action_prompt;
+pub mod branching_banner;
+pub mod compass;
+pub mod cover_pip;
+pub mod damage_direction;
+pub mod grenade_arc;
+pub mod hotbar;
+pub mod lean_pip;
+pub mod minimap;
+pub mod phase_strip;
+pub mod scope_reticle;
+pub mod settings_menu;
+pub mod squad_strip;
+pub mod stamina_bar;
+pub mod stealth_meter;
+pub mod weapon_swap_overlay;
+
+// **M9** § HUD readability + observability — reactor zone widgets.
+pub mod reactor_hp_bar;
+pub mod reactor_pressure_line;
+pub mod timer_warnings;
+
+// **M11** § HUD readability + ACC-A floor — dedicated widget modules per
+// spec § Files. lib.rs hosted earlier versions of these surfaces; the M11
+// modules below carry the dedicated state structs + helpers cf-app's
+// bridge can mirror per frame.
+pub mod banners;
+pub mod captions;
+pub mod chatter_ticker;
+pub mod contrast;
+pub mod event_ticker;
+pub mod focus_ring;
+pub mod module_strip;
+pub mod priority_indicator;
+pub mod silhouette;
+pub mod triage_window;
+
+pub use mission_resolved_modal::{render_recap_text as render_death_recap_text, RecapEvent, MAX_RECAP_LINES};
+pub use reactor_hp_bar::{ArmorPipView, IntegrityBand, ReactorHpBarState};
+pub use reactor_pressure_line::{PressureTint, ReactorPressureLineState};
+pub use timer_warnings::{TimerColor, TimerSeverity, TimerWarning, TimerWarningsState, WARNING_THRESHOLDS};
+
+pub use action_prompt::ActionPromptState;
+pub use banners::{banner_text_line, BannerSeverity, BannerStackState, BANNER_STACK_MAX_VISIBLE};
+pub use branching_banner::{BranchOption, BranchingBannerState};
+pub use captions::{CaptionVerbosity, CaptionsState, CAPTION_QUEUE_MAX_VISIBLE};
+pub use chatter_ticker::{
+    ChatterLine, ChatterTickerState, CHATTER_TICKER_DEFAULT_DWELL_TICKS, CHATTER_TICKER_MAX_LINES,
+};
+pub use compass::{CompassBearing, CompassState, CARDINALS};
+pub use contrast::{banner_bg_color, strip_bg_color, text_color, ContrastModeUi};
+pub use cover_pip::{CoverLevel, CoverPipState};
+pub use damage_direction::{DamageDirectionMarker, DamageDirectionState, DEFAULT_FADE_MS};
+pub use event_ticker::{EventTickerEntry, EventTickerState, EVENT_TICKER_DEFAULT_DWELL_TICKS};
+pub use focus_ring::{advance_focus_index, focus_ring_clear, focus_ring_color, FocusDirectionUi, FOCUSABLE_NODES};
+pub use grenade_arc::{ArcSample, GrenadeArcState};
+pub use hotbar::{HotbarSlot, HotbarState, HOTBAR_SLOTS};
+pub use lean_pip::{LeanPipState, LEAN_MAX_DEGREES, LEAN_MIN_DEGREES};
 pub use material_legend::{legend_entries, MaterialLegendEntry, MaterialLegendState};
+pub use minimap::{MinimapMarker, MinimapState, MINIMAP_SIZE_PX};
+pub use module_strip::{ModuleState, ModuleStripEntry, ModuleStripState};
+pub use phase_strip::{MissionPhase, PhaseStripState};
+pub use priority_indicator::{PriorityIcon, PriorityIndicatorEntry, PriorityIndicatorState};
+pub use scope_reticle::ScopeReticleState;
+pub use settings_menu::{SettingsMenuState, SettingsTab};
+pub use silhouette::{BodySilhouetteState, SilhouetteBand};
+pub use squad_strip::{squad_row_line, SquadAutonomyMode, SquadStripMember, SquadStripState, SQUAD_STRIP_MAX_MEMBERS};
+pub use stamina_bar::{StaminaBarState, StaminaColor, STAMINA_CRITICAL_THRESHOLD, STAMINA_HIGH_THRESHOLD};
+pub use stealth_meter::{StealthMeterState, SPOTTED_THRESHOLD};
+pub use triage_window::{TriageAffliction, TriageVerdict, TriageWindowState};
+pub use weapon_swap_overlay::{WeaponSwapOverlayState, SWAP_TRANSITION_MS};
 
 /// Latest HUD model derived from the engine. The cf-app bridge writes this each
 /// frame from the same `M0Engine` snapshot it feeds to `cf-render-2d::ActorRenderState`.
@@ -321,6 +394,12 @@ impl Plugin for StatusStripPlugin {
     fn build(&self, app: &mut App) {
         app.init_resource::<HudState>()
             .init_resource::<HudSettings>()
+            // **M9** § HUD readability + observability — reactor zone resources.
+            // cf-app's `sync_reactor_state_to_widgets` writes these per frame
+            // from the engine's `ActorRenderSnapshot::reactor / timer`.
+            .init_resource::<ReactorHpBarState>()
+            .init_resource::<ReactorPressureLineState>()
+            .init_resource::<TimerWarningsState>()
             .add_systems(Startup, (spawn_status_strip, spawn_banner_strip, spawn_caption_strip))
             .add_systems(
                 Update,
@@ -1524,6 +1603,22 @@ mod tests {
             dying_dwell_ticks_remaining: 0,
             mission_critical: false,
             bloom_factor: 1.0,
+            facing: "right".into(),
+            stamina: 1.0,
+            stamina_max: 1.0,
+            sprint_active: false,
+            prone_active: false,
+            lean_angle_degrees: 0.0,
+            lean_direction: "none".into(),
+            stealth_meter: 0.0,
+            spotted: false,
+            cover_side: "none".into(),
+            cover_effectiveness: 0.0,
+            inventory_weight_kg: 0.0,
+            weight_forces_walk: false,
+            limb_loss: cf_actor::LimbLossFlags::default(),
+            inventory_extended: Vec::new(),
+            weapon_state: cf_actor::WeaponStateView::default(),
         };
         let line = stance_line("airborne", Some(&player));
         assert!(line.contains("AIRBORNE"));
