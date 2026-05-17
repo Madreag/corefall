@@ -1,0 +1,16 @@
+// M9B trench segment — fire_step (16×20 with 8 px raised firing step).
+// Spec §"Trench cross-section variants" table row 5. The Standing cover
+// value uses the on-step (firing-posture) reading; the off-step axis is
+// derived via cf_trench::cover_state_fire_step(stance, false).
+(
+    variant: fire_step,
+    depth: 16,
+    width: 20,
+    raised_step_height: Some(8),
+    embedded_modules: [duckboard, fire_step],
+    cover_state: (
+        standing: Exposed,
+        crouched: Partial,
+        prone: Full,
+    ),
+)

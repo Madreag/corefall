@@ -1,0 +1,11 @@
+// M9B trench module — revetment (wood + iron-mesh wall reinforcement).
+// Spec §"Trench modules" table row 5: 4 wood + 2 iron, 10 s build time.
+// Anchors M14E integrity field to ≥600 to prevent wall slough.
+(
+    module: revetment,
+    material_cost: {
+        "wood": 4,
+        "iron": 2,
+    },
+    build_time_seconds: 10,
+)

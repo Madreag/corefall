@@ -46,6 +46,7 @@ members = [
   "crates/cf-killcam",
   "crates/cf-squad-ui",
   "crates/cf-shell",
+  "crates/cf-trench",
 ]
 
 [workspace.package]

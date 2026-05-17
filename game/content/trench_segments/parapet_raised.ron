@@ -1,0 +1,16 @@
+// M9B trench segment — parapet_raised (16×24 with 8 px sandbag breastwork
+// above grade). Spec §"Trench cross-section variants" table row 6.
+// Pre-M9C the breastwork module is a placeholder — see
+// VAL-M9B-PARAPET-FWDCOMPAT-001 (owned by m9b-3 cfctl gate).
+(
+    variant: parapet_raised,
+    depth: 16,
+    width: 24,
+    raised_step_height: Some(8),
+    embedded_modules: [duckboard, breastwork],
+    cover_state: (
+        standing: Full,
+        crouched: Full,
+        prone: Full,
+    ),
+)

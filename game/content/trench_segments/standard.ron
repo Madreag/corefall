@@ -1,0 +1,14 @@
+// M9B trench segment — standard (16×16, default infantry trench + duckboard).
+// Spec §"Trench cross-section variants" table row 2.
+(
+    variant: standard,
+    depth: 16,
+    width: 16,
+    raised_step_height: None,
+    embedded_modules: [duckboard],
+    cover_state: (
+        standing: Partial,
+        crouched: Full,
+        prone: Full,
+    ),
+)

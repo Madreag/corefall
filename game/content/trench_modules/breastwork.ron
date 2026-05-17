@@ -1,0 +1,10 @@
+// M9B trench module — breastwork (sandbag wall above grade).
+// Spec §"Trench modules" table row 3: 6 sandbags, 12 s build time.
+// Sandbag resource is sourced from M9C's parts inventory.
+(
+    module: breastwork,
+    material_cost: {
+        "sandbag": 6,
+    },
+    build_time_seconds: 12,
+)

@@ -1,0 +1,13 @@
+// M9B trench module — fire_step (the raised platform built INTO a
+// segment wall). Spec §"Trench modules" table row 2: 4 dirt + 1 wood,
+// 8 s build time. Filename uses the spec's `fire_step_module.ron`
+// (see VAL-M9B-MODULES-001) to avoid collision with the segment
+// variant of the same name.
+(
+    module: fire_step,
+    material_cost: {
+        "dirt": 4,
+        "wood": 1,
+    },
+    build_time_seconds: 8,
+)

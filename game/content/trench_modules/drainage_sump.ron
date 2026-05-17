@@ -1,0 +1,10 @@
+// M9B trench module — drainage_sump (gravity-fed water flush).
+// Spec §"Trench modules" table row 4: 2 dirt + 1 pipe, 6 s build time.
+(
+    module: drainage_sump,
+    material_cost: {
+        "dirt": 2,
+        "pipe": 1,
+    },
+    build_time_seconds: 6,
+)

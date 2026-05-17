@@ -1,0 +1,15 @@
+// M9B trench segment — deep (24×16, head below grade + drainage).
+// Spec §"Trench cross-section variants" table row 3. Requires substrate
+// hardness < 0.5; m9b-3 cfctl handler is responsible for the gate.
+(
+    variant: deep,
+    depth: 24,
+    width: 16,
+    raised_step_height: None,
+    embedded_modules: [duckboard, drainage_sump],
+    cover_state: (
+        standing: Full,
+        crouched: Full,
+        prone: Full,
+    ),
+)

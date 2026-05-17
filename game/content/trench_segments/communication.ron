@@ -1,0 +1,14 @@
+// M9B trench segment — communication (16×8, narrow connector between
+// firing trenches). Spec §"Trench cross-section variants" table row 4.
+(
+    variant: communication,
+    depth: 16,
+    width: 8,
+    raised_step_height: None,
+    embedded_modules: [duckboard],
+    cover_state: (
+        standing: Partial,
+        crouched: Full,
+        prone: Full,
+    ),
+)

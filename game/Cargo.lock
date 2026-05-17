@@ -2045,6 +2045,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "cf-trench"
+version = "0.0.1"
+dependencies = [
+ "ron",
+ "serde",
+ "thiserror 2.0.18",
+ "tracing",
+]
+
+[[package]]
 name = "cf-ui"
 version = "0.0.1"
 dependencies = [

@@ -1,0 +1,9 @@
+// M9B trench module — duckboard.
+// Spec §"Trench modules" table row 1: 2 wood, 4 s build time.
+(
+    module: duckboard,
+    material_cost: {
+        "wood": 2,
+    },
+    build_time_seconds: 4,
+)

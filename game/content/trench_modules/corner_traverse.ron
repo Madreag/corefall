@@ -1,0 +1,11 @@
+// M9B trench module — corner_traverse (reinforced zigzag corner).
+// Spec §"Trench modules" table row 6: 2 dirt + 4 sandbags, 6 s build time.
+// M14 prevents grenade-fragmentation funneling at the kink.
+(
+    module: corner_traverse,
+    material_cost: {
+        "dirt": 2,
+        "sandbag": 4,
+    },
+    build_time_seconds: 6,
+)
