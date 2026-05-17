@@ -33,9 +33,19 @@ publish.workspace = true
 # `-tune psnr`; FFV1 intra-frame for `archival_lossless`).
 [dependencies]
 serde = { workspace = true }
+serde_json = { workspace = true }
 ron = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+blake3 = { workspace = true }
+cf-camera = { path = "../cf-camera" }
+# cf-replay + cf-save: read M4B baseline + delta-chain events from bundle
+# replays. CRITICAL (VAL-M10B-NO-LIVE-SIM): we read these as DATA only;
+# `frame_ticker.rs` MUST NOT instantiate `cf_sim_core::Sim` — see the
+# top-of-`frame_ticker.rs` doc-comment for the contract.
+cf-replay = { path = "../cf-replay" }
+cf-save = { path = "../cf-save" }
+cf-render-2d = { path = "../cf-render-2d", default-features = false, features = ["offline"] }
 ffmpeg-next = { version = "8.1.0", default-features = false, features = [
   "codec",
   "format",
