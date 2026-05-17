@@ -30,6 +30,7 @@ cf-asset-ledger = { path = "../cf-asset-ledger" }
 cf-content = { path = "../cf-content" }
 cf-control = { path = "../cf-control" }
 cf-equipment = { path = "../cf-equipment" }
+cf-fortification = { path = "../cf-fortification" }
 cf-material = { path = "../cf-material" }
 cf-replay = { path = "../cf-replay" }
 cf-save = { path = "../cf-save" }
