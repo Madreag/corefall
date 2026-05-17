@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/replay_export_started.v1",
+  "title": "replay.export_started",
+  "description": "M10B: emitted by cf-replay-export at the start of an export job, before the first frame is encoded. Per VAL-M10B-036 the audit ordering is exactly one replay_export_started -> N chapter_marker_emitted (chapter-time ascending) -> one replay_export_completed. Non-cosmetic.",
+  "type": "object",
+  "required": ["bundle_path", "output_path", "preset", "codec"],
+  "properties": {
+    "bundle_path": {
+      "type": "string",
+      "description": "Filesystem path to the run bundle directory that the export pipeline is reading."
+    },
+    "output_path": {
+      "type": "string",
+      "description": "Filesystem path of the output MP4 / MKV that will be written."
+    },
+    "preset": {
+      "type": "string",
+      "enum": [
+        "twitch_1080p60",
+        "youtube_4k60",
+        "discord_720p30",
+        "clip_compact",
+        "archival_lossless"
+      ],
+      "description": "Preset id selected for this export (one of the five DECLARED_PRESETS)."
+    },
+    "codec": {
+      "type": "string",
+      "enum": ["h264", "h265", "av1", "ffv1"],
+      "description": "Video codec resolved from the preset registry."
+    },
+    "duration_seconds": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Anticipated output duration in seconds. Optional at start; the completed event carries the authoritative final value."
+    },
+    "cosmetic": {
+      "type": "boolean",
+      "const": false,
+      "default": false
+    }
+  },
+  "additionalProperties": true
+}

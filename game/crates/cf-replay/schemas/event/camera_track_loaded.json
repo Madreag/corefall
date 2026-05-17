@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/camera_track_loaded.v1",
+  "title": "replay.camera_track_loaded",
+  "description": "M10B: emitted when cf-replay-export::camera_director loads a *.camera.ron script and routes per-tick render commands to one of the 4 declared camera kinds (free_cam / follow_player / objective_cam / kill_cam) per VAL-M10B-024. Non-cosmetic.",
+  "type": "object",
+  "required": ["kind", "start_tick", "end_tick", "keyframe_count"],
+  "properties": {
+    "kind": {
+      "type": "string",
+      "enum": ["free_cam", "follow_player", "objective_cam", "kill_cam"],
+      "description": "Camera track kind. Matches cf-replay-export::camera_script::CameraKind."
+    },
+    "start_tick": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Inclusive start tick of this camera track's routing window."
+    },
+    "end_tick": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Exclusive end tick of this camera track's routing window."
+    },
+    "keyframe_count": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Number of keyframes declared on this track. The director interpolates per-tick pose via cubic Catmull-Rom between neighbouring keyframes."
+    },
+    "script_path": {
+      "type": ["string", "null"],
+      "description": "Optional filesystem path to the *.camera.ron script the track was loaded from."
+    },
+    "cosmetic": {
+      "type": "boolean",
+      "const": false,
+      "default": false
+    }
+  },
+  "additionalProperties": true
+}

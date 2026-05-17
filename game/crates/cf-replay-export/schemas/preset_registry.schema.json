@@ -1,0 +1,69 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay-export/preset_registry.v1",
+  "title": "preset_registry",
+  "description": "M10B: schema for the per-preset RON files under game/content/replay_export/presets/ (cf-replay-export::preset_registry). Per VAL-M10B-005 every preset declares the six required fields: resolution, fps, codec, audio_codec, target_bitrate_kbps, container. The five DECLARED_PRESETS (twitch_1080p60 / youtube_4k60 / discord_720p30 / clip_compact / archival_lossless) must each parse cleanly through ExportPreset::from_ron_str.",
+  "type": "object",
+  "required": [
+    "name",
+    "resolution",
+    "fps",
+    "codec",
+    "audio_codec",
+    "target_bitrate_kbps",
+    "container"
+  ],
+  "properties": {
+    "name": {
+      "type": "string",
+      "enum": [
+        "twitch_1080p60",
+        "youtube_4k60",
+        "discord_720p30",
+        "clip_compact",
+        "archival_lossless"
+      ],
+      "description": "Canonical preset name. Must match the file stem; ExportPreset::load rejects name/stem mismatch."
+    },
+    "resolution": {
+      "type": "object",
+      "required": ["width", "height"],
+      "properties": {
+        "width": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "height": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "fps": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Frame rate in frames per second."
+    },
+    "codec": {
+      "type": "string",
+      "enum": ["h264", "h265", "av1", "ffv1"],
+      "description": "Video codec. The four production presets use h264; archival_lossless uses ffv1 (intra-frame, mathematically lossless, byte-identical across hosts when encoded single-threaded with locked GOP per VAL-M10B-020)."
+    },
+    "audio_codec": {
+      "type": "string",
+      "description": "Audio codec. Production presets use aac; archival_lossless typically uses flac."
+    },
+    "target_bitrate_kbps": {
+      "type": "integer",
+      "minimum": 1,
+      "description": "Target video bitrate in kbps. Informational for ffv1 (quality-driven intra-frame), authoritative for the H.264 production presets."
+    },
+    "container": {
+      "type": "string",
+      "enum": ["mp4", "mkv"],
+      "description": "Container format. Production presets use mp4; archival_lossless uses mkv for ffv1."
+    }
+  },
+  "additionalProperties": false
+}

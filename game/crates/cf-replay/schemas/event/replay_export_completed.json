@@ -1,0 +1,35 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/replay_export_completed.v1",
+  "title": "replay.export_completed",
+  "description": "M10B: emitted by cf-replay-export after the last frame is encoded. Carries the four spec-required audit fields output_path, codec, duration_seconds, chapter_count per VAL-M10B-015. Non-cosmetic.",
+  "type": "object",
+  "required": ["output_path", "codec", "duration_seconds", "chapter_count"],
+  "properties": {
+    "output_path": {
+      "type": "string",
+      "description": "Filesystem path of the output MP4 / MKV that was written."
+    },
+    "codec": {
+      "type": "string",
+      "enum": ["h264", "h265", "av1", "ffv1"],
+      "description": "Video codec used for the encode (matches the started event's codec)."
+    },
+    "duration_seconds": {
+      "type": "number",
+      "minimum": 0,
+      "description": "Final output duration in seconds, ffprobe-comparable per VAL-M10B-013."
+    },
+    "chapter_count": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Count of chapter_marker_emitted events that fired during this export (VAL-M10B-014 / VAL-M10B-022)."
+    },
+    "cosmetic": {
+      "type": "boolean",
+      "const": false,
+      "default": false
+    }
+  },
+  "additionalProperties": true
+}

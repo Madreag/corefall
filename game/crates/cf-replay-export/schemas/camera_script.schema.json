@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay-export/camera_script.v1",
+  "title": "camera_script",
+  "description": "M10B: schema for the *.camera.ron multi-camera authoring scripts consumed by cf-replay-export::camera_director. The author declares up to 4 camera kinds (free_cam / follow_player / objective_cam / kill_cam), each with a half-open [start_tick, end_tick) routing window and >=1 keyframes. Per-tick pose between keyframes is computed via cubic Catmull-Rom interpolation (VAL-M10B-024 / VAL-M10B-025). Per spec, pose is [f32; 6] = (x, y, zoom, rotation, lookahead_x, lookahead_y).",
+  "type": "object",
+  "required": ["tracks"],
+  "properties": {
+    "tracks": {
+      "type": "array",
+      "minItems": 1,
+      "maxItems": 4,
+      "items": {
+        "$ref": "#/$defs/track"
+      },
+      "description": "One entry per camera track. Tracks MUST NOT have overlapping [start_tick, end_tick) windows; the loader rejects overlap with CameraScriptError::OverlappingRange."
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "track": {
+      "type": "object",
+      "required": ["kind", "start_tick", "end_tick", "keyframes"],
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": ["free_cam", "follow_player", "objective_cam", "kill_cam"],
+          "description": "Camera kind. Loader rejects unknown values with CameraScriptError::UnknownCameraKind."
+        },
+        "start_tick": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Inclusive start tick of this track's routing window."
+        },
+        "end_tick": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Exclusive end tick of this track's routing window."
+        },
+        "keyframes": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/keyframe"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "keyframe": {
+      "type": "object",
+      "required": ["tick", "pose"],
+      "properties": {
+        "tick": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Sim tick at which the keyframe is anchored."
+        },
+        "pose": {
+          "type": "array",
+          "minItems": 6,
+          "maxItems": 6,
+          "items": {
+            "type": "number"
+          },
+          "description": "Pose vector: (x, y, zoom, rotation, lookahead_x, lookahead_y). f32 precision per spec; finite-only -- loader rejects NaN / +Inf / -Inf with CameraScriptError::NonFinitePose."
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

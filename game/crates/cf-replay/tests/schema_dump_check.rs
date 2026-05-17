@@ -356,6 +356,154 @@ fn m9c_event_cosmetic_gate() {
     }
 }
 
+/// The 4 M10B replay event schemas authored by m10b-5 closure
+/// feature: ordered audit-event taxonomy (started -> markers ->
+/// completed) + the camera-track loader event.
+const M10B_EVENT_SCHEMAS: &[&str] = &[
+    "replay_export_started.json",
+    "replay_export_completed.json",
+    "chapter_marker_emitted.json",
+    "camera_track_loaded.json",
+];
+
+/// VAL-M10B-007: all 4 new M10B replay event schemas exist on disk.
+#[test]
+fn schema_dump_check_m10b_event_schemas_present() {
+    for name in M10B_EVENT_SCHEMAS {
+        let path = schemas_dir().join(name);
+        assert!(
+            path.exists(),
+            "M10B schema {name} missing on disk at {}",
+            path.display()
+        );
+    }
+    assert_eq!(M10B_EVENT_SCHEMAS.len(), 4, "expected 4 M10B event schemas");
+}
+
+/// VAL-M10B-007: every M10B schema parses + declares required JSON
+/// Schema keys ($id, title, type, properties) + cosmetic gate.
+#[test]
+fn m10b_event_schemas_valid() {
+    for name in M10B_EVENT_SCHEMAS {
+        let v = parse_schema(name);
+        assert_required_keys(&v, name);
+        let props = v
+            .get("properties")
+            .and_then(|p| p.as_object())
+            .unwrap_or_else(|| panic!("{name} missing properties"));
+        let cosmetic = props
+            .get("cosmetic")
+            .and_then(|c| c.as_object())
+            .unwrap_or_else(|| panic!("{name} missing cosmetic property"));
+        let const_val = cosmetic.get("const").and_then(|v| v.as_bool());
+        let default_val = cosmetic.get("default").and_then(|v| v.as_bool());
+        assert!(
+            const_val == Some(false) || default_val == Some(false),
+            "{name} cosmetic must be const=false or default=false (non-droppable)"
+        );
+    }
+}
+
+/// VAL-M10B-007: replay_export_started declares the four spec-aligned
+/// required fields (bundle_path, output_path, preset, codec).
+#[test]
+fn schema_dump_check_replay_export_started_required_fields() {
+    let v = parse_schema("replay_export_started.json");
+    let required = v
+        .get("required")
+        .and_then(|r| r.as_array())
+        .expect("replay_export_started.json required[] exists");
+    let names: Vec<&str> = required.iter().filter_map(|v| v.as_str()).collect();
+    for field in ["bundle_path", "output_path", "preset", "codec"] {
+        assert!(
+            names.contains(&field),
+            "replay_export_started.json must require `{field}`; got {names:?}"
+        );
+    }
+    // preset.enum covers all 5 DECLARED_PRESETS.
+    let props = v.get("properties").and_then(|p| p.as_object()).unwrap();
+    let preset = props
+        .get("preset")
+        .and_then(|r| r.as_object())
+        .expect("preset property");
+    let enum_vals = preset
+        .get("enum")
+        .and_then(|e| e.as_array())
+        .expect("preset.enum exists");
+    let strings: Vec<&str> = enum_vals.iter().filter_map(|v| v.as_str()).collect();
+    for required_preset in [
+        "twitch_1080p60",
+        "youtube_4k60",
+        "discord_720p30",
+        "clip_compact",
+        "archival_lossless",
+    ] {
+        assert!(
+            strings.contains(&required_preset),
+            "replay_export_started.json preset.enum missing `{required_preset}`"
+        );
+    }
+}
+
+/// VAL-M10B-015: replay_export_completed carries the four audit-shape
+/// fields (output_path, codec, duration_seconds, chapter_count).
+#[test]
+fn schema_dump_check_replay_export_completed_required_fields() {
+    let v = parse_schema("replay_export_completed.json");
+    let required = v
+        .get("required")
+        .and_then(|r| r.as_array())
+        .expect("replay_export_completed.json required[] exists");
+    let names: Vec<&str> = required.iter().filter_map(|v| v.as_str()).collect();
+    for field in ["output_path", "codec", "duration_seconds", "chapter_count"] {
+        assert!(
+            names.contains(&field),
+            "replay_export_completed.json must require `{field}`; got {names:?}"
+        );
+    }
+}
+
+/// VAL-M10B-036: chapter_marker_emitted carries tick_index + title +
+/// event_type at minimum so the audit ordering can be verified.
+#[test]
+fn schema_dump_check_chapter_marker_emitted_required_fields() {
+    let v = parse_schema("chapter_marker_emitted.json");
+    let required = v
+        .get("required")
+        .and_then(|r| r.as_array())
+        .expect("chapter_marker_emitted.json required[] exists");
+    let names: Vec<&str> = required.iter().filter_map(|v| v.as_str()).collect();
+    for field in ["tick_index", "start_time_seconds", "title", "event_type"] {
+        assert!(
+            names.contains(&field),
+            "chapter_marker_emitted.json must require `{field}`; got {names:?}"
+        );
+    }
+}
+
+/// VAL-M10B-007: camera_track_loaded declares the 4-variant kind enum
+/// matching cf-replay-export::camera_script::CameraKind.
+#[test]
+fn schema_dump_check_camera_track_loaded_kind_enum() {
+    let v = parse_schema("camera_track_loaded.json");
+    let props = v.get("properties").and_then(|p| p.as_object()).unwrap();
+    let kind = props
+        .get("kind")
+        .and_then(|r| r.as_object())
+        .expect("kind property");
+    let enum_vals = kind
+        .get("enum")
+        .and_then(|e| e.as_array())
+        .expect("kind.enum exists");
+    let strings: Vec<&str> = enum_vals.iter().filter_map(|v| v.as_str()).collect();
+    for required in ["free_cam", "follow_player", "objective_cam", "kill_cam"] {
+        assert!(
+            strings.contains(&required),
+            "camera_track_loaded.json kind.enum missing `{required}`"
+        );
+    }
+}
+
 /// Spec scenario field check: `sandbag_eroded` carries the `from`/`to`
 /// fields with the `low | mid | high` enum values from the spec
 /// scenario "sandbag_eroded event fires with from=high to=mid".

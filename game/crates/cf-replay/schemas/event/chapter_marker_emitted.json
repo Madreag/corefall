@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/chapter_marker_emitted.v1",
+  "title": "replay.chapter_marker_emitted",
+  "description": "M10B: emitted once per chapter marker derived from the bundle's event stream by cf-replay-export::chapter_derivation. Fires between replay_export_started and replay_export_completed in chapter-time-ascending order per VAL-M10B-036. Non-cosmetic.",
+  "type": "object",
+  "required": ["tick_index", "start_time_seconds", "title", "event_type"],
+  "properties": {
+    "tick_index": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Source event tick at which the chapter marker fires."
+    },
+    "start_time_seconds": {
+      "type": "number",
+      "minimum": 0,
+      "description": "MP4 chapter start time in seconds, derived from tick_index / fps."
+    },
+    "title": {
+      "type": "string",
+      "description": "Resolved chapter title; the template string from chapter_rules/default.ron with payload placeholders interpolated."
+    },
+    "event_type": {
+      "type": "string",
+      "description": "Source event_type that produced this chapter (e.g. mission.objective_started, actor_status_changed, trench_breastwork_breached, mine_triggered)."
+    },
+    "source_event_id": {
+      "type": ["string", "null"],
+      "description": "event_id of the source event the chapter was derived from (optional)."
+    },
+    "category": {
+      "type": ["string", "null"],
+      "description": "Optional category tag from the chapter rule (objective / death / reactor / atmos / commander / trench / fortification)."
+    },
+    "cosmetic": {
+      "type": "boolean",
+      "const": false,
+      "default": false
+    }
+  },
+  "additionalProperties": true
+}
