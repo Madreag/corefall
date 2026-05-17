@@ -165,9 +165,45 @@ if [ ! -f "${A_OUT}" ] || [ ! -f "${B_OUT}" ]; then
   exit 1
 fi
 
-# Compute per-frame BLAKE3 (whole-file hash as the stub-encode
-# fall-back; production CI invokes a per-frame YUV BLAKE3 sweep).
-hash_file() {
+# Compute the decoded-YUV BLAKE3 fingerprint for a video container.
+# Uses ffmpeg to decode every frame into yuv420p raw bytes and then
+# hashes the byte stream. This is the canonical "per-frame YUV BLAKE3"
+# rule from spec § "Export is deterministic across OS" — it ignores
+# container-level non-determinism (mp4 metadata fields, mkv segment
+# UUIDs) and compares only the decoded pixel data. Same-host repeat
+# runs of single-thread + locked-GOP H.264 produce byte-identical
+# decoded frames; FFV1 archival is additionally byte-identical
+# cross-OS per VAL-M10B-020.
+hash_file_decoded_yuv() {
+  local container="$1"
+  local pix_fmt="yuv420p"
+  if ! command -v ffmpeg >/dev/null 2>&1; then
+    # Fallback: hash the file bytes if ffmpeg is unavailable. This
+    # is only a stand-in; CI must run with ffmpeg installed so the
+    # cross-OS matrix can compare decoded YUV byte-for-byte.
+    if command -v b3sum >/dev/null 2>&1; then
+      b3sum "$container" | awk '{print $1}'
+      return
+    fi
+    python3 -c "import sys, hashlib; data=open(sys.argv[1],'rb').read(); print(hashlib.blake2b(data).hexdigest())" "$container"
+    return
+  fi
+  if [ "$2" = "yuv444p" ]; then
+    pix_fmt="yuv444p"
+  fi
+  local hasher
+  if command -v b3sum >/dev/null 2>&1; then
+    hasher="b3sum"
+  elif command -v blake3sum >/dev/null 2>&1; then
+    hasher="blake3sum"
+  else
+    hasher="python3 -c \"import sys, hashlib; data=sys.stdin.buffer.read(); print(hashlib.blake2b(data).hexdigest())\""
+  fi
+  ffmpeg -hide_banner -loglevel error -i "$container" -an -f rawvideo -pix_fmt "$pix_fmt" - 2>/dev/null \
+    | eval "$hasher" | awk '{print $1}'
+}
+
+hash_file_bytes() {
   if command -v b3sum >/dev/null 2>&1; then
     b3sum "$1" | awk '{print $1}'
   elif command -v blake3sum >/dev/null 2>&1; then
@@ -176,15 +212,36 @@ hash_file() {
     python3 -c "import sys, hashlib; data=open(sys.argv[1],'rb').read(); print(hashlib.blake2b(data).hexdigest())" "$1"
   fi
 }
-A_HASH=$(hash_file "${A_OUT}")
-B_HASH=$(hash_file "${B_OUT}")
+
+# Determine pix_fmt for decoded YUV hashing (FFV1 uses yuv444p; the
+# H.264 production presets use yuv420p).
+PIX_FMT="yuv420p"
+if [ "${PRESET}" = "archival_lossless" ]; then
+  PIX_FMT="yuv444p"
+fi
+
+# Decode-side ffprobe verification: a real ffmpeg-encoded export
+# MUST be ffprobe-decodable. If ffprobe rejects the output the
+# encoder path regressed back to the placeholder bytes; fail loud.
+if command -v ffprobe >/dev/null 2>&1; then
+  for OUT in "${A_OUT}" "${B_OUT}"; do
+    if ! ffprobe -v error -show_format -show_streams "$OUT" >/dev/null 2>"${OUT_DIR}/$(basename "$OUT").ffprobe.err"; then
+      echo "[m10b-matrix] FAIL: ffprobe rejected ${OUT}; stderr:" >&2
+      cat "${OUT_DIR}/$(basename "$OUT").ffprobe.err" >&2
+      exit 1
+    fi
+  done
+fi
+
+A_HASH=$(hash_file_decoded_yuv "${A_OUT}" "${PIX_FMT}")
+B_HASH=$(hash_file_decoded_yuv "${B_OUT}" "${PIX_FMT}")
 
 SAME_HOST_MATCH="false"
 if [ "${A_HASH}" = "${B_HASH}" ]; then
   SAME_HOST_MATCH="true"
-  echo "[m10b-matrix] same_host_repeat_run_blake3_match: true"
+  echo "[m10b-matrix] same_host_repeat_run_decoded_yuv_blake3_match: true (hash=${A_HASH})"
 else
-  echo "[m10b-matrix] same_host_repeat_run_blake3_match: false (A=${A_HASH} B=${B_HASH})" >&2
+  echo "[m10b-matrix] same_host_repeat_run_decoded_yuv_blake3_match: false (A=${A_HASH} B=${B_HASH})" >&2
   echo "{\"frame_index\": 0, \"expected_hash\": \"${A_HASH}\", \"actual_hash\": \"${B_HASH}\", \"decoded_pixel_diff_ratio\": 1.0}" \
     >> "${MISMATCH_REPORT}"
 fi
@@ -221,14 +278,14 @@ if command -v ffmpeg >/dev/null 2>&1 && [ -s "${A_OUT}" ]; then
   RC=$?
   set -e
   if [ ${RC} -eq 0 ] && [ -s "${OUT_DIR}/audio_a.wav" ]; then
-    AUDIO_HASH=$(hash_file "${OUT_DIR}/audio_a.wav")
+    AUDIO_HASH=$(hash_file_bytes "${OUT_DIR}/audio_a.wav")
     jq -n --arg hash "${AUDIO_HASH}" --argjson tol "${AUDIO_LSB_TOL}" \
       '{audio_wav_hash: $hash, max_abs_sample_diff_tolerance: $tol}' \
       > "${AUDIO_REPORT}"
     echo "[m10b-matrix] audio_wav_hash: ${AUDIO_HASH} (max_abs_sample_diff_tolerance: ${AUDIO_LSB_TOL})"
   else
     jq -n --argjson tol "${AUDIO_LSB_TOL}" \
-      '{audio_wav_hash: null, max_abs_sample_diff_tolerance: $tol, note: "ffmpeg demux failed; encode path may be stubbed"}' \
+      '{audio_wav_hash: null, max_abs_sample_diff_tolerance: $tol, note: "ffmpeg demux failed; no audio stream"}' \
       > "${AUDIO_REPORT}"
   fi
 else
