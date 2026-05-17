@@ -287,7 +287,7 @@ impl M0Engine {
     /// coordinates are translated to world by the caller). Returns the
     /// allocated `segment_id` so the cfctl handler can carry it on the
     /// `trench.segment_dug` / `trench.template_dropped` events.
-    pub(crate) fn insert_trench_segment(
+    pub fn insert_trench_segment(
         &self,
         variant: SegmentVariant,
         origin: (i32, i32),
@@ -325,7 +325,7 @@ impl M0Engine {
     ///
     /// `segment_index` is the position in the world's `segments` Vec.
     /// Returns `true` when the index pointed at a real segment.
-    pub(crate) fn embed_trench_module(
+    pub fn embed_trench_module(
         &self,
         segment_index: usize,
         module: TrenchModule,
@@ -540,7 +540,7 @@ impl M0Engine {
     /// `{ schema_version, result }` with `result` either `null` for
     /// open ground OR a `TrenchSegmentView` object describing the
     /// placed segment.
-    pub(crate) fn compute_trench_segment_at_pos(&self, x: i32, y: i32) -> Value {
+    pub fn compute_trench_segment_at_pos(&self, x: i32, y: i32) -> Value {
         let Ok(state) = self.state.read() else {
             return json!({
                 "schema_version": crate::SCHEMA_VERSION,
