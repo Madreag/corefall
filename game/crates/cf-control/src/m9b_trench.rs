@@ -24,18 +24,19 @@
 
 use serde_json::{json, Value};
 
-use cf_actor::IntentSource;
+use cf_actor::{ActorId, IntentSource};
 use cf_sim_core::Tick;
 use cf_trench::{
     apply_round_to_breastwork, breastwork::BreastworkHitOutcome, collapse_tick,
-    cover_state_post_breach, dig_substrate_validate, drainage_sump_tick,
-    segment::TrenchSegmentLookup, BreastworkHitOutcome as _BreastworkOutcomeAlias,
-    CollapseEnv, CollapseTickOutcome, CoverState, DigSubstrateOutcome, DrainageEnv,
-    DrainageTickOutcome, ModuleSpec, SegmentVariant, TrenchModule, TrenchSegment,
-    TrenchStance, DEEP_HARDNESS_THRESHOLD,
+    cover_state_change, cover_state_post_breach, dig_substrate_validate,
+    drainage_sump_tick, segment::TrenchSegmentLookup,
+    BreastworkHitOutcome as _BreastworkOutcomeAlias, CollapseEnv,
+    CollapseTickOutcome, CoverState, CoverStateChangeCause, DigSubstrateOutcome,
+    DrainageEnv, DrainageTickOutcome, ModuleSpec, SegmentVariant, TrenchModule,
+    TrenchSegment, TrenchStance, DEEP_HARDNESS_THRESHOLD,
 };
 
-use crate::engine::M0Engine;
+use crate::engine::{GuardFireRecord, M0Engine};
 use crate::server::CommandResult;
 
 /// Parse a wire-format variant id into the typed `SegmentVariant`.
@@ -697,12 +698,642 @@ impl M0Engine {
                     "integrity_after": 0.0_f32,
                     "had_revetment": env.has_revetment,
                     "cause": cause.as_str(),
+                    "tick_index": tick.0,
                 }),
                 None,
             );
         }
         outcome
     }
+}
+
+/// Cadence (ticks) at which a single segment runs its collapse-tick
+/// evaluation. Spec scenario 9 requires a collapse within 1800 ticks
+/// on `soft_dirt_no_revetment()`, which decays at 1.0/tick from
+/// `STARTING_INTEGRITY = 1200`. Evaluating every 1 tick keeps the
+/// audit window tight while remaining cheap (one branch per segment
+/// per tick).
+const M9B_COLLAPSE_CADENCE_TICKS: u32 = 1;
+
+/// Heuristic mapping of scenario id → per-tick rainfall accumulation
+/// in pixels. The M9B `m9b_drainage_flood` scenario is the only
+/// authored M9B scenario that needs rainfall; everything else runs
+/// dry. A future M31 weather kernel will override this with live
+/// rainfall state, but until then the scenario id is the authoritative
+/// switch.
+fn m9b_scenario_rain_per_tick_px(scenario_id: &str) -> f32 {
+    match scenario_id {
+        "m9b_drainage_flood" => {
+            cf_trench::RAIN_ACCUMULATION_PER_TICK_PX
+        }
+        _ => 0.0,
+    }
+}
+
+/// Heuristic mapping of scenario id → effective substrate hardness for
+/// per-segment collapse evaluation. The spec scenario uses dirt at
+/// hardness 0.2 for the revetment audit; absent a per-segment terrain
+/// sampler the scenario id is the trigger.
+fn m9b_scenario_collapse_hardness(scenario_id: &str) -> f32 {
+    match scenario_id {
+        // Trench scenarios authored on soft dirt — collapse path engages
+        // on segments without revetment.
+        "m9b_drainage_flood"
+        | "m9b_zigzag_baseline"
+        | "m9b_two_line_defense"
+        | "m9b_fire_step_duel"
+        | "m9b_reactor_defense_zigzag"
+        | "m9b_template_drop_test"
+        | "m9b_ai_in_trench_doctrine"
+        | "m9b_breastwork_breach"
+        | "m9b_collapse_audit" => 0.2,
+        _ => 0.5,
+    }
+}
+
+impl M0Engine {
+    /// **M9B audit GAP-1**: emit `trench.cover_state_changed` for every
+    /// actor whose (cover_state, segment_variant, stance) tuple changed
+    /// this tick. Reads the live trench world index, snapshots each
+    /// actor's current cover, and compares to the last latched tuple.
+    pub(crate) fn tick_m9b_cover_state_changes(&self, tick: Tick, sim_time_ms: f64) {
+        // Snapshot: per-actor (new_state, new_variant, new_stance).
+        let snapshot: Vec<(ActorId, CoverState, Option<SegmentVariant>, TrenchStance)> = {
+            let state = match self.state.read() {
+                Ok(s) => s,
+                Err(_) => return,
+            };
+            let Some(sim) = state.actor_state.as_ref() else {
+                return;
+            };
+            sim.world
+                .actors
+                .values()
+                .map(|actor| {
+                    let cover = actor.cover_state(&state.trench_world);
+                    let tile_x = actor.position.x as i32;
+                    let tile_y = actor.position.y as i32;
+                    let variant = state
+                        .trench_world
+                        .segment_at(tile_x, tile_y)
+                        .map(|s| s.variant);
+                    let trench_stance =
+                        cf_actor::stance::trench_stance_for_actor(actor);
+                    (actor.id, cover, variant, trench_stance)
+                })
+                .collect()
+        };
+
+        let mut emissions: Vec<(ActorId, CoverState, CoverState, Option<SegmentVariant>, Option<SegmentVariant>, CoverStateChangeCause)> =
+            Vec::new();
+
+        if let Ok(mut state) = self.state.write() {
+            for (actor_id, new_state, new_variant, new_stance) in &snapshot {
+                let prev = state
+                    .m9b_last_cover_state
+                    .get(actor_id)
+                    .copied()
+                    .unwrap_or((CoverState::Exposed, None, TrenchStance::Standing));
+                let (prev_state, prev_variant, prev_stance) = prev;
+                let stance_changed = prev_stance != *new_stance;
+                if let Some(change) = cover_state_change(
+                    prev_state,
+                    *new_state,
+                    prev_variant,
+                    *new_variant,
+                    stance_changed,
+                ) {
+                    emissions.push((
+                        *actor_id,
+                        change.prev_state,
+                        change.new_state,
+                        change.prev_segment_variant,
+                        change.new_segment_variant,
+                        change.cause,
+                    ));
+                }
+                state
+                    .m9b_last_cover_state
+                    .insert(*actor_id, (*new_state, *new_variant, *new_stance));
+            }
+        }
+
+        for (actor_id, prev_state, new_state, prev_variant, new_variant, cause) in emissions {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "trench",
+                "cover_state_changed",
+                json!({
+                    "actor_id": actor_id.0,
+                    "prev_state": prev_state.as_str(),
+                    "new_state": new_state.as_str(),
+                    "prev_segment_variant": prev_variant.map(|v| v.as_str()),
+                    "new_segment_variant": new_variant.map(|v| v.as_str()),
+                    "cause": cause.as_str(),
+                    "tick_index": tick.0,
+                }),
+                None,
+            );
+        }
+    }
+
+    /// **M9B audit GAP-2**: tick the trench doctrine for every opted-in
+    /// actor. Builds [`cf_ai::TrenchDoctrineInputs`] from per-actor state
+    /// and the live trench world, runs `TrenchDoctrine::tick`, emits
+    /// `ai.cover_decision`, and updates the per-actor exposure counter.
+    pub(crate) fn tick_m9b_ai_cover_decisions(&self, tick: Tick, sim_time_ms: f64) {
+        struct Plan {
+            actor_id: ActorId,
+            reason: cf_ai::TrenchCoverDecisionReason,
+            prev_cover_state: CoverState,
+            new_cover_state: CoverState,
+            burst_rounds: u32,
+        }
+        let mut plans: Vec<Plan> = Vec::new();
+
+        if let Ok(mut state) = self.state.write() {
+            let doctrine_actors: Vec<ActorId> =
+                state.m9b_trench_doctrine_actors.iter().copied().collect();
+            if doctrine_actors.is_empty() {
+                return;
+            }
+            let tick_rate_hz = self.config.tick_rate_hz;
+            let doctrine = cf_ai::TrenchDoctrine::new();
+
+            for actor_id in doctrine_actors {
+                let cover;
+                let current_ammo;
+                let mag_capacity;
+                let reload_in_progress;
+                let enemy_in_range;
+                let actor_alive;
+                {
+                    let Some(sim) = state.actor_state.as_ref() else {
+                        continue;
+                    };
+                    let Some(actor) = sim.world.actors.get(&actor_id) else {
+                        continue;
+                    };
+                    if matches!(
+                        actor.status,
+                        cf_actor::Status::Dead | cf_actor::Status::Dying
+                    ) {
+                        continue;
+                    }
+                    actor_alive = true;
+                    cover = actor.cover_state(&state.trench_world);
+                    let rifle = sim.rifles.get(&actor_id);
+                    current_ammo = rifle.map(|r| r.ammo_in_mag).unwrap_or(0);
+                    mag_capacity = rifle.map(|r| r.spec.mag_capacity).unwrap_or(0);
+                    reload_in_progress =
+                        rifle.map(|r| r.reload_remaining_ticks > 0).unwrap_or(false);
+                    let player_id = sim.world.player;
+                    enemy_in_range = match player_id {
+                        Some(pid) if pid != actor_id => sim
+                            .world
+                            .actors
+                            .get(&pid)
+                            .map(|p| {
+                                let dx = p.position.x - actor.position.x;
+                                let dy = p.position.y - actor.position.y;
+                                let dist2 = dx * dx + dy * dy;
+                                dist2 <= 1_000_000.0
+                                    && !matches!(
+                                        p.status,
+                                        cf_actor::Status::Dead | cf_actor::Status::Dying
+                                    )
+                            })
+                            .unwrap_or(false),
+                        _ => false,
+                    };
+                }
+                if !actor_alive {
+                    continue;
+                }
+
+                let exposure_ticks = state
+                    .m9b_trench_doctrine_exposure_ticks
+                    .get(&actor_id)
+                    .copied()
+                    .unwrap_or(0);
+
+                let inputs = cf_ai::TrenchDoctrineInputs {
+                    actor_id,
+                    current_cover_state: cover,
+                    enemy_in_range_with_los: enemy_in_range,
+                    current_ammo,
+                    mag_capacity,
+                    exposure_ticks,
+                    tick_rate_hz,
+                    reload_in_progress,
+                };
+
+                let decision = doctrine.tick(inputs, &mut state.rng);
+
+                if matches!(decision.new_cover_state, CoverState::Exposed) {
+                    let next = exposure_ticks.saturating_add(1);
+                    state
+                        .m9b_trench_doctrine_exposure_ticks
+                        .insert(actor_id, next);
+                } else {
+                    state.m9b_trench_doctrine_exposure_ticks.remove(&actor_id);
+                }
+
+                plans.push(Plan {
+                    actor_id,
+                    reason: decision.reason,
+                    prev_cover_state: cover,
+                    new_cover_state: decision.new_cover_state,
+                    burst_rounds: decision.burst_rounds,
+                });
+            }
+        }
+
+        for plan in plans {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "ai",
+                "cover_decision",
+                json!({
+                    "actor_id": plan.actor_id.0,
+                    "reason_label": plan.reason.as_str(),
+                    "prev_cover_state": plan.prev_cover_state.as_str(),
+                    "new_cover_state": plan.new_cover_state.as_str(),
+                    "tick_index": tick.0,
+                    "doctrine": cf_ai::TRENCH_DOCTRINE_ID,
+                    "burst_rounds": plan.burst_rounds,
+                }),
+                None,
+            );
+
+            if plan.reason.forces_exposed() {
+                if let Ok(mut state) = self.state.write() {
+                    if let Some(sim) = state.actor_state.as_mut() {
+                        if let Some(actor) = sim.world.actors.get_mut(&plan.actor_id) {
+                            actor.crouch_active = false;
+                            actor.prone_active = false;
+                        }
+                    }
+                }
+            } else if plan.reason.forces_full_cover() {
+                if let Ok(mut state) = self.state.write() {
+                    if let Some(sim) = state.actor_state.as_mut() {
+                        if let Some(actor) = sim.world.actors.get_mut(&plan.actor_id) {
+                            actor.crouch_active = true;
+                            actor.prone_active = false;
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    /// **M9B audit GAP-3**: tick drainage for every segment with a
+    /// `drainage_sump` embedded module. Accumulates per-tick rainfall
+    /// from the active scenario, calls `drainage_sump_tick`, and emits
+    /// `trench.drainage_flushed` on each flush cycle.
+    pub(crate) fn tick_m9b_drainage(&self, tick: Tick, sim_time_ms: f64) {
+        let scenario_id = self.config.scenario_id.clone();
+        let rain_per_tick = m9b_scenario_rain_per_tick_px(&scenario_id);
+        if rain_per_tick == 0.0 {
+            return;
+        }
+        let env = DrainageEnv {
+            rain_per_tick_px: rain_per_tick,
+            ..DrainageEnv::default()
+        };
+        struct FlushEmit {
+            segment_index: usize,
+            water_before: f32,
+            water_after: f32,
+        }
+        let mut emits: Vec<FlushEmit> = Vec::new();
+        if let Ok(mut state) = self.state.write() {
+            let len = state.trench_world.segments.len();
+            for idx in 0..len {
+                let sump_present = state.trench_world.segments[idx]
+                    .embedded_modules
+                    .iter()
+                    .any(|m| matches!(m, TrenchModule::DrainageSump));
+                if !sump_present {
+                    continue;
+                }
+                let Some(rt) = state.trench_world.runtime_at(idx).copied() else {
+                    continue;
+                };
+                let outcome = drainage_sump_tick(rt.water_depth_px, true, env);
+                if let Some(rt_mut) = state.trench_world.runtime_at_mut(idx) {
+                    rt_mut.water_depth_px = outcome.water_depth_after();
+                }
+                if let DrainageTickOutcome::Flushed {
+                    water_depth_before,
+                    water_depth_after,
+                } = outcome
+                {
+                    emits.push(FlushEmit {
+                        segment_index: idx,
+                        water_before: water_depth_before,
+                        water_after: water_depth_after,
+                    });
+                }
+            }
+        }
+        for e in emits {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "trench",
+                "drainage_flushed",
+                json!({
+                    "actor_id": null,
+                    "segment_id": e.segment_index as u64 + 1,
+                    "module_id": "drainage_sump",
+                    "water_depth_before": e.water_before,
+                    "water_depth_after": e.water_after,
+                    "flush_threshold_px": env.flush_threshold_px,
+                    "tick_index": tick.0,
+                }),
+                None,
+            );
+        }
+    }
+
+    /// **M9B audit GAP-5**: tick per-segment collapse for every
+    /// non-collapsed segment in the trench world. Mutates the runtime
+    /// integrity field and emits `trench.segment_collapsed` exactly
+    /// once per segment.
+    pub(crate) fn tick_m9b_collapse(&self, tick: Tick, sim_time_ms: f64) {
+        let scenario_id = self.config.scenario_id.clone();
+        let substrate_hardness = m9b_scenario_collapse_hardness(&scenario_id);
+
+        struct CollapseEmit {
+            segment_index: usize,
+            variant: SegmentVariant,
+            prev_integrity: f32,
+            had_revetment: bool,
+            cause: cf_trench::CollapseCause,
+            substrate_hardness: f32,
+            ticks_since_dug: u32,
+        }
+        let mut emits: Vec<CollapseEmit> = Vec::new();
+
+        if let Ok(mut state) = self.state.write() {
+            let len = state.trench_world.segments.len();
+            for idx in 0..len {
+                let runtime = match state.trench_world.runtime_at(idx).copied() {
+                    Some(rt) => rt,
+                    None => continue,
+                };
+                if runtime.collapsed {
+                    continue;
+                }
+                let segment = state.trench_world.segments[idx].clone();
+                let has_revetment = segment
+                    .embedded_modules
+                    .iter()
+                    .any(|m| matches!(m, TrenchModule::Revetment));
+                if let Some(rt_mut) = state.trench_world.runtime_at_mut(idx) {
+                    rt_mut.ticks_since_dug = rt_mut.ticks_since_dug.saturating_add(1);
+                }
+                let ticks_since_dug = state
+                    .trench_world
+                    .runtime_at(idx)
+                    .map(|r| r.ticks_since_dug)
+                    .unwrap_or(0);
+                if ticks_since_dug % M9B_COLLAPSE_CADENCE_TICKS != 0 {
+                    continue;
+                }
+                let env = CollapseEnv {
+                    substrate_hardness,
+                    has_revetment,
+                    decay_per_tick: cf_trench::SOFT_DIRT_DECAY_PER_TICK,
+                };
+                let outcome = collapse_tick(runtime.integrity, env);
+                match outcome {
+                    CollapseTickOutcome::Stable { integrity }
+                    | CollapseTickOutcome::Decaying { integrity } => {
+                        if let Some(rt_mut) = state.trench_world.runtime_at_mut(idx) {
+                            rt_mut.integrity = integrity;
+                        }
+                    }
+                    CollapseTickOutcome::Collapsed {
+                        prev_integrity,
+                        cause,
+                    } => {
+                        if let Some(rt_mut) = state.trench_world.runtime_at_mut(idx) {
+                            rt_mut.integrity = 0.0;
+                            rt_mut.collapsed = true;
+                        }
+                        emits.push(CollapseEmit {
+                            segment_index: idx,
+                            variant: segment.variant,
+                            prev_integrity,
+                            had_revetment: has_revetment,
+                            cause,
+                            substrate_hardness,
+                            ticks_since_dug,
+                        });
+                    }
+                }
+            }
+        }
+
+        for e in emits {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "trench",
+                "segment_collapsed",
+                json!({
+                    "actor_id": null,
+                    "segment_id": e.segment_index as u64 + 1,
+                    "variant": e.variant.as_str(),
+                    "substrate_hardness": e.substrate_hardness,
+                    "integrity_before": e.prev_integrity,
+                    "integrity_after": 0.0_f32,
+                    "had_revetment": e.had_revetment,
+                    "cause": e.cause.as_str(),
+                    "ticks_since_dug": e.ticks_since_dug,
+                    "tick_index": tick.0,
+                }),
+                None,
+            );
+        }
+    }
+
+    /// **M9B audit GAP-4**: process the per-tick collection of MG fire
+    /// records emitted by reactive guards, looking for hits that cross
+    /// a `parapet_raised` segment carrying a `Breastwork` module. Each
+    /// matching hit applies one round of damage to the segment's
+    /// runtime breastwork HP; once HP reaches 0 the engine emits
+    /// `trench.breastwork_breached`.
+    ///
+    /// The detector is intentionally coarse: it checks whether the
+    /// fire ray's origin or the trench segment AABB intersects, then
+    /// applies the round directly to breastwork HP. The cf-physics
+    /// damage routing for the residual energy is M14's responsibility.
+    pub(crate) fn tick_m9b_breastwork_hits<'a, I>(
+        &self,
+        fire_records: I,
+        tick: Tick,
+        sim_time_ms: f64,
+    ) where
+        I: IntoIterator<Item = &'a GuardFireRecord>,
+    {
+        struct BreachEmit {
+            segment_index: usize,
+            prev_hp: f32,
+        }
+        let mut emits: Vec<BreachEmit> = Vec::new();
+
+        if let Ok(mut state) = self.state.write() {
+            let world_len = state.trench_world.segments.len();
+            if world_len == 0 {
+                return;
+            }
+            for fire in fire_records {
+                let damage_per_round = cf_trench::ROUND_DAMAGE_J;
+                // For each fire record we cast a coarse ray: if any
+                // parapet_raised segment with a Breastwork module lies
+                // along the trajectory between origin and 1s of travel,
+                // we apply one round to the first matching segment.
+                let origin = fire.origin;
+                let velocity = fire.velocity;
+                let lifetime_ticks = fire.lifetime_ticks.max(1) as f32;
+                let tick_dt = if self.config.tick_rate_hz == 0 {
+                    1.0 / 60.0
+                } else {
+                    1.0 / self.config.tick_rate_hz as f32
+                };
+                let max_travel_s = (lifetime_ticks * tick_dt).max(0.01);
+                let end = [
+                    origin[0] + velocity[0] * max_travel_s,
+                    origin[1] + velocity[1] * max_travel_s,
+                ];
+
+                let mut first_hit_idx: Option<usize> = None;
+                for idx in 0..world_len {
+                    let segment = &state.trench_world.segments[idx];
+                    if !matches!(segment.variant, SegmentVariant::ParapetRaised) {
+                        continue;
+                    }
+                    let has_breastwork = segment
+                        .embedded_modules
+                        .iter()
+                        .any(|m| matches!(m, TrenchModule::Breastwork));
+                    if !has_breastwork {
+                        continue;
+                    }
+                    let x0 = segment.tile_x as f32;
+                    let x1 = segment.tile_x as f32 + segment.width as f32;
+                    let y0 = segment.tile_y as f32;
+                    let y1 = segment.tile_y as f32 + segment.depth as f32;
+                    if segment_intersects_ray(origin, end, x0, y0, x1, y1) {
+                        first_hit_idx = Some(idx);
+                        break;
+                    }
+                }
+
+                let Some(idx) = first_hit_idx else {
+                    continue;
+                };
+                let Some(rt) = state.trench_world.runtime_at(idx).copied() else {
+                    continue;
+                };
+                let Some(current_hp) = rt.breastwork_hp else {
+                    continue;
+                };
+                if current_hp <= 0.0 {
+                    continue;
+                }
+                let outcome = apply_round_to_breastwork(current_hp, damage_per_round);
+                let new_hp = outcome.hp_after();
+                if let Some(rt_mut) = state.trench_world.runtime_at_mut(idx) {
+                    rt_mut.breastwork_hp = Some(new_hp);
+                }
+                if let BreastworkHitOutcome::Breached { prev_hp, .. } = outcome {
+                    emits.push(BreachEmit {
+                        segment_index: idx,
+                        prev_hp,
+                    });
+                }
+            }
+        }
+
+        for e in emits {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "trench",
+                "breastwork_breached",
+                json!({
+                    "actor_id": null,
+                    "segment_id": e.segment_index as u64 + 1,
+                    "module_id": "breastwork",
+                    "prev_hp": e.prev_hp,
+                    "prev_cover_state": CoverState::Full.as_str(),
+                    "new_cover_state": cover_state_post_breach(
+                        TrenchStance::Standing,
+                        SegmentVariant::ParapetRaised,
+                        true,
+                    )
+                    .as_str(),
+                    "tick_index": tick.0,
+                }),
+                None,
+            );
+        }
+    }
+}
+
+/// Coarse segment-ray intersection check used by GAP-4 breastwork
+/// hit detection. Returns true when the line segment from `origin`
+/// to `end` intersects the AABB `(x0, y0) - (x1, y1)` or starts/ends
+/// inside it.
+fn segment_intersects_ray(
+    origin: [f32; 2],
+    end: [f32; 2],
+    x0: f32,
+    y0: f32,
+    x1: f32,
+    y1: f32,
+) -> bool {
+    let inside = |p: [f32; 2]| p[0] >= x0 && p[0] <= x1 && p[1] >= y0 && p[1] <= y1;
+    if inside(origin) || inside(end) {
+        return true;
+    }
+    let (mut tmin, mut tmax) = (0.0_f32, 1.0_f32);
+    let dx = end[0] - origin[0];
+    let dy = end[1] - origin[1];
+    if dx.abs() > f32::EPSILON {
+        let inv = 1.0 / dx;
+        let t0 = (x0 - origin[0]) * inv;
+        let t1 = (x1 - origin[0]) * inv;
+        let (lo, hi) = if t0 < t1 { (t0, t1) } else { (t1, t0) };
+        tmin = tmin.max(lo);
+        tmax = tmax.min(hi);
+        if tmin > tmax {
+            return false;
+        }
+    } else if origin[0] < x0 || origin[0] > x1 {
+        return false;
+    }
+    if dy.abs() > f32::EPSILON {
+        let inv = 1.0 / dy;
+        let t0 = (y0 - origin[1]) * inv;
+        let t1 = (y1 - origin[1]) * inv;
+        let (lo, hi) = if t0 < t1 { (t0, t1) } else { (t1, t0) };
+        tmin = tmin.max(lo);
+        tmax = tmax.min(hi);
+        if tmin > tmax {
+            return false;
+        }
+    } else if origin[1] < y0 || origin[1] > y1 {
+        return false;
+    }
+    true
 }
 
 /// Suppress the unused-import warning while the breastwork outcome

@@ -202,6 +202,12 @@ pub struct InitialBreachWorld {
 pub struct InitialGuard {
     pub actor: ActorId,
     pub params: cf_ai::ReactiveGuardParams,
+    /// **M9B audit GAP-2**: optional doctrine id that opts the actor
+    /// into a per-tick AI cover-decision pipeline. Currently only
+    /// `"AI-TRENCH-A-01"` is recognised (the M9B trench garrison
+    /// doctrine); unknown values are ignored.
+    #[allow(dead_code)]
+    pub doctrine: Option<String>,
 }
 
 /// **M6**: initial squad member built from a scenario actor entry.
@@ -416,6 +422,7 @@ impl M0EngineConfig {
                 cfg.initial_guards.push(InitialGuard {
                     actor: ActorId(actor.id),
                     params: enemy.build_params(),
+                    doctrine: enemy.doctrine.clone(),
                 });
             }
         }
@@ -644,7 +651,7 @@ pub struct M0EngineOutcome {
 }
 
 pub struct M0Engine {
-    config: M0EngineConfig,
+    pub(crate) config: M0EngineConfig,
     pub(crate) state: RwLock<EngineMutable>,
     pub(crate) recorder: Arc<Recorder>,
     /// Lock-free snapshot of the engine's current tick. Updated by `drive_tick` so that
@@ -667,7 +674,7 @@ pub struct M0Engine {
 
 pub(crate) struct EngineMutable {
     clock: SimClock,
-    rng: Rng,
+    pub(crate) rng: Rng,
     pub(crate) settings: Settings,
     pending_runbundle: bool,
     shutdown_requested: bool,
@@ -1002,6 +1009,34 @@ pub(crate) struct EngineMutable {
     /// chain stays linear across dig → place_module → repair_module
     /// → breach → collapse.
     pub(crate) trench_next_segment_id: u64,
+    /// **M9B audit GAP-1**: per-actor latched cover state + segment
+    /// variant. Used by `tick_m9b_cover_state_changes` to detect
+    /// per-tick transitions and emit `trench.cover_state_changed`.
+    /// The stored tuple is `(prev_cover_state, prev_segment_variant,
+    /// prev_trench_stance)` so the engine can attribute the transition
+    /// to either `segment_boundary` (segment changed) or
+    /// `stance_change` (stance changed within the same segment).
+    pub(crate) m9b_last_cover_state: BTreeMap<
+        ActorId,
+        (
+            cf_trench::CoverState,
+            Option<cf_trench::SegmentVariant>,
+            cf_trench::TrenchStance,
+        ),
+    >,
+    /// **M9B audit GAP-2**: per-actor exposure tick counter for the
+    /// `AI-TRENCH-A-01` doctrine. Increments while the actor remains
+    /// in `CoverState::Exposed`; resets on any other cover state. The
+    /// doctrine reads this to enforce the spec's "no AI remains
+    /// Exposed continuously > 1.5 seconds" invariant.
+    pub(crate) m9b_trench_doctrine_exposure_ticks: BTreeMap<ActorId, u32>,
+    /// **M9B audit GAP-2**: opt-in set of actor ids the engine drives
+    /// through the trench doctrine each tick. Currently populated by
+    /// the scenario loader when a reactive_guard entry carries
+    /// `doctrine: Some("AI-TRENCH-A-01")` in its scenario RON; the
+    /// scenario `m9b_ai_in_trench_doctrine` opts in its three
+    /// defenders.
+    pub(crate) m9b_trench_doctrine_actors: std::collections::BTreeSet<ActorId>,
 }
 
 /// **M6**: per-actor charge-fire annotation shipped from the M6 post-step
@@ -1277,6 +1312,7 @@ impl M0Engine {
             Some(cf_mission::ReactorWorld::new(config.initial_reactors.clone()))
         };
         let mut reactive_guards = BTreeMap::new();
+        let mut m9b_trench_doctrine_actors = std::collections::BTreeSet::<ActorId>::new();
         // **M1.5 G6**: when the scenario carries a difficulty_preset id,
         // overlay the preset onto each guard's params at spawn time so the
         // preset's miss_chance / aim_settle / hearing_radius / etc. are
@@ -1291,6 +1327,14 @@ impl M0Engine {
             let mut params = guard.params;
             if let Some(p) = &preset {
                 p.apply_to(&mut params, config.tick_rate_hz);
+            }
+            if guard
+                .doctrine
+                .as_deref()
+                .map(|d| d == cf_ai::trench_doctrine::DOCTRINE_ID)
+                .unwrap_or(false)
+            {
+                m9b_trench_doctrine_actors.insert(guard.actor);
             }
             let mut rg = cf_ai::ReactiveGuard::new(guard.actor, params);
             // Latch max_hp from the actor world the engine just built so
@@ -1475,6 +1519,9 @@ impl M0Engine {
                 // surfaces project the live state.
                 trench_world: cf_trench::segment::InMemorySegments::new(),
                 trench_next_segment_id: 1,
+                m9b_last_cover_state: BTreeMap::new(),
+                m9b_trench_doctrine_exposure_ticks: BTreeMap::new(),
+                m9b_trench_doctrine_actors,
             }),
             recorder,
             current_tick,
@@ -4970,6 +5017,25 @@ impl M0Engine {
         if let Some(t) = advanced {
             let sim_time_ms = self.state.read().map(|s| s.clock.sim_time_ms()).unwrap_or(0.0);
             self.tick_m7b_squad(t, sim_time_ms);
+        }
+
+        // **M9B audit GAP-1..5**: drive per-tick trench surfaces.
+        // - GAP-1 emits `trench.cover_state_changed` on actor segment
+        //   boundary cross / stance change.
+        // - GAP-2 ticks the AI-TRENCH-A-01 doctrine for opted-in actors
+        //   and emits `ai.cover_decision`.
+        // - GAP-3 ticks drainage on every sump-bearing segment under
+        //   active rainfall.
+        // - GAP-4 routes guard MG fire records into the per-segment
+        //   breastwork HP gate and emits `trench.breastwork_breached`.
+        // - GAP-5 ticks per-segment collapse on the audit cadence.
+        if let Some(t) = advanced {
+            let sim_time_ms = self.state.read().map(|s| s.clock.sim_time_ms()).unwrap_or(0.0);
+            self.tick_m9b_cover_state_changes(t, sim_time_ms);
+            self.tick_m9b_ai_cover_decisions(t, sim_time_ms);
+            self.tick_m9b_drainage(t, sim_time_ms);
+            self.tick_m9b_breastwork_hits(guard_fire_records.iter(), t, sim_time_ms);
+            self.tick_m9b_collapse(t, sim_time_ms);
         }
 
         // **M4B § "Delta baseline cadence is enforced"** — emit one snapshot
@@ -15698,13 +15764,13 @@ impl DigEvent {
 /// drifted at AI step time, so the engine just propagates it.
 #[derive(Debug, Clone)]
 #[allow(dead_code)]
-struct GuardFireRecord {
-    shooter: ActorId,
-    origin: [f32; 2],
-    velocity: [f32; 2],
-    damage: f32,
-    lifetime_ticks: u32,
-    will_miss: bool,
+pub(crate) struct GuardFireRecord {
+    pub(crate) shooter: ActorId,
+    pub(crate) origin: [f32; 2],
+    pub(crate) velocity: [f32; 2],
+    pub(crate) damage: f32,
+    pub(crate) lifetime_ticks: u32,
+    pub(crate) will_miss: bool,
 }
 
 /// Build the JsonSchema-friendly mission view used by the observe envelope.
