@@ -9,3 +9,5 @@ publish.workspace = true
 [dependencies]
 serde = { workspace = true }
 tracing = { workspace = true }
+cf-audio = { path = "../cf-audio" }
+cf-material = { path = "../cf-material" }

@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/audio_doppler_shifted.v1",
+  "title": "audio.doppler_shifted",
+  "description": "M12B § Doppler-shift event. Fires per tick per moving audio source. Carries the resolved doppler_factor (clamped to [0.25, 4.0]) + `clamped` flag (true when the clamp fired or input was NaN/Inf) + the medium-corrected speed_of_sound_m_per_s used in the formula. Always cosmetic per M12A determinism contract.",
+  "type": "object",
+  "required": ["canonical_name", "doppler_factor", "clamped", "speed_of_sound_m_per_s"],
+  "properties": {
+    "canonical_name": { "type": "string", "minLength": 1 },
+    "doppler_factor": { "type": "number", "minimum": 0.25, "maximum": 4.0 },
+    "clamped": { "type": "boolean" },
+    "speed_of_sound_m_per_s": { "type": "number", "minimum": 0.0 },
+    "medium": {
+      "type": "string",
+      "enum": ["air", "water", "smoke", "ammonia", "vacuum"]
+    },
+    "source_velocity": {
+      "type": "array",
+      "items": { "type": "number" },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "listener_velocity": {
+      "type": "array",
+      "items": { "type": "number" },
+      "minItems": 2,
+      "maxItems": 2
+    }
+  }
+}

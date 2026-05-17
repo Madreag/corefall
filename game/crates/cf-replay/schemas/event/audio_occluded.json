@@ -1,0 +1,27 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/audio_occluded.v1",
+  "title": "audio.occluded",
+  "description": "M12B § Per-source occlusion event. Fires when one or more walls lie between the source and the listener. Carries the cumulative transmission_loss_db (negative number; e.g. -28 for one concrete wall) + the effective low-pass cutoff (min across all walls in the path). Always cosmetic per M12A determinism contract.",
+  "type": "object",
+  "required": ["canonical_name", "occlusion_db", "low_pass_cutoff_hz", "wall_count"],
+  "properties": {
+    "canonical_name": { "type": "string", "minLength": 1 },
+    "occlusion_db": { "type": "number", "maximum": 0.0 },
+    "low_pass_cutoff_hz": { "type": "number", "minimum": 0.0 },
+    "wall_count": { "type": "integer", "minimum": 0 },
+    "clipped": { "type": "boolean" },
+    "source_position": {
+      "type": "array",
+      "items": { "type": "number" },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "listener_position": {
+      "type": "array",
+      "items": { "type": "number" },
+      "minItems": 2,
+      "maxItems": 2
+    }
+  }
+}

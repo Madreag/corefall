@@ -427,6 +427,16 @@ const SCHEMA_UX_JUICE_APPLIED: &str = include_str!("../schemas/event/ux_juice_ap
 // per M12A spec § Replay parity.
 const SCHEMA_AUDIO_EVENT_PLAYED: &str = include_str!("../schemas/event/audio_event_played.json");
 
+// **M12B**: HRTF spatial audio + per-room reverb + per-material echo +
+// per-source occlusion + Doppler shift. All four event types are
+// cosmetic per M12A determinism contract; the cosmetic-event filter in
+// `cf_audio::deterministic_replay::is_cosmetic_audio_event_for` lists
+// them by name.
+const SCHEMA_AUDIO_SPATIAL_RESOLVED: &str = include_str!("../schemas/event/audio_spatial_resolved.json");
+const SCHEMA_AUDIO_REVERB_APPLIED: &str = include_str!("../schemas/event/audio_reverb_applied.json");
+const SCHEMA_AUDIO_OCCLUDED: &str = include_str!("../schemas/event/audio_occluded.json");
+const SCHEMA_AUDIO_DOPPLER_SHIFTED: &str = include_str!("../schemas/event/audio_doppler_shifted.json");
+
 // **M14**: full collision + impulse routing event surface. Producers in
 // cf-control/src/engine.rs fire on swept-collision priority queue, bullet
 // sharpness decay over distance, projectile embedding in stickiness
@@ -805,6 +815,12 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("ux", "juice_applied") => Some(SCHEMA_UX_JUICE_APPLIED),
         // **M12A**: per-cue audio playback event.
         ("audio", "event_played") => Some(SCHEMA_AUDIO_EVENT_PLAYED),
+        // **M12B**: HRTF spatial audio + per-room reverb + per-material
+        // echo + per-source occlusion + Doppler shift. All four cosmetic.
+        ("audio", "spatial_resolved") => Some(SCHEMA_AUDIO_SPATIAL_RESOLVED),
+        ("audio", "reverb_applied") => Some(SCHEMA_AUDIO_REVERB_APPLIED),
+        ("audio", "occluded") => Some(SCHEMA_AUDIO_OCCLUDED),
+        ("audio", "doppler_shifted") => Some(SCHEMA_AUDIO_DOPPLER_SHIFTED),
         // **M14**: full collision + impulse routing event surface.
         ("combat", "swept_collision") => Some(SCHEMA_COMBAT_SWEPT_COLLISION),
         ("combat", "bullet_sharpness_decay") => Some(SCHEMA_COMBAT_BULLET_SHARPNESS_DECAY),
@@ -1516,6 +1532,130 @@ mod tests {
             "integrity_squared": 100.0,
         });
         validate_event_payload("terrain", "terrain_penetration_threshold", &payload).expect("valid");
+    }
+
+    // **M12B** § HRTF spatial audio + per-room reverb + per-material echo
+    // + per-source occlusion + Doppler shift. All four schemas are
+    // payload-shaped (additionalProperties: true; required fields gated).
+
+    #[test]
+    fn m12b_audio_spatial_resolved_validates_minimum_payload() {
+        let payload = json!({
+            "canonical_name": "weapon_fired",
+            "azimuth_rad": 0.78539816,
+            "elevation_rad": 0.0,
+            "distance_m": 10.0,
+            "hrir_index": { "azimuth_bucket": 4, "elevation_bucket": 0 },
+            "direction": "NE",
+            "gain": 0.5,
+            "source_position": [10.0, 10.0],
+            "listener_position": [0.0, 0.0],
+            "listener_facing_rad": 0.0
+        });
+        validate_event_payload("audio", "spatial_resolved", &payload).expect("valid");
+    }
+
+    #[test]
+    fn m12b_audio_spatial_resolved_rejects_unknown_direction() {
+        let payload = json!({
+            "canonical_name": "weapon_fired",
+            "azimuth_rad": 0.0,
+            "distance_m": 1.0,
+            "hrir_index": { "azimuth_bucket": 0, "elevation_bucket": 0 },
+            "direction": "up",
+            "gain": 1.0
+        });
+        let err = validate_event_payload("audio", "spatial_resolved", &payload).unwrap_err();
+        assert!(err.contains("direction"), "got: {err}");
+    }
+
+    #[test]
+    fn m12b_audio_reverb_applied_validates_minimum_payload() {
+        let payload = json!({
+            "canonical_name": "weapon_fired",
+            "room_id": 7,
+            "tail_seconds": 2.1,
+            "decay_coefficient": 0.85,
+            "decay_band": "bright",
+            "wet_dry_mix": 0.57,
+            "early_reflection_delay_ms": 15.0
+        });
+        validate_event_payload("audio", "reverb_applied", &payload).expect("valid");
+    }
+
+    #[test]
+    fn m12b_audio_reverb_applied_rejects_unknown_decay_band() {
+        let payload = json!({
+            "canonical_name": "weapon_fired",
+            "room_id": 7,
+            "tail_seconds": 2.1,
+            "decay_coefficient": 0.85,
+            "decay_band": "synthwave",
+            "wet_dry_mix": 0.57
+        });
+        let err = validate_event_payload("audio", "reverb_applied", &payload).unwrap_err();
+        assert!(err.contains("decay_band"), "got: {err}");
+    }
+
+    #[test]
+    fn m12b_audio_occluded_validates_minimum_payload() {
+        let payload = json!({
+            "canonical_name": "weapon_fired",
+            "occlusion_db": -28.0,
+            "low_pass_cutoff_hz": 800.0,
+            "wall_count": 1,
+            "clipped": false
+        });
+        validate_event_payload("audio", "occluded", &payload).expect("valid");
+    }
+
+    #[test]
+    fn m12b_audio_occluded_rejects_positive_db() {
+        let payload = json!({
+            "canonical_name": "weapon_fired",
+            "occlusion_db": 5.0,
+            "low_pass_cutoff_hz": 800.0,
+            "wall_count": 1
+        });
+        let err = validate_event_payload("audio", "occluded", &payload).unwrap_err();
+        assert!(err.contains("occlusion_db"), "got: {err}");
+    }
+
+    #[test]
+    fn m12b_audio_doppler_shifted_validates_minimum_payload() {
+        let payload = json!({
+            "canonical_name": "projectile_fly",
+            "doppler_factor": 0.30,
+            "clamped": false,
+            "speed_of_sound_m_per_s": 343.0,
+            "medium": "air"
+        });
+        validate_event_payload("audio", "doppler_shifted", &payload).expect("valid");
+    }
+
+    #[test]
+    fn m12b_audio_doppler_shifted_rejects_factor_outside_safe_range() {
+        let payload = json!({
+            "canonical_name": "projectile_fly",
+            "doppler_factor": 10.0,
+            "clamped": false,
+            "speed_of_sound_m_per_s": 343.0
+        });
+        let err = validate_event_payload("audio", "doppler_shifted", &payload).unwrap_err();
+        assert!(err.contains("doppler_factor"), "got: {err}");
+    }
+
+    #[test]
+    fn m12b_audio_doppler_shifted_rejects_unknown_medium() {
+        let payload = json!({
+            "canonical_name": "projectile_fly",
+            "doppler_factor": 0.5,
+            "clamped": false,
+            "speed_of_sound_m_per_s": 343.0,
+            "medium": "plasma"
+        });
+        let err = validate_event_payload("audio", "doppler_shifted", &payload).unwrap_err();
+        assert!(err.contains("medium"), "got: {err}");
     }
 
     #[test]

@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/audio_spatial_resolved.v1",
+  "title": "audio.spatial_resolved",
+  "description": "M12B § HRTF spatial-resolve event. Emitted per audio cue when the engine computes the per-source spatial envelope (azimuth + distance + HRIR index + caption direction + gain). Always cosmetic per M12A determinism contract — does NOT enter the determinism checksum, but MUST fire in deterministic order so two engines with identical seed produce identical event streams.",
+  "type": "object",
+  "required": ["canonical_name", "azimuth_rad", "distance_m", "hrir_index", "direction", "gain"],
+  "properties": {
+    "canonical_name": { "type": "string", "minLength": 1 },
+    "azimuth_rad": { "type": "number" },
+    "elevation_rad": { "type": "number" },
+    "distance_m": { "type": "number", "minimum": 0.0 },
+    "hrir_index": {
+      "type": "object",
+      "required": ["azimuth_bucket", "elevation_bucket"],
+      "properties": {
+        "azimuth_bucket": { "type": "integer", "minimum": 0, "maximum": 31 },
+        "elevation_bucket": { "type": "integer", "minimum": 0, "maximum": 7 }
+      }
+    },
+    "direction": {
+      "type": "string",
+      "enum": ["here", "ahead", "behind you", "N", "NE", "E", "SE", "S", "SW", "W", "NW"]
+    },
+    "gain": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+    "source_position": {
+      "type": "array",
+      "items": { "type": "number" },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "listener_position": {
+      "type": "array",
+      "items": { "type": "number" },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "listener_facing_rad": { "type": "number" }
+  }
+}

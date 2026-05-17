@@ -1,0 +1,23 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/audio_reverb_applied.v1",
+  "title": "audio.reverb_applied",
+  "description": "M12B § Per-room reverb application event. Fires per audio cue with the room's resolved ReverbProfile (tail seconds + decay coefficient + decay band + wet/dry mix + early reflection delay + aperture attenuation). Always cosmetic per M12A determinism contract.",
+  "type": "object",
+  "required": ["canonical_name", "room_id", "tail_seconds", "decay_coefficient", "decay_band", "wet_dry_mix"],
+  "properties": {
+    "canonical_name": { "type": "string", "minLength": 1 },
+    "room_id": { "type": ["integer", "null"], "minimum": 0 },
+    "tail_seconds": { "type": "number", "minimum": 0.0 },
+    "decay_coefficient": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+    "decay_band": {
+      "type": "string",
+      "enum": ["bright", "bright_ringing", "bright_short", "warm_mid", "warm_low", "dampened", "anechoic"]
+    },
+    "wet_dry_mix": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+    "early_reflection_delay_ms": { "type": "number", "minimum": 0.0 },
+    "aperture_attenuation_db": { "type": "number" },
+    "ir_id": { "type": "string" },
+    "reverb_send_db": { "type": "number" }
+  }
+}
