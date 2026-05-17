@@ -18,9 +18,9 @@
 //! ([`EditorState`], [`EditorError`], [`ExportSelectionResult`]) +
 //! the helper builders ([`const_scene_for_tick`],
 //! [`dry_run_frame_ticker`], [`unused_frame_ticker_handle`]). The
-//! state machine is decoupled from the egui front-end so VAL-M10B-028
-//! + VAL-M10B-029 can drive it as a library-level surface without an
-//! egui test harness.
+//! state machine is decoupled from the egui front-end so the
+//! VAL-M10B-028 and VAL-M10B-029 contracts can drive it as a
+//! library-level surface without an egui test harness.
 //!
 //! - [`EditorState::scrub_to(tick)`] renders the exact frame within
 //!   16 ms; BLAKE3 against the offline-render reference (VAL-M10B-028).

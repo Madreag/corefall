@@ -14,23 +14,12 @@ use serde::{Deserialize, Serialize};
 
 use crate::bundle::Bundle;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct DeltaReconstructorState {
     pub baseline_count: u64,
     pub delta_chain_depth: u64,
     pub last_baseline_tick: Option<u64>,
     pub last_baseline_event_id: Option<String>,
-}
-
-impl Default for DeltaReconstructorState {
-    fn default() -> Self {
-        Self {
-            baseline_count: 0,
-            delta_chain_depth: 0,
-            last_baseline_tick: None,
-            last_baseline_event_id: None,
-        }
-    }
 }
 
 /// One reconstructed snapshot at a given tick.

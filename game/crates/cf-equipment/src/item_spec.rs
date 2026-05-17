@@ -124,6 +124,7 @@ impl GridDim {
     }
 
     /// Rotated 90° footprint (swap w + h).
+    #[must_use]
     pub const fn rotated(self) -> Self {
         Self { w: self.h, h: self.w }
     }
