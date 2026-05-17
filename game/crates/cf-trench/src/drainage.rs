@@ -98,6 +98,7 @@ impl DrainageTickOutcome {
 /// rain-rate is exposed as a parameter so M31 weather can override the
 /// default (heavy rain accumulates faster).
 #[derive(Debug, Clone, Copy)]
+#[allow(clippy::struct_field_names)]
 pub struct DrainageEnv {
     pub rain_per_tick_px: f32,
     pub flush_threshold_px: f32,
