@@ -115,10 +115,11 @@ pub use minefield::{
     MINE_PROXIMITY_TRIGGER_DECITILES, ROBOT_DISARM_SECONDS,
 };
 pub use sandbag::{
-    apply_damage_to_wall, sandbag_eroded_events, sandbag_pixel_mask,
-    sandbag_tier_for_hp, SandbagErodedEvent, SandbagPixelMask, SandbagTier,
-    SandbagWall, SandbagWallSpec, SANDBAG_HIGH_MAX_HP, SANDBAG_LOW_MAX_HP,
-    SANDBAG_MID_MAX_HP,
+    apply_damage_to_wall, repair_sandbag_wall, sandbag_eroded_events,
+    sandbag_pixel_mask, sandbag_repair_cost, sandbag_tier_for_hp,
+    SandbagErodedEvent, SandbagPixelMask, SandbagTier, SandbagWall,
+    SandbagWallSpec, SANDBAG_HIGH_MAX_HP, SANDBAG_LOW_MAX_HP,
+    SANDBAG_MID_MAX_HP, SANDBAG_REPAIR_HP_PER_SANDBAG,
 };
 pub use spec::{FortCoverLevel, FortificationSpec, SandbagCoverByStance};
 pub use watchtower::{

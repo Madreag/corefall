@@ -373,6 +373,59 @@ pub fn sandbag_eroded_events(
     out
 }
 
+/// Spec § "Repair: act.player.repair_fortification consumes sandbags
+/// from inventory equal to the missing HP". The ratio is **50 HP
+/// restored per consumed sandbag** for the sandbag-wall family
+/// (closure-feature `m9c-6` description verbatim).
+///
+/// This constant is the engine-side anchor the cfctl
+/// `act.player.repair_fortification` handler reads to compute the
+/// per-call inventory deduction + HP restoration.
+pub const SANDBAG_REPAIR_HP_PER_SANDBAG: u32 = 50;
+
+/// Pure helper: given a wall's current HP + tier, compute the
+/// `(sandbags_required, hp_after_repair)` pair for a full repair to
+/// `tier.max_hp()`. Returns `(0, current_hp)` when the wall is
+/// already at max HP.
+///
+/// Used by the engine-side dispatch for
+/// `act.player.repair_fortification` to size the inventory deduction
+/// before applying the restoration (VAL-M9C-REPAIR-FORTIFICATION-
+/// BEHAVIOR).
+#[must_use]
+pub fn sandbag_repair_cost(current_hp: u32, tier: SandbagTier) -> (u32, u32) {
+    let max_hp = tier.max_hp();
+    if current_hp >= max_hp {
+        return (0, current_hp);
+    }
+    let missing = max_hp - current_hp;
+    let sandbags = missing.div_ceil(SANDBAG_REPAIR_HP_PER_SANDBAG);
+    (sandbags, max_hp)
+}
+
+/// Apply a repair to a sandbag wall: consume up to `available_sandbags`
+/// to restore HP toward `tier.max_hp()` at the spec's 50 HP / sandbag
+/// ratio. Returns the `(sandbags_consumed, hp_after)` pair. If the
+/// caller cannot supply enough sandbags for a full repair, the
+/// helper applies a partial repair scaled to what's available.
+///
+/// Used by the engine-side `act.player.repair_fortification`
+/// dispatch (VAL-M9C-REPAIR-FORTIFICATION-BEHAVIOR).
+pub fn repair_sandbag_wall(wall: &mut SandbagWall, available_sandbags: u32) -> (u32, u32) {
+    let (needed, _max) = sandbag_repair_cost(wall.hp, wall.tier);
+    if needed == 0 || available_sandbags == 0 {
+        return (0, wall.hp);
+    }
+    let consumed = needed.min(available_sandbags);
+    let restored_hp = consumed.saturating_mul(SANDBAG_REPAIR_HP_PER_SANDBAG);
+    let new_hp = wall.hp.saturating_add(restored_hp).min(wall.tier.max_hp());
+    wall.hp = new_hp;
+    if let Some(tier) = sandbag_tier_for_hp(new_hp) {
+        wall.tier = tier;
+    }
+    (consumed, new_hp)
+}
+
 /// Apply `damage_hp` to the wall: clamp HP, erode pixels strictly
 /// from the top row first (per VAL-M9C-017), and return the ordered
 /// list of `sandbag_eroded` events the caller must publish (per
@@ -525,6 +578,87 @@ mod tests {
             (events[1].from, events[1].to),
             (SandbagTier::Mid, SandbagTier::Low)
         );
+    }
+
+    /// VAL-M9C-REPAIR-FORTIFICATION-BEHAVIOR: the spec's 50 HP / sandbag
+    /// ratio computes the right `(sandbags, hp_after)` for the common
+    /// repair scenarios.
+    #[test]
+    fn sandbag_repair_cost_uses_50_hp_per_sandbag() {
+        // A `sandbag_high` wall at 300 HP needs (600 - 300) / 50 = 6 sandbags
+        // to return to 600 HP.
+        assert_eq!(
+            sandbag_repair_cost(300, SandbagTier::High),
+            (6, 600),
+            "high wall at 300 HP costs 6 sandbags + restores to 600 HP"
+        );
+        // A `sandbag_mid` wall at 200 HP needs (400 - 200) / 50 = 4 sandbags.
+        assert_eq!(
+            sandbag_repair_cost(200, SandbagTier::Mid),
+            (4, 400),
+            "mid wall at 200 HP costs 4 sandbags + restores to 400 HP"
+        );
+        // Already at max → 0 sandbags, no change.
+        assert_eq!(
+            sandbag_repair_cost(600, SandbagTier::High),
+            (0, 600),
+            "full HP costs 0 sandbags"
+        );
+        // Partial-repair ceiling division: 1 HP missing costs 1 sandbag
+        // (ceil(1 / 50) = 1).
+        assert_eq!(
+            sandbag_repair_cost(599, SandbagTier::High),
+            (1, 600),
+            "ceil-div: 1 HP missing costs 1 sandbag"
+        );
+    }
+
+    /// VAL-M9C-REPAIR-FORTIFICATION-BEHAVIOR: repair restores HP +
+    /// updates tier; partial repair scales to available sandbags.
+    /// Per the spec, repair brings HP toward the wall's CURRENT tier
+    /// max — `tier` reflects the wall's structural state (eroded
+    /// walls degrade tier; repair stabilises at the current tier's
+    /// cap). Rebuilding to a higher tier is a separate action.
+    #[test]
+    fn repair_sandbag_wall_restores_hp_within_current_tier() {
+        let mut wall = SandbagWall::new_full(FortificationId(7), SandbagTier::High, 50);
+        // Damage wall down to HP=200, which sits at the mid-tier
+        // boundary (200..399 → Mid).
+        apply_damage_to_wall(&mut wall, 400);
+        assert_eq!(wall.hp, 200);
+        assert_eq!(wall.tier, SandbagTier::Mid);
+
+        // Repair Mid wall: (400 - 200) / 50 = 4 sandbags → HP back to 400.
+        let (consumed, new_hp) = repair_sandbag_wall(&mut wall, 10);
+        assert_eq!(consumed, 4);
+        assert_eq!(new_hp, 400);
+        assert_eq!(wall.tier, SandbagTier::High);
+    }
+
+    /// Partial repair: not enough sandbags for a full restore →
+    /// scales linearly at 50 HP / sandbag.
+    #[test]
+    fn repair_sandbag_wall_partial_when_insufficient_inventory() {
+        let mut wall = SandbagWall::new_full(FortificationId(7), SandbagTier::High, 50);
+        apply_damage_to_wall(&mut wall, 300);
+        assert_eq!(wall.hp, 300);
+        // Mid tier (HP 300 < 400). Full repair would cost 2 sandbags
+        // (400-300)/50 = 2 → HP back to 400. With only 1 sandbag,
+        // partial repair restores 50 HP → HP=350 (still Mid).
+        let (consumed, new_hp) = repair_sandbag_wall(&mut wall, 1);
+        assert_eq!(consumed, 1);
+        assert_eq!(new_hp, 350);
+        assert_eq!(wall.tier, SandbagTier::Mid);
+    }
+
+    /// Repair on an already-full wall is a no-op (no inventory deduction).
+    #[test]
+    fn repair_sandbag_wall_at_full_hp_is_noop() {
+        let mut wall = SandbagWall::new_full(FortificationId(1), SandbagTier::Mid, 25);
+        assert_eq!(wall.hp, 400);
+        let (consumed, new_hp) = repair_sandbag_wall(&mut wall, 99);
+        assert_eq!(consumed, 0);
+        assert_eq!(new_hp, 400);
     }
 
     /// Spec scenario explicit threshold values: HP=399 must be `mid`,
