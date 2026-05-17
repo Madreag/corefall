@@ -5196,7 +5196,7 @@ mod tests {
                 .unwrap();
             let parsed: JsonRpcResponse = serde_json::from_str(&resp).unwrap();
             assert!(
-                parsed.result.is_some() || parsed.error.as_ref().map_or(false, |e| e.code != error_codes::METHOD_NOT_FOUND),
+                parsed.result.is_some() || parsed.error.as_ref().is_some_and(|e| e.code != error_codes::METHOD_NOT_FOUND),
                 "{method} must not return -32601 MethodNotFound"
             );
             if let Some(error) = parsed.error {

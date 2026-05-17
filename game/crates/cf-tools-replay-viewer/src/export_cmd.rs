@@ -26,6 +26,8 @@
 //! - **VAL-M10B-033**: `--list-presets` enumerates exactly the five
 //!   spec-declared presets.
 
+#![allow(clippy::result_large_err)]
+
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -118,7 +120,7 @@ pub enum ExportError {
 /// CLI-shaped arguments for the export dispatch. The shape mirrors
 /// the `Cmd::Export` clap struct so the CLI handler can route
 /// `Cmd::Export → ExportArgs → run_export` directly.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ExportArgs {
     pub bundle_dir: Option<PathBuf>,
     pub preset: Option<String>,
@@ -138,22 +140,6 @@ pub struct ExportArgs {
     /// callers always leave this `false` so the real probe drives
     /// the dispatch.
     pub force_missing_ffmpeg: bool,
-}
-
-impl Default for ExportArgs {
-    fn default() -> Self {
-        Self {
-            bundle_dir: None,
-            preset: None,
-            out: None,
-            list_presets: false,
-            presets_dir: None,
-            no_audio_base: false,
-            slow_mo: None,
-            dry_run: false,
-            force_missing_ffmpeg: false,
-        }
-    }
 }
 
 /// Outcome of a successful [`run_export`] dispatch. The CLI handler
@@ -360,12 +346,7 @@ fn locate_default_presets_dir() -> Option<PathBuf> {
         cwd.join("../../../game/content/replay_export/presets"),
         cwd.join("../../../content/replay_export/presets"),
     ];
-    for c in candidates {
-        if c.is_dir() {
-            return Some(c);
-        }
-    }
-    None
+    candidates.into_iter().find(|c| c.is_dir())
 }
 
 /// Read the bundle's `run_id` from `<bundle_dir>/run_manifest.json`.

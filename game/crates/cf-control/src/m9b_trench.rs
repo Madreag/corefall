@@ -1278,8 +1278,8 @@ mod tests {
     /// close-deferred): a crewed fortification dominates the
     /// underlying trench segment's cover_state derivation. Deploying
     /// + crewing inside a `fire_step` segment promotes Standing
-    /// on-step from Exposed → Full; uncrew returns to Exposed for
-    /// fire_step on-step Standing.
+    ///   on-step from Exposed → Full; uncrew returns to Exposed for
+    ///   fire_step on-step Standing.
     #[test]
     fn val_cross_004_mg_tripod_inside_fire_step_crewing_dominates_cover_state() {
         use cf_actor::{ActorState, ActorId, Inventory, Vec2};
