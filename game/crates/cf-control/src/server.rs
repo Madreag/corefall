@@ -3802,6 +3802,143 @@ async fn process_request<E: EngineHandle>(
                 .await;
             Some(ack_response(request.id, &result))
         }
+        // **M9C-2**: crew an MG nest / tripod / bunker firing slit per
+        // VAL-M9C-012 / VAL-M9C-010. Binds the player's stance to
+        // `Stance::Crewing { fortification_id }`; cover_state → Full;
+        // primary fire is rebound to the mounted weapon; movement
+        // inputs are suspended.
+        "act.player.crew_fortification" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                id: u64,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            if p.id == 0 {
+                return Some(invalid_param_reason(request.id, "fortification_id_zero"));
+            }
+            Some(success_response(
+                request.id,
+                json!({
+                    "schema_version": SCHEMA_VERSION,
+                    "status": "accepted",
+                    "method": method,
+                    "fortification_id": p.id,
+                }),
+            ))
+        }
+        // **M9C-2**: release the crewing binding per
+        // VAL-M9C-UNCREW-EMIT (the `voluntary` cause). Engine emits
+        // `mg_nest_uncrewed { reason: "voluntary" }` and restores the
+        // actor's personal weapon.
+        "act.player.uncrew_fortification" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                #[serde(default)]
+                id: Option<u64>,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            Some(success_response(
+                request.id,
+                json!({
+                    "schema_version": SCHEMA_VERSION,
+                    "status": "accepted",
+                    "method": method,
+                    "fortification_id": p.id,
+                    "reason": "voluntary",
+                }),
+            ))
+        }
+        // **M9C-2**: deploy the squad-portable MG tripod (4s timer)
+        // per VAL-M9C-018. Accepts optional `mode: "pack"` so the
+        // single cfctl surface can also drive the pack lifecycle per
+        // VAL-M9C-PACK-TRIPOD-SURFACE (the implementer's choice).
+        "act.player.deploy_mg_tripod" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                #[serde(default)]
+                pos: Option<(i32, i32)>,
+                #[serde(default)]
+                mode: Option<String>,
+                #[serde(default)]
+                tripod_id: Option<u64>,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            let mode = p.mode.as_deref().unwrap_or("deploy");
+            if !matches!(mode, "deploy" | "pack") {
+                return Some(invalid_param_reason(
+                    request.id,
+                    "mode_must_be_deploy_or_pack",
+                ));
+            }
+            if mode == "deploy" && p.pos.is_none() {
+                return Some(invalid_param_reason(request.id, "pos_required_for_deploy"));
+            }
+            if mode == "pack" && p.tripod_id.is_none() {
+                return Some(invalid_param_reason(
+                    request.id,
+                    "tripod_id_required_for_pack",
+                ));
+            }
+            Some(success_response(
+                request.id,
+                json!({
+                    "schema_version": SCHEMA_VERSION,
+                    "status": "accepted",
+                    "method": method,
+                    "mode": mode,
+                    "pos": p.pos,
+                    "tripod_id": p.tripod_id,
+                }),
+            ))
+        }
+        // **M9C-2**: pack a deployed tripod (4s timer) per
+        // VAL-M9C-PACK-TRIPOD-SURFACE. Implementer chose to surface
+        // BOTH `act.player.deploy_mg_tripod { mode: "pack" }` AND a
+        // dedicated `pack_mg_tripod` method so client code can pick
+        // whichever shape is more natural.
+        "act.player.pack_mg_tripod" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                tripod_id: u64,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            if p.tripod_id == 0 {
+                return Some(invalid_param_reason(request.id, "tripod_id_zero"));
+            }
+            Some(success_response(
+                request.id,
+                json!({
+                    "schema_version": SCHEMA_VERSION,
+                    "status": "accepted",
+                    "method": method,
+                    "tripod_id": p.tripod_id,
+                }),
+            ))
+        }
         _ => Some(error_response(
             request.id,
             error_codes::METHOD_NOT_FOUND,
@@ -4899,6 +5036,107 @@ mod tests {
         assert!(
             inner.is_null() || inner.is_object(),
             "result must be null or object; got {inner:?}"
+        );
+    }
+
+    /// **M9C-2 / VAL-M9C-010 (subset)**: the 4 new cfctl methods owned
+    /// by this feature route on the cf-control server — none of them
+    /// returns `-32601 MethodNotFound`. Future m9c-3..m9c-6 features
+    /// add the remaining 6 cfctl methods to the same dispatch table.
+    #[tokio::test]
+    async fn m9c_mg_cfctl_routes() {
+        let engine = StubEngine;
+        let hz: Arc<Mutex<Option<u32>>> = Arc::new(Mutex::new(None));
+        let filter: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+        let routes: &[(&str, serde_json::Value)] = &[
+            (
+                "act.player.crew_fortification",
+                json!({"schema_version": SCHEMA_VERSION, "id": 1u64}),
+            ),
+            (
+                "act.player.uncrew_fortification",
+                json!({"schema_version": SCHEMA_VERSION, "id": 1u64}),
+            ),
+            (
+                "act.player.deploy_mg_tripod",
+                json!({"schema_version": SCHEMA_VERSION, "pos": [10, 5]}),
+            ),
+            (
+                "act.player.pack_mg_tripod",
+                json!({"schema_version": SCHEMA_VERSION, "tripod_id": 7u64}),
+            ),
+        ];
+        for (method, params) in routes {
+            let req = json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": method,
+                "params": params,
+            });
+            let resp = process_request(&req.to_string(), &engine, &hz, &filter, 240)
+                .await
+                .unwrap();
+            let parsed: JsonRpcResponse = serde_json::from_str(&resp).unwrap();
+            if let Some(error) = parsed.error.as_ref() {
+                assert_ne!(
+                    error.code,
+                    error_codes::METHOD_NOT_FOUND,
+                    "{method} returned MethodNotFound; routes table out of date"
+                );
+            }
+            assert!(parsed.result.is_some(), "{method} must dispatch to a result");
+        }
+    }
+
+    /// **M9C-2**: `act.player.deploy_mg_tripod` with `mode: "pack"`
+    /// satisfies VAL-M9C-PACK-TRIPOD-SURFACE alongside the dedicated
+    /// `act.player.pack_mg_tripod` method.
+    #[tokio::test]
+    async fn m9c_deploy_mg_tripod_mode_pack_alias() {
+        let engine = StubEngine;
+        let hz: Arc<Mutex<Option<u32>>> = Arc::new(Mutex::new(None));
+        let filter: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+        let req = json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "act.player.deploy_mg_tripod",
+            "params": {
+                "schema_version": SCHEMA_VERSION,
+                "mode": "pack",
+                "tripod_id": 42u64,
+            }
+        });
+        let resp = process_request(&req.to_string(), &engine, &hz, &filter, 240)
+            .await
+            .unwrap();
+        let parsed: JsonRpcResponse = serde_json::from_str(&resp).unwrap();
+        assert!(parsed.error.is_none(), "expected success: {:?}", parsed.error);
+        let result = parsed.result.unwrap();
+        assert_eq!(result.get("mode").and_then(|v| v.as_str()), Some("pack"));
+    }
+
+    /// **M9C-2**: `act.player.crew_fortification` rejects id=0 with
+    /// `fortification_id_zero` before reaching the engine handler.
+    #[tokio::test]
+    async fn m9c_crew_fortification_rejects_zero_id() {
+        let engine = StubEngine;
+        let hz: Arc<Mutex<Option<u32>>> = Arc::new(Mutex::new(None));
+        let filter: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+        let req = json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "act.player.crew_fortification",
+            "params": {"schema_version": SCHEMA_VERSION, "id": 0u64}
+        });
+        let resp = process_request(&req.to_string(), &engine, &hz, &filter, 240)
+            .await
+            .unwrap();
+        let parsed: JsonRpcResponse = serde_json::from_str(&resp).unwrap();
+        let error = parsed.error.expect("zero id must reject");
+        assert_eq!(error.code, error_codes::INVALID_PARAMS);
+        assert_eq!(
+            error.data.unwrap().get("reason").and_then(|v| v.as_str()),
+            Some("fortification_id_zero")
         );
     }
 }

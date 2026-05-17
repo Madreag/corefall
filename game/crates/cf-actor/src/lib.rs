@@ -350,6 +350,15 @@ pub enum Stance {
     KnifeThrow = 25,
     /// M16+ reserved: aquatic locomotion.
     Swim = 26,
+    /// **M9C**: crewing a static fortification (MG nest / tripod / bunker
+    /// firing slit). The bound fortification id is stored on
+    /// `ActorState::crewing_fortification_id` so the flat enum stays
+    /// binary-compatible while satisfying the spec note:
+    /// `Stance::Crewing { fortification_id }` (M9C § Notes for the
+    /// implementer). While in this stance, `cover_state` is Full,
+    /// movement inputs are suspended, and primary fire is rebound to
+    /// the fortification's mounted weapon.
+    Crewing = 27,
 }
 
 impl Stance {
@@ -389,6 +398,7 @@ impl Stance {
             Stance::StealthAttack => "stealth_attack",
             Stance::KnifeThrow => "knife_throw",
             Stance::Swim => "swim",
+            Stance::Crewing => "crewing",
         }
     }
 
@@ -1117,6 +1127,12 @@ pub struct ActorState {
     /// Default = empty slots so legacy actors serialize cleanly.
     #[serde(default)]
     pub body_armor: BodyArmorSlot,
+    /// **M9C**: bound fortification id when this actor is in
+    /// `Stance::Crewing`. Stored externally so the `Stance` enum stays
+    /// a flat `#[repr(u8)]` while expressing the spec-shape
+    /// `Stance::Crewing { fortification_id }`. `None` when not crewing.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub crewing_fortification_id: Option<u32>,
 }
 
 fn default_bipod_equipped() -> cf_equipment::Bipod {
@@ -1303,6 +1319,7 @@ impl ActorState {
             inventory_grid: None,
             inventory_encumbrance: None,
             body_armor: BodyArmorSlot::default(),
+            crewing_fortification_id: None,
         }
     }
 

@@ -70,6 +70,18 @@ pub use camo::{
 pub use common::{
     FortId, FortificationFaction, FortificationId, FortificationKind,
 };
+pub use mg_nest::{
+    fire_binding_for, route_bunker_slit_damage, spotter_scope_acquisition_multiplier,
+    AmmoBoxMg, BunkerFiringSlit, BunkerSlitDamageResult, BunkerSlitRoundKind,
+    CrewedKind, FireBinding, MgNest, MgNestError, MgNestFireOutcome,
+    MgNestUncrewReason, MgNestUncrewedEvent, MgTripod, MgTripodError,
+    MgTripodPhase, SpotterScope, AMMO_BOX_MG_MAX_HP, AMMO_BOX_MG_ROUNDS,
+    BUNKER_FIRING_SLIT_APERTURE_PX, BUNKER_FIRING_SLIT_HP,
+    MG_DOCTRINE_CREW_SEARCH_RADIUS_TILES, MG_DOCTRINE_RETREAT_HP_THRESHOLD,
+    MG_DOCTRINE_THREAT_RANGE_TILES, MG_NEST_STATIC_MAX_HP,
+    MG_TRIPOD_DEPLOYED_HP, MG_TRIPOD_DEPLOY_SECONDS, SPOTTER_SCOPE_HP,
+    SPOTTER_SCOPE_ACQUISITION_MULTIPLIER,
+};
 pub use minefield::MineKind;
 pub use sandbag::{
     apply_damage_to_wall, sandbag_eroded_events, sandbag_pixel_mask,

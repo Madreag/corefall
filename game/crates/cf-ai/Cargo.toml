@@ -13,6 +13,7 @@ ron = { workspace = true }
 cf-actor = { path = "../cf-actor" }
 cf-sim-core = { path = "../cf-sim-core" }
 cf-trench = { path = "../cf-trench" }
+cf-fortification = { path = "../cf-fortification" }
 
 [dev-dependencies]
 serde_json = { workspace = true }

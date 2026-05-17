@@ -121,6 +121,11 @@ pub mod target_selection;
 // `{step_up_for_shot, step_down_to_reload, hold_full_cover, reload_safe}`.
 pub mod trench_doctrine;
 
+// **M9C**: AI-MG-A-02 doctrine — crew nearest empty MG when threat
+// detected within 24 tiles; uncrew + retreat when nest HP < 200;
+// auto-swap depleted ammo box. Spec § "Notes for the implementer".
+pub mod mg_doctrine;
+
 // **M7B**: deep squad command grammar + formation orders + commander hop
 // + per-archetype BT. Spec § "the squad obeys real grammar — formation
 // orders, combat verbs, breach-stack discipline — and the player can take
@@ -166,6 +171,10 @@ pub use trench_doctrine::{
     CoverDecision as TrenchCoverDecision, CoverDecisionReason as TrenchCoverDecisionReason,
     TrenchDoctrine, TrenchDoctrineConfig, TrenchDoctrineInputs,
     DOCTRINE_ID as TRENCH_DOCTRINE_ID, MAX_EXPOSURE_SECONDS as TRENCH_MAX_EXPOSURE_SECONDS,
+};
+pub use mg_doctrine::{
+    assign_crews as assign_mg_crews, decide as mg_doctrine_decide, MgDoctrineDecision,
+    MgDoctrineInputs, MgNestObservation, DOCTRINE_ID as MG_DOCTRINE_ID,
 };
 pub use thinking_stack::{
     format_task_camel, AiTickOutput, Layer, LayerKind, LayerOutput, ThinkingContext, ThinkingStack,

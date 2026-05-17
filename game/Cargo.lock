@@ -1512,6 +1512,7 @@ name = "cf-ai"
 version = "0.0.1"
 dependencies = [
  "cf-actor",
+ "cf-fortification",
  "cf-sim-core",
  "cf-trench",
  "ron",

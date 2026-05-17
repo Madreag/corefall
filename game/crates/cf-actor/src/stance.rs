@@ -350,11 +350,21 @@ impl ActorState {
     /// the value is **derived, not stored** — mutate stance and the next
     /// call observes the new cover.
     ///
+    /// **M9C** crewing override: while in `Stance::Crewing`
+    /// `{ fortification_id }` the cover state is unconditionally
+    /// [`TrenchCoverState::Full`], regardless of the underlying trench
+    /// segment (the spec § "Crewing semantics" promises Full cover when
+    /// the actor is bound to a static fortification — MG nest / tripod /
+    /// bunker firing slit).
+    ///
     /// `world` is any implementor of [`cf_trench::TrenchSegmentLookup`].
     /// m9b-2's procgen + m9b-3's cfctl handlers each provide their own
     /// implementation against the chunked terrain index.
     #[must_use]
     pub fn cover_state<W: TrenchSegmentLookup + ?Sized>(&self, world: &W) -> TrenchCoverState {
+        if self.is_crewing() {
+            return TrenchCoverState::Full;
+        }
         let trench_stance = trench_stance_for_actor(self);
         let tile_x = self.position.x as i32;
         let tile_y = self.position.y as i32;
@@ -376,6 +386,48 @@ impl ActorState {
             }
             None => TrenchCoverState::Exposed,
         }
+    }
+
+    /// **M9C**: true when the actor is bound to a fortification via the
+    /// `Stance::Crewing { fortification_id }` spec-shape (M9C § "Crewing
+    /// semantics"). The bound fortification id lives on
+    /// `crewing_fortification_id`; this returns true exactly when the
+    /// id is `Some(_)`.
+    #[must_use]
+    pub fn is_crewing(&self) -> bool {
+        self.crewing_fortification_id.is_some()
+    }
+
+    /// **M9C**: bound fortification id, if any. Returns the spec-shape
+    /// `Crewing { fortification_id }` payload as a plain `u32`.
+    #[must_use]
+    pub fn crewed_fortification_id(&self) -> Option<u32> {
+        self.crewing_fortification_id
+    }
+
+    /// **M9C**: enter the spec-shape `Stance::Crewing { fortification_id }`
+    /// binding (M9C § "Crewing semantics"). The binding is 1:1
+    /// actor→fortification; movement inputs are suspended at the cf-control
+    /// dispatch boundary, primary fire is rebound to the fortification's
+    /// mounted weapon at the cf-fortification layer, and `cover_state`
+    /// becomes Full per the spec's cover-routing table.
+    pub fn crew_fortification(&mut self, fortification_id: u32) {
+        self.crewing_fortification_id = Some(fortification_id);
+        // Suspend movement intents per spec: "Movement inputs are
+        // suspended; firing inputs are rebound to the fortification's
+        // mounted weapon."
+        self.crouch_active = false;
+        self.prone_active = false;
+        self.sprint_active = false;
+        self.climb_active = false;
+        self.jet_active = false;
+    }
+
+    /// **M9C**: release the `Stance::Crewing { fortification_id }`
+    /// binding. Caller emits the corresponding `mg_nest_uncrewed`
+    /// replay event with the appropriate cause.
+    pub fn uncrew_fortification(&mut self) -> Option<u32> {
+        self.crewing_fortification_id.take()
     }
 }
 
@@ -494,5 +546,59 @@ mod cover_state_api_tests {
         assert_eq!(trench_stance_for(Stance::Slide), TrenchStance::Crouched);
         assert_eq!(trench_stance_for(Stance::Prone), TrenchStance::Prone);
         assert_eq!(trench_stance_for(Stance::ProneWalk), TrenchStance::Prone);
+    }
+
+    /// **VAL-M9C-011**: `Stance::Crewing { fortification_id }` grants
+    /// Full cover irrespective of trench segment. The spec § "Crewing
+    /// semantics" promises:
+    ///
+    /// > a crewed fortification has a 1:1 actor→fortification binding.
+    /// > The actor's stance becomes `Crewing { fortification_id }`.
+    /// > Movement inputs are suspended; firing inputs are rebound to
+    /// > the fortification's mounted weapon.
+    ///
+    /// The cover routing overrides any underlying segment-derived
+    /// cover (Exposed / Partial / Full all promote to Full once the
+    /// actor crews a fortification).
+    #[test]
+    fn stance_crewing_full_cover() {
+        // Open ground (no trench): un-crewed actor → Exposed; crewed
+        // actor → Full.
+        let world = InMemorySegments::with_segments(vec![]);
+        let mut a = standing_player(Vec2::new(0.0, 0.0));
+        assert_eq!(a.cover_state(&world), TrenchCoverState::Exposed);
+        a.crew_fortification(42);
+        assert!(a.is_crewing());
+        assert_eq!(a.crewed_fortification_id(), Some(42));
+        assert_eq!(a.cover_state(&world), TrenchCoverState::Full);
+
+        // Even inside a fire_step segment standing on-step (which would
+        // otherwise be Exposed), crewing forces Full.
+        let world_fire_step =
+            InMemorySegments::with_segments(vec![seg(SegmentVariant::FireStep, 0, 0)]);
+        // tile_y=10 is on-step (depth=16, step_height=8 → step band at
+        // y>=8); standing → Exposed pre-crew.
+        let mut b = standing_player(Vec2::new(5.0, 10.0));
+        assert_eq!(
+            b.cover_state(&world_fire_step),
+            TrenchCoverState::Exposed,
+            "on-step baseline must be Exposed before crewing"
+        );
+        b.crew_fortification(7);
+        assert_eq!(b.cover_state(&world_fire_step), TrenchCoverState::Full);
+
+        // Movement intent flags are suspended on crew.
+        assert!(!b.crouch_active);
+        assert!(!b.prone_active);
+        assert!(!b.sprint_active);
+
+        // Uncrew releases the binding + restores normal cover routing.
+        // Off-step position (5, 2) → standing → Partial after uncrew.
+        let released = b.uncrew_fortification();
+        assert_eq!(released, Some(7));
+        assert!(!b.is_crewing());
+        assert_eq!(b.crewed_fortification_id(), None);
+        b.position = Vec2::new(5.0, 2.0);
+        assert_eq!(b.cover_state(&world_fire_step), TrenchCoverState::Partial);
     }
 }
