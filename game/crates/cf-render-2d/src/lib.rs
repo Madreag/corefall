@@ -42,6 +42,10 @@ pub mod reactor_sprite;
 pub mod color_grading;
 pub mod juice;
 
+// **M9B** § cf-render-2d::trench_layers — per-variant trench sprite
+// layers (duckboard / fire-step / drainage / revetment / breastwork).
+pub mod trench_layers;
+
 pub use asset_loader::{
     category_subdir, load_ledger_index, resolve_placeholder_path, AssetIndex, AssetIndexEntry, AssetIndexPlugin,
 };
@@ -49,7 +53,13 @@ pub use debris::{
     DebrisPlugin, DebrisSpawnQueue, DebrisSpawnRequest, LooseDebris, RenderDebrisCappedEvent, DEBRIS_CAP,
 };
 pub use dig_preview::{probe_dig_validity, DigPreviewGhost, DigPreviewPlugin, DigPreviewTarget};
-pub use overlay::{material_tint, OverlayMode, OverlayModePlugin, OverlayModeState};
+pub use overlay::{
+    material_tint, tactical_overlay_chevrons, OverlayMode, OverlayModePlugin,
+    OverlayModeState, TacticalChevronSprite,
+};
+pub use trench_layers::{
+    layers_for_segment, layers_for_variant, segment_has_layer, TrenchLayerId,
+};
 pub use palette_swap::{
     build_role_swap, parse_hex_rgb, Palette, PaletteEntry, PaletteRegistry, PaletteSwap, OVERLAY_TINT_BUILD_REPAIR,
     OVERLAY_TINT_HAZARD, OVERLAY_TINT_INTEGRITY, OVERLAY_TINT_MOBILITY, OVERLAY_TINT_PATHABILITY,

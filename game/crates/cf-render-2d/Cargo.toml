@@ -13,3 +13,4 @@ tracing = { workspace = true }
 bevy = { workspace = true }
 cf-actor = { path = "../cf-actor" }
 cf-terrain = { path = "../cf-terrain" }
+cf-trench = { path = "../cf-trench" }

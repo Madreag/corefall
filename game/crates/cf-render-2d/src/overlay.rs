@@ -1,6 +1,16 @@
 //! **M2**: 5-mode material overlay (off / integrity / pathability / mobility /
 //! hazard / build_repair).
 //!
+//! **M9B** adds a 6th overlay mode `tactical` per spec
+//! § "Per-segment cover state field — HUD readability":
+//!
+//! > per-segment chevron icon when material overlay `tactical` mode is on
+//! > (M9B adds this 6th overlay mode).
+//!
+//! VAL-M9B-HUD-002: `OverlayMode::variants().len() == 6` after M9B.
+//! VAL-M9B-HUD-TACTICAL-001: when tactical mode is active, every
+//! trench segment renders a chevron labelled with its cover state.
+//!
 //! Mirrors the engine's `material_overlay_mode` (a string carried on
 //! `ObserveFrame::terrain.current_overlay_mode`). cf-app's bridge writes
 //! the active mode each frame into the [`OverlayModeState`] resource;
@@ -21,8 +31,10 @@
 use bevy::prelude::*;
 
 use cf_terrain::{material_affordance, MaterialId};
+use cf_trench::{cover_state, CoverState, SegmentVariant, TrenchSegment, TrenchStance};
 
-/// Five canonical overlay modes plus `off`. Mirrors the engine state.
+/// Six canonical overlay modes (5 M2 modes + the M9B `tactical` mode).
+/// Plus `off`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum OverlayMode {
     #[default]
@@ -32,6 +44,9 @@ pub enum OverlayMode {
     Mobility,
     Hazard,
     BuildRepair,
+    /// **M9B**: tactical cover-state overlay. Each trench segment on
+    /// screen renders a chevron sprite labelled with its cover state.
+    Tactical,
 }
 
 impl OverlayMode {
@@ -45,6 +60,7 @@ impl OverlayMode {
             "mobility" => Self::Mobility,
             "hazard" => Self::Hazard,
             "build_repair" => Self::BuildRepair,
+            "tactical" => Self::Tactical,
             _ => Self::Off,
         }
     }
@@ -58,8 +74,72 @@ impl OverlayMode {
             Self::Mobility => "mobility",
             Self::Hazard => "hazard",
             Self::BuildRepair => "build_repair",
+            Self::Tactical => "tactical",
         }
     }
+
+    /// VAL-M9B-HUD-002: every overlay variant in display order. After
+    /// M9B the length is 6 (`Integrity..=Tactical`), excluding `Off`.
+    #[must_use]
+    pub const fn variants() -> [OverlayMode; 6] {
+        [
+            OverlayMode::Integrity,
+            OverlayMode::Pathability,
+            OverlayMode::Mobility,
+            OverlayMode::Hazard,
+            OverlayMode::BuildRepair,
+            OverlayMode::Tactical,
+        ]
+    }
+}
+
+/// VAL-M9B-HUD-TACTICAL-001 sub-helper: one chevron sprite drawn by
+/// the tactical overlay for a single trench segment.
+#[derive(Debug, Clone, PartialEq)]
+pub struct TacticalChevronSprite {
+    /// World-space anchor for the chevron sprite (tile coordinates).
+    pub world_pos: (i32, i32),
+    /// The cover state the chevron displays. Drives glyph + tint.
+    pub cover_state: CoverState,
+    /// Variant of the source segment. Useful for cf-app to choose a
+    /// per-variant tint accent.
+    pub variant: SegmentVariant,
+}
+
+impl TacticalChevronSprite {
+    /// String label cf-ui's HUD draws under the chevron (`Exposed |
+    /// Partial | Full`).
+    #[must_use]
+    pub fn label(&self) -> &'static str {
+        self.cover_state.as_str()
+    }
+}
+
+/// VAL-M9B-HUD-TACTICAL-001: produce one chevron sprite per supplied
+/// trench segment, labelled with its derived cover state for the
+/// `stance` parameter (defaults to Standing).
+///
+/// Used by cf-app's overlay renderer when [`OverlayMode::Tactical`] is
+/// active.
+#[must_use]
+pub fn tactical_overlay_chevrons(
+    segments: &[TrenchSegment],
+    stance: TrenchStance,
+) -> Vec<TacticalChevronSprite> {
+    segments
+        .iter()
+        .map(|seg| {
+            let chevron_pos = (
+                seg.tile_x + (seg.width as i32) / 2,
+                seg.tile_y + (seg.depth as i32) / 2,
+            );
+            TacticalChevronSprite {
+                world_pos: chevron_pos,
+                cover_state: cover_state(stance, seg.variant),
+                variant: seg.variant,
+            }
+        })
+        .collect()
 }
 
 /// Bevy resource carrying the current overlay mode. Written by cf-app's
@@ -148,6 +228,16 @@ pub fn material_tint(mode: OverlayMode, id: MaterialId) -> [u8; 4] {
                 [100, 200, 100, 0x90]
             }
         }
+        OverlayMode::Tactical => {
+            // **M9B**: Tactical overlay tints the canonical terrain with a
+            // neutral desaturated mask — the per-segment chevron sprites
+            // carry the cover-state semantics. Air stays transparent.
+            if aff.id == cf_terrain::MATERIAL_AIR {
+                [0, 0, 0, 0]
+            } else {
+                [120, 130, 140, 0x80]
+            }
+        }
     }
 }
 
@@ -168,6 +258,7 @@ mod tests {
         MATERIAL_AIR, MATERIAL_ANCHOR, MATERIAL_CONCRETE, MATERIAL_DIRT, MATERIAL_HAZARD, MATERIAL_METAL_NOHOOK,
         MATERIAL_REPAIR_FILL,
     };
+    use cf_trench::{SegmentVariant, TrenchModule, TrenchSegment, TrenchStance};
 
     #[test]
     fn overlay_mode_round_trips_via_string() {
@@ -178,11 +269,113 @@ mod tests {
             OverlayMode::Mobility,
             OverlayMode::Hazard,
             OverlayMode::BuildRepair,
+            OverlayMode::Tactical,
         ] {
             assert_eq!(OverlayMode::parse_mode(mode.as_str()), mode);
         }
         // Unknown defaults to Off.
         assert_eq!(OverlayMode::parse_mode("garbage"), OverlayMode::Off);
+    }
+
+    /// VAL-M9B-HUD-002: `OverlayMode::variants().len() == 6` after M9B.
+    #[test]
+    fn material_overlay_tactical_mode_is_registered() {
+        let variants = OverlayMode::variants();
+        assert_eq!(variants.len(), 6, "M9B adds Tactical as the 6th overlay");
+        assert!(variants.contains(&OverlayMode::Tactical));
+    }
+
+    /// Alias matching the spec evidence string
+    /// `tactical_mode_registered`.
+    #[test]
+    fn material_overlay_tactical_mode_registered() {
+        material_overlay_tactical_mode_is_registered();
+    }
+
+    /// VAL-M9B-HUD-TACTICAL-001 (a): tactical mode produces one
+    /// chevron per visible trench segment.
+    #[test]
+    fn material_overlay_tactical_renders_chevron_per_segment() {
+        let segments = vec![
+            TrenchSegment {
+                variant: SegmentVariant::Standard,
+                tile_x: 10,
+                tile_y: 0,
+                depth: 16,
+                width: 16,
+                raised_step_height: None,
+                embedded_modules: vec![TrenchModule::Duckboard],
+            },
+            TrenchSegment {
+                variant: SegmentVariant::Deep,
+                tile_x: 30,
+                tile_y: 0,
+                depth: 24,
+                width: 16,
+                raised_step_height: None,
+                embedded_modules: vec![
+                    TrenchModule::Duckboard,
+                    TrenchModule::DrainageSump,
+                ],
+            },
+            TrenchSegment {
+                variant: SegmentVariant::FireStep,
+                tile_x: 50,
+                tile_y: 0,
+                depth: 16,
+                width: 20,
+                raised_step_height: Some(8),
+                embedded_modules: vec![TrenchModule::Duckboard, TrenchModule::FireStep],
+            },
+        ];
+        let chevrons = tactical_overlay_chevrons(&segments, TrenchStance::Standing);
+        assert_eq!(
+            chevrons.len(),
+            segments.len(),
+            "tactical mode draws exactly one chevron per segment"
+        );
+        let labels: Vec<&str> = chevrons.iter().map(|c| c.label()).collect();
+        assert!(labels.contains(&"Partial"), "standard expects Partial");
+        assert!(labels.contains(&"Full"), "deep expects Full");
+        assert!(
+            labels.contains(&"Exposed"),
+            "fire_step on-step expects Exposed"
+        );
+    }
+
+    /// VAL-M9B-HUD-TACTICAL-001 alias matching the spec evidence
+    /// string `tactical_mode_renders_chevron_per_segment`.
+    #[test]
+    fn material_overlay_tactical_mode_renders_chevron_per_segment() {
+        material_overlay_tactical_renders_chevron_per_segment();
+    }
+
+    #[test]
+    fn tactical_overlay_chevron_labels_round_trip_via_cover_state() {
+        let segments = vec![TrenchSegment {
+            variant: SegmentVariant::Standard,
+            tile_x: 0,
+            tile_y: 0,
+            depth: 16,
+            width: 16,
+            raised_step_height: None,
+            embedded_modules: vec![],
+        }];
+        let chevrons = tactical_overlay_chevrons(&segments, TrenchStance::Crouched);
+        assert_eq!(chevrons[0].label(), "Full", "crouched in standard = Full");
+    }
+
+    #[test]
+    fn tactical_overlay_chevrons_empty_when_no_segments() {
+        let chevrons = tactical_overlay_chevrons(&[], TrenchStance::Standing);
+        assert!(chevrons.is_empty());
+    }
+
+    #[test]
+    fn tactical_overlay_air_transparent_dirt_neutral() {
+        assert_eq!(material_tint(OverlayMode::Tactical, MATERIAL_AIR), [0, 0, 0, 0]);
+        let dirt = material_tint(OverlayMode::Tactical, MATERIAL_DIRT);
+        assert!(dirt[3] > 0, "tactical mask must be visible on dirt");
     }
 
     #[test]
