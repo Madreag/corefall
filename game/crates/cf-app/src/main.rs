@@ -3225,6 +3225,15 @@ impl Plugin for M12aAudioPlugin {
             .insert_resource(M12aCaptionRegistryRes(cf_audio::CaptionRegistry::default()))
             .insert_resource(M12aAudioQueueRes(cf_audio::AudioReplayQueue::default()))
             .insert_resource(M12aMixBusesRes(cf_audio::MixBuses::default()))
+            // **M12B** § Bevy AudioPlugin impl reads `SpatialEnvelope` +
+            // applies HRIR convolution + reverb send + low-pass at
+            // playback time. cf_app::audio_backend::HrirConvolutionAdapter
+            // holds the shared HRIR table; `ReverbSendBus` swaps the
+            // active IR per room boundary.
+            .insert_resource(M12bHrirAdapterRes(
+                cf_app::HrirConvolutionAdapter::new(std::sync::Arc::new(load_m12b_hrir_table())),
+            ))
+            .insert_resource(M12bReverbSendBusRes(cf_app::ReverbSendBus::default()))
             .add_systems(Startup, hydrate_audio_registries_from_ledger)
             .add_systems(
                 Update,
@@ -3234,6 +3243,52 @@ impl Plugin for M12aAudioPlugin {
                 ),
             );
     }
+}
+
+/// **M12B** § Load the HRIR table from
+/// `game/content/audio/hrtf/mit_kemar_subset.bin`, falling back to the
+/// placeholder table when the file is unavailable. Logged at startup.
+fn load_m12b_hrir_table() -> cf_audio::HrirTable {
+    let candidates = [
+        std::path::PathBuf::from("content/audio/hrtf/mit_kemar_subset.bin"),
+        std::path::PathBuf::from("../content/audio/hrtf/mit_kemar_subset.bin"),
+        std::path::PathBuf::from("game/content/audio/hrtf/mit_kemar_subset.bin"),
+    ];
+    for path in &candidates {
+        if !path.exists() {
+            continue;
+        }
+        match std::fs::read(path) {
+            Ok(bytes) => match cf_audio::HrirTable::from_bytes(&bytes) {
+                Ok(t) => {
+                    tracing::info!(
+                        target = "cf-app::m12b",
+                        path = %path.display(),
+                        bytes = bytes.len(),
+                        "M12B HRIR table loaded from disk"
+                    );
+                    return t;
+                }
+                Err(err) => tracing::warn!(
+                    target = "cf-app::m12b",
+                    path = %path.display(),
+                    ?err,
+                    "M12B HRIR table parse failed"
+                ),
+            },
+            Err(err) => tracing::warn!(
+                target = "cf-app::m12b",
+                path = %path.display(),
+                ?err,
+                "M12B HRIR table read failed"
+            ),
+        }
+    }
+    tracing::info!(
+        target = "cf-app::m12b",
+        "M12B HRIR table not found on disk; using placeholder"
+    );
+    cf_audio::HrirTable::placeholder()
 }
 
 /// Wrapper resources — cf-audio's pure-data types don't impl `Resource`
@@ -3254,6 +3309,22 @@ struct M12aAudioQueueRes(cf_audio::AudioReplayQueue);
 #[derive(Resource)]
 #[allow(dead_code)]
 struct M12aMixBusesRes(cf_audio::MixBuses);
+
+/// **M12B** § HRIR convolution adapter (Bevy resource wrapper). Holds an
+/// `Arc<HrirTable>` shared across systems; future bevy_audio integration
+/// invokes `adapter.resolve(envelope)` per audio cue to derive the
+/// per-source HRIR samples + Doppler pitch + low-pass cutoff.
+#[derive(Resource)]
+#[allow(dead_code)]
+struct M12bHrirAdapterRes(cf_app::HrirConvolutionAdapter);
+
+/// **M12B** § Reverb send bus (Bevy resource wrapper). One global bus
+/// that swaps the active IR when the listener crosses a room boundary
+/// per M19G boundary detection; the swap cross-fades over
+/// `IR_CROSS_FADE_MS` (250 ms per spec) to avoid clicks.
+#[derive(Resource)]
+#[allow(dead_code)]
+struct M12bReverbSendBusRes(cf_app::ReverbSendBus);
 
 /// Startup: hydrate the registries from `content/asset_ledger/ledger.jsonl`
 /// + `tools/audio_gen/caption_templates.ron`.

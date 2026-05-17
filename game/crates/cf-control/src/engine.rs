@@ -1571,6 +1571,166 @@ impl M0Engine {
         }
     }
 
+    /// **M12B** § Per-tick spatial resolve pass.
+    ///
+    /// Per spec § Crates / modules touched:
+    /// `cf-control::engine` MODIFY: "Per-tick: drain audio events →
+    /// `resolve_spatial` → emit `audio.spatial_resolved` cosmetic event."
+    ///
+    /// Given a `(source_position, source_velocity, cue_name)` tuple, compute
+    /// the `SpatialEnvelope` using the current player actor as the listener
+    /// + `Medium::Air` + open-outdoor reverb (M12B baseline; the M19 room
+    /// kernel will inject the actual reverb profile when the kernel exposes
+    /// per-tile room ids). Emits 4 cosmetic events: `audio.spatial_resolved`,
+    /// `audio.reverb_applied`, `audio.occluded`, `audio.doppler_shifted`.
+    ///
+    /// `walls` is the ordered list of [`cf_audio::WallAcoustics`] between
+    /// source and listener — typically empty for the M12B integration
+    /// baseline.
+    ///
+    /// All four events are cosmetic per
+    /// `cf-audio::deterministic_replay::is_cosmetic_audio_event_for`, so
+    /// they do NOT enter the determinism checksum but MUST fire in
+    /// deterministic per-tick order so the replay verifier sees the same
+    /// event stream across two engines with identical seed.
+    #[allow(clippy::too_many_arguments)]
+    pub(crate) fn emit_m12b_spatial_resolve(
+        &self,
+        tick: cf_sim_core::Tick,
+        sim_time_ms: f64,
+        cue_name: &str,
+        source_position: [f32; 2],
+        source_velocity: [f32; 2],
+        medium: cf_audio::Medium,
+        walls: &[cf_audio::WallAcoustics],
+        reverb_profile: cf_audio::ReverbProfile,
+        room_id: Option<u64>,
+    ) {
+        let (listener_position, listener_velocity, listener_facing) = self.m12b_listener_state();
+        let source = cf_audio::SourceContext {
+            position: source_position,
+            velocity: source_velocity,
+            base_gain: 1.0,
+            propagation_range_m: 100.0,
+            room_id,
+        };
+        let listener = cf_audio::ListenerContext {
+            position: listener_position,
+            velocity: listener_velocity,
+            facing_rad: listener_facing,
+            room_id,
+        };
+        let env = cf_audio::resolve_spatial(source, listener, medium, walls, reverb_profile);
+
+        // 1. audio.spatial_resolved
+        self.recorder.record_cosmetic(
+            tick,
+            sim_time_ms,
+            "audio",
+            "spatial_resolved",
+            json!({
+                "canonical_name": cue_name,
+                "azimuth_rad": env.azimuth_rad,
+                "elevation_rad": env.elevation_rad,
+                "distance_m": env.distance_m,
+                "hrir_index": {
+                    "azimuth_bucket": env.hrir_index.azimuth_bucket as u32,
+                    "elevation_bucket": env.hrir_index.elevation_bucket as u32,
+                },
+                "direction": env.direction.label(),
+                "gain": env.gain,
+                "source_position": [source_position[0], source_position[1]],
+                "listener_position": [listener_position[0], listener_position[1]],
+                "listener_facing_rad": listener_facing,
+            }),
+            None,
+        );
+
+        // 2. audio.reverb_applied
+        self.recorder.record_cosmetic(
+            tick,
+            sim_time_ms,
+            "audio",
+            "reverb_applied",
+            json!({
+                "canonical_name": cue_name,
+                "room_id": room_id,
+                "tail_seconds": reverb_profile.tail_seconds,
+                "decay_coefficient": reverb_profile.decay_coefficient,
+                "decay_band": reverb_profile.decay_band.as_str(),
+                "wet_dry_mix": reverb_profile.wet_dry_mix,
+                "early_reflection_delay_ms": reverb_profile.early_reflection_delay_ms,
+                "aperture_attenuation_db": reverb_profile.aperture_attenuation_db,
+                "reverb_send_db": env.reverb_send_db,
+            }),
+            None,
+        );
+
+        // 3. audio.occluded
+        // Spec § "occlusion_db <= 0"; emit even at 0 dB so replay can
+        // observe a clean "no walls" line.
+        self.recorder.record_cosmetic(
+            tick,
+            sim_time_ms,
+            "audio",
+            "occluded",
+            json!({
+                "canonical_name": cue_name,
+                "occlusion_db": env.occlusion.occlusion_db,
+                "low_pass_cutoff_hz": env.occlusion.low_pass_cutoff_hz,
+                "wall_count": env.occlusion.wall_count,
+                "clipped": env.occlusion.clipped,
+                "source_position": [source_position[0], source_position[1]],
+                "listener_position": [listener_position[0], listener_position[1]],
+            }),
+            None,
+        );
+
+        // 4. audio.doppler_shifted
+        self.recorder.record_cosmetic(
+            tick,
+            sim_time_ms,
+            "audio",
+            "doppler_shifted",
+            json!({
+                "canonical_name": cue_name,
+                "doppler_factor": env.doppler.factor,
+                "clamped": env.doppler.clamped,
+                "speed_of_sound_m_per_s": env.doppler.speed_of_sound_m_per_s,
+                "medium": env.medium_filter.medium.as_str(),
+                "source_velocity": [source_velocity[0], source_velocity[1]],
+                "listener_velocity": [listener_velocity[0], listener_velocity[1]],
+            }),
+            None,
+        );
+    }
+
+    /// **M12B** § Resolve the listener's `(position, velocity, facing_rad)`
+    /// triple from the current world. Returns `([0,0], [0,0], 0.0)` when
+    /// there's no player actor.
+    fn m12b_listener_state(&self) -> ([f32; 2], [f32; 2], f32) {
+        let s = match self.state.read() {
+            Ok(s) => s,
+            Err(_) => return ([0.0, 0.0], [0.0, 0.0], 0.0),
+        };
+        let Some(pid) = s.player_actor else {
+            return ([0.0, 0.0], [0.0, 0.0], 0.0);
+        };
+        let Some(actor_state) = s.actor_state.as_ref() else {
+            return ([0.0, 0.0], [0.0, 0.0], 0.0);
+        };
+        let Some(actor) = actor_state.world.actors.get(&pid) else {
+            return ([0.0, 0.0], [0.0, 0.0], 0.0);
+        };
+        // Listener facing is derived from the aim vector: atan2(aim.y, aim.x).
+        let facing = (actor.aim.y).atan2(actor.aim.x);
+        (
+            [actor.position.x, actor.position.y],
+            [actor.velocity.x, actor.velocity.y],
+            facing,
+        )
+    }
+
     pub fn run_id(&self) -> &str {
         self.recorder.run_id()
     }
@@ -8034,6 +8194,25 @@ impl M0Engine {
                         caption: format!("actor {} fires rifle", outcome.actor.0),
                     },
                     tick,
+                );
+                // **M12B** § Per-tick spatial-resolve pass. Emits 4 cosmetic
+                // replay events (audio.spatial_resolved / reverb_applied /
+                // occluded / doppler_shifted) so the replay verifier sees
+                // the same event stream across two engines with identical
+                // seed. Pure math; no Bevy, no DSP.
+                self.emit_m12b_spatial_resolve(
+                    tick,
+                    sim_time_ms,
+                    "weapon_fired",
+                    [muzzle.x, muzzle.y],
+                    // Source velocity: shooter is roughly stationary at fire
+                    // time; full velocity surfaces when projectile carries
+                    // its own emission.
+                    [0.0, 0.0],
+                    cf_audio::Medium::Air,
+                    &[],
+                    cf_audio::ReverbProfile::open_outdoor(),
+                    None,
                 );
                 // M1: acoustic noise alarm (CCCP HDFirearm.cpp:948 — registered
                 // alarm event consumed by M1.5+ AI perception within the radius).

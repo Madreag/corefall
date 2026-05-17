@@ -110,7 +110,10 @@ pub use timer_warnings::{TimerColor, TimerSeverity, TimerWarning, TimerWarningsS
 pub use action_prompt::ActionPromptState;
 pub use banners::{banner_text_line, BannerSeverity, BannerStackState, BANNER_STACK_MAX_VISIBLE};
 pub use branching_banner::{BranchOption, BranchingBannerState};
-pub use captions::{CaptionVerbosity, CaptionsState, CAPTION_QUEUE_MAX_VISIBLE};
+pub use captions::{
+    direction_string as caption_direction_string, spatial_caption_line, CaptionVerbosity, CaptionsState,
+    CAPTION_AHEAD_BEHIND_CONE_RAD, CAPTION_HERE_RADIUS_M, CAPTION_QUEUE_MAX_VISIBLE,
+};
 pub use chatter_ticker::{
     ChatterLine, ChatterTickerState, CHATTER_TICKER_DEFAULT_DWELL_TICKS, CHATTER_TICKER_MAX_LINES,
 };
