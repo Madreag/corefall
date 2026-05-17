@@ -1741,6 +1741,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "cf-fortification"
+version = "0.0.1"
+dependencies = [
+ "ron",
+ "serde",
+ "thiserror 2.0.18",
+ "tracing",
+]
+
+[[package]]
 name = "cf-headless"
 version = "0.0.1"
 dependencies = [
@@ -1817,6 +1827,7 @@ dependencies = [
  "cf-content",
  "cf-control",
  "cf-equipment",
+ "cf-fortification",
  "cf-material",
  "cf-replay",
  "cf-save",
@@ -1903,6 +1914,7 @@ version = "0.0.1"
 dependencies = [
  "bevy",
  "cf-actor",
+ "cf-fortification",
  "cf-terrain",
  "cf-trench",
  "serde",
@@ -2096,6 +2108,7 @@ dependencies = [
  "cf-actor",
  "cf-ai",
  "cf-equipment",
+ "cf-fortification",
  "cf-terrain",
  "cf-trench",
  "serde",
