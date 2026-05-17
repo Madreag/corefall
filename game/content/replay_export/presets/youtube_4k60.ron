@@ -1,0 +1,19 @@
+// M10B export preset — youtube_4k60.
+// Spec §"Player-facing behavior" bullet 2: 3840×2160 @ 60 fps H.264 +
+// AAC + mp4. Bitrate 30000 kbps lands inside YouTube's recommended
+// 35-45 Mbps SDR upload range for 2160p60 (we pick the low end so file
+// size stays manageable for Discord-attached export). Deterministic
+// encoder profile (single thread + locked 120-frame GOP + `-tune psnr`)
+// is applied by cf_replay_export::ffmpeg_bridge::DeterministicEncoderProfile.
+(
+    name: "youtube_4k60",
+    resolution: (
+        width: 3840,
+        height: 2160,
+    ),
+    fps: 60,
+    codec: h264,
+    audio_codec: "aac",
+    target_bitrate_kbps: 30000,
+    container: mp4,
+)

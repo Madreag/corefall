@@ -1,0 +1,19 @@
+// M10B export preset — twitch_1080p60.
+// Spec §"Player-facing behavior" bullet 2: 1920×1080 @ 60 fps H.264 +
+// AAC + mp4. Bitrate 6000 kbps is the conventional Twitch ingest target
+// for 1080p60 (Twitch Production Guidelines: 6000 kbps recommended,
+// 8500 kbps for partners). Deterministic encoder profile (single
+// thread + locked 120-frame GOP + `-tune psnr`) is applied by
+// cf_replay_export::ffmpeg_bridge::DeterministicEncoderProfile.
+(
+    name: "twitch_1080p60",
+    resolution: (
+        width: 1920,
+        height: 1080,
+    ),
+    fps: 60,
+    codec: h264,
+    audio_codec: "aac",
+    target_bitrate_kbps: 6000,
+    container: mp4,
+)

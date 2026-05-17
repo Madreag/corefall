@@ -1,0 +1,20 @@
+// M10B export preset — discord_720p30.
+// Spec §"Player-facing behavior" bullet 2: 1280×720 @ 30 fps H.264 +
+// AAC + mp4. Bitrate 2500 kbps is the conventional 720p30 SDR target
+// (Discord boost-3 server attachments allow 100 MB; a 90-second
+// micro_breach clip at 2.5 Mbps + 128 kbps audio is well under 30 MB).
+// Deterministic encoder profile (single thread + locked 120-frame GOP +
+// `-tune psnr`) is applied by
+// cf_replay_export::ffmpeg_bridge::DeterministicEncoderProfile.
+(
+    name: "discord_720p30",
+    resolution: (
+        width: 1280,
+        height: 720,
+    ),
+    fps: 30,
+    codec: h264,
+    audio_codec: "aac",
+    target_bitrate_kbps: 2500,
+    container: mp4,
+)

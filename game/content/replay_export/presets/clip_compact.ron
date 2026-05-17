@@ -1,0 +1,22 @@
+// M10B export preset — clip_compact.
+// Spec §"Player-facing behavior" bullet 2: smaller resolution + bitrate
+// suitable for ≤25 MB Discord-base-tier attachments. 854×480 @ 30 fps
+// H.264 + AAC + mp4 at 700 kbps video + 96 kbps audio yields a ~6 MB
+// clip at 60 seconds; ~12 MB at 120 seconds; comfortably under the
+// 25 MB Discord-free-tier attachment cap. This is also the preset the
+// cf-app post-mission "Export Last Replay" CTA uses (m10b-4 will wire
+// the CTA → preset). Deterministic encoder profile (single thread +
+// locked 120-frame GOP + `-tune psnr`) is applied by
+// cf_replay_export::ffmpeg_bridge::DeterministicEncoderProfile.
+(
+    name: "clip_compact",
+    resolution: (
+        width: 854,
+        height: 480,
+    ),
+    fps: 30,
+    codec: h264,
+    audio_codec: "aac",
+    target_bitrate_kbps: 700,
+    container: mp4,
+)

@@ -1,0 +1,24 @@
+// M10B export preset — archival_lossless.
+// Spec §"Player-facing behavior" bullet "Export is deterministic
+// within scope": FFV1 intra-frame mathematically lossless codec in an
+// mkv container (mp4 cannot natively carry FFV1). Audio is FLAC
+// (mathematically lossless). target_bitrate_kbps is `0` because FFV1
+// is quality-driven (intra-frame quantizer = lossless); the encoder
+// derives the resulting bitrate from the visual content. The
+// deterministic encoder profile uses single-thread + 1-frame GOP (every
+// frame is a keyframe — intra-frame coding) per
+// cf_replay_export::ffmpeg_bridge::DeterministicEncoderProfile::archival_lossless().
+// VAL-M10B-020 contract: byte-identical sha256 across two same-host
+// runs AND across Linux x86_64 / macOS aarch64 / Windows x86_64.
+(
+    name: "archival_lossless",
+    resolution: (
+        width: 1920,
+        height: 1080,
+    ),
+    fps: 60,
+    codec: ffv1,
+    audio_codec: "flac",
+    target_bitrate_kbps: 0,
+    container: mkv,
+)
