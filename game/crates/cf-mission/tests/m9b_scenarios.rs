@@ -90,7 +90,7 @@ fn determinism_scenario_has_fixed_seed_42() {
 
 #[test]
 fn each_scenario_declares_distinct_id() {
-    let mut ids = SCENARIO_IDS.iter().copied().collect::<Vec<_>>();
+    let mut ids = SCENARIO_IDS.to_vec();
     ids.sort_unstable();
     ids.dedup();
     assert_eq!(ids.len(), SCENARIO_IDS.len(), "registry ids are distinct");

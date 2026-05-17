@@ -41,7 +41,12 @@ pub const SCENARIO_IDS: &[&str] = &[
 /// Criteria. Used by closure-feature verification + integration tests
 /// that drive each scenario via `cf-headless run --scenario ...
 /// --max-ticks <budget>`.
+///
+/// Several scenarios share a 600-tick budget (the spec's default
+/// per-scenario window); the per-id match arms are kept explicit so
+/// future budget changes touch exactly one line per scenario.
 #[must_use]
+#[allow(clippy::match_same_arms)]
 pub fn tick_budget_for(id: &str) -> Option<u64> {
     match id {
         "m9b_zigzag_baseline" => Some(600),
