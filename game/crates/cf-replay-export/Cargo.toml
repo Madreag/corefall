@@ -1,0 +1,47 @@
+[package]
+name = "cf-replay-export"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+# M10B FFmpeg-version pin (per spec § "Notes for the implementer" + mission
+# AGENTS.md § "Hard rule for M10B FFmpeg integration"):
+#
+# We pin `ffmpeg-next = 8.1.0` from crates.io. As of crates.io
+# `ffmpeg-next 8.0.0` (published 2025-08-22) + `ffmpeg-next 8.1.0`
+# (published 2026-03-18) the upstream binding tracks FFmpeg 8.x via
+# the matching `ffmpeg-sys-next` major. The host toolchain shipped with
+# this mission is FFmpeg 8.0.1 at /opt/homebrew/bin/ffmpeg, libav 62.11
+# / 62.3 / 60.8 / 11.4 (libavcodec / libavformat / libavutil /
+# libavfilter). That falls inside the FFmpeg 8.x window the
+# `ffmpeg-next` major covers.
+#
+# This satisfies option (a) of the mission's two acceptable paths
+# ("pin a fork / upstream version that supports FFmpeg 8.x and
+# document it") — we use the canonical upstream that has now caught up
+# to FFmpeg 8.x rather than depending on an unofficial fork. See the
+# top-of-file comment in `src/ffmpeg_bridge.rs` for the runtime probe
+# strategy.
+#
+# default-features = false drops the optional `image` integration we
+# do not need. We do enable `codec`, `format`, `software-scaling`, and
+# `software-resampling` so the bridge can decode commentary OGG/MP3
+# (resample to 48 kHz) + scale RGBA → YUV420P / YUV444P / FFV1 frames
+# at the deterministic-encoder profile (single-threaded, locked GOP,
+# `-tune psnr`; FFV1 intra-frame for `archival_lossless`).
+[dependencies]
+serde = { workspace = true }
+ron = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+ffmpeg-next = { version = "8.1.0", default-features = false, features = [
+  "codec",
+  "format",
+  "software-scaling",
+  "software-resampling",
+] }
+
+[dev-dependencies]
+tempfile = "3"

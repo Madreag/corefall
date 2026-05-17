@@ -50,6 +50,7 @@ members = [
   "crates/cf-procgen",
   "crates/cf-content",
   "crates/cf-fortification",
+  "crates/cf-replay-export",
 ]
 
 [workspace.package]
