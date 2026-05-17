@@ -39,7 +39,11 @@ impl ParapetRaisedRequiresM9c {
 /// payload when the feature is off. The cfctl handler is expected to
 /// transform the `Err` arm into a `trench.parapet_raised_requires_m9c`
 /// replay event + refuse the dig.
-#[allow(unreachable_code)]
+#[allow(
+    unreachable_code,
+    clippy::unnecessary_wraps,
+    clippy::needless_return
+)]
 pub fn parapet_raised_dig_validate() -> Result<(), ParapetRaisedRequiresM9c> {
     #[cfg(feature = "m9c")]
     {
