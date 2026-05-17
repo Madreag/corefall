@@ -1,0 +1,62 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/trench_segment_dug.v1",
+  "title": "trench.segment_dug",
+  "description": "M9B: act.player.dig_trench_segment completed. Fires once per accepted dig, after the per-variant dig-time elapses (12s standard / 5s shallow_scrape per spec table). Non-cosmetic.",
+  "type": "object",
+  "required": ["variant", "depth", "width", "origin", "tick_index"],
+  "properties": {
+    "actor_id": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "variant": {
+      "type": "string",
+      "enum": [
+        "shallow_scrape",
+        "standard",
+        "deep",
+        "communication",
+        "fire_step",
+        "parapet_raised"
+      ]
+    },
+    "depth": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "width": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "origin": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {
+        "type": "integer"
+      }
+    },
+    "tool_id": {
+      "type": "string"
+    },
+    "tool_tier": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "dig_time_seconds": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "tick_index": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cosmetic": {
+      "type": "boolean",
+      "const": false,
+      "default": false
+    }
+  },
+  "additionalProperties": true
+}

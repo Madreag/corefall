@@ -1,0 +1,43 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/trench_module_placed.v1",
+  "title": "trench.module_placed",
+  "description": "M9B: act.player.place_trench_module completed. Fires once per accepted place action, after the per-module build_time_seconds elapses (e.g. duckboard 4s, breastwork 12s) per the spec's modules table. Non-cosmetic.",
+  "type": "object",
+  "required": ["module_id", "segment_id", "tick_index"],
+  "properties": {
+    "actor_id": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "module_id": {
+      "type": "string",
+      "enum": [
+        "duckboard",
+        "fire_step",
+        "breastwork",
+        "drainage_sump",
+        "revetment",
+        "corner_traverse"
+      ]
+    },
+    "segment_id": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "build_time_seconds": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "tick_index": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cosmetic": {
+      "type": "boolean",
+      "const": false,
+      "default": false
+    }
+  },
+  "additionalProperties": true
+}

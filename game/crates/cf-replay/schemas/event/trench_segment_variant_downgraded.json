@@ -1,0 +1,58 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/trench_segment_variant_downgraded.v1",
+  "title": "trench.segment_variant_downgraded",
+  "description": "M9B forward-warning event. Per VAL-M9B-DIG-003: `deep` variant requires `parent_material.hardness < 0.5`. When the substrate is too hard the dig falls back to `shallow_scrape` and emits this event so consumers can surface the downgrade in HUD / replay. Non-cosmetic.",
+  "type": "object",
+  "required": ["from", "to", "reason", "tick_index"],
+  "properties": {
+    "actor_id": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "from": {
+      "type": "string",
+      "enum": [
+        "shallow_scrape",
+        "standard",
+        "deep",
+        "communication",
+        "fire_step",
+        "parapet_raised"
+      ]
+    },
+    "to": {
+      "type": "string",
+      "enum": [
+        "shallow_scrape",
+        "standard",
+        "deep",
+        "communication",
+        "fire_step",
+        "parapet_raised"
+      ]
+    },
+    "reason": {
+      "type": "string",
+      "enum": [
+        "substrate_hardness_above_threshold"
+      ]
+    },
+    "substrate_hardness": {
+      "type": "number"
+    },
+    "threshold": {
+      "type": "number"
+    },
+    "tick_index": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cosmetic": {
+      "type": "boolean",
+      "const": false,
+      "default": false
+    }
+  },
+  "additionalProperties": true
+}

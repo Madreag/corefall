@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ai_cover_decision.v1",
+  "title": "ai.cover_decision",
+  "description": "M9B: AI-TRENCH-A-01 doctrine cover decision. Fires when the doctrine ticks for a garrisoned actor (typically on a fire_step trench segment). `reason_label` is one of 4 spec-mandated values; non-cosmetic (cannot be dropped under M4 backpressure) per VAL-M9B-AICOVER-001. Spec §\"Acceptance criteria — AI doctrine garrisons trench and uses cover state correctly\".",
+  "type": "object",
+  "required": ["actor_id", "reason_label", "prev_cover_state", "new_cover_state", "tick_index"],
+  "properties": {
+    "actor_id": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "reason_label": {
+      "type": "string",
+      "enum": [
+        "step_up_for_shot",
+        "step_down_to_reload",
+        "hold_full_cover",
+        "reload_safe"
+      ]
+    },
+    "prev_cover_state": {
+      "type": "string",
+      "enum": ["Exposed", "Partial", "Full"]
+    },
+    "new_cover_state": {
+      "type": "string",
+      "enum": ["Exposed", "Partial", "Full"]
+    },
+    "tick_index": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "doctrine": {
+      "type": "string",
+      "default": "AI-TRENCH-A-01"
+    },
+    "burst_rounds": {
+      "type": "integer",
+      "minimum": 0,
+      "default": 0
+    },
+    "cosmetic": {
+      "type": "boolean",
+      "const": false,
+      "default": false,
+      "description": "Per VAL-M9B-AICOVER-001 / VAL-M9B-REPLAY-002: sim-relevant event, never droppable under M4 backpressure."
+    }
+  },
+  "additionalProperties": true
+}

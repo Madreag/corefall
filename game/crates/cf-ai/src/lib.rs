@@ -115,6 +115,12 @@ pub mod utility;
 pub mod path_reaction;
 pub mod target_selection;
 
+// **M9B**: AI-TRENCH-A-01 doctrine — garrison + burst-and-duck for
+// actors deployed in cf-trench fire_step segments. Emits
+// `ai.cover_decision` events with reason_label in
+// `{step_up_for_shot, step_down_to_reload, hold_full_cover, reload_safe}`.
+pub mod trench_doctrine;
+
 // **M7B**: deep squad command grammar + formation orders + commander hop
 // + per-archetype BT. Spec § "the squad obeys real grammar — formation
 // orders, combat verbs, breach-stack discipline — and the player can take
@@ -156,6 +162,11 @@ pub use retreat::{effective_retreat_threshold, RetreatDecisionEvent, RetreatReas
 pub use squad_comm::{SquadCommPending, SquadCommRelayedEvent};
 pub use suppression::SuppressionEvent;
 pub use task::TaskType;
+pub use trench_doctrine::{
+    CoverDecision as TrenchCoverDecision, CoverDecisionReason as TrenchCoverDecisionReason,
+    TrenchDoctrine, TrenchDoctrineConfig, TrenchDoctrineInputs,
+    DOCTRINE_ID as TRENCH_DOCTRINE_ID, MAX_EXPOSURE_SECONDS as TRENCH_MAX_EXPOSURE_SECONDS,
+};
 pub use thinking_stack::{
     format_task_camel, AiTickOutput, Layer, LayerKind, LayerOutput, ThinkingContext, ThinkingStack,
 };

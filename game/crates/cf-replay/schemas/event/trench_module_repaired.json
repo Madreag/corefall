@@ -1,0 +1,45 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/trench_module_repaired.v1",
+  "title": "trench.module_repaired",
+  "description": "M9B: act.player.repair_trench_module completed. Fires once per accepted repair, consuming the declared materials and restoring module integrity. Non-cosmetic.",
+  "type": "object",
+  "required": ["module_id", "segment_id", "tick_index"],
+  "properties": {
+    "actor_id": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "module_id": {
+      "type": "string",
+      "enum": [
+        "duckboard",
+        "fire_step",
+        "breastwork",
+        "drainage_sump",
+        "revetment",
+        "corner_traverse"
+      ]
+    },
+    "segment_id": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "hp_before": {
+      "type": "number"
+    },
+    "hp_after": {
+      "type": "number"
+    },
+    "tick_index": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cosmetic": {
+      "type": "boolean",
+      "const": false,
+      "default": false
+    }
+  },
+  "additionalProperties": true
+}

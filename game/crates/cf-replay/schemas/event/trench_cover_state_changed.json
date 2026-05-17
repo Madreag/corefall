@@ -1,0 +1,61 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/trench_cover_state_changed.v1",
+  "title": "trench.cover_state_changed",
+  "description": "M9B: VAL-M9B-COVER-002. Fires when an actor's cover state changes either by crossing a trench-segment boundary OR by changing stance inside the same segment. `cause` distinguishes the two axes; `prev_state` and `new_state` carry the 3-state Exposed/Partial/Full enum. Non-cosmetic (cannot be dropped under M4 backpressure).",
+  "type": "object",
+  "required": ["actor_id", "prev_state", "new_state", "cause", "tick_index"],
+  "properties": {
+    "actor_id": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "prev_state": {
+      "type": "string",
+      "enum": ["Exposed", "Partial", "Full"]
+    },
+    "new_state": {
+      "type": "string",
+      "enum": ["Exposed", "Partial", "Full"]
+    },
+    "cause": {
+      "type": "string",
+      "enum": ["segment_boundary", "stance_change"]
+    },
+    "tick_index": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "prev_segment_variant": {
+      "type": ["string", "null"],
+      "enum": [
+        "shallow_scrape",
+        "standard",
+        "deep",
+        "communication",
+        "fire_step",
+        "parapet_raised",
+        null
+      ]
+    },
+    "new_segment_variant": {
+      "type": ["string", "null"],
+      "enum": [
+        "shallow_scrape",
+        "standard",
+        "deep",
+        "communication",
+        "fire_step",
+        "parapet_raised",
+        null
+      ]
+    },
+    "cosmetic": {
+      "type": "boolean",
+      "const": false,
+      "default": false,
+      "description": "Per VAL-M9B-REPLAY-002: sim-relevant event, never droppable under M4 backpressure."
+    }
+  },
+  "additionalProperties": true
+}
