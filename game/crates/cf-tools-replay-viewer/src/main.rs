@@ -195,16 +195,16 @@ enum Cmd {
         output: Option<PathBuf>,
     },
     /// **M10B § Export pipeline**: render the run bundle into an MP4
-    /// via the `cf-replay-export` pipeline. The full encode pipeline
-    /// (frame_ticker + offline_render + overlay_graph + ffmpeg_bridge)
-    /// lands in m10b-2 / m10b-3 / m10b-4; m10b-1 ships only the
-    /// `--list-presets` introspection subcommand the Player-facing
-    /// behavior § "Preset registry covers all 5 declared presets"
-    /// Gherkin scenario requires.
+    /// via the `cf-replay-export` pipeline.
+    ///
+    /// `--list-presets` (m10b-1) introspects the preset registry; the
+    /// full encode shape (m10b-4) is `export <bundle> --preset <name>
+    /// --out <path>` with optional `--no-audio-base` + `--slow-mo
+    /// <N>` flags.
     Export {
         /// Optional bundle path. Unused by `--list-presets` (the
-        /// preset registry is data-only); reserved for the m10b-4
-        /// `export <bundle> --preset <name> --out <path>` shape.
+        /// preset registry is data-only); required by the encode
+        /// shape `export <bundle> --preset <name> --out <path>`.
         #[arg(value_name = "BUNDLE_DIR")]
         bundle_dir: Option<PathBuf>,
         /// **M10B § VAL-M10B-033**: enumerate exactly the 5 spec-declared
@@ -212,12 +212,14 @@ enum Cmd {
         /// easy consumption by `jq -e '. | length == 5'`.
         #[arg(long, default_value_t = false)]
         list_presets: bool,
-        /// Optional preset name (e.g. `twitch_1080p60`). m10b-1 only
-        /// accepts the flag for forward-compat; the actual encode
-        /// path lands in m10b-4.
+        /// Optional preset name (e.g. `twitch_1080p60`). Default:
+        /// `clip_compact` — matches the cf-app debrief CTA + the
+        /// Discord-25MB tier.
         #[arg(long)]
         preset: Option<String>,
-        /// Optional output path. Reserved for m10b-4's encode path.
+        /// Optional output path. Default: `~/Movies/Corefall/<run_id>.mp4`
+        /// (macOS) or `~/Videos/Corefall/<run_id>.mp4` (Linux/Windows)
+        /// resolved via dirs-next per VAL-M10B-DEFAULT-PATH.
         #[arg(long)]
         out: Option<PathBuf>,
         /// Override the preset content directory. Defaults to
@@ -225,6 +227,39 @@ enum Cmd {
         /// workspace root (resolved by walking up from CWD).
         #[arg(long)]
         presets_dir: Option<PathBuf>,
+        /// **M10B § VAL-M10B-NO-AUDIO-BASE**: mute the base SFX +
+        /// music mix; commentary remains audible.
+        #[arg(long, default_value_t = false)]
+        no_audio_base: bool,
+        /// **M10B § VAL-M10B-SLOW-MO**: integer multiplier `2x` /
+        /// `4x` extends output duration deterministically. Non-integer
+        /// values (`3.5x`, `1.5`) are rejected with a typed error.
+        #[arg(long)]
+        slow_mo: Option<String>,
+    },
+    /// **M10B § Replay editor**: open the egui editor for `<bundle>`.
+    ///
+    /// VAL-M10B-035: when an interactive TTY is present the editor's
+    /// timeline + scrub + trim + multi-camera angle selector opens.
+    /// In headless mode (`--headless`, or stdin not a TTY) prints a
+    /// structured JSON envelope to stdout and exits with the
+    /// documented `74` exit code so script harnesses can disambiguate
+    /// the editor-unavailable path from other failures.
+    Edit {
+        #[arg(value_name = "BUNDLE_DIR")]
+        bundle_dir: PathBuf,
+        /// Force headless mode regardless of TTY detection. Used by
+        /// `cfctl replay edit --headless` + the test suite.
+        #[arg(long, default_value_t = false)]
+        headless: bool,
+        /// Optional `*.camera.ron` path; the multi-camera angle
+        /// selector pre-loads the script's tracks on open.
+        #[arg(long)]
+        camera_script: Option<PathBuf>,
+        /// Optional initial scrub tick — the editor's timeline cursor
+        /// lands here on open.
+        #[arg(long)]
+        scrub_to_tick: Option<u64>,
     },
 }
 
@@ -537,101 +572,139 @@ fn main() -> Result<()> {
             preset,
             out,
             presets_dir,
-        } => run_export_cmd(bundle_dir, list_presets, preset, out, presets_dir),
+            no_audio_base,
+            slow_mo,
+        } => run_export_dispatch(
+            bundle_dir,
+            list_presets,
+            preset,
+            out,
+            presets_dir,
+            no_audio_base,
+            slow_mo,
+        ),
+        Cmd::Edit {
+            bundle_dir,
+            headless,
+            camera_script,
+            scrub_to_tick,
+        } => run_edit_dispatch(bundle_dir, headless, camera_script, scrub_to_tick),
     }
 }
 
-/// **M10B § VAL-M10B-033**: `--list-presets` enumerates exactly the
-/// five spec-declared presets with the six required fields each. The
-/// actual export pipeline ships in m10b-4; m10b-1 only implements
-/// the introspection surface (the Player-facing-behavior Gherkin
-/// scenario "Preset registry covers all 5 declared presets").
-fn run_export_cmd(
+/// **M10B § VAL-M10B-013 / VAL-M10B-032 / VAL-M10B-033 / VAL-M10B-NO-AUDIO-BASE / VAL-M10B-SLOW-MO**:
+/// dispatches the `export` subcommand through [`cf_tools_replay_viewer::export_cmd::run_export`].
+fn run_export_dispatch(
     bundle_dir: Option<PathBuf>,
     list_presets: bool,
     preset: Option<String>,
     out: Option<PathBuf>,
     presets_dir: Option<PathBuf>,
+    no_audio_base: bool,
+    slow_mo: Option<String>,
 ) -> Result<()> {
-    use cf_replay_export::preset_registry::{PresetRegistry, DECLARED_PRESETS};
-
-    if !list_presets {
-        if bundle_dir.is_some() || preset.is_some() || out.is_some() {
-            bail!(
-                "`cf-tools-replay-viewer export <bundle> --preset <name> --out <path>` lands in m10b-4. \
-                 m10b-1 ships only `--list-presets`. Re-run with `--list-presets`."
-            );
-        }
-        bail!(
-            "missing `--list-presets`. m10b-1 only implements the preset introspection surface. \
-             The full encode pipeline lands in m10b-4."
-        );
-    }
-    if bundle_dir.is_some() || preset.is_some() || out.is_some() {
-        tracing::warn!("`--list-presets` ignores --bundle, --preset, --out (forward-compat flags for m10b-4)");
-    }
-    let dir = match presets_dir {
-        Some(p) => p,
-        None => default_presets_dir().context("locate game/content/replay_export/presets/ relative to CWD")?,
+    use cf_tools_replay_viewer::export_cmd::{
+        delete_partial_output, format_missing_ffmpeg_json, run_export, ExportArgs, ExportError, ExportOutcome,
     };
-    let registry =
-        PresetRegistry::load_declared(&dir).with_context(|| format!("load preset registry from {}", dir.display()))?;
-    let json =
-        serde_json::to_string_pretty(&export_list_presets_json(&registry)).context("serialise --list-presets JSON")?;
-    println!("{json}");
-    // Per VAL-M10B-033 the output enumerates exactly the 5 declared
-    // presets with the 6 required fields each. Reaffirmed here as a
-    // post-condition so a mis-loaded registry can never quietly skip a
-    // preset.
-    debug_assert_eq!(registry.len(), DECLARED_PRESETS.len());
-    Ok(())
-}
-
-/// Render the preset registry as a JSON array. Each preset object
-/// carries the six VAL-M10B-005 required fields (`resolution`, `fps`,
-/// `codec`, `audio_codec`, `target_bitrate_kbps`, `container`) plus
-/// the preset `name`. JSON order is stable (alphabetical by name) so
-/// piped consumers (`jq -e '.[].name'`) see the same ordering across
-/// runs.
-fn export_list_presets_json(registry: &cf_replay_export::preset_registry::PresetRegistry) -> serde_json::Value {
-    let mut arr: Vec<serde_json::Value> = Vec::with_capacity(registry.len());
-    for preset in registry.iter_sorted() {
-        arr.push(serde_json::json!({
-            "name": preset.name,
-            "resolution": {
-                "width": preset.resolution.width,
-                "height": preset.resolution.height,
-            },
-            "fps": preset.fps,
-            "codec": preset.codec.as_str(),
-            "audio_codec": preset.audio_codec,
-            "target_bitrate_kbps": preset.target_bitrate_kbps,
-            "container": preset.container.as_str(),
-        }));
+    let args = ExportArgs {
+        bundle_dir: bundle_dir.clone(),
+        preset,
+        out: out.clone(),
+        list_presets,
+        presets_dir,
+        no_audio_base,
+        slow_mo,
+        dry_run: false,
+        force_missing_ffmpeg: false,
+    };
+    match run_export(args) {
+        Ok(ExportOutcome::PresetsListed(p)) => {
+            println!("{}", p.json);
+            Ok(())
+        }
+        Ok(ExportOutcome::EncodeCompleted(s)) => {
+            tracing::info!(
+                target: "cf_tools_replay_viewer::export",
+                bytes = s.bytes_written,
+                preset = %s.preset.name,
+                slow_mo = s.slow_mo.value(),
+                no_audio_base = s.no_audio_base,
+                "export complete: {}",
+                s.out_path.display()
+            );
+            println!(
+                "{}",
+                serde_json::json!({
+                    "result": "export_complete",
+                    "out_path": s.out_path.display().to_string(),
+                    "preset": s.preset.name,
+                    "codec": s.preset.codec.as_str(),
+                    "container": s.preset.container.as_str(),
+                    "slow_mo": s.slow_mo.value(),
+                    "no_audio_base": s.no_audio_base,
+                    "bytes_written": s.bytes_written,
+                })
+            );
+            Ok(())
+        }
+        Ok(ExportOutcome::DryRun(_)) => unreachable!("dry_run=false above"),
+        Err(ExportError::MissingFfmpeg(_)) => {
+            if let Some(out_path) = out.as_deref() {
+                delete_partial_output(out_path);
+            }
+            println!("{}", format_missing_ffmpeg_json());
+            bail!("missing FFmpeg / libav dependency; see structured JSON above");
+        }
+        Err(err) => Err(anyhow!(err)),
     }
-    serde_json::Value::Array(arr)
 }
 
-/// Walk up from CWD looking for `game/content/replay_export/presets/`.
-/// Mirrors the same approach used by `locate_markdown_to_png_script`.
-fn default_presets_dir() -> Result<PathBuf> {
-    let cwd = std::env::current_dir().context("read CWD")?;
-    let candidates = [
-        cwd.join("game/content/replay_export/presets"),
-        cwd.join("content/replay_export/presets"),
-        cwd.join("../game/content/replay_export/presets"),
-        cwd.join("../../game/content/replay_export/presets"),
-    ];
-    for c in candidates {
-        if c.is_dir() {
-            return Ok(c);
+/// **M10B § VAL-M10B-035**: dispatches the `edit` subcommand through
+/// [`cf_tools_replay_viewer::edit_cmd::run_edit`].
+fn run_edit_dispatch(
+    bundle_dir: PathBuf,
+    headless: bool,
+    camera_script: Option<PathBuf>,
+    scrub_to_tick: Option<u64>,
+) -> Result<()> {
+    use cf_tools_replay_viewer::edit_cmd::{run_edit, EditArgs, EditOutcome};
+    let args = EditArgs {
+        bundle_dir: Some(bundle_dir),
+        headless,
+        camera_script,
+        scrub_to_tick,
+    };
+    match run_edit(args)? {
+        EditOutcome::Headless(env) => {
+            println!("{}", serde_json::to_string_pretty(&env).unwrap_or_default());
+            // Propagate the documented headless exit code via std::process::exit;
+            // anyhow's Err route would surface a generic non-zero we'd rather avoid.
+            std::process::exit(env.exit_code);
+        }
+        EditOutcome::Interactive {
+            bundle,
+            opened_at_tick,
+            initial_tracks,
+        } => {
+            tracing::info!(
+                target: "cf_tools_replay_viewer::edit",
+                bundle = %bundle.display(),
+                opened_at_tick,
+                track_count = initial_tracks.len(),
+                "editor opened interactively"
+            );
+            println!(
+                "{}",
+                serde_json::json!({
+                    "result": "editor_open",
+                    "bundle": bundle.display().to_string(),
+                    "opened_at_tick": opened_at_tick,
+                    "track_count": initial_tracks.len(),
+                })
+            );
+            Ok(())
         }
     }
-    bail!(
-        "could not locate game/content/replay_export/presets/ from CWD {}; \
-         pass an absolute path via --presets-dir or run from the repo root",
-        cwd.display()
-    )
 }
 
 fn load_bundle(path: &Path) -> Result<Bundle> {

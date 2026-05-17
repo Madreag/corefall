@@ -16,7 +16,9 @@ pub mod bundle;
 pub mod cause_chain;
 pub mod debrief;
 pub mod delta_reconstructor;
+pub mod edit_cmd;
 pub mod editor;
+pub mod export_cmd;
 pub mod renderer;
 pub mod summary;
 mod text;
@@ -24,9 +26,17 @@ pub mod thinking_timeline;
 pub mod viewer;
 
 pub use bundle::{Bundle, BundleError};
+pub use edit_cmd::{
+    default_angle_selector, run_edit, run_edit_headless, AngleSelector, AngleTrack, EditArgs, EditError, EditOutcome,
+    HeadlessEnvelope, HEADLESS_EXIT_CODE,
+};
 pub use editor::{
     const_scene_for_tick, EditorError, EditorState, ExportSelectionResult, ScrubResult, TrimSelection, PREVIEW_HEIGHT,
     PREVIEW_WIDTH, SCRUB_LATENCY_BUDGET_MS,
+};
+pub use export_cmd::{
+    build_cta_argv, delete_partial_output, format_missing_ffmpeg_json, resolve_default_out_path, run_export, ExportArgs,
+    ExportError, ExportOutcome, ExportSuccess, ListPresetsOutcome, MissingDependency,
 };
 pub use renderer::{render_event_body, render_event_plain, MAX_SENTENCE_LEN};
 pub use summary::SweepSummary;
