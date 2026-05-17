@@ -49,6 +49,7 @@ members = [
   "crates/cf-trench",
   "crates/cf-procgen",
   "crates/cf-content",
+  "crates/cf-fortification",
 ]
 
 [workspace.package]
