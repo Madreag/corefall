@@ -101,6 +101,32 @@ pub enum NegotiationOutcome {
     },
 }
 
+impl NegotiationOutcome {
+    /// **M8B § Acceptance "Semver negotiation rejects a major-mismatched
+    /// client"** — when the outcome is a major-mismatch rejection,
+    /// convert to the spec-literal `NetError::ProtocolVersionMismatch {
+    /// server, client }` with `server` + `client` packed as u16. Returns
+    /// `None` on Accepted outcomes.
+    pub fn to_net_error(&self) -> Option<crate::NetError> {
+        match self {
+            NegotiationOutcome::RejectedMajorMismatch { server, client, .. } => {
+                Some(crate::NetError::ProtocolVersionMismatch {
+                    server: server.pack(),
+                    client: client.pack(),
+                })
+            }
+            NegotiationOutcome::Accepted { .. } => None,
+        }
+    }
+
+    pub fn download_url(&self) -> Option<&str> {
+        match self {
+            NegotiationOutcome::RejectedMajorMismatch { download_url, .. } => Some(download_url.as_str()),
+            NegotiationOutcome::Accepted { .. } => None,
+        }
+    }
+}
+
 /// Run the M8B semver-handshake on the SERVER side. The server is at
 /// `server_semver` + advertises `server_features`; the client sent
 /// `client_semver` + `client_features`.

@@ -12,6 +12,7 @@ serde_json = { workspace = true }
 tracing = { workspace = true }
 blake3 = { workspace = true }
 thiserror = { workspace = true }
+bincode = { workspace = true }
 cf-sim-core = { path = "../cf-sim-core" }
 cf-replay = { path = "../cf-replay" }
 

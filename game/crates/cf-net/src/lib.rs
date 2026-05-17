@@ -40,19 +40,24 @@ pub mod client;
 pub mod loss_recovery;
 pub mod nat;
 pub mod protocol;
+pub mod recovery_events;
 pub mod rollback;
 pub mod server;
 pub mod snapshot;
+pub mod stream_routing;
 pub mod transport;
 pub mod transport_select;
 
-pub use protocol::{NetFrame, NetPayload, PROTOCOL_VERSION};
 pub use protocol::semver::{Semver, PROTOCOL_SEMVER};
+pub use protocol::{NetFrame, NetPayload, PROTOCOL_VERSION};
 pub use server::ServerConfig;
 pub use snapshot::SnapshotCadence;
+pub use stream_routing::{
+    binding_for, binding_for_payload, TransportBinding, RELIABLE_STREAM_CONTROL, RELIABLE_STREAM_EVENT_LOG,
+    RELIABLE_STREAM_FEC,
+};
 pub use transport_select::{
-    select_transport, ClientCapabilities, LanParticipantRole, ServerMode, TransportMode,
-    TransportSelectInput,
+    select_transport, ClientCapabilities, LanParticipantRole, ServerMode, TransportMode, TransportSelectInput,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -63,14 +68,31 @@ pub enum NetError {
     FrameTooLarge(usize),
     #[error("content hash mismatch on join")]
     ContentHashMismatch,
+    /// **M8B § Acceptance "Protocol downgrade attack is rejected"**: the
+    /// session is closed with `NetError::Transport("tls handshake
+    /// mismatch")` literal per spec. TLS-bound semver / application
+    /// Handshake skew is the canonical trigger.
     #[error("transport error: {0}")]
     Transport(String),
     #[error("deserialize: {0}")]
     Deserialize(String),
-    /// **M8B**: tls-bound downgrade attack detected (handshake mismatch
-    /// between QUIC TLS-bound semver and application-layer Handshake).
-    #[error("tls handshake mismatch")]
-    TlsHandshakeMismatch,
 }
 
 pub type NetResult<T> = Result<T, NetError>;
+
+/// **M8B § Acceptance "Protocol downgrade attack is rejected"** —
+/// canonical error string for a TLS-bound handshake mismatch (downgrade
+/// attempt). Producers wrap this in [`NetError::Transport`] per spec
+/// literal: `NetError::Transport("tls handshake mismatch")`.
+pub const TLS_HANDSHAKE_MISMATCH_REASON: &str = "tls handshake mismatch";
+
+/// Build the canonical [`NetError`] for a downgrade attack rejection.
+pub fn tls_handshake_mismatch_error() -> NetError {
+    NetError::Transport(TLS_HANDSHAKE_MISMATCH_REASON.to_string())
+}
+
+impl From<protocol::semver::DowngradeAttackError> for NetError {
+    fn from(_: protocol::semver::DowngradeAttackError) -> Self {
+        tls_handshake_mismatch_error()
+    }
+}

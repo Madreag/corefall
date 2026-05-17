@@ -3,11 +3,14 @@
 //! datagram's redundant tail; the server's authoritative tick is not
 //! stalled and no rollback is triggered.
 //!
-//! Wire shape (matches the byte-pinned frame_v01 layout):
+//! Wire shape (encoded via the bincode 2.x fixed-int + little-endian
+//! config in `protocol::frame_v01`):
 //!
 //! - `window_ticks: u8` — the number of redundant entries that follow.
 //!   Default `REDUNDANT_INPUT_DEFAULT_WINDOW` = 3 per the M8B Notes.
-//! - For each entry: `u64 tick` + length-prefixed `Vec<u8> intent_bytes`.
+//! - `entries: Vec<RedundantInputEntry>` — bincode-encoded as u64
+//!   length prefix + per-entry serialization (u64 tick + Vec<u8>
+//!   intent_bytes).
 //!
 //! The server maintains a per-client `tick -> ingested` BTreeSet. On
 //! each incoming datagram (head + redundant tail), every entry whose
@@ -15,8 +18,6 @@
 //! into the recorder.
 
 use serde::{Deserialize, Serialize};
-
-use crate::protocol::frame_v01::{CursorRead, FrameV01Error, FrameV01Result, PrivCursor};
 
 /// **M8B § Notes**: default redundant-input window in ticks.
 pub const REDUNDANT_INPUT_DEFAULT_WINDOW: u8 = 3;
@@ -57,28 +58,6 @@ impl RedundantInputTail {
         while self.entries.len() > self.window_ticks as usize {
             self.entries.remove(0);
         }
-    }
-
-    pub(crate) fn write_v01(&self, buf: &mut Vec<u8>) {
-        buf.push(self.window_ticks);
-        buf.extend_from_slice(&(self.entries.len() as u32).to_le_bytes());
-        for e in &self.entries {
-            buf.extend_from_slice(&e.tick.to_le_bytes());
-            buf.extend_from_slice(&(e.intent_bytes.len() as u32).to_le_bytes());
-            buf.extend_from_slice(&e.intent_bytes);
-        }
-    }
-
-    pub(crate) fn read_v01(c: &mut PrivCursor<'_>) -> FrameV01Result<Self> {
-        let window_ticks = CursorRead::read_u8(c)?;
-        let n = CursorRead::read_u32(c)? as usize;
-        let mut entries = Vec::with_capacity(n.min(64));
-        for _ in 0..n {
-            let tick = CursorRead::read_u64(c)?;
-            let intent_bytes = CursorRead::read_bytes(c)?;
-            entries.push(RedundantInputEntry { tick, intent_bytes });
-        }
-        Ok(Self { window_ticks, entries })
     }
 }
 
@@ -134,7 +113,7 @@ impl RedundantInputLedger {
 #[derive(Debug, thiserror::Error)]
 pub enum RedundantInputError {
     #[error("redundant input decode: {0}")]
-    Decode(#[from] FrameV01Error),
+    Decode(String),
 }
 
 #[cfg(test)]

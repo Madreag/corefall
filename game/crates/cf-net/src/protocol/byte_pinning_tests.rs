@@ -1,8 +1,8 @@
 //! M8B § Byte-pinning tests — verify the v0.1 frame encoder produces the
 //! same byte stream as the canonical fixture vectors. Any byte that
 //! changes here MUST bump `PROTOCOL_SEMVER` minor and add a new fixture;
-//! the byte-pin CI gate (game/tools/ci/m8b_protocol_byte_pin.sh) fails any
-//! patch that flips a single byte without that bump.
+//! the byte-pin CI gate (game/tools/ci/m8b_protocol_byte_pin.sh) fails
+//! any patch that flips a single byte without that bump.
 //!
 //! Fixtures live under
 //! `game/content/net/protocol/frame_v01_fixtures.json` and are loaded at
@@ -31,14 +31,12 @@ struct Fixture {
     pub semver_packed: u16,
     pub seq: u32,
     pub timestamp_ms: u64,
-    /// Build the payload using `variant` as the discriminator. The
-    /// remaining params are inline so the fixture stays self-contained.
     #[serde(default)]
     pub params: serde_json::Value,
 }
 
 fn build_payload(variant: &str, params: &serde_json::Value) -> NetPayloadV01 {
-    use crate::loss_recovery::redundant_input::RedundantInputTail;
+    use crate::loss_recovery::redundant_input::{RedundantInputEntry, RedundantInputTail};
     match variant {
         "ping" => NetPayloadV01::Ping {
             send_ms: params["send_ms"].as_u64().unwrap_or(0),
@@ -121,16 +119,12 @@ fn build_payload(variant: &str, params: &serde_json::Value) -> NetPayloadV01 {
                     .as_array()
                     .map(|a| {
                         a.iter()
-                            .map(|v| {
-                                let tick = v["tick"].as_u64().unwrap_or(0);
-                                let bytes: Vec<u8> = v["intent_bytes"]
+                            .map(|v| RedundantInputEntry {
+                                tick: v["tick"].as_u64().unwrap_or(0),
+                                intent_bytes: v["intent_bytes"]
                                     .as_array()
                                     .map(|x| x.iter().filter_map(|y| y.as_u64().map(|n| n as u8)).collect())
-                                    .unwrap_or_default();
-                                crate::loss_recovery::redundant_input::RedundantInputEntry {
-                                    tick,
-                                    intent_bytes: bytes,
-                                }
+                                    .unwrap_or_default(),
                             })
                             .collect()
                     })
@@ -171,7 +165,6 @@ fn hex_encode(bytes: &[u8]) -> String {
     s
 }
 
-#[cfg(test)]
 mod tests {
     use super::*;
 

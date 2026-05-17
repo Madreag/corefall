@@ -98,10 +98,11 @@ use crate::{
         ActPlayerDetachModifierParams, ActPlayerDigParams, ActPlayerDisembarkParams, ActPlayerEjectParams,
         ActPlayerFireParams, ActPlayerJetParams, ActPlayerJumpParams, ActPlayerMoveParams, ActPlayerReloadParams,
         ActPlayerResetParams, ActPlayerSelectItemParams, ActPlayerSetDroneModeParams, ActPlayerSharpAimParams,
+        ActSquadAssignRoleParams, ActSquadIssueParams, ActSquadSetFormationParams,
         InspectActorParams, InspectAiParams, InspectChassisParams, InspectEquipmentParams, InspectMissionParams,
         ObserveActorParams, ObserveAiParams, ObserveChassisSilhouetteParams, ObserveMissionParams,
         ObserveOnceParams, ObservePerceptionParams, ObserveSubscribeParams, RunBundleWriteParams,
-        RunForTicksParams, ScenarioLoadParams, StepParams, SystemShutdownParams,
+        RunForTicksParams, ScenarioLoadParams, SrvDumpSquadStateParams, StepParams, SystemShutdownParams,
     },
     schemas::{SCHEMA_VERSION, SCHEMA_VERSION_MIN},
     state::{ControlEnvelopeStatus, ObserveFrame, ObserveSettings},
@@ -860,6 +861,35 @@ pub enum ControlCommand {
         preset_id: String,
         source: IntentSource,
     },
+    /// **M7B**: issue a verb from the squad-command grammar to a squad.
+    /// Spec § "50+ named squad verbs in a data-driven registry".
+    ActSquadIssue {
+        squad_id: u64,
+        verb_id: String,
+        args: Vec<serde_json::Value>,
+        source: IntentSource,
+    },
+    /// **M7B**: switch the squad's active formation kind. Spec § "9
+    /// formation kinds with per-actor slot resolution".
+    ActSquadSetFormation {
+        squad_id: u64,
+        formation_kind: String,
+        source: IntentSource,
+    },
+    /// **M7B**: assign a sticky role to a squad member. Spec §
+    /// "Per-member role assignment is sticky + loadout-aware".
+    ActSquadAssignRole {
+        squad_id: u64,
+        member_actor_id: u64,
+        role: String,
+        source: IntentSource,
+    },
+    /// **M7B**: dump the full squad-state JSON view including the verb
+    /// registry, formation catalog, and archetype-BT node counts.
+    SrvDumpSquadState {
+        squad_id: u64,
+        source: IntentSource,
+    },
     // === M8 cfctl surface ===
     /// **M8**: switch the camera mode (`follow | scope | free_look`).
     ActCameraSetMode {
@@ -1174,6 +1204,12 @@ pub trait EngineHandle: Send + Sync + 'static {
     /// **M7-B**: return the per-actor autonomy mode + auto-action cap.
     /// Default returns `None`.
     async fn observe_autonomy(&self, _actor_id: u64) -> Option<serde_json::Value> {
+        None
+    }
+    /// **M7B**: return the full squad-state JSON view (verb registry +
+    /// formation catalog + archetype-BT node counts + per-squad state row).
+    /// Powers `srv.dump_squad_state`. Default returns `None`.
+    async fn dump_squad_state(&self, _squad_id: u64) -> Option<serde_json::Value> {
         None
     }
     /// **M8**: return the live `cf_camera::CameraState` projection
@@ -2102,6 +2138,69 @@ async fn process_request<E: EngineHandle>(
                 })
                 .await;
             Some(ack_response(request.id, &result))
+        }
+        // **M7B**: issue a verb from the squad command grammar.
+        "act.squad.issue" => {
+            let p: ActSquadIssueParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            let result = engine
+                .dispatch(ControlCommand::ActSquadIssue {
+                    squad_id: p.squad_id,
+                    verb_id: p.verb_id,
+                    args: p.args,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        // **M7B**: switch the squad's active formation kind.
+        "act.squad.set_formation" => {
+            let p: ActSquadSetFormationParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            let result = engine
+                .dispatch(ControlCommand::ActSquadSetFormation {
+                    squad_id: p.squad_id,
+                    formation_kind: p.formation_kind,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        // **M7B**: assign a sticky role to a squad member.
+        "act.squad.assign_role" => {
+            let p: ActSquadAssignRoleParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            let result = engine
+                .dispatch(ControlCommand::ActSquadAssignRole {
+                    squad_id: p.squad_id,
+                    member_actor_id: p.member_actor_id,
+                    role: p.role,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        // **M7B**: dump the full squad-state JSON view (verb registry +
+        // formation catalog + archetype-BT node counts + per-squad state row).
+        "srv.dump_squad_state" => {
+            let p: SrvDumpSquadStateParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            match engine.dump_squad_state(p.squad_id).await {
+                Some(value) => Some(success_response(request.id, value)),
+                None => Some(invalid_param_reason(request.id, "no_such_squad")),
+            }
         }
         // **M7-B**: read-only projection of an actor's PriorityTable.
         "observe.priority_table" => {
@@ -3420,6 +3519,56 @@ async fn process_request<E: EngineHandle>(
                 .await;
             Some(ack_response(request.id, &result))
         }
+        // **M8B § cfctl new methods**: observe/admin net surface. The
+        // engine-side projection is wired live at M9+ when the cf-net
+        // server loop actually drives a session; M8B exposes the wire
+        // contract (param shapes + return envelope) so M9+ + downstream
+        // tooling can build against a stable JSON-RPC surface.
+        "observe.net.session_transport" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            Some(success_response(
+                request.id,
+                serde_json::to_value(crate::m8b_net_admin::NetSessionTransportView::empty()).unwrap_or(json!({})),
+            ))
+        }
+        "observe.net.rollback_stats" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            Some(success_response(
+                request.id,
+                serde_json::to_value(crate::m8b_net_admin::NetRollbackStatsView::empty()).unwrap_or(json!({})),
+            ))
+        }
+        "observe.net.loss_recovery" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            Some(success_response(
+                request.id,
+                serde_json::to_value(crate::m8b_net_admin::NetLossRecoveryView::empty()).unwrap_or(json!({})),
+            ))
+        }
+        "admin.net.force_relay" => {
+            let p: crate::m8b_net_admin::AdminNetForceRelayParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            // **M8B**: command shape locked at v0.1. Live engine wires
+            // the toggle at M9+; the M8B path returns a stable ack so
+            // tooling can build against the wire surface.
+            Some(success_response(
+                request.id,
+                json!({
+                    "schema_version": 1u32,
+                    "status": "accepted",
+                    "force_relay_enabled": p.enabled,
+                }),
+            ))
+        }
         _ => Some(error_response(
             request.id,
             error_codes::METHOD_NOT_FOUND,
@@ -3845,6 +3994,91 @@ mod tests {
         let parsed: JsonRpcResponse = serde_json::from_str(&resp).unwrap();
         let error = parsed.error.expect("unknown method returns error");
         assert_eq!(error.code, error_codes::METHOD_NOT_FOUND);
+    }
+
+    /// **M8B § cfctl new methods** — observe.net.session_transport
+    /// dispatch returns a stable empty view (live engine wires at M9+).
+    #[tokio::test]
+    async fn m8b_observe_net_session_transport_dispatches() {
+        let engine = StubEngine;
+        let hz: Arc<Mutex<Option<u32>>> = Arc::new(Mutex::new(None));
+        let filter: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+        let req = json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "observe.net.session_transport",
+            "params": {"schema_version": SCHEMA_VERSION}
+        });
+        let resp = process_request(&req.to_string(), &engine, &hz, &filter, 240)
+            .await
+            .unwrap();
+        let parsed: JsonRpcResponse = serde_json::from_str(&resp).unwrap();
+        let result = parsed.result.expect("session_transport returns success");
+        assert_eq!(result.get("schema_version").unwrap(), 1);
+        assert!(result.get("session_id").is_some(), "view has session_id field");
+        assert!(result.get("transport_mode").is_some());
+        assert!(result.get("traversal_method").is_some());
+        assert!(result.get("traversal_path").is_some());
+    }
+
+    #[tokio::test]
+    async fn m8b_observe_net_rollback_stats_dispatches() {
+        let engine = StubEngine;
+        let hz: Arc<Mutex<Option<u32>>> = Arc::new(Mutex::new(None));
+        let filter: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+        let req = json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "observe.net.rollback_stats",
+            "params": {"schema_version": SCHEMA_VERSION}
+        });
+        let resp = process_request(&req.to_string(), &engine, &hz, &filter, 240)
+            .await
+            .unwrap();
+        let parsed: JsonRpcResponse = serde_json::from_str(&resp).unwrap();
+        let result = parsed.result.expect("rollback_stats returns success");
+        assert!(result.get("recent_windows").is_some());
+        assert_eq!(result.get("windows_within_budget").unwrap(), 0);
+        assert_eq!(result.get("windows_over_budget").unwrap(), 0);
+    }
+
+    #[tokio::test]
+    async fn m8b_observe_net_loss_recovery_dispatches() {
+        let engine = StubEngine;
+        let hz: Arc<Mutex<Option<u32>>> = Arc::new(Mutex::new(None));
+        let filter: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+        let req = json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "observe.net.loss_recovery",
+            "params": {"schema_version": SCHEMA_VERSION}
+        });
+        let resp = process_request(&req.to_string(), &engine, &hz, &filter, 240)
+            .await
+            .unwrap();
+        let parsed: JsonRpcResponse = serde_json::from_str(&resp).unwrap();
+        let result = parsed.result.expect("loss_recovery returns success");
+        assert_eq!(result.get("redundant_input_window_ticks").unwrap(), 3);
+    }
+
+    #[tokio::test]
+    async fn m8b_admin_net_force_relay_accepts_toggle() {
+        let engine = StubEngine;
+        let hz: Arc<Mutex<Option<u32>>> = Arc::new(Mutex::new(None));
+        let filter: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+        let req = json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "admin.net.force_relay",
+            "params": {"schema_version": SCHEMA_VERSION, "enabled": true}
+        });
+        let resp = process_request(&req.to_string(), &engine, &hz, &filter, 240)
+            .await
+            .unwrap();
+        let parsed: JsonRpcResponse = serde_json::from_str(&resp).unwrap();
+        let result = parsed.result.expect("force_relay returns success");
+        assert_eq!(result.get("status").unwrap(), "accepted");
+        assert_eq!(result.get("force_relay_enabled").unwrap(), true);
     }
 
     #[tokio::test]

@@ -73,7 +73,7 @@ impl IceLiteAgent {
     /// **M8B § Acceptance "ICE-lite + STUN punches a symmetric-NAT to
     /// symmetric-NAT pair"**: enumerate (local, remote) candidate pairs
     /// + run connectivity checks; return the chosen pair (or None when
-    /// every pair fails → caller falls back to TURN).
+    ///   every pair fails → caller falls back to TURN).
     pub fn enumerate_pairs(&self, remote_candidates: &[Candidate]) -> Vec<CandidatePair> {
         let mut pairs = Vec::new();
         let locals = std::iter::once(&self.local_host).chain(self.local_srflx.iter());

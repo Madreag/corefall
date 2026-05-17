@@ -50,7 +50,7 @@ fn major_mismatched_client_rejected() {
         &["fec"],
         "https://corefall.example/update",
     );
-    match outcome {
+    match outcome.clone() {
         NegotiationOutcome::RejectedMajorMismatch {
             server: s,
             client: c,
@@ -63,18 +63,49 @@ fn major_mismatched_client_rejected() {
         }
         other => panic!("expected RejectedMajorMismatch, got {other:?}"),
     }
+
+    // **M8B § spec literal**: "Then the server responds with
+    // NetError::ProtocolVersionMismatch { server: 0x0107, client: 0x0200 }".
+    let net_err = outcome.to_net_error().expect("major mismatch yields NetError");
+    match net_err {
+        cf_net::NetError::ProtocolVersionMismatch { server: s, client: c } => {
+            assert_eq!(s, 0x0107);
+            assert_eq!(c, 0x0200);
+        }
+        other => panic!("expected ProtocolVersionMismatch, got {other:?}"),
+    }
 }
 
 #[test]
 fn downgrade_attack_detected_on_handshake_mismatch() {
+    // **M8B § Acceptance "Protocol downgrade attack is rejected"**:
     // TLS-bound layer says 0.1.4; application Handshake says 0.0.1
-    // (an attempted downgrade). detect_downgrade_attack returns an error
-    // so the session is closed with NetError::TlsHandshakeMismatch.
+    // (an attempted downgrade). detect_downgrade_attack returns an
+    // error; the From<DowngradeAttackError> for NetError implementation
+    // converts it to the spec-literal NetError::Transport("tls
+    // handshake mismatch").
     let tls = Semver::new(0, 1, 4).pack();
     let app = Semver::new(0, 0, 1).pack();
     let err = detect_downgrade_attack(tls, app).unwrap_err();
     assert_eq!(err.tls_advertised, Semver::new(0, 1, 4));
     assert_eq!(err.application_advertised, Semver::new(0, 0, 1));
+
+    // Per spec: "And the session is closed with NetError::Transport(\"tls
+    // handshake mismatch\")"
+    let net_err: cf_net::NetError = err.into();
+    match net_err {
+        cf_net::NetError::Transport(reason) => assert_eq!(reason, "tls handshake mismatch"),
+        other => panic!("expected NetError::Transport(\"tls handshake mismatch\"), got {other:?}"),
+    }
+}
+
+#[test]
+fn tls_handshake_mismatch_helper_returns_spec_literal() {
+    let err = cf_net::tls_handshake_mismatch_error();
+    match err {
+        cf_net::NetError::Transport(reason) => assert_eq!(reason, "tls handshake mismatch"),
+        other => panic!("expected Transport variant, got {other:?}"),
+    }
 }
 
 #[test]
