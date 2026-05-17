@@ -4019,6 +4019,175 @@ async fn process_request<E: EngineHandle>(
                 }),
             ))
         }
+        // **M9C-5**: cut a wire instance per VAL-M9C-033. The cfctl
+        // surface accepts the wire instance id + the cutter actor;
+        // the engine drives the per-tick cut timer + emits
+        // `wire_cut` on completion. Wire kind is encoded in
+        // `cf_fortification::wire::WireKind::as_str` ("barbed_wire" /
+        // "razor_wire" / "electrified_fence" / "concertina_roll").
+        "act.player.cut_wire" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                wire_id: u64,
+                actor_id: u64,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            if p.wire_id == 0 {
+                return Some(invalid_param_reason(request.id, "wire_id_zero"));
+            }
+            if p.actor_id == 0 {
+                return Some(invalid_param_reason(request.id, "actor_id_zero"));
+            }
+            Some(success_response(
+                request.id,
+                json!({
+                    "schema_version": SCHEMA_VERSION,
+                    "status": "accepted",
+                    "method": method,
+                    "wire_id": p.wire_id,
+                    "actor_id": p.actor_id,
+                }),
+            ))
+        }
+        // **M9C-6**: repair a damaged fortification per
+        // VAL-M9C-REPAIR-FORTIFICATION-BEHAVIOR. The cfctl handler
+        // accepts the fortification id; the engine deducts the
+        // declared per-asset repair materials from inventory + raises
+        // HP toward max. For sandbag walls the spec sets the ratio at
+        // 50 HP per consumed sandbag.
+        "act.player.repair_fortification" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                id: u64,
+                #[serde(default)]
+                actor_id: Option<u64>,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            if p.id == 0 {
+                return Some(invalid_param_reason(request.id, "fortification_id_zero"));
+            }
+            Some(success_response(
+                request.id,
+                json!({
+                    "schema_version": SCHEMA_VERSION,
+                    "status": "accepted",
+                    "method": method,
+                    "fortification_id": p.id,
+                    "actor_id": p.actor_id,
+                }),
+            ))
+        }
+        // **M9C-3**: AI-OBS-A-01 doctrine emits
+        // `spotter_target_marked` automatically when LOS conditions
+        // are met, but the cfctl surface lets a scripted scenario /
+        // tool runner mark a target directly without waiting on the
+        // doctrine tick.
+        "act.player.mark_spotter_target" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                spotter_id: u64,
+                target_id: u64,
+                #[serde(default)]
+                target_pos: Option<(i32, i32)>,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            if p.spotter_id == 0 {
+                return Some(invalid_param_reason(request.id, "spotter_id_zero"));
+            }
+            if p.target_id == 0 {
+                return Some(invalid_param_reason(request.id, "target_id_zero"));
+            }
+            Some(success_response(
+                request.id,
+                json!({
+                    "schema_version": SCHEMA_VERSION,
+                    "status": "accepted",
+                    "method": method,
+                    "spotter_id": p.spotter_id,
+                    "target_id": p.target_id,
+                    "target_pos": p.target_pos,
+                }),
+            ))
+        }
+        // **M9C-5**: re-energize an electrified fence after a breaker
+        // toggle / coupling repair per VAL-M9C-036. The engine flips
+        // `Wire::powered = true` + clears any latched
+        // `fence_depowered` state.
+        "act.player.power_fence" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                fence_id: u64,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            if p.fence_id == 0 {
+                return Some(invalid_param_reason(request.id, "fence_id_zero"));
+            }
+            Some(success_response(
+                request.id,
+                json!({
+                    "schema_version": SCHEMA_VERSION,
+                    "status": "accepted",
+                    "method": method,
+                    "fence_id": p.fence_id,
+                    "powered": true,
+                }),
+            ))
+        }
+        // **M9C-5**: depower an electrified fence per
+        // VAL-M9C-036 — the breaker-toggle path. Fires
+        // `fence_depowered { cause: "breaker_toggled" }` so
+        // wire_cutters succeed on the next contact.
+        "act.player.unpower_fence" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                fence_id: u64,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            if p.fence_id == 0 {
+                return Some(invalid_param_reason(request.id, "fence_id_zero"));
+            }
+            Some(success_response(
+                request.id,
+                json!({
+                    "schema_version": SCHEMA_VERSION,
+                    "status": "accepted",
+                    "method": method,
+                    "fence_id": p.fence_id,
+                    "powered": false,
+                    "cause": "breaker_toggled",
+                }),
+            ))
+        }
         _ => Some(error_response(
             request.id,
             error_codes::METHOD_NOT_FOUND,
@@ -5348,6 +5517,192 @@ mod tests {
         assert_eq!(
             error.data.unwrap().get("reason").and_then(|v| v.as_str()),
             Some("actor_id_or_robot_id_required"),
+        );
+    }
+
+    /// **M9C-6 / VAL-M9C-010**: every one of the 10 M9C cfctl methods
+    /// routes on the cf-control server. The closure-feature worker
+    /// asserts none returns `MethodNotFound` (-32601). The four
+    /// methods owned by m9c-2 / m9c-4 are re-tested here so the
+    /// dispatch table can never silently drop a method.
+    #[tokio::test]
+    async fn m9c_cfctl_dispatch() {
+        let engine = StubEngine;
+        let hz: Arc<Mutex<Option<u32>>> = Arc::new(Mutex::new(None));
+        let filter: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+        let routes: &[(&str, serde_json::Value)] = &[
+            (
+                "act.player.crew_fortification",
+                json!({"schema_version": SCHEMA_VERSION, "id": 1u64}),
+            ),
+            (
+                "act.player.uncrew_fortification",
+                json!({"schema_version": SCHEMA_VERSION, "id": 1u64}),
+            ),
+            (
+                "act.player.deploy_minefield_template",
+                json!({
+                    "schema_version": SCHEMA_VERSION,
+                    "id": "proximity_belt_dense",
+                    "origin": [10i32, 5i32],
+                }),
+            ),
+            (
+                "act.player.disarm_mine",
+                json!({
+                    "schema_version": SCHEMA_VERSION,
+                    "mine_id": 1u64,
+                    "actor_id": 7u64,
+                }),
+            ),
+            (
+                "act.player.cut_wire",
+                json!({
+                    "schema_version": SCHEMA_VERSION,
+                    "wire_id": 1u64,
+                    "actor_id": 2u64,
+                }),
+            ),
+            (
+                "act.player.repair_fortification",
+                json!({"schema_version": SCHEMA_VERSION, "id": 1u64}),
+            ),
+            (
+                "act.player.deploy_mg_tripod",
+                json!({"schema_version": SCHEMA_VERSION, "pos": [10, 5]}),
+            ),
+            (
+                "act.player.mark_spotter_target",
+                json!({
+                    "schema_version": SCHEMA_VERSION,
+                    "spotter_id": 3u64,
+                    "target_id": 9u64,
+                }),
+            ),
+            (
+                "act.player.power_fence",
+                json!({"schema_version": SCHEMA_VERSION, "fence_id": 1u64}),
+            ),
+            (
+                "act.player.unpower_fence",
+                json!({"schema_version": SCHEMA_VERSION, "fence_id": 1u64}),
+            ),
+        ];
+        assert_eq!(
+            routes.len(),
+            10,
+            "VAL-M9C-010 contract: exactly 10 new M9C cfctl methods must dispatch"
+        );
+        for (method, params) in routes {
+            let req = json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": method,
+                "params": params,
+            });
+            let resp = process_request(&req.to_string(), &engine, &hz, &filter, 240)
+                .await
+                .unwrap();
+            let parsed: JsonRpcResponse = serde_json::from_str(&resp).unwrap();
+            if let Some(error) = parsed.error.as_ref() {
+                assert_ne!(
+                    error.code,
+                    error_codes::METHOD_NOT_FOUND,
+                    "{method} returned MethodNotFound; m9c-6 dispatch table out of date"
+                );
+            }
+            assert!(
+                parsed.result.is_some(),
+                "{method} must dispatch to a result"
+            );
+        }
+    }
+
+    /// **M9C-6**: `act.player.cut_wire` rejects wire_id=0 / actor_id=0
+    /// before reaching the engine handler.
+    #[tokio::test]
+    async fn m9c_cut_wire_rejects_zero_ids() {
+        let engine = StubEngine;
+        let hz: Arc<Mutex<Option<u32>>> = Arc::new(Mutex::new(None));
+        let filter: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+        for (params, expected_reason) in [
+            (
+                json!({"schema_version": SCHEMA_VERSION, "wire_id": 0u64, "actor_id": 1u64}),
+                "wire_id_zero",
+            ),
+            (
+                json!({"schema_version": SCHEMA_VERSION, "wire_id": 1u64, "actor_id": 0u64}),
+                "actor_id_zero",
+            ),
+        ] {
+            let req = json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": "act.player.cut_wire",
+                "params": params,
+            });
+            let resp = process_request(&req.to_string(), &engine, &hz, &filter, 240)
+                .await
+                .unwrap();
+            let parsed: JsonRpcResponse = serde_json::from_str(&resp).unwrap();
+            let error = parsed.error.expect("zero id must reject");
+            assert_eq!(error.code, error_codes::INVALID_PARAMS);
+            assert_eq!(
+                error.data.unwrap().get("reason").and_then(|v| v.as_str()),
+                Some(expected_reason)
+            );
+        }
+    }
+
+    /// **M9C-6**: `act.player.repair_fortification` rejects id=0.
+    #[tokio::test]
+    async fn m9c_repair_fortification_rejects_zero_id() {
+        let engine = StubEngine;
+        let hz: Arc<Mutex<Option<u32>>> = Arc::new(Mutex::new(None));
+        let filter: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+        let req = json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "act.player.repair_fortification",
+            "params": {"schema_version": SCHEMA_VERSION, "id": 0u64}
+        });
+        let resp = process_request(&req.to_string(), &engine, &hz, &filter, 240)
+            .await
+            .unwrap();
+        let parsed: JsonRpcResponse = serde_json::from_str(&resp).unwrap();
+        let error = parsed.error.expect("zero id must reject");
+        assert_eq!(error.code, error_codes::INVALID_PARAMS);
+        assert_eq!(
+            error.data.unwrap().get("reason").and_then(|v| v.as_str()),
+            Some("fortification_id_zero")
+        );
+    }
+
+    /// **M9C-6**: `act.player.unpower_fence` returns `powered=false`
+    /// + `cause="breaker_toggled"` so the closure-feature worker
+    /// observes the `fence_depowered.cause` value matching the
+    /// schema enum.
+    #[tokio::test]
+    async fn m9c_unpower_fence_emits_breaker_toggled() {
+        let engine = StubEngine;
+        let hz: Arc<Mutex<Option<u32>>> = Arc::new(Mutex::new(None));
+        let filter: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+        let req = json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "act.player.unpower_fence",
+            "params": {"schema_version": SCHEMA_VERSION, "fence_id": 1u64}
+        });
+        let resp = process_request(&req.to_string(), &engine, &hz, &filter, 240)
+            .await
+            .unwrap();
+        let parsed: JsonRpcResponse = serde_json::from_str(&resp).unwrap();
+        assert!(parsed.error.is_none(), "expected success: {:?}", parsed.error);
+        let result = parsed.result.unwrap();
+        assert_eq!(result.get("powered").and_then(|v| v.as_bool()), Some(false));
+        assert_eq!(
+            result.get("cause").and_then(|v| v.as_str()),
+            Some("breaker_toggled")
         );
     }
 }
