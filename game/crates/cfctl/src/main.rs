@@ -370,6 +370,19 @@ enum ActAction {
     },
     /// **M5**: `act.chassis.clear_jam` — manually clear a weapon jam.
     ChassisClearJam,
+    /// **M9B-2**: `act.player.drop_trench_template id=<template> origin_x=<i32> origin_y=<i32>`.
+    /// Drops the authored trench template at the supplied tile origin
+    /// and emits `trench.template_dropped` with the template SHA256 +
+    /// segment_count + placed/missing fortification arrays. The template
+    /// id resolves against `content/trench_templates/<id>.trench.ron`.
+    PlayerDropTrenchTemplate {
+        #[arg(long)]
+        id: String,
+        #[arg(long)]
+        origin_x: i32,
+        #[arg(long)]
+        origin_y: i32,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -1253,6 +1266,18 @@ async fn cmd_act(
                 .await?
         }
         ActAction::ChassisClearJam => session.send_request("act.chassis.clear_jam", json!({})).await?,
+        ActAction::PlayerDropTrenchTemplate {
+            id,
+            origin_x,
+            origin_y,
+        } => {
+            session
+                .send_request(
+                    "act.player.drop_trench_template",
+                    json!({"id": id, "origin": [origin_x, origin_y]}),
+                )
+                .await?
+        }
     };
     println!("{}", serde_json::to_string(&result).unwrap());
     session.close().await?;
