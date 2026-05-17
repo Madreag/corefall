@@ -90,4 +90,21 @@ pub use sandbag::{
     SANDBAG_MID_MAX_HP,
 };
 pub use spec::{FortCoverLevel, FortificationSpec, SandbagCoverByStance};
+pub use watchtower::{
+    apply_destruction_collapse, collapse_distance_tiles, fall_impulse_damage_for,
+    faction_radio_range, observation_post_artillery_multiplier, spotlight_illuminates,
+    spotter_acquisition_multiplier, ActorInCollapseRadius, FallImpulseDamageEvent,
+    ObservationPost, RadioRepeater, Spotlight, SpotlightConeInputs, SpotlightDazzledEvent,
+    SpotterAcquisitionInputs, SpotterMark, Watchtower, WatchtowerDestructionOutcome,
+    WatchtowerDestructionPending, WatchtowerDestroyedEvent, WatchtowerTier,
+    OBSERVATION_POST_ARTILLERY_ACQUISITION_MULTIPLIER, OBSERVATION_POST_MAX_HP,
+    RADIO_REPEATER_MAX_HP, RADIO_REPEATER_RANGE_BONUS_TILES,
+    SPOTLIGHT_CONE_RANGE_TILES, SPOTLIGHT_DAZZLE_SECONDS, SPOTLIGHT_HALF_ANGLE_DEGREES,
+    SPOTLIGHT_MAX_HP, SPOTLIGHT_POWER_DRAW_KW, SPOTTER_TARGET_MARK_ACQUISITION_BONUS,
+    WATCHTOWER_T1_BASE_FALL_DAMAGE, WATCHTOWER_T1_COLLAPSE_RADIUS_TILES,
+    WATCHTOWER_T1_MAX_HP, WATCHTOWER_T2_BASE_FALL_DAMAGE,
+    WATCHTOWER_T2_COLLAPSE_RADIUS_TILES, WATCHTOWER_T2_MAX_HP,
+    WATCHTOWER_T3_BASE_FALL_DAMAGE, WATCHTOWER_T3_COLLAPSE_RADIUS_TILES,
+    WATCHTOWER_T3_MAX_HP,
+};
 pub use wire::WireKind;

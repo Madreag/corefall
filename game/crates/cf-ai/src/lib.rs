@@ -126,6 +126,12 @@ pub mod trench_doctrine;
 // auto-swap depleted ammo box. Spec § "Notes for the implementer".
 pub mod mg_doctrine;
 
+// **M9C**: AI-OBS-A-01 doctrine — spotter actor in a watchtower /
+// observation post emits `spotter_target_marked` (TTL 3s) for targets
+// visible only to the spotter; squad MGs / snipers consume the mark
+// for +50% acquisition. Mark cap = 1 per target. Spec § "Spotter role".
+pub mod observer_doctrine;
+
 // **M7B**: deep squad command grammar + formation orders + commander hop
 // + per-archetype BT. Spec § "the squad obeys real grammar — formation
 // orders, combat verbs, breach-stack discipline — and the player can take
@@ -175,6 +181,14 @@ pub use trench_doctrine::{
 pub use mg_doctrine::{
     assign_crews as assign_mg_crews, decide as mg_doctrine_decide, MgDoctrineDecision,
     MgDoctrineInputs, MgNestObservation, DOCTRINE_ID as MG_DOCTRINE_ID,
+};
+pub use observer_doctrine::{
+    apply_decision as apply_observer_decision, decide as observer_doctrine_decide,
+    mark_expired as observer_mark_expired, ttl_ticks_for as observer_ttl_ticks_for,
+    ObserverDoctrineDecision, ObserverDoctrineInputs,
+    DOCTRINE_ID as OBSERVER_DOCTRINE_ID,
+    SPOTTER_MARK_LOS_LOSS_TTL_SECONDS, SPOTTER_MARK_TTL_SECONDS,
+    SPOTTER_TARGET_MARK_ACQUISITION_BONUS as OBSERVER_TARGET_MARK_ACQUISITION_BONUS,
 };
 pub use thinking_stack::{
     format_task_camel, AiTickOutput, Layer, LayerKind, LayerOutput, ThinkingContext, ThinkingStack,
