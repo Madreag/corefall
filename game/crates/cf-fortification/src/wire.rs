@@ -262,9 +262,9 @@ impl Wire {
             && self.powered
     }
 
-    /// Recompute the live `powered` flag from the coupling + breaker
-    /// + supplied M29-grid-energized flag. Returns the new value.
-    /// Engine ticks call this each tick on every electrified fence.
+    /// Recompute the live `powered` flag from the coupling, breaker,
+    /// and supplied M29-grid-energized flag. Returns the new value;
+    /// engine ticks call this each tick on every electrified fence.
     pub fn sync_powered_from_grid(&mut self, grid_energized: bool) -> bool {
         let new_powered = matches!(self.kind, WireKind::ElectrifiedFence)
             && self.power_coupling_intact

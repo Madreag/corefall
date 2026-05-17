@@ -544,11 +544,10 @@ pub fn tick_tank_trap_x_heavy_plow(
         };
     }
     let period_ticks = TANK_TRAP_X_HEAVY_PLOW_SECONDS.saturating_mul(tick_rate_hz);
-    let centi_per_tick = if period_ticks == 0 {
-        TANK_TRAP_X_HP.saturating_mul(100)
-    } else {
-        TANK_TRAP_X_HP.saturating_mul(100) / period_ticks
-    };
+    let centi_per_tick = TANK_TRAP_X_HP
+        .saturating_mul(100)
+        .checked_div(period_ticks)
+        .unwrap_or_else(|| TANK_TRAP_X_HP.saturating_mul(100));
     trap.plow_accumulator_centi = trap
         .plow_accumulator_centi
         .saturating_add(centi_per_tick);
@@ -823,7 +822,7 @@ mod tests {
         let tick_rate = 60_u32;
         let mut trap = TankTrapX::new(trap_id, (0, 0));
         let mut ticks_until_destroyed = 0_u32;
-        for t in 0..(TANK_TRAP_X_HEAVY_PLOW_SECONDS * tick_rate + 1) {
+        for t in 0..=(TANK_TRAP_X_HEAVY_PLOW_SECONDS * tick_rate) {
             let outcome = tick_tank_trap_x_heavy_plow(&mut trap, vehicle_id, tick_rate, u64::from(t));
             if outcome.trap_destroyed {
                 ticks_until_destroyed = t + 1;

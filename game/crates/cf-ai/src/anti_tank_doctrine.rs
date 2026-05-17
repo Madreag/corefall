@@ -162,9 +162,8 @@ pub fn decide(inputs: &AntiTankDoctrineInputs) -> AntiTankDoctrineDecision {
             }
         }
     }
-    let obstacle = match best {
-        Some(o) => o,
-        None => return AntiTankDoctrineDecision::Continue,
+    let Some(obstacle) = best else {
+        return AntiTankDoctrineDecision::Continue;
     };
     match obstacle.kind {
         AntiTankKind::DragonsTeeth => AntiTankDoctrineDecision::Detour {
