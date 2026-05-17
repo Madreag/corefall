@@ -2,11 +2,15 @@
 // Spec §"Player-facing behavior" bullet "Export is deterministic
 // within scope": FFV1 intra-frame mathematically lossless codec in an
 // mkv container (mp4 cannot natively carry FFV1). Audio is FLAC
-// (mathematically lossless). target_bitrate_kbps is `0` because FFV1
-// is quality-driven (intra-frame quantizer = lossless); the encoder
-// derives the resulting bitrate from the visual content. The
-// deterministic encoder profile uses single-thread + 1-frame GOP (every
-// frame is a keyframe — intra-frame coding) per
+// (mathematically lossless). target_bitrate_kbps is `1` as a
+// placeholder; FFV1 is quality-driven (intra-frame quantizer =
+// lossless) and the encoder ignores this field for FFV1 entirely —
+// the resulting bitrate is derived from visual content. The schema
+// declares `"minimum": 1` so the placeholder satisfies it; the
+// encoder switches behaviour by `ExportPreset::codec` (PresetCodec::Ffv1)
+// rather than reading this field. The deterministic encoder profile
+// uses single-thread + 1-frame GOP (every frame is a keyframe —
+// intra-frame coding) per
 // cf_replay_export::ffmpeg_bridge::DeterministicEncoderProfile::archival_lossless().
 // VAL-M10B-020 contract: byte-identical sha256 across two same-host
 // runs AND across Linux x86_64 / macOS aarch64 / Windows x86_64.
@@ -19,6 +23,6 @@
     fps: 60,
     codec: ffv1,
     audio_codec: "flac",
-    target_bitrate_kbps: 0,
+    target_bitrate_kbps: 1,
     container: mkv,
 )
