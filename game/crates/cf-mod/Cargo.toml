@@ -27,11 +27,13 @@ serde = { workspace = true }
 serde_json = { workspace = true }
 ron = { workspace = true }
 cf-asset-ledger = { path = "../cf-asset-ledger" }
+cf-content = { path = "../cf-content" }
 cf-control = { path = "../cf-control" }
 cf-equipment = { path = "../cf-equipment" }
 cf-material = { path = "../cf-material" }
 cf-replay = { path = "../cf-replay" }
 cf-save = { path = "../cf-save" }
+cf-trench = { path = "../cf-trench" }
 
 [dev-dependencies]
 blake3 = { workspace = true }

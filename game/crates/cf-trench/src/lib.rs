@@ -40,8 +40,13 @@
 
 pub mod cover_state;
 pub mod modules;
+pub mod parapet_raised_forward_compat;
 pub mod segment;
 
 pub use cover_state::{cover_state, cover_state_fire_step, CoverState, TrenchStance};
 pub use modules::{ModuleSpec, TrenchModule};
+pub use parapet_raised_forward_compat::{
+    parapet_raised_dig_validate, warning_event_kind as parapet_raised_warning_event_kind,
+    ParapetRaisedRequiresM9c,
+};
 pub use segment::{SegmentSpec, SegmentVariant, TrenchSegment, TrenchSegmentLookup};

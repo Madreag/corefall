@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/trench_template_missing_fortification.v1",
+  "title": "trench.template_missing_fortification",
+  "description": "M9B: a trench template's fortification placeholder could not be resolved against the currently shipped M9C asset registry. The placeholder degrades to a warning rather than panicking per VAL-M9B-TEMPLATE-004; an M9C-shipped build promotes the same placeholder to a real placed fortification instead.",
+  "type": "object",
+  "required": ["template_id", "fortification_id", "world_pos"],
+  "properties": {
+    "template_id": { "type": "string" },
+    "fortification_id": { "type": "string" },
+    "world_pos": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": { "type": "integer" }
+    },
+    "reason": { "type": ["string", "null"] },
+    "tick": { "type": "integer", "minimum": 0 }
+  },
+  "additionalProperties": true
+}

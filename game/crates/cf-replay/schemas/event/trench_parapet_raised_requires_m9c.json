@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/trench_parapet_raised_requires_m9c.v1",
+  "title": "trench.parapet_raised_requires_m9c",
+  "description": "M9B forward-compat warning. When `parapet_raised` (which embeds the M9C-owned `breastwork` sandbag module) is dug in a build where M9C is absent (cf-trench compiled with `--no-default-features`, i.e. `m9c` feature off), validation fails and emits this event with `requires_m9c=true` per VAL-M9B-PARAPET-FWDCOMPAT-001.",
+  "type": "object",
+  "required": ["requires_m9c"],
+  "properties": {
+    "actor_id": { "type": ["integer", "null"], "minimum": 0 },
+    "variant": { "type": "string" },
+    "requires_m9c": { "type": "boolean", "const": true },
+    "reason": { "type": "string" },
+    "tick": { "type": "integer", "minimum": 0 }
+  },
+  "additionalProperties": true
+}

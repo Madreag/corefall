@@ -6,6 +6,15 @@ rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[features]
+# `m9c` gates the M9C-owned `breastwork` (sandbag wall) integration for
+# the `parapet_raised` trench variant. Default-on so the workspace
+# always sees the fully-wired surface; downstream crates compiled with
+# `--no-default-features` see the pre-M9C forward-compat warning per
+# VAL-M9B-PARAPET-FWDCOMPAT-001.
+default = ["m9c"]
+m9c = []
+
 [dependencies]
 serde = { workspace = true }
 ron = { workspace = true }

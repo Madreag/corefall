@@ -1,0 +1,59 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/trench_template_dropped.v1",
+  "title": "trench.template_dropped",
+  "description": "M9B: act.player.drop_trench_template completed. The template's SHA256 (64 hex chars) uniquely identifies the authored content the player dropped at `origin`; segment_count + placed_fortifications enumerate what was placed in the world.",
+  "type": "object",
+  "required": ["template_id", "template_sha256", "origin", "segment_count"],
+  "properties": {
+    "template_id": { "type": "string" },
+    "template_sha256": {
+      "type": "string",
+      "minLength": 64,
+      "maxLength": 64,
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "origin": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": { "type": "integer" }
+    },
+    "segment_count": { "type": "integer", "minimum": 0 },
+    "placed_fortifications": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["fortification_id", "world_pos", "instance_id"],
+        "properties": {
+          "fortification_id": { "type": "string" },
+          "world_pos": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": { "type": "integer" }
+          },
+          "instance_id": { "type": "integer", "minimum": 0 }
+        }
+      }
+    },
+    "missing_fortifications": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["fortification_id", "world_pos"],
+        "properties": {
+          "fortification_id": { "type": "string" },
+          "world_pos": {
+            "type": "array",
+            "minItems": 2,
+            "maxItems": 2,
+            "items": { "type": "integer" }
+          }
+        }
+      }
+    },
+    "tick": { "type": "integer", "minimum": 0 }
+  },
+  "additionalProperties": true
+}
