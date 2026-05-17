@@ -2630,6 +2630,7 @@ mod tests {
     use super::*;
 
     mod body_a;
+    mod m9b_damage_routing;
 
     #[test]
     fn status_thresholds() {

@@ -37,7 +37,7 @@ fn assert_required_keys(v: &serde_json::Value, name: &str) {
 /// VAL-M9B-AICOVER-001: ai_cover_decision.json parses + declares the
 /// 4-variant reason_label enum + non-cosmetic.
 #[test]
-fn ai_cover_decision_valid() {
+fn schema_dump_check_ai_cover_decision_valid() {
     let v = parse_schema("ai_cover_decision.json");
     assert_required_keys(&v, "ai_cover_decision.json");
     let props = v.get("properties").and_then(|p| p.as_object()).unwrap();
@@ -78,7 +78,7 @@ fn ai_cover_decision_valid() {
 /// VAL-M9B-COVER-002: trench_cover_state_changed.json parses + declares
 /// segment_boundary / stance_change enum on `cause`.
 #[test]
-fn trench_cover_state_changed_valid() {
+fn schema_dump_check_trench_cover_state_changed_valid() {
     let v = parse_schema("trench_cover_state_changed.json");
     assert_required_keys(&v, "trench_cover_state_changed.json");
     let props = v.get("properties").and_then(|p| p.as_object()).unwrap();
@@ -100,7 +100,7 @@ fn trench_cover_state_changed_valid() {
 }
 
 #[test]
-fn trench_segment_dug_valid() {
+fn schema_dump_check_trench_segment_dug_valid() {
     let v = parse_schema("trench_segment_dug.json");
     assert_required_keys(&v, "trench_segment_dug.json");
     let props = v.get("properties").and_then(|p| p.as_object()).unwrap();
@@ -129,19 +129,19 @@ fn trench_segment_dug_valid() {
 }
 
 #[test]
-fn trench_module_placed_valid() {
+fn schema_dump_check_trench_module_placed_valid() {
     let v = parse_schema("trench_module_placed.json");
     assert_required_keys(&v, "trench_module_placed.json");
 }
 
 #[test]
-fn trench_module_repaired_valid() {
+fn schema_dump_check_trench_module_repaired_valid() {
     let v = parse_schema("trench_module_repaired.json");
     assert_required_keys(&v, "trench_module_repaired.json");
 }
 
 #[test]
-fn trench_segment_variant_downgraded_valid() {
+fn schema_dump_check_trench_segment_variant_downgraded_valid() {
     let v = parse_schema("trench_segment_variant_downgraded.json");
     assert_required_keys(&v, "trench_segment_variant_downgraded.json");
 }
@@ -150,7 +150,7 @@ fn trench_segment_variant_downgraded_valid() {
 /// this feature declares `cosmetic=false` so the recorder treats them
 /// as non-droppable under M4 backpressure.
 #[test]
-fn m9b_event_cosmetic_gate() {
+fn schema_dump_check_m9b_event_cosmetic_gate() {
     let m9b_schemas = [
         "ai_cover_decision.json",
         "trench_cover_state_changed.json",
