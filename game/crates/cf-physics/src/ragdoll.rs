@@ -16,10 +16,11 @@ use serde::{Deserialize, Serialize};
 /// Ragdoll lifecycle state. Mirrors the actor's high-level status but
 /// tracks the *physics-authority* axis separately so the renderer can read
 /// it without recomputing.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum RagdollState {
     /// Animation-driven. No ragdoll authority.
+    #[default]
     Animated,
     /// Physics-driven; the body is a debris object but the actor is still
     /// DYING (alive-but-collapsing). Inventory has been tossed.
@@ -31,11 +32,7 @@ pub enum RagdollState {
     StaticCollapse,
 }
 
-impl Default for RagdollState {
-    fn default() -> Self {
-        RagdollState::Animated
-    }
-}
+
 
 /// One ragdoll instance. Created when an actor enters DYING; the body
 /// integrates gravity per [`cf_physics::step_kinematics`] each tick.

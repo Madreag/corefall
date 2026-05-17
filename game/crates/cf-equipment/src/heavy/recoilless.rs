@@ -93,19 +93,23 @@ mod tests {
 
     #[test]
     fn damage_falls_off_with_distance() {
-        let near = match evaluate_back_blast_hit(BackBlastCandidate {
+        let BackBlastOutcome::Inside {
+            damage_x1000: near, ..
+        } = evaluate_back_blast_hit(BackBlastCandidate {
             distance_behind_units: 5.0,
             lateral_offset_units: 0.0,
-        }) {
-            BackBlastOutcome::Inside { damage_x1000 } => damage_x1000,
-            _ => panic!("expected inside"),
+        })
+        else {
+            panic!("expected inside");
         };
-        let far = match evaluate_back_blast_hit(BackBlastCandidate {
+        let BackBlastOutcome::Inside {
+            damage_x1000: far, ..
+        } = evaluate_back_blast_hit(BackBlastCandidate {
             distance_behind_units: 50.0,
             lateral_offset_units: 0.0,
-        }) {
-            BackBlastOutcome::Inside { damage_x1000 } => damage_x1000,
-            _ => panic!("expected inside"),
+        })
+        else {
+            panic!("expected inside");
         };
         assert!(near > far, "near={near}, far={far}");
     }

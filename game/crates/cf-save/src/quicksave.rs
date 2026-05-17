@@ -105,6 +105,7 @@ pub fn read_quicksave(dir: &Path) -> Result<QuickloadOutcome, SaveError> {
     })
 }
 
+#[allow(clippy::needless_pass_by_value)]
 fn map_io(err: std::io::Error) -> SaveError {
     SaveError::MigrationFailed {
         from: crate::CURRENT_SAVE_SCHEMA_VERSION,

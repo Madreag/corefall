@@ -286,15 +286,15 @@ mod tests {
     #[test]
     fn spalling_count_in_range() {
         let c = spalling_fragment_count(10.0, 5.0, 0.5);
-        assert!(c >= 1 && c <= 3);
+        assert!((1..=3).contains(&c));
     }
 
     #[test]
     fn spalling_fragment_damage_in_range() {
         let f0 = spalling_fragment_damage_fraction(0, 3, 0.0);
         let f2 = spalling_fragment_damage_fraction(2, 3, 0.5);
-        assert!(f0 >= 0.2 && f0 <= 0.5);
-        assert!(f2 >= 0.2 && f2 <= 0.5);
+        assert!((0.2..=0.5).contains(&f0));
+        assert!((0.2..=0.5).contains(&f2));
     }
 
     #[test]

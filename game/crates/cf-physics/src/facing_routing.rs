@@ -56,7 +56,11 @@ pub fn classify_hit_direction(velocity: (f32, f32), facing_sign: f32) -> HitDire
     // projectile catches up).
     // Projectile traveling +x hits an actor facing -x from the FRONT.
     let facing = if facing_sign >= 0.0 { 1.0_f32 } else { -1.0_f32 };
-    if nx.signum() == facing {
+    // signum() returns ±1.0 exactly for finite non-zero inputs; strict
+    // equality is the intended check here.
+    #[allow(clippy::float_cmp)]
+    let matches = nx.signum() == facing;
+    if matches {
         HitDirection::Back
     } else {
         HitDirection::Front

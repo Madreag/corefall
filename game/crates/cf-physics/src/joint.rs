@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
 /// One joint in a body graph. The joint is the connection between a
 /// child attachable (limb, weapon, sensor) and its parent zone (torso,
 /// arm-stump, backpack mount).
+#[allow(clippy::struct_field_names)]
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub struct Joint {
     /// Impulse magnitude (N) at which the joint cleanly snaps and the
@@ -100,7 +101,7 @@ impl Joint {
     }
 
     /// Construct a joint, normalizing `gib_impulse_limit >= joint_strength`
-    /// + clamping absorption / damage_multiplier so caller mistakes don't
+    /// and clamping absorption / damage_multiplier so caller mistakes don't
     /// silently produce nonsense state.
     pub fn new(joint_strength: f32, gib_impulse_limit: f32, damage_multiplier: f32, absorption: f32) -> Self {
         let js = joint_strength.max(0.0);
@@ -152,10 +153,10 @@ pub fn evaluate_joint(joint: Joint, impulse_in: f32) -> JointEval {
 }
 
 /// **M14**: falling-damage impulse chain. Given a landing velocity (m/s)
-/// + actor mass (kg) + chain of joints (in body-graph order, foot → leg
-/// → torso), return per-joint evaluations. The first joint that detaches
-/// or gibs is the "severance point"; later joints in the chain still see
-/// reduced impulse forwarded through the absorbed cascade.
+/// plus actor mass (kg) plus a chain of joints (in body-graph order,
+/// foot to leg to torso), return per-joint evaluations. The first joint
+/// that detaches or gibs is the "severance point"; later joints in the
+/// chain still see reduced impulse forwarded through the absorbed cascade.
 ///
 /// Per CCCP `AHuman` foot landing — impulse splits across both feet when
 /// standing; M14 callers pass `mass_kg / 2.0` when the actor has both feet

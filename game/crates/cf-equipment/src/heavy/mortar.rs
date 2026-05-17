@@ -64,7 +64,7 @@ mod tests {
                 assert_eq!(reason, "crew_required");
                 assert_eq!(missing, 1);
             }
-            _ => panic!("expected rejection"),
+            CrewFireOutcome::Crewed { .. } => panic!("expected rejection"),
         }
     }
 
@@ -77,7 +77,7 @@ mod tests {
         assert!(out.is_crewed());
         match out {
             CrewFireOutcome::Crewed { crew_size } => assert_eq!(crew_size, 2),
-            _ => unreachable!(),
+            CrewFireOutcome::Rejected { .. } => unreachable!(),
         }
     }
 

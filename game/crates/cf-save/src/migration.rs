@@ -133,6 +133,7 @@ pub fn migrate(blob: WorldSave, target: SaveSchemaVersion) -> Result<MigrationOu
 }
 
 /// Walk the supplied (typically `registry()`) migration chain forward.
+#[allow(clippy::needless_pass_by_value)]
 pub fn migrate_with_registry(
     mut blob: WorldSave,
     target: SaveSchemaVersion,
@@ -250,7 +251,7 @@ mod tests {
         // handler_id (so the audit trail in save_migrated.handler_chain is
         // unambiguous when multiple handlers fire).
         let mut ids: Vec<&'static str> = reg.iter().map(|h| h.handler_id()).collect();
-        ids.sort();
+        ids.sort_unstable();
         let n = ids.len();
         ids.dedup();
         assert_eq!(n, ids.len(), "every handler_id in the registry must be unique");
@@ -259,6 +260,7 @@ mod tests {
     /// Spec calls out `cf_save::migration::REGISTRY` as the canonical name.
     /// The PascalCase alias must produce an equivalent chain to `registry()`.
     #[test]
+    #[allow(non_snake_case)]
     fn pascal_case_REGISTRY_alias_matches_registry() {
         let a = registry();
         #[allow(non_snake_case)]

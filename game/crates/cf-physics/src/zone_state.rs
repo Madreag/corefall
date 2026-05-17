@@ -21,20 +21,15 @@ use serde::{Deserialize, Serialize};
 /// is functional (Intact/Damaged), bleeding (Critical), or lost
 /// (Severed/Destroyed).
 #[repr(u8)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum ZoneState {
+    #[default]
     Intact = 0,
     Damaged = 1,
     Critical = 2,
     Severed = 3,
     Destroyed = 4,
-}
-
-impl Default for ZoneState {
-    fn default() -> Self {
-        ZoneState::Intact
-    }
 }
 
 impl ZoneState {

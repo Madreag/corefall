@@ -160,7 +160,7 @@ impl<'de> Deserialize<'de> for SaveSchemaVersion {
             serde_json::Value::Object(map) => {
                 let parse_field = |k: &str| -> Result<u16, D::Error> {
                     map.get(k)
-                        .and_then(|v| v.as_u64())
+                        .and_then(serde_json::Value::as_u64)
                         .and_then(|n| u16::try_from(n).ok())
                         .ok_or_else(|| {
                             serde::de::Error::custom(format!(

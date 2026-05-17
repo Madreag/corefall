@@ -286,7 +286,7 @@ mod tests {
             HeavyWeaponKind::PlasmaCannon,
             HeavyWeaponKind::GaussRifle,
         ] {
-            assert!(kinds.contains(&k), "missing kind {:?}", k);
+            assert!(kinds.contains(&k), "missing kind {k:?}");
         }
     }
 

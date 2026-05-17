@@ -797,18 +797,21 @@ impl ChassisModule {
     }
 
     /// **M13**: builder helper that attaches a chassis-local hitbox to the module.
+    #[must_use]
     pub fn with_local_aabb(mut self, aabb: Aabb) -> Self {
         self.local_aabb = aabb;
         self
     }
 
     /// **M13**: builder helper that wires the failure cascade onto the module.
+    #[must_use]
     pub fn with_failure_cascade(mut self, cascade: FailureCascade) -> Self {
         self.failure_cascade = cascade;
         self
     }
 
     /// **M13** AmmoRack-only: pre-seed the rounds remaining + cascade.
+    #[must_use]
     pub fn with_ammo(mut self, rounds: u32) -> Self {
         self.ammo_quantity_remaining = rounds;
         if self.kind == ModuleKind::AmmoRack && self.failure_cascade == FailureCascade::None {
@@ -1083,6 +1086,7 @@ impl Default for EjectWindow {
 /// **M13** § "Armor mounting angles per chassis archetype". Per-zone mount
 /// angles drive the M9 angled-armor math: incoming projectiles that strike
 /// at a glancing angle effectively thicken the armor.
+#[allow(clippy::struct_field_names)]
 #[derive(Debug, Clone, Copy, PartialEq, Default, Serialize, Deserialize)]
 pub struct ArmorMountAngles {
     /// Forward-facing armor angle (degrees from vertical).
@@ -2228,11 +2232,10 @@ impl ChassisState {
         // authoritative dedupe for reactors.
         if cascade == FailureCascade::ReactorOverpressure {
             let pressure = match module_state {
-                ModuleStateKind::Nominal => 0,
                 ModuleStateKind::Degraded => 1,
                 ModuleStateKind::Warning => 2,
                 ModuleStateKind::Failed => 4,
-                ModuleStateKind::NotPresent => 0,
+                ModuleStateKind::Nominal | ModuleStateKind::NotPresent => 0,
             };
             let mut crossed = false;
             if let Some(m) = self.module_mut(&module_id) {
@@ -2309,7 +2312,7 @@ impl ChassisState {
         let count = fragment_count.clamp(1, 3);
         for i in 0..count {
             // Deterministic fragment direction within ±30° cone (per spec).
-            let frag_seed = seed.wrapping_mul(0x9E3779B97F4A7C15).wrapping_add(i as u64);
+            let frag_seed = seed.wrapping_mul(0x9E37_79B9_7F4A_7C15).wrapping_add(i as u64);
             let angle_norm = ((frag_seed % 1024) as f32 / 1024.0) - 0.5; // -0.5..+0.5
             let angle_rad = angle_norm * std::f32::consts::PI * (60.0 / 180.0);
             let dx = angle_rad.cos();

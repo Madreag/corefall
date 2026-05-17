@@ -473,7 +473,7 @@ mod tests {
 
     #[test]
     fn apply_chain_round_trips() {
-        let frames = vec![
+        let frames = [
             json!({"hp": 100, "ammo": 30, "team": "blue"}),
             json!({"hp": 90, "ammo": 28, "team": "blue"}),
             json!({"hp": 75, "ammo": 25, "team": "blue", "afflictions": ["bleeding"]}),
@@ -500,7 +500,7 @@ mod tests {
 
     #[test]
     fn reconstruct_at_walks_forward_only_to_requested_tick() {
-        let frames = vec![
+        let frames = [
             json!({"hp": 100}),
             json!({"hp": 90}),
             json!({"hp": 75}),
