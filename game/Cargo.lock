@@ -1679,6 +1679,7 @@ dependencies = [
  "cf-physics",
  "cf-priority",
  "cf-replay",
+ "cf-replay-export",
  "cf-replay-scrub",
  "cf-save",
  "cf-sim-core",

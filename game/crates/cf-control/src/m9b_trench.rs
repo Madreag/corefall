@@ -1162,4 +1162,186 @@ mod tests {
         );
         assert!(integrity >= cf_trench::REVETMENT_INTEGRITY_FLOOR);
     }
+
+    /// **VAL-CROSS-002** (inherited by M10B closure from M9C
+    /// close-deferred): a parapet_raised trench dig succeeds
+    /// post-M9C, the placed segment carries the `breastwork`
+    /// embedded module, the M9B-side authored breastwork.ron declares
+    /// the 6-sandbag cost, the M9C breastwork kernel reports HP 400,
+    /// and the `parapet_raised_requires_m9c` warning event does NOT
+    /// fire. The cfctl trace this test captures is the
+    /// `dispatch_m9b_dig_trench_segment` call (cfctl maps
+    /// `act.player.dig_trench_segment` to this dispatch path) +
+    /// `compute_trench_segment_at_pos` (cfctl maps
+    /// `observe.trench_segment_at_pos`).
+    #[test]
+    fn val_cross_002_parapet_raised_dig_emits_breastwork_segment() {
+        let engine = make_engine();
+
+        // 1. Kernel surface: cf-trench's parapet_raised_dig_validate is
+        //    Ok(()) post-M9C (the same surface VAL-CROSS-003 covers
+        //    against the pre-M9C warning path).
+        let validate = cf_trench::parapet_raised_forward_compat::parapet_raised_dig_validate();
+        assert!(
+            validate.is_ok(),
+            "VAL-CROSS-002 precondition: parapet_raised_dig_validate must return Ok(()) post-M9C"
+        );
+
+        // 2. M9C kernel HP 400 invariant: BREASTWORK_MAX_HP is the
+        //    health the placed breastwork module spawns with.
+        assert_eq!(
+            cf_trench::BREASTWORK_MAX_HP as u32,
+            400,
+            "VAL-CROSS-002: BREASTWORK_MAX_HP must be 400 (spec § Notes)"
+        );
+
+        // 3. End-to-end cfctl trace: drive the dig via the
+        //    `dispatch_m9b_dig_trench_segment` handler the cfctl
+        //    method `act.player.dig_trench_segment` routes to. The
+        //    handler MUST accept the action; substrate hardness 0.2 is
+        //    below the deep-substrate threshold so parapet_raised does
+        //    not fall back to shallow_scrape. We mark the source as
+        //    Cfctl to mirror the JSON-RPC dispatch path the spec
+        //    contract is anchored to.
+        let outcome = engine.dispatch_m9b_dig_trench_segment(
+            "parapet_raised".into(),
+            Some(cf_equipment::tool::entrenching::ENTRENCHING_TOOL_ID.into()),
+            0.2_f32,
+            false,
+            cf_actor::IntentSource::Cfctl,
+            Tick(0),
+            0.0,
+        );
+        assert_eq!(
+            outcome.status,
+            crate::state::ControlEnvelopeStatus::Accepted,
+            "VAL-CROSS-002: parapet_raised dig must be accepted post-M9C; got {outcome:?}"
+        );
+
+        // 4. observe.trench_segment_at_pos reports the placed segment
+        //    with `breastwork` embedded so subsequent fire route
+        //    through the breastwork HP gate (VAL-M9B-BREASTWORK-001).
+        let observed = engine.compute_trench_segment_at_pos(0, 0);
+        let modules = observed
+            .pointer("/result/embedded_modules")
+            .and_then(|m| m.as_array())
+            .expect("VAL-CROSS-002: observe must return embedded_modules");
+        let names: Vec<&str> = modules.iter().filter_map(|v| v.as_str()).collect();
+        assert!(
+            names.contains(&"breastwork"),
+            "VAL-CROSS-002: parapet_raised segment must embed `breastwork` module; got {names:?}"
+        );
+
+        // 5. The replay log carries `segment_dug` with
+        //    variant=parapet_raised AND DOES NOT carry the
+        //    `parapet_raised_requires_m9c` warning.
+        let dug = engine
+            .recorder
+            .snapshot_events()
+            .into_iter()
+            .filter(|e| e.event_type == "segment_dug" && e.category == "trench")
+            .collect::<Vec<_>>();
+        assert!(
+            !dug.is_empty(),
+            "VAL-CROSS-002: expected ≥ 1 trench.segment_dug event"
+        );
+        assert!(
+            dug.iter().any(|e| {
+                e.payload.get("variant").and_then(|v| v.as_str()) == Some("parapet_raised")
+            }),
+            "VAL-CROSS-002: ≥ 1 segment_dug event must carry variant=parapet_raised"
+        );
+        assert_eq!(
+            count_events(&engine, "trench", "parapet_raised_requires_m9c"),
+            0,
+            "VAL-CROSS-002 / VAL-CROSS-003: post-M9C the parapet_raised_requires_m9c warning MUST NOT fire"
+        );
+
+        // 6. The 6-sandbag cost is declared by the authored module
+        //    cost map. m9b-3 already routes
+        //    `act.player.place_trench_module` through
+        //    `module_cost_json(Breastwork)`; we assert the spec value
+        //    end-to-end here so a future cost change can't silently
+        //    drift the VAL-CROSS-002 contract.
+        let cost = module_cost_json(TrenchModule::Breastwork);
+        let obj = cost
+            .as_object()
+            .expect("VAL-CROSS-002: breastwork cost is a JSON object");
+        assert_eq!(
+            obj.get("sandbag").and_then(|v| v.as_u64()),
+            Some(6),
+            "VAL-CROSS-002: breastwork module declares 6 sandbags (spec § M9B modules table)"
+        );
+    }
+
+    /// **VAL-CROSS-004** (inherited by M10B closure from M9C
+    /// close-deferred): a crewed fortification dominates the
+    /// underlying trench segment's cover_state derivation. Deploying
+    /// + crewing inside a `fire_step` segment promotes Standing
+    /// on-step from Exposed → Full; uncrew returns to Exposed for
+    /// fire_step on-step Standing.
+    #[test]
+    fn val_cross_004_mg_tripod_inside_fire_step_crewing_dominates_cover_state() {
+        use cf_actor::{ActorState, ActorId, Inventory, Vec2};
+        use cf_trench::segment::{InMemorySegments, TrenchSegment};
+        use cf_trench::CoverState as TrenchCoverState;
+
+        // 1. Set up: a fire_step segment at (0, 0) with depth=16 +
+        //    step_height=8. Per VAL-M9B-SEGMENT-004 standing on-step
+        //    == Exposed.
+        let segment = TrenchSegment {
+            variant: SegmentVariant::FireStep,
+            tile_x: 0,
+            tile_y: 0,
+            depth: 16,
+            width: 20,
+            raised_step_height: Some(8),
+            embedded_modules: vec![TrenchModule::Duckboard, TrenchModule::FireStep],
+        };
+        let world = InMemorySegments::with_segments(vec![segment]);
+
+        // 2. Stand the player on-step; pre-crew baseline is Exposed.
+        let mut player = ActorState::player(
+            ActorId(1),
+            "blue",
+            Vec2::new(5.0, 10.0),
+            100.0,
+            Inventory::default(),
+        );
+        player.on_ground = true;
+        player.crouch_active = false;
+        player.prone_active = false;
+        assert_eq!(
+            player.cover_state(&world),
+            TrenchCoverState::Exposed,
+            "VAL-CROSS-004 baseline: Standing on-step in fire_step must be Exposed"
+        );
+
+        // 3. Deploy + crew the mg_tripod (the cfctl methods
+        //    `act.player.deploy_mg_tripod` then
+        //    `act.player.crew_fortification` map to this kernel
+        //    transition; the engine assigns a fortification_id which
+        //    we mimic here as 42).
+        let tripod_id: u32 = 42;
+        player.crew_fortification(tripod_id);
+        assert!(player.is_crewing());
+        assert_eq!(player.crewed_fortification_id(), Some(tripod_id));
+        assert_eq!(
+            player.cover_state(&world),
+            TrenchCoverState::Full,
+            "VAL-CROSS-004: crewing dominates the segment-variant table → cover_state == Full"
+        );
+
+        // 4. Uncrew (cfctl `act.player.uncrew_fortification`) →
+        //    segment-variant baseline restored (Exposed for
+        //    Standing on-step in fire_step).
+        let released = player.uncrew_fortification();
+        assert_eq!(released, Some(tripod_id));
+        assert!(!player.is_crewing());
+        assert_eq!(
+            player.cover_state(&world),
+            TrenchCoverState::Exposed,
+            "VAL-CROSS-004: uncrew restores fire_step on-step Standing == Exposed"
+        );
+    }
 }

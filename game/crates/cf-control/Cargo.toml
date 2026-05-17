@@ -53,6 +53,7 @@ cf-net = { path = "../cf-net" }
 anyhow = { workspace = true }
 cf-sim-core = { path = "../cf-sim-core" }
 cf-tools-replay-viewer = { path = "../cf-tools-replay-viewer" }
+cf-replay-export = { path = "../cf-replay-export" }
 blake3 = { workspace = true }
 hex = { workspace = true }
 tempfile = "3"
