@@ -46,6 +46,14 @@ pub mod juice;
 // layers (duckboard / fire-step / drainage / revetment / breastwork).
 pub mod trench_layers;
 
+// **M9C** § cf-render-2d — Per-fortification sprite layers,
+// spotlight cone shader, wire visuals (barbed/razor/electric/
+// concertina), camo netting overlay (rendered through
+// `fortification_layers::CamoOverlay`).
+pub mod fortification_layers;
+pub mod spotlight_cone;
+pub mod wire_visuals;
+
 pub use asset_loader::{
     category_subdir, load_ledger_index, resolve_placeholder_path, AssetIndex, AssetIndexEntry, AssetIndexPlugin,
 };
@@ -60,6 +68,15 @@ pub use overlay::{
 pub use trench_layers::{
     layers_for_segment, layers_for_variant, segment_has_layer, TrenchLayerId,
 };
+pub use fortification_layers::{
+    kind_has_layer, layers_for_kind, sandbag_fill_intact_rows, sandbag_full_row_count,
+    FortLayerId,
+};
+pub use spotlight_cone::{
+    SpotlightCone, SPOTLIGHT_DAZZLE_DURATION_SECONDS, SPOTLIGHT_HALF_ANGLE_DEGREES,
+    SPOTLIGHT_RANGE_TILES,
+};
+pub use wire_visuals::WireVisual;
 pub use palette_swap::{
     build_role_swap, parse_hex_rgb, Palette, PaletteEntry, PaletteRegistry, PaletteSwap, OVERLAY_TINT_BUILD_REPAIR,
     OVERLAY_TINT_HAZARD, OVERLAY_TINT_INTEGRITY, OVERLAY_TINT_MOBILITY, OVERLAY_TINT_PATHABILITY,
