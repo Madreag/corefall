@@ -6,12 +6,34 @@ rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
 
+# **M10B § "cf-render-2d --offline mode"** — VAL-M10B-009 mandates that
+# `cargo check -p cf-render-2d --no-default-features --features offline`
+# exits 0 and that the offline rasterizer carries no `wgpu::Surface` /
+# `wgpu::create_surface` / `winit::window` references. The feature set
+# below splits the crate into:
+#
+# - `bevy_render` (default) — the original Bevy-coupled live renderer
+#   that cf-app links against. Drags in bevy + cf-actor + cf-terrain.
+# - `offline` — the M10B software-rasterizer fallback. Pulls in
+#   `tiny-skia` for pure-Rust per-frame RGBA composition, plus the
+#   bevy-free helper modules (`trench_layers`, `fortification_layers`,
+#   `spotlight_cone`, `wire_visuals`) so the offline pipeline can
+#   render M9B trench + M9C fortification pixels without a GPU.
+#
+# `cf-trench` and `cf-fortification` stay required (non-optional)
+# because the bevy-free helper modules need them under BOTH features.
+[features]
+default = ["bevy_render"]
+bevy_render = ["dep:bevy", "dep:cf-actor", "dep:cf-terrain"]
+offline = ["dep:tiny-skia"]
+
 [dependencies]
 serde = { workspace = true }
 serde_json = { workspace = true }
 tracing = { workspace = true }
-bevy = { workspace = true }
-cf-actor = { path = "../cf-actor" }
+bevy = { workspace = true, optional = true }
+cf-actor = { path = "../cf-actor", optional = true }
 cf-fortification = { path = "../cf-fortification" }
-cf-terrain = { path = "../cf-terrain" }
+cf-terrain = { path = "../cf-terrain", optional = true }
 cf-trench = { path = "../cf-trench" }
+tiny-skia = { version = "0.11", optional = true }
