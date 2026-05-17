@@ -383,6 +383,39 @@ enum ActAction {
         #[arg(long)]
         origin_y: i32,
     },
+    /// **M9B-3**: `act.player.dig_trench_segment variant=<id>
+    /// [tool_id=<id>] [substrate_hardness=<f32>] [strict]`.
+    /// Carves a trench segment with the specified variant. Substrate
+    /// hardness ≥ 0.5 on `deep` falls back to `shallow_scrape` with a
+    /// `trench.segment_variant_downgraded` warning event, or rejects
+    /// outright when `--strict` is supplied.
+    PlayerDigTrenchSegment {
+        #[arg(long)]
+        variant: String,
+        #[arg(long)]
+        tool_id: Option<String>,
+        #[arg(long, default_value_t = 0.0)]
+        substrate_hardness: f32,
+        #[arg(long, default_value_t = false)]
+        strict: bool,
+    },
+    /// **M9B-3**: `act.player.place_trench_module module_id=<id> segment_id=<u64>`.
+    /// Places an embedded module on a built trench segment; emits
+    /// `trench.module_placed`.
+    PlayerPlaceTrenchModule {
+        #[arg(long)]
+        module_id: String,
+        #[arg(long)]
+        segment_id: u64,
+    },
+    /// **M9B-3**: `act.player.repair_trench_module module_id=<id> segment_id=<u64>`.
+    /// Repairs a damaged trench module; emits `trench.module_repaired`.
+    PlayerRepairTrenchModule {
+        #[arg(long)]
+        module_id: String,
+        #[arg(long)]
+        segment_id: u64,
+    },
 }
 
 #[derive(Debug, Subcommand)]
@@ -1275,6 +1308,48 @@ async fn cmd_act(
                 .send_request(
                     "act.player.drop_trench_template",
                     json!({"id": id, "origin": [origin_x, origin_y]}),
+                )
+                .await?
+        }
+        ActAction::PlayerDigTrenchSegment {
+            variant,
+            tool_id,
+            substrate_hardness,
+            strict,
+        } => {
+            let mut payload = json!({
+                "variant": variant,
+                "substrate_hardness": substrate_hardness,
+                "strict": strict,
+            });
+            if let Some(t) = tool_id {
+                if let Some(obj) = payload.as_object_mut() {
+                    obj.insert("tool_id".to_string(), json!(t));
+                }
+            }
+            session
+                .send_request("act.player.dig_trench_segment", payload)
+                .await?
+        }
+        ActAction::PlayerPlaceTrenchModule {
+            module_id,
+            segment_id,
+        } => {
+            session
+                .send_request(
+                    "act.player.place_trench_module",
+                    json!({"module_id": module_id, "segment_id": segment_id}),
+                )
+                .await?
+        }
+        ActAction::PlayerRepairTrenchModule {
+            module_id,
+            segment_id,
+        } => {
+            session
+                .send_request(
+                    "act.player.repair_trench_module",
+                    json!({"module_id": module_id, "segment_id": segment_id}),
                 )
                 .await?
         }
