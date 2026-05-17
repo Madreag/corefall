@@ -990,6 +990,18 @@ pub(crate) struct EngineMutable {
     /// exist yet); the persistent setter is reserved for the M36+
     /// scenario loader.
     pub(crate) multiplayer_session: bool,
+    /// **M9B**: live trench-segment placement index. Mutated by
+    /// `act.player.dig_trench_segment`, `act.player.place_trench_module`,
+    /// and `act.player.drop_trench_template`; consumed by
+    /// `compute_actor_cover_state` + `compute_trench_segment_at_pos`
+    /// so the observe surfaces project real per-segment state instead
+    /// of always-empty placeholders.
+    pub(crate) trench_world: cf_trench::segment::InMemorySegments,
+    /// **M9B**: monotonic id counter for placed trench segments.
+    /// Replay events reference segments via this id so the cause
+    /// chain stays linear across dig → place_module → repair_module
+    /// → breach → collapse.
+    pub(crate) trench_next_segment_id: u64,
 }
 
 /// **M6**: per-actor charge-fire annotation shipped from the M6 post-step
@@ -1458,6 +1470,11 @@ impl M0Engine {
                 m4b_previous_snapshot: None,
                 m4b_last_baseline_event_id: None,
                 m4b_last_baseline_tick: None,
+                // **M9B**: empty trench-world index. Mutated as the
+                // player digs segments + places modules; observe
+                // surfaces project the live state.
+                trench_world: cf_trench::segment::InMemorySegments::new(),
+                trench_next_segment_id: 1,
             }),
             recorder,
             current_tick,
@@ -16940,14 +16957,13 @@ impl EngineHandle for M0Engine {
                         mission_critical: a.mission_critical,
                         bloom_factor: a.bloom_factor,
                         mass_kg: a.mass_kg,
-                        // **M9B**: trench cover state derived against an empty
-                        // segment world for the standard observe path. The
-                        // dedicated `observe.actor.cover_state` cfctl method
-                        // computes the value against any future trench-world
-                        // implementation; on open ground the value is "Exposed"
-                        // per VAL-M9B-COVERMATRIX-001.
+                        // **M9B / m9b-4**: trench cover state derived
+                        // against the live engine trench-world index. On
+                        // open ground the value is "Exposed" per
+                        // VAL-M9B-COVERMATRIX-001; standing in a placed
+                        // segment reflects the (stance × variant) table.
                         cover_state: a
-                            .cover_state(&cf_trench::segment::InMemorySegments::new())
+                            .cover_state(&state.trench_world)
                             .as_str()
                             .to_string(),
                     }
@@ -20932,6 +20948,12 @@ impl EngineHandle for M0Engine {
                         })
                     })
                     .collect();
+                // **m9b-4**: also push the template's runtime segments
+                // into the live trench-world index so subsequent
+                // observe.trench_segment_at_pos calls find them.
+                let segment_count = inst.segments.len();
+                let first_segment_id =
+                    self.insert_trench_segments_bulk(inst.trench_segments.clone());
                 let dropped_id = self.recorder.record(
                     tick,
                     sim_time_ms,
@@ -20941,7 +20963,8 @@ impl EngineHandle for M0Engine {
                         "template_id": inst.id,
                         "template_sha256": inst.template_sha256,
                         "origin": [inst.origin.0, inst.origin.1],
-                        "segment_count": inst.segments.len(),
+                        "segment_count": segment_count,
+                        "first_segment_id": first_segment_id,
                         "placed_fortifications": placed_json,
                         "missing_fortifications": missing_json,
                     }),
