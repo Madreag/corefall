@@ -1052,6 +1052,21 @@ pub enum ControlCommand {
     Shutdown {
         write_run_bundle: bool,
     },
+    /// **M9B-2**: drop an authored trench template at the supplied tile
+    /// origin. Loads `content/trench_templates/<id>.trench.ron` through
+    /// the cf-content loader, instantiates it via
+    /// `TrenchTemplate::instantiate`, and emits
+    /// `trench.template_dropped` with `template_sha256` (64 hex chars),
+    /// `segment_count`, and `placed_fortifications[]` per
+    /// VAL-M9B-TEMPLATE-002. Optional placeholders that don't resolve to
+    /// a currently-shipped M9C asset emit
+    /// `trench.template_missing_fortification` warning events per
+    /// VAL-M9B-TEMPLATE-004 (the template still places).
+    ActPlayerDropTrenchTemplate {
+        id: String,
+        origin: (i32, i32),
+        source: IntentSource,
+    },
 }
 
 /// Trait that the engine implements so the server stays decoupled from `cf-app`.
@@ -3569,6 +3584,35 @@ async fn process_request<E: EngineHandle>(
                 }),
             ))
         }
+        // **M9B-2**: drop an authored trench template at the supplied
+        // tile origin. Routes to the engine's
+        // ActPlayerDropTrenchTemplate dispatch, which loads + hashes
+        // the template + emits `trench.template_dropped`.
+        "act.player.drop_trench_template" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                id: String,
+                origin: (i32, i32),
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            if p.id.trim().is_empty() {
+                return Some(invalid_param_reason(request.id, "template_id_empty"));
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerDropTrenchTemplate {
+                    id: p.id,
+                    origin: p.origin,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
         _ => Some(error_response(
             request.id,
             error_codes::METHOD_NOT_FOUND,
@@ -4451,5 +4495,63 @@ mod tests {
                 "wrong reason for {params}",
             );
         }
+    }
+
+    /// **M9B-2 / VAL-M9B-CFCTL-001 (subset)**: `act.player.drop_trench_template`
+    /// is routable on the cf-control server. With a well-formed
+    /// payload the dispatcher returns an `accepted` ack — never the
+    /// generic `-32601 MethodNotFound` error.
+    #[tokio::test]
+    async fn act_player_drop_trench_template_routes() {
+        let engine = StubEngine;
+        let hz: Arc<Mutex<Option<u32>>> = Arc::new(Mutex::new(None));
+        let filter: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+        let req = json!({
+            "jsonrpc": "2.0",
+            "id": 7,
+            "method": "act.player.drop_trench_template",
+            "params": {
+                "schema_version": SCHEMA_VERSION,
+                "id": "wwi_frontline_a",
+                "origin": [50, 30],
+            }
+        });
+        let resp = process_request(&req.to_string(), &engine, &hz, &filter, 240)
+            .await
+            .unwrap();
+        let parsed: JsonRpcResponse = serde_json::from_str(&resp).unwrap();
+        assert!(parsed.error.is_none(), "expected success, got error: {:?}", parsed.error);
+        let result = parsed.result.expect("dispatched response carries result");
+        assert_eq!(result.get("status").and_then(|v| v.as_str()), Some("accepted"));
+    }
+
+    /// `act.player.drop_trench_template` rejects an empty template id
+    /// before reaching the engine handler — surfaces
+    /// `template_id_empty` reason.
+    #[tokio::test]
+    async fn act_player_drop_trench_template_rejects_empty_id() {
+        let engine = StubEngine;
+        let hz: Arc<Mutex<Option<u32>>> = Arc::new(Mutex::new(None));
+        let filter: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+        let req = json!({
+            "jsonrpc": "2.0",
+            "id": 8,
+            "method": "act.player.drop_trench_template",
+            "params": {
+                "schema_version": SCHEMA_VERSION,
+                "id": "",
+                "origin": [0, 0],
+            }
+        });
+        let resp = process_request(&req.to_string(), &engine, &hz, &filter, 240)
+            .await
+            .unwrap();
+        let parsed: JsonRpcResponse = serde_json::from_str(&resp).unwrap();
+        let error = parsed.error.expect("empty id must reject");
+        assert_eq!(error.code, error_codes::INVALID_PARAMS);
+        assert_eq!(
+            error.data.unwrap().get("reason").and_then(|v| v.as_str()),
+            Some("template_id_empty")
+        );
     }
 }

@@ -20791,8 +20791,152 @@ impl EngineHandle for M0Engine {
             ControlCommand::ActPlayerPieMenuClose { source } => {
                 self.dispatch_pie_menu_close(source, tick, sim_time_ms, state)
             }
+            ControlCommand::ActPlayerDropTrenchTemplate { id, origin, source } => {
+                let source_label = match source {
+                    IntentSource::Human => "human",
+                    IntentSource::Cfctl => "cfctl",
+                    IntentSource::Ai => "ai",
+                    IntentSource::Replay => "replay",
+                };
+                drop(state);
+                let action_id = self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "control",
+                    "command_accepted",
+                    json!({
+                        "method": "act.player.drop_trench_template",
+                        "id": id,
+                        "origin": [origin.0, origin.1],
+                        "source": source_label,
+                    }),
+                    None,
+                );
+                let template = match load_trench_template(&id) {
+                    Ok(t) => t,
+                    Err(err) => {
+                        self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "control",
+                            "command_rejected",
+                            json!({
+                                "method": "act.player.drop_trench_template",
+                                "reason": "trench_template_load_failed",
+                                "id": id,
+                                "detail": err,
+                            }),
+                            Some(action_id),
+                        );
+                        return CommandResult::rejected("trench_template_load_failed", tick.0);
+                    }
+                };
+                let resolved: std::collections::HashSet<String> =
+                    resolved_fortifications_for_build();
+                let inst_request = cf_content::TrenchTemplateInstantiation {
+                    template: &template,
+                    origin,
+                    resolved_fortifications: resolved,
+                    instance_id_base: tick.0.saturating_mul(1024),
+                };
+                let inst = template.instantiate(&inst_request);
+                let placed_json: Vec<serde_json::Value> = inst
+                    .placed_fortifications
+                    .iter()
+                    .map(|p| {
+                        json!({
+                            "fortification_id": p.fortification_id,
+                            "world_pos": [p.world_pos.0, p.world_pos.1],
+                            "instance_id": p.instance_id,
+                        })
+                    })
+                    .collect();
+                let missing_json: Vec<serde_json::Value> = inst
+                    .missing_fortifications
+                    .iter()
+                    .map(|m| {
+                        json!({
+                            "fortification_id": m.fortification_id,
+                            "world_pos": [m.world_pos.0, m.world_pos.1],
+                        })
+                    })
+                    .collect();
+                let dropped_id = self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "trench",
+                    "template_dropped",
+                    json!({
+                        "template_id": inst.id,
+                        "template_sha256": inst.template_sha256,
+                        "origin": [inst.origin.0, inst.origin.1],
+                        "segment_count": inst.segments.len(),
+                        "placed_fortifications": placed_json,
+                        "missing_fortifications": missing_json,
+                    }),
+                    Some(action_id),
+                );
+                for warn in &inst.missing_fortifications {
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "trench",
+                        "template_missing_fortification",
+                        json!({
+                            "template_id": inst.id,
+                            "fortification_id": warn.fortification_id,
+                            "world_pos": [warn.world_pos.0, warn.world_pos.1],
+                            "reason": "m9c_not_shipped",
+                        }),
+                        Some(dropped_id.clone()),
+                    );
+                }
+                CommandResult::accepted(tick.0)
+            }
         }
     }
+}
+
+/// Locate `content/trench_templates/<id>.trench.ron` by searching the
+/// canonical paths the engine may be launched from (workspace root,
+/// `game/`, or one level above). Returns a typed error string for the
+/// engine handler to surface in the `control.command_rejected` event.
+fn load_trench_template(id: &str) -> Result<cf_content::TrenchTemplate, String> {
+    use std::path::{Path, PathBuf};
+    let filename = format!("{id}.trench.ron");
+    let candidates: [PathBuf; 4] = [
+        PathBuf::from("content/trench_templates").join(&filename),
+        PathBuf::from("../content/trench_templates").join(&filename),
+        PathBuf::from("game/content/trench_templates").join(&filename),
+        PathBuf::from("../game/content/trench_templates").join(&filename),
+    ];
+    let mut tried: Vec<String> = Vec::new();
+    for path in &candidates {
+        let p: &Path = path.as_ref();
+        if p.exists() {
+            let text = std::fs::read_to_string(p)
+                .map_err(|e| format!("read {}: {e}", p.display()))?;
+            return cf_content::TrenchTemplate::from_ron_str(&text)
+                .map_err(|e| format!("parse {}: {e}", p.display()));
+        }
+        tried.push(p.display().to_string());
+    }
+    Err(format!(
+        "template id `{id}` not found under content/trench_templates/; tried [{}]",
+        tried.join(", ")
+    ))
+}
+
+/// Returns the set of M9C fortification ids that are currently
+/// shipped + ready to instantiate. Pre-M9C every id is missing →
+/// optional placeholders degrade to warnings (per spec § Notes for
+/// the implementer / VAL-M9B-TEMPLATE-004); once m9c-1..m9c-5 land,
+/// this function returns a populated set so the same templates
+/// promote to real placed fortifications (VAL-CROSS-001).
+fn resolved_fortifications_for_build() -> std::collections::HashSet<String> {
+    // Pre-M9C: empty set. m9c-1..m9c-5 features will replace this
+    // helper with one driven by the actual fortification registry.
+    std::collections::HashSet::new()
 }
 
 /// Drive an inline run for `duration_ticks`, paced at the configured tick rate
