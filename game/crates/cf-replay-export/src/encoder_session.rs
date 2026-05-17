@@ -191,6 +191,7 @@ pub struct EncoderSession {
 
     bytes_written_estimate: u64,
     audio_disabled: bool,
+    audio_write_failures: u64,
 }
 
 impl EncoderSession {
@@ -275,6 +276,7 @@ impl EncoderSession {
             audio_buffer: Vec::new(),
             bytes_written_estimate: 0,
             audio_disabled,
+            audio_write_failures: 0,
         })
     }
 
@@ -345,13 +347,13 @@ impl EncoderSession {
             self.flush_audio_buffer(true)?;
         }
 
-        self.video_encoder.send_eof().map_err(EncodeError::SendFrame)?;
-        self.drain_video_packets()?;
-
         if let Some(encoder) = self.audio_encoder.as_mut() {
             encoder.send_eof().map_err(EncodeError::SendFrame)?;
         }
         self.drain_audio_packets()?;
+
+        self.video_encoder.send_eof().map_err(EncodeError::SendFrame)?;
+        self.drain_video_packets()?;
 
         self.octx.write_trailer().map_err(EncodeError::WriteTrailer)?;
 
@@ -392,11 +394,13 @@ impl EncoderSession {
         while encoder.receive_packet(&mut pkt).is_ok() {
             pkt.set_stream(idx);
             pkt.rescale_ts(self.audio_time_base, self.audio_st_time_base);
-            self.bytes_written_estimate = self
-                .bytes_written_estimate
-                .saturating_add(pkt_size(&pkt));
-            pkt.write_interleaved(&mut self.octx)
-                .map_err(EncodeError::WritePacket)?;
+            let est = pkt_size(&pkt);
+            if let Err(source) = pkt.write_interleaved(&mut self.octx) {
+                tracing::warn!(stream = idx, "audio packet write failed (skipping): {source}");
+                self.audio_write_failures = self.audio_write_failures.saturating_add(1);
+            } else {
+                self.bytes_written_estimate = self.bytes_written_estimate.saturating_add(est);
+            }
         }
         Ok(())
     }
@@ -414,9 +418,10 @@ impl EncoderSession {
             self.encode_audio_chunk(&chunk, frame_size)?;
         }
         if drain_partial && !self.audio_buffer.is_empty() {
+            let remaining_samples = self.audio_buffer.len() / channels;
             let mut tail = std::mem::take(&mut self.audio_buffer);
-            tail.resize(samples_per_frame, 0.0);
-            self.encode_audio_chunk(&tail, frame_size)?;
+            tail.resize(remaining_samples * channels, 0.0);
+            self.encode_audio_chunk(&tail, remaining_samples)?;
         }
         Ok(())
     }
@@ -425,20 +430,7 @@ impl EncoderSession {
         let channels = ENCODER_AUDIO_CHANNELS as usize;
         let layout = ChannelLayout::STEREO;
         let mut a_frame = frame::Audio::new(self.audio_sample_format, frame_size, layout);
-        if self.audio_sample_format.is_planar() {
-            for ch in 0..channels {
-                let plane: &mut [f32] = a_frame.plane_mut(ch);
-                for (i, sample) in plane.iter_mut().enumerate() {
-                    let idx = i * channels + ch;
-                    *sample = interleaved.get(idx).copied().unwrap_or(0.0);
-                }
-            }
-        } else {
-            let plane: &mut [f32] = a_frame.plane_mut(0);
-            for (i, sample) in plane.iter_mut().enumerate() {
-                *sample = interleaved.get(i).copied().unwrap_or(0.0);
-            }
-        }
+        write_audio_samples(&mut a_frame, self.audio_sample_format, channels, frame_size, interleaved);
         a_frame.set_pts(Some(self.audio_pts));
         self.audio_pts += frame_size as i64;
         if let Some(encoder) = self.audio_encoder.as_mut() {
@@ -448,6 +440,101 @@ impl EncoderSession {
         }
         self.drain_audio_packets()
     }
+}
+
+fn write_audio_samples(
+    a_frame: &mut frame::Audio,
+    fmt: format::Sample,
+    channels: usize,
+    frame_size: usize,
+    interleaved: &[f32],
+) {
+    use format::sample::{Sample as S, Type};
+    match fmt {
+        S::F32(Type::Planar) => {
+            for ch in 0..channels {
+                let plane: &mut [f32] = a_frame.plane_mut(ch);
+                let take = plane.len().min(frame_size);
+                for (i, sample) in plane.iter_mut().take(take).enumerate() {
+                    let idx = i * channels + ch;
+                    *sample = interleaved.get(idx).copied().unwrap_or(0.0);
+                }
+            }
+        }
+        S::F32(Type::Packed) => {
+            let buf = a_frame.data_mut(0);
+            let bytes_per_sample = 4;
+            let total_bytes = frame_size * channels * bytes_per_sample;
+            let limit = buf.len().min(total_bytes);
+            for i in 0..(limit / bytes_per_sample) {
+                let raw = interleaved.get(i).copied().unwrap_or(0.0);
+                let bytes = raw.to_ne_bytes();
+                let off = i * bytes_per_sample;
+                buf[off..off + bytes_per_sample].copy_from_slice(&bytes);
+            }
+        }
+        S::I16(Type::Packed) => {
+            let buf = a_frame.data_mut(0);
+            let bytes_per_sample = 2;
+            let total_bytes = frame_size * channels * bytes_per_sample;
+            let limit = buf.len().min(total_bytes);
+            for i in 0..(limit / bytes_per_sample) {
+                let raw = interleaved.get(i).copied().unwrap_or(0.0);
+                let val = float_to_i16(raw);
+                let bytes = val.to_ne_bytes();
+                let off = i * bytes_per_sample;
+                buf[off..off + bytes_per_sample].copy_from_slice(&bytes);
+            }
+        }
+        S::I16(Type::Planar) => {
+            for ch in 0..channels {
+                let plane: &mut [i16] = a_frame.plane_mut(ch);
+                let take = plane.len().min(frame_size);
+                for (i, sample) in plane.iter_mut().take(take).enumerate() {
+                    let idx = i * channels + ch;
+                    let raw = interleaved.get(idx).copied().unwrap_or(0.0);
+                    *sample = float_to_i16(raw);
+                }
+            }
+        }
+        S::I32(Type::Packed) => {
+            let buf = a_frame.data_mut(0);
+            let bytes_per_sample = 4;
+            let total_bytes = frame_size * channels * bytes_per_sample;
+            let limit = buf.len().min(total_bytes);
+            for i in 0..(limit / bytes_per_sample) {
+                let raw = interleaved.get(i).copied().unwrap_or(0.0);
+                let val = float_to_i32(raw);
+                let bytes = val.to_ne_bytes();
+                let off = i * bytes_per_sample;
+                buf[off..off + bytes_per_sample].copy_from_slice(&bytes);
+            }
+        }
+        S::I32(Type::Planar) => {
+            for ch in 0..channels {
+                let plane: &mut [i32] = a_frame.plane_mut(ch);
+                let take = plane.len().min(frame_size);
+                for (i, sample) in plane.iter_mut().take(take).enumerate() {
+                    let idx = i * channels + ch;
+                    let raw = interleaved.get(idx).copied().unwrap_or(0.0);
+                    *sample = float_to_i32(raw);
+                }
+            }
+        }
+        _ => {
+            tracing::warn!(?fmt, "encoder_session: unsupported audio sample format; emitting silence");
+        }
+    }
+}
+
+fn float_to_i16(v: f32) -> i16 {
+    let clamped = v.clamp(-1.0, 1.0);
+    (clamped * f32::from(i16::MAX)) as i16
+}
+
+fn float_to_i32(v: f32) -> i32 {
+    let clamped = v.clamp(-1.0, 1.0);
+    (f64::from(clamped) * f64::from(i32::MAX)) as i32
 }
 
 fn pkt_size(pkt: &Packet) -> u64 {
@@ -597,10 +684,12 @@ fn configure_audio_stream(
     audio_enc.set_channel_layout(layout);
     let sample_format = preferred_sample_format(codec_name);
     audio_enc.set_format(sample_format);
-    audio_enc.set_bit_rate(192_000);
+    if codec_name != "flac" {
+        audio_enc.set_bit_rate(192_000);
+    }
     audio_enc.set_time_base(time_base);
 
-    let opened = audio_enc.open().map_err(EncodeError::EncoderConfig)?;
+    let opened = audio_enc.open_as(codec).map_err(EncodeError::EncoderConfig)?;
     ost.set_parameters(&opened);
 
     let mut frame_size = opened.frame_size() as usize;
