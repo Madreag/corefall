@@ -38,12 +38,25 @@
     clippy::match_same_arms
 )]
 
+pub mod cover_change;
 pub mod cover_state;
+pub mod damage_routing;
+pub mod dig_validation;
 pub mod modules;
 pub mod parapet_raised_forward_compat;
 pub mod segment;
 
+pub use cover_change::{
+    cover_state_change, CoverStateChangeCause, CoverStateChangeEvent,
+};
 pub use cover_state::{cover_state, cover_state_fire_step, CoverState, TrenchStance};
+pub use damage_routing::{
+    damage_route_for, DamageRoute, DamageZone,
+};
+pub use dig_validation::{
+    dig_substrate_validate, DigSubstrateOutcome, DEEP_HARDNESS_THRESHOLD,
+    SUBSTRATE_TOO_HARD_REASON, WARNING_EVENT_KIND as DIG_DOWNGRADE_EVENT_KIND,
+};
 pub use modules::{ModuleSpec, TrenchModule};
 pub use parapet_raised_forward_compat::{
     parapet_raised_dig_validate, warning_event_kind as parapet_raised_warning_event_kind,
