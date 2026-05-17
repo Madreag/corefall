@@ -677,7 +677,7 @@ pub(crate) struct EngineMutable {
     /// fields. Continuous fields (`move_x`, `aim`) persist tick-to-tick.
     pending_intent: ControlIntent,
     /// M1: actor world + rifles + projectiles. `None` for M0 scenarios.
-    actor_state: Option<ActorSimState>,
+    pub(crate) actor_state: Option<ActorSimState>,
     /// Cached player actor id from the actor world for fast access.
     pub(crate) player_actor: Option<ActorId>,
     /// Monotonic counter incremented whenever `pending_intent` is externally
@@ -16940,6 +16940,16 @@ impl EngineHandle for M0Engine {
                         mission_critical: a.mission_critical,
                         bloom_factor: a.bloom_factor,
                         mass_kg: a.mass_kg,
+                        // **M9B**: trench cover state derived against an empty
+                        // segment world for the standard observe path. The
+                        // dedicated `observe.actor.cover_state` cfctl method
+                        // computes the value against any future trench-world
+                        // implementation; on open ground the value is "Exposed"
+                        // per VAL-M9B-COVERMATRIX-001.
+                        cover_state: a
+                            .cover_state(&cf_trench::segment::InMemorySegments::new())
+                            .as_str()
+                            .to_string(),
                     }
                 })
                 .collect()
@@ -17118,6 +17128,7 @@ impl EngineHandle for M0Engine {
                 captured: state.controls_captured_by.is_some(),
                 capturer: state.controls_captured_by.clone(),
             },
+            trench_segment_at_pos: None,
         };
         let tick = state.clock.tick();
         let sim_time_ms = state.clock.sim_time_ms();
@@ -17704,6 +17715,20 @@ impl EngineHandle for M0Engine {
                 "severity": severity,
             },
         })
+    }
+
+    /// **M9B / VAL-M9B-CFCTL-002**: derive `cover_state` for the named
+    /// actor against the engine's trench-segment world. Pre-segment
+    /// placement the world is empty + cover defaults to `Exposed`. The
+    /// m9b_trench dispatcher module owns the live wiring.
+    async fn observe_actor_cover_state(&self, actor_id: u64) -> serde_json::Value {
+        self.compute_actor_cover_state(actor_id)
+    }
+
+    /// **M9B / VAL-M9B-CFCTL-002**: project the trench segment at the
+    /// supplied tile, or `null` when the tile is open ground.
+    async fn observe_trench_segment_at_pos(&self, x: i32, y: i32) -> serde_json::Value {
+        self.compute_trench_segment_at_pos(x, y)
     }
 
     /// **M2 re-audit (2026-05-13)**: full mission inspect including the last
@@ -20790,6 +20815,52 @@ impl EngineHandle for M0Engine {
             }
             ControlCommand::ActPlayerPieMenuClose { source } => {
                 self.dispatch_pie_menu_close(source, tick, sim_time_ms, state)
+            }
+            ControlCommand::ActPlayerDigTrenchSegment {
+                variant,
+                tool_id,
+                substrate_hardness,
+                strict,
+                source,
+            } => {
+                drop(state);
+                self.dispatch_m9b_dig_trench_segment(
+                    variant,
+                    tool_id,
+                    substrate_hardness,
+                    strict,
+                    source,
+                    tick,
+                    sim_time_ms,
+                )
+            }
+            ControlCommand::ActPlayerPlaceTrenchModule {
+                module_id,
+                segment_id,
+                source,
+            } => {
+                drop(state);
+                self.dispatch_m9b_place_trench_module(
+                    module_id,
+                    segment_id,
+                    source,
+                    tick,
+                    sim_time_ms,
+                )
+            }
+            ControlCommand::ActPlayerRepairTrenchModule {
+                module_id,
+                segment_id,
+                source,
+            } => {
+                drop(state);
+                self.dispatch_m9b_repair_trench_module(
+                    module_id,
+                    segment_id,
+                    source,
+                    tick,
+                    sim_time_ms,
+                )
             }
             ControlCommand::ActPlayerDropTrenchTemplate { id, origin, source } => {
                 let source_label = match source {

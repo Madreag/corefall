@@ -153,6 +153,17 @@
           "type": "null"
         }
       ]
+    },
+    "trench_segment_at_pos": {
+      "description": "**M9B / VAL-M9B-CFCTL-003**: optional projection of the trench\nsegment at a queried tile position. `None` when no segment has\nbeen queried OR the queried tile is open ground. Populated on\ndemand by `observe.trench_segment_at_pos` callers; the standard\nobserve stream leaves this empty so the frame stays cheap.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/TrenchSegmentView"
+        },
+        {
+          "type": "null"
+        }
+      ]
     }
   },
   "required": [
@@ -296,6 +307,11 @@
         },
         "controllable": {
           "type": "boolean"
+        },
+        "cover_state": {
+          "description": "**M9B**: trench cover state derived from (stance × current\ntrench segment variant) per VAL-M9B-CFCTL-003 + VAL-M9B-COVERMATRIX-001.\nOne of `Exposed | Partial | Full`. Defaults to `Exposed` for actors\non open ground (no trench segment under foot).",
+          "type": "string",
+          "default": "Exposed"
         },
         "crouch_active": {
           "description": "**M5**: per-tick movement-intent flags surfaced to AI / HUD.",
@@ -1938,6 +1954,57 @@
       },
       "required": [
         "valid"
+      ]
+    },
+    "TrenchSegmentView": {
+      "description": "**M9B / VAL-M9B-CFCTL-003**: typed projection of one trench segment\nreturned by `observe.trench_segment_at_pos`. The shape mirrors\n`cf_trench::TrenchSegment` so cfctl callers get a stable JSON view.",
+      "type": "object",
+      "properties": {
+        "depth": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "embedded_modules": {
+          "description": "Ids of embedded modules (`duckboard`, `fire_step`, etc.) — order\npreserved from the authoring RON.",
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "string"
+          }
+        },
+        "raised_step_height": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint32",
+          "minimum": 0
+        },
+        "tile_x": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "tile_y": {
+          "type": "integer",
+          "format": "int32"
+        },
+        "variant": {
+          "description": "One of the six declared variants\n(`shallow_scrape | standard | deep | communication | fire_step | parapet_raised`).",
+          "type": "string"
+        },
+        "width": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        }
+      },
+      "required": [
+        "variant",
+        "tile_x",
+        "tile_y",
+        "depth",
+        "width"
       ]
     },
     "UiDensity": {

@@ -78,6 +78,51 @@ pub struct ObserveFrame {
     /// dispatch.
     #[serde(default)]
     pub controls_capture: ControlsCaptureView,
+    /// **M9B / VAL-M9B-CFCTL-003**: optional projection of the trench
+    /// segment at a queried tile position. `None` when no segment has
+    /// been queried OR the queried tile is open ground. Populated on
+    /// demand by `observe.trench_segment_at_pos` callers; the standard
+    /// observe stream leaves this empty so the frame stays cheap.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub trench_segment_at_pos: Option<TrenchSegmentView>,
+}
+
+/// **M9B / VAL-M9B-CFCTL-003**: typed projection of one trench segment
+/// returned by `observe.trench_segment_at_pos`. The shape mirrors
+/// `cf_trench::TrenchSegment` so cfctl callers get a stable JSON view.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct TrenchSegmentView {
+    /// One of the six declared variants
+    /// (`shallow_scrape | standard | deep | communication | fire_step | parapet_raised`).
+    pub variant: String,
+    pub tile_x: i32,
+    pub tile_y: i32,
+    pub depth: u32,
+    pub width: u32,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub raised_step_height: Option<u32>,
+    /// Ids of embedded modules (`duckboard`, `fire_step`, etc.) — order
+    /// preserved from the authoring RON.
+    #[serde(default)]
+    pub embedded_modules: Vec<String>,
+}
+
+impl From<&cf_trench::TrenchSegment> for TrenchSegmentView {
+    fn from(s: &cf_trench::TrenchSegment) -> Self {
+        Self {
+            variant: s.variant.as_str().to_string(),
+            tile_x: s.tile_x,
+            tile_y: s.tile_y,
+            depth: s.depth,
+            width: s.width,
+            raised_step_height: s.raised_step_height,
+            embedded_modules: s
+                .embedded_modules
+                .iter()
+                .map(|m| m.as_str().to_string())
+                .collect(),
+        }
+    }
 }
 
 /// **M1 / Gap D3**: minimal HUD projection for the CONTROLS CAPTURED badge.
@@ -300,6 +345,16 @@ pub struct ActorView {
     /// **M1**: physical mass (kg). Drives mass_factor in physics + stability cost.
     #[serde(default = "default_mass_kg")]
     pub mass_kg: f32,
+    /// **M9B**: trench cover state derived from (stance × current
+    /// trench segment variant) per VAL-M9B-CFCTL-003 + VAL-M9B-COVERMATRIX-001.
+    /// One of `Exposed | Partial | Full`. Defaults to `Exposed` for actors
+    /// on open ground (no trench segment under foot).
+    #[serde(default = "default_cover_state")]
+    pub cover_state: String,
+}
+
+fn default_cover_state() -> String {
+    "Exposed".to_string()
 }
 
 fn default_stability() -> f32 {

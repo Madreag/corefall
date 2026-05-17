@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ObserveTrenchSegmentAtPosParams",
+  "description": "**M9B-3 / VAL-M9B-CFCTL-002**: `observe.trench_segment_at_pos` —\nread the trench segment at the supplied tile, or `null` for open\nground.",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "x": {
+      "type": "integer",
+      "format": "int32"
+    },
+    "y": {
+      "type": "integer",
+      "format": "int32"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "x",
+    "y"
+  ]
+}

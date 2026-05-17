@@ -1067,6 +1067,39 @@ pub enum ControlCommand {
         origin: (i32, i32),
         source: IntentSource,
     },
+    /// **M9B-3 / VAL-M9B-DIG-001..003 / VAL-M9B-CFCTL-001**: dig a
+    /// trench segment at the player's current tile. `variant` is one of
+    /// the 6 declared cross-section variants; `tool_id` selects the
+    /// dig tool (entrenching_tool T0, or pickaxe T1/T2/T3 from the
+    /// M30B-tier ladder); `substrate_hardness` is `[0.0, 1.0]` from
+    /// cf-material — gating the `deep` variant per VAL-M9B-DIG-003.
+    /// `strict=true` makes hard-substrate `deep` requests reject
+    /// outright; `false` (default) falls back to `shallow_scrape` with a
+    /// `trench.segment_variant_downgraded` warning event.
+    ActPlayerDigTrenchSegment {
+        variant: String,
+        tool_id: Option<String>,
+        substrate_hardness: f32,
+        strict: bool,
+        source: IntentSource,
+    },
+    /// **M9B-3 / VAL-M9B-MODULES-002 / VAL-M9B-CFCTL-001**: place an
+    /// embedded module on a built trench segment. `module_id` is one of
+    /// the 6 declared modules (`duckboard`, `fire_step`, `breastwork`,
+    /// `drainage_sump`, `revetment`, `corner_traverse`).
+    ActPlayerPlaceTrenchModule {
+        module_id: String,
+        segment_id: u64,
+        source: IntentSource,
+    },
+    /// **M9B-3 / VAL-M9B-MODULES-003 / VAL-M9B-CFCTL-001**: repair a
+    /// damaged trench module. Consumes the declared per-module
+    /// resources (wood/iron); emits `trench.module_repaired`.
+    ActPlayerRepairTrenchModule {
+        module_id: String,
+        segment_id: u64,
+        source: IntentSource,
+    },
 }
 
 /// Trait that the engine implements so the server stays decoupled from `cf-app`.
@@ -1284,6 +1317,25 @@ pub trait EngineHandle: Send + Sync + 'static {
     /// `severity=critical`). Returns a JSON `{ pass: bool, observed: <val> }`.
     async fn ui_assert(&self, _node_id: &str, _predicate: &str) -> serde_json::Value {
         json!({ "schema_version": SCHEMA_VERSION, "pass": false, "observed": serde_json::Value::Null })
+    }
+    /// **M9B / VAL-M9B-CFCTL-002**: return `{ cover_state: Exposed | Partial | Full }`
+    /// for the named actor. Default returns `Exposed` (open ground); the
+    /// engine override derives the value from stance × current trench
+    /// segment.
+    async fn observe_actor_cover_state(&self, actor_id: u64) -> serde_json::Value {
+        json!({
+            "schema_version": SCHEMA_VERSION,
+            "actor_id": actor_id,
+            "cover_state": "Exposed",
+        })
+    }
+    /// **M9B / VAL-M9B-CFCTL-002**: return `null` for open ground or a
+    /// `TrenchSegmentView` object. Default returns `null`.
+    async fn observe_trench_segment_at_pos(&self, _x: i32, _y: i32) -> serde_json::Value {
+        json!({
+            "schema_version": SCHEMA_VERSION,
+            "result": serde_json::Value::Null,
+        })
     }
 }
 
@@ -3584,6 +3636,143 @@ async fn process_request<E: EngineHandle>(
                 }),
             ))
         }
+        // **M9B-3**: dig a trench segment with the player's current
+        // tool. Routes to the engine's `ActPlayerDigTrenchSegment`
+        // dispatch, which validates substrate hardness (VAL-M9B-DIG-003),
+        // schedules the per-variant dig-time, and emits `trench.segment_dug`.
+        "act.player.dig_trench_segment" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                variant: String,
+                #[serde(default)]
+                tool_id: Option<String>,
+                #[serde(default)]
+                substrate_hardness: Option<f32>,
+                #[serde(default)]
+                strict: Option<bool>,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            if p.variant.trim().is_empty() {
+                return Some(invalid_param_reason(request.id, "variant_empty"));
+            }
+            let hardness = p.substrate_hardness.unwrap_or(0.0);
+            if !hardness.is_finite() {
+                return Some(invalid_param_reason(
+                    request.id,
+                    "substrate_hardness_must_be_finite",
+                ));
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerDigTrenchSegment {
+                    variant: p.variant,
+                    tool_id: p.tool_id,
+                    substrate_hardness: hardness,
+                    strict: p.strict.unwrap_or(false),
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        // **M9B-3**: place an embedded trench module on a built segment.
+        // Routes to `ActPlayerPlaceTrenchModule`, which schedules the
+        // per-module build_time + emits `trench.module_placed`.
+        "act.player.place_trench_module" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                module_id: String,
+                segment_id: u64,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            if p.module_id.trim().is_empty() {
+                return Some(invalid_param_reason(request.id, "module_id_empty"));
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerPlaceTrenchModule {
+                    module_id: p.module_id,
+                    segment_id: p.segment_id,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        // **M9B-3**: repair a damaged trench module. Routes to
+        // `ActPlayerRepairTrenchModule`; consumes the declared
+        // resources + emits `trench.module_repaired`.
+        "act.player.repair_trench_module" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                module_id: String,
+                segment_id: u64,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            if p.module_id.trim().is_empty() {
+                return Some(invalid_param_reason(request.id, "module_id_empty"));
+            }
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerRepairTrenchModule {
+                    module_id: p.module_id,
+                    segment_id: p.segment_id,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        // **M9B-3**: read the actor's trench cover state per
+        // VAL-M9B-CFCTL-002. Returns `{ cover_state: "Exposed" | "Partial" | "Full" }`.
+        "observe.actor.cover_state" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                #[serde(default)]
+                actor_id: Option<u64>,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            let actor_id = p.actor_id.unwrap_or(0);
+            let value = engine.observe_actor_cover_state(actor_id).await;
+            Some(success_response(request.id, value))
+        }
+        // **M9B-3**: read the trench segment at a tile coordinate per
+        // VAL-M9B-CFCTL-002. Returns `null` for open ground OR a
+        // segment view object.
+        "observe.trench_segment_at_pos" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                x: i32,
+                y: i32,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            let value = engine.observe_trench_segment_at_pos(p.x, p.y).await;
+            Some(success_response(request.id, value))
+        }
         // **M9B-2**: drop an authored trench template at the supplied
         // tile origin. Routes to the engine's
         // ActPlayerDropTrenchTemplate dispatch, which loads + hashes
@@ -3918,6 +4107,7 @@ mod tests {
                 tool_validity: None,
                 accessibility: crate::state::AccessibilityView::default(),
                 controls_capture: crate::state::ControlsCaptureView::default(),
+                trench_segment_at_pos: None,
             }
         }
         async fn settings_snapshot(&self) -> Settings {
@@ -4552,6 +4742,163 @@ mod tests {
         assert_eq!(
             error.data.unwrap().get("reason").and_then(|v| v.as_str()),
             Some("template_id_empty")
+        );
+    }
+
+    /// **M9B-3 / VAL-M9B-CFCTL-001**: 4 player methods + 2 observe
+    /// methods route on the cf-control server (the assertion list:
+    /// `act.player.dig_trench_segment`, `act.player.place_trench_module`,
+    /// `act.player.drop_trench_template`, `act.player.repair_trench_module`,
+    /// `observe.actor.cover_state`, `observe.trench_segment_at_pos`).
+    #[tokio::test]
+    async fn m9b_cfctl_dispatch() {
+        let engine = StubEngine;
+        let hz: Arc<Mutex<Option<u32>>> = Arc::new(Mutex::new(None));
+        let filter: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+        let routes: &[(&str, serde_json::Value)] = &[
+            (
+                "act.player.dig_trench_segment",
+                json!({
+                    "schema_version": SCHEMA_VERSION,
+                    "variant": "standard",
+                    "tool_id": "entrenching_tool",
+                    "substrate_hardness": 0.2,
+                }),
+            ),
+            (
+                "act.player.place_trench_module",
+                json!({
+                    "schema_version": SCHEMA_VERSION,
+                    "module_id": "duckboard",
+                    "segment_id": 7u64,
+                }),
+            ),
+            (
+                "act.player.repair_trench_module",
+                json!({
+                    "schema_version": SCHEMA_VERSION,
+                    "module_id": "duckboard",
+                    "segment_id": 7u64,
+                }),
+            ),
+            (
+                "act.player.drop_trench_template",
+                json!({
+                    "schema_version": SCHEMA_VERSION,
+                    "id": "wwi_frontline_a",
+                    "origin": [50, 30],
+                }),
+            ),
+            (
+                "observe.actor.cover_state",
+                json!({"schema_version": SCHEMA_VERSION, "actor_id": 0u64}),
+            ),
+            (
+                "observe.trench_segment_at_pos",
+                json!({"schema_version": SCHEMA_VERSION, "x": 0, "y": 0}),
+            ),
+        ];
+        for (method, params) in routes {
+            let req = json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": method,
+                "params": params,
+            });
+            let resp = process_request(&req.to_string(), &engine, &hz, &filter, 240)
+                .await
+                .unwrap();
+            let parsed: JsonRpcResponse = serde_json::from_str(&resp).unwrap();
+            assert!(
+                parsed.result.is_some() || parsed.error.as_ref().map_or(false, |e| e.code != error_codes::METHOD_NOT_FOUND),
+                "{method} must not return -32601 MethodNotFound"
+            );
+            if let Some(error) = parsed.error {
+                assert_ne!(
+                    error.code,
+                    error_codes::METHOD_NOT_FOUND,
+                    "{method} returned MethodNotFound; routes table out of date"
+                );
+            }
+        }
+    }
+
+    /// **M9B-3**: `act.player.dig_trench_segment` rejects malformed
+    /// variant ids upstream of dispatch.
+    #[tokio::test]
+    async fn act_player_dig_trench_segment_rejects_empty_variant() {
+        let engine = StubEngine;
+        let hz: Arc<Mutex<Option<u32>>> = Arc::new(Mutex::new(None));
+        let filter: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+        let req = json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "act.player.dig_trench_segment",
+            "params": {
+                "schema_version": SCHEMA_VERSION,
+                "variant": "",
+                "substrate_hardness": 0.0,
+            }
+        });
+        let resp = process_request(&req.to_string(), &engine, &hz, &filter, 240)
+            .await
+            .unwrap();
+        let parsed: JsonRpcResponse = serde_json::from_str(&resp).unwrap();
+        let error = parsed.error.expect("empty variant must reject");
+        assert_eq!(error.code, error_codes::INVALID_PARAMS);
+        assert_eq!(
+            error.data.unwrap().get("reason").and_then(|v| v.as_str()),
+            Some("variant_empty")
+        );
+    }
+
+    /// **M9B-3 / VAL-M9B-CFCTL-002**: `observe.actor.cover_state`
+    /// returns one of the three declared values.
+    #[tokio::test]
+    async fn observe_actor_cover_state_returns_enum_value() {
+        let engine = StubEngine;
+        let hz: Arc<Mutex<Option<u32>>> = Arc::new(Mutex::new(None));
+        let filter: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+        let req = json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "observe.actor.cover_state",
+            "params": {"schema_version": SCHEMA_VERSION, "actor_id": 0u64}
+        });
+        let resp = process_request(&req.to_string(), &engine, &hz, &filter, 240)
+            .await
+            .unwrap();
+        let parsed: JsonRpcResponse = serde_json::from_str(&resp).unwrap();
+        let result = parsed.result.expect("observe.actor.cover_state returns success");
+        let cover = result.get("cover_state").and_then(|v| v.as_str()).unwrap();
+        assert!(
+            matches!(cover, "Exposed" | "Partial" | "Full"),
+            "cover_state must be one of Exposed | Partial | Full; got {cover:?}"
+        );
+    }
+
+    /// **M9B-3 / VAL-M9B-CFCTL-002**: `observe.trench_segment_at_pos`
+    /// returns either `null` or an object.
+    #[tokio::test]
+    async fn observe_trench_segment_at_pos_returns_null_or_object() {
+        let engine = StubEngine;
+        let hz: Arc<Mutex<Option<u32>>> = Arc::new(Mutex::new(None));
+        let filter: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+        let req = json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "observe.trench_segment_at_pos",
+            "params": {"schema_version": SCHEMA_VERSION, "x": 0, "y": 0}
+        });
+        let resp = process_request(&req.to_string(), &engine, &hz, &filter, 240)
+            .await
+            .unwrap();
+        let parsed: JsonRpcResponse = serde_json::from_str(&resp).unwrap();
+        let result = parsed.result.expect("observe.trench_segment_at_pos returns success");
+        let inner = result.get("result").expect("result key");
+        assert!(
+            inner.is_null() || inner.is_object(),
+            "result must be null or object; got {inner:?}"
         );
     }
 }

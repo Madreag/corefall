@@ -50,6 +50,11 @@
     "controllable": {
       "type": "boolean"
     },
+    "cover_state": {
+      "description": "**M9B**: trench cover state derived from (stance × current\ntrench segment variant) per VAL-M9B-CFCTL-003 + VAL-M9B-COVERMATRIX-001.\nOne of `Exposed | Partial | Full`. Defaults to `Exposed` for actors\non open ground (no trench segment under foot).",
+      "type": "string",
+      "default": "Exposed"
+    },
     "crouch_active": {
       "description": "**M5**: per-tick movement-intent flags surfaced to AI / HUD.",
       "type": "boolean",

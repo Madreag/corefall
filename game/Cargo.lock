@@ -1513,6 +1513,7 @@ version = "0.0.1"
 dependencies = [
  "cf-actor",
  "cf-sim-core",
+ "cf-trench",
  "ron",
  "serde",
  "serde_json",

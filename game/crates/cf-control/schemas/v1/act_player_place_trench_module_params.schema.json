@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ActPlayerPlaceTrenchModuleParams",
+  "description": "**M9B-3 / VAL-M9B-MODULES-002 / VAL-M9B-CFCTL-001**:\n`act.player.place_trench_module` — place an embedded trench module\non a built segment. `module_id` is one of the 6 declared modules\n(`duckboard` / `fire_step` / `breastwork` / `drainage_sump` /\n`revetment` / `corner_traverse`). `segment_id` identifies the\ntarget trench segment instance.",
+  "type": "object",
+  "properties": {
+    "module_id": {
+      "type": "string"
+    },
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "segment_id": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "module_id",
+    "segment_id"
+  ]
+}

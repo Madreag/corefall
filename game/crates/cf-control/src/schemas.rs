@@ -142,6 +142,79 @@ pub struct ActPlayerDigParams {
     pub target: Option<String>,
 }
 
+/// **M9B-3 / VAL-M9B-DIG-001..003 / VAL-M9B-CFCTL-001**:
+/// `act.player.dig_trench_segment` — request a trench carve at the
+/// player's current tile. `variant` is one of the 6 declared
+/// cross-section variants (`shallow_scrape` / `standard` / `deep` /
+/// `communication` / `fire_step` / `parapet_raised`). `tool_id` selects
+/// the dig tool (`entrenching_tool` T0 baseline, or
+/// `pickaxe_dig_t1` / `pickaxe_dig_t2` / `pickaxe_dig_t3` from the
+/// M30B-tier ladder). `substrate_hardness` (`[0.0, 1.0]`) gates the
+/// `deep` variant per VAL-M9B-DIG-003 — `>= 0.5` falls back to
+/// `shallow_scrape` with a `trench.segment_variant_downgraded` warning
+/// event (or rejects when `strict=true`).
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerDigTrenchSegmentParams {
+    pub schema_version: u32,
+    pub variant: String,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub tool_id: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub substrate_hardness: Option<f32>,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub strict: Option<bool>,
+}
+
+/// **M9B-3 / VAL-M9B-MODULES-002 / VAL-M9B-CFCTL-001**:
+/// `act.player.place_trench_module` — place an embedded trench module
+/// on a built segment. `module_id` is one of the 6 declared modules
+/// (`duckboard` / `fire_step` / `breastwork` / `drainage_sump` /
+/// `revetment` / `corner_traverse`). `segment_id` identifies the
+/// target trench segment instance.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerPlaceTrenchModuleParams {
+    pub schema_version: u32,
+    pub module_id: String,
+    pub segment_id: u64,
+}
+
+/// **M9B-3 / VAL-M9B-MODULES-003 / VAL-M9B-CFCTL-001**:
+/// `act.player.repair_trench_module` — repair a damaged trench module.
+/// Consumes the declared per-module resources (wood / iron / sandbag)
+/// and emits `trench.module_repaired`.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerRepairTrenchModuleParams {
+    pub schema_version: u32,
+    pub module_id: String,
+    pub segment_id: u64,
+}
+
+/// **M9B-3 / VAL-M9B-CFCTL-002**: `observe.actor.cover_state` — read
+/// the actor's current trench cover state. Returns
+/// `{ cover_state: "Exposed" | "Partial" | "Full" }`. `actor_id=None`
+/// resolves to the player.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ObserveActorCoverStateParams {
+    pub schema_version: u32,
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub actor_id: Option<u64>,
+}
+
+/// **M9B-3 / VAL-M9B-CFCTL-002**: `observe.trench_segment_at_pos` —
+/// read the trench segment at the supplied tile, or `null` for open
+/// ground.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ObserveTrenchSegmentAtPosParams {
+    pub schema_version: u32,
+    pub x: i32,
+    pub y: i32,
+}
+
 /// **M3 re-open (2026-05-13)**: `act.player.anchor` — attempt to place a
 /// tether / anchor / rope-grapple at world-space `(x, y)`. The engine samples
 /// the material at the target and emits `terrain.anchor_material_result`:
@@ -605,6 +678,12 @@ pub fn dump_v1() -> BTreeMap<String, String> {
         entry::<ActPlayerResetParams>("act_player_reset_params"),
         entry::<ActPlayerDigParams>("act_player_dig_params"),
         entry::<ActPlayerAnchorParams>("act_player_anchor_params"),
+        // **M9B-3**: trench player actions + observes (new methods).
+        entry::<ActPlayerDigTrenchSegmentParams>("act_player_dig_trench_segment_params"),
+        entry::<ActPlayerPlaceTrenchModuleParams>("act_player_place_trench_module_params"),
+        entry::<ActPlayerRepairTrenchModuleParams>("act_player_repair_trench_module_params"),
+        entry::<ObserveActorCoverStateParams>("observe_actor_cover_state_params"),
+        entry::<ObserveTrenchSegmentAtPosParams>("observe_trench_segment_at_pos_params"),
         entry::<ObserveMissionParams>("observe_mission_params"),
         entry::<ObserveAiParams>("observe_ai_params"),
         entry::<ObservePerceptionParams>("observe_perception_params"),

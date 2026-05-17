@@ -15,6 +15,7 @@ pub mod m7_ai;
 pub mod m7b_squad;
 pub mod m8_ux;
 pub mod m8b_net_admin;
+pub mod m9b_trench;
 pub mod runtime;
 pub mod scenario;
 pub mod schemas;
