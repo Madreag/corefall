@@ -13,6 +13,7 @@
 
 pub mod beacon;
 pub mod concrete;
+pub mod dig_pickaxe;
 pub mod drill;
 pub mod entrenching;
 pub mod foam;
@@ -118,6 +119,33 @@ pub fn find_entrenching_tool(id: &str) -> Option<entrenching::EntrenchingToolSpe
     m9b_entrenching_tools().into_iter().find(|t| t.id == id)
 }
 
+/// **M9B**: union catalog of every dig-tool registered for M9B trench
+/// carving — entrenching_tool (T0) plus the three M30B-tier pickaxes
+/// (T1 / T2 / T3). Returned as a sorted-by-`tier` list so the cfctl
+/// dispatcher picks the lowest dig time among the player's equipped
+/// tools deterministically. Each entry is projected onto the canonical
+/// [`entrenching::EntrenchingToolSpec`] shape; the pickaxe-specific
+/// stamina cost is queried separately via [`dig_pickaxe::find_pickaxe_dig`].
+#[must_use]
+pub fn m9b_dig_tools_all() -> Vec<entrenching::EntrenchingToolSpec> {
+    let mut all: Vec<entrenching::EntrenchingToolSpec> = m9b_entrenching_tools();
+    for p in dig_pickaxe::m9b_pickaxe_dig_tools() {
+        all.push(dig_pickaxe::as_dig_tool_spec(&p));
+    }
+    all.sort_by_key(|t| t.tier);
+    all
+}
+
+/// **M9B**: lookup any registered dig-tool spec (entrenching_tool or
+/// pickaxe T1/T2/T3) by catalog id.
+#[must_use]
+pub fn find_m9b_dig_tool(id: &str) -> Option<entrenching::EntrenchingToolSpec> {
+    if let Some(spec) = find_entrenching_tool(id) {
+        return Some(spec);
+    }
+    dig_pickaxe::find_pickaxe_dig(id).map(|p| dig_pickaxe::as_dig_tool_spec(&p))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -147,5 +175,70 @@ mod tests {
         let v = m6_tool_presets();
         let b = v.iter().find(|t| t.kind == ToolKind::Beacon).unwrap();
         assert!(b.persistent_marker);
+    }
+
+    /// VAL-M9B-PICKAXE-001: pickaxe-tier dig times are strictly faster
+    /// than the entrenching_tool baseline (T3 < T2 < T1 < entrenching).
+    #[test]
+    fn pickaxe_dig_time_scales_with_tier_in_catalog() {
+        let all = m9b_dig_tools_all();
+        // Sorted by tier ascending: entrenching(0), pickaxe T1, T2, T3.
+        let by_id: std::collections::BTreeMap<&str, &entrenching::EntrenchingToolSpec> =
+            all.iter().map(|t| (t.id.as_str(), t)).collect();
+        let baseline = by_id
+            .get(entrenching::ENTRENCHING_TOOL_ID)
+            .expect("entrenching_tool present")
+            .dig_time_for_variant("standard")
+            .expect("baseline standard dig time");
+        let t1 = by_id
+            .get(dig_pickaxe::PICKAXE_DIG_T1_ID)
+            .unwrap()
+            .dig_time_for_variant("standard")
+            .unwrap();
+        let t2 = by_id
+            .get(dig_pickaxe::PICKAXE_DIG_T2_ID)
+            .unwrap()
+            .dig_time_for_variant("standard")
+            .unwrap();
+        let t3 = by_id
+            .get(dig_pickaxe::PICKAXE_DIG_T3_ID)
+            .unwrap()
+            .dig_time_for_variant("standard")
+            .unwrap();
+        assert!(
+            t3 < t2 && t2 < t1 && t1 < baseline,
+            "expected T3({t3}) < T2({t2}) < T1({t1}) < entrenching({baseline})"
+        );
+    }
+
+    /// VAL-M9B-PICKAXE-001: pickaxes register a `deep` dig time the
+    /// entrenching_tool does not — the pickaxe is the only tool that
+    /// can attempt the `deep` variant.
+    #[test]
+    fn pickaxes_register_deep_variant() {
+        for tier_id in [
+            dig_pickaxe::PICKAXE_DIG_T1_ID,
+            dig_pickaxe::PICKAXE_DIG_T2_ID,
+            dig_pickaxe::PICKAXE_DIG_T3_ID,
+        ] {
+            let spec = find_m9b_dig_tool(tier_id).expect("pickaxe registered");
+            assert!(
+                spec.dig_time_for_variant("deep").is_some(),
+                "{tier_id} must register `deep` dig time"
+            );
+        }
+        // The T0 entrenching_tool intentionally does NOT register `deep` —
+        // the cfctl handler falls back to shallow_scrape on hard substrate
+        // for the entrenching_tool path (VAL-M9B-DIG-003).
+        let baseline = find_m9b_dig_tool(entrenching::ENTRENCHING_TOOL_ID).unwrap();
+        assert!(baseline.dig_time_for_variant("deep").is_none());
+    }
+
+    /// VAL-M9B-PICKAXE-001: every pickaxe declares non-zero stamina cost.
+    #[test]
+    fn pickaxes_have_stamina_cost() {
+        for p in dig_pickaxe::m9b_pickaxe_dig_tools() {
+            assert!(p.stamina_cost > 0, "{} stamina cost must be > 0", p.id);
+        }
     }
 }
