@@ -715,6 +715,27 @@ impl M0Engine {
 /// per tick).
 const M9B_COLLAPSE_CADENCE_TICKS: u32 = 1;
 
+/// Per-actor cover snapshot captured at the start of the M9B
+/// cover-change tick. Pulled into a typed struct to keep the snapshot
+/// vector signature clippy-friendly.
+struct CoverSnapshot {
+    actor_id: ActorId,
+    cover: CoverState,
+    variant: Option<SegmentVariant>,
+    trench_stance: TrenchStance,
+}
+
+/// One pending `trench.cover_state_changed` emission queued after the
+/// state lock is released.
+struct CoverEmit {
+    actor_id: ActorId,
+    prev_state: CoverState,
+    new_state: CoverState,
+    prev_variant: Option<SegmentVariant>,
+    new_variant: Option<SegmentVariant>,
+    cause: CoverStateChangeCause,
+}
+
 /// Heuristic mapping of scenario id → per-tick rainfall accumulation
 /// in pixels. The M9B `m9b_drainage_flood` scenario is the only
 /// authored M9B scenario that needs rainfall; everything else runs
@@ -758,7 +779,7 @@ impl M0Engine {
     /// actor's current cover, and compares to the last latched tuple.
     pub(crate) fn tick_m9b_cover_state_changes(&self, tick: Tick, sim_time_ms: f64) {
         // Snapshot: per-actor (new_state, new_variant, new_stance).
-        let snapshot: Vec<(ActorId, CoverState, Option<SegmentVariant>, TrenchStance)> = {
+        let snapshot: Vec<CoverSnapshot> = {
             let state = match self.state.read() {
                 Ok(s) => s,
                 Err(_) => return,
@@ -779,58 +800,63 @@ impl M0Engine {
                         .map(|s| s.variant);
                     let trench_stance =
                         cf_actor::stance::trench_stance_for_actor(actor);
-                    (actor.id, cover, variant, trench_stance)
+                    CoverSnapshot {
+                        actor_id: actor.id,
+                        cover,
+                        variant,
+                        trench_stance,
+                    }
                 })
                 .collect()
         };
 
-        let mut emissions: Vec<(ActorId, CoverState, CoverState, Option<SegmentVariant>, Option<SegmentVariant>, CoverStateChangeCause)> =
-            Vec::new();
+        let mut emissions: Vec<CoverEmit> = Vec::new();
 
         if let Ok(mut state) = self.state.write() {
-            for (actor_id, new_state, new_variant, new_stance) in &snapshot {
+            for snap in &snapshot {
                 let prev = state
                     .m9b_last_cover_state
-                    .get(actor_id)
+                    .get(&snap.actor_id)
                     .copied()
                     .unwrap_or((CoverState::Exposed, None, TrenchStance::Standing));
                 let (prev_state, prev_variant, prev_stance) = prev;
-                let stance_changed = prev_stance != *new_stance;
+                let stance_changed = prev_stance != snap.trench_stance;
                 if let Some(change) = cover_state_change(
                     prev_state,
-                    *new_state,
+                    snap.cover,
                     prev_variant,
-                    *new_variant,
+                    snap.variant,
                     stance_changed,
                 ) {
-                    emissions.push((
-                        *actor_id,
-                        change.prev_state,
-                        change.new_state,
-                        change.prev_segment_variant,
-                        change.new_segment_variant,
-                        change.cause,
-                    ));
+                    emissions.push(CoverEmit {
+                        actor_id: snap.actor_id,
+                        prev_state: change.prev_state,
+                        new_state: change.new_state,
+                        prev_variant: change.prev_segment_variant,
+                        new_variant: change.new_segment_variant,
+                        cause: change.cause,
+                    });
                 }
-                state
-                    .m9b_last_cover_state
-                    .insert(*actor_id, (*new_state, *new_variant, *new_stance));
+                state.m9b_last_cover_state.insert(
+                    snap.actor_id,
+                    (snap.cover, snap.variant, snap.trench_stance),
+                );
             }
         }
 
-        for (actor_id, prev_state, new_state, prev_variant, new_variant, cause) in emissions {
+        for emit in emissions {
             self.recorder.record(
                 tick,
                 sim_time_ms,
                 "trench",
                 "cover_state_changed",
                 json!({
-                    "actor_id": actor_id.0,
-                    "prev_state": prev_state.as_str(),
-                    "new_state": new_state.as_str(),
-                    "prev_segment_variant": prev_variant.map(|v| v.as_str()),
-                    "new_segment_variant": new_variant.map(|v| v.as_str()),
-                    "cause": cause.as_str(),
+                    "actor_id": emit.actor_id.0,
+                    "prev_state": emit.prev_state.as_str(),
+                    "new_state": emit.new_state.as_str(),
+                    "prev_segment_variant": emit.prev_variant.map(|v| v.as_str()),
+                    "new_segment_variant": emit.new_variant.map(|v| v.as_str()),
+                    "cause": emit.cause.as_str(),
                     "tick_index": tick.0,
                 }),
                 None,
@@ -1102,9 +1128,11 @@ impl M0Engine {
                     .runtime_at(idx)
                     .map(|r| r.ticks_since_dug)
                     .unwrap_or(0);
-                if ticks_since_dug % M9B_COLLAPSE_CADENCE_TICKS != 0 {
-                    continue;
-                }
+                // Cadence == 1 means "every tick"; future per-segment
+                // throttling could honour M9B_COLLAPSE_CADENCE_TICKS by
+                // skipping ticks where the counter is not a multiple of
+                // the cadence.
+                let _ = M9B_COLLAPSE_CADENCE_TICKS;
                 let env = CollapseEnv {
                     substrate_hardness,
                     has_revetment,
