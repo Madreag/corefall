@@ -84,6 +84,7 @@ image = { version = "0.25", default-features = false, features = ["png"] }
 crossbeam-channel = "0.5"
 fs2 = "0.4"
 bincode = { version = "2", features = ["serde"] }
+dirs-next = "2.0"
 
 [profile.dev]
 opt-level = 1

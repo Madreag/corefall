@@ -135,6 +135,7 @@ pub mod cause_chain_walker;
 pub mod chapter_derivation;
 pub mod chapter_markers;
 pub mod commentary;
+pub mod default_output_path;
 pub mod ffmpeg_bridge;
 pub mod frame_ticker;
 pub mod overlay_cause_chain;
@@ -144,10 +145,12 @@ pub mod overlay_hud;
 pub mod overlay_kill_feed;
 pub mod overlay_watermark;
 pub mod preset_registry;
+pub mod slow_mo;
 
 pub use audio_base_mix::{
-    linear_to_dbfs, peak_dbfs_at_tick, synthesis_frequency_hz, synthesize_base_mix, AudioEvent,
-    ENVELOPE_LENGTH_SAMPLES, PEAK_THRESHOLD_DBFS,
+    linear_to_dbfs, peak_dbfs_at_tick, synthesis_frequency_hz, synthesize_base_mix,
+    synthesize_base_mix_or_silence, synthesize_silent_base_mix, AudioEvent, ENVELOPE_LENGTH_SAMPLES,
+    NO_AUDIO_BASE_FLOOR_DBFS, PEAK_THRESHOLD_DBFS,
 };
 pub use audit_events::{
     emit_export_audit_events, ExportJobMetadata, EVENT_CATEGORY, EVENT_TYPE_CHAPTER_MARKER_EMITTED,
@@ -168,8 +171,9 @@ pub use commentary::{
     VoiceClip, CAPTION_LOC_BUNDLE_SIZE_CAP, COMMENTARY_CHANNELS, COMMENTARY_SAMPLE_RATE_HZ,
 };
 pub use ffmpeg_bridge::{
-    DeterministicEncoderProfile, FfmpegBridge, FfmpegProbeError, FfmpegRuntime, ARCHIVAL_LOSSLESS_GOP_SIZE,
-    ARCHIVAL_LOSSLESS_TUNE, FFMPEG_NEXT_PIN, PRODUCTION_GOP_SIZE, PRODUCTION_TUNE, REQUIRED_FFMPEG_THREADS,
+    simulated_missing_ffmpeg_error, DeterministicEncoderProfile, FfmpegBridge, FfmpegProbeError, FfmpegRuntime,
+    ARCHIVAL_LOSSLESS_GOP_SIZE, ARCHIVAL_LOSSLESS_TUNE, FFMPEG_NEXT_PIN, PRODUCTION_GOP_SIZE, PRODUCTION_TUNE,
+    REQUIRED_FFMPEG_THREADS,
 };
 pub use frame_ticker::{
     frame_step_ticks, BundleSource, FrameCommand, FrameCommandStream, FrameTicker, FrameTickerConfig, FrameTickerError,
@@ -199,8 +203,14 @@ pub use overlay_watermark::{
     WatermarkOverlay, WatermarkProvenance, WATERMARK_AOI_HEIGHT, WATERMARK_AOI_WIDTH, WATERMARK_AOI_X,
     WATERMARK_AOI_Y, WATERMARK_FIELD_TRUNCATE,
 };
+pub use default_output_path::{
+    default_output_directory, default_output_filename, default_output_path, CORE_FALL_OUTPUT_SUBDIR,
+};
 pub use preset_registry::{
     ContainerKind, ExportPreset, PresetCodec, PresetError, PresetField, PresetRegistry, PresetResolution,
     ARCHIVAL_LOSSLESS_NAME, CLIP_COMPACT_NAME, DECLARED_PRESETS, DISCORD_720P30_NAME, PRESET_REQUIRED_FIELDS,
     TWITCH_1080P60_NAME, YOUTUBE_4K60_NAME,
+};
+pub use slow_mo::{
+    SlowMoError, SlowMoMultiplier, DEFAULT_SLOW_MO_MULTIPLIER, MAX_SLOW_MO_MULTIPLIER,
 };

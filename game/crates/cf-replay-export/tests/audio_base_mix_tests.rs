@@ -13,7 +13,8 @@
 
 use cf_replay::Event;
 use cf_replay_export::audio_base_mix::{
-    peak_dbfs_at_tick, synthesize_base_mix, PEAK_THRESHOLD_DBFS,
+    peak_dbfs_at_tick, synthesize_base_mix, synthesize_base_mix_or_silence, synthesize_silent_base_mix,
+    NO_AUDIO_BASE_FLOOR_DBFS, PEAK_THRESHOLD_DBFS,
 };
 
 fn audio_event(tick: u64, canonical_name: &str, gain: f32) -> Event {
@@ -103,4 +104,42 @@ fn default_audio_mix_is_byte_identical_across_runs() {
     let a = synthesize_base_mix(&events, 60, 600);
     let b = synthesize_base_mix(&events, 60, 600);
     assert_eq!(a, b, "mix must be deterministic");
+}
+
+/// VAL-M10B-NO-AUDIO-BASE: `--no-audio-base` mutes base SFX/music
+/// (peak ≤ -90 dBFS at every cue tick); commentary remains audible
+/// (synthesised separately above the muted base).
+#[test]
+fn no_audio_base_mutes_sfx_music() {
+    let events = vec![
+        audio_event(60, "mg_nest_burst", 1.0),
+        audio_event(180, "mine_arming_beep", 1.0),
+        audio_event(300, "electrified_shock_zap", 1.0),
+    ];
+    // Live mix produces audible peaks.
+    let live = synthesize_base_mix(&events, 60, 600);
+    for ev in &events {
+        let peak = peak_dbfs_at_tick(&live, ev.tick, 60, 1);
+        assert!(peak > PEAK_THRESHOLD_DBFS);
+    }
+    // `synthesize_base_mix_or_silence(no_audio_base=true)` mutes
+    // every cue.
+    let muted = synthesize_base_mix_or_silence(&events, 60, 600, true);
+    for ev in &events {
+        let peak = peak_dbfs_at_tick(&muted, ev.tick, 60, 1);
+        assert!(
+            peak <= NO_AUDIO_BASE_FLOOR_DBFS,
+            "--no-audio-base must produce peak ≤ {NO_AUDIO_BASE_FLOOR_DBFS} dBFS at cue tick {} (got {peak} dBFS)",
+            ev.tick
+        );
+    }
+    // Buffer length parity so commentary can mix over either output
+    // sample-for-sample.
+    assert_eq!(live.len(), muted.len());
+    // Also exercise the silent helper directly.
+    let silent = synthesize_silent_base_mix(60, 600);
+    assert!(
+        silent.iter().all(|s| *s == 0.0),
+        "synthesize_silent_base_mix must produce zeros"
+    );
 }

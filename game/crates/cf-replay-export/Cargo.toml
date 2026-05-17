@@ -57,6 +57,11 @@ ffmpeg-next = { version = "8.1.0", default-features = false, features = [
   "software-scaling",
   "software-resampling",
 ] }
+# m10b-4: VAL-M10B-DEFAULT-PATH — resolve the `--out` default to the
+# host's Movies/Videos directory (`~/Movies/Corefall/` on macOS,
+# `~/Videos/Corefall/` on Linux/Windows). dirs-next is the canonical
+# cross-platform XDG/Known-Folders resolver for the Rust ecosystem.
+dirs-next = { workspace = true }
 
 [dev-dependencies]
 tempfile = "3"

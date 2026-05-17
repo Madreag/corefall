@@ -95,6 +95,44 @@ pub fn synthesis_frequency_hz(canonical_name: &str) -> f32 {
     }
 }
 
+/// `--no-audio-base` floor: when the CLI flag is set, the base mix
+/// is suppressed entirely so the export's audio track only carries
+/// commentary. The peak floor sits at this level so VAL-M10B-NO-AUDIO-BASE
+/// can assert "base mix silent (≤ -90 dBFS)" while the commentary
+/// tracks (rendered separately) remain audible.
+pub const NO_AUDIO_BASE_FLOOR_DBFS: f32 = -90.0;
+
+/// Synthesize a silent (zeros) PCM buffer with the same length the
+/// non-muted [`synthesize_base_mix`] would produce. Used by the
+/// `--no-audio-base` CLI flag: VAL-M10B-NO-AUDIO-BASE requires the
+/// base SFX + music mix to be silent (peak ≤ -90 dBFS) while the
+/// commentary track remains audible.
+#[must_use]
+pub fn synthesize_silent_base_mix(tick_rate_hz: u32, end_tick: u64) -> Vec<f32> {
+    let samples_per_tick = COMMENTARY_SAMPLE_RATE_HZ as f64 / tick_rate_hz as f64;
+    let total_samples = (end_tick as f64 * samples_per_tick) as usize;
+    let total_channels = COMMENTARY_CHANNELS as usize;
+    vec![0.0f32; total_samples * total_channels]
+}
+
+/// Synthesize either the live base mix OR a silent buffer based on
+/// the `no_audio_base` flag. This is the single helper the export
+/// pipeline (m10b-4) calls so the `--no-audio-base` CLI path stays
+/// out of the per-tick mix-event-iteration code.
+#[must_use]
+pub fn synthesize_base_mix_or_silence(
+    events: &[Event],
+    tick_rate_hz: u32,
+    end_tick: u64,
+    no_audio_base: bool,
+) -> Vec<f32> {
+    if no_audio_base {
+        synthesize_silent_base_mix(tick_rate_hz, end_tick)
+    } else {
+        synthesize_base_mix(events, tick_rate_hz, end_tick)
+    }
+}
+
 /// Synthesize a 48 kHz stereo base-mix PCM buffer from the bundle's
 /// `audio.event_played` events. Buffer length is
 /// `tick_count * COMMENTARY_SAMPLE_RATE_HZ / tick_rate_hz` samples per
@@ -281,5 +319,42 @@ mod tests {
     #[test]
     fn linear_to_dbfs_handles_zero() {
         assert!(linear_to_dbfs(0.0) <= -100.0);
+    }
+
+    /// VAL-M10B-NO-AUDIO-BASE: `--no-audio-base` mutes base SFX/music
+    /// (peak ≤ -90 dBFS) while preserving buffer length so commentary
+    /// can still be mixed over silence.
+    #[test]
+    fn no_audio_base_mutes_sfx_music() {
+        let events = vec![
+            audio_event(60, "mg_nest_burst", 1.0),
+            audio_event(180, "mine_arming_beep", 1.0),
+            audio_event(300, "electrified_shock_zap", 1.0),
+        ];
+        let muted = synthesize_base_mix_or_silence(&events, 60, 600, true);
+        assert!(!muted.is_empty(), "muted buffer must still allocate samples");
+        for ev in &events {
+            let peak = peak_dbfs_at_tick(&muted, ev.tick, 60, 1);
+            assert!(
+                peak <= NO_AUDIO_BASE_FLOOR_DBFS,
+                "--no-audio-base must produce peak ≤ {NO_AUDIO_BASE_FLOOR_DBFS} dBFS at cue tick {} (got {peak})",
+                ev.tick
+            );
+        }
+        // Length parity: muted buffer has the same length as the live
+        // mix so commentary can be merged over it sample-for-sample.
+        let live = synthesize_base_mix(&events, 60, 600);
+        assert_eq!(muted.len(), live.len());
+    }
+
+    /// `synthesize_base_mix_or_silence(false, …)` is byte-identical
+    /// to `synthesize_base_mix(…)` — no-audio-base is the only switch
+    /// that changes output.
+    #[test]
+    fn synthesize_base_mix_or_silence_passes_through_when_flag_unset() {
+        let events = vec![audio_event(120, "mg_nest_burst", 1.0)];
+        let live = synthesize_base_mix(&events, 60, 600);
+        let routed = synthesize_base_mix_or_silence(&events, 60, 600, false);
+        assert_eq!(live, routed);
     }
 }

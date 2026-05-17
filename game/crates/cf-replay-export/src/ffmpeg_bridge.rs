@@ -188,6 +188,20 @@ pub enum FfmpegProbeError {
 
 static FFMPEG_INIT_DONE: AtomicBool = AtomicBool::new(false);
 
+/// Construct a simulated missing-FFmpeg probe error. Used by the
+/// m10b-4 export CLI's VAL-M10B-032 test path so the missing-FFmpeg
+/// structured-JSON shape can be exercised end-to-end without
+/// requiring the host to actually uninstall libav. Production
+/// callers should never call this; downstream tests construct the
+/// error through this helper so they don't depend on `ffmpeg_next`'s
+/// internal `Error` enum directly.
+#[must_use]
+pub fn simulated_missing_ffmpeg_error() -> FfmpegProbeError {
+    FfmpegProbeError::InitFailed {
+        source: ffmpeg_next::Error::Other { errno: 2 },
+    }
+}
+
 /// Static surface for the libav bridge. m10b-1 ships only the probe +
 /// the deterministic-encoder profile constants; the full encoder
 /// pipeline (frame submission, codec context creation, mux to mp4 /
