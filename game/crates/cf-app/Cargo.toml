@@ -6,6 +6,10 @@ rust-version.workspace = true
 license.workspace = true
 publish.workspace = true
 
+[lib]
+name = "cf_app"
+path = "src/lib.rs"
+
 [[bin]]
 name = "cf-app"
 path = "src/main.rs"
@@ -25,6 +29,8 @@ ron = { workspace = true }
 bevy = { workspace = true }
 cf-sim-core = { path = "../cf-sim-core" }
 cf-replay = { path = "../cf-replay" }
+cf-replay-export = { path = "../cf-replay-export" }
+cf-tools-replay-viewer = { path = "../cf-tools-replay-viewer" }
 cf-control = { path = "../cf-control" }
 cf-render-2d = { path = "../cf-render-2d" }
 cf-capture = { path = "../cf-capture" }
@@ -35,3 +41,6 @@ cf-terrain = { path = "../cf-terrain" }
 cf-shell = { path = "../cf-shell" }
 cf-audio = { path = "../cf-audio" }
 cf-save = { path = "../cf-save" }
+
+[dev-dependencies]
+tempfile = "3"
