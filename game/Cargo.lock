@@ -1633,6 +1633,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "cf-content"
+version = "0.0.1"
+dependencies = [
+ "blake3",
+ "cf-trench",
+ "hex",
+ "ron",
+ "serde",
+ "thiserror 2.0.18",
+ "tracing",
+]
+
+[[package]]
 name = "cf-control"
 version = "0.0.1"
 dependencies = [
@@ -1862,6 +1875,20 @@ dependencies = [
  "ron",
  "serde",
  "serde_json",
+ "tracing",
+]
+
+[[package]]
+name = "cf-procgen"
+version = "0.0.1"
+dependencies = [
+ "blake3",
+ "cf-trench",
+ "rand_core 0.10.1",
+ "rand_xoshiro",
+ "ron",
+ "serde",
+ "thiserror 2.0.18",
  "tracing",
 ]
 

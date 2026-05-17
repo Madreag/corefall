@@ -1,0 +1,43 @@
+// M9B trench template — wwi_frontline_b_two_line.
+// Spec § "Per-zone trench templates (CC parity)" launch roster row 2.
+// Forward firing trench + 16-tile communication trench + rear reserve line.
+(
+    id: "wwi_frontline_b_two_line",
+    display_name: "WWI Frontline B (two-line)",
+    faction: Some("default_defender"),
+    doctrine_hint: Some("AI-TRENCH-A-01"),
+    recommended_garrison: Some(10),
+    footprint: (min_x: 0, min_y: -16, max_x: 60, max_y: 16),
+    path_polyline: [
+        (0, 0),
+        (11, 0),
+        (20, -9),
+        (31, -9),
+        (40, 0),
+        (51, 0),
+        (60, 0),
+        (60, 8),
+        (49, 8),
+        (40, 16),
+        (29, 16),
+        (20, 8),
+        (9, 8),
+        (0, 8),
+    ],
+    segment_overrides: [
+        (at_index: 0, variant: fire_step, embedded_modules: [duckboard, fire_step]),
+        (at_index: 6, variant: communication, embedded_modules: [duckboard]),
+        (at_index: 7, variant: standard, embedded_modules: [duckboard, revetment]),
+        (at_index: 8, variant: communication, embedded_modules: [duckboard]),
+        (at_index: 9, variant: standard, embedded_modules: [duckboard, revetment]),
+        (at_index: 10, variant: communication, embedded_modules: [duckboard]),
+        (at_index: 11, variant: standard, embedded_modules: [duckboard, revetment]),
+        (at_index: 12, variant: standard, embedded_modules: [duckboard, revetment]),
+    ],
+    default_variant: standard,
+    fortification_placeholders: [],
+    zones: [
+        (id: "forward", footprint: (min_x: 0, min_y: -9, max_x: 60, max_y: 0), tags: ["fighting"]),
+        (id: "reserve", footprint: (min_x: 0, min_y: 8, max_x: 60, max_y: 16), tags: ["reserve", "field_kit"]),
+    ],
+)

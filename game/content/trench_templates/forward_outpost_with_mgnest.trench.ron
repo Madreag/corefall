@@ -1,0 +1,37 @@
+// M9B trench template — forward_outpost_with_mgnest.
+// Spec § "Per-zone trench templates (CC parity)" launch roster row 4.
+// Single fire-step + parapet_raised forward outpost embedding an M9C
+// mg_nest_static placeholder. The placeholder is marked optional so
+// pre-M9C builds emit a `trench_template_missing_fortification`
+// warning event instead of panicking (VAL-M9B-TEMPLATE-004); post-M9C
+// the same template promotes the placeholder to a placed MG nest
+// (VAL-CROSS-001).
+(
+    id: "forward_outpost_with_mgnest",
+    display_name: "Forward Outpost with MG Nest",
+    faction: Some("default_defender"),
+    doctrine_hint: Some("AI-MG-A-02"),
+    recommended_garrison: Some(3),
+    footprint: (min_x: 0, min_y: -8, max_x: 24, max_y: 8),
+    path_polyline: [
+        (0, 0),
+        (8, 0),
+        (16, -8),
+        (24, -8),
+    ],
+    segment_overrides: [
+        (at_index: 0, variant: communication, embedded_modules: [duckboard]),
+        (at_index: 1, variant: fire_step, embedded_modules: [duckboard, fire_step]),
+        (at_index: 2, variant: parapet_raised, embedded_modules: [duckboard, breastwork]),
+    ],
+    default_variant: standard,
+    fortification_placeholders: [
+        (fortification_id: "mg_nest_static", offset: (20, -8), optional: true),
+        (fortification_id: "ammo_box_mg", offset: (22, -8), optional: true),
+        (fortification_id: "sandbag_mid", offset: (18, -10), optional: true),
+        (fortification_id: "sandbag_mid", offset: (22, -10), optional: true),
+    ],
+    zones: [
+        (id: "outpost", footprint: (min_x: 8, min_y: -8, max_x: 24, max_y: 0), tags: ["mg_position"]),
+    ],
+)

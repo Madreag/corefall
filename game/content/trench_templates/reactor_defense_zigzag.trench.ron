@@ -1,0 +1,50 @@
+// M9B trench template — reactor_defense_zigzag.
+// Spec § "Per-zone trench templates (CC parity)" launch roster row 3.
+// Hexagonal-ish defensive ring around the M9 reactor; six fire_step
+// segments alternating with communication kinks form a continuous
+// covered loop. Used by m9b_reactor_defense_zigzag scenario.
+(
+    id: "reactor_defense_zigzag",
+    display_name: "Reactor Defense Zigzag Ring",
+    faction: Some("default_defender"),
+    doctrine_hint: Some("AI-TRENCH-A-01"),
+    recommended_garrison: Some(8),
+    footprint: (min_x: -32, min_y: -32, max_x: 32, max_y: 32),
+    path_polyline: [
+        (-24, -16),
+        (-16, -24),
+        (-8, -24),
+        (0, -16),
+        (8, -24),
+        (16, -24),
+        (24, -16),
+        (24, -8),
+        (16, 0),
+        (24, 8),
+        (24, 16),
+        (16, 24),
+        (8, 24),
+        (0, 16),
+        (-8, 24),
+        (-16, 24),
+        (-24, 16),
+        (-24, 8),
+        (-16, 0),
+        (-24, -8),
+        (-24, -16),
+    ],
+    segment_overrides: [
+        (at_index: 0, variant: fire_step, embedded_modules: [duckboard, fire_step]),
+        (at_index: 3, variant: deep, embedded_modules: [duckboard, drainage_sump]),
+        (at_index: 6, variant: fire_step, embedded_modules: [duckboard, fire_step]),
+        (at_index: 9, variant: deep, embedded_modules: [duckboard, drainage_sump]),
+        (at_index: 12, variant: fire_step, embedded_modules: [duckboard, fire_step]),
+        (at_index: 15, variant: deep, embedded_modules: [duckboard, drainage_sump]),
+        (at_index: 18, variant: fire_step, embedded_modules: [duckboard, fire_step]),
+    ],
+    default_variant: standard,
+    fortification_placeholders: [],
+    zones: [
+        (id: "ring", footprint: (min_x: -24, min_y: -24, max_x: 24, max_y: 24), tags: ["fighting", "reactor_defense"]),
+    ],
+)

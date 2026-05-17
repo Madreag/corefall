@@ -47,6 +47,8 @@ members = [
   "crates/cf-squad-ui",
   "crates/cf-shell",
   "crates/cf-trench",
+  "crates/cf-procgen",
+  "crates/cf-content",
 ]
 
 [workspace.package]
