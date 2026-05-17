@@ -754,4 +754,114 @@ mod tests {
         );
         assert!((env.azimuth_rad - std::f32::consts::FRAC_PI_4).abs() < 1e-3);
     }
+
+    #[test]
+    fn vacuum_caption_parity_acc_a_floor() {
+        // Spec § "Vacuum blocks audio entirely (DR-014 vacuum_no_voice)":
+        //   listener inside a sealed suit in vacuum
+        //   And a metal pipe shears off 8 m away in the same vacuum field
+        //   When the metal-bend SFX fires
+        //   Then medium_at returns medium="vacuum"
+        //   And SpatialEnvelope.gain == 0
+        //   And no waveform reaches the listener's headphones
+        //   And the caption "PIPE SHEAR — NE 8 m" still surfaces (ACC-A parity)
+        let listener = ListenerContext {
+            position: [0.0, 0.0],
+            velocity: [0.0, 0.0],
+            facing_rad: 0.0,
+            room_id: None,
+        };
+        let source = SourceContext {
+            position: [5.66, 5.66], // NE, ~8 m away.
+            velocity: [0.0, 0.0],
+            base_gain: 1.0,
+            propagation_range_m: 100.0,
+            room_id: None,
+        };
+        let env = resolve_spatial(source, listener, Medium::Vacuum, &[], ReverbProfile::open_outdoor());
+        assert!(env.gain.abs() < 1e-6, "vacuum must produce gain == 0");
+        assert_eq!(env.medium_filter.medium, Medium::Vacuum);
+        // ACC-A parity: the direction string is independent of gain — captions still surface.
+        assert_eq!(env.direction, DirectionString::Ne);
+        assert!((env.distance_m - 8.005).abs() < 0.05);
+    }
+
+    #[test]
+    fn determinism_across_30_sfx_emit_positions_byte_identical() {
+        // Spec § "Determinism across HRTF + reverb + occlusion resolution":
+        //   two engines with the same seed + identical scenario (player + 30 SFX emit positions)
+        //   When 600 ticks of audio resolution elapse
+        //   Then per-tick audio.spatial_resolved + audio.reverb_applied + audio.occluded +
+        //   audio.doppler_shifted event streams are byte-identical.
+        //
+        // We exercise the determinism contract at the pure-math layer: 30
+        // deterministic source positions resolved against the same listener
+        // must produce byte-identical SpatialEnvelope outputs across two
+        // runs.
+        let make_envelopes = || {
+            let listener = ListenerContext {
+                position: [0.0, 0.0],
+                velocity: [0.0, 0.0],
+                facing_rad: 0.0,
+                room_id: Some(7),
+            };
+            (0..30)
+                .map(|i| {
+                    let theta = i as f32 * 0.21;
+                    let r = 5.0 + (i as f32) * 0.7;
+                    let pos = [r * theta.cos(), r * theta.sin()];
+                    let vel = [(i as f32) * 1.3, -(i as f32) * 0.7];
+                    let source = SourceContext {
+                        position: pos,
+                        velocity: vel,
+                        base_gain: 1.0,
+                        propagation_range_m: 100.0,
+                        room_id: Some(if i % 2 == 0 { 7 } else { 8 }),
+                    };
+                    resolve_spatial(source, listener, Medium::Air, &[], ReverbProfile::open_outdoor())
+                })
+                .collect::<Vec<_>>()
+        };
+        let a = make_envelopes();
+        let b = make_envelopes();
+        assert_eq!(a.len(), 30);
+        for (i, (envelope_a, envelope_b)) in a.iter().zip(b.iter()).enumerate() {
+            assert_eq!(envelope_a, envelope_b, "envelope {i} diverged across runs");
+        }
+    }
+
+    #[test]
+    fn determinism_30_source_serialization_is_byte_identical() {
+        // Stronger determinism check: serialized JSON of all 30 envelopes must
+        // be byte-for-byte identical across runs (covers any hidden non-canonical
+        // ordering or floating-point representation drift in serde).
+        let resolve_all = || {
+            let listener = ListenerContext {
+                position: [0.0, 0.0],
+                velocity: [0.0, 0.0],
+                facing_rad: 0.0,
+                room_id: Some(7),
+            };
+            let mut out = Vec::new();
+            for i in 0..30 {
+                let theta = i as f32 * 0.21;
+                let r = 5.0 + (i as f32) * 0.7;
+                let pos = [r * theta.cos(), r * theta.sin()];
+                let vel = [(i as f32) * 1.3, -(i as f32) * 0.7];
+                let source = SourceContext {
+                    position: pos,
+                    velocity: vel,
+                    base_gain: 1.0,
+                    propagation_range_m: 100.0,
+                    room_id: Some(if i % 2 == 0 { 7 } else { 8 }),
+                };
+                let env = resolve_spatial(source, listener, Medium::Air, &[], ReverbProfile::open_outdoor());
+                out.push(serde_json::to_string(&env).expect("serialize"));
+            }
+            out
+        };
+        let a = resolve_all();
+        let b = resolve_all();
+        assert_eq!(a, b, "byte-identical determinism contract failed");
+    }
 }

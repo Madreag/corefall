@@ -26,5 +26,6 @@ pub mod reverb_send;
 
 pub use hrtf_convolution::{HrirConvolutionAdapter, HrirConvolutionFrame, HRIR_FADE_MS};
 pub use reverb_send::{
-    cross_fade_alpha, current_ir_id_for, ReverbSendBus, ReverbSendFrame, IR_CROSS_FADE_MS,
+    all_ir_ids, cross_fade_alpha, current_ir_id_for, ReverbSendBus, ReverbSendFrame, IR_CROSS_FADE_MS,
+    REVERB_SEND_GAIN_MULTIPLIER, WET_RETURN_DB,
 };
