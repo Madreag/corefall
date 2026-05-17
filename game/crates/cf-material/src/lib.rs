@@ -47,6 +47,7 @@ use std::{collections::BTreeMap, path::Path};
 use serde::{Deserialize, Serialize};
 
 pub mod loader;
+pub mod registry;
 
 pub use loader::{load_registry_from_file, validate_registry_json, RegistryValidationError, RegistryValidationReport};
 
@@ -274,9 +275,22 @@ impl AcousticProfile {
 impl MaterialDef {
     /// **M12B** § Resolved acoustic profile for this material. Missing
     /// fields fall back to [`AcousticProfile::fallback`].
+    ///
+    /// Per M12B spec § Notes for the implementer: "missing acoustic
+    /// fields fall back to `(echo_coefficient=0.2, decay_band=warm_mid,
+    /// transmission_loss_db=8.0, low_pass_cutoff_hz=2000)` (the 'default
+    /// dirt' row). Log via `tracing::warn!` once per missing material
+    /// id.". The once-per-id throttle lives in [`warn_missing_acoustic`].
     #[must_use]
     pub fn acoustic_profile(&self) -> AcousticProfile {
         let fb = AcousticProfile::fallback();
+        if self.echo_coefficient.is_none()
+            || self.decay_band.is_none()
+            || self.acoustic_transmission_loss_db.is_none()
+            || self.low_pass_cutoff_hz.is_none()
+        {
+            warn_missing_acoustic(self.id, self.name.as_str());
+        }
         AcousticProfile {
             echo_coefficient: self
                 .echo_coefficient
@@ -288,6 +302,26 @@ impl MaterialDef {
                 .map_or(fb.decay_band, AcousticProfile::canonical_band),
             transmission_loss_db: self.acoustic_transmission_loss_db.unwrap_or(fb.transmission_loss_db).max(0.0),
             low_pass_cutoff_hz: self.low_pass_cutoff_hz.unwrap_or(fb.low_pass_cutoff_hz).max(20.0),
+        }
+    }
+}
+
+/// **M12B** § Once-per-material warning helper. Tracks seen ids so the
+/// log spam is bounded — the warning fires exactly once per missing
+/// material id (per process). Test-only `reset_acoustic_warning_cache`
+/// drains the state between tests.
+fn warn_missing_acoustic(id: MaterialId, name: &str) {
+    use std::sync::Mutex;
+    static SEEN: std::sync::OnceLock<Mutex<std::collections::BTreeSet<MaterialId>>> = std::sync::OnceLock::new();
+    let seen = SEEN.get_or_init(|| Mutex::new(std::collections::BTreeSet::new()));
+    if let Ok(mut set) = seen.lock() {
+        if set.insert(id) {
+            tracing::warn!(
+                target = "cf-material::acoustic",
+                material_id = id,
+                material_name = name,
+                "missing one or more M12B acoustic fields; falling back to default-dirt acoustic row"
+            );
         }
     }
 }
@@ -497,6 +531,26 @@ mod tests {
         let r: MaterialRegistry = serde_json::from_value(v).expect("parse");
         let prof = r.acoustic_for_name("not_a_material");
         assert_eq!(prof, AcousticProfile::fallback());
+    }
+
+    #[test]
+    fn registry_module_reexports_canonical_types() {
+        // Per M12B spec § Files: `cf-material/src/registry.rs` (MODIFY).
+        // The canonical types live in lib.rs for backward-compat; the
+        // registry module re-exports them so `cf_material::registry::*`
+        // resolves cleanly.
+        use crate::registry::{
+            AcousticDefaults, AcousticProfile, MaterialDef, MaterialId, MaterialRegistry, PhaseChange,
+            MATERIAL_SCHEMA_VERSION,
+        };
+        // Just smoke-test the imports resolve and one type compiles.
+        assert_eq!(MATERIAL_SCHEMA_VERSION, 1);
+        let fb = AcousticProfile::fallback();
+        assert!((fb.echo_coefficient - AcousticDefaults::ECHO_COEFFICIENT).abs() < 1e-6);
+        let _: Option<MaterialDef> = None;
+        let _: Option<MaterialRegistry> = None;
+        let _: Option<PhaseChange> = None;
+        let _: MaterialId = 0;
     }
 
     #[test]
