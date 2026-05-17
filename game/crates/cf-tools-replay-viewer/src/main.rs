@@ -194,6 +194,38 @@ enum Cmd {
         #[arg(long)]
         output: Option<PathBuf>,
     },
+    /// **M10B § Export pipeline**: render the run bundle into an MP4
+    /// via the `cf-replay-export` pipeline. The full encode pipeline
+    /// (frame_ticker + offline_render + overlay_graph + ffmpeg_bridge)
+    /// lands in m10b-2 / m10b-3 / m10b-4; m10b-1 ships only the
+    /// `--list-presets` introspection subcommand the Player-facing
+    /// behavior § "Preset registry covers all 5 declared presets"
+    /// Gherkin scenario requires.
+    Export {
+        /// Optional bundle path. Unused by `--list-presets` (the
+        /// preset registry is data-only); reserved for the m10b-4
+        /// `export <bundle> --preset <name> --out <path>` shape.
+        #[arg(value_name = "BUNDLE_DIR")]
+        bundle_dir: Option<PathBuf>,
+        /// **M10B § VAL-M10B-033**: enumerate exactly the 5 spec-declared
+        /// presets with the 6 required fields each. Output is JSON for
+        /// easy consumption by `jq -e '. | length == 5'`.
+        #[arg(long, default_value_t = false)]
+        list_presets: bool,
+        /// Optional preset name (e.g. `twitch_1080p60`). m10b-1 only
+        /// accepts the flag for forward-compat; the actual encode
+        /// path lands in m10b-4.
+        #[arg(long)]
+        preset: Option<String>,
+        /// Optional output path. Reserved for m10b-4's encode path.
+        #[arg(long)]
+        out: Option<PathBuf>,
+        /// Override the preset content directory. Defaults to
+        /// `game/content/replay_export/presets/` relative to the
+        /// workspace root (resolved by walking up from CWD).
+        #[arg(long)]
+        presets_dir: Option<PathBuf>,
+    },
 }
 
 fn init_diagnostics() {
@@ -499,7 +531,107 @@ fn main() -> Result<()> {
             write_output(output.as_deref(), &text)?;
             Ok(())
         }
+        Cmd::Export {
+            bundle_dir,
+            list_presets,
+            preset,
+            out,
+            presets_dir,
+        } => run_export_cmd(bundle_dir, list_presets, preset, out, presets_dir),
     }
+}
+
+/// **M10B § VAL-M10B-033**: `--list-presets` enumerates exactly the
+/// five spec-declared presets with the six required fields each. The
+/// actual export pipeline ships in m10b-4; m10b-1 only implements
+/// the introspection surface (the Player-facing-behavior Gherkin
+/// scenario "Preset registry covers all 5 declared presets").
+fn run_export_cmd(
+    bundle_dir: Option<PathBuf>,
+    list_presets: bool,
+    preset: Option<String>,
+    out: Option<PathBuf>,
+    presets_dir: Option<PathBuf>,
+) -> Result<()> {
+    use cf_replay_export::preset_registry::{PresetRegistry, DECLARED_PRESETS};
+
+    if !list_presets {
+        if bundle_dir.is_some() || preset.is_some() || out.is_some() {
+            bail!(
+                "`cf-tools-replay-viewer export <bundle> --preset <name> --out <path>` lands in m10b-4. \
+                 m10b-1 ships only `--list-presets`. Re-run with `--list-presets`."
+            );
+        }
+        bail!(
+            "missing `--list-presets`. m10b-1 only implements the preset introspection surface. \
+             The full encode pipeline lands in m10b-4."
+        );
+    }
+    if bundle_dir.is_some() || preset.is_some() || out.is_some() {
+        tracing::warn!("`--list-presets` ignores --bundle, --preset, --out (forward-compat flags for m10b-4)");
+    }
+    let dir = match presets_dir {
+        Some(p) => p,
+        None => default_presets_dir().context("locate game/content/replay_export/presets/ relative to CWD")?,
+    };
+    let registry =
+        PresetRegistry::load_declared(&dir).with_context(|| format!("load preset registry from {}", dir.display()))?;
+    let json =
+        serde_json::to_string_pretty(&export_list_presets_json(&registry)).context("serialise --list-presets JSON")?;
+    println!("{json}");
+    // Per VAL-M10B-033 the output enumerates exactly the 5 declared
+    // presets with the 6 required fields each. Reaffirmed here as a
+    // post-condition so a mis-loaded registry can never quietly skip a
+    // preset.
+    debug_assert_eq!(registry.len(), DECLARED_PRESETS.len());
+    Ok(())
+}
+
+/// Render the preset registry as a JSON array. Each preset object
+/// carries the six VAL-M10B-005 required fields (`resolution`, `fps`,
+/// `codec`, `audio_codec`, `target_bitrate_kbps`, `container`) plus
+/// the preset `name`. JSON order is stable (alphabetical by name) so
+/// piped consumers (`jq -e '.[].name'`) see the same ordering across
+/// runs.
+fn export_list_presets_json(registry: &cf_replay_export::preset_registry::PresetRegistry) -> serde_json::Value {
+    let mut arr: Vec<serde_json::Value> = Vec::with_capacity(registry.len());
+    for preset in registry.iter_sorted() {
+        arr.push(serde_json::json!({
+            "name": preset.name,
+            "resolution": {
+                "width": preset.resolution.width,
+                "height": preset.resolution.height,
+            },
+            "fps": preset.fps,
+            "codec": preset.codec.as_str(),
+            "audio_codec": preset.audio_codec,
+            "target_bitrate_kbps": preset.target_bitrate_kbps,
+            "container": preset.container.as_str(),
+        }));
+    }
+    serde_json::Value::Array(arr)
+}
+
+/// Walk up from CWD looking for `game/content/replay_export/presets/`.
+/// Mirrors the same approach used by `locate_markdown_to_png_script`.
+fn default_presets_dir() -> Result<PathBuf> {
+    let cwd = std::env::current_dir().context("read CWD")?;
+    let candidates = [
+        cwd.join("game/content/replay_export/presets"),
+        cwd.join("content/replay_export/presets"),
+        cwd.join("../game/content/replay_export/presets"),
+        cwd.join("../../game/content/replay_export/presets"),
+    ];
+    for c in candidates {
+        if c.is_dir() {
+            return Ok(c);
+        }
+    }
+    bail!(
+        "could not locate game/content/replay_export/presets/ from CWD {}; \
+         pass an absolute path via --presets-dir or run from the repo root",
+        cwd.display()
+    )
 }
 
 fn load_bundle(path: &Path) -> Result<Bundle> {

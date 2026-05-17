@@ -23,6 +23,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 cf-replay = { path = "../cf-replay" }
+cf-replay-export = { path = "../cf-replay-export" }
 cf-save = { path = "../cf-save" }
 
 [dev-dependencies]
