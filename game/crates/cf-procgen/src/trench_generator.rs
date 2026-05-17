@@ -378,7 +378,7 @@ fn dir_vector(idx: i32) -> (i32, i32) {
 }
 
 fn wrap_direction(idx: i32) -> i32 {
-    ((idx % 8) + 8) % 8
+    idx.rem_euclid(8)
 }
 
 /// Pick the closest 8-way direction to the (end - start) vector. Used

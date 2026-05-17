@@ -30,7 +30,12 @@
     clippy::too_many_lines,
     clippy::match_same_arms,
     clippy::similar_names,
-    clippy::if_not_else
+    clippy::if_not_else,
+    clippy::unreadable_literal,
+    clippy::no_effect_underscore_binding,
+    clippy::assigning_clones,
+    clippy::needless_range_loop,
+    clippy::many_single_char_names
 )]
 
 pub mod trench_templates;
