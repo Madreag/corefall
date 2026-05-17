@@ -45,6 +45,7 @@ pub mod objective_banner;
 pub mod action_prompt;
 pub mod branching_banner;
 pub mod compass;
+pub mod cover_indicator;
 pub mod cover_pip;
 pub mod damage_direction;
 pub mod grenade_arc;
@@ -112,6 +113,10 @@ pub use chatter_ticker::{
 };
 pub use compass::{CompassBearing, CompassState, CARDINALS};
 pub use contrast::{banner_bg_color, strip_bg_color, text_color, ContrastModeUi};
+pub use cover_indicator::{
+    chevron_for_ground_standing, chevron_sequence_for_walk, spec_walk_chevron_sequence,
+    ChevronState, CoverIndicatorState, WalkGround, WalkPath, CHEVRON_PALETTE,
+};
 pub use cover_pip::{CoverLevel, CoverPipState};
 pub use damage_direction::{DamageDirectionMarker, DamageDirectionState, DEFAULT_FADE_MS};
 pub use event_ticker::{EventTickerEntry, EventTickerState, EVENT_TICKER_DEFAULT_DWELL_TICKS};

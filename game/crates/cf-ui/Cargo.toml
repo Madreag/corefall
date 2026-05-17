@@ -15,3 +15,4 @@ cf-actor = { path = "../cf-actor" }
 cf-ai = { path = "../cf-ai" }
 cf-equipment = { path = "../cf-equipment" }
 cf-terrain = { path = "../cf-terrain" }
+cf-trench = { path = "../cf-trench" }
