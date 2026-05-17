@@ -27,8 +27,12 @@ use serde_json::{json, Value};
 use cf_actor::IntentSource;
 use cf_sim_core::Tick;
 use cf_trench::{
-    dig_substrate_validate, segment::TrenchSegmentLookup, DigSubstrateOutcome, ModuleSpec,
-    SegmentVariant, TrenchModule, TrenchSegment, DEEP_HARDNESS_THRESHOLD,
+    apply_round_to_breastwork, breastwork::BreastworkHitOutcome, collapse_tick,
+    cover_state_post_breach, dig_substrate_validate, drainage_sump_tick,
+    segment::TrenchSegmentLookup, BreastworkHitOutcome as _BreastworkOutcomeAlias,
+    CollapseEnv, CollapseTickOutcome, CoverState, DigSubstrateOutcome, DrainageEnv,
+    DrainageTickOutcome, ModuleSpec, SegmentVariant, TrenchModule, TrenchSegment,
+    TrenchStance, DEEP_HARDNESS_THRESHOLD,
 };
 
 use crate::engine::M0Engine;
@@ -567,6 +571,147 @@ impl M0Engine {
     }
 }
 
+impl M0Engine {
+    /// **m9b-4 / VAL-M9B-DRAINAGE-001..002**: run one drainage tick
+    /// against the segment at `segment_index` (0-based) and emit
+    /// `trench.drainage_flushed` when the sump fires. Returns the
+    /// resulting [`DrainageTickOutcome`] so the caller (scenario or
+    /// test) can chain ticks together.
+    ///
+    /// Note: this is a single-tick helper — scenarios drive the
+    /// 600-tick window by calling it 600 times. Tests in
+    /// `cf-trench::drainage::run_drainage_window` validate the math.
+    pub fn dispatch_m9b_drainage_tick(
+        &self,
+        segment_index: usize,
+        current_water_depth: f32,
+        sump_present: bool,
+        env: DrainageEnv,
+        tick: Tick,
+        sim_time_ms: f64,
+    ) -> DrainageTickOutcome {
+        let outcome = drainage_sump_tick(current_water_depth, sump_present, env);
+        if let DrainageTickOutcome::Flushed {
+            water_depth_before,
+            water_depth_after,
+        } = outcome
+        {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "trench",
+                "drainage_flushed",
+                json!({
+                    "actor_id": null,
+                    "segment_id": segment_index as u64 + 1,
+                    "module_id": "drainage_sump",
+                    "water_depth_before": water_depth_before,
+                    "water_depth_after": water_depth_after,
+                    "flush_threshold_px": env.flush_threshold_px,
+                }),
+                None,
+            );
+        }
+        outcome
+    }
+
+    /// **m9b-4 / VAL-M9B-BREASTWORK-001**: apply one MG round to the
+    /// breastwork on `segment_index`, mutating its HP and emitting
+    /// `trench.breastwork_breached` when HP reaches 0. Returns the
+    /// [`BreastworkHitOutcome`].
+    pub fn dispatch_m9b_breastwork_hit(
+        &self,
+        segment_index: usize,
+        current_hp: f32,
+        damage: f32,
+        tick: Tick,
+        sim_time_ms: f64,
+    ) -> BreastworkHitOutcome {
+        let outcome = apply_round_to_breastwork(current_hp, damage);
+        if let BreastworkHitOutcome::Breached { prev_hp, .. } = outcome {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "trench",
+                "breastwork_breached",
+                json!({
+                    "actor_id": null,
+                    "segment_id": segment_index as u64 + 1,
+                    "module_id": "breastwork",
+                    "prev_hp": prev_hp,
+                    "prev_cover_state": CoverState::Full.as_str(),
+                    "new_cover_state": cover_state_post_breach(
+                        TrenchStance::Standing,
+                        SegmentVariant::ParapetRaised,
+                        true,
+                    )
+                    .as_str(),
+                }),
+                None,
+            );
+        }
+        outcome
+    }
+
+    /// **m9b-4 / VAL-M9B-REVETMENT-001..002**: run one collapse tick
+    /// against the segment at `segment_index`. Emits
+    /// `trench.segment_collapsed` exactly once when the integrity
+    /// crosses zero; returns the [`CollapseTickOutcome`] so the caller
+    /// can stop ticking the segment after collapse.
+    pub fn dispatch_m9b_collapse_tick(
+        &self,
+        segment_index: usize,
+        current_integrity: f32,
+        env: CollapseEnv,
+        tick: Tick,
+        sim_time_ms: f64,
+    ) -> CollapseTickOutcome {
+        let outcome = collapse_tick(current_integrity, env);
+        if let CollapseTickOutcome::Collapsed {
+            prev_integrity,
+            cause,
+        } = outcome
+        {
+            let variant = self
+                .state
+                .read()
+                .ok()
+                .and_then(|s| {
+                    s.trench_world
+                        .segments
+                        .get(segment_index)
+                        .map(|seg| seg.variant)
+                })
+                .unwrap_or(SegmentVariant::Standard);
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "trench",
+                "segment_collapsed",
+                json!({
+                    "actor_id": null,
+                    "segment_id": segment_index as u64 + 1,
+                    "variant": variant.as_str(),
+                    "substrate_hardness": env.substrate_hardness,
+                    "integrity_before": prev_integrity,
+                    "integrity_after": 0.0_f32,
+                    "had_revetment": env.has_revetment,
+                    "cause": cause.as_str(),
+                }),
+                None,
+            );
+        }
+        outcome
+    }
+}
+
+/// Suppress the unused-import warning while the breastwork outcome
+/// alias is reserved for future cfctl wire types.
+#[allow(dead_code)]
+fn _breastwork_alias_suppress() -> _BreastworkOutcomeAlias {
+    _BreastworkOutcomeAlias::AlreadyBreached
+}
+
 /// Default embedded modules for a freshly-dug segment of the given
 /// variant, mirroring the authored `content/trench_segments/*.ron`
 /// catalog so the live world matches the on-disk spec.
@@ -893,5 +1038,128 @@ mod tests {
         let id2 = engine.insert_trench_segment(SegmentVariant::Deep, (40, 0));
         assert_eq!(id1, 1);
         assert_eq!(id2, 2);
+    }
+
+    fn count_events(engine: &M0Engine, category: &str, event_type: &str) -> usize {
+        engine
+            .recorder
+            .snapshot_events()
+            .into_iter()
+            .filter(|e| e.category == category && e.event_type == event_type)
+            .count()
+    }
+
+    /// VAL-M9B-DRAINAGE-001: drainage tick fires
+    /// `trench.drainage_flushed` when the sump kicks.
+    #[test]
+    fn drainage_tick_emits_flush_event() {
+        let engine = make_engine();
+        let _ = engine.insert_trench_segment(SegmentVariant::Deep, (0, 0));
+        let env = DrainageEnv::default();
+        // Drive enough ticks to cross the threshold.
+        let mut depth = 0.0_f32;
+        for _ in 0..400 {
+            let outcome = engine.dispatch_m9b_drainage_tick(
+                0,
+                depth,
+                true,
+                env,
+                Tick(0),
+                0.0,
+            );
+            depth = outcome.water_depth_after();
+        }
+        let flushes = count_events(&engine, "trench", "drainage_flushed");
+        assert!(
+            flushes >= 1,
+            "drainage helper must emit ≥ 1 flush event over the 600-tick window"
+        );
+    }
+
+    /// VAL-M9B-DRAINAGE-002: no-sump tick does NOT emit a flush event.
+    #[test]
+    fn drainage_tick_without_sump_emits_no_event() {
+        let engine = make_engine();
+        let _ = engine.insert_trench_segment(SegmentVariant::Standard, (0, 0));
+        let env = DrainageEnv::default();
+        let mut depth = 0.0_f32;
+        for _ in 0..400 {
+            let outcome = engine.dispatch_m9b_drainage_tick(
+                0,
+                depth,
+                false,
+                env,
+                Tick(0),
+                0.0,
+            );
+            depth = outcome.water_depth_after();
+        }
+        assert_eq!(count_events(&engine, "trench", "drainage_flushed"), 0);
+    }
+
+    /// VAL-M9B-BREASTWORK-001: 80 rounds at 6 J emits exactly one
+    /// `trench.breastwork_breached` event.
+    #[test]
+    fn breastwork_hits_emit_exactly_one_breach() {
+        let engine = make_engine();
+        let _ = engine.insert_trench_segment(SegmentVariant::ParapetRaised, (0, 0));
+        let mut hp = cf_trench::BREASTWORK_MAX_HP;
+        for _ in 0..80 {
+            let outcome =
+                engine.dispatch_m9b_breastwork_hit(0, hp, 6.0, Tick(0), 0.0);
+            hp = outcome.hp_after();
+            if hp <= 0.0 {
+                break;
+            }
+        }
+        assert_eq!(
+            count_events(&engine, "trench", "breastwork_breached"),
+            1,
+            "exactly one breach event over the 80-round burst"
+        );
+    }
+
+    /// VAL-M9B-REVETMENT-001: no revetment + soft dirt → ≥ 1
+    /// `trench.segment_collapsed` event over 1800 ticks.
+    #[test]
+    fn collapse_tick_no_revetment_emits_collapse_event() {
+        let engine = make_engine();
+        let _ = engine.insert_trench_segment(SegmentVariant::Standard, (0, 0));
+        let env = CollapseEnv::soft_dirt_no_revetment();
+        let mut integrity = cf_trench::STARTING_INTEGRITY;
+        for _ in 0..cf_trench::REVETMENT_AUDIT_WINDOW_TICKS {
+            let outcome =
+                engine.dispatch_m9b_collapse_tick(0, integrity, env, Tick(0), 0.0);
+            if outcome.collapsed() {
+                break;
+            }
+            integrity = outcome.integrity_after();
+        }
+        let collapses = count_events(&engine, "trench", "segment_collapsed");
+        assert!(
+            collapses >= 1,
+            "no-revetment soft-dirt 1800-tick window must emit ≥ 1 collapse"
+        );
+    }
+
+    /// VAL-M9B-REVETMENT-002: revetment installed → 0
+    /// `trench.segment_collapsed` events over 1800 ticks.
+    #[test]
+    fn collapse_tick_with_revetment_emits_no_collapse() {
+        let engine = make_engine();
+        let _ = engine.insert_trench_segment(SegmentVariant::Standard, (0, 0));
+        let env = CollapseEnv::soft_dirt_with_revetment();
+        let mut integrity = cf_trench::STARTING_INTEGRITY;
+        for _ in 0..cf_trench::REVETMENT_AUDIT_WINDOW_TICKS {
+            let outcome =
+                engine.dispatch_m9b_collapse_tick(0, integrity, env, Tick(0), 0.0);
+            integrity = outcome.integrity_after();
+        }
+        assert_eq!(
+            count_events(&engine, "trench", "segment_collapsed"),
+            0,
+            "revetment must prevent collapse over 1800 ticks"
+        );
+        assert!(integrity >= cf_trench::REVETMENT_INTEGRITY_FLOOR);
     }
 }
