@@ -560,6 +560,7 @@ pub fn evaluate_trigger(mine: &Mine, candidate: ActorCandidate) -> TriggerOutcom
 
 /// Inputs to a single minesweeper detection ping.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[allow(clippy::struct_field_names)]
 pub struct MinesweeperPingInputs {
     pub sweeper_actor_id: u64,
     pub sweeper_faction: FortificationFaction,
@@ -1416,7 +1417,7 @@ mod tests {
             .iter()
             .filter_map(|e| match e {
                 IedChainEmission::Trigger(t) => Some(t.mine_id.0),
-                _ => None,
+                IedChainEmission::Cookoff(_) => None,
             })
             .collect();
         assert_eq!(triggers, vec![1, 2, 3, 4, 5]);
@@ -1428,7 +1429,7 @@ mod tests {
                 assert_eq!(t.trigger_kind, MineTriggerCause::Manual);
                 assert_eq!(t.tick_index, 100);
             }
-            _ => panic!("first emission must be a Trigger"),
+            IedChainEmission::Cookoff(_) => panic!("first emission must be a Trigger"),
         }
 
         // Adjacent triggers are bridged by `cookoff.charge_initiated`.
@@ -1438,7 +1439,7 @@ mod tests {
             .iter()
             .filter_map(|e| match e {
                 IedChainEmission::Cookoff(c) => Some(*c),
-                _ => None,
+                IedChainEmission::Trigger(_) => None,
             })
             .collect();
         assert!(!cookoffs.is_empty(), "cascade must bridge with cookoff events");
@@ -1672,7 +1673,7 @@ mod tests {
         // module documents the absorption math + the scenario gate
         // accepts any hp_after in the [800, 1200] window (well within
         // the ±tolerance language).
-        assert!(hp_after >= 800 && hp_after <= BOMB_DISPOSAL_ROBOT_HP);
+        assert!((800..=BOMB_DISPOSAL_ROBOT_HP).contains(&hp_after));
     }
 
     /// Robot disarm time: spec § "Bomb-disposal robot": 4 s.
