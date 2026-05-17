@@ -19,6 +19,7 @@
 #![forbid(unsafe_code)]
 #![deny(missing_docs)]
 
+pub mod director_hook;
 pub mod follow;
 pub mod free_look;
 pub mod hit_stop;
@@ -142,6 +143,9 @@ impl CameraState {
     }
 }
 
+pub use director_hook::{
+    apply_director_pose, zoom_to_fov_degrees, DirectorCameraKind, DirectorPose, DIRECTOR_POSE_COMPONENTS,
+};
 pub use follow::tick_smooth_follow;
 pub use free_look::{enter_free_look, exit_free_look};
 pub use hit_stop::{tick_hit_stop, trigger_hit_stop};
