@@ -1,0 +1,19 @@
+// M9C — Minefield template: pressure corridor.
+//
+// Spec § "Mine kinds" table: pressure mine triggers on
+// Standing/Crouched directly over the mine tile, applies 120 J HE,
+// cripples legs (M16A). This template lines a 12-tile corridor with
+// 6 pressure mines every 2 tiles so an infantry advance has roughly
+// even odds of stepping onto one per pace.
+(
+    id: "pressure_corridor",
+    display_name: "Pressure Corridor",
+    placements: [
+        (kind: mine_pressure, offset_tiles: (0, 0)),
+        (kind: mine_pressure, offset_tiles: (2, 0)),
+        (kind: mine_pressure, offset_tiles: (4, 0)),
+        (kind: mine_pressure, offset_tiles: (6, 0)),
+        (kind: mine_pressure, offset_tiles: (8, 0)),
+        (kind: mine_pressure, offset_tiles: (10, 0)),
+    ],
+)

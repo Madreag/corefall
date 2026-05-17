@@ -82,7 +82,23 @@ pub use mg_nest::{
     MG_TRIPOD_DEPLOYED_HP, MG_TRIPOD_DEPLOY_SECONDS, SPOTTER_SCOPE_HP,
     SPOTTER_SCOPE_ACQUISITION_MULTIPLIER,
 };
-pub use minefield::MineKind;
+pub use minefield::{
+    begin_ied_chain_cascade, deploy_template as deploy_minefield_template,
+    evaluate_trigger as evaluate_mine_trigger, manual_disarm_required_ticks,
+    minesweeper_detection_radius_tiles, ms_to_ticks, robot_disarm_required_ticks,
+    run_minesweeper_ping, template_inventory_cost, tick_manual_disarm, ActorCandidate,
+    DetectionMask, DisarmFailureCause, DisarmInputs, DisarmResult, DisarmTickResult,
+    IedChainEmission, IedChainOutcome, IedCookoffEvent, IedCookoffKind, Mine,
+    MineArmedEvent, MineDisarmedEvent, MineKind, MineTriggerCause, MineTriggeredEvent,
+    MinefieldDeployOutcome, MinefieldPlacement, MinefieldTemplateSpec,
+    MinesweeperDetectedEvent, MinesweeperPingInputs, MinesweeperPingOutcome,
+    TriggerOutcome, BOMB_DISPOSAL_ROBOT_ARMOR_REDUCTION_PERCENT, BOMB_DISPOSAL_ROBOT_DRIVE_PX_PER_SECOND,
+    BOMB_DISPOSAL_ROBOT_HP, IED_CHAIN_HOP_MILLIS, IED_CHAIN_LINK_RANGE_TILES,
+    IED_CHAIN_MAX_WINDOW_MILLIS, MANUAL_DISARM_SECONDS, MINESWEEPER_DETECTION_PRESSURE_IED_TILES,
+    MINESWEEPER_DETECTION_PROXIMITY_TRIPWIRE_TILES, MINESWEEPER_PING_SECONDS,
+    MINE_DISARMED_EXPLOSIVE_RECOVERED, MINE_PRESSURE_BLAST_RADIUS_TILES,
+    MINE_PROXIMITY_TRIGGER_DECITILES, ROBOT_DISARM_SECONDS,
+};
 pub use sandbag::{
     apply_damage_to_wall, sandbag_eroded_events, sandbag_pixel_mask,
     sandbag_tier_for_hp, SandbagErodedEvent, SandbagPixelMask, SandbagTier,

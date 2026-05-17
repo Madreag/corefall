@@ -1,0 +1,37 @@
+// M9C — Minefield template: tripwire perimeter.
+//
+// Spec § "Mine kinds" table: tripwire_mine fires on visible-line
+// crossing + emits alarm.tripwire_triggered audio. This template
+// strings 4 tripwire mines along a square perimeter; each mine wires
+// a 4-tile tripwire line one side of the square. Crossing any line
+// alarms the defending faction.
+(
+    id: "tripwire_perimeter",
+    display_name: "Tripwire Perimeter",
+    placements: [
+        // North side: line from (0,0) to (4,0).
+        (
+            kind: tripwire_mine,
+            offset_tiles: (0, 0),
+            tripwire_endpoints: Some(((0, 0), (4, 0))),
+        ),
+        // East side: line from (4,0) to (4,4).
+        (
+            kind: tripwire_mine,
+            offset_tiles: (4, 0),
+            tripwire_endpoints: Some(((4, 0), (4, 4))),
+        ),
+        // South side: line from (4,4) to (0,4).
+        (
+            kind: tripwire_mine,
+            offset_tiles: (4, 4),
+            tripwire_endpoints: Some(((4, 4), (0, 4))),
+        ),
+        // West side: line from (0,4) to (0,0).
+        (
+            kind: tripwire_mine,
+            offset_tiles: (0, 4),
+            tripwire_endpoints: Some(((0, 4), (0, 0))),
+        ),
+    ],
+)

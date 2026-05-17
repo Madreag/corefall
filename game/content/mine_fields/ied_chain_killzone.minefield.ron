@@ -1,0 +1,55 @@
+// M9C — Minefield template: 5-IED chain killzone.
+//
+// Spec § "Mine kinds" table + § Gherkin "IED chain daisy-fires on
+// remote detonation": 5 IEDs placed 4 tiles apart in a line; each
+// wired to its neighbors. Triggering any one IED daisy-fires the
+// full chain via BFS over the wire-link graph within 0.5 s of the
+// trigger event. Cookoff routing through M14J emits a
+// `cookoff.charge_initiated` event between each pair of adjacent
+// `mine_triggered` records (VAL-M9C-IED-COOKOFF).
+//
+// Per-mine yield is authored in the 200..400 J range per spec table
+// ("200-400 J HE (configurable yield per IED)"). The killzone uses
+// 300 J for the central IEDs and 200 J for the edge IEDs to mimic
+// the classic Cortex Command "biggest blast in the middle" rig.
+(
+    id: "ied_chain_killzone",
+    display_name: "IED Chain Killzone",
+    placements: [
+        (
+            kind: ied_chain,
+            offset_tiles: (0, 0),
+            yield_joules: Some(200),
+            blast_radius_tiles: Some(3),
+            wired_links: [1],
+        ),
+        (
+            kind: ied_chain,
+            offset_tiles: (4, 0),
+            yield_joules: Some(300),
+            blast_radius_tiles: Some(3),
+            wired_links: [0, 2],
+        ),
+        (
+            kind: ied_chain,
+            offset_tiles: (8, 0),
+            yield_joules: Some(400),
+            blast_radius_tiles: Some(4),
+            wired_links: [1, 3],
+        ),
+        (
+            kind: ied_chain,
+            offset_tiles: (12, 0),
+            yield_joules: Some(300),
+            blast_radius_tiles: Some(3),
+            wired_links: [2, 4],
+        ),
+        (
+            kind: ied_chain,
+            offset_tiles: (16, 0),
+            yield_joules: Some(200),
+            blast_radius_tiles: Some(3),
+            wired_links: [3],
+        ),
+    ],
+)

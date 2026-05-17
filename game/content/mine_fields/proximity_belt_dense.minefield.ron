@@ -1,0 +1,26 @@
+// M9C — Minefield template: dense proximity belt.
+//
+// Spec § "Minefield template": a declarative cluster of mines + spacing
+// + density. Player or AI deploys via
+// `act.player.deploy_minefield_template { id, origin }` consuming
+// pooled mine inventory.
+//
+// 9 proximity mines in a 3×3 grid 2 tiles apart, covering an
+// 8×8-tile killbox. Each mine has 1.5-tile trigger radius so
+// neighbors overlap into a single "step anywhere and you're inside
+// the trigger window" belt.
+(
+    id: "proximity_belt_dense",
+    display_name: "Proximity Belt (Dense)",
+    placements: [
+        (kind: mine_proximity, offset_tiles: (0, 0)),
+        (kind: mine_proximity, offset_tiles: (2, 0)),
+        (kind: mine_proximity, offset_tiles: (4, 0)),
+        (kind: mine_proximity, offset_tiles: (0, 2)),
+        (kind: mine_proximity, offset_tiles: (2, 2)),
+        (kind: mine_proximity, offset_tiles: (4, 2)),
+        (kind: mine_proximity, offset_tiles: (0, 4)),
+        (kind: mine_proximity, offset_tiles: (2, 4)),
+        (kind: mine_proximity, offset_tiles: (4, 4)),
+    ],
+)
