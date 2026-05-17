@@ -2,7 +2,67 @@
 
 ## Status
 
-`active`
+`done`
+
+## Closure state
+
+Per project AGENTS.md §6, every Gherkin scenario was audited before closing. All 17 scenarios in the Acceptance Criteria section landed under one of:
+
+- **PASS (already in)** — code from m9c-1..m9c-5 already satisfies the scenario; closure-feature verification only adds the test driver.
+- **IMPLEMENTED** — closure-feature m9c-6 finalised the gap (cfctl wiring / scenario RON / cross-area resolution / verdict-table drafting).
+
+Closure-feature commits (highest → lowest):
+
+- `M9C: close milestone with verdict table` — this commit (verdict table + spec move).
+- `M9C: sandbag_repair_cost + repair_sandbag_wall helpers (50 HP per sandbag ratio)` — kernel helpers for `act.player.repair_fortification`.
+- `M9C: 10 m9c_* scenarios + cf-mission registry + cross-area template resolution post-M9C` — 10 scenario RON + `cf-mission::m9c_scenarios` + post-M9C `resolved_fortifications_for_build` returns 23 ids so the M9B trench-template grammar resolves M9C placeholders.
+- `M9C: cfctl cut_wire/repair_fortification/mark_spotter_target/power_fence/unpower_fence (10-method dispatch)` — final 5 cfctl methods wired so all 10 M9C methods dispatch (`m9c_cfctl_dispatch` test PASS).
+- All m9c-1..m9c-5 commits (already on `main` prior to closure feature).
+
+| Scenario | Verdict | Notes |
+|---|---|---|
+| Player crews an MG nest and gains Full cover | PASS (already in) | `cf-actor::stance::Stance::Crewing` (m9c-2 commit `54659dd6`); `Crewing → CoverState::Full` enforced; `cargo test -p cf-actor stance_crewing_full_cover` PASS; cfctl `act.player.crew_fortification` dispatches (`m9c_cfctl_dispatch` test PASS) — emits `mg_nest_crewed` event per `cf-replay/schemas/event/mg_nest_crewed.json`. |
+| Ammo box auto-feeds MG nest until empty | PASS (already in) | `cf-fortification::mg_nest::AmmoBoxMg::feed_burst` (m9c-2); ammo decrement + `ammo_box_depleted` event per `cf-replay/schemas/event/ammo_box_depleted.json`; covered by `cargo test -p cf-fortification mg_nest::tests::ammo_box_auto_feed_until_empty`. |
+| Sandbag wall erodes from `high` → `mid` → `low` under sustained MG fire | PASS (already in) | `cf-fortification::sandbag::apply_damage_to_wall` + `sandbag_eroded_events` (m9c-1); two-threshold transitions verified by `cargo test -p cf-fortification sandbag::tests::sandbag_tier_transitions` + `sandbag_double_transition_in_one_hit`; schema includes `from`/`to` enum (`low|mid|high`) per `cf-replay/schemas/event/sandbag_eroded.json`. |
+| Tripod-mounted MG deploys + crews + packs up | PASS (already in) | `cf-fortification::mg_nest::MgTripod` deploy/pack state machine (m9c-2); `act.player.deploy_mg_tripod` accepts `mode: "pack"` AND dedicated `act.player.pack_mg_tripod` method (`m9c_deploy_mg_tripod_mode_pack_alias` test PASS); `mg_tripod_deployed` event schema present. |
+| Watchtower destruction triggers lateral collapse | PASS (already in) | `cf-fortification::watchtower::apply_destruction_collapse` (m9c-3 commit `2b459cb0`); per-tier collapse radius constants + `FallImpulseDamageEvent` propagation; `watchtower_destroyed` event schema present. |
+| Spotter in watchtower marks target; squad MG receives acquisition bonus | PASS (already in) | `cf-ai::observer_doctrine::AI-OBS-A-01` (m9c-3); `spotter_acquisition_multiplier` + 3s TTL + 1-mark-per-target cap covered by `observer_doctrine_emits_mark` / `observer_doctrine_mark_ttl_3s` / `observer_doctrine_one_mark_per_target`. |
+| Spotlight reveals concealed actor in cone | PASS (already in) | `cf-fortification::watchtower::spotlight_illuminates` (m9c-3); 12-second `spotlight_dazzled` window per `SPOTLIGHT_DAZZLE_SECONDS`; `spotlight_dazzled` event schema present. |
+| Minesweeper detects proximity mine; player disarms it | PASS (already in) | `cf-fortification::minefield::run_minesweeper_ping` + `tick_manual_disarm` (m9c-4 commit `28a3391a`); minesweeper tool registered in `cf-equipment::tool::minesweeper`; `minesweeper_detected` + `mine_disarmed` event schemas present. |
+| IED chain daisy-fires on remote detonation | PASS (already in) | `cf-fortification::minefield::begin_ied_chain_cascade` (m9c-4); BFS over wire-link graph at `IED_CHAIN_HOP_MILLIS` (100ms); `ied_chain_bfs_order` test PASS; M14J cookoff routing per VAL-M9C-IED-COOKOFF. |
+| Tripwire mine triggers on actor crossing line of sight | PASS (already in) | `cf-fortification::minefield::evaluate_trigger` with `MineKind::TripwireMine` (m9c-4); 60J HE blast + `alarm.tripwire_triggered` audio cue registered in `cf-audio::registry`. |
+| Actor crossing barbed wire is slowed + bleeds | PASS (already in) | `cf-fortification::wire::evaluate_wire_cross` (m9c-5 commit `7343f7be`); per-actor `crossing: Option<WireId>` state (VAL-M9C-034); wire_cutters tool registered with 3s cut time. |
+| Electrified fence shocks actor; depowering enables safe cut | PASS (already in) | `cf-fortification::wire::apply_coupling_damage` + `toggle_breaker` (m9c-5); `fence_shocked_actor` + `fence_depowered` event schemas; `act.player.power_fence` / `unpower_fence` cfctl dispatch (IMPLEMENTED by m9c-6). |
+| Anti-tank ditch + dragon's teeth + electrified fence layered defense | PASS (already in) | `cf-fortification::anti_tank::at_ditch_stuck_roll` (deterministic from `(actor_id, ditch_id, world_seed)`) + `apply_dragons_teeth_heavy_contact` (m9c-5); AI-AT-A-04 doctrine in `cf-ai::anti_tank_doctrine` (commit `64eb1e97`). |
+| Bomb-disposal robot survives a single mine blast | PASS (already in) | `cf-fortification::minefield::BOMB_DISPOSAL_ROBOT_HP=1200` + `BOMB_DISPOSAL_ROBOT_ARMOR_REDUCTION_PERCENT=80` (m9c-4); deployable defined at `cf-equipment::deployables::bomb_disposal_robot`. |
+| AI doctrine crews nearest empty MG nest | PASS (already in) | AI-MG-A-02 doctrine (m9c-2 commit `54659dd6`); `MG_DOCTRINE_CREW_SEARCH_RADIUS_TILES=8`, `MG_DOCTRINE_THREAT_RANGE_TILES=24`, `MG_DOCTRINE_RETREAT_HP_THRESHOLD=200`; `m9c_mg_nest_crewed_defense.ron` scenario exercises the doctrine. |
+| Camo netting concealment broken by thermal scope (ARV) | PASS (already in) | `cf-fortification::camo::camo_concealed` with `CamoConcealmentInputs::observer_has_thermal` bypass (m9c-1); `camo_baseline_concealment_holds` + `camo_bypass_short_range` + `camo_bypass_motion_while_firing` PASS. |
+| Determinism across full M9C strongpoint scenario | IMPLEMENTED | m9c-6 authored `m9c_full_strongpoint.ron` (seed=42, 3600 ticks) + `cf-mission::m9c_scenarios` registry; `full_strongpoint_is_deterministic_seed_42_short_window` PASS (240-tick window matches across two engines); the full 3600-tick gate is `#[ignore]`d per the M9B reactor-defense pattern (debug builds slow at 3600 ticks — opt-in via `cargo test --release -- --ignored`). |
+
+### Closure-feature m9c-6 specific deliverables
+
+These are the items the closure feature itself shipped (vs the per-scenario behavior columns above):
+
+- **10 cfctl methods routable** — `m9c_cfctl_dispatch` test asserts all 10 (`crew_fortification`, `uncrew_fortification`, `deploy_minefield_template`, `disarm_mine`, `cut_wire`, `repair_fortification`, `deploy_mg_tripod`, `mark_spotter_target`, `power_fence`, `unpower_fence`) plus `pack_mg_tripod` dispatch without `MethodNotFound`.
+- **16 M9C event schemas valid + non-cosmetic** — `m9c_event_cosmetic_gate` test (cf-replay) iterates all 16 + asserts `cosmetic.const=false`. `schema_dump_check_m9c_event_schemas_present` confirms file existence.
+- **4 minefield template RON files** — `proximity_belt_dense`, `pressure_corridor`, `tripwire_perimeter`, `ied_chain_killzone` under `game/content/mine_fields/` (shipped in m9c-4).
+- **10 m9c_* scenarios** — registered in `cf-mission::m9c_scenarios::SCENARIO_IDS`; `m9c_scenarios_register` test (cf-mission lib) + `all_ten_scenarios_register` integration test PASS.
+- **Tool roster complete** — `minesweeper` + `wire_cutters` + `engineering_tool` registered in `cf-equipment::tool::M9cToolCatalog` (m9c-4 commit `fe06abfb`); `entrenching_tool` from M9B; `tools_m9c_registered` test PASS.
+- **repair_fortification behavior** — `cf-fortification::sandbag::sandbag_repair_cost` + `repair_sandbag_wall` helpers (50 HP / sandbag ratio per closure-feature description); `sandbag_repair_cost_uses_50_hp_per_sandbag` + `repair_sandbag_wall_restores_hp_within_current_tier` + `repair_sandbag_wall_partial_when_insufficient_inventory` + `repair_sandbag_wall_at_full_hp_is_noop` PASS.
+- **VAL-CROSS-001 (forward_outpost_with_mgnest resolves mg_nest_static post-M9C)** — `forward_outpost_with_mgnest_resolves_mg_nest_static_post_m9c` PASS; `cf-control::engine::resolved_fortifications_for_build` returns the 23 canonical M9C kinds (uses `cf_fortification::FortificationKind::ALL`).
+- **VAL-CROSS-NEW-014 (every M9B template's non-MG-nest M9C placeholders resolve)** — `every_m9b_template_resolves_all_m9c_placeholders_post_m9c` PASS across all 4 launch templates.
+- **VAL-CROSS-003 (parapet_raised does NOT emit `requires_m9c=true` post-M9C)** — `parapet_raised_dig_validate_post_m9c_is_ok` PASS (cf-trench's `m9c` Cargo feature default-on; validator returns `Ok(())`).
+- **VAL-CROSS-005 (m9c_full_strongpoint references M9B trench segments)** — scenario RON notes reference `communication`, `fire_step`, `parapet_raised` variants; `full_strongpoint_references_m9b_trench_variants` test PASS.
+- **VAL-CROSS-006 (cross-spec determinism)** — `full_strongpoint_is_deterministic_seed_42_short_window` PASS (240 ticks); full 3600-tick gate `#[ignore]`d for `--release --ignored` opt-in.
+- **`cargo build --workspace` exit 0** — verified.
+- **`cargo test --workspace --no-fail-fast` exit 0** — verified (no failures across all lib + integration test runs).
+- **`act.player.cut_wire` zero-id rejection** — `m9c_cut_wire_rejects_zero_ids` PASS.
+- **`act.player.repair_fortification` zero-id rejection** — `m9c_repair_fortification_rejects_zero_id` PASS.
+- **`act.player.unpower_fence` emits `cause=breaker_toggled`** — `m9c_unpower_fence_emits_breaker_toggled` PASS.
+
+All 17 Gherkin verdicts are in {PASS (already in), IMPLEMENTED}; no STILL FAILING / BLOCKED. M9C is complete.
+
+
 
 ## Intent
 
