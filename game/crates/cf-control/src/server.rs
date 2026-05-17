@@ -3939,6 +3939,86 @@ async fn process_request<E: EngineHandle>(
                 }),
             ))
         }
+        // **M9C-4**: deploy a minefield template per
+        // VAL-M9C-MINEFIELD-DEPLOY-BEHAVIOR. The engine resolves the
+        // template id to a `MinefieldTemplateSpec`, calls
+        // `cf_fortification::deploy_template`, decrements inventory by
+        // the per-kind template cost, and fans out one `mine_armed`
+        // event per placed mine.
+        "act.player.deploy_minefield_template" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                id: String,
+                origin: (i32, i32),
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            if p.id.is_empty() {
+                return Some(invalid_param_reason(request.id, "template_id_empty"));
+            }
+            // Lenient validation: accept any non-empty id at the cfctl
+            // layer. The engine layer rejects ids not registered in
+            // `content/mine_fields/<id>.minefield.ron`. Stay forward-
+            // compatible with mod-supplied templates.
+            Some(success_response(
+                request.id,
+                json!({
+                    "schema_version": SCHEMA_VERSION,
+                    "status": "accepted",
+                    "method": method,
+                    "template_id": p.id,
+                    "origin": [p.origin.0, p.origin.1],
+                }),
+            ))
+        }
+        // **M9C-4**: disarm a mine per VAL-M9C-026 (manual) /
+        // VAL-M9C-043 (robot). Required param `mine_id`; optional
+        // `actor_id` for the disarming actor; optional `robot_id` for
+        // the bomb-disposal robot path.
+        "act.player.disarm_mine" => {
+            #[derive(Deserialize)]
+            #[serde(deny_unknown_fields)]
+            struct P {
+                schema_version: u32,
+                mine_id: u64,
+                #[serde(default)]
+                actor_id: Option<u64>,
+                #[serde(default)]
+                robot_id: Option<u64>,
+            }
+            let p: P = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let _ = p.schema_version;
+            if p.mine_id == 0 {
+                return Some(invalid_param_reason(request.id, "mine_id_zero"));
+            }
+            if p.actor_id.is_none() && p.robot_id.is_none() {
+                return Some(invalid_param_reason(
+                    request.id,
+                    "actor_id_or_robot_id_required",
+                ));
+            }
+            let agent = if p.robot_id.is_some() { "robot" } else { "manual" };
+            Some(success_response(
+                request.id,
+                json!({
+                    "schema_version": SCHEMA_VERSION,
+                    "status": "accepted",
+                    "method": method,
+                    "mine_id": p.mine_id,
+                    "actor_id": p.actor_id,
+                    "robot_id": p.robot_id,
+                    "agent": agent,
+                }),
+            ))
+        }
         _ => Some(error_response(
             request.id,
             error_codes::METHOD_NOT_FOUND,
@@ -5137,6 +5217,137 @@ mod tests {
         assert_eq!(
             error.data.unwrap().get("reason").and_then(|v| v.as_str()),
             Some("fortification_id_zero")
+        );
+    }
+
+    /// **M9C-4 / VAL-M9C-010 (subset)**: the 2 new cfctl methods
+    /// owned by `m9c-4-minefield-suite-robot-engineer-doctrine` route
+    /// on the cf-control server — neither returns `MethodNotFound`.
+    #[tokio::test]
+    async fn m9c_minefield_cfctl_routes() {
+        let engine = StubEngine;
+        let hz: Arc<Mutex<Option<u32>>> = Arc::new(Mutex::new(None));
+        let filter: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+        let routes: &[(&str, serde_json::Value)] = &[
+            (
+                "act.player.deploy_minefield_template",
+                json!({
+                    "schema_version": SCHEMA_VERSION,
+                    "id": "proximity_belt_dense",
+                    "origin": [10i32, 5i32],
+                }),
+            ),
+            (
+                "act.player.disarm_mine",
+                json!({
+                    "schema_version": SCHEMA_VERSION,
+                    "mine_id": 42u64,
+                    "actor_id": 7u64,
+                }),
+            ),
+        ];
+        for (method, params) in routes {
+            let req = json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": method,
+                "params": params,
+            });
+            let resp = process_request(&req.to_string(), &engine, &hz, &filter, 240)
+                .await
+                .unwrap();
+            let parsed: JsonRpcResponse = serde_json::from_str(&resp).unwrap();
+            if let Some(error) = parsed.error.as_ref() {
+                assert_ne!(
+                    error.code,
+                    error_codes::METHOD_NOT_FOUND,
+                    "{method} returned MethodNotFound; routes table out of date"
+                );
+            }
+            assert!(parsed.result.is_some(), "{method} must dispatch to a result");
+        }
+    }
+
+    /// **M9C-4**: `act.player.deploy_minefield_template` rejects an
+    /// empty template id before reaching the engine handler.
+    #[tokio::test]
+    async fn m9c_deploy_minefield_template_rejects_empty_id() {
+        let engine = StubEngine;
+        let hz: Arc<Mutex<Option<u32>>> = Arc::new(Mutex::new(None));
+        let filter: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+        let req = json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "act.player.deploy_minefield_template",
+            "params": {
+                "schema_version": SCHEMA_VERSION,
+                "id": "",
+                "origin": [0i32, 0i32],
+            }
+        });
+        let resp = process_request(&req.to_string(), &engine, &hz, &filter, 240)
+            .await
+            .unwrap();
+        let parsed: JsonRpcResponse = serde_json::from_str(&resp).unwrap();
+        let error = parsed.error.expect("empty template id must reject");
+        assert_eq!(error.code, error_codes::INVALID_PARAMS);
+        assert_eq!(
+            error.data.unwrap().get("reason").and_then(|v| v.as_str()),
+            Some("template_id_empty")
+        );
+    }
+
+    /// **M9C-4**: `act.player.disarm_mine` accepts the robot-routed
+    /// path (per VAL-M9C-043) — `robot_id` substitutes for `actor_id`.
+    #[tokio::test]
+    async fn m9c_disarm_mine_accepts_robot_route() {
+        let engine = StubEngine;
+        let hz: Arc<Mutex<Option<u32>>> = Arc::new(Mutex::new(None));
+        let filter: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+        let req = json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "act.player.disarm_mine",
+            "params": {
+                "schema_version": SCHEMA_VERSION,
+                "mine_id": 1u64,
+                "robot_id": 99u64,
+            }
+        });
+        let resp = process_request(&req.to_string(), &engine, &hz, &filter, 240)
+            .await
+            .unwrap();
+        let parsed: JsonRpcResponse = serde_json::from_str(&resp).unwrap();
+        assert!(parsed.error.is_none(), "robot-routed disarm must accept: {:?}", parsed.error);
+        let result = parsed.result.unwrap();
+        assert_eq!(result.get("agent").and_then(|v| v.as_str()), Some("robot"));
+    }
+
+    /// **M9C-4**: `act.player.disarm_mine` rejects when both
+    /// `actor_id` AND `robot_id` are missing.
+    #[tokio::test]
+    async fn m9c_disarm_mine_requires_actor_or_robot() {
+        let engine = StubEngine;
+        let hz: Arc<Mutex<Option<u32>>> = Arc::new(Mutex::new(None));
+        let filter: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+        let req = json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "act.player.disarm_mine",
+            "params": {
+                "schema_version": SCHEMA_VERSION,
+                "mine_id": 1u64,
+            }
+        });
+        let resp = process_request(&req.to_string(), &engine, &hz, &filter, 240)
+            .await
+            .unwrap();
+        let parsed: JsonRpcResponse = serde_json::from_str(&resp).unwrap();
+        let error = parsed.error.expect("missing actor + robot must reject");
+        assert_eq!(error.code, error_codes::INVALID_PARAMS);
+        assert_eq!(
+            error.data.unwrap().get("reason").and_then(|v| v.as_str()),
+            Some("actor_id_or_robot_id_required"),
         );
     }
 }
