@@ -11,7 +11,12 @@
 
 use serde::{Deserialize, Serialize};
 
-use crate::{Stance, Status, Vec2};
+use cf_trench::{
+    cover_state as derive_trench_cover_state, cover_state_fire_step, CoverState as TrenchCoverState,
+    SegmentVariant as TrenchSegmentVariant, TrenchSegmentLookup, TrenchStance,
+};
+
+use crate::{ActorState, Stance, Status, Vec2};
 
 /// One-stop record of all M6 stance inputs. Engine builds this each tick
 /// from the actor's [`crate::ActorState`] + edge/sticky intents from
@@ -300,5 +305,194 @@ mod tests {
         assert!(stance_bloom_factor(Stance::Crouching) < stance_bloom_factor(Stance::Stand));
         assert!(stance_bloom_factor(Stance::Prone) < stance_bloom_factor(Stance::Crouching));
         assert!(stance_bloom_factor(Stance::Airborne) > stance_bloom_factor(Stance::Stand));
+    }
+}
+
+/// **M9B**: collapse the 23-variant tactical [`Stance`] enum down to the
+/// three-state [`TrenchStance`] axis used by the cf-trench cover-state
+/// derivation. Crouch-variants → [`TrenchStance::Crouched`]; prone-variants
+/// → [`TrenchStance::Prone`]; everything else (Stand, Walking, Running,
+/// Sprint, Airborne, Idle, Slide, Vault, Dive, Climb, Jet, Eject, etc.) →
+/// [`TrenchStance::Standing`] because the actor's torso is at full standing
+/// silhouette for cover-routing purposes.
+#[must_use]
+pub fn trench_stance_for(stance: Stance) -> TrenchStance {
+    match stance {
+        Stance::Crouching | Stance::CrouchWalk | Stance::Slide => TrenchStance::Crouched,
+        Stance::Prone | Stance::ProneWalk => TrenchStance::Prone,
+        _ => TrenchStance::Standing,
+    }
+}
+
+/// **M9B**: collapse the per-actor posture intent + derived stance down
+/// to a single [`TrenchStance`] for cover-state derivation. Honours
+/// `prone_active` and `crouch_active` directly so cover updates the
+/// instant the player toggles the intent flag — even when `ActorState::stance()`
+/// (which routes via `Stance::from_chassis`) has not yet promoted those
+/// intents into the chassis-derived Stance value.
+#[must_use]
+pub fn trench_stance_for_actor(actor: &ActorState) -> TrenchStance {
+    if actor.prone_active {
+        return TrenchStance::Prone;
+    }
+    if actor.crouch_active {
+        return TrenchStance::Crouched;
+    }
+    trench_stance_for(actor.stance())
+}
+
+impl ActorState {
+    /// **M9B**: derive cover state for this actor against a trench-segment
+    /// `world` lookup. The result equals
+    /// `cf_trench::cover_state(trench_stance_for_actor(self),
+    /// segment.variant)` when the actor stands inside a segment, and
+    /// [`TrenchCoverState::Exposed`] on open ground. Per spec §"Notes"
+    /// the value is **derived, not stored** — mutate stance and the next
+    /// call observes the new cover.
+    ///
+    /// `world` is any implementor of [`cf_trench::TrenchSegmentLookup`].
+    /// m9b-2's procgen + m9b-3's cfctl handlers each provide their own
+    /// implementation against the chunked terrain index.
+    #[must_use]
+    pub fn cover_state<W: TrenchSegmentLookup + ?Sized>(&self, world: &W) -> TrenchCoverState {
+        let trench_stance = trench_stance_for_actor(self);
+        let tile_x = self.position.x as i32;
+        let tile_y = self.position.y as i32;
+        match world.segment_at(tile_x, tile_y) {
+            Some(segment) => {
+                // fire_step has an on/off-step sub-axis. The actor stands
+                // on-step when its y-position sits within the
+                // raised_step_height band at the top of the segment's
+                // depth range. Off-step (the default) routes through the
+                // canonical (stance × variant) table.
+                if let Some(step_height) = segment.raised_step_height {
+                    if matches!(segment.variant, TrenchSegmentVariant::FireStep) {
+                        let on_step = tile_y
+                            >= segment.tile_y + segment.depth as i32 - step_height as i32;
+                        return cover_state_fire_step(trench_stance, on_step);
+                    }
+                }
+                derive_trench_cover_state(trench_stance, segment.variant)
+            }
+            None => TrenchCoverState::Exposed,
+        }
+    }
+}
+
+#[cfg(test)]
+mod cover_state_api_tests {
+    use super::*;
+    use crate::{ActorId, Inventory};
+    use cf_trench::segment::{InMemorySegments, TrenchSegment};
+    use cf_trench::{CoverState as TrenchCoverState, SegmentVariant, TrenchModule};
+
+    fn standing_player(pos: Vec2) -> ActorState {
+        let mut a = ActorState::player(ActorId(1), "blue", pos, 100.0, Inventory::default());
+        a.on_ground = true;
+        a.crouch_active = false;
+        a.prone_active = false;
+        a
+    }
+
+    fn seg(variant: SegmentVariant, tile_x: i32, tile_y: i32) -> TrenchSegment {
+        let (depth, width, step, modules): (u32, u32, Option<u32>, Vec<TrenchModule>) = match variant {
+            SegmentVariant::ShallowScrape => (6, 12, None, vec![]),
+            SegmentVariant::Standard => (16, 16, None, vec![TrenchModule::Duckboard]),
+            SegmentVariant::Deep => (24, 16, None, vec![TrenchModule::Duckboard, TrenchModule::DrainageSump]),
+            SegmentVariant::Communication => (16, 8, None, vec![TrenchModule::Duckboard]),
+            SegmentVariant::FireStep => (16, 20, Some(8), vec![TrenchModule::Duckboard, TrenchModule::FireStep]),
+            SegmentVariant::ParapetRaised => (16, 24, Some(8), vec![TrenchModule::Duckboard, TrenchModule::Breastwork]),
+        };
+        TrenchSegment {
+            variant,
+            tile_x,
+            tile_y,
+            depth,
+            width,
+            raised_step_height: step,
+            embedded_modules: modules,
+        }
+    }
+
+    /// VAL-M9B feature `actor.cover_state(&world)`: open ground returns
+    /// `Exposed`; standing inside a `standard` trench returns `Partial`;
+    /// crouching inside `standard` upgrades to `Full`; mutating stance
+    /// mid-tick observes the new value.
+    #[test]
+    fn cover_state_api() {
+        let world = InMemorySegments::with_segments(vec![seg(
+            SegmentVariant::Standard,
+            10,
+            0,
+        )]);
+        // open ground far to the left
+        let actor_open = standing_player(Vec2::new(0.0, 5.0));
+        assert_eq!(actor_open.cover_state(&world), TrenchCoverState::Exposed);
+
+        // inside the standard segment — standing
+        let mut actor_in = standing_player(Vec2::new(15.0, 8.0));
+        assert_eq!(actor_in.cover_state(&world), TrenchCoverState::Partial);
+
+        // mutate stance to crouched → expect Full
+        actor_in.crouch_active = true;
+        assert_eq!(actor_in.cover_state(&world), TrenchCoverState::Full);
+
+        // toggle to prone → still Full (standard is Full when prone)
+        actor_in.crouch_active = false;
+        actor_in.prone_active = true;
+        assert_eq!(actor_in.cover_state(&world), TrenchCoverState::Full);
+    }
+
+    /// Standing inside `deep` → Full (head below grade). VAL-M9B-SEGMENT-003.
+    #[test]
+    fn cover_state_api_deep_standing_is_full() {
+        let world = InMemorySegments::with_segments(vec![seg(SegmentVariant::Deep, 0, 0)]);
+        let a = standing_player(Vec2::new(8.0, 4.0));
+        assert_eq!(a.cover_state(&world), TrenchCoverState::Full);
+    }
+
+    /// `fire_step` on-step Standing → Exposed; off-step Standing → Partial.
+    /// VAL-M9B-SEGMENT-004.
+    #[test]
+    fn cover_state_api_fire_step_on_off_step() {
+        let world = InMemorySegments::with_segments(vec![seg(SegmentVariant::FireStep, 0, 0)]);
+        // fire_step: depth=16, raised_step_height=Some(8). On-step band
+        // sits at y >= 16-8 = 8. tile_y=10 → on-step.
+        let on_step_player = standing_player(Vec2::new(5.0, 10.0));
+        assert_eq!(on_step_player.cover_state(&world), TrenchCoverState::Exposed);
+
+        // tile_y=2 → off-step (lower than step band).
+        let off_step_player = standing_player(Vec2::new(5.0, 2.0));
+        assert_eq!(off_step_player.cover_state(&world), TrenchCoverState::Partial);
+    }
+
+    /// Stance changes mid-tick are visible immediately (derivation is
+    /// not cached). VAL-M9B-COVER-001 mirror on the actor surface.
+    #[test]
+    fn cover_state_api_not_cached_across_stance_change() {
+        let world = InMemorySegments::with_segments(vec![seg(SegmentVariant::Standard, 0, 0)]);
+        let mut a = standing_player(Vec2::new(8.0, 8.0));
+        let first = a.cover_state(&world);
+        a.crouch_active = true;
+        let second = a.cover_state(&world);
+        a.crouch_active = false;
+        let third = a.cover_state(&world);
+        assert_eq!(first, TrenchCoverState::Partial);
+        assert_eq!(second, TrenchCoverState::Full);
+        assert_eq!(third, TrenchCoverState::Partial);
+    }
+
+    #[test]
+    fn trench_stance_for_collapses_full_axis() {
+        assert_eq!(trench_stance_for(Stance::Stand), TrenchStance::Standing);
+        assert_eq!(trench_stance_for(Stance::Walking), TrenchStance::Standing);
+        assert_eq!(trench_stance_for(Stance::Running), TrenchStance::Standing);
+        assert_eq!(trench_stance_for(Stance::Sprint), TrenchStance::Standing);
+        assert_eq!(trench_stance_for(Stance::Airborne), TrenchStance::Standing);
+        assert_eq!(trench_stance_for(Stance::Crouching), TrenchStance::Crouched);
+        assert_eq!(trench_stance_for(Stance::CrouchWalk), TrenchStance::Crouched);
+        assert_eq!(trench_stance_for(Stance::Slide), TrenchStance::Crouched);
+        assert_eq!(trench_stance_for(Stance::Prone), TrenchStance::Prone);
+        assert_eq!(trench_stance_for(Stance::ProneWalk), TrenchStance::Prone);
     }
 }

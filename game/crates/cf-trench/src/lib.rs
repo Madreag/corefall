@@ -30,6 +30,6 @@ pub mod cover_state;
 pub mod modules;
 pub mod segment;
 
-pub use cover_state::{cover_state, CoverState, TrenchStance};
+pub use cover_state::{cover_state, cover_state_fire_step, CoverState, TrenchStance};
 pub use modules::{ModuleSpec, TrenchModule};
 pub use segment::{SegmentSpec, SegmentVariant, TrenchSegment, TrenchSegmentLookup};
