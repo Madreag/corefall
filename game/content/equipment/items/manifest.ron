@@ -1,0 +1,31 @@
+// **M6B § Files**: lists every canonical ItemSpec id. Mirrors the
+// hardcoded runtime registry in `cf_equipment::item_spec::registered_ids()`
+// so cf-mod can validate that the on-disk manifest is in sync with the
+// engine's view of the registry.
+//
+// Schema (locked at M6B):
+//   schema_version: u32 = 1
+//   items: Vec<ItemEntry>
+//   ItemEntry { id: String, category: String }
+//
+// Categories MUST match `cf_equipment::ItemCategory::as_str()`.
+//
+// Owning milestone: M6B (Item schema canonicalization + per-item weight
+// + grid dimensions + inventory encumbrance).
+(
+    schema_version: 1,
+    items: [
+        (id: "ammo_5_56x45", category: "ammo"),
+        (id: "backpack_industrial", category: "container"),
+        (id: "backpack_large", category: "container"),
+        (id: "backpack_medium", category: "container"),
+        (id: "backpack_small", category: "container"),
+        (id: "chest", category: "container"),
+        (id: "crate", category: "container"),
+        (id: "medkit", category: "medical"),
+        (id: "ration_mre", category: "consumable"),
+        (id: "rifle_m1", category: "weapon"),
+        (id: "rifle_m1_default", category: "weapon"),
+        (id: "water_bottle", category: "liquid"),
+    ],
+)

@@ -1953,6 +1953,7 @@ async fn process_request<E: EngineHandle>(
                     | "act.player.detach_suppressor"
                     | "act.player.set_facing"
                     | "act.player.aim_set_facing"
+                    | "act.player.nest_container"
             ) =>
         {
             let action = match decode_m6_action(m6_method, params) {
@@ -3654,6 +3655,24 @@ fn decode_m6_action(method: &str, params: serde_json::Value) -> Result<crate::m6
                 return Err("invalid_facing".to_string());
             }
             Ok(M6Action::AimSetFacing { facing })
+        }
+        "act.player.nest_container" => {
+            let parent_instance_id = p
+                .get("parent_instance_id")
+                .and_then(serde_json::Value::as_u64)
+                .ok_or_else(|| "missing_parent_instance_id".to_string())?;
+            let child_item_id = p
+                .get("child_item_id")
+                .and_then(serde_json::Value::as_str)
+                .ok_or_else(|| "missing_child_item_id".to_string())?
+                .to_string();
+            if child_item_id.is_empty() {
+                return Err("empty_child_item_id".to_string());
+            }
+            Ok(M6Action::NestContainer {
+                parent_instance_id,
+                child_item_id,
+            })
         }
         _ => Err(format!("unknown_m6_method:{method}")),
     }

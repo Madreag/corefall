@@ -1194,6 +1194,26 @@ fn validate_one(path: &Path, report: &mut ValidationReport) {
         validate_loadout_file(path, report);
         return;
     }
+    // **M6B**: validate `content/equipment/items/manifest.ron` against
+    // the cf_equipment::item_spec registry. The manifest mirrors the
+    // hardcoded registry id list so authoring tools can see the
+    // canonical set without consulting the engine binary.
+    if path
+        .parent()
+        .and_then(|p| p.file_name())
+        .and_then(|s| s.to_str())
+        == Some("items")
+        && path
+            .parent()
+            .and_then(|p| p.parent())
+            .and_then(|p| p.file_name())
+            .and_then(|s| s.to_str())
+            == Some("equipment")
+        && path.file_name().and_then(|s| s.to_str()) == Some("manifest.ron")
+    {
+        validate_item_manifest(path, report);
+        return;
+    }
     if path.parent().and_then(|p| p.file_name()).and_then(|s| s.to_str()) == Some("scenarios")
         || path
             .components()
@@ -1967,6 +1987,101 @@ fn validate_loadout_file(path: &Path, report: &mut ValidationReport) {
             ),
         ),
         Err(err) => report.add_error(path.to_path_buf(), format!("{err}")),
+    }
+}
+
+/// **M6B**: ItemSpec manifest entry shape (mirrors
+/// `cf_equipment::ItemSpec::{id, category}`).
+#[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct M6BItemManifestEntry {
+    id: String,
+    category: String,
+}
+
+/// **M6B**: full item manifest envelope. Schema_version is locked at 1
+/// per spec § Files.
+#[derive(Debug, serde::Deserialize)]
+#[serde(deny_unknown_fields)]
+struct M6BItemManifest {
+    schema_version: u32,
+    items: Vec<M6BItemManifestEntry>,
+}
+
+/// **M6B**: validate the on-disk
+/// `content/equipment/items/manifest.ron` against the canonical
+/// `cf_equipment::item_spec` registry. Each manifest entry MUST resolve
+/// through `spec_for_id()` and the declared `category` MUST match the
+/// runtime spec's `category.as_str()`. Manifest must list at least every
+/// registered item id (drift-detection: a hardcoded registry entry that
+/// authors forgot to list in the manifest is a bug).
+fn validate_item_manifest(path: &Path, report: &mut ValidationReport) {
+    let raw = match fs::read_to_string(path) {
+        Ok(t) => t,
+        Err(err) => {
+            report.add_error(path.to_path_buf(), format!("read failed: {err}"));
+            return;
+        }
+    };
+    let parsed: M6BItemManifest = match ron::from_str(&raw) {
+        Ok(v) => v,
+        Err(err) => {
+            report.add_error(path.to_path_buf(), format!("ron parse failed: {err}"));
+            return;
+        }
+    };
+    let mut messages: Vec<String> = Vec::new();
+    if parsed.schema_version != 1 {
+        messages.push(format!(
+            "item_manifest.schema_version must be 1 (got {})",
+            parsed.schema_version
+        ));
+    }
+    if parsed.items.is_empty() {
+        messages.push("item_manifest must declare at least 1 item".to_string());
+    }
+    let mut manifest_ids: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
+    for (i, entry) in parsed.items.iter().enumerate() {
+        if entry.id.trim().is_empty() {
+            messages.push(format!("items[{i}].id must be non-empty"));
+            continue;
+        }
+        if !manifest_ids.insert(entry.id.clone()) {
+            messages.push(format!("items[{i}].id `{}` duplicated", entry.id));
+        }
+        match cf_equipment::spec_for_id(&entry.id) {
+            Some(spec) => {
+                if spec.category.as_str() != entry.category {
+                    messages.push(format!(
+                        "items[{i}].id `{}` category mismatch (manifest={}, registry={})",
+                        entry.id,
+                        entry.category,
+                        spec.category.as_str()
+                    ));
+                }
+            }
+            None => {
+                messages.push(format!(
+                    "items[{i}].id `{}` is not registered in cf_equipment::item_spec",
+                    entry.id
+                ));
+            }
+        }
+    }
+    // Drift-detection: every registered id must appear in the manifest.
+    let registry_ids: std::collections::BTreeSet<String> = cf_equipment::item_registered_ids().into_iter().collect();
+    for missing in registry_ids.difference(&manifest_ids) {
+        messages.push(format!(
+            "registered item `{missing}` is missing from manifest.ron (mirror drift)"
+        ));
+    }
+    if messages.is_empty() {
+        report.add_pass(
+            path.to_path_buf(),
+            format!("item_manifest ({} entries)", parsed.items.len()),
+        );
+    } else {
+        report.add_error(path.to_path_buf(), messages.join("; "));
     }
 }
 
@@ -3248,6 +3363,91 @@ mod tests {
         let path = write_tmp("tool_registry.ron", body);
         let mut report = ValidationReport::default();
         validate_tool_registry(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+    }
+
+    #[test]
+    fn item_manifest_accepts_minimal_synced_manifest() {
+        // **M6B**: a manifest that lists every registered id with the
+        // canonical category must pass.
+        let registry_ids = cf_equipment::item_registered_ids();
+        let mut items = String::new();
+        for id in &registry_ids {
+            let spec = cf_equipment::spec_for_id(id).unwrap();
+            items.push_str(&format!("(id: \"{}\", category: \"{}\"),\n", id, spec.category.as_str()));
+        }
+        let body = format!("(schema_version: 1, items: [{items}])");
+        let path = write_tmp("manifest.ron", &body);
+        let mut report = ValidationReport::default();
+        validate_item_manifest(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.pass(), 1, "report: {:?}", report.entries);
+        assert_eq!(report.fail(), 0);
+    }
+
+    #[test]
+    fn item_manifest_rejects_unknown_id() {
+        let body = r#"(
+  schema_version: 1,
+  items: [
+    (id: "rifle_m1", category: "weapon"),
+    (id: "this_id_does_not_exist", category: "weapon"),
+  ],
+)"#;
+        let path = write_tmp("manifest.ron", body);
+        let mut report = ValidationReport::default();
+        validate_item_manifest(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+        assert!(report.entries[0].message.contains("not registered"));
+    }
+
+    #[test]
+    fn item_manifest_rejects_category_drift() {
+        let body = r#"(
+  schema_version: 1,
+  items: [
+    (id: "rifle_m1", category: "consumable"),
+  ],
+)"#;
+        let path = write_tmp("manifest.ron", body);
+        let mut report = ValidationReport::default();
+        validate_item_manifest(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+        assert!(report.entries[0].message.contains("category mismatch"));
+    }
+
+    #[test]
+    fn item_manifest_rejects_missing_registered_id() {
+        // Drift detection — when the manifest omits a registered id,
+        // validation fails with "mirror drift".
+        let body = r#"(
+  schema_version: 1,
+  items: [
+    (id: "rifle_m1", category: "weapon"),
+  ],
+)"#;
+        let path = write_tmp("manifest.ron", body);
+        let mut report = ValidationReport::default();
+        validate_item_manifest(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+        assert!(report.entries[0].message.contains("mirror drift"));
+    }
+
+    #[test]
+    fn item_manifest_rejects_bad_schema_version() {
+        let body = r#"(
+  schema_version: 2,
+  items: [
+    (id: "rifle_m1", category: "weapon"),
+  ],
+)"#;
+        let path = write_tmp("manifest.ron", body);
+        let mut report = ValidationReport::default();
+        validate_item_manifest(&path, &mut report);
         let _ = fs::remove_file(&path);
         assert_eq!(report.fail(), 1);
     }

@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/equipment.item_picked_up_with_mass.v0.1",
+  "title": "equipment.item_picked_up_with_mass",
+  "description": "M6B § ItemSpec canonicalization — pickup event that carries the per-item canonical mass + dimensions + bulk + category from the ItemSpec registry. Distinct from the legacy equipment.item_picked_up event (which only carries item_id + slot) so M14A's mass aggregator + M27's Tetris grid HUD can consume one canonical mass surface. Additive-only per M4 DR-002.",
+  "type": "object",
+  "required": ["actor", "item_id", "mass_kg"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "item_id": {"type": "string"},
+    "slot": {"type": "integer", "minimum": 0},
+    "instance_id": {"type": "integer", "minimum": 0},
+    "mass_kg": {"type": "number", "minimum": 0.0},
+    "bulk_volume_l": {"type": "number", "minimum": 0.0},
+    "dimensions": {
+      "type": "object",
+      "properties": {
+        "w": {"type": "integer", "minimum": 0},
+        "h": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": true
+    },
+    "category": {"type": "string"},
+    "inventory_total_mass_kg": {"type": "number", "minimum": 0.0},
+    "inventory_total_bulk_l": {"type": "number", "minimum": 0.0},
+    "source": {"type": "string"}
+  },
+  "additionalProperties": true
+}

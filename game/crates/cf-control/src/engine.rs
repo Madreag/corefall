@@ -888,6 +888,10 @@ pub(crate) struct EngineMutable {
     /// **M6**: last-emitted weight-bucket per actor (0 = under threshold,
     /// 1 = above). Toggling emits an `inventory.weight_changed` event.
     m6_last_weight_bucket: BTreeMap<ActorId, bool>,
+    /// **M6B**: last-emitted discrete encumbrance band per actor
+    /// (`None` / `Light` / `Moderate` / `Heavy`). Transitions emit
+    /// `inventory.encumbrance_threshold_crossed`.
+    m6b_last_encumbrance_band: BTreeMap<ActorId, cf_equipment::EncumbranceBand>,
     /// **M6**: per-actor footstep cadence accumulator (ticks since last
     /// emitted `perception.footstep_emitted`). Prevents replay spam.
     m6_footstep_cooldown: BTreeMap<ActorId, u32>,
@@ -1160,6 +1164,28 @@ fn rects_touch_or_overlap(a_min: [i64; 2], a_max: [i64; 2], b_min: [i64; 2], b_m
     x_overlap && y_overlap
 }
 
+/// **M6B**: walk the inventory grid tree to find the nesting depth of the
+/// placement identified by `instance_id`. Depth 0 = root inventory (the
+/// placement lives at `grid.items`); depth 1 = inside a top-level
+/// container; depth 2 = inside a nested container; etc. Returns 0 when the
+/// id is not found.
+fn container_depth_of(grid: &cf_actor::InventoryGrid, instance_id: u64) -> u8 {
+    fn walk(items: &[cf_actor::PlacedItem], target_id: u64, depth: u8) -> Option<u8> {
+        for item in items {
+            if item.instance_id == target_id {
+                return Some(depth);
+            }
+            if let Some(inner) = &item.container {
+                if let Some(d) = walk(&inner.items, target_id, depth.saturating_add(1)) {
+                    return Some(d);
+                }
+            }
+        }
+        None
+    }
+    walk(&grid.items, instance_id, 0).unwrap_or(0)
+}
+
 fn observed_run_status(state: &EngineMutable) -> RunStatus {
     if state.shutdown_requested {
         return RunStatus::Ended;
@@ -1389,6 +1415,7 @@ impl M0Engine {
                 m6_last_stamina_emit: BTreeMap::new(),
                 m6_last_stealth_band: BTreeMap::new(),
                 m6_last_weight_bucket: BTreeMap::new(),
+                m6b_last_encumbrance_band: BTreeMap::new(),
                 m6_footstep_cooldown: BTreeMap::new(),
                 grenade_projectiles: Vec::new(),
                 knife_projectiles: Vec::new(),
@@ -12217,6 +12244,130 @@ impl M0Engine {
         self.state.read().map(|s| s.shutdown_requested).unwrap_or(false)
     }
 
+    /// **M6B**: ensure the actor has an inventory grid + encumbrance
+    /// envelope; add a top-level placement of `item_id` × `count` to it
+    /// (with `liters_filled` for liquid containers); return
+    /// `(total_mass_kg, total_bulk_l, instance_id)`. The instance id is
+    /// `0` when the actor is missing.
+    fn add_to_inventory_grid_mut(
+        &self,
+        actor_id: ActorId,
+        item_id: &str,
+        count: u16,
+        liters_filled: f32,
+    ) -> (f32, f32, u64) {
+        let mut state = match self.state.write() {
+            Ok(s) => s,
+            Err(_) => return (0.0, 0.0, 0),
+        };
+        let Some(actor) = state
+            .actor_state
+            .as_mut()
+            .and_then(|sim| sim.world.actors.get_mut(&actor_id))
+        else {
+            return (0.0, 0.0, 0);
+        };
+        actor.inventory_grid_attach();
+        let Some(grid) = actor.inventory_grid_mut() else {
+            return (0.0, 0.0, 0);
+        };
+        let id = grid.add_top_level(item_id, count, liters_filled);
+        let total_mass = grid.total_mass_kg();
+        let total_bulk = grid.total_bulk_l();
+        // Refresh the encumbrance envelope from the new totals.
+        actor.recompute_inventory_encumbrance();
+        (total_mass, total_bulk, id)
+    }
+
+    /// **M6B**: remove the most-recent top-level placement of `item_id`
+    /// from the actor's inventory grid (FIFO order is arbitrary here —
+    /// the drop flow doesn't pre-thread an instance id). Returns
+    /// `(total_mass_kg, total_bulk_l, removed_instance_id)`; the
+    /// instance id is `0` when no matching placement was found.
+    fn remove_from_inventory_grid_mut(&self, actor_id: ActorId, item_id: &str) -> (f32, f32, u64) {
+        let mut state = match self.state.write() {
+            Ok(s) => s,
+            Err(_) => return (0.0, 0.0, 0),
+        };
+        let Some(actor) = state
+            .actor_state
+            .as_mut()
+            .and_then(|sim| sim.world.actors.get_mut(&actor_id))
+        else {
+            return (0.0, 0.0, 0);
+        };
+        if actor.inventory_grid.is_none() {
+            return (0.0, 0.0, 0);
+        }
+        let removed_id = {
+            let grid = actor.inventory_grid_mut().expect("grid present");
+            let id_opt = grid
+                .items
+                .iter()
+                .rev()
+                .find(|p| p.item_id == item_id)
+                .map(|p| p.instance_id);
+            if let Some(id) = id_opt {
+                grid.remove_top_level(id);
+                id
+            } else {
+                0
+            }
+        };
+        let grid = actor.inventory_grid().expect("grid present");
+        let total_mass = grid.total_mass_kg();
+        let total_bulk = grid.total_bulk_l();
+        actor.recompute_inventory_encumbrance();
+        (total_mass, total_bulk, removed_id)
+    }
+
+    /// **M6B**: after pickup / drop / liquid-fill changes the inventory,
+    /// recompute the encumbrance envelope + emit
+    /// `inventory.encumbrance_threshold_crossed` when the discrete band
+    /// transitions. Also enforces the walk-speed-penalty side-effects
+    /// (sprint is cancelled when band reaches Heavy).
+    fn tick_m6b_encumbrance_after_change(&self, tick: Tick, sim_time_ms: f64, actor_id: ActorId) {
+        let mut emit: Option<serde_json::Value> = None;
+        if let Ok(mut state) = self.state.write() {
+            let prev_band = state.m6b_last_encumbrance_band.get(&actor_id).copied();
+            let Some(actor) = state
+                .actor_state
+                .as_mut()
+                .and_then(|sim| sim.world.actors.get_mut(&actor_id))
+            else {
+                return;
+            };
+            actor.recompute_inventory_encumbrance();
+            let Some(env) = actor.inventory_encumbrance else {
+                return;
+            };
+            // Cancel sprint when actor enters the Heavy band.
+            if env.encumbered() && actor.sprint_active {
+                actor.sprint_active = false;
+                actor.stamina.sprinting = false;
+            }
+            let new_band = env.band;
+            let origin_id = actor.origin_id.clone();
+            if Some(new_band) != prev_band {
+                state.m6b_last_encumbrance_band.insert(actor_id, new_band);
+                emit = Some(json!({
+                    "actor": actor_id.0,
+                    "from_band": prev_band.map(|b| b.as_str()).unwrap_or("none"),
+                    "to_band": new_band.as_str(),
+                    "total_carried_kg": env.total_carried_kg,
+                    "max_carry_kg": env.max_carry_kg,
+                    "carry_ratio": env.carry_ratio(),
+                    "walk_speed_multiplier": env.walk_speed_multiplier,
+                    "origin_id": origin_id,
+                }));
+            }
+        }
+        if let Some(payload) = emit {
+            self.recorder
+                .record(tick, sim_time_ms, "inventory", "encumbrance_threshold_crossed", payload, None);
+        }
+    }
+
     /// Monotonic counter that increments whenever `pending_intent` is
     /// externally reset (currently only `scenario.reset`). Input bridges that
     /// edge-trigger dispatch on keyboard-state change watch this so that
@@ -13142,6 +13293,72 @@ impl M0Engine {
                             "cause": "cfctl_aim_set_facing",
                         });
                     }
+                    M6Action::NestContainer {
+                        parent_instance_id,
+                        child_item_id,
+                    } => {
+                        // **M6B § Acceptance: Container nesting depth-limited**.
+                        // The actor must have an inventory grid attached; the
+                        // grid drives the depth check + emits the locked
+                        // `max_depth_exceeded` reason on rejection.
+                        actor.inventory_grid_attach();
+                        let mut child_is_container = false;
+                        let mut parent_item_id_str = String::new();
+                        let mut resolved_depth: u8 = 0;
+                        let mut new_instance_id: Option<u64> = None;
+                        if let Some(spec) = cf_equipment::spec_for_id(child_item_id) {
+                            child_is_container = spec.is_container();
+                        } else {
+                            reject_reason = Some("child_unknown_item");
+                        }
+                        if reject_reason.is_none() {
+                            if let Some(grid) = actor.inventory_grid_mut() {
+                                // Capture the parent label first so the
+                                // emitted event carries it.
+                                if let Some(parent) = grid.find(*parent_instance_id) {
+                                    parent_item_id_str = parent.item_id.clone();
+                                }
+                                match grid.try_nest_container(*parent_instance_id, child_item_id.clone()) {
+                                    Ok(id) => {
+                                        new_instance_id = Some(id);
+                                        // Depth is parent_depth+1; recompute by
+                                        // walking the tree.
+                                        if let Some(child) = grid.find(id) {
+                                            let _ = child;
+                                        }
+                                        resolved_depth = container_depth_of(grid, id);
+                                    }
+                                    Err(reason) => {
+                                        // Static-lifetime mapping for the spec-locked rejection.
+                                        if reason == cf_equipment::MAX_DEPTH_EXCEEDED {
+                                            reject_reason = Some(cf_equipment::MAX_DEPTH_EXCEEDED);
+                                        } else if reason == "parent_not_found" {
+                                            reject_reason = Some("parent_not_found");
+                                        } else if reason == "child_unknown_item" {
+                                            reject_reason = Some("child_unknown_item");
+                                        } else {
+                                            reject_reason = Some("nest_container_failed");
+                                        }
+                                    }
+                                }
+                            } else {
+                                reject_reason = Some("no_inventory_grid");
+                            }
+                        }
+                        if reject_reason.is_none() {
+                            let child_id = new_instance_id.unwrap_or(0);
+                            event_payload = json!({
+                                "actor": player_id.0,
+                                "parent_instance_id": *parent_instance_id,
+                                "parent_item_id": parent_item_id_str,
+                                "child_instance_id": child_id,
+                                "child_item_id": child_item_id,
+                                "depth": resolved_depth,
+                                "max_depth": cf_equipment::MAX_CONTAINER_NEST_DEPTH,
+                                "child_is_container": child_is_container,
+                            });
+                        }
+                    }
                 }
             }
         }
@@ -13316,11 +13533,57 @@ impl M0Engine {
         }
         // **M6**: spawn a physical item entity in the world for drop_item.
         if let Some(mut spawn) = drop_item_spawn.take() {
+            let dropped_item_id_clone = spawn.item_id.clone();
+            let dropped_slot = spawn.original_slot;
+            let dropped_pos = spawn.position;
             if let Ok(mut s) = self.state.write() {
                 spawn.id = s.m6_next_dropped_item_id;
                 s.m6_next_dropped_item_id = s.m6_next_dropped_item_id.saturating_add(1);
                 s.m6_dropped_items.push(spawn);
             }
+            // **M6B**: mirror the drop into the actor's inventory grid
+            // (remove the most-recent placement of the item) + emit
+            // the mass-aware sibling event.
+            let (grid_total_mass, grid_total_bulk, instance_id) =
+                self.remove_from_inventory_grid_mut(player_id, &dropped_item_id_clone);
+            let spec = cf_equipment::spec_for_id(&dropped_item_id_clone);
+            let (mass_kg, dims, bulk, category) = if let Some(s) = spec.as_ref() {
+                (
+                    s.mass_kg,
+                    json!({"w": s.dimensions.w, "h": s.dimensions.h}),
+                    s.bulk_volume_l,
+                    s.category.as_str().to_string(),
+                )
+            } else {
+                (
+                    3.5_f32,
+                    json!({"w": 2, "h": 4}),
+                    3.0_f32,
+                    cf_equipment::ItemCategory::Weapon.as_str().to_string(),
+                )
+            };
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "equipment",
+                "item_dropped_with_mass",
+                json!({
+                    "actor": player_id.0,
+                    "item_id": dropped_item_id_clone,
+                    "slot": dropped_slot,
+                    "instance_id": instance_id,
+                    "mass_kg": mass_kg,
+                    "bulk_volume_l": bulk,
+                    "dimensions": dims,
+                    "category": category,
+                    "inventory_total_mass_kg": grid_total_mass,
+                    "inventory_total_bulk_l": grid_total_bulk,
+                    "position": [dropped_pos.x, dropped_pos.y],
+                    "reason": "act.player.drop_item",
+                }),
+                None,
+            );
+            self.tick_m6b_encumbrance_after_change(tick, sim_time_ms, player_id);
         }
         // **M6**: scan pickup radius + add nearest item to first empty slot.
         //
@@ -13433,7 +13696,7 @@ impl M0Engine {
                     }
                 }
             }
-            if let Some((dropped_id, item_id, weight, slot)) = picked_dropped {
+            if let Some((dropped_id, item_id, weight, slot)) = picked_dropped.clone() {
                 self.recorder.record(
                     tick,
                     sim_time_ms,
@@ -13467,6 +13730,99 @@ impl M0Engine {
                     }),
                     None,
                 );
+                // **M6B**: also emit the mass-aware sibling event with the
+                // canonical knife spec from the ItemSpec registry. Falls
+                // back to the legacy values when no spec is registered.
+                let knife_spec = cf_equipment::spec_for_id(cf_equipment::KNIFE_M6_DEFAULT_ID);
+                let (mass_kg, dims, bulk, category) = if let Some(s) = knife_spec.as_ref() {
+                    (
+                        s.mass_kg,
+                        json!({"w": s.dimensions.w, "h": s.dimensions.h}),
+                        s.bulk_volume_l,
+                        s.category.as_str().to_string(),
+                    )
+                } else {
+                    (
+                        weight,
+                        json!({"w": 1, "h": 1}),
+                        0.5_f32,
+                        cf_equipment::ItemCategory::Weapon.as_str().to_string(),
+                    )
+                };
+                // Mirror into the actor's inventory grid (M6B canonical
+                // surface) so M14A's mass aggregator can read one source.
+                let (grid_total_mass, grid_total_bulk, instance_id) = self.add_to_inventory_grid_mut(
+                    player_id,
+                    cf_equipment::KNIFE_M6_DEFAULT_ID,
+                    1,
+                    0.0,
+                );
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "equipment",
+                    "item_picked_up_with_mass",
+                    json!({
+                        "actor": player_id.0,
+                        "item_id": cf_equipment::KNIFE_M6_DEFAULT_ID,
+                        "slot": slot,
+                        "instance_id": instance_id,
+                        "mass_kg": mass_kg,
+                        "bulk_volume_l": bulk,
+                        "dimensions": dims,
+                        "category": category,
+                        "inventory_total_mass_kg": grid_total_mass,
+                        "inventory_total_bulk_l": grid_total_bulk,
+                        "projectile_id": projectile_id,
+                        "source": "retrieved_throw",
+                    }),
+                    None,
+                );
+                self.tick_m6b_encumbrance_after_change(tick, sim_time_ms, player_id);
+            }
+            if let Some((dropped_id, item_id, weight, slot)) = picked_dropped {
+                // **M6B**: also emit the mass-aware sibling event with the
+                // canonical ItemSpec from the registry.
+                let spec = cf_equipment::spec_for_id(&item_id);
+                let (mass_kg, dims, bulk, category) = if let Some(s) = spec.as_ref() {
+                    (
+                        s.mass_kg,
+                        json!({"w": s.dimensions.w, "h": s.dimensions.h}),
+                        s.bulk_volume_l,
+                        s.category.as_str().to_string(),
+                    )
+                } else {
+                    (
+                        weight,
+                        json!({"w": 1, "h": 1}),
+                        weight * 0.3_f32,
+                        cf_equipment::ItemCategory::Weapon.as_str().to_string(),
+                    )
+                };
+                let (grid_total_mass, grid_total_bulk, instance_id) =
+                    self.add_to_inventory_grid_mut(player_id, &item_id, 1, 0.0);
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "equipment",
+                    "item_picked_up_with_mass",
+                    json!({
+                        "actor": player_id.0,
+                        "item_id": item_id,
+                        "slot": slot,
+                        "instance_id": instance_id,
+                        "mass_kg": mass_kg,
+                        "bulk_volume_l": bulk,
+                        "dimensions": dims,
+                        "category": category,
+                        "inventory_total_mass_kg": grid_total_mass,
+                        "inventory_total_bulk_l": grid_total_bulk,
+                        "dropped_item_id": dropped_id,
+                        "source": "dropped_world",
+                    }),
+                    None,
+                );
+                self.tick_m6b_encumbrance_after_change(tick, sim_time_ms, player_id);
             }
         }
         // **M6**: emit follow-on events (melee hit, knockdown, tool broken,
@@ -13763,6 +14119,7 @@ impl M0Engine {
             }
             crate::m6_actions::M6Action::SetFacing { .. } => ("actor", "facing_changed"),
             crate::m6_actions::M6Action::AimSetFacing { .. } => ("actor", "facing_changed"),
+            crate::m6_actions::M6Action::NestContainer { .. } => ("inventory", "container_nested"),
         };
         self.recorder
             .record(tick, sim_time_ms, category, event, event_payload, None);

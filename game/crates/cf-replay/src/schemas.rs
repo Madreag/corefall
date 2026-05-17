@@ -250,6 +250,13 @@ const SCHEMA_EQUIPMENT_WEAPON_SWAP_COMPLETED: &str =
 const SCHEMA_EQUIPMENT_WEAPON_SWAP_STARTED: &str = include_str!("../schemas/event/equipment_weapon_swap_started.json");
 const SCHEMA_INVENTORY_TANK_SLOT_RESERVED: &str = include_str!("../schemas/event/inventory_tank_slot_reserved.json");
 const SCHEMA_INVENTORY_WEIGHT_CHANGED: &str = include_str!("../schemas/event/inventory_weight_changed.json");
+// **M6B**: ItemSpec canonicalization — per-item mass + dimensions + bulk + per-actor encumbrance.
+const SCHEMA_EQUIPMENT_ITEM_PICKED_UP_WITH_MASS: &str =
+    include_str!("../schemas/event/item_picked_up_with_mass.json");
+const SCHEMA_EQUIPMENT_ITEM_DROPPED_WITH_MASS: &str = include_str!("../schemas/event/item_dropped_with_mass.json");
+const SCHEMA_INVENTORY_ENCUMBRANCE_THRESHOLD_CROSSED: &str =
+    include_str!("../schemas/event/encumbrance_threshold_crossed.json");
+const SCHEMA_INVENTORY_CONTAINER_NESTED: &str = include_str!("../schemas/event/container_nested.json");
 const SCHEMA_PERCEPTION_ACTOR_SIGNAL: &str = include_str!("../schemas/event/perception_actor_signal.json");
 const SCHEMA_PERCEPTION_FOOTSTEP_EMITTED: &str = include_str!("../schemas/event/perception_footstep_emitted.json");
 const SCHEMA_PERCEPTION_OCCLUSION_APPLIED: &str = include_str!("../schemas/event/perception_occlusion_applied.json");
@@ -635,6 +642,11 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("equipment", "weapon_swap_started") => Some(SCHEMA_EQUIPMENT_WEAPON_SWAP_STARTED),
         ("inventory", "tank_slot_reserved") => Some(SCHEMA_INVENTORY_TANK_SLOT_RESERVED),
         ("inventory", "weight_changed") => Some(SCHEMA_INVENTORY_WEIGHT_CHANGED),
+        // **M6B**: ItemSpec canonicalization event surface.
+        ("equipment", "item_picked_up_with_mass") => Some(SCHEMA_EQUIPMENT_ITEM_PICKED_UP_WITH_MASS),
+        ("equipment", "item_dropped_with_mass") => Some(SCHEMA_EQUIPMENT_ITEM_DROPPED_WITH_MASS),
+        ("inventory", "encumbrance_threshold_crossed") => Some(SCHEMA_INVENTORY_ENCUMBRANCE_THRESHOLD_CROSSED),
+        ("inventory", "container_nested") => Some(SCHEMA_INVENTORY_CONTAINER_NESTED),
         ("perception", "actor_signal") => Some(SCHEMA_PERCEPTION_ACTOR_SIGNAL),
         ("perception", "footstep_emitted") => Some(SCHEMA_PERCEPTION_FOOTSTEP_EMITTED),
         ("perception", "occlusion_applied") => Some(SCHEMA_PERCEPTION_OCCLUSION_APPLIED),
@@ -1282,6 +1294,11 @@ mod tests {
             ("equipment", "weapon_swap_started"),
             ("inventory", "tank_slot_reserved"),
             ("inventory", "weight_changed"),
+            // **M6B**: ItemSpec canonicalization event surface.
+            ("equipment", "item_picked_up_with_mass"),
+            ("equipment", "item_dropped_with_mass"),
+            ("inventory", "encumbrance_threshold_crossed"),
+            ("inventory", "container_nested"),
             ("perception", "actor_signal"),
             ("perception", "footstep_emitted"),
             ("perception", "occlusion_applied"),

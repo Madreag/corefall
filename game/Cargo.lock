@@ -2024,6 +2024,7 @@ version = "0.0.1"
 dependencies = [
  "bevy",
  "cf-actor",
+ "cf-equipment",
  "cf-terrain",
  "serde",
  "serde_json",

@@ -12,4 +12,5 @@ serde_json = { workspace = true }
 tracing = { workspace = true }
 bevy = { workspace = true }
 cf-actor = { path = "../cf-actor" }
+cf-equipment = { path = "../cf-equipment" }
 cf-terrain = { path = "../cf-terrain" }

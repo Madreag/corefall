@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/inventory.encumbrance_threshold_crossed.v0.1",
+  "title": "inventory.encumbrance_threshold_crossed",
+  "description": "M6B § ItemSpec canonicalization — discrete encumbrance-band transition. Fires when actor.encumbrance_band changes between {none, light, moderate, heavy}. Drives the HUD 'ENCUMBERED' warning (band=heavy) + the walk-speed-penalty multiplier. Additive-only per M4 DR-002.",
+  "type": "object",
+  "required": ["actor", "from_band", "to_band", "total_carried_kg", "max_carry_kg"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "from_band": {"type": "string", "enum": ["none", "light", "moderate", "heavy"]},
+    "to_band": {"type": "string", "enum": ["none", "light", "moderate", "heavy"]},
+    "total_carried_kg": {"type": "number", "minimum": 0.0},
+    "max_carry_kg": {"type": "number", "minimum": 0.0},
+    "carry_ratio": {"type": "number", "minimum": 0.0},
+    "walk_speed_multiplier": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+    "origin_id": {"type": "string"}
+  },
+  "additionalProperties": true
+}

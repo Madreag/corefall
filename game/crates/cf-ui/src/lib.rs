@@ -49,6 +49,7 @@ pub mod cover_pip;
 pub mod damage_direction;
 pub mod grenade_arc;
 pub mod hotbar;
+pub mod inventory_grid;
 pub mod lean_pip;
 pub mod minimap;
 pub mod phase_strip;
@@ -1656,6 +1657,13 @@ mod tests {
             hit_reaction_ticks_remaining: 0,
             drone_mode: None,
             drone_fuel: None,
+            max_carry_kg: cf_equipment::HUMAN_BASELINE_MAX_CARRY_KG,
+            max_carry_volume_l: cf_equipment::HUMAN_BASELINE_MAX_CARRY_VOLUME_L,
+            total_carried_kg: 0.0,
+            total_carried_volume_l: 0.0,
+            encumbrance_walk_speed_multiplier: 1.0,
+            encumbrance_band: "none".to_string(),
+            encumbered: false,
         };
         let line = stance_line("airborne", Some(&player));
         assert!(line.contains("AIRBORNE"));

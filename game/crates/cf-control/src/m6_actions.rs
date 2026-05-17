@@ -74,6 +74,17 @@ pub enum M6Action {
     /// actor)". Distinct from `SetFacing` which is the manual cfctl
     /// override (debug surface).
     AimSetFacing { facing: String },
+    /// **M6B**: nest a container item inside another container that
+    /// already lives in the actor's inventory grid. The child item is
+    /// allocated a fresh instance id and inserted into the parent's
+    /// nested container. Rejected with `max_depth_exceeded` per spec
+    /// § Acceptance criteria — Container nesting depth-limited — when
+    /// the parent is already at the M6B-locked depth cap
+    /// ([`cf_equipment::MAX_CONTAINER_NEST_DEPTH`]).
+    NestContainer {
+        parent_instance_id: u64,
+        child_item_id: String,
+    },
 }
 
 impl M6Action {
@@ -110,6 +121,7 @@ impl M6Action {
             M6Action::DetachSuppressor => "act.player.detach_suppressor",
             M6Action::SetFacing { .. } => "act.player.set_facing",
             M6Action::AimSetFacing { .. } => "act.player.aim_set_facing",
+            M6Action::NestContainer { .. } => "act.player.nest_container",
         }
     }
 }
@@ -203,6 +215,10 @@ mod tests {
             M6Action::DetachSuppressor,
             M6Action::SetFacing { facing: "right".into() },
             M6Action::AimSetFacing { facing: "right".into() },
+            M6Action::NestContainer {
+                parent_instance_id: 1,
+                child_item_id: "crate".into(),
+            },
         ];
         let names: std::collections::BTreeSet<&str> = actions.iter().map(M6Action::method_name).collect();
         assert_eq!(names.len(), actions.len());

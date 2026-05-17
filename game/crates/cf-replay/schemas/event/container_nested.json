@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/inventory.container_nested.v0.1",
+  "title": "inventory.container_nested",
+  "description": "M6B § ItemSpec canonicalization — fired when an item is nested inside a container in the inventory grid. The depth field carries the resulting nesting depth (1 = top-level container, 2 = nested container, capped by MAX_CONTAINER_NEST_DEPTH). Rejections (depth > 2) fire actor.action_rejected with reason 'max_depth_exceeded' instead of this event. Additive-only per M4 DR-002.",
+  "type": "object",
+  "required": ["actor", "parent_instance_id", "child_item_id", "depth"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "parent_instance_id": {"type": "integer", "minimum": 0},
+    "parent_item_id": {"type": "string"},
+    "child_instance_id": {"type": "integer", "minimum": 0},
+    "child_item_id": {"type": "string"},
+    "depth": {"type": "integer", "minimum": 1, "maximum": 8},
+    "max_depth": {"type": "integer", "minimum": 1, "maximum": 8},
+    "child_is_container": {"type": "boolean"}
+  },
+  "additionalProperties": true
+}

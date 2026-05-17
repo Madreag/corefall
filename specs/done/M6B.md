@@ -2,7 +2,7 @@
 
 ## Status
 
-`active`
+`done`
 
 ## Intent
 
@@ -149,3 +149,14 @@ Scenario: Determinism — encumbrance reproduced
 - ItemSpec is the **single source of truth** — every other equipment/loot/crafting milestone reads from this registry.
 - Per-origin carry modifier is multiplicative; stacks with M17 origin matrix.
 - Encumbrance penalty curve is deterministic + replay-stable.
+
+## Per-scenario verdict
+
+| Scenario | Verdict | Notes |
+|---|---|---|
+| Item declares mass + dimensions | IMPLEMENTED | `cf_equipment::item_spec` registry returns `rifle_m1 { mass_kg=3.5, dimensions=2×4 }`; engine `add_to_inventory_grid_mut` adds mass to actor's `inventory_grid`; `equipment.item_picked_up_with_mass` event fires with canonical mass; `mass_aggregator::total_mass` reflects new inventory contribution. Tests: `scenario_item_declares_mass_and_dimensions`. |
+| Encumbrance at 100% reduces walk speed | IMPLEMENTED | `walk_speed_multiplier(50, 50) = 0.5`; `encumbrance_band` returns Heavy at 100%; `cf-actor::sim` `effective_max_speed` multiplied by `encumbrance_walk_speed_multiplier()`; HUD widget `cf-ui::inventory_grid::InventoryGridState::warning_text() = "ENCUMBERED"` at Heavy band. Tests: `scenario_encumbrance_at_100_percent_reduces_walk_speed`, `scenario_encumbrance_table_lerp_curve`. |
+| Per-origin scaling applies | IMPLEMENTED | `carry_capacity_modifier("heavy_biomech")=1.5×`, `max_carry_kg_for_origin("heavy_biomech")=75`; `InventoryEncumbrance::for_origin` baseline scaled; `actor.max_carry_kg()` returns origin-scaled cap. Tests: `scenario_per_origin_scaling_applies`, `scenario_per_origin_actor_envelope_seeded_from_origin`. |
+| Container nesting depth-limited | IMPLEMENTED | `InventoryGrid::try_nest_container` rejects with `MAX_DEPTH_EXCEEDED` ("max_depth_exceeded") when candidate depth > `MAX_CONTAINER_NEST_DEPTH=2`; `act.player.nest_container` cfctl method wired to `M6Action::NestContainer`; engine routes rejection through `actor.action_rejected` with the spec-locked reason; on success emits `inventory.container_nested` with depth. Tests: `scenario_container_nesting_depth_limited_rejects_max_depth_exceeded`, `scenario_container_nesting_depth_helper_matches_spec`. |
+| Liquid container full vs empty mass | IMPLEMENTED | `water_bottle` spec carries `mass_kg=0.2 + liquid_capacity_l=Some(1.0)`; `liquid_fill_mass(spec, 1.0)=1.2`, `0.5=0.7`; `InventoryGrid::adjust_liquid` updates the placed item's `current_liquid_l` and the grid's `total_mass_kg` reflects the new full/half/empty mass. Tests: `scenario_liquid_container_full_vs_empty_mass`. |
+| Determinism — encumbrance reproduced | IMPLEMENTED | Encumbrance compute is pure (no RNG, no wall clock, no system time); `walk_speed_multiplier` + `encumbrance_band` are byte-stable across repeated calls; serde round-trip preserves `InventoryGrid` mass deterministically. Tests: `scenario_determinism_encumbrance_reproduced`, `deterministic_total_mass_after_round_trip`. |

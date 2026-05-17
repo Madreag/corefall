@@ -736,10 +736,17 @@ fn step_one_actor<R: FnMut() -> u64>(
                 outcome.gear_dropped_by_limb_loss = true;
             }
             let effective_jump_impulse = tuning.jump_impulse * jump_factor;
+            // **M6B § Encumbrance**: scale walk speed by the inventory
+            // grid's load curve (1.0 empty, 0.5 at 100% carry). Pure
+            // multiplicative with chassis movement factor + crawl floor
+            // so the spec's PARITY-34 (mass_factor) and M6B encumbrance
+            // stack deterministically. Falls back to 1.0 when no
+            // encumbrance envelope is attached (pre-M6B actors).
+            let encumbrance_factor = actor.encumbrance_walk_speed_multiplier();
             let effective_max_speed = if force_crawl {
-                tuning.max_speed * 0.25
+                tuning.max_speed * 0.25 * encumbrance_factor
             } else {
-                tuning.max_speed * move_factor
+                tuning.max_speed * move_factor * encumbrance_factor
             };
             if accepted_input && intent.jump {
                 let (new_vy, accepted) = apply_jump(JumpInputs {

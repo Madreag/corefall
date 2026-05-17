@@ -46,12 +46,19 @@ pub mod components;
 pub mod constants;
 pub mod cover;
 pub mod gib;
+pub mod inventory;
 pub mod lean;
+pub mod mass_aggregator;
 pub mod sim;
 pub mod stamina;
 pub mod stance;
 pub mod systems;
 pub mod ttd;
+
+pub use inventory::{
+    Container, InventoryBreakdown, InventoryEncumbrance, InventoryGrid, PlacedItem,
+};
+pub use mass_aggregator::{breakdown as mass_breakdown, total_mass, MassBreakdown};
 
 pub use attachable::{apply_damage as apply_attachable_damage, Attachable};
 pub use cover::{CoverSide, CoverState};
@@ -1089,6 +1096,20 @@ pub struct ActorState {
     /// charge-scaled shot.
     #[serde(default)]
     pub fire_held_prev: bool,
+    /// **M6B**: per-actor inventory grid (Tetris-style placement +
+    /// container nesting + liquid-mass tracking). `None` for legacy
+    /// actors that still drive purely off `inventory` /
+    /// `inventory_weight_kg`; `Some(...)` for M6B+ actors so the M14A
+    /// mass aggregator can read a single canonical inventory surface.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inventory_grid: Option<crate::inventory::InventoryGrid>,
+    /// **M6B**: per-actor inventory encumbrance envelope (carry cap +
+    /// derived walk-speed multiplier + band). Populated lazily on
+    /// `inventory_grid_attach` or at construction time via
+    /// `seed_inventory_encumbrance_for_origin`. `None` for legacy actors;
+    /// `Some(...)` for M6B+ actors.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inventory_encumbrance: Option<crate::inventory::InventoryEncumbrance>,
 }
 
 fn default_bipod_equipped() -> cf_equipment::Bipod {
@@ -1272,6 +1293,8 @@ impl ActorState {
             burst3_remaining_shots: 0,
             burst3_next_fire_at_seconds: 0.0,
             fire_held_prev: false,
+            inventory_grid: None,
+            inventory_encumbrance: None,
         }
     }
 
@@ -1316,6 +1339,100 @@ impl ActorState {
             self.drone_ally = Some(cf_chassis::DroneAllyState::default());
         }
         self.chassis = Some(chassis);
+    }
+
+    /// **M6B**: attach a default `InventoryGrid` and per-origin
+    /// `InventoryEncumbrance` envelope. Idempotent — safe to call on
+    /// already-initialized actors. Sets the encumbrance baseline from
+    /// the actor's current `origin_id` so heavy_biomech / drone /
+    /// robot get the spec-mandated `1.5× / 0.3× / 1.2×` carry scaling.
+    pub fn inventory_grid_attach(&mut self) {
+        if self.inventory_grid.is_none() {
+            self.inventory_grid = Some(crate::inventory::InventoryGrid::default());
+        }
+        if self.inventory_encumbrance.is_none() {
+            self.inventory_encumbrance = Some(crate::inventory::InventoryEncumbrance::for_origin(&self.origin_id));
+        }
+    }
+
+    /// **M6B**: borrow the per-actor inventory grid (read-only).
+    pub fn inventory_grid(&self) -> Option<&crate::inventory::InventoryGrid> {
+        self.inventory_grid.as_ref()
+    }
+
+    /// **M6B**: borrow the per-actor inventory grid (mutable).
+    pub fn inventory_grid_mut(&mut self) -> Option<&mut crate::inventory::InventoryGrid> {
+        self.inventory_grid.as_mut()
+    }
+
+    /// **M6B**: total mass of every placed item in the inventory grid
+    /// (recursive). Returns `0.0` when no grid is attached.
+    pub fn inventory_grid_total_mass_kg(&self) -> f32 {
+        if let Some(grid) = &self.inventory_grid {
+            grid.total_mass_kg()
+        } else {
+            // Fallback to the legacy M6 slot-weight surface so
+            // mass_aggregator::total_mass still reports a sensible
+            // value for chassis-less / pre-M6B actors.
+            self.inventory_weight_kg.max(0.0)
+        }
+    }
+
+    /// **M6B**: total bulk volume of every placed item in the
+    /// inventory grid (recursive). Returns `0.0` when no grid is
+    /// attached.
+    pub fn inventory_grid_total_bulk_l(&self) -> f32 {
+        self.inventory_grid
+            .as_ref()
+            .map_or(0.0, inventory::InventoryGrid::total_bulk_l)
+    }
+
+    /// **M6B**: refresh the `InventoryEncumbrance` envelope from the
+    /// live `inventory_grid` totals. Caller drives this from the engine
+    /// tick after pickup / drop / liquid-fill events. Returns the new
+    /// envelope (or `None` when no envelope is attached).
+    pub fn recompute_inventory_encumbrance(&mut self) -> Option<crate::inventory::InventoryEncumbrance> {
+        let total_mass = self.inventory_grid_total_mass_kg();
+        let total_bulk = self.inventory_grid_total_bulk_l();
+        let env = self.inventory_encumbrance.as_mut()?;
+        env.set_carried(total_mass, total_bulk);
+        Some(*env)
+    }
+
+    /// **M6B**: per-actor `max_carry_kg` baseline (50 × origin modifier).
+    /// Falls back to the human baseline when no envelope is attached.
+    pub fn max_carry_kg(&self) -> f32 {
+        self.inventory_encumbrance
+            .map_or(cf_equipment::HUMAN_BASELINE_MAX_CARRY_KG, |e| e.max_carry_kg)
+    }
+
+    /// **M6B**: per-actor `max_carry_volume_l` baseline (60 × origin modifier).
+    pub fn max_carry_volume_l(&self) -> f32 {
+        self.inventory_encumbrance
+            .map_or(cf_equipment::HUMAN_BASELINE_MAX_CARRY_VOLUME_L, |e| {
+                e.max_carry_volume_l
+            })
+    }
+
+    /// **M6B**: derived walk-speed multiplier from the encumbrance
+    /// envelope (`1.0` empty, `0.5` at 100%). Returns `1.0` when no
+    /// envelope is attached.
+    pub fn encumbrance_walk_speed_multiplier(&self) -> f32 {
+        self.inventory_encumbrance.map_or(1.0, |e| e.walk_speed_multiplier)
+    }
+
+    /// **M6B**: derived encumbrance band from the envelope
+    /// (`None` / `Light` / `Moderate` / `Heavy`).
+    pub fn encumbrance_band(&self) -> cf_equipment::EncumbranceBand {
+        self.inventory_encumbrance
+            .map_or(cf_equipment::EncumbranceBand::None, |e| e.band)
+    }
+
+    /// **M6B**: true when the actor is at or past 100% load (HUD shows
+    /// "ENCUMBERED" warning per spec § "Encumbrance at 100% reduces
+    /// walk speed").
+    pub fn is_encumbered(&self) -> bool {
+        self.inventory_encumbrance.is_some_and(|e| e.encumbered())
     }
 
     /// **M13** § "Hit reactions per body part" — apply a hit-reaction window
@@ -1420,6 +1537,16 @@ impl ActorState {
         self.burst3_remaining_shots = 0;
         self.burst3_next_fire_at_seconds = 0.0;
         self.fire_held_prev = false;
+        // **M6B**: reset the inventory grid + encumbrance envelope so a
+        // reset actor's encumbrance band returns to `None` and HUD widgets
+        // clear the "ENCUMBERED" warning.
+        if let Some(grid) = self.inventory_grid.as_mut() {
+            grid.items.clear();
+            grid.next_instance_id = 1;
+        }
+        if let Some(env) = self.inventory_encumbrance.as_mut() {
+            env.set_carried(0.0, 0.0);
+        }
     }
 
     /// Apply damage with a cause string. Returns the new status if it changed.
@@ -2026,6 +2153,32 @@ pub struct ActorObservation {
     pub drone_mode: Option<String>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub drone_fuel: Option<f32>,
+    /// **M6B**: per-actor `max_carry_kg` (50 × origin modifier).
+    #[serde(default)]
+    pub max_carry_kg: f32,
+    /// **M6B**: per-actor `max_carry_volume_l` (60 × origin modifier).
+    #[serde(default)]
+    pub max_carry_volume_l: f32,
+    /// **M6B**: total carried mass in kg (sum of inventory grid).
+    /// Distinct from the legacy `inventory_weight_kg` (M6 slot sum) so
+    /// the M14A mass aggregator can consume a per-item canonical surface.
+    #[serde(default)]
+    pub total_carried_kg: f32,
+    /// **M6B**: total carried bulk in liters.
+    #[serde(default)]
+    pub total_carried_volume_l: f32,
+    /// **M6B**: walk-speed multiplier from the encumbrance curve
+    /// (`1.0` empty, `0.5` at 100% carry).
+    #[serde(default = "default_bloom_factor")]
+    pub encumbrance_walk_speed_multiplier: f32,
+    /// **M6B**: discrete encumbrance band (none/light/moderate/heavy).
+    #[serde(default)]
+    pub encumbrance_band: String,
+    /// **M6B**: true when the actor is at or past 100% load (HUD shows
+    /// "ENCUMBERED" warning per spec § "Encumbrance at 100% reduces
+    /// walk speed").
+    #[serde(default)]
+    pub encumbered: bool,
 }
 
 /// **M6**: extended-inventory slot projection. Mirrors
@@ -2173,6 +2326,13 @@ impl ActorObservation {
             hit_reaction_ticks_remaining: actor.hit_reaction_ticks_remaining,
             drone_mode: actor.drone_ally.as_ref().map(|d| d.mode.as_str().to_string()),
             drone_fuel: actor.drone_ally.as_ref().map(|d| d.fuel),
+            max_carry_kg: actor.max_carry_kg(),
+            max_carry_volume_l: actor.max_carry_volume_l(),
+            total_carried_kg: actor.inventory_grid_total_mass_kg(),
+            total_carried_volume_l: actor.inventory_grid_total_bulk_l(),
+            encumbrance_walk_speed_multiplier: actor.encumbrance_walk_speed_multiplier(),
+            encumbrance_band: actor.encumbrance_band().as_str().to_string(),
+            encumbered: actor.is_encumbered(),
         }
     }
 }
