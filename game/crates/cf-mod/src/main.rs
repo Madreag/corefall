@@ -61,6 +61,21 @@ enum Cmd {
         #[command(subcommand)]
         action: Box<AudioGenAction>,
     },
+    /// **M4B § "cf-mod save validate"** — full schema + migration +
+    /// checksum validation pass over a single `.cfsave` file.
+    Save {
+        #[command(subcommand)]
+        action: SaveAction,
+    },
+}
+
+/// **M4B** save subcommands.
+#[derive(Debug, Subcommand)]
+enum SaveAction {
+    /// Run full validation: schema_version parsable, migration registry
+    /// reaches the current version, checksum (when sidecar exists)
+    /// matches the canonical-JSON BLAKE3 of the payload.
+    Validate { path: PathBuf },
 }
 
 /// **M12A**: audio-gen subcommands. Per spec § Files:
@@ -233,6 +248,13 @@ enum LedgerAction {
         strict_status: bool,
         #[arg(long)]
         ledger_path: Option<PathBuf>,
+        /// **M4B § "Ledger chain rejects tampered bundle"** — verify the
+        /// per-event BLAKE3 chain in a run bundle (rather than the asset
+        /// ledger). When set, ignores `id` / `all` and walks the bundle's
+        /// `events.jsonl` against the manifest's `run_id` + `seed` +
+        /// `ledger_chain_anchor`.
+        #[arg(long)]
+        bundle: Option<PathBuf>,
     },
     /// Re-bake one or more entries. Uses the freeze-then-store path by
     /// default; pipelines may register their own deterministic runner.
@@ -343,8 +365,18 @@ fn main() -> Result<()> {
         Cmd::Ledger { action } => run_ledger(action.as_ref(), cli.strict, cli.json),
         Cmd::AssetGen { action } => run_asset_gen(action.as_ref(), cli.json),
         Cmd::AudioGen { action } => run_audio_gen(action.as_ref(), cli.json),
+        Cmd::Save { action } => run_save(action, cli.json),
     }
 }
+
+fn run_save(action: &SaveAction, json_output: bool) -> Result<()> {
+    match action {
+        SaveAction::Validate { path } => save_validate::run(path, json_output),
+    }
+}
+
+mod bundle_chain_verify;
+mod save_validate;
 
 fn run_audio_gen(action: &AudioGenAction, json_output: bool) -> Result<()> {
     use std::process::{Command, Stdio};
@@ -676,7 +708,14 @@ fn run_ledger(action: &LedgerAction, global_strict: bool, json_output: bool) -> 
             all,
             strict_status,
             ledger_path,
+            bundle,
         } => {
+            // **M4B § "Ledger chain rejects tampered bundle"** — when
+            // `--bundle <path>` is passed, switch to per-event chain
+            // verification over the run bundle's `events.jsonl`.
+            if let Some(bundle_dir) = bundle {
+                return bundle_chain_verify::run(bundle_dir, json_output);
+            }
             let paths = ledger_paths(ledger_path.as_ref());
             let target = if *all { None } else { id.as_deref() };
             // **M4A spec literal**: `cf-mod ledger verify --strict` (global flag)

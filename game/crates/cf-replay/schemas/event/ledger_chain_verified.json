@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "ledger_chain_verified.v0.1",
+  "title": "system.ledger_chain_verified payload",
+  "description": "M4B § 'Ledger chain passes for a clean tournament bundle': emitted when `cf-mod ledger verify --bundle` or `cf-tools-replay-viewer validate` walks the chain end-to-end and finds it intact. The payload's `anchor` MUST equal `run_manifest.json.ledger_chain_anchor`.",
+  "type": "object",
+  "required": ["events_verified", "anchor", "result"],
+  "properties": {
+    "events_verified": { "type": "integer", "minimum": 0 },
+    "anchor": { "type": "string", "minLength": 64, "maxLength": 64 },
+    "result": { "type": "string", "enum": ["clean", "tampered", "empty_chain"] },
+    "first_break": {
+      "type": ["object", "null"],
+      "description": "Present only when `result` is `tampered`.",
+      "properties": {
+        "event_id": { "type": "string" },
+        "expected_hash": { "type": "string", "minLength": 64, "maxLength": 64 },
+        "actual_hash": { "type": "string", "minLength": 64, "maxLength": 64 }
+      }
+    }
+  }
+}

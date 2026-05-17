@@ -45,6 +45,8 @@ pub mod perf;
 pub mod record_id;
 pub mod schemas;
 pub mod shard;
+pub mod snapshot_baseline;
+pub mod snapshot_delta;
 
 pub use bundle_paths::{default_run_bundle_root, resolve_run_bundle_root};
 pub use record_id::{EntityKind, RecordId, RecordIdRegistry};
@@ -110,6 +112,21 @@ pub struct Event {
     /// `AssetId` (blake3 hex prefix).
     #[serde(skip_serializing_if = "Option::is_none", default)]
     pub asset_ref: Option<String>,
+    /// **M4B § "Tamper-evident competitive replays"** — optional BLAKE3
+    /// hash linking this event to the immediately-prior event in
+    /// tournament-mode bundles. The chain is verified by `cf-mod ledger
+    /// verify --bundle <path>` + `cf-tools-replay-viewer validate`. Dev
+    /// runs leave this `None` so existing M0/M3A bundles continue to
+    /// parse unchanged.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub prev_event_hash: Option<String>,
+    /// **M4B § "Tamper-evident competitive replays"** — the BLAKE3-keyed
+    /// hash for THIS event (binding `prev_event_hash` + canonical payload).
+    /// Stored alongside `prev_event_hash` so the verifier can pinpoint the
+    /// tamper to the exact event_id rather than the next one. `None` when
+    /// the recorder is not in chain mode.
+    #[serde(skip_serializing_if = "Option::is_none", default)]
+    pub chained_hash_hex: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -325,6 +342,37 @@ pub struct RunManifest {
     /// per-outcome event-count rules above.
     #[serde(default)]
     pub expected_outcome: ExpectedOutcome,
+    /// **M4B § "Replays survive a game update"** — the `.cfsave`
+    /// SaveSchemaVersion this run was recorded under. Serialized as a
+    /// 3-element JSON array `[major, minor, patch]` (canonical form so
+    /// canonical-JSON BLAKE3 stays unambiguous). Defaults to the current
+    /// build's version so legacy bundles without the field deserialize
+    /// cleanly.
+    #[serde(default = "default_save_schema_version")]
+    pub save_schema_version: [u16; 3],
+    /// **M4B § "Save files are smaller"** — cadence at which baseline
+    /// snapshots are emitted into the run bundle. Default 600 ticks
+    /// (10 s @ 60 Hz). Configurable per scenario.
+    #[serde(default = "default_delta_baseline_cadence_ticks")]
+    pub delta_baseline_cadence_ticks: u64,
+    /// **M4B § "Tamper-evident competitive replays"** — the BLAKE3 chain
+    /// anchor (chained_hash_hex of the final event in the run). Set in
+    /// tournament mode; `None` in dev mode so existing bundles continue
+    /// to parse unchanged.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ledger_chain_anchor: Option<String>,
+}
+
+/// Default the save schema version to the current build's `[2, 0, 0]` so
+/// legacy bundles without the field deserialize cleanly.
+fn default_save_schema_version() -> [u16; 3] {
+    [2, 0, 0]
+}
+
+/// Default delta baseline cadence (600 ticks = 10 s at 60 Hz) per
+/// M4B § "Delta baseline cadence is enforced".
+fn default_delta_baseline_cadence_ticks() -> u64 {
+    600
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -475,12 +523,22 @@ pub struct RecorderBlock {
 /// events are never starved by particle/visual cosmetics. If no cosmetic
 /// event is in the buffer, the new gameplay event itself is dropped (counted
 /// in `dropped_total` and the next emitted event picks up the dropped count).
+///
+/// **M4B § "Tamper-evident competitive replays"** — the recorder optionally
+/// runs in CHAIN MODE. When [`Recorder::enable_chain_mode`] has been called,
+/// every recorded event carries a `prev_event_hash` + `chained_hash_hex` pair
+/// computed via [`cf_save::ledger_chain::Encoder`]. The final
+/// [`Recorder::chain_anchor`] is the run-bundle's tournament-mode anchor.
 pub struct Recorder {
     run_id: String,
     seq: AtomicU64,
     inner: Mutex<RecorderInner>,
     /// Maximum events before backpressure drops. 0 = unlimited.
     capacity: usize,
+    /// **M4B**: ledger chain encoder. `Some(_)` when [`Recorder::enable_chain_mode`]
+    /// has been called; default `None` (events ship without chain fields,
+    /// matching legacy bundle behavior).
+    chain_encoder: Mutex<Option<cf_save::ledger_chain::Encoder>>,
 }
 
 struct RecorderInner {
@@ -531,7 +589,38 @@ impl Recorder {
                 checksum_event_count: 0,
             }),
             capacity,
+            chain_encoder: Mutex::new(None),
         }
+    }
+
+    /// **M4B § "Tournament-mode chain anchor"** — enable per-event BLAKE3
+    /// chain mode. The encoder uses keyed-BLAKE3 with a per-run key derived
+    /// from `(run_id, seed)` so chains from two different runs (or the same
+    /// run with a different seed) produce different anchors. Idempotent:
+    /// re-enabling resets the chain state.
+    pub fn enable_chain_mode(&self, seed: u64) {
+        let encoder = cf_save::ledger_chain::new_encoder(&self.run_id, seed);
+        let mut guard = self.chain_encoder.lock().expect("chain_encoder mutex poisoned");
+        *guard = Some(encoder);
+    }
+
+    /// **M4B**: returns true when chain mode is engaged.
+    pub fn chain_mode_enabled(&self) -> bool {
+        self.chain_encoder
+            .lock()
+            .expect("chain_encoder mutex poisoned")
+            .is_some()
+    }
+
+    /// **M4B § "Tournament-mode chain anchor"** — the BLAKE3 chained_hash of
+    /// the final event. Returns `None` when chain mode is OFF or no event
+    /// has been recorded yet.
+    pub fn chain_anchor(&self) -> Option<String> {
+        self.chain_encoder
+            .lock()
+            .expect("chain_encoder mutex poisoned")
+            .as_ref()
+            .and_then(|e| e.anchor())
     }
 
     pub fn peak_buffer_depth(&self) -> usize {
@@ -671,6 +760,21 @@ impl Recorder {
         } else {
             None
         };
+        // **M4B § "Tamper-evident competitive replays"** — when chain mode
+        // is on, compute the per-event BLAKE3 keyed chain hash over the
+        // canonical-JSON of the payload. Both `prev_event_hash` and
+        // `chained_hash_hex` are stored on the envelope so the verifier
+        // can pinpoint a tamper to the exact event_id.
+        let (prev_hash, chained_hash) = {
+            let mut chain_guard = self.chain_encoder.lock().expect("chain_encoder mutex poisoned");
+            if let Some(encoder) = chain_guard.as_mut() {
+                let canonical = serde_json::to_string(&payload).unwrap_or_else(|_| "null".to_string());
+                let chained = encoder.append(&event_id, &canonical);
+                (chained.prev_event_hash, Some(chained.chained_hash_hex))
+            } else {
+                (None, None)
+            }
+        };
         let event = Event {
             schema_version: EVENT_SCHEMA_VERSION.to_string(),
             run_id: self.run_id.clone(),
@@ -689,6 +793,8 @@ impl Recorder {
             dropped_count: drop_tag,
             cosmetic: if cosmetic { Some(true) } else { None },
             asset_ref: None,
+            prev_event_hash: prev_hash,
+            chained_hash_hex: chained_hash,
         };
         *inner.by_category.entry(event.category.clone()).or_insert(0) += 1;
         *inner.by_type.entry(event.event_type.clone()).or_insert(0) += 1;
@@ -1122,6 +1228,9 @@ mod tests {
             checksum: ChecksumConfig::m0_default(),
             tick_rate_hz: 60,
             expected_outcome: ExpectedOutcome::Clean,
+            save_schema_version: default_save_schema_version(),
+            delta_baseline_cadence_ticks: default_delta_baseline_cadence_ticks(),
+            ledger_chain_anchor: None,
         }
     }
 

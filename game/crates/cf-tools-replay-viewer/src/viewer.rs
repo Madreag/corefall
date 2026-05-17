@@ -110,6 +110,35 @@ pub fn render_markdown(bundle: &Bundle, state: &ViewerState) -> String {
             .map(|t| t.to_string())
             .unwrap_or_else(|| "n/a".into()),
     );
+    // **M4B § "Cross-version replay viewer surfaces migration banner"** —
+    // when the recorded save_schema_version differs from the current
+    // build's, the viewer header renders a single-line migration banner.
+    let recorded = bundle.manifest.save_schema_version;
+    let recorded_version = cf_save::SaveSchemaVersion::new(recorded[0], recorded[1], recorded[2]);
+    if recorded_version != cf_save::CURRENT_SAVE_SCHEMA_VERSION {
+        let _ = writeln!(
+            out,
+            "- Replay migrated from {} -> {} (handler: v1_to_v2)",
+            recorded_version.as_string(),
+            cf_save::CURRENT_SAVE_SCHEMA_VERSION.as_string()
+        );
+    }
+    // **M4B § "viewer header — delta depth: N + last baseline at tick: T"**.
+    let delta_summary = crate::delta_reconstructor::summarize(bundle);
+    if delta_summary.baseline_count > 0 {
+        let last_baseline = delta_summary
+            .last_baseline_tick
+            .map(|t| t.to_string())
+            .unwrap_or_else(|| "n/a".into());
+        let _ = writeln!(
+            out,
+            "- Delta chain depth: {} · Baselines emitted: {} · Last baseline at tick: {}",
+            delta_summary.delta_chain_depth, delta_summary.baseline_count, last_baseline
+        );
+    }
+    if let Some(anchor) = bundle.manifest.ledger_chain_anchor.as_deref() {
+        let _ = writeln!(out, "- Ledger chain anchor: `{}`", &anchor[..anchor.len().min(16)]);
+    }
     let _ = writeln!(out);
 
     let _ = writeln!(out, "## State");
@@ -534,6 +563,8 @@ mod tests {
             dropped_count: None,
             cosmetic: None,
             asset_ref: None,
+            prev_event_hash: None,
+            chained_hash_hex: None,
         };
         assert!(event_matches_actor(&event, 7));
         assert!(!event_matches_actor(&event, 9));

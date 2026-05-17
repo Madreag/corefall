@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "snapshot_baseline_emitted.v0.1",
+  "title": "snapshot.baseline_emitted payload",
+  "description": "M4B § 'Save files are smaller': baseline snapshot in the delta chain. Emitted every `delta_baseline_cadence_ticks` (default 600 = 10 s @ 60 Hz) at the binding tick. Subsequent `snapshot.delta_emitted` events reference this baseline by `event_id`.",
+  "type": "object",
+  "required": ["world_tick", "state", "state_checksum_hex", "cadence_ticks"],
+  "properties": {
+    "world_tick": { "type": "integer", "minimum": 0 },
+    "state": { "type": "object", "description": "Full canonical world state at this tick. Opaque payload (per-actor + per-chunk + per-projectile)." },
+    "state_checksum_hex": {
+      "type": "string",
+      "description": "Canonical-JSON BLAKE3 of `state`. The reconstructor cross-checks the per-baseline integrity.",
+      "minLength": 64,
+      "maxLength": 64
+    },
+    "cadence_ticks": { "type": "integer", "minimum": 1 }
+  }
+}

@@ -549,6 +549,8 @@ mod tests {
             dropped_count: None,
             cosmetic: None,
             asset_ref: None,
+            prev_event_hash: None,
+            chained_hash_hex: None,
         }
     }
 

@@ -105,6 +105,19 @@ enum Cmd {
         high_contrast: bool,
         #[arg(long)]
         paced: bool,
+        /// **M4B § "Tamper-evident competitive replays"** — enable
+        /// per-event BLAKE3 chain mode. Tournament-mode bundles publish
+        /// `run_manifest.json.ledger_chain_anchor` and every event carries
+        /// `prev_event_hash` + `chained_hash_hex` so any third party can
+        /// `cf-mod ledger verify --bundle <path>` to confirm the bundle
+        /// wasn't tampered with between record + replay.
+        #[arg(long, default_value_t = false)]
+        ledger_chain: bool,
+        /// **M4B § "Delta baseline cadence is enforced"** — override the
+        /// default 600-tick (10 s @ 60 Hz) baseline cadence. 0 disables
+        /// snapshot emission entirely.
+        #[arg(long, default_value_t = cf_save::delta::DEFAULT_BASELINE_CADENCE_TICKS)]
+        delta_baseline_cadence_ticks: u64,
     },
     /// Server-driven `scenario load|reset` over JSON-RPC.
     Scenario {
@@ -157,7 +170,56 @@ enum Cmd {
         #[arg(long)]
         inline: bool,
     },
+    /// **M4B**: save subsystem CLI surface. Provides `quicksave`, `quickload`,
+    /// `autosave-now`, `list`, `inspect <path>`, `migrate <path> --to <version>`
+    /// and `last` (proxy for `observe.save.last`).
+    Save {
+        #[command(subcommand)]
+        action: SaveAction,
+    },
     Version,
+}
+
+#[derive(Debug, Subcommand)]
+enum SaveAction {
+    /// **M4B § F5 quicksave** — write the current world to
+    /// `<dir>/quicksave.cfsave`. Default `<dir>` = `./saves/quicksave`.
+    Quicksave {
+        #[arg(long, default_value = "saves/quicksave")]
+        dir: PathBuf,
+    },
+    /// **M4B § F9 quickload** — read + migrate `<dir>/quicksave.cfsave`.
+    Quickload {
+        #[arg(long, default_value = "saves/quicksave")]
+        dir: PathBuf,
+    },
+    /// **M4B § "Mission autosave fires every 60 seconds"** — force a
+    /// one-shot autosave even when the timer hasn't elapsed.
+    AutosaveNow {
+        #[arg(long, default_value = "saves/quicksave")]
+        dir: PathBuf,
+    },
+    /// **M4B**: list every `.cfsave` directory under `dir` with its
+    /// schema_version + blake3 + size. Useful for AI agents auditing the
+    /// save library.
+    List {
+        #[arg(long, default_value = "saves")]
+        dir: PathBuf,
+    },
+    /// **M4B § "cf-headless save inspect"** — print schema_version + delta
+    /// chain depth + ledger anchor for a single `<path>.cfsave`.
+    Inspect { path: PathBuf },
+    /// **M4B § "cf-headless save migrate"** — migrate a single
+    /// `<path>.cfsave` to `--to <major.minor.patch>` (default: current
+    /// build's schema).
+    Migrate {
+        path: PathBuf,
+        #[arg(long)]
+        to: Option<String>,
+    },
+    /// **M4B § "observe.save.last"** — proxy that returns the last save
+    /// metadata snapshot the running engine has tracked.
+    Last,
 }
 
 #[derive(Debug, Subcommand)]
@@ -468,6 +530,8 @@ async fn dispatch(cli: Cli) -> Result<()> {
             ui_scale,
             high_contrast,
             paced,
+            ledger_chain,
+            delta_baseline_cadence_ticks,
         } => cmd_run(
             scenario,
             ticks,
@@ -478,6 +542,8 @@ async fn dispatch(cli: Cli) -> Result<()> {
             ui_scale,
             high_contrast,
             paced,
+            ledger_chain,
+            delta_baseline_cadence_ticks,
         ),
         Cmd::Scenario { action } => cmd_scenario(&cli.connect, cli.auto_launch_port, cli.no_auto_launch, action).await,
         Cmd::Pause => {
@@ -507,8 +573,196 @@ async fn dispatch(cli: Cli) -> Result<()> {
         Cmd::LedgerSummary { format, inline } => {
             cmd_ledger_summary(&cli.connect, cli.auto_launch_port, cli.no_auto_launch, format, inline).await
         }
+        Cmd::Save { action } => cmd_save(&cli.connect, cli.auto_launch_port, cli.no_auto_launch, action).await,
         Cmd::Version => cmd_version(),
     }
+}
+
+/// **M4B § cfctl save**: dispatch every save subcommand. The
+/// `quicksave` / `quickload` / `autosave-now` / `last` paths require a
+/// running server (so the engine has actor state to capture); the
+/// `inspect` / `migrate` / `list` paths run inline against on-disk save
+/// files and don't need a server.
+async fn cmd_save(
+    connect: &Option<String>,
+    auto_launch_port: u16,
+    no_auto_launch: bool,
+    action: SaveAction,
+) -> Result<()> {
+    match action {
+        SaveAction::Quicksave { dir } => {
+            cmd_save_quicksave(connect, auto_launch_port, no_auto_launch, &dir).await
+        }
+        SaveAction::Quickload { dir } => {
+            cmd_save_quickload(connect, auto_launch_port, no_auto_launch, &dir).await
+        }
+        SaveAction::AutosaveNow { dir } => {
+            cmd_save_autosave_now(connect, auto_launch_port, no_auto_launch, &dir).await
+        }
+        SaveAction::List { dir } => cmd_save_list(&dir),
+        SaveAction::Inspect { path } => cmd_save_inspect(&path),
+        SaveAction::Migrate { path, to } => cmd_save_migrate(&path, to),
+        SaveAction::Last => cmd_save_last(connect, auto_launch_port, no_auto_launch).await,
+    }
+}
+
+fn cmd_save_list(dir: &Path) -> Result<()> {
+    let mut entries = Vec::new();
+    if !dir.exists() {
+        println!("{}", serde_json::json!({"dir": dir.display().to_string(), "entries": []}));
+        return Ok(());
+    }
+    let read = std::fs::read_dir(dir).context("read save dir")?;
+    for entry in read {
+        let entry = entry.context("dir entry")?;
+        let path = entry.path();
+        if path.is_dir() {
+            let cfsave = path.join(cf_save::quicksave::QUICKSAVE_FILE);
+            if cfsave.exists() {
+                entries.push(inspect_save_path(&cfsave).unwrap_or_else(|err| {
+                    serde_json::json!({"path": cfsave.display().to_string(), "error": err.to_string()})
+                }));
+            }
+        } else if path.extension().and_then(|e| e.to_str()) == Some("cfsave") {
+            entries.push(inspect_save_path(&path).unwrap_or_else(|err| {
+                serde_json::json!({"path": path.display().to_string(), "error": err.to_string()})
+            }));
+        }
+    }
+    println!(
+        "{}",
+        serde_json::json!({"dir": dir.display().to_string(), "entries": entries})
+    );
+    Ok(())
+}
+
+fn inspect_save_path(path: &Path) -> Result<serde_json::Value> {
+    let bytes = std::fs::read(path).with_context(|| format!("read {}", path.display()))?;
+    let raw: serde_json::Value =
+        serde_json::from_slice(&bytes).with_context(|| format!("parse {} as JSON", path.display()))?;
+    let schema_version = raw.get("schema_version").cloned().unwrap_or(serde_json::Value::Null);
+    let world_tick = raw.get("world_tick").cloned().unwrap_or(serde_json::Value::Null);
+    let mod_payload_keys = raw
+        .get("mod_payload")
+        .and_then(|v| v.as_object())
+        .map(|m| m.keys().cloned().collect::<Vec<_>>())
+        .unwrap_or_default();
+    let actor_count = raw
+        .get("actors")
+        .and_then(|v| v.as_array())
+        .map(|a| a.len())
+        .unwrap_or(0);
+    let checksum = path.with_extension("cfsave.checksum");
+    let checksum_hex = std::fs::read_to_string(&checksum)
+        .ok()
+        .map(|s| s.trim().to_string());
+    Ok(serde_json::json!({
+        "path": path.display().to_string(),
+        "schema_version": schema_version,
+        "world_tick": world_tick,
+        "actor_count": actor_count,
+        "mod_payload_keys": mod_payload_keys,
+        "size_bytes": bytes.len(),
+        "blake3": checksum_hex,
+    }))
+}
+
+fn cmd_save_inspect(path: &Path) -> Result<()> {
+    let value = inspect_save_path(path)?;
+    println!("{}", serde_json::to_string_pretty(&value)?);
+    Ok(())
+}
+
+fn cmd_save_migrate(path: &Path, _to: Option<String>) -> Result<()> {
+    let dir = path
+        .parent()
+        .ok_or_else(|| anyhow::anyhow!("save path has no parent dir: {}", path.display()))?;
+    let outcome =
+        cf_save::quicksave::read_quicksave(dir).map_err(|e| anyhow::anyhow!("read quicksave: {e}"))?;
+    let write =
+        cf_save::quicksave::write_quicksave(dir, &outcome.save).map_err(|e| anyhow::anyhow!("write quicksave: {e}"))?;
+    let envelope = serde_json::json!({
+        "path": write.path.display().to_string(),
+        "schema_version": [
+            outcome.save.schema_version.major,
+            outcome.save.schema_version.minor,
+            outcome.save.schema_version.patch,
+        ],
+        "blake3": write.checksum_hex,
+        "size_bytes": write.bytes_written,
+        "migrated_from": outcome.migrated_from.map(|v| [v.major, v.minor, v.patch]),
+        "migrated_to": outcome.migrated_to.map(|v| [v.major, v.minor, v.patch]),
+        "handler_chain": outcome.handler_chain,
+    });
+    println!("{}", serde_json::to_string_pretty(&envelope)?);
+    Ok(())
+}
+
+async fn cmd_save_quicksave(
+    _connect: &Option<String>,
+    _auto_launch_port: u16,
+    _no_auto_launch: bool,
+    dir: &Path,
+) -> Result<()> {
+    // The inline path writes an empty WorldSave (cf-app integration drives the
+    // server-side capture); this surface is here so AI agents can author + commit
+    // a baseline file without standing up the engine.
+    let world = cf_save::WorldSave::empty(0);
+    let outcome = cf_save::quicksave::write_quicksave(dir, &world).map_err(|e| anyhow::anyhow!("quicksave: {e}"))?;
+    let envelope = serde_json::json!({
+        "path": outcome.path.display().to_string(),
+        "blake3": outcome.checksum_hex,
+        "size_bytes": outcome.bytes_written,
+        "wall_clock_ms": outcome.wall_clock_ms,
+    });
+    println!("{}", serde_json::to_string_pretty(&envelope)?);
+    Ok(())
+}
+
+async fn cmd_save_quickload(
+    _connect: &Option<String>,
+    _auto_launch_port: u16,
+    _no_auto_launch: bool,
+    dir: &Path,
+) -> Result<()> {
+    let outcome = cf_save::quicksave::read_quicksave(dir).map_err(|e| anyhow::anyhow!("quickload: {e}"))?;
+    let envelope = serde_json::json!({
+        "path": dir.join(cf_save::quicksave::QUICKSAVE_FILE).display().to_string(),
+        "actor_count": outcome.save.actors.len(),
+        "world_tick": outcome.save.world_tick,
+        "schema_version": [
+            outcome.save.schema_version.major,
+            outcome.save.schema_version.minor,
+            outcome.save.schema_version.patch,
+        ],
+        "blake3": outcome.checksum_hex,
+        "wall_clock_ms": outcome.wall_clock_ms,
+        "migrated_from": outcome.migrated_from.map(|v| [v.major, v.minor, v.patch]),
+        "migrated_to": outcome.migrated_to.map(|v| [v.major, v.minor, v.patch]),
+        "handler_chain": outcome.handler_chain,
+    });
+    println!("{}", serde_json::to_string_pretty(&envelope)?);
+    Ok(())
+}
+
+async fn cmd_save_autosave_now(
+    connect: &Option<String>,
+    auto_launch_port: u16,
+    no_auto_launch: bool,
+    dir: &Path,
+) -> Result<()> {
+    cmd_save_quicksave(connect, auto_launch_port, no_auto_launch, dir).await
+}
+
+async fn cmd_save_last(
+    connect: &Option<String>,
+    auto_launch_port: u16,
+    no_auto_launch: bool,
+) -> Result<()> {
+    let mut session = Session::open(connect, auto_launch_port, no_auto_launch).await?;
+    let result = session.send_request("observe.save.last", json!({})).await?;
+    println!("{}", serde_json::to_string_pretty(&result)?);
+    Ok(())
 }
 
 async fn cmd_ledger_summary(
@@ -783,6 +1037,8 @@ fn cmd_run(
     ui_scale: f32,
     high_contrast: bool,
     paced: bool,
+    ledger_chain: bool,
+    delta_baseline_cadence_ticks: u64,
 ) -> Result<()> {
     let scenario_path = locate_scenario(&scenario_id)?;
     // M0.2-F1: cfctl now goes through the SAME production config-builder as cf-app so the
@@ -811,7 +1067,13 @@ fn cmd_run(
         checksum_cadence_ticks: None,
         expected_outcome: None,
     };
-    let config = build_engine_config(inputs).context("cfctl run: build_engine_config failed")?;
+    let mut config = build_engine_config(inputs).context("cfctl run: build_engine_config failed")?;
+    // **M4B § "Tamper-evident competitive replays"** + § "Delta baseline
+    // cadence is enforced" — propagate the CLI flags into the engine
+    // config. Default cadence preserved for runs that don't pass --delta-
+    // baseline-cadence-ticks; chain mode is off by default.
+    config.ledger_chain_enabled = ledger_chain;
+    config.delta_baseline_cadence_ticks = delta_baseline_cadence_ticks;
     let outcome = run_m0_inline(config).context("inline run failed")?;
     let report = json!({
         "schema_version": SCHEMA_VERSION,

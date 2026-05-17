@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "snapshot_delta_emitted.v0.1",
+  "title": "snapshot.delta_emitted payload",
+  "description": "M4B § 'Save files are smaller': delta snapshot in the chain. References the most recent baseline by `baseline_event_id`; carries the JSON-Patch-style ops sufficient to transform `previous_state` to `current_state`.",
+  "type": "object",
+  "required": ["world_tick", "baseline_event_id", "baseline_tick", "ops"],
+  "properties": {
+    "world_tick": { "type": "integer", "minimum": 0 },
+    "baseline_event_id": { "type": "string" },
+    "baseline_tick": { "type": "integer", "minimum": 0 },
+    "ops": {
+      "type": "array",
+      "description": "JSON-Patch ops. Each op has a `op` tag and `path` array; per-op fields per cf_save::delta::DeltaOp.",
+      "items": { "type": "object" }
+    }
+  }
+}

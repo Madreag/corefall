@@ -16,3 +16,4 @@ blake3 = { workspace = true }
 hex = { workspace = true }
 chrono = { workspace = true }
 cf-sim-core = { path = "../cf-sim-core" }
+cf-save = { path = "../cf-save" }

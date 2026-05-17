@@ -500,6 +500,11 @@ pub const SUPPORTED_KEY_BINDING_ACTIONS: &[&str] = &[
     // M11: sharp_aim (ADS) added to the discrete action set so the remap
     // surface covers ACC-A's full 18+ action floor.
     "sharp_aim",
+    // **M4B § "F5 / F9 hotkeys are reserved by cf-shell::keybinds"** —
+    // register the save subsystem actions in the remap surface so cf-app
+    // honors player overrides via `Settings.key_bindings`.
+    "save.quicksave",
+    "save.quickload",
 ];
 
 pub const SUPPORTED_KEY_CODE_NAMES: &[&str] = &[
@@ -562,6 +567,23 @@ pub const SUPPORTED_KEY_CODE_NAMES: &[&str] = &[
     "Numpad7",
     "Numpad8",
     "Numpad9",
+    // **M4B § "F5 / F9 hotkeys are reserved by cf-shell::keybinds"** —
+    // the reserved save subsystem function keys. The full function-key
+    // row is registered so the player can remap quicksave/quickload onto
+    // any F-key, and so future shell hotkeys (e.g. F1 help, F12 photo
+    // mode) have their key names registered too.
+    "F1",
+    "F2",
+    "F3",
+    "F4",
+    "F5",
+    "F6",
+    "F7",
+    "F8",
+    "F9",
+    "F10",
+    "F11",
+    "F12",
 ];
 
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema, PartialEq)]
@@ -939,6 +961,12 @@ pub fn default_key_bindings() -> BTreeMap<String, String> {
     // M11: sharp_aim (ADS) — right-click typically, but we wire a keyboard
     // fallback so KeyboardOnly profile can still ADS.
     m.insert("sharp_aim".into(), "ShiftLeft".into());
+    // **M4B § "F5 / F9 hotkeys are reserved by cf-shell::keybinds"** —
+    // wire the spec's reserved defaults into the remap surface so the
+    // settings UI shows them and the player can override them. cf-app's
+    // ingest_quicksave_input reads these via key_for_action.
+    m.insert("save.quicksave".into(), "F5".into());
+    m.insert("save.quickload".into(), "F9".into());
     m
 }
 

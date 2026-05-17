@@ -181,6 +181,14 @@ pub struct M0EngineConfig {
     /// graph seeded into `M7AiWorld.objective_graph`. `None` opts out —
     /// the M2 single-vec objective list keeps working unchanged.
     pub initial_objective_graph: Option<cf_mission::ObjectiveGraph>,
+    /// **M4B § "Delta baseline cadence is enforced"** — ticks between
+    /// `snapshot.baseline_emitted` events. Default 600 (10 s @ 60 Hz);
+    /// 0 disables snapshot emission entirely.
+    pub delta_baseline_cadence_ticks: u64,
+    /// **M4B § "Tamper-evident competitive replays"** — when true, the
+    /// recorder runs in chain mode (per-event BLAKE3 keyed hash + final
+    /// anchor in `RunManifest.ledger_chain_anchor`). Default false.
+    pub ledger_chain_enabled: bool,
 }
 
 /// M1.5: initial breach world snapshot.
@@ -356,6 +364,13 @@ impl M0EngineConfig {
             initial_reinforcement_waves: Vec::new(),
             initial_boss_state: None,
             initial_objective_graph: None,
+            // **M4B § "Delta baseline cadence is enforced"** — default 600
+            // ticks (10 s @ 60 Hz) per spec.
+            delta_baseline_cadence_ticks: cf_save::delta::DEFAULT_BASELINE_CADENCE_TICKS,
+            // **M4B § "Tamper-evident competitive replays"** — chain mode is
+            // OFF by default for dev runs. Tournament mode opts in via cf-app
+            // / cfctl `--ledger-chain` / `--tournament-mode`.
+            ledger_chain_enabled: false,
         }
     }
 
@@ -644,6 +659,10 @@ pub struct M0Engine {
     /// (no-op + tracing). cf-app or cf-tools-replay-viewer install their own
     /// implementation via `set_audio_plugin` to play real sound.
     audio_plugin: std::sync::Mutex<Box<dyn cf_audio::AudioPlugin>>,
+    /// **M4B § "observe.save.last returns last save metadata"** — shared
+    /// snapshot of the last quicksave / quickload / migrate operation.
+    /// Updated by the cf-app F5/F9 path + `cfctl save quicksave/quickload`.
+    pub(crate) last_save_cache: Arc<crate::m4b_save::LastSaveCache>,
 }
 
 pub(crate) struct EngineMutable {
@@ -692,6 +711,15 @@ pub(crate) struct EngineMutable {
     /// raised_at_tick FIFO. Replay events are NOT re-derived from the queue;
     /// they live in `events.jsonl`.
     hud_banners: VecDeque<crate::state::HudBannerView>,
+    /// **M4B § "Delta baseline cadence is enforced"** — last snapshot we
+    /// captured (used as the diff base for the next delta).
+    m4b_previous_snapshot: Option<serde_json::Value>,
+    /// **M4B**: event_id of the most recent `snapshot.baseline_emitted`.
+    /// Stamped onto each subsequent `snapshot.delta_emitted` so the
+    /// reconstructor can chain them back.
+    m4b_last_baseline_event_id: Option<String>,
+    /// **M4B**: tick at which the most recent baseline was emitted.
+    m4b_last_baseline_tick: Option<u64>,
     /// M4A: captions queue (audio-bound events surfaced as text). Drains FIFO
     /// at `M4A_CAPTION_BUFFER`. The HUD draws the most recent N entries when
     /// `Settings.captions == true`.
@@ -1295,7 +1323,7 @@ impl M0Engine {
             }
         });
 
-        Self {
+        let engine = Self {
             config,
             state: RwLock::new(EngineMutable {
                 clock,
@@ -1383,6 +1411,13 @@ impl M0Engine {
                     .unwrap_or_else(|_| cf_localization::LocalizationTable::new("en")),
                 game_speed_accumulator: 0,
                 multiplayer_session: false,
+                // **M4B § "Delta baseline cadence is enforced"** —
+                // snapshot emitter state is empty until the first
+                // baseline fires at tick 0 (or `delta_baseline_cadence_ticks
+                // == 0` disables emission entirely).
+                m4b_previous_snapshot: None,
+                m4b_last_baseline_event_id: None,
+                m4b_last_baseline_tick: None,
             }),
             recorder,
             current_tick,
@@ -1390,7 +1425,16 @@ impl M0Engine {
             started_instant,
             run_bundle_dir,
             audio_plugin: std::sync::Mutex::new(Box::new(cf_audio::NullAudioPlugin)),
+            last_save_cache: Arc::new(crate::m4b_save::LastSaveCache::new()),
+        };
+        // **M4B § "Tournament-mode chain anchor"** — enable chain mode on
+        // the recorder when the config opts in. Must happen AFTER the
+        // recorder is constructed but BEFORE any tick fires so the very
+        // first event in the bundle gets a chain hash.
+        if engine.config.ledger_chain_enabled {
+            engine.recorder.enable_chain_mode(engine.config.seed);
         }
+        engine
     }
 
     /// **M1 R2**: install a custom audio backend. Default is
@@ -1502,6 +1546,11 @@ impl M0Engine {
         }
         self.emit_initial_snapshots(tick, sim_time_ms, Some(&started_id));
         self.emit_category_baseline(tick, sim_time_ms, &started_id);
+        // **M4B § "Delta baseline cadence is enforced"** — emit the tick-0
+        // baseline as part of run_started so the cadence is anchored from
+        // the very first tick. drive_tick() advances starts at tick 1, so
+        // tick 0 itself never goes through emit_m4b_snapshot_for_tick.
+        self.emit_m4b_snapshot_for_tick(tick);
         // **M4 § ux first_event_type**: emit one `ux.banner_raised` at run
         // start so the baseline's `first_event_type` for the ux category
         // is reachable. Banners are cosmetic per the determinism-island
@@ -4854,7 +4903,97 @@ impl M0Engine {
             self.refresh_hud_chassis_banners(&mut state, t);
         }
 
+        // **M4B § "Delta baseline cadence is enforced"** — emit one snapshot
+        // event per advanced tick. At ticks where `tick % cadence == 0` the
+        // emitter fires `snapshot.baseline_emitted` (full state); otherwise it
+        // fires `snapshot.delta_emitted` (JSON-Patch diff vs the previous
+        // tick's state). Disabled when cadence is 0.
+        if let Some(t) = advanced {
+            self.emit_m4b_snapshot_for_tick(t);
+        }
+
         advanced
+    }
+
+    /// **M4B § "Delta baseline cadence is enforced"** — per-tick snapshot
+    /// emitter. Reads the current world state via [`Self::snapshot_world_save`]
+    /// and produces either a baseline event (when `tick % cadence == 0`) or
+    /// a delta event chained back to the most recent baseline.
+    fn emit_m4b_snapshot_for_tick(&self, tick: Tick) {
+        let cadence = self.config.delta_baseline_cadence_ticks;
+        if cadence == 0 {
+            return;
+        }
+        let sim_time_ms = self.state.read().map(|s| s.clock.sim_time_ms()).unwrap_or(0.0);
+        let world = self.snapshot_world_save();
+        let state_value = match serde_json::to_value(&world) {
+            Ok(v) => v,
+            Err(err) => {
+                tracing::warn!(target: "cf::ctl::m4b", ?err, "snapshot serialization failed");
+                return;
+            }
+        };
+        let is_baseline = tick.0.is_multiple_of(cadence);
+        if is_baseline {
+            // Emit a baseline. Always emit, even at tick 0, so the chain
+            // is anchored from the very first cadence boundary.
+            match cf_replay::snapshot_baseline::emit_baseline(
+                &self.recorder,
+                tick,
+                sim_time_ms,
+                tick.0,
+                state_value.clone(),
+                cadence,
+            ) {
+                Ok(event_id) => {
+                    let mut state = self.state.write().expect("engine state poisoned");
+                    state.m4b_last_baseline_event_id = Some(event_id);
+                    state.m4b_last_baseline_tick = Some(tick.0);
+                    state.m4b_previous_snapshot = Some(state_value);
+                }
+                Err(err) => {
+                    tracing::warn!(target: "cf::ctl::m4b", ?err, "baseline emission failed");
+                }
+            }
+        } else {
+            // Emit a delta. Skip when there's no baseline yet (shouldn't
+            // happen — tick 0 always fires a baseline — but be defensive).
+            let (baseline_event_id, baseline_tick, previous) = {
+                let state = self.state.read().expect("engine state poisoned");
+                (
+                    state.m4b_last_baseline_event_id.clone(),
+                    state.m4b_last_baseline_tick.unwrap_or(0),
+                    state.m4b_previous_snapshot.clone(),
+                )
+            };
+            let (Some(baseline_event_id), Some(previous)) = (baseline_event_id, previous) else {
+                return;
+            };
+            let ops = cf_save::delta::diff(&previous, &state_value);
+            let ops_value = match serde_json::to_value(&ops) {
+                Ok(v) => v,
+                Err(err) => {
+                    tracing::warn!(target: "cf::ctl::m4b", ?err, "delta ops serialization failed");
+                    return;
+                }
+            };
+            if let Err(err) = cf_replay::snapshot_delta::emit_delta(
+                &self.recorder,
+                tick,
+                sim_time_ms,
+                tick.0,
+                baseline_event_id,
+                baseline_tick,
+                ops_value,
+            ) {
+                tracing::warn!(target: "cf::ctl::m4b", ?err, "delta emission failed");
+                return;
+            }
+            // Update the previous-snapshot cursor so the next delta diffs
+            // against THIS tick's state, not the baseline's state.
+            let mut state = self.state.write().expect("engine state poisoned");
+            state.m4b_previous_snapshot = Some(state_value);
+        }
     }
 
     /// **M3 re-open (2026-05-13)**: drain `state.pending_dirty_rects` and emit
@@ -14176,7 +14315,253 @@ impl M0Engine {
                     cf_replay::ExpectedOutcome::Clean
                 }
             }),
+            // **M4B § "Replays survive a game update"** — record the
+            // SaveSchemaVersion this run was produced under. Default
+            // `[2, 0, 0]` matches `cf_save::CURRENT_SAVE_SCHEMA_VERSION`.
+            save_schema_version: [
+                cf_save::CURRENT_SAVE_SCHEMA_VERSION.major,
+                cf_save::CURRENT_SAVE_SCHEMA_VERSION.minor,
+                cf_save::CURRENT_SAVE_SCHEMA_VERSION.patch,
+            ],
+            // **M4B § "Delta baseline cadence is enforced"** — honor the
+            // engine config (default 600 = 10 s @ 60 Hz, per spec). cf-app
+            // / cfctl can override via `--delta-baseline-cadence-ticks`.
+            delta_baseline_cadence_ticks: self.config.delta_baseline_cadence_ticks,
+            // **M4B § "Tamper-evident competitive replays"** — read the
+            // recorder's current chain anchor. `Some(_)` in tournament
+            // mode (`--ledger-chain`); `None` for dev bundles. Computed
+            // continuously as events are recorded; the value at manifest-
+            // write time is the run-end anchor.
+            ledger_chain_anchor: self.recorder.chain_anchor(),
         }
+    }
+
+    /// **M4B**: snapshot the entire current world into a [`cf_save::WorldSave`]
+    /// suitable for F5 quicksave. Captures every actor's M5 [`cf_save::SaveBlob`]
+    /// payload. Terrain chunks + projectiles are captured as opaque JSON so
+    /// the same encoder works across heterogeneous content.
+    pub fn snapshot_world_save(&self) -> cf_save::WorldSave {
+        let state = self.state.read().expect("engine state poisoned");
+        let world_tick = state.clock.tick().0;
+        let mut actors = Vec::new();
+        if let Some(sim) = state.actor_state.as_ref() {
+            for actor in sim.world.actors.values() {
+                let rifle = sim.rifles.get(&actor.id);
+                let reload_remaining = rifle.and_then(|r| {
+                    if r.reload_remaining_ticks > 0 {
+                        Some(r.reload_remaining_ticks)
+                    } else {
+                        None
+                    }
+                });
+                actors.push(cf_save::SaveBlob {
+                    schema_version: cf_save::CURRENT_SAVE_SCHEMA_VERSION,
+                    actor_id: actor.id.0,
+                    team: actor.team.clone(),
+                    origin_id: actor.origin_id.clone(),
+                    position: [actor.position.x, actor.position.y],
+                    velocity: [actor.velocity.x, actor.velocity.y],
+                    aim: [actor.aim.x, actor.aim.y],
+                    hp: actor.hp,
+                    hp_max: actor.hp_max,
+                    on_ground: actor.on_ground,
+                    status: format!("{:?}", actor.status),
+                    selected_slot: actor.inventory.selected.0,
+                    rifle_preset: rifle.map(|r| r.spec.preset_id.clone()),
+                    rifle_ammo: rifle.map(|r| r.ammo_in_mag),
+                    rifle_reload_remaining_ticks: reload_remaining,
+                    chassis: actor.chassis.clone(),
+                    gear_dropped_by_limb_loss: actor.gear_dropped_by_limb_loss,
+                    chassis_detached: actor.chassis_detached,
+                    afflictions: actor.afflictions.iter().map(|a| format!("{:?}", a.kind)).collect(),
+                    crouch_active: actor.crouch_active,
+                    climb_active: actor.climb_active,
+                    jet_active: actor.jet_active,
+                    mod_payload: std::collections::BTreeMap::new(),
+                });
+            }
+        }
+        cf_save::WorldSave {
+            schema_version: cf_save::CURRENT_SAVE_SCHEMA_VERSION,
+            world_tick,
+            actors,
+            terrain_chunks: Vec::new(),
+            projectiles: Vec::new(),
+            mod_payload: std::collections::BTreeMap::new(),
+        }
+    }
+
+    /// **M4B § F5 quicksave**: write the current world to `dir/quicksave.cfsave`
+    /// and emit `system.save_completed`. On success, pushes the
+    /// "Quicksaved" HUD banner; on failure, pushes the
+    /// [`Self::push_save_failure_banner`] plain-language modal-style
+    /// banner so the player sees the error without a panic.
+    pub fn quicksave(&self, dir: &std::path::Path) -> Result<cf_save::quicksave::QuicksaveOutcome, cf_save::SaveError> {
+        let save = self.snapshot_world_save();
+        let tick = Tick(self.current_tick.load(std::sync::atomic::Ordering::Relaxed));
+        let sim_time_ms = tick.0 as f64 * (1000.0 / f64::from(self.config.tick_rate_hz.max(1)));
+        let result = crate::m4b_save::fire_quicksave(
+            &self.recorder,
+            tick,
+            sim_time_ms,
+            &self.last_save_cache,
+            dir,
+            &save,
+            "quicksave",
+        );
+        match &result {
+            Ok(out) => self.push_save_success_banner("save_quicksaved", "Quicksaved", out.wall_clock_ms, tick.0),
+            Err(err) => self.push_save_failure_banner(err, tick.0),
+        }
+        result
+    }
+
+    /// **M4B § F9 quickload**: read `dir/quicksave.cfsave`, migrate it to
+    /// the current schema, emit `system.save_loaded` (and `save_migrated` if
+    /// the load triggered a migration step). On corruption surfaces the
+    /// plain-language modal `"Save file appears corrupted ..."` per spec
+    /// Acceptance Criterion 3; on future-version surfaces
+    /// `"This save was created in a newer game version (vN.M.P) ..."` per
+    /// Acceptance Criterion 2.
+    pub fn quickload(&self, dir: &std::path::Path) -> Result<cf_save::quicksave::QuickloadOutcome, cf_save::SaveError> {
+        let tick = Tick(self.current_tick.load(std::sync::atomic::Ordering::Relaxed));
+        let sim_time_ms = tick.0 as f64 * (1000.0 / f64::from(self.config.tick_rate_hz.max(1)));
+        let result = crate::m4b_save::fire_quickload(&self.recorder, tick, sim_time_ms, &self.last_save_cache, dir);
+        match &result {
+            Ok(out) => {
+                self.push_save_success_banner("save_loaded", "Quickloaded", out.wall_clock_ms, tick.0);
+                if let (Some(from), Some(to)) = (out.migrated_from, out.migrated_to) {
+                    self.push_migration_banner(from, to, tick.0);
+                }
+            }
+            Err(err) => self.push_save_failure_banner(err, tick.0),
+        }
+        result
+    }
+
+    /// **M4B § cfctl save autosave-now**: same as `quicksave` but tags the
+    /// emitted event with `kind: "autosave"`.
+    pub fn autosave(&self, dir: &std::path::Path) -> Result<cf_save::quicksave::QuicksaveOutcome, cf_save::SaveError> {
+        let save = self.snapshot_world_save();
+        let tick = Tick(self.current_tick.load(std::sync::atomic::Ordering::Relaxed));
+        let sim_time_ms = tick.0 as f64 * (1000.0 / f64::from(self.config.tick_rate_hz.max(1)));
+        let result = crate::m4b_save::fire_quicksave(
+            &self.recorder,
+            tick,
+            sim_time_ms,
+            &self.last_save_cache,
+            dir,
+            &save,
+            "autosave",
+        );
+        match &result {
+            Ok(out) => self.push_save_success_banner("save_autosaved", "Autosaved", out.wall_clock_ms, tick.0),
+            Err(err) => self.push_save_failure_banner(err, tick.0),
+        }
+        result
+    }
+
+    /// **M4B**: push a transient "Quicksaved (Nms)" / "Quickloaded" /
+    /// "Autosaved" banner into the HUD queue. cf-app's HUD renders this
+    /// in the standard banner stack.
+    fn push_save_success_banner(&self, id: &str, label: &str, wall_clock_ms: u32, tick: u64) {
+        let mut state = match self.state.write() {
+            Ok(s) => s,
+            Err(_) => return,
+        };
+        push_banner_dedup(
+            &mut state.hud_banners,
+            crate::state::HudBannerView {
+                id: id.to_string(),
+                severity: "info".to_string(),
+                label: format!("{label} ({wall_clock_ms} ms)"),
+                raised_at_tick: tick,
+                expires_at_tick: Some(tick + 180), // ~3 s @ 60 Hz
+                accessibility_id: format!("hud.banner.{id}"),
+            },
+        );
+    }
+
+    /// **M4B § "Save corrupted modal in plain language"** + § "Future
+    /// version save modal" — push a critical-severity HUD banner whose
+    /// label matches the spec's prescribed modal text for each
+    /// [`cf_save::SaveError`] variant.
+    fn push_save_failure_banner(&self, err: &cf_save::SaveError, tick: u64) {
+        let (id, label) = match err {
+            cf_save::SaveError::ChecksumMismatch { .. } => (
+                "save_corrupted",
+                "Save file appears corrupted (checksum mismatch). Try another slot.".to_string(),
+            ),
+            cf_save::SaveError::UnsupportedFutureVersion { found, .. } => (
+                "save_future_version",
+                format!(
+                    "This save was created in a newer game version ({}). Update Corefall to load it.",
+                    found.as_string()
+                ),
+            ),
+            cf_save::SaveError::MigrationFailed { from, to, reason } => (
+                "save_migration_failed",
+                format!(
+                    "Save migration failed ({} -> {}): {reason}",
+                    from.as_string(),
+                    to.as_string()
+                ),
+            ),
+            other => ("save_error", format!("Save failed: {other}")),
+        };
+        let mut state = match self.state.write() {
+            Ok(s) => s,
+            Err(_) => return,
+        };
+        push_banner_dedup(
+            &mut state.hud_banners,
+            crate::state::HudBannerView {
+                id: id.to_string(),
+                severity: "critical".to_string(),
+                label,
+                raised_at_tick: tick,
+                expires_at_tick: Some(tick + 600), // ~10 s @ 60 Hz (critical sticks longer)
+                accessibility_id: format!("hud.banner.{id}"),
+            },
+        );
+    }
+
+    /// **M4B § "Replay migrated banner"** — push the single-line "Replay
+    /// migrated from vA -> vB" banner. The viewer header already surfaces
+    /// this for replay bundles; the cf-app HUD surfaces it after a F9
+    /// quickload that triggered a migration step.
+    fn push_migration_banner(&self, from: cf_save::SaveSchemaVersion, to: cf_save::SaveSchemaVersion, tick: u64) {
+        let label = format!("Save migrated from {} -> {}", from.as_string(), to.as_string());
+        let mut state = match self.state.write() {
+            Ok(s) => s,
+            Err(_) => return,
+        };
+        push_banner_dedup(
+            &mut state.hud_banners,
+            crate::state::HudBannerView {
+                id: "save_migrated".to_string(),
+                severity: "info".to_string(),
+                label,
+                raised_at_tick: tick,
+                expires_at_tick: Some(tick + 360),
+                accessibility_id: "hud.banner.save_migrated".to_string(),
+            },
+        );
+    }
+
+    /// **M4B § cfctl save migrate**: in-place migrate a `<dir>/quicksave.cfsave`.
+    pub fn save_migrate(
+        &self,
+        dir: &std::path::PathBuf,
+    ) -> Result<cf_save::quicksave::QuickloadOutcome, cf_save::SaveError> {
+        let tick = Tick(self.current_tick.load(std::sync::atomic::Ordering::Relaxed));
+        let sim_time_ms = tick.0 as f64 * (1000.0 / f64::from(self.config.tick_rate_hz.max(1)));
+        crate::m4b_save::fire_migrate(&self.recorder, tick, sim_time_ms, &self.last_save_cache, dir)
+    }
+
+    /// Last quicksave metadata snapshot (for cfctl `observe.save.last`).
+    pub fn last_save_snapshot(&self) -> crate::m4b_save::LastSaveMetadata {
+        self.last_save_cache.snapshot()
     }
 }
 
@@ -15601,6 +15986,16 @@ fn apply_settings_patch(settings: &mut Settings, patch: &SettingsPatch) -> Vec<S
 
 #[async_trait]
 impl EngineHandle for M0Engine {
+    /// **M4B § "observe.save.last"** — return the live LastSaveMetadata
+    /// snapshot the engine has tracked since startup. Updated by F5/F9 +
+    /// cfctl save subcommands via [`crate::m4b_save::LastSaveCache`].
+    async fn observe_save_last(&self) -> serde_json::Value {
+        serde_json::to_value(self.last_save_cache.snapshot()).unwrap_or(serde_json::Value::Null)
+    }
+
+    /// Public accessor used by cf-app + cfctl save subcommands to dispatch
+    /// `system.save_completed` / `system.save_loaded` / `system.save_migrated`
+    /// events with full context.
     async fn snapshot(&self, _filter: Option<&str>) -> ObserveFrame {
         let state = self.state.read().expect("engine state poisoned");
         let actors = if let Some(sim) = state.actor_state.as_ref() {

@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "save_migrated.v0.1",
+  "title": "system.save_migrated payload",
+  "description": "M4B § 'Save written under v1 loads under current build via migration': emitted when the migration registry walks one or more handlers during a load or in-place migrate.",
+  "type": "object",
+  "required": ["from", "to", "handler_chain"],
+  "properties": {
+    "from": {
+      "type": "array",
+      "description": "Source SaveSchemaVersion before migration.",
+      "items": { "type": "integer", "minimum": 0, "maximum": 65535 },
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "to": {
+      "type": "array",
+      "description": "Target SaveSchemaVersion after migration.",
+      "items": { "type": "integer", "minimum": 0, "maximum": 65535 },
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "handler_chain": {
+      "type": "array",
+      "description": "Ordered list of migration handler ids the loader walked through (`v1_to_v2`, ...).",
+      "items": { "type": "string" }
+    },
+    "path": { "type": ["string", "null"] }
+  }
+}

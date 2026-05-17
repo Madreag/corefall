@@ -9,6 +9,7 @@
 pub mod components;
 pub mod engine;
 pub mod envelope;
+pub mod m4b_save;
 pub mod m6_actions;
 pub mod m7_ai;
 pub mod m8_ux;

@@ -43,10 +43,15 @@ cf-photo = { path = "../cf-photo" }
 cf-replay-scrub = { path = "../cf-replay-scrub" }
 cf-killcam = { path = "../cf-killcam" }
 cf-squad-ui = { path = "../cf-squad-ui" }
+cf-save = { path = "../cf-save" }
 
 [dev-dependencies]
 anyhow = { workspace = true }
 cf-sim-core = { path = "../cf-sim-core" }
+cf-tools-replay-viewer = { path = "../cf-tools-replay-viewer" }
+blake3 = { workspace = true }
+hex = { workspace = true }
+tempfile = "3"
 
 [[example]]
 name = "dump_schemas"

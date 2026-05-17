@@ -245,6 +245,11 @@ pub struct SaveSlotMetadata {
     pub thumbnail_png_path: Option<String>,
     pub is_corrupt: bool,
     pub is_empty: bool,
+    /// **M4B § "save_load module reads + displays schema version next to
+    /// each slot"** — pretty schema version (`vMAJOR.MINOR.PATCH`) parsed
+    /// from the on-disk `.cfsave` payload. Empty when the slot is empty.
+    #[serde(default)]
+    pub save_schema_version_pretty: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, Deserialize)]

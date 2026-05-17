@@ -56,6 +56,7 @@ use cf_ui::{
 // behavior-equivalent and emits a workspace test in each module file.
 mod gamepad_focus;
 mod hold_tracker;
+mod quicksave;
 
 const APP_VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -150,6 +151,21 @@ struct Cli {
     /// Default: 60. Set 0 to disable checksums.
     #[arg(long)]
     checksum_cadence_ticks: Option<u64>,
+    /// **M4B § "Delta baseline cadence is enforced"** — ticks between
+    /// `snapshot.baseline_emitted` events. Default 600 (10 s @ 60 Hz);
+    /// 0 disables snapshot emission entirely. Lower values give more
+    /// frequent baselines (faster reconstruction, larger bundle); higher
+    /// values amortize over deltas (smaller bundle, slower reconstruction).
+    #[arg(long)]
+    delta_baseline_cadence_ticks: Option<u64>,
+    /// **M4B § "Tamper-evident competitive replays"** — when set, the
+    /// recorder runs in chain mode: every event carries `prev_event_hash`
+    /// + `chained_hash_hex`, and `RunManifest.ledger_chain_anchor` is the
+    /// BLAKE3 chain anchor of the final event. Tournament organizers
+    /// publish the anchor + the bundle so third parties can verify
+    /// tamper-evidence via `cf-mod ledger verify --bundle`.
+    #[arg(long)]
+    ledger_chain: bool,
     /// **DEBUG-ONLY**: spawn a sub-thread that panics at the configured tick. Used to
     /// capture `system.panic` evidence in a real run bundle (M0-008 / M0.2-F5).
     /// Production runs should never set this.
@@ -574,7 +590,14 @@ fn build_config(cli: &Cli, scenario_path: PathBuf) -> Result<M0EngineConfig> {
         checksum_cadence_ticks: cli.checksum_cadence_ticks,
         expected_outcome: cli.expected_outcome.map(Into::into),
     };
-    build_engine_config(inputs).context("build_engine_config failed for cf-app")
+    let mut config = build_engine_config(inputs).context("build_engine_config failed for cf-app")?;
+    // **M4B § "Tamper-evident competitive replays"** + § "Delta baseline
+    // cadence is enforced" — pull M4B CLI flags into the engine config.
+    config.ledger_chain_enabled = cli.ledger_chain;
+    if let Some(cadence) = cli.delta_baseline_cadence_ticks {
+        config.delta_baseline_cadence_ticks = cadence;
+    }
+    Ok(config)
 }
 
 fn run_headless(mut config: M0EngineConfig) -> Result<()> {
@@ -591,6 +614,11 @@ fn run_headless(mut config: M0EngineConfig) -> Result<()> {
 
 #[derive(Resource)]
 struct EngineHolder(Arc<M0Engine>);
+
+/// **M4B § F5/F9 hotkeys** — per-frame state holder for the quicksave
+/// loop. Wraps [`crate::quicksave::QuicksaveLoopState`] in a Bevy resource.
+#[derive(Resource, Default)]
+struct QuicksaveLoopResource(crate::quicksave::QuicksaveLoopState);
 
 #[derive(Resource)]
 struct AppRuntime {
@@ -806,6 +834,7 @@ fn run_bevy(
             log_tick_progress,
             ingest_player_input,
             ingest_focus_input,
+            ingest_quicksave_input,
             sync_actor_state_to_render,
             sync_terrain_state_to_render,
             sync_reactor_state_to_widgets,
@@ -815,6 +844,7 @@ fn run_bevy(
         )
             .chain(),
     );
+    app.insert_resource(QuicksaveLoopResource::default());
     // **M12** § Visual direction closure — per-frame settings sync,
     // input handling for slideshow skip, scene-mood inference, and the
     // ClearColor tint that applies the live `ColorGradingState::current_grade()`.
@@ -1351,6 +1381,22 @@ fn parse_key_code(name: &str) -> Option<KeyCode> {
         "Numpad7" => Some(KeyCode::Numpad7),
         "Numpad8" => Some(KeyCode::Numpad8),
         "Numpad9" => Some(KeyCode::Numpad9),
+        // **M4B § "F5 / F9 hotkeys are reserved by cf-shell::keybinds"** —
+        // recognize the full F-key row so the player can remap quicksave
+        // / quickload to any F-key, and so future shell hotkeys can ride
+        // the same registry.
+        "F1" => Some(KeyCode::F1),
+        "F2" => Some(KeyCode::F2),
+        "F3" => Some(KeyCode::F3),
+        "F4" => Some(KeyCode::F4),
+        "F5" => Some(KeyCode::F5),
+        "F6" => Some(KeyCode::F6),
+        "F7" => Some(KeyCode::F7),
+        "F8" => Some(KeyCode::F8),
+        "F9" => Some(KeyCode::F9),
+        "F10" => Some(KeyCode::F10),
+        "F11" => Some(KeyCode::F11),
+        "F12" => Some(KeyCode::F12),
         _ => None,
     }
 }
@@ -1388,6 +1434,11 @@ fn key_for_action(settings: &cf_control::Settings, action: &str) -> Option<KeyCo
         ACTION_AIM_RIGHT => Some(KeyCode::ArrowRight),
         ACTION_AIM_UP => Some(KeyCode::ArrowUp),
         ACTION_AIM_DOWN => Some(KeyCode::ArrowDown),
+        // **M4B § "F5 / F9 hotkeys are reserved by cf-shell::keybinds"** —
+        // wire the spec defaults so cf-app's ingest_quicksave_input picks
+        // up F5/F9 even when the player hasn't enabled key_remap_enabled.
+        _ if action == cf_shell::keybinds::ACTION_QUICKSAVE => Some(KeyCode::F5),
+        _ if action == cf_shell::keybinds::ACTION_QUICKLOAD => Some(KeyCode::F9),
         _ => None,
     }
 }
@@ -2644,6 +2695,95 @@ fn sync_reactor_state_to_widgets(
 /// node — M4A does NOT own activation semantics (M5 + M8 own that), so
 /// pressing South emits no focus dispatch (deliberate no-op rather than a
 /// dishonest hard-coded `set("hud.silhouette")` jump).
+/// **M4B § "F5 / F9 hotkeys"** — quicksave / quickload + autosave timer.
+/// The deterministic state machine lives in [`crate::quicksave`]; this
+/// system is the Bevy adapter.
+fn ingest_quicksave_input(
+    holder: Res<EngineHolder>,
+    keys: Res<ButtonInput<KeyCode>>,
+    local_input_enabled: Res<LocalInputEnabled>,
+    mut loop_state: ResMut<QuicksaveLoopResource>,
+) {
+    if !local_input_enabled.0 {
+        return;
+    }
+    let engine = holder.0.clone();
+    let current_tick = engine.current_tick().0;
+    // **M4B § "F5 / F9 hotkeys are reserved by cf-shell::keybinds; M4B
+    // wires them; cf-app key remap respects the binding."** — read the
+    // live remap table for `save.quicksave` / `save.quickload`. Falls
+    // back to F5 / F9 (the spec defaults) when no remap is present.
+    let settings = engine.current_settings();
+    let quicksave_key =
+        key_for_action(&settings, cf_shell::keybinds::ACTION_QUICKSAVE).unwrap_or(KeyCode::F5);
+    let quickload_key =
+        key_for_action(&settings, cf_shell::keybinds::ACTION_QUICKLOAD).unwrap_or(KeyCode::F9);
+    let f5 = keys.just_pressed(quicksave_key);
+    let f9 = keys.just_pressed(quickload_key);
+    let action = crate::quicksave::next_action(
+        &loop_state.0,
+        f5,
+        f9,
+        current_tick,
+        engine.config().tick_rate_hz,
+    );
+    let dir = engine.config().run_bundle_root.join("../saves/quicksave");
+    let dir = if dir.is_absolute() {
+        dir
+    } else {
+        std::env::current_dir().unwrap_or_default().join(dir)
+    };
+    match action {
+        crate::quicksave::QuicksaveAction::None => {}
+        crate::quicksave::QuicksaveAction::Quicksave => match engine.quicksave(&dir) {
+            Ok(outcome) => {
+                loop_state.0.last_outcome = Some(crate::quicksave::QuicksaveOutcomeUi::SaveOk {
+                    path: outcome.path.display().to_string(),
+                    wall_clock_ms: outcome.wall_clock_ms,
+                });
+            }
+            Err(err) => {
+                tracing::warn!(target: "cf::app::quicksave", ?err, "quicksave failed");
+                loop_state.0.last_outcome = Some(crate::quicksave::QuicksaveOutcomeUi::from_save_error(&err));
+            }
+        },
+        crate::quicksave::QuicksaveAction::Quickload => match engine.quickload(&dir) {
+            Ok(outcome) => {
+                let migrated_from = outcome.migrated_from.map(|v| v.as_string());
+                let migrated_to = outcome.migrated_to.map(|v| v.as_string());
+                loop_state.0.last_outcome = Some(crate::quicksave::QuicksaveOutcomeUi::LoadOk {
+                    path: dir.join(cf_save::quicksave::QUICKSAVE_FILE).display().to_string(),
+                    wall_clock_ms: outcome.wall_clock_ms,
+                    migrated_from,
+                    migrated_to,
+                });
+                if loop_state.0.last_outcome.as_ref().and_then(|o| o.migration_banner()).is_some() {
+                    loop_state.0.migration_banner_shown = true;
+                }
+            }
+            Err(err) => {
+                tracing::warn!(target: "cf::app::quicksave", ?err, "quickload failed");
+                loop_state.0.last_outcome = Some(crate::quicksave::QuicksaveOutcomeUi::from_save_error(&err));
+            }
+        },
+        crate::quicksave::QuicksaveAction::Autosave => {
+            match engine.autosave(&dir) {
+                Ok(outcome) => {
+                    crate::quicksave::record_autosave(&mut loop_state.0, current_tick);
+                    loop_state.0.last_outcome = Some(crate::quicksave::QuicksaveOutcomeUi::SaveOk {
+                        path: outcome.path.display().to_string(),
+                        wall_clock_ms: outcome.wall_clock_ms,
+                    });
+                }
+                Err(err) => {
+                    tracing::warn!(target: "cf::app::quicksave", ?err, "autosave failed");
+                    loop_state.0.last_outcome = Some(crate::quicksave::QuicksaveOutcomeUi::from_save_error(&err));
+                }
+            }
+        }
+    }
+}
+
 ///
 /// All routes dispatch through `act.input.focus` so the cfctl, cf-e2e,
 /// keyboard, and gamepad consumers share the same code path. The visible

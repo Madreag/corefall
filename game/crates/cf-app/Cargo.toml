@@ -34,3 +34,4 @@ cf-equipment = { path = "../cf-equipment" }
 cf-terrain = { path = "../cf-terrain" }
 cf-shell = { path = "../cf-shell" }
 cf-audio = { path = "../cf-audio" }
+cf-save = { path = "../cf-save" }

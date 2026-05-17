@@ -15,3 +15,19 @@ blake3 = { workspace = true }
 hex = { workspace = true }
 cf-chassis = { path = "../cf-chassis" }
 cf-equipment = { path = "../cf-equipment" }
+
+[dev-dependencies]
+tempfile = "3"
+anyhow = "1"
+
+[[example]]
+name = "dump_save_corpus"
+path = "examples/dump_save_corpus.rs"
+
+[[example]]
+name = "delta_compression_bench"
+path = "examples/delta_compression_bench.rs"
+
+[[example]]
+name = "migration_golden_check"
+path = "examples/migration_golden_check.rs"

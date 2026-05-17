@@ -31,6 +31,7 @@
 pub mod attract_mode;
 pub mod credits;
 pub mod fre_wizard;
+pub mod keybinds;
 pub mod loading_screen;
 pub mod main_menu;
 pub mod pause_menu;

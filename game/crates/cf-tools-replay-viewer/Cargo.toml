@@ -23,3 +23,7 @@ thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 cf-replay = { path = "../cf-replay" }
+cf-save = { path = "../cf-save" }
+
+[dev-dependencies]
+tempfile = "3"
