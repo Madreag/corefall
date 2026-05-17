@@ -38,14 +38,27 @@
     clippy::match_same_arms
 )]
 
+pub mod breastwork;
+pub mod collapse;
 pub mod cover_change;
 pub mod cover_state;
 pub mod damage_routing;
 pub mod dig_validation;
+pub mod drainage;
 pub mod modules;
 pub mod parapet_raised_forward_compat;
 pub mod segment;
 
+pub use breastwork::{
+    apply_round_to_breastwork, cover_state_post_breach, run_breach_sequence,
+    BreastworkHitOutcome, BREASTWORK_MAX_HP, ROUND_DAMAGE_J,
+};
+pub use collapse::{
+    collapse_tick, run_revetment_audit, variant_supports_collapse, CollapseCause,
+    CollapseEnv, CollapseTickOutcome, COLLAPSE_INTEGRITY_FLOOR,
+    REVETMENT_AUDIT_WINDOW_TICKS, REVETMENT_INTEGRITY_FLOOR, SOFT_DIRT_THRESHOLD,
+    SOFT_DIRT_DECAY_PER_TICK, STARTING_INTEGRITY,
+};
 pub use cover_change::{
     cover_state_change, CoverStateChangeCause, CoverStateChangeEvent,
 };
@@ -57,9 +70,15 @@ pub use dig_validation::{
     dig_substrate_validate, DigSubstrateOutcome, DEEP_HARDNESS_THRESHOLD,
     SUBSTRATE_TOO_HARD_REASON, WARNING_EVENT_KIND as DIG_DOWNGRADE_EVENT_KIND,
 };
+pub use drainage::{
+    drainage_sump_tick, run_drainage_window, DrainageEnv, DrainageTickOutcome,
+    FLUSH_FLOOR_PX, FLUSH_THRESHOLD_PX, RAIN_ACCUMULATION_PER_TICK_PX,
+};
 pub use modules::{ModuleSpec, TrenchModule};
 pub use parapet_raised_forward_compat::{
     parapet_raised_dig_validate, warning_event_kind as parapet_raised_warning_event_kind,
     ParapetRaisedRequiresM9c,
 };
-pub use segment::{SegmentSpec, SegmentVariant, TrenchSegment, TrenchSegmentLookup};
+pub use segment::{
+    InMemorySegments, SegmentSpec, SegmentVariant, TrenchSegment, TrenchSegmentLookup,
+};
