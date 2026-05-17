@@ -15,12 +15,15 @@ pub mod beacon;
 pub mod concrete;
 pub mod dig_pickaxe;
 pub mod drill;
+pub mod engineering_tool;
 pub mod entrenching;
 pub mod foam;
+pub mod minesweeper;
 pub mod multi_tool;
 pub mod repair;
 pub mod sensor_pulse;
 pub mod welder;
+pub mod wire_cutters;
 
 use serde::{Deserialize, Serialize};
 
@@ -146,6 +149,40 @@ pub fn find_m9b_dig_tool(id: &str) -> Option<entrenching::EntrenchingToolSpec> {
     dig_pickaxe::find_pickaxe_dig(id).map(|p| dig_pickaxe::as_dig_tool_spec(&p))
 }
 
+/// **M9C**: enumeration of the new T1/T2 fortification tools per spec
+/// § "Crates / modules touched": `minesweeper`, `wire_cutters`,
+/// `engineering_tool`. The entrenching_tool is shared with M9B and is
+/// catalogued separately via [`m9b_entrenching_tools`].
+#[derive(Debug, Clone, PartialEq)]
+pub struct M9cToolCatalog {
+    pub minesweeper: minesweeper::MinesweeperToolSpec,
+    pub wire_cutters: wire_cutters::WireCuttersSpec,
+    pub engineering_tool: engineering_tool::EngineeringToolSpec,
+}
+
+/// Default M9C tool catalog used by the cfctl handlers + AI
+/// engineer-doctrine consumer.
+#[must_use]
+pub fn m9c_tool_catalog() -> M9cToolCatalog {
+    M9cToolCatalog {
+        minesweeper: minesweeper::minesweeper_m9c_default(),
+        wire_cutters: wire_cutters::wire_cutters_m9c_default(),
+        engineering_tool: engineering_tool::engineering_tool_m9c_default(),
+    }
+}
+
+/// True when the supplied tool id maps to one of the M9C fortification
+/// tools (minesweeper / wire_cutters / engineering_tool).
+#[must_use]
+pub fn is_m9c_tool(id: &str) -> bool {
+    matches!(
+        id,
+        minesweeper::MINESWEEPER_ID
+            | wire_cutters::WIRE_CUTTERS_ID
+            | engineering_tool::ENGINEERING_TOOL_ID
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -154,6 +191,24 @@ mod tests {
     fn at_least_seven_tools() {
         let v = m6_tool_presets();
         assert!(v.len() >= 7);
+    }
+
+    /// VAL-M9C-054: minesweeper, wire_cutters, engineering_tool +
+    /// entrenching_tool are all registered + reachable from the
+    /// equipment catalog. (entrenching_tool ships in M9B.)
+    #[test]
+    fn tools_m9c_registered() {
+        let cat = m9c_tool_catalog();
+        assert_eq!(cat.minesweeper.id, minesweeper::MINESWEEPER_ID);
+        assert_eq!(cat.wire_cutters.id, wire_cutters::WIRE_CUTTERS_ID);
+        assert_eq!(cat.engineering_tool.id, engineering_tool::ENGINEERING_TOOL_ID);
+        assert!(is_m9c_tool("minesweeper"));
+        assert!(is_m9c_tool("wire_cutters"));
+        assert!(is_m9c_tool("engineering_tool"));
+        assert!(!is_m9c_tool("entrenching_tool"));
+        // VAL-M9B parity: entrenching_tool ships in M9B; covered by
+        // the existing `entrenching_tool_registered` test.
+        assert!(find_entrenching_tool(entrenching::ENTRENCHING_TOOL_ID).is_some());
     }
 
     #[test]

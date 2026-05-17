@@ -50,6 +50,7 @@ pub use projectile::ProjectileSpawnParams;
 // M6 modules — see spec § Files for the canonical list.
 // M6C adds: heavy, medical, survival, sensor, ppe.
 pub mod bipod;
+pub mod deployables;
 pub mod durability;
 pub mod fire_modes;
 pub mod grenade;
@@ -135,11 +136,26 @@ pub use stealth_kill::{
 pub use suppressor::{Suppressor, SUPPRESSOR_LOUDNESS_FACTOR};
 pub use tool::{
     drill::{DRILL_HEAT_DECAY_PER_S, DRILL_HEAT_PER_USE, DRILL_HEAT_RATE_PER_S, DRILL_JAM_HEAT_THRESHOLD},
+    engineering_tool::{
+        engineering_tool_m9c_default, EngineeringToolSpec, ENGINEERING_TOOL_AT_DITCH_SECONDS,
+        ENGINEERING_TOOL_ID,
+    },
     entrenching::{entrenching_tool_m9b_default, EntrenchingToolSpec, ENTRENCHING_TOOL_ID},
-    find_entrenching_tool,
-    m6_tool_presets, m9b_entrenching_tools,
+    find_entrenching_tool, is_m9c_tool, m6_tool_presets, m9b_entrenching_tools, m9c_tool_catalog,
+    minesweeper::{
+        minesweeper_m9c_default, MinesweeperToolSpec, MINESWEEPER_ID, MINESWEEPER_PING_SECONDS,
+        MINESWEEPER_RADIUS_PRESSURE_IED, MINESWEEPER_RADIUS_PROXIMITY_TRIPWIRE,
+    },
     sensor_pulse::{SENSOR_PULSE_REVEAL_RADIUS, SENSOR_PULSE_REVEAL_SECONDS},
-    ToolKind, ToolPreset,
+    wire_cutters::{wire_cutters_m9c_default, WireCuttersSpec, WIRE_CUTTERS_ID},
+    M9cToolCatalog, ToolKind, ToolPreset,
+};
+pub use deployables::{
+    bomb_disposal_robot_spec, BombDisposalRobotSpec, BombDisposalRobotState,
+    BombDisposalRobotStatus, BOMB_DISPOSAL_ROBOT_CHASSIS_ID,
+    BOMB_DISPOSAL_ROBOT_DRIVE_PX_PER_SECOND, BOMB_DISPOSAL_ROBOT_HP,
+    BOMB_DISPOSAL_ROBOT_MECHANICAL_ARM_DISARM_SECONDS,
+    BOMB_DISPOSAL_ROBOT_REACTIVE_ARMOR_REDUCTION_PERCENT,
 };
 pub use weapon::{m6_weapon_presets, m6c_firearm_presets, WeaponClass, WeaponPreset};
 pub use weapon_swap::{swap_duration_for_target, WeaponSwap, PISTOL_SWAP_SECONDS, WEAPON_SWAP_SECONDS};
