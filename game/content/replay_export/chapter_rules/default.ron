@@ -1,0 +1,153 @@
+// M10B chapter rules — default rule set.
+//
+// Per the M10B spec § "Notes for the implementer":
+//
+//   "Chapter rules in `chapter_rules/default.ron` are data, not code.
+//   A mod can ship its own chapter_rules.ron to customize titles +
+//   which event types become chapters; the rule engine is just
+//   `(event_type, chapter_template_string)` pairs."
+//
+// Each rule declares a single M4 `event_type` + a `template` string
+// that becomes the MP4 chapter title at export time (m10b-3 will
+// interpolate the curly-brace placeholders against the event payload).
+// `status_filter` disambiguates multi-status events
+// (actor_status_changed with status="killed" produces a chapter
+// marker; status="injured"/"reviving" do not).
+//
+// Per VAL-M10B-006 + the mission cross-area validation contract this
+// rule set MUST cover ALL of:
+//   - mission.objective_started / completed / failed
+//   - actor_status_changed=killed
+//   - reactor.armor_layer_destroyed
+//   - atmos.breach_detected
+//   - ≥1 mission.commander_* beat
+//   - M9B: trench_breastwork_breached / trench_segment_collapsed /
+//     trench_template_dropped
+//   - M9C: mine_triggered / mg_nest_fired_burst / watchtower_destroyed /
+//     fence_shocked_actor
+//
+// The chapter_rules round-trip test asserts every key above is present
+// before this RON is shipped.
+(
+    rules: [
+        // ----------------------------------------------------------------
+        // M4 — mission objective transitions
+        // ----------------------------------------------------------------
+        (
+            event_type: "mission.objective_started",
+            template: "Objective started: {objective_name}",
+            status_filter: None,
+            category: Some("objective"),
+        ),
+        (
+            event_type: "mission.objective_completed",
+            template: "Objective completed: {objective_name}",
+            status_filter: None,
+            category: Some("objective"),
+        ),
+        (
+            event_type: "mission.objective_failed",
+            template: "Objective failed: {objective_name}",
+            status_filter: None,
+            category: Some("objective"),
+        ),
+
+        // ----------------------------------------------------------------
+        // M4 — actor death (status_filter narrows the multi-status
+        // actor_status_changed event taxonomy to just `killed`)
+        // ----------------------------------------------------------------
+        (
+            event_type: "actor_status_changed",
+            template: "{actor_name} killed",
+            status_filter: Some("killed"),
+            category: Some("death"),
+        ),
+
+        // ----------------------------------------------------------------
+        // M4 — reactor + atmos crisis beats
+        // ----------------------------------------------------------------
+        (
+            event_type: "reactor.armor_layer_destroyed",
+            template: "Reactor armor layer destroyed",
+            status_filter: None,
+            category: Some("reactor"),
+        ),
+        (
+            event_type: "atmos.breach_detected",
+            template: "Atmospheric breach: {region}",
+            status_filter: None,
+            category: Some("atmos"),
+        ),
+
+        // ----------------------------------------------------------------
+        // M4 — commander beats (≥1 mission.commander_* required by
+        // VAL-M10B-006). m7-7b shipped the squad commander grammar; the
+        // commander event family ladders up here so a replay export of a
+        // commanded squad gets per-order chapter markers.
+        // ----------------------------------------------------------------
+        (
+            event_type: "mission.commander_objective_assigned",
+            template: "Commander: {objective_name}",
+            status_filter: None,
+            category: Some("commander"),
+        ),
+        (
+            event_type: "mission.commander_order_issued",
+            template: "Commander order: {order_kind}",
+            status_filter: None,
+            category: Some("commander"),
+        ),
+
+        // ----------------------------------------------------------------
+        // M9B — trench-network event taxonomy (cross-area VAL contract).
+        // m9b-4 ships these JSON schemas under cf-replay/schemas/event/.
+        // ----------------------------------------------------------------
+        (
+            event_type: "trench_breastwork_breached",
+            template: "Breastwork breached at segment {segment_id}",
+            status_filter: None,
+            category: Some("trench"),
+        ),
+        (
+            event_type: "trench_segment_collapsed",
+            template: "Trench segment {segment_id} collapsed",
+            status_filter: None,
+            category: Some("trench"),
+        ),
+        (
+            event_type: "trench_template_dropped",
+            template: "Trench template dropped: {template_id}",
+            status_filter: None,
+            category: Some("trench"),
+        ),
+
+        // ----------------------------------------------------------------
+        // M9C — fortification event taxonomy (cross-area VAL contract).
+        // m9c-6 ships these JSON schemas under cf-replay/schemas/event/.
+        // ----------------------------------------------------------------
+        (
+            event_type: "mine_triggered",
+            template: "Mine triggered ({trigger_kind})",
+            status_filter: None,
+            category: Some("fortification"),
+        ),
+        (
+            event_type: "mg_nest_fired_burst",
+            template: "MG nest fired burst",
+            status_filter: None,
+            category: Some("fortification"),
+        ),
+        (
+            event_type: "watchtower_destroyed",
+            template: "Watchtower destroyed",
+            status_filter: None,
+            category: Some("fortification"),
+        ),
+        (
+            event_type: "fence_shocked_actor",
+            template: "Electrified fence shocked {actor_name}",
+            status_filter: None,
+            category: Some("fortification"),
+        ),
+    ],
+)
