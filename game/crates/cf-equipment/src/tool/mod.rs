@@ -14,6 +14,7 @@
 pub mod beacon;
 pub mod concrete;
 pub mod drill;
+pub mod entrenching;
 pub mod foam;
 pub mod multi_tool;
 pub mod repair;
@@ -97,6 +98,24 @@ pub fn m6_tool_presets() -> Vec<ToolPreset> {
         beacon::beacon_m6_default(),
         sensor_pulse::sensor_pulse_m6_default(),
     ]
+}
+
+/// **M9B**: T0 entrenching-tool catalog. The cf-equipment tool surface
+/// keeps the M6 `ToolPreset` schema (no cost/dig-time fields) untouched
+/// and exposes M9B-specific dig tools via this parallel catalog so the
+/// cfctl handler `act.player.dig_trench_segment` (m9b-3) can look up
+/// material cost + per-variant dig-time without churning M6 callers.
+#[must_use]
+pub fn m9b_entrenching_tools() -> Vec<entrenching::EntrenchingToolSpec> {
+    vec![entrenching::entrenching_tool_m9b_default()]
+}
+
+/// **M9B**: lookup an entrenching-tool spec by its catalog id. Returns
+/// `None` for unknown ids so cfctl can surface a structured error
+/// rather than panic.
+#[must_use]
+pub fn find_entrenching_tool(id: &str) -> Option<entrenching::EntrenchingToolSpec> {
+    m9b_entrenching_tools().into_iter().find(|t| t.id == id)
 }
 
 #[cfg(test)]

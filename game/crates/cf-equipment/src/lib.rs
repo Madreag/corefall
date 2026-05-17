@@ -135,7 +135,9 @@ pub use stealth_kill::{
 pub use suppressor::{Suppressor, SUPPRESSOR_LOUDNESS_FACTOR};
 pub use tool::{
     drill::{DRILL_HEAT_DECAY_PER_S, DRILL_HEAT_PER_USE, DRILL_HEAT_RATE_PER_S, DRILL_JAM_HEAT_THRESHOLD},
-    m6_tool_presets,
+    entrenching::{entrenching_tool_m9b_default, EntrenchingToolSpec, ENTRENCHING_TOOL_ID},
+    find_entrenching_tool,
+    m6_tool_presets, m9b_entrenching_tools,
     sensor_pulse::{SENSOR_PULSE_REVEAL_RADIUS, SENSOR_PULSE_REVEAL_SECONDS},
     ToolKind, ToolPreset,
 };
