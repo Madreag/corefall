@@ -1,0 +1,68 @@
+// M9B launch scenario — m9b_ai_in_trench_doctrine.
+// Spec § "8 launch trench scenarios" row 7:
+//   Layout: AI defenders garrison a trench line; player attacks.
+//   Players: 1v3.
+//   Goal: Prove AI uses cover state correctly via AI-TRENCH-A-01
+//   (VAL-M9B-AI-001).
+(
+    schema_version: 1,
+    id: "m9b_ai_in_trench_doctrine",
+    display_name: "M9B AI Trench Doctrine",
+    description: "M9B AI-TRENCH-A-01 doctrine scenario per specs/active/M9B.md § '8 launch trench scenarios' row 7: three AI defenders garrison fire_step segments + step-up -> 1-3 round burst -> step-down per the AI cover decision pipeline. ai.cover_decision events with reason_label in {step_up_for_shot, step_down_to_reload} fire; no AI remains Exposed continuously for more than 1.5s x tick_rate ticks (VAL-M9B-AI-001).",
+    seed: 37,
+    duration_ticks: Some(1200),
+    region: (anchor: (0.0, 0.0), width: 1280.0, height: 720.0),
+    gravity: -980.0,
+    floor_y: 16.0,
+    teams: [],
+    actors: [
+        (id: 1, team: "blue", spawn: (160.0, 32.0), controllable: true, hp: 100.0,
+            inventory: (rifle: Some("rifle_m1_default")), half_extents: Some((8.0, 16.0))),
+        (id: 2, team: "red", spawn: (900.0, 32.0), controllable: false, hp: 100.0,
+            inventory: (rifle: None), aim: Some((-1.0, 0.0)),
+            half_extents: Some((8.0, 16.0)),
+            enemy: Some((
+                kind: Some("reactive_guard"),
+                miss_chance: Some(0.4),
+                damage_per_hit: Some(6.0),
+                burst_pause_seconds: Some(0.5),
+                burst_shots: Some(2),
+            ))),
+        (id: 3, team: "red", spawn: (960.0, 32.0), controllable: false, hp: 100.0,
+            inventory: (rifle: None), aim: Some((-1.0, 0.0)),
+            half_extents: Some((8.0, 16.0)),
+            enemy: Some((
+                kind: Some("reactive_guard"),
+                miss_chance: Some(0.4),
+                damage_per_hit: Some(6.0),
+                burst_pause_seconds: Some(0.5),
+                burst_shots: Some(2),
+            ))),
+        (id: 4, team: "red", spawn: (1020.0, 32.0), controllable: false, hp: 100.0,
+            inventory: (rifle: None), aim: Some((-1.0, 0.0)),
+            half_extents: Some((8.0, 16.0)),
+            enemy: Some((
+                kind: Some("reactive_guard"),
+                miss_chance: Some(0.4),
+                damage_per_hit: Some(6.0),
+                burst_pause_seconds: Some(0.5),
+                burst_shots: Some(2),
+            ))),
+    ],
+    terrain: Some((
+        width_px: 1280,
+        height_px: 720,
+        default_material: "air",
+        stamps: [
+            (kind: "fill_aabb", min: (0.0, 0.0), max: (1280.0, 16.0), material: "concrete"),
+            (kind: "fill_aabb", min: (800.0, 16.0), max: (1120.0, 96.0), material: "dirt"),
+        ],
+    )),
+    objectives: [],
+    director: None,
+    capabilities: (debug: false, control_api: true, save_load: false),
+    save_fields: [],
+    expected_tests: ["M9B-AI-01"],
+    notes: "AI-TRENCH-A-01 doctrine: AI defenders garrison fire_step segments + execute burst-and-duck. cf-ai::trench_doctrine drives the cover_decision emit.",
+    scenario_tags: ["m9b", "trench", "ai"],
+)

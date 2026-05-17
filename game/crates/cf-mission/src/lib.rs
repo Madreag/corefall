@@ -79,6 +79,13 @@ pub mod reinforcement;
 // without bloating the file.
 pub mod reactor;
 
+// **M9B**: launch scenario registry (8 trench scenarios under
+// `game/content/scenarios/m9b_*.ron`). The module exposes
+// `SCENARIO_IDS` + `registry()` + `tick_budget_for(id)` so closure-
+// feature verification can enumerate the M9B launch roster without
+// scanning the filesystem.
+pub mod m9b_scenarios;
+
 pub use reactor::{
     pressure_state_for_hp_percent, ArmorLayerHpEvent, LayerKind, LayerState, PressureState, ReactorDamageReport,
     TIMER_WARNING_THRESHOLDS_S,

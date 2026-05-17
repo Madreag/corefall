@@ -1,0 +1,61 @@
+// M9B launch scenario — m9b_breastwork_breach.
+// Spec § "8 launch trench scenarios" row 8:
+//   Layout: Parapet-raised trench under sustained MG fire; breastwork
+//   degrades + breaches.
+//   Players: 2v2.
+//   Goal: Prove breastwork is a real M14 surface (HP, breach, repair)
+//   (VAL-M9B-BREASTWORK-001).
+(
+    schema_version: 1,
+    id: "m9b_breastwork_breach",
+    display_name: "M9B Breastwork Breach",
+    description: "M9B breastwork breach per specs/active/M9B.md § '8 launch trench scenarios' row 8: a parapet_raised trench under sustained MG fire eventually breaches (breastwork HP -> 0). trench.breastwork_breached event fires; cover_state for the segment downgrades from Full to Partial; subsequent rounds route through the gap per M14 (VAL-M9B-BREASTWORK-001).",
+    seed: 41,
+    duration_ticks: Some(1800),
+    region: (anchor: (0.0, 0.0), width: 1280.0, height: 720.0),
+    gravity: -980.0,
+    floor_y: 16.0,
+    teams: [],
+    actors: [
+        (id: 1, team: "blue", spawn: (200.0, 32.0), controllable: true, hp: 100.0,
+            inventory: (rifle: Some("rifle_m1_default")), half_extents: Some((8.0, 16.0))),
+        (id: 2, team: "blue", spawn: (240.0, 32.0), controllable: false, hp: 100.0,
+            inventory: (rifle: Some("rifle_m1_default")), half_extents: Some((8.0, 16.0))),
+        (id: 3, team: "red", spawn: (1040.0, 32.0), controllable: false, hp: 100.0,
+            inventory: (rifle: None), aim: Some((-1.0, 0.0)),
+            half_extents: Some((8.0, 16.0)),
+            enemy: Some((
+                kind: Some("reactive_guard"),
+                miss_chance: Some(0.3),
+                damage_per_hit: Some(6.0),
+                burst_pause_seconds: Some(0.4),
+                burst_shots: Some(4),
+            ))),
+        (id: 4, team: "red", spawn: (1080.0, 32.0), controllable: false, hp: 100.0,
+            inventory: (rifle: None), aim: Some((-1.0, 0.0)),
+            half_extents: Some((8.0, 16.0)),
+            enemy: Some((
+                kind: Some("reactive_guard"),
+                miss_chance: Some(0.3),
+                damage_per_hit: Some(6.0),
+                burst_pause_seconds: Some(0.4),
+                burst_shots: Some(4),
+            ))),
+    ],
+    terrain: Some((
+        width_px: 1280,
+        height_px: 720,
+        default_material: "air",
+        stamps: [
+            (kind: "fill_aabb", min: (0.0, 0.0), max: (1280.0, 16.0), material: "concrete"),
+            (kind: "fill_aabb", min: (160.0, 16.0), max: (1120.0, 128.0), material: "dirt"),
+        ],
+    )),
+    objectives: [],
+    director: None,
+    capabilities: (debug: false, control_api: true, save_load: false),
+    save_fields: [],
+    expected_tests: ["M9B-BREASTWORK-01"],
+    notes: "Breastwork breach: a parapet_raised trench is repeatedly hit by an opposing MG. cf-trench::breastwork drives the per-round HP decrement + breach emit.",
+    scenario_tags: ["m9b", "trench"],
+)

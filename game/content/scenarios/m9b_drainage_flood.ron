@@ -1,0 +1,39 @@
+// M9B launch scenario — m9b_drainage_flood.
+// Spec § "8 launch trench scenarios" row 4:
+//   Layout: Trench line during rainfall (M31); requires drainage_sump or
+//   floods.
+//   Players: 1-2.
+//   Goal: Prove drainage_sump gameplay (VAL-M9B-DRAINAGE-001 +
+//   VAL-M9B-DRAINAGE-002).
+(
+    schema_version: 1,
+    id: "m9b_drainage_flood",
+    display_name: "M9B Drainage Flood",
+    description: "M9B drainage gameplay per specs/active/M9B.md § '8 launch trench scenarios' row 4: a deep trench segment with drainage_sump module under simulated rainfall. With the sump intact, water tile depth stays <= 2 px (flush cycle emits trench.drainage_flushed). With the sump demolished, water exceeds 2 px within 600 additional ticks and footing converts to wet-mud (VAL-M9B-DRAINAGE-001 + VAL-M9B-DRAINAGE-002).",
+    seed: 29,
+    duration_ticks: Some(1800),
+    region: (anchor: (0.0, 0.0), width: 1280.0, height: 720.0),
+    gravity: -980.0,
+    floor_y: 16.0,
+    teams: [],
+    actors: [
+        (id: 1, team: "blue", spawn: (200.0, 32.0), controllable: true, hp: 100.0,
+            inventory: (rifle: Some("rifle_m1_default")), half_extents: Some((8.0, 16.0))),
+    ],
+    terrain: Some((
+        width_px: 1280,
+        height_px: 720,
+        default_material: "air",
+        stamps: [
+            (kind: "fill_aabb", min: (0.0, 0.0), max: (1280.0, 16.0), material: "concrete"),
+            (kind: "fill_aabb", min: (160.0, 16.0), max: (1120.0, 144.0), material: "dirt"),
+        ],
+    )),
+    objectives: [],
+    director: None,
+    capabilities: (debug: false, control_api: true, save_load: false),
+    save_fields: [],
+    expected_tests: ["M9B-DRAINAGE-01", "M9B-DRAINAGE-02"],
+    notes: "Drainage flood scenario. cf-trench::drainage::drainage_sump_tick drives the per-flush event emission; the M31 rainfall surface is approximated via cfctl-injected rainfall_rate_mm_per_tick during the scenario walk.",
+    scenario_tags: ["m9b", "trench"],
+)

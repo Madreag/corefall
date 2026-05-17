@@ -1,0 +1,43 @@
+// M9B launch scenario — m9b_zigzag_baseline.
+// Spec § "8 launch trench scenarios" row 1:
+//   Layout: Single zigzag line, 60 tiles long, fire-steps every 12 tiles.
+//   Players: 1v1.
+//   Goal: Prove zigzag prevents single-shooter enfilade.
+// Tick budget: 600 ticks (10s @ 60 Hz) — long enough to dig at least one
+// segment + cross a boundary so VAL-M9B-COVER-002 observes a
+// trench.cover_state_changed.
+(
+    schema_version: 1,
+    id: "m9b_zigzag_baseline",
+    display_name: "M9B Zigzag Baseline",
+    description: "M9B baseline trench scenario per specs/active/M9B.md § '8 launch trench scenarios' row 1: a 60-tile single zigzag firing line with fire_step segments every 12 tiles, ±45° kinks generated from world_seed. Used to prove the zigzag generator forbids straight runs > 12 tiles + a single enfilade ray cannot graze more than 12 contiguous tiles of trench floor (VAL-M9B-PROCGEN-001 + VAL-M9B-PROCGEN-004).",
+    seed: 17,
+    duration_ticks: Some(600),
+    region: (anchor: (0.0, 0.0), width: 1280.0, height: 720.0),
+    gravity: -980.0,
+    floor_y: 16.0,
+    teams: [],
+    actors: [
+        (id: 1, team: "blue", spawn: (200.0, 32.0), controllable: true, hp: 100.0,
+            inventory: (rifle: Some("rifle_m1_default")), half_extents: Some((8.0, 16.0))),
+        (id: 2, team: "red", spawn: (1080.0, 32.0), controllable: false, hp: 100.0,
+            inventory: (rifle: Some("rifle_m1_default")), half_extents: Some((8.0, 16.0)),
+            aim: Some((-1.0, 0.0))),
+    ],
+    terrain: Some((
+        width_px: 1280,
+        height_px: 720,
+        default_material: "air",
+        stamps: [
+            (kind: "fill_aabb", min: (0.0, 0.0), max: (1280.0, 16.0), material: "concrete"),
+            (kind: "fill_aabb", min: (200.0, 16.0), max: (1080.0, 96.0), material: "dirt"),
+        ],
+    )),
+    objectives: [],
+    director: None,
+    capabilities: (debug: false, control_api: true, save_load: false),
+    save_fields: [],
+    expected_tests: ["M9B-COVER-02", "M9B-PROCGEN-01", "M9B-PROCGEN-04"],
+    notes: "Zigzag baseline. cf-procgen::trench_generator builds the polyline at world_seed=17. The scenario surface is intentionally minimal — the cfctl-driven dig + cover_state derivation is the focus.",
+    scenario_tags: ["m9b", "trench"],
+)

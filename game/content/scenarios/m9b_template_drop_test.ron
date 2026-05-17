@@ -1,0 +1,38 @@
+// M9B launch scenario — m9b_template_drop_test.
+// Spec § "8 launch trench scenarios" row 6:
+//   Layout: Mapper drops `wwi_frontline_a.trench.ron` template via cfctl.
+//   Players: Sandbox (1 controllable).
+//   Goal: Validate template authoring + import pipeline
+//   (VAL-M9B-TEMPLATE-002 + VAL-M9B-TEMPLATE-003 + VAL-M9B-TEMPLATE-004).
+(
+    schema_version: 1,
+    id: "m9b_template_drop_test",
+    display_name: "M9B Template Drop Test",
+    description: "M9B mapper-flow sandbox per specs/active/M9B.md § '8 launch trench scenarios' row 6: an empty 200x60 sandbox map where the player issues act.player.drop_trench_template { id: 'wwi_frontline_a', origin: (50, 30) }. Every declared segment + embedded module is placed deterministically; SaveBlob.checksum at tick 60 matches across two engines with the same seed (VAL-M9B-TEMPLATE-002). cf-mod rejects bad_template.trench.ron with 'unknown_segment_variant' (VAL-M9B-TEMPLATE-003). Missing-fortification placeholder produces a warning event but does not panic (VAL-M9B-TEMPLATE-004).",
+    seed: 31,
+    duration_ticks: Some(600),
+    region: (anchor: (0.0, 0.0), width: 1280.0, height: 720.0),
+    gravity: -980.0,
+    floor_y: 16.0,
+    teams: [],
+    actors: [
+        (id: 1, team: "blue", spawn: (200.0, 32.0), controllable: true, hp: 100.0,
+            inventory: (rifle: Some("rifle_m1_default")), half_extents: Some((8.0, 16.0))),
+    ],
+    terrain: Some((
+        width_px: 1280,
+        height_px: 720,
+        default_material: "air",
+        stamps: [
+            (kind: "fill_aabb", min: (0.0, 0.0), max: (1280.0, 16.0), material: "concrete"),
+            (kind: "fill_aabb", min: (160.0, 16.0), max: (1120.0, 144.0), material: "dirt"),
+        ],
+    )),
+    objectives: [],
+    director: None,
+    capabilities: (debug: false, control_api: true, save_load: false),
+    save_fields: [],
+    expected_tests: ["M9B-TEMPLATE-02", "M9B-TEMPLATE-03", "M9B-TEMPLATE-04"],
+    notes: "Template drop sandbox. cfctl act.player.drop_trench_template carries the template_sha256 + segment_count into the trench.template_dropped event.",
+    scenario_tags: ["m9b", "trench"],
+)

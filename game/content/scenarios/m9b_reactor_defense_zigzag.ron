@@ -1,0 +1,61 @@
+// M9B launch scenario — m9b_reactor_defense_zigzag.
+// Spec § "8 launch trench scenarios" row 5:
+//   Layout: M9 reactor + pre-placed zigzag trench around it
+//   (template-based).
+//   Players: Solo.
+//   Goal: M9-grade scenario with M9B authored trench
+//   (VAL-M9B-DETERMINISM-001 + VAL-M9B-DETERMINISM-002).
+//
+// SEED IS FIXED AT 42 — the determinism contract (VAL-M9B-DETERMINISM-001)
+// requires identical event sequences + identical SaveBlob.checksum
+// across two engines running this scenario with seed=42 for 3600 ticks.
+(
+    schema_version: 1,
+    id: "m9b_reactor_defense_zigzag",
+    display_name: "M9B Reactor Defense — Zigzag",
+    description: "M9B reactor-defense scenario per specs/active/M9B.md § '8 launch trench scenarios' row 5: M9 core reactor wrapped by a pre-placed zigzag trench instantiated from the reactor_defense_zigzag.trench.ron template. Seed is fixed at 42; running twice with seed=42 for 3600 ticks must produce identical event sequences + identical SaveBlob.checksum (VAL-M9B-DETERMINISM-001) and per-engine capture parity (VAL-M9B-DETERMINISM-002).",
+    seed: 42,
+    duration_ticks: Some(3600),
+    region: (anchor: (0.0, 0.0), width: 1280.0, height: 720.0),
+    gravity: -980.0,
+    floor_y: 16.0,
+    teams: [],
+    actors: [
+        (id: 1, team: "blue", spawn: (200.0, 32.0), controllable: true, hp: 100.0,
+            inventory: (rifle: Some("rifle_m1_default")), half_extents: Some((8.0, 16.0))),
+        (id: 2, team: "red", spawn: (1180.0, 32.0), controllable: false, hp: 80.0,
+            inventory: (rifle: None), aim: Some((-1.0, 0.0)),
+            half_extents: Some((8.0, 16.0)),
+            enemy: Some((
+                kind: Some("reactive_guard"),
+                miss_chance: Some(0.5),
+                damage_per_hit: Some(8.0),
+                burst_pause_seconds: Some(0.55),
+                sight_radius: Some(1200.0),
+                sight_cone_degrees: Some(160.0),
+                burst_shots: Some(3),
+            ))),
+    ],
+    reactors: [
+        (id: "core_reactor", position: (640.0, 32.0), half_extents: (16.0, 16.0), hp: 100.0),
+    ],
+    terrain: Some((
+        width_px: 1280,
+        height_px: 720,
+        default_material: "air",
+        stamps: [
+            (kind: "fill_aabb", min: (0.0, 0.0), max: (1280.0, 16.0), material: "concrete"),
+            (kind: "fill_aabb", min: (480.0, 16.0), max: (800.0, 128.0), material: "dirt"),
+        ],
+    )),
+    objectives: [
+        (id: "defend_reactor", kind: { "kind": "defend_reactor", "target": "core_reactor" }),
+    ],
+    mission: Some((time_limit_ticks: 3600, player_dead_loses: true)),
+    director: None,
+    capabilities: (debug: false, control_api: true, save_load: false),
+    save_fields: [],
+    expected_tests: ["M9B-DETERMINISM-01", "M9B-DETERMINISM-02"],
+    notes: "Reactor defense with M9B zigzag wrap. The trench layout is materialized via the reactor_defense_zigzag.trench.ron template (placed by cf-content::trench_templates::instantiate). Seed=42 is the determinism contract anchor.",
+    scenario_tags: ["m9b", "trench", "determinism"],
+)
