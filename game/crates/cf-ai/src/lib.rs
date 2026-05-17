@@ -132,6 +132,11 @@ pub mod mg_doctrine;
 // for +50% acquisition. Mark cap = 1 per target. Spec § "Spotter role".
 pub mod observer_doctrine;
 
+// **M9C**: AI-ENG-A-03 doctrine — engineer behavior: lay mines /
+// wire forward of the perimeter, repair breaches, disarm enemy
+// minefields in the squad's path. Spec § "Notes for the implementer".
+pub mod engineer_doctrine;
+
 // **M7B**: deep squad command grammar + formation orders + commander hop
 // + per-archetype BT. Spec § "the squad obeys real grammar — formation
 // orders, combat verbs, breach-stack discipline — and the player can take
@@ -189,6 +194,12 @@ pub use observer_doctrine::{
     DOCTRINE_ID as OBSERVER_DOCTRINE_ID,
     SPOTTER_MARK_LOS_LOSS_TTL_SECONDS, SPOTTER_MARK_TTL_SECONDS,
     SPOTTER_TARGET_MARK_ACQUISITION_BONUS as OBSERVER_TARGET_MARK_ACQUISITION_BONUS,
+};
+pub use engineer_doctrine::{
+    decide as engineer_doctrine_decide, BreachedFortification, EngineerDoctrineDecision,
+    EngineerDoctrineInputs, EnemyMineObservation, PerimeterSite,
+    DOCTRINE_ID as ENGINEER_DOCTRINE_ID, ENGINEER_DOCTRINE_BREACH_HP_THRESHOLD,
+    ENGINEER_DOCTRINE_LAY_MINE_FORWARD_TILES,
 };
 pub use thinking_stack::{
     format_task_camel, AiTickOutput, Layer, LayerKind, LayerOutput, ThinkingContext, ThinkingStack,
