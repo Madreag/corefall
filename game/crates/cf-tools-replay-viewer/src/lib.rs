@@ -12,17 +12,20 @@
 //! All output is deterministic markdown so golden tests + corefall-review
 //! evidence + BP3 closure notes can compare bundles offline.
 
+pub mod angle_selector;
 pub mod bundle;
 pub mod cause_chain;
 pub mod debrief;
 pub mod delta_reconstructor;
 pub mod edit_cmd;
 pub mod editor;
+pub mod editor_ui;
 pub mod export_cmd;
 pub mod renderer;
 pub mod summary;
 mod text;
 pub mod thinking_timeline;
+pub mod timeline;
 pub mod viewer;
 
 pub use bundle::{Bundle, BundleError};
