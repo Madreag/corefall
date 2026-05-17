@@ -162,12 +162,82 @@ pub trait TrenchSegmentLookup {
     fn segment_at(&self, tile_x: i32, tile_y: i32) -> Option<&TrenchSegment>;
 }
 
+/// Per-segment runtime state the engine carries alongside the placed
+/// [`TrenchSegment`] grid. The engine ticks drainage / collapse /
+/// breastwork-HP per segment and writes the resulting replay events;
+/// these fields are reset to [`Default`] values when a fresh segment
+/// is pushed.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TrenchSegmentRuntime {
+    /// Accumulated water depth in pixels. Driven by the drainage
+    /// sub-kernel each tick.
+    pub water_depth_px: f32,
+    /// Breastwork HP at the start of the current tick. `None` for
+    /// variants without a breastwork module; `Some(BREASTWORK_MAX_HP)`
+    /// at spawn for `parapet_raised` segments.
+    pub breastwork_hp: Option<f32>,
+    /// M14E integrity remaining for the segment. Decremented by the
+    /// collapse sub-kernel; pinned to `REVETMENT_INTEGRITY_FLOOR`
+    /// when revetment is installed.
+    pub integrity: f32,
+    /// Latched true once the segment has emitted a
+    /// `trench.segment_collapsed` event so subsequent ticks skip the
+    /// collapse pipeline.
+    pub collapsed: bool,
+    /// Tick counter used to throttle the collapse evaluation cadence
+    /// per segment.
+    pub ticks_since_dug: u32,
+}
+
+impl Default for TrenchSegmentRuntime {
+    fn default() -> Self {
+        Self {
+            water_depth_px: 0.0,
+            breastwork_hp: None,
+            integrity: crate::collapse::STARTING_INTEGRITY,
+            collapsed: false,
+            ticks_since_dug: 0,
+        }
+    }
+}
+
+impl TrenchSegmentRuntime {
+    /// Build a fresh runtime row keyed to the segment's variant +
+    /// embedded modules. Initialises `breastwork_hp` for any segment
+    /// carrying the `Breastwork` module and leaves it `None`
+    /// otherwise.
+    #[must_use]
+    pub fn for_segment(seg: &TrenchSegment) -> Self {
+        let breastwork_hp = if seg
+            .embedded_modules
+            .iter()
+            .any(|m| matches!(m, crate::modules::TrenchModule::Breastwork))
+        {
+            Some(crate::breastwork::BREASTWORK_MAX_HP)
+        } else {
+            None
+        };
+        Self {
+            water_depth_px: 0.0,
+            breastwork_hp,
+            integrity: crate::collapse::STARTING_INTEGRITY,
+            collapsed: false,
+            ticks_since_dug: 0,
+        }
+    }
+}
+
 /// Convenience wrapper: lookup a segment by 1-tile vector. Used by the
 /// in-process tests that simulate "actor moves between segments" without
 /// needing the full world.
 #[derive(Debug, Default, Clone)]
 pub struct InMemorySegments {
     pub segments: Vec<TrenchSegment>,
+    /// Per-segment runtime state (drainage water depth, breastwork HP,
+    /// collapse integrity). Indices line up with `segments[]` 1:1; the
+    /// vector is grown by `push` so external mutations through
+    /// `with_segments` automatically initialise per-segment defaults.
+    pub runtime: Vec<TrenchSegmentRuntime>,
 }
 
 impl InMemorySegments {
@@ -176,11 +246,42 @@ impl InMemorySegments {
     }
 
     pub fn with_segments(segments: Vec<TrenchSegment>) -> Self {
-        Self { segments }
+        let runtime = segments
+            .iter()
+            .map(TrenchSegmentRuntime::for_segment)
+            .collect();
+        Self { segments, runtime }
     }
 
     pub fn push(&mut self, seg: TrenchSegment) {
+        let runtime = TrenchSegmentRuntime::for_segment(&seg);
         self.segments.push(seg);
+        self.runtime.push(runtime);
+    }
+
+    /// Borrow the per-segment runtime row at `index` (0-based). Returns
+    /// `None` when the index is out of range.
+    #[must_use]
+    pub fn runtime_at(&self, index: usize) -> Option<&TrenchSegmentRuntime> {
+        self.runtime.get(index)
+    }
+
+    /// Borrow the per-segment runtime row mutably at `index` (0-based).
+    pub fn runtime_at_mut(&mut self, index: usize) -> Option<&mut TrenchSegmentRuntime> {
+        self.runtime.get_mut(index)
+    }
+
+    /// Return the segment index whose AABB encloses the tile, or
+    /// `None` on open ground.
+    #[must_use]
+    pub fn segment_index_at(&self, tile_x: i32, tile_y: i32) -> Option<usize> {
+        self.segments.iter().position(|s| {
+            let x0 = s.tile_x;
+            let x1 = s.tile_x + s.width as i32;
+            let y0 = s.tile_y;
+            let y1 = s.tile_y + s.depth as i32;
+            tile_x >= x0 && tile_x < x1 && tile_y >= y0 && tile_y < y1
+        })
     }
 }
 

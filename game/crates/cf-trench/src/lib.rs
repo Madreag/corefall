@@ -81,4 +81,5 @@ pub use parapet_raised_forward_compat::{
 };
 pub use segment::{
     InMemorySegments, SegmentSpec, SegmentVariant, TrenchSegment, TrenchSegmentLookup,
+    TrenchSegmentRuntime,
 };
