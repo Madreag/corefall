@@ -1,0 +1,25 @@
+{
+  "language": "es-ES",
+  "entries": {
+    "cause_chain.actor_died": "Actor muri\u00f3 en el tick {tick}",
+    "cause_chain.actor_status_changed.killed": "{actor_name} fue matado",
+    "cause_chain.command_accepted": "Comando aceptado: {action}",
+    "cause_chain.electrified_fence": "Valla electrificada electrocut\u00f3 a {actor_name}",
+    "cause_chain.fallback": "Evento {event_type} en el tick {tick}",
+    "cause_chain.fence_shocked_actor": "Valla electrificada electrocut\u00f3 a {actor_name} ({fence_id})",
+    "cause_chain.header": "Cadena causal para {trigger_type}",
+    "cause_chain.mine_arming_beep": "Pitido de armado de mina",
+    "cause_chain.mine_triggered": "Mina {mine_id} detonada ({trigger_kind}) rendimiento {yield_joules} J",
+    "cause_chain.mission_resolved": "Misi\u00f3n resuelta",
+    "cause_chain.objective_completed": "Objetivo completado",
+    "cause_chain.objective_failed": "Objetivo fallado",
+    "cause_chain.objective_started": "Objetivo iniciado",
+    "cause_chain.projectile_hit": "Proyectil impact\u00f3 a {target_id}",
+    "cause_chain.projectile_spawned": "Proyectil generado",
+    "cause_chain.reactor_damaged": "Reactor da\u00f1ado",
+    "cause_chain.reactor_destroyed": "Reactor destruido",
+    "cause_chain.run_started": "Partida iniciada",
+    "cause_chain.terrain_carved": "Terreno tallado",
+    "cause_chain.weapon_fired": "Arma disparada por {actor_name}"
+  }
+}

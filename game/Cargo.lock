@@ -1952,6 +1952,7 @@ version = "0.0.1"
 dependencies = [
  "blake3",
  "cf-camera",
+ "cf-localization",
  "cf-render-2d",
  "cf-replay",
  "cf-save",

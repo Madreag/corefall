@@ -94,23 +94,78 @@
     // `pose.iter_mut().enumerate()` would obscure the per-component
     // intent without saving any runtime work (compiler unrolls the
     // small fixed-size loop).
-    clippy::needless_range_loop
+    clippy::needless_range_loop,
+    // m10b-3 raw-string tests use `r#"..."#` because some RON test
+    // fixtures embed double quotes; pedantic flags the hash-pair when
+    // a specific fixture happens not to use `"`, but the consistency
+    // is more valuable than the byte saving.
+    clippy::needless_raw_string_hashes,
+    // m10b-3 sample-rate constants (48_000 used as `48_000_u64`-ish
+    // literals in audio-tick math) read more naturally without
+    // separator for the math operand; allowing in this crate.
+    clippy::unreadable_literal,
+    // m10b-3 audio + chapter-derivation lookups use `map(|v|
+    // v.as_str()).unwrap_or("")` to keep the read sites flat against
+    // the `payload.get(...)?` pattern; the `.and_then` alternative
+    // adds line noise without saving allocations.
+    clippy::map_unwrap_or,
+    // m10b-3 keeps the inherent renderer lifetime explicit on the
+    // [`CauseChainOverlay::render`] receiver because the borrow
+    // depends on the events slice; clippy's `'_` suggestion obscures
+    // the binding.
+    clippy::needless_lifetimes,
+    // m10b-3 overlay_graph emits an `orphan_warning` with `&self`
+    // intentionally — production callers route the warning through
+    // an instance whose composition state may inform the message in
+    // a future iteration. Tests for clean-uninstall exercise this
+    // explicitly.
+    clippy::unused_self,
+    // m10b-3 chapter-timeline tests + audio_base_mix use abs-diff
+    // arithmetic via the `if-then-else` form; switching to
+    // `abs_diff` reads identically and isn't worth the lint churn
+    // because both terms come from u32 sample / pixel positions.
+    clippy::manual_abs_diff
 )]
 
+pub mod audio_base_mix;
+pub mod audit_events;
 pub mod camera_director;
 pub mod camera_script;
+pub mod cause_chain_walker;
+pub mod chapter_derivation;
 pub mod chapter_markers;
+pub mod commentary;
 pub mod ffmpeg_bridge;
 pub mod frame_ticker;
+pub mod overlay_cause_chain;
+pub mod overlay_chapter_timeline;
+pub mod overlay_graph;
+pub mod overlay_hud;
+pub mod overlay_kill_feed;
+pub mod overlay_watermark;
 pub mod preset_registry;
 
+pub use audio_base_mix::{
+    linear_to_dbfs, peak_dbfs_at_tick, synthesis_frequency_hz, synthesize_base_mix, AudioEvent,
+    ENVELOPE_LENGTH_SAMPLES, PEAK_THRESHOLD_DBFS,
+};
+pub use audit_events::{
+    emit_export_audit_events, ExportJobMetadata, EVENT_CATEGORY, EVENT_TYPE_CHAPTER_MARKER_EMITTED,
+    EVENT_TYPE_EXPORT_COMPLETED, EVENT_TYPE_EXPORT_STARTED,
+};
 pub use camera_director::{pose_at_tick, pose_displacement_pixels, CameraDirector, DirectorResolution};
 pub use camera_script::{
     CameraKeyframe, CameraKind, CameraScript, CameraScriptError, CameraTrack, Pose, POSE_COMPONENTS,
 };
+pub use cause_chain_walker::{trace as cause_chain_trace, CauseChain, ChainLink, ChainTermination};
+pub use chapter_derivation::{counts_by_event_type, interpolate, ChapterDerivation, ChapterMarker};
 pub use chapter_markers::{
     ChapterRule, ChapterRuleSet, ChapterRulesError, COMMANDER_EVENT_PREFIX, DEFAULT_CHAPTER_RULES_RON,
     REQUIRED_M4_EVENT_KINDS, REQUIRED_M9B_EVENT_KINDS, REQUIRED_M9C_EVENT_KINDS,
+};
+pub use commentary::{
+    linear_interp_resample, max_drift_frames, sample_offsets_for_clip, CommentaryError, CommentaryScript,
+    VoiceClip, CAPTION_LOC_BUNDLE_SIZE_CAP, COMMENTARY_CHANNELS, COMMENTARY_SAMPLE_RATE_HZ,
 };
 pub use ffmpeg_bridge::{
     DeterministicEncoderProfile, FfmpegBridge, FfmpegProbeError, FfmpegRuntime, ARCHIVAL_LOSSLESS_GOP_SIZE,
@@ -119,6 +174,30 @@ pub use ffmpeg_bridge::{
 pub use frame_ticker::{
     frame_step_ticks, BundleSource, FrameCommand, FrameCommandStream, FrameTicker, FrameTickerConfig, FrameTickerError,
     SUPPORTED_FRAME_RATES,
+};
+pub use overlay_cause_chain::{
+    render_chain as render_cause_chain, render_event_plain as render_cause_chain_event_plain, CauseChainOverlay,
+    RenderedLine, CAUSE_CHAIN_AOI_HEIGHT, CAUSE_CHAIN_AOI_WIDTH, CAUSE_CHAIN_AOI_X, CAUSE_CHAIN_AOI_Y,
+    CAUSE_CHAIN_FALLBACK_KEY, CAUSE_CHAIN_LINK_DWELL_TICKS, CAUSE_CHAIN_LOCALIZATION_PREFIX,
+};
+pub use overlay_chapter_timeline::{
+    ChapterTimelineOverlay, TickMark, CHAPTER_TIMELINE_AOI_HEIGHT, CHAPTER_TIMELINE_AOI_WIDTH,
+    CHAPTER_TIMELINE_AOI_X, CHAPTER_TIMELINE_AOI_Y,
+};
+pub use overlay_graph::{
+    ModOverlayDeclaration, OverlayGraph, OverlayGraphBuilder, OverlayGraphError, OverlayLayer, OverlaySource,
+    CAUSE_CHAIN_OVERLAY_NAME, CAUSE_CHAIN_Z_ORDER, CHAPTER_TIMELINE_OVERLAY_NAME, CHAPTER_TIMELINE_Z_ORDER,
+    HUD_OVERLAY_NAME, HUD_Z_ORDER, KILL_FEED_OVERLAY_NAME, KILL_FEED_Z_ORDER, OVERLAY_GRAPH_TRACE_TARGET,
+    WATERMARK_OVERLAY_NAME, WATERMARK_Z_ORDER,
+};
+pub use overlay_hud::{HudOverlay, HUD_AOI_HEIGHT, HUD_AOI_WIDTH, HUD_AOI_X, HUD_AOI_Y};
+pub use overlay_kill_feed::{
+    derive_entries as derive_kill_feed_entries, KillFeedEntry, KillFeedOverlay, KILL_FEED_AOI_HEIGHT,
+    KILL_FEED_AOI_WIDTH, KILL_FEED_AOI_X, KILL_FEED_AOI_Y, KILL_FEED_CAUSE_FILTER, KILL_FEED_DWELL_TICKS,
+};
+pub use overlay_watermark::{
+    WatermarkOverlay, WatermarkProvenance, WATERMARK_AOI_HEIGHT, WATERMARK_AOI_WIDTH, WATERMARK_AOI_X,
+    WATERMARK_AOI_Y, WATERMARK_FIELD_TRUNCATE,
 };
 pub use preset_registry::{
     ContainerKind, ExportPreset, PresetCodec, PresetError, PresetField, PresetRegistry, PresetResolution,

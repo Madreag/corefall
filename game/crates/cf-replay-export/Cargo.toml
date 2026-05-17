@@ -46,6 +46,11 @@ cf-camera = { path = "../cf-camera" }
 cf-replay = { path = "../cf-replay" }
 cf-save = { path = "../cf-save" }
 cf-render-2d = { path = "../cf-render-2d", default-features = false, features = ["offline"] }
+# m10b-3: caption + cause-chain overlay route through cf-localization so a
+# non-en-US locale (es-ES test) produces translated sidebar / caption text
+# per VAL-M10B-030. We bundle the English baseline at compile time via
+# `LocalizationTable::english_baseline()`.
+cf-localization = { path = "../cf-localization" }
 ffmpeg-next = { version = "8.1.0", default-features = false, features = [
   "codec",
   "format",

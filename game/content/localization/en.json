@@ -692,6 +692,26 @@
     "weapon.smg.name": "SMG",
     "weapon.smg.short": "SMG",
     "weapon.sniper.name": "Sniper",
-    "weapon.sniper.short": "SNP"
+    "weapon.sniper.short": "SNP",
+    "cause_chain.actor_died": "Actor died at tick {tick}",
+    "cause_chain.actor_status_changed.killed": "{actor_name} was killed",
+    "cause_chain.command_accepted": "Control accepted: {action}",
+    "cause_chain.electrified_fence": "Electrified fence shock {actor_name}",
+    "cause_chain.fallback": "Event {event_type} at tick {tick}",
+    "cause_chain.fence_shocked_actor": "Electrified fence shocked {actor_name} ({fence_id})",
+    "cause_chain.header": "Cause chain for {trigger_type}",
+    "cause_chain.mine_arming_beep": "Mine arming beep",
+    "cause_chain.mine_triggered": "Mine {mine_id} triggered ({trigger_kind}) yield {yield_joules} J",
+    "cause_chain.mission_resolved": "Mission resolved",
+    "cause_chain.objective_completed": "Objective completed",
+    "cause_chain.objective_failed": "Objective failed",
+    "cause_chain.objective_started": "Objective started",
+    "cause_chain.projectile_hit": "Shot hit {target_id}",
+    "cause_chain.projectile_spawned": "Projectile spawned",
+    "cause_chain.reactor_damaged": "Reactor damaged",
+    "cause_chain.reactor_destroyed": "Reactor destroyed",
+    "cause_chain.run_started": "Run started",
+    "cause_chain.terrain_carved": "Terrain carved",
+    "cause_chain.weapon_fired": "Weapon fired by {actor_name}"
   }
 }
