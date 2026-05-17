@@ -146,9 +146,99 @@ fn schema_dump_check_trench_segment_variant_downgraded_valid() {
     assert_required_keys(&v, "trench_segment_variant_downgraded.json");
 }
 
-/// VAL-M9B-REPLAY-002 sub-check: every M9B-owned schema authored by
-/// this feature declares `cosmetic=false` so the recorder treats them
-/// as non-droppable under M4 backpressure.
+#[test]
+fn schema_dump_check_trench_template_dropped_valid() {
+    let v = parse_schema("trench_template_dropped.json");
+    assert_required_keys(&v, "trench_template_dropped.json");
+}
+
+/// VAL-M9B-BREASTWORK-001: trench_breastwork_breached.json parses +
+/// declares `module_id="breastwork"` + non-cosmetic.
+#[test]
+fn schema_dump_check_trench_breastwork_breached_valid() {
+    let v = parse_schema("trench_breastwork_breached.json");
+    assert_required_keys(&v, "trench_breastwork_breached.json");
+    let props = v.get("properties").and_then(|p| p.as_object()).unwrap();
+    let module = props
+        .get("module_id")
+        .and_then(|r| r.as_object())
+        .expect("module_id property");
+    let enum_vals = module
+        .get("enum")
+        .and_then(|e| e.as_array())
+        .expect("module_id.enum");
+    let strings: Vec<&str> = enum_vals.iter().filter_map(|v| v.as_str()).collect();
+    assert!(
+        strings.contains(&"breastwork"),
+        "module_id.enum must contain `breastwork`"
+    );
+}
+
+/// VAL-M9B-DRAINAGE-001: trench_drainage_flushed.json parses + carries
+/// water_depth_before/after.
+#[test]
+fn schema_dump_check_trench_drainage_flushed_valid() {
+    let v = parse_schema("trench_drainage_flushed.json");
+    assert_required_keys(&v, "trench_drainage_flushed.json");
+    let props = v.get("properties").and_then(|p| p.as_object()).unwrap();
+    assert!(
+        props.contains_key("water_depth_before"),
+        "missing water_depth_before"
+    );
+    assert!(
+        props.contains_key("water_depth_after"),
+        "missing water_depth_after"
+    );
+}
+
+/// VAL-M9B-REVETMENT-001: trench_segment_collapsed.json parses + has
+/// the variant enum + cause field.
+#[test]
+fn schema_dump_check_trench_segment_collapsed_valid() {
+    let v = parse_schema("trench_segment_collapsed.json");
+    assert_required_keys(&v, "trench_segment_collapsed.json");
+    let props = v.get("properties").and_then(|p| p.as_object()).unwrap();
+    let variant = props
+        .get("variant")
+        .and_then(|r| r.as_object())
+        .expect("variant property");
+    let enum_vals = variant
+        .get("enum")
+        .and_then(|e| e.as_array())
+        .expect("variant.enum");
+    let strings: Vec<&str> = enum_vals.iter().filter_map(|v| v.as_str()).collect();
+    for required in [
+        "shallow_scrape",
+        "standard",
+        "deep",
+        "communication",
+        "fire_step",
+        "parapet_raised",
+    ] {
+        assert!(
+            strings.contains(&required),
+            "trench_segment_collapsed variant.enum missing `{required}`"
+        );
+    }
+    let cause = props
+        .get("cause")
+        .and_then(|r| r.as_object())
+        .expect("cause property");
+    let cause_vals = cause
+        .get("enum")
+        .and_then(|e| e.as_array())
+        .expect("cause.enum");
+    let cause_strings: Vec<&str> = cause_vals.iter().filter_map(|v| v.as_str()).collect();
+    assert!(
+        cause_strings.contains(&"no_revetment_in_soft_dirt"),
+        "cause.enum must include `no_revetment_in_soft_dirt`"
+    );
+}
+
+/// VAL-M9B-REPLAY-001 / VAL-M9B-REPLAY-002: all 8 M9B trench replay
+/// event schemas exist + parse + declare cosmetic=false. The cosmetic
+/// gate ensures the recorder treats them as non-droppable under M4
+/// backpressure.
 #[test]
 fn schema_dump_check_m9b_event_cosmetic_gate() {
     let m9b_schemas = [
@@ -158,6 +248,10 @@ fn schema_dump_check_m9b_event_cosmetic_gate() {
         "trench_module_placed.json",
         "trench_module_repaired.json",
         "trench_segment_variant_downgraded.json",
+        "trench_template_dropped.json",
+        "trench_breastwork_breached.json",
+        "trench_drainage_flushed.json",
+        "trench_segment_collapsed.json",
     ];
     for name in m9b_schemas {
         let v = parse_schema(name);
@@ -174,6 +268,29 @@ fn schema_dump_check_m9b_event_cosmetic_gate() {
             const_val,
             Some(false),
             "{name} cosmetic.const must be false (non-droppable)"
+        );
+    }
+}
+
+/// VAL-M9B-REPLAY-001: all 8 trench event schemas exist on disk.
+#[test]
+fn schema_dump_check_m9b_trench_event_schemas_present() {
+    let m9b_trench_schemas = [
+        "trench_segment_dug.json",
+        "trench_module_placed.json",
+        "trench_module_repaired.json",
+        "trench_template_dropped.json",
+        "trench_cover_state_changed.json",
+        "trench_breastwork_breached.json",
+        "trench_drainage_flushed.json",
+        "trench_segment_collapsed.json",
+    ];
+    for name in m9b_trench_schemas {
+        let path = schemas_dir().join(name);
+        assert!(
+            path.exists(),
+            "trench schema {name} missing on disk at {}",
+            path.display()
         );
     }
 }

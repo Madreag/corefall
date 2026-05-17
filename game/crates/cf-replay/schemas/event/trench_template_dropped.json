@@ -53,7 +53,13 @@
         }
       }
     },
-    "tick": { "type": "integer", "minimum": 0 }
+    "tick": { "type": "integer", "minimum": 0 },
+    "tick_index": { "type": "integer", "minimum": 0 },
+    "cosmetic": {
+      "type": "boolean",
+      "const": false,
+      "default": false
+    }
   },
   "additionalProperties": true
 }

@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/trench_drainage_flushed.v1",
+  "title": "trench.drainage_flushed",
+  "description": "M9B: VAL-M9B-DRAINAGE-001. A drainage_sump module's flush cycle ran, draining accumulated water tiles below the 2 px gameplay threshold. Non-cosmetic.",
+  "type": "object",
+  "required": ["segment_id", "module_id", "water_depth_before", "water_depth_after", "tick_index"],
+  "properties": {
+    "actor_id": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "segment_id": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "module_id": {
+      "type": "string",
+      "enum": [
+        "drainage_sump"
+      ]
+    },
+    "water_depth_before": {
+      "type": "number",
+      "minimum": 0
+    },
+    "water_depth_after": {
+      "type": "number",
+      "minimum": 0
+    },
+    "flush_threshold_px": {
+      "type": "number",
+      "minimum": 0
+    },
+    "tick_index": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cosmetic": {
+      "type": "boolean",
+      "const": false,
+      "default": false
+    }
+  },
+  "additionalProperties": true
+}

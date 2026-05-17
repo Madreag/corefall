@@ -1,0 +1,65 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/trench_segment_collapsed.v1",
+  "title": "trench.segment_collapsed",
+  "description": "M9B: VAL-M9B-REVETMENT-001. An unreinforced trench segment in soft dirt (hardness < 0.3) sloughed naturally via the M14F lateral-collapse path. With revetment installed, no collapse event fires over the same window (VAL-M9B-REVETMENT-002). Non-cosmetic.",
+  "type": "object",
+  "required": ["segment_id", "variant", "tick_index"],
+  "properties": {
+    "actor_id": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "segment_id": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "variant": {
+      "type": "string",
+      "enum": [
+        "shallow_scrape",
+        "standard",
+        "deep",
+        "communication",
+        "fire_step",
+        "parapet_raised"
+      ]
+    },
+    "substrate_hardness": {
+      "type": "number",
+      "minimum": 0,
+      "maximum": 1
+    },
+    "integrity_before": {
+      "type": "number"
+    },
+    "integrity_after": {
+      "type": "number"
+    },
+    "ticks_since_dug": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "had_revetment": {
+      "type": "boolean"
+    },
+    "cause": {
+      "type": "string",
+      "enum": [
+        "no_revetment_in_soft_dirt",
+        "integrity_exhausted",
+        "wall_slough"
+      ]
+    },
+    "tick_index": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cosmetic": {
+      "type": "boolean",
+      "const": false,
+      "default": false
+    }
+  },
+  "additionalProperties": true
+}

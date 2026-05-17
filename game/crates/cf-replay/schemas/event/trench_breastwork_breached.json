@@ -1,0 +1,49 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/trench_breastwork_breached.v1",
+  "title": "trench.breastwork_breached",
+  "description": "M9B: VAL-M9B-BREASTWORK-001. A parapet_raised trench segment's breastwork module reached HP 0 under sustained fire. Cover state for the affected segment downgrades from Full to Partial; subsequent M14 hits route through the gap. Non-cosmetic.",
+  "type": "object",
+  "required": ["segment_id", "module_id", "prev_hp", "tick_index"],
+  "properties": {
+    "actor_id": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "segment_id": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "module_id": {
+      "type": "string",
+      "enum": [
+        "breastwork"
+      ]
+    },
+    "prev_hp": {
+      "type": "number"
+    },
+    "prev_cover_state": {
+      "type": "string",
+      "enum": ["Exposed", "Partial", "Full"]
+    },
+    "new_cover_state": {
+      "type": "string",
+      "enum": ["Exposed", "Partial", "Full"]
+    },
+    "rounds_absorbed": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "tick_index": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cosmetic": {
+      "type": "boolean",
+      "const": false,
+      "default": false
+    }
+  },
+  "additionalProperties": true
+}
