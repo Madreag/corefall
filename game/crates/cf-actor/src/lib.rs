@@ -1388,13 +1388,21 @@ impl ActorState {
     }
 
     /// **M6B**: refresh the `InventoryEncumbrance` envelope from the
-    /// live `inventory_grid` totals. Caller drives this from the engine
-    /// tick after pickup / drop / liquid-fill events. Returns the new
-    /// envelope (or `None` when no envelope is attached).
+    /// live `inventory_grid` totals AND from the actor's current
+    /// `origin_id`. Caller drives this from the engine tick (and after
+    /// pickup / drop / liquid-fill / set_origin events). Returns the
+    /// new envelope (or `None` when no envelope is attached).
+    ///
+    /// **Important**: rebasing on `origin_id` here means that an actor
+    /// whose origin changes mid-game (M17 origin swap, brain hop) sees
+    /// the per-origin `max_carry_kg` modifier applied automatically on
+    /// the next tick — no extra plumbing in cfctl required.
     pub fn recompute_inventory_encumbrance(&mut self) -> Option<crate::inventory::InventoryEncumbrance> {
         let total_mass = self.inventory_grid_total_mass_kg();
         let total_bulk = self.inventory_grid_total_bulk_l();
+        let origin_id = self.origin_id.clone();
         let env = self.inventory_encumbrance.as_mut()?;
+        env.rebaseline_for_origin(&origin_id);
         env.set_carried(total_mass, total_bulk);
         Some(*env)
     }
@@ -2179,11 +2187,21 @@ pub struct ActorObservation {
     /// walk speed").
     #[serde(default)]
     pub encumbered: bool,
+    /// **M6B**: per-actor inventory grid (Tetris placements + per-item
+    /// mass + bulk + nested container counts). `None` for pre-M6B
+    /// legacy actors; `Some(...)` for any actor with an attached
+    /// `inventory_grid`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub inventory_grid: Option<InventoryGridView>,
 }
 
 /// **M6**: extended-inventory slot projection. Mirrors
 /// `cf_equipment::inventory::ExtendedSlot` but lives here so observe.actor
 /// stays a pure cf-actor projection.
+///
+/// **M6B**: extended with `bulk_volume_l` so `observe.actor.inventory`
+/// surfaces both per-slot mass + bulk per spec § Crates / modules touched
+/// (cf-control MODIFY — observe.actor.inventory extended with mass + bulk).
 #[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
 pub struct ExtendedInventorySlotView {
     pub kind: String,
@@ -2192,8 +2210,48 @@ pub struct ExtendedInventorySlotView {
     pub item_id: String,
     #[serde(default)]
     pub weight_kg: f32,
+    /// **M6B**: per-slot bulk volume in liters (from
+    /// `cf_equipment::ItemSpec.bulk_volume_l`). Zero for empty slots.
+    #[serde(default)]
+    pub bulk_volume_l: f32,
     #[serde(default)]
     pub locked_tooltip: Option<String>,
+}
+
+/// **M6B**: per-placement projection of the actor's inventory grid for
+/// `observe.actor`. Surfaces the canonical mass + bulk per item so the
+/// HUD + M27 Tetris UX + M14A mass aggregator all see one source of
+/// truth without each having to recompute from the spec registry.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct InventoryGridPlacementView {
+    pub instance_id: u64,
+    pub item_id: String,
+    pub category: String,
+    pub origin: [u8; 2],
+    pub dimensions: [u8; 2],
+    pub rotated: bool,
+    pub stack_count: u16,
+    pub mass_kg: f32,
+    pub bulk_volume_l: f32,
+    pub is_container: bool,
+    pub nested_count: u16,
+    pub current_liquid_l: f32,
+    pub liquid_capacity_l: f32,
+    pub quick_slot_eligible: bool,
+}
+
+/// **M6B**: full inventory-grid projection surfaced via
+/// `observe.actor.inventory_grid`. Mirrors
+/// `cf_actor::InventoryGrid` with derived totals so cfctl consumers see
+/// the canonical M6B surface without consulting the engine binary.
+#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+pub struct InventoryGridView {
+    pub tier: String,
+    pub grid_w: u8,
+    pub grid_h: u8,
+    pub placements: Vec<InventoryGridPlacementView>,
+    pub total_mass_kg: f32,
+    pub total_bulk_l: f32,
 }
 
 /// **M6**: high-level reload-state projection for [`WeaponStateView`].
@@ -2333,6 +2391,7 @@ impl ActorObservation {
             encumbrance_walk_speed_multiplier: actor.encumbrance_walk_speed_multiplier(),
             encumbrance_band: actor.encumbrance_band().as_str().to_string(),
             encumbered: actor.is_encumbered(),
+            inventory_grid: actor.inventory_grid_view(),
         }
     }
 }
@@ -2370,15 +2429,24 @@ impl ActorState {
         let mut out = Vec::with_capacity(slot_kinds.len() + tank_kinds.len());
         for (i, name) in slot_kinds.iter().enumerate() {
             let item = self.inventory.items.get(i).cloned().unwrap_or(InventoryItem::Empty);
-            let (state, item_id, weight) = match &item {
-                InventoryItem::Empty => ("empty", String::new(), 0.0),
-                InventoryItem::Rifle { preset } => ("occupied", preset.clone(), 3.5),
+            // **M6B**: per-slot mass + bulk derive from the canonical
+            // `cf_equipment::ItemSpec` registry. Unknown ids fall back
+            // to the M6 hardcoded weight (3.5) for legacy compat.
+            let (state, item_id, weight, bulk) = match &item {
+                InventoryItem::Empty => ("empty", String::new(), 0.0, 0.0),
+                InventoryItem::Rifle { preset } => {
+                    let spec = cf_equipment::spec_for_id(preset);
+                    let mass = spec.as_ref().map_or(3.5, |s| s.mass_kg);
+                    let bulk = spec.as_ref().map_or(0.0, |s| s.bulk_volume_l);
+                    ("occupied", preset.clone(), mass, bulk)
+                }
             };
             out.push(ExtendedInventorySlotView {
                 kind: (*name).to_string(),
                 state: state.to_string(),
                 item_id,
                 weight_kg: weight,
+                bulk_volume_l: bulk,
                 locked_tooltip: None,
             });
         }
@@ -2388,10 +2456,78 @@ impl ActorState {
                 state: "locked".to_string(),
                 item_id: String::new(),
                 weight_kg: 0.0,
+                bulk_volume_l: 0.0,
                 locked_tooltip: Some((*tooltip).to_string()),
             });
         }
         out
+    }
+
+    /// **M6B**: build the per-actor inventory-grid projection used by
+    /// `observe.actor.inventory_grid`. Walks every top-level placement
+    /// in the grid and emits a [`InventoryGridPlacementView`] with the
+    /// canonical mass + bulk + category + nested-count derived from
+    /// the [`cf_equipment::ItemSpec`] registry. Returns `None` when no
+    /// grid is attached (pre-M6B legacy actors).
+    pub fn inventory_grid_view(&self) -> Option<InventoryGridView> {
+        let grid = self.inventory_grid.as_ref()?;
+        let (w, h) = grid.dimensions();
+        let placements = grid
+            .items
+            .iter()
+            .map(|p| {
+                let spec = cf_equipment::spec_for_id(&p.item_id);
+                let (mass, bulk, dims, category, is_container, liquid_cap, quick_slot) = match spec {
+                    Some(s) => (
+                        p.mass_kg(&s),
+                        p.bulk_volume_l(&s),
+                        if p.rotated {
+                            s.dimensions.rotated()
+                        } else {
+                            s.dimensions
+                        },
+                        s.category.as_str().to_string(),
+                        s.is_container(),
+                        s.liquid_capacity_l.unwrap_or(0.0),
+                        s.quick_slot_eligible,
+                    ),
+                    None => (
+                        0.0,
+                        0.0,
+                        cf_equipment::GridDim::new(1, 1),
+                        String::new(),
+                        false,
+                        0.0,
+                        false,
+                    ),
+                };
+                let nested_count = p.container.as_ref().map(|c| c.items.len() as u16).unwrap_or(0);
+                InventoryGridPlacementView {
+                    instance_id: p.instance_id,
+                    item_id: p.item_id.clone(),
+                    category,
+                    origin: [p.origin.0, p.origin.1],
+                    dimensions: [dims.w, dims.h],
+                    rotated: p.rotated,
+                    stack_count: p.count,
+                    mass_kg: mass,
+                    bulk_volume_l: bulk,
+                    is_container,
+                    nested_count,
+                    current_liquid_l: p.current_liquid_l,
+                    liquid_capacity_l: liquid_cap,
+                    quick_slot_eligible: quick_slot,
+                }
+            })
+            .collect();
+        Some(InventoryGridView {
+            tier: grid.tier.as_str().to_string(),
+            grid_w: w,
+            grid_h: h,
+            placements,
+            total_mass_kg: grid.total_mass_kg(),
+            total_bulk_l: grid.total_bulk_l(),
+        })
     }
 
     /// **M6**: project a [`WeaponStateView`] for the actor's currently

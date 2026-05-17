@@ -77,10 +77,11 @@ pub use inventory::{
 };
 pub use item_spec::{
     bulk_volume_l_for_id, carry_capacity_modifier, encumbrance_band, liquid_fill_mass, mass_kg_for_id,
-    max_carry_kg_for_origin, max_carry_volume_l_for_origin, registered_ids as item_registered_ids, spec_for_id,
-    try_nest_depth, walk_speed_multiplier, BackpackTier, ContainerCapacity, EncumbranceBand, GridDim, ItemCategory,
-    ItemId, ItemSpec, MaterialId, OriginId, RecipeId, HUMAN_BASELINE_MAX_CARRY_KG, HUMAN_BASELINE_MAX_CARRY_VOLUME_L,
-    MAX_CONTAINER_NEST_DEPTH, MAX_DEPTH_EXCEEDED, WALK_SPEED_AT_EMPTY_CARRY, WALK_SPEED_AT_FULL_CARRY,
+    max_carry_kg_for_origin, max_carry_volume_l_for_origin, quick_slot_eligible_ids,
+    registered_ids as item_registered_ids, spec_for_id, try_nest_depth, walk_speed_multiplier, BackpackTier,
+    ContainerCapacity, EncumbranceBand, GridDim, ItemCategory, ItemId, ItemSpec, MaterialId, OriginId, RecipeId,
+    HUMAN_BASELINE_MAX_CARRY_KG, HUMAN_BASELINE_MAX_CARRY_VOLUME_L, MAX_CONTAINER_NEST_DEPTH, MAX_DEPTH_EXCEEDED,
+    WALK_SPEED_AT_EMPTY_CARRY, WALK_SPEED_AT_FULL_CARRY,
 };
 pub use knife_throw::{KnifeProjectile, KnifeThrowState, KNIFE_THROW_DAMAGE_FACTOR, KNIFE_THROW_MAX_FLIGHT_SECONDS};
 pub use magazine::{Magazine, PoppedRound, RoundKind};

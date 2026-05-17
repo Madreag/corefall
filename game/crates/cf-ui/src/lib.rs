@@ -1664,6 +1664,7 @@ mod tests {
             encumbrance_walk_speed_multiplier: 1.0,
             encumbrance_band: "none".to_string(),
             encumbered: false,
+            inventory_grid: None,
         };
         let line = stance_line("airborne", Some(&player));
         assert!(line.contains("AIRBORNE"));

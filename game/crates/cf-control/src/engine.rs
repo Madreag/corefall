@@ -1165,10 +1165,16 @@ fn rects_touch_or_overlap(a_min: [i64; 2], a_max: [i64; 2], b_min: [i64; 2], b_m
 }
 
 /// **M6B**: walk the inventory grid tree to find the nesting depth of the
-/// placement identified by `instance_id`. Depth 0 = root inventory (the
-/// placement lives at `grid.items`); depth 1 = inside a top-level
-/// container; depth 2 = inside a nested container; etc. Returns 0 when the
-/// id is not found.
+/// placement identified by `instance_id`. Depth is **1-indexed** to match
+/// the spec § Acceptance criteria scenario ("chest (level 1) containing a
+/// crate (level 2)") and `cf_actor::inventory::find_container_depth`:
+///
+/// - top-level item in `grid.items` = depth 1
+/// - item nested in a top-level container = depth 2
+/// - item nested two levels deep = depth 3 (only valid for non-container
+///   children; container children are gated by `try_nest_depth`)
+///
+/// Returns 0 when the id is not found.
 fn container_depth_of(grid: &cf_actor::InventoryGrid, instance_id: u64) -> u8 {
     fn walk(items: &[cf_actor::PlacedItem], target_id: u64, depth: u8) -> Option<u8> {
         for item in items {
@@ -1183,7 +1189,7 @@ fn container_depth_of(grid: &cf_actor::InventoryGrid, instance_id: u64) -> u8 {
         }
         None
     }
-    walk(&grid.items, instance_id, 0).unwrap_or(0)
+    walk(&grid.items, instance_id, 1).unwrap_or(0)
 }
 
 fn observed_run_status(state: &EngineMutable) -> RunStatus {
@@ -10408,6 +10414,20 @@ impl M0Engine {
             actor: u64,
             reason: &'static str,
         }
+        /// **M6B**: per-tick band transition emit captured during the
+        /// inventory-weight pass so the recorder can fire the
+        /// `inventory.encumbrance_threshold_crossed` event after the
+        /// write-guard is released.
+        struct EncumbranceEmit {
+            actor: u64,
+            from_band: &'static str,
+            to_band: &'static str,
+            total_carried_kg: f32,
+            max_carry_kg: f32,
+            carry_ratio: f32,
+            walk_speed_multiplier: f32,
+            origin_id: String,
+        }
 
         let mut stance_transitions: Vec<StanceTransition> = Vec::new();
         let mut stamina_emits: Vec<StaminaEmit> = Vec::new();
@@ -10415,6 +10435,7 @@ impl M0Engine {
         let mut weight_emits: Vec<WeightEmit> = Vec::new();
         let mut swap_emits: Vec<SwapEmit> = Vec::new();
         let mut action_rejects: Vec<ActionReject> = Vec::new();
+        let mut encumbrance_emits: Vec<EncumbranceEmit> = Vec::new();
 
         let tick_rate_hz = self.config.tick_rate_hz;
         let mut state = match self.state.write() {
@@ -10616,16 +10637,52 @@ impl M0Engine {
                 .expect("actor still present");
 
             // (f) Inventory-weight recompute.
+            //
+            // **M6B**: each slot consults the canonical ItemSpec
+            // registry (`cf_equipment::mass_kg_for_id`) for the
+            // per-item mass — the M6 hardcoded SLOT_WEIGHT_RIFLE_KG=8
+            // placeholder is now stale data drift. Unknown ids fall
+            // back to SLOT_WEIGHT_RIFLE_KG so any not-yet-registered
+            // preset still contributes a sensible non-zero mass and
+            // the legacy "weight > 30 kg forces walk" pipeline keeps
+            // working.
             let total_weight: f32 = actor
                 .inventory
                 .items
                 .iter()
                 .map(|item| match item {
                     cf_actor::InventoryItem::Empty => SLOT_WEIGHT_EMPTY_KG,
-                    cf_actor::InventoryItem::Rifle { .. } => SLOT_WEIGHT_RIFLE_KG,
+                    cf_actor::InventoryItem::Rifle { preset } => {
+                        cf_equipment::mass_kg_for_id(preset).unwrap_or(SLOT_WEIGHT_RIFLE_KG)
+                    }
                 })
                 .sum();
             actor.inventory_weight_kg = total_weight;
+            // **M6B**: the per-actor inventory grid is the canonical
+            // M6B surface; ensure it's attached + the envelope is
+            // refreshed every tick so liquid-drain, M6C SKU swap,
+            // M27B loot pickup, etc. always see a current
+            // walk-speed-multiplier without each caller needing to
+            // remember to recompute.
+            actor.inventory_grid_attach();
+            actor.recompute_inventory_encumbrance();
+            // Capture all M6B encumbrance + sprint-cancel side-effects
+            // BEFORE we drop the actor borrow, so we can update
+            // state.m6b_last_encumbrance_band + push the emit without
+            // racing the outer state borrow.
+            let m6b_env = actor.inventory_encumbrance;
+            let m6b_origin_id = actor.origin_id.clone();
+            // Apply sprint cancellation on Heavy band before
+            // releasing the actor reference.
+            let mut m6b_sprint_cancelled = false;
+            if let Some(env) = m6b_env {
+                if env.encumbered() && actor.sprint_active {
+                    actor.sprint_active = false;
+                    actor.stamina.sprinting = false;
+                    m6b_sprint_cancelled = true;
+                }
+            }
+            let _ = m6b_sprint_cancelled;
             let forces_walk = total_weight > cf_equipment::WEIGHT_FORCE_WALK_KG;
             if forces_walk && actor.sprint_active {
                 actor.sprint_active = false;
@@ -10634,6 +10691,25 @@ impl M0Engine {
                     actor: actor_id.0,
                     reason: "weight_forces_walk",
                 });
+            }
+            // Now safe to re-borrow state for the maps + emit pushes.
+            if let Some(env) = m6b_env {
+                let prev_enc_band = state.m6b_last_encumbrance_band.get(&actor_id).copied();
+                if Some(env.band) != prev_enc_band {
+                    state.m6b_last_encumbrance_band.insert(actor_id, env.band);
+                    encumbrance_emits.push(EncumbranceEmit {
+                        actor: actor_id.0,
+                        from_band: prev_enc_band
+                            .map(cf_equipment::EncumbranceBand::as_str)
+                            .unwrap_or("none"),
+                        to_band: env.band.as_str(),
+                        total_carried_kg: env.total_carried_kg,
+                        max_carry_kg: env.max_carry_kg,
+                        carry_ratio: env.carry_ratio(),
+                        walk_speed_multiplier: env.walk_speed_multiplier,
+                        origin_id: m6b_origin_id,
+                    });
+                }
             }
             let prev_bucket = state.m6_last_weight_bucket.get(&actor_id).copied();
             if prev_bucket != Some(forces_walk) {
@@ -10750,6 +10826,25 @@ impl M0Engine {
                 json!({
                     "actor": emit.actor,
                     "active_slot": emit.active_slot,
+                }),
+                None,
+            );
+        }
+        for emit in encumbrance_emits {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "inventory",
+                "encumbrance_threshold_crossed",
+                json!({
+                    "actor": emit.actor,
+                    "from_band": emit.from_band,
+                    "to_band": emit.to_band,
+                    "total_carried_kg": emit.total_carried_kg,
+                    "max_carry_kg": emit.max_carry_kg,
+                    "carry_ratio": emit.carry_ratio,
+                    "walk_speed_multiplier": emit.walk_speed_multiplier,
+                    "origin_id": emit.origin_id,
                 }),
                 None,
             );
@@ -22227,5 +22322,245 @@ mod tests {
                 .map(|e| (e.category.clone(), e.event_type.clone()))
                 .collect::<Vec<_>>()
         );
+    }
+
+    /// **M6B § Acceptance: Container nesting depth-limited**.
+    /// Full engine round trip: a chest at depth-1 holding a crate at
+    /// depth-2; attempting to nest a third container into the crate
+    /// rejects with the spec-locked `max_depth_exceeded` reason and
+    /// emits `actor.action_rejected` (no `inventory.container_nested`
+    /// fires for the rejection).
+    #[tokio::test]
+    async fn m6b_nest_container_engine_rejects_max_depth() {
+        let path = write_m1_scenario();
+        let config = load_m1_test_config(path);
+        let engine = M0Engine::new(config);
+        engine.record_run_started();
+
+        // Seed the player actor's grid with a chest (top-level) +
+        // crate (nested into chest at depth 2).
+        let chest_id;
+        let crate_id;
+        {
+            let mut state = engine.state.write().unwrap();
+            let player_id = state.player_actor.unwrap();
+            let actor = state
+                .actor_state
+                .as_mut()
+                .unwrap()
+                .world
+                .actors
+                .get_mut(&player_id)
+                .unwrap();
+            actor.inventory_grid_attach();
+            let grid = actor.inventory_grid_mut().unwrap();
+            chest_id = grid.add_top_level("chest", 1, 0.0);
+            crate_id = grid.try_nest_container(chest_id, "crate").unwrap();
+        }
+        engine.drive_tick();
+
+        // Step 1: nest another container (crate) into the crate. This
+        // would land at depth 3 = MAX_CONTAINER_NEST_DEPTH+1; the
+        // dispatch returns Rejected with the locked reason.
+        let result_rejected = engine
+            .dispatch(ControlCommand::ActM6 {
+                action: crate::m6_actions::M6Action::NestContainer {
+                    parent_instance_id: crate_id,
+                    child_item_id: "crate".to_string(),
+                },
+                source: IntentSource::Cfctl,
+            })
+            .await;
+        assert_eq!(result_rejected.status, crate::state::ControlEnvelopeStatus::Rejected);
+        assert_eq!(
+            result_rejected.reason.as_deref(),
+            Some(cf_equipment::MAX_DEPTH_EXCEEDED)
+        );
+
+        // Step 2: nest a medkit into the crate. Non-container child at
+        // depth 3 is allowed (depth cap only constrains containers).
+        let result_accepted = engine
+            .dispatch(ControlCommand::ActM6 {
+                action: crate::m6_actions::M6Action::NestContainer {
+                    parent_instance_id: crate_id,
+                    child_item_id: "medkit".to_string(),
+                },
+                source: IntentSource::Cfctl,
+            })
+            .await;
+        assert_eq!(result_accepted.status, crate::state::ControlEnvelopeStatus::Accepted);
+
+        engine.drive_tick();
+
+        let events = engine.recorder().snapshot_events();
+        // Rejection emits actor.action_rejected with the locked reason.
+        let rejected = events
+            .iter()
+            .find(|e| {
+                e.category == "actor"
+                    && e.event_type == "action_rejected"
+                    && e.payload
+                        .get("reason")
+                        .and_then(|r| r.as_str())
+                        .map(|s| s == cf_equipment::MAX_DEPTH_EXCEEDED)
+                        .unwrap_or(false)
+            })
+            .expect(
+                "expected actor.action_rejected with reason 'max_depth_exceeded'; \
+                 saw events: see test output",
+            );
+        assert_eq!(
+            rejected.payload.get("action").and_then(|v| v.as_str()),
+            Some("act.player.nest_container")
+        );
+
+        // Success path emits inventory.container_nested with depth=3.
+        let nested = events
+            .iter()
+            .find(|e| e.category == "inventory" && e.event_type == "container_nested")
+            .expect("expected inventory.container_nested for successful medkit nest");
+        let depth = nested.payload.get("depth").and_then(|v| v.as_u64()).unwrap_or(0);
+        assert_eq!(depth, 3, "medkit nested at depth 3 (inside crate)");
+        assert_eq!(
+            nested.payload.get("child_item_id").and_then(|v| v.as_str()),
+            Some("medkit")
+        );
+        assert_eq!(
+            nested.payload.get("child_is_container").and_then(|v| v.as_bool()),
+            Some(false)
+        );
+    }
+
+    /// **M6B § Acceptance: Encumbrance band transition fires the
+    /// `inventory.encumbrance_threshold_crossed` event**.
+    #[tokio::test]
+    async fn m6b_encumbrance_band_transition_fires_event() {
+        let path = write_m1_scenario();
+        let config = load_m1_test_config(path);
+        let engine = M0Engine::new(config);
+        engine.record_run_started();
+
+        // Seed the player with 15 rifles → Heavy band (52.5 / 50 ratio).
+        {
+            let mut state = engine.state.write().unwrap();
+            let player_id = state.player_actor.unwrap();
+            let actor = state
+                .actor_state
+                .as_mut()
+                .unwrap()
+                .world
+                .actors
+                .get_mut(&player_id)
+                .unwrap();
+            actor.inventory_grid_attach();
+            let grid = actor.inventory_grid_mut().unwrap();
+            for _ in 0..15 {
+                grid.add_top_level("rifle_m1", 1, 0.0);
+            }
+        }
+        // The tick recomputes encumbrance + detects band change.
+        engine.drive_tick();
+        engine.drive_tick();
+
+        let events = engine.recorder().snapshot_events();
+        let band_crossed = events
+            .iter()
+            .find(|e| e.category == "inventory" && e.event_type == "encumbrance_threshold_crossed")
+            .expect("encumbrance_threshold_crossed must fire when band changes");
+        assert_eq!(
+            band_crossed.payload.get("to_band").and_then(|v| v.as_str()),
+            Some("heavy")
+        );
+        let walk_mult = band_crossed
+            .payload
+            .get("walk_speed_multiplier")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(1.0);
+        assert!((walk_mult - 0.5).abs() < 0.01, "walk_speed_multiplier must be ~0.5");
+    }
+
+    /// **M6B § Acceptance: Item picked up via the engine adds canonical mass
+    /// to the inventory grid AND emits `equipment.item_picked_up_with_mass`**.
+    #[tokio::test]
+    async fn m6b_pickup_emits_mass_aware_event_and_updates_grid() {
+        let path = write_m1_scenario();
+        let config = load_m1_test_config(path);
+        let engine = M0Engine::new(config);
+        engine.record_run_started();
+
+        // Spawn a dropped rifle near the player.
+        let player_pos = {
+            let state = engine.state.read().unwrap();
+            let player_id = state.player_actor.unwrap();
+            state
+                .actor_state
+                .as_ref()
+                .unwrap()
+                .world
+                .actors
+                .get(&player_id)
+                .unwrap()
+                .position
+        };
+        // Drop the held rifle so it lands in the world.
+        engine
+            .dispatch(ControlCommand::ActM6 {
+                action: crate::m6_actions::M6Action::DropItem { slot: Some(0) },
+                source: IntentSource::Cfctl,
+            })
+            .await;
+        engine.drive_tick();
+        // Push the dropped item next to the player so pickup is in range.
+        {
+            let mut state = engine.state.write().unwrap();
+            for item in state.m6_dropped_items.iter_mut() {
+                item.position = player_pos;
+            }
+        }
+        engine.drive_tick();
+        // Now pick it up.
+        engine
+            .dispatch(ControlCommand::ActM6 {
+                action: crate::m6_actions::M6Action::Pickup,
+                source: IntentSource::Cfctl,
+            })
+            .await;
+        engine.drive_tick();
+        engine.drive_tick();
+
+        let events = engine.recorder().snapshot_events();
+        // Both the legacy event AND the mass-aware sibling MUST fire.
+        let legacy = events
+            .iter()
+            .filter(|e| e.category == "equipment" && e.event_type == "item_picked_up")
+            .count();
+        let mass_aware = events
+            .iter()
+            .filter(|e| e.category == "equipment" && e.event_type == "item_picked_up_with_mass")
+            .count();
+        assert!(legacy >= 1, "legacy equipment.item_picked_up must still fire");
+        assert!(
+            mass_aware >= 1,
+            "M6B equipment.item_picked_up_with_mass must fire alongside legacy event"
+        );
+        // The mass_aware event carries canonical mass + dimensions from
+        // the ItemSpec registry (mass=3.5, dims=2×4 per rifle_m1_default
+        // → falls back to legacy weight when not in registry; rifle_m1_default
+        // IS in the registry so we expect 3.5).
+        let mass_event = events
+            .iter()
+            .find(|e| e.category == "equipment" && e.event_type == "item_picked_up_with_mass")
+            .unwrap();
+        let mass_kg = mass_event.payload.get("mass_kg").and_then(|v| v.as_f64()).unwrap_or(0.0);
+        assert!(
+            (mass_kg - 3.5).abs() < 0.01,
+            "mass_kg from registry must be 3.5 (got {mass_kg})"
+        );
+        let total = mass_event
+            .payload
+            .get("inventory_total_mass_kg")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.0);
+        assert!(total > 0.0, "inventory_total_mass_kg must be > 0 after pickup");
     }
 }

@@ -6,11 +6,16 @@
 //! cf-actor primitives directly (pure helpers) and verify per-actor
 //! grid + encumbrance state contracts.
 
-use cf_actor::{ActorId, ActorState, Inventory, InventoryGrid, Vec2};
-use cf_equipment::{
-    encumbrance_band, liquid_fill_mass, max_carry_kg_for_origin, spec_for_id, try_nest_depth, walk_speed_multiplier,
-    BackpackTier, EncumbranceBand, MAX_CONTAINER_NEST_DEPTH, MAX_DEPTH_EXCEEDED,
+use cf_actor::{
+    sim::{step_no_rng, ActorSimState, StepDeps},
+    ActorId, ActorState, ControlIntent, IntentSource, Inventory, InventoryGrid, Vec2,
 };
+use cf_equipment::{
+    encumbrance_band, liquid_fill_mass, max_carry_kg_for_origin, quick_slot_eligible_ids, spec_for_id,
+    try_nest_depth, walk_speed_multiplier, BackpackTier, EncumbranceBand, ItemSpec, MAX_CONTAINER_NEST_DEPTH,
+    MAX_DEPTH_EXCEEDED,
+};
+use std::collections::BTreeMap;
 
 // ============================================================================
 // Scenario: Item declares mass + dimensions
@@ -123,6 +128,27 @@ fn scenario_per_origin_actor_envelope_seeded_from_origin() {
     let mut actor = ActorState::player(ActorId(1), "blue", Vec2::ZERO, 100.0, inv);
     actor.origin_id = "heavy_biomech".to_string();
     actor.inventory_grid_attach();
+    assert!((actor.max_carry_kg() - 75.0).abs() < 1e-6);
+}
+
+#[test]
+fn scenario_origin_change_rebaselines_max_carry_on_next_recompute() {
+    // M17 forward-compat: actor changes origin mid-game (e.g., brain
+    // hops into a drone chassis). `recompute_inventory_encumbrance`
+    // must refresh max_carry_kg from the new origin so the
+    // walk-speed multiplier reflects the new envelope on the next
+    // tick — no extra cfctl plumbing required.
+    let inv = Inventory::with_rifle("rifle_m1_default");
+    let mut actor = ActorState::player(ActorId(1), "blue", Vec2::ZERO, 100.0, inv);
+    actor.inventory_grid_attach();
+    assert!((actor.max_carry_kg() - 50.0).abs() < 1e-6);
+    // Swap origin: human → drone (max_carry_kg becomes 15.0 = 50 × 0.3).
+    actor.origin_id = "drone".to_string();
+    actor.recompute_inventory_encumbrance();
+    assert!((actor.max_carry_kg() - 15.0).abs() < 1e-6);
+    // Swap origin: drone → heavy_biomech (max_carry_kg becomes 75.0).
+    actor.origin_id = "heavy_biomech".to_string();
+    actor.recompute_inventory_encumbrance();
     assert!((actor.max_carry_kg() - 75.0).abs() < 1e-6);
 }
 
@@ -256,6 +282,194 @@ fn item_spec_schema_round_trips() {
     // Schema lock: serde round-trip must preserve every field.
     let spec = spec_for_id("rifle_m1").unwrap();
     let json = serde_json::to_string(&spec).expect("serialize");
-    let back: cf_equipment::ItemSpec = serde_json::from_str(&json).expect("deserialize");
+    let back: ItemSpec = serde_json::from_str(&json).expect("deserialize");
     assert_eq!(spec, back);
+}
+
+// ============================================================================
+// Engine-level integration: 100-tick deterministic movement under load
+// ============================================================================
+
+fn make_step_deps() -> StepDeps {
+    StepDeps {
+        tick_dt: 1.0 / 60.0,
+        region_min_x: 0.0,
+        region_max_x: 4096.0,
+        region_max_y: 4096.0,
+        auto_reload_when_empty: false,
+        tuning: None,
+        tutorial_safety: false,
+    }
+}
+
+fn make_loaded_actor(start_x: f32, encumbered: bool) -> ActorState {
+    let inv = Inventory::with_rifle("rifle_m1_default");
+    let mut a = ActorState::player(ActorId(1), "blue", Vec2::new(start_x, 16.0), 100.0, inv);
+    a.on_ground = true;
+    a.inventory_grid_attach();
+    if encumbered {
+        // Fill ~50 kg = full encumbrance for a human (max_carry_kg = 50).
+        for _ in 0..15 {
+            a.inventory_grid_mut().unwrap().add_top_level("rifle_m1", 1, 0.0);
+        }
+    }
+    a.recompute_inventory_encumbrance();
+    a
+}
+
+#[test]
+fn scenario_determinism_engine_100_ticks_two_runs_identical_positions() {
+    // **Spec § Acceptance criteria**: "Given identical seed + identical
+    // inventory load, when 100 ticks of movement elapse, then identical
+    // actor positions per tick".
+    //
+    // This is the engine-level proof: two independent ActorSimState
+    // instances seeded with the same actor + same load + same control
+    // intents produce bit-identical positions per tick across 100
+    // ticks of horizontal movement.
+    let mut state_a = ActorSimState::new(cf_actor::ActorWorld::new(0.0, -980.0));
+    let mut state_b = ActorSimState::new(cf_actor::ActorWorld::new(0.0, -980.0));
+    state_a.world.insert(make_loaded_actor(50.0, true));
+    state_b.world.insert(make_loaded_actor(50.0, true));
+
+    let deps = make_step_deps();
+    let mut positions_a: Vec<(f32, f32)> = Vec::with_capacity(100);
+    let mut positions_b: Vec<(f32, f32)> = Vec::with_capacity(100);
+    for _ in 0..100 {
+        // The sim drains intents each step (`intents.remove`), so we
+        // re-insert the constant move-x intent every tick.
+        let mut intents_a = BTreeMap::new();
+        let mut intents_b = BTreeMap::new();
+        let mut intent = ControlIntent::new(ActorId(1), IntentSource::Human);
+        intent.move_x = 1.0;
+        intents_a.insert(ActorId(1), intent.clone());
+        intents_b.insert(ActorId(1), intent);
+        let _ = step_no_rng(&mut state_a, &mut intents_a, deps);
+        let _ = step_no_rng(&mut state_b, &mut intents_b, deps);
+        let pa = state_a.world.actors[&ActorId(1)].position;
+        let pb = state_b.world.actors[&ActorId(1)].position;
+        positions_a.push((pa.x, pa.y));
+        positions_b.push((pb.x, pb.y));
+    }
+    assert_eq!(positions_a, positions_b, "encumbered movement must be deterministic");
+    // Sanity: actor moved (didn't stall).
+    assert!(
+        positions_a.last().unwrap().0 > 60.0,
+        "actor must move forward (got x={})",
+        positions_a.last().unwrap().0
+    );
+}
+
+#[test]
+fn scenario_encumbrance_reduces_actor_displacement_vs_unloaded() {
+    // Cross-check on the sim path: an encumbered actor (50 kg → 0.5×
+    // walk speed) MUST travel less far over 100 ticks than an unloaded
+    // actor (1.0× walk speed) given identical move-x input.
+    let mut state_loaded = ActorSimState::new(cf_actor::ActorWorld::new(0.0, -980.0));
+    let mut state_empty = ActorSimState::new(cf_actor::ActorWorld::new(0.0, -980.0));
+    state_loaded.world.insert(make_loaded_actor(50.0, true));
+    state_empty.world.insert(make_loaded_actor(50.0, false));
+
+    let deps = make_step_deps();
+    for _ in 0..100 {
+        // Re-insert the constant move-x intent every tick (the sim
+        // drains intents via `remove` each step).
+        let mut intents_l = BTreeMap::new();
+        let mut intents_e = BTreeMap::new();
+        let mut intent = ControlIntent::new(ActorId(1), IntentSource::Human);
+        intent.move_x = 1.0;
+        intents_l.insert(ActorId(1), intent.clone());
+        intents_e.insert(ActorId(1), intent);
+        let _ = step_no_rng(&mut state_loaded, &mut intents_l, deps);
+        let _ = step_no_rng(&mut state_empty, &mut intents_e, deps);
+    }
+    let loaded_x = state_loaded.world.actors[&ActorId(1)].position.x;
+    let empty_x = state_empty.world.actors[&ActorId(1)].position.x;
+    assert!(
+        loaded_x < empty_x,
+        "encumbered actor must travel less far ({loaded_x} vs {empty_x})"
+    );
+    // Verify the ratio is roughly in the spec-mandated 0.5× zone (allow
+    // ±15% slack for steady-state friction / ground-acceleration differences).
+    let displacement_loaded = loaded_x - 50.0;
+    let displacement_empty = empty_x - 50.0;
+    let ratio = displacement_loaded / displacement_empty;
+    assert!(
+        (0.4..=0.65).contains(&ratio),
+        "displacement ratio {ratio:.3} should be near 0.5 (got loaded={displacement_loaded:.2} / empty={displacement_empty:.2})"
+    );
+}
+
+// ============================================================================
+// observe.actor.inventory_grid surfaces canonical mass + bulk
+// ============================================================================
+
+#[test]
+fn observe_actor_inventory_grid_surfaces_mass_and_bulk() {
+    // Spec § Crates / modules touched: "cf-control MODIFY — observe.actor.inventory extended with mass + bulk".
+    let inv = Inventory::with_rifle("rifle_m1_default");
+    let mut actor = ActorState::player(ActorId(1), "blue", Vec2::ZERO, 100.0, inv);
+    actor.inventory_grid_attach();
+    actor.inventory_grid_mut().unwrap().add_top_level("rifle_m1", 1, 0.0);
+    actor.inventory_grid_mut().unwrap().add_top_level("water_bottle", 1, 0.5);
+    actor.recompute_inventory_encumbrance();
+    let view = actor.inventory_grid_view().expect("grid view present");
+    assert_eq!(view.tier, "small");
+    assert_eq!(view.grid_w, 4);
+    assert_eq!(view.grid_h, 6);
+    assert_eq!(view.placements.len(), 2);
+    // Per-placement mass + bulk surfaced from registry.
+    let rifle_view = view.placements.iter().find(|p| p.item_id == "rifle_m1").unwrap();
+    assert!((rifle_view.mass_kg - 3.5).abs() < 1e-4);
+    assert!((rifle_view.bulk_volume_l - 3.0).abs() < 1e-4);
+    assert!(rifle_view.quick_slot_eligible);
+    assert_eq!(rifle_view.category, "weapon");
+    let bottle_view = view.placements.iter().find(|p| p.item_id == "water_bottle").unwrap();
+    assert!((bottle_view.mass_kg - 0.7).abs() < 1e-4);
+    assert!((bottle_view.current_liquid_l - 0.5).abs() < 1e-4);
+    assert!((view.total_mass_kg - 4.2).abs() < 1e-4);
+}
+
+#[test]
+fn extended_inventory_view_carries_bulk_from_registry() {
+    // Spec § Crates / modules touched: "observe.actor.inventory extended with mass + bulk"
+    // — ExtendedInventorySlotView now carries `bulk_volume_l`.
+    let inv = Inventory::with_rifle("rifle_m1");
+    let actor = ActorState::player(ActorId(1), "blue", Vec2::ZERO, 100.0, inv);
+    let view = actor.extended_inventory_view();
+    let occupied: Vec<_> = view.iter().filter(|s| s.state == "occupied").collect();
+    assert_eq!(occupied.len(), 1);
+    let slot = occupied[0];
+    assert_eq!(slot.item_id, "rifle_m1");
+    // From the ItemSpec registry: mass=3.5, bulk=3.0.
+    assert!((slot.weight_kg - 3.5).abs() < 1e-4);
+    assert!((slot.bulk_volume_l - 3.0).abs() < 1e-4);
+}
+
+// ============================================================================
+// quick_slot_eligible filter for M14A QAB
+// ============================================================================
+
+#[test]
+fn quick_slot_eligible_ids_excludes_containers() {
+    // Spec § Player-facing behavior: "Hot-swap M14A QAB items declare
+    // `quick_slot_eligible = true`".
+    let qs = quick_slot_eligible_ids();
+    assert!(qs.contains(&"rifle_m1".to_string()));
+    assert!(qs.contains(&"medkit".to_string()));
+    assert!(qs.contains(&"water_bottle".to_string()));
+    assert!(!qs.contains(&"chest".to_string()));
+    assert!(!qs.contains(&"backpack_small".to_string()));
+}
+
+// ============================================================================
+// stack_mass helper
+// ============================================================================
+
+#[test]
+fn stack_mass_matches_spec_formula() {
+    // Spec § Player-facing behavior: "stack_mass = item_mass × count".
+    let ammo = spec_for_id("ammo_5_56x45").unwrap();
+    assert!((ammo.stack_mass(30) - 0.36).abs() < 1e-4);
+    assert!((ammo.stack_mass(60) - 0.72).abs() < 1e-4);
 }

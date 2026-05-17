@@ -1194,10 +1194,12 @@ fn validate_one(path: &Path, report: &mut ValidationReport) {
         validate_loadout_file(path, report);
         return;
     }
-    // **M6B**: validate `content/equipment/items/manifest.ron` against
-    // the cf_equipment::item_spec registry. The manifest mirrors the
-    // hardcoded registry id list so authoring tools can see the
-    // canonical set without consulting the engine binary.
+    // **M6B**: validate `content/equipment/items/*.ron` per spec §
+    // "Validate `content/equipment/items/*.ron` against ItemSpec
+    // schema". `manifest.ron` is validated against the canonical
+    // `cf_equipment::item_spec` registry (mirror drift detection);
+    // any other `*.ron` file in the items dir is validated as a
+    // standalone `cf_equipment::ItemSpec` definition.
     if path
         .parent()
         .and_then(|p| p.file_name())
@@ -1209,9 +1211,13 @@ fn validate_one(path: &Path, report: &mut ValidationReport) {
             .and_then(|p| p.file_name())
             .and_then(|s| s.to_str())
             == Some("equipment")
-        && path.file_name().and_then(|s| s.to_str()) == Some("manifest.ron")
+        && path.extension().and_then(|s| s.to_str()) == Some("ron")
     {
-        validate_item_manifest(path, report);
+        if path.file_name().and_then(|s| s.to_str()) == Some("manifest.ron") {
+            validate_item_manifest(path, report);
+        } else {
+            validate_item_spec_ron(path, report);
+        }
         return;
     }
     if path.parent().and_then(|p| p.file_name()).and_then(|s| s.to_str()) == Some("scenarios")
@@ -2079,6 +2085,91 @@ fn validate_item_manifest(path: &Path, report: &mut ValidationReport) {
         report.add_pass(
             path.to_path_buf(),
             format!("item_manifest ({} entries)", parsed.items.len()),
+        );
+    } else {
+        report.add_error(path.to_path_buf(), messages.join("; "));
+    }
+}
+
+/// **M6B**: validate a standalone `content/equipment/items/<id>.ron`
+/// ItemSpec definition. The file must parse as a `cf_equipment::ItemSpec`
+/// (via serde) and the canonical id MUST already be registered in the
+/// runtime registry (so mods can't ship arbitrary undeclared ids while
+/// the lock window stays narrow). Per spec § "Validate
+/// `content/equipment/items/*.ron` against ItemSpec schema".
+fn validate_item_spec_ron(path: &Path, report: &mut ValidationReport) {
+    let raw = match fs::read_to_string(path) {
+        Ok(t) => t,
+        Err(err) => {
+            report.add_error(path.to_path_buf(), format!("read failed: {err}"));
+            return;
+        }
+    };
+    let spec: cf_equipment::ItemSpec = match ron::from_str(&raw) {
+        Ok(v) => v,
+        Err(err) => {
+            report.add_error(path.to_path_buf(), format!("item_spec ron parse failed: {err}"));
+            return;
+        }
+    };
+    let mut messages: Vec<String> = Vec::new();
+    if spec.id.trim().is_empty() {
+        messages.push("item_spec.id must be non-empty".to_string());
+    }
+    let stem = path.file_stem().and_then(|s| s.to_str()).unwrap_or("");
+    if !stem.is_empty() && stem != spec.id {
+        messages.push(format!(
+            "item_spec.id `{}` mismatches filename stem `{stem}`",
+            spec.id
+        ));
+    }
+    if spec.mass_kg < 0.0 || !spec.mass_kg.is_finite() {
+        messages.push(format!("item_spec.mass_kg must be finite and >= 0 (got {})", spec.mass_kg));
+    }
+    if spec.dimensions.w == 0 || spec.dimensions.h == 0 {
+        messages.push(format!(
+            "item_spec.dimensions must be > 0 in both axes (got {}×{})",
+            spec.dimensions.w, spec.dimensions.h
+        ));
+    }
+    if spec.bulk_volume_l < 0.0 || !spec.bulk_volume_l.is_finite() {
+        messages.push(format!(
+            "item_spec.bulk_volume_l must be finite and >= 0 (got {})",
+            spec.bulk_volume_l
+        ));
+    }
+    if spec.stackable && spec.max_stack == 0 {
+        messages.push("stackable items must declare max_stack > 0".to_string());
+    }
+    if let Some(cap) = &spec.container_capacity {
+        if cap.max_nest_depth > cf_equipment::MAX_CONTAINER_NEST_DEPTH {
+            messages.push(format!(
+                "container_capacity.max_nest_depth ({}) exceeds engine cap ({})",
+                cap.max_nest_depth,
+                cf_equipment::MAX_CONTAINER_NEST_DEPTH
+            ));
+        }
+    }
+    if let Some(liquid_cap) = spec.liquid_capacity_l {
+        if liquid_cap < 0.0 || !liquid_cap.is_finite() {
+            messages.push(format!(
+                "liquid_capacity_l must be finite and >= 0 (got {liquid_cap})"
+            ));
+        }
+    }
+    // Registry-pinned: the id must already be a known runtime registry
+    // entry. This keeps mods from declaring unknown ids during M6B's
+    // lock window; M6C+ may relax this once the SKU pipeline lands.
+    if cf_equipment::spec_for_id(&spec.id).is_none() {
+        messages.push(format!(
+            "item_spec.id `{}` is not registered in cf_equipment::item_spec (M6B locked the registry; new ids land in M6C+)",
+            spec.id
+        ));
+    }
+    if messages.is_empty() {
+        report.add_pass(
+            path.to_path_buf(),
+            format!("item_spec `{}` ({} kg, {}×{}, {} L)", spec.id, spec.mass_kg, spec.dimensions.w, spec.dimensions.h, spec.bulk_volume_l),
         );
     } else {
         report.add_error(path.to_path_buf(), messages.join("; "));
@@ -3450,5 +3541,126 @@ mod tests {
         validate_item_manifest(&path, &mut report);
         let _ = fs::remove_file(&path);
         assert_eq!(report.fail(), 1);
+    }
+
+    #[test]
+    fn item_spec_ron_accepts_registered_id() {
+        // Standalone item_spec ron file mirroring a registered id.
+        let body = r#"(
+  id: "rifle_m1",
+  display_name: "Rifle (M1)",
+  mass_kg: 3.5,
+  dimensions: (w: 2, h: 4),
+  bulk_volume_l: 3.0,
+  stackable: false,
+  max_stack: 1,
+  category: weapon,
+  container_capacity: None,
+  liquid_capacity_l: None,
+  rotation_allowed: true,
+  quick_slot_eligible: true,
+  durability_max: Some(1000),
+  repair_recipe: Some("repair.rifle_m1"),
+  material_weight_breakdown: {},
+  crafting_yield_count: 1,
+  origin_compatibility: [],
+  forbid_for_origin: [],
+)"#;
+        let path = write_tmp("rifle_m1.ron", body);
+        let mut report = ValidationReport::default();
+        validate_item_spec_ron(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.pass(), 1, "report: {:?}", report.entries);
+        assert_eq!(report.fail(), 0);
+    }
+
+    #[test]
+    fn item_spec_ron_rejects_unknown_id() {
+        let body = r#"(
+  id: "made_up_item",
+  display_name: "Made Up",
+  mass_kg: 1.0,
+  dimensions: (w: 1, h: 1),
+  bulk_volume_l: 1.0,
+  stackable: false,
+  max_stack: 1,
+  category: weapon,
+  container_capacity: None,
+  liquid_capacity_l: None,
+  rotation_allowed: true,
+  quick_slot_eligible: false,
+  durability_max: None,
+  repair_recipe: None,
+  material_weight_breakdown: {},
+  crafting_yield_count: 1,
+  origin_compatibility: [],
+  forbid_for_origin: [],
+)"#;
+        let path = write_tmp("made_up_item.ron", body);
+        let mut report = ValidationReport::default();
+        validate_item_spec_ron(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+        assert!(report.entries[0].message.contains("not registered"));
+    }
+
+    #[test]
+    fn item_spec_ron_rejects_filename_mismatch() {
+        let body = r#"(
+  id: "rifle_m1",
+  display_name: "Rifle (M1)",
+  mass_kg: 3.5,
+  dimensions: (w: 2, h: 4),
+  bulk_volume_l: 3.0,
+  stackable: false,
+  max_stack: 1,
+  category: weapon,
+  container_capacity: None,
+  liquid_capacity_l: None,
+  rotation_allowed: true,
+  quick_slot_eligible: true,
+  durability_max: Some(1000),
+  repair_recipe: None,
+  material_weight_breakdown: {},
+  crafting_yield_count: 1,
+  origin_compatibility: [],
+  forbid_for_origin: [],
+)"#;
+        let path = write_tmp("wrong_filename.ron", body);
+        let mut report = ValidationReport::default();
+        validate_item_spec_ron(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+        assert!(report.entries[0].message.contains("mismatches filename"));
+    }
+
+    #[test]
+    fn item_spec_ron_rejects_zero_dimensions() {
+        let body = r#"(
+  id: "rifle_m1",
+  display_name: "Rifle (M1)",
+  mass_kg: 3.5,
+  dimensions: (w: 0, h: 4),
+  bulk_volume_l: 3.0,
+  stackable: false,
+  max_stack: 1,
+  category: weapon,
+  container_capacity: None,
+  liquid_capacity_l: None,
+  rotation_allowed: true,
+  quick_slot_eligible: true,
+  durability_max: None,
+  repair_recipe: None,
+  material_weight_breakdown: {},
+  crafting_yield_count: 1,
+  origin_compatibility: [],
+  forbid_for_origin: [],
+)"#;
+        let path = write_tmp("rifle_m1.ron", body);
+        let mut report = ValidationReport::default();
+        validate_item_spec_ron(&path, &mut report);
+        let _ = fs::remove_file(&path);
+        assert_eq!(report.fail(), 1);
+        assert!(report.entries[0].message.contains("dimensions"));
     }
 }

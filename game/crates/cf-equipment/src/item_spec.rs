@@ -274,6 +274,32 @@ impl ItemSpec {
     pub fn quick_slot_ok(&self) -> bool {
         self.quick_slot_eligible
     }
+
+    /// **M6B § Player-facing behavior**: stack mass formula.
+    ///
+    /// Spec literal: "Stack items declare `stack_mass = item_mass × count`".
+    /// Non-stackable items: `count` is clamped to `[1, max_stack]` so the
+    /// returned mass is always `mass_kg × count` (with `count` clamped at
+    /// 1 for non-stackable items).
+    pub fn stack_mass(&self, count: u16) -> f32 {
+        let clamped_count = if self.stackable {
+            count.clamp(1, self.max_stack.max(1))
+        } else {
+            1
+        };
+        self.mass_kg * f32::from(clamped_count)
+    }
+
+    /// **M6B § Player-facing behavior**: stack bulk formula. Same semantics
+    /// as [`stack_mass`] but for bulk volume.
+    pub fn stack_bulk_l(&self, count: u16) -> f32 {
+        let clamped_count = if self.stackable {
+            count.clamp(1, self.max_stack.max(1))
+        } else {
+            1
+        };
+        self.bulk_volume_l * f32::from(clamped_count)
+    }
 }
 
 /// **M6B**: compute the effective mass of a liquid container when it
@@ -742,6 +768,20 @@ pub fn registered_ids() -> Vec<ItemId> {
     })
 }
 
+/// **M6B § Player-facing behavior**: filter the registry down to items
+/// flagged `quick_slot_eligible = true`. Consumed by the M14A
+/// quick-action-bar — spec literal "Hot-swap M14A QAB items declare
+/// `quick_slot_eligible = true`". Result is sorted ascending by id for
+/// deterministic ordering.
+pub fn quick_slot_eligible_ids() -> Vec<ItemId> {
+    REGISTRY_CACHE.with(|cache| {
+        let map = cache.get_or_init(build_registry);
+        map.iter()
+            .filter_map(|(id, spec)| if spec.quick_slot_eligible { Some(id.clone()) } else { None })
+            .collect()
+    })
+}
+
 /// Mass lookup convenience: returns `Some(mass_kg)` when the id resolves,
 /// else `None`. M6B's "every item declares mass" contract.
 pub fn mass_kg_for_id(id: &str) -> Option<f32> {
@@ -920,5 +960,56 @@ mod tests {
         let json = serde_json::to_string(&spec).expect("serialize");
         let back: ItemSpec = serde_json::from_str(&json).expect("deserialize");
         assert_eq!(spec, back);
+    }
+
+    #[test]
+    fn stack_mass_matches_spec_literal() {
+        // Spec literal: "Stack items declare `stack_mass = item_mass × count`".
+        let ammo = spec_for_id("ammo_5_56x45").unwrap();
+        assert!(ammo.stackable);
+        assert!((ammo.stack_mass(1) - 0.012).abs() < 1e-6);
+        assert!((ammo.stack_mass(60) - 0.72).abs() < 1e-4);
+        assert!((ammo.stack_bulk_l(60) - 1.2).abs() < 1e-4);
+    }
+
+    #[test]
+    fn stack_mass_clamps_count_for_non_stackable() {
+        // Non-stackable items: count always clamps to 1.
+        let rifle = spec_for_id("rifle_m1").unwrap();
+        assert!(!rifle.stackable);
+        // Passing count=5 on a non-stackable item still returns 1×mass.
+        assert!((rifle.stack_mass(5) - 3.5).abs() < 1e-6);
+        assert!((rifle.stack_mass(0) - 3.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn stack_mass_clamps_to_max_stack() {
+        // Stackable items: count is clamped to `[1, max_stack]`.
+        let ammo = spec_for_id("ammo_5_56x45").unwrap();
+        // max_stack = 60; passing 200 still returns 60 × 0.012 = 0.72.
+        assert!((ammo.stack_mass(200) - 0.72).abs() < 1e-4);
+    }
+
+    #[test]
+    fn quick_slot_eligible_filter_returns_subset() {
+        // Spec literal: "Hot-swap M14A QAB items declare `quick_slot_eligible = true`".
+        let qs = quick_slot_eligible_ids();
+        assert!(qs.contains(&"rifle_m1".to_string()));
+        assert!(qs.contains(&"water_bottle".to_string()));
+        assert!(qs.contains(&"medkit".to_string()));
+        // Containers (chest / crate / backpack_*) are NOT quick-slot eligible.
+        assert!(!qs.contains(&"chest".to_string()));
+        assert!(!qs.contains(&"crate".to_string()));
+        // Result is sorted for determinism.
+        let mut sorted = qs.clone();
+        sorted.sort();
+        assert_eq!(qs, sorted);
+    }
+
+    #[test]
+    fn quick_slot_eligible_every_id_resolves() {
+        for id in quick_slot_eligible_ids() {
+            assert!(spec_for_id(&id).is_some(), "qs id `{id}` must resolve");
+        }
     }
 }
