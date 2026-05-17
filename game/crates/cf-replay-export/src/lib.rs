@@ -136,6 +136,7 @@ pub mod chapter_derivation;
 pub mod chapter_markers;
 pub mod commentary;
 pub mod default_output_path;
+pub mod encoder_session;
 pub mod ffmpeg_bridge;
 pub mod frame_ticker;
 pub mod overlay_cause_chain;
@@ -169,6 +170,10 @@ pub use chapter_markers::{
 pub use commentary::{
     linear_interp_resample, max_drift_frames, sample_offsets_for_clip, CommentaryError, CommentaryScript,
     VoiceClip, CAPTION_LOC_BUNDLE_SIZE_CAP, COMMENTARY_CHANNELS, COMMENTARY_SAMPLE_RATE_HZ,
+};
+pub use encoder_session::{
+    container_extension, EncodeError, EncodeReport, EncoderConfig, EncoderSession, ENCODER_AUDIO_CHANNELS,
+    ENCODER_AUDIO_SAMPLE_RATE,
 };
 pub use ffmpeg_bridge::{
     simulated_missing_ffmpeg_error, DeterministicEncoderProfile, FfmpegBridge, FfmpegProbeError, FfmpegRuntime,
