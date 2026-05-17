@@ -46,6 +46,9 @@ pub mod action_prompt;
 pub mod branching_banner;
 pub mod compass;
 pub mod cover_indicator;
+/// **M9C** § cf-ui::fortification_hud — per-fortification HP bar +
+/// ammo state + spotlight preview + minefield-warning banner.
+pub mod fortification_hud;
 pub mod cover_pip;
 pub mod damage_direction;
 pub mod grenade_arc;
@@ -116,6 +119,10 @@ pub use contrast::{banner_bg_color, strip_bg_color, text_color, ContrastModeUi};
 pub use cover_indicator::{
     chevron_for_ground_standing, chevron_sequence_for_walk, spec_walk_chevron_sequence,
     ChevronState, CoverIndicatorState, WalkGround, WalkPath, CHEVRON_PALETTE,
+};
+pub use fortification_hud::{
+    AmmoBoxHudState, FortificationHpBarState, FortificationHudPlugin,
+    MinefieldWarningBannerState, SpotlightPreviewState,
 };
 pub use cover_pip::{CoverLevel, CoverPipState};
 pub use damage_direction::{DamageDirectionMarker, DamageDirectionState, DEFAULT_FADE_MS};

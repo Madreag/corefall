@@ -34,12 +34,31 @@ pub const TRENCH_AUDIO_CUES: &[&str] = &[
     "drainage_drip",
 ];
 
+/// **M9C** § VAL-M9C-052 — six fortification audio cues registered in
+/// the audio family. Spec § Crates / modules touched:
+///
+/// > New cues: `mg_nest_burst`, `mine_arming_beep`, `wire_snag_pain`,
+/// > `electrified_shock_zap`, `spotlight_relay_click`, `tripwire_snap`.
+///
+/// Surfaced via [`AudioRegistry::family`] under the `"fortification"`
+/// family name so closure-feature tests can audit membership without
+/// re-parsing the asset ledger.
+pub const FORTIFICATION_AUDIO_CUES: &[&str] = &[
+    "mg_nest_burst",
+    "mine_arming_beep",
+    "wire_snag_pain",
+    "electrified_shock_zap",
+    "spotlight_relay_click",
+    "tripwire_snap",
+];
+
 /// Map a family name to its canonical cue-id list. Returns `&[]` for
 /// unknown family names so the lookup is panic-free.
 #[must_use]
 pub fn family_members(family: &str) -> &'static [&'static str] {
     match family {
         "trench" => TRENCH_AUDIO_CUES,
+        "fortification" => FORTIFICATION_AUDIO_CUES,
         _ => &[],
     }
 }
@@ -285,6 +304,28 @@ mod tests {
     #[test]
     fn m9b_trench_audio_family() {
         registry_contains_trench_cues();
+    }
+
+    /// VAL-M9C-052: registry exposes the six fortification cues under
+    /// the `fortification` family.
+    #[test]
+    fn registry_contains_m9c_cues() {
+        let registry = AudioRegistry::default();
+        let family = registry.family("fortification");
+        assert_eq!(family.len(), 6, "fortification family must contain 6 cues");
+        for required in [
+            "mg_nest_burst",
+            "mine_arming_beep",
+            "wire_snag_pain",
+            "electrified_shock_zap",
+            "spotlight_relay_click",
+            "tripwire_snap",
+        ] {
+            assert!(
+                family.contains(&required),
+                "fortification family missing `{required}`"
+            );
+        }
     }
 
     /// Unknown families return an empty slice without panicking.
