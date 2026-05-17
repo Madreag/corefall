@@ -191,8 +191,7 @@ impl SandbagPixelMask {
     #[must_use]
     pub fn top_row_alive_count(&self) -> u32 {
         self.first_intact_row()
-            .map(|idx| self.rows[idx].iter().filter(|p| **p).count() as u32)
-            .unwrap_or(0)
+            .map_or(0, |idx| self.rows[idx].iter().filter(|p| **p).count() as u32)
     }
 
     /// Index of the topmost row that still has at least one intact pixel.
