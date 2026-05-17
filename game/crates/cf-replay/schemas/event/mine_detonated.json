@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/mine.detonated.v0.1",
+  "title": "mine.detonated",
+  "type": "object",
+  "required": ["mine_id", "kind"],
+  "properties": {
+    "mine_id": {"type": "integer", "minimum": 0},
+    "kind": {
+      "type": "string",
+      "enum": ["proximity_mine", "pressure_mine", "tripwire_mine", "bouncing_betty"]
+    },
+    "owner": {"type": "integer", "minimum": 0},
+    "trigger_actor": {"type": "integer", "minimum": 0},
+    "reason": {"type": "string"},
+    "position": {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2},
+    "radius": {"type": "number", "minimum": 0.0}
+  },
+  "additionalProperties": true
+}

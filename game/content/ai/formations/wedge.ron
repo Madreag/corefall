@@ -1,0 +1,40 @@
+// M7B: Wedge formation — 5 slots.
+//
+// Commander at slot 0 (origin, facing +x). Two riflemen flank left/right at
+// 6u rearward + 4u outward; two heavies at 12u rearward + 8u outward to keep
+// the wedge cone open.
+(
+    kind: wedge,
+    slots: [
+        (
+            slot_id: 0,
+            offset: (0.0, 0.0),
+            role_hint: squad_leader,
+            sector_bearing_degrees: 0.0,
+        ),
+        (
+            slot_id: 1,
+            offset: (-6.0, 4.0),
+            role_hint: rifleman,
+            sector_bearing_degrees: 30.0,
+        ),
+        (
+            slot_id: 2,
+            offset: (-6.0, -4.0),
+            role_hint: rifleman,
+            sector_bearing_degrees: -30.0,
+        ),
+        (
+            slot_id: 3,
+            offset: (-12.0, 8.0),
+            role_hint: heavy,
+            sector_bearing_degrees: 60.0,
+        ),
+        (
+            slot_id: 4,
+            offset: (-12.0, -8.0),
+            role_hint: heavy,
+            sector_bearing_degrees: -60.0,
+        ),
+    ],
+)

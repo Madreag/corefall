@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/squad_formation_slot_broken.v1",
+  "title": "squad.formation_slot_broken",
+  "description": "Emitted when an actor loses its slot position (out-of-range, KIA, brain-hop). The solver reassigns next 2s tick. Spec M7B § Per-actor relative position in formation.",
+  "type": "object",
+  "required": ["squad_id", "member_actor_id", "slot_id", "reason"],
+  "properties": {
+    "squad_id": {"type": "integer", "minimum": 0},
+    "member_actor_id": {"type": "integer", "minimum": 0},
+    "slot_id": {"type": "integer", "minimum": 0},
+    "reason": {"type": "string"},
+    "next_solve_tick": {"type": ["integer", "null"], "minimum": 0},
+    "distance": {"type": ["number", "null"]},
+    "threshold": {"type": ["number", "null"]}
+  },
+  "additionalProperties": true
+}

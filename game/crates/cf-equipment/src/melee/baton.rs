@@ -15,5 +15,9 @@ pub fn baton_m6_default() -> MeleePreset {
         animation_seconds: 0.45,
         damage_kind: "blunt".to_string(),
         mass_kg: 0.9,
+        requires_host_weapon: false,
+        non_lethal_jolt: false,
+        can_mine_terrain: false,
+        structural_breach: false,
     }
 }

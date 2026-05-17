@@ -743,7 +743,278 @@ fn build_registry() -> BTreeMap<ItemId, ItemSpec> {
     for spec in entries {
         map.insert(spec.id.clone(), spec);
     }
+    for spec in m6c_entries() {
+        map.insert(spec.id.clone(), spec);
+    }
     map
+}
+
+/// **M6C**: 81 new equipment SKUs registered with the M6B `ItemSpec`
+/// schema. See `specs/active/M6C.md § Player-facing behavior` for the
+/// per-category breakdown and tunables. Owned by M6C — `cf-mod` walks
+/// `content/equipment/<category>/*.ron` and validates every entry
+/// against this registry.
+#[allow(clippy::too_many_lines)]
+pub fn m6c_entries() -> Vec<ItemSpec> {
+    let mut out = Vec::new();
+    out.extend(m6c_firearm_entries());
+    out.extend(m6c_melee_entries());
+    out.extend(m6c_throwable_entries());
+    out.extend(m6c_heavy_entries());
+    out.extend(m6c_medical_entries());
+    out.extend(m6c_survival_entries());
+    out.extend(m6c_sensor_entries());
+    out.extend(m6c_ppe_entries());
+    out
+}
+
+/// **M6C**: M6C entries grouped by per-category folder name. The folder
+/// name matches the path under `content/equipment/<folder>/` that
+/// cf-mod validates and the generator binary writes.
+pub fn m6c_entries_by_category() -> Vec<(&'static str, Vec<ItemSpec>)> {
+    vec![
+        ("firearms", m6c_firearm_entries()),
+        ("melee", m6c_melee_entries()),
+        ("grenades", m6c_throwable_entries()),
+        ("heavy", m6c_heavy_entries()),
+        ("medical", m6c_medical_entries()),
+        ("survival", m6c_survival_entries()),
+        ("sensors", m6c_sensor_entries()),
+        ("ppe", m6c_ppe_entries()),
+    ]
+}
+
+/// Convenience constructor for an ItemSpec entry that just needs the
+/// canonical fields. The signature is intentionally wide because every
+/// M6C entry declares the same axis of fields.
+#[allow(clippy::too_many_arguments)]
+fn entry(
+    id: &str,
+    display_name: &str,
+    mass_kg: f32,
+    grid_w: u8,
+    grid_h: u8,
+    bulk_l: f32,
+    category: ItemCategory,
+    materials: &[(&str, f32)],
+    quick_slot: bool,
+    durability_max: Option<u32>,
+) -> ItemSpec {
+    let mut map = BTreeMap::new();
+    for (m, w) in materials {
+        map.insert((*m).to_string(), *w);
+    }
+    ItemSpec {
+        id: id.to_string(),
+        display_name: display_name.to_string(),
+        mass_kg,
+        dimensions: GridDim::new(grid_w, grid_h),
+        bulk_volume_l: bulk_l,
+        stackable: false,
+        max_stack: 1,
+        category,
+        container_capacity: None,
+        liquid_capacity_l: None,
+        rotation_allowed: true,
+        quick_slot_eligible: quick_slot,
+        durability_max,
+        repair_recipe: None,
+        material_weight_breakdown: map,
+        crafting_yield_count: 1,
+        origin_compatibility: BTreeSet::new(),
+        forbid_for_origin: BTreeSet::new(),
+    }
+}
+
+#[allow(clippy::too_many_arguments)]
+fn stackable_entry(
+    id: &str,
+    display_name: &str,
+    mass_kg: f32,
+    grid_w: u8,
+    grid_h: u8,
+    bulk_l: f32,
+    max_stack: u16,
+    category: ItemCategory,
+    materials: &[(&str, f32)],
+    quick_slot: bool,
+) -> ItemSpec {
+    let mut e = entry(id, display_name, mass_kg, grid_w, grid_h, bulk_l, category, materials, quick_slot, None);
+    e.stackable = true;
+    e.max_stack = max_stack.max(1);
+    e
+}
+
+fn liquid_entry(
+    id: &str,
+    display_name: &str,
+    empty_mass_kg: f32,
+    grid_w: u8,
+    grid_h: u8,
+    bulk_l: f32,
+    capacity_l: f32,
+    materials: &[(&str, f32)],
+) -> ItemSpec {
+    let mut e = entry(
+        id,
+        display_name,
+        empty_mass_kg,
+        grid_w,
+        grid_h,
+        bulk_l,
+        ItemCategory::Liquid,
+        materials,
+        true,
+        Some(200),
+    );
+    e.liquid_capacity_l = Some(capacity_l);
+    e
+}
+
+fn m6c_firearm_entries() -> Vec<ItemSpec> {
+    vec![
+        entry("revolver_357", ".357 Revolver", 1.4, 2, 3, 2.5, ItemCategory::Weapon, &[("steel", 1.2), ("polymer", 0.2)], true, Some(1200)),
+        entry("submachine_gun_9mm", "9mm Submachine Gun", 2.8, 2, 4, 3.0, ItemCategory::Weapon, &[("steel", 1.8), ("polymer", 1.0)], true, Some(1200)),
+        entry("assault_rifle_t2", "Assault Rifle (T2)", 3.4, 2, 5, 3.5, ItemCategory::Weapon, &[("steel", 2.0), ("polymer", 1.4)], true, Some(1500)),
+        entry("sniper_rifle_t2", "Sniper Rifle (T2)", 7.5, 2, 6, 5.5, ItemCategory::Weapon, &[("steel", 5.0), ("polymer", 2.5)], true, Some(1500)),
+        entry("shotgun_pump", "Pump Shotgun", 3.6, 2, 5, 4.0, ItemCategory::Weapon, &[("steel", 2.6), ("polymer", 1.0)], true, Some(1500)),
+        entry("heavy_machine_gun_50cal", ".50 cal Heavy Machine Gun", 38.0, 3, 7, 18.0, ItemCategory::Weapon, &[("steel", 30.0), ("polymer", 4.0)], false, Some(2000)),
+        entry("battle_rifle_762", "7.62 Battle Rifle", 4.5, 2, 5, 4.0, ItemCategory::Weapon, &[("steel", 3.0), ("polymer", 1.5)], true, Some(1500)),
+        entry("carbine_compact", "Compact Carbine", 2.9, 2, 4, 3.0, ItemCategory::Weapon, &[("steel", 1.8), ("polymer", 1.1)], true, Some(1300)),
+        entry("dmr_762", "7.62 DMR", 5.2, 2, 6, 4.5, ItemCategory::Weapon, &[("steel", 3.5), ("polymer", 1.7)], true, Some(1500)),
+        entry("lmg_belt_fed", "Belt-fed LMG", 9.5, 3, 6, 8.5, ItemCategory::Weapon, &[("steel", 7.0), ("polymer", 2.5)], false, Some(2000)),
+        entry("anti_materiel_rifle_127", "12.7mm Anti-Materiel Rifle", 14.0, 3, 7, 10.0, ItemCategory::Weapon, &[("steel", 11.0), ("polymer", 3.0)], false, Some(1800)),
+        entry("squad_automatic_saw", "Squad Automatic Weapon", 7.5, 3, 6, 7.0, ItemCategory::Weapon, &[("steel", 5.5), ("polymer", 2.0)], false, Some(1800)),
+    ]
+}
+
+fn m6c_melee_entries() -> Vec<ItemSpec> {
+    vec![
+        entry("dagger_combat", "Combat Dagger", 0.2, 1, 2, 0.4, ItemCategory::Weapon, &[("steel", 0.2)], true, Some(600)),
+        entry("katana", "Katana", 1.1, 1, 5, 1.6, ItemCategory::Weapon, &[("steel", 1.1)], true, Some(900)),
+        entry("sledgehammer", "Sledgehammer", 5.0, 2, 5, 5.0, ItemCategory::Weapon, &[("steel", 4.0), ("wood", 1.0)], false, Some(1500)),
+        entry("spear", "Spear", 1.6, 1, 6, 3.0, ItemCategory::Weapon, &[("steel", 1.0), ("wood", 0.6)], true, Some(700)),
+        entry("bayonet", "Bayonet", 0.4, 1, 2, 0.5, ItemCategory::Weapon, &[("steel", 0.4)], true, Some(800)),
+        entry("axe_hatchet", "Felling Axe", 1.8, 2, 4, 2.5, ItemCategory::Weapon, &[("steel", 1.4), ("wood", 0.4)], true, Some(1200)),
+        entry("stun_baton", "Stun Baton", 1.0, 1, 3, 1.5, ItemCategory::Weapon, &[("polymer", 0.6), ("battery", 0.4)], true, Some(800)),
+        entry("pickaxe_combat_variant", "Combat Pickaxe", 2.4, 2, 4, 3.0, ItemCategory::Weapon, &[("steel", 2.0), ("wood", 0.4)], true, Some(1500)),
+    ]
+}
+
+fn m6c_throwable_entries() -> Vec<ItemSpec> {
+    vec![
+        stackable_entry("he_grenade", "HE Grenade", 0.5, 1, 2, 0.6, 4, ItemCategory::Specialty, &[("steel", 0.3), ("explosive", 0.2)], true),
+        stackable_entry("acid_grenade", "Acid Grenade", 0.5, 1, 2, 0.6, 4, ItemCategory::Specialty, &[("polymer", 0.2), ("acid", 0.3)], true),
+        stackable_entry("pipe_bomb", "Pipe Bomb", 0.8, 1, 2, 0.8, 2, ItemCategory::Specialty, &[("steel", 0.5), ("explosive", 0.3)], true),
+        stackable_entry("molotov_cocktail", "Molotov Cocktail", 0.6, 1, 2, 0.7, 4, ItemCategory::Specialty, &[("glass", 0.2), ("fuel", 0.4)], true),
+        stackable_entry("proximity_mine", "Proximity Mine", 1.4, 2, 2, 1.5, 2, ItemCategory::Specialty, &[("steel", 0.8), ("explosive", 0.6)], true),
+        stackable_entry("pressure_mine", "Pressure Mine", 1.6, 2, 2, 1.8, 2, ItemCategory::Specialty, &[("steel", 1.0), ("explosive", 0.6)], true),
+        stackable_entry("tripwire_mine", "Tripwire Mine", 1.0, 2, 2, 1.2, 2, ItemCategory::Specialty, &[("steel", 0.6), ("explosive", 0.4)], true),
+        stackable_entry("c4_charge", "C4 Charge", 1.5, 1, 2, 1.5, 4, ItemCategory::Specialty, &[("polymer", 0.5), ("explosive", 1.0)], true),
+        stackable_entry("incendiary_grenade", "Incendiary Grenade", 0.45, 1, 2, 0.6, 4, ItemCategory::Specialty, &[("steel", 0.2), ("thermite", 0.25)], true),
+        stackable_entry("bouncing_betty", "Bouncing Betty", 1.8, 2, 2, 2.0, 2, ItemCategory::Specialty, &[("steel", 1.2), ("explosive", 0.6)], true),
+    ]
+}
+
+fn m6c_heavy_entries() -> Vec<ItemSpec> {
+    vec![
+        entry("rpg_launcher_heat", "RPG Launcher (HEAT)", 7.5, 3, 6, 10.0, ItemCategory::Weapon, &[("steel", 5.5), ("polymer", 2.0)], false, Some(800)),
+        entry("tank_autocannon_m14c", "Tank Autocannon (APFSDS)", 95.0, 6, 12, 60.0, ItemCategory::Weapon, &[("steel", 85.0), ("polymer", 10.0)], false, Some(3000)),
+        entry("mortar_60mm", "60mm Mortar", 22.0, 4, 8, 30.0, ItemCategory::Weapon, &[("steel", 18.0), ("polymer", 4.0)], false, Some(2200)),
+        entry("recoilless_rifle", "Recoilless Rifle", 14.5, 3, 7, 18.0, ItemCategory::Weapon, &[("steel", 11.0), ("polymer", 3.5)], false, Some(1800)),
+        entry("atgm_javelin", "ATGM Javelin", 22.0, 4, 8, 28.0, ItemCategory::Weapon, &[("steel", 14.0), ("polymer", 8.0)], false, Some(1500)),
+        entry("flamethrower", "Flamethrower", 23.0, 3, 7, 22.0, ItemCategory::Weapon, &[("steel", 14.0), ("polymer", 9.0)], false, Some(1200)),
+        entry("plasma_cannon_m48", "Plasma Cannon (M48)", 18.0, 3, 6, 20.0, ItemCategory::Weapon, &[("alloy", 12.0), ("polymer", 6.0)], false, Some(1500)),
+        entry("gauss_rifle_anti_materiel", "Gauss Rifle (Anti-Materiel)", 17.0, 3, 7, 18.0, ItemCategory::Weapon, &[("alloy", 12.0), ("polymer", 5.0)], false, Some(1500)),
+    ]
+}
+
+fn m6c_medical_entries() -> Vec<ItemSpec> {
+    vec![
+        stackable_entry("field_bandage", "Field Bandage", 0.1, 1, 1, 0.2, 6, ItemCategory::Medical, &[("polymer", 0.1)], true),
+        stackable_entry("trauma_pack", "Trauma Pack", 0.4, 2, 2, 1.0, 3, ItemCategory::Medical, &[("polymer", 0.4)], true),
+        stackable_entry("tourniquet", "Tourniquet", 0.05, 1, 1, 0.1, 6, ItemCategory::Medical, &[("polymer", 0.05)], true),
+        stackable_entry("sutures", "Sutures", 0.1, 1, 1, 0.2, 6, ItemCategory::Medical, &[("polymer", 0.1)], true),
+        stackable_entry("splint", "Splint", 0.3, 1, 3, 0.5, 3, ItemCategory::Medical, &[("polymer", 0.3)], true),
+        entry("surgery_kit", "Surgery Kit", 2.5, 3, 3, 5.0, ItemCategory::Medical, &[("polymer", 2.0), ("steel", 0.5)], false, Some(500)),
+        entry("defibrillator", "Defibrillator", 2.0, 2, 3, 3.0, ItemCategory::Medical, &[("polymer", 1.5), ("battery", 0.5)], true, Some(800)),
+        stackable_entry("cpr_compressions", "CPR Compressions", 0.0, 1, 1, 0.0, 1, ItemCategory::Medical, &[], false),
+        stackable_entry("transfusion_bag", "Transfusion Bag", 0.6, 2, 2, 1.0, 4, ItemCategory::Medical, &[("polymer", 0.1), ("blood", 0.5)], true),
+        stackable_entry("iv_fluids", "IV Fluids", 0.5, 2, 2, 1.0, 4, ItemCategory::Medical, &[("polymer", 0.1), ("saline", 0.4)], true),
+        entry("oxygen_therapy", "Oxygen Therapy", 1.4, 2, 3, 2.5, ItemCategory::Medical, &[("steel", 1.0), ("polymer", 0.4)], true, Some(400)),
+        entry("medical_scanner_t1", "Medical Scanner (T1)", 0.8, 2, 2, 1.2, ItemCategory::Medical, &[("polymer", 0.6), ("alloy", 0.2)], true, Some(600)),
+    ]
+}
+
+fn m6c_survival_entries() -> Vec<ItemSpec> {
+    vec![
+        liquid_entry("water_bottle_1l", "Water Bottle (1L)", 0.2, 1, 2, 1.2, 1.0, &[("polymer", 0.2)]),
+        stackable_entry("food_ration_mre", "Food Ration (MRE)", 0.6, 2, 2, 1.5, 4, ItemCategory::Consumable, &[("polymer", 0.6)], true),
+        entry("sleeping_bag", "Sleeping Bag", 1.8, 3, 4, 8.0, ItemCategory::Survival, &[("polymer", 1.8)], false, Some(500)),
+        entry("tent_2_person", "Tent (2-person)", 3.5, 4, 5, 12.0, ItemCategory::Survival, &[("polymer", 3.5)], false, Some(600)),
+        entry("cooking_pot", "Cooking Pot", 0.9, 2, 2, 2.0, ItemCategory::Survival, &[("steel", 0.9)], true, Some(600)),
+        entry("lighter_zippo", "Lighter (Zippo)", 0.1, 1, 1, 0.1, ItemCategory::Survival, &[("steel", 0.05), ("fuel", 0.05)], true, Some(300)),
+        entry("compass_magnetic", "Magnetic Compass", 0.1, 1, 1, 0.1, ItemCategory::Survival, &[("polymer", 0.05), ("alloy", 0.05)], true, Some(400)),
+        entry("binoculars_8x", "Binoculars (8x)", 0.7, 2, 2, 1.5, ItemCategory::Survival, &[("alloy", 0.5), ("polymer", 0.2)], true, Some(600)),
+        // **M6C-4 acceptance**: the flamethrower scenario pairs the weapon
+        // with a `fuel_canister` in `tank_utility`. The canister itself is
+        // a consumable tank-slot item that the flamethrower drains; the
+        // SKU is required for the scenario to load even though the spec
+        // body text doesn't enumerate it under any per-category section.
+        fuel_canister_entry(),
+    ]
+}
+
+fn fuel_canister_entry() -> ItemSpec {
+    let mut e = entry(
+        "fuel_canister",
+        "Fuel Canister",
+        5.0,
+        2,
+        3,
+        6.0,
+        ItemCategory::Consumable,
+        &[("steel", 1.0), ("fuel", 4.0)],
+        false,
+        Some(400),
+    );
+    // Liquid capacity = 5 L napalm; M6C flamethrower drains at
+    // 0.6 L / s so a full canister sustains ~8s of continuous fire.
+    e.liquid_capacity_l = Some(5.0);
+    e
+}
+
+fn m6c_sensor_entries() -> Vec<ItemSpec> {
+    vec![
+        entry("radio_direction_finder", "Radio Direction Finder", 1.4, 2, 3, 3.0, ItemCategory::Sensor, &[("polymer", 1.0), ("alloy", 0.4)], true, Some(600)),
+        entry("sound_detector_passive", "Passive Sound Detector", 0.8, 2, 2, 1.5, ItemCategory::Sensor, &[("polymer", 0.6), ("alloy", 0.2)], true, Some(500)),
+        entry("heat_camera_handheld", "Handheld Heat Camera", 1.0, 2, 2, 2.0, ItemCategory::Sensor, &[("polymer", 0.6), ("alloy", 0.4)], true, Some(600)),
+        entry("radar_compact_t2", "Compact Radar (T2)", 6.0, 3, 5, 8.0, ItemCategory::Sensor, &[("alloy", 4.0), ("polymer", 2.0)], false, Some(800)),
+        entry("geological_surveyor_m30d", "Geological Surveyor (M30D)", 3.0, 2, 4, 4.0, ItemCategory::Sensor, &[("alloy", 2.0), ("polymer", 1.0)], false, Some(700)),
+    ]
+}
+
+fn m6c_ppe_entries() -> Vec<ItemSpec> {
+    vec![
+        entry("helmet_light_kevlar", "Light Kevlar Helmet", 1.2, 2, 2, 2.0, ItemCategory::Armor, &[("polymer", 1.2)], false, Some(200)),
+        entry("helmet_medium_steel", "Medium Steel Helmet", 2.5, 2, 2, 2.2, ItemCategory::Armor, &[("steel", 2.5)], false, Some(400)),
+        entry("helmet_heavy_titanium", "Heavy Titanium Helmet", 3.8, 2, 3, 2.5, ItemCategory::Armor, &[("titanium", 3.8)], false, Some(700)),
+        entry("armor_kevlar_light", "Light Kevlar Armor", 4.0, 3, 4, 6.0, ItemCategory::Armor, &[("polymer", 4.0)], false, Some(400)),
+        entry("armor_ceramic_medium", "Medium Ceramic Armor", 7.0, 3, 4, 7.0, ItemCategory::Armor, &[("ceramic", 5.0), ("polymer", 2.0)], false, Some(700)),
+        entry("armor_steel_heavy", "Heavy Steel Armor", 12.0, 4, 5, 9.0, ItemCategory::Armor, &[("steel", 12.0)], false, Some(1200)),
+        entry("armor_heavy_plate", "Heavy Plate Armor", 18.0, 4, 5, 11.0, ItemCategory::Armor, &[("alloy", 18.0)], false, Some(1800)),
+        entry("armor_modular_plate_carrier", "Modular Plate Carrier", 5.0, 3, 4, 7.0, ItemCategory::Armor, &[("polymer", 3.0), ("steel", 2.0)], false, Some(800)),
+        entry("combat_gloves_light", "Light Combat Gloves", 0.2, 1, 2, 0.5, ItemCategory::Armor, &[("polymer", 0.2)], false, Some(80)),
+        entry("combat_gloves_heavy", "Heavy Combat Gloves", 0.4, 2, 2, 0.7, ItemCategory::Armor, &[("polymer", 0.4)], false, Some(120)),
+        entry("tactical_boots", "Tactical Boots", 1.2, 2, 3, 3.0, ItemCategory::Armor, &[("polymer", 1.0), ("steel", 0.2)], false, Some(300)),
+        entry("knee_pads", "Knee Pads", 0.4, 2, 2, 1.0, ItemCategory::Armor, &[("polymer", 0.4)], false, Some(150)),
+        entry("elbow_pads", "Elbow Pads", 0.3, 2, 2, 0.8, ItemCategory::Armor, &[("polymer", 0.3)], false, Some(150)),
+        entry("hardsuit_full", "Full Hardsuit", 18.0, 5, 6, 18.0, ItemCategory::Armor, &[("alloy", 14.0), ("polymer", 4.0)], false, Some(1500)),
+        entry("eva_suit", "EVA Suit", 14.0, 5, 6, 16.0, ItemCategory::Armor, &[("alloy", 8.0), ("polymer", 6.0)], false, Some(1000)),
+        entry("radiation_suit", "Radiation Suit", 8.0, 4, 5, 10.0, ItemCategory::Armor, &[("lead", 4.0), ("polymer", 4.0)], false, Some(600)),
+        entry("hazmat_suit", "Hazmat Suit", 6.0, 4, 5, 9.0, ItemCategory::Armor, &[("polymer", 6.0)], false, Some(400)),
+        entry("insulated_suit", "Insulated Suit", 5.0, 4, 5, 8.0, ItemCategory::Armor, &[("polymer", 5.0)], false, Some(500)),
+    ]
 }
 
 thread_local! {
@@ -1011,5 +1282,62 @@ mod tests {
         for id in quick_slot_eligible_ids() {
             assert!(spec_for_id(&id).is_some(), "qs id `{id}` must resolve");
         }
+    }
+
+    #[test]
+    fn m6c_registry_contains_eighty_one_skus() {
+        // M6C § Acceptance criteria M6C-1: "78 new SKUs declared with mass + grid + bulk".
+        // We ship 81 (the spec lists 18 PPE while the section header says 15; we
+        // implement all 18 enumerated). The acceptance test requires at least 78.
+        let m6c_ids: Vec<String> = m6c_entries().iter().map(|s| s.id.clone()).collect();
+        assert!(m6c_ids.len() >= 78, "M6C must declare at least 78 SKUs (got {})", m6c_ids.len());
+        for id in &m6c_ids {
+            let spec = spec_for_id(id).unwrap_or_else(|| panic!("missing M6C id `{id}`"));
+            assert!(spec.mass_kg >= 0.0 && spec.mass_kg.is_finite(), "{id} bad mass");
+            assert!(spec.dimensions.w > 0 && spec.dimensions.h > 0, "{id} bad dimensions");
+            assert!(spec.bulk_volume_l >= 0.0 && spec.bulk_volume_l.is_finite(), "{id} bad bulk");
+        }
+    }
+
+    #[test]
+    fn m6c_ids_unique() {
+        use std::collections::BTreeSet;
+        let m6c_ids: BTreeSet<String> = m6c_entries().iter().map(|s| s.id.clone()).collect();
+        assert_eq!(m6c_ids.len(), m6c_entries().len());
+    }
+
+    #[test]
+    fn m6c_revolver_resolves_to_weapon_category() {
+        let r = spec_for_id("revolver_357").unwrap();
+        assert_eq!(r.category, ItemCategory::Weapon);
+    }
+
+    #[test]
+    fn m6c_armor_kevlar_light_resolves_to_armor_category() {
+        let a = spec_for_id("armor_kevlar_light").unwrap();
+        assert_eq!(a.category, ItemCategory::Armor);
+        assert!((a.mass_kg - 4.0).abs() < 1e-3);
+    }
+
+    #[test]
+    fn m6c_defibrillator_resolves_to_medical() {
+        let d = spec_for_id("defibrillator").unwrap();
+        assert_eq!(d.category, ItemCategory::Medical);
+    }
+
+    #[test]
+    fn m6c_water_bottle_1l_is_liquid_container() {
+        let w = spec_for_id("water_bottle_1l").unwrap();
+        assert_eq!(w.category, ItemCategory::Liquid);
+        assert_eq!(w.liquid_capacity_l, Some(1.0));
+    }
+
+    #[test]
+    fn m6c_fuel_canister_is_registered_for_flamethrower_pairing() {
+        // M6C-4 scenario "flamethrower in primary + fuel_canister in tank_utility".
+        let f = spec_for_id("fuel_canister").expect("fuel_canister must be registered");
+        assert_eq!(f.category, ItemCategory::Consumable);
+        assert!(f.liquid_capacity_l.is_some());
+        assert!(f.mass_kg > 0.0);
     }
 }

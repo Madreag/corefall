@@ -48,18 +48,24 @@ pub use digger::DiggerTool;
 pub use projectile::ProjectileSpawnParams;
 
 // M6 modules — see spec § Files for the canonical list.
+// M6C adds: heavy, medical, survival, sensor, ppe.
 pub mod bipod;
 pub mod durability;
 pub mod fire_modes;
 pub mod grenade;
+pub mod heavy;
 pub mod inventory;
 pub mod item_spec;
 pub mod knife_throw;
 pub mod magazine;
+pub mod medical;
 pub mod melee;
+pub mod ppe;
+pub mod sensor;
 pub mod shell;
 pub mod stealth_kill;
 pub mod suppressor;
+pub mod survival;
 pub mod tool;
 pub mod weapon;
 pub mod weapon_swap;
@@ -70,25 +76,57 @@ pub use fire_modes::{
     charge_damage_multiplier, charge_fraction, AdvancedFireMode, FireModeSet, BURST3_INTER_SHOT_SECONDS,
     BURST3_ROUND_COUNT, SNIPER_CHARGE_MAX_SECONDS, SNIPER_MISFIRE_BELOW,
 };
-pub use grenade::{cook_grenade, m6_grenade_presets, GrenadeKind, GrenadePreset};
+pub use grenade::{
+    cook_grenade, m6_grenade_presets, m6c_throwable_presets,
+    mines::{
+        evaluate_mine_trigger as evaluate_mine_trigger_for_candidates, CandidateActor as MineCandidateActor,
+        MineDescriptor, MineTriggerKind, MineTriggerOutcome, Relation as MineRelation,
+        PROXIMITY_TRIGGER_RADIUS_TILES,
+    },
+    GrenadeKind, GrenadePreset,
+};
+pub use heavy::{
+    atgm::{AtgmLockOutcome, AtgmLockState, AtgmLockTracker, ATGM_LOCK_ACQUISITION_SECONDS},
+    flamethrower::{
+        FireSpawnTick, FlamethrowerState, FlamethrowerTickOutcome, FIRE_TILES_PER_SECOND,
+        FIRE_TILE_INTENSITY, FUEL_PER_SECOND_LITERS, FUEL_PRESSURE_CUTOFF, FUEL_PRESSURE_FULL,
+    },
+    m6c_heavy_presets,
+    mortar::{evaluate_crew_fire, CrewFireOutcome, CREW_REQUIRED_REASON},
+    HeavyWeaponKind, HeavyWeaponPreset,
+};
 pub use inventory::{
     ExtendedInventory, ExtendedSlot, SlotKind, SlotState, ACTIVE_SLOT_COUNT, TANK_SLOT_COUNT, TANK_SLOT_LOCKED_REASON,
     TOTAL_SLOT_COUNT, WEIGHT_FORCE_CRAWL_KG, WEIGHT_FORCE_WALK_KG,
 };
 pub use item_spec::{
-    bulk_volume_l_for_id, carry_capacity_modifier, encumbrance_band, liquid_fill_mass, mass_kg_for_id,
-    max_carry_kg_for_origin, max_carry_volume_l_for_origin, quick_slot_eligible_ids,
-    registered_ids as item_registered_ids, spec_for_id, try_nest_depth, walk_speed_multiplier, BackpackTier,
-    ContainerCapacity, EncumbranceBand, GridDim, ItemCategory, ItemId, ItemSpec, MaterialId, OriginId, RecipeId,
-    HUMAN_BASELINE_MAX_CARRY_KG, HUMAN_BASELINE_MAX_CARRY_VOLUME_L, MAX_CONTAINER_NEST_DEPTH, MAX_DEPTH_EXCEEDED,
-    WALK_SPEED_AT_EMPTY_CARRY, WALK_SPEED_AT_FULL_CARRY,
+    bulk_volume_l_for_id, carry_capacity_modifier, encumbrance_band, liquid_fill_mass, m6c_entries,
+    m6c_entries_by_category, mass_kg_for_id, max_carry_kg_for_origin, max_carry_volume_l_for_origin,
+    quick_slot_eligible_ids, registered_ids as item_registered_ids, spec_for_id, try_nest_depth,
+    walk_speed_multiplier, BackpackTier, ContainerCapacity, EncumbranceBand, GridDim, ItemCategory, ItemId, ItemSpec,
+    MaterialId, OriginId, RecipeId, HUMAN_BASELINE_MAX_CARRY_KG, HUMAN_BASELINE_MAX_CARRY_VOLUME_L,
+    MAX_CONTAINER_NEST_DEPTH, MAX_DEPTH_EXCEEDED, WALK_SPEED_AT_EMPTY_CARRY, WALK_SPEED_AT_FULL_CARRY,
 };
 pub use knife_throw::{KnifeProjectile, KnifeThrowState, KNIFE_THROW_DAMAGE_FACTOR, KNIFE_THROW_MAX_FLIGHT_SECONDS};
 pub use magazine::{Magazine, PoppedRound, RoundKind};
-pub use melee::{
-    m6_melee_presets, MeleeKind, MeleePreset, BATON_M6_DEFAULT_ID, HATCHET_M6_DEFAULT_ID, KNIFE_M6_DEFAULT_ID,
-    RIFLE_BASH_M6_DEFAULT_ID,
+pub use medical::{
+    defibrillator::{
+        apply_defibrillator, DefibOutcome, DefibTarget, DEFIB_REVIVE_HP_FRACTION,
+        DEFIB_REVIVE_WINDOW_SECONDS,
+    },
+    m6c_medical_presets, MedicalEffectKind, MedicalPreset,
 };
+pub use melee::{
+    m6_melee_presets, m6c_melee_presets, MeleeKind, MeleePreset, BATON_M6_DEFAULT_ID, HATCHET_M6_DEFAULT_ID,
+    KNIFE_M6_DEFAULT_ID, RIFLE_BASH_M6_DEFAULT_ID,
+};
+pub use ppe::{
+    armor_calc::{apply_kinetic_hit, DamageReductionResult, ARMOR_FAILURE_FRACTION, DEGRADED_THRESHOLD_FRACTION},
+    eva::{tick_vacuum, VacuumTickInputs, VacuumTickResult, DECOMPRESSION_DAMAGE_PER_SECOND, SEALED_O2_DRAIN_PER_SECOND_L},
+    m6c_ppe_presets, ppe_preset, PpeKind, PpePreset,
+};
+pub use sensor::{m6c_sensor_presets, SensorKind, SensorPreset};
+pub use survival::{m6c_survival_presets, SurvivalEffectKind, SurvivalPreset};
 pub use shell::{ShellEjection, ShellKind};
 pub use stealth_kill::{
     evaluate_attempt, StealthKillAttempt, StealthKillRejection, STEALTH_KILL_ANIMATION_SECONDS, STEALTH_KILL_METER_MAX,
@@ -101,7 +139,7 @@ pub use tool::{
     sensor_pulse::{SENSOR_PULSE_REVEAL_RADIUS, SENSOR_PULSE_REVEAL_SECONDS},
     ToolKind, ToolPreset,
 };
-pub use weapon::{m6_weapon_presets, WeaponClass, WeaponPreset};
+pub use weapon::{m6_weapon_presets, m6c_firearm_presets, WeaponClass, WeaponPreset};
 pub use weapon_swap::{swap_duration_for_target, WeaponSwap, PISTOL_SWAP_SECONDS, WEAPON_SWAP_SECONDS};
 
 /// **M1**: how the weapon's fire button is consumed.

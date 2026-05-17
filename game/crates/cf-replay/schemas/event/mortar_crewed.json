@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/mortar.crewed.v0.1",
+  "title": "mortar.crewed",
+  "type": "object",
+  "required": ["weapon_id", "gunner", "crew_size"],
+  "properties": {
+    "weapon_id": {"type": "string"},
+    "gunner": {"type": "integer", "minimum": 0},
+    "loaders": {"type": "array", "items": {"type": "integer", "minimum": 0}},
+    "crew_size": {"type": "integer", "minimum": 1, "maximum": 8}
+  },
+  "additionalProperties": true
+}

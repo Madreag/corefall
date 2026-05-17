@@ -1200,25 +1200,48 @@ fn validate_one(path: &Path, report: &mut ValidationReport) {
     // `cf_equipment::item_spec` registry (mirror drift detection);
     // any other `*.ron` file in the items dir is validated as a
     // standalone `cf_equipment::ItemSpec` definition.
-    if path
+    //
+    // **M6C** § "Crates / modules touched": `cf-mod` MODIFY — validate
+    // per-category folder. The per-category folders
+    // (`content/equipment/<category>/*.ron`) hold standalone
+    // `cf_equipment::ItemSpec` files split per-category for modder
+    // ergonomics; the validator routes them through the same
+    // `validate_item_spec_ron` path used by `items/<id>.ron` so the
+    // schema lock applies uniformly.
+    let parent_name = path
         .parent()
         .and_then(|p| p.file_name())
-        .and_then(|s| s.to_str())
-        == Some("items")
-        && path
-            .parent()
-            .and_then(|p| p.parent())
-            .and_then(|p| p.file_name())
-            .and_then(|s| s.to_str())
-            == Some("equipment")
+        .and_then(|s| s.to_str());
+    let grandparent_name = path
+        .parent()
+        .and_then(|p| p.parent())
+        .and_then(|p| p.file_name())
+        .and_then(|s| s.to_str());
+    if grandparent_name == Some("equipment")
         && path.extension().and_then(|s| s.to_str()) == Some("ron")
     {
-        if path.file_name().and_then(|s| s.to_str()) == Some("manifest.ron") {
-            validate_item_manifest(path, report);
-        } else {
-            validate_item_spec_ron(path, report);
+        if parent_name == Some("items") {
+            if path.file_name().and_then(|s| s.to_str()) == Some("manifest.ron") {
+                validate_item_manifest(path, report);
+            } else {
+                validate_item_spec_ron(path, report);
+            }
+            return;
         }
-        return;
+        if matches!(
+            parent_name,
+            Some("firearms")
+                | Some("melee")
+                | Some("grenades")
+                | Some("heavy")
+                | Some("medical")
+                | Some("survival")
+                | Some("sensors")
+                | Some("ppe")
+        ) {
+            validate_item_spec_ron(path, report);
+            return;
+        }
     }
     if path.parent().and_then(|p| p.file_name()).and_then(|s| s.to_str()) == Some("scenarios")
         || path

@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ActSquadIssueParams",
+  "description": "**M7B**: `act.squad.issue` — issue a verb from the canonical squad\ncommand grammar to a squad. Spec § \"50+ named squad verbs in a\ndata-driven registry\".",
+  "type": "object",
+  "properties": {
+    "args": {
+      "type": "array",
+      "default": [],
+      "items": true
+    },
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "squad_id": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    },
+    "verb_id": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "squad_id",
+    "verb_id"
+  ]
+}

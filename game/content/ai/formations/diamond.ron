@@ -1,0 +1,39 @@
+// M7B: Diamond formation — 5 slots.
+//
+// Pointman at +6u forward, riflemen at ±6u lateral, leader at -6u, heavy
+// trailing.
+(
+    kind: diamond,
+    slots: [
+        (
+            slot_id: 0,
+            offset: (6.0, 0.0),
+            role_hint: pointman,
+            sector_bearing_degrees: 0.0,
+        ),
+        (
+            slot_id: 1,
+            offset: (0.0, 6.0),
+            role_hint: rifleman,
+            sector_bearing_degrees: 90.0,
+        ),
+        (
+            slot_id: 2,
+            offset: (0.0, -6.0),
+            role_hint: rifleman,
+            sector_bearing_degrees: -90.0,
+        ),
+        (
+            slot_id: 3,
+            offset: (-6.0, 0.0),
+            role_hint: squad_leader,
+            sector_bearing_degrees: 180.0,
+        ),
+        (
+            slot_id: 4,
+            offset: (-12.0, 0.0),
+            role_hint: heavy,
+            sector_bearing_degrees: 180.0,
+        ),
+    ],
+)

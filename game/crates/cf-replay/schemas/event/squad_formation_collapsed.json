@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/squad_formation_collapsed.v1",
+  "title": "squad.formation_collapsed",
+  "description": "Emitted when the formation kind collapses (Wedge -> Diamond -> Column -> Single-File) because surviving members cannot fill the original slot count. Spec M7B § Slot solver collapse chain.",
+  "type": "object",
+  "required": ["squad_id", "previous_kind", "new_kind", "member_count"],
+  "properties": {
+    "squad_id": {"type": "integer", "minimum": 0},
+    "previous_kind": {"type": "string"},
+    "new_kind": {"type": "string"},
+    "member_count": {"type": "integer", "minimum": 0},
+    "trigger_actor_id": {"type": ["integer", "null"], "minimum": 0}
+  },
+  "additionalProperties": true
+}

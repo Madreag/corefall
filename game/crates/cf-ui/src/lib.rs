@@ -87,6 +87,14 @@ pub mod animation;
 pub mod comic_overlay;
 pub mod slideshow;
 
+// **M7B**: Tab tactical overlay + Q-hold context wheel — both enumerate
+// from the cf-ai squad-command grammar verb registry + formation catalog
+// so the wheel + overlay stay in lockstep with the canonical registry
+// (spec § "Tab tactical overlay reads verb registry + formation registry;
+// Q-hold context wheel reads same").
+pub mod context_wheel;
+pub mod tactical_overlay;
+
 pub use mission_resolved_modal::{
     render_comic_death_recap, render_death_recap_with_mode, render_recap_text as render_death_recap_text,
     DeathRecapViewMode, RecapEvent, COMIC_DEATH_RECAP_PANELS, MAX_RECAP_LINES,

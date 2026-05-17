@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ActSquadSetFormationParams",
+  "description": "**M7B**: `act.squad.set_formation` — switch the squad's active formation\nkind (Wedge / Diamond / Column / Line Abreast / Echelon-Left /\nEchelon-Right / Single-File / Stack (door) / Defensive Perimeter).",
+  "type": "object",
+  "properties": {
+    "formation_kind": {
+      "type": "string"
+    },
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "squad_id": {
+      "type": "integer",
+      "format": "uint64",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "squad_id",
+    "formation_kind"
+  ]
+}

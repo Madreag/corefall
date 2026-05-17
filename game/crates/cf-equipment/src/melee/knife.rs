@@ -15,5 +15,9 @@ pub fn knife_m6_default() -> MeleePreset {
         animation_seconds: 0.3,
         damage_kind: "piercing".to_string(),
         mass_kg: 0.3,
+        requires_host_weapon: false,
+        non_lethal_jolt: false,
+        can_mine_terrain: false,
+        structural_breach: false,
     }
 }

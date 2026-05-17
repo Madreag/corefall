@@ -1,0 +1,36 @@
+// M7B: Single-File — pointman leads, marksman rear-guards 180°.
+(
+    kind: single_file,
+    slots: [
+        (
+            slot_id: 0,
+            offset: (0.0, 0.0),
+            role_hint: pointman,
+            sector_bearing_degrees: 0.0,
+        ),
+        (
+            slot_id: 1,
+            offset: (-3.0, 0.0),
+            role_hint: rifleman,
+            sector_bearing_degrees: 0.0,
+        ),
+        (
+            slot_id: 2,
+            offset: (-6.0, 0.0),
+            role_hint: squad_leader,
+            sector_bearing_degrees: 0.0,
+        ),
+        (
+            slot_id: 3,
+            offset: (-9.0, 0.0),
+            role_hint: heavy,
+            sector_bearing_degrees: 0.0,
+        ),
+        (
+            slot_id: 4,
+            offset: (-12.0, 0.0),
+            role_hint: marksman,
+            sector_bearing_degrees: 180.0,
+        ),
+    ],
+)

@@ -1,0 +1,175 @@
+ArchetypeBtDef(
+  kind: "engineer",
+  nodes: [
+    "engineer_idle",
+    "engineer_scan_for_module_damage",
+    "engineer_approach_chassis",
+    "engineer_repair_chassis_module",
+    "engineer_repair_terrain_breach",
+    "engineer_pour_concrete",
+    "engineer_seal_pipe",
+    "engineer_extinguish_fire",
+    "engineer_set_trap",
+    "engineer_disarm_trap",
+    "engineer_lay_mine",
+    "engineer_dig_cover",
+    "engineer_dig_breach",
+    "engineer_demolish_wall",
+    "engineer_breach_door",
+    "engineer_stack_left",
+    "engineer_stack_right",
+    "engineer_engage_visible_enemy",
+    "engineer_burst_fire",
+    "engineer_take_cover",
+    "engineer_hold_cover",
+    "engineer_reload",
+    "engineer_throw_smoke",
+    "engineer_throw_flash",
+    "engineer_retreat_to_cover",
+    "engineer_call_for_medic",
+    "engineer_mark_threat",
+    "engineer_cover_ally",
+    "engineer_defend_brain_actor",
+    "engineer_follow_order",
+    "engineer_patrol_perimeter",
+    "engineer_scout_ahead",
+    "engineer_investigate_sound",
+    "engineer_emergency_self_repair",
+    "engineer_cover_me",
+    "engineer_track_mover",
+  ],
+  task_subtrees: [
+    TaskSubtree(
+      task: "engage_visible_enemy",
+      root: sequence([
+        action("engineer_take_cover"),
+        action("engineer_engage_visible_enemy"),
+      ]),
+    ),
+    TaskSubtree(
+      task: "suppress_fire",
+      root: action("engineer_idle"),
+    ),
+    TaskSubtree(
+      task: "hold_cover",
+      root: action("engineer_hold_cover"),
+    ),
+    TaskSubtree(
+      task: "flank_target",
+      root: action("engineer_idle"),
+    ),
+    TaskSubtree(
+      task: "throw_grenade",
+      root: action("engineer_idle"),
+    ),
+    TaskSubtree(
+      task: "demolish",
+      root: action("engineer_demolish_wall"),
+    ),
+    TaskSubtree(
+      task: "sharpshoot_target",
+      root: action("engineer_idle"),
+    ),
+    TaskSubtree(
+      task: "mark_threats",
+      root: action("engineer_mark_threat"),
+    ),
+    TaskSubtree(
+      task: "scout_ahead",
+      root: action("engineer_scout_ahead"),
+    ),
+    TaskSubtree(
+      task: "repair_chassis_module",
+      root: sequence([
+        action("engineer_scan_for_module_damage"),
+        action("engineer_approach_chassis"),
+        action("engineer_repair_chassis_module"),
+      ]),
+    ),
+    TaskSubtree(
+      task: "repair_terrain_breach",
+      root: sequence([
+        action("engineer_pour_concrete"),
+        action("engineer_repair_terrain_breach"),
+      ]),
+    ),
+    TaskSubtree(
+      task: "set_trap",
+      root: selector([
+        action("engineer_set_trap"),
+        action("engineer_lay_mine"),
+      ]),
+    ),
+    TaskSubtree(
+      task: "dig_cover",
+      root: action("engineer_dig_cover"),
+    ),
+    TaskSubtree(
+      task: "triage_downed_ally",
+      root: action("engineer_idle"),
+    ),
+    TaskSubtree(
+      task: "heal_self",
+      root: action("engineer_emergency_self_repair"),
+    ),
+    TaskSubtree(
+      task: "cover_ally",
+      root: action("engineer_cover_ally"),
+    ),
+    TaskSubtree(
+      task: "defend_brain_actor",
+      root: action("engineer_defend_brain_actor"),
+    ),
+    TaskSubtree(
+      task: "investigate_sound",
+      root: action("engineer_investigate_sound"),
+    ),
+    TaskSubtree(
+      task: "follow_order",
+      root: action("engineer_follow_order"),
+    ),
+    TaskSubtree(
+      task: "retreat_to_cover",
+      root: action("engineer_retreat_to_cover"),
+    ),
+    TaskSubtree(
+      task: "patrol",
+      root: action("engineer_patrol_perimeter"),
+    ),
+    TaskSubtree(
+      task: "idle",
+      root: action("engineer_idle"),
+    ),
+  ],
+  squad_verb_subtrees: [
+    SquadVerbSubtree(
+      verb_id: "suppress_window",
+      root: sequence([
+        action("engineer_take_cover"),
+        action("engineer_burst_fire"),
+      ]),
+    ),
+    SquadVerbSubtree(
+      verb_id: "suppress_target",
+      root: sequence([
+        action("engineer_take_cover"),
+        action("engineer_engage_visible_enemy"),
+      ]),
+    ),
+    SquadVerbSubtree(
+      verb_id: "overwatch_sector",
+      root: sequence([
+        action("engineer_hold_cover"),
+        action("engineer_burst_fire"),
+      ]),
+    ),
+    SquadVerbSubtree(
+      verb_id: "cover_me",
+      root: sequence([
+        action("engineer_track_mover"),
+        action("engineer_cover_me"),
+        action("engineer_burst_fire"),
+      ]),
+    ),
+  ],
+)

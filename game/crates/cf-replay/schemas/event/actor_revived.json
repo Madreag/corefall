@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/actor.revived.v0.1",
+  "title": "actor.revived",
+  "type": "object",
+  "required": ["actor", "by_actor", "item_id"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "by_actor": {"type": "integer", "minimum": 0},
+    "item_id": {"type": "string"},
+    "hp_restored_fraction": {"type": "number", "minimum": 0.0, "maximum": 1.0},
+    "seconds_since_downed": {"type": "number", "minimum": 0.0}
+  },
+  "additionalProperties": true
+}

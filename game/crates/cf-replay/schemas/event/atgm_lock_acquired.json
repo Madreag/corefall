@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/atgm.lock_acquired.v0.1",
+  "title": "atgm.lock_acquired",
+  "type": "object",
+  "required": ["actor", "target", "weapon_id"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "target": {"type": "integer", "minimum": 0},
+    "weapon_id": {"type": "string"},
+    "lock_seconds": {"type": "number", "minimum": 0.0}
+  },
+  "additionalProperties": true
+}

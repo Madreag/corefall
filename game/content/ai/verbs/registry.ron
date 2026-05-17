@@ -1,0 +1,86 @@
+// M7B: canonical squad-verb registry — 50+ entries authored as data.
+// Mirrors the Rust builtin under `cf_ai::squad_command_grammar::verb_registry`;
+// the Rust constant remains canonical at runtime (tests + headless builds
+// work without a filesystem). This RON is the content-author surface so
+// M25 wheel / Tab overlay / M23B commander-doctrine re-enumerate without a
+// Rust rebuild.
+(
+    verbs: [
+        // ============================================================
+        // Movement
+        // ============================================================
+        (verb_id: "move_to",          display_name: "Move To",          family: movement, args: [ (name: "waypoint", kind: waypoint, required: true) ], valid_target: "area"),
+        (verb_id: "stop",             display_name: "Stop",             family: movement, args: [], valid_target: "none"),
+        (verb_id: "halt",             display_name: "Halt",             family: movement, args: [], valid_target: "none"),
+        (verb_id: "hold_position",    display_name: "Hold Position",    family: movement, args: [], valid_target: "none"),
+        (verb_id: "bound_alt",        display_name: "Bound (alt)",      family: movement, args: [ (name: "waypoint", kind: waypoint, required: true) ], valid_target: "area"),
+        (verb_id: "bound_succ",       display_name: "Bound (succ)",     family: movement, args: [ (name: "waypoint", kind: waypoint, required: true) ], valid_target: "area"),
+        (verb_id: "fall_back",        display_name: "Fall Back",        family: movement, args: [], valid_target: "none"),
+        (verb_id: "withdraw",         display_name: "Withdraw",         family: movement, args: [ (name: "rally", kind: waypoint, required: false) ], valid_target: "area"),
+        (verb_id: "retreat_in_order", display_name: "Retreat In Order", family: movement, args: [ (name: "rally", kind: waypoint, required: false) ], valid_target: "area"),
+        (verb_id: "rally_on_me",      display_name: "Rally On Me",      family: movement, args: [], valid_target: "none"),
+        (verb_id: "regroup",          display_name: "Regroup",          family: movement, args: [], valid_target: "none"),
+
+        // ============================================================
+        // Engagement
+        // ============================================================
+        (verb_id: "advance",                 display_name: "Advance",                 family: engagement, args: [], valid_target: "none"),
+        (verb_id: "press_attack",            display_name: "Press Attack",            family: engagement, args: [], valid_target: "none"),
+        (verb_id: "hold_fire",               display_name: "Hold Fire",               family: engagement, args: [], valid_target: "none"),
+        (verb_id: "fire_at_will",            display_name: "Fire At Will",            family: engagement, args: [], valid_target: "none"),
+        (verb_id: "engage_priority_target",  display_name: "Engage Priority Target",  family: engagement, args: [ (name: "target", kind: actor, required: true) ], valid_target: "actor"),
+        (verb_id: "disengage",               display_name: "Disengage",               family: engagement, args: [], valid_target: "none"),
+        (verb_id: "overwatch_sector",        display_name: "Overwatch (sector)",      family: engagement, args: [ (name: "sector", kind: sector, required: true) ], valid_target: "area"),
+        (verb_id: "suppress_target",         display_name: "Suppress (target)",       family: engagement, args: [ (name: "target", kind: actor, required: true) ], valid_target: "actor"),
+        (verb_id: "suppress_window",         display_name: "Suppress (window)",       family: engagement, args: [ (name: "window", kind: window, required: true) ], valid_target: "window"),
+        (verb_id: "cover_me",                display_name: "Cover Me",                family: engagement, args: [], valid_target: "none"),
+        (verb_id: "cover_that_wall",         display_name: "Cover That Wall",         family: engagement, args: [ (name: "waypoint", kind: waypoint, required: true) ], valid_target: "area"),
+        (verb_id: "frag_out",                display_name: "Frag-Out",                family: engagement, args: [ (name: "waypoint", kind: waypoint, required: true) ], valid_target: "area"),
+        (verb_id: "smoke",                   display_name: "Smoke",                   family: engagement, args: [ (name: "waypoint", kind: waypoint, required: true) ], valid_target: "area"),
+        (verb_id: "flash",                   display_name: "Flash",                   family: engagement, args: [ (name: "waypoint", kind: waypoint, required: true) ], valid_target: "area"),
+
+        // ============================================================
+        // Movement-to-Contact
+        // ============================================================
+        (verb_id: "breach_door",              display_name: "Breach (door)",            family: movement_to_contact, args: [ (name: "door", kind: door, required: true) ], valid_target: "door"),
+        (verb_id: "stack_door",               display_name: "Stack (door, side)",       family: movement_to_contact, args: [ (name: "door", kind: door, required: true), (name: "side", kind: side, required: true) ], valid_target: "door"),
+        (verb_id: "single_file",              display_name: "Single-File",              family: movement_to_contact, args: [], valid_target: "none"),
+        (verb_id: "wedge",                    display_name: "Wedge",                    family: movement_to_contact, args: [], valid_target: "none"),
+        (verb_id: "echelon_left",             display_name: "Echelon-Left",             family: movement_to_contact, args: [], valid_target: "none"),
+        (verb_id: "echelon_right",            display_name: "Echelon-Right",            family: movement_to_contact, args: [], valid_target: "none"),
+        (verb_id: "line_abreast",             display_name: "Line Abreast",             family: movement_to_contact, args: [], valid_target: "none"),
+        (verb_id: "column",                   display_name: "Column",                   family: movement_to_contact, args: [], valid_target: "none"),
+        (verb_id: "diamond",                  display_name: "Diamond",                  family: movement_to_contact, args: [], valid_target: "none"),
+        (verb_id: "form_defensive_perimeter", display_name: "Form Defensive Perimeter", family: movement_to_contact, args: [ (name: "center", kind: waypoint, required: false) ], valid_target: "area"),
+
+        // ============================================================
+        // Role-Specific
+        // ============================================================
+        (verb_id: "sniper_cover",   display_name: "Sniper-Cover",   family: role_specific, args: [ (name: "sector", kind: sector, required: false) ], valid_target: "area"),
+        (verb_id: "heavy_forward",  display_name: "Heavy-Forward",  family: role_specific, args: [], valid_target: "none"),
+        (verb_id: "engineer_up",    display_name: "Engineer-Up",    family: role_specific, args: [ (name: "target", kind: actor, required: false) ], valid_target: "actor"),
+        (verb_id: "medic_up",       display_name: "Medic-Up",       family: role_specific, args: [ (name: "target", kind: actor, required: false) ], valid_target: "actor"),
+        (verb_id: "reinforce",      display_name: "Reinforce",      family: role_specific, args: [ (name: "waypoint", kind: waypoint, required: true) ], valid_target: "area"),
+        (verb_id: "drag_to_cover",  display_name: "Drag To Cover",  family: role_specific, args: [ (name: "target", kind: actor, required: true) ], valid_target: "actor"),
+
+        // ============================================================
+        // Logistics
+        // ============================================================
+        (verb_id: "pick_up",      display_name: "Pick Up",      family: logistics, args: [ (name: "item", kind: actor, required: true) ], valid_target: "actor"),
+        (verb_id: "drop",         display_name: "Drop",         family: logistics, args: [ (name: "item", kind: label, required: true) ], valid_target: "none"),
+        (verb_id: "hand_off",     display_name: "Hand Off",     family: logistics, args: [ (name: "item", kind: label, required: true), (name: "recipient", kind: actor, required: true) ], valid_target: "actor"),
+        (verb_id: "reload_up",    display_name: "Reload Up",    family: logistics, args: [], valid_target: "none"),
+        (verb_id: "top_off_mags", display_name: "Top Off Mags", family: logistics, args: [], valid_target: "none"),
+
+        // ============================================================
+        // Extension verbs to clear the 50+ floor + cover spec hooks.
+        // ============================================================
+        (verb_id: "mark_threat",     display_name: "Mark Threat",     family: engagement,          args: [ (name: "target", kind: actor, required: true) ], valid_target: "actor"),
+        (verb_id: "take_cover",      display_name: "Take Cover",      family: movement,            args: [], valid_target: "none"),
+        (verb_id: "spread_out",      display_name: "Spread Out",      family: movement_to_contact, args: [], valid_target: "none"),
+        (verb_id: "form_up",         display_name: "Form Up",         family: movement,            args: [], valid_target: "none"),
+        (verb_id: "storm_building",  display_name: "Storm Building",  family: movement_to_contact, args: [ (name: "door", kind: door, required: false) ], valid_target: "door"),
+        (verb_id: "crouch",          display_name: "Crouch",          family: movement,            args: [], valid_target: "none"),
+        (verb_id: "prone",           display_name: "Prone",           family: movement,            args: [], valid_target: "none"),
+    ],
+)

@@ -932,6 +932,12 @@ pub(crate) struct EngineMutable {
     /// the M2 guard FSM still drives projectile / fire behavior; M7-A
     /// adds the reason-label + role-template surface on top.
     pub(crate) m7_ai_world: crate::m7_ai::M7AiWorld,
+    /// **M7B**: deep squad-command grammar surface — per-squad
+    /// `SquadState` (current verb + formation + role assignments +
+    /// breach-chain progress + bounding-step state) + verb registry +
+    /// doctrine-compatibility matrix. Lives on the squad NOT on the held
+    /// actor so brain-hop preserves doctrine.
+    pub(crate) m7b_squad: crate::m7b_squad::M7BSquadWorld,
     /// **M8**: smooth-follow + hit-stop + scope + free-look camera state.
     pub(crate) camera_state: cf_camera::CameraState,
     /// **M8**: photo mode (basic stub) state machine + filter + free camera.
@@ -1431,6 +1437,7 @@ impl M0Engine {
                 m6_next_dropped_item_id: 1,
                 m6_charge_misfires: BTreeMap::new(),
                 m7_ai_world: m7_ai_world_seed,
+                m7b_squad: crate::m7b_squad::M7BSquadWorld::new(),
                 camera_state: cf_camera::CameraState::default(),
                 photo_mode: cf_photo::PhotoModeState::default(),
                 replay_scrub: cf_replay_scrub::ReplayScrubState::default(),
@@ -4936,6 +4943,18 @@ impl M0Engine {
             self.refresh_hud_chassis_banners(&mut state, t);
         }
 
+        // **M7B** § "Slot solver runs at issue + every 2s while moving"
+        // and "an actor that loses the slot position emits
+        // `squad.formation_slot_broken` and the solver reassigns next 2s
+        // tick." We tick the player squad's reslot cadence + slot-broken
+        // detection per frame; the reslot helper short-circuits when the
+        // squad is idle, and the slot-broken helper short-circuits when
+        // no member has wandered out of range.
+        if let Some(t) = advanced {
+            let sim_time_ms = self.state.read().map(|s| s.clock.sim_time_ms()).unwrap_or(0.0);
+            self.tick_m7b_squad(t, sim_time_ms);
+        }
+
         // **M4B § "Delta baseline cadence is enforced"** — emit one snapshot
         // event per advanced tick. At ticks where `tick % cadence == 0` the
         // emitter fires `snapshot.baseline_emitted` (full state); otherwise it
@@ -4946,6 +4965,74 @@ impl M0Engine {
         }
 
         advanced
+    }
+
+    /// **M7B**: per-tick squad systems. Runs once per advanced engine tick
+    /// to drive (1) the 2s slot-solver cadence + (2) per-member slot-
+    /// broken detection. Both emit replay events through the recorder so
+    /// determinism + the event surface stay in lockstep with the spec.
+    fn tick_m7b_squad(&self, tick: Tick, sim_time_ms: f64) {
+        let squad_id = crate::m7b_squad::PLAYER_SQUAD_ID;
+        let tick_rate = self.config.tick_rate_hz;
+        // 2s reslot cadence — only fires when the squad has an active
+        // command (is moving) and the cadence elapsed.
+        let reslot = {
+            let mut state = match self.state.write() {
+                Ok(s) => s,
+                Err(_) => return,
+            };
+            let commander_actor_id = state.player_actor.map(|a| a.0);
+            let commander_pos = state
+                .player_actor
+                .and_then(|pid| state.actor_state.as_ref().and_then(|sim| sim.world.actors.get(&pid)))
+                .map(|a| [a.position.x, a.position.y])
+                .unwrap_or([0.0, 0.0]);
+            state.m7b_squad.tick_periodic_reslot(
+                squad_id,
+                commander_pos,
+                0.0,
+                commander_actor_id,
+                tick.0,
+                tick_rate,
+            )
+        };
+        if let Some(out) = reslot {
+            self.recorder
+                .record(tick, sim_time_ms, "squad", "formation_set", out.formation_payload, None);
+            for p in out.assignment_payloads {
+                self.recorder
+                    .record(tick, sim_time_ms, "squad", "formation_slot_assigned", p, None);
+            }
+        }
+
+        // Slot-broken detection — emit one event per member whose world
+        // position has wandered past `SLOT_BROKEN_THRESHOLD_UNITS` from
+        // its assigned slot anchor. The next 2s reslot tick reassigns.
+        let slot_broken = {
+            let state = match self.state.read() {
+                Ok(s) => s,
+                Err(_) => return,
+            };
+            let mut positions: std::collections::BTreeMap<u64, [f32; 2]> = std::collections::BTreeMap::new();
+            if let Some(sim) = state.actor_state.as_ref() {
+                for (id, actor) in &sim.world.actors {
+                    positions.insert(id.0, [actor.position.x, actor.position.y]);
+                }
+            }
+            let cadence_ticks = (cf_ai::squad_state::SLOT_RESLOT_CADENCE_SECONDS * tick_rate.max(1) as f32) as u64;
+            let next_solve = state
+                .m7b_squad
+                .squad(squad_id)
+                .map(|s| s.last_solve_tick.saturating_add(cadence_ticks))
+                .unwrap_or(tick.0);
+            state
+                .m7b_squad
+                .detect_and_report_broken_slots(squad_id, &positions, next_solve)
+        };
+        for p in slot_broken {
+            self.recorder
+                .record(tick, sim_time_ms, "squad", "formation_slot_broken", p, None);
+        }
     }
 
     /// **M4B § "Delta baseline cadence is enforced"** — per-tick snapshot
@@ -11420,9 +11507,21 @@ impl M0Engine {
                         }
                     }
                 }
-                cf_equipment::GrenadeKind::Stick => {
-                    // Stick grenade just used 4s fuse on adhesive surface;
-                    // detonation has same effect as frag.
+                cf_equipment::GrenadeKind::Stick
+                | cf_equipment::GrenadeKind::HighExplosive
+                | cf_equipment::GrenadeKind::Acid
+                | cf_equipment::GrenadeKind::PipeBomb
+                | cf_equipment::GrenadeKind::Molotov
+                | cf_equipment::GrenadeKind::ProximityMine
+                | cf_equipment::GrenadeKind::PressureMine
+                | cf_equipment::GrenadeKind::TripwireMine
+                | cf_equipment::GrenadeKind::C4Charge
+                | cf_equipment::GrenadeKind::Incendiary
+                | cf_equipment::GrenadeKind::BouncingBetty => {
+                    // Stick + M6C throwables: apply inverse-square radius
+                    // damage. Material / hazard side-effects for acid /
+                    // molotov / incendiary land via M15 material spawn at
+                    // their owning milestone wires.
                     if let Ok(mut s) = self.state.write() {
                         let radius = det.radius.max(1.0);
                         let center = det.position;
@@ -14598,6 +14697,299 @@ impl M0Engine {
         CommandResult::accepted(tick.0)
     }
 
+    /// **M7B**: dispatch `act.squad.issue` — parse args, validate, run
+    /// doctrine check, mutate squad state, emit the appropriate event.
+    /// Chain-aware verbs (`stack_door` / `breach_door` / `frag_out` /
+    /// `advance` / `retreat_in_order`) also drive the matching squad
+    /// state machine + emit the chain events.
+    fn dispatch_m7b_squad_issue(
+        &self,
+        squad_id: u64,
+        verb_id: String,
+        args: Vec<serde_json::Value>,
+        source: cf_actor::IntentSource,
+        tick: Tick,
+        sim_time_ms: f64,
+        state: std::sync::RwLockWriteGuard<'_, EngineMutable>,
+    ) -> CommandResult {
+        let _ = source;
+        let mut parsed_args = Vec::with_capacity(args.len());
+        for (i, value) in args.iter().enumerate() {
+            match crate::m7b_squad::parse_verb_arg(value) {
+                Ok(v) => parsed_args.push(v),
+                Err(err) => {
+                    drop(state);
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "control",
+                        "command_rejected",
+                        json!({
+                            "method": "act.squad.issue",
+                            "reason": "invalid_arg",
+                            "verb_id": verb_id,
+                            "arg_index": i,
+                            "detail": err,
+                        }),
+                        None,
+                    );
+                    return CommandResult::rejected("invalid_arg", tick.0);
+                }
+            }
+        }
+        let mut state = state;
+        let issuer = state.player_actor.map(|a| a.0).unwrap_or(0);
+        let outcome = state
+            .m7b_squad
+            .issue_verb(squad_id, &verb_id, parsed_args.clone(), issuer, tick.0);
+        let event_category = "squad";
+        let event_type = if outcome.is_accepted() {
+            "command_issued"
+        } else {
+            "command_vetoed"
+        };
+        let payload = outcome.payload.clone();
+        let was_accepted = outcome.is_accepted();
+
+        // **M7B**: chain-aware side effects when the verb was accepted.
+        // The squad state machines (breach chain + bounding) auto-drive
+        // their events here so the per-verb issue produces the correct
+        // chain-step / bounding-step payloads per spec.
+        let mut chain_events: Vec<(&str, serde_json::Value)> = Vec::new();
+        if was_accepted {
+            let stack_actor_ids: Vec<u64> = state
+                .squad
+                .followers
+                .iter()
+                .map(|m| m.actor.0)
+                .chain(state.squad.leader.iter().map(|l| l.actor.0))
+                .take(4)
+                .collect();
+            match verb_id.as_str() {
+                "stack_door" => {
+                    // Args: door, side.
+                    let door_id = parsed_args
+                        .iter()
+                        .find_map(|a| match a {
+                            cf_ai::VerbArgValue::Door(d) => Some(*d),
+                            _ => None,
+                        })
+                        .unwrap_or(0);
+                    let side = parsed_args
+                        .iter()
+                        .find_map(|a| match a {
+                            cf_ai::VerbArgValue::Side(s) => Some(s.clone()),
+                            _ => None,
+                        })
+                        .unwrap_or_else(|| "left".to_string());
+                    let started = state.m7b_squad.start_breach_chain(
+                        squad_id,
+                        door_id,
+                        &side,
+                        stack_actor_ids.clone(),
+                        tick.0,
+                    );
+                    chain_events.push(("breach_chain_started", started));
+                }
+                "breach_door" | "frag_out" | "advance" => {
+                    // Each subsequent chain verb advances the chain by
+                    // one step. The engine emits the matching
+                    // breach_chain_step / breach_chain_complete event.
+                    let res = state
+                        .m7b_squad
+                        .advance_breach_chain_with_actors(squad_id, tick.0, &stack_actor_ids);
+                    if let Some(p) = res.step_payload {
+                        chain_events.push(("breach_chain_step", p));
+                    }
+                    if let Some(p) = res.complete_payload {
+                        chain_events.push(("breach_chain_complete", p));
+                    }
+                }
+                "retreat_in_order" => {
+                    // Per spec § "Retreat In Order = bounding (half
+                    // cover, half move 30u, swap); emits
+                    // squad.bounding_step". Start the bounding sequence
+                    // at the rally arg (if supplied).
+                    let rally = parsed_args
+                        .iter()
+                        .find_map(|a| match a {
+                            cf_ai::VerbArgValue::Waypoint(w) => Some(*w),
+                            _ => None,
+                        })
+                        .unwrap_or([0.0, 0.0]);
+                    if let Some(squad) = state.m7b_squad.squad_mut(squad_id) {
+                        squad.start_bounding(rally, tick.0);
+                    }
+                    if let Some(p) = state.m7b_squad.tick_bounding(squad_id, Some(rally)) {
+                        chain_events.push(("bounding_step", p));
+                    }
+                }
+                _ => {}
+            }
+        }
+        drop(state);
+        self.recorder.record(
+            tick,
+            sim_time_ms,
+            "control",
+            "command_accepted",
+            json!({"method": "act.squad.issue", "squad_id": squad_id, "verb_id": verb_id, "accepted": was_accepted}),
+            None,
+        );
+        self.recorder.record(tick, sim_time_ms, event_category, event_type, payload, None);
+        for (ev, payload) in chain_events {
+            self.recorder.record(tick, sim_time_ms, "squad", ev, payload, None);
+        }
+        CommandResult::accepted(tick.0)
+    }
+
+    /// **M7B**: dispatch `act.squad.set_formation` — collapse to fit member
+    /// count, run slot solver, emit `squad.formation_set` +
+    /// `squad.formation_slot_assigned` per slot.
+    fn dispatch_m7b_squad_set_formation(
+        &self,
+        squad_id: u64,
+        formation_kind: String,
+        source: cf_actor::IntentSource,
+        tick: Tick,
+        sim_time_ms: f64,
+        state: std::sync::RwLockWriteGuard<'_, EngineMutable>,
+    ) -> CommandResult {
+        let _ = source;
+        let kind = match cf_ai::FormationKind::from_str(&formation_kind) {
+            Some(k) => k,
+            None => {
+                drop(state);
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "control",
+                    "command_rejected",
+                    json!({"method": "act.squad.set_formation", "reason": "unknown_formation_kind", "formation_kind": formation_kind}),
+                    None,
+                );
+                return CommandResult::rejected("unknown_formation_kind", tick.0);
+            }
+        };
+        let mut state = state;
+        let commander_actor_id = state.player_actor.map(|a| a.0);
+        let commander_pos = state
+            .player_actor
+            .and_then(|pid| state.actor_state.as_ref().and_then(|sim| sim.world.actors.get(&pid)))
+            .map(|a| [a.position.x, a.position.y])
+            .unwrap_or([0.0, 0.0]);
+        let outcome =
+            state
+                .m7b_squad
+                .set_formation(squad_id, kind, commander_pos, 0.0, commander_actor_id, tick.0);
+        let mut collapse_payload: Option<serde_json::Value> = None;
+        if outcome.previous != outcome.new_kind {
+            let squad = state.m7b_squad.squad(squad_id);
+            let member_count = squad.map(|s| s.role_assignments.len()).unwrap_or(0);
+            collapse_payload = Some(json!({
+                "squad_id": squad_id,
+                "previous_kind": outcome.previous.as_str(),
+                "new_kind": outcome.new_kind.as_str(),
+                "member_count": member_count,
+                "trigger_actor_id": serde_json::Value::Null,
+            }));
+        }
+        let formation_payload = outcome.formation_payload;
+        let assignment_payloads = outcome.assignment_payloads;
+        drop(state);
+        self.recorder.record(
+            tick,
+            sim_time_ms,
+            "control",
+            "command_accepted",
+            json!({"method": "act.squad.set_formation", "squad_id": squad_id, "formation_kind": formation_kind}),
+            None,
+        );
+        if let Some(p) = collapse_payload {
+            self.recorder.record(tick, sim_time_ms, "squad", "formation_collapsed", p, None);
+        }
+        self.recorder
+            .record(tick, sim_time_ms, "squad", "formation_set", formation_payload, None);
+        for p in assignment_payloads {
+            self.recorder
+                .record(tick, sim_time_ms, "squad", "formation_slot_assigned", p, None);
+        }
+        CommandResult::accepted(tick.0)
+    }
+
+    /// **M7B**: dispatch `act.squad.assign_role` — mutate role_assignments
+    /// + emit `squad.role_assigned`.
+    fn dispatch_m7b_squad_assign_role(
+        &self,
+        squad_id: u64,
+        member_actor_id: u64,
+        role: String,
+        source: cf_actor::IntentSource,
+        tick: Tick,
+        sim_time_ms: f64,
+        state: std::sync::RwLockWriteGuard<'_, EngineMutable>,
+    ) -> CommandResult {
+        let _ = source;
+        let parsed = match cf_ai::SquadRoleHint::from_str(&role) {
+            Some(r) => r,
+            None => {
+                drop(state);
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "control",
+                    "command_rejected",
+                    json!({"method": "act.squad.assign_role", "reason": "unknown_role", "role": role}),
+                    None,
+                );
+                return CommandResult::rejected("unknown_role", tick.0);
+            }
+        };
+        let mut state = state;
+        let outcome = state.m7b_squad.assign_role(squad_id, member_actor_id, parsed);
+        let payload = outcome.payload;
+        drop(state);
+        self.recorder.record(
+            tick,
+            sim_time_ms,
+            "control",
+            "command_accepted",
+            json!({"method": "act.squad.assign_role", "squad_id": squad_id, "member_actor_id": member_actor_id, "role": role}),
+            None,
+        );
+        self.recorder
+            .record(tick, sim_time_ms, "squad", "role_assigned", payload, None);
+        CommandResult::accepted(tick.0)
+    }
+
+    /// **M7B**: dispatch `srv.dump_squad_state` — returns a JSON view.
+    fn dispatch_m7b_dump_squad_state(
+        &self,
+        squad_id: u64,
+        source: cf_actor::IntentSource,
+        tick: Tick,
+        sim_time_ms: f64,
+        state: std::sync::RwLockWriteGuard<'_, EngineMutable>,
+    ) -> CommandResult {
+        let _ = source;
+        let view = state.m7b_squad.dump_state_view(squad_id);
+        drop(state);
+        self.recorder.record(
+            tick,
+            sim_time_ms,
+            "control",
+            "command_accepted",
+            json!({"method": "srv.dump_squad_state", "squad_id": squad_id}),
+            None,
+        );
+        // Stash the view in the engine for the cfctl response. The
+        // cfctl-side `dump_squad_state` helper reads it back. To avoid a
+        // mailbox round-trip we cheat slightly: the response path uses
+        // `M0Engine::dump_squad_state` which queries the world directly.
+        let _ = view;
+        CommandResult::accepted(tick.0)
+    }
+
     pub fn write_run_bundle(&self, ended_at: DateTime<Utc>, exit_code: i32) -> Result<PathBuf, cf_replay::BundleError> {
         // M2 (extended): every bundle written from the engine — including mid-run
         // `runbundle.write` that fires before `record_run_finished` — must contain at
@@ -17085,6 +17477,12 @@ impl EngineHandle for M0Engine {
         state.m7_ai_world.autonomy_view(cf_actor::ActorId(actor_id))
     }
 
+    /// **M7B**: dump the full squad-state JSON view for `srv.dump_squad_state`.
+    async fn dump_squad_state(&self, squad_id: u64) -> Option<serde_json::Value> {
+        let state = self.state.read().ok()?;
+        Some(state.m7b_squad.dump_state_view(squad_id))
+    }
+
     /// **M8**: live `cf_camera::CameraState` projection.
     async fn observe_camera(&self) -> serde_json::Value {
         self.snapshot_camera_state()
@@ -17750,6 +18148,11 @@ impl EngineHandle for M0Engine {
                 ControlCommand::ActM6 { action, .. } => Some(action.method_name()),
                 ControlCommand::ActSquadIssueCommand { .. } => Some("act.squad.issue_command"),
                 ControlCommand::ActSquadCancelCommand { .. } => Some("act.squad.cancel_command"),
+                // **M7B**: squad-command grammar surface — observable in
+                // capture mode so the player still hears the rejection.
+                ControlCommand::ActSquadIssue { .. } => Some("act.squad.issue"),
+                ControlCommand::ActSquadSetFormation { .. } => Some("act.squad.set_formation"),
+                ControlCommand::ActSquadAssignRole { .. } => Some("act.squad.assign_role"),
                 // **M13** chassis-grade methods rejected during input capture.
                 ControlCommand::ActPlayerBrainHop { .. } => Some("act.player.brain_hop"),
                 ControlCommand::ActPlayerActivateAbility { .. } => Some("act.player.activate_ability"),
@@ -19512,6 +19915,29 @@ impl EngineHandle for M0Engine {
                     json!({"from_actor": prior_id, "target_actor": target_actor_id, "transition_ms": 200}),
                     None,
                 );
+                // **M7B** § "Cortex-Command-style commander hopping" —
+                // emit `squad.brain_hop` so consumers can join the hop
+                // with the squad's preserved doctrine + formation row.
+                // The hop never mutates `m7b_squad` state — that's the
+                // whole point of the spec's "doctrine survives the hop"
+                // invariant.
+                let squad_hop_payload = {
+                    let mut squad_lock = self.state.write().ok();
+                    if let Some(s) = squad_lock.as_mut() {
+                        Some(s.m7b_squad.brain_hop_payload(
+                            crate::m7b_squad::PLAYER_SQUAD_ID,
+                            prior_id,
+                            target_actor_id,
+                            tick.0,
+                            true,
+                        ))
+                    } else {
+                        None
+                    }
+                };
+                if let Some(p) = squad_hop_payload {
+                    self.recorder.record(tick, sim_time_ms, "squad", "brain_hop", p, None);
+                }
                 // **M13** § "Brain hopping" — caption "Switched to <actor name>".
                 if let Ok(mut s) = self.state.write() {
                     let caption_label = format!("Switched to actor {target_actor_id}");
@@ -20259,6 +20685,27 @@ impl EngineHandle for M0Engine {
                 preset_id,
                 source,
             } => self.dispatch_apply_quick_preset(actor_id, preset_id, source, tick, sim_time_ms, state),
+            // === M7B squad-command grammar ===
+            ControlCommand::ActSquadIssue {
+                squad_id,
+                verb_id,
+                args,
+                source,
+            } => self.dispatch_m7b_squad_issue(squad_id, verb_id, args, source, tick, sim_time_ms, state),
+            ControlCommand::ActSquadSetFormation {
+                squad_id,
+                formation_kind,
+                source,
+            } => self.dispatch_m7b_squad_set_formation(squad_id, formation_kind, source, tick, sim_time_ms, state),
+            ControlCommand::ActSquadAssignRole {
+                squad_id,
+                member_actor_id,
+                role,
+                source,
+            } => self.dispatch_m7b_squad_assign_role(squad_id, member_actor_id, role, source, tick, sim_time_ms, state),
+            ControlCommand::SrvDumpSquadState { squad_id, source } => {
+                self.dispatch_m7b_dump_squad_state(squad_id, source, tick, sim_time_ms, state)
+            }
             // === M8 cfctl surface ===
             ControlCommand::ActCameraSetMode { mode, source } => {
                 self.dispatch_camera_set_mode(mode, source, tick, sim_time_ms, state)

@@ -10,6 +10,14 @@ publish.workspace = true
 name = "cf-mod"
 path = "src/main.rs"
 
+[[bin]]
+name = "generate_m6c_rons"
+path = "src/bin/generate_m6c_rons.rs"
+
+[[bin]]
+name = "generate_m6c_manifest"
+path = "src/bin/generate_m6c_manifest.rs"
+
 [dependencies]
 anyhow = { workspace = true }
 clap = { workspace = true }

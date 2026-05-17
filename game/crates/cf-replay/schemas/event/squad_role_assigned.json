@@ -1,0 +1,15 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/squad_role_assigned.v1",
+  "title": "squad.role_assigned",
+  "description": "Emitted when a member is assigned (or reassigned) a sticky role. Spec M7B § Per-member role assignment.",
+  "type": "object",
+  "required": ["squad_id", "member_actor_id", "role"],
+  "properties": {
+    "squad_id": {"type": "integer", "minimum": 0},
+    "member_actor_id": {"type": "integer", "minimum": 0},
+    "role": {"type": "string"},
+    "previous_role": {"type": ["string", "null"]}
+  },
+  "additionalProperties": true
+}

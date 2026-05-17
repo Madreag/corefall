@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/squad_brain_hop.v1",
+  "title": "squad.brain_hop",
+  "description": "Emitted when the player hops to another squad member via Cortex-Command-style brain-hop. Squad state survives the hop — the previously-held actor reverts to AI under the same doctrine. Spec M7B § Cortex-Command-style commander hopping.",
+  "type": "object",
+  "required": ["squad_id", "from_actor_id", "to_actor_id"],
+  "properties": {
+    "squad_id": {"type": "integer", "minimum": 0},
+    "from_actor_id": {"type": "integer", "minimum": 0},
+    "to_actor_id": {"type": "integer", "minimum": 0},
+    "initiated_tick": {"type": ["integer", "null"], "minimum": 0},
+    "completed_tick": {"type": ["integer", "null"], "minimum": 0},
+    "same_squad": {"type": "boolean"}
+  },
+  "additionalProperties": true
+}

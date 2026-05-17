@@ -1,19 +1,25 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://corefall/event/squad.command_issued.v0.1",
+  "$id": "https://corefall/event/squad.command_issued.v0.2",
   "title": "squad.command_issued",
+  "description": "Emitted when a squad command is committed. M6 enum kinds (follow_leader / hold_position / defend_point / push_to_waypoint) remain accepted; M7B adds the data-driven verb grammar via verb_id + verb_family + args.",
   "type": "object",
-  "required": ["kind"],
   "properties": {
     "bot_actor": {"type": ["integer", "null"], "minimum": 0},
-    "kind": {"type": "string", "enum": ["follow_leader", "hold_position", "defend_point", "push_to_waypoint"]},
+    "kind": {"type": ["string", "null"]},
     "waypoint": {
       "type": ["object", "null"],
       "properties": {
         "x": {"type": "number"},
         "y": {"type": "number"}
       }
-    }
+    },
+    "squad_id": {"type": ["integer", "null"], "minimum": 0},
+    "verb_id": {"type": ["string", "null"]},
+    "verb_family": {"type": ["string", "null"]},
+    "args": {"type": ["array", "null"]},
+    "issuer_actor_id": {"type": ["integer", "null"], "minimum": 0},
+    "issued_tick": {"type": ["integer", "null"], "minimum": 0}
   },
   "additionalProperties": true
 }

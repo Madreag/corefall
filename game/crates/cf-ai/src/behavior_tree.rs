@@ -5,9 +5,17 @@
 //! Decorator nodes). The BT is purely advisory at M7-A — the engine consumes
 //! the leaf `BehaviorAction` and dispatches it. M8 extends with rich BT
 //! authoring and persistence.
+//!
+//! **M7B**: when `ThinkingContext.archetype` maps onto one of the 6
+//! `ArchetypeBtKind` rows, the layer expands via the deep `archetype_bt`
+//! tree (≥30 distinct leaves per archetype) instead of the M7-A canned
+//! tree. The generic [`BehaviorTreeLayer::expand`] is preserved for tests
+//! that still want to assert the M7-A baseline.
 
 use serde::{Deserialize, Serialize};
 
+use crate::archetype::Archetype;
+use crate::archetype_bt::{self, ArchetypeBtKind};
 use crate::task::TaskType;
 use crate::thinking_stack::{Layer, LayerKind, LayerOutput, ThinkingContext};
 
@@ -248,39 +256,89 @@ impl BehaviorTreeLayer {
     /// First (leftmost) leaf action in the BT root.
     pub fn leaf_action(node: &BtNode) -> BehaviorAction {
         match node {
-            BtNode::Action { name } => match name.as_str() {
-                "move_to_cover" => BehaviorAction::MoveToCover,
-                "move_to_waypoint" => BehaviorAction::MoveToWaypoint,
-                "approach_ally" => BehaviorAction::MoveToAlly,
-                "approach_enemy" => BehaviorAction::MoveToEnemy,
-                "approach_breach" => BehaviorAction::MoveToWaypoint,
-                "fire" => BehaviorAction::Fire,
-                "suppress_fire" => BehaviorAction::SuppressFire,
-                "reload" => BehaviorAction::Reload,
-                "throw_grenade" => BehaviorAction::ThrowGrenade,
-                "set_trap" => BehaviorAction::SetTrap,
-                "treat_loop" | "treat_self" => BehaviorAction::ApplyMedkit,
-                "repair_loop" => BehaviorAction::ApplyRepairTool,
-                "mark_threat" => BehaviorAction::MarkThreat,
-                "scope_settle" => BehaviorAction::ScopeSettle,
-                "dodge" => BehaviorAction::Dodge,
-                "hold_position" => BehaviorAction::Idle,
-                "demolish_target" => BehaviorAction::ApplyRepairTool,
-                "move_to_flank" => BehaviorAction::MoveToEnemy,
-                "cover_ally" => BehaviorAction::Idle,
-                "defend_brain_actor" => BehaviorAction::Idle,
-                "investigate_sound" => BehaviorAction::MoveToWaypoint,
-                "follow_order" => BehaviorAction::MoveToWaypoint,
-                "scout_ahead" => BehaviorAction::MoveToWaypoint,
-                "dig_cover" => BehaviorAction::SetTrap,
-                "idle" | "idle_pause" => BehaviorAction::Idle,
-                _ => BehaviorAction::Idle,
-            },
+            BtNode::Action { name } => name_to_action(name.as_str()),
             BtNode::Sequence { children } | BtNode::Selector { children } => {
                 children.first().map(Self::leaf_action).unwrap_or(BehaviorAction::Idle)
             }
             BtNode::Decorator { child, .. } => Self::leaf_action(child),
         }
+    }
+}
+
+/// **M7B**: map an M7B `Archetype` enum onto an `ArchetypeBtKind` row. Medic
+/// reuses the rifleman tree (closest analog with cover-based behavior) until
+/// a dedicated medic_bt ships in a future milestone.
+pub fn archetype_to_bt_kind(archetype: Archetype) -> ArchetypeBtKind {
+    match archetype {
+        Archetype::Rifleman | Archetype::Medic => ArchetypeBtKind::Rifleman,
+        Archetype::Sniper => ArchetypeBtKind::Sniper,
+        Archetype::Assault => ArchetypeBtKind::Assault,
+        Archetype::Engineer => ArchetypeBtKind::Engineer,
+        Archetype::Spotter => ArchetypeBtKind::Spotter,
+    }
+}
+
+fn strip_archetype_prefix(name: &str) -> &str {
+    for prefix in [
+        "rifleman_",
+        "sniper_",
+        "assault_",
+        "engineer_",
+        "spotter_",
+        "heavy_",
+        "medic_",
+    ] {
+        if let Some(rest) = name.strip_prefix(prefix) {
+            return rest;
+        }
+    }
+    name
+}
+
+/// **M7B**: map a leaf node name (with or without archetype prefix) to its
+/// `BehaviorAction`. Falls back to `Idle` for unrecognised names.
+fn name_to_action(raw: &str) -> BehaviorAction {
+    let stripped = strip_archetype_prefix(raw);
+    match stripped {
+        "move_to_cover" | "take_cover" | "post_breach_cover" | "retreat_to_cover" => BehaviorAction::MoveToCover,
+        "move_to_waypoint" | "move_to_target" | "patrol_waypoint" | "patrol_ridge" | "patrol_overlook"
+        | "patrol_perimeter" | "approach_breach" | "advance_through_door" | "advance_forward"
+        | "advance_bounding" | "investigate_sound" | "follow_order" | "scout_ahead" | "push_to_target"
+        | "storm_room" | "storm_building" | "re_position" | "seek_high_ground" | "climb_perch"
+        | "bounding_step" | "fall_back" | "disengage" | "kick_door" | "breach_door"
+        | "stack_left" | "stack_right" | "sweep_corner" => BehaviorAction::MoveToWaypoint,
+        "approach_ally" | "approach_chassis" => BehaviorAction::MoveToAlly,
+        "approach_enemy" | "engage_visible_enemy" | "flank_left" | "flank_right" | "close_quarters_fire"
+        | "track_target" | "track_target_los" => BehaviorAction::MoveToEnemy,
+        "fire" | "burst_fire" | "rapid_burst" | "aimed_shot" | "anti_material_shot" | "walk_fire"
+        | "re_chamber" => BehaviorAction::Fire,
+        "suppress_fire" | "suppress_window" | "suppress_target" | "lay_suppressive_fire"
+        | "overwatch_sector" | "overwatch_door" => BehaviorAction::SuppressFire,
+        "reload" | "belt_reload" | "long_reload" | "break_barrel" | "change_barrel" | "top_off_mags" => {
+            BehaviorAction::Reload
+        }
+        "throw_grenade" | "throw_smoke" | "throw_flash" | "decoy_throw" | "smoke_to_break_los"
+        | "frag_out" => BehaviorAction::ThrowGrenade,
+        "set_trap" | "lay_mine" | "disarm_trap" | "dig_cover" | "dig_breach" | "dig_emplacement"
+        | "pour_concrete" | "seal_pipe" | "extinguish_fire" | "deploy_bipod" | "stow_bipod"
+        | "demolish_target" | "demolish_wall" | "demolish_window" => BehaviorAction::SetTrap,
+        "treat_loop" | "treat_self" | "emergency_self_repair" | "call_for_medic" | "call_for_engineer" => {
+            BehaviorAction::ApplyMedkit
+        }
+        "repair_loop" | "repair_chassis_module" | "repair_terrain_breach" => BehaviorAction::ApplyRepairTool,
+        "mark_threat" | "mark_priority_target" | "spot_for_squad" | "call_target" | "call_target_lost"
+        | "relay_target_to_sniper" | "relay_target_to_squad" | "scan_arc" | "sweep_360"
+        | "announce_low_ammo" | "acquire_secondary_target" => BehaviorAction::MarkThreat,
+        "scope_settle" | "breath_hold" | "scope_zoom_increase" | "scope_zoom_decrease" => {
+            BehaviorAction::ScopeSettle
+        }
+        "dodge" | "prone" | "crouch" | "take_prone" => BehaviorAction::ChangeStance,
+        "hold_position" | "hold_cover" | "cover_ally" | "defend_brain_actor" | "cover_me"
+        | "scan_for_module_damage" | "sniper_cover" | "press_attack" | "heavy_forward" | "disappear_act"
+        | "call_artillery" | "call_drone_strike" | "call_support" | "idle" | "idle_pause" => {
+            BehaviorAction::Idle
+        }
+        _ => BehaviorAction::Idle,
     }
 }
 
@@ -297,7 +355,8 @@ impl Layer for BehaviorTreeLayer {
 
     fn tick_layer(&mut self, ctx: &mut ThinkingContext<'_>) -> LayerOutput {
         let chosen = ctx.chosen_task.unwrap_or(TaskType::Idle);
-        let root = Self::expand(chosen);
+        let kind = archetype_to_bt_kind(ctx.archetype);
+        let root = archetype_bt::bt_for(kind, chosen);
         let trail = root.flatten_label();
         let action = Self::leaf_action(&root);
         self.last_action = Some(action);

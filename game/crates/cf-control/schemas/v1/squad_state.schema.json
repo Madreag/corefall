@@ -1,0 +1,79 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-control/v1/squad_state",
+  "title": "SquadStateView",
+  "description": "M7B `srv.dump_squad_state` response shape. Surfaces the per-squad state row (current verb + formation + role assignments + breach-chain + bounding state) plus the canonical verb registry, formation catalog, and per-archetype BT node counts so the M25 wheel + Tab overlay + M23B commander-doctrine all render off a single round-trip. Spec M7B § Acceptance criteria.",
+  "type": "object",
+  "required": ["verb_registry_count", "verb_registry", "formations", "archetype_bt"],
+  "properties": {
+    "squad": {
+      "type": ["object", "null"],
+      "description": "Per-squad state row when the squad exists; null when no squad is registered for this id.",
+      "properties": {
+        "squad_id": {"type": "integer", "minimum": 0},
+        "doctrine": {"type": "string"},
+        "current_verb": {"type": ["string", "null"]},
+        "current_command_family": {"type": ["string", "null"]},
+        "last_veto_label": {"type": ["string", "null"]},
+        "formation_kind": {"type": "string"},
+        "role_assignments": {"type": "array"},
+        "slot_assignments": {"type": "array"},
+        "breach_chain_active": {"type": "boolean"},
+        "bounding_active": {"type": "boolean"},
+        "last_solve_tick": {"type": "integer", "minimum": 0}
+      },
+      "additionalProperties": true
+    },
+    "verb_registry_count": {"type": "integer", "minimum": 50},
+    "verb_registry": {
+      "type": "array",
+      "minItems": 50,
+      "items": {
+        "type": "object",
+        "required": ["verb_id", "display_name", "family", "args", "valid_target", "doctrine_compat"],
+        "properties": {
+          "verb_id": {"type": "string"},
+          "display_name": {"type": "string"},
+          "family": {"type": "string"},
+          "args": {"type": "array"},
+          "valid_target": {"type": "string"},
+          "doctrine_compat": {
+            "type": "object",
+            "description": "Per-doctrine compatibility row. Keys are doctrine ids; values are `allowed` or `vetoed`."
+          }
+        }
+      }
+    },
+    "formations": {
+      "type": "array",
+      "minItems": 9,
+      "items": {
+        "type": "object",
+        "required": ["kind", "slot_count", "slots"],
+        "properties": {
+          "kind": {"type": "string"},
+          "slot_count": {"type": "integer", "minimum": 0},
+          "slots": {"type": "array"}
+        }
+      }
+    },
+    "archetype_bt": {
+      "type": "array",
+      "minItems": 6,
+      "items": {
+        "type": "object",
+        "required": ["kind", "node_count", "node_ids"],
+        "properties": {
+          "kind": {"type": "string"},
+          "node_count": {"type": "integer", "minimum": 30},
+          "node_ids": {"type": "array"}
+        }
+      }
+    },
+    "doctrine_vetoes": {
+      "type": "object",
+      "description": "Per-doctrine veto map. Each key is a doctrine id; the value is the list of vetoed verb_ids."
+    }
+  },
+  "additionalProperties": true
+}

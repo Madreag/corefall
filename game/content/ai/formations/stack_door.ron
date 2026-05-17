@@ -1,0 +1,37 @@
+// M7B: Stack (door) — Stack-1 ahead, Stack-2 left of jamb, Stack-3 right,
+// Stack-4 rear; leader watches 180°, heavy covers rear.
+(
+    kind: stack_door,
+    slots: [
+        (
+            slot_id: 0,
+            offset: (0.0, 0.0),
+            role_hint: pointman,
+            sector_bearing_degrees: 0.0,
+        ),
+        (
+            slot_id: 1,
+            offset: (-2.0, 1.0),
+            role_hint: rifleman,
+            sector_bearing_degrees: 90.0,
+        ),
+        (
+            slot_id: 2,
+            offset: (-2.0, -1.0),
+            role_hint: rifleman,
+            sector_bearing_degrees: -90.0,
+        ),
+        (
+            slot_id: 3,
+            offset: (-4.0, 0.0),
+            role_hint: squad_leader,
+            sector_bearing_degrees: 180.0,
+        ),
+        (
+            slot_id: 4,
+            offset: (-6.0, 0.0),
+            role_hint: heavy,
+            sector_bearing_degrees: 180.0,
+        ),
+    ],
+)

@@ -42,6 +42,7 @@
 )]
 
 pub mod attachable;
+pub mod body_armor_slot;
 pub mod components;
 pub mod constants;
 pub mod cover;
@@ -61,6 +62,7 @@ pub use inventory::{
 pub use mass_aggregator::{breakdown as mass_breakdown, total_mass, MassBreakdown};
 
 pub use attachable::{apply_damage as apply_attachable_damage, Attachable};
+pub use body_armor_slot::{ArmorHitOutcome, ArmorSlotState, BodyArmorSlot, EquipReject as BodyArmorEquipReject, HitZone};
 pub use cover::{CoverSide, CoverState};
 pub use gib::{default_cascade_chain, spread_angle, GibOriginKind, GibSpawn, SpreadMode};
 pub use lean::{LeanDirection, LeanState, LEAN_MAX_DEGREES};
@@ -1110,6 +1112,11 @@ pub struct ActorState {
     /// `Some(...)` for M6B+ actors.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub inventory_encumbrance: Option<crate::inventory::InventoryEncumbrance>,
+    /// **M6C**: per-actor body armor slot (helmet + body + gloves +
+    /// boots + knee/elbow pads). Separate from the M13 chassis armor.
+    /// Default = empty slots so legacy actors serialize cleanly.
+    #[serde(default)]
+    pub body_armor: BodyArmorSlot,
 }
 
 fn default_bipod_equipped() -> cf_equipment::Bipod {
@@ -1295,6 +1302,7 @@ impl ActorState {
             fire_held_prev: false,
             inventory_grid: None,
             inventory_encumbrance: None,
+            body_armor: BodyArmorSlot::default(),
         }
     }
 

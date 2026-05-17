@@ -1,15 +1,31 @@
-//! M6: grenade registry (4 grenades).
+//! M6: grenade registry (4 grenades) + M6C: 10 new throwables.
 //!
-//! Per spec § "4 grenade types with throw-arc preview":
+//! Per M6 spec § "4 grenade types with throw-arc preview":
 //! - Frag (5 s fuse, radius damage)
 //! - Smoke (5 s fuse, smoke hazard tile spawn)
 //! - Flash (1.5 s fuse, deafen + blind)
 //! - Stick (adheres to actor/surface, 4 s fuse)
+//!
+//! Per M6C § "Throwables (10 new)":
+//! - he_grenade, acid_grenade, pipe_bomb, molotov_cocktail,
+//!   proximity_mine, pressure_mine, tripwire_mine, c4_charge,
+//!   incendiary_grenade, bouncing_betty.
 
+pub mod acid;
+pub mod bouncing_betty;
+pub mod c4;
 pub mod flash;
 pub mod frag;
+pub mod he;
+pub mod incendiary;
+pub mod mines;
+pub mod molotov;
+pub mod pipe_bomb;
+pub mod pressure_mine;
+pub mod prox_mine;
 pub mod smoke;
 pub mod stick;
+pub mod tripwire;
 
 use serde::{Deserialize, Serialize};
 
@@ -17,6 +33,18 @@ pub const FRAG_M6_DEFAULT_ID: &str = "grenade_frag_m6";
 pub const SMOKE_M6_DEFAULT_ID: &str = "grenade_smoke_m6";
 pub const FLASH_M6_DEFAULT_ID: &str = "grenade_flash_m6";
 pub const STICK_M6_DEFAULT_ID: &str = "grenade_stick_m6";
+
+// M6C throwable SKU ids.
+pub const HE_GRENADE_ID: &str = "he_grenade";
+pub const ACID_GRENADE_ID: &str = "acid_grenade";
+pub const PIPE_BOMB_ID: &str = "pipe_bomb";
+pub const MOLOTOV_COCKTAIL_ID: &str = "molotov_cocktail";
+pub const PROXIMITY_MINE_ID: &str = "proximity_mine";
+pub const PRESSURE_MINE_ID: &str = "pressure_mine";
+pub const TRIPWIRE_MINE_ID: &str = "tripwire_mine";
+pub const C4_CHARGE_ID: &str = "c4_charge";
+pub const INCENDIARY_GRENADE_ID: &str = "incendiary_grenade";
+pub const BOUNCING_BETTY_ID: &str = "bouncing_betty";
 
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
@@ -26,6 +54,17 @@ pub enum GrenadeKind {
     Smoke = 1,
     Flash = 2,
     Stick = 3,
+    // M6C additions:
+    HighExplosive = 4,
+    Acid = 5,
+    PipeBomb = 6,
+    Molotov = 7,
+    ProximityMine = 8,
+    PressureMine = 9,
+    TripwireMine = 10,
+    C4Charge = 11,
+    Incendiary = 12,
+    BouncingBetty = 13,
 }
 
 impl GrenadeKind {
@@ -35,7 +74,34 @@ impl GrenadeKind {
             GrenadeKind::Smoke => "smoke",
             GrenadeKind::Flash => "flash",
             GrenadeKind::Stick => "stick",
+            GrenadeKind::HighExplosive => "he",
+            GrenadeKind::Acid => "acid",
+            GrenadeKind::PipeBomb => "pipe_bomb",
+            GrenadeKind::Molotov => "molotov",
+            GrenadeKind::ProximityMine => "proximity_mine",
+            GrenadeKind::PressureMine => "pressure_mine",
+            GrenadeKind::TripwireMine => "tripwire_mine",
+            GrenadeKind::C4Charge => "c4_charge",
+            GrenadeKind::Incendiary => "incendiary",
+            GrenadeKind::BouncingBetty => "bouncing_betty",
         }
+    }
+
+    /// True when this grenade is a placed mine that detonates on a
+    /// trigger condition rather than after a fuse timeout.
+    pub fn is_mine(self) -> bool {
+        matches!(
+            self,
+            GrenadeKind::ProximityMine
+                | GrenadeKind::PressureMine
+                | GrenadeKind::TripwireMine
+                | GrenadeKind::BouncingBetty
+        )
+    }
+
+    /// True when this throwable is a remote-detonated charge (C4).
+    pub fn is_remote_detonated(self) -> bool {
+        matches!(self, GrenadeKind::C4Charge)
     }
 }
 
@@ -55,6 +121,22 @@ pub struct GrenadePreset {
     pub vision_disrupt: bool,
     /// Mass in kg.
     pub mass_kg: f32,
+    /// Spawn-material id for material-spawning throwables (acid, molotov,
+    /// incendiary). Empty when no material spawn.
+    #[serde(default)]
+    pub spawn_material_id: String,
+    /// Trigger radius in tiles for proximity-style mines (0 = none).
+    #[serde(default)]
+    pub trigger_radius_tiles: u8,
+    /// Top-attack arms after burst (bouncing_betty).
+    #[serde(default)]
+    pub air_burst: bool,
+    /// Craftable from improvised parts (pipe_bomb).
+    #[serde(default)]
+    pub craftable_t0: bool,
+    /// Remote-detonated (C4 charge).
+    #[serde(default)]
+    pub remote_detonated: bool,
 }
 
 #[must_use]
@@ -64,6 +146,23 @@ pub fn m6_grenade_presets() -> Vec<GrenadePreset> {
         smoke::smoke_m6_default(),
         flash::flash_m6_default(),
         stick::stick_m6_default(),
+    ]
+}
+
+/// M6C throwable presets (10 SKUs beyond the M6 baseline).
+#[must_use]
+pub fn m6c_throwable_presets() -> Vec<GrenadePreset> {
+    vec![
+        he::he_grenade(),
+        acid::acid_grenade(),
+        pipe_bomb::pipe_bomb(),
+        molotov::molotov_cocktail(),
+        prox_mine::proximity_mine(),
+        pressure_mine::pressure_mine(),
+        tripwire::tripwire_mine(),
+        c4::c4_charge(),
+        incendiary::incendiary_grenade(),
+        bouncing_betty::bouncing_betty(),
     ]
 }
 

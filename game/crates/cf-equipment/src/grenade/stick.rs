@@ -15,5 +15,10 @@ pub fn stick_m6_default() -> GrenadePreset {
         spawns_hazard: false,
         vision_disrupt: false,
         mass_kg: 0.5,
+        spawn_material_id: String::new(),
+        trigger_radius_tiles: 0,
+        air_burst: false,
+        craftable_t0: false,
+        remote_detonated: false,
     }
 }

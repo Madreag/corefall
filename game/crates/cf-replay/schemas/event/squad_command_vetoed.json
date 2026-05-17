@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/squad_command_vetoed.v1",
+  "title": "squad.command_vetoed",
+  "description": "Emitted when a verb the player tried to issue is forbidden by the squad's current doctrine. reason_label follows the convention `doctrine_<X>_blocks_<Y>` (e.g. `doctrine_defensive_blocks_press_attack`). Spec M7B § Doctrine veto.",
+  "type": "object",
+  "required": ["squad_id", "verb_id", "doctrine", "reason_label"],
+  "properties": {
+    "squad_id": {"type": "integer", "minimum": 0},
+    "verb_id": {"type": "string"},
+    "doctrine": {"type": "string"},
+    "reason_label": {"type": "string"},
+    "issuer_actor_id": {"type": ["integer", "null"], "minimum": 0},
+    "issued_tick": {"type": ["integer", "null"], "minimum": 0}
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,36 @@
+// M7B: Line Abreast — 5 slots arrayed perpendicular to facing.
+(
+    kind: line_abreast,
+    slots: [
+        (
+            slot_id: 0,
+            offset: (0.0, -8.0),
+            role_hint: rifleman,
+            sector_bearing_degrees: 0.0,
+        ),
+        (
+            slot_id: 1,
+            offset: (0.0, -4.0),
+            role_hint: rifleman,
+            sector_bearing_degrees: 0.0,
+        ),
+        (
+            slot_id: 2,
+            offset: (0.0, 0.0),
+            role_hint: squad_leader,
+            sector_bearing_degrees: 0.0,
+        ),
+        (
+            slot_id: 3,
+            offset: (0.0, 4.0),
+            role_hint: heavy,
+            sector_bearing_degrees: 0.0,
+        ),
+        (
+            slot_id: 4,
+            offset: (0.0, 8.0),
+            role_hint: rifleman,
+            sector_bearing_degrees: 0.0,
+        ),
+    ],
+)

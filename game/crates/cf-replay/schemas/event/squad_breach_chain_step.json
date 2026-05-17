@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/squad_breach_chain_step.v1",
+  "title": "squad.breach_chain_step",
+  "description": "Emitted four times per breach chain — once per step (stack, breach, frag, advance). step_ordinal is 0..3. sectors_of_fire mirrors the spec's per-slot pre-assignment. Spec M7B § Breach-Stack-Frag-Clear chain.",
+  "type": "object",
+  "required": ["squad_id", "door_id", "step", "step_ordinal"],
+  "properties": {
+    "squad_id": {"type": "integer", "minimum": 0},
+    "door_id": {"type": "integer", "minimum": 0},
+    "step": {"type": "string"},
+    "step_ordinal": {"type": "integer", "minimum": 0},
+    "tick": {"type": ["integer", "null"], "minimum": 0},
+    "actor_ids": {"type": "array"},
+    "sectors_of_fire": {"type": "array"}
+  },
+  "additionalProperties": true
+}

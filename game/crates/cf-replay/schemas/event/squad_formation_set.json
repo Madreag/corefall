@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/squad_formation_set.v1",
+  "title": "squad.formation_set",
+  "description": "Emitted when the squad's active formation kind changes. Includes the per-slot world anchors of the first resolution so the M25 overlay can draw the wedge / column / diamond shape. Spec M7B § 9 formation kinds.",
+  "type": "object",
+  "required": ["squad_id", "formation_kind", "slot_count"],
+  "properties": {
+    "squad_id": {"type": "integer", "minimum": 0},
+    "formation_kind": {"type": "string"},
+    "previous_kind": {"type": ["string", "null"]},
+    "slot_count": {"type": "integer", "minimum": 0},
+    "slot_assignments": {"type": "array"},
+    "commander_actor_id": {"type": ["integer", "null"], "minimum": 0}
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/squad_bounding_step.v1",
+  "title": "squad.bounding_step",
+  "description": "Emitted per swap of the bounding-retreat alternating half (cover_half / move_half). Spec M7B § Retreat verbs are layered — Retreat In Order.",
+  "type": "object",
+  "required": ["squad_id", "step_index", "new_phase"],
+  "properties": {
+    "squad_id": {"type": "integer", "minimum": 0},
+    "step_index": {"type": "integer", "minimum": 0},
+    "previous_phase": {"type": ["string", "null"]},
+    "new_phase": {"type": "string"},
+    "cover_actors": {"type": "array"},
+    "moving_actors": {"type": "array"},
+    "rally_position": {"type": "array", "minItems": 2, "maxItems": 2}
+  },
+  "additionalProperties": true
+}

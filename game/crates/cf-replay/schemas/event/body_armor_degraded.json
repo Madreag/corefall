@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/body_armor.degraded.v0.1",
+  "title": "body_armor.degraded",
+  "type": "object",
+  "required": ["actor", "slot_kind", "item_id"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "slot_kind": {
+      "type": "string",
+      "enum": [
+        "helmet",
+        "body_armor",
+        "gloves",
+        "boots",
+        "knee_pads",
+        "elbow_pads",
+        "hardsuit",
+        "eva_suit",
+        "radiation_suit",
+        "hazmat_suit",
+        "insulated_suit",
+        "modular_plate_carrier"
+      ]
+    },
+    "item_id": {"type": "string"},
+    "durability_after": {"type": "number", "minimum": 0.0},
+    "durability_max": {"type": "number", "minimum": 0.0},
+    "fraction_after": {"type": "number", "minimum": 0.0, "maximum": 1.0}
+  },
+  "additionalProperties": true
+}

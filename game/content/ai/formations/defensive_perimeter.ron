@@ -1,0 +1,36 @@
+// M7B: Defensive Perimeter — cardinal coverage with marksman pinned center.
+(
+    kind: defensive_perimeter,
+    slots: [
+        (
+            slot_id: 0,
+            offset: (8.0, 0.0),
+            role_hint: squad_leader,
+            sector_bearing_degrees: 0.0,
+        ),
+        (
+            slot_id: 1,
+            offset: (-8.0, 0.0),
+            role_hint: heavy,
+            sector_bearing_degrees: 180.0,
+        ),
+        (
+            slot_id: 2,
+            offset: (0.0, 8.0),
+            role_hint: rifleman,
+            sector_bearing_degrees: 90.0,
+        ),
+        (
+            slot_id: 3,
+            offset: (0.0, -8.0),
+            role_hint: rifleman,
+            sector_bearing_degrees: -90.0,
+        ),
+        (
+            slot_id: 4,
+            offset: (0.0, 0.0),
+            role_hint: marksman,
+            sector_bearing_degrees: 0.0,
+        ),
+    ],
+)

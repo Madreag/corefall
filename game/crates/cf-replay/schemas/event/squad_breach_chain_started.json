@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/squad_breach_chain_started.v1",
+  "title": "squad.breach_chain_started",
+  "description": "Emitted when the four-verb Stack -> Breach -> Frag -> Advance chain begins. sectors_of_fire is the spec-mandated pre-assignment (Stack-1 ahead, Stack-2 left, Stack-3 right, Stack-4 rear). Spec M7B § Breach-Stack-Frag-Clear is a four-verb chain.",
+  "type": "object",
+  "required": ["squad_id", "door_id", "side"],
+  "properties": {
+    "squad_id": {"type": "integer", "minimum": 0},
+    "door_id": {"type": "integer", "minimum": 0},
+    "side": {"type": "string"},
+    "started_tick": {"type": ["integer", "null"], "minimum": 0},
+    "stack_actor_ids": {"type": "array"},
+    "sectors_of_fire": {"type": "array"}
+  },
+  "additionalProperties": true
+}

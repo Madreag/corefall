@@ -115,6 +115,16 @@ pub mod utility;
 pub mod path_reaction;
 pub mod target_selection;
 
+// **M7B**: deep squad command grammar + formation orders + commander hop
+// + per-archetype BT. Spec § "the squad obeys real grammar — formation
+// orders, combat verbs, breach-stack discipline — and the player can take
+// the wheel of any one of them without the rest forgetting the plan."
+pub mod archetype_bt;
+pub mod commander_hop;
+pub mod formation;
+pub mod squad_command_grammar;
+pub mod squad_state;
+
 pub use archetype::Archetype;
 pub use auto_repair::{AutoRepairInitiatedEvent, AutoRepairMission, AutoRepairProgressedEvent, AutoRepairState};
 pub use auto_triage::{AutoTriageAppliedEvent, AutoTriageInitiatedEvent, AutoTriageMission, AutoTriageState};
@@ -150,6 +160,24 @@ pub use thinking_stack::{
     format_task_camel, AiTickOutput, Layer, LayerKind, LayerOutput, ThinkingContext, ThinkingStack,
 };
 pub use utility::{base_utility, situational_bonus, ScoredTask, UtilityLayer};
+
+// **M7B**: deep squad command grammar + formation + commander hop +
+// per-archetype BT re-exports.
+pub use archetype_bt::{bt_for as archetype_bt_for, node_ids_for as archetype_bt_nodes, ArchetypeBtKind};
+pub use commander_hop::{build_los_radial, finalize_hop, CommanderHopState, HopError, HopResult, LosRadialCandidate};
+pub use formation::{
+    rotate_local_to_world, world_anchor_for_slot, FormationDef, FormationKind, FormationSlot,
+    SlotAssignment, SlotSolver, SquadRoleHint,
+};
+pub use squad_command_grammar::{
+    builtin_registry as squad_verb_registry, parse_verb_invocation, try_issue as squad_try_issue,
+    verb_family_label, CommandIssue, DoctrineCompatMatrix, ParsedVerb, SquadCommand as SquadGrammarCommand,
+    VerbArgKind, VerbArgSpec, VerbArgValue, VerbDef, VerbFamily, VerbRegistry, VetoReason,
+};
+pub use squad_state::{
+    BoundingEvent, BoundingPhase, BoundingState, BreachChainState, BreachChainStep, RoleAssignmentResult,
+    SlotBrokenReport, SquadId, SquadState, SLOT_BROKEN_THRESHOLD_UNITS, SLOT_RESLOT_CADENCE_SECONDS,
+};
 
 /// Tunable parameters for the M1.5 reactive guard.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]

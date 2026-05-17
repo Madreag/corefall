@@ -1,0 +1,18 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/squad_formation_slot_assigned.v1",
+  "title": "squad.formation_slot_assigned",
+  "description": "Emitted per actor per formation solve. world_anchor is the commander-rotated local offset; sector_bearing_degrees drives sectors-of-fire. Spec M7B § Per-actor relative position in formation.",
+  "type": "object",
+  "required": ["squad_id", "member_actor_id", "slot_id", "world_anchor"],
+  "properties": {
+    "squad_id": {"type": "integer", "minimum": 0},
+    "member_actor_id": {"type": "integer", "minimum": 0},
+    "slot_id": {"type": "integer", "minimum": 0},
+    "local_offset": {"type": "array", "minItems": 2, "maxItems": 2},
+    "world_anchor": {"type": "array", "minItems": 2, "maxItems": 2},
+    "sector_bearing_degrees": {"type": "number"},
+    "role_hint": {"type": ["string", "null"]}
+  },
+  "additionalProperties": true
+}
