@@ -21024,13 +21024,15 @@ fn load_trench_template(id: &str) -> Result<cf_content::TrenchTemplate, String> 
 /// Returns the set of M9C fortification ids that are currently
 /// shipped + ready to instantiate. Pre-M9C every id is missing →
 /// optional placeholders degrade to warnings (per spec § Notes for
-/// the implementer / VAL-M9B-TEMPLATE-004); once m9c-1..m9c-5 land,
-/// this function returns a populated set so the same templates
-/// promote to real placed fortifications (VAL-CROSS-001).
+/// the implementer / VAL-M9B-TEMPLATE-004); post-M9C the 23 canonical
+/// kinds enumerated by [`cf_fortification::FortificationKind::ALL`]
+/// are all present so the same templates promote to real placed
+/// fortifications (VAL-CROSS-001 / VAL-CROSS-NEW-014).
 fn resolved_fortifications_for_build() -> std::collections::HashSet<String> {
-    // Pre-M9C: empty set. m9c-1..m9c-5 features will replace this
-    // helper with one driven by the actual fortification registry.
-    std::collections::HashSet::new()
+    cf_fortification::FortificationKind::ALL
+        .iter()
+        .map(|k| k.as_str().to_string())
+        .collect()
 }
 
 /// Drive an inline run for `duration_ticks`, paced at the configured tick rate

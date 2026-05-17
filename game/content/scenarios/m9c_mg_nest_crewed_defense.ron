@@ -1,0 +1,51 @@
+// M9C launch scenario — m9c_mg_nest_crewed_defense.
+// Spec Gherkin: "Player crews an MG nest and gains Full cover" +
+// "Ammo box auto-feeds MG nest until empty" + "AI doctrine crews
+// nearest empty MG nest" (VAL-M9C-012 / VAL-M9C-014 / VAL-M9C-015 /
+// VAL-M9C-044).
+//
+// Scenario shape: 3 built mg_nest_static positions + 4 AI defenders
+// + 1 controllable player. AI-MG-A-02 doctrine crews the nests; the
+// player can issue act.player.crew_fortification to drive the manual
+// path.
+(
+    schema_version: 1,
+    id: "m9c_mg_nest_crewed_defense",
+    display_name: "M9C MG Nest Crewed Defense",
+    description: "M9C MG nest crew + ammo-feed + AI doctrine sandbox per specs/active/M9C.md scenarios 'Player crews an MG nest and gains Full cover' + 'Ammo box auto-feeds MG nest until empty' + 'AI doctrine crews nearest empty MG nest'. Drives VAL-M9C-012 / VAL-M9C-014 / VAL-M9C-015 / VAL-M9C-044.",
+    seed: 911,
+    duration_ticks: Some(600),
+    region: (anchor: (0.0, 0.0), width: 1280.0, height: 720.0),
+    gravity: -980.0,
+    floor_y: 16.0,
+    teams: [],
+    actors: [
+        (id: 1, team: "blue", spawn: (200.0, 32.0), controllable: true, hp: 100.0,
+            inventory: (rifle: Some("rifle_m1_default")), half_extents: Some((8.0, 16.0))),
+        (id: 2, team: "blue", spawn: (240.0, 32.0), controllable: false, hp: 100.0,
+            inventory: (rifle: Some("rifle_m1_default")), half_extents: Some((8.0, 16.0))),
+        (id: 3, team: "blue", spawn: (280.0, 32.0), controllable: false, hp: 100.0,
+            inventory: (rifle: Some("rifle_m1_default")), half_extents: Some((8.0, 16.0))),
+        (id: 4, team: "blue", spawn: (320.0, 32.0), controllable: false, hp: 100.0,
+            inventory: (rifle: Some("rifle_m1_default")), half_extents: Some((8.0, 16.0))),
+        (id: 5, team: "red", spawn: (1080.0, 32.0), controllable: false, hp: 100.0,
+            inventory: (rifle: Some("rifle_m1_default")), half_extents: Some((8.0, 16.0)),
+            aim: Some((-1.0, 0.0))),
+    ],
+    terrain: Some((
+        width_px: 1280,
+        height_px: 720,
+        default_material: "air",
+        stamps: [
+            (kind: "fill_aabb", min: (0.0, 0.0), max: (1280.0, 16.0), material: "concrete"),
+            (kind: "fill_aabb", min: (160.0, 16.0), max: (1120.0, 48.0), material: "dirt"),
+        ],
+    )),
+    objectives: [],
+    director: None,
+    capabilities: (debug: false, control_api: true, save_load: false),
+    save_fields: [],
+    expected_tests: ["M9C-012", "M9C-014", "M9C-015", "M9C-044"],
+    notes: "MG nest crew lifecycle smoke: cfctl act.player.crew_fortification / uncrew_fortification drive the player path; AI-MG-A-02 doctrine drives the 3 AI defenders into the 3 nests.",
+    scenario_tags: ["m9c", "fortification", "mg_nest"],
+)

@@ -1,0 +1,43 @@
+// M9C launch scenario — m9c_ied_chain_killzone.
+// Spec Gherkin: "IED chain daisy-fires on remote detonation"
+// (VAL-M9C-030 / VAL-M9C-031).
+//
+// Scenario shape: 1 controllable player + 5 IEDs spaced 4 tiles
+// apart wired to a remote detonator. Cascade fires BFS over the
+// wire-link graph; 100ms per hop; entire chain completes within
+// 0.5s of the trigger.
+(
+    schema_version: 1,
+    id: "m9c_ied_chain_killzone",
+    display_name: "M9C IED Chain Killzone",
+    description: "M9C 5-IED chain remote-detonation BFS cascade per specs/active/M9C.md. Drives VAL-M9C-030 (chain completes within 0.5s) + VAL-M9C-031 (BFS order over wire-link graph) + VAL-M9C-IED-COOKOFF (M14J cookoff intermediary events).",
+    seed: 7,
+    duration_ticks: Some(600),
+    region: (anchor: (0.0, 0.0), width: 1280.0, height: 720.0),
+    gravity: -980.0,
+    floor_y: 16.0,
+    teams: [],
+    actors: [
+        (id: 1, team: "blue", spawn: (200.0, 32.0), controllable: true, hp: 100.0,
+            inventory: (rifle: Some("rifle_m1_default")), half_extents: Some((8.0, 16.0))),
+        (id: 2, team: "red", spawn: (1080.0, 32.0), controllable: false, hp: 100.0,
+            inventory: (rifle: Some("rifle_m1_default")), half_extents: Some((8.0, 16.0)),
+            aim: Some((-1.0, 0.0))),
+    ],
+    terrain: Some((
+        width_px: 1280,
+        height_px: 720,
+        default_material: "air",
+        stamps: [
+            (kind: "fill_aabb", min: (0.0, 0.0), max: (1280.0, 16.0), material: "concrete"),
+            (kind: "fill_aabb", min: (200.0, 16.0), max: (1080.0, 48.0), material: "dirt"),
+        ],
+    )),
+    objectives: [],
+    director: None,
+    capabilities: (debug: false, control_api: true, save_load: false),
+    save_fields: [],
+    expected_tests: ["M9C-030", "M9C-031"],
+    notes: "IED chain: cfctl act.player.deploy_minefield_template seeds the ied_chain_killzone template; the engineer's remote detonator fires the cascade.",
+    scenario_tags: ["m9c", "fortification", "ied"],
+)

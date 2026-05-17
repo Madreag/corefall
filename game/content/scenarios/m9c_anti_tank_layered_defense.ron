@@ -1,0 +1,40 @@
+// M9C launch scenario — m9c_anti_tank_layered_defense.
+// Spec Gherkin: "Anti-tank ditch + dragon's teeth + electrified
+// fence layered defense" (VAL-M9C-038 / VAL-M9C-039 / VAL-M9C-040 /
+// VAL-M9C-041).
+//
+// Scenario shape: 3-row dragon's_teeth behind an 8-px AT ditch
+// behind an electrified fence. Enemy light tank approaches and is
+// shocked, then stuck, then suspension-damaged on the teeth.
+(
+    schema_version: 1,
+    id: "m9c_anti_tank_layered_defense",
+    display_name: "M9C Anti-Tank Layered Defense",
+    description: "M9C layered anti-vehicle defense per specs/active/M9C.md. Drives VAL-M9C-038 (tank crew shock + wire_crushed_by_vehicle) + VAL-M9C-039 (deterministic ditch stuck rolls) + VAL-M9C-040 (per-component suspension damage) + VAL-M9C-041 (tank_trap_x light stop / heavy plow).",
+    seed: 8000,
+    duration_ticks: Some(1200),
+    region: (anchor: (0.0, 0.0), width: 1280.0, height: 720.0),
+    gravity: -980.0,
+    floor_y: 16.0,
+    teams: [],
+    actors: [
+        (id: 1, team: "blue", spawn: (200.0, 32.0), controllable: true, hp: 100.0,
+            inventory: (rifle: Some("rifle_m1_default")), half_extents: Some((8.0, 16.0))),
+    ],
+    terrain: Some((
+        width_px: 1280,
+        height_px: 720,
+        default_material: "air",
+        stamps: [
+            (kind: "fill_aabb", min: (0.0, 0.0), max: (1280.0, 16.0), material: "concrete"),
+            (kind: "fill_aabb", min: (200.0, 16.0), max: (1080.0, 48.0), material: "dirt"),
+        ],
+    )),
+    objectives: [],
+    director: None,
+    capabilities: (debug: false, control_api: true, save_load: false),
+    save_fields: [],
+    expected_tests: ["M9C-038", "M9C-039", "M9C-040", "M9C-041"],
+    notes: "Anti-tank layered defense: enemy tank approaches; deterministic stuck-chance rolls + per-component suspension damage drive a stop within ~2 dragon's teeth contacts.",
+    scenario_tags: ["m9c", "fortification", "anti_tank"],
+)

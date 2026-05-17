@@ -86,6 +86,13 @@ pub mod reactor;
 // scanning the filesystem.
 pub mod m9b_scenarios;
 
+// **M9C**: launch scenario registry (10 fortification scenarios under
+// `game/content/scenarios/m9c_*.ron`). Same shape as
+// `m9b_scenarios`: enumerated registry + per-scenario tick budgets
+// (with `m9c_full_strongpoint` budgeted at 3600 ticks per VAL-M9C-050
+// / VAL-CROSS-006).
+pub mod m9c_scenarios;
+
 pub use reactor::{
     pressure_state_for_hp_percent, ArmorLayerHpEvent, LayerKind, LayerState, PressureState, ReactorDamageReport,
     TIMER_WARNING_THRESHOLDS_S,

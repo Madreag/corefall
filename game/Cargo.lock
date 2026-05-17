@@ -1664,6 +1664,7 @@ dependencies = [
  "cf-content",
  "cf-debug",
  "cf-equipment",
+ "cf-fortification",
  "cf-internal",
  "cf-killcam",
  "cf-localization",

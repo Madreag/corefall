@@ -1,0 +1,48 @@
+// M9C launch scenario — m9c_watchtower_spotter_chain.
+// Spec Gherkin: "Spotter in watchtower marks target; squad MG
+// receives acquisition bonus" + "Watchtower destruction triggers
+// lateral collapse" (VAL-M9C-019 / VAL-M9C-020 / VAL-M9C-021 /
+// VAL-M9C-022).
+//
+// Scenario shape: 1 watchtower_t2 with a spotter actor + 1 MG nest
+// at 16 tiles range with LOS-blocked-by-terrain to the enemy. The
+// spotter's spotter_target_marked event boosts the MG's acquisition
+// rate.
+(
+    schema_version: 1,
+    id: "m9c_watchtower_spotter_chain",
+    display_name: "M9C Watchtower Spotter Chain",
+    description: "M9C spotter→MG acquisition chain + watchtower destruction cascade per specs/active/M9C.md. Drives VAL-M9C-019 / VAL-M9C-020 / VAL-M9C-021 / VAL-M9C-022 (spotter mark TTL + LOS expiry).",
+    seed: 271,
+    duration_ticks: Some(600),
+    region: (anchor: (0.0, 0.0), width: 1280.0, height: 720.0),
+    gravity: -980.0,
+    floor_y: 16.0,
+    teams: [],
+    actors: [
+        (id: 1, team: "blue", spawn: (300.0, 64.0), controllable: false, hp: 100.0,
+            inventory: (rifle: Some("rifle_m1_default")), half_extents: Some((8.0, 16.0))),
+        (id: 2, team: "blue", spawn: (560.0, 32.0), controllable: true, hp: 100.0,
+            inventory: (rifle: Some("rifle_m1_default")), half_extents: Some((8.0, 16.0))),
+        (id: 3, team: "red", spawn: (1080.0, 32.0), controllable: false, hp: 100.0,
+            inventory: (rifle: Some("rifle_m1_default")), half_extents: Some((8.0, 16.0)),
+            aim: Some((-1.0, 0.0))),
+    ],
+    terrain: Some((
+        width_px: 1280,
+        height_px: 720,
+        default_material: "air",
+        stamps: [
+            (kind: "fill_aabb", min: (0.0, 0.0), max: (1280.0, 16.0), material: "concrete"),
+            (kind: "fill_aabb", min: (200.0, 16.0), max: (560.0, 48.0), material: "dirt"),
+            (kind: "fill_aabb", min: (760.0, 16.0), max: (820.0, 96.0), material: "concrete"),
+        ],
+    )),
+    objectives: [],
+    director: None,
+    capabilities: (debug: false, control_api: true, save_load: false),
+    save_fields: [],
+    expected_tests: ["M9C-019", "M9C-020", "M9C-021", "M9C-022"],
+    notes: "Spotter→MG chain: AI-OBS-A-01 doctrine emits spotter_target_marked; MG acquisition rate observable via cfctl observe.actor.target_acquisition_rate.",
+    scenario_tags: ["m9c", "fortification", "watchtower", "spotter"],
+)

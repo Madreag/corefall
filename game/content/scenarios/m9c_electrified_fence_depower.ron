@@ -1,0 +1,39 @@
+// M9C launch scenario — m9c_electrified_fence_depower.
+// Spec Gherkin: "Electrified fence shocks actor; depowering enables
+// safe cut" (VAL-M9C-036 / VAL-M9C-037).
+//
+// Scenario shape: 1 controllable player + 1 electrified_fence row
+// powered from a 240V M29 grid node. The player flips the breaker
+// to depower the fence before cutting it.
+(
+    schema_version: 1,
+    id: "m9c_electrified_fence_depower",
+    display_name: "M9C Electrified Fence Depower",
+    description: "M9C electrified fence shock + depower + cut sequence per specs/active/M9C.md. Drives VAL-M9C-036 (powered shock + depower-via-breaker + safe cut in 4s) + VAL-M9C-037 (power-coupling destruction depowers).",
+    seed: 240,
+    duration_ticks: Some(600),
+    region: (anchor: (0.0, 0.0), width: 1280.0, height: 720.0),
+    gravity: -980.0,
+    floor_y: 16.0,
+    teams: [],
+    actors: [
+        (id: 1, team: "blue", spawn: (200.0, 32.0), controllable: true, hp: 100.0,
+            inventory: (rifle: Some("rifle_m1_default")), half_extents: Some((8.0, 16.0))),
+    ],
+    terrain: Some((
+        width_px: 1280,
+        height_px: 720,
+        default_material: "air",
+        stamps: [
+            (kind: "fill_aabb", min: (0.0, 0.0), max: (1280.0, 16.0), material: "concrete"),
+            (kind: "fill_aabb", min: (200.0, 16.0), max: (1080.0, 48.0), material: "dirt"),
+        ],
+    )),
+    objectives: [],
+    director: None,
+    capabilities: (debug: false, control_api: true, save_load: false),
+    save_fields: [],
+    expected_tests: ["M9C-036", "M9C-037"],
+    notes: "Electrified fence depower: cfctl act.player.unpower_fence flips the breaker to fence_depowered { cause: 'breaker_toggled' }; wire_cutters complete the cut in 4s.",
+    scenario_tags: ["m9c", "fortification", "wire", "power"],
+)

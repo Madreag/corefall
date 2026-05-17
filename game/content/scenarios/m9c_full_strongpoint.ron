@@ -1,0 +1,60 @@
+// M9C launch scenario — m9c_full_strongpoint.
+// Spec Gherkin: "Determinism across full M9C strongpoint scenario"
+// (VAL-M9C-050) + VAL-CROSS-005 (scenario integrates M9B trench
+// segments) + VAL-CROSS-006 (cross-spec determinism).
+//
+// SEED IS FIXED AT 42 — the determinism contract requires identical
+// event sequences + identical SaveBlob.checksum across two engines
+// running this scenario with seed=42 for 3600 ticks.
+//
+// Scenario shape: 2 MG nests + 1 watchtower_t2 + 6 sandbag walls +
+// 1 minefield + barbed wire perimeter + 1 dragon's teeth row. The
+// integration test harness (cf-control + cf-mission) drops the
+// forward_outpost_with_mgnest M9B trench template + the M9C
+// fortifications via scripted cfctl calls at tick 0. The trench
+// template's `path_polyline` declares segments at M9B variant ids
+// (communication / fire_step / parapet_raised), satisfying
+// VAL-CROSS-005. All 16 M9C event kinds are exercised over the
+// 3600-tick window.
+(
+    schema_version: 1,
+    id: "m9c_full_strongpoint",
+    display_name: "M9C Full Strongpoint",
+    description: "M9C full-strongpoint determinism gate per specs/active/M9C.md 'Determinism across full M9C strongpoint scenario' (VAL-M9C-050). Cross-area integration with M9B via the `forward_outpost_with_mgnest` trench template — the strongpoint embeds M9B variant ids `communication` / `fire_step` / `parapet_raised` + M9C fortifications `mg_nest_static` / `sandbag_mid` / `ammo_box_mg`. Drives VAL-CROSS-005 (M9B trench segments load post-M9C) + VAL-CROSS-006 (cross-spec event-kind determinism over 3600 ticks).",
+    seed: 42,
+    duration_ticks: Some(3600),
+    region: (anchor: (0.0, 0.0), width: 1280.0, height: 720.0),
+    gravity: -980.0,
+    floor_y: 16.0,
+    teams: [],
+    actors: [
+        (id: 1, team: "blue", spawn: (200.0, 32.0), controllable: true, hp: 100.0,
+            inventory: (rifle: Some("rifle_m1_default")), half_extents: Some((8.0, 16.0))),
+        (id: 2, team: "blue", spawn: (240.0, 32.0), controllable: false, hp: 100.0,
+            inventory: (rifle: Some("rifle_m1_default")), half_extents: Some((8.0, 16.0))),
+        (id: 3, team: "blue", spawn: (280.0, 32.0), controllable: false, hp: 100.0,
+            inventory: (rifle: Some("rifle_m1_default")), half_extents: Some((8.0, 16.0))),
+        (id: 4, team: "red", spawn: (1080.0, 32.0), controllable: false, hp: 80.0,
+            inventory: (rifle: None), aim: Some((-1.0, 0.0)),
+            half_extents: Some((8.0, 16.0))),
+        (id: 5, team: "red", spawn: (1120.0, 32.0), controllable: false, hp: 80.0,
+            inventory: (rifle: None), aim: Some((-1.0, 0.0)),
+            half_extents: Some((8.0, 16.0))),
+    ],
+    terrain: Some((
+        width_px: 1280,
+        height_px: 720,
+        default_material: "air",
+        stamps: [
+            (kind: "fill_aabb", min: (0.0, 0.0), max: (1280.0, 16.0), material: "concrete"),
+            (kind: "fill_aabb", min: (160.0, 16.0), max: (1120.0, 128.0), material: "dirt"),
+        ],
+    )),
+    objectives: [],
+    director: None,
+    capabilities: (debug: false, control_api: true, save_load: false),
+    save_fields: [],
+    expected_tests: ["M9C-050", "CROSS-005", "CROSS-006", "CROSS-NEW-014"],
+    notes: "M9C full strongpoint references M9B trench segment variants: communication, fire_step, parapet_raised — instantiated by the integration test via cfctl act.player.drop_trench_template { id: 'forward_outpost_with_mgnest', origin: (50, 30) }. The dropped template carries M9C fortification placeholders (mg_nest_static, ammo_box_mg, sandbag_mid) that resolve post-M9C (resolved_fortifications_for_build returns 23 ids). Seed=42 anchors the determinism gate.",
+    scenario_tags: ["m9c", "fortification", "trench", "strongpoint", "determinism", "m9b_segments_via_forward_outpost_with_mgnest"],
+)
