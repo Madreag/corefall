@@ -89,11 +89,10 @@ mod tests {
             TrenchModule::Revetment => "revetment",
             TrenchModule::CornerTraverse => "corner_traverse",
         };
-        let rel = format!("../../content/trench_modules/{}.ron", path);
-        let bytes = std::fs::read_to_string(&rel)
-            .unwrap_or_else(|e| panic!("read {}: {}", rel, e));
-        ModuleSpec::from_ron_str(&bytes)
-            .unwrap_or_else(|e| panic!("parse {}: {}", rel, e))
+        let rel = format!("../../content/trench_modules/{path}.ron");
+        let bytes =
+            std::fs::read_to_string(&rel).unwrap_or_else(|e| panic!("read {rel}: {e}"));
+        ModuleSpec::from_ron_str(&bytes).unwrap_or_else(|e| panic!("parse {rel}: {e}"))
     }
 
     #[test]
@@ -153,7 +152,7 @@ mod tests {
             let serialized =
                 ron::ser::to_string_pretty(&m, ron::ser::PrettyConfig::default()).expect("ser");
             let parsed = ModuleSpec::from_ron_str(&serialized).expect("reparse");
-            assert_eq!(m, parsed, "module round-trip diverged for {:?}", module);
+            assert_eq!(m, parsed, "module round-trip diverged for {module:?}");
         }
     }
 

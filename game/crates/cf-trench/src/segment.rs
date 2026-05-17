@@ -202,14 +202,12 @@ mod tests {
     use crate::modules::TrenchModule;
 
     fn load(variant: SegmentVariant) -> SegmentSpec {
-        let rel = format!(
-            "../../content/trench_segments/{}.ron",
-            variant.as_str()
-        );
+        let name = variant.as_str();
+        let rel = format!("../../content/trench_segments/{name}.ron");
         let bytes = std::fs::read_to_string(&rel)
-            .unwrap_or_else(|e| panic!("read {}: {}", rel, e));
+            .unwrap_or_else(|e| panic!("read {rel}: {e}"));
         SegmentSpec::from_ron_str(&bytes)
-            .unwrap_or_else(|e| panic!("parse {}: {}", rel, e))
+            .unwrap_or_else(|e| panic!("parse {rel}: {e}"))
     }
 
     #[test]
@@ -291,7 +289,7 @@ mod tests {
             let serialized = ron::ser::to_string_pretty(&s, ron::ser::PrettyConfig::default())
                 .expect("serialize spec");
             let parsed = SegmentSpec::from_ron_str(&serialized).expect("re-parse spec");
-            assert_eq!(s, parsed, "round-trip diverged for {:?}", v);
+            assert_eq!(s, parsed, "round-trip diverged for {v:?}");
         }
     }
 

@@ -237,8 +237,7 @@ mod tests {
             let got = cover_state(*stance, *variant);
             assert_eq!(
                 got, *want,
-                "({:?}, {:?}) expected {:?} got {:?}",
-                stance, variant, want, got
+                "({stance:?}, {variant:?}) expected {want:?} got {got:?}"
             );
         }
     }

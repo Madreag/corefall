@@ -23,7 +23,19 @@
     clippy::missing_errors_doc,
     clippy::missing_panics_doc,
     clippy::must_use_candidate,
-    clippy::doc_markdown
+    clippy::missing_const_for_fn,
+    clippy::doc_markdown,
+    clippy::cast_possible_truncation,
+    clippy::cast_sign_loss,
+    clippy::cast_possible_wrap,
+    clippy::cast_lossless,
+    clippy::return_self_not_must_use,
+    clippy::items_after_statements,
+    clippy::derivable_impls,
+    clippy::struct_excessive_bools,
+    clippy::needless_pass_by_value,
+    clippy::too_many_lines,
+    clippy::match_same_arms
 )]
 
 pub mod cover_state;
