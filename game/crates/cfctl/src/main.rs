@@ -502,6 +502,40 @@ enum ReplayAction {
     },
     /// Validate a bundle. `cfctl replay validate <bundle>`.
     Validate { bundle_dir: PathBuf },
+    /// **M10B § VAL-M10B-035**: export the bundle to an MP4 via the
+    /// `cf-tools-replay-viewer export` pipeline.
+    Export {
+        bundle_dir: Option<PathBuf>,
+        #[arg(long, default_value_t = false)]
+        list_presets: bool,
+        #[arg(long)]
+        preset: Option<String>,
+        #[arg(long)]
+        out: Option<PathBuf>,
+        #[arg(long)]
+        presets_dir: Option<PathBuf>,
+        /// **VAL-M10B-NO-AUDIO-BASE**: mute the base SFX + music
+        /// mix; commentary remains audible.
+        #[arg(long, default_value_t = false)]
+        no_audio_base: bool,
+        /// **VAL-M10B-SLOW-MO**: integer multiplier (`2x` / `4x`) —
+        /// non-integer values rejected with a typed error.
+        #[arg(long)]
+        slow_mo: Option<String>,
+    },
+    /// **M10B § VAL-M10B-035**: open the egui editor for a bundle.
+    /// Headless mode (TTY-less invocations / `--headless`) prints a
+    /// structured envelope to stdout and exits with the documented
+    /// `74` code.
+    Edit {
+        bundle_dir: PathBuf,
+        #[arg(long, default_value_t = false)]
+        headless: bool,
+        #[arg(long)]
+        camera_script: Option<PathBuf>,
+        #[arg(long)]
+        scrub_to_tick: Option<u64>,
+    },
 }
 
 /// Parser for `--key-binding action=KeyName` flags on `cfctl act settings-set`.
@@ -953,9 +987,66 @@ fn cmd_replay(action: ReplayAction) -> Result<()> {
         ReplayAction::Validate { bundle_dir } => {
             cmd.arg("validate").arg(&bundle_dir);
         }
+        ReplayAction::Export {
+            bundle_dir,
+            list_presets,
+            preset,
+            out,
+            presets_dir,
+            no_audio_base,
+            slow_mo,
+        } => {
+            cmd.arg("export");
+            if let Some(b) = &bundle_dir {
+                cmd.arg(b);
+            }
+            if list_presets {
+                cmd.arg("--list-presets");
+            }
+            if let Some(p) = &preset {
+                cmd.arg("--preset").arg(p);
+            }
+            if let Some(o) = &out {
+                cmd.arg("--out").arg(o);
+            }
+            if let Some(pd) = &presets_dir {
+                cmd.arg("--presets-dir").arg(pd);
+            }
+            if no_audio_base {
+                cmd.arg("--no-audio-base");
+            }
+            if let Some(s) = &slow_mo {
+                cmd.arg("--slow-mo").arg(s);
+            }
+        }
+        ReplayAction::Edit {
+            bundle_dir,
+            headless,
+            camera_script,
+            scrub_to_tick,
+        } => {
+            cmd.arg("edit").arg(&bundle_dir);
+            if headless {
+                cmd.arg("--headless");
+            }
+            if let Some(cs) = &camera_script {
+                cmd.arg("--camera-script").arg(cs);
+            }
+            if let Some(t) = scrub_to_tick {
+                cmd.arg("--scrub-to-tick").arg(t.to_string());
+            }
+        }
     }
     let status = cmd.status().context("spawn cf-tools-replay-viewer")?;
+    // VAL-M10B-035: headless `edit` exits with code 74 — we propagate
+    // that exit code so script harnesses can disambiguate the
+    // editor-unavailable path from other failures. Production CLI
+    // routes any non-zero exit through anyhow's error path so the
+    // process surfaces a non-zero status.
     if !status.success() {
+        if let Some(code) = status.code() {
+            bail!("cf-tools-replay-viewer exited {code}");
+        }
         bail!("cf-tools-replay-viewer exited {status}");
     }
     Ok(())
