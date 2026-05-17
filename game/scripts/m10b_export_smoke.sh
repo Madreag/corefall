@@ -170,18 +170,45 @@ for PRESET in "${PRESETS_TO_RUN[@]}"; do
     continue
   fi
 
-  # Diff against golden metadata captured in the preset RON. The
-  # current export pipeline stubs the libav encode; we assert the
-  # preset RON's declared codec / resolution / fps / container match
-  # the listing returned by --list-presets so the dispatch is
-  # round-trip stable.
-  if command -v ffprobe >/dev/null 2>&1 && [ -s "${OUT_FILE}" ]; then
-    # Real ffprobe path: prefer the codec name + duration assertion when
-    # the encode is non-stub.
-    PROBE=$(ffprobe -v error -of json -show_format -show_streams "${OUT_FILE}" 2>/dev/null || true)
-    if [ -n "${PROBE}" ]; then
-      echo "[m10b-smoke]   ffprobe: $(echo "${PROBE}" | head -c 256)..."
+  # Real-encode verification (GAP-1 fix): the export pipeline now
+  # produces playable mp4 / mkv files via ffmpeg-next. Verify that
+  # ffprobe can decode the container + that the declared codec
+  # matches what the preset RON specifies.
+  if command -v ffprobe >/dev/null 2>&1; then
+    PROBE=$(ffprobe -v error -of json -show_format -show_streams "${OUT_FILE}" 2>"${OUT_DIR}/${PRESET}.ffprobe.err")
+    RC=$?
+    if [ ${RC} -ne 0 ] || [ -z "${PROBE}" ]; then
+      fail=$((fail+1))
+      results+=("${PRESET}: FAIL ffprobe rejected output; stderr=$(cat "${OUT_DIR}/${PRESET}.ffprobe.err")")
+      continue
     fi
+    # Assert at least one video stream is present. The PRESET RON
+    # encodes one of: h264, h265, av1, ffv1. The smoke gate accepts
+    # any of these in the output.
+    HAS_VIDEO=$(echo "${PROBE}" | jq -r '[.streams[]? | select(.codec_type == "video")] | length' 2>/dev/null || echo 0)
+    if [ "${HAS_VIDEO}" = "0" ]; then
+      fail=$((fail+1))
+      results+=("${PRESET}: FAIL ffprobe reported zero video streams in ${OUT_FILE}")
+      continue
+    fi
+    DECLARED_CODEC=$(grep -E "^[[:space:]]*codec:" "${PRESET_RON}" | head -1 | sed -E 's/.*codec:[[:space:]]*([a-z0-9_]+).*/\1/')
+    ACTUAL_CODEC=$(echo "${PROBE}" | jq -r '[.streams[]? | select(.codec_type == "video")][0].codec_name')
+    case "${DECLARED_CODEC}" in
+      h264) EXPECT_NAME="h264" ;;
+      h265) EXPECT_NAME="hevc" ;;
+      av1)  EXPECT_NAME="av1"  ;;
+      ffv1) EXPECT_NAME="ffv1" ;;
+      *)    EXPECT_NAME="${DECLARED_CODEC}" ;;
+    esac
+    if [ "${ACTUAL_CODEC}" != "${EXPECT_NAME}" ]; then
+      fail=$((fail+1))
+      results+=("${PRESET}: FAIL ffprobe codec=${ACTUAL_CODEC} expected=${EXPECT_NAME}")
+      continue
+    fi
+    PROBE_SHORT=$(echo "${PROBE}" | jq -c '{codec: [.streams[]? | select(.codec_type=="video")][0].codec_name, w: [.streams[]? | select(.codec_type=="video")][0].width, h: [.streams[]? | select(.codec_type=="video")][0].height}')
+    echo "[m10b-smoke]   ffprobe: ${PROBE_SHORT}"
+  else
+    echo "[m10b-smoke]   ffprobe unavailable on host; skipping decode verification"
   fi
 
   results+=("${PRESET}: OK bytes=$(wc -c < "${OUT_FILE}") path=${OUT_FILE}")
