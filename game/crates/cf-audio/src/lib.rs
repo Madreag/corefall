@@ -55,7 +55,7 @@ pub use positional::{
     direction_of, distance_attenuation, occlusion_attenuation, source_gain, top_n_by_gain, AudioDirection,
     DIRECTION_HERE_THRESHOLD_M, MAX_SIMULTANEOUS_VOICES,
 };
-pub use registry::{AudioAsset, AudioRegistry};
+pub use registry::{family_members, AudioAsset, AudioRegistry, TRENCH_AUDIO_CUES};
 
 /// Catalogue of M1 audio cues. Tied 1:1 to the event taxonomy in
 /// `cf-replay` so a replay-viewer plugin can pattern-match on the event

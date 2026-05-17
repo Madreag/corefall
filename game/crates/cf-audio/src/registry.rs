@@ -6,12 +6,43 @@
 //!
 //! Lives in `cf-audio` (not in a Bevy adapter crate) because the lookup is
 //! pure data + pure path resolution; no presentation or determinism surface.
+//!
+//! **M9B**: adds a static `family` registry so milestone-owned cue groups
+//! (e.g. `trench`) can be enumerated without re-scanning the ledger.
+//! Spec §"Crates / modules touched": cf-audio gets trench cues
+//! `duckboard_step`, `mud_squelch`, `entrenching_dig`, `drainage_drip`.
 
 use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::{Path, PathBuf};
+
+/// **M9B** § VAL-M9B-AUDIO-001 — four trench audio cues registered in
+/// the audio family. Spec § Crates / modules touched:
+///
+/// > Trench cues: `duckboard_step`, `mud_squelch`, `entrenching_dig`,
+/// > `drainage_drip`.
+///
+/// Surfaced via [`AudioRegistry::family`] under the `"trench"` family
+/// name so closure-feature tests can audit membership without
+/// re-parsing the asset ledger.
+pub const TRENCH_AUDIO_CUES: &[&str] = &[
+    "duckboard_step",
+    "mud_squelch",
+    "entrenching_dig",
+    "drainage_drip",
+];
+
+/// Map a family name to its canonical cue-id list. Returns `&[]` for
+/// unknown family names so the lookup is panic-free.
+#[must_use]
+pub fn family_members(family: &str) -> &'static [&'static str] {
+    match family {
+        "trench" => TRENCH_AUDIO_CUES,
+        _ => &[],
+    }
+}
 
 /// One hydrated ledger row exposed to audio callers.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -148,6 +179,16 @@ impl AudioRegistry {
         (self.voice.len(), self.sfx.len(), self.music.len())
     }
 
+    /// **M9B** § VAL-M9B-AUDIO-001 — return the static cue-id list for
+    /// the named family. Cue ids are owned by [`TRENCH_AUDIO_CUES`] and
+    /// peer constants; the registry only owns the family → static
+    /// list mapping so the ledger never has to know about gameplay
+    /// vocabulary.
+    #[must_use]
+    pub fn family(&self, family: &str) -> &'static [&'static str] {
+        family_members(family)
+    }
+
     /// Iterate over every voice asset (deterministic order).
     pub fn voices(&self) -> impl Iterator<Item = &AudioAsset> {
         self.voice.values()
@@ -217,6 +258,41 @@ mod tests {
         assert_eq!(reg.music_variant_for("music_boss_hollow_king", 0.6).unwrap().canonical_name, "music_boss_hollow_king_climax");
         assert_eq!(reg.music_variant_for("music_boss_hollow_king", 1.0).unwrap().canonical_name, "music_boss_hollow_king_climax");
         assert!(reg.music_variant_for("music_unknown", 0.5).is_none());
+    }
+
+    /// VAL-M9B-AUDIO-001: registry exposes the four trench cues under
+    /// the `trench` family.
+    #[test]
+    fn registry_contains_trench_cues() {
+        let registry = AudioRegistry::default();
+        let family = registry.family("trench");
+        assert_eq!(family.len(), 4, "trench family must contain 4 cues");
+        for required in [
+            "duckboard_step",
+            "mud_squelch",
+            "entrenching_dig",
+            "drainage_drip",
+        ] {
+            assert!(
+                family.iter().any(|s| *s == required),
+                "trench family missing `{required}`"
+            );
+        }
+    }
+
+    /// Alias matching the validation contract evidence string
+    /// `m9b_trench_audio_family`.
+    #[test]
+    fn m9b_trench_audio_family() {
+        registry_contains_trench_cues();
+    }
+
+    /// Unknown families return an empty slice without panicking.
+    #[test]
+    fn unknown_family_returns_empty_slice() {
+        let registry = AudioRegistry::default();
+        assert!(registry.family("nonexistent").is_empty());
+        assert!(family_members("garbage").is_empty());
     }
 
     #[test]
