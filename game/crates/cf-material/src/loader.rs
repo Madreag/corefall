@@ -329,6 +329,11 @@ fn known_material_fields() -> &'static [&'static str] {
         "wetting",
         "reaction_tags",
         "ai_affordances",
+        // M12B § acoustic registry fields (echo + decay + transmission + low-pass).
+        "echo_coefficient",
+        "decay_band",
+        "acoustic_transmission_loss_db",
+        "low_pass_cutoff_hz",
     ]
 }
 

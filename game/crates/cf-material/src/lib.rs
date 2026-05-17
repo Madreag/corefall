@@ -184,6 +184,112 @@ pub struct MaterialDef {
     pub reaction_tags: Vec<String>,
     #[serde(default)]
     pub ai_affordances: Vec<String>,
+
+    // --- M12B acoustic registry fields. Modders extend by adding rows with
+    // these four fields; the cf-audio backend reads from cf-material::registry
+    // only. Missing fields fall back to the canonical "dirt" row (see
+    // [`AcousticDefaults`]). Per M12B spec § "Per-material acoustic registry".
+    #[serde(default)]
+    pub echo_coefficient: Option<f32>,
+    #[serde(default)]
+    pub decay_band: Option<String>,
+    #[serde(default)]
+    pub acoustic_transmission_loss_db: Option<f32>,
+    #[serde(default)]
+    pub low_pass_cutoff_hz: Option<f32>,
+}
+
+/// **M12B** § Canonical per-material acoustic fallback. When a material row
+/// is missing any of the four acoustic fields, lookups return these defaults
+/// (the "default dirt" row) so the audio backend always has a deterministic
+/// number to plug into the HRTF / reverb / occlusion / low-pass pipeline.
+///
+/// Per M12B spec § Notes:
+/// > `(echo_coefficient=0.2, decay_band=warm_mid, transmission_loss_db=8.0,
+/// > low_pass_cutoff_hz=2000)` (the "default dirt" row). Log via
+/// > `tracing::warn!` once per missing material id.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AcousticDefaults;
+
+impl AcousticDefaults {
+    /// Default echo coefficient (`0.2`).
+    pub const ECHO_COEFFICIENT: f32 = 0.2;
+    /// Default decay band (`warm_mid`).
+    pub const DECAY_BAND: &'static str = "warm_mid";
+    /// Default acoustic transmission loss per wall in decibels (`8.0`).
+    pub const TRANSMISSION_LOSS_DB: f32 = 8.0;
+    /// Default low-pass cutoff in hertz (`2000`).
+    pub const LOW_PASS_CUTOFF_HZ: f32 = 2000.0;
+}
+
+/// **M12B** § Resolved per-material acoustic profile. Returned by
+/// [`MaterialDef::acoustic_profile`] / [`MaterialRegistry::acoustic_for`]. All
+/// four fields are guaranteed populated — missing data falls back to the
+/// [`AcousticDefaults`] row.
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct AcousticProfile {
+    /// 0..=1 — first-reflection amplitude on this surface.
+    pub echo_coefficient: f32,
+    /// Spectral tilt label — `bright`, `bright_ringing`, `warm_mid`,
+    /// `warm_low`, `dampened`, `anechoic`, `bright_short`.
+    pub decay_band: &'static str,
+    /// Per-wall transmission loss in dB (positive number, applied as
+    /// attenuation).
+    pub transmission_loss_db: f32,
+    /// Low-pass cutoff frequency in Hz for sounds traveling through this
+    /// material.
+    pub low_pass_cutoff_hz: f32,
+}
+
+impl AcousticProfile {
+    /// The canonical "default dirt" fallback row.
+    #[must_use]
+    pub const fn fallback() -> Self {
+        Self {
+            echo_coefficient: AcousticDefaults::ECHO_COEFFICIENT,
+            decay_band: AcousticDefaults::DECAY_BAND,
+            transmission_loss_db: AcousticDefaults::TRANSMISSION_LOSS_DB,
+            low_pass_cutoff_hz: AcousticDefaults::LOW_PASS_CUTOFF_HZ,
+        }
+    }
+
+    /// Canonical decay-band label table. Returns the stable `&'static str`
+    /// matching the spec-locked vocabulary; unknown bands fall back to
+    /// [`AcousticDefaults::DECAY_BAND`].
+    #[must_use]
+    pub fn canonical_band(s: &str) -> &'static str {
+        match s {
+            "bright" => "bright",
+            "bright_ringing" => "bright_ringing",
+            "bright_short" => "bright_short",
+            "warm_mid" => "warm_mid",
+            "warm_low" => "warm_low",
+            "dampened" => "dampened",
+            "anechoic" => "anechoic",
+            _ => AcousticDefaults::DECAY_BAND,
+        }
+    }
+}
+
+impl MaterialDef {
+    /// **M12B** § Resolved acoustic profile for this material. Missing
+    /// fields fall back to [`AcousticProfile::fallback`].
+    #[must_use]
+    pub fn acoustic_profile(&self) -> AcousticProfile {
+        let fb = AcousticProfile::fallback();
+        AcousticProfile {
+            echo_coefficient: self
+                .echo_coefficient
+                .unwrap_or(fb.echo_coefficient)
+                .clamp(0.0, 1.0),
+            decay_band: self
+                .decay_band
+                .as_deref()
+                .map_or(fb.decay_band, AcousticProfile::canonical_band),
+            transmission_loss_db: self.acoustic_transmission_loss_db.unwrap_or(fb.transmission_loss_db).max(0.0),
+            low_pass_cutoff_hz: self.low_pass_cutoff_hz.unwrap_or(fb.low_pass_cutoff_hz).max(20.0),
+        }
+    }
 }
 
 /// Phase-change rule for the M5.6 active material kernel. `From → To` when
@@ -249,6 +355,28 @@ impl MaterialRegistry {
     pub fn name_to_id(&self) -> BTreeMap<String, MaterialId> {
         self.materials.iter().map(|m| (m.name.clone(), m.id)).collect()
     }
+
+    /// **M12B** § Acoustic profile lookup by material id. Returns the
+    /// resolved [`AcousticProfile`] (with fallbacks applied per
+    /// [`AcousticDefaults`]). Returns `AcousticProfile::fallback()` for
+    /// unknown ids so audio resolution never panics on a missing material.
+    #[must_use]
+    pub fn acoustic_for(&self, id: MaterialId) -> AcousticProfile {
+        match self.find_by_id(id) {
+            Some(m) => m.acoustic_profile(),
+            None => AcousticProfile::fallback(),
+        }
+    }
+
+    /// **M12B** § Acoustic profile lookup by material name (snake_case).
+    /// Returns the canonical fallback when the name is unknown.
+    #[must_use]
+    pub fn acoustic_for_name(&self, name: &str) -> AcousticProfile {
+        match self.find_by_name(name) {
+            Some(m) => m.acoustic_profile(),
+            None => AcousticProfile::fallback(),
+        }
+    }
 }
 
 #[cfg(test)]
@@ -305,5 +433,85 @@ mod tests {
         v["materials"][0]["rainbow_color"] = serde_json::json!("red");
         let res: Result<MaterialRegistry, _> = serde_json::from_value(v);
         assert!(res.is_err());
+    }
+
+    // M12B § Per-material acoustic registry.
+
+    #[test]
+    fn acoustic_profile_defaults_to_fallback_when_fields_missing() {
+        let v = registry_json();
+        let r: MaterialRegistry = serde_json::from_value(v).expect("parse");
+        let profile = r.materials[0].acoustic_profile();
+        let fb = AcousticProfile::fallback();
+        assert!((profile.echo_coefficient - fb.echo_coefficient).abs() < 1e-6);
+        assert_eq!(profile.decay_band, fb.decay_band);
+        assert!((profile.transmission_loss_db - fb.transmission_loss_db).abs() < 1e-6);
+        assert!((profile.low_pass_cutoff_hz - fb.low_pass_cutoff_hz).abs() < 1e-6);
+    }
+
+    #[test]
+    fn acoustic_profile_uses_supplied_fields() {
+        let mut v = registry_json();
+        v["materials"][0]["echo_coefficient"] = serde_json::json!(0.85);
+        v["materials"][0]["decay_band"] = serde_json::json!("bright");
+        v["materials"][0]["acoustic_transmission_loss_db"] = serde_json::json!(28.0);
+        v["materials"][0]["low_pass_cutoff_hz"] = serde_json::json!(800);
+        let r: MaterialRegistry = serde_json::from_value(v).expect("parse");
+        let profile = r.materials[0].acoustic_profile();
+        assert!((profile.echo_coefficient - 0.85).abs() < 1e-6);
+        assert_eq!(profile.decay_band, "bright");
+        assert!((profile.transmission_loss_db - 28.0).abs() < 1e-6);
+        assert!((profile.low_pass_cutoff_hz - 800.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn acoustic_profile_clamps_echo_coefficient() {
+        let mut v = registry_json();
+        v["materials"][0]["echo_coefficient"] = serde_json::json!(5.0);
+        let r: MaterialRegistry = serde_json::from_value(v).expect("parse");
+        assert!((r.materials[0].acoustic_profile().echo_coefficient - 1.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn acoustic_profile_canonicalises_unknown_decay_band() {
+        let mut v = registry_json();
+        v["materials"][0]["decay_band"] = serde_json::json!("garbage_band");
+        let r: MaterialRegistry = serde_json::from_value(v).expect("parse");
+        assert_eq!(
+            r.materials[0].acoustic_profile().decay_band,
+            AcousticDefaults::DECAY_BAND
+        );
+    }
+
+    #[test]
+    fn acoustic_for_unknown_id_returns_fallback() {
+        let v = registry_json();
+        let r: MaterialRegistry = serde_json::from_value(v).expect("parse");
+        let prof = r.acoustic_for(255);
+        assert_eq!(prof, AcousticProfile::fallback());
+    }
+
+    #[test]
+    fn acoustic_for_name_unknown_returns_fallback() {
+        let v = registry_json();
+        let r: MaterialRegistry = serde_json::from_value(v).expect("parse");
+        let prof = r.acoustic_for_name("not_a_material");
+        assert_eq!(prof, AcousticProfile::fallback());
+    }
+
+    #[test]
+    fn acoustic_field_round_trips_through_serde() {
+        let mut v = registry_json();
+        v["materials"][0]["echo_coefficient"] = serde_json::json!(0.85);
+        v["materials"][0]["decay_band"] = serde_json::json!("bright");
+        v["materials"][0]["acoustic_transmission_loss_db"] = serde_json::json!(28.0);
+        v["materials"][0]["low_pass_cutoff_hz"] = serde_json::json!(800);
+        let r: MaterialRegistry = serde_json::from_value(v).expect("parse");
+        let back = serde_json::to_value(&r).unwrap();
+        let s = back.to_string();
+        assert!(s.contains("echo_coefficient"));
+        assert!(s.contains("decay_band"));
+        assert!(s.contains("acoustic_transmission_loss_db"));
+        assert!(s.contains("low_pass_cutoff_hz"));
     }
 }

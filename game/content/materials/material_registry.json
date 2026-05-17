@@ -1,6 +1,6 @@
 {
   "schema_version": 1,
-  "description": "Launch material registry. 8 materials at BP2; DR-036 expands to 17 at M5.6. All 9 DR-007 affordance flags populated explicitly per material (no implicit defaults) — M3 re-open 2026-05-13 fix #8.",
+  "description": "Launch material registry. 8 DR-007 materials at BP2; M12B (2026-05-17) expands to 14 with 6 acoustic-only modder rows + 4 acoustic fields per row. Modders extend by adding rows with the same four fields (`echo_coefficient`, `decay_band`, `acoustic_transmission_loss_db`, `low_pass_cutoff_hz`); cf-audio reads via cf-material::registry::acoustic_for. M5.6 will further expand to 17 per DR-036.",
   "materials": [
     {
       "id": 0,
@@ -19,7 +19,11 @@
       "path_cost": 1.0,
       "density": 0.0,
       "color_hex": "000000",
-      "description": "Empty passable space."
+      "description": "Empty passable space.",
+      "echo_coefficient": 0.0,
+      "decay_band": "anechoic",
+      "acoustic_transmission_loss_db": 0.0,
+      "low_pass_cutoff_hz": 20000
     },
     {
       "id": 1,
@@ -39,7 +43,11 @@
       "density": 1.5,
       "stickiness": 0.05,
       "color_hex": "8B6914",
-      "description": "Default destructible terrain. Digger carves easily; tether anchors."
+      "description": "Default destructible terrain. Digger carves easily; tether anchors.",
+      "echo_coefficient": 0.20,
+      "decay_band": "warm_mid",
+      "acoustic_transmission_loss_db": 8.0,
+      "low_pass_cutoff_hz": 1800
     },
     {
       "id": 2,
@@ -58,7 +66,11 @@
       "path_cost": 1.0,
       "density": 2.3,
       "color_hex": "808080",
-      "description": "Bunker wall. Rifle ineffective; drill/charge required."
+      "description": "Bunker wall. Rifle ineffective; drill/charge required.",
+      "echo_coefficient": 0.85,
+      "decay_band": "bright",
+      "acoustic_transmission_loss_db": 28.0,
+      "low_pass_cutoff_hz": 800
     },
     {
       "id": 3,
@@ -78,7 +90,11 @@
       "density": 7.8,
       "stickiness": 0.70,
       "color_hex": "4A4A4A",
-      "description": "Hard undiggable metal. Tether/anchor refuses with reason label. High stickiness — projectiles stick on failed penetration."
+      "description": "Hard undiggable metal (steel). Tether/anchor refuses with reason label. High stickiness — projectiles stick on failed penetration.",
+      "echo_coefficient": 0.92,
+      "decay_band": "bright_ringing",
+      "acoustic_transmission_loss_db": 32.0,
+      "low_pass_cutoff_hz": 1200
     },
     {
       "id": 4,
@@ -97,7 +113,11 @@
       "path_cost": 10.0,
       "density": 3.0,
       "color_hex": "FF4444",
-      "description": "Damage-on-touch surface. Player must identify before contact."
+      "description": "Damage-on-touch surface. Player must identify before contact.",
+      "echo_coefficient": 0.30,
+      "decay_band": "warm_mid",
+      "acoustic_transmission_loss_db": 6.0,
+      "low_pass_cutoff_hz": 2500
     },
     {
       "id": 5,
@@ -117,7 +137,11 @@
       "density": 1.2,
       "stickiness": 0.10,
       "color_hex": "C8A864",
-      "description": "Soft fill. Movement slowdown; low structural support."
+      "description": "Soft fill. Movement slowdown; low structural support.",
+      "echo_coefficient": 0.10,
+      "decay_band": "anechoic",
+      "acoustic_transmission_loss_db": 5.0,
+      "low_pass_cutoff_hz": 2200
     },
     {
       "id": 6,
@@ -137,7 +161,11 @@
       "density": 0.8,
       "stickiness": 0.20,
       "color_hex": "44FF44",
-      "description": "Player-placed repair material. Creates cover and restores pathability."
+      "description": "Player-placed repair material. Creates cover and restores pathability.",
+      "echo_coefficient": 0.04,
+      "decay_band": "dampened",
+      "acoustic_transmission_loss_db": 8.0,
+      "low_pass_cutoff_hz": 4500
     },
     {
       "id": 7,
@@ -157,7 +185,149 @@
       "density": 2.6,
       "stickiness": 0.50,
       "color_hex": "6B4226",
-      "description": "Hard anchorable surface. Tether attaches; drill/charge can breach."
+      "description": "Hard anchorable surface. Tether attaches; drill/charge can breach.",
+      "echo_coefficient": 0.75,
+      "decay_band": "bright",
+      "acoustic_transmission_loss_db": 22.0,
+      "low_pass_cutoff_hz": 1000
+    },
+    {
+      "id": 8,
+      "name": "wood",
+      "display_name": "Wood",
+      "hardness": 12,
+      "diggable": true,
+      "drillable": true,
+      "blastable": true,
+      "anchorable": true,
+      "beam_cuttable": true,
+      "projectile_passable": false,
+      "actor_passable": false,
+      "blocks_line_of_sight": true,
+      "hazard": false,
+      "path_cost": 1.0,
+      "density": 0.7,
+      "color_hex": "8B5A2B",
+      "description": "M12B acoustic modder row. Warm-mid echo + moderate transmission loss.",
+      "echo_coefficient": 0.55,
+      "decay_band": "warm_mid",
+      "acoustic_transmission_loss_db": 14.0,
+      "low_pass_cutoff_hz": 2500
+    },
+    {
+      "id": 9,
+      "name": "cloth",
+      "display_name": "Cloth / Fabric",
+      "hardness": 1,
+      "diggable": true,
+      "drillable": true,
+      "blastable": true,
+      "anchorable": false,
+      "beam_cuttable": true,
+      "projectile_passable": true,
+      "actor_passable": true,
+      "blocks_line_of_sight": false,
+      "hazard": false,
+      "path_cost": 1.0,
+      "density": 0.3,
+      "color_hex": "C0A080",
+      "description": "M12B acoustic modder row. Dampened anechoic surface; curtains barely attenuate (~3 dB).",
+      "echo_coefficient": 0.08,
+      "decay_band": "dampened",
+      "acoustic_transmission_loss_db": 3.0,
+      "low_pass_cutoff_hz": 4000
+    },
+    {
+      "id": 10,
+      "name": "glass",
+      "display_name": "Glass",
+      "hardness": 8,
+      "diggable": false,
+      "drillable": false,
+      "blastable": true,
+      "anchorable": false,
+      "beam_cuttable": true,
+      "projectile_passable": false,
+      "actor_passable": false,
+      "blocks_line_of_sight": false,
+      "hazard": false,
+      "path_cost": 1.0,
+      "density": 2.5,
+      "color_hex": "B0D8E8",
+      "description": "M12B acoustic modder row. Bright short echo; ~18 dB transmission loss.",
+      "echo_coefficient": 0.70,
+      "decay_band": "bright_short",
+      "acoustic_transmission_loss_db": 18.0,
+      "low_pass_cutoff_hz": 3000
+    },
+    {
+      "id": 11,
+      "name": "cardboard",
+      "display_name": "Cardboard",
+      "hardness": 2,
+      "diggable": true,
+      "drillable": true,
+      "blastable": true,
+      "anchorable": false,
+      "beam_cuttable": true,
+      "projectile_passable": false,
+      "actor_passable": false,
+      "blocks_line_of_sight": true,
+      "hazard": false,
+      "path_cost": 1.0,
+      "density": 0.5,
+      "color_hex": "B07840",
+      "description": "M12B acoustic modder row. Dampened, ~6 dB transmission loss.",
+      "echo_coefficient": 0.18,
+      "decay_band": "dampened",
+      "acoustic_transmission_loss_db": 6.0,
+      "low_pass_cutoff_hz": 3500
+    },
+    {
+      "id": 12,
+      "name": "snow",
+      "display_name": "Snow",
+      "hardness": 1,
+      "diggable": true,
+      "drillable": true,
+      "blastable": true,
+      "anchorable": false,
+      "beam_cuttable": true,
+      "projectile_passable": false,
+      "actor_passable": false,
+      "blocks_line_of_sight": true,
+      "hazard": false,
+      "path_cost": 1.5,
+      "density": 0.4,
+      "color_hex": "F0F0FF",
+      "description": "M12B acoustic modder row. Nearly anechoic; thick blanket dampens.",
+      "echo_coefficient": 0.05,
+      "decay_band": "anechoic",
+      "acoustic_transmission_loss_db": 4.0,
+      "low_pass_cutoff_hz": 2000
+    },
+    {
+      "id": 13,
+      "name": "water",
+      "display_name": "Water",
+      "hardness": 0,
+      "diggable": false,
+      "drillable": false,
+      "blastable": false,
+      "anchorable": false,
+      "beam_cuttable": false,
+      "projectile_passable": true,
+      "actor_passable": true,
+      "blocks_line_of_sight": false,
+      "hazard": false,
+      "path_cost": 2.0,
+      "density": 1.0,
+      "color_hex": "3070C0",
+      "description": "M12B acoustic modder row. Warm-low; underwater listener gets 800 Hz cutoff + 60% volume per spec § Per-environment low-pass.",
+      "echo_coefficient": 0.40,
+      "decay_band": "warm_low",
+      "acoustic_transmission_loss_db": 12.0,
+      "low_pass_cutoff_hz": 1500
     }
   ]
 }

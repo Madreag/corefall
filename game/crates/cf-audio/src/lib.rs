@@ -36,10 +36,16 @@ use tracing::trace;
 pub mod caption_bridge;
 pub mod chatter;
 pub mod deterministic_replay;
+pub mod doppler;
+pub mod echo;
 pub mod loader;
+pub mod medium;
 pub mod mix;
+pub mod occlusion;
 pub mod positional;
 pub mod registry;
+pub mod reverb;
+pub mod spatial;
 
 pub use caption_bridge::{
     caption_visible, render_caption_for_sfx, resolve_template, CaptionRegistry, CaptionSeverity, CaptionTemplate,
@@ -48,14 +54,27 @@ pub use chatter::{
     tts_stub, voice_id_for_archetype, ChatterCaption, ChatterCategory, ChatterCooldownTable, ChatterEmittedEvent,
     EmissionInfo, Phoneme, PLACEHOLDER_PHONEME_MS,
 };
-pub use deterministic_replay::{is_cosmetic_audio_event, AudioPlaybackEvent, AudioReplayQueue};
+pub use deterministic_replay::{
+    is_cosmetic_audio_event, is_cosmetic_audio_event_for, AudioPlaybackEvent, AudioReplayQueue, M12B_COSMETIC_EVENT_TYPES,
+};
+pub use doppler::{clamp_factor, resolve_doppler, DopplerShift, DOPPLER_FACTOR_MAX, DOPPLER_FACTOR_MIN};
+pub use echo::{dominant_band, echo_response_for, weighted_mean_coefficient, DecayBand, EchoResponse};
 pub use loader::{relative_to_repo_root, SfxEntry, SfxPool, MEMORY_BUDGET_BYTES};
+pub use medium::{
+    medium_at_midpoint, Medium, MediumFilter, SPEED_OF_SOUND_AIR_M_PER_S, SPEED_OF_SOUND_AMMONIA_M_PER_S,
+    SPEED_OF_SOUND_VACUUM_M_PER_S, SPEED_OF_SOUND_WATER_M_PER_S,
+};
 pub use mix::{AudioBus, MixBuses, DEFAULT_TARGET_LUFS, LUFS_TOLERANCE, PEAK_DBFS_CEILING};
+pub use occlusion::{resolve_occlusion, walls_between, OcclusionEnvelope, WallAcoustics, MAX_WALLS_PER_RAY};
 pub use positional::{
-    direction_of, distance_attenuation, occlusion_attenuation, source_gain, top_n_by_gain, AudioDirection,
-    DIRECTION_HERE_THRESHOLD_M, MAX_SIMULTANEOUS_VOICES,
+    direction_of, distance_attenuation, occlusion_attenuation, resolve_direction_string, resolve_spatial, source_gain,
+    top_n_by_gain, AudioDirection, DirectionString, HrirIndex, HrirTable, ListenerContext, SourceContext,
+    SpatialEnvelope, AHEAD_BEHIND_CONE_RAD, DIRECTION_HERE_THRESHOLD_M, HRTF_AZIMUTH_BUCKETS, HRTF_EARS,
+    HRTF_ELEVATION_BUCKETS, HRTF_SAMPLES, HRTF_TOTAL_BYTES, HRTF_TOTAL_F32, MAX_SIMULTANEOUS_VOICES,
+    SPATIAL_HERE_RADIUS_M,
 };
 pub use registry::{family_members, AudioAsset, AudioRegistry, TRENCH_AUDIO_CUES};
+pub use reverb::{derive_reverb_profile, fraction_of_walls_open, ReverbProfile, WallComposition};
 
 /// Catalogue of M1 audio cues. Tied 1:1 to the event taxonomy in
 /// `cf-replay` so a replay-viewer plugin can pattern-match on the event

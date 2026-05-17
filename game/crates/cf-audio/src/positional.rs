@@ -19,7 +19,11 @@
 //!   atmospheric density between source + listener.
 //! - Direction indicator (8-way compass) for caption rendering.
 //!
-//! Steam Audio HRTF integration is OUT OF SCOPE (M36A/M48A per spec).
+//! **M12B** extends the surface with [`resolve_spatial`] — the full HRTF +
+//! reverb + occlusion + Doppler + medium-filter resolver. The
+//! M12A-vintage helpers remain in this module for backwards-compat with
+//! the existing recorder events; the M12B helpers re-export from
+//! `cf_audio::spatial`.
 
 use serde::{Deserialize, Serialize};
 
@@ -193,6 +197,19 @@ pub fn top_n_by_gain(gains: &[f32], n: usize) -> Vec<usize> {
 /// Maximum simultaneous voices played by the cf-audio mixer. Lower
 /// values reduce CPU overhead; Steam Deck T-PERF caps at 32.
 pub const MAX_SIMULTANEOUS_VOICES: usize = 32;
+
+/// **M12B** § Spec § Files entry-point.
+///
+/// `positional.rs` is the named entry point per the M12B spec § Files
+/// section ("MODIFY: add `resolve_spatial` entry point"). The actual
+/// implementation lives in [`crate::spatial`]; this re-export keeps the
+/// canonical call site `cf_audio::positional::resolve_spatial`.
+pub use crate::spatial::{
+    direction_string as resolve_direction_string, resolve_spatial, DirectionString, HrirIndex,
+    HrirTable, ListenerContext, SourceContext, SpatialEnvelope, AHEAD_BEHIND_CONE_RAD,
+    HRTF_AZIMUTH_BUCKETS, HRTF_EARS, HRTF_ELEVATION_BUCKETS, HRTF_SAMPLES, HRTF_TOTAL_BYTES,
+    HRTF_TOTAL_F32, SPATIAL_HERE_RADIUS_M,
+};
 
 #[cfg(test)]
 mod tests {

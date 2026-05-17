@@ -139,6 +139,43 @@ pub fn is_cosmetic_audio_event(category: &str) -> bool {
     matches!(category, "audio")
 }
 
+/// **M12B** § Per spec § Notes for the implementer:
+///
+/// > the 4 new replay events MUST register in
+/// > `cf-audio::deterministic_replay::is_cosmetic_audio_event`. Treating
+/// > spatial resolution as non-cosmetic would mean the replay verifier
+/// > compares audio output, which we explicitly DO NOT want.
+///
+/// The audio-event registry of M12B-cosmetic event types is enumerated
+/// here so the test suite + replay verifier can pattern-match on the
+/// exact set instead of approximating with a `category == "audio"`
+/// match.
+pub const M12B_COSMETIC_EVENT_TYPES: &[&str] = &[
+    "spatial_resolved",
+    "reverb_applied",
+    "occluded",
+    "doppler_shifted",
+];
+
+/// **M12B** § Two-argument cosmetic-event classifier. Returns `true` for
+/// the existing `audio.event_played` event AND each of the 4 new M12B
+/// replay event types so they're always excluded from the determinism
+/// checksum.
+#[must_use]
+pub fn is_cosmetic_audio_event_for(category: &str, event_type: &str) -> bool {
+    if is_cosmetic_audio_event(category) {
+        return true;
+    }
+    matches!(
+        (category, event_type),
+        ("audio", "spatial_resolved")
+            | ("audio", "reverb_applied")
+            | ("audio", "occluded")
+            | ("audio", "doppler_shifted")
+            | ("audio", "event_played")
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -198,6 +235,23 @@ mod tests {
         assert!(is_cosmetic_audio_event("audio"));
         assert!(!is_cosmetic_audio_event("combat"));
         assert!(!is_cosmetic_audio_event("terrain"));
+    }
+
+    #[test]
+    fn m12b_cosmetic_event_types_includes_four_new_events() {
+        for et in ["spatial_resolved", "reverb_applied", "occluded", "doppler_shifted"] {
+            assert!(M12B_COSMETIC_EVENT_TYPES.contains(&et), "missing {et}");
+        }
+    }
+
+    #[test]
+    fn is_cosmetic_audio_event_for_classifies_m12b_events() {
+        for et in M12B_COSMETIC_EVENT_TYPES {
+            assert!(is_cosmetic_audio_event_for("audio", et), "missed audio.{et}");
+        }
+        assert!(is_cosmetic_audio_event_for("audio", "event_played"));
+        assert!(!is_cosmetic_audio_event_for("combat", "spatial_resolved"));
+        assert!(!is_cosmetic_audio_event_for("terrain", "occluded"));
     }
 
     #[test]
