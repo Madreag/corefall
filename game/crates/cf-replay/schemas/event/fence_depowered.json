@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/fence_depowered.v1",
+  "title": "fortification.fence_depowered",
+  "description": "M9C: an electrified fence transitioned from powered to depowered (M29 grid power loss / breaker toggled to open / coupling destroyed). Once depowered the fence collapses to the barbed_wire damage profile (1 dmg/tick, no shock) until reenergized. Non-cosmetic.",
+  "type": "object",
+  "required": ["fence_id", "cause", "tick_index"],
+  "properties": {
+    "fence_id": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cause": {
+      "type": "string",
+      "enum": ["breaker_toggled", "coupling_destroyed", "grid_failure"]
+    },
+    "tick_index": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cosmetic": {
+      "type": "boolean",
+      "const": false,
+      "default": false
+    }
+  },
+  "additionalProperties": true
+}

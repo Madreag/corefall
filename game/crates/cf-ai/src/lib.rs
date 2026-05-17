@@ -137,6 +137,11 @@ pub mod observer_doctrine;
 // minefields in the squad's path. Spec § "Notes for the implementer".
 pub mod engineer_doctrine;
 
+// **M9C**: AI-AT-A-04 doctrine — anti-tank obstacle approach
+// decisions. Detour > 30 tiles around AT ditch unless suspension HP
+// > 70% (plow); always detour around dragon's teeth.
+pub mod anti_tank_doctrine;
+
 // **M7B**: deep squad command grammar + formation orders + commander hop
 // + per-archetype BT. Spec § "the squad obeys real grammar — formation
 // orders, combat verbs, breach-stack discipline — and the player can take
@@ -200,6 +205,12 @@ pub use engineer_doctrine::{
     EngineerDoctrineInputs, EnemyMineObservation, PerimeterSite,
     DOCTRINE_ID as ENGINEER_DOCTRINE_ID, ENGINEER_DOCTRINE_BREACH_HP_THRESHOLD,
     ENGINEER_DOCTRINE_LAY_MINE_FORWARD_TILES,
+};
+pub use anti_tank_doctrine::{
+    decide as anti_tank_doctrine_decide, AntiTankDoctrineDecision, AntiTankDoctrineInputs,
+    DetourReason, ObservedObstacle, ANTI_TANK_DOCTRINE_DETOUR_THRESHOLD_TILES,
+    ANTI_TANK_DOCTRINE_PLOW_SUSPENSION_THRESHOLD_PERCENT,
+    DOCTRINE_ID as ANTI_TANK_DOCTRINE_ID,
 };
 pub use thinking_stack::{
     format_task_camel, AiTickOutput, Layer, LayerKind, LayerOutput, ThinkingContext, ThinkingStack,
