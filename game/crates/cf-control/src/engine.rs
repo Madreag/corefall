@@ -1571,6 +1571,46 @@ impl M0Engine {
         }
     }
 
+    /// **M12B** § Wrapper around [`emit_audio_cue`] that ALSO fires the
+    /// 4 cosmetic spatial-resolve events for an actor-attached cue. Used
+    /// at audio-emit sites where the source actor is known (weapon fire,
+    /// reload, body hit, status change, item drop / settle). The source
+    /// position + velocity are looked up via the actor world.
+    ///
+    /// Per spec § Acceptance, every positional SFX must produce the 4
+    /// cosmetic spatial-resolve events so the replay verifier sees the
+    /// full envelope per cue.
+    fn emit_audio_cue_for_actor(
+        &self,
+        cue: cf_audio::AudioCue,
+        tick: cf_sim_core::Tick,
+        sim_time_ms: f64,
+        actor: cf_actor::ActorId,
+    ) {
+        let cue_tag = cue.stub_tag().to_string();
+        self.emit_audio_cue(cue, tick);
+        let (position, velocity) = self
+            .state
+            .read()
+            .ok()
+            .and_then(|s| s.actor_state.as_ref().and_then(|sim| sim.world.actors.get(&actor)).map(|a| {
+                ([a.position.x, a.position.y], [a.velocity.x, a.velocity.y])
+            }))
+            .unwrap_or(([0.0, 0.0], [0.0, 0.0]));
+        let cue_name = format!("{cue_tag}.{}", actor.0);
+        self.emit_m12b_spatial_resolve(
+            tick,
+            sim_time_ms,
+            &cue_name,
+            position,
+            velocity,
+            cf_audio::Medium::Air,
+            &[],
+            cf_audio::ReverbProfile::open_outdoor(),
+            None,
+        );
+    }
+
     /// **M12B** § Per-tick spatial resolve pass.
     ///
     /// Per spec § Crates / modules touched:
@@ -1578,11 +1618,12 @@ impl M0Engine {
     /// `resolve_spatial` → emit `audio.spatial_resolved` cosmetic event."
     ///
     /// Given a `(source_position, source_velocity, cue_name)` tuple, compute
-    /// the `SpatialEnvelope` using the current player actor as the listener
-    /// + `Medium::Air` + open-outdoor reverb (M12B baseline; the M19 room
-    /// kernel will inject the actual reverb profile when the kernel exposes
-    /// per-tile room ids). Emits 4 cosmetic events: `audio.spatial_resolved`,
-    /// `audio.reverb_applied`, `audio.occluded`, `audio.doppler_shifted`.
+    /// the `SpatialEnvelope` using the current player actor as the
+    /// listener + `Medium::Air` + open-outdoor reverb (M12B baseline; the
+    /// M19 room kernel injects the actual reverb profile when the kernel
+    /// exposes per-tile room ids). Emits 4 cosmetic events:
+    /// `audio.spatial_resolved`, `audio.reverb_applied`,
+    /// `audio.occluded`, `audio.doppler_shifted`.
     ///
     /// `walls` is the ordered list of [`cf_audio::WallAcoustics`] between
     /// source and listener — typically empty for the M12B integration
@@ -1703,6 +1744,57 @@ impl M0Engine {
             }),
             None,
         );
+    }
+
+    /// **M12B** § Per-tick projectile audio emission. For every live
+    /// projectile in `sim.projectiles`, emits the 4 cosmetic spatial-
+    /// resolve events (`audio.spatial_resolved`, `audio.reverb_applied`,
+    /// `audio.occluded`, `audio.doppler_shifted`) so the supersonic
+    /// projectile flyby acceptance scenario fires once per tick.
+    ///
+    /// Per spec § Acceptance "Doppler shift on supersonic projectile
+    /// flyby":
+    ///
+    /// > audio.doppler_shifted fires per tick with the resolved
+    /// > doppler_factor And as the projectile approaches:
+    /// > doppler_factor ≈ (343 + 0) / (343 - 800) — clipped to a safe
+    /// > positive minimum And as the projectile recedes:
+    /// > doppler_factor ≈ (343 + 0) / (343 + 800) ≈ 0.30 (lower pitch)
+    ///
+    /// All emitted events are cosmetic per
+    /// `cf_audio::is_cosmetic_audio_event_for`, so the determinism
+    /// checksum doesn't include them.
+    fn emit_m12b_per_tick_projectile_audio(&self, tick: cf_sim_core::Tick, sim_time_ms: f64) {
+        let projectile_snapshot: Vec<(u64, [f32; 2], [f32; 2])> = match self.state.read() {
+            Ok(s) => match s.actor_state.as_ref() {
+                Some(sim) => sim
+                    .projectiles
+                    .iter()
+                    .map(|p| (p.id, [p.position.x, p.position.y], [p.velocity.x, p.velocity.y]))
+                    .collect(),
+                None => Vec::new(),
+            },
+            Err(_) => Vec::new(),
+        };
+        if projectile_snapshot.is_empty() {
+            return;
+        }
+        for (id, position, velocity) in projectile_snapshot {
+            let cue_name = format!("projectile_fly.{id}");
+            self.emit_m12b_spatial_resolve(
+                tick,
+                sim_time_ms,
+                &cue_name,
+                position,
+                velocity,
+                // Default to air medium; M19F will inject the
+                // per-position medium via `cf_atmos::medium_at(pos)`.
+                cf_audio::Medium::Air,
+                &[],
+                cf_audio::ReverbProfile::open_outdoor(),
+                None,
+            );
+        }
     }
 
     /// **M12B** § Resolve the listener's `(position, velocity, facing_rad)`
@@ -4049,6 +4141,13 @@ impl M0Engine {
             // and the right damage (for Charge).
             self.post_process_m6_fire_modes(&mut report);
             self.emit_actor_events(tick, sim_time_ms, &intent, &report);
+            // **M12B** § Per-tick doppler emission for in-flight
+            // projectiles. Spec § "Doppler shift on supersonic projectile
+            // flyby": "audio.doppler_shifted fires per tick with the
+            // resolved doppler_factor". Iterates `sim.projectiles` and
+            // emits the 4 cosmetic spatial-resolve events for each live
+            // projectile.
+            self.emit_m12b_per_tick_projectile_audio(tick, sim_time_ms);
             // **M7-A fix-round-2 (audit gaps A8-A11)**: dispatch
             // auto-triage / auto-repair missions on fresh DYING +
             // chassis-module-degraded transitions, and emit
@@ -7839,13 +7938,18 @@ impl M0Engine {
                 // M1 audit pass 6 (2026-05-13): emit BodyHit audio cue when
                 // a travel-impulse triggered the status change (per spec
                 // "And a body-hit sound event is emitted").
+                // M12B: route through emit_audio_cue_for_actor so the 4
+                // cosmetic spatial-resolve events fire for the body-hit
+                // cue's source position.
                 if outcome.travel_impulse_damage {
-                    self.emit_audio_cue(
+                    self.emit_audio_cue_for_actor(
                         cf_audio::AudioCue::BodyHit {
                             zone: "torso".to_string(),
                             caption: format!("actor {} took travel impulse", outcome.actor.0),
                         },
                         tick,
+                        sim_time_ms,
+                        outcome.actor,
                     );
                 }
             }
@@ -8016,12 +8120,17 @@ impl M0Engine {
                 if let Ok(mut s) = self.state.write() {
                     s.reload_started_event_id_by_actor.insert(outcome.actor, started_id);
                 }
-                self.emit_audio_cue(
+                // M12B: route reload-started through emit_audio_cue_for_actor
+                // so the 4 cosmetic spatial-resolve events fire for the
+                // reloading actor's position.
+                self.emit_audio_cue_for_actor(
                     cf_audio::AudioCue::ReloadStarted {
                         equipment_id: cf_equipment::RIFLE_M1_DEFAULT_ID.to_string(),
                         caption: format!("actor {} reloading", outcome.actor.0),
                     },
                     tick,
+                    sim_time_ms,
+                    outcome.actor,
                 );
             }
             if outcome.reload_completed {
@@ -8063,12 +8172,15 @@ impl M0Engine {
                 if let Ok(mut s) = self.state.write() {
                     s.reload_started_event_id_by_actor.remove(&outcome.actor);
                 }
-                self.emit_audio_cue(
+                // M12B: route reload-completed through the spatial helper.
+                self.emit_audio_cue_for_actor(
                     cf_audio::AudioCue::ReloadCompleted {
                         equipment_id: cf_equipment::RIFLE_M1_DEFAULT_ID.to_string(),
                         caption: format!("actor {} reload complete", outcome.actor.0),
                     },
                     tick,
+                    sim_time_ms,
+                    outcome.actor,
                 );
             }
             if outcome.fire_denied_reloading {
@@ -8437,12 +8549,17 @@ impl M0Engine {
                                 sim.spawn_loose_item(label.clone(), pos, vel, dropped_event_id);
                             }
                         }
-                        self.emit_audio_cue(
+                        // M12B: route inventory-drop through emit_audio_cue_for_actor
+                        // so the 4 cosmetic spatial-resolve events fire at the
+                        // dropping actor's position.
+                        self.emit_audio_cue_for_actor(
                             cf_audio::AudioCue::InventoryDropped {
                                 item_label: label.clone(),
                                 caption: format!("{label} dropped"),
                             },
                             tick,
+                            sim_time_ms,
+                            outcome.actor,
                         );
                     }
                 }
@@ -8710,12 +8827,16 @@ impl M0Engine {
                 }),
                 Some(projectile_hit_event_id.clone()),
             );
-            self.emit_audio_cue(
+            // M12B: route body-hit through the spatial-resolve helper so
+            // the 4 cosmetic events fire for the victim's position.
+            self.emit_audio_cue_for_actor(
                 cf_audio::AudioCue::BodyHit {
                     zone: hit.zone.clone(),
                     caption: format!("body hit ({})", hit.zone),
                 },
                 tick,
+                sim_time_ms,
+                hit.target,
             );
             if hit.previous_status != hit.new_status {
                 self.recorder.record(
@@ -9415,12 +9536,26 @@ impl M0Engine {
                 }),
                 Some(settled.source_event_id.clone()),
             );
+            // M12B: inventory_settled is positional but the source is the
+            // loose item (not an actor); call the spatial-resolve helper
+            // directly with the item's rest position.
             self.emit_audio_cue(
                 cf_audio::AudioCue::InventorySettled {
                     item_label: settled.item_label.clone(),
                     caption: format!("{} settled", settled.item_label),
                 },
                 tick,
+            );
+            self.emit_m12b_spatial_resolve(
+                tick,
+                sim_time_ms,
+                &format!("inventory_settled.{}", settled.id),
+                [settled.position.x, settled.position.y],
+                [0.0, 0.0],
+                cf_audio::Medium::Air,
+                &[],
+                cf_audio::ReverbProfile::open_outdoor(),
+                None,
             );
         }
     }
@@ -12123,6 +12258,12 @@ impl M0Engine {
             surface: &'static str,
             loudness: f32,
             band: &'static str,
+            /// **M12B** § Source world position. Used by the spatial
+            /// resolve pass to emit `audio.spatial_resolved` etc. for
+            /// each footstep cue.
+            position: [f32; 2],
+            /// **M12B** § Source velocity (m/s).
+            velocity: [f32; 2],
         }
         struct OcclusionEmit {
             actor: u64,
@@ -12138,7 +12279,9 @@ impl M0Engine {
         };
 
         // Footstep emission — actors moving horizontally on a surface.
-        let actor_movement: Vec<(ActorId, cf_actor::Vec2, f32, bool, bool)> = state
+        // **M12B**: snapshot full velocity (not just speed) so the
+        // spatial-resolve pass can emit a moving-source doppler factor.
+        let actor_movement: Vec<(ActorId, cf_actor::Vec2, cf_actor::Vec2, f32, bool, bool)> = state
             .actor_state
             .as_ref()
             .map(|sim| {
@@ -12149,6 +12292,7 @@ impl M0Engine {
                         (
                             *id,
                             cf_actor::Vec2::new(a.position.x, a.position.y + a.half_extents.y),
+                            a.velocity,
                             a.velocity.x.abs(),
                             a.sprint_active,
                             a.on_ground,
@@ -12158,7 +12302,7 @@ impl M0Engine {
             })
             .unwrap_or_default();
 
-        for (actor_id, feet_pos, speed, sprinting, on_ground) in actor_movement {
+        for (actor_id, feet_pos, velocity, speed, sprinting, on_ground) in actor_movement {
             if !on_ground || speed < cf_actor::Stance::WALK_THRESHOLD {
                 state.m6_footstep_cooldown.insert(actor_id, 0);
                 continue;
@@ -12197,6 +12341,8 @@ impl M0Engine {
                 surface: surface_kind.as_str(),
                 loudness,
                 band,
+                position: [feet_pos.x, feet_pos.y],
+                velocity: [velocity.x, velocity.y],
             });
         }
 
@@ -12265,6 +12411,22 @@ impl M0Engine {
                     "loudness": emit.loudness,
                     "band": emit.band,
                 }),
+                None,
+            );
+            // **M12B** § Per-footstep spatial-resolve emission. Spec
+            // acceptance "Player locates an unseen footstep by ear within
+            // 15 degrees": `audio.spatial_resolved` fires with azimuth +
+            // distance + hrir_index when the footstep SFX fires.
+            let cue_name = format!("footstep.{}", emit.actor);
+            self.emit_m12b_spatial_resolve(
+                tick,
+                sim_time_ms,
+                &cue_name,
+                emit.position,
+                emit.velocity,
+                cf_audio::Medium::Air,
+                &[],
+                cf_audio::ReverbProfile::open_outdoor(),
                 None,
             );
         }
