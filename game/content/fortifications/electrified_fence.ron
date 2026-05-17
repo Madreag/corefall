@@ -1,0 +1,21 @@
+// M9C fortification — electrified_fence. Spec §"Barbed wire + razor
+// wire + electrified fence" table row 3. HP 400; powered fence deals
+// 80 J shock damage + knockback 4 tiles; depowered acts as barbed_wire.
+// Cut while powered = electrocution; must depower first.
+(
+    kind: electrified_fence,
+    hp: 400,
+    footprint_tiles: (3, 1),
+    build_time_seconds: 8,
+    material_cost: {
+        "iron": 6,
+        "wire": 2,
+        "insulator": 1,
+        "power_coupling": 1,
+    },
+    provides: "Powered: 80 J shock + cannot cross; depowered acts as barbed_wire",
+    wire_kind: Some(electrified_fence),
+    damage_per_tick: Some(1),
+    speed_multiplier_on_cross: Some(0.25),
+    depends_on: ["m29_power_grid"],
+)

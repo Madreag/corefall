@@ -1,0 +1,15 @@
+// M9C fortification — watchtower_t2. Spec §"Watchtower (3 height
+// tiers) + spotlight + observation post" table row 2. 32 px tall; 4×4
+// base; HP 1200; +3 LOS tiles; rooftop mount slot for MG/sniper.
+(
+    kind: watchtower_t2,
+    hp: 1200,
+    footprint_tiles: (4, 4),
+    build_time_seconds: 150,
+    material_cost: {
+        "iron": 80,
+        "steel": 20,
+        "wood": 8,
+    },
+    provides: "+3 LOS tiles; cover against ground fire; rooftop mount slot (MG / sniper)",
+)

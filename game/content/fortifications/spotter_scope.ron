@@ -1,0 +1,15 @@
+// M9C fortification — spotter_scope. Spec §"MG nest module + ammo box
+// + tripod variant" table row 4. 1×1 footprint, HP 100, +50% target
+// acquisition range to adjacent crewed MG / sniper position.
+(
+    kind: spotter_scope,
+    hp: 100,
+    footprint_tiles: (1, 1),
+    build_time_seconds: 12,
+    material_cost: {
+        "glass": 2,
+        "iron": 4,
+        "electronics": 1,
+    },
+    provides: "Adds +50% target acquisition range to adjacent crewed MG / sniper position",
+)

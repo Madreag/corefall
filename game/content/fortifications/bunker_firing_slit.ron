@@ -1,0 +1,16 @@
+// M9C fortification — bunker_firing_slit. Spec §"MG nest module + ammo
+// box + tripod variant" table row 5. 2×1 footprint embedded in M28F
+// bunker template; HP 1600; defender inside has Full cover; only the
+// 8 px slit aperture passes incoming rounds.
+(
+    kind: bunker_firing_slit,
+    hp: 1600,
+    footprint_tiles: (2, 1),
+    build_time_seconds: 90,
+    material_cost: {
+        "concrete": 40,
+        "heavy_mg_7_62mm": 1,
+    },
+    provides: "Concrete-embedded slit; defender inside has Full cover; rounds blocked except via 8 px aperture",
+    depends_on: ["bunker_template:m28f_t2"],
+)

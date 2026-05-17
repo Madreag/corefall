@@ -58,19 +58,24 @@ pub mod common;
 pub mod mg_nest;
 pub mod minefield;
 pub mod sandbag;
+pub mod spec;
 pub mod watchtower;
 pub mod wire;
 
+pub use anti_tank::AntiTankKind;
 pub use camo::{
-    camo_concealed, CamoBypassReason, CamoConcealmentInputs, CamoNetting,
-    BYPASS_RANGE_TILES, CAMO_NETTING_HP, CAMO_NETTING_TILE_FOOTPRINT,
+    camo_concealed, CamoBypassReason, CamoConcealment, CamoConcealmentInputs,
+    CamoNetting, BYPASS_RANGE_TILES, CAMO_NETTING_HP, CAMO_NETTING_TILE_FOOTPRINT,
 };
 pub use common::{
-    FortificationFaction, FortificationId, FortificationKind, FortId,
+    FortId, FortificationFaction, FortificationId, FortificationKind,
 };
+pub use minefield::MineKind;
 pub use sandbag::{
     apply_damage_to_wall, sandbag_eroded_events, sandbag_pixel_mask,
     sandbag_tier_for_hp, SandbagErodedEvent, SandbagPixelMask, SandbagTier,
     SandbagWall, SandbagWallSpec, SANDBAG_HIGH_MAX_HP, SANDBAG_LOW_MAX_HP,
     SANDBAG_MID_MAX_HP,
 };
+pub use spec::{FortCoverLevel, FortificationSpec, SandbagCoverByStance};
+pub use wire::WireKind;

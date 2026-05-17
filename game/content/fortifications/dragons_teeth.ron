@@ -1,0 +1,16 @@
+// M9C fortification — dragons_teeth. Spec §"Anti-tank ditch + dragon's
+// teeth + tank trap" table row 2. 1×1 per tooth (placed in 3-row
+// staggered pattern); HP 1200 per tooth. Light: full stop on contact;
+// heavy: stops + per-component suspension damage. Infantry: walks
+// through gaps freely.
+(
+    kind: dragons_teeth,
+    hp: 1200,
+    footprint_tiles: (1, 1),
+    build_time_seconds: 90,
+    material_cost: {
+        "concrete": 40,
+    },
+    provides: "Concrete pyramid; vehicles physically blocked; infantry walks through gaps",
+    anti_tank_kind: Some(dragons_teeth),
+)

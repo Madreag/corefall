@@ -1,0 +1,19 @@
+// M9C fortification — sandbag_high. Spec §"Sandbag wall (3 height
+// tiers)" table row 3. 12 px (chest-high standing); HP 600; full
+// standing cover; full crouched cover.
+(
+    kind: sandbag_high,
+    hp: 600,
+    footprint_tiles: (3, 1),
+    build_time_seconds: 12,
+    material_cost: {
+        "sandbag": 12,
+    },
+    provides: "12 px sandbag wall; full standing cover; full crouched cover",
+    cover_state: Some((
+        standing: Full,
+        crouched: Full,
+        prone: Full,
+    )),
+    sandbag_tier: Some(high),
+)

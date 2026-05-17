@@ -1,0 +1,17 @@
+// M9C fortification — razor_wire. Spec §"Barbed wire + razor wire +
+// electrified fence" table row 2. HP 300; speed -90%; "snagged" 1.0s;
+// 4 dmg/tick; M16A laceration affliction. Cut with wire_cutters in 4s.
+(
+    kind: razor_wire,
+    hp: 300,
+    footprint_tiles: (3, 1),
+    build_time_seconds: 6,
+    material_cost: {
+        "iron": 6,
+        "wire": 1,
+    },
+    provides: "Speed -90% while crossing; snagged 1.0s; 4 dmg/tick; laceration; cut in 4s with wire_cutters",
+    wire_kind: Some(razor_wire),
+    damage_per_tick: Some(4),
+    speed_multiplier_on_cross: Some(0.10),
+)

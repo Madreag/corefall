@@ -1,0 +1,17 @@
+// M9C fortification — watchtower_t3. Spec §"Watchtower (3 height
+// tiers) + spotlight + observation post" table row 3. 48 px tall; 5×5
+// base; HP 2400; +6 LOS tiles; multi-actor platform; integrated radio
+// repeater. M14F lateral collapse on destruction.
+(
+    kind: watchtower_t3,
+    hp: 2400,
+    footprint_tiles: (5, 5),
+    build_time_seconds: 240,
+    material_cost: {
+        "steel": 200,
+        "concrete": 40,
+        "electronics": 20,
+        "radio_relay": 1,
+    },
+    provides: "+6 LOS tiles; multi-actor platform; integrated radio repeater",
+)

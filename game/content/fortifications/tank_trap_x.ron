@@ -1,0 +1,16 @@
+// M9C fortification — tank_trap_x. Spec §"Anti-tank ditch + dragon's
+// teeth + tank trap" table row 3. 2×2 welded I-beam X (Czech hedgehog
+// reference); HP 800; light vehicle stops + per-component damage;
+// heavy plows through in ~5s.
+(
+    kind: tank_trap_x,
+    hp: 800,
+    footprint_tiles: (2, 2),
+    build_time_seconds: 60,
+    material_cost: {
+        "steel": 30,
+        "weld": 8,
+    },
+    provides: "Welded I-beam X; light vehicle stops; heavy plows through in ~5s; cover from one direction",
+    anti_tank_kind: Some(tank_trap_x),
+)

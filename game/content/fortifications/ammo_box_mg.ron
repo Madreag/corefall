@@ -1,0 +1,14 @@
+// M9C fortification — ammo_box_mg. Spec §"MG nest module + ammo box
+// + tripod variant" table row 2. 2×1 footprint, HP 200, 800-round belt
+// cache that auto-feeds adjacent MG nests.
+(
+    kind: ammo_box_mg,
+    hp: 200,
+    footprint_tiles: (2, 1),
+    build_time_seconds: 8,
+    material_cost: {
+        "iron": 4,
+        "ammo_7_62mm": 200,
+    },
+    provides: "800-round belt cache; auto-feeds adjacent MG nest",
+)

@@ -1,0 +1,14 @@
+// M9C fortification — watchtower_t1. Spec §"Watchtower (3 height
+// tiers) + spotlight + observation post" table row 1. 16 px tall; 3×3
+// base; HP 600; +1 LOS tile; standing cover at top platform.
+(
+    kind: watchtower_t1,
+    hp: 600,
+    footprint_tiles: (3, 3),
+    build_time_seconds: 90,
+    material_cost: {
+        "wood": 40,
+        "iron": 10,
+    },
+    provides: "+1 LOS tile; standing-cover at top platform; vision over low cover",
+)

@@ -1,0 +1,15 @@
+// M9C fortification — mg_tripod_portable. Spec §"MG nest module + ammo
+// box + tripod variant" table row 3. 1×1 packed (3×2 deployed); HP 400;
+// squad-portable MG; 4s deploy + 4s pack-up. M16A stamina-cost movement
+// while carried.
+(
+    kind: mg_tripod_portable,
+    hp: 400,
+    footprint_tiles: (1, 1),
+    build_time_seconds: 30,
+    material_cost: {
+        "iron": 20,
+        "heavy_mg_7_62mm": 1,
+    },
+    provides: "Squad-portable MG; 4s deploy + 4s pack-up; M16A stamina-cost movement",
+)

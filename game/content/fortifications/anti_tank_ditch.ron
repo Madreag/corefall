@@ -1,0 +1,14 @@
+// M9C fortification — anti_tank_ditch. Spec §"Anti-tank ditch +
+// dragon's teeth + tank trap" table row 1. 8 px wide × 4 px deep
+// terrain carve; HP n/a (terrain). Light vehicle: 30% stuck chance;
+// heavy: 80% stuck chance; SPG/howitzer impassable.
+(
+    kind: anti_tank_ditch,
+    hp: 0,
+    footprint_tiles: (8, 4),
+    build_time_seconds: 60,
+    material_cost: {},
+    provides: "8 px wide × 4 px deep AT ditch; vehicles stuck per-tier; infantry: 25% slip + partial cover",
+    anti_tank_kind: Some(anti_tank_ditch),
+    depends_on: ["engineering_tool:t2"],
+)

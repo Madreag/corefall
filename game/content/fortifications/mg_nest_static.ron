@@ -1,0 +1,16 @@
+// M9C fortification — mg_nest_static. Spec §"MG nest module + ammo box
+// + tripod variant" table row 1. 4×2 footprint, HP 800, mounted MG with
+// 90° firing arc + 360° base traverse. Crewed via
+// act.player.crew_fortification.
+(
+    kind: mg_nest_static,
+    hp: 800,
+    footprint_tiles: (4, 2),
+    build_time_seconds: 60,
+    material_cost: {
+        "sandbag": 60,
+        "iron": 40,
+        "heavy_mg_7_62mm": 1,
+    },
+    provides: "Mounted MG with 360° base traverse, 90° firing arc, full cover when crewed",
+)

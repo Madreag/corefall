@@ -1,0 +1,14 @@
+// M9C fortification — radio_repeater. Spec §"Watchtower (3 height
+// tiers) + spotlight + observation post" table row 6. 1×1 footprint;
+// HP 200; extends squad-radio range by 100 tiles.
+(
+    kind: radio_repeater,
+    hp: 200,
+    footprint_tiles: (1, 1),
+    build_time_seconds: 20,
+    material_cost: {
+        "electronics": 8,
+        "antenna": 1,
+    },
+    provides: "Extends squad-radio range by 100 tiles; required for off-screen squad coordination",
+)

@@ -1,0 +1,15 @@
+// M9C fortification — bollard_concrete. Spec §"Anti-tank ditch +
+// dragon's teeth + tank trap" table row 4. 1×1 concrete bollard;
+// HP 600; stops light vehicle / soft-stops heavy; non-block to
+// infantry.
+(
+    kind: bollard_concrete,
+    hp: 600,
+    footprint_tiles: (1, 1),
+    build_time_seconds: 30,
+    material_cost: {
+        "concrete": 20,
+    },
+    provides: "Stops light vehicle / soft-stops heavy; non-block to infantry",
+    anti_tank_kind: Some(bollard_concrete),
+)

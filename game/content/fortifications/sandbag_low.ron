@@ -1,0 +1,20 @@
+// M9C fortification — sandbag_low. Spec §"Sandbag wall (3 height
+// tiers)" table row 1. 4 px height; HP 200; no standing cover, partial
+// crouched cover. M9C-1's sandbag-wall kernel binds tier transitions
+// via this RON's HP cap.
+(
+    kind: sandbag_low,
+    hp: 200,
+    footprint_tiles: (3, 1),
+    build_time_seconds: 4,
+    material_cost: {
+        "sandbag": 4,
+    },
+    provides: "4 px sandbag wall; no standing cover; partial crouched cover",
+    cover_state: Some((
+        standing: None,
+        crouched: Partial,
+        prone: Full,
+    )),
+    sandbag_tier: Some(low),
+)

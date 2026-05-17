@@ -1,0 +1,18 @@
+// M9C fortification — concertina_roll. Spec §"Barbed wire + razor
+// wire + electrified fence" table row 4. HP 250; speed -85%; 0.75s
+// snag; covers 4 tiles; 3 dmg/tick. Cut with wire_cutters in 4s per
+// coil section.
+(
+    kind: concertina_roll,
+    hp: 250,
+    footprint_tiles: (4, 1),
+    build_time_seconds: 6,
+    material_cost: {
+        "iron": 12,
+        "wire": 3,
+    },
+    provides: "Speed -85% while crossing; snagged 0.75s; 3 dmg/tick; covers 4 tiles",
+    wire_kind: Some(concertina_roll),
+    damage_per_tick: Some(3),
+    speed_multiplier_on_cross: Some(0.15),
+)

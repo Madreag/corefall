@@ -1,0 +1,16 @@
+// M9C fortification — camo_netting. Spec §"Camo netting" table. 4×4
+// overlay; HP 100; flammable (M15D fire propagates fast); concealed
+// against M22 visual detection at > 8 tiles range. Bypass rules:
+// thermal scope (ARV), spotlight cone, distance < 8 tiles,
+// motion-while-firing.
+(
+    kind: camo_netting,
+    hp: 100,
+    footprint_tiles: (4, 4),
+    build_time_seconds: 12,
+    material_cost: {
+        "burlap": 4,
+        "twine": 2,
+    },
+    provides: "Concealed=true against M22 visual detection at > 8 tiles range",
+)

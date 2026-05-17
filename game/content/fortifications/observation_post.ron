@@ -1,0 +1,16 @@
+// M9C fortification — observation_post. Spec §"Watchtower (3 height
+// tiers) + spotlight + observation post" table row 5. 4×3 footprint;
+// HP 400; full cover; +75% acquisition bonus to faction-wide artillery
+// (M44D SPG).
+(
+    kind: observation_post,
+    hp: 400,
+    footprint_tiles: (4, 3),
+    build_time_seconds: 60,
+    material_cost: {
+        "concrete": 40,
+        "glass": 4,
+        "electronics": 2,
+    },
+    provides: "Hardened spotter station; full cover; +75% acquisition bonus to faction-wide artillery (M44D SPG)",
+)

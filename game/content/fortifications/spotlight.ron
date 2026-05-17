@@ -1,0 +1,17 @@
+// M9C fortification — spotlight. Spec §"Watchtower (3 height tiers) +
+// spotlight + observation post" table row 4. 1×1 mounted on a
+// watchtower; HP 100; cone-of-light 24-tile range; reveals concealed
+// actors in cone (bypasses camo_netting).
+(
+    kind: spotlight,
+    hp: 100,
+    footprint_tiles: (1, 1),
+    build_time_seconds: 12,
+    material_cost: {
+        "iron": 4,
+        "glass": 2,
+        "electronics": 1,
+    },
+    provides: "Cone-of-light 24-tile range; reveals concealed actors in cone",
+    depends_on: ["m29_power_grid"],
+)
