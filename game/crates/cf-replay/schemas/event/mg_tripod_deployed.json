@@ -1,0 +1,30 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/mg_tripod_deployed.v1",
+  "title": "fortification.mg_tripod_deployed",
+  "description": "M9C: act.player.deploy_mg_tripod placed a tripod-mounted MG after the 4s deploy timer. Placeholder authored by m9c-1; full payload (tripod_id, pos, tick_index) lands in m9c-2. Non-cosmetic.",
+  "type": "object",
+  "required": ["tick_index"],
+  "properties": {
+    "tripod_id": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "pos": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {"type": "integer"}
+    },
+    "tick_index": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cosmetic": {
+      "type": "boolean",
+      "const": false,
+      "default": false
+    }
+  },
+  "additionalProperties": true
+}

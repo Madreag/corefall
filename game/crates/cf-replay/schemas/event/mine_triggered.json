@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/mine_triggered.v1",
+  "title": "fortification.mine_triggered",
+  "description": "M9C: an armed mine triggered via proximity, pressure, tripwire crossing, or IED-chain BFS cascade. Placeholder authored by m9c-1; full payload (mine_id, trigger_kind, yield_joules, blast_radius_tiles, tick_index) lands in m9c-4 / m9c-6. Non-cosmetic.",
+  "type": "object",
+  "required": ["tick_index"],
+  "properties": {
+    "mine_id": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "trigger_kind": {
+      "type": "string",
+      "enum": ["proximity", "pressure", "tripwire", "ied_chain", "manual"]
+    },
+    "yield_joules": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "blast_radius_tiles": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "tick_index": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cosmetic": {
+      "type": "boolean",
+      "const": false,
+      "default": false
+    }
+  },
+  "additionalProperties": true
+}

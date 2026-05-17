@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/watchtower_destroyed.v1",
+  "title": "fortification.watchtower_destroyed",
+  "description": "M9C: watchtower HP reached 0; M14F lateral collapse routes fall_impulse damage to actors in the collapse radius. Placeholder authored by m9c-1; full payload (tower_id, tier, collapse_radius, tick_index) lands in m9c-3 / m9c-6. Non-cosmetic.",
+  "type": "object",
+  "required": ["tick_index"],
+  "properties": {
+    "tower_id": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "tier": {
+      "type": "string",
+      "enum": ["t1", "t2", "t3"]
+    },
+    "collapse_radius_tiles": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "tick_index": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cosmetic": {
+      "type": "boolean",
+      "const": false,
+      "default": false
+    }
+  },
+  "additionalProperties": true
+}

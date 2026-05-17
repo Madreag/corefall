@@ -1,0 +1,34 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/mine_armed.v1",
+  "title": "fortification.mine_armed",
+  "description": "M9C: a mine (proximity / pressure / tripwire / ied_chain) was deployed and is now armed. Placeholder authored by m9c-1; full payload (mine_id, mine_kind, pos, tick_index) lands in m9c-4 / m9c-6. Non-cosmetic.",
+  "type": "object",
+  "required": ["tick_index"],
+  "properties": {
+    "mine_id": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "mine_kind": {
+      "type": "string",
+      "enum": ["mine_proximity", "mine_pressure", "tripwire_mine", "ied_chain"]
+    },
+    "pos": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {"type": "integer"}
+    },
+    "tick_index": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cosmetic": {
+      "type": "boolean",
+      "const": false,
+      "default": false
+    }
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/mg_nest_fired_burst.v1",
+  "title": "fortification.mg_nest_fired_burst",
+  "description": "M9C: crewed mg_nest fired a burst window of rounds. Placeholder authored by m9c-1; full payload (nest_id, rounds, tick_index) lands in m9c-2. Non-cosmetic.",
+  "type": "object",
+  "required": ["tick_index"],
+  "properties": {
+    "nest_id": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "rounds": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "tick_index": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cosmetic": {
+      "type": "boolean",
+      "const": false,
+      "default": false
+    }
+  },
+  "additionalProperties": true
+}

@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/wire_crushed_by_vehicle.v1",
+  "title": "fortification.wire_crushed_by_vehicle",
+  "description": "M9C: a heavy vehicle (tank) crushed a wire / fence segment on contact, destroying it without taking damage. Placeholder authored by m9c-1; full payload (wire_id, vehicle_id, tick_index) lands in m9c-5 / m9c-6. Non-cosmetic.",
+  "type": "object",
+  "required": ["tick_index"],
+  "properties": {
+    "wire_id": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "vehicle_id": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "tick_index": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cosmetic": {
+      "type": "boolean",
+      "const": false,
+      "default": false
+    }
+  },
+  "additionalProperties": true
+}

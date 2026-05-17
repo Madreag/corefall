@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/spotlight_dazzled.v1",
+  "title": "fortification.spotlight_dazzled",
+  "description": "M9C: flashbang (M15D) detonated near spotlight; spotlight offline for 12 seconds. Placeholder authored by m9c-1; full payload (spotlight_id, duration_ticks, tick_index) lands in m9c-3 / m9c-6. Non-cosmetic.",
+  "type": "object",
+  "required": ["tick_index"],
+  "properties": {
+    "spotlight_id": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "duration_ticks": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "tick_index": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cosmetic": {
+      "type": "boolean",
+      "const": false,
+      "default": false
+    }
+  },
+  "additionalProperties": true
+}

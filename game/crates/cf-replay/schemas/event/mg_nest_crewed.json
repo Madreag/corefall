@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/mg_nest_crewed.v1",
+  "title": "fortification.mg_nest_crewed",
+  "description": "M9C: act.player.crew_fortification on a built mg_nest_static binds the actor to the nest. Placeholder schema authored by m9c-1; full payload (actor_id, nest_id, tick_index) lands in m9c-2. Non-cosmetic.",
+  "type": "object",
+  "required": ["tick_index"],
+  "properties": {
+    "actor_id": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "nest_id": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "tick_index": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cosmetic": {
+      "type": "boolean",
+      "const": false,
+      "default": false
+    }
+  },
+  "additionalProperties": true
+}

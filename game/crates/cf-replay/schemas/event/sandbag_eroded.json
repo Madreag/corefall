@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/sandbag_eroded.v1",
+  "title": "fortification.sandbag_eroded",
+  "description": "M9C: sandbag wall tier transition (HP < 400 high→mid; HP < 200 mid→low). Authored at m9c-1; cf-fortification::sandbag::apply_damage_to_wall emits one event per crossed threshold. Non-cosmetic.",
+  "type": "object",
+  "required": ["from", "to", "tick_index"],
+  "properties": {
+    "fortification_id": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "from": {
+      "type": "string",
+      "enum": ["low", "mid", "high"]
+    },
+    "to": {
+      "type": "string",
+      "enum": ["low", "mid", "high"]
+    },
+    "tick_index": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cosmetic": {
+      "type": "boolean",
+      "const": false,
+      "default": false
+    }
+  },
+  "additionalProperties": true
+}

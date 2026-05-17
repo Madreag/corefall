@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/spotter_target_marked.v1",
+  "title": "fortification.spotter_target_marked",
+  "description": "M9C: AI-OBS-A-01 doctrine: spotter actor emits a target-mark event with TTL 3s. Squad members with relevant weapons receive +50% acquisition. Placeholder authored by m9c-1; full payload (spotter_id, target_id, target_pos, ttl_ticks, tick_index) lands in m9c-3 / m9c-6. Non-cosmetic.",
+  "type": "object",
+  "required": ["tick_index"],
+  "properties": {
+    "spotter_id": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "target_id": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "target_pos": {
+      "type": "array",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": {"type": "integer"}
+    },
+    "ttl_ticks": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "tick_index": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cosmetic": {
+      "type": "boolean",
+      "const": false,
+      "default": false
+    }
+  },
+  "additionalProperties": true
+}

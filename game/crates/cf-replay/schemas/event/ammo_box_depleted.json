@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/ammo_box_depleted.v1",
+  "title": "fortification.ammo_box_depleted",
+  "description": "M9C: ammo_box_mg auto-feed exhausted its 800-round belt cache; the MG nest cannot fire until a fresh box is swapped in. Placeholder authored by m9c-1; full payload (ammo_box_id, nest_id, tick_index) lands in m9c-2. Non-cosmetic.",
+  "type": "object",
+  "required": ["tick_index"],
+  "properties": {
+    "ammo_box_id": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "nest_id": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "tick_index": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cosmetic": {
+      "type": "boolean",
+      "const": false,
+      "default": false
+    }
+  },
+  "additionalProperties": true
+}

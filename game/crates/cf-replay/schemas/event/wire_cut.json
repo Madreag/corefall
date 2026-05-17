@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/wire_cut.v1",
+  "title": "fortification.wire_cut",
+  "description": "M9C: a player or AI with wire_cutters held [E] for the required time and severed a wire segment. Placeholder authored by m9c-1; full payload (wire_id, wire_kind, actor_id, cut_duration_ticks, tick_index) lands in m9c-5 / m9c-6. Non-cosmetic.",
+  "type": "object",
+  "required": ["tick_index"],
+  "properties": {
+    "wire_id": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "wire_kind": {
+      "type": "string",
+      "enum": ["barbed_wire", "razor_wire", "electrified_fence", "concertina_roll"]
+    },
+    "actor_id": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "cut_duration_ticks": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "tick_index": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cosmetic": {
+      "type": "boolean",
+      "const": false,
+      "default": false
+    }
+  },
+  "additionalProperties": true
+}

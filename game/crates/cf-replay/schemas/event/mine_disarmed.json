@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/mine_disarmed.v1",
+  "title": "fortification.mine_disarmed",
+  "description": "M9C: a detected mine was disarmed manually (6s crouched hold) OR via the bomb-disposal robot. Placeholder authored by m9c-1; full payload (mine_id, actor_id, result, tick_index) lands in m9c-4 / m9c-6. Non-cosmetic.",
+  "type": "object",
+  "required": ["tick_index"],
+  "properties": {
+    "mine_id": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "actor_id": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "result": {
+      "type": "string",
+      "enum": ["ok", "failed"]
+    },
+    "failure_cause": {
+      "type": "string",
+      "enum": ["actor_moved", "actor_damaged", "actor_released_e", "interrupted_other"]
+    },
+    "tick_index": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cosmetic": {
+      "type": "boolean",
+      "const": false,
+      "default": false
+    }
+  },
+  "additionalProperties": true
+}

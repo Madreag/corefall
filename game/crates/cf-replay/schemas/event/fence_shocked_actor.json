@@ -1,0 +1,36 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/fence_shocked_actor.v1",
+  "title": "fortification.fence_shocked_actor",
+  "description": "M9C: a powered electrified_fence shocked a crossing actor for 80 J + applied M16A electrocution + knockback 4 tiles. Placeholder authored by m9c-1; full payload (fence_id, actor_id, joules, knockback_tiles, tick_index) lands in m9c-5 / m9c-6. Non-cosmetic.",
+  "type": "object",
+  "required": ["tick_index"],
+  "properties": {
+    "fence_id": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "actor_id": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "joules": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "knockback_tiles": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "tick_index": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cosmetic": {
+      "type": "boolean",
+      "const": false,
+      "default": false
+    }
+  },
+  "additionalProperties": true
+}

@@ -294,3 +294,90 @@ fn schema_dump_check_m9b_trench_event_schemas_present() {
         );
     }
 }
+
+/// The 16 M9C event schemas authored by m9c-1 (placeholder shapes) +
+/// hydrated to full payloads by m9c-2..m9c-6.
+const M9C_EVENT_SCHEMAS: &[&str] = &[
+    "mg_nest_crewed.json",
+    "mg_nest_uncrewed.json",
+    "mg_nest_fired_burst.json",
+    "mg_tripod_deployed.json",
+    "ammo_box_depleted.json",
+    "sandbag_eroded.json",
+    "watchtower_destroyed.json",
+    "spotlight_dazzled.json",
+    "spotter_target_marked.json",
+    "mine_armed.json",
+    "mine_triggered.json",
+    "mine_disarmed.json",
+    "minesweeper_detected.json",
+    "wire_cut.json",
+    "wire_crushed_by_vehicle.json",
+    "fence_shocked_actor.json",
+];
+
+/// VAL-M9C-009: all 16 new replay event schemas exist on disk.
+#[test]
+fn schema_dump_check_m9c_event_schemas_present() {
+    for name in M9C_EVENT_SCHEMAS {
+        let path = schemas_dir().join(name);
+        assert!(
+            path.exists(),
+            "M9C schema {name} missing on disk at {}",
+            path.display()
+        );
+    }
+    assert_eq!(M9C_EVENT_SCHEMAS.len(), 16, "expected 16 M9C event schemas");
+}
+
+/// VAL-M9C-COSMETIC-GATE: all 16 new M9C event schemas declare
+/// `cosmetic=false` (either via `const` or `default`). Protocol /
+/// sim-layer events are non-cosmetic and cannot be dropped under M4
+/// backpressure.
+#[test]
+fn m9c_event_cosmetic_gate() {
+    for name in M9C_EVENT_SCHEMAS {
+        let v = parse_schema(name);
+        assert_required_keys(&v, name);
+        let props = v
+            .get("properties")
+            .and_then(|p| p.as_object())
+            .unwrap_or_else(|| panic!("{name} missing properties"));
+        let cosmetic = props
+            .get("cosmetic")
+            .and_then(|c| c.as_object())
+            .unwrap_or_else(|| panic!("{name} missing cosmetic property"));
+        let const_val = cosmetic.get("const").and_then(|v| v.as_bool());
+        let default_val = cosmetic.get("default").and_then(|v| v.as_bool());
+        assert!(
+            const_val == Some(false) || default_val == Some(false),
+            "{name} cosmetic must be const=false or default=false (non-droppable)"
+        );
+    }
+}
+
+/// Spec scenario field check: `sandbag_eroded` carries the `from`/`to`
+/// fields with the `low | mid | high` enum values from the spec
+/// scenario "sandbag_eroded event fires with from=high to=mid".
+#[test]
+fn schema_dump_check_sandbag_eroded_from_to_enum() {
+    let v = parse_schema("sandbag_eroded.json");
+    let props = v.get("properties").and_then(|p| p.as_object()).unwrap();
+    for field in ["from", "to"] {
+        let entry = props
+            .get(field)
+            .and_then(|r| r.as_object())
+            .unwrap_or_else(|| panic!("sandbag_eroded.json missing `{field}` property"));
+        let enum_vals = entry
+            .get("enum")
+            .and_then(|e| e.as_array())
+            .unwrap_or_else(|| panic!("sandbag_eroded.json `{field}.enum` missing"));
+        let strings: Vec<&str> = enum_vals.iter().filter_map(|v| v.as_str()).collect();
+        for required in ["low", "mid", "high"] {
+            assert!(
+                strings.contains(&required),
+                "sandbag_eroded.json {field}.enum missing `{required}`"
+            );
+        }
+    }
+}

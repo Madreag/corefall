@@ -1,0 +1,32 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/minesweeper_detected.v1",
+  "title": "fortification.minesweeper_detected",
+  "description": "M9C: minesweeper tool ping revealed a mine; faction-local marker now visible to the sweeping faction. Placeholder authored by m9c-1; full payload (mine_id, sweeper_id, sweeper_faction, tick_index) lands in m9c-4 / m9c-6. Non-cosmetic.",
+  "type": "object",
+  "required": ["tick_index"],
+  "properties": {
+    "mine_id": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "sweeper_id": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "sweeper_faction": {
+      "type": "string",
+      "enum": ["player", "enemy", "neutral"]
+    },
+    "tick_index": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "cosmetic": {
+      "type": "boolean",
+      "const": false,
+      "default": false
+    }
+  },
+  "additionalProperties": true
+}
