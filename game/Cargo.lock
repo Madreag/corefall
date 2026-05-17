@@ -1500,6 +1500,7 @@ version = "0.0.1"
 dependencies = [
  "cf-chassis",
  "cf-equipment",
+ "cf-fortification",
  "cf-physics",
  "cf-trench",
  "serde",
@@ -1745,8 +1746,12 @@ dependencies = [
 name = "cf-fortification"
 version = "0.0.1"
 dependencies = [
+ "cf-trench",
+ "rand_core 0.10.1",
+ "rand_xoshiro",
  "ron",
  "serde",
+ "serde_json",
  "thiserror 2.0.18",
  "tracing",
 ]

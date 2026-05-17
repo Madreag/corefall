@@ -1133,6 +1133,14 @@ pub struct ActorState {
     /// `Stance::Crewing { fortification_id }`. `None` when not crewing.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub crewing_fortification_id: Option<u32>,
+    /// **M9C**: per-actor wire-crossing state. Per spec § "Notes for
+    /// the implementer": *don't store wire crossing state on the wire
+    /// (one wire, many actors); store it on the actor's `crossing:
+    /// Option<WireId>`. Avoid the O(n×m) interaction-matrix trap.*
+    /// `Some(wire_id)` while the actor is currently crossing /
+    /// snagged on a wire; `None` otherwise.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub crossing: Option<cf_fortification::WireId>,
 }
 
 fn default_bipod_equipped() -> cf_equipment::Bipod {
@@ -1320,6 +1328,7 @@ impl ActorState {
             inventory_encumbrance: None,
             body_armor: BodyArmorSlot::default(),
             crewing_fortification_id: None,
+            crossing: None,
         }
     }
 

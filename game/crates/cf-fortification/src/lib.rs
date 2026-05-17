@@ -62,7 +62,22 @@ pub mod spec;
 pub mod watchtower;
 pub mod wire;
 
-pub use anti_tank::AntiTankKind;
+pub use anti_tank::{
+    apply_bollard_contact, apply_dragons_teeth_heavy_contact,
+    apply_dragons_teeth_light_contact, apply_tank_trap_x_light_contact,
+    at_ditch_infantry_cover_state, at_ditch_stuck_roll,
+    tank_trap_x_heavy_plow_centi_per_tick, tick_tank_trap_x_heavy_plow,
+    AntiTankDitch, AntiTankKind, AntiTankVehicleClass, AtDitchStuckInputs,
+    AtDitchStuckOutcome, BollardConcrete, BollardContactOutcome, DragonsTeeth,
+    DragonsTeethContactOutcome, SuspensionComponentKind, SuspensionDamageEvent,
+    TankTrapContactOutcome, TankTrapX, ANTI_TANK_DITCH_DEPTH_PX,
+    ANTI_TANK_DITCH_WIDTH_PX, AT_DITCH_HEAVY_STUCK_PERCENT,
+    AT_DITCH_INFANTRY_SLIP_PERCENT, AT_DITCH_LIGHT_STUCK_PERCENT,
+    AT_DITCH_SPG_HOWITZER_STUCK_PERCENT, BOLLARD_CONCRETE_HP,
+    DRAGONS_TEETH_PER_TOOTH_HP, DRAGONS_TEETH_SUSPENSION_DAMAGE_PER_CONTACT,
+    M44C_SUSPENSION_HP_BUDGET, TANK_TRAP_X_HEAVY_PLOW_SECONDS, TANK_TRAP_X_HP,
+    TANK_TRAP_X_LIGHT_SUSPENSION_DAMAGE,
+};
 pub use camo::{
     camo_concealed, CamoBypassReason, CamoConcealment, CamoConcealmentInputs,
     CamoNetting, BYPASS_RANGE_TILES, CAMO_NETTING_HP, CAMO_NETTING_TILE_FOOTPRINT,
@@ -123,4 +138,20 @@ pub use watchtower::{
     WATCHTOWER_T3_BASE_FALL_DAMAGE, WATCHTOWER_T3_COLLAPSE_RADIUS_TILES,
     WATCHTOWER_T3_MAX_HP,
 };
-pub use wire::WireKind;
+pub use wire::{
+    apply_coupling_damage, apply_vehicle_contact, cut_time_seconds, cut_time_ticks,
+    cutter_damage_per_cut, evaluate_wire_cross, reenergize_fence, sync_grid_energized,
+    tick_wire_cut, toggle_breaker, FenceDepoweredCause, FenceDepoweredEvent,
+    FenceShockedActorEvent, Wire, WireCrossInputs, WireCrossOutcome, WireCrushedByVehicleEvent,
+    WireCutEvent, WireCutFailureCause, WireCutInputs, WireCutTickResult, WireId, WireKind,
+    WireVehicleClass, WireVehicleContactOutcome, BARBED_WIRE_CUT_SECONDS,
+    BARBED_WIRE_DAMAGE_PER_TICK, BARBED_WIRE_HP, BARBED_WIRE_SNAG_MILLIS,
+    BARBED_WIRE_SPEED_BP, CONCERTINA_ROLL_CUT_SECONDS, CONCERTINA_ROLL_DAMAGE_PER_TICK,
+    CONCERTINA_ROLL_FOOTPRINT_TILES, CONCERTINA_ROLL_HP, CONCERTINA_ROLL_SNAG_MILLIS,
+    CONCERTINA_ROLL_SPEED_BP, ELECTRIFIED_DEPOWERED_SPEED_BP, ELECTRIFIED_FENCE_CUT_SECONDS,
+    ELECTRIFIED_FENCE_HP, ELECTRIFIED_POWERED_SPEED_BP, FENCE_DEPOWERED_DAMAGE_PER_TICK,
+    FENCE_SHOCK_JOULES, FENCE_SHOCK_KNOCKBACK_TILES, FORCE_THROUGH_DAMAGE_PER_TICK,
+    FORCE_THROUGH_SPEED_BP, LIGHT_VEHICLE_WIRE_TRACK_DAMAGE, RAZOR_WIRE_CUT_SECONDS,
+    RAZOR_WIRE_CUTTER_DAMAGE, RAZOR_WIRE_DAMAGE_PER_TICK, RAZOR_WIRE_HP,
+    RAZOR_WIRE_SNAG_MILLIS, RAZOR_WIRE_SPEED_BP,
+};

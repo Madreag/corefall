@@ -8,6 +8,10 @@ publish.workspace = true
 
 [dependencies]
 serde = { workspace = true }
+serde_json = { workspace = true }
 ron = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
+rand_xoshiro = { workspace = true }
+rand_core = { workspace = true }
+cf-trench = { path = "../cf-trench" }

@@ -13,6 +13,7 @@ cf-physics = { path = "../cf-physics" }
 cf-equipment = { path = "../cf-equipment" }
 cf-chassis = { path = "../cf-chassis" }
 cf-trench = { path = "../cf-trench" }
+cf-fortification = { path = "../cf-fortification" }
 
 [dev-dependencies]
 serde_json = { workspace = true }
