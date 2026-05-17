@@ -8450,6 +8450,13 @@ impl M0Engine {
                 }),
                 Some(hit_parent),
             );
+            // M14 boundary: cf_trench::damage_route_for(target_cover_state,
+            // body_zone) → DamageRoute decides whether this hit checks
+            // the parapet material first (ParapetFirst) or routes directly
+            // to the actor zone (ActorDirect). M9B owns the pure deriver
+            // + the per-segment breastwork HP gate; M14 owns the energy
+            // attenuation pass that consumes DamageRoute. Wire the call
+            // here when M14's damage pipeline lands.
             // **M14** § "Full swept-collision pipeline" — emit
             // `combat.swept_collision` for every projectile-vs-actor hit
             // with the priority index/total computed from the

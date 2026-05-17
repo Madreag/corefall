@@ -180,6 +180,20 @@ pub struct ActPlayerPlaceTrenchModuleParams {
     pub segment_id: u64,
 }
 
+/// **M9B-2 / VAL-M9B-TEMPLATE-001..004 / VAL-M9B-CFCTL-001**:
+/// `act.player.drop_trench_template` — instantiate an authored trench
+/// template at the supplied tile origin. `id` resolves to
+/// `content/trench_templates/<id>.trench.ron`; the cfctl handler
+/// hashes the template (`template_sha256`) + counts placed segments
+/// (`segment_count`) into the `trench.template_dropped` event.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerDropTrenchTemplateParams {
+    pub schema_version: u32,
+    pub id: String,
+    pub origin: (i32, i32),
+}
+
 /// **M9B-3 / VAL-M9B-MODULES-003 / VAL-M9B-CFCTL-001**:
 /// `act.player.repair_trench_module` — repair a damaged trench module.
 /// Consumes the declared per-module resources (wood / iron / sandbag)
@@ -682,6 +696,7 @@ pub fn dump_v1() -> BTreeMap<String, String> {
         entry::<ActPlayerDigTrenchSegmentParams>("act_player_dig_trench_segment_params"),
         entry::<ActPlayerPlaceTrenchModuleParams>("act_player_place_trench_module_params"),
         entry::<ActPlayerRepairTrenchModuleParams>("act_player_repair_trench_module_params"),
+        entry::<ActPlayerDropTrenchTemplateParams>("act_player_drop_trench_template_params"),
         entry::<ObserveActorCoverStateParams>("observe_actor_cover_state_params"),
         entry::<ObserveTrenchSegmentAtPosParams>("observe_trench_segment_at_pos_params"),
         entry::<ObserveMissionParams>("observe_mission_params"),
