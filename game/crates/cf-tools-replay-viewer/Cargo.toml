@@ -22,8 +22,14 @@ serde_json = { workspace = true }
 thiserror = { workspace = true }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
+blake3 = { workspace = true }
 cf-replay = { path = "../cf-replay" }
 cf-replay-export = { path = "../cf-replay-export" }
+# cf-render-2d wired in for the M10B editor's `scrub_to` preview pane:
+# the editor renders the requested tick via the offline software
+# rasterizer (`--features offline`) so the preview is bit-identical
+# to the offline-export reference (VAL-M10B-028).
+cf-render-2d = { path = "../cf-render-2d", default-features = false, features = ["offline"] }
 cf-save = { path = "../cf-save" }
 
 [dev-dependencies]
