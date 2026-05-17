@@ -179,6 +179,7 @@ pub fn run_drainage_window(
 }
 
 #[cfg(test)]
+#[allow(clippy::float_cmp)]
 mod tests {
     use super::*;
 

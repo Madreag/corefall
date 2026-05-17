@@ -177,7 +177,7 @@ impl M0Engine {
                     }),
                     None,
                 );
-                return CommandResult::rejected(reason, tick.0);
+                CommandResult::rejected(reason, tick.0)
             }
             DigSubstrateOutcome::Fallback {
                 requested: req_variant,
@@ -237,7 +237,7 @@ impl M0Engine {
                     }),
                     Some(downgrade_id),
                 );
-                return CommandResult::accepted(tick.0);
+                CommandResult::accepted(tick.0)
             }
             DigSubstrateOutcome::Ok { variant } => {
                 let action_id = self.recorder.record(
@@ -816,6 +816,9 @@ fn _typed_module_spec_for(module: TrenchModule) -> Option<ModuleSpec> {
 mod tests {
     use super::*;
 
+    static TEST_SCENARIO_SEQ: std::sync::atomic::AtomicU64 =
+        std::sync::atomic::AtomicU64::new(0);
+
     #[test]
     fn parse_variant_round_trip() {
         for variant in [
@@ -947,10 +950,7 @@ mod tests {
 
     fn make_engine() -> M0Engine {
         let mut p = std::env::temp_dir();
-        let seq = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap()
-            .as_nanos();
+        let seq = TEST_SCENARIO_SEQ.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
         p.push(format!("m9b_trench_test_{}_{}.ron", std::process::id(), seq));
         std::fs::write(
             &p,

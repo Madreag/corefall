@@ -293,7 +293,7 @@ mod tests {
     use cf_sim_core::Rng;
 
     fn rng() -> Rng {
-        Rng::from_seed(0xCAFE_BABE_DEADBEEF)
+        Rng::from_seed(0xCAFE_BABE_DEAD_BEEF)
     }
 
     fn baseline_inputs(cover: CoverState, enemy: bool) -> TrenchDoctrineInputs {

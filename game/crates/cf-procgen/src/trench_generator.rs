@@ -754,12 +754,11 @@ mod tests {
                     if tiles.contains(&probe) {
                         run += 1;
                         step += 1;
-                        if run > 12 {
-                            panic!(
-                                "enfilade ray from {origin:?} in {dx:?},{dy:?} \
-                                 covered > 12 contiguous tiles"
-                            );
-                        }
+                        assert!(
+                            run <= 12,
+                            "enfilade ray from {origin:?} in {dx:?},{dy:?} \
+                             covered > 12 contiguous tiles"
+                        );
                     } else {
                         break;
                     }

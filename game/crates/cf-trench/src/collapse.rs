@@ -246,6 +246,7 @@ pub fn variant_supports_collapse(variant: SegmentVariant) -> bool {
 }
 
 #[cfg(test)]
+#[allow(clippy::float_cmp)]
 mod tests {
     use super::*;
 
@@ -258,8 +259,7 @@ mod tests {
             run_revetment_audit(STARTING_INTEGRITY, env, REVETMENT_AUDIT_WINDOW_TICKS);
         assert!(
             collapses >= 1,
-            "soft-dirt no-revetment must collapse at least once in {} ticks",
-            REVETMENT_AUDIT_WINDOW_TICKS
+            "soft-dirt no-revetment must collapse at least once in {REVETMENT_AUDIT_WINDOW_TICKS} ticks"
         );
         assert_eq!(final_integrity, 0.0);
     }
@@ -273,8 +273,7 @@ mod tests {
             run_revetment_audit(STARTING_INTEGRITY, env, REVETMENT_AUDIT_WINDOW_TICKS);
         assert_eq!(
             collapses, 0,
-            "revetment must prevent collapse over {} ticks",
-            REVETMENT_AUDIT_WINDOW_TICKS
+            "revetment must prevent collapse over {REVETMENT_AUDIT_WINDOW_TICKS} ticks"
         );
         assert!(
             final_integrity >= REVETMENT_INTEGRITY_FLOOR,

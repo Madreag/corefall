@@ -274,7 +274,7 @@ mod tests {
             "drainage_drip",
         ] {
             assert!(
-                family.iter().any(|s| *s == required),
+                family.contains(&required),
                 "trench family missing `{required}`"
             );
         }

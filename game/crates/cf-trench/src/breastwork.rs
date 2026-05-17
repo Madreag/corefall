@@ -134,6 +134,7 @@ pub fn run_breach_sequence(rounds: u32, per_round_damage: f32) -> (Vec<Breastwor
 }
 
 #[cfg(test)]
+#[allow(clippy::float_cmp)]
 mod tests {
     use super::*;
 

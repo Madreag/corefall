@@ -81,8 +81,7 @@ impl PickaxeDigSpec {
 
 fn scale_baseline(baseline: u32, percent: u32) -> u32 {
     let scaled = (u64::from(baseline) * u64::from(percent)) / 100;
-    let min_one = if scaled == 0 { 1 } else { scaled as u32 };
-    min_one
+    if scaled == 0 { 1 } else { scaled as u32 }
 }
 
 fn pickaxe_entry(
