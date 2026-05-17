@@ -27,6 +27,7 @@
                 damage_per_hit: Some(6.0),
                 burst_pause_seconds: Some(0.5),
                 burst_shots: Some(2),
+                doctrine: Some("AI-TRENCH-A-01"),
             ))),
         (id: 3, team: "red", spawn: (960.0, 32.0), controllable: false, hp: 100.0,
             inventory: (rifle: None), aim: Some((-1.0, 0.0)),
@@ -37,6 +38,7 @@
                 damage_per_hit: Some(6.0),
                 burst_pause_seconds: Some(0.5),
                 burst_shots: Some(2),
+                doctrine: Some("AI-TRENCH-A-01"),
             ))),
         (id: 4, team: "red", spawn: (1020.0, 32.0), controllable: false, hp: 100.0,
             inventory: (rifle: None), aim: Some((-1.0, 0.0)),
@@ -47,6 +49,7 @@
                 damage_per_hit: Some(6.0),
                 burst_pause_seconds: Some(0.5),
                 burst_shots: Some(2),
+                doctrine: Some("AI-TRENCH-A-01"),
             ))),
     ],
     terrain: Some((

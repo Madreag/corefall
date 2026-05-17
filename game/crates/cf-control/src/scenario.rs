@@ -240,6 +240,11 @@ pub struct ScenarioEnemy {
     pub reload_seconds: Option<f32>,
     pub muzzle_forward_offset: Option<f32>,
     pub muzzle_vertical_offset: Option<f32>,
+    /// **M9B audit GAP-2**: opt the actor into a per-tick AI cover-decision
+    /// pipeline. The engine recognises `"AI-TRENCH-A-01"` (M9B trench
+    /// garrison doctrine); other values are forward-compat placeholders
+    /// and are ignored by the current engine.
+    pub doctrine: Option<String>,
 }
 
 impl ScenarioEnemy {
