@@ -1,0 +1,46 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/net_fec_recovered.v1",
+  "title": "net.fec_recovered",
+  "description": "M8B § Acceptance 'Reed-Solomon FEC recovers a single-byte-corrupted reliable payload'. Emitted when a FEC-protected reliable payload (event batch < 8 kB) is reconstructed from surviving shards without an application-level retransmit. NOT cosmetic.",
+  "type": "object",
+  "required": [
+    "group_id",
+    "k",
+    "m",
+    "shards_lost",
+    "payload_bytes"
+  ],
+  "properties": {
+    "group_id": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "FEC group id (per spec § Schemas — net.fec_recovered)."
+    },
+    "k": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 8,
+      "description": "Data shards in the group (default 4)."
+    },
+    "m": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 8,
+      "description": "Parity shards in the group (default 2)."
+    },
+    "shards_lost": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 8,
+      "description": "Number of shards that were lost or corrupted + recovered. Must be ≤ m."
+    },
+    "payload_bytes": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 8192,
+      "description": "Original payload size in bytes (≤ FEC_MAX_PAYLOAD_BYTES)."
+    },
+    "tick": { "type": "integer", "minimum": 0 }
+  }
+}

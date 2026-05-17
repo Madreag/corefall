@@ -41,6 +41,12 @@ const SCHEMA_TERRAIN_CHUNK_ACTIVE_REGION_CHANGED: &str =
     include_str!("../schemas/event/terrain_chunk_active_region_changed.json");
 // M8A: perf_sample (cosmetic) — per-cadence per-subsystem latency samples.
 const SCHEMA_PERF_SAMPLE: &str = include_str!("../schemas/event/perf_sample.json");
+// M8B: net protocol + rollback + loss recovery + NAT traversal events.
+const SCHEMA_NET_PROTOCOL_NEGOTIATED: &str = include_str!("../schemas/event/net_protocol_negotiated.json");
+const SCHEMA_NET_ROLLBACK_WINDOW: &str = include_str!("../schemas/event/net_rollback_window.json");
+const SCHEMA_NET_INPUT_RESENT_REDUNDANT: &str = include_str!("../schemas/event/net_input_resent_redundant.json");
+const SCHEMA_NET_FEC_RECOVERED: &str = include_str!("../schemas/event/net_fec_recovered.json");
+const SCHEMA_NET_NAT_TRAVERSAL_OUTCOME: &str = include_str!("../schemas/event/net_nat_traversal_outcome.json");
 const SCHEMA_TERRAIN_PIXEL_DISLODGED: &str = include_str!("../schemas/event/terrain_pixel_dislodged.json");
 const SCHEMA_HAZARD_CONTACT_OR_AVOIDANCE: &str = include_str!("../schemas/event/hazard_contact_or_avoidance.json");
 const SCHEMA_ANCHOR_MATERIAL_RESULT: &str = include_str!("../schemas/event/anchor_material_result.json");
@@ -257,6 +263,13 @@ const SCHEMA_EQUIPMENT_ITEM_DROPPED_WITH_MASS: &str = include_str!("../schemas/e
 const SCHEMA_INVENTORY_ENCUMBRANCE_THRESHOLD_CROSSED: &str =
     include_str!("../schemas/event/encumbrance_threshold_crossed.json");
 const SCHEMA_INVENTORY_CONTAINER_NESTED: &str = include_str!("../schemas/event/container_nested.json");
+// **M6C**: equipment catalog buildout — body armor durability, ATGM lock,
+// downed-actor revive, placed-mine triggers, mortar crew gating.
+const SCHEMA_BODY_ARMOR_DEGRADED: &str = include_str!("../schemas/event/body_armor_degraded.json");
+const SCHEMA_ATGM_LOCK_ACQUIRED: &str = include_str!("../schemas/event/atgm_lock_acquired.json");
+const SCHEMA_ACTOR_REVIVED: &str = include_str!("../schemas/event/actor_revived.json");
+const SCHEMA_MINE_DETONATED: &str = include_str!("../schemas/event/mine_detonated.json");
+const SCHEMA_MORTAR_CREWED: &str = include_str!("../schemas/event/mortar_crewed.json");
 const SCHEMA_PERCEPTION_ACTOR_SIGNAL: &str = include_str!("../schemas/event/perception_actor_signal.json");
 const SCHEMA_PERCEPTION_FOOTSTEP_EMITTED: &str = include_str!("../schemas/event/perception_footstep_emitted.json");
 const SCHEMA_PERCEPTION_OCCLUSION_APPLIED: &str = include_str!("../schemas/event/perception_occlusion_applied.json");
@@ -265,6 +278,24 @@ const SCHEMA_PERCEPTION_STEALTH_METER_CHANGED: &str =
 const SCHEMA_SQUAD_COMMAND_ISSUED: &str = include_str!("../schemas/event/squad_command_issued.json");
 const SCHEMA_SQUAD_MEMBER_ADDED: &str = include_str!("../schemas/event/squad_member_added.json");
 const SCHEMA_SQUAD_WAYPOINT_MARKED: &str = include_str!("../schemas/event/squad_waypoint_marked.json");
+
+// **M7B**: Deep squad command grammar + formation orders + commander hop
+// event surface. 12 new schemas (squad.command_issued already existed; M7B
+// extends it). Spec § Files.
+const SCHEMA_SQUAD_COMMAND_VETOED: &str = include_str!("../schemas/event/squad_command_vetoed.json");
+const SCHEMA_SQUAD_FORMATION_SET: &str = include_str!("../schemas/event/squad_formation_set.json");
+const SCHEMA_SQUAD_FORMATION_SLOT_ASSIGNED: &str =
+    include_str!("../schemas/event/squad_formation_slot_assigned.json");
+const SCHEMA_SQUAD_FORMATION_SLOT_BROKEN: &str =
+    include_str!("../schemas/event/squad_formation_slot_broken.json");
+const SCHEMA_SQUAD_FORMATION_COLLAPSED: &str = include_str!("../schemas/event/squad_formation_collapsed.json");
+const SCHEMA_SQUAD_ROLE_ASSIGNED: &str = include_str!("../schemas/event/squad_role_assigned.json");
+const SCHEMA_SQUAD_BREACH_CHAIN_STARTED: &str = include_str!("../schemas/event/squad_breach_chain_started.json");
+const SCHEMA_SQUAD_BREACH_CHAIN_STEP: &str = include_str!("../schemas/event/squad_breach_chain_step.json");
+const SCHEMA_SQUAD_BREACH_CHAIN_COMPLETE: &str =
+    include_str!("../schemas/event/squad_breach_chain_complete.json");
+const SCHEMA_SQUAD_BOUNDING_STEP: &str = include_str!("../schemas/event/squad_bounding_step.json");
+const SCHEMA_SQUAD_BRAIN_HOP: &str = include_str!("../schemas/event/squad_brain_hop.json");
 
 // **M7-A**: smart commandable AI surface — reason labels, layer invocations,
 // archetype assignment, auto-triage / auto-repair contracts, cover seeking,
@@ -451,6 +482,12 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("terrain", "chunk_active_region_changed") => Some(SCHEMA_TERRAIN_CHUNK_ACTIVE_REGION_CHANGED),
         // M8A: perf_sample cosmetic per-cadence latency event (PR-8).
         ("perf", "sample") => Some(SCHEMA_PERF_SAMPLE),
+        // M8B: net protocol + rollback + loss recovery + NAT traversal events.
+        ("net", "protocol_negotiated") => Some(SCHEMA_NET_PROTOCOL_NEGOTIATED),
+        ("net", "rollback_window") => Some(SCHEMA_NET_ROLLBACK_WINDOW),
+        ("net", "input_resent_redundant") => Some(SCHEMA_NET_INPUT_RESENT_REDUNDANT),
+        ("net", "fec_recovered") => Some(SCHEMA_NET_FEC_RECOVERED),
+        ("net", "nat_traversal_outcome") => Some(SCHEMA_NET_NAT_TRAVERSAL_OUTCOME),
         ("terrain", "terrain_pixel_dislodged") => Some(SCHEMA_TERRAIN_PIXEL_DISLODGED),
         ("terrain", "hazard_contact_or_avoidance") => Some(SCHEMA_HAZARD_CONTACT_OR_AVOIDANCE),
         ("terrain", "anchor_material_result") => Some(SCHEMA_ANCHOR_MATERIAL_RESULT),
@@ -647,6 +684,12 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("equipment", "item_dropped_with_mass") => Some(SCHEMA_EQUIPMENT_ITEM_DROPPED_WITH_MASS),
         ("inventory", "encumbrance_threshold_crossed") => Some(SCHEMA_INVENTORY_ENCUMBRANCE_THRESHOLD_CROSSED),
         ("inventory", "container_nested") => Some(SCHEMA_INVENTORY_CONTAINER_NESTED),
+        // **M6C**: equipment catalog buildout.
+        ("body_armor", "degraded") => Some(SCHEMA_BODY_ARMOR_DEGRADED),
+        ("atgm", "lock_acquired") => Some(SCHEMA_ATGM_LOCK_ACQUIRED),
+        ("actor", "revived") => Some(SCHEMA_ACTOR_REVIVED),
+        ("mine", "detonated") => Some(SCHEMA_MINE_DETONATED),
+        ("mortar", "crewed") => Some(SCHEMA_MORTAR_CREWED),
         ("perception", "actor_signal") => Some(SCHEMA_PERCEPTION_ACTOR_SIGNAL),
         ("perception", "footstep_emitted") => Some(SCHEMA_PERCEPTION_FOOTSTEP_EMITTED),
         ("perception", "occlusion_applied") => Some(SCHEMA_PERCEPTION_OCCLUSION_APPLIED),
@@ -654,6 +697,18 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("squad", "command_issued") => Some(SCHEMA_SQUAD_COMMAND_ISSUED),
         ("squad", "member_added") => Some(SCHEMA_SQUAD_MEMBER_ADDED),
         ("squad", "waypoint_marked") => Some(SCHEMA_SQUAD_WAYPOINT_MARKED),
+        // **M7B**: deep squad command grammar + formation + commander hop.
+        ("squad", "command_vetoed") => Some(SCHEMA_SQUAD_COMMAND_VETOED),
+        ("squad", "formation_set") => Some(SCHEMA_SQUAD_FORMATION_SET),
+        ("squad", "formation_slot_assigned") => Some(SCHEMA_SQUAD_FORMATION_SLOT_ASSIGNED),
+        ("squad", "formation_slot_broken") => Some(SCHEMA_SQUAD_FORMATION_SLOT_BROKEN),
+        ("squad", "formation_collapsed") => Some(SCHEMA_SQUAD_FORMATION_COLLAPSED),
+        ("squad", "role_assigned") => Some(SCHEMA_SQUAD_ROLE_ASSIGNED),
+        ("squad", "breach_chain_started") => Some(SCHEMA_SQUAD_BREACH_CHAIN_STARTED),
+        ("squad", "breach_chain_step") => Some(SCHEMA_SQUAD_BREACH_CHAIN_STEP),
+        ("squad", "breach_chain_complete") => Some(SCHEMA_SQUAD_BREACH_CHAIN_COMPLETE),
+        ("squad", "bounding_step") => Some(SCHEMA_SQUAD_BOUNDING_STEP),
+        ("squad", "brain_hop") => Some(SCHEMA_SQUAD_BRAIN_HOP),
         // **M7-A**: smart commandable AI event surface.
         ("ai", "reason_label_changed") => Some(SCHEMA_AI_REASON_LABEL_CHANGED),
         ("ai", "thinking_layer_invoked") => Some(SCHEMA_AI_THINKING_LAYER_INVOKED),
@@ -1299,6 +1354,12 @@ mod tests {
             ("equipment", "item_dropped_with_mass"),
             ("inventory", "encumbrance_threshold_crossed"),
             ("inventory", "container_nested"),
+            // **M6C**: equipment catalog buildout event surface.
+            ("body_armor", "degraded"),
+            ("atgm", "lock_acquired"),
+            ("actor", "revived"),
+            ("mine", "detonated"),
+            ("mortar", "crewed"),
             ("perception", "actor_signal"),
             ("perception", "footstep_emitted"),
             ("perception", "occlusion_applied"),
@@ -1319,11 +1380,118 @@ mod tests {
             // and per-guard path invalidation.
             ("ai", "target_scored"),
             ("ai", "path_invalidated"),
+            // **M8B**: net protocol + rollback + loss recovery + NAT events.
+            ("net", "protocol_negotiated"),
+            ("net", "rollback_window"),
+            ("net", "input_resent_redundant"),
+            ("net", "fec_recovered"),
+            ("net", "nat_traversal_outcome"),
         ] {
             let raw = event_schema_for(cat, ty).unwrap_or_else(|| panic!("no schema for {cat}.{ty}"));
             let _parsed_value: serde_json::Value =
                 serde_json::from_str(raw).unwrap_or_else(|e| panic!("schema json parse error for {cat}.{ty}: {e}"));
         }
+    }
+
+    /// **M8B § Acceptance**: validate the canonical payload shape for
+    /// each new net.* event family.
+    #[test]
+    fn m8b_net_protocol_negotiated_validates() {
+        let payload = json!({
+            "session_id": "sess-1",
+            "accepted": true,
+            "server_semver_packed": 0x0107u32,
+            "client_semver_packed": 0x0104u32,
+            "session_semver_packed": 0x0104u32,
+            "granted_features": ["fec", "ice_lite"],
+        });
+        validate_event_payload("net", "protocol_negotiated", &payload).expect("valid");
+    }
+
+    #[test]
+    fn m8b_net_protocol_negotiated_rejected_validates() {
+        let payload = json!({
+            "session_id": "sess-2",
+            "accepted": false,
+            "server_semver_packed": 0x0107u32,
+            "client_semver_packed": 0x0200u32,
+            "session_semver_packed": 0u32,
+            "granted_features": [],
+            "reject_reason": "protocol_major_mismatch",
+            "download_url": "https://corefall.example/update",
+        });
+        validate_event_payload("net", "protocol_negotiated", &payload).expect("valid reject");
+    }
+
+    #[test]
+    fn m8b_net_rollback_window_validates() {
+        let payload = json!({
+            "from_tick": 614u32,
+            "to_tick": 620u32,
+            "resim_us": 7100u32,
+            "cause": "input_mismatch",
+            "rollback_to_tick_elapsed_us": 800u32,
+            "per_frame_resim_elapsed_us": 6300u32,
+            "within_budget": true,
+        });
+        validate_event_payload("net", "rollback_window", &payload).expect("valid");
+    }
+
+    #[test]
+    fn m8b_net_input_resent_redundant_validates() {
+        let payload = json!({
+            "session_id": "sess-1",
+            "recovered_tick": 700u32,
+            "carrier_tick": 701u32,
+            "window_ticks": 3u32,
+        });
+        validate_event_payload("net", "input_resent_redundant", &payload).expect("valid");
+    }
+
+    #[test]
+    fn m8b_net_fec_recovered_validates() {
+        let payload = json!({
+            "group_id": 42u32,
+            "k": 4u32,
+            "m": 2u32,
+            "shards_lost": 1u32,
+            "payload_bytes": 512u32,
+        });
+        validate_event_payload("net", "fec_recovered", &payload).expect("valid");
+    }
+
+    #[test]
+    fn m8b_net_nat_traversal_outcome_validates_direct() {
+        let payload = json!({
+            "session_id": "sess-1",
+            "method": "ice_lite",
+            "path": "direct",
+            "elapsed_ms": 2500u32,
+        });
+        validate_event_payload("net", "nat_traversal_outcome", &payload).expect("valid direct");
+    }
+
+    #[test]
+    fn m8b_net_nat_traversal_outcome_validates_relay() {
+        let payload = json!({
+            "session_id": "sess-1",
+            "method": "turn_relay",
+            "path": "relay",
+            "elapsed_ms": 5500u32,
+        });
+        validate_event_payload("net", "nat_traversal_outcome", &payload).expect("valid relay");
+    }
+
+    #[test]
+    fn m8b_net_nat_traversal_outcome_rejects_invalid_method() {
+        let payload = json!({
+            "session_id": "sess-1",
+            "method": "magic_pony",
+            "path": "direct",
+            "elapsed_ms": 1000u32,
+        });
+        let err = validate_event_payload("net", "nat_traversal_outcome", &payload).unwrap_err();
+        assert!(err.contains("method"), "expected method enum error, got: {err}");
     }
 
     #[test]

@@ -1,0 +1,245 @@
+{
+  "fixtures": [
+    {
+      "variant": "ping",
+      "payload_hex": "060000000700000000000000",
+      "frame_hex": "04012a00000040420f0000000000060000000700000000000000",
+      "semver_packed": 260,
+      "seq": 42,
+      "timestamp_ms": 1000000,
+      "params": {
+        "send_ms": 7
+      }
+    },
+    {
+      "variant": "pong",
+      "payload_hex": "0700000007000000000000000800000000000000",
+      "frame_hex": "04012a00000040420f00000000000700000007000000000000000800000000000000",
+      "semver_packed": 260,
+      "seq": 42,
+      "timestamp_ms": 1000000,
+      "params": {
+        "send_ms": 7,
+        "recv_ms": 8
+      }
+    },
+    {
+      "variant": "disconnect",
+      "payload_hex": "0800000003000000627965",
+      "frame_hex": "04012a00000040420f00000000000800000003000000627965",
+      "semver_packed": 260,
+      "seq": 42,
+      "timestamp_ms": 1000000,
+      "params": {
+        "reason": "bye"
+      }
+    },
+    {
+      "variant": "handshake",
+      "payload_hex": "0000000004010c00000063662d61707020302e312e3404000000616263640200000003000000666563080000006963655f6c697465",
+      "frame_hex": "04012a00000040420f00000000000000000004010c00000063662d61707020302e312e3404000000616263640200000003000000666563080000006963655f6c697465",
+      "semver_packed": 260,
+      "seq": 42,
+      "timestamp_ms": 1000000,
+      "params": {
+        "semver_packed": 260,
+        "client_version": "cf-app 0.1.4",
+        "content_hash": "abcd",
+        "supported_features": [
+          "fec",
+          "ice_lite"
+        ]
+      }
+    },
+    {
+      "variant": "handshake_ack",
+      "payload_hex": "01000000010100000003000000666563040000007330303104010000000000000000",
+      "frame_hex": "04012a00000040420f000000000001000000010100000003000000666563040000007330303104010000000000000000",
+      "semver_packed": 260,
+      "seq": 42,
+      "timestamp_ms": 1000000,
+      "params": {
+        "accepted": true,
+        "granted_features": [
+          "fec"
+        ],
+        "session_id": "s001",
+        "server_semver_packed": 260,
+        "reject_reason": "",
+        "download_url": ""
+      }
+    },
+    {
+      "variant": "input_command",
+      "payload_hex": "0200000064020000000000000a0000006d315f723a3631323a3000000000",
+      "frame_hex": "04012a00000040420f00000000000200000064020000000000000a0000006d315f723a3631323a3000000000",
+      "semver_packed": 260,
+      "seq": 42,
+      "timestamp_ms": 1000000,
+      "params": {
+        "tick": 612,
+        "intent_event_id": "m1_r:612:0",
+        "control_command_bytes": []
+      }
+    },
+    {
+      "variant": "snapshot_delta",
+      "payload_hex": "030000005802000000000000640200000000000004000000deadbeef",
+      "frame_hex": "04012a00000040420f0000000000030000005802000000000000640200000000000004000000deadbeef",
+      "semver_packed": 260,
+      "seq": 42,
+      "timestamp_ms": 1000000,
+      "params": {
+        "from_tick": 600,
+        "to_tick": 612,
+        "delta_bytes": [
+          222,
+          173,
+          190,
+          239
+        ]
+      }
+    },
+    {
+      "variant": "event_batch",
+      "payload_hex": "04000000580200000000000003000000010203",
+      "frame_hex": "04012a00000040420f000000000004000000580200000000000003000000010203",
+      "semver_packed": 260,
+      "seq": 42,
+      "timestamp_ms": 1000000,
+      "params": {
+        "tick": 600,
+        "events_bytes": [
+          1,
+          2,
+          3
+        ]
+      }
+    },
+    {
+      "variant": "checksum_probe",
+      "payload_hex": "050000005802000000000000000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "frame_hex": "04012a00000040420f0000000000050000005802000000000000000102030405060708090a0b0c0d0e0f101112131415161718191a1b1c1d1e1f",
+      "semver_packed": 260,
+      "seq": 42,
+      "timestamp_ms": 1000000,
+      "params": {
+        "tick": 600,
+        "checksum_bytes": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9,
+          10,
+          11,
+          12,
+          13,
+          14,
+          15,
+          16,
+          17,
+          18,
+          19,
+          20,
+          21,
+          22,
+          23,
+          24,
+          25,
+          26,
+          27,
+          28,
+          29,
+          30,
+          31
+        ]
+      }
+    },
+    {
+      "variant": "input_command_redundant",
+      "payload_hex": "09000000bd020000000000000303000000ba020000000000000100000010bb020000000000000100000011bc020000000000000100000012",
+      "frame_hex": "04012a00000040420f000000000009000000bd020000000000000303000000ba020000000000000100000010bb020000000000000100000011bc020000000000000100000012",
+      "semver_packed": 260,
+      "seq": 42,
+      "timestamp_ms": 1000000,
+      "params": {
+        "head_tick": 701,
+        "window_ticks": 3,
+        "entries": [
+          {
+            "tick": 698,
+            "intent_bytes": [
+              16
+            ]
+          },
+          {
+            "tick": 699,
+            "intent_bytes": [
+              17
+            ]
+          },
+          {
+            "tick": 700,
+            "intent_bytes": [
+              18
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "variant": "fec_shard",
+      "payload_hex": "0a000000630000000000000004040204000000deadbeef",
+      "frame_hex": "04012a00000040420f00000000000a000000630000000000000004040204000000deadbeef",
+      "semver_packed": 260,
+      "seq": 42,
+      "timestamp_ms": 1000000,
+      "params": {
+        "group_id": 99,
+        "shard_index": 4,
+        "k": 4,
+        "m": 2,
+        "shard_bytes": [
+          222,
+          173,
+          190,
+          239
+        ]
+      }
+    },
+    {
+      "variant": "nat_traversal_outcome",
+      "payload_hex": "0b00000008000000736573732d616263080000006963655f6c69746506000000646972656374d2040000",
+      "frame_hex": "04012a00000040420f00000000000b00000008000000736573732d616263080000006963655f6c69746506000000646972656374d2040000",
+      "semver_packed": 260,
+      "seq": 42,
+      "timestamp_ms": 1000000,
+      "params": {
+        "session_id": "sess-abc",
+        "method": "ice_lite",
+        "path": "direct",
+        "elapsed_ms": 1234
+      }
+    },
+    {
+      "variant": "rollback_window",
+      "payload_hex": "0c00000066020000000000006c02000000000000bc1b00000e000000696e7075745f6d69736d61746368",
+      "frame_hex": "04012a00000040420f00000000000c00000066020000000000006c02000000000000bc1b00000e000000696e7075745f6d69736d61746368",
+      "semver_packed": 260,
+      "seq": 42,
+      "timestamp_ms": 1000000,
+      "params": {
+        "from_tick": 614,
+        "to_tick": 620,
+        "resim_us": 7100,
+        "cause": "input_mismatch"
+      }
+    }
+  ]
+}

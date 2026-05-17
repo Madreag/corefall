@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/net_rollback_window.v1",
+  "title": "net.rollback_window",
+  "description": "M8B § Acceptance '6-frame rollback resimulates inside budget'. Emitted once per rollback resimulation window; payload carries the (from_tick, to_tick, resim_us, cause) so the replay viewer + observe.net.rollback_stats consumers can render perf timelines. NOT cosmetic.",
+  "type": "object",
+  "required": [
+    "from_tick",
+    "to_tick",
+    "resim_us",
+    "cause"
+  ],
+  "properties": {
+    "from_tick": { "type": "integer", "minimum": 0 },
+    "to_tick": { "type": "integer", "minimum": 0 },
+    "resim_us": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Total resimulation wall-clock cost in microseconds. Budget = 8000 (8 ms) at p99 per M8B § locked."
+    },
+    "cause": {
+      "type": "string",
+      "description": "Free-form reason for the rollback (e.g., 'input_mismatch')."
+    },
+    "rollback_to_tick_elapsed_us": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Sub-budget for the initial state-rollback (per spec 'rolls back to tick T within 1 ms')."
+    },
+    "per_frame_resim_elapsed_us": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "Sub-budget for the per-frame resimulation steps (≤ 7 ms p99 for 6 frames)."
+    },
+    "within_budget": { "type": "boolean" },
+    "tick": { "type": "integer", "minimum": 0 }
+  }
+}

@@ -1492,6 +1492,7 @@ version = "0.0.1"
 dependencies = [
  "cf-actor",
  "cf-sim-core",
+ "ron",
  "serde",
  "serde_json",
  "tracing",
@@ -1630,6 +1631,7 @@ dependencies = [
  "cf-localization",
  "cf-material",
  "cf-mission",
+ "cf-net",
  "cf-perception",
  "cf-photo",
  "cf-physics",
@@ -1898,7 +1900,10 @@ name = "cf-server"
 version = "0.0.1"
 dependencies = [
  "anyhow",
+ "cf-net",
  "clap",
+ "serde",
+ "serde_json",
  "tracing",
  "tracing-subscriber",
 ]
@@ -2024,6 +2029,7 @@ version = "0.0.1"
 dependencies = [
  "bevy",
  "cf-actor",
+ "cf-ai",
  "cf-equipment",
  "cf-terrain",
  "serde",

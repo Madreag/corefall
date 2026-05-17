@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/net_nat_traversal_outcome.v1",
+  "title": "net.nat_traversal_outcome",
+  "description": "M8B § Acceptance 'ICE-lite + STUN punches a symmetric-NAT to symmetric-NAT pair' + 'TURN relay engages when ICE-lite fails'. Emitted by the server (and surfaced to the client's status line) when the NAT punch-through flow resolves. NOT cosmetic (status of the session's connectivity tier is sim-relevant).",
+  "type": "object",
+  "required": [
+    "session_id",
+    "method",
+    "path",
+    "elapsed_ms"
+  ],
+  "properties": {
+    "session_id": { "type": "string" },
+    "method": {
+      "type": "string",
+      "enum": ["ice_lite", "turn_relay"],
+      "description": "Which traversal flow succeeded. ICE-lite = STUN-discovered candidate pair; TURN relay = relayed allocation."
+    },
+    "path": {
+      "type": "string",
+      "enum": ["direct", "relay"],
+      "description": "User-visible tier label surfaced in the status line."
+    },
+    "elapsed_ms": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 60000,
+      "description": "Total wall-clock time spent in the NAT punch flow. Target ≤ 6000 ms per spec § Acceptance."
+    },
+    "tick": { "type": "integer", "minimum": 0 }
+  }
+}

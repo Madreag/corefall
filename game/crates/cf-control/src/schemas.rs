@@ -496,6 +496,55 @@ pub struct ObserveTerrainMaterialAtParams {
     pub y: f32,
 }
 
+/// **M7B**: `act.squad.issue` — issue a verb from the canonical squad
+/// command grammar to a squad. Spec § "50+ named squad verbs in a
+/// data-driven registry".
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActSquadIssueParams {
+    pub schema_version: u32,
+    pub squad_id: u64,
+    pub verb_id: String,
+    #[serde(default)]
+    pub args: Vec<serde_json::Value>,
+}
+
+/// **M7B**: `act.squad.set_formation` — switch the squad's active formation
+/// kind (Wedge / Diamond / Column / Line Abreast / Echelon-Left /
+/// Echelon-Right / Single-File / Stack (door) / Defensive Perimeter).
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActSquadSetFormationParams {
+    pub schema_version: u32,
+    pub squad_id: u64,
+    pub formation_kind: String,
+}
+
+/// **M7B**: `act.squad.assign_role` — assign a sticky role to a member
+/// (Pointman / Rifleman / Marksman / Heavy / Engineer / Medic /
+/// Squad Leader).
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActSquadAssignRoleParams {
+    pub schema_version: u32,
+    pub squad_id: u64,
+    pub member_actor_id: u64,
+    pub role: String,
+}
+
+/// **M7B**: `srv.dump_squad_state` — return the full squad-state JSON
+/// view (verb registry + formation catalog + archetype-BT node counts +
+/// per-squad state row). Used by the M25 wheel + Tab overlay + assert
+/// the spec's "verb registry enumerates 50+ named squad commands"
+/// invariant.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SrvDumpSquadStateParams {
+    pub schema_version: u32,
+    #[serde(default)]
+    pub squad_id: u64,
+}
+
 fn default_true() -> bool {
     true
 }
@@ -597,6 +646,16 @@ pub fn dump_v1() -> BTreeMap<String, String> {
         entry::<ObserveFrame>("observe_frame"),
         entry::<ObserveSettings>("observe_settings"),
         entry::<crate::state::ActorView>("actor_view"),
+        // **M7B**: deep squad command grammar surface.
+        entry::<ActSquadIssueParams>("act_squad_issue_params"),
+        entry::<ActSquadSetFormationParams>("act_squad_set_formation_params"),
+        entry::<ActSquadAssignRoleParams>("act_squad_assign_role_params"),
+        entry::<SrvDumpSquadStateParams>("srv_dump_squad_state_params"),
+        // **M8B**: net admin / observe surface (observe.net.* + admin.net.*).
+        entry::<crate::m8b_net_admin::ObserveNetSessionTransportParams>("observe_net_session_transport_params"),
+        entry::<crate::m8b_net_admin::ObserveNetRollbackStatsParams>("observe_net_rollback_stats_params"),
+        entry::<crate::m8b_net_admin::ObserveNetLossRecoveryParams>("observe_net_loss_recovery_params"),
+        entry::<crate::m8b_net_admin::AdminNetForceRelayParams>("admin_net_force_relay_params"),
     ] {
         out.insert(name, body);
     }

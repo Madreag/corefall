@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/net_input_resent_redundant.v1",
+  "title": "net.input_resent_redundant",
+  "description": "M8B § Acceptance 'Redundant-input encoding recovers from single-datagram loss'. Emitted by the server when an input tick that would otherwise have stalled the rollback queue is recovered from a redundant-input tail piggybacked on a later datagram. NOT cosmetic (recovery is sim-relevant evidence).",
+  "type": "object",
+  "required": [
+    "session_id",
+    "recovered_tick",
+    "carrier_tick",
+    "window_ticks"
+  ],
+  "properties": {
+    "session_id": { "type": "string" },
+    "recovered_tick": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "The tick whose datagram was dropped + recovered from a redundant tail."
+    },
+    "carrier_tick": {
+      "type": "integer",
+      "minimum": 0,
+      "description": "The tick of the datagram whose redundant tail carried the recovered input."
+    },
+    "window_ticks": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 16,
+      "description": "Configured redundant-input window. Default 3 per M8B § Notes."
+    },
+    "tick": { "type": "integer", "minimum": 0 }
+  }
+}

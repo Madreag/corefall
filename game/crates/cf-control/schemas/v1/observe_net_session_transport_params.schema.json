@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ObserveNetSessionTransportParams",
+  "description": "`observe.net.session_transport` — projection of the currently\nnegotiated transport mode + NAT traversal outcome. Empty when no\nsession is active.",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema_version"
+  ]
+}

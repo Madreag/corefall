@@ -1,6 +1,5 @@
-//! M8A § Network protocol v0.1 — locked wire frames.
-//!
-//! Per M8A spec § Network protocol v0.1:
+//! M8A § Network protocol v0.1 — locked wire frames + M8B byte-stable
+//! v0.1 frame layout + semver gate + downgrade-attack detection.
 //!
 //! ```text
 //! NetFrame {
@@ -10,10 +9,20 @@
 //!   payload: NetPayload  // tagged union
 //! }
 //! ```
+//!
+//! M8A shipped the JSON-encoded scaffold. M8B promotes it to a
+//! byte-pinned v0.1 layout via the `frame_v01` submodule + adds the
+//! semver gate via `semver`.
 
 use serde::{Deserialize, Serialize};
 
-/// **M8A § locked**: protocol_version stays at 1 for v0.1.
+pub mod byte_pinning_tests;
+pub mod frame_v01;
+pub mod semver;
+
+/// **M8A § locked**: protocol_version stays at 1 for v0.1 (legacy
+/// scaffold field). M8B introduces the byte-pinned `semver_packed` u16
+/// in `NetFrameV01` for the canonical wire.
 pub const PROTOCOL_VERSION: u16 = 1;
 
 /// **M8A § locked**: per-frame max size (Ethernet MTU minus IP+UDP+QUIC

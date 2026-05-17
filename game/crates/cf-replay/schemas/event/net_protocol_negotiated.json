@@ -1,0 +1,53 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/net_protocol_negotiated.v1",
+  "title": "net.protocol_negotiated",
+  "description": "M8B § Acceptance 'Semver negotiation accepts a minor-newer server' + 'Semver negotiation rejects a major-mismatched client'. Emitted on every cf-net handshake by both sides; payload carries the session_semver agreed upon plus the granted feature subset. NOT cosmetic (sim-relevant + non-droppable under M4 cosmetic backpressure).",
+  "type": "object",
+  "required": [
+    "session_id",
+    "accepted",
+    "server_semver_packed",
+    "client_semver_packed",
+    "session_semver_packed",
+    "granted_features"
+  ],
+  "properties": {
+    "session_id": {
+      "type": "string"
+    },
+    "accepted": {
+      "type": "boolean"
+    },
+    "server_semver_packed": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 65535,
+      "description": "u16 packed (minor << 8) | patch. 0.1.7 = 0x0107; 0.2.0 = 0x0200."
+    },
+    "client_semver_packed": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 65535
+    },
+    "session_semver_packed": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 65535,
+      "description": "The lower of (server, client) when both agree on major+minor. Zero when accepted=false."
+    },
+    "granted_features": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "reject_reason": {
+      "type": "string",
+      "description": "'protocol_major_mismatch' when accepted=false; otherwise empty."
+    },
+    "download_url": {
+      "type": "string",
+      "description": "Server-supplied URL for the client to download an update. Present on reject only."
+    },
+    "tick": { "type": "integer", "minimum": 0 }
+  }
+}

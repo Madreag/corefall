@@ -1,12 +1,21 @@
 //! M8A § Files / cf-net — NEW crate for network protocol + transport +
-//! server + client + snapshot + rollback.
+//! server + client + snapshot + rollback. **M8B** locks the deep network
+//! protocol layer: v0.1 byte-pinned wire layout, semver gate, rollback
+//! prediction + resimulate, loss recovery (redundant input + Reed-Solomon
+//! FEC), NAT punch-through (ICE-lite + STUN + TURN relay), and
+//! deterministic transport-select policy.
 //!
 //! cf-net is the wire-protocol crate. Trust-tier / ops / persistence /
 //! anti-cheat live in the sibling cf-server* crates. cf-net's job:
 //!
 //! - **`protocol`** — locked wire frames v0.1; NetFrame + NetPayload
 //!   tagged union (Handshake / InputCommand / SnapshotDelta /
-//!   EventBatch / ChecksumProbe / Ping / Pong / Disconnect).
+//!   EventBatch / ChecksumProbe / Ping / Pong / Disconnect /
+//!   InputCommandRedundant / FecShard / NatTraversalOutcome /
+//!   RollbackWindow).
+//! - **`protocol::frame_v01`** — locked v0.1 byte-pinned layout +
+//!   encode_frame / decode_frame.
+//! - **`protocol::semver`** — major / minor / patch negotiation.
 //! - **`transport`** — QUIC via `quinn` + WebSocket fallback for in-
 //!   browser spectator clients (M11+ scope).
 //! - **`server`** — authoritative loop; one canonical sim instance;
@@ -18,20 +27,33 @@
 //!   field contract (Powder-Toy-derived).
 //! - **`rollback`** — rollback netcode primitives; 6-frame budget at p99
 //!   ≤ 8 ms total resimulation; reuses deterministic sim core.
-//!
-//! M8A ships the protocol + transport contracts + server/client/snapshot
-//! /rollback scaffolds; M9+ wires the live engine drive.
+//! - **`loss_recovery`** — redundant-input piggyback + Reed-Solomon FEC
+//!   for small reliable payloads.
+//! - **`nat`** — ICE-lite candidate gathering + STUN discovery + TURN
+//!   relay fallback + parallel candidate-pair check with deterministic
+//!   tiebreak.
+//! - **`transport_select`** — deterministic per-session transport
+//!   selection (`DedicatedServerAuth` / `HostAuthoritativeLockstep` /
+//!   `P2pLockstep`).
 
 pub mod client;
+pub mod loss_recovery;
+pub mod nat;
 pub mod protocol;
 pub mod rollback;
 pub mod server;
 pub mod snapshot;
 pub mod transport;
+pub mod transport_select;
 
 pub use protocol::{NetFrame, NetPayload, PROTOCOL_VERSION};
+pub use protocol::semver::{Semver, PROTOCOL_SEMVER};
 pub use server::ServerConfig;
 pub use snapshot::SnapshotCadence;
+pub use transport_select::{
+    select_transport, ClientCapabilities, LanParticipantRole, ServerMode, TransportMode,
+    TransportSelectInput,
+};
 
 #[derive(Debug, thiserror::Error)]
 pub enum NetError {
@@ -45,6 +67,10 @@ pub enum NetError {
     Transport(String),
     #[error("deserialize: {0}")]
     Deserialize(String),
+    /// **M8B**: tls-bound downgrade attack detected (handshake mismatch
+    /// between QUIC TLS-bound semver and application-layer Handshake).
+    #[error("tls handshake mismatch")]
+    TlsHandshakeMismatch,
 }
 
 pub type NetResult<T> = Result<T, NetError>;
