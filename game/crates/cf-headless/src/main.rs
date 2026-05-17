@@ -83,6 +83,20 @@ enum Cmd {
         /// tests that bake against a sandbox ledger.
         #[arg(long)]
         asset_ledger_path: Option<PathBuf>,
+        /// **M4B § "Ledger chain rejects tampered bundle"** — verify the
+        /// per-event BLAKE3 chain anchored at `RunManifest.ledger_chain_anchor`.
+        /// Default ON for tournament-mode bundles; pass `--skip-chain-verify`
+        /// to opt out in dev workflows.
+        #[arg(long, default_value_t = false)]
+        skip_chain_verify: bool,
+    },
+    /// **M4B § "cf-headless save migrate"** — standalone migrator binary path.
+    /// Read `<path>/quicksave.cfsave`, walk the migration registry up to the
+    /// current build's schema, write back.
+    #[command(name = "save")]
+    Save {
+        #[command(subcommand)]
+        action: SaveAction,
     },
     /// M8A § cf-net authoritative server. Runs the deterministic sim
     /// core with no Bevy render plugin; emits a server-side run bundle
@@ -118,6 +132,24 @@ enum MeasureMode {
     Throughput,
 }
 
+#[derive(Debug, Subcommand)]
+enum SaveAction {
+    /// Standalone migrate-only path. Reads `<dir>/quicksave.cfsave`, walks
+    /// the migration registry up to `--to <version>` (default current
+    /// build), writes back in place.
+    Migrate {
+        dir: PathBuf,
+        #[arg(long)]
+        to: Option<String>,
+    },
+    /// **M4B § "cf-headless save inspect"** — print schema_version + delta
+    /// chain depth + ledger anchor for `<dir>/quicksave.cfsave` (and the
+    /// optional `<dir>/events.jsonl` sibling for chain audit).
+    Inspect { dir: PathBuf },
+}
+
+mod save_migrate;
+
 fn init_diagnostics() {
     tracing_subscriber::fmt()
         .with_env_filter(EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info,cf_=debug")))
@@ -142,6 +174,7 @@ fn main() -> Result<()> {
             max_no_advance_retries,
             no_verify_asset_refs,
             asset_ledger_path,
+            skip_chain_verify,
         } => {
             let verify = match measure {
                 Some(MeasureMode::Throughput) => false,
@@ -155,8 +188,13 @@ fn main() -> Result<()> {
                 max_no_advance_retries,
                 verify_asset_refs: !no_verify_asset_refs,
                 asset_ledger_path,
+                verify_chain: !skip_chain_verify,
             })
         }
+        Cmd::Save { action } => match action {
+            SaveAction::Migrate { dir, to } => save_migrate::run_migrate(&dir, to.as_deref()),
+            SaveAction::Inspect { dir } => save_migrate::run_inspect(&dir),
+        },
         Cmd::Serve {
             scenario,
             bind_addr,
@@ -183,6 +221,11 @@ struct ReplayArgs<'a> {
     max_no_advance_retries: u32,
     verify_asset_refs: bool,
     asset_ledger_path: Option<PathBuf>,
+    /// **M4B § "cf-headless replay <bundle> runs ledger chain verification
+    /// before sim playback"** — when true (default for tournament bundles)
+    /// walks the BLAKE3 chain over `events.jsonl` BEFORE replaying any
+    /// tick. On break, returns non-zero immediately.
+    verify_chain: bool,
 }
 
 fn replay(args: ReplayArgs<'_>) -> Result<()> {
@@ -194,9 +237,13 @@ fn replay(args: ReplayArgs<'_>) -> Result<()> {
         max_no_advance_retries,
         verify_asset_refs,
         asset_ledger_path,
+        verify_chain,
     } = args;
     if !bundle_dir.exists() {
         bail!("bundle directory does not exist: {}", bundle_dir.display());
+    }
+    if verify_chain {
+        save_migrate::verify_chain_in_bundle(bundle_dir).context("ledger chain verification (M4B)")?;
     }
     let manifest_path = bundle_dir.join("run_manifest.json");
     let manifest_text = std::fs::read_to_string(&manifest_path)

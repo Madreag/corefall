@@ -74,6 +74,13 @@ const SCHEMA_SYSTEM_RUN_FINISHED: &str = include_str!("../schemas/event/system_r
 const SCHEMA_SYSTEM_CATEGORY_BASELINE: &str = include_str!("../schemas/event/system_category_baseline.json");
 const SCHEMA_DETERMINISM_SIM_CHECKSUM: &str = include_str!("../schemas/event/determinism_sim_checksum.json");
 const SCHEMA_DETERMINISM_FIRST_DIVERGENCE: &str = include_str!("../schemas/event/determinism_first_divergence.json");
+// M4B (2026-05-16): save subsystem + delta-chain + ledger-chain event schemas.
+const SCHEMA_SNAPSHOT_BASELINE_EMITTED: &str = include_str!("../schemas/event/snapshot_baseline_emitted.json");
+const SCHEMA_SNAPSHOT_DELTA_EMITTED: &str = include_str!("../schemas/event/snapshot_delta_emitted.json");
+const SCHEMA_SAVE_COMPLETED: &str = include_str!("../schemas/event/save_completed.json");
+const SCHEMA_SAVE_LOADED: &str = include_str!("../schemas/event/save_loaded.json");
+const SCHEMA_SAVE_MIGRATED: &str = include_str!("../schemas/event/save_migrated.json");
+const SCHEMA_LEDGER_CHAIN_VERIFIED: &str = include_str!("../schemas/event/ledger_chain_verified.json");
 const SCHEMA_SNAPSHOT_ACTOR: &str = include_str!("../schemas/event/snapshot_actor.json");
 const SCHEMA_SNAPSHOT_INVENTORY: &str = include_str!("../schemas/event/snapshot_inventory.json");
 const SCHEMA_SNAPSHOT_TERRAIN_CHUNK: &str = include_str!("../schemas/event/snapshot_terrain_chunk.json");
@@ -473,6 +480,13 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("snapshot", "snapshot_terrain_chunk") => Some(SCHEMA_SNAPSHOT_TERRAIN_CHUNK),
         ("snapshot", "snapshot_terrain_summary") => Some(SCHEMA_SNAPSHOT_TERRAIN_SUMMARY),
         ("snapshot", "snapshot_chassis") => Some(SCHEMA_SNAPSHOT_CHASSIS),
+        // M4B (2026-05-16): save subsystem + delta-chain + ledger-chain events.
+        ("snapshot", "baseline_emitted") => Some(SCHEMA_SNAPSHOT_BASELINE_EMITTED),
+        ("snapshot", "delta_emitted") => Some(SCHEMA_SNAPSHOT_DELTA_EMITTED),
+        ("system", "save_completed") => Some(SCHEMA_SAVE_COMPLETED),
+        ("system", "save_loaded") => Some(SCHEMA_SAVE_LOADED),
+        ("system", "save_migrated") => Some(SCHEMA_SAVE_MIGRATED),
+        ("system", "ledger_chain_verified") => Some(SCHEMA_LEDGER_CHAIN_VERIFIED),
         // M4 § M9 firehose surface placeholders.
         ("snapshot", "snapshot_hazard_grid") => Some(SCHEMA_SNAPSHOT_HAZARD_GRID),
         ("snapshot", "snapshot_affliction") => Some(SCHEMA_SNAPSHOT_AFFLICTION),
@@ -1122,6 +1136,13 @@ mod tests {
             ("snapshot", "snapshot_terrain_chunk"),
             ("snapshot", "snapshot_terrain_summary"),
             ("snapshot", "snapshot_chassis"),
+            // M4B (2026-05-16): save subsystem + delta-chain + ledger-chain.
+            ("snapshot", "baseline_emitted"),
+            ("snapshot", "delta_emitted"),
+            ("system", "save_completed"),
+            ("system", "save_loaded"),
+            ("system", "save_migrated"),
+            ("system", "ledger_chain_verified"),
             // M4 § M9 firehose surface placeholders.
             ("snapshot", "snapshot_hazard_grid"),
             ("snapshot", "snapshot_affliction"),

@@ -1159,6 +1159,13 @@ pub trait EngineHandle: Send + Sync + 'static {
     async fn observe_assets_ledger_summary(&self) -> Option<serde_json::Value> {
         default_observe_assets_ledger_summary()
     }
+    /// **M4B § "observe.save.last returns last save metadata"** — last
+    /// quicksave / quickload / migrate snapshot (path, schema_version,
+    /// size_bytes, blake3). Default returns the empty placeholder; M0Engine
+    /// overrides with the shared [`crate::m4b_save::LastSaveCache`].
+    async fn observe_save_last(&self) -> serde_json::Value {
+        serde_json::to_value(crate::m4b_save::LastSaveMetadata::fresh()).unwrap_or(serde_json::Value::Null)
+    }
     /// **M7-B**: return the per-actor PriorityTable view (22-task weight
     /// grid + role + personality modifier). Default returns `None`.
     async fn observe_priority_table(&self, _actor_id: u64) -> Option<serde_json::Value> {
@@ -3103,6 +3110,13 @@ async fn process_request<E: EngineHandle>(
                     Some(success_response(request.id, empty))
                 }
             }
+        }
+        // **M4B § "observe.save.last returns last save metadata"**.
+        "observe.save.last" => {
+            if let Err(resp) = parse_schema_only(request.id.clone(), params) {
+                return Some(resp);
+            }
+            Some(success_response(request.id, engine.observe_save_last().await))
         }
         // M2 re-audit (2026-05-13): mission inspect (includes objectives + last events).
         "inspect.mission" => {

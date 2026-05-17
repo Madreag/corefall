@@ -1,0 +1,74 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "save_blob.v2.0.0",
+  "title": "SaveBlob (M5 + M4B)",
+  "description": "One per-actor save payload. Schema version is a 3-element JSON array [major, minor, patch] per M4B § 'SaveSchemaVersion is a 3-element JSON array'. The legacy numeric form (`schema_version: 1`) parses as `[1, 0, 0]` via cf-save's compat path.",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "actor_id",
+    "team",
+    "origin_id",
+    "position",
+    "velocity",
+    "aim",
+    "hp",
+    "hp_max",
+    "on_ground",
+    "status",
+    "selected_slot"
+  ],
+  "properties": {
+    "schema_version": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": { "type": "integer", "minimum": 0, "maximum": 65535 },
+          "minItems": 3,
+          "maxItems": 3
+        },
+        {
+          "type": "integer",
+          "description": "Legacy numeric form. Parsed as `[N, 0, 0]` for backward compat.",
+          "minimum": 0
+        },
+        {
+          "type": "object",
+          "description": "Object form (human authoring).",
+          "required": ["major", "minor", "patch"],
+          "properties": {
+            "major": { "type": "integer", "minimum": 0, "maximum": 65535 },
+            "minor": { "type": "integer", "minimum": 0, "maximum": 65535 },
+            "patch": { "type": "integer", "minimum": 0, "maximum": 65535 }
+          }
+        }
+      ]
+    },
+    "actor_id": { "type": "integer", "minimum": 0 },
+    "team": { "type": "string" },
+    "origin_id": { "type": "string" },
+    "position": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+    "velocity": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+    "aim": { "type": "array", "items": { "type": "number" }, "minItems": 2, "maxItems": 2 },
+    "hp": { "type": "number" },
+    "hp_max": { "type": "number" },
+    "on_ground": { "type": "boolean" },
+    "status": { "type": "string" },
+    "selected_slot": { "type": "integer", "minimum": 0 },
+    "rifle_preset": { "type": ["string", "null"] },
+    "rifle_ammo": { "type": ["integer", "null"], "minimum": 0 },
+    "rifle_reload_remaining_ticks": { "type": ["integer", "null"], "minimum": 0 },
+    "chassis": { "type": ["object", "null"] },
+    "gear_dropped_by_limb_loss": { "type": "boolean" },
+    "chassis_detached": { "type": "boolean" },
+    "afflictions": { "type": "array", "items": { "type": "string" } },
+    "crouch_active": { "type": "boolean" },
+    "climb_active": { "type": "boolean" },
+    "jet_active": { "type": "boolean" },
+    "mod_payload": {
+      "type": "object",
+      "description": "M4B § 'Mod-extending fields survive migration': opaque passthrough for third-party mod fields. Builds without a mod installed MUST round-trip this map verbatim through migration.",
+      "additionalProperties": true
+    }
+  }
+}

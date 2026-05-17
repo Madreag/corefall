@@ -1,0 +1,21 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "save_completed.v0.1",
+  "title": "system.save_completed payload",
+  "description": "M4B § 'system.save_completed': emitted when a quicksave / autosave write finishes. `kind` distinguishes quicksave vs autosave; `wall_clock_ms` is the engine-clock duration of the save operation.",
+  "type": "object",
+  "required": ["kind", "path", "blake3", "size_bytes", "save_schema_version"],
+  "properties": {
+    "kind": { "type": "string", "enum": ["quicksave", "autosave"] },
+    "path": { "type": "string" },
+    "blake3": { "type": "string", "minLength": 64, "maxLength": 64 },
+    "size_bytes": { "type": "integer", "minimum": 0 },
+    "wall_clock_ms": { "type": "integer", "minimum": 0 },
+    "save_schema_version": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 0, "maximum": 65535 },
+      "minItems": 3,
+      "maxItems": 3
+    }
+  }
+}

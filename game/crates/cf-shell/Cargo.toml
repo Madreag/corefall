@@ -1,5 +1,6 @@
 [package]
 name = "cf-shell"
+# M4B: cf-save dep added for SaveSchemaVersion display next to slots.
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -12,3 +13,4 @@ serde_json = { workspace = true }
 tracing = { workspace = true }
 bevy = { workspace = true }
 ron = { workspace = true }
+cf-save = { path = "../cf-save" }

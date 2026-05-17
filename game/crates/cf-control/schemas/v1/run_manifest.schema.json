@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "run_manifest.v0.1+m4b",
+  "title": "RunManifest (M4 + M4B)",
+  "description": "Run bundle manifest. M4B extends the M4 manifest with `save_schema_version`, `delta_baseline_cadence_ticks`, and `ledger_chain_anchor` (optional, tournament-mode only).",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "run_id",
+    "prototype_slice",
+    "run_mode",
+    "milestone",
+    "seed",
+    "started_at_utc",
+    "tick_rate_hz"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "prototype-run-manifest.v0.1"
+    },
+    "run_id": { "type": "string" },
+    "prototype_slice": { "type": "string" },
+    "run_mode": { "type": "string" },
+    "milestone": { "type": "string" },
+    "seed": { "type": "integer", "minimum": 0 },
+    "tick_rate_hz": { "type": "integer", "minimum": 1 },
+    "expected_outcome": {
+      "type": "string",
+      "enum": ["clean", "panic", "abort"]
+    },
+    "save_schema_version": {
+      "type": "array",
+      "description": "M4B § 'Replays survive a game update': the SaveSchemaVersion this run was recorded under, as [major, minor, patch]. Defaults to `[2, 0, 0]` for legacy bundles.",
+      "items": { "type": "integer", "minimum": 0, "maximum": 65535 },
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "delta_baseline_cadence_ticks": {
+      "type": "integer",
+      "description": "M4B § 'Delta baseline cadence is enforced': ticks between baseline snapshots in the run bundle. Default 600 (10 s @ 60 Hz).",
+      "minimum": 1,
+      "default": 600
+    },
+    "ledger_chain_anchor": {
+      "type": ["string", "null"],
+      "description": "M4B § 'Tamper-evident competitive replays': BLAKE3 chain anchor of the final event in the run. Set in tournament mode; null in dev mode."
+    }
+  },
+  "additionalProperties": true
+}

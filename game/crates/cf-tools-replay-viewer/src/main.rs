@@ -256,6 +256,22 @@ fn main() -> Result<()> {
                 return Ok(());
             }
             let bundle = load_bundle(&bundle_dir)?;
+            // **M4B § "Tamper-evident competitive replays"** — when the
+            // bundle has a ledger_chain_anchor (tournament mode), refuse
+            // to render its events if the chain is broken. Dev-mode
+            // bundles (no anchor) pass through unchanged.
+            if let Some(cf_save::ledger_chain::VerifyOutcome::Tampered { first_break }) =
+                verify_bundle_chain(&bundle)
+            {
+                eprintln!(
+                    "FAIL bundle_dir={} ledger_chain_tampered_at={} expected={} actual={}",
+                    bundle_dir.display(),
+                    first_break.event_id,
+                    first_break.expected_hash,
+                    first_break.actual_hash
+                );
+                bail!("ledger chain verification failed; refusing to render tampered bundle");
+            }
             // **M11**: --accessibility composes with --filter by adding the
             // ACC-A audit trail categories (accessibility, ux) to the union.
             let effective_filter = if accessibility {
@@ -352,6 +368,42 @@ fn main() -> Result<()> {
         }
         Cmd::Validate { bundle_dir, output } => match Bundle::load(&bundle_dir) {
             Ok(bundle) => {
+                // **M4B § "Viewer validate refuses to render tampered
+                // bundle"** — run the BLAKE3 ledger chain check before
+                // declaring PASS. When the chain anchor is set + the chain
+                // doesn't verify, downgrade to FAIL.
+                let chain_outcome = verify_bundle_chain(&bundle);
+                // **M4B § "ledger_chain_verified event fires in the viewer's
+                // audit log"** — record the outcome regardless of pass/fail
+                // so the audit trail is preserved.
+                if let Some(out) = &chain_outcome {
+                    let _ = write_chain_audit_event(&bundle_dir, &bundle.manifest.run_id, out);
+                }
+                if let Some(cf_save::ledger_chain::VerifyOutcome::Tampered { first_break }) = &chain_outcome {
+                    let json = serde_json::json!({
+                        "run_id": bundle.manifest.run_id,
+                        "status": "fail",
+                        "error": format!(
+                            "ledger chain tampered at event_id={}",
+                            first_break.event_id
+                        ),
+                        "first_break": {
+                            "event_id": first_break.event_id,
+                            "expected_hash": first_break.expected_hash,
+                            "actual_hash": first_break.actual_hash,
+                        },
+                        "warnings": [],
+                    });
+                    if let Some(out_path) = output.as_deref() {
+                        write_output(Some(out_path), &serde_json::to_string_pretty(&json)?)?;
+                    }
+                    eprintln!(
+                        "FAIL bundle_dir={} ledger_chain_tampered_at={}",
+                        bundle_dir.display(),
+                        first_break.event_id
+                    );
+                    bail!("ledger chain verification failed");
+                }
                 if let Some(out_path) = output.as_deref() {
                     let json = serde_json::json!({
                         "run_id": bundle.manifest.run_id,
@@ -361,6 +413,15 @@ fn main() -> Result<()> {
                         "events_total": bundle.summary.event_counts.total,
                         "first_tick": bundle.summary.first_tick,
                         "last_tick": bundle.summary.last_tick,
+                        "ledger_chain": match &chain_outcome {
+                            Some(cf_save::ledger_chain::VerifyOutcome::Clean { events_verified, anchor }) => {
+                                serde_json::json!({"result": "clean", "events_verified": events_verified, "anchor": anchor})
+                            }
+                            Some(cf_save::ledger_chain::VerifyOutcome::EmptyChain) => {
+                                serde_json::json!({"result": "empty_chain"})
+                            }
+                            _ => serde_json::Value::Null,
+                        },
                     });
                     write_output(Some(out_path), &serde_json::to_string_pretty(&json)?)?;
                 } else {
@@ -443,6 +504,81 @@ fn main() -> Result<()> {
 
 fn load_bundle(path: &Path) -> Result<Bundle> {
     Bundle::load(path).with_context(|| format!("load run bundle {}", path.display()))
+}
+
+/// **M4B § "ledger_chain_verified event fires in the viewer's audit log"** —
+/// append one structured entry per validation run. The schema matches
+/// `cf-replay/schemas/event/ledger_chain_verified.json`. The audit log
+/// lives at `<bundle>/ledger_chain_audit.jsonl` (shared with `cf-mod
+/// ledger verify --bundle`) so every verification by either tool persists.
+fn write_chain_audit_event(
+    bundle_dir: &Path,
+    run_id: &str,
+    outcome: &cf_save::ledger_chain::VerifyOutcome,
+) -> std::io::Result<()> {
+    use std::io::Write as _;
+    let path = bundle_dir.join("ledger_chain_audit.jsonl");
+    let envelope = match outcome {
+        cf_save::ledger_chain::VerifyOutcome::Clean { events_verified, anchor } => {
+            serde_json::json!({
+                "event_type": "ledger_chain_verified",
+                "run_id": run_id,
+                "result": "clean",
+                "events_verified": events_verified,
+                "anchor": anchor,
+                "verifier": "cf-tools-replay-viewer",
+            })
+        }
+        cf_save::ledger_chain::VerifyOutcome::Tampered { first_break } => serde_json::json!({
+            "event_type": "ledger_chain_verified",
+            "run_id": run_id,
+            "result": "tampered",
+            "first_break": {
+                "event_id": first_break.event_id,
+                "expected_hash": first_break.expected_hash,
+                "actual_hash": first_break.actual_hash,
+            },
+            "verifier": "cf-tools-replay-viewer",
+        }),
+        cf_save::ledger_chain::VerifyOutcome::EmptyChain => serde_json::json!({
+            "event_type": "ledger_chain_verified",
+            "run_id": run_id,
+            "result": "empty_chain",
+            "verifier": "cf-tools-replay-viewer",
+        }),
+    };
+    let mut f = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&path)?;
+    writeln!(f, "{}", serde_json::to_string(&envelope)?)?;
+    Ok(())
+}
+
+/// **M4B**: BLAKE3 ledger chain verifier shared between
+/// `cf-tools-replay-viewer validate` and the view header. Returns `None`
+/// when the bundle has no `ledger_chain_anchor` (dev mode); otherwise
+/// returns the structured outcome from `cf_save::ledger_chain::verify_chain`.
+fn verify_bundle_chain(bundle: &Bundle) -> Option<cf_save::ledger_chain::VerifyOutcome> {
+    let anchor = bundle.manifest.ledger_chain_anchor.as_deref()?;
+    if anchor.is_empty() {
+        return None;
+    }
+    let mut chained = Vec::with_capacity(bundle.events.len());
+    for event in &bundle.events {
+        let payload_canonical_json = serde_json::to_string(&event.payload).ok()?;
+        chained.push(cf_save::ledger_chain::ChainedEvent {
+            event_id: event.event_id.clone(),
+            payload_canonical_json,
+            prev_event_hash: event.prev_event_hash.clone(),
+            chained_hash_hex: event.chained_hash_hex.clone().unwrap_or_default(),
+        });
+    }
+    Some(cf_save::ledger_chain::verify_chain(
+        &bundle.manifest.run_id,
+        bundle.manifest.seed,
+        &chained,
+    ))
 }
 
 fn write_output(output: Option<&Path>, text: &str) -> Result<()> {

@@ -23,6 +23,7 @@ cf-control = { path = "../cf-control" }
 cf-equipment = { path = "../cf-equipment" }
 cf-material = { path = "../cf-material" }
 cf-replay = { path = "../cf-replay" }
+cf-save = { path = "../cf-save" }
 
 [dev-dependencies]
 blake3 = { workspace = true }

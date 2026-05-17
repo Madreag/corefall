@@ -23,3 +23,7 @@ cf-control = { path = "../cf-control" }
 cf-replay = { path = "../cf-replay" }
 cf-actor = { path = "../cf-actor" }
 cf-net = { path = "../cf-net" }
+cf-save = { path = "../cf-save" }
+
+[dev-dependencies]
+tempfile = "3"

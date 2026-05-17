@@ -15,6 +15,7 @@
 pub mod bundle;
 pub mod cause_chain;
 pub mod debrief;
+pub mod delta_reconstructor;
 pub mod renderer;
 pub mod summary;
 mod text;

@@ -1,0 +1,19 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "save_loaded.v0.1",
+  "title": "system.save_loaded payload",
+  "description": "M4B § 'system.save_loaded': emitted when F9 / cfctl quickload finishes. Paired with `system.save_migrated` when the load triggered a migration step.",
+  "type": "object",
+  "required": ["path", "blake3", "save_schema_version"],
+  "properties": {
+    "path": { "type": "string" },
+    "blake3": { "type": "string" },
+    "wall_clock_ms": { "type": "integer", "minimum": 0 },
+    "save_schema_version": {
+      "type": "array",
+      "items": { "type": "integer", "minimum": 0, "maximum": 65535 },
+      "minItems": 3,
+      "maxItems": 3
+    }
+  }
+}
