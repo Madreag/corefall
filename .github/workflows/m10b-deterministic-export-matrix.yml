@@ -1,0 +1,82 @@
+name: m10b-deterministic-export-matrix
+# VAL-M10B-037: this workflow is the required CI gate that runs
+# `m10b_deterministic_export_matrix.sh` on any PR whose diff touches
+# `game/crates/cf-replay-export/**` or `game/content/replay_export/**`.
+# The matrix script enforces the cross-OS BLAKE3 determinism contract +
+# the audio WAV +/- 1 LSB tolerance + the archival_lossless byte-identical
+# contract per VAL-M10B-017..020.
+on:
+  pull_request:
+    paths:
+      - "game/crates/cf-replay-export/**"
+      - "game/crates/cf-replay/schemas/event/replay_export_started.json"
+      - "game/crates/cf-replay/schemas/event/replay_export_completed.json"
+      - "game/crates/cf-replay/schemas/event/chapter_marker_emitted.json"
+      - "game/crates/cf-replay/schemas/event/camera_track_loaded.json"
+      - "game/content/replay_export/**"
+      - "game/scripts/m10b_deterministic_export_matrix.sh"
+      - "game/scripts/m10b_export_smoke.sh"
+      - ".github/workflows/m10b-deterministic-export-matrix.yml"
+  push:
+    branches: [main]
+    paths:
+      - "game/crates/cf-replay-export/**"
+      - "game/content/replay_export/**"
+      - "game/scripts/m10b_deterministic_export_matrix.sh"
+      - "game/scripts/m10b_export_smoke.sh"
+      - ".github/workflows/m10b-deterministic-export-matrix.yml"
+
+jobs:
+  matrix:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        shell: bash
+        working-directory: ${{ github.workspace }}
+    steps:
+      - uses: actions/checkout@v6.0.2
+      - name: Install Linux deps
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libasound2-dev libudev-dev libxkbcommon-dev libwayland-dev pkg-config ffmpeg jq
+      - name: Install macOS deps
+        if: runner.os == 'macOS'
+        run: |
+          brew install ffmpeg jq || true
+      - name: Install Windows deps
+        if: runner.os == 'Windows'
+        run: |
+          choco install ffmpeg jq -y || true
+      - name: Install Rust 1.95.0
+        run: |
+          rustup toolchain install 1.95.0 --profile minimal --component rustfmt --component clippy
+          rustup show active-toolchain
+          rustc --version
+          cargo --version
+      - uses: Swatinem/rust-cache@v2.9.1
+        continue-on-error: true
+        with:
+          workspaces: game -> target
+      - name: cargo check cf-replay-export
+        working-directory: game
+        run: cargo check -p cf-replay-export
+      - name: cargo test cf-replay-export
+        working-directory: game
+        run: cargo test -p cf-replay-export --no-fail-fast
+      - name: m10b_deterministic_export_matrix.sh (local-only per OS)
+        run: bash game/scripts/m10b_deterministic_export_matrix.sh --local-only --json
+      - name: Upload mismatch report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: m10b-matrix-${{ matrix.os }}
+          path: |
+            /tmp/m10b_deterministic_export_matrix/m10b_matrix_summary.json
+            /tmp/m10b_deterministic_export_matrix/m10b_matrix_mismatches.jsonl
+            /tmp/m10b_deterministic_export_matrix/audio_check.json
+          if-no-files-found: ignore
