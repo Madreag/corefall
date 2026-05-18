@@ -1,0 +1,62 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/wound.scarred.v0.1",
+  "title": "wound.scarred",
+  "description": "M14G § Per-tick aging pass — fires when a wound whose WoundSpec.closes_to_scar = true transitions to the Scar visible state. Only emitted for kinds with closes_to_scar true (e.g. LacerationModerate, GunshotThrough). Honors VAL-M14G-024/035/039.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "wound" },
+    "event_type": { "const": "scarred" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "tick": { "type": "integer", "minimum": 0 },
+        "zone": { "type": "string" },
+        "wound_id": { "type": "integer", "minimum": 0 },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "LacerationLight",
+            "LacerationModerate",
+            "LacerationSevere",
+            "Puncture",
+            "StabThrough",
+            "GunshotEntry",
+            "GunshotExit",
+            "GunshotThrough",
+            "ShrapnelEmbedded",
+            "ShrapnelThrough",
+            "BruiseLight",
+            "BruiseHeavy",
+            "CrushLimb",
+            "Concussion",
+            "FractureSimple",
+            "FractureCompound",
+            "FractureComminuted",
+            "Dislocation",
+            "SprainStrain",
+            "Burn1st",
+            "Burn2nd",
+            "Burn3rd",
+            "Frostbite1st",
+            "Frostbite2nd",
+            "Frostbite3rd",
+            "AcidBurn",
+            "ChemicalBurn",
+            "EyeInjury",
+            "EarInjury",
+            "DentalDamage"
+          ]
+        }
+      },
+      "required": ["actor_id", "tick", "zone", "wound_id", "kind"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

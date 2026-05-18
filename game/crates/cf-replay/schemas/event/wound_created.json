@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/wound.created.v0.1",
+  "title": "wound.created",
+  "description": "M14G § Per-Wound-Type Granularity — fires when a producer (penetration_ray / fall_impulse_chain / material_reactions / tile_thermal / M14C tank rounds / M14D fuze trigger / M14E cave-in / M14F wall-rupture) emits a typed wound. Payload carries the canonical WoundKind name, actor + zone + severity ∈ [0, 1] + tick + wound_id. Honors VAL-M14G-009/010/011/013/014/016/017/018/022/023/027/029/030.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "wound" },
+    "event_type": { "const": "created" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "tick": { "type": "integer", "minimum": 0 },
+        "wound_id": { "type": "integer", "minimum": 0 },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "LacerationLight",
+            "LacerationModerate",
+            "LacerationSevere",
+            "Puncture",
+            "StabThrough",
+            "GunshotEntry",
+            "GunshotExit",
+            "GunshotThrough",
+            "ShrapnelEmbedded",
+            "ShrapnelThrough",
+            "BruiseLight",
+            "BruiseHeavy",
+            "CrushLimb",
+            "Concussion",
+            "FractureSimple",
+            "FractureCompound",
+            "FractureComminuted",
+            "Dislocation",
+            "SprainStrain",
+            "Burn1st",
+            "Burn2nd",
+            "Burn3rd",
+            "Frostbite1st",
+            "Frostbite2nd",
+            "Frostbite3rd",
+            "AcidBurn",
+            "ChemicalBurn",
+            "EyeInjury",
+            "EarInjury",
+            "DentalDamage"
+          ]
+        },
+        "zone": { "type": "string" },
+        "severity": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "dirt_pct": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+      },
+      "required": ["actor_id", "tick", "kind", "zone", "severity"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

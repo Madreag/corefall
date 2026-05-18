@@ -157,6 +157,13 @@ const SCHEMA_TERRAIN_WALL_BULGING: &str = include_str!("../schemas/event/terrain
 const SCHEMA_TERRAIN_WALL_CRACK_ADVANCED: &str = include_str!("../schemas/event/terrain_wall_crack_advanced.json");
 const SCHEMA_TERRAIN_WALL_RUPTURE: &str = include_str!("../schemas/event/terrain_wall_rupture.json");
 const SCHEMA_TERRAIN_BRACE_STRUT_PLACED: &str = include_str!("../schemas/event/terrain_brace_strut_placed.json");
+// **M14G** — Per-wound-type granularity event schemas (wound.created, wound.escalated,
+// wound.aged, wound.scabbed, wound.scarred).
+const SCHEMA_WOUND_CREATED: &str = include_str!("../schemas/event/wound_created.json");
+const SCHEMA_WOUND_ESCALATED: &str = include_str!("../schemas/event/wound_escalated.json");
+const SCHEMA_WOUND_AGED: &str = include_str!("../schemas/event/wound_aged.json");
+const SCHEMA_WOUND_SCABBED: &str = include_str!("../schemas/event/wound_scabbed.json");
+const SCHEMA_WOUND_SCARRED: &str = include_str!("../schemas/event/wound_scarred.json");
 const SCHEMA_ARMOR_SCHURZEN_PRE_DETONATED: &str = include_str!("../schemas/event/armor_schurzen_pre_detonated.json");
 const SCHEMA_ARMOR_MULTI_HIT_DEGRADATION: &str = include_str!("../schemas/event/armor_multi_hit_degradation.json");
 const SCHEMA_ARMOR_REACTIVE_ARMOR_CONSUMED: &str = include_str!("../schemas/event/armor_reactive_armor_consumed.json");
@@ -623,6 +630,12 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("terrain", "wall_crack_advanced") => Some(SCHEMA_TERRAIN_WALL_CRACK_ADVANCED),
         ("terrain", "wall_rupture") => Some(SCHEMA_TERRAIN_WALL_RUPTURE),
         ("terrain", "brace_strut_placed") => Some(SCHEMA_TERRAIN_BRACE_STRUT_PLACED),
+        // **M14G** § per-wound-type granularity event surface.
+        ("wound", "created") => Some(SCHEMA_WOUND_CREATED),
+        ("wound", "escalated") => Some(SCHEMA_WOUND_ESCALATED),
+        ("wound", "aged") => Some(SCHEMA_WOUND_AGED),
+        ("wound", "scabbed") => Some(SCHEMA_WOUND_SCABBED),
+        ("wound", "scarred") => Some(SCHEMA_WOUND_SCARRED),
         ("armor", "schurzen_pre_detonated") => Some(SCHEMA_ARMOR_SCHURZEN_PRE_DETONATED),
         ("armor", "multi_hit_degradation") => Some(SCHEMA_ARMOR_MULTI_HIT_DEGRADATION),
         ("armor", "reactive_armor_consumed") => Some(SCHEMA_ARMOR_REACTIVE_ARMOR_CONSUMED),
@@ -1339,6 +1352,12 @@ mod tests {
             ("terrain", "wall_crack_advanced"),
             ("terrain", "wall_rupture"),
             ("terrain", "brace_strut_placed"),
+            // M14G § per-wound-type granularity event surface.
+            ("wound", "created"),
+            ("wound", "escalated"),
+            ("wound", "aged"),
+            ("wound", "scabbed"),
+            ("wound", "scarred"),
             // M5 internal.* family.
             ("internal", "organ_damaged"),
             ("internal", "organ_destroyed"),
@@ -2536,6 +2555,12 @@ mod tests {
             ("armor", "era_pre_detonated"),
             // M14D projectile-projectile CCD pair contact.
             ("collision", "projectile_pair_contact"),
+            // M14G per-wound-type granularity event surface.
+            ("wound", "created"),
+            ("wound", "escalated"),
+            ("wound", "aged"),
+            ("wound", "scabbed"),
+            ("wound", "scarred"),
             ("internal", "organ_damaged"),
             ("internal", "organ_destroyed"),
             ("internal", "organ_failure_cascade"),
