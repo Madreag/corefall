@@ -20,10 +20,10 @@
       origin_id: Some("human")),
   ],
   gravity_overrides: [
-    (kind: "uniform_well", id: 1, center: (200.0, 100.0), radius: 50.0, magnitude: 25.0),
-    (kind: "region_low_g", id: 2, min: (260.0, 0.0), max: (380.0, 200.0), local_g: 4.9),
+    (kind: "uniform_well", id: 1, center: (200.0, 100.0), radius: 50.0, magnitude: 250.0),
+    (kind: "region_low_g", id: 2, min: (260.0, 0.0), max: (380.0, 200.0), local_g: 490.0),
     (kind: "magnetic_boots", id: 3, actor_id: 2),
-    (kind: "damaged_grav", id: 4, center: (420.0, 100.0), radius: 80.0, magnitude_factor: 0.4, wave_front_radius: 40.0),
+    (kind: "damaged_grav", id: 4, center: (420.0, 100.0), radius: 80.0, magnitude_factor: 0.4, wave_front_radius: 0.0, wave_front_growth_per_s: 8.0),
     (kind: "reverse_g", id: 5, min: (480.0, 0.0), max: (540.0, 80.0)),
   ],
   objectives: [],

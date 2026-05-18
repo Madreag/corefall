@@ -123,10 +123,70 @@ pub fn wind_force_from_aperture(
     delta_kpa * 1000.0 * aperture_area_m2.max(0.0) * crate::WIND_FORCE_PER_KPA_DIFFERENTIAL / 1000.0
 }
 
+/// **M14B** § chimney effect / buoyancy lift in N for an actor at
+/// `actor_pos`. Implements the spec implementer note:
+///
+/// > Wind impulse direction must include gravity bias (vertical wind
+/// > from chimney-effect = real). Combine `wind_horizontal` from ΔP +
+/// > `wind_vertical` from temperature + buoyancy.
+///
+/// Algorithm: find the cell containing `actor_pos`; find the cell
+/// directly above (smallest center_y > actor_y in the same column id,
+/// or the cell whose min.y == this cell's max.y). Compute the
+/// temperature differential and apply Stationeers buoyancy
+/// `F_lift = (T_below - T_above) / T_above × ρ × V × g_local`. The
+/// `ρ × V` factor is folded into [`BUOYANCY_FORCE_PER_K_DELTA`] so the
+/// kernel returns N directly.
+///
+/// Returns 0 when there's no temperature gradient or no neighbor above.
+#[must_use]
+pub fn buoyancy_lift_at(actor_pos: [f32; 2], cells: &[AtmosCell], local_g_m_s2: f32) -> f32 {
+    let here = cells.iter().find(|c| c.contains(actor_pos));
+    let Some(here) = here else {
+        return 0.0;
+    };
+    // Find the cell directly above (lowest min.y greater than here.max.y,
+    // sharing the lateral range). Used as the chimney's "cold" reference.
+    let above = cells
+        .iter()
+        .filter(|c| c.id != here.id)
+        .filter(|c| (c.min[0] - here.min[0]).abs() < 1e-3 && (c.max[0] - here.max[0]).abs() < 1e-3)
+        .filter(|c| c.min[1] >= here.max[1] - 1e-3)
+        .min_by(|a, b| a.min[1].partial_cmp(&b.min[1]).unwrap_or(std::cmp::Ordering::Equal));
+    let Some(above) = above else {
+        return 0.0;
+    };
+    let t_below = here.temp_k.max(1.0);
+    let t_above = above.temp_k.max(1.0);
+    let delta = t_below - t_above;
+    if delta.abs() < 0.5 {
+        return 0.0;
+    }
+    let g = local_g_m_s2.abs();
+    if g < 1e-3 {
+        // Vacuum / micro-g — no buoyancy.
+        return 0.0;
+    }
+    // Stationeers chimney: lift in N per kelvin delta per actor proxy.
+    // BUOYANCY_FORCE_PER_K_DELTA = 0.5 N/K at 1 m/s²; scales linearly
+    // with local g. A 30 K differential in Earth-g (9.81) produces
+    // ~15 × 9.81 ≈ 147 N — enough to feel.
+    delta * BUOYANCY_FORCE_PER_K_DELTA * g
+}
+
+/// Buoyancy lift constant: N per kelvin delta per 1 m/s² of local
+/// gravity. Tuned so a sealed cell 30 K warmer than its ceiling under
+/// Earth gravity produces ~150 N of lift (enough to push a light actor).
+pub const BUOYANCY_FORCE_PER_K_DELTA: f32 = 0.5;
+
 /// **M14B** § sample the wind force vector at `actor_pos` from the cell
 /// + aperture index. Walks every [`WindSource`] in `wind_sources`,
 ///   projects `actor_pos` onto the jet lane (origin + axis × jet_length,
 ///   half_width perpendicular), and sums the contributions.
+///
+/// Adds the chimney/buoyancy lift from [`buoyancy_lift_at`] to the
+/// vertical force component when `local_g_m_s2 > 0` (spec implementer
+/// note: "vertical wind from chimney-effect = real").
 ///
 /// Returns the dominating aperture id (largest scalar contribution)
 /// alongside the summed force; the dominating id is what the per-tick
@@ -185,6 +245,29 @@ pub fn wind_force_at(
         source_aperture_id: best_id,
         magnitude_sq: fx * fx + fy * fy,
     }
+}
+
+/// **M14B** § wind force WITH chimney/buoyancy lift folded into the
+/// vertical component. Combines [`wind_force_at`] (horizontal ΔP from
+/// apertures + vertical from axis projection) with [`buoyancy_lift_at`]
+/// (vertical lift from temperature differential between stacked cells).
+///
+/// Per spec implementer note: "Combine wind_horizontal from ΔP +
+/// wind_vertical from temperature + buoyancy."
+#[must_use]
+pub fn wind_force_with_buoyancy_at(
+    actor_pos: [f32; 2],
+    cells: &[AtmosCell],
+    wind_sources: &[WindSource],
+    local_g_m_s2: f32,
+) -> WindForceOutcome {
+    let mut outcome = wind_force_at(actor_pos, cells, wind_sources);
+    let lift = buoyancy_lift_at(actor_pos, cells, local_g_m_s2);
+    if lift.abs() > 0.01 {
+        outcome.force_n[1] += lift;
+        outcome.magnitude_sq = outcome.force_n[0] * outcome.force_n[0] + outcome.force_n[1] * outcome.force_n[1];
+    }
+    outcome
 }
 
 #[cfg(test)]
@@ -310,6 +393,96 @@ mod tests {
             let b = wind_force_at([12.0, 5.0], &cells, &sources);
             assert_eq!(a, b);
         }
+    }
+
+    #[test]
+    fn buoyancy_lift_pushes_up_when_lower_cell_is_warmer() {
+        // Hot cell below (323 K = 50 °C), cool cell above (293 K = 20 °C).
+        let cells = vec![
+            AtmosCell {
+                id: 1,
+                min: [0.0, 0.0],
+                max: [10.0, 5.0],
+                pressure_kpa: 101.0,
+                temp_k: 323.15,
+            },
+            AtmosCell {
+                id: 2,
+                min: [0.0, 5.0],
+                max: [10.0, 10.0],
+                pressure_kpa: 101.0,
+                temp_k: 293.15,
+            },
+        ];
+        let lift = buoyancy_lift_at([5.0, 2.0], &cells, 9.81);
+        assert!(lift > 0.0, "expected upward lift, got {lift}");
+        // Sanity: 30 K × 0.5 N/K × 9.81 m/s² ≈ 147 N
+        assert!((lift - 147.15).abs() < 5.0, "lift {lift} not in expected range");
+    }
+
+    #[test]
+    fn buoyancy_lift_zero_in_vacuum() {
+        let cells = vec![
+            AtmosCell {
+                id: 1,
+                min: [0.0, 0.0],
+                max: [10.0, 5.0],
+                pressure_kpa: 101.0,
+                temp_k: 323.15,
+            },
+            AtmosCell {
+                id: 2,
+                min: [0.0, 5.0],
+                max: [10.0, 10.0],
+                pressure_kpa: 101.0,
+                temp_k: 293.15,
+            },
+        ];
+        // Zero g (vacuum / orbit) → no buoyancy.
+        let lift = buoyancy_lift_at([5.0, 2.0], &cells, 0.0);
+        assert!(lift.abs() < 1e-3);
+    }
+
+    #[test]
+    fn wind_force_with_buoyancy_adds_chimney_lift() {
+        let cells = vec![
+            AtmosCell {
+                id: 1,
+                min: [0.0, 0.0],
+                max: [10.0, 5.0],
+                pressure_kpa: 110.0,
+                temp_k: 323.15,
+            },
+            AtmosCell {
+                id: 2,
+                min: [10.0, 0.0],
+                max: [20.0, 5.0],
+                pressure_kpa: 100.0,
+                temp_k: 293.15,
+            },
+            AtmosCell {
+                id: 3,
+                min: [0.0, 5.0],
+                max: [10.0, 10.0],
+                pressure_kpa: 101.0,
+                temp_k: 293.15,
+            },
+        ];
+        let sources = vec![WindSource {
+            id: 1,
+            origin: [10.0, 2.0],
+            axis: [1.0, 0.0],
+            aperture_area_m2: 0.5,
+            cell_high_id: 1,
+            cell_low_id: 2,
+            jet_length: 10.0,
+            jet_half_width: 3.0,
+        }];
+        let without = wind_force_at([5.0, 2.0], &cells, &sources);
+        let with = wind_force_with_buoyancy_at([5.0, 2.0], &cells, &sources, 9.81);
+        // Same horizontal force; bigger vertical (buoyancy lifts upward).
+        assert!((with.force_n[0] - without.force_n[0]).abs() < 1e-3);
+        assert!(with.force_n[1] > without.force_n[1]);
     }
 
     #[test]

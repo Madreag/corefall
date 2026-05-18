@@ -113,17 +113,23 @@ pub enum GravityOverride {
         min: [f32; 2],
         max: [f32; 2],
     },
-    /// Per-cell damaged-generator override — magnitude decays from
-    /// `magnitude_factor` at `center` toward the wave-front boundary.
-    /// `wave_front_radius` is the progressive-collapse radius (grows over
-    /// time; producer holds the state, the override sees the current
-    /// radius).
+    /// Per-cell damaged-generator override — magnitude is scaled by
+    /// `magnitude_factor` inside the wave-front. The wave-front grows
+    /// from 0 toward `radius` at `wave_front_growth_per_s` units / second
+    /// (producer ticks the radius each frame). Cells inside the current
+    /// `wave_front_radius` are affected; cells outside are not yet.
     DamagedGrav {
         id: u32,
         center: [f32; 2],
         radius: f32,
         magnitude_factor: f32,
+        /// Current wave-front radius (mutable; producer grows it per tick).
+        /// Authored as the initial value at scenario start (typically 0.0).
         wave_front_radius: f32,
+        /// Wave-front collapse rate in world units per second. The
+        /// producer integrates `wave_front_radius += growth_per_s × dt`
+        /// each tick, clamped to `radius`.
+        wave_front_growth_per_s: f32,
     },
 }
 
@@ -277,6 +283,7 @@ pub fn apply_overrides(
                 radius,
                 magnitude_factor,
                 wave_front_radius,
+                wave_front_growth_per_s: _,
             } => {
                 if !ovr.contains(world_pos) {
                     continue;
@@ -284,9 +291,9 @@ pub fn apply_overrides(
                 let dx = world_pos[0] - center[0];
                 let dy = world_pos[1] - center[1];
                 let dist = (dx * dx + dy * dy).sqrt();
-                // Wave front grows from the centre outward; cells past
-                // the front are unaffected, cells inside the front get
-                // the magnitude scaled by `magnitude_factor`.
+                // Wave front grows from the centre outward; cells inside
+                // the current wave-front are affected, cells outside are
+                // not yet (collapse-from-edges visual).
                 if dist <= *wave_front_radius && *wave_front_radius <= *radius {
                     let factor = magnitude_factor.clamp(0.0, 4.0);
                     current = GravityVec {
@@ -312,6 +319,28 @@ pub fn apply_overrides(
     OverrideResult {
         gravity: current,
         active_ids,
+    }
+}
+
+/// **M14B** § Advance every [`GravityOverride::DamagedGrav`] entry in the
+/// slice by `dt_secs`. Each wave-front radius grows by
+/// `wave_front_growth_per_s × dt_secs`, clamped to the override's
+/// authored `radius`. Pure / deterministic.
+///
+/// Producer-side hook called once per tick before [`apply_overrides`]
+/// so the next sampling pass sees the up-to-date wave-front.
+pub fn advance_damaged_grav_wave_fronts(overrides: &mut [GravityOverride], dt_secs: f32) {
+    for ovr in overrides.iter_mut() {
+        if let GravityOverride::DamagedGrav {
+            radius,
+            wave_front_radius,
+            wave_front_growth_per_s,
+            ..
+        } = ovr
+        {
+            let new_radius = *wave_front_radius + (*wave_front_growth_per_s) * dt_secs;
+            *wave_front_radius = new_radius.clamp(0.0, *radius);
+        }
     }
 }
 
@@ -429,6 +458,7 @@ mod tests {
             radius: 100.0,
             magnitude_factor: 0.5,
             wave_front_radius: 20.0,
+            wave_front_growth_per_s: 0.0,
         }];
         // Inside wave front — halved magnitude.
         let inside = apply_overrides(base, [10.0, 0.0], Some(1), &overrides);
@@ -436,6 +466,29 @@ mod tests {
         // Outside wave front but inside radius — no change yet.
         let outside_front = apply_overrides(base, [50.0, 0.0], Some(1), &overrides);
         assert!((outside_front.gravity.magnitude - 9.81).abs() < 1e-3);
+    }
+
+    #[test]
+    fn advance_damaged_grav_wave_fronts_grows_radius() {
+        let mut overrides = vec![GravityOverride::DamagedGrav {
+            id: 1,
+            center: [0.0, 0.0],
+            radius: 100.0,
+            magnitude_factor: 0.5,
+            wave_front_radius: 0.0,
+            wave_front_growth_per_s: 25.0,
+        }];
+        advance_damaged_grav_wave_fronts(&mut overrides, 1.0);
+        if let GravityOverride::DamagedGrav { wave_front_radius, .. } = &overrides[0] {
+            assert!((*wave_front_radius - 25.0).abs() < 1e-6);
+        } else {
+            panic!("expected DamagedGrav");
+        }
+        // Continue growing until clamped to radius.
+        advance_damaged_grav_wave_fronts(&mut overrides, 10.0);
+        if let GravityOverride::DamagedGrav { wave_front_radius, .. } = &overrides[0] {
+            assert!((*wave_front_radius - 100.0).abs() < 1e-6);
+        }
     }
 
     #[test]

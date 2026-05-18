@@ -50,7 +50,9 @@ pub mod ragdoll;
 pub mod sharpness;
 pub mod swept;
 pub mod zone_state;
-pub use gravity_field::{apply_overrides, GravityOverride, GravityVec, OverrideResult};
+pub use gravity_field::{
+    advance_damaged_grav_wave_fronts, apply_overrides, GravityOverride, GravityVec, OverrideResult,
+};
 pub use atom_group::{
     evaluate_ricochet, flail_as_limb, push_as_limb, push_travel, Atom, AtomGroup, RicochetOutcome,
     SweepOutcome, RICOCHET_ANGLE_THRESHOLD, RICOCHET_ENERGY_LOSS, RICOCHET_HARDNESS_FACTOR,

@@ -55,8 +55,17 @@ pub enum ScenarioGravityOverride {
         center: (f32, f32),
         radius: f32,
         magnitude_factor: f32,
+        /// Initial wave-front radius (defaults to 0 for true
+        /// "collapse-from-edges" intro). Producer mutates this each tick
+        /// per `wave_front_growth_per_s`.
         #[serde(default)]
         wave_front_radius: f32,
+        /// Wave-front collapse rate in world units per second. Defaults
+        /// to 0 (frozen wave-front). Scenarios that animate the collapse
+        /// typically use radius / 10s (e.g. 10.0 px/s for a 100 px radius
+        /// finishing in ~10s).
+        #[serde(default)]
+        wave_front_growth_per_s: f32,
     },
 }
 
