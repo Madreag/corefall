@@ -205,6 +205,16 @@ pub struct M0EngineConfig {
     /// `drive_tick` reads this each tick and injects matching intents into
     /// `pending_intent` before the actor sim runs. Empty by default.
     pub initial_scripted_steps: Vec<crate::scenario::ScenarioScriptStep>,
+    /// **M14D** § initial projectile-pair pool authored by the scenario
+    /// manifest's `m14d_projectile_pool[]` field. Drives the per-tick
+    /// projectile-pair CCD pass (`cf_physics::run_projectile_pair_pass`).
+    /// Empty by default — pre-M14D scenarios behave identically.
+    pub initial_m14d_projectile_pool: Vec<cf_physics::ProjectileSnapshot>,
+    /// **M14D § VAL-M14D-019** initial per-player `replay_intercepts`
+    /// setting. Default false — killcam excludes
+    /// `collision.projectile_pair_contact` events unless the player
+    /// opts in via this setting.
+    pub initial_replay_intercepts: bool,
 }
 
 /// M1.5: initial breach world snapshot.
@@ -360,6 +370,23 @@ fn build_wind_source(w: &cf_mission::ScenarioWindSource) -> cf_atmos::WindSource
         cell_low_id: w.cell_low_id,
         jet_length: w.jet_length,
         jet_half_width: w.jet_half_width,
+    }
+}
+
+/// **M14D** § convert a [`crate::scenario::ScenarioM14dProjectile`] manifest
+/// entry into a runtime [`cf_physics::ProjectileSnapshot`] for the
+/// projectile-pair CCD pass.
+fn build_m14d_projectile_snapshot(
+    p: &crate::scenario::ScenarioM14dProjectile,
+) -> cf_physics::ProjectileSnapshot {
+    cf_physics::ProjectileSnapshot {
+        id: p.id,
+        kind: p.kind,
+        position: [p.position.0, p.position.1],
+        velocity: [p.velocity.0, p.velocity.1],
+        radius: p.radius.max(0.0),
+        mass_kg: p.mass_kg.max(0.0),
+        owner_actor_id: p.owner_actor_id,
     }
 }
 
@@ -532,6 +559,11 @@ impl M0EngineConfig {
             initial_atmosphere_cells: Vec::new(),
             initial_stratification_cells: Vec::new(),
             initial_scripted_steps: Vec::new(),
+            // **M14D** § empty by default; scenarios opt in by declaring
+            // `m14d_projectile_pool[]` / `m14d_replay_intercepts` in the
+            // manifest.
+            initial_m14d_projectile_pool: Vec::new(),
+            initial_replay_intercepts: false,
         }
     }
 
@@ -696,6 +728,14 @@ impl M0EngineConfig {
             .collect();
         // **M14C** § propagate the scenario's scripted director steps.
         cfg.initial_scripted_steps = scenario.scripted_steps.clone();
+        // **M14D** § propagate the scenario's projectile-pair pool +
+        // replay_intercepts setting.
+        cfg.initial_m14d_projectile_pool = scenario
+            .m14d_projectile_pool
+            .iter()
+            .map(build_m14d_projectile_snapshot)
+            .collect();
+        cfg.initial_replay_intercepts = scenario.m14d_replay_intercepts;
         // Promote the milestone tag when the scenario uses M14B producers.
         if !scenario.gravity_overrides.is_empty()
             || !scenario.wind_sources.is_empty()
@@ -1268,6 +1308,28 @@ pub(crate) struct EngineMutable {
     /// of `m14c_heat_vs_era.ron` / `m14c_apfsds_vs_heavy.ron` actually fire
     /// the HEAT / APFSDS round at a deterministic tick (rather than no-op).
     pub(crate) m14c_scripted_steps: Vec<crate::scenario::ScenarioScriptStep>,
+    /// **M14D** § projectile-pair pool consumed by
+    /// `cf_physics::run_projectile_pair_pass` between the actor-collision
+    /// pass and the terrain pass. Authored at scenario load + advanced
+    /// each tick. Empty by default (pre-M14D scenarios behave identically).
+    pub(crate) m14d_projectile_pair_pool: Vec<cf_physics::ProjectileSnapshot>,
+    /// **M14D § VAL-M14D-020** per-tick projectile-pair pass invocation
+    /// counter. Incremented once per call to
+    /// [`M0Engine::tick_m14d_projectile_pair`]. Exposed via the
+    /// schedule-trace accessor for the `pass_called_once_per_tick` test.
+    pub(crate) m14d_pair_pass_invocations: u64,
+    /// **M14D § VAL-M14D-008/009/010** rolling trace of the per-tick pair
+    /// pass timing + candidate counts surfaced to perf tests.
+    pub(crate) m14d_last_pair_pass_trace: cf_physics::ProjectilePairPassTrace,
+    /// **M14D § VAL-M14D-019** per-player `replay_intercepts` setting.
+    /// Default false — killcam excludes `collision.projectile_pair_contact`
+    /// events unless the player opts in.
+    pub(crate) m14d_replay_intercepts: bool,
+    /// **M14D § VAL-M14D-020** schedule-trace ordered window. Records
+    /// each pass entry ("actor_collision_start", "projectile_pair_start",
+    /// "terrain_start", ...) for the most recent N ticks so the engine
+    /// integration test can assert ordering. Capped at 120 entries.
+    pub(crate) m14d_schedule_trace: std::collections::VecDeque<&'static str>,
     /// **M14B** § per-(actor, override) activation latch. Used by the
     /// per-tick step to emit `gravity.override_activated` only on entry +
     /// `gravity.override_deactivated` only on exit. The inner BTreeSet
@@ -1673,6 +1735,8 @@ impl M0Engine {
         let m14b_atmos_cells = config.initial_atmosphere_cells.clone();
         let m14b_strat_cells = config.initial_stratification_cells.clone();
         let m14c_scripted_steps = config.initial_scripted_steps.clone();
+        let m14d_projectile_pair_pool = config.initial_m14d_projectile_pool.clone();
+        let m14d_replay_intercepts = config.initial_replay_intercepts;
         let engine = Self {
             config,
             state: RwLock::new(EngineMutable {
@@ -1792,6 +1856,11 @@ impl M0Engine {
                 m14b_transient_wind_ttl: BTreeMap::new(),
                 m14b_transient_cells: Vec::new(),
                 m14c_scripted_steps,
+                m14d_projectile_pair_pool,
+                m14d_pair_pass_invocations: 0,
+                m14d_last_pair_pass_trace: cf_physics::ProjectilePairPassTrace::default(),
+                m14d_replay_intercepts,
+                m14d_schedule_trace: std::collections::VecDeque::with_capacity(120),
             }),
             recorder,
             current_tick,
@@ -4446,7 +4515,16 @@ impl M0Engine {
             // sees the correctly-typed projectile (or no projectile, for Arc)
             // and the right damage (for Charge).
             self.post_process_m6_fire_modes(&mut report);
+            self.record_schedule_trace_marker("actor_collision_start");
             self.emit_actor_events(tick, sim_time_ms, &intent, &report);
+            self.record_schedule_trace_marker("actor_collision_end");
+            // **M14D § VAL-M14D-020** projectile-projectile CCD pass —
+            // STRICTLY between the actor-collision pass and the terrain
+            // pass. Runs every tick (the pool is empty for pre-M14D
+            // scenarios so the cost is negligible).
+            self.record_schedule_trace_marker("projectile_pair_start");
+            self.tick_m14d_projectile_pair(tick, sim_time_ms);
+            self.record_schedule_trace_marker("projectile_pair_end");
             // **M12B** § Per-tick doppler emission for in-flight
             // projectiles. Spec § "Doppler shift on supersonic projectile
             // flyby": "audio.doppler_shifted fires per tick with the
@@ -5559,7 +5637,9 @@ impl M0Engine {
         // `specs/active/M3.md` § Re-opened gaps.
         if let Some(t) = advanced {
             let sim_time_ms = self.state.read().map(|s| s.clock.sim_time_ms()).unwrap_or(0.0);
+            self.record_schedule_trace_marker("terrain_start");
             self.flush_pending_dirty_batch(t, sim_time_ms);
+            self.record_schedule_trace_marker("terrain_end");
         }
 
         // M4A: refresh HUD banners + captions + tool_validity caches AFTER all events
@@ -8138,6 +8218,150 @@ impl M0Engine {
                 }),
                 Some(weapon_fired_id),
             );
+        }
+    }
+
+    /// **M14D § VAL-M14D-020** record a single schedule-trace marker
+    /// so the engine integration test can assert the ordered pass
+    /// invariant `(actor_collision_start, projectile_pair_start,
+    /// terrain_start, ...)` over a sliding window. Capped at 120
+    /// entries so long runs don't grow the trace unboundedly.
+    pub(crate) fn record_schedule_trace_marker(&self, marker: &'static str) {
+        if let Ok(mut s) = self.state.write() {
+            if s.m14d_schedule_trace.len() >= 120 {
+                s.m14d_schedule_trace.pop_front();
+            }
+            s.m14d_schedule_trace.push_back(marker);
+        }
+    }
+
+    /// **M14D § VAL-M14D-020** snapshot of the most recent schedule-trace
+    /// markers. Surfaces the ordered ring buffer for engine integration
+    /// tests asserting pass invocation ordering.
+    pub fn m14d_schedule_trace_snapshot(&self) -> Vec<&'static str> {
+        self.state
+            .read()
+            .map(|s| s.m14d_schedule_trace.iter().copied().collect())
+            .unwrap_or_default()
+    }
+
+    /// **M14D § VAL-M14D-020** schedule-trace invocation counter.
+    pub fn m14d_pair_pass_invocations(&self) -> u64 {
+        self.state
+            .read()
+            .map(|s| s.m14d_pair_pass_invocations)
+            .unwrap_or(0)
+    }
+
+    /// **M14D § VAL-M14D-008/009/010** trace from the most recent
+    /// projectile-pair pass.
+    pub fn m14d_last_pair_pass_trace(&self) -> cf_physics::ProjectilePairPassTrace {
+        self.state
+            .read()
+            .map(|s| s.m14d_last_pair_pass_trace)
+            .unwrap_or_default()
+    }
+
+    /// **M14D § VAL-M14D-019** per-player `replay_intercepts` setting
+    /// surfaced to consumers (cf-killcam).
+    pub fn m14d_replay_intercepts(&self) -> bool {
+        self.state
+            .read()
+            .map(|s| s.m14d_replay_intercepts)
+            .unwrap_or(false)
+    }
+
+    /// **M14D** snapshot of the current projectile-pair pool length —
+    /// used by integration tests to verify projectile consumption.
+    pub fn m14d_projectile_pair_pool_len(&self) -> usize {
+        self.state
+            .read()
+            .map(|s| s.m14d_projectile_pair_pool.len())
+            .unwrap_or(0)
+    }
+
+    /// **M14D § VAL-M14D-002** snapshot of the projectile-pair pool.
+    /// Returns a deep copy of every active projectile so tests can
+    /// assert per-projectile state without holding the state lock.
+    pub fn m14d_projectile_pair_pool_snapshot(&self) -> Vec<cf_physics::ProjectileSnapshot> {
+        self.state
+            .read()
+            .map(|s| s.m14d_projectile_pair_pool.clone())
+            .unwrap_or_default()
+    }
+
+    /// **M14D § VAL-M14D-001..016 + VAL-M14D-020** per-tick projectile-
+    /// projectile CCD pass — STRICTLY between the actor-collision pass
+    /// and the terrain pass. Drives the `cf_physics::projectile`
+    /// broadphase + narrowphase against the projectile-pair pool
+    /// authored by the scenario manifest, emits
+    /// `collision.projectile_pair_contact` events for every resolved
+    /// pair contact, and prunes consumed projectiles from the pool.
+    fn tick_m14d_projectile_pair(&self, tick: Tick, sim_time_ms: f64) {
+        let tick_dt = 1.0 / (self.config.tick_rate_hz.max(1) as f32);
+        let pool_snapshot = match self.state.read() {
+            Ok(s) => s.m14d_projectile_pair_pool.clone(),
+            Err(_) => return,
+        };
+        let (contacts, trace) = if pool_snapshot.is_empty() {
+            (Vec::new(), cf_physics::ProjectilePairPassTrace::default())
+        } else {
+            cf_physics::run_projectile_pair_pass(&pool_snapshot, tick_dt)
+        };
+        if let Ok(mut s) = self.state.write() {
+            s.m14d_pair_pass_invocations = s.m14d_pair_pass_invocations.saturating_add(1);
+            s.m14d_last_pair_pass_trace = trace;
+        }
+        for contact in &contacts {
+            let payload = json!({
+                "projectile_a_id": contact.a_id,
+                "projectile_b_id": contact.b_id,
+                "projectile_a_kind": contact.a_kind.as_str(),
+                "projectile_b_kind": contact.b_kind.as_str(),
+                "outcome": contact.outcome.as_str(),
+                "intercept_point": contact.intercept_point,
+                "toi": contact.toi,
+                "convergence_deg": contact.convergence_deg,
+                "a_energy_retained": contact.a_energy_retained,
+                "b_energy_retained": contact.b_energy_retained,
+                "cosmetic": contact.cosmetic,
+            });
+            self.recorder
+                .record(tick, sim_time_ms, "collision", "projectile_pair_contact", payload, None);
+        }
+        // Advance / prune the pool deterministically. Consumed
+        // projectiles (post_velocity == None) are removed; surviving
+        // projectiles get their post-contact velocity applied and step
+        // their position by tick_dt.
+        if let Ok(mut s) = self.state.write() {
+            let mut consumed: std::collections::BTreeSet<u64> = std::collections::BTreeSet::new();
+            let mut velocity_overrides: BTreeMap<u64, [f32; 2]> = BTreeMap::new();
+            for contact in &contacts {
+                match contact.a_post_velocity {
+                    Some(v) => {
+                        velocity_overrides.insert(contact.a_id, v);
+                    }
+                    None => {
+                        consumed.insert(contact.a_id);
+                    }
+                }
+                match contact.b_post_velocity {
+                    Some(v) => {
+                        velocity_overrides.insert(contact.b_id, v);
+                    }
+                    None => {
+                        consumed.insert(contact.b_id);
+                    }
+                }
+            }
+            s.m14d_projectile_pair_pool.retain(|p| !consumed.contains(&p.id));
+            for p in s.m14d_projectile_pair_pool.iter_mut() {
+                if let Some(v) = velocity_overrides.get(&p.id) {
+                    p.velocity = *v;
+                }
+                p.position[0] += p.velocity[0] * tick_dt;
+                p.position[1] += p.velocity[1] * tick_dt;
+            }
         }
     }
 

@@ -145,6 +145,52 @@ pub struct Scenario {
     /// (no scripted intent injection).
     #[serde(default)]
     pub scripted_steps: Vec<ScenarioScriptStep>,
+    /// **M14D** § projectile-pair pool authored by the scenario manifest.
+    /// Drives the per-tick projectile-pair CCD pass
+    /// (`cf_physics::run_projectile_pair_pass`) between the actor-collision
+    /// pass and the terrain pass. Empty by default; only M14D scenarios
+    /// (e.g., `m14d_projectile_intercept.ron`) populate it.
+    #[serde(default)]
+    pub m14d_projectile_pool: Vec<ScenarioM14dProjectile>,
+    /// **M14D § VAL-M14D-019** initial per-player `replay_intercepts`
+    /// setting. Default false. Setting `true` opts the killcam back into
+    /// surfacing `collision.projectile_pair_contact` events.
+    #[serde(default)]
+    pub m14d_replay_intercepts: bool,
+}
+
+/// **M14D** § one scenario projectile entry feeding the pair-CCD pool.
+/// Mirrors [`cf_physics::ProjectileSnapshot`] but uses serde-friendly
+/// types for RON. The engine converts these to runtime snapshots at
+/// scenario load via `build_m14d_projectile_snapshot`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScenarioM14dProjectile {
+    /// Stable id (must be unique across the pool).
+    pub id: u64,
+    /// Kind discriminator (`kinetic_rifle` / `explosive_grenade` /
+    /// `energy_beam` / `heat_round` / `apfsds_round` / `aps_laser`).
+    pub kind: cf_physics::ProjectileKind,
+    /// World position (px) at scenario init.
+    pub position: (f32, f32),
+    /// Velocity in world units per second.
+    pub velocity: (f32, f32),
+    /// Effective collision radius. Default 1.0.
+    #[serde(default = "default_m14d_radius")]
+    pub radius: f32,
+    /// Scalar mass (kg). Default 0.01.
+    #[serde(default = "default_m14d_mass_kg")]
+    pub mass_kg: f32,
+    /// Owner actor id (0 for base-mounted modules like C-RAM).
+    #[serde(default)]
+    pub owner_actor_id: u64,
+}
+
+fn default_m14d_radius() -> f32 {
+    1.0
+}
+
+fn default_m14d_mass_kg() -> f32 {
+    0.01
 }
 
 /// **M14C** § one scripted director step. The engine compares the current
@@ -1482,6 +1528,8 @@ mod tests {
             wind_sources: vec![],
             atmosphere_cells: vec![],
             scripted_steps: vec![],
+            m14d_projectile_pool: vec![],
+            m14d_replay_intercepts: false,
         };
         assert!(matches!(
             scenario.validate("t.ron"),

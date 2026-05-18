@@ -1,0 +1,33 @@
+(
+  schema_version: 1,
+  id: "m14d_projectile_intercept",
+  display_name: "M14D Projectile Intercept",
+  description: "M14D Gherkin-1 + Gherkin-4 — projectile-projectile CCD pair contacts. Pool seeds two head-on intercept geometries: (a) a frag grenade (id 10) at [100,50] meets a rifle bullet (id 11) at [105,55] head-on → `collision.projectile_pair_contact{outcome=\"fuze_triggered\"}` ≤ 1 tick; (b) a C-RAM APS laser pulse (id 20) at [0,200] meets an incoming HEAT round (id 21) at [80,200] head-on → `outcome=\"aps_intercept\"` ≤ 1 tick. Determinism: same seed → identical event stream + SaveBlob.checksum at tick 600. Per-player `replay_intercepts` defaults to false so the killcam excludes pair contacts.",
+  seed: 14,
+  duration_ticks: Some(600),
+  region: (anchor: (0.0, 0.0), width: 1024.0, height: 1024.0),
+  gravity: -980.0,
+  floor_y: 16.0,
+  teams: [],
+  actors: [
+    (id: 1, team: "blue", spawn: (50.0, 32.0), controllable: true, hp: 100.0,
+      inventory: (rifle: None), half_extents: Some((8.0, 16.0)), aim: Some((1.0, 0.0)),
+      origin_id: Some("human")),
+  ],
+  objectives: [],
+  director: None,
+  capabilities: (debug: false, control_api: true, save_load: false),
+  save_fields: [],
+  expected_tests: ["M14D-FUZE-01", "M14D-APS-01"],
+  notes: "M14D projectile-pair intercept fixture. Pool seeds two intercept pairs per the spec's Gherkin-1 (frag grenade + rifle bullet) and Gherkin-4 (C-RAM APS laser + HEAT round). The per-tick `cf_physics::run_projectile_pair_pass` (wired in cf-control between actor-collision + terrain passes) resolves each pair within the first 1-2 ticks and emits `collision.projectile_pair_contact` with cosmetic=true.",
+  scripted_steps: [],
+  m14d_projectile_pool: [
+    // Pair A — Gherkin-1: kinetic-vs-explosive fuze trigger.
+    (id: 10, kind: explosive_grenade, position: (100.0, 50.0), velocity: (300.0, 120.0), radius: 4.0, mass_kg: 0.4, owner_actor_id: 1),
+    (id: 11, kind: kinetic_rifle, position: (105.0, 55.0), velocity: (-300.0, -120.0), radius: 1.0, mass_kg: 0.01, owner_actor_id: 1),
+    // Pair B — Gherkin-4: APS laser vs incoming HEAT round.
+    (id: 20, kind: aps_laser, position: (0.0, 200.0), velocity: (60000.0, 0.0), radius: 1.0, mass_kg: 0.0, owner_actor_id: 0),
+    (id: 21, kind: heat_round, position: (80.0, 200.0), velocity: (-12000.0, 0.0), radius: 2.0, mass_kg: 1.0, owner_actor_id: 0),
+  ],
+  m14d_replay_intercepts: false,
+)
