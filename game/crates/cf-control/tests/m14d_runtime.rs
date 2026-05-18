@@ -9,7 +9,8 @@
 //! Each test cites the VAL-M14D-* assertion it satisfies:
 //!   - VAL-M14D-001: kinetic-vs-explosive emits `outcome="fuze_triggered"`.
 //!   - VAL-M14D-006: APS laser intercepts HEAT round with
-//!     `outcome="aps_intercept"`.
+//!     `outcome="aps_intercept"` AND engages a C-RAM cooldown latch
+//!     that decays to idle after the documented duration.
 //!   - VAL-M14D-007: same-seed determinism across two engines.
 //!   - VAL-M14D-020: per-tick schedule trace — projectile-pair pass
 //!     runs STRICTLY between actor-collision pass and terrain pass.
@@ -99,6 +100,79 @@ fn val_m14d_006_runtime_aps_intercept_event_emitted() {
             .unwrap_or(false)
     });
     assert!(aps.is_some(), "expected outcome=aps_intercept event");
+}
+
+/// **VAL-M14D-006 runtime evidence (cooldown latch)**: per the spec's
+/// Gherkin scenario 4 — "And the C-RAM cooldown begins" — every
+/// `collision.projectile_pair_contact{outcome="aps_intercept"}` event
+/// must engage the firing C-RAM unit's `cf_equipment::Cram` cooldown
+/// latch on the SAME tick the intercept fires AND the latch must
+/// return to idle after the documented `cooldown_duration_ticks`
+/// elapse. The scenario's seeded APS pulse carries
+/// `owner_actor_id: 0` so the cooldown is keyed by 0.
+#[test]
+fn val_m14d_006_runtime_aps_intercept() {
+    let path = locate_scenario("m14d_projectile_intercept");
+    let scenario = Scenario::load_from_file(&path).expect("scenario parses");
+    let config = M0EngineConfig::for_loaded_scenario(&scenario, path);
+    let engine = M0Engine::new(config);
+    engine.record_run_started();
+
+    let baseline = engine.m14d_cram_cooldown(0);
+    assert!(
+        !baseline.cooldown_active,
+        "C-RAM cooldown must start idle before any intercept fires"
+    );
+    assert_eq!(baseline.cooldown_ticks_remaining, 0);
+
+    engine.drive_tick();
+
+    let events = engine.recorder().snapshot_events();
+    let aps_intercept_count = events
+        .iter()
+        .filter(|e| {
+            e.category == "collision"
+                && e.event_type == "projectile_pair_contact"
+                && e.payload
+                    .get("outcome")
+                    .and_then(|v| v.as_str())
+                    .map(|s| s == "aps_intercept")
+                    .unwrap_or(false)
+        })
+        .count();
+    assert!(
+        aps_intercept_count >= 1,
+        "expected at least one aps_intercept event on the first tick; got {} events",
+        events.len()
+    );
+
+    let engaged = engine.m14d_cram_cooldown(0);
+    assert!(
+        engaged.cooldown_active,
+        "C-RAM cooldown must latch true on the same tick as aps_intercept fires"
+    );
+    let duration = engaged.cooldown_duration_ticks;
+    assert!(duration >= 1, "documented cooldown duration must be >= 1 tick");
+    assert_eq!(
+        engaged.cooldown_ticks_remaining, duration,
+        "freshly-engaged cooldown must seed ticks_remaining to the full duration"
+    );
+
+    for _ in 0..duration {
+        if engine.drive_tick().is_none() {
+            break;
+        }
+    }
+
+    let cleared = engine.m14d_cram_cooldown(0);
+    assert!(
+        !cleared.cooldown_active,
+        "C-RAM cooldown must return to false after the documented duration elapses"
+    );
+    assert_eq!(
+        cleared.cooldown_ticks_remaining, 0,
+        "cooldown_ticks_remaining must decay to zero"
+    );
 }
 
 /// **VAL-M14D-014 runtime evidence**: every emitted
