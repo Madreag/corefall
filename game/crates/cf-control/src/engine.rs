@@ -9317,7 +9317,7 @@ impl M0Engine {
             (world_pos.0 / cf_terrain::CHUNK_SIZE as f32).floor() as i32,
             (world_pos.1 / cf_terrain::CHUNK_SIZE as f32).floor() as i32,
         );
-        let radius_cells = ((spec.lock_radius_px + 15) / 16).max(1) as usize;
+        let radius_cells = spec.lock_radius_px.div_ceil(16).max(1) as usize;
         let placed = if let Ok(mut s) = self.state.write() {
             // Per-actor inventory delta — debits exactly the spec'd
             // cost so VAL-CROSS-023 (disjoint debits) holds.
