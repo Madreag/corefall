@@ -1504,6 +1504,7 @@ dependencies = [
  "cf-fortification",
  "cf-physics",
  "cf-trench",
+ "cf-wound",
  "ron",
  "serde",
  "serde_json",

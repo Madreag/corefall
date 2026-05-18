@@ -16,6 +16,7 @@ cf-chassis = { path = "../cf-chassis" }
 cf-atmos = { path = "../cf-atmos" }
 cf-trench = { path = "../cf-trench" }
 cf-fortification = { path = "../cf-fortification" }
+cf-wound = { path = "../cf-wound" }
 
 [dev-dependencies]
 serde_json = { workspace = true }

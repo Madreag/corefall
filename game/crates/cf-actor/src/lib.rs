@@ -1088,6 +1088,11 @@ pub struct ActorState {
     /// at M5 baseline; serde-default preserves backward compat.
     #[serde(default)]
     pub afflictions: Vec<Affliction>,
+    /// **M14G**: per-actor typed wound list keyed by zone. Empty for actors
+    /// that have not taken a typed wound yet. Survives save/load via
+    /// `checksum_bytes` (VAL-CROSS-029).
+    #[serde(default)]
+    pub m14g_wound_list: cf_wound::ActorWoundList,
     /// **M6**: side-view facing direction. Updates on aim; flips sprite.
     #[serde(default)]
     pub facing: FacingDirection,
@@ -1479,6 +1484,7 @@ impl ActorState {
             bloom_factor: default_bloom_factor(),
             resources: ResourceAccumulators::default(),
             afflictions: Vec::new(),
+            m14g_wound_list: cf_wound::ActorWoundList::new(),
             facing: FacingDirection::Right,
             stamina: Stamina::full(),
             lean_state: LeanState::default(),
@@ -2267,6 +2273,17 @@ impl ActorState {
             out.push(u8::from(self.climb_active));
             out.push(u8::from(self.jet_active));
         }
+        // **M14G § VAL-CROSS-029**: append the typed wound list state so
+        // save/load round-trips preserve M14G simulation state. Append-only
+        // (never reorder existing fields) to keep cross-milestone
+        // determinism comparisons stable.
+        if !self.m14g_wound_list.wounds_by_zone.is_empty()
+            || !self.m14g_wound_list.necrotic_zones.is_empty()
+            || self.m14g_wound_list.next_id != 0
+        {
+            out.push(1);
+            out.extend_from_slice(&self.m14g_wound_list.checksum_bytes());
+        }
         out
     }
 }
@@ -2999,6 +3016,7 @@ mod tests {
     use super::*;
 
     mod body_a;
+    mod m14g_wound_list;
     mod m9b_damage_routing;
 
     #[test]
