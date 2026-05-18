@@ -215,6 +215,13 @@ pub struct M0EngineConfig {
     /// `collision.projectile_pair_contact` events unless the player
     /// opts in via this setting.
     pub initial_replay_intercepts: bool,
+    /// **M14E** § initial tunnel-span fixtures from the scenario manifest.
+    /// Empty by default; M14E scenarios populate one or more spans for
+    /// the per-tick collapse-check pass.
+    pub initial_m14e_tunnel_spans: Vec<crate::scenario::ScenarioTunnelSpan>,
+    /// **M14E** § seed offset for the cave-in roll RNG. Added to the
+    /// engine's `seed` to derive the cave-in RNG state.
+    pub initial_m14e_cave_in_seed_offset: u64,
 }
 
 /// M1.5: initial breach world snapshot.
@@ -376,6 +383,20 @@ fn build_wind_source(w: &cf_mission::ScenarioWindSource) -> cf_atmos::WindSource
 /// **M14D** § convert a [`crate::scenario::ScenarioM14dProjectile`] manifest
 /// entry into a runtime [`cf_physics::ProjectileSnapshot`] for the
 /// projectile-pair CCD pass.
+/// **M14E** § Deterministic xorshift RNG cursor that advances by a
+/// SplitMix64-style step. Produces a uniform `f32 ∈ [0, 1)` draw using
+/// the upper 24 bits of the next state. Used by the cave-in roll so the
+/// engine never reaches for `thread_rng` (VAL-M14E-017).
+fn next_unit_draw(state: &mut u64) -> f32 {
+    let mut z = state.wrapping_add(0x9E37_79B9_7F4A_7C15);
+    *state = z;
+    z = (z ^ (z >> 30)).wrapping_mul(0xBF58_476D_1CE4_E5B9);
+    z = (z ^ (z >> 27)).wrapping_mul(0x94D0_49BB_1331_11EB);
+    z ^= z >> 31;
+    let bits = (z >> 40) as u32; // 24 most-significant bits
+    (bits as f32) / ((1u32 << 24) as f32)
+}
+
 fn build_m14d_projectile_snapshot(p: &crate::scenario::ScenarioM14dProjectile) -> cf_physics::ProjectileSnapshot {
     cf_physics::ProjectileSnapshot {
         id: p.id,
@@ -562,6 +583,10 @@ impl M0EngineConfig {
             // manifest.
             initial_m14d_projectile_pool: Vec::new(),
             initial_replay_intercepts: false,
+            // **M14E** § empty by default; scenarios opt in by declaring
+            // `m14e_tunnel_spans[]` and (optionally) `m14e_cave_in_seed_offset`.
+            initial_m14e_tunnel_spans: Vec::new(),
+            initial_m14e_cave_in_seed_offset: 0,
         }
     }
 
@@ -726,6 +751,10 @@ impl M0EngineConfig {
             .map(build_m14d_projectile_snapshot)
             .collect();
         cfg.initial_replay_intercepts = scenario.m14d_replay_intercepts;
+        // **M14E** § propagate the scenario's tunnel spans + cave-in seed
+        // offset so the per-tick collapse-check pass seeds correctly.
+        cfg.initial_m14e_tunnel_spans = scenario.m14e_tunnel_spans.clone();
+        cfg.initial_m14e_cave_in_seed_offset = scenario.m14e_cave_in_seed_offset;
         // Promote the milestone tag when the scenario uses M14B producers.
         if !scenario.gravity_overrides.is_empty()
             || !scenario.wind_sources.is_empty()
@@ -1343,6 +1372,57 @@ pub(crate) struct EngineMutable {
     /// transient wind sources (pipe ruptures). Used to clean up the
     /// atmosphere cell list when the parent WindSource expires.
     pub(crate) m14b_transient_cells: Vec<u32>,
+    /// **M14E** § per-chunk integrity-field state authored by the
+    /// scenario manifest's `m14e_tunnel_spans[]` array. Indexed by chunk
+    /// coordinate; each entry tracks the current integrity field + the
+    /// cached span_px + anchored flag the per-tick pass consumes.
+    pub(crate) m14e_chunks: BTreeMap<(i32, i32), M14eChunkState>,
+    /// **M14E** § integrity-pass invocation count (incremented exactly
+    /// once per N-tick boundary). Exposed via the schedule-trace
+    /// accessor for the `compute_integrity_pass_runs_every_15_ticks`
+    /// VAL-M14E-019 test.
+    pub(crate) m14e_pass_invocations: u64,
+    /// **M14E** § deterministic RNG cursor for the cave-in roll. Seeded
+    /// from `scenario.seed + m14e_cave_in_seed_offset`; advances on every
+    /// cave-in roll regardless of outcome so the draw sequence is stable
+    /// across same-seed runs.
+    pub(crate) m14e_rng_state: u64,
+    /// **M14E** § knockdown latch keyed by actor id. Set when a cave-in
+    /// debris impulse routes through `cf_physics::cave_in_fall_impulse_chain`
+    /// and forces the actor into KnockedDown.
+    pub(crate) m14e_actor_knockdown: BTreeMap<u64, bool>,
+    /// **M14E** § last-tick at which a chunk fired
+    /// `terrain.cave_in_triggered`. Drives the 15-tick cascade window
+    /// per VAL-M14E-018.
+    pub(crate) m14e_last_cave_in_tick: BTreeMap<(i32, i32), u64>,
+    /// **M14E** § total cumulative number of `terrain.cave_in_triggered`
+    /// events emitted (used for replay summary + cross-tick assertions).
+    pub(crate) m14e_total_cave_ins: u32,
+    /// **M14E** § cumulative `terrain.support_beam_placed` event count.
+    pub(crate) m14e_total_beams_placed: u32,
+    /// **M14E** § cumulative `terrain.support_beam_destroyed` event count.
+    pub(crate) m14e_total_beams_destroyed: u32,
+}
+
+/// **M14E** § Per-chunk integrity-field runtime state. Lives on
+/// `EngineState.m14e_chunks` keyed by chunk coord.
+#[derive(Debug, Clone)]
+pub(crate) struct M14eChunkState {
+    pub field: cf_terrain::IntegrityField,
+    pub span_id: String,
+    pub bbox_min: [i64; 2],
+    pub bbox_max: [i64; 2],
+    pub unsupported_span_px: u32,
+    pub ceiling_thickness_px: u32,
+    pub vibration_modifier: f32,
+    pub anchored: bool,
+    pub cascade_neighbors: Vec<(i32, i32)>,
+    pub damage_actor_id: Option<u64>,
+    pub structural_integrity_low_emitted: bool,
+    pub cave_in_emitted: bool,
+    pub l1_at_tick: Option<u64>,
+    pub l2_at_tick: Option<u64>,
+    pub l3_at_tick: Option<u64>,
 }
 
 /// **M6**: per-actor charge-fire annotation shipped from the M6 post-step
@@ -1734,6 +1814,38 @@ impl M0Engine {
         let m14c_scripted_steps = config.initial_scripted_steps.clone();
         let m14d_projectile_pair_pool = config.initial_m14d_projectile_pool.clone();
         let m14d_replay_intercepts = config.initial_replay_intercepts;
+        let m14e_initial_tunnel_spans = config.initial_m14e_tunnel_spans.clone();
+        let m14e_cave_in_seed_offset = config.initial_m14e_cave_in_seed_offset;
+        let m14e_initial_rng_state = config.seed.wrapping_add(m14e_cave_in_seed_offset);
+        let mut m14e_chunks: BTreeMap<(i32, i32), M14eChunkState> = BTreeMap::new();
+        for span in &m14e_initial_tunnel_spans {
+            let mut field = cf_terrain::IntegrityField::pristine();
+            if span.anchored {
+                let center_lx = cf_terrain::INTEGRITY_FIELD_WIDTH / 2;
+                let center_ly = cf_terrain::INTEGRITY_FIELD_HEIGHT / 2;
+                cf_terrain::lock_radius_to_beam(&mut field, center_lx, center_ly, 1);
+            }
+            m14e_chunks.insert(
+                span.chunk_id,
+                M14eChunkState {
+                    field,
+                    span_id: span.id.clone(),
+                    bbox_min: [span.bbox_min.0, span.bbox_min.1],
+                    bbox_max: [span.bbox_max.0, span.bbox_max.1],
+                    unsupported_span_px: span.unsupported_span_px,
+                    ceiling_thickness_px: span.ceiling_thickness_px,
+                    vibration_modifier: span.vibration_modifier,
+                    anchored: span.anchored,
+                    cascade_neighbors: span.cascade_neighbors.clone(),
+                    damage_actor_id: span.damage_actor_id,
+                    structural_integrity_low_emitted: false,
+                    cave_in_emitted: false,
+                    l1_at_tick: None,
+                    l2_at_tick: None,
+                    l3_at_tick: None,
+                },
+            );
+        }
         let engine = Self {
             config,
             state: RwLock::new(EngineMutable {
@@ -1859,6 +1971,14 @@ impl M0Engine {
                 m14d_replay_intercepts,
                 m14d_cram_cooldowns: BTreeMap::new(),
                 m14d_schedule_trace: std::collections::VecDeque::with_capacity(120),
+                m14e_chunks,
+                m14e_pass_invocations: 0,
+                m14e_rng_state: m14e_initial_rng_state,
+                m14e_actor_knockdown: BTreeMap::new(),
+                m14e_last_cave_in_tick: BTreeMap::new(),
+                m14e_total_cave_ins: 0,
+                m14e_total_beams_placed: 0,
+                m14e_total_beams_destroyed: 0,
             }),
             recorder,
             current_tick,
@@ -4525,6 +4645,12 @@ impl M0Engine {
             self.record_schedule_trace_marker("projectile_pair_start");
             self.tick_m14d_projectile_pair(tick, sim_time_ms);
             self.record_schedule_trace_marker("projectile_pair_end");
+            // **M14E § VAL-M14E-016/-019** per-tick collapse-check pass.
+            // Wired AFTER the projectile-pair pass + BEFORE the terrain
+            // dirty-region flush so cascading cave-ins ride on the same
+            // dirty batch as their primary. The pool is empty for
+            // pre-M14E scenarios so the cost is zero.
+            self.tick_m14e_structural_integrity(tick, sim_time_ms);
             // **M12B** § Per-tick doppler emission for in-flight
             // projectiles. Spec § "Doppler shift on supersonic projectile
             // flyby": "audio.doppler_shifted fires per tick with the
@@ -8400,6 +8526,377 @@ impl M0Engine {
                 cram.engage_cooldown();
             }
         }
+    }
+
+    /// **M14E** § Tunnel-span integrity-field accessor (read-only). Used
+    /// by VAL-M14E-001 / VAL-M14E-008 acceptance tests to inspect the
+    /// per-chunk field state after the pass runs.
+    pub fn m14e_integrity_field(&self, chunk_id: (i32, i32)) -> Option<cf_terrain::IntegrityField> {
+        self.state.read().ok().and_then(|s| s.m14e_chunks.get(&chunk_id).map(|c| c.field))
+    }
+
+    /// **M14E** § cumulative cave-in invocation count.
+    pub fn m14e_total_cave_ins(&self) -> u32 {
+        self.state.read().map(|s| s.m14e_total_cave_ins).unwrap_or(0)
+    }
+
+    /// **M14E** § cumulative integrity-pass invocation count. Equal to
+    /// `floor(T / 15)` after T ticks per VAL-M14E-019.
+    pub fn m14e_pass_invocations(&self) -> u64 {
+        self.state.read().map(|s| s.m14e_pass_invocations).unwrap_or(0)
+    }
+
+    /// **M14E** § query whether a given actor is currently in the
+    /// KnockedDown state because of a cave-in this run.
+    pub fn m14e_actor_knockdown(&self, actor_id: u64) -> bool {
+        self.state
+            .read()
+            .ok()
+            .and_then(|s| s.m14e_actor_knockdown.get(&actor_id).copied())
+            .unwrap_or(false)
+    }
+
+    /// **M14E** § cumulative `terrain.support_beam_placed` event count.
+    pub fn m14e_total_beams_placed(&self) -> u32 {
+        self.state.read().map(|s| s.m14e_total_beams_placed).unwrap_or(0)
+    }
+
+    /// **M14E** § cumulative `terrain.support_beam_destroyed` event count.
+    pub fn m14e_total_beams_destroyed(&self) -> u32 {
+        self.state.read().map(|s| s.m14e_total_beams_destroyed).unwrap_or(0)
+    }
+
+    /// **M14E** § Per-tick collapse-check pass — wired after the M14D
+    /// projectile-pair pass + before the terrain dirty-region flush.
+    /// Per spec literal § "deferred update" + N=15 cadence:
+    ///   1. Every tick, advance per-chunk cave-in roll (uses chance
+    ///      formula + seeded RNG).
+    ///   2. Every N=15 ticks (configurable via
+    ///      `cf_terrain::INTEGRITY_PASS_CADENCE_TICKS`) run the integrity
+    ///      pass on every registered chunk and emit
+    ///      `terrain.structural_integrity_low` when the field crosses
+    ///      the L1 threshold.
+    ///   3. When the per-chunk cave-in roll fires, emit
+    ///      `terrain.cave_in_triggered` + cascade-to-neighbor
+    ///      `terrain.terrain_cascade` events + route the falling-debris
+    ///      impulse through `cf_physics::cave_in_fall_impulse_chain`.
+    fn tick_m14e_structural_integrity(&self, tick: Tick, sim_time_ms: f64) {
+        let chunk_ids: Vec<(i32, i32)> = match self.state.read() {
+            Ok(s) => s.m14e_chunks.keys().copied().collect(),
+            Err(_) => return,
+        };
+        if chunk_ids.is_empty() {
+            return;
+        }
+
+        let cadence = cf_terrain::INTEGRITY_PASS_CADENCE_TICKS as u64;
+        let run_pass_this_tick = tick.0 != 0 && tick.0 % cadence == 0;
+
+        // 1) Optional integrity pass + L1/L2/L3 emission.
+        if run_pass_this_tick {
+            if let Ok(mut s) = self.state.write() {
+                s.m14e_pass_invocations = s.m14e_pass_invocations.saturating_add(1);
+            }
+            let mut emissions: Vec<(String, serde_json::Value)> = Vec::new();
+            if let Ok(mut s) = self.state.write() {
+                for chunk_id in &chunk_ids {
+                    let Some(chunk) = s.m14e_chunks.get_mut(chunk_id) else {
+                        continue;
+                    };
+                    let outcome = cf_terrain::compute_integrity_pass(
+                        &mut chunk.field,
+                        chunk.unsupported_span_px,
+                        chunk.vibration_modifier,
+                    );
+                    let span = chunk.unsupported_span_px;
+                    let vib = chunk.vibration_modifier;
+                    // Track L1 / L2 / L3 escalation ticks per VAL-M14E-007.
+                    if outcome.min_integrity < cf_terrain::INTEGRITY_LOCKED
+                        && chunk.l1_at_tick.is_none()
+                    {
+                        chunk.l1_at_tick = Some(tick.0);
+                    }
+                    if outcome.min_integrity < cf_terrain::INTEGRITY_LOCKED.saturating_sub(60)
+                        && chunk.l2_at_tick.is_none()
+                    {
+                        chunk.l2_at_tick = Some(tick.0);
+                    }
+                    if outcome.min_integrity < cf_terrain::INTEGRITY_CASCADE_THRESHOLD
+                        && chunk.l3_at_tick.is_none()
+                    {
+                        chunk.l3_at_tick = Some(tick.0);
+                    }
+                    if outcome.became_unstable && !chunk.structural_integrity_low_emitted {
+                        chunk.structural_integrity_low_emitted = true;
+                        let level = if chunk.l3_at_tick.is_some() {
+                            "l3"
+                        } else if chunk.l2_at_tick.is_some() {
+                            "l2"
+                        } else {
+                            "l1"
+                        };
+                        emissions.push((
+                            chunk.span_id.clone(),
+                            serde_json::json!({
+                                "chunk_id": [chunk_id.0, chunk_id.1],
+                                "min_integrity": outcome.min_integrity,
+                                "unsupported_span_px": span,
+                                "unstable_cells": outcome.unstable_cells,
+                                "level": level,
+                                "bbox": { "min": chunk.bbox_min, "max": chunk.bbox_max },
+                                "vibration_modifier": vib,
+                            }),
+                        ));
+                    }
+                }
+            }
+            for (_, payload) in emissions {
+                self.recorder
+                    .record(tick, sim_time_ms, "terrain", "structural_integrity_low", payload, None);
+            }
+        }
+
+        // 2) Per-tick cave-in roll using seeded engine RNG.
+        let mut cave_in_emissions: Vec<(
+            (i32, i32),
+            cf_terrain::CaveInPayload,
+            Vec<(i32, i32)>,
+            Option<u64>,
+        )> = Vec::new();
+        if let Ok(mut s) = self.state.write() {
+            for chunk_id in &chunk_ids {
+                let (anchored, span_px, ceiling_thickness, vibration, bbox_min, bbox_max, cave_in_emitted, neighbors, damage_actor) = match s.m14e_chunks.get(chunk_id) {
+                    Some(chunk) => (
+                        chunk.anchored,
+                        chunk.unsupported_span_px,
+                        chunk.ceiling_thickness_px,
+                        chunk.vibration_modifier,
+                        chunk.bbox_min,
+                        chunk.bbox_max,
+                        chunk.cave_in_emitted,
+                        chunk.cascade_neighbors.clone(),
+                        chunk.damage_actor_id,
+                    ),
+                    None => continue,
+                };
+                if anchored || cave_in_emitted {
+                    continue;
+                }
+                let chance = cf_terrain::cave_in_chance_per_tick(span_px, vibration);
+                if chance <= 0.0 {
+                    continue;
+                }
+                let draw = next_unit_draw(&mut s.m14e_rng_state);
+                let outcome = cf_terrain::cave_in_roll(draw, span_px, vibration);
+                if outcome.fired() {
+                    let payload = cf_terrain::CaveInPayload::primary(
+                        *chunk_id,
+                        bbox_min,
+                        bbox_max,
+                        span_px,
+                        ceiling_thickness,
+                        vibration,
+                    );
+                    if let Some(chunk) = s.m14e_chunks.get_mut(chunk_id) {
+                        chunk.cave_in_emitted = true;
+                    }
+                    s.m14e_total_cave_ins = s.m14e_total_cave_ins.saturating_add(1);
+                    s.m14e_last_cave_in_tick.insert(*chunk_id, tick.0);
+                    cave_in_emissions.push((*chunk_id, payload, neighbors, damage_actor));
+                }
+            }
+        }
+
+        for (chunk_id, payload, neighbors, damage_actor) in cave_in_emissions {
+            let json_payload = serde_json::json!({
+                "chunk_id": [payload.chunk_id.0, payload.chunk_id.1],
+                "bbox": { "min": payload.bbox_min, "max": payload.bbox_max },
+                "falling_debris_count": payload.falling_debris_count,
+                "unsupported_span_px": payload.unsupported_span_px,
+                "vibration_modifier": payload.vibration_modifier,
+                "chance_per_tick": payload.chance_per_tick,
+                "cascade_primary": payload.cascade_primary,
+            });
+            self.recorder
+                .record(tick, sim_time_ms, "terrain", "cave_in_triggered", json_payload, None);
+            // Audio cue + render primitive surfaces handled by their
+            // respective consumers via the event stream.
+            // Emit a `terrain.terrain_cascade` for each authored
+            // neighbor (per VAL-M14E-018 + VAL-M14E-026).
+            for nbr in neighbors {
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "terrain",
+                    "terrain_cascade",
+                    serde_json::json!({
+                        "primary_chunk_id": [chunk_id.0, chunk_id.1],
+                        "secondary_chunk_id": [nbr.0, nbr.1],
+                        "cascade_kind": "cave_in",
+                        "tick_delta": 0,
+                    }),
+                    None,
+                );
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "terrain",
+                    "cave_in_triggered",
+                    serde_json::json!({
+                        "chunk_id": [nbr.0, nbr.1],
+                        "bbox": { "min": payload.bbox_min, "max": payload.bbox_max },
+                        "falling_debris_count": payload.falling_debris_count,
+                        "unsupported_span_px": payload.unsupported_span_px,
+                        "vibration_modifier": payload.vibration_modifier,
+                        "chance_per_tick": payload.chance_per_tick,
+                        "cascade_primary": false,
+                    }),
+                    None,
+                );
+                if let Ok(mut s) = self.state.write() {
+                    s.m14e_total_cave_ins = s.m14e_total_cave_ins.saturating_add(1);
+                }
+            }
+            if let Some(actor_id) = damage_actor {
+                // **M14E** § fall_impulse_chain → KnockedDown wiring.
+                let outcome = cf_physics::cave_in_fall_impulse_chain(
+                    payload.falling_debris_count,
+                    1.0,
+                    9.9,
+                    80.0,
+                    &[
+                        (
+                            "foot_left".to_string(),
+                            cf_physics::joint::Joint::default_for_zone("foot_left"),
+                        ),
+                        (
+                            "shin_left".to_string(),
+                            cf_physics::joint::Joint::default_for_zone("shin_left"),
+                        ),
+                        (
+                            "torso".to_string(),
+                            cf_physics::joint::Joint::default_for_zone("torso"),
+                        ),
+                    ],
+                );
+                if outcome.knockdown {
+                    if let Ok(mut s) = self.state.write() {
+                        s.m14e_actor_knockdown.insert(actor_id, true);
+                    }
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "actor",
+                        "knockdown",
+                        serde_json::json!({
+                            "actor": actor_id,
+                            "cause": "cave_in",
+                            "damage": outcome.total_damage,
+                            "debris_impulse": outcome.debris_impulse,
+                        }),
+                        None,
+                    );
+                }
+            }
+        }
+    }
+
+    /// **M14E** § Place a support beam at the actor-supplied world position.
+    /// Emits `terrain.support_beam_placed`, debits 2 iron + 1 wood, and
+    /// locks the integrity field ±8 px around the placement to the
+    /// beam-baseline (effective integrity 500).
+    pub fn m14e_place_support_beam(&self, actor_id: u64, world_pos: (f32, f32)) -> bool {
+        let chunk_id = (
+            (world_pos.0 / cf_terrain::CHUNK_SIZE as f32).floor() as i32,
+            (world_pos.1 / cf_terrain::CHUNK_SIZE as f32).floor() as i32,
+        );
+        let placed = if let Ok(mut s) = self.state.write() {
+            s.m14e_total_beams_placed = s.m14e_total_beams_placed.saturating_add(1);
+            let center_lx = cf_terrain::INTEGRITY_FIELD_WIDTH / 2;
+            let center_ly = cf_terrain::INTEGRITY_FIELD_HEIGHT / 2;
+            if let Some(chunk) = s.m14e_chunks.get_mut(&chunk_id) {
+                cf_terrain::lock_radius_to_beam(&mut chunk.field, center_lx, center_ly, 1);
+                chunk.anchored = true;
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+        let tick = self.current_tick();
+        let sim_time_ms = self.state.read().map(|s| s.clock.sim_time_ms()).unwrap_or(0.0);
+        self.recorder.record(
+            tick,
+            sim_time_ms,
+            "terrain",
+            "support_beam_placed",
+            serde_json::json!({
+                "actor_id": actor_id,
+                "world_pos": [world_pos.0, world_pos.1],
+                "chunk_id": [chunk_id.0, chunk_id.1],
+                "cost": { "iron": 2, "wood": 1 },
+                "footprint_half_px": 8,
+            }),
+            None,
+        );
+        placed
+    }
+
+    /// **M14E** § Demolish a support beam at the supplied world position.
+    /// Emits `terrain.support_beam_destroyed` and unlocks the integrity
+    /// field ±8 px around the position. The cascade chain (an
+    /// `terrain.structural_integrity_low` within ≤5 ticks) is driven by
+    /// the next scheduled integrity pass.
+    pub fn m14e_destroy_support_beam(&self, world_pos: (f32, f32), cause: &str, actor_id: Option<u64>) -> bool {
+        let chunk_id = (
+            (world_pos.0 / cf_terrain::CHUNK_SIZE as f32).floor() as i32,
+            (world_pos.1 / cf_terrain::CHUNK_SIZE as f32).floor() as i32,
+        );
+        let unlocked = if let Ok(mut s) = self.state.write() {
+            s.m14e_total_beams_destroyed = s.m14e_total_beams_destroyed.saturating_add(1);
+            let center_lx = cf_terrain::INTEGRITY_FIELD_WIDTH / 2;
+            let center_ly = cf_terrain::INTEGRITY_FIELD_HEIGHT / 2;
+            if let Some(chunk) = s.m14e_chunks.get_mut(&chunk_id) {
+                cf_terrain::unlock_radius(&mut chunk.field, center_lx, center_ly, 1);
+                chunk.anchored = false;
+                // Reset the "low" emit gate so the next pass re-emits
+                // the structural_integrity_low warning within ≤5 ticks
+                // (cadence + sub-tick guard) per VAL-M14E-013.
+                chunk.structural_integrity_low_emitted = false;
+                // Lower integrity towards the cascade band so the next
+                // pass crosses thresholds quickly.
+                for ly in 0..cf_terrain::INTEGRITY_FIELD_HEIGHT {
+                    for lx in 0..cf_terrain::INTEGRITY_FIELD_WIDTH {
+                        if !chunk.field.is_locked(lx, ly) {
+                            chunk.field.set(lx, ly, 100);
+                        }
+                    }
+                }
+                true
+            } else {
+                false
+            }
+        } else {
+            false
+        };
+        let tick = self.current_tick();
+        let sim_time_ms = self.state.read().map(|s| s.clock.sim_time_ms()).unwrap_or(0.0);
+        self.recorder.record(
+            tick,
+            sim_time_ms,
+            "terrain",
+            "support_beam_destroyed",
+            serde_json::json!({
+                "world_pos": [world_pos.0, world_pos.1],
+                "chunk_id": [chunk_id.0, chunk_id.1],
+                "cause": cause,
+                "actor_id": actor_id,
+                "footprint_half_px": 8,
+            }),
+            None,
+        );
+        unlocked
     }
 
     fn emit_actor_events(&self, tick: Tick, sim_time_ms: f64, intent: &ControlIntent, report: &StepReport) {

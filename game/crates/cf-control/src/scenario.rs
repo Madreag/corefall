@@ -157,6 +157,18 @@ pub struct Scenario {
     /// surfacing `collision.projectile_pair_contact` events.
     #[serde(default)]
     pub m14d_replay_intercepts: bool,
+    /// **M14E** § per-tick collapse-check fixtures authored by the
+    /// scenario manifest. Empty by default; M14E scenarios populate one
+    /// or more ScenarioTunnelSpan rows so the integrity pass + cave-in
+    /// roll fire against a known tunnel topology.
+    #[serde(default)]
+    pub m14e_tunnel_spans: Vec<ScenarioTunnelSpan>,
+    /// **M14E** § per-tick collapse-check seed offset. Scenarios that
+    /// rely on cave-in determinism (`m14e_tunnel_collapse_drill.ron`)
+    /// set this so the engine's cave-in RNG draw is reproducible. Default
+    /// 0 falls back to the engine's `seed` field.
+    #[serde(default)]
+    pub m14e_cave_in_seed_offset: u64,
 }
 
 /// **M14D** § one scenario projectile entry feeding the pair-CCD pool.
@@ -191,6 +203,52 @@ fn default_m14d_radius() -> f32 {
 
 fn default_m14d_mass_kg() -> f32 {
     0.01
+}
+
+/// **M14E** § One tunnel-span fixture authored by the scenario manifest.
+/// Drives the per-tick collapse-check pass on a single chunk per
+/// VAL-M14E-001..VAL-M14E-018.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScenarioTunnelSpan {
+    /// Stable id for diagnostics + replay matching.
+    pub id: String,
+    /// Chunk coordinate the tunnel ceiling occupies.
+    pub chunk_id: (i32, i32),
+    /// Pixel-space AABB of the unsupported ceiling region.
+    pub bbox_min: (i64, i64),
+    pub bbox_max: (i64, i64),
+    /// Unsupported tunnel span (pixels). The cave-in roll consumes this
+    /// alongside `vibration_modifier`.
+    pub unsupported_span_px: u32,
+    /// Ceiling thickness (pixels). Used in
+    /// `falling_debris_count(span_px, ceiling_thickness)`.
+    #[serde(default = "default_ceiling_thickness")]
+    pub ceiling_thickness_px: u32,
+    /// Vibration modifier (1.0 baseline; 2.0 plasma cutter).
+    #[serde(default = "default_vibration_modifier")]
+    pub vibration_modifier: f32,
+    /// True when the tunnel has at least one anchored support beam
+    /// covering the span. At init the integrity field locks the ±8 px
+    /// around the beam to integrity 500.
+    #[serde(default)]
+    pub anchored: bool,
+    /// Optional cascade-neighbor chunk ids that should re-run the
+    /// integrity pass when this tunnel cave-in fires.
+    #[serde(default)]
+    pub cascade_neighbors: Vec<(i32, i32)>,
+    /// True when a downstream actor should receive cave-in falling
+    /// debris (drives the fall_impulse_chain → KnockedDown wiring per
+    /// VAL-M14E-027).
+    #[serde(default)]
+    pub damage_actor_id: Option<u64>,
+}
+
+fn default_ceiling_thickness() -> u32 {
+    4
+}
+
+fn default_vibration_modifier() -> f32 {
+    1.0
 }
 
 /// **M14C** § one scripted director step. The engine compares the current
@@ -1530,6 +1588,8 @@ mod tests {
             scripted_steps: vec![],
             m14d_projectile_pool: vec![],
             m14d_replay_intercepts: false,
+            m14e_tunnel_spans: vec![],
+            m14e_cave_in_seed_offset: 0,
         };
         assert!(matches!(
             scenario.validate("t.ron"),
