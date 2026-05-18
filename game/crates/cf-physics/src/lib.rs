@@ -39,6 +39,7 @@ pub mod atom_group;
 pub mod authority;
 pub mod constants;
 pub mod facing_routing;
+pub mod gravity_field;
 pub mod hazard;
 pub mod joint;
 pub mod limb_path_interop;
@@ -49,6 +50,7 @@ pub mod ragdoll;
 pub mod sharpness;
 pub mod swept;
 pub mod zone_state;
+pub use gravity_field::{apply_overrides, GravityOverride, GravityVec, OverrideResult};
 pub use atom_group::{
     evaluate_ricochet, flail_as_limb, push_as_limb, push_travel, Atom, AtomGroup, RicochetOutcome,
     SweepOutcome, RICOCHET_ANGLE_THRESHOLD, RICOCHET_ENERGY_LOSS, RICOCHET_HARDNESS_FACTOR,
@@ -69,31 +71,65 @@ pub use zone_state::{bleed_per_tick, classify as classify_zone_state, ZoneState}
 
 use serde::{Deserialize, Serialize};
 
-/// **DR-038 forward-hook**: universal gravity field. `Uniform(f32)` is the
-/// only variant used through BP3 (matches M0..M3A `gravity: -980.0`
-/// scenario manifest scalar). M5.5 + M5.9 will extend with `Layered { ambient,
-/// regions, cells }` for per-cell overrides (gravity wells, low-g labs,
-/// magnetic boots). `#[serde(untagged)]` keeps the on-disk `.ron` shape
-/// compatible with the existing `gravity: -980.0` scalar form.
+/// **DR-038 / M14B**: universal gravity field. `Uniform(f32)` matches the
+/// legacy `gravity: -980.0` scenario manifest scalar (the value IS the
+/// y-component of the gravity acceleration). `Layered` lands at M14B with
+/// per-cell + per-region overrides for gravity wells, low-g labs,
+/// magnetic boots, reverse-g rooms, and damaged grav generators.
+/// `#[serde(untagged)]` keeps the on-disk `.ron` shape compatible with
+/// the existing `gravity: -980.0` scalar form while allowing manifests
+/// to opt into the richer struct form when they declare overrides.
 #[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
 #[serde(untagged)]
 pub enum GravityField {
     Uniform(f32),
+    Layered {
+        magnitude: f32,
+        direction: [f32; 2],
+    },
 }
 
 impl GravityField {
-    /// Sample the gravity vector at a world position. Today returns the
-    /// uniform scalar; M5.9 will sample per-cell layered overrides.
-    pub fn sample(self, _pos_x: f32, _pos_y: f32) -> f32 {
-        let GravityField::Uniform(g) = self;
-        g
+    /// **M14B** § sample the gravity vector at a world position. Returns a
+    /// typed [`GravityVec`] (magnitude + direction). For `Uniform(g)` the
+    /// magnitude is `|g|` and the direction is `[0, sign(g)]` — preserving
+    /// the legacy pixel-scale convention where `g = -980.0` means
+    /// "magnitude 980 pointing down".
+    ///
+    /// Pure / deterministic — identical inputs always produce identical
+    /// outputs. Per-cell overrides are layered on top of this baseline
+    /// via [`apply_overrides`] (consumer side).
+    #[must_use]
+    pub fn sample(self, _pos: [f32; 2]) -> GravityVec {
+        match self {
+            GravityField::Uniform(g) => {
+                if g.abs() <= f32::EPSILON {
+                    GravityVec {
+                        magnitude: 0.0,
+                        direction: [0.0, -1.0],
+                    }
+                } else {
+                    let mag = g.abs();
+                    let sign = g.signum();
+                    GravityVec {
+                        magnitude: mag,
+                        direction: [0.0, sign],
+                    }
+                }
+            }
+            GravityField::Layered { magnitude, direction } => GravityVec::new(magnitude, direction),
+        }
     }
-    /// Convenience accessor for callers that need a scalar fallback (e.g.
-    /// the M1/M2 actor controller). Always returns the same value as `sample()`
-    /// for `Uniform`; will be replaced with `sample(pos)` at M5.9.
+
+    /// Convenience accessor that returns the y-component of the gravity
+    /// acceleration in legacy scalar form (negative when pulling down).
+    /// Kept for backwards compatibility with M0..M14A callers that store
+    /// a single `gravity: f32` and route it directly through
+    /// [`step_kinematics`].
+    #[must_use]
     pub fn scalar(self) -> f32 {
-        let GravityField::Uniform(g) = self;
-        g
+        let g = self.sample([0.0, 0.0]);
+        g.direction[1] * g.magnitude
     }
 }
 
@@ -704,10 +740,35 @@ mod tests {
     }
 
     #[test]
-    fn gravity_field_sample_matches_scalar_for_uniform() {
+    fn gravity_field_sample_returns_typed_vector_for_uniform() {
         let g = GravityField::Uniform(-500.0);
-        assert!((g.sample(0.0, 0.0) - g.scalar()).abs() < f32::EPSILON);
-        assert!((g.sample(1234.5, -6789.0) - -500.0).abs() < f32::EPSILON);
+        let v = g.sample([0.0, 0.0]);
+        assert!((v.magnitude - 500.0).abs() < f32::EPSILON);
+        assert!(v.direction[0].abs() < f32::EPSILON);
+        assert!((v.direction[1] - -1.0).abs() < f32::EPSILON);
+        assert!((g.scalar() - -500.0).abs() < f32::EPSILON);
+    }
+
+    #[test]
+    fn gravity_field_sample_is_deterministic_across_calls() {
+        let g = GravityField::Uniform(-980.0);
+        let v1 = g.sample([100.0, 50.0]);
+        for _ in 0..1024 {
+            let v = g.sample([100.0, 50.0]);
+            assert_eq!(v, v1);
+        }
+    }
+
+    #[test]
+    fn gravity_field_layered_returns_authored_direction() {
+        let g = GravityField::Layered {
+            magnitude: 9.81,
+            direction: [0.0, -1.0],
+        };
+        let v = g.sample([0.0, 0.0]);
+        assert!((v.magnitude - 9.81).abs() < f32::EPSILON);
+        assert!(v.direction[0].abs() < f32::EPSILON);
+        assert!((v.direction[1] - -1.0).abs() < f32::EPSILON);
     }
 
     #[test]

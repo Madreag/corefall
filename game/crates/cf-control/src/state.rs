@@ -85,6 +85,46 @@ pub struct ObserveFrame {
     /// observe stream leaves this empty so the frame stays cheap.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub trench_segment_at_pos: Option<TrenchSegmentView>,
+    /// **M14B § "Surface in observe.frame.cells"** — per-cell atmosphere
+    /// projection (pressure + temperature + gas composition). Empty for
+    /// scenarios that don't declare `atmosphere_cells` in the manifest.
+    #[serde(default)]
+    pub cells: Vec<AtmosphericCellView>,
+    /// **M14B** § per-actor gravity vector projection. Reports the
+    /// scenario-base gravity plus stacked overrides as observed at the
+    /// actor's position this tick. Empty for scenarios with no actors.
+    #[serde(default)]
+    pub gravity_vectors: Vec<ActorGravityView>,
+}
+
+/// **M14B** § per-cell atmosphere projection for `observe.frame.cells`.
+/// Authored by the scenario manifest and mutated by the M14B
+/// stratification kernel each step.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct AtmosphericCellView {
+    pub id: u32,
+    pub column_id: u32,
+    pub min: [f32; 2],
+    pub max: [f32; 2],
+    pub pressure_kpa: f32,
+    pub temp_k: f32,
+    pub gases: Vec<AtmosphericCellGasView>,
+}
+
+/// **M14B** § per-gas projection inside [`AtmosphericCellView`].
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct AtmosphericCellGasView {
+    pub gas: String,
+    pub fraction: f32,
+}
+
+/// **M14B** § per-actor gravity vector projection for `observe.frame.gravity_vectors`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
+pub struct ActorGravityView {
+    pub actor_id: u64,
+    pub magnitude: f32,
+    pub direction: [f32; 2],
+    pub active_override_ids: Vec<u32>,
 }
 
 /// **M9B / VAL-M9B-CFCTL-003**: typed projection of one trench segment

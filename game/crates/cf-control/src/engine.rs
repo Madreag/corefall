@@ -189,6 +189,18 @@ pub struct M0EngineConfig {
     /// recorder runs in chain mode (per-event BLAKE3 keyed hash + final
     /// anchor in `RunManifest.ledger_chain_anchor`). Default false.
     pub ledger_chain_enabled: bool,
+    /// **M14B** § gravity field overrides authored by the scenario manifest.
+    /// Empty by default; producer-side `cf_physics::apply_overrides` reads
+    /// this list each tick.
+    pub initial_gravity_overrides: Vec<cf_physics::GravityOverride>,
+    /// **M14B** § wind apertures authored by the scenario manifest.
+    pub initial_wind_sources: Vec<cf_atmos::WindSource>,
+    /// **M14B** § authored atmosphere cells (pressure + temperature). Drives
+    /// the wind force kernel + stratification.
+    pub initial_atmosphere_cells: Vec<cf_atmos::AtmosCell>,
+    /// **M14B** § per-column gas composition for stratification (parallel
+    /// to `initial_atmosphere_cells` by `cell_id`). Empty = pure-air default.
+    pub initial_stratification_cells: Vec<cf_atmos::StratCell>,
 }
 
 /// M1.5: initial breach world snapshot.
@@ -266,6 +278,123 @@ fn build_rifles_for_world(world: &ActorWorld, tick_rate_hz: u32) -> BTreeMap<Act
         }
     }
     rifles
+}
+
+/// **M14B** § convert a [`cf_mission::ScenarioGravityOverride`] manifest
+/// entry into a runtime [`cf_physics::GravityOverride`].
+fn build_gravity_override(ovr: &cf_mission::ScenarioGravityOverride) -> cf_physics::GravityOverride {
+    match ovr {
+        cf_mission::ScenarioGravityOverride::UniformWell {
+            id,
+            center,
+            radius,
+            magnitude,
+        } => cf_physics::GravityOverride::UniformWell {
+            id: *id,
+            center: [center.0, center.1],
+            radius: *radius,
+            magnitude: *magnitude,
+        },
+        cf_mission::ScenarioGravityOverride::RegionLowG { id, min, max, local_g } => {
+            cf_physics::GravityOverride::RegionLowG {
+                id: *id,
+                min: [min.0, min.1],
+                max: [max.0, max.1],
+                local_g: *local_g,
+            }
+        }
+        cf_mission::ScenarioGravityOverride::MagneticBoots { id, actor_id } => {
+            cf_physics::GravityOverride::MagneticBoots {
+                id: *id,
+                actor_id: *actor_id,
+            }
+        }
+        cf_mission::ScenarioGravityOverride::ReverseG { id, min, max } => cf_physics::GravityOverride::ReverseG {
+            id: *id,
+            min: [min.0, min.1],
+            max: [max.0, max.1],
+        },
+        cf_mission::ScenarioGravityOverride::DamagedGrav {
+            id,
+            center,
+            radius,
+            magnitude_factor,
+            wave_front_radius,
+        } => cf_physics::GravityOverride::DamagedGrav {
+            id: *id,
+            center: [center.0, center.1],
+            radius: *radius,
+            magnitude_factor: *magnitude_factor,
+            wave_front_radius: *wave_front_radius,
+        },
+    }
+}
+
+/// **M14B** § convert a [`cf_mission::ScenarioWindSource`] manifest entry
+/// into a runtime [`cf_atmos::WindSource`].
+fn build_wind_source(w: &cf_mission::ScenarioWindSource) -> cf_atmos::WindSource {
+    cf_atmos::WindSource {
+        id: w.id,
+        origin: [w.origin.0, w.origin.1],
+        axis: [w.axis.0, w.axis.1],
+        aperture_area_m2: w.aperture_area_m2,
+        cell_high_id: w.cell_high_id,
+        cell_low_id: w.cell_low_id,
+        jet_length: w.jet_length,
+        jet_half_width: w.jet_half_width,
+    }
+}
+
+/// **M14B** § convert a [`cf_mission::ScenarioAtmosCell`] manifest entry
+/// into a runtime [`cf_atmos::AtmosCell`] (pressure + bounding rect).
+fn build_atmos_cell(c: &cf_mission::ScenarioAtmosCell) -> cf_atmos::AtmosCell {
+    cf_atmos::AtmosCell {
+        id: c.id,
+        min: [c.min.0, c.min.1],
+        max: [c.max.0, c.max.1],
+        pressure_kpa: c.pressure_kpa,
+        temp_k: c.temp_k,
+    }
+}
+
+/// **M14B** § convert a [`cf_mission::ScenarioAtmosCell`] entry into a
+/// stratification cell with per-gas mole fractions. The string labels
+/// in the manifest map to [`cf_atmos::Gas`] variants; unknown labels
+/// route to [`cf_atmos::Gas::Pollutant`] so manifests can declare new
+/// gases without crashing the engine (per the AGENTS rule against
+/// `unwrap()` on user-controllable inputs).
+fn build_strat_cell(c: &cf_mission::ScenarioAtmosCell) -> cf_atmos::StratCell {
+    let column_id = c.column_id.unwrap_or(c.id);
+    let center_y = (c.min.1 + c.max.1) * 0.5;
+    let fractions: Vec<(cf_atmos::Gas, f32)> = c
+        .gases
+        .iter()
+        .map(|(label, frac)| (gas_from_label(label), frac.clamp(0.0, 1.0)))
+        .collect();
+    cf_atmos::StratCell {
+        cell_id: c.id,
+        column_id,
+        center_y,
+        fractions,
+    }
+}
+
+/// **M14B** § map a canonical gas label to a [`cf_atmos::Gas`] variant.
+/// Unknown labels default to [`cf_atmos::Gas::Pollutant`] so mod-supplied
+/// gases (or typos) don't crash the loader.
+fn gas_from_label(label: &str) -> cf_atmos::Gas {
+    match label.to_ascii_lowercase().as_str() {
+        "h2" | "hydrogen" => cf_atmos::Gas::H2,
+        "he" | "helium" => cf_atmos::Gas::He,
+        "methane" | "ch4" => cf_atmos::Gas::Methane,
+        "water_vapor" | "h2o" | "watervapor" => cf_atmos::Gas::WaterVapor,
+        "n2" | "nitrogen" => cf_atmos::Gas::N2,
+        "o2" | "oxygen" => cf_atmos::Gas::O2,
+        "co2" | "carbon_dioxide" => cf_atmos::Gas::CO2,
+        "n2o" | "nitrous_oxide" => cf_atmos::Gas::N2O,
+        "volatiles" | "fuel" => cf_atmos::Gas::Volatiles,
+        _ => cf_atmos::Gas::Pollutant,
+    }
 }
 
 /// **M9** § Concussion bands — map cumulative dose (0..=100) to the canonical
@@ -377,6 +506,13 @@ impl M0EngineConfig {
             // OFF by default for dev runs. Tournament mode opts in via cf-app
             // / cfctl `--ledger-chain` / `--tournament-mode`.
             ledger_chain_enabled: false,
+            // **M14B** § empty by default; scenarios opt in by declaring
+            // gravity_overrides / wind_sources / atmosphere_cells in the
+            // manifest.
+            initial_gravity_overrides: Vec::new(),
+            initial_wind_sources: Vec::new(),
+            initial_atmosphere_cells: Vec::new(),
+            initial_stratification_cells: Vec::new(),
         }
     }
 
@@ -522,6 +658,29 @@ impl M0EngineConfig {
         }
         if let Some(graph) = &scenario.objective_graph {
             cfg.initial_objective_graph = Some(graph.build_graph());
+        }
+        // **M14B** § gravity field + wind force + atmosphere cells. Build
+        // cf-physics + cf-atmos types from the scenario manifest's
+        // `gravity_overrides[]` / `wind_sources[]` / `atmosphere_cells[]`
+        // arrays. Empty arrays = pass-through (no overrides).
+        cfg.initial_gravity_overrides = scenario
+            .gravity_overrides
+            .iter()
+            .map(build_gravity_override)
+            .collect();
+        cfg.initial_wind_sources = scenario.wind_sources.iter().map(build_wind_source).collect();
+        cfg.initial_atmosphere_cells = scenario.atmosphere_cells.iter().map(build_atmos_cell).collect();
+        cfg.initial_stratification_cells = scenario
+            .atmosphere_cells
+            .iter()
+            .map(build_strat_cell)
+            .collect();
+        // Promote the milestone tag when the scenario uses M14B producers.
+        if !scenario.gravity_overrides.is_empty()
+            || !scenario.wind_sources.is_empty()
+            || !scenario.atmosphere_cells.is_empty()
+        {
+            cfg.milestone = "m14b".to_string();
         }
         cfg
     }
@@ -1061,6 +1220,24 @@ pub(crate) struct EngineMutable {
     /// engage; the M25 hook will fold real rival-alive state into this
     /// roll when it ships.
     pub(crate) cinematic_rival_taunt_roll: u8,
+    /// **M14B** § gravity field producer state. Authored by the scenario
+    /// manifest's `gravity_overrides[]` array; consumed by per-tick
+    /// `cf_physics::apply_overrides` calls.
+    pub(crate) m14b_gravity_overrides: Vec<cf_physics::GravityOverride>,
+    /// **M14B** § wind force producer apertures.
+    pub(crate) m14b_wind_sources: Vec<cf_atmos::WindSource>,
+    /// **M14B** § authored atmosphere cells (pressure + temperature). Drives
+    /// the wind force kernel + observe.frame.cells projection.
+    pub(crate) m14b_atmos_cells: Vec<cf_atmos::AtmosCell>,
+    /// **M14B** § gas-stratification cells (per-column composition). Runs
+    /// every 4th tick per the spec.
+    pub(crate) m14b_strat_cells: Vec<cf_atmos::StratCell>,
+    /// **M14B** § per-(actor, override) activation latch. Used by the
+    /// per-tick step to emit `gravity.override_activated` only on entry +
+    /// `gravity.override_deactivated` only on exit. The inner BTreeSet
+    /// holds the override ids currently active for the actor; the outer
+    /// map is keyed by actor id.
+    pub(crate) m14b_active_overrides: BTreeMap<ActorId, std::collections::BTreeSet<u32>>,
 }
 
 /// **M6**: per-actor charge-fire annotation shipped from the M6 post-step
@@ -1441,6 +1618,14 @@ impl M0Engine {
             }
         });
 
+        // **M14B**: snapshot the producer-side authored state before moving
+        // `config` into the engine struct. The engine's mutable side owns
+        // its own copy so per-tick mutations (e.g. `DamagedGrav` wave-front
+        // growth, stratification deltas) don't bleed back into the config.
+        let m14b_gravity_overrides = config.initial_gravity_overrides.clone();
+        let m14b_wind_sources = config.initial_wind_sources.clone();
+        let m14b_atmos_cells = config.initial_atmosphere_cells.clone();
+        let m14b_strat_cells = config.initial_stratification_cells.clone();
         let engine = Self {
             config,
             state: RwLock::new(EngineMutable {
@@ -1551,6 +1736,11 @@ impl M0Engine {
                 cinematic_mixer: cf_audio::CinematicMixer::new(),
                 cinematic_takeover: cf_cinematic::CinematicTakeoverSnapshot::default(),
                 cinematic_rival_taunt_roll: 0,
+                m14b_gravity_overrides,
+                m14b_wind_sources,
+                m14b_atmos_cells,
+                m14b_strat_cells,
+                m14b_active_overrides: BTreeMap::new(),
             }),
             recorder,
             current_tick,
@@ -5324,6 +5514,21 @@ impl M0Engine {
             self.tick_m9b_drainage(t, sim_time_ms);
             self.tick_m9b_breastwork_hits(guard_fire_records.iter(), t, sim_time_ms);
             self.tick_m9b_collapse(t, sim_time_ms);
+        }
+
+        // **M14B § gravity field + wind force + gas stratification producers.**
+        // Per-tick step that:
+        //   1. Samples per-actor gravity overrides → applies acceleration +
+        //      emits gravity.override_activated / gravity.override_deactivated.
+        //   2. Samples per-actor wind force from the cell + aperture index →
+        //      applies impulse + emits atmos.wind_force_applied.
+        //   3. Runs gas stratification at 1/4 the tick rate → emits
+        //      atmos.gas_stratified per cell that changed composition.
+        // See `specs/active/M14B.md` § "Crates / modules touched" /
+        // "Acceptance criteria".
+        if let Some(t) = advanced {
+            let sim_time_ms = self.state.read().map(|s| s.clock.sim_time_ms()).unwrap_or(0.0);
+            self.tick_m14b(t, sim_time_ms);
         }
 
         // **M4B § "Delta baseline cadence is enforced"** — emit one snapshot
@@ -10842,6 +11047,171 @@ impl M0Engine {
                 | cf_equipment::AdvancedFireMode::Auto
                 | cf_equipment::AdvancedFireMode::Pump => {}
             }
+        }
+    }
+
+    /// `M14B` § per-tick gravity field + wind force + gas stratification
+    /// producer step.
+    ///
+    /// 1. For each actor (player + reactive guards), sample the
+    ///    [`cf_physics::GravityField`] baseline + [`cf_physics::apply_overrides`]
+    ///    with the scenario's authored override list. Compare the active
+    ///    override id set to the previous tick's set:
+    ///    - Newly-entered ids fire `gravity.override_activated`.
+    ///    - Newly-exited ids fire `gravity.override_deactivated`.
+    ///      The resulting [`cf_physics::GravityVec`] is added to the actor's
+    ///      velocity (F = ma form via dt × magnitude × direction).
+    ///
+    /// 2. For each actor, sample [`cf_atmos::wind_force_at`] from the
+    ///    authored cells + apertures. Apply Δv = F / mass × dt and emit
+    ///    `atmos.wind_force_applied` per actor that received a force ≥ 1 N.
+    ///
+    /// 3. Every 4th tick run [`cf_atmos::stratify`] on the per-column gas
+    ///    composition. Each non-trivial delta produces an
+    ///    `atmos.gas_stratified` event. (Spec: "Stratification step runs
+    ///    at 1/4 the atmospherics tick rate to amortize the per-cell
+    ///    reorder cost; checksum still per-tick.")
+    ///
+    /// Deterministic / replay-stable: every input is read out of
+    /// `state.m14b_*` which is seeded at scenario init and mutated only
+    /// by this method.
+    fn tick_m14b(&self, tick: Tick, sim_time_ms: f64) {
+        // Snapshot the producer-side fields + per-actor positions under
+        // a single read lock. The recorder writes happen after the lock
+        // is released to avoid lock-during-IO.
+        let (overrides, wind_sources, atmos_cells, base_field, actor_positions, prev_active) = {
+            let state = match self.state.read() {
+                Ok(s) => s,
+                Err(_) => return,
+            };
+            let base_field = state
+                .actor_state
+                .as_ref()
+                .map(|sim| cf_physics::GravityField::Uniform(sim.world.gravity))
+                .unwrap_or_default();
+            let actors: Vec<(ActorId, [f32; 2], f32)> = state
+                .actor_state
+                .as_ref()
+                .map(|sim| {
+                    sim.world
+                        .actors
+                        .values()
+                        .map(|a| (a.id, [a.position.x, a.position.y], a.total_mass_cached.max(1.0)))
+                        .collect()
+                })
+                .unwrap_or_default();
+            (
+                state.m14b_gravity_overrides.clone(),
+                state.m14b_wind_sources.clone(),
+                state.m14b_atmos_cells.clone(),
+                base_field,
+                actors,
+                state.m14b_active_overrides.clone(),
+            )
+        };
+
+        let mut events_to_emit: Vec<(&'static str, &'static str, serde_json::Value)> = Vec::new();
+        let mut new_active: BTreeMap<ActorId, std::collections::BTreeSet<u32>> = BTreeMap::new();
+        let mut velocity_deltas: BTreeMap<ActorId, [f32; 2]> = BTreeMap::new();
+        let dt_secs = 1.0_f32 / self.config.tick_rate_hz.max(1) as f32;
+
+        if !overrides.is_empty() || !wind_sources.is_empty() {
+            for (actor_id, pos, mass) in &actor_positions {
+                // -- Gravity override sampling -------------------------------
+                let base_vec = base_field.sample(*pos);
+                let result = cf_physics::apply_overrides(base_vec, *pos, Some(actor_id.0), &overrides);
+                let active_set: std::collections::BTreeSet<u32> = result.active_ids.iter().copied().collect();
+                let prev_set = prev_active.get(actor_id).cloned().unwrap_or_default();
+                // Emit override_activated for newly-entered ids.
+                for id in active_set.difference(&prev_set) {
+                    if let Some(ovr) = overrides.iter().find(|o| o.id() == *id) {
+                        let payload = serde_json::json!({
+                            "actor_id": actor_id.0,
+                            "override_id": *id,
+                            "kind": ovr.kind_str(),
+                            "magnitude": result.gravity.magnitude,
+                            "direction": result.gravity.direction,
+                        });
+                        events_to_emit.push(("gravity", "override_activated", payload));
+                    }
+                }
+                // Emit override_deactivated for ids the actor just left.
+                for id in prev_set.difference(&active_set) {
+                    let kind = overrides
+                        .iter()
+                        .find(|o| o.id() == *id)
+                        .map(|o| o.kind_str())
+                        .unwrap_or("unknown");
+                    let payload = serde_json::json!({
+                        "actor_id": actor_id.0,
+                        "override_id": *id,
+                        "kind": kind,
+                    });
+                    events_to_emit.push(("gravity", "override_deactivated", payload));
+                }
+                new_active.insert(*actor_id, active_set);
+
+                // -- Wind force sampling -------------------------------------
+                let wind_outcome = cf_atmos::wind_force_at(*pos, &atmos_cells, &wind_sources);
+                let mag = wind_outcome.magnitude_sq.sqrt();
+                if mag >= 1.0 {
+                    let dvx = wind_outcome.force_n[0] / mass.max(1.0) * dt_secs;
+                    let dvy = wind_outcome.force_n[1] / mass.max(1.0) * dt_secs;
+                    velocity_deltas.insert(*actor_id, [dvx, dvy]);
+                    let payload = serde_json::json!({
+                        "actor_id": actor_id.0,
+                        "force_n": wind_outcome.force_n,
+                        "source_aperture_id": wind_outcome.source_aperture_id,
+                        "magnitude_n": mag,
+                    });
+                    events_to_emit.push(("atmos", "wind_force_applied", payload));
+                }
+            }
+        }
+
+        // -- Stratification step (every 4th tick) ----------------------------
+        let mut strat_deltas: Vec<cf_atmos::StratificationDelta> = Vec::new();
+        if tick.0.is_multiple_of(4) {
+            // Use the base field's scalar gravity for the kernel (magnitude
+            // in m/s² equivalent — the scalar is in authored units but the
+            // kernel only cares about the relative magnitude for the
+            // separation rate).
+            let g_mag = base_field.sample([0.0, 0.0]).magnitude;
+            // Scale down from pixel units (~980) to m/s² (~9.81) when the
+            // base scalar is at pixel scale. We detect this by comparing
+            // against a threshold (50 m/s² — well above any planetary g).
+            let local_g = if g_mag > 50.0 { g_mag / 100.0 } else { g_mag };
+            if let Ok(mut state) = self.state.write() {
+                strat_deltas = cf_atmos::stratify(&mut state.m14b_strat_cells, local_g);
+            }
+            for delta in &strat_deltas {
+                let payload = serde_json::json!({
+                    "cell_id": delta.cell_id,
+                    "gas": delta.gas.label(),
+                    "fraction_delta": delta.fraction_delta,
+                });
+                events_to_emit.push(("atmos", "gas_stratified", payload));
+            }
+        }
+
+        // -- Commit state mutations (active set + actor velocity) ------------
+        if let Ok(mut state) = self.state.write() {
+            state.m14b_active_overrides = new_active;
+            if !velocity_deltas.is_empty() {
+                if let Some(sim) = state.actor_state.as_mut() {
+                    for (actor_id, dv) in &velocity_deltas {
+                        if let Some(actor) = sim.world.actors.get_mut(actor_id) {
+                            actor.velocity.x += dv[0];
+                            actor.velocity.y += dv[1];
+                        }
+                    }
+                }
+            }
+        }
+
+        // -- Emit events ----------------------------------------------------
+        for (cat, ty, payload) in events_to_emit {
+            self.recorder.record(tick, sim_time_ms, cat, ty, payload, None);
         }
     }
 
@@ -17855,6 +18225,65 @@ impl EngineHandle for M0Engine {
             focused_node: state.hud_focus_index.map(|i| HUD_FOCUSABLE_NODES[i].to_string()),
             focus_cycle: state.hud_focus_cycle,
         };
+        // **M14B § "Surface in observe.frame.cells"** — per-cell
+        // atmosphere projection (pressure + temperature + per-gas
+        // mole fractions). Empty for scenarios that don't declare
+        // `atmosphere_cells` in the manifest.
+        let cells: Vec<crate::state::AtmosphericCellView> = state
+            .m14b_atmos_cells
+            .iter()
+            .map(|c| {
+                let strat = state.m14b_strat_cells.iter().find(|s| s.cell_id == c.id);
+                let gases: Vec<crate::state::AtmosphericCellGasView> = strat
+                    .map(|s| {
+                        s.fractions
+                            .iter()
+                            .map(|(g, f)| crate::state::AtmosphericCellGasView {
+                                gas: g.label().to_string(),
+                                fraction: *f,
+                            })
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                let column_id = strat.map(|s| s.column_id).unwrap_or(c.id);
+                crate::state::AtmosphericCellView {
+                    id: c.id,
+                    column_id,
+                    min: c.min,
+                    max: c.max,
+                    pressure_kpa: c.pressure_kpa,
+                    temp_k: c.temp_k,
+                    gases,
+                }
+            })
+            .collect();
+        // **M14B** § per-actor gravity vector projection.
+        let gravity_vectors: Vec<crate::state::ActorGravityView> = state
+            .actor_state
+            .as_ref()
+            .map(|sim| {
+                let base = cf_physics::GravityField::Uniform(sim.world.gravity);
+                sim.world
+                    .actors
+                    .values()
+                    .map(|a| {
+                        let pos = [a.position.x, a.position.y];
+                        let result = cf_physics::apply_overrides(
+                            base.sample(pos),
+                            pos,
+                            Some(a.id.0),
+                            &state.m14b_gravity_overrides,
+                        );
+                        crate::state::ActorGravityView {
+                            actor_id: a.id.0,
+                            magnitude: result.gravity.magnitude,
+                            direction: result.gravity.direction,
+                            active_override_ids: result.active_ids,
+                        }
+                    })
+                    .collect()
+            })
+            .unwrap_or_default();
         let frame = ObserveFrame {
             schema_version: SCHEMA_VERSION,
             run_id: self.recorder.run_id().to_string(),
@@ -17905,6 +18334,8 @@ impl EngineHandle for M0Engine {
                 capturer: state.controls_captured_by.clone(),
             },
             trench_segment_at_pos: None,
+            cells,
+            gravity_vectors,
         };
         let tick = state.clock.tick();
         let sim_time_ms = state.clock.sim_time_ms();

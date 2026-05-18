@@ -15,11 +15,15 @@
 //! `gain=0` before doppler math.".
 
 pub mod room;
+pub mod stratification;
+pub mod wind;
 
 use cf_audio::{Medium, MediumFilter};
 use serde::{Deserialize, Serialize};
 
 pub use room::{reverb_profile, RoomAtmosphere};
+pub use stratification::{stratify, stratify_if_due, Gas, StratCell, StratificationDelta, AIR_MOLAR_MASS_G_PER_MOL};
+pub use wind::{wind_force_at, wind_force_from_aperture, AtmosCell, WindForceOutcome, WindSource};
 
 /// **M14A** § "Atmosphere overlay" — Stationeers-grade atmospheric constants.
 pub const IDEAL_GAS_CONSTANT_R: f32 = 8314.46;

@@ -53,6 +53,14 @@
         "$ref": "#/$defs/CaptionView"
       }
     },
+    "cells": {
+      "description": "**M14B § \"Surface in observe.frame.cells\"** — per-cell atmosphere\nprojection (pressure + temperature + gas composition). Empty for\nscenarios that don't declare `atmosphere_cells` in the manifest.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/AtmosphericCellView"
+      }
+    },
     "controls_capture": {
       "description": "**M1 / Gap D3**: controls-capture surface. When `captured=true`\ncf-ui renders the CAPTURED zone and cf-app suppresses keyboard/mouse\ndispatch.",
       "$ref": "#/$defs/ControlsCaptureView",
@@ -76,6 +84,14 @@
       "type": "integer",
       "format": "uint64",
       "minimum": 0
+    },
+    "gravity_vectors": {
+      "description": "**M14B** § per-actor gravity vector projection. Reports the\nscenario-base gravity plus stacked overrides as observed at the\nactor's position this tick. Empty for scenarios with no actors.",
+      "type": "array",
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/ActorGravityView"
+      }
     },
     "mission": {
       "description": "M1.5: mission state machine projection. `None` for sandbox scenarios.",
@@ -256,6 +272,44 @@
         "key_remap_enabled",
         "key_bindings",
         "focusable_nodes"
+      ]
+    },
+    "ActorGravityView": {
+      "description": "**M14B** § per-actor gravity vector projection for `observe.frame.gravity_vectors`.",
+      "type": "object",
+      "properties": {
+        "active_override_ids": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "format": "uint32",
+            "minimum": 0
+          }
+        },
+        "actor_id": {
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0
+        },
+        "direction": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "float"
+          },
+          "maxItems": 2,
+          "minItems": 2
+        },
+        "magnitude": {
+          "type": "number",
+          "format": "float"
+        }
+      },
+      "required": [
+        "actor_id",
+        "magnitude",
+        "direction",
+        "active_override_ids"
       ]
     },
     "ActorView": {
@@ -519,6 +573,80 @@
           "type": "string",
           "const": "auto_aim_with_damage_penalty"
         }
+      ]
+    },
+    "AtmosphericCellGasView": {
+      "description": "**M14B** § per-gas projection inside [`AtmosphericCellView`].",
+      "type": "object",
+      "properties": {
+        "fraction": {
+          "type": "number",
+          "format": "float"
+        },
+        "gas": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "gas",
+        "fraction"
+      ]
+    },
+    "AtmosphericCellView": {
+      "description": "**M14B** § per-cell atmosphere projection for `observe.frame.cells`.\nAuthored by the scenario manifest and mutated by the M14B\nstratification kernel each step.",
+      "type": "object",
+      "properties": {
+        "column_id": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "gases": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/AtmosphericCellGasView"
+          }
+        },
+        "id": {
+          "type": "integer",
+          "format": "uint32",
+          "minimum": 0
+        },
+        "max": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "float"
+          },
+          "maxItems": 2,
+          "minItems": 2
+        },
+        "min": {
+          "type": "array",
+          "items": {
+            "type": "number",
+            "format": "float"
+          },
+          "maxItems": 2,
+          "minItems": 2
+        },
+        "pressure_kpa": {
+          "type": "number",
+          "format": "float"
+        },
+        "temp_k": {
+          "type": "number",
+          "format": "float"
+        }
+      },
+      "required": [
+        "id",
+        "column_id",
+        "min",
+        "max",
+        "pressure_kpa",
+        "temp_k",
+        "gases"
       ]
     },
     "BodySilhouetteView": {

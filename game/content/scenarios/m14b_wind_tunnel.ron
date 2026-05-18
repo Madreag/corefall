@@ -1,0 +1,33 @@
+(
+  schema_version: 1,
+  id: "m14b_wind_tunnel",
+  display_name: "M14B Wind Tunnel",
+  description: "Two adjacent atmosphere cells with a pressure differential drive wind force through an aperture. Tests M14B wind force producer + M14A PARITY-86 closure.",
+  seed: 14,
+  duration_ticks: Some(1800),
+  region: (anchor: (0.0, 0.0), width: 320.0, height: 160.0),
+  gravity: -980.0,
+  floor_y: 16.0,
+  teams: [],
+  actors: [
+    (id: 1, team: "blue", spawn: (140.0, 32.0), controllable: true, hp: 100.0,
+      inventory: (rifle: Some("rifle_m1_default")), half_extents: Some((8.0, 16.0)),
+      chassis: Some((spec_id: "infantry_v1", tutorial_safety: false)),
+      origin_id: Some("human")),
+  ],
+  atmosphere_cells: [
+    (id: 1, min: (0.0, 0.0), max: (100.0, 160.0), pressure_kpa: 101.0, temp_k: 293.15),
+    (id: 2, min: (100.0, 0.0), max: (200.0, 160.0), pressure_kpa: 96.0, temp_k: 293.15),
+    (id: 3, min: (200.0, 0.0), max: (320.0, 160.0), pressure_kpa: 70000.0, temp_k: 293.15),
+  ],
+  wind_sources: [
+    (id: 1, origin: (100.0, 32.0), axis: (1.0, 0.0), aperture_area_m2: 0.5, cell_high_id: 1, cell_low_id: 2, jet_length: 80.0, jet_half_width: 32.0),
+    (id: 2, origin: (200.0, 32.0), axis: (-1.0, 0.0), aperture_area_m2: 0.01, cell_high_id: 3, cell_low_id: 2, jet_length: 80.0, jet_half_width: 32.0),
+  ],
+  objectives: [],
+  director: None,
+  capabilities: (debug: false, control_api: true, save_load: false),
+  save_fields: [],
+  expected_tests: ["M14B-WIND-01"],
+  notes: "5 kPa wind aperture pushes actor; the 70 MPa pipe rupture jet on the right staggers light actors via M14A consumer.",
+)

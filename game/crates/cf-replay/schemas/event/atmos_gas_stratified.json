@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/atmos.gas_stratified.v0.1",
+  "title": "atmos.gas_stratified",
+  "description": "M14B § gas stratification producer — per-step atmos.gas_stratified event emitted when a gas's fraction shifts between cells in the same vertical column. `cell_id` identifies the cell, `gas` is one of the canonical Stationeers gas labels (h2/he/methane/water_vapor/n2/o2/co2/n2o/pollutant/volatiles), `fraction_delta` is the signed change (positive when the cell gained the gas, negative when it lost). Producer fills at M14B. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "atmos" },
+    "event_type": { "const": "gas_stratified" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "cell_id": { "type": "integer", "minimum": 0 },
+        "gas": { "type": "string" },
+        "fraction_delta": { "type": "number" }
+      },
+      "required": ["cell_id", "gas", "fraction_delta"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

@@ -194,6 +194,12 @@ const SCHEMA_ATMOS_PIPE_FLOW: &str = include_str!("../schemas/event/atmos_pipe_f
 const SCHEMA_ATMOS_PIPE_FREEZE: &str = include_str!("../schemas/event/atmos_pipe_freeze.json");
 const SCHEMA_ATMOS_PIPE_RUPTURE: &str = include_str!("../schemas/event/atmos_pipe_rupture.json");
 const SCHEMA_ATMOS_ELECTROLYSIS_STARTED: &str = include_str!("../schemas/event/atmos_electrolysis_started.json");
+// atmos.* (M14B § wind + stratification producers).
+const SCHEMA_ATMOS_WIND_FORCE_APPLIED: &str = include_str!("../schemas/event/atmos_wind_force_applied.json");
+const SCHEMA_ATMOS_GAS_STRATIFIED: &str = include_str!("../schemas/event/atmos_gas_stratified.json");
+// gravity.* (M14B § gravity field producer).
+const SCHEMA_GRAVITY_OVERRIDE_ACTIVATED: &str = include_str!("../schemas/event/gravity_override_activated.json");
+const SCHEMA_GRAVITY_OVERRIDE_DEACTIVATED: &str = include_str!("../schemas/event/gravity_override_deactivated.json");
 // shield.* (M13+ + M25+).
 const SCHEMA_SHIELD_HIT: &str = include_str!("../schemas/event/shield_hit.json");
 const SCHEMA_SHIELD_DEPLETED: &str = include_str!("../schemas/event/shield_depleted.json");
@@ -640,6 +646,12 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("atmos", "pipe_freeze") => Some(SCHEMA_ATMOS_PIPE_FREEZE),
         ("atmos", "pipe_rupture") => Some(SCHEMA_ATMOS_PIPE_RUPTURE),
         ("atmos", "electrolysis_started") => Some(SCHEMA_ATMOS_ELECTROLYSIS_STARTED),
+        // atmos.* (M14B § wind + stratification producers).
+        ("atmos", "wind_force_applied") => Some(SCHEMA_ATMOS_WIND_FORCE_APPLIED),
+        ("atmos", "gas_stratified") => Some(SCHEMA_ATMOS_GAS_STRATIFIED),
+        // gravity.* (M14B § gravity field producer).
+        ("gravity", "override_activated") => Some(SCHEMA_GRAVITY_OVERRIDE_ACTIVATED),
+        ("gravity", "override_deactivated") => Some(SCHEMA_GRAVITY_OVERRIDE_DEACTIVATED),
         // shield.* (M13+ + M25+).
         ("shield", "hit") => Some(SCHEMA_SHIELD_HIT),
         ("shield", "depleted") => Some(SCHEMA_SHIELD_DEPLETED),
@@ -1330,6 +1342,12 @@ mod tests {
             ("atmos", "pipe_freeze"),
             ("atmos", "pipe_rupture"),
             ("atmos", "electrolysis_started"),
+            // M14B atmos.* (wind + stratification producers).
+            ("atmos", "wind_force_applied"),
+            ("atmos", "gas_stratified"),
+            // M14B gravity.* (gravity field producer).
+            ("gravity", "override_activated"),
+            ("gravity", "override_deactivated"),
             // M5 shield.*.
             ("shield", "hit"),
             ("shield", "depleted"),
@@ -2507,6 +2525,10 @@ mod tests {
             ("atmos", "pipe_freeze"),
             ("atmos", "pipe_rupture"),
             ("atmos", "electrolysis_started"),
+            ("atmos", "wind_force_applied"),
+            ("atmos", "gas_stratified"),
+            ("gravity", "override_activated"),
+            ("gravity", "override_deactivated"),
             ("shield", "hit"),
             ("shield", "depleted"),
             ("shield", "regen_started"),

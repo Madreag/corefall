@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/gravity.override_deactivated.v0.1",
+  "title": "gravity.override_deactivated",
+  "description": "M14B § gravity field producer — fires the first tick an actor leaves the spatial extent of a previously-activated gravity override or unequips magnetic boots. Mirrors gravity.override_activated with the same `override_id`/`kind`/`actor_id` payload shape. Producer fills at M14B. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "gravity" },
+    "event_type": { "const": "override_deactivated" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer", "minimum": 0 },
+        "override_id": { "type": "integer", "minimum": 0 },
+        "kind": { "type": "string" }
+      },
+      "required": ["actor_id", "override_id", "kind"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

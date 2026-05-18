@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/gravity.override_activated.v0.1",
+  "title": "gravity.override_activated",
+  "description": "M14B § gravity field producer — fires the first tick an actor enters the spatial extent of a gravity override (uniform_well, region_low_g, reverse_g, damaged_grav) or equips magnetic boots. `override_id` is the manifest-authored id; `kind` is one of `uniform_well|region_low_g|magnetic_boots|reverse_g|damaged_grav`; `actor_id` is the actor whose gravity vector changed this tick. Producer fills at M14B. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "gravity" },
+    "event_type": { "const": "override_activated" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer", "minimum": 0 },
+        "override_id": { "type": "integer", "minimum": 0 },
+        "kind": { "type": "string" },
+        "magnitude": { "type": "number" },
+        "direction": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        }
+      },
+      "required": ["actor_id", "override_id", "kind"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

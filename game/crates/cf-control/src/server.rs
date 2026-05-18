@@ -4699,6 +4699,8 @@ mod tests {
                 accessibility: crate::state::AccessibilityView::default(),
                 controls_capture: crate::state::ControlsCaptureView::default(),
                 trench_segment_at_pos: None,
+                cells: vec![],
+                gravity_vectors: vec![],
             }
         }
         async fn settings_snapshot(&self) -> Settings {

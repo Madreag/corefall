@@ -62,10 +62,12 @@ use serde::{Deserialize, Serialize};
 // / `cf_mission::director::*`) compile cleanly.
 pub mod director;
 pub mod m14a_resource_drain;
+pub mod m14b_world;
 pub mod objective;
 pub use m14a_resource_drain::{
     helmet_o2_inhaled_mol_per_tick, skips_unstable_for_origin, stride_drain_for_origin, OriginClass, StrideDrain,
 };
+pub use m14b_world::{ScenarioAtmosCell, ScenarioGravityOverride, ScenarioWindSource};
 
 // **M7**: Mission director v0.5 — additive multi-objective DiGraph + 4-phase
 // pacing + reinforcement waves + mini-boss patterns. The M2 single-vec

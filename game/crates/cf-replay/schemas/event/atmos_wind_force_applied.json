@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/atmos.wind_force_applied.v0.1",
+  "title": "atmos.wind_force_applied",
+  "description": "M14B § wind force producer — per-tick atmos.wind_force_applied event emitted when an actor stands in the jet lane of a wind source (aperture coupling two cells with a pressure differential). `force_n` is the net force vector in newtons; `source_aperture_id` identifies the dominating aperture. Producer fills at M14B. Additive-only per M4 DR-002.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "atmos" },
+    "event_type": { "const": "wind_force_applied" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer", "minimum": 0 },
+        "force_n": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "source_aperture_id": { "type": ["integer", "null"], "minimum": 0 },
+        "magnitude_n": { "type": "number", "minimum": 0.0 }
+      },
+      "required": ["actor_id", "force_n", "magnitude_n"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

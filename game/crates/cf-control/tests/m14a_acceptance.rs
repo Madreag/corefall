@@ -1193,7 +1193,18 @@ fn parity_121_low_g_extends_jump_arc_via_field_sample() {
     use cf_physics::GravityField;
     let normal = GravityField::Uniform(-980.0);
     let low_g = GravityField::Uniform(-490.0);
-    assert!(low_g.sample(0.0, 0.0) > normal.sample(0.0, 0.0));
+    // M14B: sample now returns GravityVec; low-g magnitude must be lower.
+    let normal_vec = normal.sample([0.0, 0.0]);
+    let low_g_vec = low_g.sample([0.0, 0.0]);
+    assert!(
+        low_g_vec.magnitude < normal_vec.magnitude,
+        "low_g={:?} normal={:?}",
+        low_g_vec,
+        normal_vec
+    );
+    // Direction is preserved (both point down).
+    assert_eq!(normal_vec.direction, [0.0, -1.0]);
+    assert_eq!(low_g_vec.direction, [0.0, -1.0]);
 }
 
 #[test]

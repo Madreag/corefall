@@ -40,6 +40,7 @@ cf-audio = { path = "../cf-audio" }
 cf-perception = { path = "../cf-perception" }
 cf-priority = { path = "../cf-priority" }
 cf-squad = { path = "../cf-squad" }
+cf-atmos = { path = "../cf-atmos" }
 cf-camera = { path = "../cf-camera" }
 cf-debug = { path = "../cf-debug" }
 cf-localization = { path = "../cf-localization" }
@@ -55,7 +56,6 @@ anyhow = { workspace = true }
 cf-sim-core = { path = "../cf-sim-core" }
 cf-tools-replay-viewer = { path = "../cf-tools-replay-viewer" }
 cf-replay-export = { path = "../cf-replay-export" }
-cf-atmos = { path = "../cf-atmos" }
 cf-audio = { path = "../cf-audio" }
 cf-asset-ledger = { path = "../cf-asset-ledger" }
 cf-environment = { path = "../cf-environment" }

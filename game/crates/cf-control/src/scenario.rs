@@ -118,6 +118,23 @@ pub struct Scenario {
     /// `mission.optional_offered` per `drain_objective_graph_emissions`.
     #[serde(default)]
     pub objective_graph: Option<ScenarioObjectiveGraph>,
+    /// **M14B** § gravity field overrides — per-cell + per-region + per-actor
+    /// modifiers stacked atop `gravity`. Empty by default; scenarios that
+    /// declare gravity wells, low-g labs, magnetic boots, reverse-g rooms,
+    /// or damaged generators populate this array.
+    #[serde(default)]
+    pub gravity_overrides: Vec<cf_mission::ScenarioGravityOverride>,
+    /// **M14B** § wind apertures — pressure-differential sources between
+    /// authored atmosphere cells. Empty by default; scenarios that declare
+    /// pipe ruptures, vent fans, or breaches populate this array.
+    #[serde(default)]
+    pub wind_sources: Vec<cf_mission::ScenarioWindSource>,
+    /// **M14B** § authored atmosphere cells — pressure + temperature + gas
+    /// composition that feed the wind force + stratification producers.
+    /// Empty by default; scenarios opt in by declaring cells (typically
+    /// alongside `wind_sources`).
+    #[serde(default)]
+    pub atmosphere_cells: Vec<cf_mission::ScenarioAtmosCell>,
 }
 
 /// One actor entry in `Scenario.actors`. M1 only models the player + simple dummies
@@ -1314,6 +1331,9 @@ mod tests {
             reinforcement_waves: vec![],
             boss_state: None,
             objective_graph: None,
+            gravity_overrides: vec![],
+            wind_sources: vec![],
+            atmosphere_cells: vec![],
         };
         assert!(matches!(
             scenario.validate("t.ron"),
