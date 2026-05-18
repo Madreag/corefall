@@ -11,7 +11,7 @@
 // Derived KE ≈ 0.5 × 7 × 1600² ≈ 8.96 MJ (~9.0 MJ per spec).
 // `rod_length_mm = 600` matches `rod_aspect_ratio` × baseline 20 mm bore.
 (
-  kind: apfsds,
+  kind: "apfsds",
   id: "apfsds_round_v1",
   display_name: "Tank APFSDS v1",
   rod_mass_kg: 7.0,

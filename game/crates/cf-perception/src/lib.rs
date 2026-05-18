@@ -25,7 +25,9 @@
     clippy::cast_sign_loss,
     clippy::cast_precision_loss,
     clippy::float_cmp,
-    clippy::needless_pass_by_value
+    clippy::needless_pass_by_value,
+    clippy::field_reassign_with_default,
+    clippy::match_same_arms
 )]
 
 use serde::{Deserialize, Serialize};

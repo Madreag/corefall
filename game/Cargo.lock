@@ -1793,6 +1793,7 @@ dependencies = [
  "cf-actor",
  "cf-asset-ledger",
  "cf-control",
+ "cf-equipment",
  "cf-net",
  "cf-replay",
  "cf-save",

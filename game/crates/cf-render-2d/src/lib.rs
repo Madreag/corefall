@@ -21,7 +21,10 @@
 #![allow(
     clippy::module_name_repetitions,
     clippy::type_complexity,
-    clippy::needless_pass_by_value
+    clippy::needless_pass_by_value,
+    clippy::field_reassign_with_default,
+    clippy::doc_lazy_continuation,
+    clippy::manual_range_contains
 )]
 
 // Bevy-free helper modules — available under BOTH `bevy_render` and

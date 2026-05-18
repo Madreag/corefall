@@ -43,6 +43,7 @@
     clippy::too_many_lines,
     clippy::uninlined_format_args,
     clippy::single_match_else,
+    clippy::struct_field_names,
     // M7 director v0.5 additions: phases/reinforcement/boss/graph modules
     // trip a handful of additional pedantic lints whose remedy doesn't add
     // clarity (inherent `from_str`, similar names across enums, etc.).

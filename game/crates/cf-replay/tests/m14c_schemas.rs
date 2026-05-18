@@ -125,7 +125,7 @@ fn val_m14c_009_era_event_precedes_heat_event_for_same_impact() {
             is_ammo_rack: false,
         }
     }
-    let outcome = heat_impact_producer(HeatImpactInput {
+    let outcome = heat_impact_producer(&HeatImpactInput {
         actor_id: 99,
         charge_mass_kg: 1.0,
         jet_velocity_mps: 3000.0,

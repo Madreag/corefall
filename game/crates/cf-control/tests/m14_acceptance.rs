@@ -9,6 +9,8 @@
 //! verified by the live-ws acceptance harness; this file proves the
 //! contract surfaces are present + deterministic.
 
+#![allow(clippy::doc_lazy_continuation, clippy::manual_range_contains)]
+
 use cf_actor::{default_cascade_chain, spread_angle, GibOriginKind, GibSpawn, SpreadMode};
 use cf_internal::{
     route_explosion_internal_damage, route_internal_damage, InternalGraphKind,

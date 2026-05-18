@@ -13,7 +13,7 @@
 // `min_jet_formation_standoff_m = 0.2`: below this distance the jet is
 // "under-formed" and effective penetration drops by 50% (Gherkin-5).
 (
-  kind: heat,
+  kind: "heat",
   id: "heat_round_v1",
   display_name: "RPG HEAT v1",
   charge_mj: 10.0,

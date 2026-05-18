@@ -1599,6 +1599,7 @@ mod tests {
 
     #[test]
     fn m12b_audio_spatial_resolved_validates_minimum_payload() {
+        #[allow(clippy::approx_constant)]
         let payload = json!({
             "canonical_name": "weapon_fired",
             "azimuth_rad": 0.78539816,

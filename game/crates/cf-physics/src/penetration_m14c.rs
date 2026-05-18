@@ -191,7 +191,7 @@ pub fn era_penetration_reduction(era_charge_kg: f32) -> f32 {
 /// **M14C** § HEAT producer. Returns the ordered event tuple per
 /// the validation contract (ERA event strictly before traversal event).
 #[must_use]
-pub fn heat_impact_producer(input: HeatImpactInput) -> HeatImpactOutcome {
+pub fn heat_impact_producer(input: &HeatImpactInput) -> HeatImpactOutcome {
     let mut outcome = HeatImpactOutcome::default();
 
     // Step 1: cone gate. Off-axis → glance (no events; the caller emits
@@ -256,7 +256,7 @@ pub fn heat_impact_producer(input: HeatImpactInput) -> HeatImpactOutcome {
 /// **M14C** § APFSDS producer. Walks the rod through each module on the
 /// path, emitting per-module energy decay per `KE_in × (1 - absorption_ratio)`.
 #[must_use]
-pub fn apfsds_impact_producer(input: ApfsdsImpactInput) -> ApfsdsImpactOutcome {
+pub fn apfsds_impact_producer(input: &ApfsdsImpactInput) -> ApfsdsImpactOutcome {
     let mut outcome = ApfsdsImpactOutcome::default();
     let initial = 0.5 * input.rod_mass_kg.max(0.0) * input.velocity_mps * input.velocity_mps;
     let mut remaining = initial;
@@ -390,7 +390,7 @@ mod tests {
             modules,
             era_charge_kg: None,
         };
-        let outcome = heat_impact_producer(input);
+        let outcome = heat_impact_producer(&input);
         assert!(outcome.era_event.is_none(), "no ERA panel on Heavy Trooper torso");
         let traversed = outcome.traversed.expect("HEAT traversal fires");
         assert_eq!(
@@ -424,7 +424,7 @@ mod tests {
             modules,
             era_charge_kg: Some(1.0),
         };
-        let outcome = heat_impact_producer(input);
+        let outcome = heat_impact_producer(&input);
         let era = outcome.era_event.expect("ERA event fires");
         let traversed = outcome.traversed.expect("HEAT traversal fires");
         // Reduction ~70% at era_charge_kg=1.0
@@ -455,7 +455,7 @@ mod tests {
             modules,
             era_charge_kg: None,
         };
-        let outcome = heat_impact_producer(input);
+        let outcome = heat_impact_producer(&input);
         assert!(outcome.traversed.is_none(), "off-axis hit must not produce HEAT path");
     }
 
@@ -474,7 +474,7 @@ mod tests {
             velocity_mps: 1600.0,
             modules,
         };
-        let outcome = apfsds_impact_producer(input);
+        let outcome = apfsds_impact_producer(&input);
         let ev = outcome.event.expect("APFSDS event");
         assert_eq!(ev.path.len(), 3);
         // KE_in × (1 - 0.3) = 0.7 per module → 0.49 → 0.343 of original.
@@ -500,7 +500,7 @@ mod tests {
             velocity_mps: 1600.0,
             modules,
         };
-        let outcome = apfsds_impact_producer(input);
+        let outcome = apfsds_impact_producer(&input);
         // Sanity: APFSDS producer never carries an ERA event.
         assert!(outcome.event.is_some());
     }
@@ -532,12 +532,12 @@ mod tests {
             era_charge_kg: None,
         };
         // Same velocity × mass (= 3000), different individual values.
-        let a = heat_impact_producer(make(2.0, 1500.0)).traversed.unwrap();
-        let b = heat_impact_producer(make(1.0, 3000.0)).traversed.unwrap();
+        let a = heat_impact_producer(&make(2.0, 1500.0)).traversed.unwrap();
+        let b = heat_impact_producer(&make(1.0, 3000.0)).traversed.unwrap();
         assert!((a.effective_damage - b.effective_damage).abs() < 1e-3);
         // Same raw KE (= 1e6), different velocity × mass.
-        let c = heat_impact_producer(make(2.0, 1000.0)).traversed.unwrap(); // v*m=2000
-        let d = heat_impact_producer(make(8.0, 500.0)).traversed.unwrap(); // v*m=4000
+        let c = heat_impact_producer(&make(2.0, 1000.0)).traversed.unwrap(); // v*m=2000
+        let d = heat_impact_producer(&make(8.0, 500.0)).traversed.unwrap(); // v*m=4000
         assert!((c.effective_damage - d.effective_damage).abs() > 1.0);
     }
 
@@ -564,7 +564,7 @@ mod tests {
             modules,
             era_charge_kg: None,
         };
-        let outcome = heat_impact_producer(input);
+        let outcome = heat_impact_producer(&input);
         let path = outcome.traversed.expect("HEAT traversal fires").modules;
         assert!(path.contains(&"inner_plate".to_string()), "post-gap module on path");
     }

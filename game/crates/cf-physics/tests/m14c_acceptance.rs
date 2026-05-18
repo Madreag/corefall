@@ -44,7 +44,7 @@ fn val_m14c_010_heat_jet_through_torso_path_with_cascade() {
         module("torso_internal", 1.0, 0.7, 0.2),
         ammo_rack("ammo_rack", 2.0),
     ];
-    let outcome = heat_impact_producer(HeatImpactInput {
+    let outcome = heat_impact_producer(&HeatImpactInput {
         actor_id: 2,
         charge_mass_kg: 1.0,
         jet_velocity_mps: 3000.0,
@@ -79,7 +79,7 @@ fn val_m14c_009_011_025_era_event_strictly_before_traversal() {
         module("torso_external", 0.0, 0.6, 0.2),
         module("torso_internal", 1.0, 0.6, 0.2),
     ];
-    let outcome = heat_impact_producer(HeatImpactInput {
+    let outcome = heat_impact_producer(&HeatImpactInput {
         actor_id: 9,
         charge_mass_kg: 1.0,
         jet_velocity_mps: 3000.0,
@@ -115,7 +115,7 @@ fn val_m14c_014_rifle_glance_does_not_invoke_heat_path() {
     // RoundKind::Apfsds). Sanity: calling heat_impact_producer with a
     // glancing 10° impact still produces no HEAT traversal event.
     let modules = vec![module("torso_external", 0.0, 0.6, 0.2)];
-    let outcome = heat_impact_producer(HeatImpactInput {
+    let outcome = heat_impact_producer(&HeatImpactInput {
         actor_id: 14,
         charge_mass_kg: 1.0,
         jet_velocity_mps: 3000.0,
@@ -162,7 +162,7 @@ fn val_m14c_017_heat_cone_half_angle_5deg() {
 #[test]
 fn val_m14c_018_player_captions_verbatim() {
     // ERA caption.
-    let outcome = heat_impact_producer(HeatImpactInput {
+    let outcome = heat_impact_producer(&HeatImpactInput {
         actor_id: 1,
         charge_mass_kg: 1.0,
         jet_velocity_mps: 3000.0,
@@ -176,7 +176,7 @@ fn val_m14c_018_player_captions_verbatim() {
     });
     assert_eq!(outcome.caption, Some("ERA absorbed shaped charge"));
     // Under-formed standoff caption.
-    let outcome = heat_impact_producer(HeatImpactInput {
+    let outcome = heat_impact_producer(&HeatImpactInput {
         actor_id: 1,
         charge_mass_kg: 1.0,
         jet_velocity_mps: 3000.0,
@@ -207,7 +207,7 @@ fn val_m14c_021_heat_bypasses_spaced_armor() {
         module("outer_plate", 0.0, 0.6, 0.2),
         module("inner_plate", 1.5, 0.6, 0.2),
     ];
-    let outcome = heat_impact_producer(HeatImpactInput {
+    let outcome = heat_impact_producer(&HeatImpactInput {
         actor_id: 21,
         charge_mass_kg: 1.0,
         jet_velocity_mps: 3000.0,
@@ -239,12 +239,12 @@ fn val_m14c_022_heat_damage_velocity_mass_product_not_ke() {
         era_charge_kg: None,
     };
     // Same velocity × mass (= 3000), different individual values → equal damage.
-    let a = heat_impact_producer(make(2.0, 1500.0)).traversed.unwrap();
-    let b = heat_impact_producer(make(1.0, 3000.0)).traversed.unwrap();
+    let a = heat_impact_producer(&make(2.0, 1500.0)).traversed.unwrap();
+    let b = heat_impact_producer(&make(1.0, 3000.0)).traversed.unwrap();
     assert!((a.effective_damage - b.effective_damage).abs() < 1e-3);
     // Same raw KE, different velocity × mass → DIFFERENT damage.
-    let c = heat_impact_producer(make(2.0, 1000.0)).traversed.unwrap();
-    let d = heat_impact_producer(make(8.0, 500.0)).traversed.unwrap();
+    let c = heat_impact_producer(&make(2.0, 1000.0)).traversed.unwrap();
+    let d = heat_impact_producer(&make(8.0, 500.0)).traversed.unwrap();
     assert!((c.effective_damage - d.effective_damage).abs() > 1.0);
 }
 
@@ -257,7 +257,7 @@ fn val_m14c_012_apfsds_three_module_decay() {
         module("engine", 0.5, 1.0, 0.3),
         module("fuel_tank", 1.0, 1.0, 0.3),
     ];
-    let outcome = apfsds_impact_producer(ApfsdsImpactInput {
+    let outcome = apfsds_impact_producer(&ApfsdsImpactInput {
         actor_id: 12,
         rod_mass_kg: 7.0,
         velocity_mps: 1600.0,
@@ -287,7 +287,7 @@ fn val_m14c_024_apfsds_does_not_predetonate_era() {
         module("era_panel", 0.0, 1.0, 0.3),
         module("front_plate", 0.5, 1.0, 0.3),
     ];
-    let outcome = apfsds_impact_producer(ApfsdsImpactInput {
+    let outcome = apfsds_impact_producer(&ApfsdsImpactInput {
         actor_id: 24,
         rod_mass_kg: 7.0,
         velocity_mps: 1600.0,
@@ -336,8 +336,8 @@ fn val_m14c_026_producer_determinism_across_two_runs() {
         era_charge_kg: Some(1.0),
     };
     let inputs_b = inputs_a.clone();
-    let a = heat_impact_producer(inputs_a);
-    let b = heat_impact_producer(inputs_b);
+    let a = heat_impact_producer(&inputs_a);
+    let b = heat_impact_producer(&inputs_b);
     assert_eq!(a.era_event, b.era_event);
     assert_eq!(a.traversed, b.traversed);
     assert_eq!(a.caption, b.caption);
@@ -352,8 +352,8 @@ fn val_m14c_026_producer_determinism_across_two_runs() {
             module("fuel_tank", 2.0, 1.0, 0.3),
         ],
     };
-    let aa = apfsds_impact_producer(aps_input.clone());
-    let bb = apfsds_impact_producer(aps_input);
+    let aa = apfsds_impact_producer(&aps_input.clone());
+    let bb = apfsds_impact_producer(&aps_input);
     assert_eq!(aa.event, bb.event);
 }
 
@@ -376,7 +376,7 @@ fn val_m14c_023_producer_is_pure_no_rng_required() {
         era_charge_kg: None,
     };
     for _ in 0..16 {
-        let outcome = heat_impact_producer(mk());
+        let outcome = heat_impact_producer(&mk());
         let traversed = outcome.traversed.expect("HEAT path");
         assert_eq!(traversed.modules, vec!["ammo_rack".to_string()]);
     }

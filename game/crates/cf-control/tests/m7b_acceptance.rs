@@ -3,6 +3,8 @@
 //! retreat, and per-archetype BT contracts end-to-end against the
 //! engine-side `M7BSquadWorld`.
 
+#![allow(clippy::manual_contains)]
+
 use serde_json::Value;
 
 use cf_ai::{

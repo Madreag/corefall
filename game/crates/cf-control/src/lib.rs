@@ -6,6 +6,12 @@
 //! JSON-RPC error code `-32602` (`InvalidParams`) and a fix-hint per
 //! `spec/ai-control-observability-layer.md`.
 
+#![allow(
+    clippy::redundant_closure,
+    clippy::unnecessary_cast,
+    clippy::ptr_arg
+)]
+
 pub mod components;
 pub mod engine;
 pub mod envelope;

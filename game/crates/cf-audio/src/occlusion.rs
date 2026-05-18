@@ -231,7 +231,7 @@ mod tests {
 
     #[test]
     fn ray_caps_at_max_walls() {
-        let walls: Vec<WallAcoustics> = std::iter::repeat(concrete()).take(20).collect();
+        let walls: Vec<WallAcoustics> = std::iter::repeat_n(concrete(), 20).collect();
         let env = resolve_occlusion(&walls);
         assert_eq!(env.wall_count as usize, MAX_WALLS_PER_RAY);
         assert!(env.clipped);

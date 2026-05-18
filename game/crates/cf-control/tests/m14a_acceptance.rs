@@ -6,6 +6,8 @@
 //! cf-chassis primitives directly + verify the public API contracts hold
 //! deterministically.
 
+#![allow(clippy::field_reassign_with_default, unused_mut)]
+
 use cf_actor::{
     angular_impulse_from_offcenter_hit, apply_stride_drain, attitude_spring_tick_stable, evaluate_knockdown,
     mass_factor, resolve_atmosphere_contact, resolve_material_contact, tick_arm_sway, tick_prone_state_machine,

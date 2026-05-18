@@ -25,7 +25,14 @@
     clippy::module_name_repetitions,
     clippy::type_complexity,
     clippy::needless_pass_by_value,
-    clippy::too_many_arguments
+    clippy::too_many_arguments,
+    clippy::let_and_return,
+    clippy::wrong_self_convention,
+    clippy::stable_sort_primitive,
+    clippy::needless_lifetimes,
+    clippy::doc_lazy_continuation,
+    clippy::field_reassign_with_default,
+    clippy::unnecessary_sort_by
 )]
 
 pub mod attract_mode;

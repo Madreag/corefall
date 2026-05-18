@@ -1,3 +1,9 @@
+#![allow(
+    clippy::doc_lazy_continuation,
+    clippy::too_many_arguments,
+    clippy::type_complexity
+)]
+
 use std::{
     collections::{HashMap, HashSet},
     net::SocketAddr,

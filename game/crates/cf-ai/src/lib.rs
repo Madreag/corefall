@@ -59,7 +59,8 @@
     clippy::manual_clamp,
     clippy::unused_self,
     clippy::struct_field_names,
-    clippy::elidable_lifetime_names
+    clippy::elidable_lifetime_names,
+    clippy::uninlined_format_args
 )]
 
 use serde::{Deserialize, Serialize};

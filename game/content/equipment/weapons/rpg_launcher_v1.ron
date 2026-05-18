@@ -1,7 +1,9 @@
 // **M14C** — Reference HEAT-capable launcher.
 //
-// `primary_round = heat` so the magazine pops HEAT rounds; `ammo_spec_id`
-// points to `content/ammo/heat_round_v1.ron`.
+// `primary_round: heat` so the magazine pops HEAT rounds; `ammo_spec_id`
+// points to `content/ammo/heat_round_v1.ron`. The bare `heat` identifier
+// matches `RoundKind` (serde `rename_all = "snake_case"`) — RON serde
+// expects the unit-variant identifier, not the quoted string form.
 (
   id: "rpg_launcher_v1",
   display_name: "RPG Launcher v1",

@@ -4,6 +4,8 @@
 //! tests that need to inject trench segments + guard fire records by
 //! hand) and walk the resulting `events.jsonl` to assert that the five
 //! per-tick trench emissions fire.
+
+#![allow(clippy::manual_contains)]
 //!
 //! - GAP-1: `trench.cover_state_changed` on per-tick cover transitions.
 //! - GAP-2: `ai.cover_decision` when an AI actor with the

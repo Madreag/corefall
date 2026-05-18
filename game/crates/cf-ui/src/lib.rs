@@ -22,7 +22,10 @@
     clippy::module_name_repetitions,
     clippy::type_complexity,
     clippy::needless_pass_by_value,
-    clippy::too_many_arguments
+    clippy::too_many_arguments,
+    clippy::field_reassign_with_default,
+    clippy::needless_doctest_main,
+    clippy::derivable_impls
 )]
 
 use bevy::prelude::*;

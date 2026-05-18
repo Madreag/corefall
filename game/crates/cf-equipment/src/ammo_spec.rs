@@ -44,7 +44,7 @@ impl AmmoSpec {
     pub fn as_heat(&self) -> Option<&HeatRoundSpec> {
         match self {
             AmmoSpec::Heat(s) => Some(s),
-            _ => None,
+            AmmoSpec::Apfsds(_) => None,
         }
     }
 
@@ -52,7 +52,7 @@ impl AmmoSpec {
     pub fn as_apfsds(&self) -> Option<&ApfsdsRoundSpec> {
         match self {
             AmmoSpec::Apfsds(s) => Some(s),
-            _ => None,
+            AmmoSpec::Heat(_) => None,
         }
     }
 }
@@ -294,7 +294,7 @@ mod tests {
 
     #[test]
     fn parse_rejects_negative_charge() {
-        let bad = "(kind: heat, id: \"x\", display_name: \"X\", charge_mj: -1.0, charge_mass_kg: 1.0, jet_velocity_mps: 3000.0, cone_half_angle_deg: 5.0, optimum_standoff_m: 0.6, min_jet_formation_standoff_m: 0.2)";
+        let bad = "(kind: \"heat\", id: \"x\", display_name: \"X\", charge_mj: -1.0, charge_mass_kg: 1.0, jet_velocity_mps: 3000.0, cone_half_angle_deg: 5.0, optimum_standoff_m: 0.6, min_jet_formation_standoff_m: 0.2)";
         assert!(matches!(parse_ammo_spec(bad), Err(AmmoSpecLoadError::Invariant(_))));
     }
 

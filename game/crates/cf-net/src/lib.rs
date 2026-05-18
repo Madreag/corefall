@@ -36,6 +36,12 @@
 //!   selection (`DedicatedServerAuth` / `HostAuthoritativeLockstep` /
 //!   `P2pLockstep`).
 
+#![allow(
+    clippy::needless_range_loop,
+    clippy::unnecessary_cast,
+    clippy::bool_assert_comparison
+)]
+
 pub mod client;
 pub mod loss_recovery;
 pub mod nat;
