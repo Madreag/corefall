@@ -47,6 +47,11 @@ pub mod quick_action_render;
 // `cosmetic: true` flag under backpressure per VAL-M14D-018.
 pub mod projectile_intercept;
 
+// **M14E** — Tunnel-collapse renderer (L1/L2/L3 ceiling crack decals +
+// falling-debris cone). Bevy-free helper consumed by the live + offline
+// renderers via `TunnelCollapseQueue::enqueue_cave_in`.
+pub mod tunnel_collapse;
+
 // M10B § cf-render-2d::offline_mode — software rasterizer for the
 // no-GPU export path. NO wgpu surface / winit::window references per
 // VAL-M10B-009. Only compiled with `--features offline`.

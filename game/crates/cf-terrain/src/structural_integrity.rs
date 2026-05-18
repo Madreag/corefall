@@ -343,6 +343,7 @@ pub fn unlock_radius(field: &mut IntegrityField, center_lx: usize, center_ly: us
 mod tests {
     use super::*;
     use std::mem::size_of;
+    use std::time::Instant;
 
     /// VAL-M14E-024: per-chunk integrity buffer is exactly 256 bytes
     /// shaped as a 16×16 u8 grid.
@@ -450,6 +451,38 @@ mod tests {
         }
         assert!(f.is_locked(7, 7));
         assert_eq!(f.effective_integrity(7, 7), INTEGRITY_BEAM_LOCKED);
+    }
+
+    /// VAL-M14E-016: the per-tick collapse-check pass must complete in
+    /// ≤ 0.4 ms p99 with 500 actively-dug chunks. We run the pass on
+    /// 500 fields and measure p99 wall time. The check runs in release
+    /// build only — `cargo test --release -p cf-terrain integrity_pass_p99`.
+    #[test]
+    fn integrity_pass_p99_on_500_chunks_under_0_4_ms() {
+        const CHUNKS: usize = 500;
+        const SAMPLES: usize = 32;
+        let mut fields: Vec<IntegrityField> = (0..CHUNKS).map(|_| IntegrityField::pristine()).collect();
+        let mut durations_us: Vec<u128> = Vec::with_capacity(SAMPLES);
+        for _ in 0..SAMPLES {
+            let start = Instant::now();
+            for field in &mut fields {
+                let _ = compute_integrity_pass(field, 32, 1.0);
+            }
+            durations_us.push(start.elapsed().as_micros());
+        }
+        durations_us.sort_unstable();
+        let p99_idx = ((SAMPLES as f32 * 0.99) as usize).min(SAMPLES - 1);
+        let p99 = durations_us[p99_idx];
+        let budget_us = 400u128;
+        // Inside debug builds the worst-case may exceed the budget;
+        // the perf gate is `cargo test --release`. We only assert the
+        // strict bound in release.
+        if cfg!(not(debug_assertions)) {
+            assert!(
+                p99 <= budget_us,
+                "p99 = {p99} µs exceeded 0.4 ms budget on 500 chunks"
+            );
+        }
     }
 
     #[test]

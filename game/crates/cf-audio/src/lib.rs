@@ -166,6 +166,27 @@ pub enum AudioCue {
         /// Mirror of the `JuicePulse.accessibility_suppressed` flag.
         accessibility_suppressed: bool,
     },
+    /// **M14E** § `terrain.structural_integrity_low` L1 warning cue.
+    /// One-shot when the per-chunk integrity field first crosses the
+    /// L1 threshold. Drives the "tunnel_creak" SFX backend stub.
+    TunnelCreak {
+        /// Chunk coordinate that triggered the warning.
+        chunk_id: (i32, i32),
+        /// Caption surfaced to `HudState.captions`.
+        caption: String,
+    },
+    /// **M14E** § `terrain.cave_in_triggered` collapse-onset cue. One
+    /// per cave-in event. Drives the "cave_in_thunder" SFX backend stub.
+    CaveInThunder {
+        /// Chunk coordinate of the collapsing ceiling.
+        chunk_id: (i32, i32),
+        /// X pixel for the spatializer anchor (centre of the bbox).
+        world_pos_x_px: i64,
+        /// Y pixel for the spatializer anchor (centre of the bbox).
+        world_pos_y_px: i64,
+        /// Caption surfaced to `HudState.captions`.
+        caption: String,
+    },
 }
 
 impl AudioCue {
@@ -181,6 +202,8 @@ impl AudioCue {
             AudioCue::InventorySettled { caption, .. } => caption,
             AudioCue::StatusChanged { caption, .. } => caption,
             AudioCue::Juice { .. } => "",
+            AudioCue::TunnelCreak { caption, .. } => caption,
+            AudioCue::CaveInThunder { caption, .. } => caption,
         }
     }
 
@@ -196,6 +219,8 @@ impl AudioCue {
             AudioCue::InventorySettled { .. } => "inventory_settled",
             AudioCue::StatusChanged { .. } => "status_changed",
             AudioCue::Juice { .. } => "juice",
+            AudioCue::TunnelCreak { .. } => "tunnel_creak",
+            AudioCue::CaveInThunder { .. } => "cave_in_thunder",
         }
     }
 }

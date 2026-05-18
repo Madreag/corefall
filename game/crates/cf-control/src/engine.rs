@@ -8626,7 +8626,10 @@ impl M0Engine {
                     {
                         chunk.l3_at_tick = Some(tick.0);
                     }
-                    if outcome.became_unstable && !chunk.structural_integrity_low_emitted {
+                    let cross_now = outcome.became_unstable
+                        || (outcome.min_integrity < cf_terrain::INTEGRITY_LOCKED
+                            && !chunk.structural_integrity_low_emitted);
+                    if cross_now && !chunk.structural_integrity_low_emitted {
                         chunk.structural_integrity_low_emitted = true;
                         let level = if chunk.l3_at_tick.is_some() {
                             "l3"
