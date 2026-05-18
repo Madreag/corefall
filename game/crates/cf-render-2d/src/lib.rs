@@ -41,6 +41,12 @@ pub mod armor_scratch_overlay;
 pub mod limb_render;
 pub mod quick_action_render;
 
+// **M14D** — Projectile-pair intercept renderer (spark cluster +
+// dual-trail termination). Bevy-free helper consumed by the live +
+// offline renderers via `IntercepRenderQueue::enqueue`. Honors the
+// `cosmetic: true` flag under backpressure per VAL-M14D-018.
+pub mod projectile_intercept;
+
 // M10B § cf-render-2d::offline_mode — software rasterizer for the
 // no-GPU export path. NO wgpu surface / winit::window references per
 // VAL-M10B-009. Only compiled with `--features offline`.
