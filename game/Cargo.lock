@@ -1942,6 +1942,7 @@ version = "0.0.1"
 dependencies = [
  "bevy",
  "cf-actor",
+ "cf-cinematic",
  "cf-fortification",
  "cf-terrain",
  "cf-trench",

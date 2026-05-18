@@ -112,8 +112,8 @@ pub use debris::{
 pub use dig_preview::{probe_dig_validity, DigPreviewGhost, DigPreviewPlugin, DigPreviewTarget};
 #[cfg(feature = "bevy_render")]
 pub use juice::{
-    chromatic_aberration_amplitude, glow_halo_alpha, scale_at, screen_flash_alpha, slide_offset, tick_juice,
-    weapon_swap_streak_intensity, JuiceAccessibility, JuiceKind, JuicePlugin, JuicePulse, JuiceState,
+    camera_shake_amplitude, chromatic_aberration_amplitude, glow_halo_alpha, scale_at, screen_flash_alpha, slide_offset,
+    tick_juice, weapon_swap_streak_intensity, JuiceAccessibility, JuiceKind, JuicePlugin, JuicePulse, JuiceState,
 };
 #[cfg(feature = "bevy_render")]
 pub use camera_takeover::{

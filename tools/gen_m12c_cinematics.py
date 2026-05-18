@@ -129,18 +129,33 @@ ENDING_LINES = {
 }
 
 
-def shot_block(label, duration_ms, moves):
+def shot_block(label, duration_ms, moves, actor_poses=None):
     moves_str = "\n".join(["                " + m + "," for m in moves])
+    poses = actor_poses or []
+    poses_str = "\n".join(
+        [
+            f"                ( actor_id: \"{aid}\", pose_id: \"{pid}\" ),"
+            for aid, pid in poses
+        ]
+    )
+    actor_poses_block = (
+        f"            actor_poses: [\n{poses_str}\n            ],\n" if poses_str else "            actor_poses: [],\n"
+    )
     return (
         f"        (\n"
         f"            label: \"{label}\",\n"
         f"            duration_ms: {duration_ms},\n"
         f"            moves: [\n{moves_str}\n            ],\n"
+        f"{actor_poses_block}"
         f"        ),"
     )
 
 
 def write_opening(mission_id, headline):
+    # Per spec § "Live actors play scripted poses — squad members enter
+    # their pre-mission stance (chassis idle + weapon at low-ready +
+    # storyteller-specific body language)".  Authored pose IDs resolve
+    # against the M9A animation catalog.
     shots = [
         shot_block(
             "dropship_door_opens",
@@ -148,12 +163,17 @@ def write_opening(mission_id, headline):
             [
                 "( kind: Dolly, start_ms: 0, duration_ms: 8000, easing: EaseInOutCubic, dolly_target: (0.0, 0.0), dolly_distance: 12.0 )",
             ],
+            actor_poses=[("player", "chassis_idle")],
         ),
         shot_block(
             "squad_silhouettes",
             6000,
             [
                 "( kind: Pan, start_ms: 0, duration_ms: 6000, easing: EaseInOutCubic, pan: (8.0, 0.0) )",
+            ],
+            actor_poses=[
+                ("squad_alpha", "low_ready"),
+                ("squad_bravo", "low_ready"),
             ],
         ),
         shot_block(

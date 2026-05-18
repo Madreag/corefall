@@ -57,6 +57,11 @@
     "captions": {
       "type": "boolean"
     },
+    "cinematic_captions_enabled": {
+      "description": "**M12C**: captions-enabled mirror for the cinematic caption\nribbon. Defaults to `captions` (M11 mode) but exposed as a\nseparate flag so cfctl tests can toggle the cinematic surface\nindependently of the gameplay caption strip. Per spec § \"the\nM12A `caption_visible` predicate gates the subtitle ribbon\".",
+      "type": "boolean",
+      "default": true
+    },
     "cinematic_kills": {
       "description": "**M8**: cinematic kill cam on boss final blow.",
       "type": "boolean",
@@ -298,6 +303,11 @@
       "description": "**M8**: speedrun mode (HUD shows persistent timer + segment\nmarkers; mission resolves immediately on objectives).",
       "type": "boolean",
       "default": false
+    },
+    "storyteller": {
+      "description": "**M12C**: active storyteller id matching `cf-cinematic::StorytellerId`\n(`cassandra_classic` | `phoebe_chillax` | `randy_random` |\n`ironman` | `sandbox`). Forward-compat with M25's director-driven\nstoryteller selection. cf-shell + cfctl set this via\n`act.settings.set`; cf-cinematic reads it at every kernel engage\nper spec § \"The cinematic player reads the active storyteller\nfrom M25 director state and applies its profile globally.\"",
+      "type": "string",
+      "default": "cassandra_classic"
     },
     "text_scale": {
       "description": "**M8**: text scale (mirrors ui_scale; some HUD widgets honour this\ndistinct field per spec § Settings menu Accessibility tab).",

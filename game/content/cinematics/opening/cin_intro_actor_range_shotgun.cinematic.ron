@@ -12,12 +12,19 @@
             moves: [
                 ( kind: Dolly, start_ms: 0, duration_ms: 8000, easing: EaseInOutCubic, dolly_target: (0.0, 0.0), dolly_distance: 12.0 ),
             ],
+            actor_poses: [
+                ( actor_id: "player", pose_id: "chassis_idle" ),
+            ],
         ),
         (
             label: "squad_silhouettes",
             duration_ms: 6000,
             moves: [
                 ( kind: Pan, start_ms: 0, duration_ms: 6000, easing: EaseInOutCubic, pan: (8.0, 0.0) ),
+            ],
+            actor_poses: [
+                ( actor_id: "squad_alpha", pose_id: "low_ready" ),
+                ( actor_id: "squad_bravo", pose_id: "low_ready" ),
             ],
         ),
         (
@@ -27,6 +34,7 @@
                 ( kind: Pan, start_ms: 0, duration_ms: 9000, easing: EaseInOutCubic, pan: (10.0, -2.0) ),
                 ( kind: Shake, start_ms: 4000, duration_ms: 600, shake: ( amplitude_px: 4.0, frequency_hz: 30.0, decay_s: 0.6 ) ),
             ],
+            actor_poses: [],
         ),
         (
             label: "boss_silhouette_reveal",
@@ -34,6 +42,7 @@
             moves: [
                 ( kind: Zoom, start_ms: 0, duration_ms: 7000, easing: EaseInOutCubic, zoom_to: 10.0 ),
             ],
+            actor_poses: [],
         ),
     ],
     chapters: [

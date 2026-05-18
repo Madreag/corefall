@@ -261,12 +261,9 @@ pub fn compose_offset(mv: &ShotMove, t_in_shot_ms: u32, seed: u64) -> ComposedOf
         }
         MoveKind::Shake => {
             let elapsed_s = elapsed_in_move as f32 / 1000.0;
-            let decay = if mv.shake.decay_s > 0.0 {
-                (-elapsed_s / mv.shake.decay_s).exp()
-            } else {
-                1.0
-            };
-            let amplitude = mv.shake.amplitude_px * decay;
+            // Reuse the M12 `camera_shake_amplitude` curve so cinematic
+            // shake + critical-hit shake match envelopes.
+            let amplitude = camera_shake_amplitude(mv.shake.amplitude_px, elapsed_s, mv.shake.decay_s);
             // Quantize the sample index by frequency so two engines at the
             // same tick produce the same noise sample.
             let sample_index = if mv.shake.frequency_hz > 0.0 {
@@ -289,6 +286,25 @@ pub fn compose_offset(mv: &ShotMove, t_in_shot_ms: u32, seed: u64) -> ComposedOf
         }
     }
     out
+}
+
+/// **M12C** § Camera shake amplitude curve — exponential decay from
+/// `amplitude_px_0` toward zero with time-constant `decay_s`. Matches
+/// `cf-render-2d::juice::camera_shake_amplitude` so the M12 critical-
+/// hit shake and the M12C cinematic shake share the same envelope.
+///
+/// Per spec § "Shake — perlin-noise additive offset, parameterized by
+/// amplitude_px + frequency_hz + decay_s; reuses M12's
+/// `cf-render-2d::juice::camera_shake_amplitude` curve."
+#[must_use]
+pub fn camera_shake_amplitude(amplitude_px_0: f32, t_s: f32, decay_s: f32) -> f32 {
+    if amplitude_px_0 <= 0.0 || t_s < 0.0 {
+        return 0.0;
+    }
+    if decay_s <= 0.0 {
+        return amplitude_px_0;
+    }
+    amplitude_px_0 * (-t_s / decay_s).exp()
 }
 
 /// Deterministic noise sample in `[-1.0, 1.0]`. Pure hash of

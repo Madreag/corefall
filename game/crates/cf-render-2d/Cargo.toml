@@ -33,6 +33,7 @@ serde_json = { workspace = true }
 tracing = { workspace = true }
 bevy = { workspace = true, optional = true }
 cf-actor = { path = "../cf-actor", optional = true }
+cf-cinematic = { path = "../cf-cinematic" }
 cf-fortification = { path = "../cf-fortification" }
 cf-terrain = { path = "../cf-terrain", optional = true }
 cf-trench = { path = "../cf-trench" }

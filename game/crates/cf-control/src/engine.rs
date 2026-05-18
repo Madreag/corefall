@@ -1048,6 +1048,19 @@ pub(crate) struct EngineMutable {
     /// watched (or skipped past the 3-second confirm window). Lives
     /// here at M12C; M41 save format will persist it to `save.cinematic_seen_set`.
     pub(crate) cinematic_seen_set: cf_cinematic::SeenSet,
+    /// **M12C**: LUFS-aware narration/music/SFX duck mixer. Engaged
+    /// when a cinematic kernel boots; releases at `cinematic.ended`.
+    /// Per spec § "Cinematic mixer ducks music under narration".
+    pub(crate) cinematic_mixer: cf_audio::CinematicMixer,
+    /// **M12C**: snapshot of the renderer-side camera takeover state
+    /// (mirrors the cinematic kernel's composed offset). cf-app's
+    /// bridge polls this via `engine.cinematic_takeover_snapshot()`.
+    pub(crate) cinematic_takeover: cf_cinematic::CinematicTakeoverSnapshot,
+    /// **M12C**: `cinematic.rival_taunt` 40% deterministic gate per
+    /// spec § Between-mission cinematic. Drained per between-mission
+    /// engage; the M25 hook will fold real rival-alive state into this
+    /// roll when it ships.
+    pub(crate) cinematic_rival_taunt_roll: u8,
 }
 
 /// **M6**: per-actor charge-fire annotation shipped from the M6 post-step
@@ -1535,6 +1548,9 @@ impl M0Engine {
                 m9b_trench_doctrine_actors,
                 cinematic_kernel: None,
                 cinematic_seen_set: cf_cinematic::SeenSet::default(),
+                cinematic_mixer: cf_audio::CinematicMixer::new(),
+                cinematic_takeover: cf_cinematic::CinematicTakeoverSnapshot::default(),
+                cinematic_rival_taunt_roll: 0,
             }),
             recorder,
             current_tick,
@@ -17354,6 +17370,50 @@ impl M0Engine {
         );
     }
 
+    /// **M12C**: select a deterministic stinger variant for `cinematic_id`
+    /// from the per-storyteller stinger table. Pure function of
+    /// `(cinematic_id, seed, table)` so replay parity holds.
+    /// Per spec § "the per-storyteller stinger picks a variant".
+    /// Returns `None` when the table parse fails or has zero variants.
+    pub fn select_opening_stinger(
+        &self,
+        cinematic_id: &str,
+        stinger_table_bytes: &[u8],
+    ) -> Option<cf_cinematic::StingerVariant> {
+        let table = cf_cinematic::StingerTable::from_ron(stinger_table_bytes).ok()?;
+        table.pick(cinematic_id, self.config.seed).cloned()
+    }
+
+    /// **M12C**: engage a cinematic kernel with an optional stinger
+    /// variant pre-injected into the briefing card. The stinger's
+    /// `line_a` / `line_b` are appended to `script.briefing_card_lines`
+    /// before kernel construction so the stinger surfaces on the
+    /// mission-briefing fade card alongside the authored briefing.
+    pub fn engage_cinematic_kernel_with_stinger(
+        &self,
+        id: &str,
+        source: cf_cinematic::ScriptSource,
+        storyteller: cf_cinematic::StorytellerId,
+        mut script: cf_cinematic::CinematicScript,
+        narration: cf_cinematic::NarrationTrack,
+        stinger: Option<cf_cinematic::StingerVariant>,
+        replay: bool,
+    ) {
+        if let Some(s) = stinger {
+            if !s.line_a.is_empty() {
+                script.briefing_card_lines.push(s.line_a.clone());
+            }
+            if !s.line_b.is_empty() {
+                script.briefing_card_lines.push(s.line_b.clone());
+            }
+            // Cap at 8 lines (BriefingCardState::BRIEFING_MAX_LINES).
+            if script.briefing_card_lines.len() > 8 {
+                script.briefing_card_lines.truncate(8);
+            }
+        }
+        self.engage_cinematic_kernel(id, source, storyteller, script, narration, replay);
+    }
+
     /// **M12C**: engage a cinematic kernel at scenario/mission load OR
     /// at codex replay. Fires the initial `cinematic.started` event +
     /// `cinematic.skipped { reason: sandbox_suppressed }` +
@@ -17373,13 +17433,42 @@ impl M0Engine {
         let sim_time_ms = state.clock.sim_time_ms();
         let seed = self.config.seed;
         let seen = state.cinematic_seen_set.clone();
-        let mut kernel = cf_cinematic::CinematicKernel::new(script, profile, narration, seed, seen, replay);
+        let mut kernel = cf_cinematic::CinematicKernel::new(script, profile.clone(), narration, seed, seen, replay);
         let mut events: Vec<cf_cinematic::CinematicEvent> = Vec::new();
         if kernel.profile().suppress_cinematics {
             events.extend(kernel.suppress_for_sandbox());
         }
         let parent = state.run_started_event_id.clone();
+        let sandbox_suppressed = kernel.profile().suppress_cinematics;
         state.cinematic_seen_set = kernel.seen().clone();
+        // **M12C**: engage the per-cinematic audio mixer + per-storyteller
+        // LUFS overrides (Cassandra cello @ -22 LUFS during narration,
+        // Randy percussion +20% contrast, etc.) per spec acceptance
+        // criterion "Per-storyteller cinematic profile biases camera +
+        // audio + color". Sandbox path skips engage so the steady-state
+        // mixer (music @ -16 LUFS) is preserved.
+        if !sandbox_suppressed {
+            state.cinematic_mixer.engage();
+            state.cinematic_mixer.set_profile_music_lufs(
+                Some(profile.music_lufs_outside_narration),
+                Some(profile.music_lufs_during_narration),
+            );
+            state.cinematic_takeover = cf_cinematic::CinematicTakeoverSnapshot {
+                active: true,
+                translation: [0.0, 0.0],
+                shake_px: [0.0, 0.0],
+                ortho_half_height: 0.0,
+                color_grade: cf_cinematic::ColorGradeSnapshot {
+                    saturation: profile.color_grade.saturation,
+                    value: profile.color_grade.value,
+                    contrast: profile.color_grade.contrast,
+                },
+                paused: false,
+            };
+        } else {
+            state.cinematic_mixer.release();
+            state.cinematic_takeover = cf_cinematic::CinematicTakeoverSnapshot::default();
+        }
         state.cinematic_kernel = Some(kernel);
         drop(state);
         for ev in events {
@@ -17396,20 +17485,123 @@ impl M0Engine {
         let mut state = self.state.write().expect("engine state poisoned");
         let tick = state.clock.tick();
         let sim_time_ms = state.clock.sim_time_ms();
-        let kernel = state.cinematic_kernel.as_mut()?;
-        let events = kernel.advance(dt_ms);
-        let snapshot = kernel.state().clone();
-        let kernel_ended = matches!(snapshot.phase, cf_cinematic::PlaybackPhase::Ended);
-        state.cinematic_seen_set = kernel.seen().clone();
+        let (events, snapshot, kernel_ended, profile, seen) = {
+            let kernel = state.cinematic_kernel.as_mut()?;
+            let events = kernel.advance(dt_ms);
+            let snapshot = kernel.state().clone();
+            let kernel_ended = matches!(snapshot.phase, cf_cinematic::PlaybackPhase::Ended);
+            let profile = kernel.profile().clone();
+            let seen = kernel.seen().clone();
+            (events, snapshot, kernel_ended, profile, seen)
+        };
+        // Mirror camera takeover snapshot for the renderer bridge.
+        let color_grade = cf_cinematic::ColorGradeSnapshot {
+            saturation: profile.color_grade.saturation,
+            value: profile.color_grade.value,
+            contrast: profile.color_grade.contrast,
+        };
+        state.cinematic_takeover = cf_cinematic::CinematicTakeoverSnapshot {
+            active: !kernel_ended,
+            translation: snapshot.camera_translation,
+            shake_px: snapshot.camera_shake_px,
+            ortho_half_height: snapshot.camera_ortho_half_height,
+            color_grade,
+            paused: snapshot.paused,
+        };
+        // Drive the mixer narration-active state from the kernel's word
+        // crossings (event-driven below would lose state across paused
+        // ticks; the kernel snapshot's `active_word_index` is the ground
+        // truth).
+        let narration_active = snapshot.active_word_index.is_some() && !snapshot.paused;
+        state.cinematic_mixer.set_narration_active(narration_active);
+        state.cinematic_mixer.tick(dt_ms);
+        state.cinematic_seen_set = seen;
         let parent = state.run_started_event_id.clone();
         if kernel_ended {
+            // **M12C** § "the gameplay camera + input are restored on the
+            // next tick" — release the takeover + mixer when the kernel
+            // ends so the renderer falls back to gameplay camera.
             state.cinematic_kernel = None;
+            state.cinematic_mixer.release();
+            state.cinematic_takeover = cf_cinematic::CinematicTakeoverSnapshot::default();
         }
         drop(state);
         for ev in events {
             self.emit_cinematic_event(tick, sim_time_ms, &ev, parent.as_deref());
         }
         Some(snapshot)
+    }
+
+    /// **M12C**: read the renderer-facing cinematic camera takeover
+    /// snapshot. cf-app's bridge mirrors this into
+    /// `cf-render-2d::camera_takeover::CinematicCameraTakeover` each
+    /// frame. Per spec § Notes for the implementer: "The cinematic
+    /// camera REPLACES the gameplay camera at the render layer
+    /// (`cf-render-2d::camera_takeover`)".
+    pub fn cinematic_takeover_snapshot(&self) -> cf_cinematic::CinematicTakeoverSnapshot {
+        self.state
+            .read()
+            .ok()
+            .map(|s| s.cinematic_takeover)
+            .unwrap_or_default()
+    }
+
+    /// **M12C**: read the cinematic-mixer LUFS snapshot. cf-app's audio
+    /// bridge consumes this each frame to attenuate the live audio
+    /// backend per spec § "Cinematic mixer ducks music under narration".
+    pub fn cinematic_mixer_snapshot(&self) -> cf_audio::CinematicMix {
+        self.state
+            .read()
+            .ok()
+            .map(|s| *s.cinematic_mixer.mix())
+            .unwrap_or_default()
+    }
+
+    /// **M12C**: read-only handle to the persistent seen-set of
+    /// cinematics the player has watched. Per spec § Notes: "Codex
+    /// unlock state lives in `save.cinematic_seen_set: HashSet<CinematicId>`;
+    /// persisted via M41 save format." M41 reads this; M12C ships the
+    /// in-memory mirror.
+    pub fn cinematic_seen_set(&self) -> cf_cinematic::SeenSet {
+        self.state.read().map(|s| s.cinematic_seen_set.clone()).unwrap_or_default()
+    }
+
+    /// **M12C**: bulk-replace the seen-set when M41 loads a save. Drops
+    /// any in-memory seen-set the engine had accumulated. Per spec §
+    /// Notes: "Codex unlock state lives in `save.cinematic_seen_set
+    /// : HashSet<CinematicId>`; persisted via M41 save format."
+    pub fn restore_cinematic_seen_set(&self, seen: cf_cinematic::SeenSet) {
+        if let Ok(mut state) = self.state.write() {
+            state.cinematic_seen_set = seen;
+        }
+    }
+
+    /// **M12C**: resolve the storyteller for the current cinematic boot.
+    /// Per spec § Per-storyteller cinematic style: "The cinematic player
+    /// reads the active storyteller from M25 director state and applies
+    /// its profile globally." M25 is still active; M12C reads from
+    /// `Settings.storyteller`, falling back to Cassandra Classic.
+    pub fn active_storyteller(&self) -> cf_cinematic::StorytellerId {
+        let settings = self.current_settings();
+        cf_cinematic::StorytellerId::from_str(&settings.storyteller).unwrap_or(cf_cinematic::StorytellerId::CassandraClassic)
+    }
+
+    /// **M12C**: deterministic 40% rival-taunt roll per spec §
+    /// Between-mission cinematic ("40% chance the rival's faction-
+    /// channel taunt plays over a static portrait card"). Drained by
+    /// the between-mission engage path. M25 will fold real rival-alive
+    /// state into this gate when it ships.
+    pub fn cinematic_rival_taunt_should_play(&self) -> bool {
+        let mut state = self.state.write().expect("engine state poisoned");
+        // Use the deterministic per-engine RNG so two runs at the same
+        // seed observe the same rival-taunt sequence.
+        let v = state.rng.next_u64();
+        // 40% gate: roll < (u64::MAX * 0.4). Compare via shifted compare
+        // to avoid overflow on multiplication.
+        let threshold = (u64::MAX / 10) * 4;
+        let result = v < threshold;
+        state.cinematic_rival_taunt_roll = state.cinematic_rival_taunt_roll.wrapping_add(1);
+        result
     }
 }
 
@@ -18912,6 +19104,63 @@ impl EngineHandle for M0Engine {
         let mut state = self.state.write().expect("engine state poisoned");
         let tick = state.clock.tick();
         let sim_time_ms = state.clock.sim_time_ms();
+        // **M12C** § "Player gameplay input is blocked (only skip / pause
+        // accepted)" while a cinematic is playing. Mirror of the
+        // `controls_captured_by` gate below — keyed off the cinematic
+        // kernel rather than the overlay capture flag. Squad/camera/UI
+        // commands flow through to preserve cfctl scripting hooks.
+        if state
+            .cinematic_kernel
+            .as_ref()
+            .is_some_and(|k| k.blocks_gameplay_input())
+        {
+            let method = match &command {
+                ControlCommand::ActPlayerMove { .. } => Some("act.player.move"),
+                ControlCommand::ActPlayerJump { .. } => Some("act.player.jump"),
+                ControlCommand::ActPlayerAim { .. } => Some("act.player.aim"),
+                ControlCommand::ActPlayerFire { .. } => Some("act.player.fire"),
+                ControlCommand::ActPlayerReload { .. } => Some("act.player.reload"),
+                ControlCommand::ActPlayerSelectItem { .. } => Some("act.player.select_item"),
+                ControlCommand::ActPlayerReset { .. } => Some("act.player.reset"),
+                ControlCommand::ActPlayerDig { .. } => Some("act.player.dig"),
+                ControlCommand::ActPlayerAnchor { .. } => Some("act.player.anchor"),
+                ControlCommand::ActPlayerCrouch { .. } => Some("act.player.crouch"),
+                ControlCommand::ActPlayerClimb { .. } => Some("act.player.climb"),
+                ControlCommand::ActPlayerJet { .. } => Some("act.player.jet"),
+                ControlCommand::ActPlayerEject { .. } => Some("act.player.eject"),
+                ControlCommand::ActPlayerSharpAim { .. } => Some("act.player.sharp_aim"),
+                ControlCommand::ActM6 { action, .. } => Some(action.method_name()),
+                ControlCommand::ActPlayerBrainHop { .. } => Some("act.player.brain_hop"),
+                ControlCommand::ActPlayerActivateAbility { .. } => Some("act.player.activate_ability"),
+                ControlCommand::ActPlayerAttachModifier { .. } => Some("act.player.attach_modifier"),
+                ControlCommand::ActPlayerDetachModifier { .. } => Some("act.player.detach_modifier"),
+                ControlCommand::ActPlayerBoard { .. } => Some("act.player.board"),
+                ControlCommand::ActPlayerDisembark { .. } => Some("act.player.disembark"),
+                ControlCommand::ActPlayerSetDroneMode { .. } => Some("act.player.set_drone_mode"),
+                _ => None,
+            };
+            if let Some(method_name) = method {
+                let cinematic_id = state
+                    .cinematic_kernel
+                    .as_ref()
+                    .and_then(|k| k.state().cinematic_id.clone())
+                    .unwrap_or_default();
+                drop(state);
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "control",
+                    "command_rejected",
+                    json!({
+                        "method": method_name,
+                        "reason": "cinematic_active",
+                        "cinematic_id": cinematic_id,
+                    }),
+                    None,
+                );
+                return CommandResult::rejected("cinematic_active", tick.0);
+            }
+        }
         // Gap D2: while an overlay has captured controls, reject every
         // `act.player.*` command. Capture/release commands themselves still
         // flow through so the UI can release the capture.

@@ -205,6 +205,63 @@ impl CinematicEventKind {
     }
 }
 
+/// **M12C**: Bevy-free snapshot of the renderer-side camera takeover
+/// state. Cinematic kernel composes this each tick; cf-app's bridge
+/// mirrors it into `cf-render-2d::camera_takeover::CinematicCameraTakeover`.
+///
+/// Kept in `cf-cinematic` so the engine (`cf-control`) — which does NOT
+/// depend on cf-render-2d's bevy build — can hold the snapshot.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct CinematicTakeoverSnapshot {
+    /// True while a cinematic is owning the camera.
+    pub active: bool,
+    /// World-space translation delta.
+    pub translation: [f32; 2],
+    /// Screen-space shake offset (px).
+    pub shake_px: [f32; 2],
+    /// Orthographic half-height override (0 = use gameplay value).
+    pub ortho_half_height: f32,
+    /// Per-storyteller color grade biases (saturation / value / contrast).
+    pub color_grade: ColorGradeSnapshot,
+    /// True while playback is paused.
+    pub paused: bool,
+}
+
+impl Default for CinematicTakeoverSnapshot {
+    fn default() -> Self {
+        Self {
+            active: false,
+            translation: [0.0, 0.0],
+            shake_px: [0.0, 0.0],
+            ortho_half_height: 0.0,
+            color_grade: ColorGradeSnapshot::default(),
+            paused: false,
+        }
+    }
+}
+
+/// Bevy-free mirror of `cf-cinematic::storyteller_profile::ColorGradeBias`.
+/// Carries the saturation / value / contrast multipliers.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct ColorGradeSnapshot {
+    /// Saturation multiplier (1.0 = neutral).
+    pub saturation: f32,
+    /// Value multiplier (HSV V; 1.0 = neutral).
+    pub value: f32,
+    /// Contrast multiplier (1.0 = neutral).
+    pub contrast: f32,
+}
+
+impl Default for ColorGradeSnapshot {
+    fn default() -> Self {
+        Self {
+            saturation: 1.0,
+            value: 1.0,
+            contrast: 1.0,
+        }
+    }
+}
+
 /// Snapshot of the cinematic state visible to `srv.dump_cinematic_state`
 /// + the renderer's camera-takeover bridge.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -629,6 +686,7 @@ mod tests {
                     pan: [5.0, 0.0],
                     ..ShotMove::default()
                 }],
+                actor_poses: Vec::new(),
             }],
             chapters,
             narration_track_id: None,
@@ -858,6 +916,7 @@ mod tests {
                     },
                     ..ShotMove::default()
                 }],
+                actor_poses: Vec::new(),
             }],
             chapters: vec![],
             narration_track_id: None,

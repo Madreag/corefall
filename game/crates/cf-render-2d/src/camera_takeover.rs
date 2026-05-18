@@ -23,7 +23,7 @@
 
 use bevy::prelude::*;
 
-use serde::{Deserialize, Serialize};
+pub use cf_cinematic::{CinematicTakeoverSnapshot, ColorGradeSnapshot};
 
 /// **M12C** § "Cinematic-owned camera state stack". The renderer reads
 /// this resource first when `active == true` and falls back to the
@@ -107,62 +107,6 @@ impl CinematicCameraTakeover {
     #[must_use]
     pub fn composed_world_offset(&self, world_per_px: f32) -> Vec2 {
         self.translation + self.shake_px * world_per_px
-    }
-}
-
-/// Bevy-free intermediate snapshot the cf-app bridge fills from
-/// `cf_cinematic::CinematicState` before mirroring into the
-/// `CinematicCameraTakeover` resource. Decouples cf-render-2d from a
-/// direct cf-cinematic dependency (which would pull the RON loader
-/// into the render crate's build graph).
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub struct CinematicTakeoverSnapshot {
-    /// True = takeover active.
-    pub active: bool,
-    /// Translation in world units.
-    pub translation: [f32; 2],
-    /// Shake offset in screen pixels.
-    pub shake_px: [f32; 2],
-    /// Orthographic half-height (`<= 0.0` = no override).
-    pub ortho_half_height: f32,
-    /// Per-storyteller color grade.
-    pub color_grade: ColorGradeSnapshot,
-    /// True = paused.
-    pub paused: bool,
-}
-
-/// Bevy-free color grade snapshot. Mirrors
-/// `cf_cinematic::storyteller_profile::ColorGradeBias`.
-#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
-pub struct ColorGradeSnapshot {
-    /// Saturation multiplier.
-    pub saturation: f32,
-    /// Value multiplier.
-    pub value: f32,
-    /// Contrast multiplier.
-    pub contrast: f32,
-}
-
-impl Default for ColorGradeSnapshot {
-    fn default() -> Self {
-        Self {
-            saturation: 1.0,
-            value: 1.0,
-            contrast: 1.0,
-        }
-    }
-}
-
-impl Default for CinematicTakeoverSnapshot {
-    fn default() -> Self {
-        Self {
-            active: false,
-            translation: [0.0, 0.0],
-            shake_px: [0.0, 0.0],
-            ortho_half_height: 0.0,
-            color_grade: ColorGradeSnapshot::default(),
-            paused: false,
-        }
     }
 }
 

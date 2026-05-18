@@ -818,6 +818,30 @@ pub struct Settings {
     /// cause-chain walker is used. Gated by `comic_style_overlay != Off`.
     #[serde(default)]
     pub comic_death_recap: bool,
+
+    // === M12C in-engine cinematic surface ===
+    /// **M12C**: active storyteller id matching `cf-cinematic::StorytellerId`
+    /// (`cassandra_classic` | `phoebe_chillax` | `randy_random` |
+    /// `ironman` | `sandbox`). Forward-compat with M25's director-driven
+    /// storyteller selection. cf-shell + cfctl set this via
+    /// `act.settings.set`; cf-cinematic reads it at every kernel engage
+    /// per spec § "The cinematic player reads the active storyteller
+    /// from M25 director state and applies its profile globally."
+    #[serde(default = "default_storyteller")]
+    pub storyteller: String,
+    /// **M12C**: captions-enabled mirror for the cinematic caption
+    /// ribbon. Defaults to `captions` (M11 mode) but exposed as a
+    /// separate flag so cfctl tests can toggle the cinematic surface
+    /// independently of the gameplay caption strip. Per spec § "the
+    /// M12A `caption_visible` predicate gates the subtitle ribbon".
+    #[serde(default = "default_true")]
+    pub cinematic_captions_enabled: bool,
+}
+
+/// Default M12C storyteller (matches the cf-shell SettingsScaffold
+/// "gameplay.storyteller" default).
+pub fn default_storyteller() -> String {
+    "cassandra_classic".to_string()
 }
 
 /// **M12**: comic-style overlay mode mirror — `full | subtle | off`.
@@ -1065,6 +1089,9 @@ impl Default for Settings {
             // === M12 cinematic story beats ===
             comic_style_overlay: ComicStyleOverlay::Subtle,
             comic_death_recap: false,
+            // === M12C in-engine cinematic surface ===
+            storyteller: default_storyteller(),
+            cinematic_captions_enabled: true,
         }
     }
 }

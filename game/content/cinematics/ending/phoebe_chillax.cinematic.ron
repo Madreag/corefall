@@ -12,6 +12,7 @@
             moves: [
                 ( kind: Pan, start_ms: 0, duration_ms: 60000, easing: EaseInOutCubic, pan: (15.0, 0.0) ),
             ],
+            actor_poses: [],
         ),
         (
             label: "act2_montage",
@@ -19,6 +20,7 @@
             moves: [
                 ( kind: Pan, start_ms: 0, duration_ms: 60000, easing: EaseInOutCubic, pan: (-12.0, 4.0) ),
             ],
+            actor_poses: [],
         ),
         (
             label: "act3_resolution",
@@ -26,6 +28,7 @@
             moves: [
                 ( kind: Zoom, start_ms: 0, duration_ms: 60000, easing: EaseInOutCubic, zoom_to: 8.0 ),
             ],
+            actor_poses: [],
         ),
     ],
     chapters: [

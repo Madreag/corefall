@@ -12,6 +12,7 @@
             moves: [
                 ( kind: Dolly, start_ms: 0, duration_ms: 10000, easing: EaseInOutCubic, dolly_target: (0.0, 0.0), dolly_distance: 14.0 ),
             ],
+            actor_poses: [],
         ),
         (
             label: "storyteller_pov",
@@ -19,6 +20,7 @@
             moves: [
                 ( kind: Pan, start_ms: 0, duration_ms: 10000, easing: EaseInOutCubic, pan: (4.0, 0.0) ),
             ],
+            actor_poses: [],
         ),
     ],
     chapters: [

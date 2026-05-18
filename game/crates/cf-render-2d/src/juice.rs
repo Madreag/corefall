@@ -221,6 +221,28 @@ pub fn chromatic_aberration_amplitude(pulse: &JuicePulse) -> f32 {
     6.0 * (1.0 - t)
 }
 
+/// **M12** § Camera shake amplitude curve — exponential decay from
+/// `amplitude_px_0` toward zero with time-constant `decay_s`.
+///
+/// `t_s` is the elapsed seconds since the shake began; the function
+/// is pure and deterministic so M12 critical-hit shakes and M12C
+/// cinematic shakes both feed off the same envelope. Returns the
+/// instantaneous amplitude (px) the noise sampler multiplies by.
+///
+/// Per spec § M12C "Shake — perlin-noise additive offset, parameterized
+/// by amplitude_px + frequency_hz + decay_s; reuses M12's
+/// `cf-render-2d::juice::camera_shake_amplitude` curve."
+#[must_use]
+pub fn camera_shake_amplitude(amplitude_px_0: f32, t_s: f32, decay_s: f32) -> f32 {
+    if amplitude_px_0 <= 0.0 || t_s < 0.0 {
+        return 0.0;
+    }
+    if decay_s <= 0.0 {
+        return amplitude_px_0;
+    }
+    amplitude_px_0 * (-t_s / decay_s).exp()
+}
+
 /// **M12** § Weapon swap whoosh — "brief light streak". Returns the
 /// streak intensity [0..1]. Suppressed when `reduce_motion=true`.
 #[must_use]

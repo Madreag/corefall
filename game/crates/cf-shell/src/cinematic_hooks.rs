@@ -21,6 +21,7 @@
 //! cf-app binary translates into an `engage_cinematic_kernel` call on
 //! the engine.
 
+use std::fs;
 use std::path::{Path, PathBuf};
 
 use serde::{Deserialize, Serialize};
@@ -158,6 +159,22 @@ pub fn on_campaign_end(content_root: &Path, storyteller_id: &str) -> Option<Cine
         narration_track_id: Some(storyteller_id.to_string()),
         storyteller_id: Some(storyteller_id.to_string()),
     })
+}
+
+/// Per spec § "the per-storyteller stinger picks a variant from
+/// `content/cinematics/opening_stingers/<storyteller_id>.ron`."
+///
+/// Reads the RON stinger table for `storyteller_id`. Returns the parsed
+/// bytes (NOT validated here — the caller passes them to
+/// `cf_cinematic::StingerTable::from_ron` which validates + parses).
+/// Returns `None` when the file is missing.
+#[must_use]
+pub fn read_opening_stinger_table(content_root: &Path, storyteller_id: &str) -> Option<Vec<u8>> {
+    let path = content_root
+        .join("cinematics")
+        .join("opening_stingers")
+        .join(format!("{storyteller_id}.ron"));
+    fs::read(&path).ok()
 }
 
 #[cfg(test)]

@@ -17,6 +17,26 @@
 use bevy::prelude::*;
 use serde::{Deserialize, Serialize};
 
+/// **M12C** § "the M12A `caption_visible` predicate gates the subtitle
+/// ribbon; never silent without captions when `captions_enabled=true`."
+///
+/// Pure helper computing whether the cinematic caption ribbon should be
+/// visible given:
+///
+/// - `captions_enabled` — global captions setting (M11 caption mode !=
+///   Off OR M12C `cinematic_captions_enabled` toggle).
+/// - `reduce_motion` — accessibility flag; the ribbon stays visible
+///   (it's not a motion surface) but the renderer drops fades.
+///
+/// Returns `true` when the cinematic caption ribbon should be drawn.
+#[must_use]
+pub fn caption_ribbon_visible(captions_enabled: bool, _reduce_motion: bool) -> bool {
+    // Per spec § Acceptance: "When captions_enabled = false / Then …
+    // the caption ribbon is hidden". Reduce-motion does NOT hide the
+    // ribbon — it only suppresses fade animations.
+    captions_enabled
+}
+
 /// One word entry on the ribbon. Mirror of
 /// `cf_cinematic::narration_sync::NarrationWord` decoupled from the
 /// cinematic crate so cf-ui doesn't depend on it.
@@ -107,6 +127,14 @@ impl CaptionRibbonState {
         }
         s
     }
+
+    /// **M12C** § "the M12A `caption_visible` predicate gates the
+    /// subtitle ribbon". Convenience setter that wires the visible flag
+    /// to the predicate's output. cf-app's bridge calls this each frame
+    /// from the live `Settings.captions` + `Settings.reduced_motion`.
+    pub fn update_visibility(&mut self, captions_enabled: bool, reduce_motion: bool) {
+        self.visible = caption_ribbon_visible(captions_enabled, reduce_motion);
+    }
 }
 
 /// Plugin that registers `CaptionRibbonState`. cf-app's bridge owns the
@@ -190,5 +218,23 @@ mod tests {
         s.clear();
         assert!(!s.active);
         assert!(s.words.is_empty());
+    }
+
+    #[test]
+    fn caption_ribbon_visible_honors_captions_enabled() {
+        assert!(caption_ribbon_visible(true, false));
+        assert!(!caption_ribbon_visible(false, false));
+        // Reduce-motion does NOT hide the ribbon.
+        assert!(caption_ribbon_visible(true, true));
+    }
+
+    #[test]
+    fn update_visibility_wires_captions_enabled_into_state() {
+        let mut s = CaptionRibbonState::default();
+        s.active = true;
+        s.update_visibility(true, false);
+        assert!(s.should_render());
+        s.update_visibility(false, false);
+        assert!(!s.should_render(), "captions_enabled=false hides ribbon");
     }
 }

@@ -45,24 +45,28 @@ pub mod narration_sync;
 pub mod scheduler;
 pub mod script;
 pub mod skip_pause_replay;
+pub mod stinger;
 pub mod storyteller_profile;
 
 pub use camera_moves::{
-    apply_move_stack, compose_offset, easing_sample, EaseKind, MoveKind, ShakeParams, ShotMove,
+    apply_move_stack, camera_shake_amplitude, compose_offset, easing_sample, EaseKind, MoveKind,
+    ShakeParams, ShotMove,
 };
 pub use narration_sync::{
     word_at_ms, NarrationTrack, NarrationWord, WordHighlightState,
 };
 pub use scheduler::{
     CinematicEvent, CinematicEventKind, CinematicKernel, CinematicSource, CinematicState,
-    PlaybackPhase,
+    CinematicTakeoverSnapshot, ColorGradeSnapshot, PlaybackPhase,
 };
 pub use script::{
-    ChapterMarker, CinematicId, CinematicScript, ScriptLoadError, ScriptSource, Shot, ShotIndex,
+    ActorPose, ChapterMarker, CinematicId, CinematicScript, ScriptLoadError, ScriptSource, Shot,
+    ShotIndex,
 };
 pub use skip_pause_replay::{
     skip_allowed_at, SeenSet, SkipPauseReplayPolicy, SkipReason, SKIP_CONFIRM_WINDOW_MS,
 };
+pub use stinger::{StingerLoadError, StingerTable, StingerVariant};
 pub use storyteller_profile::{
     builtin_profile, default_profiles, StorytellerId, StorytellerProfile, COLOR_GRADE_NEUTRAL,
 };

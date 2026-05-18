@@ -45,6 +45,24 @@ pub struct ChapterMarker {
     pub at_ms: u32,
 }
 
+/// Per spec § "Live actors play scripted poses": one author-declared
+/// actor pose ID for a shot. Pose IDs resolve against the M9A animation
+/// frame catalog (e.g. `"squad_low_ready"`, `"chassis_idle"`). The
+/// cinematic kernel emits these as `cinematic.chapter_marker` payload
+/// metadata so cf-app's animation bridge can swap the actor's frame.
+///
+/// Per spec § Out of scope: "Per-cinematic motion-captured pose data
+/// (never — actors use M9A animation frames + scripted pose IDs)."
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ActorPose {
+    /// Actor reference (string id resolved against the active scenario's
+    /// actor table — e.g. `"player"`, `"squad_alpha"`, or a numeric id).
+    pub actor_id: String,
+    /// Pose id from the M9A animation catalog (e.g. `"low_ready"`,
+    /// `"chassis_idle"`, `"crouched_aim"`).
+    pub pose_id: String,
+}
+
 /// One scripted shot within a cinematic. The composer applies each move
 /// in `moves` to the cinematic camera stack additively in declared order;
 /// the renderer reads the final composed transform from
@@ -62,6 +80,13 @@ pub struct Shot {
     /// Move-stack — Pan / Dolly / Zoom / Orbit / Shake primitives. Per
     /// spec § "Camera primitives compose into a per-shot move-stack".
     pub moves: Vec<ShotMove>,
+    /// Per spec § "Live actors play scripted poses — squad members
+    /// enter their pre-mission stance (chassis idle + weapon at
+    /// low-ready + storyteller-specific body language)". Authored
+    /// actor pose declarations the cinematic bridge applies to the
+    /// referenced actors at shot start.
+    #[serde(default)]
+    pub actor_poses: Vec<ActorPose>,
 }
 
 /// On-disk schema for `content/cinematics/**/<id>.cinematic.ron`.
@@ -293,6 +318,7 @@ mod tests {
                 pan: [10.0, 0.0],
                 ..ShotMove::default()
             }],
+            actor_poses: Vec::new(),
         }
     }
 
