@@ -20,6 +20,18 @@ pub const BRACE_STRUT_T1_ID: &str = "brace_strut_t1";
 pub const BRACE_STRUT_T2_ID: &str = "brace_strut_t2";
 pub const BRACE_STRUT_T3_ID: &str = "brace_strut_t3";
 
+/// RON text for the canonical brace_strut_t1.ron content file. Embedded
+/// at compile time so the runtime loader can resolve the tier spec
+/// without filesystem access.
+pub const BRACE_STRUT_T1_RON: &str =
+    include_str!("../../../../content/equipment/brace_strut_t1.ron");
+/// RON text for the canonical brace_strut_t2.ron content file.
+pub const BRACE_STRUT_T2_RON: &str =
+    include_str!("../../../../content/equipment/brace_strut_t2.ron");
+/// RON text for the canonical brace_strut_t3.ron content file.
+pub const BRACE_STRUT_T3_RON: &str =
+    include_str!("../../../../content/equipment/brace_strut_t3.ron");
+
 /// Brace-strut tier discriminator. T1/T2/T3 produce behaviorally
 /// distinct lock radii per VAL-M14F-031.
 #[repr(u8)]
@@ -191,25 +203,92 @@ pub fn brace_strut_t3_default() -> BraceStrutSpec {
     }
 }
 
-/// Resolve a brace-strut spec by id.
-#[must_use]
-pub fn find_brace_strut(id: &str) -> Option<BraceStrutSpec> {
-    match id {
-        BRACE_STRUT_T1_ID => Some(brace_strut_t1_default()),
-        BRACE_STRUT_T2_ID => Some(brace_strut_t2_default()),
-        BRACE_STRUT_T3_ID => Some(brace_strut_t3_default()),
-        _ => None,
+/// Errors that may occur loading a [`BraceStrutSpec`] from RON text.
+#[derive(Debug)]
+pub enum BraceStrutSpecLoadError {
+    /// RON parse failed.
+    Parse(ron::error::SpannedError),
+    /// The deserialized payload violates M14F invariants.
+    Invariant(String),
+}
+
+impl std::fmt::Display for BraceStrutSpecLoadError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BraceStrutSpecLoadError::Parse(e) => write!(f, "ron parse error: {e}"),
+            BraceStrutSpecLoadError::Invariant(s) => write!(f, "invariant violation: {s}"),
+        }
     }
 }
 
-/// Resolve a brace-strut spec by tier discriminator.
+impl std::error::Error for BraceStrutSpecLoadError {}
+
+/// **M14F § VAL-M14F-017**: parse a [`BraceStrutSpec`] from RON text
+/// and validate that the spec carries a non-empty id + cost map +
+/// monotone non-zero lock radius. Used by [`brace_strut_for_tier`] +
+/// [`find_brace_strut`] so content authors can tune the tier specs by
+/// editing `content/equipment/brace_strut_t{1,2,3}.ron`.
+pub fn parse_brace_strut_ron(text: &str) -> Result<BraceStrutSpec, BraceStrutSpecLoadError> {
+    let spec: BraceStrutSpec = ron::from_str(text).map_err(BraceStrutSpecLoadError::Parse)?;
+    if spec.id.is_empty() {
+        return Err(BraceStrutSpecLoadError::Invariant(
+            "brace_strut id must not be empty".to_string(),
+        ));
+    }
+    if spec.cost_per_unit.is_empty() {
+        return Err(BraceStrutSpecLoadError::Invariant(
+            "brace_strut cost_per_unit must not be empty".to_string(),
+        ));
+    }
+    if spec.lock_radius_px == 0 {
+        return Err(BraceStrutSpecLoadError::Invariant(
+            "brace_strut lock_radius_px must be > 0".to_string(),
+        ));
+    }
+    if spec.lock_strength == 0 {
+        return Err(BraceStrutSpecLoadError::Invariant(
+            "brace_strut lock_strength must be > 0".to_string(),
+        ));
+    }
+    Ok(spec)
+}
+
+/// Embedded RON text for a tier. Used by the runtime loader to resolve
+/// `BraceStrutTier::T{1,2,3}` against the canonical content files.
+#[must_use]
+pub fn brace_strut_ron_for_tier(tier: BraceStrutTier) -> &'static str {
+    match tier {
+        BraceStrutTier::T1 => BRACE_STRUT_T1_RON,
+        BraceStrutTier::T2 => BRACE_STRUT_T2_RON,
+        BraceStrutTier::T3 => BRACE_STRUT_T3_RON,
+    }
+}
+
+/// Resolve a brace-strut spec by id. Reads the canonical RON content
+/// embedded via `include_str!` at compile time. Returns `None` for
+/// unknown ids; on RON parse failure, falls back to the hard-coded
+/// defaults so the runtime never panics.
+#[must_use]
+pub fn find_brace_strut(id: &str) -> Option<BraceStrutSpec> {
+    let (text, fallback): (&str, fn() -> BraceStrutSpec) = match id {
+        BRACE_STRUT_T1_ID => (BRACE_STRUT_T1_RON, brace_strut_t1_default),
+        BRACE_STRUT_T2_ID => (BRACE_STRUT_T2_RON, brace_strut_t2_default),
+        BRACE_STRUT_T3_ID => (BRACE_STRUT_T3_RON, brace_strut_t3_default),
+        _ => return None,
+    };
+    Some(parse_brace_strut_ron(text).unwrap_or_else(|_| fallback()))
+}
+
+/// Resolve a brace-strut spec by tier discriminator. Reads from the
+/// canonical RON content (see [`find_brace_strut`]).
 #[must_use]
 pub fn brace_strut_for_tier(tier: BraceStrutTier) -> BraceStrutSpec {
-    match tier {
-        BraceStrutTier::T1 => brace_strut_t1_default(),
-        BraceStrutTier::T2 => brace_strut_t2_default(),
-        BraceStrutTier::T3 => brace_strut_t3_default(),
-    }
+    let (text, fallback): (&str, fn() -> BraceStrutSpec) = match tier {
+        BraceStrutTier::T1 => (BRACE_STRUT_T1_RON, brace_strut_t1_default),
+        BraceStrutTier::T2 => (BRACE_STRUT_T2_RON, brace_strut_t2_default),
+        BraceStrutTier::T3 => (BRACE_STRUT_T3_RON, brace_strut_t3_default),
+    };
+    parse_brace_strut_ron(text).unwrap_or_else(|_| fallback())
 }
 
 /// All three brace-strut tier specs in ascending order.
@@ -315,5 +394,58 @@ mod tests {
         assert_ne!(BRACE_STRUT_T1_ID, placer_id);
         assert_ne!(BRACE_STRUT_T2_ID, placer_id);
         assert_ne!(BRACE_STRUT_T3_ID, placer_id);
+    }
+
+    /// **M14F § Cluster 8**: the embedded RON content for each tier
+    /// parses + validates without invariant errors, so the runtime
+    /// loader resolves to the content-authored spec (not the
+    /// hard-coded default).
+    #[test]
+    fn embedded_ron_content_parses_for_all_three_tiers() {
+        let t1 = parse_brace_strut_ron(BRACE_STRUT_T1_RON).expect("T1 RON must parse");
+        let t2 = parse_brace_strut_ron(BRACE_STRUT_T2_RON).expect("T2 RON must parse");
+        let t3 = parse_brace_strut_ron(BRACE_STRUT_T3_RON).expect("T3 RON must parse");
+        assert_eq!(t1.id, BRACE_STRUT_T1_ID);
+        assert_eq!(t2.id, BRACE_STRUT_T2_ID);
+        assert_eq!(t3.id, BRACE_STRUT_T3_ID);
+        assert_eq!(t1.tier, BraceStrutTier::T1);
+        assert_eq!(t2.tier, BraceStrutTier::T2);
+        assert_eq!(t3.tier, BraceStrutTier::T3);
+    }
+
+    /// **M14F § Cluster 8**: `brace_strut_for_tier` returns a spec
+    /// whose fields match the content RON (not the hard-coded default
+    /// path).
+    #[test]
+    fn brace_strut_for_tier_reads_from_content_ron() {
+        let t1 = brace_strut_for_tier(BraceStrutTier::T1);
+        let parsed = parse_brace_strut_ron(BRACE_STRUT_T1_RON).unwrap();
+        assert_eq!(t1, parsed);
+        let t3 = brace_strut_for_tier(BraceStrutTier::T3);
+        let parsed_t3 = parse_brace_strut_ron(BRACE_STRUT_T3_RON).unwrap();
+        assert_eq!(t3, parsed_t3);
+    }
+
+    /// **M14F § Cluster 8**: malformed RON yields a typed `Parse` error
+    /// (and `find_brace_strut` falls back to the default so callers
+    /// never panic on bad content).
+    #[test]
+    fn parse_rejects_malformed_ron() {
+        let err = parse_brace_strut_ron("not-a-valid-ron-payload");
+        assert!(matches!(err, Err(BraceStrutSpecLoadError::Parse(_))));
+        let err2 = parse_brace_strut_ron("(id: \"\", display_name: \"\", tier: t1, cost_per_unit: {}, lock_radius_px: 0, lock_strength: 0, mass_kg: 0.0, max_durability: 0.0)");
+        assert!(matches!(err2, Err(BraceStrutSpecLoadError::Invariant(_))));
+    }
+
+    /// **M14F § Cluster 8**: the tier struct surface and the loaded RON
+    /// values agree on lock_radius_px and lock_strength so the engine's
+    /// brace-strut placement reads identical values from either path.
+    #[test]
+    fn ron_loaded_lock_geometry_matches_tier_helpers() {
+        for tier in [BraceStrutTier::T1, BraceStrutTier::T2, BraceStrutTier::T3] {
+            let spec = brace_strut_for_tier(tier);
+            assert_eq!(spec.lock_radius_px, tier.lock_radius_px());
+            assert_eq!(spec.lock_strength, tier.lock_strength());
+        }
     }
 }

@@ -4,7 +4,7 @@
   "title": "terrain.wall_crack_advanced",
   "description": "M14F L2 wall-crack escalation. Emitted between terrain.wall_bulging (L1) and terrain.wall_rupture (L3) on the same lateral chunk. Drives the L2 sidewall crack decal.",
   "type": "object",
-  "required": ["chunk_id", "bbox", "unsupported_span_px"],
+  "required": ["chunk_id", "bbox", "unsupported_span_px", "level"],
   "properties": {
     "chunk_id": {
       "type": "array",

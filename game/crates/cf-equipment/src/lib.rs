@@ -154,9 +154,11 @@ pub use stealth_kill::{
 pub use suppressor::{Suppressor, SUPPRESSOR_LOUDNESS_FACTOR};
 pub use tool::{
     brace_strut::{
-        brace_strut_catalog, brace_strut_for_tier, brace_strut_t1_default, brace_strut_t2_default,
-        brace_strut_t3_default, find_brace_strut, BraceStrutSpec, BraceStrutTier, BRACE_STRUT_T1_ID,
-        BRACE_STRUT_T2_ID, BRACE_STRUT_T3_ID,
+        brace_strut_catalog, brace_strut_for_tier, brace_strut_ron_for_tier, brace_strut_t1_default,
+        brace_strut_t2_default, brace_strut_t3_default, find_brace_strut, parse_brace_strut_ron,
+        BraceStrutSpec, BraceStrutSpecLoadError, BraceStrutTier, BRACE_STRUT_T1_ID,
+        BRACE_STRUT_T1_RON, BRACE_STRUT_T2_ID, BRACE_STRUT_T2_RON, BRACE_STRUT_T3_ID,
+        BRACE_STRUT_T3_RON,
     },
     drill::{DRILL_HEAT_DECAY_PER_S, DRILL_HEAT_PER_USE, DRILL_HEAT_RATE_PER_S, DRILL_JAM_HEAT_THRESHOLD},
     engineering_tool::{

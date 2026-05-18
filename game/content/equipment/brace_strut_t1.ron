@@ -13,7 +13,7 @@
 (
   id: "brace_strut_t1",
   display_name: "Brace Strut T1",
-  tier: "t1",
+  tier: t1,
   cost_per_unit: {
     "iron": 2,
     "wood": 1,

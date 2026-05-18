@@ -4,7 +4,7 @@
   "title": "terrain.wall_bulging",
   "description": "M14F L1 wall-bulging warning. Emitted when a chunk's lateral integrity_field drops below the L1 locked threshold (200) for at least one cell on the lateral axis. Drives the L1 sidewall crack decal + 'MINESHAFT WALL UNSTABLE' HUD banner.",
   "type": "object",
-  "required": ["chunk_id", "bbox", "unsupported_span_px"],
+  "required": ["chunk_id", "bbox", "unsupported_span_px", "level"],
   "properties": {
     "chunk_id": {
       "type": "array",
