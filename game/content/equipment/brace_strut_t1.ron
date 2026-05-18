@@ -1,0 +1,25 @@
+// **M14F** § Brace-strut T1 — lateral wall reinforcement equipment.
+//
+// Mirrors the M14E `support_beam_placer` UX (hold-to-place) but locks the
+// lateral integrity field on the chunk's sidewall axis instead of the
+// ceiling axis. Same cost class as T1 support_beam_placer per VAL-M14F-022.
+//
+// Lock radius = ±8 px around the placement; lock strength = 200 (matches
+// the M14E `INTEGRITY_LOCKED` threshold so the lateral pass treats the
+// anchored cells as load-bearing).
+//
+// VAL-M14F-017 / VAL-M14F-022 / VAL-M14F-031.
+
+(
+  id: "brace_strut_t1",
+  display_name: "Brace Strut T1",
+  tier: "t1",
+  cost_per_unit: {
+    "iron": 2,
+    "wood": 1,
+  },
+  lock_radius_px: 8,
+  lock_strength: 200,
+  mass_kg: 2.5,
+  max_durability: 100.0,
+)

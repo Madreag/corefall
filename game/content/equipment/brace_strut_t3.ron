@@ -1,0 +1,19 @@
+// **M14F** § Brace-strut T3 — heaviest lateral wall reinforcement.
+//
+// Top-tier costs more (4 iron + 2 wood) and locks the widest span
+// (±16 px) at maximum strength (500 — matches the M14E support_beam
+// baseline). Per VAL-M14F-022 + VAL-M14F-031.
+
+(
+  id: "brace_strut_t3",
+  display_name: "Brace Strut T3",
+  tier: "t3",
+  cost_per_unit: {
+    "iron": 4,
+    "wood": 2,
+  },
+  lock_radius_px: 16,
+  lock_strength: 500,
+  mass_kg: 4.5,
+  max_durability: 200.0,
+)

@@ -20,3 +20,4 @@ cf-save = { path = "../cf-save" }
 
 [dev-dependencies]
 cf-physics = { path = "../cf-physics" }
+cf-terrain = { path = "../cf-terrain" }
