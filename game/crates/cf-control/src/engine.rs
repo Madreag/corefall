@@ -9301,6 +9301,213 @@ impl M0Engine {
         }
     }
 
+    /// **M14F § VAL-M14F-004**: Place a brace strut at the actor-supplied
+    /// world position. Emits `terrain.brace_strut_placed`, debits the
+    /// per-tier crafting cost from the actor's inventory, and locks the
+    /// lateral integrity field ±N px around the placement (N scales by
+    /// tier per VAL-M14F-031). Returns `true` when placement succeeded.
+    pub fn m14f_place_brace_strut(
+        &self,
+        actor_id: u64,
+        tier: cf_equipment::BraceStrutTier,
+        world_pos: (f32, f32),
+    ) -> bool {
+        let spec = cf_equipment::brace_strut_for_tier(tier);
+        let chunk_id = (
+            (world_pos.0 / cf_terrain::CHUNK_SIZE as f32).floor() as i32,
+            (world_pos.1 / cf_terrain::CHUNK_SIZE as f32).floor() as i32,
+        );
+        let radius_cells = ((spec.lock_radius_px + 15) / 16).max(1) as usize;
+        let placed = if let Ok(mut s) = self.state.write() {
+            // Per-actor inventory delta — debits exactly the spec'd
+            // cost so VAL-CROSS-023 (disjoint debits) holds.
+            let resources = s
+                .m14e_actor_resources
+                .entry(actor_id)
+                .or_default();
+            for (k, v) in &spec.cost_per_unit {
+                *resources.entry(k.clone()).or_insert(0) -= i64::from(*v);
+            }
+            // Lock the lateral cells in the shared `IntegrityField` per
+            // VAL-CROSS-005 (single buffer; lock used by both passes).
+            let center_lx = cf_terrain::INTEGRITY_FIELD_WIDTH / 2;
+            let center_ly = cf_terrain::INTEGRITY_FIELD_HEIGHT / 2;
+            if let Some(chunk) = s.m14e_chunks.get_mut(&chunk_id) {
+                cf_terrain::lock_radius_to_beam(&mut chunk.field, center_lx, center_ly, radius_cells);
+                chunk.anchored = true;
+            }
+            true
+        } else {
+            false
+        };
+        let tick = self.current_tick();
+        let sim_time_ms = self.state.read().map(|s| s.clock.sim_time_ms()).unwrap_or(0.0);
+        let cost_iron = spec.cost_per_unit.get("iron").copied().unwrap_or(0);
+        let cost_wood = spec.cost_per_unit.get("wood").copied().unwrap_or(0);
+        self.recorder.record(
+            tick,
+            sim_time_ms,
+            "terrain",
+            "brace_strut_placed",
+            serde_json::json!({
+                "actor_id": actor_id,
+                "tier": tier.as_str(),
+                "world_pos": [world_pos.0, world_pos.1],
+                "chunk_id": [chunk_id.0, chunk_id.1],
+                "cost": { "iron": cost_iron, "wood": cost_wood },
+                "lock_radius_px": spec.lock_radius_px,
+            }),
+            None,
+        );
+        placed
+    }
+
+    /// **M14F § VAL-M14F-002 / VAL-M14F-003**: emit a `terrain.wall_bulging`
+    /// event with the L1 sidewall crack-decal level + HUD banner
+    /// `MINESHAFT WALL UNSTABLE`. Used by the engine's lateral pass when
+    /// integrity drops below the L1 threshold.
+    pub fn m14f_emit_wall_bulging(
+        &self,
+        chunk_id: (i32, i32),
+        bbox_min: [i64; 2],
+        bbox_max: [i64; 2],
+        unsupported_span_px: u32,
+        lateral_yield_strength: u16,
+    ) {
+        let tick = self.current_tick();
+        let sim_time_ms = self.state.read().map(|s| s.clock.sim_time_ms()).unwrap_or(0.0);
+        self.recorder.record(
+            tick,
+            sim_time_ms,
+            "terrain",
+            "wall_bulging",
+            serde_json::json!({
+                "chunk_id": [chunk_id.0, chunk_id.1],
+                "bbox": { "min": bbox_min, "max": bbox_max },
+                "unsupported_span_px": unsupported_span_px,
+                "lateral_yield_strength": lateral_yield_strength,
+                "vibration_modifier": 1.0,
+                "level": "l1",
+            }),
+            None,
+        );
+        // HUD banner: "MINESHAFT WALL UNSTABLE" per VAL-M14F-003.
+        if let Ok(mut s) = self.state.write() {
+            push_banner_dedup(
+                &mut s.hud_banners,
+                crate::state::HudBannerView {
+                    id: format!("m14f_wall_unstable_{}_{}", chunk_id.0, chunk_id.1),
+                    severity: "warning".to_string(),
+                    label: "MINESHAFT WALL UNSTABLE".to_string(),
+                    raised_at_tick: tick.0,
+                    expires_at_tick: Some(tick.0 + 120),
+                    accessibility_id: "hud.banner.m14f_wall_unstable".to_string(),
+                },
+            );
+            // L1 sidewall crack decal — reuse the M14E render queue.
+            let bbox_min_f = (bbox_min[0] as f32, bbox_min[1] as f32);
+            let bbox_max_f = (bbox_max[0] as f32, bbox_max[1] as f32);
+            s.m14e_tunnel_collapse_queue.enqueue_crack_decal(
+                chunk_id,
+                cf_render_2d::tunnel_collapse::CrackLevel::L1,
+                bbox_min_f,
+                bbox_max_f,
+            );
+        }
+    }
+
+    /// **M14F § VAL-M14F-012 / VAL-M14F-025**: emit a
+    /// `terrain.wall_crack_advanced` (L2) escalation event between
+    /// bulging and rupture on the same chunk.
+    pub fn m14f_emit_wall_crack_advanced(
+        &self,
+        chunk_id: (i32, i32),
+        bbox_min: [i64; 2],
+        bbox_max: [i64; 2],
+        unsupported_span_px: u32,
+        lateral_yield_strength: u16,
+    ) {
+        let tick = self.current_tick();
+        let sim_time_ms = self.state.read().map(|s| s.clock.sim_time_ms()).unwrap_or(0.0);
+        self.recorder.record(
+            tick,
+            sim_time_ms,
+            "terrain",
+            "wall_crack_advanced",
+            serde_json::json!({
+                "chunk_id": [chunk_id.0, chunk_id.1],
+                "bbox": { "min": bbox_min, "max": bbox_max },
+                "unsupported_span_px": unsupported_span_px,
+                "lateral_yield_strength": lateral_yield_strength,
+                "vibration_modifier": 1.0,
+                "level": "l2",
+            }),
+            None,
+        );
+        if let Ok(mut s) = self.state.write() {
+            let bbox_min_f = (bbox_min[0] as f32, bbox_min[1] as f32);
+            let bbox_max_f = (bbox_max[0] as f32, bbox_max[1] as f32);
+            s.m14e_tunnel_collapse_queue.enqueue_crack_decal(
+                chunk_id,
+                cf_render_2d::tunnel_collapse::CrackLevel::L2,
+                bbox_min_f,
+                bbox_max_f,
+            );
+        }
+    }
+
+    /// **M14F § VAL-M14F-006 / VAL-M14F-027**: emit a
+    /// `terrain.wall_rupture` (L3) event with the required
+    /// chunk_id + bbox + falling_debris_count payload.
+    pub fn m14f_emit_wall_rupture(
+        &self,
+        chunk_id: (i32, i32),
+        bbox_min: [i64; 2],
+        bbox_max: [i64; 2],
+        unsupported_span_px: u32,
+        wall_thickness_px: u32,
+        lateral_yield_strength: u16,
+        trigger: &str,
+    ) {
+        let payload = cf_terrain::WallCollapsePayload::rupture(
+            chunk_id,
+            bbox_min,
+            bbox_max,
+            unsupported_span_px,
+            wall_thickness_px,
+            1.0,
+        );
+        let tick = self.current_tick();
+        let sim_time_ms = self.state.read().map(|s| s.clock.sim_time_ms()).unwrap_or(0.0);
+        self.recorder.record(
+            tick,
+            sim_time_ms,
+            "terrain",
+            "wall_rupture",
+            serde_json::json!({
+                "chunk_id": [payload.chunk_id.0, payload.chunk_id.1],
+                "bbox": { "min": payload.bbox_min, "max": payload.bbox_max },
+                "falling_debris_count": payload.falling_debris_count,
+                "unsupported_span_px": payload.unsupported_span_px,
+                "lateral_yield_strength": lateral_yield_strength,
+                "vibration_modifier": payload.vibration_modifier,
+                "cascade_primary": payload.cascade_primary,
+                "trigger": trigger,
+            }),
+            None,
+        );
+        if let Ok(mut s) = self.state.write() {
+            let bbox_min_f = (bbox_min[0] as f32, bbox_min[1] as f32);
+            let bbox_max_f = (bbox_max[0] as f32, bbox_max[1] as f32);
+            s.m14e_tunnel_collapse_queue.enqueue_cave_in(
+                chunk_id,
+                bbox_min_f,
+                bbox_max_f,
+                payload.falling_debris_count,
+            );
+        }
+    }
+
     fn emit_actor_events(&self, tick: Tick, sim_time_ms: f64, intent: &ControlIntent, report: &StepReport) {
         // **M1 Gap C**: collect weapon_fired event_id per actor so subsequent
         // projectile_spawned events parent to the closer fire event rather
