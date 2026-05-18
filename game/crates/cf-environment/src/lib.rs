@@ -7,6 +7,14 @@
 
 use serde::{Deserialize, Serialize};
 
+pub mod tile_thermal;
+
+pub use tile_thermal::{
+    classify_tile_thermal, ThermalWoundEmit, BURN_FIRST_DEGREE_TICKS, BURN_SECOND_DEGREE_TICKS,
+    BURN_THIRD_DEGREE_TICKS, COLD_TILE_THRESHOLD_K, FROSTBITE_FIRST_DEGREE_TICKS,
+    FROSTBITE_SECOND_DEGREE_TICKS, FROSTBITE_THIRD_DEGREE_TICKS, HOT_TILE_THRESHOLD_K,
+};
+
 /// **DR-040** 15-class closed-enum hazard taxonomy. Stable variant IDs;
 /// new variants append at the end to preserve `#[repr(u8)]` discriminant
 /// order if/when that becomes a serialization shape.

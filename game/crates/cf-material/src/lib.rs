@@ -47,9 +47,11 @@ use std::{collections::BTreeMap, path::Path};
 use serde::{Deserialize, Serialize};
 
 pub mod loader;
+pub mod reactions;
 pub mod registry;
 
 pub use loader::{load_registry_from_file, validate_registry_json, RegistryValidationError, RegistryValidationReport};
+pub use reactions::{classify_reaction, ReactionWoundEmit};
 
 /// Material schema version stamped into every registry JSON file. M2 ships
 /// v1; M5.6 will bump when the active material kernel starts reading the

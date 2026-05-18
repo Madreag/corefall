@@ -1756,6 +1756,7 @@ dependencies = [
 name = "cf-environment"
 version = "0.0.1"
 dependencies = [
+ "cf-wound",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
@@ -1839,6 +1840,7 @@ dependencies = [
 name = "cf-material"
 version = "0.0.1"
 dependencies = [
+ "cf-wound",
  "serde",
  "serde_json",
  "thiserror 2.0.18",
@@ -1916,6 +1918,7 @@ name = "cf-physics"
 version = "0.0.1"
 dependencies = [
  "cf-chassis",
+ "cf-wound",
  "serde",
  "serde_json",
  "tracing",
@@ -2177,6 +2180,7 @@ dependencies = [
  "cf-fortification",
  "cf-terrain",
  "cf-trench",
+ "cf-wound",
  "serde",
  "serde_json",
  "tracing",

@@ -43,6 +43,7 @@ pub mod gravity_field;
 pub mod hazard;
 pub mod joint;
 pub mod limb_path_interop;
+pub mod m14g_producer;
 pub mod parallel;
 pub mod penetration;
 pub mod penetration_m14c;
@@ -63,6 +64,10 @@ pub use gravity_field::{
 };
 pub use joint::{
     evaluate_joint, explosion_impulse, fall_impulse_chain, severance_probability, severance_roll, Joint, JointEval,
+};
+pub use m14g_producer::{
+    classify_blunt_face_hit, classify_fall_fracture, classify_gunshot, classify_heat_cluster, classify_shrapnel,
+    substitute_for_origin, M14gWoundEmit,
 };
 pub use limb_path_interop::LimbPathInterop;
 pub use penetration_m14c::{

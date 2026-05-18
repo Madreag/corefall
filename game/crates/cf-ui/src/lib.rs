@@ -117,6 +117,9 @@ pub mod quick_action_bar;
 pub mod quick_action_radial;
 pub mod walk_strip;
 
+// **M14G** § per-zone wound silhouette badges.
+pub mod wound_strip;
+
 pub use mission_resolved_modal::{
     render_comic_death_recap, render_death_recap_with_mode, render_recap_text as render_death_recap_text,
     DeathRecapViewMode, RecapEvent, COMIC_DEATH_RECAP_PANELS, MAX_RECAP_LINES,

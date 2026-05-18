@@ -17,3 +17,4 @@ cf-equipment = { path = "../cf-equipment" }
 cf-fortification = { path = "../cf-fortification" }
 cf-terrain = { path = "../cf-terrain" }
 cf-trench = { path = "../cf-trench" }
+cf-wound = { path = "../cf-wound" }
