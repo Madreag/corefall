@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/quick_action.radial_opened.v1",
+  "title": "quick_action.radial_opened",
+  "type": "object",
+  "required": ["actor", "tick"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "tick": {"type": "integer", "minimum": 0}
+  },
+  "additionalProperties": true
+}

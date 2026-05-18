@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/actor.prone_state_changed.v1",
+  "title": "actor.prone_state_changed",
+  "type": "object",
+  "required": ["actor", "state"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "state": {"type": "string", "enum": ["not_prone", "go_prone", "prone"]},
+    "transition_ms": {"type": "integer", "minimum": 0}
+  },
+  "additionalProperties": true
+}

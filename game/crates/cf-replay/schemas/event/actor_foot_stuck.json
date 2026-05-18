@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/actor.foot_stuck.v1",
+  "title": "actor.foot_stuck",
+  "type": "object",
+  "required": ["actor", "side", "stuck_ms"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "side": {"type": "string"},
+    "stuck_ms": {"type": "integer", "minimum": 0},
+    "push_force_n": {"type": "number"}
+  },
+  "additionalProperties": true
+}

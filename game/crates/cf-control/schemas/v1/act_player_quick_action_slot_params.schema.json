@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ActPlayerQuickActionSlotParams",
+  "description": "**M14A**: `act.player.quick_action_slot` — instant slot invocation (keys 1-8).",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    },
+    "slot": {
+      "description": "1-8 inclusive (the player-facing numbering); engine subtracts 1 internally.",
+      "type": "integer",
+      "format": "uint8",
+      "maximum": 255,
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "slot"
+  ]
+}

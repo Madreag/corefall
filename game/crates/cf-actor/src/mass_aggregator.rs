@@ -129,10 +129,12 @@ mod tests {
     fn empty_actor_mass_is_chassis_baseline() {
         let actor = make_actor();
         let bd = breakdown(&actor);
-        // Default infantry = 80 kg chassis baseline; no inventory yet.
+        // Default infantry = 80 kg chassis baseline; legacy rifle adds 3.5 kg held.
         assert!((bd.chassis_kg - 80.0).abs() < 1e-6);
         assert!((bd.inventory_kg - 0.0).abs() < 1e-6);
-        assert!((bd.total() - 80.0).abs() < 1e-6);
+        // **M14A** legacy path: held rifle (3.5 kg) counts as held device.
+        assert!((bd.held_kg - 3.5).abs() < 1e-6);
+        assert!((bd.total() - 83.5).abs() < 1e-6);
     }
 
     #[test]
@@ -142,7 +144,9 @@ mod tests {
         let grid = actor.inventory_grid_mut().expect("grid attached");
         grid.add_top_level("rifle_m1", 1, 0.0);
         let bd = breakdown(&actor);
+        // Grid mode: held_kg = 0 (grid covers all); only inventory_kg counts.
         assert!((bd.inventory_kg - 3.5).abs() < 1e-6);
+        assert!((bd.held_kg - 0.0).abs() < 1e-6);
         assert!((bd.total() - 83.5).abs() < 1e-6);
     }
 
@@ -153,6 +157,27 @@ mod tests {
         actor.inventory_weight_kg = 12.0;
         let bd = breakdown(&actor);
         assert!((bd.inventory_kg - 12.0).abs() < 1e-6);
-        assert!((bd.total() - 92.0).abs() < 1e-6);
+        // **M14A** held rifle: 3.5 kg added separately.
+        assert!((bd.held_kg - 3.5).abs() < 1e-6);
+        assert!((bd.total() - 95.5).abs() < 1e-6);
+    }
+
+    #[test]
+    fn jetpack_fuel_contributes_to_total() {
+        let mut actor = make_actor();
+        actor.jetpack = Some(cf_equipment::Jetpack::standard_powered_armor());
+        let bd = breakdown(&actor);
+        // Jetpack dry mass (5 kg) folds into chassis; fuel mass surfaces separately.
+        assert!(bd.jetpack_fuel_kg > 10.0);
+        // chassis_kg = 80 + dry_mass 5 = 85
+        assert!((bd.chassis_kg - 85.0).abs() < 1e-6);
+    }
+
+    #[test]
+    fn mass_factor_clamped_at_quarter_for_heavy_actor() {
+        let mut actor = make_actor();
+        actor.mass_kg = 380.0;
+        let mf = mass_factor(&actor);
+        assert!((mf - 0.25).abs() < 1e-3, "heavy actor should clamp to 0.25, got {mf}");
     }
 }

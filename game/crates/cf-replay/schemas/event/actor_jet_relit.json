@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/actor.jet_relit.v1",
+  "title": "actor.jet_relit",
+  "type": "object",
+  "required": ["actor"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0}
+  },
+  "additionalProperties": true
+}

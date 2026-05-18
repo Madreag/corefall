@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/quick_action.radial_closed.v1",
+  "title": "quick_action.radial_closed",
+  "type": "object",
+  "required": ["actor", "cancelled"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "cancelled": {"type": "boolean"},
+    "slice": {"type": "integer", "minimum": 0}
+  },
+  "additionalProperties": true
+}

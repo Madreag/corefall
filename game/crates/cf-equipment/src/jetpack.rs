@@ -453,10 +453,11 @@ mod tests {
     #[test]
     fn jump_pack_full_discharge() {
         let mut jet = Jetpack::jump_pack_light_mech();
-        // Hold thrust through entire fuel.
+        // Burst first (jet_press_edge=true), then sustain.
         let mut total_thrust = 0.0;
-        for _ in 0..200 {
-            let outcome = jetpack_tick(&mut jet, true, false, false, 1900.0, 80.0, 0.0, false, 101.0, 16);
+        for i in 0..200 {
+            let press_edge = i == 0;
+            let outcome = jetpack_tick(&mut jet, true, press_edge, false, 1900.0, 80.0, 0.0, false, 101.0, 16);
             total_thrust += outcome.thrust_n.abs();
             if jet.jet_time_left_ms == 0 {
                 break;

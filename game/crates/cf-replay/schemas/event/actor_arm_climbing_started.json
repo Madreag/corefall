@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/actor.arm_climbing_started.v1",
+  "title": "actor.arm_climbing_started",
+  "type": "object",
+  "required": ["actor", "side"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "side": {"type": "string"}
+  },
+  "additionalProperties": true
+}

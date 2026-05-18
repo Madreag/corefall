@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/actor.thermal_contact.v1",
+  "title": "actor.thermal_contact",
+  "type": "object",
+  "required": ["actor", "delta_temp_c"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "delta_temp_c": {"type": "number"},
+    "material_id": {"type": "integer"},
+    "conductivity": {"type": "number"}
+  },
+  "additionalProperties": true
+}

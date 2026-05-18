@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/actor.jet_fired.v1",
+  "title": "actor.jet_fired",
+  "type": "object",
+  "required": ["actor"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "thrust_n": {"type": "number"},
+    "emit_angle": {"type": "number"},
+    "fuel_left_ms": {"type": "integer", "minimum": 0}
+  },
+  "additionalProperties": true
+}

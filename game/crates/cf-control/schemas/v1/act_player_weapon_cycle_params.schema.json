@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ActPlayerWeaponCycleParams",
+  "description": "**M14A**: `act.player.weapon_cycle` — mouse-wheel slot category cycle.",
+  "type": "object",
+  "properties": {
+    "direction": {
+      "description": "-1 or +1.",
+      "type": "integer",
+      "format": "int8",
+      "maximum": 127,
+      "minimum": -128
+    },
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "direction"
+  ]
+}

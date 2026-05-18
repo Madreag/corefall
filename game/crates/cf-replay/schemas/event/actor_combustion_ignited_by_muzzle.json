@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/actor.combustion_ignited_by_muzzle.v1",
+  "title": "actor.combustion_ignited_by_muzzle",
+  "type": "object",
+  "required": ["actor", "reaction_id"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "reaction_id": {"type": "string"},
+    "volatiles_partial_kpa": {"type": "number"},
+    "o2_partial_kpa": {"type": "number"},
+    "temp_k": {"type": "number"}
+  },
+  "additionalProperties": true
+}

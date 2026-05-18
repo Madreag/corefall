@@ -1,0 +1,14 @@
+(
+    schema_version: 1,
+    chassis_archetype: "infantry_v1",
+    slots: [
+        (slot: 1, kind: "weapon", item_id: "rifle_m1_default", ammo: 24, ammo_max: 30, cooldown_total_ticks: 0),
+        (slot: 2, kind: "weapon", item_id: "pistol_m1_default", ammo: 12, ammo_max: 12, cooldown_total_ticks: 0),
+        (slot: 3, kind: "melee", item_id: "knife_m6_default", ammo: 0, ammo_max: 0, cooldown_total_ticks: 0),
+        (slot: 4, kind: "grenade", item_id: "frag_m6_default", ammo: 3, ammo_max: 3, cooldown_total_ticks: 0),
+        (slot: 5, kind: "consumable", item_id: "medkit", ammo: 1, ammo_max: 1, cooldown_total_ticks: 0),
+        (slot: 6, kind: "empty", item_id: "", ammo: 0, ammo_max: 0, cooldown_total_ticks: 0),
+        (slot: 7, kind: "empty", item_id: "", ammo: 0, ammo_max: 0, cooldown_total_ticks: 0),
+        (slot: 8, kind: "empty", item_id: "", ammo: 0, ammo_max: 0, cooldown_total_ticks: 0),
+    ],
+)

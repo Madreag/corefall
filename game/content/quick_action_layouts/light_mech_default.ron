@@ -1,0 +1,14 @@
+(
+    schema_version: 1,
+    chassis_archetype: "light_mech_v1",
+    slots: [
+        (slot: 1, kind: "weapon", item_id: "autocannon_m1_default", ammo: 80, ammo_max: 80, cooldown_total_ticks: 0),
+        (slot: 2, kind: "weapon", item_id: "pistol_m1_default", ammo: 12, ammo_max: 12, cooldown_total_ticks: 0),
+        (slot: 3, kind: "empty", item_id: "", ammo: 0, ammo_max: 0, cooldown_total_ticks: 0),
+        (slot: 4, kind: "grenade", item_id: "grenade_launcher", ammo: 6, ammo_max: 6, cooldown_total_ticks: 0),
+        (slot: 5, kind: "consumable", item_id: "repair_drone", ammo: 1, ammo_max: 1, cooldown_total_ticks: 0),
+        (slot: 6, kind: "ability", item_id: "time_slow", ammo: 0, ammo_max: 0, cooldown_total_ticks: 2400),
+        (slot: 7, kind: "ability", item_id: "overdrive", ammo: 0, ammo_max: 0, cooldown_total_ticks: 1800),
+        (slot: 8, kind: "ability", item_id: "repair_pulse", ammo: 0, ammo_max: 0, cooldown_total_ticks: 1200),
+    ],
+)

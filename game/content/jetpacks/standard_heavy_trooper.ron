@@ -1,0 +1,17 @@
+(
+    schema_version: 1,
+    id: "standard_heavy_trooper",
+    jetpack_type: "standard",
+    jet_time_total_ms: 3000,
+    jet_replenish_rate: 0.7,
+    minimum_fuel_ratio: 0.30,
+    jet_angle_range: 0.6,
+    can_adjust_angle_while_firing: true,
+    adjusts_throttle_for_weight: true,
+    base_thrust_n: 5500.0,
+    burst_thrust_multiplier: 2.0,
+    dry_mass_kg: 8.0,
+    fuel_density_kg_per_ms: 0.006,
+    bound_zone: "backpack",
+    emitter_offset: (-10.0, 22.0),
+)

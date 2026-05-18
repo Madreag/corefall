@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/actor.resource_depleted_by_stride.v1",
+  "title": "actor.resource_depleted_by_stride",
+  "type": "object",
+  "required": ["actor", "resource"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "resource": {"type": "string"},
+    "value_after": {"type": "number"},
+    "warning": {"type": "boolean"}
+  },
+  "additionalProperties": true
+}

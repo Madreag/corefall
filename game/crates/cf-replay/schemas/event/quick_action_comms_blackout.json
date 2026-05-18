@@ -1,0 +1,11 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/quick_action.comms_blackout.v1",
+  "title": "quick_action.comms_blackout",
+  "type": "object",
+  "required": ["actor"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0}
+  },
+  "additionalProperties": true
+}

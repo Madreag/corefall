@@ -4308,10 +4308,29 @@ mod tests {
     /// **M13** § "Chassis archetypes — M13 ships 5": crab + drone archetypes
     /// must be in the canonical registry alongside the 3 humanoid kinds.
     #[test]
-    fn registry_ships_five_chassis_archetypes() {
+    fn registry_ships_six_chassis_archetypes() {
         assert!(chassis_spec(CRAB_QUADRUPED_ID).is_some());
         assert!(chassis_spec(DRONE_ID).is_some());
-        assert_eq!(chassis_specs().len(), 5, "M13 ships 5 chassis archetypes");
+        // **M14A** ships the 6th archetype — Heavy Trooper.
+        assert!(chassis_spec(HEAVY_TROOPER_ID).is_some());
+        assert_eq!(chassis_specs().len(), 6, "M14A ships 6 chassis archetypes");
+    }
+
+    /// **M14A** § "Heavy Armor" — heavy trooper spec contract.
+    #[test]
+    fn heavy_trooper_spec_has_tank_grade_zones() {
+        let s = heavy_trooper_spec();
+        assert_eq!(s.kind, ChassisKind::HeavyTrooper);
+        assert!((s.mass_kg - 380.0).abs() < 1e-3);
+        // Torso External ≥ 400 HP at hardness ≥ 22.
+        let torso = s.zones.iter().find(|z| z.zone == BodyZone::Torso).unwrap();
+        let torso_ext = torso.layers.iter().find(|l| l.kind == ArmorLayerKind::External).unwrap();
+        assert!(torso_ext.hp >= 400.0);
+        assert!(torso_ext.hardness >= 22.0);
+        // Per-zone tunings: torso dmg_multiplier=0.6, stagger=0.2, gib≥3200.
+        assert!((torso.damage_multiplier - 0.6).abs() < 1e-6);
+        assert!((torso.stagger_factor - 0.2).abs() < 1e-6);
+        assert!(torso.gib_impulse_limit >= 3200.0);
     }
 
     /// **M13** § "Quadruped=11 zones": crab body graph zone count contract.

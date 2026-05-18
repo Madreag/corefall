@@ -1,0 +1,17 @@
+(
+    schema_version: 1,
+    id: "jump_pack_light_mech",
+    jetpack_type: "jump_pack",
+    jet_time_total_ms: 1500,
+    jet_replenish_rate: 0.3,
+    minimum_fuel_ratio: 1.0,
+    jet_angle_range: 0.6,
+    can_adjust_angle_while_firing: false,
+    adjusts_throttle_for_weight: true,
+    base_thrust_n: 30000.0,
+    burst_thrust_multiplier: 3.0,
+    dry_mass_kg: 20.0,
+    fuel_density_kg_per_ms: 0.0267,
+    bound_zone: "backpack",
+    emitter_offset: (-12.0, 24.0),
+)

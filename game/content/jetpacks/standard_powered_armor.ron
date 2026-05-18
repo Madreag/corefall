@@ -1,0 +1,17 @@
+(
+    schema_version: 1,
+    id: "standard_powered_armor",
+    jetpack_type: "standard",
+    jet_time_total_ms: 4500,
+    jet_replenish_rate: 1.0,
+    minimum_fuel_ratio: 0.25,
+    jet_angle_range: 0.6,
+    can_adjust_angle_while_firing: true,
+    adjusts_throttle_for_weight: true,
+    base_thrust_n: 3500.0,
+    burst_thrust_multiplier: 2.0,
+    dry_mass_kg: 5.0,
+    fuel_density_kg_per_ms: 0.00267,
+    bound_zone: "backpack",
+    emitter_offset: (-8.0, 18.0),
+)

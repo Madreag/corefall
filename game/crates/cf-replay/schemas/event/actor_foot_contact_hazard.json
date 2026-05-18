@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/actor.foot_contact_hazard.v1",
+  "title": "actor.foot_contact_hazard",
+  "type": "object",
+  "required": ["actor", "hazard_kind"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "hazard_kind": {"type": "string"},
+    "material_id": {"type": "integer"},
+    "foot_damage_hp": {"type": "number"},
+    "zone": {"type": "string"}
+  },
+  "additionalProperties": true
+}

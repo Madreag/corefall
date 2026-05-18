@@ -1188,6 +1188,11 @@ pub trait EngineHandle: Send + Sync + 'static {
     async fn observe_actor(&self, _actor_id: Option<u64>) -> Option<serde_json::Value> {
         None
     }
+    /// **M14A** § "observe.quick_action projection" — per-actor 8-slot quick
+    /// action bar + radial state. Default returns `None`.
+    async fn observe_quick_action(&self, _actor_id: Option<u64>) -> Option<serde_json::Value> {
+        None
+    }
     /// **M6**: per-actor perception projection — sight cone + hearing radius
     /// + stealth_meter + last footstep loudness band + last occlusion
     /// factor + spotted flag. `actor_id=None` resolves to the player. Default
@@ -3279,6 +3284,17 @@ async fn process_request<E: EngineHandle>(
                 Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
             };
             match engine.observe_actor(p.actor_id).await {
+                Some(value) => Some(success_response(request.id, value)),
+                None => Some(invalid_param_reason(request.id, "no_player_actor")),
+            }
+        }
+        // **M14A** § "observe.quick_action projection".
+        "observe.quick_action" => {
+            let p: ObserveActorParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            match engine.observe_quick_action(p.actor_id).await {
                 Some(value) => Some(success_response(request.id, value)),
                 None => Some(invalid_param_reason(request.id, "no_player_actor")),
             }

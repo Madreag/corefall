@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/actor.on_stride.v1",
+  "title": "actor.on_stride",
+  "type": "object",
+  "required": ["actor", "side"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "side": {"type": "string", "enum": ["fg", "bg", "fl_rr_pair", "fr_rl_pair"]},
+    "foot_pos": {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2},
+    "stride_timer_ms": {"type": "integer", "minimum": 0},
+    "stride_frame_index": {"type": "integer", "minimum": 0},
+    "material_at_foot": {"type": "string"}
+  },
+  "additionalProperties": true
+}

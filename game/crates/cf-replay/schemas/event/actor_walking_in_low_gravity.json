@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/actor.walking_in_low_gravity.v1",
+  "title": "actor.walking_in_low_gravity",
+  "type": "object",
+  "required": ["actor", "local_g"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "local_g": {"type": "number"}
+  },
+  "additionalProperties": true
+}

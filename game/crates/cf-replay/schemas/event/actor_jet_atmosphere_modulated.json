@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/actor.jet_atmosphere_modulated.v1",
+  "title": "actor.jet_atmosphere_modulated",
+  "type": "object",
+  "required": ["actor", "efficiency_multiplier"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "efficiency_multiplier": {"type": "number"},
+    "pressure_kpa": {"type": "number"}
+  },
+  "additionalProperties": true
+}

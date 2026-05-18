@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/actor.foot_slip.v1",
+  "title": "actor.foot_slip",
+  "type": "object",
+  "required": ["actor", "friction_at_contact"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "friction_at_contact": {"type": "number"},
+    "material_id": {"type": "integer"},
+    "lateral_velocity": {"type": "number"}
+  },
+  "additionalProperties": true
+}

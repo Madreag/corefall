@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/quick_action.slot_invoked.v1",
+  "title": "quick_action.slot_invoked",
+  "type": "object",
+  "required": ["actor", "slot"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "slot": {"type": "integer", "minimum": 1, "maximum": 8},
+    "item_id": {"type": "string"}
+  },
+  "additionalProperties": true
+}

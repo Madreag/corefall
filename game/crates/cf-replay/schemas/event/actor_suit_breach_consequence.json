@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/actor.suit_breach_consequence.v1",
+  "title": "actor.suit_breach_consequence",
+  "type": "object",
+  "required": ["actor"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "kind": {"type": "string"},
+    "mol_per_tick": {"type": "number"}
+  },
+  "additionalProperties": true
+}

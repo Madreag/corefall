@@ -1,0 +1,14 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/actor.knockdown.v1",
+  "title": "actor.knockdown",
+  "type": "object",
+  "required": ["actor"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "impulse_n_s": {"type": "number"},
+    "outcome": {"type": "string", "enum": ["none", "stagger", "knockdown"]},
+    "zone": {"type": "string"}
+  },
+  "additionalProperties": true
+}

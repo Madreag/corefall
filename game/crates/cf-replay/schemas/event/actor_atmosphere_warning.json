@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/actor.atmosphere_warning.v1",
+  "title": "actor.atmosphere_warning",
+  "type": "object",
+  "required": ["actor", "severity"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "severity": {"type": "string", "enum": ["yellow", "red", "damage"]},
+    "warning_kind": {"type": "string"},
+    "o2_partial_kpa": {"type": "number"},
+    "pressure_kpa": {"type": "number"},
+    "temp_c": {"type": "number"}
+  },
+  "additionalProperties": true
+}

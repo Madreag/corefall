@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/actor.stride_completed.v1",
+  "title": "actor.stride_completed",
+  "type": "object",
+  "required": ["actor", "side"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "side": {"type": "string"},
+    "duration_ms": {"type": "integer", "minimum": 0}
+  },
+  "additionalProperties": true
+}

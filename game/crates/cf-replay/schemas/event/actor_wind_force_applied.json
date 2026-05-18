@@ -1,0 +1,13 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/actor.wind_force_applied.v1",
+  "title": "actor.wind_force_applied",
+  "type": "object",
+  "required": ["actor", "force_n"],
+  "properties": {
+    "actor": {"type": "integer", "minimum": 0},
+    "force_n": {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2},
+    "wind_velocity": {"type": "array", "items": {"type": "number"}, "minItems": 2, "maxItems": 2}
+  },
+  "additionalProperties": true
+}
