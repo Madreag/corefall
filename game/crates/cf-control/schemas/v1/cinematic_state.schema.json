@@ -1,0 +1,44 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-control/v1/cinematic_state",
+  "title": "CinematicState",
+  "description": "M12C `srv.dump_cinematic_state` response shape. Mirrors `cf_cinematic::CinematicState` — the full per-tick snapshot of the cinematic kernel that the Codex tab + cinematic editor + tests consume.",
+  "type": "object",
+  "required": ["schema_version", "phase", "playhead_ms", "duration_ms"],
+  "properties": {
+    "schema_version": { "type": "integer", "minimum": 0 },
+    "cinematic_id": { "type": ["string", "null"] },
+    "source": {
+      "type": ["string", "null"],
+      "enum": [null, "opening", "between", "ending"]
+    },
+    "phase": {
+      "type": "string",
+      "enum": ["pending_start", "playing", "paused", "ended"]
+    },
+    "playhead_ms": { "type": "integer", "minimum": 0 },
+    "duration_ms": { "type": "integer", "minimum": 0 },
+    "replay": { "type": "boolean" },
+    "paused": { "type": "boolean" },
+    "sandbox_suppressed": { "type": "boolean" },
+    "active_word_index": { "type": ["integer", "null"], "minimum": 0 },
+    "briefing_card_lines": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "camera_translation": {
+      "type": "array",
+      "items": { "type": "number" },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "camera_shake_px": {
+      "type": "array",
+      "items": { "type": "number" },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "camera_ortho_half_height": { "type": "number", "minimum": 0 }
+  },
+  "additionalProperties": true
+}

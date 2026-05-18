@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/cinematic_paused.v1",
+  "title": "cinematic.paused",
+  "description": "M12C § Pause / resume. Fires when the player presses [P] mid-cinematic. The cinematic clock is paused; camera + narration WAV + caption ribbon freeze at the same playhead. `ms` is the playhead when pause was accepted.",
+  "type": "object",
+  "required": ["id", "ms"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "ms": { "type": "integer", "minimum": 0 }
+  }
+}

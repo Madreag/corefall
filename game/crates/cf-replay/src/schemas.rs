@@ -437,6 +437,17 @@ const SCHEMA_AUDIO_REVERB_APPLIED: &str = include_str!("../schemas/event/audio_r
 const SCHEMA_AUDIO_OCCLUDED: &str = include_str!("../schemas/event/audio_occluded.json");
 const SCHEMA_AUDIO_DOPPLER_SHIFTED: &str = include_str!("../schemas/event/audio_doppler_shifted.json");
 
+// **M12C**: In-engine cinematic playback event surface. Spec §
+// "Chapter markers via M4 events": cinematic.started, chapter_marker,
+// skipped, paused, resumed, ended, narration_word.
+const SCHEMA_CINEMATIC_STARTED: &str = include_str!("../schemas/event/cinematic_started.json");
+const SCHEMA_CINEMATIC_CHAPTER_MARKER: &str = include_str!("../schemas/event/cinematic_chapter_marker.json");
+const SCHEMA_CINEMATIC_SKIPPED: &str = include_str!("../schemas/event/cinematic_skipped.json");
+const SCHEMA_CINEMATIC_PAUSED: &str = include_str!("../schemas/event/cinematic_paused.json");
+const SCHEMA_CINEMATIC_RESUMED: &str = include_str!("../schemas/event/cinematic_resumed.json");
+const SCHEMA_CINEMATIC_ENDED: &str = include_str!("../schemas/event/cinematic_ended.json");
+const SCHEMA_CINEMATIC_NARRATION_WORD: &str = include_str!("../schemas/event/cinematic_narration_word.json");
+
 // **M14**: full collision + impulse routing event surface. Producers in
 // cf-control/src/engine.rs fire on swept-collision priority queue, bullet
 // sharpness decay over distance, projectile embedding in stickiness
@@ -821,6 +832,15 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("audio", "reverb_applied") => Some(SCHEMA_AUDIO_REVERB_APPLIED),
         ("audio", "occluded") => Some(SCHEMA_AUDIO_OCCLUDED),
         ("audio", "doppler_shifted") => Some(SCHEMA_AUDIO_DOPPLER_SHIFTED),
+        // **M12C**: In-engine cinematic event surface. Spec §
+        // "Chapter markers via M4 events".
+        ("cinematic", "started") => Some(SCHEMA_CINEMATIC_STARTED),
+        ("cinematic", "chapter_marker") => Some(SCHEMA_CINEMATIC_CHAPTER_MARKER),
+        ("cinematic", "skipped") => Some(SCHEMA_CINEMATIC_SKIPPED),
+        ("cinematic", "paused") => Some(SCHEMA_CINEMATIC_PAUSED),
+        ("cinematic", "resumed") => Some(SCHEMA_CINEMATIC_RESUMED),
+        ("cinematic", "ended") => Some(SCHEMA_CINEMATIC_ENDED),
+        ("cinematic", "narration_word") => Some(SCHEMA_CINEMATIC_NARRATION_WORD),
         // **M14**: full collision + impulse routing event surface.
         ("combat", "swept_collision") => Some(SCHEMA_COMBAT_SWEPT_COLLISION),
         ("combat", "bullet_sharpness_decay") => Some(SCHEMA_COMBAT_BULLET_SHARPNESS_DECAY),
@@ -1402,6 +1422,14 @@ mod tests {
             ("net", "input_resent_redundant"),
             ("net", "fec_recovered"),
             ("net", "nat_traversal_outcome"),
+            // **M12C**: cinematic playback event surface.
+            ("cinematic", "started"),
+            ("cinematic", "chapter_marker"),
+            ("cinematic", "skipped"),
+            ("cinematic", "paused"),
+            ("cinematic", "resumed"),
+            ("cinematic", "ended"),
+            ("cinematic", "narration_word"),
         ] {
             let raw = event_schema_for(cat, ty).unwrap_or_else(|| panic!("no schema for {cat}.{ty}"));
             let _parsed_value: serde_json::Value =
@@ -1656,6 +1684,98 @@ mod tests {
         });
         let err = validate_event_payload("audio", "doppler_shifted", &payload).unwrap_err();
         assert!(err.contains("medium"), "got: {err}");
+    }
+
+    // **M12C** § In-engine cinematic event surface. All 7 schemas are
+    // payload-shaped (additionalProperties: true; required fields gated).
+
+    #[test]
+    fn m12c_cinematic_started_validates_minimum_payload() {
+        let payload = json!({
+            "id": "cin_intro_reactor_defense",
+            "source": "opening",
+            "replay": false,
+        });
+        validate_event_payload("cinematic", "started", &payload).expect("valid");
+    }
+
+    #[test]
+    fn m12c_cinematic_started_rejects_unknown_source() {
+        let payload = json!({
+            "id": "cin_intro_reactor_defense",
+            "source": "title_card",
+        });
+        let err = validate_event_payload("cinematic", "started", &payload).unwrap_err();
+        assert!(err.contains("source"), "got: {err}");
+    }
+
+    #[test]
+    fn m12c_cinematic_chapter_marker_validates() {
+        let payload = json!({
+            "id": "cin_intro_reactor_defense",
+            "chapter_id": "dropship_door_opens",
+            "ms": 8000,
+        });
+        validate_event_payload("cinematic", "chapter_marker", &payload).expect("valid");
+    }
+
+    #[test]
+    fn m12c_cinematic_skipped_validates_user_input() {
+        let payload = json!({
+            "id": "cin_intro_reactor_defense",
+            "skipped_at_ms": 3500,
+            "reason": "user_input",
+        });
+        validate_event_payload("cinematic", "skipped", &payload).expect("valid");
+    }
+
+    #[test]
+    fn m12c_cinematic_skipped_validates_sandbox_suppressed() {
+        let payload = json!({
+            "id": "cin_intro_reactor_defense",
+            "skipped_at_ms": 0,
+            "reason": "sandbox_suppressed",
+        });
+        validate_event_payload("cinematic", "skipped", &payload).expect("valid");
+    }
+
+    #[test]
+    fn m12c_cinematic_skipped_rejects_unknown_reason() {
+        let payload = json!({
+            "id": "cin_intro_reactor_defense",
+            "skipped_at_ms": 0,
+            "reason": "rage_quit",
+        });
+        let err = validate_event_payload("cinematic", "skipped", &payload).unwrap_err();
+        assert!(err.contains("reason"), "got: {err}");
+    }
+
+    #[test]
+    fn m12c_cinematic_paused_resumed_validate() {
+        let p = json!({"id": "cin_intro", "ms": 4200});
+        validate_event_payload("cinematic", "paused", &p).expect("paused valid");
+        validate_event_payload("cinematic", "resumed", &p).expect("resumed valid");
+    }
+
+    #[test]
+    fn m12c_cinematic_ended_validates() {
+        let payload = json!({
+            "id": "cin_intro_reactor_defense",
+            "duration_ms": 30000,
+            "was_skipped": false,
+        });
+        validate_event_payload("cinematic", "ended", &payload).expect("valid");
+    }
+
+    #[test]
+    fn m12c_cinematic_narration_word_validates() {
+        let payload = json!({
+            "id": "cin_intro_reactor_defense",
+            "word_index": 7,
+            "text": "dropship",
+            "ms": 2100,
+        });
+        validate_event_payload("cinematic", "narration_word", &payload).expect("valid");
     }
 
     #[test]

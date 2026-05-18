@@ -1,0 +1,11 @@
+// M12C § Per-storyteller stinger variants — Phoebe Chillax (quirky, warm).
+(
+    storyteller_id: phoebe_chillax,
+    variants: [
+        ( id: "phoebe_quirk_001", line_a: "I made you a sandwich.", line_b: "It's in the dropship somewhere." ),
+        ( id: "phoebe_quirk_002", line_a: "The threat board has too many red dots.", line_b: "I drew a smiley face in the corner." ),
+        ( id: "phoebe_quirk_003", line_a: "Comms are quiet today.", line_b: "I'll talk to you anyway." ),
+        ( id: "phoebe_quirk_004", line_a: "There's a tea stain on my chart shaped like Phobos.", line_b: "Take it as a sign." ),
+        ( id: "phoebe_quirk_005", line_a: "Squad inventory says you packed exactly enough rations.", line_b: "I packed two extra anyway." ),
+    ],
+)

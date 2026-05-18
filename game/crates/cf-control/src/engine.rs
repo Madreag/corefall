@@ -1037,6 +1037,17 @@ pub(crate) struct EngineMutable {
     /// scenario `m9b_ai_in_trench_doctrine` opts in its three
     /// defenders.
     pub(crate) m9b_trench_doctrine_actors: std::collections::BTreeSet<ActorId>,
+    /// **M12C**: in-engine cinematic playback kernel. `Some` while a
+    /// cinematic is playing (opening / between-mission / ending);
+    /// `None` when the gameplay camera + input are in normal control.
+    /// cfctl `act.player.skip_cinematic`, `act.player.pause_cinematic`,
+    /// `act.player.replay_cinematic`, and `srv.dump_cinematic_state`
+    /// operate on this slot.
+    pub(crate) cinematic_kernel: Option<cf_cinematic::CinematicKernel>,
+    /// **M12C**: persisted seen-set of cinematics the player has
+    /// watched (or skipped past the 3-second confirm window). Lives
+    /// here at M12C; M41 save format will persist it to `save.cinematic_seen_set`.
+    pub(crate) cinematic_seen_set: cf_cinematic::SeenSet,
 }
 
 /// **M6**: per-actor charge-fire annotation shipped from the M6 post-step
@@ -1522,6 +1533,8 @@ impl M0Engine {
                 m9b_last_cover_state: BTreeMap::new(),
                 m9b_trench_doctrine_exposure_ticks: BTreeMap::new(),
                 m9b_trench_doctrine_actors,
+                cinematic_kernel: None,
+                cinematic_seen_set: cf_cinematic::SeenSet::default(),
             }),
             recorder,
             current_tick,
@@ -17259,6 +17272,147 @@ fn apply_settings_patch(settings: &mut Settings, patch: &SettingsPatch) -> Vec<S
     changed
 }
 
+// **M12C**: Cinematic kernel integration helpers — inherent methods on
+// `M0Engine` (sync; called by cf-shell mission-load hooks + the cf-app
+// per-frame loop). The async dispatch methods (`act_player_*` /
+// `dump_cinematic_state`) live in the `EngineHandle` trait impl below.
+impl M0Engine {
+    /// **M12C**: shared helper — given an emitted `CinematicEvent`,
+    /// translate it into the canonical replay event surface.
+    pub(crate) fn emit_cinematic_event(
+        &self,
+        tick: Tick,
+        sim_time_ms: f64,
+        event: &cf_cinematic::CinematicEvent,
+        parent: Option<&str>,
+    ) {
+        let (event_type, payload) = match event {
+            cf_cinematic::CinematicEvent::Started { id, source, replay } => (
+                "started",
+                json!({
+                    "id": id,
+                    "source": source.as_str(),
+                    "replay": *replay,
+                }),
+            ),
+            cf_cinematic::CinematicEvent::Chapter { id, chapter_id, ms } => (
+                "chapter_marker",
+                json!({
+                    "id": id,
+                    "chapter_id": chapter_id,
+                    "ms": *ms,
+                }),
+            ),
+            cf_cinematic::CinematicEvent::NarrationWord {
+                id,
+                word_index,
+                text,
+                ms,
+            } => (
+                "narration_word",
+                json!({
+                    "id": id,
+                    "word_index": *word_index,
+                    "text": text,
+                    "ms": *ms,
+                }),
+            ),
+            cf_cinematic::CinematicEvent::Paused { id, ms } => ("paused", json!({"id": id, "ms": *ms})),
+            cf_cinematic::CinematicEvent::Resumed { id, ms } => ("resumed", json!({"id": id, "ms": *ms})),
+            cf_cinematic::CinematicEvent::Skipped {
+                id,
+                skipped_at_ms,
+                reason,
+            } => (
+                "skipped",
+                json!({
+                    "id": id,
+                    "skipped_at_ms": *skipped_at_ms,
+                    "reason": reason.as_str(),
+                }),
+            ),
+            cf_cinematic::CinematicEvent::Ended {
+                id,
+                duration_ms,
+                was_skipped,
+            } => (
+                "ended",
+                json!({
+                    "id": id,
+                    "duration_ms": *duration_ms,
+                    "was_skipped": *was_skipped,
+                }),
+            ),
+        };
+        self.recorder.record(
+            tick,
+            sim_time_ms,
+            "cinematic",
+            event_type,
+            payload,
+            parent.map(|s| s.to_string()),
+        );
+    }
+
+    /// **M12C**: engage a cinematic kernel at scenario/mission load OR
+    /// at codex replay. Fires the initial `cinematic.started` event +
+    /// `cinematic.skipped { reason: sandbox_suppressed }` +
+    /// `cinematic.ended` pair when the storyteller is Sandbox.
+    pub fn engage_cinematic_kernel(
+        &self,
+        _id: &str,
+        _source: cf_cinematic::ScriptSource,
+        storyteller: cf_cinematic::StorytellerId,
+        script: cf_cinematic::CinematicScript,
+        narration: cf_cinematic::NarrationTrack,
+        replay: bool,
+    ) {
+        let profile = cf_cinematic::builtin_profile(storyteller);
+        let mut state = self.state.write().expect("engine state poisoned");
+        let tick = state.clock.tick();
+        let sim_time_ms = state.clock.sim_time_ms();
+        let seed = self.config.seed;
+        let seen = state.cinematic_seen_set.clone();
+        let mut kernel = cf_cinematic::CinematicKernel::new(script, profile, narration, seed, seen, replay);
+        let mut events: Vec<cf_cinematic::CinematicEvent> = Vec::new();
+        if kernel.profile().suppress_cinematics {
+            events.extend(kernel.suppress_for_sandbox());
+        }
+        let parent = state.run_started_event_id.clone();
+        state.cinematic_seen_set = kernel.seen().clone();
+        state.cinematic_kernel = Some(kernel);
+        drop(state);
+        for ev in events {
+            self.emit_cinematic_event(tick, sim_time_ms, &ev, parent.as_deref());
+        }
+    }
+
+    /// **M12C**: advance the cinematic kernel by `dt_ms`. cf-app's
+    /// per-frame loop calls this between physics + render steps. Emits
+    /// any `Started` / `Chapter` / `NarrationWord` / `Ended` events
+    /// that fired during the advance. Returns the kernel state after
+    /// the advance (or `None` when no cinematic is active).
+    pub fn advance_cinematic_kernel(&self, dt_ms: u32) -> Option<cf_cinematic::CinematicState> {
+        let mut state = self.state.write().expect("engine state poisoned");
+        let tick = state.clock.tick();
+        let sim_time_ms = state.clock.sim_time_ms();
+        let kernel = state.cinematic_kernel.as_mut()?;
+        let events = kernel.advance(dt_ms);
+        let snapshot = kernel.state().clone();
+        let kernel_ended = matches!(snapshot.phase, cf_cinematic::PlaybackPhase::Ended);
+        state.cinematic_seen_set = kernel.seen().clone();
+        let parent = state.run_started_event_id.clone();
+        if kernel_ended {
+            state.cinematic_kernel = None;
+        }
+        drop(state);
+        for ev in events {
+            self.emit_cinematic_event(tick, sim_time_ms, &ev, parent.as_deref());
+        }
+        Some(snapshot)
+    }
+}
+
 #[async_trait]
 impl EngineHandle for M0Engine {
     /// **M4B § "observe.save.last"** — return the live LastSaveMetadata
@@ -17922,6 +18076,184 @@ impl EngineHandle for M0Engine {
     async fn dump_squad_state(&self, squad_id: u64) -> Option<serde_json::Value> {
         let state = self.state.read().ok()?;
         Some(state.m7b_squad.dump_state_view(squad_id))
+    }
+
+    /// **M12C**: `srv.dump_cinematic_state` — return the full
+    /// `CinematicState` projection. Returns `None` when no cinematic is
+    /// active (callers fall back to a 'no cinematic' sentinel).
+    async fn dump_cinematic_state(&self) -> serde_json::Value {
+        let state = self.state.read().expect("engine state poisoned");
+        if let Some(kernel) = state.cinematic_kernel.as_ref() {
+            let snapshot = kernel.state();
+            json!({
+                "schema_version": snapshot.schema_version,
+                "cinematic_id": snapshot.cinematic_id,
+                "source": snapshot.source.map(|s| s.as_str()),
+                "phase": match snapshot.phase {
+                    cf_cinematic::PlaybackPhase::PendingStart => "pending_start",
+                    cf_cinematic::PlaybackPhase::Playing => "playing",
+                    cf_cinematic::PlaybackPhase::Paused => "paused",
+                    cf_cinematic::PlaybackPhase::Ended => "ended",
+                },
+                "playhead_ms": snapshot.playhead_ms,
+                "duration_ms": snapshot.duration_ms,
+                "replay": snapshot.replay,
+                "paused": snapshot.paused,
+                "sandbox_suppressed": snapshot.sandbox_suppressed,
+                "active_word_index": snapshot.active_word_index,
+                "briefing_card_lines": snapshot.briefing_card_lines.clone(),
+                "camera_translation": [snapshot.camera_translation[0], snapshot.camera_translation[1]],
+                "camera_shake_px": [snapshot.camera_shake_px[0], snapshot.camera_shake_px[1]],
+                "camera_ortho_half_height": snapshot.camera_ortho_half_height,
+                "active": kernel.is_active(),
+                "blocks_gameplay_input": kernel.blocks_gameplay_input(),
+                "seen_set_count": state.cinematic_seen_set.len(),
+            })
+        } else {
+            json!({
+                "schema_version": 1,
+                "cinematic_id": null,
+                "source": null,
+                "phase": "ended",
+                "playhead_ms": 0,
+                "duration_ms": 0,
+                "replay": false,
+                "paused": false,
+                "sandbox_suppressed": false,
+                "active_word_index": null,
+                "briefing_card_lines": [],
+                "camera_translation": [0.0, 0.0],
+                "camera_shake_px": [0.0, 0.0],
+                "camera_ortho_half_height": 0.0,
+                "active": false,
+                "blocks_gameplay_input": false,
+                "seen_set_count": state.cinematic_seen_set.len(),
+            })
+        }
+    }
+
+    /// **M12C**: `act.player.skip_cinematic` — request a skip of the
+    /// currently-playing cinematic. Returns `Ok(())` on success or an
+    /// error reason when the skip is rejected.
+    async fn act_player_skip_cinematic(&self) -> Result<u32, String> {
+        let mut state = self.state.write().expect("engine state poisoned");
+        let tick = state.clock.tick();
+        let sim_time_ms = state.clock.sim_time_ms();
+        let kernel = match state.cinematic_kernel.as_mut() {
+            Some(k) => k,
+            None => return Err("no_cinematic_active".to_string()),
+        };
+        let request = kernel.request_skip();
+        let (skipped_ms, events) = match request {
+            Some((sk, end)) => {
+                // Extract skipped_at_ms via pattern match.
+                let mut ms_out = 0u32;
+                if let cf_cinematic::CinematicEvent::Skipped { skipped_at_ms, .. } = &sk {
+                    ms_out = *skipped_at_ms;
+                }
+                (ms_out, vec![sk, end])
+            }
+            None => return Err("skip_blocked_within_confirm_window".to_string()),
+        };
+        // Mirror seen-set from kernel back into engine-level field.
+        state.cinematic_seen_set = kernel.seen().clone();
+        let parent = state.run_started_event_id.clone();
+        drop(state);
+        for ev in events {
+            self.emit_cinematic_event(tick, sim_time_ms, &ev, parent.as_deref());
+        }
+        Ok(skipped_ms)
+    }
+
+    /// **M12C**: `act.player.pause_cinematic` — toggle pause state.
+    /// Returns the (paused, ms) tuple after the toggle.
+    async fn act_player_pause_cinematic(&self) -> Result<(bool, u32), String> {
+        let mut state = self.state.write().expect("engine state poisoned");
+        let tick = state.clock.tick();
+        let sim_time_ms = state.clock.sim_time_ms();
+        let kernel = match state.cinematic_kernel.as_mut() {
+            Some(k) => k,
+            None => return Err("no_cinematic_active".to_string()),
+        };
+        let event = if kernel.state().phase == cf_cinematic::PlaybackPhase::Paused {
+            kernel.request_resume()
+        } else {
+            kernel.request_pause()
+        };
+        let Some(ev) = event else {
+            return Err("invalid_pause_state".to_string());
+        };
+        let (paused, ms) = match &ev {
+            cf_cinematic::CinematicEvent::Paused { ms, .. } => (true, *ms),
+            cf_cinematic::CinematicEvent::Resumed { ms, .. } => (false, *ms),
+            _ => (false, 0),
+        };
+        let parent = state.run_started_event_id.clone();
+        drop(state);
+        self.emit_cinematic_event(tick, sim_time_ms, &ev, parent.as_deref());
+        Ok((paused, ms))
+    }
+
+    /// **M12C**: `act.player.replay_cinematic { id }` — replay a watched
+    /// cinematic from `Codex → Cinematics`. The dispatcher loads the
+    /// script from `content/cinematics/**/<id>.cinematic.ron`, narration
+    /// track (if any), and the active storyteller profile, then engages
+    /// the kernel with `replay=true` so save state is NOT mutated.
+    async fn act_player_replay_cinematic(&self, id: &str) -> Result<u64, String> {
+        let state_read = self.state.read().expect("engine state poisoned");
+        let seen = state_read.cinematic_seen_set.clone();
+        if !seen.contains(id) {
+            return Err("cinematic_locked".to_string());
+        }
+        drop(state_read);
+        // Locate the script in opening / between / ending directories.
+        let candidates = [
+            ("opening", format!("game/content/cinematics/opening/{id}.cinematic.ron")),
+            ("between", format!("game/content/cinematics/between/{id}.cinematic.ron")),
+            ("ending", format!("game/content/cinematics/ending/{id}.cinematic.ron")),
+        ];
+        let mut script_bytes: Option<Vec<u8>> = None;
+        for (_label, path) in &candidates {
+            if let Ok(bytes) = std::fs::read(path) {
+                script_bytes = Some(bytes);
+                break;
+            }
+        }
+        let bytes = script_bytes.ok_or_else(|| format!("script_not_found:{id}"))?;
+        let script = cf_cinematic::CinematicScript::from_ron(&bytes)
+            .map_err(|e| format!("script_parse_error:{e}"))?;
+        let profile = cf_cinematic::builtin_profile(
+            script
+                .storyteller
+                .unwrap_or(cf_cinematic::StorytellerId::CassandraClassic),
+        );
+        let narration = if let Some(track_id) = &script.narration_track_id {
+            let track_path =
+                format!("game/content/audio/voice/cinematic/{track_id}.narration_track.json");
+            std::fs::read(&track_path)
+                .ok()
+                .and_then(|b| cf_cinematic::NarrationTrack::from_json(&b).ok())
+                .unwrap_or_default()
+        } else {
+            cf_cinematic::NarrationTrack::default()
+        };
+        let seed = self.config.seed ^ u64::from_le_bytes({
+            let mut buf = [0u8; 8];
+            let id_hash = blake3::hash(id.as_bytes());
+            buf.copy_from_slice(&id_hash.as_bytes()[..8]);
+            buf
+        });
+        let mut state = self.state.write().expect("engine state poisoned");
+        let tick = state.clock.tick();
+        state.cinematic_kernel = Some(cf_cinematic::CinematicKernel::new(
+            script,
+            profile,
+            narration,
+            seed,
+            seen,
+            true,
+        ));
+        Ok(tick.0)
     }
 
     /// **M8**: live `cf_camera::CameraState` projection.

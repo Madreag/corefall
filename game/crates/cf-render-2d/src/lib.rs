@@ -81,6 +81,12 @@ pub mod color_grading;
 #[cfg(feature = "bevy_render")]
 pub mod juice;
 
+// **M12C** § Cinematic camera takeover — separate optional resource the
+// renderer reads first when a cinematic plays. Bevy-feature-gated; the
+// Bevy-free snapshot intermediate ships with both feature sets.
+#[cfg(feature = "bevy_render")]
+pub mod camera_takeover;
+
 pub use fortification_layers::{
     kind_has_layer, layers_for_kind, sandbag_fill_intact_rows, sandbag_full_row_count, FortLayerId,
 };
@@ -108,6 +114,10 @@ pub use dig_preview::{probe_dig_validity, DigPreviewGhost, DigPreviewPlugin, Dig
 pub use juice::{
     chromatic_aberration_amplitude, glow_halo_alpha, scale_at, screen_flash_alpha, slide_offset, tick_juice,
     weapon_swap_streak_intensity, JuiceAccessibility, JuiceKind, JuicePlugin, JuicePulse, JuiceState,
+};
+#[cfg(feature = "bevy_render")]
+pub use camera_takeover::{
+    CinematicCameraPlugin, CinematicCameraTakeover, CinematicTakeoverSnapshot, ColorGradeSnapshot,
 };
 #[cfg(feature = "bevy_render")]
 pub use overlay::{

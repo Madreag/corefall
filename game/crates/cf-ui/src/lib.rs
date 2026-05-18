@@ -91,6 +91,12 @@ pub mod animation;
 pub mod comic_overlay;
 pub mod slideshow;
 
+// **M12C** § In-engine cinematic UI surfaces — distinct from M12's painted
+// slideshow. Per spec § Crates / modules touched.
+pub mod briefing_card;
+pub mod caption_ribbon;
+pub mod codex_cinematics_tab;
+
 // **M7B**: Tab tactical overlay + Q-hold context wheel — both enumerate
 // from the cf-ai squad-command grammar verb registry + formation catalog
 // so the wheel + overlay stay in lockstep with the canonical registry

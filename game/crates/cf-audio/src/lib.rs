@@ -35,6 +35,7 @@ use tracing::trace;
 
 pub mod caption_bridge;
 pub mod chatter;
+pub mod cinematic_mixer;
 pub mod deterministic_replay;
 pub mod doppler;
 pub mod echo;
@@ -49,6 +50,11 @@ pub mod spatial;
 
 pub use caption_bridge::{
     caption_visible, render_caption_for_sfx, resolve_template, CaptionRegistry, CaptionSeverity, CaptionTemplate,
+};
+pub use cinematic_mixer::{
+    CinematicMix, CinematicMixer, CINEMATIC_DUCK_ATTACK_MS, CINEMATIC_DUCK_RELEASE_MS,
+    CINEMATIC_MUSIC_LUFS_DURING_NARRATION, CINEMATIC_MUSIC_LUFS_OUTSIDE_NARRATION, CINEMATIC_NARRATION_LUFS,
+    CINEMATIC_SFX_LUFS,
 };
 pub use chatter::{
     tts_stub, voice_id_for_archetype, ChatterCaption, ChatterCategory, ChatterCooldownTable, ChatterEmittedEvent,

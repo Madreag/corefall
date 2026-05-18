@@ -29,6 +29,7 @@
 )]
 
 pub mod attract_mode;
+pub mod cinematic_hooks;
 pub mod credits;
 pub mod fre_wizard;
 pub mod keybinds;

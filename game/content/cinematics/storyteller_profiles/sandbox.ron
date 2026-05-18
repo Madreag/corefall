@@ -1,0 +1,21 @@
+// M12C § "Per-storyteller cinematic style" — Sandbox:
+// Plain establishing wide; no acting. Ambient bed only; no music score.
+// Default neutral grade. Cinematic SUPPRESSED entirely.
+//
+// Per spec § Notes for the implementer: "The 'Sandbox suppresses
+// cinematics' rule is implemented by the storyteller profile, not by
+// the cinematic kernel."
+(
+    id: sandbox,
+    suppress_cinematics: true,
+    shot_dwell_ms: [0, 0],
+    audio_bed_id: "",
+    music_lufs_during_narration: -22.0,
+    music_lufs_outside_narration: -16.0,
+    color_grade: (
+        saturation: 1.0,
+        value: 1.0,
+        contrast: 1.0,
+    ),
+    narrator_voice_id: "sandbox_neutral_narrator",
+)

@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/cinematic_chapter_marker.v1",
+  "title": "cinematic.chapter_marker",
+  "description": "M12C § Chapter markers via M4 events. Fires when the cinematic playhead crosses an author-defined chapter beat (e.g. 'dropship_door_opens', 'boss_silhouette_reveal', 'rival_taunt'). The death-recap (M12 view-as-graphic-novel) stitches these into the recap timeline.",
+  "type": "object",
+  "required": ["id", "chapter_id", "ms"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "chapter_id": { "type": "string", "minLength": 1 },
+    "ms": { "type": "integer", "minimum": 0 }
+  }
+}

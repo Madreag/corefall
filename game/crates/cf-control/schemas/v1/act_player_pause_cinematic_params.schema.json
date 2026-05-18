@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ActPlayerPauseCinematicParams",
+  "description": "**M12C**: `act.player.pause_cinematic` — toggle the cinematic pause.\nPer spec § \"Pause — `[P]`. Pauses the cinematic clock; camera\nfrozen; voice-over paused at boundary; subtitle frozen. Resume with\n`[P]` again.\" Idempotent: the dispatcher inspects the current\nphase to decide whether to fire `cinematic.paused` or\n`cinematic.resumed`.",
+  "type": "object",
+  "properties": {
+    "schema_version": {
+      "type": "integer",
+      "format": "uint32",
+      "default": 0,
+      "minimum": 0
+    }
+  },
+  "additionalProperties": false
+}

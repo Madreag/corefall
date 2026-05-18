@@ -21,6 +21,7 @@ blake3 = { workspace = true }
 hex = { workspace = true }
 chrono = { workspace = true }
 cf-asset-ledger = { path = "../cf-asset-ledger" }
+cf-cinematic = { path = "../cf-cinematic" }
 cf-content = { path = "../cf-content" }
 cf-trench = { path = "../cf-trench" }
 cf-fortification = { path = "../cf-fortification" }

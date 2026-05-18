@@ -1641,6 +1641,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "cf-cinematic"
+version = "0.0.1"
+dependencies = [
+ "blake3",
+ "cf-sim-core",
+ "hex",
+ "ron",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.18",
+ "tracing",
+]
+
+[[package]]
 name = "cf-content"
 version = "0.0.1"
 dependencies = [
@@ -1666,6 +1680,7 @@ dependencies = [
  "cf-audio",
  "cf-camera",
  "cf-chassis",
+ "cf-cinematic",
  "cf-content",
  "cf-debug",
  "cf-equipment",
@@ -2050,6 +2065,7 @@ dependencies = [
  "ron",
  "serde",
  "serde_json",
+ "tempfile",
  "tracing",
 ]
 

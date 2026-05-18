@@ -1,0 +1,43 @@
+// M12C § Campaign-ending cinematic — cassandra_classic.
+// 2-5min 3-act structure per spec § Campaign-ending cinematic.
+(
+    schema_version: 1,
+    id: "cassandra_classic",
+    source: ending,
+    storyteller: Some(cassandra_classic),
+    shots: [
+        (
+            label: "act1_denouement",
+            duration_ms: 60000,
+            moves: [
+                ( kind: Pan, start_ms: 0, duration_ms: 60000, easing: EaseInOutCubic, pan: (15.0, 0.0) ),
+            ],
+        ),
+        (
+            label: "act2_montage",
+            duration_ms: 60000,
+            moves: [
+                ( kind: Pan, start_ms: 0, duration_ms: 60000, easing: EaseInOutCubic, pan: (-12.0, 4.0) ),
+            ],
+        ),
+        (
+            label: "act3_resolution",
+            duration_ms: 60000,
+            moves: [
+                ( kind: Zoom, start_ms: 0, duration_ms: 60000, easing: EaseInOutCubic, zoom_to: 8.0 ),
+            ],
+        ),
+    ],
+    chapters: [
+        ( id: "act1_denouement_start", at_ms: 0 ),
+        ( id: "act2_montage_start", at_ms: 60000 ),
+        ( id: "act3_resolution_start", at_ms: 120000 ),
+    ],
+    narration_track_id: Some("cassandra_classic"),
+    briefing_card_lines: [
+        "The frontier was always going to fall.",
+        "You stayed long enough to remember the names.",
+        "That counts for something.",
+    ],
+    briefing_at_ms: 120000,
+)

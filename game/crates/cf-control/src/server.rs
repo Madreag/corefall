@@ -96,13 +96,15 @@ use crate::{
         ActPlayerActivateAbilityParams, ActPlayerAimParams, ActPlayerAnchorParams, ActPlayerAttachModifierParams,
         ActPlayerBoardParams, ActPlayerBrainHopParams, ActPlayerClimbParams, ActPlayerCrouchParams,
         ActPlayerDetachModifierParams, ActPlayerDigParams, ActPlayerDisembarkParams, ActPlayerEjectParams,
-        ActPlayerFireParams, ActPlayerJetParams, ActPlayerJumpParams, ActPlayerMoveParams, ActPlayerReloadParams,
+        ActPlayerFireParams, ActPlayerJetParams, ActPlayerJumpParams, ActPlayerMoveParams,
+        ActPlayerPauseCinematicParams, ActPlayerReloadParams, ActPlayerReplayCinematicParams,
         ActPlayerResetParams, ActPlayerSelectItemParams, ActPlayerSetDroneModeParams, ActPlayerSharpAimParams,
-        ActSquadAssignRoleParams, ActSquadIssueParams, ActSquadSetFormationParams,
+        ActPlayerSkipCinematicParams, ActSquadAssignRoleParams, ActSquadIssueParams, ActSquadSetFormationParams,
         InspectActorParams, InspectAiParams, InspectChassisParams, InspectEquipmentParams, InspectMissionParams,
         ObserveActorParams, ObserveAiParams, ObserveChassisSilhouetteParams, ObserveMissionParams,
         ObserveOnceParams, ObservePerceptionParams, ObserveSubscribeParams, RunBundleWriteParams,
-        RunForTicksParams, ScenarioLoadParams, SrvDumpSquadStateParams, StepParams, SystemShutdownParams,
+        RunForTicksParams, ScenarioLoadParams, SrvDumpCinematicStateParams, SrvDumpSquadStateParams, StepParams,
+        SystemShutdownParams,
     },
     schemas::{SCHEMA_VERSION, SCHEMA_VERSION_MIN},
     state::{ControlEnvelopeStatus, ObserveFrame, ObserveSettings},
@@ -1259,6 +1261,40 @@ pub trait EngineHandle: Send + Sync + 'static {
     /// Powers `srv.dump_squad_state`. Default returns `None`.
     async fn dump_squad_state(&self, _squad_id: u64) -> Option<serde_json::Value> {
         None
+    }
+    /// **M12C**: full `CinematicState` JSON projection — cinematic id +
+    /// source + phase + playhead + duration + active word + camera
+    /// offset. Powers `srv.dump_cinematic_state`. Default returns a
+    /// "no cinematic" sentinel.
+    async fn dump_cinematic_state(&self) -> serde_json::Value {
+        json!({
+            "schema_version": SCHEMA_VERSION,
+            "cinematic_id": null,
+            "source": null,
+            "phase": "ended",
+            "playhead_ms": 0,
+            "duration_ms": 0,
+            "active": false,
+            "blocks_gameplay_input": false,
+            "seen_set_count": 0,
+        })
+    }
+    /// **M12C**: request a skip of the active cinematic. Returns the
+    /// playhead ms when the skip was accepted, or an error reason when
+    /// it was rejected (no cinematic active / inside confirm window).
+    async fn act_player_skip_cinematic(&self) -> Result<u32, String> {
+        Err("no_cinematic_active".to_string())
+    }
+    /// **M12C**: toggle pause on the active cinematic. Returns
+    /// `(paused, ms)` after the toggle.
+    async fn act_player_pause_cinematic(&self) -> Result<(bool, u32), String> {
+        Err("no_cinematic_active".to_string())
+    }
+    /// **M12C**: replay a previously-watched cinematic from
+    /// `Codex → Cinematics`. Returns the engine tick at which the
+    /// replay kernel was engaged.
+    async fn act_player_replay_cinematic(&self, _id: &str) -> Result<u64, String> {
+        Err("no_cinematic_replay_support".to_string())
     }
     /// **M8**: return the live `cf_camera::CameraState` projection
     /// (mode + position + hit_stop_remaining_ms + fov_degrees +
@@ -3026,6 +3062,69 @@ async fn process_request<E: EngineHandle>(
                 })
                 .await;
             Some(ack_response(request.id, &result))
+        }
+        // **M12C**: cinematic playback cfctl surface.
+        "act.player.skip_cinematic" => {
+            let _p: ActPlayerSkipCinematicParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            match engine.act_player_skip_cinematic().await {
+                Ok(skipped_at_ms) => Some(success_response(
+                    request.id,
+                    json!({
+                        "schema_version": SCHEMA_VERSION,
+                        "status": "accepted",
+                        "skipped_at_ms": skipped_at_ms,
+                    }),
+                )),
+                Err(reason) => Some(invalid_param_reason(request.id, &reason)),
+            }
+        }
+        "act.player.pause_cinematic" => {
+            let _p: ActPlayerPauseCinematicParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            match engine.act_player_pause_cinematic().await {
+                Ok((paused, ms)) => Some(success_response(
+                    request.id,
+                    json!({
+                        "schema_version": SCHEMA_VERSION,
+                        "status": "accepted",
+                        "paused": paused,
+                        "ms": ms,
+                    }),
+                )),
+                Err(reason) => Some(invalid_param_reason(request.id, &reason)),
+            }
+        }
+        "act.player.replay_cinematic" => {
+            let p: ActPlayerReplayCinematicParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let id_for_call = p.id.clone();
+            match engine.act_player_replay_cinematic(&id_for_call).await {
+                Ok(tick) => Some(success_response(
+                    request.id,
+                    json!({
+                        "schema_version": SCHEMA_VERSION,
+                        "status": "accepted",
+                        "id": p.id,
+                        "effective_tick": tick,
+                    }),
+                )),
+                Err(reason) => Some(invalid_param_reason(request.id, &reason)),
+            }
+        }
+        "srv.dump_cinematic_state" => {
+            let _p: SrvDumpCinematicStateParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let value = engine.dump_cinematic_state().await;
+            Some(success_response(request.id, value))
         }
         "act.input.capture_controls" => {
             let p: ActInputCaptureControlsParams = match serde_json::from_value(params) {
@@ -5704,5 +5803,80 @@ mod tests {
             result.get("cause").and_then(|v| v.as_str()),
             Some("breaker_toggled")
         );
+    }
+
+    /// **M12C** § cfctl cinematic surface — every method routes (not
+    /// `MethodNotFound`). Stub engine defaults to "no cinematic
+    /// active" so the request shape is exercised end-to-end.
+    #[tokio::test]
+    async fn m12c_cinematic_cfctl_routes() {
+        let engine = StubEngine;
+        let hz: Arc<Mutex<Option<u32>>> = Arc::new(Mutex::new(None));
+        let filter: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+        for method in [
+            "act.player.skip_cinematic",
+            "act.player.pause_cinematic",
+            "srv.dump_cinematic_state",
+        ] {
+            let req = json!({
+                "jsonrpc": "2.0",
+                "id": 1,
+                "method": method,
+                "params": {"schema_version": SCHEMA_VERSION},
+            });
+            let resp = process_request(&req.to_string(), &engine, &hz, &filter, 240)
+                .await
+                .unwrap();
+            let parsed: JsonRpcResponse = serde_json::from_str(&resp).unwrap();
+            if let Some(err) = &parsed.error {
+                assert_ne!(
+                    err.code,
+                    error_codes::METHOD_NOT_FOUND,
+                    "{method} returned MethodNotFound; cfctl routes table out of date"
+                );
+            }
+        }
+        // replay_cinematic carries an `id` parameter.
+        let req = json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "act.player.replay_cinematic",
+            "params": {"schema_version": SCHEMA_VERSION, "id": "cin_intro"},
+        });
+        let resp = process_request(&req.to_string(), &engine, &hz, &filter, 240)
+            .await
+            .unwrap();
+        let parsed: JsonRpcResponse = serde_json::from_str(&resp).unwrap();
+        if let Some(err) = &parsed.error {
+            assert_ne!(
+                err.code,
+                error_codes::METHOD_NOT_FOUND,
+                "act.player.replay_cinematic returned MethodNotFound"
+            );
+        }
+    }
+
+    /// **M12C** § `srv.dump_cinematic_state` returns the "no cinematic"
+    /// sentinel from the stub engine — schema_version + phase ended +
+    /// active false.
+    #[tokio::test]
+    async fn m12c_dump_cinematic_state_sentinel() {
+        let engine = StubEngine;
+        let hz: Arc<Mutex<Option<u32>>> = Arc::new(Mutex::new(None));
+        let filter: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(None));
+        let req = json!({
+            "jsonrpc": "2.0",
+            "id": 1,
+            "method": "srv.dump_cinematic_state",
+            "params": {"schema_version": SCHEMA_VERSION},
+        });
+        let resp = process_request(&req.to_string(), &engine, &hz, &filter, 240)
+            .await
+            .unwrap();
+        let parsed: JsonRpcResponse = serde_json::from_str(&resp).unwrap();
+        assert!(parsed.error.is_none(), "expected success: {:?}", parsed.error);
+        let result = parsed.result.expect("payload");
+        assert_eq!(result.get("phase").and_then(|v| v.as_str()), Some("ended"));
+        assert_eq!(result.get("active").and_then(|v| v.as_bool()), Some(false));
     }
 }

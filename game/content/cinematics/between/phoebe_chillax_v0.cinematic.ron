@@ -1,0 +1,34 @@
+// M12C § Between-mission cinematic — phoebe_chillax variant 0.
+// 15-30s monologue per spec § Between-mission cinematic.
+(
+    schema_version: 1,
+    id: "phoebe_chillax_v0",
+    source: between,
+    storyteller: Some(phoebe_chillax),
+    shots: [
+        (
+            label: "base_dolly",
+            duration_ms: 10000,
+            moves: [
+                ( kind: Dolly, start_ms: 0, duration_ms: 10000, easing: EaseInOutCubic, dolly_target: (0.0, 0.0), dolly_distance: 14.0 ),
+            ],
+        ),
+        (
+            label: "storyteller_pov",
+            duration_ms: 10000,
+            moves: [
+                ( kind: Pan, start_ms: 0, duration_ms: 10000, easing: EaseInOutCubic, pan: (4.0, 0.0) ),
+            ],
+        ),
+    ],
+    chapters: [
+        ( id: "monologue_start", at_ms: 1000 ),
+        ( id: "rival_taunt", at_ms: 12000 ),
+    ],
+    narration_track_id: Some("phoebe_chillax_v0"),
+    briefing_card_lines: [
+        "There's a tea-stain shaped like Phobos on my chart.",
+        "Take it as a sign.",
+    ],
+    briefing_at_ms: 4000,
+)

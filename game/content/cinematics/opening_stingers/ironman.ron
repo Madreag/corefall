@@ -1,0 +1,11 @@
+// M12C § Per-storyteller stinger variants — Ironman (stoic, challenge-as-greeting).
+(
+    storyteller_id: ironman,
+    variants: [
+        ( id: "ironman_challenge_001", line_a: "You survived the last one.", line_b: "Earn the next." ),
+        ( id: "ironman_challenge_002", line_a: "The frontier doesn't soften.", line_b: "Neither do you." ),
+        ( id: "ironman_challenge_003", line_a: "No retreat from this contract.", line_b: "Win or die clean." ),
+        ( id: "ironman_challenge_004", line_a: "Hold your line.", line_b: "I'll hold mine." ),
+        ( id: "ironman_challenge_005", line_a: "Pain is data.", line_b: "Read it; advance." ),
+    ],
+)

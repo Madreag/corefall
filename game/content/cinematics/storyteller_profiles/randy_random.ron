@@ -1,0 +1,17 @@
+// M12C § "Per-storyteller cinematic style" — Randy Random:
+// Whip-pans + dutch tilt + cut-on-action. Percussive synth + horn stabs.
+// Punchy contrast (+20% contrast). Snappy 3-8s per shot.
+(
+    id: randy_random,
+    suppress_cinematics: false,
+    shot_dwell_ms: [3000, 8000],
+    audio_bed_id: "cinematic_bed_randy_percussion",
+    music_lufs_during_narration: -22.0,
+    music_lufs_outside_narration: -16.0,
+    color_grade: (
+        saturation: 1.0,
+        value: 1.0,
+        contrast: 1.20,
+    ),
+    narrator_voice_id: "randy_random_chaotic_male",
+)

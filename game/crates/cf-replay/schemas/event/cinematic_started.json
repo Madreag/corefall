@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/cinematic_started.v1",
+  "title": "cinematic.started",
+  "description": "M12C § In-engine cinematic playback. Fires on the first tick of any cinematic the player sees (opening / between-mission / campaign-ending). `id` is the on-disk cinematic id (matches `content/cinematics/**/<id>.cinematic.ron`). `source` distinguishes the three classes per spec § Player-facing behavior. `replay=true` marks a Codex → Cinematics replay launch (no save mutation).",
+  "type": "object",
+  "required": ["id", "source"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "source": {
+      "type": "string",
+      "enum": ["opening", "between", "ending"]
+    },
+    "replay": { "type": "boolean" },
+    "storyteller": {
+      "type": "string",
+      "enum": ["cassandra_classic", "phoebe_chillax", "randy_random", "ironman", "sandbox"]
+    },
+    "duration_ms": { "type": "integer", "minimum": 0 },
+    "source_sha256": { "type": "string" }
+  }
+}

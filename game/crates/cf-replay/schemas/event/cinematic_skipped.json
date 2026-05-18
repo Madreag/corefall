@@ -1,0 +1,16 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/cinematic_skipped.v1",
+  "title": "cinematic.skipped",
+  "description": "M12C § Skip / pause / replay UX. Fires when the player skips a cinematic (Esc/Space past the 3000 ms confirm window on first-watched) OR when Sandbox storyteller suppresses cinematics entirely (`reason: sandbox_suppressed`, `skipped_at_ms: 0`). Pair with `cinematic.ended { was_skipped: true }` for replay parity.",
+  "type": "object",
+  "required": ["id", "skipped_at_ms", "reason"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "skipped_at_ms": { "type": "integer", "minimum": 0 },
+    "reason": {
+      "type": "string",
+      "enum": ["user_input", "sandbox_suppressed", "completed"]
+    }
+  }
+}

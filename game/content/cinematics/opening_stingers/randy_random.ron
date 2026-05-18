@@ -1,0 +1,11 @@
+// M12C § Per-storyteller stinger variants — Randy Random (chaotic, percussive).
+(
+    storyteller_id: randy_random,
+    variants: [
+        ( id: "randy_chaos_001", line_a: "HA. Coin flipped.", line_b: "Mission's going south." ),
+        ( id: "randy_chaos_002", line_a: "I rolled the dice.", line_b: "It came up boss." ),
+        ( id: "randy_chaos_003", line_a: "Threat assessment: chaos.", line_b: "I love it." ),
+        ( id: "randy_chaos_004", line_a: "Friend or foe? Spin the wheel.", line_b: "Wheel says yes." ),
+        ( id: "randy_chaos_005", line_a: "Plan A is gone.", line_b: "There was never a Plan B." ),
+    ],
+)

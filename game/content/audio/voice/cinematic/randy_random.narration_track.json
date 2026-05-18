@@ -1,0 +1,19 @@
+{
+  "words": [
+    {
+      "word": "epilogue",
+      "start_ms": 1000,
+      "end_ms": 1800
+    },
+    {
+      "word": "and",
+      "start_ms": 1800,
+      "end_ms": 2000
+    },
+    {
+      "word": "credits",
+      "start_ms": 2000,
+      "end_ms": 2700
+    }
+  ]
+}

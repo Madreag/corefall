@@ -1,0 +1,14 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/cinematic_narration_word.v1",
+  "title": "cinematic.narration_word",
+  "description": "M12C § ElevenLabs narration sync. Fires once per word as the cinematic playhead crosses the word's `start_ms` (from `<id>.narration_track.json`). Always emitted for replay parity; the caption ribbon is hidden when `captions_enabled=false`. Per spec § 'cinematic.narration_word events still emit (replay parity)'.",
+  "type": "object",
+  "required": ["id", "word_index", "text", "ms"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "word_index": { "type": "integer", "minimum": 0 },
+    "text": { "type": "string" },
+    "ms": { "type": "integer", "minimum": 0 }
+  }
+}

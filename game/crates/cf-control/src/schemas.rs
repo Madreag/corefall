@@ -632,6 +632,54 @@ pub struct SrvDumpSquadStateParams {
     pub squad_id: u64,
 }
 
+/// **M12C**: `act.player.skip_cinematic` — request a skip of the
+/// currently-playing cinematic. Per spec § "Skip / pause / replay UX",
+/// the dispatcher consults the seen-set + skip-confirm window before
+/// allowing the skip to fire.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerSkipCinematicParams {
+    #[serde(default)]
+    pub schema_version: u32,
+}
+
+/// **M12C**: `act.player.pause_cinematic` — toggle the cinematic pause.
+/// Per spec § "Pause — `[P]`. Pauses the cinematic clock; camera
+/// frozen; voice-over paused at boundary; subtitle frozen. Resume with
+/// `[P]` again." Idempotent: the dispatcher inspects the current
+/// phase to decide whether to fire `cinematic.paused` or
+/// `cinematic.resumed`.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerPauseCinematicParams {
+    #[serde(default)]
+    pub schema_version: u32,
+}
+
+/// **M12C**: `act.player.replay_cinematic { id }` — replay a watched
+/// cinematic from `Codex → Cinematics`. Per spec § "Replay — any
+/// cinematic the player has watched is unlocked / Replay runs the
+/// script identically (replay-deterministic) without affecting save
+/// state."
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerReplayCinematicParams {
+    #[serde(default)]
+    pub schema_version: u32,
+    pub id: String,
+}
+
+/// **M12C**: `srv.dump_cinematic_state` — return the full
+/// `CinematicState` JSON view (cinematic id + source + phase +
+/// playhead + duration + color grade + active word + camera offset).
+/// Used by the Codex tab + cinematic editor + tests.
+#[derive(Debug, Clone, Default, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct SrvDumpCinematicStateParams {
+    #[serde(default)]
+    pub schema_version: u32,
+}
+
 fn default_true() -> bool {
     true
 }
@@ -750,6 +798,11 @@ pub fn dump_v1() -> BTreeMap<String, String> {
         entry::<crate::m8b_net_admin::ObserveNetRollbackStatsParams>("observe_net_rollback_stats_params"),
         entry::<crate::m8b_net_admin::ObserveNetLossRecoveryParams>("observe_net_loss_recovery_params"),
         entry::<crate::m8b_net_admin::AdminNetForceRelayParams>("admin_net_force_relay_params"),
+        // **M12C**: in-engine cinematic playback cfctl surface.
+        entry::<ActPlayerSkipCinematicParams>("act_player_skip_cinematic_params"),
+        entry::<ActPlayerPauseCinematicParams>("act_player_pause_cinematic_params"),
+        entry::<ActPlayerReplayCinematicParams>("act_player_replay_cinematic_params"),
+        entry::<SrvDumpCinematicStateParams>("srv_dump_cinematic_state_params"),
     ] {
         out.insert(name, body);
     }

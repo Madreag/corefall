@@ -1,0 +1,9 @@
+// M12C § Per-storyteller stinger variants — Sandbox (neutral; cinematic
+// suppressed entirely, but kept as a one-line metadata entry so the
+// codex preview still renders a placeholder).
+(
+    storyteller_id: sandbox,
+    variants: [
+        ( id: "sandbox_neutral_001", line_a: "Mission ready.", line_b: "Drop when prompted." ),
+    ],
+)

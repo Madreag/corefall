@@ -1,0 +1,12 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/cinematic_resumed.v1",
+  "title": "cinematic.resumed",
+  "description": "M12C § Pause / resume. Fires when the player presses [P] a second time. Playback continues from the same `ms` with frame-accurate sync (camera + narration + caption resume from the freeze point).",
+  "type": "object",
+  "required": ["id", "ms"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "ms": { "type": "integer", "minimum": 0 }
+  }
+}

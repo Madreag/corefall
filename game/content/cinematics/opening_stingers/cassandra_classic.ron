@@ -1,0 +1,17 @@
+// M12C § "the per-storyteller stinger picks a variant from
+// `content/cinematics/opening_stingers/<storyteller_id>.ron`."
+//
+// Cassandra Classic — dread-laced two-line briefing stingers. Each
+// variant slot is selected deterministically by hashing (mission_id +
+// seed) modulo the variant count, so two engines on the same seed
+// surface the same stinger.
+(
+    storyteller_id: cassandra_classic,
+    variants: [
+        ( id: "cassandra_dread_001", line_a: "Something on this rock has teeth.", line_b: "Bring more bullets than you think you'll need." ),
+        ( id: "cassandra_dread_002", line_a: "The dropship will leave with or without you.", line_b: "Try to be on it." ),
+        ( id: "cassandra_dread_003", line_a: "I've seen this mission fail twice already.", line_b: "Take a third bite anyway." ),
+        ( id: "cassandra_dread_004", line_a: "The reactor's screaming.", line_b: "Pay attention to the silences." ),
+        ( id: "cassandra_dread_005", line_a: "Your last squad member died in the airlock.", line_b: "Don't make it a habit." ),
+    ],
+)

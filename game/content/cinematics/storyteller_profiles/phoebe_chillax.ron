@@ -1,0 +1,17 @@
+// M12C § "Per-storyteller cinematic style" — Phoebe Chillax:
+// Steady medium shots + soft handheld. Warm strings + light piano.
+// Warm saturated tint (+10% sat, +5% value). Even beats, 8-15s per shot.
+(
+    id: phoebe_chillax,
+    suppress_cinematics: false,
+    shot_dwell_ms: [8000, 15000],
+    audio_bed_id: "cinematic_bed_phoebe_warm_strings",
+    music_lufs_during_narration: -22.0,
+    music_lufs_outside_narration: -16.0,
+    color_grade: (
+        saturation: 1.10,
+        value: 1.05,
+        contrast: 1.0,
+    ),
+    narrator_voice_id: "phoebe_chillax_warm_female",
+)

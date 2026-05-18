@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/cinematic_ended.v1",
+  "title": "cinematic.ended",
+  "description": "M12C § Cinematic ends — fired on the last tick OR immediately after `cinematic.skipped`. `duration_ms` is the playhead position at completion (= total duration for natural completion; = `skipped_at_ms` for skipped). `was_skipped` mirrors the cause. After this event the gameplay camera + input are restored on the next tick.",
+  "type": "object",
+  "required": ["id", "duration_ms", "was_skipped"],
+  "properties": {
+    "id": { "type": "string", "minLength": 1 },
+    "duration_ms": { "type": "integer", "minimum": 0 },
+    "was_skipped": { "type": "boolean" }
+  }
+}

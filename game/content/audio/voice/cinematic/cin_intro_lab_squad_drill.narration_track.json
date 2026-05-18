@@ -1,0 +1,24 @@
+{
+  "words": [
+    {
+      "word": "the",
+      "start_ms": 1000,
+      "end_ms": 1300
+    },
+    {
+      "word": "dropship",
+      "start_ms": 2100,
+      "end_ms": 2700
+    },
+    {
+      "word": "hovers",
+      "start_ms": 2700,
+      "end_ms": 3500
+    },
+    {
+      "word": "down",
+      "start_ms": 3500,
+      "end_ms": 4000
+    }
+  ]
+}
