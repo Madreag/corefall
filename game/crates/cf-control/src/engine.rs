@@ -1315,6 +1315,13 @@ pub(crate) struct EngineMutable {
     /// Default false — killcam excludes `collision.projectile_pair_contact`
     /// events unless the player opts in.
     pub(crate) m14d_replay_intercepts: bool,
+    /// **M14D § VAL-M14D-006** C-RAM cooldown latches keyed by APS
+    /// laser `owner_actor_id`. Engaged on every
+    /// `collision.projectile_pair_contact{outcome="aps_intercept"}`
+    /// event and decayed by [`cf_equipment::Cram::tick`] each
+    /// projectile-pair pass. Empty by default; an entry materialises
+    /// the first time a given owner fires an intercept.
+    pub(crate) m14d_cram_cooldowns: BTreeMap<u64, cf_equipment::Cram>,
     /// **M14D § VAL-M14D-020** schedule-trace ordered window. Records
     /// each pass entry ("actor_collision_start", "projectile_pair_start",
     /// "terrain_start", ...) for the most recent N ticks so the engine
@@ -1850,6 +1857,7 @@ impl M0Engine {
                 m14d_pair_pass_invocations: 0,
                 m14d_last_pair_pass_trace: cf_physics::ProjectilePairPassTrace::default(),
                 m14d_replay_intercepts,
+                m14d_cram_cooldowns: BTreeMap::new(),
                 m14d_schedule_trace: std::collections::VecDeque::with_capacity(120),
             }),
             recorder,
@@ -8261,6 +8269,20 @@ impl M0Engine {
         self.state.read().map(|s| s.m14d_replay_intercepts).unwrap_or(false)
     }
 
+    /// **M14D § VAL-M14D-006** C-RAM cooldown snapshot for the given
+    /// owner actor id (or 0 for base-mounted units). Returns the
+    /// default idle [`cf_equipment::Cram`] if no intercept has ever
+    /// engaged this owner. Callers should observe
+    /// `cooldown_active`/`cooldown_ticks_remaining` to determine
+    /// whether the unit may fire another APS pulse this tick.
+    pub fn m14d_cram_cooldown(&self, owner_actor_id: u64) -> cf_equipment::Cram {
+        self.state
+            .read()
+            .ok()
+            .and_then(|s| s.m14d_cram_cooldowns.get(&owner_actor_id).copied())
+            .unwrap_or_default()
+    }
+
     /// **M14D** snapshot of the current projectile-pair pool length —
     /// used by integration tests to verify projectile consumption.
     pub fn m14d_projectile_pair_pool_len(&self) -> usize {
@@ -8286,13 +8308,20 @@ impl M0Engine {
     /// broadphase + narrowphase against the projectile-pair pool
     /// authored by the scenario manifest, emits
     /// `collision.projectile_pair_contact` events for every resolved
-    /// pair contact, and prunes consumed projectiles from the pool.
+    /// pair contact, prunes consumed projectiles from the pool, and
+    /// (**VAL-M14D-006**) engages / decays C-RAM cooldown latches keyed
+    /// by the firing APS laser's `owner_actor_id`.
     fn tick_m14d_projectile_pair(&self, tick: Tick, sim_time_ms: f64) {
         let tick_dt = 1.0 / (self.config.tick_rate_hz.max(1) as f32);
         let pool_snapshot = match self.state.read() {
             Ok(s) => s.m14d_projectile_pair_pool.clone(),
             Err(_) => return,
         };
+        if let Ok(mut s) = self.state.write() {
+            for cram in s.m14d_cram_cooldowns.values_mut() {
+                cram.tick();
+            }
+        }
         let (contacts, trace) = if pool_snapshot.is_empty() {
             (Vec::new(), cf_physics::ProjectilePairPassTrace::default())
         } else {
@@ -8319,10 +8348,24 @@ impl M0Engine {
             self.recorder
                 .record(tick, sim_time_ms, "collision", "projectile_pair_contact", payload, None);
         }
-        // Advance / prune the pool deterministically. Consumed
-        // projectiles (post_velocity == None) are removed; surviving
-        // projectiles get their post-contact velocity applied and step
-        // their position by tick_dt.
+        let mut cram_engagements: Vec<u64> = Vec::new();
+        for contact in &contacts {
+            if contact.outcome != cf_physics::ProjectilePairOutcome::ApsIntercept {
+                continue;
+            }
+            let aps_id = if contact.a_kind == cf_physics::ProjectileKind::ApsLaser {
+                Some(contact.a_id)
+            } else if contact.b_kind == cf_physics::ProjectileKind::ApsLaser {
+                Some(contact.b_id)
+            } else {
+                None
+            };
+            if let Some(id) = aps_id {
+                if let Some(snap) = pool_snapshot.iter().find(|p| p.id == id) {
+                    cram_engagements.push(snap.owner_actor_id);
+                }
+            }
+        }
         if let Ok(mut s) = self.state.write() {
             let mut consumed: std::collections::BTreeSet<u64> = std::collections::BTreeSet::new();
             let mut velocity_overrides: BTreeMap<u64, [f32; 2]> = BTreeMap::new();
@@ -8351,6 +8394,10 @@ impl M0Engine {
                 }
                 p.position[0] += p.velocity[0] * tick_dt;
                 p.position[1] += p.velocity[1] * tick_dt;
+            }
+            for owner in cram_engagements {
+                let cram = s.m14d_cram_cooldowns.entry(owner).or_default();
+                cram.engage_cooldown();
             }
         }
     }
