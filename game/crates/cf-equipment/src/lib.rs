@@ -51,6 +51,7 @@ pub use projectile::ProjectileSpawnParams;
 // M6C adds: heavy, medical, survival, sensor, ppe.
 pub mod ammo_spec;
 pub mod bipod;
+pub mod cram;
 pub mod deployables;
 pub mod durability;
 pub mod fire_modes;
@@ -76,6 +77,7 @@ pub mod weapon_swap;
 pub mod weapons_m14c;
 
 pub use bipod::{Bipod, BipodState, BIPOD_BLOOM_FACTOR, BIPOD_RECOIL_FACTOR};
+pub use cram::{Cram, DEFAULT_CRAM_COOLDOWN_TICKS};
 pub use durability::{Durability, DURABILITY_MAX};
 pub use fire_modes::{
     charge_damage_multiplier, charge_fraction, AdvancedFireMode, FireModeSet, BURST3_INTER_SHOT_SECONDS,
