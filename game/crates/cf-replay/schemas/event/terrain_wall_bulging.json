@@ -1,0 +1,51 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/terrain_wall_bulging.v1",
+  "title": "terrain.wall_bulging",
+  "description": "M14F L1 wall-bulging warning. Emitted when a chunk's lateral integrity_field drops below the L1 locked threshold (200) for at least one cell on the lateral axis. Drives the L1 sidewall crack decal + 'MINESHAFT WALL UNSTABLE' HUD banner.",
+  "type": "object",
+  "required": ["chunk_id", "bbox", "unsupported_span_px"],
+  "properties": {
+    "chunk_id": {
+      "type": "array",
+      "description": "Lateral-wall chunk coordinate as [cx, cy] in chunk-space.",
+      "items": { "type": "integer" },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "bbox": {
+      "type": "object",
+      "description": "Pixel-space AABB of the bulging lateral wall region.",
+      "required": ["min", "max"],
+      "properties": {
+        "min": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "integer" } },
+        "max": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "integer" } }
+      }
+    },
+    "unsupported_span_px": {
+      "type": "integer",
+      "description": "Unsupported lateral span (in pixels) that drove the integrity decay.",
+      "minimum": 0
+    },
+    "min_integrity": {
+      "type": "integer",
+      "description": "Minimum cell integrity observed in the chunk this pass (0..=255).",
+      "minimum": 0,
+      "maximum": 255
+    },
+    "lateral_yield_strength": {
+      "type": "integer",
+      "description": "Per-material lateral yield strength (concrete=50, brick=30, steel=200, wood=15, dirt=10).",
+      "minimum": 0
+    },
+    "vibration_modifier": {
+      "type": "number",
+      "description": "Vibration modifier driving the bulging probability (1.0 baseline)."
+    },
+    "level": {
+      "type": "string",
+      "description": "Crack-decal level rendered by this event. Bulging emits 'l1'.",
+      "enum": ["l1"]
+    }
+  }
+}

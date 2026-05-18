@@ -71,12 +71,20 @@ pub mod integrity;
 pub mod m14a_overlay;
 pub mod parallel;
 pub mod structural_integrity;
+pub mod wall_collapse;
 pub use m14a_overlay::{material_thermal_contact, material_walk_modulator, ThermalContact, WalkModulator};
 
 pub use cave_in::{
     cascade_neighbors_for_chunk, cave_in_chance_per_tick, cave_in_roll, falling_debris_count, CascadeNeighbor,
     CaveInOutcome, CaveInPayload, CAVE_IN_BASE_COEFFICIENT, FALLING_DEBRIS_CAP, UNSUPPORTED_SPAN_FLOOR_PX,
     VIBRATION_MODIFIER_BASELINE, VIBRATION_MODIFIER_PLASMA_CUTTER,
+};
+pub use wall_collapse::{
+    lateral_cascade_neighbors_for_chunk, pressure_blowout_triggers, wall_bulging_chance_per_tick,
+    wall_bulging_roll, wall_crack_advanced_chance_per_tick, wall_crack_advanced_roll, wall_rupture_chance_per_tick,
+    wall_rupture_debris_count, wall_rupture_roll, CumulativeStress, WallCollapseOutcome, WallCollapsePayload,
+    WallCollapseStage, WALL_COLLAPSE_BASE_COEFFICIENT, WALL_LATERAL_SPAN_FLOOR_PX, WALL_LATERAL_STABLE_SPAN_PX,
+    WALL_RUPTURE_DEBRIS_CAP,
 };
 pub use chunked::{
     material_affordance, material_id_from_name, material_name_from_id, Chunk, ChunkCoord, ChunkedCarveNoOp,
@@ -86,9 +94,9 @@ pub use chunked::{
     MATERIAL_METAL_NOHOOK, MATERIAL_REPAIR_FILL, MATERIAL_SCHEMA_VERSION, MATERIAL_SUPPORT_BEAM,
 };
 pub use structural_integrity::{
-    compute_integrity_pass, lock_radius_to_beam, unlock_radius, IntegrityField, IntegrityPassOutcome,
-    INTEGRITY_BEAM_LOCKED, INTEGRITY_CASCADE_THRESHOLD, INTEGRITY_FIELD_CELLS, INTEGRITY_FIELD_HEIGHT,
-    INTEGRITY_FIELD_WIDTH, INTEGRITY_LOCKED, INTEGRITY_PASS_CADENCE_TICKS,
+    compute_integrity_pass, compute_lateral_integrity_pass, lock_radius_to_beam, unlock_radius, IntegrityField,
+    IntegrityPassOutcome, INTEGRITY_BEAM_LOCKED, INTEGRITY_CASCADE_THRESHOLD, INTEGRITY_FIELD_CELLS,
+    INTEGRITY_FIELD_HEIGHT, INTEGRITY_FIELD_WIDTH, INTEGRITY_LOCKED, INTEGRITY_PASS_CADENCE_TICKS,
 };
 pub use integrity::{
     apply_damage_formula, normalized_hardness, BandCrossing, CascadeEvent, DamageKind, IntegrityBand,

@@ -1,0 +1,54 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/terrain_brace_strut_placed.v1",
+  "title": "terrain.brace_strut_placed",
+  "description": "M14F brace-strut placement event. Emitted when the player uses the `brace_strut_t1` / `brace_strut_t2` / `brace_strut_t3` tool: debits the per-tier crafting cost, locks the ±N lateral pixels around the placement to integrity 500 (N scales by tier per VAL-M14F-031), and writes the support material to the terrain.",
+  "type": "object",
+  "required": ["actor_id", "tier", "world_pos", "chunk_id", "cost"],
+  "properties": {
+    "actor_id": {
+      "type": "integer",
+      "description": "Actor id of the player who placed the strut."
+    },
+    "tier": {
+      "type": "string",
+      "description": "Brace-strut tier — T1 / T2 / T3.",
+      "enum": ["t1", "t2", "t3"]
+    },
+    "world_pos": {
+      "type": "array",
+      "description": "World-space placement position as [x, y] (pixels).",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": { "type": "number" }
+    },
+    "chunk_id": {
+      "type": "array",
+      "description": "Chunk coordinate the placement landed in.",
+      "items": { "type": "integer" },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "lateral_cell": {
+      "type": "array",
+      "description": "Lateral-axis integrity-field cell coordinate (lx, ly) within the chunk's 16×16 buffer.",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": { "type": "integer", "minimum": 0, "maximum": 15 }
+    },
+    "cost": {
+      "type": "object",
+      "description": "Inventory delta the placement applied. Per VAL-M14F-022: T1 = 2 iron + 1 wood; T2/T3 element-wise ≥ T1.",
+      "required": ["iron", "wood"],
+      "properties": {
+        "iron": { "type": "integer", "minimum": 0 },
+        "wood": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "lock_radius_px": {
+      "type": "integer",
+      "description": "Lock radius (in pixels) applied to the lateral integrity field around the placement. T1=8, T2=12, T3=16 per VAL-M14F-031.",
+      "minimum": 0
+    }
+  }
+}

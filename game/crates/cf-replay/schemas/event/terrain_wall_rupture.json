@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/terrain_wall_rupture.v1",
+  "title": "terrain.wall_rupture",
+  "description": "M14F L3 catastrophic lateral wall rupture. Emitted when the lateral integrity field drops below the cascade threshold OR when M19 pressure-differential blowout fires. Drives the L3 sidewall crack decal + falling-debris cone + M15 fluid cascade + M19 atmosphere flow.",
+  "type": "object",
+  "required": ["chunk_id", "bbox", "falling_debris_count"],
+  "properties": {
+    "chunk_id": {
+      "type": "array",
+      "description": "Lateral-wall chunk coordinate as [cx, cy] in chunk-space.",
+      "items": { "type": "integer" },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "bbox": {
+      "type": "object",
+      "description": "Pixel-space AABB of the rupture breach. M15/M19 read this for fluid + atmosphere flow geometry.",
+      "required": ["min", "max"],
+      "properties": {
+        "min": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "integer" } },
+        "max": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "integer" } }
+      }
+    },
+    "falling_debris_count": {
+      "type": "integer",
+      "description": "Pixel count of debris spawned by the rupture. Per spec literal `min(span_px × wall_thickness, 200)`.",
+      "minimum": 0,
+      "maximum": 200
+    },
+    "unsupported_span_px": {
+      "type": "integer",
+      "description": "Unsupported lateral span (in pixels) that drove the rupture.",
+      "minimum": 0
+    },
+    "lateral_yield_strength": {
+      "type": "integer",
+      "description": "Per-material lateral yield strength used to determine the rupture threshold.",
+      "minimum": 0
+    },
+    "vibration_modifier": {
+      "type": "number",
+      "description": "Vibration modifier driving the rupture probability."
+    },
+    "cascade_primary": {
+      "type": "boolean",
+      "description": "True for the first rupture in a cascade; false for secondary ruptures triggered via neighbor chunks (VAL-M14F-026)."
+    },
+    "trigger": {
+      "type": "string",
+      "description": "Cause classifier — 'integrity_decay' (mineshaft / siege wall), 'pressure_blowout' (M19 sudden decompression), 'explosive_damage' (200 dmg threshold).",
+      "enum": ["integrity_decay", "pressure_blowout", "explosive_damage"]
+    }
+  }
+}

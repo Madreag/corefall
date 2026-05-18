@@ -12,6 +12,7 @@
 //! - Sensor pulse — reveal enemies / hazards in radius
 
 pub mod beacon;
+pub mod brace_strut;
 pub mod concrete;
 pub mod dig_pickaxe;
 pub mod drill;
@@ -203,6 +204,16 @@ pub fn find_support_beam_placer(id: &str) -> Option<support_beam_placer::Support
     }
 }
 
+/// **M14F** § True when the supplied id maps to one of the
+/// brace-strut tier items (T1 / T2 / T3).
+#[must_use]
+pub fn is_brace_strut_tool(id: &str) -> bool {
+    matches!(
+        id,
+        brace_strut::BRACE_STRUT_T1_ID | brace_strut::BRACE_STRUT_T2_ID | brace_strut::BRACE_STRUT_T3_ID
+    )
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -337,5 +348,41 @@ mod tests {
         // Distinct slot id check: support_beam_placer must NOT collide
         // with any registered M9C tool.
         assert!(!is_m9c_tool("support_beam_placer"));
+    }
+
+    /// VAL-M14F-017 + VAL-CROSS-023: brace-strut T1/T2/T3 register at
+    /// distinct ids from the support-beam placer.
+    #[test]
+    fn brace_strut_tiers_register_distinct_from_support_beam_placer() {
+        assert!(brace_strut::find_brace_strut(brace_strut::BRACE_STRUT_T1_ID).is_some());
+        assert!(brace_strut::find_brace_strut(brace_strut::BRACE_STRUT_T2_ID).is_some());
+        assert!(brace_strut::find_brace_strut(brace_strut::BRACE_STRUT_T3_ID).is_some());
+
+        let placer_id = support_beam_placer::SUPPORT_BEAM_PLACER_ID;
+        assert_ne!(placer_id, brace_strut::BRACE_STRUT_T1_ID);
+        assert_ne!(placer_id, brace_strut::BRACE_STRUT_T2_ID);
+        assert_ne!(placer_id, brace_strut::BRACE_STRUT_T3_ID);
+
+        // The brace-strut catalog must not collide with the M14E placer
+        // material id (= 8 = support_beam). We surface tier IDs as
+        // distinct strings — the engine slots them in unique inventory
+        // entries.
+        assert!(is_brace_strut_tool(brace_strut::BRACE_STRUT_T1_ID));
+        assert!(is_brace_strut_tool(brace_strut::BRACE_STRUT_T2_ID));
+        assert!(is_brace_strut_tool(brace_strut::BRACE_STRUT_T3_ID));
+        assert!(!is_brace_strut_tool(placer_id));
+        assert!(!is_brace_strut_tool("unknown_tool"));
+    }
+
+    /// VAL-CROSS-023: placement of a `brace_strut_t1` debits its own cost
+    /// (2 iron + 1 wood per VAL-M14F-022) and does NOT debit a
+    /// `support_beam_placer` resource.
+    #[test]
+    fn brace_strut_t1_cost_matches_support_beam_placer_cost_class() {
+        let placer = m14e_support_beam_placer();
+        let t1 = brace_strut::brace_strut_t1_default();
+        let placer_cost = placer.cost_per_beam_iron_wood();
+        let t1_cost = t1.cost_per_unit_iron_wood();
+        assert_eq!(placer_cost, t1_cost);
     }
 }

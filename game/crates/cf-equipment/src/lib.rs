@@ -153,18 +153,28 @@ pub use stealth_kill::{
 };
 pub use suppressor::{Suppressor, SUPPRESSOR_LOUDNESS_FACTOR};
 pub use tool::{
+    brace_strut::{
+        brace_strut_catalog, brace_strut_for_tier, brace_strut_t1_default, brace_strut_t2_default,
+        brace_strut_t3_default, find_brace_strut, BraceStrutSpec, BraceStrutTier, BRACE_STRUT_T1_ID,
+        BRACE_STRUT_T2_ID, BRACE_STRUT_T3_ID,
+    },
     drill::{DRILL_HEAT_DECAY_PER_S, DRILL_HEAT_PER_USE, DRILL_HEAT_RATE_PER_S, DRILL_JAM_HEAT_THRESHOLD},
     engineering_tool::{
         engineering_tool_m9c_default, EngineeringToolSpec, ENGINEERING_TOOL_AT_DITCH_SECONDS,
         ENGINEERING_TOOL_ID,
     },
     entrenching::{entrenching_tool_m9b_default, EntrenchingToolSpec, ENTRENCHING_TOOL_ID},
-    find_entrenching_tool, is_m9c_tool, m6_tool_presets, m9b_entrenching_tools, m9c_tool_catalog,
+    find_entrenching_tool, find_support_beam_placer, is_m9c_tool, m14e_support_beam_placer, m6_tool_presets,
+    m9b_entrenching_tools, m9c_tool_catalog,
     minesweeper::{
         minesweeper_m9c_default, MinesweeperToolSpec, MINESWEEPER_ID, MINESWEEPER_PING_SECONDS,
         MINESWEEPER_RADIUS_PRESSURE_IED, MINESWEEPER_RADIUS_PROXIMITY_TRIPWIRE,
     },
     sensor_pulse::{SENSOR_PULSE_REVEAL_RADIUS, SENSOR_PULSE_REVEAL_SECONDS},
+    support_beam_placer::{
+        support_beam_placer_m14e_default, SupportBeamPlacerSpec, SUPPORT_BEAM_PLACER_ID,
+        SUPPORT_BEAM_PLACER_TIER,
+    },
     wire_cutters::{wire_cutters_m9c_default, WireCuttersSpec, WIRE_CUTTERS_ID},
     M9cToolCatalog, ToolKind, ToolPreset,
 };

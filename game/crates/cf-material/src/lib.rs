@@ -154,6 +154,14 @@ pub struct MaterialDef {
     /// Missing entries fall back to 0 via [`structural_support_strength_for`].
     #[serde(default)]
     pub structural_support_strength: Option<u16>,
+    /// **M14F** § Per-material lateral yield strength. Drives the
+    /// lateral integrity field's bulge/crack/rupture cascade — the
+    /// 90°-rotated sibling of `structural_support_strength`. Spec
+    /// literal: concrete=50, brick=30, steel=200, wood=15, dirt=10;
+    /// default falls back to the material's compressive strength via
+    /// [`lateral_yield_strength_for`].
+    #[serde(default)]
+    pub lateral_yield_strength: Option<u16>,
     #[serde(default)]
     pub settle_material: Option<MaterialId>,
     #[serde(default)]
@@ -297,6 +305,38 @@ pub fn structural_support_strength_for(material_name: &str) -> u16 {
     }
 }
 
+/// **M14F** § Canonical per-material `lateral_yield_strength` for the
+/// lateral wall collapse pass. Returns the spec-baked values when the
+/// material name is recognized; otherwise returns `None` so callers can
+/// fall back to the material's compressive strength
+/// (i.e. [`structural_support_strength_for`] per VAL-M14F-021).
+///
+/// Per spec literal:
+/// > Per-material `lateral_yield_strength` = approximate Stationeers
+/// > values: concrete 50, brick 30, steel 200, wood 15, dirt 10
+/// > (default = same as compressive for now).
+#[must_use]
+pub fn lateral_yield_strength_for(material_name: &str) -> Option<u16> {
+    match material_name {
+        "concrete" | "concrete_soft" => Some(50),
+        "brick" => Some(30),
+        "steel" | "metal_nohook" => Some(200),
+        "wood" => Some(15),
+        "dirt" => Some(10),
+        _ => None,
+    }
+}
+
+/// **M14F** § Effective lateral yield strength for a material identified
+/// only by name (no full `MaterialDef`). Returns the spec-baked value
+/// when known, otherwise falls back to compressive strength
+/// ([`structural_support_strength_for`]). Per VAL-M14F-021.
+#[must_use]
+pub fn lateral_yield_strength_value_for(material_name: &str) -> u16 {
+    lateral_yield_strength_for(material_name)
+        .unwrap_or_else(|| structural_support_strength_for(material_name))
+}
+
 impl MaterialDef {
     /// **M14E** § Resolved structural-support strength for this material.
     /// Uses the explicit registry field when set; otherwise falls back to
@@ -305,6 +345,32 @@ impl MaterialDef {
     pub fn structural_support_strength_value(&self) -> u16 {
         self.structural_support_strength
             .unwrap_or_else(|| structural_support_strength_for(self.name.as_str()))
+    }
+
+    /// **M14F** § Compressive strength for this material — alias for
+    /// [`structural_support_strength_value`]. Surfaced under the
+    /// "compressive" name so the lateral-yield default path
+    /// (VAL-M14F-021) reads as the spec says: "default = same as
+    /// compressive for now".
+    #[must_use]
+    pub fn compressive_strength(&self) -> u16 {
+        self.structural_support_strength_value()
+    }
+
+    /// **M14F** § Resolved lateral yield strength for this material.
+    /// Resolution order (per VAL-M14F-015 + VAL-M14F-021):
+    ///   1. Explicit `lateral_yield_strength` field on the registry row.
+    ///   2. Spec-baked override via [`lateral_yield_strength_for`].
+    ///   3. Fallback to [`Self::compressive_strength`].
+    #[must_use]
+    pub fn lateral_yield_strength_value(&self) -> u16 {
+        if let Some(v) = self.lateral_yield_strength {
+            return v;
+        }
+        if let Some(v) = lateral_yield_strength_for(self.name.as_str()) {
+            return v;
+        }
+        self.compressive_strength()
     }
 
     /// **M12B** § Resolved acoustic profile for this material. Missing
@@ -616,6 +682,89 @@ mod tests {
         v["materials"][0]["name"] = serde_json::json!("concrete");
         let r: MaterialRegistry = serde_json::from_value(v).expect("parse");
         assert_eq!(r.materials[0].structural_support_strength_value(), 50);
+    }
+
+    /// VAL-M14F-015: per-material lateral_yield_strength baseline matches
+    /// the spec literal values (concrete=50, brick=30, steel=200, wood=15,
+    /// dirt=10).
+    #[test]
+    fn lateral_yield_strength_baseline_matches_spec() {
+        assert_eq!(lateral_yield_strength_for("concrete"), Some(50));
+        assert_eq!(lateral_yield_strength_for("concrete_soft"), Some(50));
+        assert_eq!(lateral_yield_strength_for("brick"), Some(30));
+        assert_eq!(lateral_yield_strength_for("steel"), Some(200));
+        assert_eq!(lateral_yield_strength_for("metal_nohook"), Some(200));
+        assert_eq!(lateral_yield_strength_for("wood"), Some(15));
+        assert_eq!(lateral_yield_strength_for("dirt"), Some(10));
+        assert_eq!(lateral_yield_strength_for("air"), None);
+        assert_eq!(lateral_yield_strength_for("unknown_alloy"), None);
+    }
+
+    /// VAL-M14F-021: default lateral_yield_strength for materials without
+    /// an explicit override equals the material's compressive strength.
+    #[test]
+    fn lateral_yield_strength_defaults_to_compressive() {
+        let v = registry_json();
+        let r: MaterialRegistry = serde_json::from_value(v).expect("parse");
+        let air = &r.materials[0];
+        assert_eq!(
+            air.lateral_yield_strength_value(),
+            air.compressive_strength(),
+            "default lateral_yield_strength must equal compressive_strength"
+        );
+        assert_eq!(lateral_yield_strength_value_for("unknown_material"), 0);
+        assert_eq!(lateral_yield_strength_value_for("concrete"), 50);
+        // Confirms an unmapped material with no override returns the
+        // compressive baseline.
+        assert_eq!(lateral_yield_strength_value_for("air"), 0);
+    }
+
+    /// VAL-CROSS-025: cf-material exposes BOTH structural_support_strength
+    /// (M14E) and lateral_yield_strength (M14F) independently — no field
+    /// shadowing.
+    #[test]
+    fn structural_support_and_lateral_yield_are_independent_fields() {
+        let mut v = registry_json();
+        v["materials"][0]["name"] = serde_json::json!("concrete");
+        let concrete: MaterialRegistry = serde_json::from_value(v.clone()).expect("parse");
+        let m = &concrete.materials[0];
+        assert_eq!(m.structural_support_strength_value(), 50);
+        assert_eq!(m.lateral_yield_strength_value(), 50);
+
+        v["materials"][0]["name"] = serde_json::json!("steel");
+        let steel: MaterialRegistry = serde_json::from_value(v).expect("parse");
+        let m = &steel.materials[0];
+        assert_eq!(m.structural_support_strength_value(), 0);
+        assert_eq!(m.lateral_yield_strength_value(), 200);
+    }
+
+    /// VAL-CROSS-025: explicit registry override for lateral_yield_strength
+    /// wins over the spec-baked table.
+    #[test]
+    fn material_def_lateral_yield_strength_uses_override() {
+        let mut v = registry_json();
+        v["materials"][0]["name"] = serde_json::json!("concrete");
+        v["materials"][0]["lateral_yield_strength"] = serde_json::json!(77);
+        let r: MaterialRegistry = serde_json::from_value(v).expect("parse");
+        assert_eq!(r.materials[0].lateral_yield_strength_value(), 77);
+    }
+
+    /// VAL-M14F-023: material lateral-yield ordering is strictly
+    /// `wood < brick < concrete < steel`. The spec asserts this in
+    /// behaviour — having the values in this strict ordering is a
+    /// necessary precondition for that behaviour.
+    #[test]
+    fn material_yield_strict_ordering_wood_brick_concrete_steel() {
+        let wood = lateral_yield_strength_for("wood").unwrap();
+        let brick = lateral_yield_strength_for("brick").unwrap();
+        let concrete = lateral_yield_strength_for("concrete").unwrap();
+        let steel = lateral_yield_strength_for("steel").unwrap();
+        assert!(wood < brick, "wood ({wood}) must yield before brick ({brick})");
+        assert!(brick < concrete, "brick ({brick}) must yield before concrete ({concrete})");
+        assert!(
+            concrete < steel,
+            "concrete ({concrete}) must yield before steel ({steel})"
+        );
     }
 
     #[test]

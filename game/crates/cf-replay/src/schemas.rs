@@ -152,6 +152,11 @@ const SCHEMA_TERRAIN_SUPPORT_BEAM_PLACED: &str = include_str!("../schemas/event/
 const SCHEMA_TERRAIN_SUPPORT_BEAM_DESTROYED: &str =
     include_str!("../schemas/event/terrain_support_beam_destroyed.json");
 const SCHEMA_TERRAIN_TERRAIN_CASCADE: &str = include_str!("../schemas/event/terrain_terrain_cascade.json");
+// **M14F** — Lateral wall collapse + brace-strut placement event schemas.
+const SCHEMA_TERRAIN_WALL_BULGING: &str = include_str!("../schemas/event/terrain_wall_bulging.json");
+const SCHEMA_TERRAIN_WALL_CRACK_ADVANCED: &str = include_str!("../schemas/event/terrain_wall_crack_advanced.json");
+const SCHEMA_TERRAIN_WALL_RUPTURE: &str = include_str!("../schemas/event/terrain_wall_rupture.json");
+const SCHEMA_TERRAIN_BRACE_STRUT_PLACED: &str = include_str!("../schemas/event/terrain_brace_strut_placed.json");
 const SCHEMA_ARMOR_SCHURZEN_PRE_DETONATED: &str = include_str!("../schemas/event/armor_schurzen_pre_detonated.json");
 const SCHEMA_ARMOR_MULTI_HIT_DEGRADATION: &str = include_str!("../schemas/event/armor_multi_hit_degradation.json");
 const SCHEMA_ARMOR_REACTIVE_ARMOR_CONSUMED: &str = include_str!("../schemas/event/armor_reactive_armor_consumed.json");
@@ -613,6 +618,11 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("terrain", "support_beam_placed") => Some(SCHEMA_TERRAIN_SUPPORT_BEAM_PLACED),
         ("terrain", "support_beam_destroyed") => Some(SCHEMA_TERRAIN_SUPPORT_BEAM_DESTROYED),
         ("terrain", "terrain_cascade") => Some(SCHEMA_TERRAIN_TERRAIN_CASCADE),
+        // **M14F** § lateral wall collapse + brace-strut placement events.
+        ("terrain", "wall_bulging") => Some(SCHEMA_TERRAIN_WALL_BULGING),
+        ("terrain", "wall_crack_advanced") => Some(SCHEMA_TERRAIN_WALL_CRACK_ADVANCED),
+        ("terrain", "wall_rupture") => Some(SCHEMA_TERRAIN_WALL_RUPTURE),
+        ("terrain", "brace_strut_placed") => Some(SCHEMA_TERRAIN_BRACE_STRUT_PLACED),
         ("armor", "schurzen_pre_detonated") => Some(SCHEMA_ARMOR_SCHURZEN_PRE_DETONATED),
         ("armor", "multi_hit_degradation") => Some(SCHEMA_ARMOR_MULTI_HIT_DEGRADATION),
         ("armor", "reactive_armor_consumed") => Some(SCHEMA_ARMOR_REACTIVE_ARMOR_CONSUMED),
@@ -1324,6 +1334,11 @@ mod tests {
             ("terrain", "support_beam_placed"),
             ("terrain", "support_beam_destroyed"),
             ("terrain", "terrain_cascade"),
+            // M14F § lateral wall collapse + brace-strut placement events.
+            ("terrain", "wall_bulging"),
+            ("terrain", "wall_crack_advanced"),
+            ("terrain", "wall_rupture"),
+            ("terrain", "brace_strut_placed"),
             // M5 internal.* family.
             ("internal", "organ_damaged"),
             ("internal", "organ_destroyed"),
