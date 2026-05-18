@@ -312,29 +312,33 @@ pub fn compute_integrity_pass(
 /// We round up to ±1 cell (= 16 pixels) which covers the spec's 16-pixel
 /// span around the beam.
 pub fn lock_radius_to_beam(field: &mut IntegrityField, center_lx: usize, center_ly: usize, radius_cells: usize) {
-    let r = radius_cells.max(0);
-    let lx0 = center_lx.saturating_sub(r);
-    let ly0 = center_ly.saturating_sub(r);
-    let lx1 = (center_lx + r).min(INTEGRITY_FIELD_WIDTH - 1);
-    let ly1 = (center_ly + r).min(INTEGRITY_FIELD_HEIGHT - 1);
-    for ly in ly0..=ly1 {
-        for lx in lx0..=lx1 {
-            field.lock_to_beam(lx, ly);
-        }
-    }
+    apply_radius_to_field(field, center_lx, center_ly, radius_cells, |f, lx, ly| {
+        f.lock_to_beam(lx, ly);
+    });
 }
 
 /// Unlock the ±radius cells around `(lx, ly)`. Used when a `support_beam`
 /// is demolished (`terrain.support_beam_destroyed`).
 pub fn unlock_radius(field: &mut IntegrityField, center_lx: usize, center_ly: usize, radius_cells: usize) {
-    let r = radius_cells.max(0);
-    let lx0 = center_lx.saturating_sub(r);
-    let ly0 = center_ly.saturating_sub(r);
-    let lx1 = (center_lx + r).min(INTEGRITY_FIELD_WIDTH - 1);
-    let ly1 = (center_ly + r).min(INTEGRITY_FIELD_HEIGHT - 1);
-    for ly in ly0..=ly1 {
-        for lx in lx0..=lx1 {
-            field.unlock(lx, ly);
+    apply_radius_to_field(field, center_lx, center_ly, radius_cells, |f, lx, ly| {
+        f.unlock(lx, ly);
+    });
+}
+
+fn apply_radius_to_field(
+    field: &mut IntegrityField,
+    center_lx: usize,
+    center_ly: usize,
+    radius_cells: usize,
+    mut apply: impl FnMut(&mut IntegrityField, usize, usize),
+) {
+    let lower_x = center_lx.saturating_sub(radius_cells);
+    let lower_y = center_ly.saturating_sub(radius_cells);
+    let upper_x = (center_lx + radius_cells).min(INTEGRITY_FIELD_WIDTH - 1);
+    let upper_y = (center_ly + radius_cells).min(INTEGRITY_FIELD_HEIGHT - 1);
+    for ly in lower_y..=upper_y {
+        for lx in lower_x..=upper_x {
+            apply(field, lx, ly);
         }
     }
 }

@@ -50,7 +50,8 @@
     clippy::struct_excessive_bools,
     clippy::unused_self,
     clippy::map_unwrap_or,
-    clippy::manual_let_else
+    clippy::manual_let_else,
+    clippy::similar_names
 )]
 
 // M2 / M3 spec "## Files" wiring: re-export the canonical types via thin

@@ -8589,8 +8589,8 @@ impl M0Engine {
             return;
         }
 
-        let cadence = cf_terrain::INTEGRITY_PASS_CADENCE_TICKS as u64;
-        let run_pass_this_tick = tick.0 != 0 && tick.0 % cadence == 0;
+        let cadence = u64::from(cf_terrain::INTEGRITY_PASS_CADENCE_TICKS);
+        let run_pass_this_tick = tick.0 != 0 && tick.0.is_multiple_of(cadence);
 
         // 1) Optional integrity pass + L1/L2/L3 emission.
         if run_pass_this_tick {
@@ -8660,12 +8660,13 @@ impl M0Engine {
         }
 
         // 2) Per-tick cave-in roll using seeded engine RNG.
-        let mut cave_in_emissions: Vec<(
+        type CaveInEmission = (
             (i32, i32),
             cf_terrain::CaveInPayload,
             Vec<(i32, i32)>,
             Option<u64>,
-        )> = Vec::new();
+        );
+        let mut cave_in_emissions: Vec<CaveInEmission> = Vec::new();
         if let Ok(mut s) = self.state.write() {
             for chunk_id in &chunk_ids {
                 let (anchored, span_px, ceiling_thickness, vibration, bbox_min, bbox_max, cave_in_emitted, neighbors, damage_actor) = match s.m14e_chunks.get(chunk_id) {

@@ -34,7 +34,10 @@ impl CrackLevel {
         }
     }
 
-    pub fn from_str(s: &str) -> Option<Self> {
+    /// Parse a crack-level discriminator from its canonical wire name.
+    /// Named distinctly from `std::str::FromStr::from_str` so clippy
+    /// doesn't flag the method-confusion lint.
+    pub fn parse_str(s: &str) -> Option<Self> {
         match s {
             "l1" => Some(CrackLevel::L1),
             "l2" => Some(CrackLevel::L2),
@@ -154,9 +157,9 @@ mod tests {
     #[test]
     fn crack_level_round_trips_through_str() {
         for level in [CrackLevel::L1, CrackLevel::L2, CrackLevel::L3] {
-            assert_eq!(CrackLevel::from_str(level.as_str()), Some(level));
+            assert_eq!(CrackLevel::parse_str(level.as_str()), Some(level));
         }
-        assert_eq!(CrackLevel::from_str("garbage"), None);
+        assert_eq!(CrackLevel::parse_str("garbage"), None);
     }
 
     /// VAL-M14E-007: L1 → L2 → L3 decal progression.
