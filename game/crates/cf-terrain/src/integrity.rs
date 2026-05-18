@@ -23,7 +23,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::chunked::{
     material_affordance, MaterialId, MATERIAL_AIR, MATERIAL_ANCHOR, MATERIAL_CONCRETE, MATERIAL_DIRT, MATERIAL_HAZARD,
-    MATERIAL_LOOSE_FILL, MATERIAL_METAL_NOHOOK, MATERIAL_REPAIR_FILL,
+    MATERIAL_LOOSE_FILL, MATERIAL_METAL_NOHOOK, MATERIAL_REPAIR_FILL, MATERIAL_SUPPORT_BEAM,
 };
 
 /// 5-tier integrity band. Mirrors `cf-ui::IntegrityBand`; kept in cf-terrain so
@@ -174,6 +174,9 @@ pub fn normalized_hardness(id: MaterialId) -> f32 {
         MATERIAL_HAZARD => 0.5,
         MATERIAL_REPAIR_FILL => 0.3,
         MATERIAL_ANCHOR => 0.95,
+        // **M14E** § support_beam carries integrity above the cascade
+        // threshold so neighbor cave-ins do not cascade through it.
+        MATERIAL_SUPPORT_BEAM => 0.9,
         _ => material_affordance(id)
             .map(|a| (a.hardness / 100.0).clamp(0.0, 1.0))
             .unwrap_or(0.0),

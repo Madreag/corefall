@@ -334,6 +334,8 @@ fn known_material_fields() -> &'static [&'static str] {
         "decay_band",
         "acoustic_transmission_loss_db",
         "low_pass_cutoff_hz",
+        // M14E § per-material load-bearing baseline for the integrity field.
+        "structural_support_strength",
     ]
 }
 

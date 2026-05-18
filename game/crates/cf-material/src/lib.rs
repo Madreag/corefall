@@ -147,6 +147,13 @@ pub struct MaterialDef {
     pub priority: Option<i32>,
     #[serde(default)]
     pub piling: Option<bool>,
+    /// **M14E** § Per-material structural-support strength. Drives the
+    /// per-chunk integrity field's "locked" baseline: integrity at any
+    /// pixel anchored to a load-bearing material is at least this value
+    /// (default 0 = no support; concrete=50; reinforced=200; support_beam=500).
+    /// Missing entries fall back to 0 via [`structural_support_strength_for`].
+    #[serde(default)]
+    pub structural_support_strength: Option<u16>,
     #[serde(default)]
     pub settle_material: Option<MaterialId>,
     #[serde(default)]
@@ -272,7 +279,34 @@ impl AcousticProfile {
     }
 }
 
+/// **M14E** § Canonical per-material `structural_support_strength` for the
+/// load-bearing baseline that the per-chunk integrity field uses to lock
+/// anchored pixels. Returns the spec-baked values when the material name
+/// is recognized; falls back to `0` for unsupported materials.
+///
+/// Per spec literal:
+/// > Add per-material `structural_support_strength` field (default 0;
+/// > concrete = 50; reinforced = 200; support_beam = 500).
+#[must_use]
+pub fn structural_support_strength_for(material_name: &str) -> u16 {
+    match material_name {
+        "concrete" | "concrete_soft" => 50,
+        "reinforced" => 200,
+        "support_beam" => 500,
+        _ => 0,
+    }
+}
+
 impl MaterialDef {
+    /// **M14E** § Resolved structural-support strength for this material.
+    /// Uses the explicit registry field when set; otherwise falls back to
+    /// [`structural_support_strength_for`].
+    #[must_use]
+    pub fn structural_support_strength_value(&self) -> u16 {
+        self.structural_support_strength
+            .unwrap_or_else(|| structural_support_strength_for(self.name.as_str()))
+    }
+
     /// **M12B** § Resolved acoustic profile for this material. Missing
     /// fields fall back to [`AcousticProfile::fallback`].
     ///
@@ -551,6 +585,37 @@ mod tests {
         let _: Option<MaterialRegistry> = None;
         let _: Option<PhaseChange> = None;
         let _: MaterialId = 0;
+    }
+
+    /// VAL-M14E-011: per-material structural_support_strength baseline
+    /// per spec (default 0 / concrete=50 / reinforced=200 / support_beam=500).
+    #[test]
+    fn structural_support_strength_baseline_matches_spec() {
+        assert_eq!(structural_support_strength_for("air"), 0);
+        assert_eq!(structural_support_strength_for("dirt"), 0);
+        assert_eq!(structural_support_strength_for("concrete"), 50);
+        assert_eq!(structural_support_strength_for("concrete_soft"), 50);
+        assert_eq!(structural_support_strength_for("reinforced"), 200);
+        assert_eq!(structural_support_strength_for("support_beam"), 500);
+        assert_eq!(structural_support_strength_for("unknown_alloy"), 0);
+    }
+
+    /// VAL-M14E-011: MaterialDef may carry an explicit override which wins
+    /// over the canonical baseline.
+    #[test]
+    fn material_def_structural_support_strength_uses_override() {
+        let mut v = registry_json();
+        v["materials"][0]["structural_support_strength"] = serde_json::json!(123);
+        let r: MaterialRegistry = serde_json::from_value(v).expect("parse");
+        assert_eq!(r.materials[0].structural_support_strength_value(), 123);
+    }
+
+    #[test]
+    fn material_def_structural_support_strength_falls_back_to_name_table() {
+        let mut v = registry_json();
+        v["materials"][0]["name"] = serde_json::json!("concrete");
+        let r: MaterialRegistry = serde_json::from_value(v).expect("parse");
+        assert_eq!(r.materials[0].structural_support_strength_value(), 50);
     }
 
     #[test]

@@ -60,6 +60,7 @@
 pub mod active_region;
 pub mod breach;
 pub mod carve;
+pub mod cave_in;
 pub mod checksum;
 pub mod chunk;
 pub mod chunked;
@@ -68,14 +69,25 @@ pub mod dirty;
 pub mod integrity;
 pub mod m14a_overlay;
 pub mod parallel;
+pub mod structural_integrity;
 pub use m14a_overlay::{material_thermal_contact, material_walk_modulator, ThermalContact, WalkModulator};
 
+pub use cave_in::{
+    cascade_neighbors_for_chunk, cave_in_chance_per_tick, cave_in_roll, falling_debris_count, CascadeNeighbor,
+    CaveInOutcome, CaveInPayload, CAVE_IN_BASE_COEFFICIENT, FALLING_DEBRIS_CAP, UNSUPPORTED_SPAN_FLOOR_PX,
+    VIBRATION_MODIFIER_BASELINE, VIBRATION_MODIFIER_PLASMA_CUTTER,
+};
 pub use chunked::{
     material_affordance, material_id_from_name, material_name_from_id, Chunk, ChunkCoord, ChunkedCarveNoOp,
     ChunkedCarveOutcome, ChunkedCarveRefusal, ChunkedCarveStats, ChunkedTerrain, ChunkedTerrainSnapshot,
     ChunkedTerrainSnapshotChunk, MaterialAffordance, MaterialId, MaterialRegistry, TerrainStamp, CHUNK_SIZE,
     MATERIAL_AIR, MATERIAL_ANCHOR, MATERIAL_CONCRETE, MATERIAL_DIRT, MATERIAL_HAZARD, MATERIAL_LOOSE_FILL,
-    MATERIAL_METAL_NOHOOK, MATERIAL_REPAIR_FILL, MATERIAL_SCHEMA_VERSION,
+    MATERIAL_METAL_NOHOOK, MATERIAL_REPAIR_FILL, MATERIAL_SCHEMA_VERSION, MATERIAL_SUPPORT_BEAM,
+};
+pub use structural_integrity::{
+    compute_integrity_pass, lock_radius_to_beam, unlock_radius, IntegrityField, IntegrityPassOutcome,
+    INTEGRITY_BEAM_LOCKED, INTEGRITY_CASCADE_THRESHOLD, INTEGRITY_FIELD_CELLS, INTEGRITY_FIELD_HEIGHT,
+    INTEGRITY_FIELD_WIDTH, INTEGRITY_LOCKED, INTEGRITY_PASS_CADENCE_TICKS,
 };
 pub use integrity::{
     apply_damage_formula, normalized_hardness, BandCrossing, CascadeEvent, DamageKind, IntegrityBand,

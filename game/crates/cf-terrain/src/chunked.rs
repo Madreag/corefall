@@ -44,6 +44,11 @@ pub const MATERIAL_HAZARD: MaterialId = 4;
 pub const MATERIAL_LOOSE_FILL: MaterialId = 5;
 pub const MATERIAL_REPAIR_FILL: MaterialId = 6;
 pub const MATERIAL_ANCHOR: MaterialId = 7;
+/// **M14E** § Per-pixel structural integrity. Player-placed load-bearing
+/// reinforcement (T1 craftable, 2 iron + 1 wood per beam). Anchorable,
+/// non-piling, hardness=200 — locks the ±8-pixel integrity field around
+/// it to integrity 500 so cave-in roll is suppressed.
+pub const MATERIAL_SUPPORT_BEAM: MaterialId = 8;
 
 /// 256x256 chunk size — matches the canonical roadmap M2 scope ("256×256
 /// chunks; per-pixel material id; sparse storage"). Stored as `u32` so chunk
@@ -136,7 +141,7 @@ impl MaterialAffordance {
     }
 }
 
-const MATERIAL_TABLE: [MaterialAffordance; 8] = [
+const MATERIAL_TABLE: [MaterialAffordance; 9] = [
     MaterialAffordance {
         id: MATERIAL_AIR,
         name: "air",
@@ -361,6 +366,35 @@ const MATERIAL_TABLE: [MaterialAffordance; 8] = [
         // material is on the payload's `material` field.
         refusal_reason: Some("material_not_diggable"),
     },
+    // **M14E** § Per-pixel structural integrity. Player-placed support
+    // beam (T1 craftable). Hardness=200 + anchorable=true; non-piling so
+    // it doesn't pile-fill its neighbors. Locks the ±8-pixel structural
+    // integrity field around itself to 500 (load-bearing). Diggable so the
+    // demolish-beam scenario can remove it; blast clears at force >= 200.
+    MaterialAffordance {
+        id: MATERIAL_SUPPORT_BEAM,
+        name: "support_beam",
+        solid: true,
+        diggable: true,
+        hardness: 200.0,
+        anchorable: true,
+        hazard: false,
+        damage_per_tick: 0.0,
+        drillable: true,
+        blastable: true,
+        beam_cuttable: true,
+        projectile_passable: false,
+        actor_passable: false,
+        blocks_line_of_sight: true,
+        stickiness: 0.20,
+        restitution: 0.20,
+        friction: 0.6,
+        density: 2.0,
+        spawn_material: Some(MATERIAL_LOOSE_FILL),
+        path_cost: 1.0,
+        overlay_rgba: [110, 70, 30, 0xFF],
+        refusal_reason: None,
+    },
 ];
 
 /// Look up a material affordance by id. `None` if the id is outside the launch
@@ -391,6 +425,7 @@ pub fn material_id_from_name(name: &str) -> Option<MaterialId> {
         "loose_fill" => Some(MATERIAL_LOOSE_FILL),
         "repair_fill" => Some(MATERIAL_REPAIR_FILL),
         "anchor" => Some(MATERIAL_ANCHOR),
+        "support_beam" => Some(MATERIAL_SUPPORT_BEAM),
         _ => None,
     }
 }
