@@ -13,6 +13,8 @@
 
 use serde::{Deserialize, Serialize};
 
+use crate::joint::{evaluate_joint, fall_impulse_chain, Joint, JointEval};
+
 /// Ragdoll lifecycle state. Mirrors the actor's high-level status but
 /// tracks the *physics-authority* axis separately so the renderer can read
 /// it without recomputing.
@@ -134,6 +136,80 @@ pub fn step_ragdoll(
     }
 }
 
+/// **M14E** § Outcome of a cave-in falling-debris impulse landing on an
+/// actor underneath a collapsing tunnel ceiling. Carries both the damage
+/// to apply (per joint, via the existing M14 `fall_impulse_chain`) and
+/// the stance transition (KnockedDown). VAL-M14E-005 + VAL-M14E-027 +
+/// VAL-CROSS-007.
+#[derive(Debug, Clone, PartialEq)]
+pub struct CaveInImpulseOutcome {
+    /// Per-joint impulse evaluations after the chain. Empty when the
+    /// caller supplied no joints (caller falls back to a single-zone
+    /// damage record).
+    pub joint_evals: Vec<(String, JointEval)>,
+    /// True when the impulse magnitude crosses the
+    /// `min_knockdown_impulse` threshold and the actor should transition
+    /// to KnockedDown. Always true for cave-in impulses (per spec
+    /// literal "cave-in falling-debris impulse feeds existing ragdoll +
+    /// fall-damage chain (M14)" — knockdown is the M14E contract).
+    pub knockdown: bool,
+    /// Aggregate damage value the caller routes into actor HP. Sum of
+    /// each joint's propagated_damage so chassis HP is decremented
+    /// consistently with the existing M14 fall-damage path.
+    pub total_damage: f32,
+    /// Magnitude (N) of the inbound debris impulse. Echoed so callers
+    /// can log it onto the replay event payload.
+    pub debris_impulse: f32,
+}
+
+/// **M14E** § Cave-in falling-debris impulse → ragdoll + fall-damage chain.
+/// Drives `fall_impulse_chain` (per M14) over the actor's joint stack and
+/// then forces a KnockedDown transition on the actor regardless of joint
+/// outcomes (cave-in debris always knocks the actor down per spec literal).
+///
+/// `debris_pixel_count` is the falling-debris count emitted by
+/// `cf_terrain::falling_debris_count`. The impulse is computed as
+/// `debris_pixel_count × debris_mass_per_pixel × landing_velocity`,
+/// with a floor of 1.0 so even a token cave-in produces non-zero damage
+/// (VAL-M14E-005). Per VAL-M14E-027 the function additionally records
+/// the KnockedDown transition so the actor's stance flips on the same
+/// tick the fall-impulse damage routes through.
+#[must_use]
+pub fn cave_in_fall_impulse_chain(
+    debris_pixel_count: u32,
+    debris_mass_per_pixel: f32,
+    landing_velocity: f32,
+    mass_kg: f32,
+    joints: &[(String, Joint)],
+) -> CaveInImpulseOutcome {
+    let pixel_mass = (debris_pixel_count as f32) * debris_mass_per_pixel.max(0.0);
+    let effective_mass = (mass_kg.max(0.0) + pixel_mass).max(1.0);
+    let evals = fall_impulse_chain(landing_velocity, effective_mass, joints);
+    let total_damage = evals.iter().map(|(_, e)| e.propagated_damage).sum::<f32>();
+    let debris_impulse = landing_velocity.abs() * pixel_mass.max(0.0);
+    CaveInImpulseOutcome {
+        joint_evals: evals,
+        knockdown: true,
+        total_damage,
+        debris_impulse,
+    }
+}
+
+/// **M14E** § Single-joint cave-in impulse path. Used when callers want
+/// to evaluate a focused-zone hit (e.g. the actor's torso) without
+/// running the full chain. Always reports `knockdown = true` (cave-in
+/// debris is destabilizing by spec).
+#[must_use]
+pub fn cave_in_joint_impulse(joint: Joint, impulse: f32) -> CaveInImpulseOutcome {
+    let eval = evaluate_joint(joint, impulse);
+    CaveInImpulseOutcome {
+        joint_evals: vec![("torso".to_string(), eval)],
+        knockdown: true,
+        total_damage: eval.propagated_damage,
+        debris_impulse: impulse,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -179,5 +255,51 @@ mod tests {
         let r2 = step_ragdoll(r, -980.0, 1.0 / 60.0, 0.0, 16.0, -2000.0);
         assert!((r2.position.1 - 16.0).abs() < 1e-3);
         assert!((r2.velocity.1).abs() < f32::EPSILON);
+    }
+
+    /// VAL-M14E-005 + VAL-M14E-027: cave-in falling-debris impulse routes
+    /// through fall_impulse_chain (damage propagates) AND forces the
+    /// actor into KnockedDown.
+    #[test]
+    fn cave_in_chain_propagates_damage_and_forces_knockdown() {
+        let joints = vec![
+            (
+                "foot_left".to_string(),
+                Joint::default_for_zone("foot_left"),
+            ),
+            (
+                "shin_left".to_string(),
+                Joint::default_for_zone("shin_left"),
+            ),
+            ("torso".to_string(), Joint::default_for_zone("torso")),
+        ];
+        let outcome = cave_in_fall_impulse_chain(96, 1.0, 12.0, 80.0, &joints);
+        assert!(outcome.knockdown, "cave-in must force KnockedDown");
+        assert_eq!(outcome.joint_evals.len(), 3);
+        assert!(
+            outcome.total_damage > 0.0,
+            "cave-in impulse must damage at least one joint"
+        );
+        assert!(outcome.debris_impulse > 0.0);
+    }
+
+    /// VAL-M14E-005: an empty joint stack still records knockdown so the
+    /// caller can route the damage path even when no chassis data is
+    /// available.
+    #[test]
+    fn cave_in_chain_handles_empty_joints() {
+        let outcome = cave_in_fall_impulse_chain(96, 1.0, 12.0, 80.0, &[]);
+        assert!(outcome.knockdown);
+        assert!(outcome.joint_evals.is_empty());
+        assert!(outcome.debris_impulse > 0.0);
+    }
+
+    #[test]
+    fn cave_in_joint_impulse_records_propagated_damage_and_knockdown() {
+        let joint = Joint::default_for_zone("torso");
+        let outcome = cave_in_joint_impulse(joint, 500.0);
+        assert!(outcome.knockdown);
+        assert_eq!(outcome.joint_evals.len(), 1);
+        assert!(outcome.total_damage > 0.0);
     }
 }

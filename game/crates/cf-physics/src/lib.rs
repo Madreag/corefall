@@ -83,7 +83,9 @@ pub use projectile::{
     ENERGY_CANCEL_MIN_ANGLE_DEG, KINETIC_DEFLECT_ENERGY_RETAINED, KINETIC_DEFLECT_MIN_ANGLE_DEG,
     NARROWPHASE_CANDIDATE_BUDGET,
 };
-pub use ragdoll::{step_ragdoll, Ragdoll, RagdollState};
+pub use ragdoll::{
+    cave_in_fall_impulse_chain, cave_in_joint_impulse, step_ragdoll, CaveInImpulseOutcome, Ragdoll, RagdollState,
+};
 pub use sharpness::{decay_damage, DecayBand, SharpnessInputs, SharpnessOutcome};
 pub use swept::{
     prioritize_mixed_swept_candidates, prioritize_swept_collisions, ProjectilePairKey, ResolvedSweptCandidate,

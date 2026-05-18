@@ -1,0 +1,42 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/terrain_support_beam_placed.v1",
+  "title": "terrain.support_beam_placed",
+  "description": "M14E support-beam placement event. Emitted when the player uses the `support_beam_placer` tool: writes id=8 (support_beam) material at the target, debits 2 iron + 1 wood from the actor inventory, and locks the integrity field ±8 px around the target to integrity 500.",
+  "type": "object",
+  "required": ["actor_id", "world_pos", "chunk_id", "cost"],
+  "properties": {
+    "actor_id": {
+      "type": "integer",
+      "description": "Actor id of the player who placed the beam."
+    },
+    "world_pos": {
+      "type": "array",
+      "description": "World-space placement position as [x, y] (pixels).",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": { "type": "number" }
+    },
+    "chunk_id": {
+      "type": "array",
+      "description": "Chunk coordinate the placement landed in.",
+      "items": { "type": "integer" },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "cost": {
+      "type": "object",
+      "description": "Inventory delta the placement applied. Per spec: `2 iron + 1 wood`.",
+      "required": ["iron", "wood"],
+      "properties": {
+        "iron": { "type": "integer", "minimum": 0 },
+        "wood": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "footprint_half_px": {
+      "type": "integer",
+      "description": "Half-extent (pixels) of the beam footprint written to the terrain. Default 8 → 16-pixel beam.",
+      "minimum": 0
+    }
+  }
+}

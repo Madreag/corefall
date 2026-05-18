@@ -1,0 +1,55 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/terrain_cave_in_triggered.v1",
+  "title": "terrain.cave_in_triggered",
+  "description": "M14E cave-in event emitted when the per-tick cave-in roll fires on a chunk whose `structural_integrity_field` dropped below the cave-in threshold. Drives the `cave_in_thunder` audio cue, the falling-debris particle cone, and the M14 `fall_impulse_chain` damage path on actors underneath.",
+  "type": "object",
+  "required": ["chunk_id", "bbox", "falling_debris_count", "unsupported_span_px", "cascade_primary"],
+  "properties": {
+    "chunk_id": {
+      "type": "array",
+      "description": "Chunk coordinate as [cx, cy] in chunk-space.",
+      "items": { "type": "integer" },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "bbox": {
+      "type": "object",
+      "description": "Inclusive pixel-space AABB of the collapsing ceiling region.",
+      "required": ["min", "max"],
+      "properties": {
+        "min": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "integer" } },
+        "max": { "type": "array", "minItems": 2, "maxItems": 2, "items": { "type": "integer" } }
+      }
+    },
+    "falling_debris_count": {
+      "type": "integer",
+      "description": "Number of falling-debris pixels spawned. min(span_px × ceiling_thickness, 200).",
+      "minimum": 0,
+      "maximum": 200
+    },
+    "unsupported_span_px": {
+      "type": "integer",
+      "description": "Unsupported tunnel span (pixels) that drove the cave-in roll.",
+      "minimum": 0
+    },
+    "vibration_modifier": {
+      "type": "number",
+      "description": "Vibration modifier the roll consumed (1.0 baseline; 2.0 plasma cutter)."
+    },
+    "chance_per_tick": {
+      "type": "number",
+      "description": "Per-tick cave-in probability the roll consumed.",
+      "minimum": 0.0
+    },
+    "cascade_primary": {
+      "type": "boolean",
+      "description": "True when this cave-in is the primary trigger; false when secondary (cascaded from a neighbor chunk)."
+    },
+    "ceiling_thickness_px": {
+      "type": "integer",
+      "description": "Ceiling thickness (pixels) used in the falling_debris_count formula.",
+      "minimum": 0
+    }
+  }
+}

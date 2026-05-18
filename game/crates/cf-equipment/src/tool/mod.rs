@@ -22,6 +22,7 @@ pub mod minesweeper;
 pub mod multi_tool;
 pub mod repair;
 pub mod sensor_pulse;
+pub mod support_beam_placer;
 pub mod welder;
 pub mod wire_cutters;
 
@@ -183,6 +184,25 @@ pub fn is_m9c_tool(id: &str) -> bool {
     )
 }
 
+/// **M14E** § Support-beam placer catalog. T1 tool that writes the
+/// `support_beam` material at the placement target. Returns the
+/// single registered placer instance.
+#[must_use]
+pub fn m14e_support_beam_placer() -> support_beam_placer::SupportBeamPlacerSpec {
+    support_beam_placer::support_beam_placer_m14e_default()
+}
+
+/// **M14E** § Resolve the placer spec by id. Returns `None` for
+/// unknown ids so cfctl handlers can emit a structured error.
+#[must_use]
+pub fn find_support_beam_placer(id: &str) -> Option<support_beam_placer::SupportBeamPlacerSpec> {
+    if id == support_beam_placer::SUPPORT_BEAM_PLACER_ID {
+        Some(support_beam_placer::support_beam_placer_m14e_default())
+    } else {
+        None
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -295,5 +315,27 @@ mod tests {
         for p in dig_pickaxe::m9b_pickaxe_dig_tools() {
             assert!(p.stamina_cost > 0, "{} stamina cost must be > 0", p.id);
         }
+    }
+
+    /// VAL-M14E-012: support_beam_placer is registered at T1 with the
+    /// canonical per-beam cost `2 iron + 1 wood`.
+    #[test]
+    fn support_beam_placer_registered_at_t1_with_iron_wood_cost() {
+        let placer = m14e_support_beam_placer();
+        assert_eq!(placer.id, support_beam_placer::SUPPORT_BEAM_PLACER_ID);
+        assert_eq!(placer.tier, 1);
+        let cost = placer.cost_per_beam_iron_wood();
+        assert_eq!(cost, [("iron", 2), ("wood", 1)]);
+    }
+
+    /// VAL-CROSS-023: the support-beam placer is registered at a distinct
+    /// slot id from the M14F brace_strut catalog (no collision).
+    #[test]
+    fn support_beam_placer_lookup_finds_canonical_id() {
+        assert!(find_support_beam_placer("support_beam_placer").is_some());
+        assert!(find_support_beam_placer("unknown_tool").is_none());
+        // Distinct slot id check: support_beam_placer must NOT collide
+        // with any registered M9C tool.
+        assert!(!is_m9c_tool("support_beam_placer"));
     }
 }

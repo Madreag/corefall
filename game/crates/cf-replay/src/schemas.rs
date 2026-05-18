@@ -144,6 +144,14 @@ const SCHEMA_ARMOR_ERA_PRE_DETONATED: &str = include_str!("../schemas/event/armo
 // **M14D** — Projectile-Projectile CCD event schema (one new schema).
 const SCHEMA_COLLISION_PROJECTILE_PAIR_CONTACT: &str =
     include_str!("../schemas/event/collision_projectile_pair_contact.json");
+// **M14E** — Tunnel collapse + structural-integrity-field event schemas.
+const SCHEMA_TERRAIN_STRUCTURAL_INTEGRITY_LOW: &str =
+    include_str!("../schemas/event/terrain_structural_integrity_low.json");
+const SCHEMA_TERRAIN_CAVE_IN_TRIGGERED: &str = include_str!("../schemas/event/terrain_cave_in_triggered.json");
+const SCHEMA_TERRAIN_SUPPORT_BEAM_PLACED: &str = include_str!("../schemas/event/terrain_support_beam_placed.json");
+const SCHEMA_TERRAIN_SUPPORT_BEAM_DESTROYED: &str =
+    include_str!("../schemas/event/terrain_support_beam_destroyed.json");
+const SCHEMA_TERRAIN_TERRAIN_CASCADE: &str = include_str!("../schemas/event/terrain_terrain_cascade.json");
 const SCHEMA_ARMOR_SCHURZEN_PRE_DETONATED: &str = include_str!("../schemas/event/armor_schurzen_pre_detonated.json");
 const SCHEMA_ARMOR_MULTI_HIT_DEGRADATION: &str = include_str!("../schemas/event/armor_multi_hit_degradation.json");
 const SCHEMA_ARMOR_REACTIVE_ARMOR_CONSUMED: &str = include_str!("../schemas/event/armor_reactive_armor_consumed.json");
@@ -599,6 +607,12 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("armor", "era_pre_detonated") => Some(SCHEMA_ARMOR_ERA_PRE_DETONATED),
         // **M14D** § projectile-projectile CCD pair-contact event.
         ("collision", "projectile_pair_contact") => Some(SCHEMA_COLLISION_PROJECTILE_PAIR_CONTACT),
+        // **M14E** § structural-integrity + tunnel-collapse events.
+        ("terrain", "structural_integrity_low") => Some(SCHEMA_TERRAIN_STRUCTURAL_INTEGRITY_LOW),
+        ("terrain", "cave_in_triggered") => Some(SCHEMA_TERRAIN_CAVE_IN_TRIGGERED),
+        ("terrain", "support_beam_placed") => Some(SCHEMA_TERRAIN_SUPPORT_BEAM_PLACED),
+        ("terrain", "support_beam_destroyed") => Some(SCHEMA_TERRAIN_SUPPORT_BEAM_DESTROYED),
+        ("terrain", "terrain_cascade") => Some(SCHEMA_TERRAIN_TERRAIN_CASCADE),
         ("armor", "schurzen_pre_detonated") => Some(SCHEMA_ARMOR_SCHURZEN_PRE_DETONATED),
         ("armor", "multi_hit_degradation") => Some(SCHEMA_ARMOR_MULTI_HIT_DEGRADATION),
         ("armor", "reactive_armor_consumed") => Some(SCHEMA_ARMOR_REACTIVE_ARMOR_CONSUMED),
@@ -1304,6 +1318,12 @@ mod tests {
             ("armor", "era_pre_detonated"),
             // M14D § projectile-projectile CCD pair-contact event.
             ("collision", "projectile_pair_contact"),
+            // M14E § structural-integrity + tunnel-collapse events.
+            ("terrain", "structural_integrity_low"),
+            ("terrain", "cave_in_triggered"),
+            ("terrain", "support_beam_placed"),
+            ("terrain", "support_beam_destroyed"),
+            ("terrain", "terrain_cascade"),
             // M5 internal.* family.
             ("internal", "organ_damaged"),
             ("internal", "organ_destroyed"),

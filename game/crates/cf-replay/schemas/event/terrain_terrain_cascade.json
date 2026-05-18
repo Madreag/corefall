@@ -1,0 +1,34 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/terrain_terrain_cascade.v1",
+  "title": "terrain.terrain_cascade",
+  "description": "M14E neighbor-chunk cascade event. Fires alongside a secondary `terrain.cave_in_triggered` (per VAL-M14E-018/-026) so renderer + audio can chain visual + audio continuity from the primary collapse to its neighbor. Reuses the M18 sabotage-scenario `terrain_cascade` family per spec literal.",
+  "type": "object",
+  "required": ["primary_chunk_id", "secondary_chunk_id", "cascade_kind"],
+  "properties": {
+    "primary_chunk_id": {
+      "type": "array",
+      "description": "Chunk coord of the primary cave-in.",
+      "items": { "type": "integer" },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "secondary_chunk_id": {
+      "type": "array",
+      "description": "Chunk coord of the neighbor that received the cascade.",
+      "items": { "type": "integer" },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "cascade_kind": {
+      "type": "string",
+      "description": "Cascade discriminator. `cave_in` for M14E ceiling cave-in.",
+      "enum": ["cave_in"]
+    },
+    "tick_delta": {
+      "type": "integer",
+      "description": "Ticks between the primary cave-in and this cascade event.",
+      "minimum": 0
+    }
+  }
+}

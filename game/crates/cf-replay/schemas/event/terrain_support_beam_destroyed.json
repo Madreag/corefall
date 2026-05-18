@@ -1,0 +1,38 @@
+{
+  "$schema": "http://json-schema.org/draft-2020-12/schema",
+  "$id": "cf-replay/event/terrain_support_beam_destroyed.v1",
+  "title": "terrain.support_beam_destroyed",
+  "description": "M14E support-beam destruction event. Emitted when a placed `support_beam` is demolished (player demolish-tool, blast, or cumulative integrity damage). Unlocks the integrity-field ±8 px around the beam and queues `compute_integrity_pass` on the affected chunk within ≤5 ticks (so a `terrain.structural_integrity_low` may fire on the same chain).",
+  "type": "object",
+  "required": ["world_pos", "chunk_id", "cause"],
+  "properties": {
+    "world_pos": {
+      "type": "array",
+      "description": "World-space position of the destroyed beam as [x, y] (pixels).",
+      "minItems": 2,
+      "maxItems": 2,
+      "items": { "type": "number" }
+    },
+    "chunk_id": {
+      "type": "array",
+      "description": "Chunk coordinate the destruction landed in.",
+      "items": { "type": "integer" },
+      "minItems": 2,
+      "maxItems": 2
+    },
+    "cause": {
+      "type": "string",
+      "description": "Reason the beam was destroyed: 'demolish' (player tool), 'blast' (explosive), 'cascade' (cave-in propagation), 'reactor_breach' (M9 explosion).",
+      "enum": ["demolish", "blast", "cascade", "reactor_breach"]
+    },
+    "actor_id": {
+      "type": "integer",
+      "description": "Optional actor id of the demolisher (when cause == 'demolish')."
+    },
+    "footprint_half_px": {
+      "type": "integer",
+      "description": "Half-extent (pixels) of the beam footprint the destruction cleared. Default 8.",
+      "minimum": 0
+    }
+  }
+}
