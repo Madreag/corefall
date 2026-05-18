@@ -828,6 +828,18 @@ pub struct ControlIntent {
     /// once per held press regardless of `fire_held`.
     #[serde(default)]
     pub fire_held: bool,
+    /// **M14C** § per-shot ammo-kind override surfaced by
+    /// `cfctl.act.player.fire { ammo_kind: ... }`. Edge-triggered (cleared
+    /// alongside `fire` in `clear_edges`). `None` = use the weapon's default
+    /// primary round per `RifleSpec::primary_round`. `Some(RoundKind::Heat)`
+    /// / `Some(RoundKind::Apfsds)` routes the fired shot through the M14C
+    /// HEAT / APFSDS producer pipeline so the cfctl drive of
+    /// `m14c_heat_vs_era.ron` / `m14c_apfsds_vs_heavy.ron` emits the expected
+    /// `armor.heat_jet_traversed` / `armor.apfsds_long_rod_through` /
+    /// `armor.era_pre_detonated` events in the replay log per
+    /// VAL-M14C-007/008/009/010/011/012/019/020/023/026.
+    #[serde(default)]
+    pub ammo_kind: Option<cf_equipment::RoundKind>,
 }
 
 impl Default for IntentSource {
@@ -856,6 +868,7 @@ impl ControlIntent {
         self.use_tool = false;
         self.crouch = false;
         self.prone = false;
+        self.ammo_kind = None;
     }
 
     /// Returns true when no actively-driven input is present. `aim` is a

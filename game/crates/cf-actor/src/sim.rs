@@ -483,10 +483,20 @@ pub struct SpawnedProjectile {
     /// **M1**: total particles in this shot. =1 for single-round weapons.
     #[serde(default = "default_particle_count_in_shot")]
     pub particle_count: u32,
+    /// **M14C** § round-kind discriminator for this spawned projectile so
+    /// downstream M14C HEAT / APFSDS producers can route on the right path
+    /// (HEAT → `heat_impact_producer`, APFSDS → `apfsds_impact_producer`,
+    /// other kinds → existing M14 traversal path).
+    #[serde(default = "default_round_kind_in_shot")]
+    pub round_kind: cf_equipment::RoundKind,
 }
 
 fn default_particle_count_in_shot() -> u32 {
     1
+}
+
+fn default_round_kind_in_shot() -> cf_equipment::RoundKind {
+    cf_equipment::RoundKind::Regular
 }
 
 /// Projectile that flew off the map / outlasted its budget without hitting anything.
@@ -956,7 +966,26 @@ fn step_one_actor<R: FnMut() -> u64>(
         let (popped_round, shell_ejection) = {
             let _mag_capacity = spec.mag_capacity.max(1);
             let mag_remaining = state.rifles.get(&actor_id).map_or(0, |r| r.ammo_in_mag);
-            let round_kind = if rifle_outcomes.fired_is_tracer {
+            // **M14C** § round-kind resolution priority:
+            //   1. `intent.ammo_kind` — per-shot override from cfctl
+            //      `act.player.fire { ammo_kind: ... }` (e.g. HEAT / APFSDS
+            //      for tank-grade rounds).
+            //   2. `spec.primary_round` when it is NOT Regular — every M14C
+            //      tank-grade RifleSpec (`rpg_launcher_v1`, `tank_autocannon_t3`)
+            //      bakes the canonical primary kind into the preset so the
+            //      magazine pops HEAT / APFSDS even when no cfctl override
+            //      is provided.
+            //   3. Tracer cadence — preserves M1 byte-identical Tracer vs
+            //      Regular interleave per `tracer_round_to_total_ratio`.
+            let round_kind = if let Some(kind) = intent.ammo_kind {
+                kind
+            } else if spec.primary_round != cf_equipment::RoundKind::Regular {
+                if rifle_outcomes.fired_is_tracer {
+                    cf_equipment::RoundKind::Tracer
+                } else {
+                    spec.primary_round
+                }
+            } else if rifle_outcomes.fired_is_tracer {
                 cf_equipment::RoundKind::Tracer
             } else {
                 cf_equipment::RoundKind::Regular
@@ -1095,6 +1124,7 @@ fn step_one_actor<R: FnMut() -> u64>(
                 is_tracer: rifle_outcomes.fired_is_tracer,
                 particle_index: particle_idx,
                 particle_count,
+                round_kind: popped_round.round_kind,
             });
         }
         // M1: alternating recoil accumulator (CCCP HDFirearm.cpp:891) — each
