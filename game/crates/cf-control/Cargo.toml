@@ -51,6 +51,8 @@ cf-squad-ui = { path = "../cf-squad-ui" }
 cf-save = { path = "../cf-save" }
 cf-net = { path = "../cf-net" }
 cf-render-2d = { path = "../cf-render-2d", default-features = false }
+cf-wound = { path = "../cf-wound" }
+cf-environment = { path = "../cf-environment" }
 
 [dev-dependencies]
 anyhow = { workspace = true }
@@ -59,7 +61,6 @@ cf-tools-replay-viewer = { path = "../cf-tools-replay-viewer" }
 cf-replay-export = { path = "../cf-replay-export" }
 cf-audio = { path = "../cf-audio" }
 cf-asset-ledger = { path = "../cf-asset-ledger" }
-cf-environment = { path = "../cf-environment" }
 cf-ui = { path = "../cf-ui" }
 blake3 = { workspace = true }
 hex = { workspace = true }

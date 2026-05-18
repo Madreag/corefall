@@ -280,7 +280,7 @@ mod tests {
         for (impulse, expected) in cases {
             let got = classify_fall_fracture(zone.clone(), *impulse, threshold)
                 .map(|e| e.kind);
-            assert_eq!(got, *expected, "impulse {} → {:?}, expected {:?}", impulse, got, expected);
+            assert_eq!(got, *expected, "impulse {impulse} → {got:?}, expected {expected:?}");
         }
     }
 

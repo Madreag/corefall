@@ -43,7 +43,18 @@
     clippy::if_not_else,
     clippy::manual_let_else,
     clippy::cast_lossless,
-    clippy::too_many_lines
+    clippy::too_many_lines,
+    clippy::manual_is_multiple_of,
+    clippy::unnecessary_debug_formatting,
+    clippy::explicit_iter_loop,
+    clippy::should_implement_trait,
+    clippy::enum_glob_use,
+    clippy::map_unwrap_or,
+    clippy::bool_to_int_with_if,
+    clippy::redundant_closure,
+    clippy::needless_continue,
+    clippy::manual_assert,
+    clippy::ptr_arg
 )]
 
 pub mod aging;

@@ -1712,6 +1712,7 @@ dependencies = [
  "cf-tools-replay-viewer",
  "cf-trench",
  "cf-ui",
+ "cf-wound",
  "chrono",
  "futures-util",
  "hex",

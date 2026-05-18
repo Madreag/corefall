@@ -1440,6 +1440,14 @@ pub(crate) struct EngineMutable {
     /// **M14F § VAL-M14F-016**: lateral integrity pass invocation
     /// count. Equal to `floor(T / 15)` after T ticks.
     pub(crate) m14f_lateral_pass_invocations: u64,
+    /// **M14G § VAL-M14G-046**: total invocations of the wound-aging
+    /// pass. Equal to the number of engine ticks since boot (one
+    /// invocation per tick).
+    pub(crate) m14g_wound_aging_invocations: u64,
+    /// **M14G**: per-engine WoundSpec registry, populated lazily from the
+    /// baked defaults on first use so cf-control does not need to read
+    /// content files at engine boot.
+    pub(crate) m14g_wound_registry: Option<cf_wound::WoundSpecRegistry>,
     /// **M14F § VAL-M14F-009**: per-actor flood-contact flag. Tick at
     /// which the actor was first registered as submerged / damp after
     /// a dam rupture.
@@ -2212,6 +2220,8 @@ impl M0Engine {
                 m14e_plasma_cutter_active: BTreeMap::new(),
                 m14f_lateral_chunks,
                 m14f_lateral_pass_invocations: 0,
+                m14g_wound_aging_invocations: 0,
+                m14g_wound_registry: None,
                 m14f_actor_submerged_tick: BTreeMap::new(),
                 m14f_actor_vacuum_tick: BTreeMap::new(),
                 m14f_breach_fluid_mass: BTreeMap::new(),
@@ -4895,6 +4905,13 @@ impl M0Engine {
             // after the ceiling pass so the union per-chunk budget is
             // bounded by VAL-CROSS-006.
             self.tick_m14f_lateral_collapse(tick, sim_time_ms);
+            // **M14G § VAL-M14G-025 / VAL-M14G-046**: per-tick wound
+            // aging pass. Increments `age_ticks` every tick on every
+            // wound; commits visible-state mutations (bandage soak,
+            // scab, scar, dirt escalation, Frostbite → Necrosis) every
+            // 5 ticks. Does NOT roll infection chance (deferred to
+            // M14H per VAL-M14G-047).
+            self.tick_m14g_wound_aging(tick, sim_time_ms);
             // **M12B** § Per-tick doppler emission for in-flight
             // projectiles. Spec § "Doppler shift on supersonic projectile
             // flyby": "audio.doppler_shifted fires per tick with the
@@ -9461,6 +9478,87 @@ impl M0Engine {
     }
 
     /// **M14F § VAL-M14F-002 / VAL-M14F-016**: per-tick lateral
+    /// **M14G § VAL-M14G-025 / VAL-M14G-046 / VAL-M14G-033**: per-tick
+    /// wound aging pass. Increments `age_ticks` every tick + commits
+    /// visible-state mutations every 5 ticks. Emits `wound.aged` /
+    /// `wound.scabbed` / `wound.scarred` events. Does NOT roll
+    /// infection chance (deferred to M14H — VAL-M14G-047).
+    fn tick_m14g_wound_aging(&self, tick: Tick, sim_time_ms: f64) {
+        use cf_wound::aging::{AgingEvent, AgingNewState};
+        let mut emitted_events: Vec<serde_json::Value> = Vec::new();
+        if let Ok(mut s) = self.state.write() {
+            s.m14g_wound_aging_invocations =
+                s.m14g_wound_aging_invocations.saturating_add(1);
+            if s.m14g_wound_registry.is_none() {
+                s.m14g_wound_registry = Some(cf_wound::WoundSpecRegistry::baked_default());
+            }
+            let tick_rate = s.clock.config().tick_rate_hz;
+            // Pull the registry out of the option so the borrow on actors
+            // can run without re-borrowing the mutable option.
+            let registry = s.m14g_wound_registry.clone().unwrap_or_default();
+            if let Some(sim) = s.actor_state.as_mut() {
+                for (actor_id, actor) in sim.world.actors.iter_mut() {
+                    let events = cf_wound::aging::aging_tick_pass(
+                        &mut actor.m14g_wound_list,
+                        &registry,
+                        tick.0,
+                        tick_rate,
+                    );
+                    for ev in events {
+                        match ev {
+                            AgingEvent::Aged { wound_id, zone, new_state } => {
+                                emitted_events.push(serde_json::json!({
+                                    "category": "wound",
+                                    "event_type": "aged",
+                                    "actor_id": actor_id.0,
+                                    "tick": tick.0,
+                                    "zone": zone.as_str(),
+                                    "wound_id": wound_id.0,
+                                    "new_state": new_state.as_str(),
+                                }));
+                                let _ = AgingNewState::BandageSoaked;
+                            }
+                            AgingEvent::Scabbed { wound_id, zone, kind } => {
+                                emitted_events.push(serde_json::json!({
+                                    "category": "wound",
+                                    "event_type": "scabbed",
+                                    "actor_id": actor_id.0,
+                                    "tick": tick.0,
+                                    "zone": zone.as_str(),
+                                    "wound_id": wound_id.0,
+                                    "kind": kind.as_str(),
+                                }));
+                            }
+                            AgingEvent::Scarred { wound_id, zone, kind } => {
+                                emitted_events.push(serde_json::json!({
+                                    "category": "wound",
+                                    "event_type": "scarred",
+                                    "actor_id": actor_id.0,
+                                    "tick": tick.0,
+                                    "zone": zone.as_str(),
+                                    "wound_id": wound_id.0,
+                                    "kind": kind.as_str(),
+                                }));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        for ev in emitted_events {
+            let cat = ev["category"].as_str().unwrap_or("wound").to_string();
+            let ty = ev["event_type"].as_str().unwrap_or("aged").to_string();
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                &cat,
+                &ty,
+                ev,
+                None,
+            );
+        }
+    }
+
     /// integrity pass. Runs at the same N=15 cadence as the M14E
     /// ceiling pass (per VAL-CROSS-005 — single buffer, two axes).
     /// Drives the bulging → crack_advanced → rupture cascade per
@@ -19469,6 +19567,50 @@ fn build_checksum_bytes(state: &EngineMutable) -> Vec<u8> {
         out.extend_from_slice(&id.to_le_bytes());
         out.extend_from_slice(&ttl.to_le_bytes());
     }
+    // **M14G § VAL-CROSS-029**: hash the M14E + M14F transient state that
+    // ships with this mission so save → load → save round-trips byte-
+    // identically. Append-only — never reorder existing fields.
+    out.extend_from_slice(&(state.m14e_chunks.len() as u64).to_le_bytes());
+    for id in state.m14e_chunks.keys() {
+        out.extend_from_slice(&id.0.to_le_bytes());
+        out.extend_from_slice(&id.1.to_le_bytes());
+    }
+    out.extend_from_slice(&(state.m14e_actor_resources.len() as u64).to_le_bytes());
+    for (actor_id, deltas) in &state.m14e_actor_resources {
+        out.extend_from_slice(&actor_id.to_le_bytes());
+        out.extend_from_slice(&(deltas.len() as u64).to_le_bytes());
+        for (k, v) in deltas {
+            out.extend_from_slice(k.as_bytes());
+            out.push(0);
+            out.extend_from_slice(&v.to_le_bytes());
+        }
+    }
+    out.extend_from_slice(&(state.m14f_lateral_chunks.len() as u64).to_le_bytes());
+    for id in state.m14f_lateral_chunks.keys() {
+        out.extend_from_slice(&id.0.to_le_bytes());
+        out.extend_from_slice(&id.1.to_le_bytes());
+    }
+    out.extend_from_slice(&state.m14f_lateral_pass_invocations.to_le_bytes());
+    out.extend_from_slice(&(state.m14f_actor_submerged_tick.len() as u64).to_le_bytes());
+    for (k, v) in &state.m14f_actor_submerged_tick {
+        out.extend_from_slice(&k.to_le_bytes());
+        out.extend_from_slice(&v.to_le_bytes());
+    }
+    out.extend_from_slice(&(state.m14f_actor_vacuum_tick.len() as u64).to_le_bytes());
+    for (k, v) in &state.m14f_actor_vacuum_tick {
+        out.extend_from_slice(&k.to_le_bytes());
+        out.extend_from_slice(&v.to_le_bytes());
+    }
+    out.extend_from_slice(&(state.m14f_breach_fluid_mass.len() as u64).to_le_bytes());
+    for (id, m) in &state.m14f_breach_fluid_mass {
+        out.extend_from_slice(&id.0.to_le_bytes());
+        out.extend_from_slice(&id.1.to_le_bytes());
+        out.extend_from_slice(&m.to_le_bytes());
+    }
+    // M14G — wound aging pass invocation counter (already covered by per-actor
+    // wound list inside `actor_state.checksum_bytes`, but include the counter
+    // here so independent cadence drift is observable on the engine level).
+    out.extend_from_slice(&state.m14g_wound_aging_invocations.to_le_bytes());
     out
 }
 

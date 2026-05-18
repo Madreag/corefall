@@ -13,7 +13,7 @@
 //!   the scorer can sum contributions across an actor.
 
 use cf_wound::registry::ZoneId;
-use cf_wound::severity::{SeverityBand, BAND_LABEL_CRITICAL};
+use cf_wound::severity::SeverityBand;
 use cf_wound::{ActorWoundList, Wound, WoundKind, WoundVisibleState};
 
 pub const MAX_BADGES_PER_ZONE: usize = 5;
@@ -150,6 +150,7 @@ pub enum WoundBadgeVariant {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use cf_wound::severity::BAND_LABEL_CRITICAL;
     use cf_wound::{WoundId, WoundKind};
 
     fn mk_wound(id: u64, kind: WoundKind, severity: f32, zone: &str) -> Wound {
@@ -231,9 +232,10 @@ mod tests {
     #[test]
     fn badge_decal_id_and_caption_mapping() {
         let zone = ZoneId::from("torso_front");
-        let mut wounds = Vec::new();
-        wounds.push(mk_wound(1, WoundKind::LacerationLight, 0.2, "torso_front"));
-        wounds.push(mk_wound(2, WoundKind::Burn3rd, 0.85, "torso_front"));
+        let wounds = vec![
+            mk_wound(1, WoundKind::LacerationLight, 0.2, "torso_front"),
+            mk_wound(2, WoundKind::Burn3rd, 0.85, "torso_front"),
+        ];
         let badges = render_zone(zone, &wounds, |k| format!("decal.{}", k.as_str()));
         // Sorted severity-descending → Burn3rd first.
         assert_eq!(badges[0].kind, Some(WoundKind::Burn3rd));
