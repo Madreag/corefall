@@ -50,6 +50,7 @@ cf-killcam = { path = "../cf-killcam" }
 cf-squad-ui = { path = "../cf-squad-ui" }
 cf-save = { path = "../cf-save" }
 cf-net = { path = "../cf-net" }
+cf-render-2d = { path = "../cf-render-2d", default-features = false }
 
 [dev-dependencies]
 anyhow = { workspace = true }

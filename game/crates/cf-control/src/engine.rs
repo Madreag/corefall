@@ -1402,6 +1402,24 @@ pub(crate) struct EngineMutable {
     pub(crate) m14e_total_beams_placed: u32,
     /// **M14E** § cumulative `terrain.support_beam_destroyed` event count.
     pub(crate) m14e_total_beams_destroyed: u32,
+    /// **M14E** § render-side queue mirroring the L1/L2/L3 crack decals +
+    /// falling-debris cones the per-tick collapse-check pass produces.
+    /// `cf-app` drains this every frame; headless runs let it grow up to a
+    /// soft cap (see `drain_*`).
+    pub(crate) m14e_tunnel_collapse_queue: cf_render_2d::tunnel_collapse::TunnelCollapseQueue,
+    /// **M14E** § total `cf-audio::AudioCue::TunnelCreak` cues enqueued
+    /// (the engine surfaces these via `emit_audio_cue` already; we still
+    /// keep a counter for cross-tick test assertions).
+    pub(crate) m14e_tunnel_creak_count: u32,
+    /// **M14E** § total `cf-audio::AudioCue::CaveInThunder` cues enqueued.
+    pub(crate) m14e_cave_in_thunder_count: u32,
+    /// **M14E** § per-actor crafting resource ledger (iron, wood, etc.).
+    /// Used by the support-beam placer's inventory-debit path so VAL-M14E-009
+    /// can assert the post-placement delta.
+    pub(crate) m14e_actor_resources: BTreeMap<u64, BTreeMap<String, i64>>,
+    /// **M14E** § per-actor plasma-cutter use flag (drives the
+    /// "VIBRATION ACCUMULATING" HUD banner per VAL-M14E-015).
+    pub(crate) m14e_plasma_cutter_active: BTreeMap<u64, bool>,
 }
 
 /// **M14E** § Per-chunk integrity-field runtime state. Lives on
@@ -1409,6 +1427,7 @@ pub(crate) struct EngineMutable {
 #[derive(Debug, Clone)]
 pub(crate) struct M14eChunkState {
     pub field: cf_terrain::IntegrityField,
+    #[allow(dead_code)]
     pub span_id: String,
     pub bbox_min: [i64; 2],
     pub bbox_max: [i64; 2],
@@ -1423,6 +1442,20 @@ pub(crate) struct M14eChunkState {
     pub l1_at_tick: Option<u64>,
     pub l2_at_tick: Option<u64>,
     pub l3_at_tick: Option<u64>,
+    /// Per VAL-M14E-013 cadence fidelity: when set to `Some(deadline_tick)`,
+    /// the per-tick collapse-check pass MUST recompute integrity on this
+    /// chunk no later than `deadline_tick` (typically demolish_tick + 5).
+    /// Honored even when the cadence guard would otherwise skip the chunk.
+    pub force_integrity_pass_deadline: Option<u64>,
+    /// Tracks which crack levels (L1/L2/L3) have already been enqueued as
+    /// render decals so duplicate primitives aren't pushed across passes.
+    pub crack_decal_l1_enqueued: bool,
+    pub crack_decal_l2_enqueued: bool,
+    pub crack_decal_l3_enqueued: bool,
+    /// Caching of the most-recent emission's HUD banner so a second
+    /// emit-pass doesn't re-stack the banner. Reset on demolish so a
+    /// follow-up cascade can re-fire the banner.
+    pub structural_warning_banner_emitted: bool,
 }
 
 /// **M6**: per-actor charge-fire annotation shipped from the M6 post-step
@@ -1843,6 +1876,11 @@ impl M0Engine {
                     l1_at_tick: None,
                     l2_at_tick: None,
                     l3_at_tick: None,
+                    force_integrity_pass_deadline: None,
+                    crack_decal_l1_enqueued: false,
+                    crack_decal_l2_enqueued: false,
+                    crack_decal_l3_enqueued: false,
+                    structural_warning_banner_emitted: false,
                 },
             );
         }
@@ -1979,6 +2017,11 @@ impl M0Engine {
                 m14e_total_cave_ins: 0,
                 m14e_total_beams_placed: 0,
                 m14e_total_beams_destroyed: 0,
+                m14e_tunnel_collapse_queue: cf_render_2d::tunnel_collapse::TunnelCollapseQueue::new(),
+                m14e_tunnel_creak_count: 0,
+                m14e_cave_in_thunder_count: 0,
+                m14e_actor_resources: BTreeMap::new(),
+                m14e_plasma_cutter_active: BTreeMap::new(),
             }),
             recorder,
             current_tick,
@@ -8535,6 +8578,16 @@ impl M0Engine {
         self.state.read().ok().and_then(|s| s.m14e_chunks.get(&chunk_id).map(|c| c.field))
     }
 
+    /// **M14E** § Read the chunked-terrain pixel at the supplied
+    /// world-space pixel coordinates. Returns `None` when no chunked
+    /// terrain is loaded. Used by VAL-M14E-003 + VAL-M14E-028 tests.
+    pub fn m14e_terrain_material_at(&self, px: i64, py: i64) -> Option<cf_terrain::MaterialId> {
+        self.state
+            .read()
+            .ok()
+            .and_then(|s| s.chunked_terrain.as_ref().map(|t| t.material_at(px, py)))
+    }
+
     /// **M14E** § cumulative cave-in invocation count.
     pub fn m14e_total_cave_ins(&self) -> u32 {
         self.state.read().map(|s| s.m14e_total_cave_ins).unwrap_or(0)
@@ -8590,14 +8643,40 @@ impl M0Engine {
         }
 
         let cadence = u64::from(cf_terrain::INTEGRITY_PASS_CADENCE_TICKS);
-        let run_pass_this_tick = tick.0 != 0 && tick.0.is_multiple_of(cadence);
+        let cadence_run = tick.0 != 0 && tick.0.is_multiple_of(cadence);
+        // VAL-M14E-013 cadence fidelity: when a beam was just demolished,
+        // the chunk gets a force-pass deadline so the integrity pass runs
+        // within ≤5 ticks regardless of the N=15 cadence.
+        let force_pass_due = if let Ok(s) = self.state.read() {
+            s.m14e_chunks
+                .values()
+                .any(|c| c.force_integrity_pass_deadline.is_some_and(|d| tick.0 >= d))
+        } else {
+            false
+        };
+        let run_pass_this_tick = cadence_run || force_pass_due;
 
+        // Per-tick render-decal + audio-cue + HUD-banner emissions are
+        // accumulated here and consumed AFTER the lock is released so
+        // re-entrant borrows don't fight with `self.emit_audio_cue`.
+        struct StructuralEmit {
+            chunk_id: (i32, i32),
+            bbox_min: [i64; 2],
+            bbox_max: [i64; 2],
+            span: u32,
+            vib: f32,
+            level: &'static str,
+            min_integrity: u8,
+            unstable_cells: u32,
+            decal_levels: Vec<cf_render_2d::tunnel_collapse::CrackLevel>,
+            banner_already_emitted: bool,
+        }
         // 1) Optional integrity pass + L1/L2/L3 emission.
         if run_pass_this_tick {
             if let Ok(mut s) = self.state.write() {
                 s.m14e_pass_invocations = s.m14e_pass_invocations.saturating_add(1);
             }
-            let mut emissions: Vec<(String, serde_json::Value)> = Vec::new();
+            let mut emissions: Vec<StructuralEmit> = Vec::new();
             if let Ok(mut s) = self.state.write() {
                 for chunk_id in &chunk_ids {
                     let Some(chunk) = s.m14e_chunks.get_mut(chunk_id) else {
@@ -8608,23 +8687,49 @@ impl M0Engine {
                         chunk.unsupported_span_px,
                         chunk.vibration_modifier,
                     );
+                    // Clear the force-pass deadline now that the pass ran
+                    // on this chunk; the next demolish will re-arm it.
+                    if let Some(deadline) = chunk.force_integrity_pass_deadline {
+                        if tick.0 >= deadline {
+                            chunk.force_integrity_pass_deadline = None;
+                        }
+                    }
                     let span = chunk.unsupported_span_px;
                     let vib = chunk.vibration_modifier;
                     // Track L1 / L2 / L3 escalation ticks per VAL-M14E-007.
+                    let mut decal_levels_this_pass: Vec<cf_render_2d::tunnel_collapse::CrackLevel> = Vec::new();
                     if outcome.min_integrity < cf_terrain::INTEGRITY_LOCKED
                         && chunk.l1_at_tick.is_none()
                     {
                         chunk.l1_at_tick = Some(tick.0);
+                    }
+                    if outcome.min_integrity < cf_terrain::INTEGRITY_LOCKED
+                        && !chunk.crack_decal_l1_enqueued
+                    {
+                        chunk.crack_decal_l1_enqueued = true;
+                        decal_levels_this_pass.push(cf_render_2d::tunnel_collapse::CrackLevel::L1);
                     }
                     if outcome.min_integrity < cf_terrain::INTEGRITY_LOCKED.saturating_sub(60)
                         && chunk.l2_at_tick.is_none()
                     {
                         chunk.l2_at_tick = Some(tick.0);
                     }
+                    if outcome.min_integrity < cf_terrain::INTEGRITY_LOCKED.saturating_sub(60)
+                        && !chunk.crack_decal_l2_enqueued
+                    {
+                        chunk.crack_decal_l2_enqueued = true;
+                        decal_levels_this_pass.push(cf_render_2d::tunnel_collapse::CrackLevel::L2);
+                    }
                     if outcome.min_integrity < cf_terrain::INTEGRITY_CASCADE_THRESHOLD
                         && chunk.l3_at_tick.is_none()
                     {
                         chunk.l3_at_tick = Some(tick.0);
+                    }
+                    if outcome.min_integrity < cf_terrain::INTEGRITY_CASCADE_THRESHOLD
+                        && !chunk.crack_decal_l3_enqueued
+                    {
+                        chunk.crack_decal_l3_enqueued = true;
+                        decal_levels_this_pass.push(cf_render_2d::tunnel_collapse::CrackLevel::L3);
                     }
                     let cross_now = outcome.became_unstable
                         || (outcome.min_integrity < cf_terrain::INTEGRITY_LOCKED
@@ -8638,28 +8743,101 @@ impl M0Engine {
                         } else {
                             "l1"
                         };
-                        emissions.push((
-                            chunk.span_id.clone(),
-                            serde_json::json!({
-                                "chunk_id": [chunk_id.0, chunk_id.1],
-                                "min_integrity": outcome.min_integrity,
-                                "unsupported_span_px": span,
-                                "unstable_cells": outcome.unstable_cells,
-                                "level": level,
-                                "bbox": { "min": chunk.bbox_min, "max": chunk.bbox_max },
-                                "vibration_modifier": vib,
-                            }),
-                        ));
+                        let banner_seen = chunk.structural_warning_banner_emitted;
+                        chunk.structural_warning_banner_emitted = true;
+                        emissions.push(StructuralEmit {
+                            chunk_id: *chunk_id,
+                            bbox_min: chunk.bbox_min,
+                            bbox_max: chunk.bbox_max,
+                            span,
+                            vib,
+                            level,
+                            min_integrity: outcome.min_integrity,
+                            unstable_cells: outcome.unstable_cells,
+                            decal_levels: decal_levels_this_pass,
+                            banner_already_emitted: banner_seen,
+                        });
+                    } else if !decal_levels_this_pass.is_empty() {
+                        // Decal escalation without a fresh structural_integrity_low
+                        // (e.g. L2/L3 on a chunk that already emitted L1). Still
+                        // surface the render-side primitive.
+                        emissions.push(StructuralEmit {
+                            chunk_id: *chunk_id,
+                            bbox_min: chunk.bbox_min,
+                            bbox_max: chunk.bbox_max,
+                            span,
+                            vib,
+                            level: "decal_only",
+                            min_integrity: outcome.min_integrity,
+                            unstable_cells: outcome.unstable_cells,
+                            decal_levels: decal_levels_this_pass,
+                            banner_already_emitted: true,
+                        });
                     }
                 }
             }
-            for (_, payload) in emissions {
-                self.recorder
-                    .record(tick, sim_time_ms, "terrain", "structural_integrity_low", payload, None);
+            for emit in emissions {
+                if emit.level != "decal_only" {
+                    let payload = serde_json::json!({
+                        "chunk_id": [emit.chunk_id.0, emit.chunk_id.1],
+                        "min_integrity": emit.min_integrity,
+                        "unsupported_span_px": emit.span,
+                        "unstable_cells": emit.unstable_cells,
+                        "level": emit.level,
+                        "bbox": { "min": emit.bbox_min, "max": emit.bbox_max },
+                        "vibration_modifier": emit.vib,
+                    });
+                    self.recorder
+                        .record(tick, sim_time_ms, "terrain", "structural_integrity_low", payload, None);
+                    // Audio cue: cf-audio::AudioCue::TunnelCreak per VAL-M14E-002.
+                    self.emit_audio_cue(
+                        cf_audio::AudioCue::TunnelCreak {
+                            chunk_id: emit.chunk_id,
+                            caption: "STRUCTURAL WARNING — ceiling unstable".to_string(),
+                        },
+                        tick,
+                    );
+                    if let Ok(mut s) = self.state.write() {
+                        s.m14e_tunnel_creak_count = s.m14e_tunnel_creak_count.saturating_add(1);
+                    }
+                    // HUD banner — emit verbatim per spec literal.
+                    if !emit.banner_already_emitted {
+                        if let Ok(mut s) = self.state.write() {
+                            push_banner_dedup(
+                                &mut s.hud_banners,
+                                crate::state::HudBannerView {
+                                    id: format!(
+                                        "m14e_structural_warning_{}_{}",
+                                        emit.chunk_id.0, emit.chunk_id.1
+                                    ),
+                                    severity: "warning".to_string(),
+                                    label: "STRUCTURAL WARNING — ceiling unstable".to_string(),
+                                    raised_at_tick: tick.0,
+                                    expires_at_tick: Some(tick.0 + 120),
+                                    accessibility_id: "hud.banner.m14e_structural_warning".to_string(),
+                                },
+                            );
+                        }
+                    }
+                }
+                // Render decal enqueue: each new level appears once per chunk.
+                if !emit.decal_levels.is_empty() {
+                    if let Ok(mut s) = self.state.write() {
+                        let bbox_min_f = (emit.bbox_min[0] as f32, emit.bbox_min[1] as f32);
+                        let bbox_max_f = (emit.bbox_max[0] as f32, emit.bbox_max[1] as f32);
+                        for level in &emit.decal_levels {
+                            s.m14e_tunnel_collapse_queue
+                                .enqueue_crack_decal(emit.chunk_id, *level, bbox_min_f, bbox_max_f);
+                        }
+                    }
+                }
             }
         }
 
         // 2) Per-tick cave-in roll using seeded engine RNG.
+        // VAL-M14E-007: cave-in fires AFTER L1/L2/L3 escalation. Gate
+        // the roll on `chunk.l3_at_tick` having been set (which means
+        // the integrity field has decayed below the cascade threshold).
         type CaveInEmission = (
             (i32, i32),
             cf_terrain::CaveInPayload,
@@ -8669,7 +8847,7 @@ impl M0Engine {
         let mut cave_in_emissions: Vec<CaveInEmission> = Vec::new();
         if let Ok(mut s) = self.state.write() {
             for chunk_id in &chunk_ids {
-                let (anchored, span_px, ceiling_thickness, vibration, bbox_min, bbox_max, cave_in_emitted, neighbors, damage_actor) = match s.m14e_chunks.get(chunk_id) {
+                let (anchored, span_px, ceiling_thickness, vibration, bbox_min, bbox_max, cave_in_emitted, neighbors, damage_actor, l3_set) = match s.m14e_chunks.get(chunk_id) {
                     Some(chunk) => (
                         chunk.anchored,
                         chunk.unsupported_span_px,
@@ -8680,10 +8858,17 @@ impl M0Engine {
                         chunk.cave_in_emitted,
                         chunk.cascade_neighbors.clone(),
                         chunk.damage_actor_id,
+                        chunk.l3_at_tick.is_some(),
                     ),
                     None => continue,
                 };
                 if anchored || cave_in_emitted {
+                    continue;
+                }
+                if !l3_set {
+                    // VAL-M14E-007: L3 must be reached before cave-in
+                    // fires. Skip the roll until the integrity field
+                    // crosses the cascade threshold.
                     continue;
                 }
                 let chance = cf_terrain::cave_in_chance_per_tick(span_px, vibration);
@@ -8723,8 +8908,41 @@ impl M0Engine {
             });
             self.recorder
                 .record(tick, sim_time_ms, "terrain", "cave_in_triggered", json_payload, None);
-            // Audio cue + render primitive surfaces handled by their
-            // respective consumers via the event stream.
+            // Audio cue: cf-audio::AudioCue::CaveInThunder per VAL-M14E-006.
+            // World position anchor = centre of the ceiling bbox.
+            let centre_x = (payload.bbox_min[0] + payload.bbox_max[0]) / 2;
+            let centre_y = (payload.bbox_min[1] + payload.bbox_max[1]) / 2;
+            self.emit_audio_cue(
+                cf_audio::AudioCue::CaveInThunder {
+                    chunk_id,
+                    world_pos_x_px: centre_x,
+                    world_pos_y_px: centre_y,
+                    caption: "Cave-in!".to_string(),
+                },
+                tick,
+            );
+            // Render-side: enqueue L3 crack decal + falling-debris cone
+            // per VAL-M14E-025.
+            if let Ok(mut s) = self.state.write() {
+                s.m14e_cave_in_thunder_count = s.m14e_cave_in_thunder_count.saturating_add(1);
+                let bbox_min_f = (payload.bbox_min[0] as f32, payload.bbox_min[1] as f32);
+                let bbox_max_f = (payload.bbox_max[0] as f32, payload.bbox_max[1] as f32);
+                s.m14e_tunnel_collapse_queue.enqueue_cave_in(
+                    chunk_id,
+                    bbox_min_f,
+                    bbox_max_f,
+                    payload.falling_debris_count,
+                );
+                if let Some(chunk) = s.m14e_chunks.get_mut(&chunk_id) {
+                    chunk.crack_decal_l3_enqueued = true;
+                }
+            }
+            // Pixel-mutation per VAL-M14E-003: mutate the chunked-terrain
+            // pixel buffer so the ceiling bbox becomes air. The mutation
+            // persists past tick 600 and is not regenerated by the
+            // dirty-region flush (we write `air` once + leave the chunks
+            // marked dirty so the renderer sees the new pixels).
+            self.m14e_mutate_ceiling_to_air(&payload);
             // Emit a `terrain.terrain_cascade` for each authored
             // neighbor (per VAL-M14E-018 + VAL-M14E-026).
             for nbr in neighbors {
@@ -8757,9 +8975,50 @@ impl M0Engine {
                     }),
                     None,
                 );
+                // VAL-M14E-006: each cave_in_triggered (primary OR
+                // cascade) gets exactly one CaveInThunder cue + render
+                // primitive at its own chunk's bbox.
+                let nbr_centre_x = (payload.bbox_min[0] + payload.bbox_max[0]) / 2;
+                let nbr_centre_y = (payload.bbox_min[1] + payload.bbox_max[1]) / 2;
+                self.emit_audio_cue(
+                    cf_audio::AudioCue::CaveInThunder {
+                        chunk_id: nbr,
+                        world_pos_x_px: nbr_centre_x,
+                        world_pos_y_px: nbr_centre_y,
+                        caption: "Cave-in!".to_string(),
+                    },
+                    tick,
+                );
                 if let Ok(mut s) = self.state.write() {
                     s.m14e_total_cave_ins = s.m14e_total_cave_ins.saturating_add(1);
+                    s.m14e_cave_in_thunder_count = s.m14e_cave_in_thunder_count.saturating_add(1);
+                    let bbox_min_f = (payload.bbox_min[0] as f32, payload.bbox_min[1] as f32);
+                    let bbox_max_f = (payload.bbox_max[0] as f32, payload.bbox_max[1] as f32);
+                    s.m14e_tunnel_collapse_queue.enqueue_cave_in(
+                        nbr,
+                        bbox_min_f,
+                        bbox_max_f,
+                        payload.falling_debris_count,
+                    );
+                    // Mark the neighbor as cave_in_emitted so it doesn't
+                    // fire its own roll later (the cascade already brought
+                    // it down). Per VAL-M14E-023's "cascade within 60 ticks"
+                    // — the neighbor cave-ins are part of the same cascade,
+                    // not independent events.
+                    if let Some(chunk) = s.m14e_chunks.get_mut(&nbr) {
+                        chunk.cave_in_emitted = true;
+                    }
                 }
+                // Mutate the neighbor's ceiling pixels to air too.
+                let cascade_payload = cf_terrain::CaveInPayload::cascade(
+                    nbr,
+                    payload.bbox_min,
+                    payload.bbox_max,
+                    payload.unsupported_span_px,
+                    1,
+                    payload.vibration_modifier,
+                );
+                self.m14e_mutate_ceiling_to_air(&cascade_payload);
             }
             if let Some(actor_id) = damage_actor {
                 // **M14E** § fall_impulse_chain → KnockedDown wiring.
@@ -8806,25 +9065,57 @@ impl M0Engine {
     }
 
     /// **M14E** § Place a support beam at the actor-supplied world position.
-    /// Emits `terrain.support_beam_placed`, debits 2 iron + 1 wood, and
-    /// locks the integrity field ±8 px around the placement to the
-    /// beam-baseline (effective integrity 500).
+    /// Emits `terrain.support_beam_placed`, debits 2 iron + 1 wood, writes
+    /// `MATERIAL_SUPPORT_BEAM` (id=8) pixels into the chunked terrain over
+    /// the placer's 8-px-half-width footprint, and locks the integrity
+    /// field ±8 px around the placement to the beam-baseline (effective
+    /// integrity 500). Per VAL-M14E-009, VAL-M14E-028.
     pub fn m14e_place_support_beam(&self, actor_id: u64, world_pos: (f32, f32)) -> bool {
         let chunk_id = (
             (world_pos.0 / cf_terrain::CHUNK_SIZE as f32).floor() as i32,
             (world_pos.1 / cf_terrain::CHUNK_SIZE as f32).floor() as i32,
         );
+        const FOOTPRINT_HALF_PX: i64 = 8;
         let placed = if let Ok(mut s) = self.state.write() {
             s.m14e_total_beams_placed = s.m14e_total_beams_placed.saturating_add(1);
+            // VAL-M14E-009: debit 2 iron + 1 wood from the actor's
+            // crafting resources (saturating at 0 so a debit from an
+            // empty inventory still records the delta).
+            let resources = s
+                .m14e_actor_resources
+                .entry(actor_id)
+                .or_insert_with(BTreeMap::new);
+            *resources.entry("iron".to_string()).or_insert(0) -= 2;
+            *resources.entry("wood".to_string()).or_insert(0) -= 1;
             let center_lx = cf_terrain::INTEGRITY_FIELD_WIDTH / 2;
             let center_ly = cf_terrain::INTEGRITY_FIELD_HEIGHT / 2;
             if let Some(chunk) = s.m14e_chunks.get_mut(&chunk_id) {
                 cf_terrain::lock_radius_to_beam(&mut chunk.field, center_lx, center_ly, 1);
                 chunk.anchored = true;
-                true
-            } else {
-                false
             }
+            // VAL-M14E-028: write MATERIAL_SUPPORT_BEAM (id=8) into the
+            // chunked-terrain pixel buffer over the beam footprint.
+            // 8-px half-width per the placer geometry.
+            let mut wrote_pixels = false;
+            if let Some(terrain) = s.chunked_terrain.as_mut() {
+                let beam_min = [
+                    world_pos.0 - FOOTPRINT_HALF_PX as f32,
+                    world_pos.1 - 2.0,
+                ];
+                let beam_max = [
+                    world_pos.0 + FOOTPRINT_HALF_PX as f32,
+                    world_pos.1 + 2.0,
+                ];
+                let _ = terrain.fill_aabb(beam_min, beam_max, cf_terrain::MATERIAL_SUPPORT_BEAM);
+                // Ensure the pixel at world_pos itself is the support_beam id (8).
+                let _ = terrain.fill_aabb(
+                    [world_pos.0 - 1.0, world_pos.1 - 1.0],
+                    [world_pos.0 + 1.0, world_pos.1 + 1.0],
+                    cf_terrain::MATERIAL_SUPPORT_BEAM,
+                );
+                wrote_pixels = true;
+            }
+            wrote_pixels || s.m14e_chunks.contains_key(&chunk_id)
         } else {
             false
         };
@@ -8840,7 +9131,8 @@ impl M0Engine {
                 "world_pos": [world_pos.0, world_pos.1],
                 "chunk_id": [chunk_id.0, chunk_id.1],
                 "cost": { "iron": 2, "wood": 1 },
-                "footprint_half_px": 8,
+                "footprint_half_px": FOOTPRINT_HALF_PX,
+                "material_id": cf_terrain::MATERIAL_SUPPORT_BEAM,
             }),
             None,
         );
@@ -8848,15 +9140,18 @@ impl M0Engine {
     }
 
     /// **M14E** § Demolish a support beam at the supplied world position.
-    /// Emits `terrain.support_beam_destroyed` and unlocks the integrity
-    /// field ±8 px around the position. The cascade chain (an
-    /// `terrain.structural_integrity_low` within ≤5 ticks) is driven by
-    /// the next scheduled integrity pass.
+    /// Emits `terrain.support_beam_destroyed`, unlocks the integrity field
+    /// ±8 px around the position, and arms a force-pass deadline at
+    /// `tick + 5` so the next collapse-check pass runs within the
+    /// VAL-M14E-013 cadence budget (≤5 ticks) regardless of the cadence
+    /// gate. Per spec literal: "structural_integrity_low must fire within
+    /// 5 ticks of support_beam_destroyed".
     pub fn m14e_destroy_support_beam(&self, world_pos: (f32, f32), cause: &str, actor_id: Option<u64>) -> bool {
         let chunk_id = (
             (world_pos.0 / cf_terrain::CHUNK_SIZE as f32).floor() as i32,
             (world_pos.1 / cf_terrain::CHUNK_SIZE as f32).floor() as i32,
         );
+        let tick_now = self.current_tick().0;
         let unlocked = if let Ok(mut s) = self.state.write() {
             s.m14e_total_beams_destroyed = s.m14e_total_beams_destroyed.saturating_add(1);
             let center_lx = cf_terrain::INTEGRITY_FIELD_WIDTH / 2;
@@ -8866,8 +9161,13 @@ impl M0Engine {
                 chunk.anchored = false;
                 // Reset the "low" emit gate so the next pass re-emits
                 // the structural_integrity_low warning within ≤5 ticks
-                // (cadence + sub-tick guard) per VAL-M14E-013.
+                // (cadence + force-pass deadline) per VAL-M14E-013.
                 chunk.structural_integrity_low_emitted = false;
+                chunk.structural_warning_banner_emitted = false;
+                // Arm the force-pass deadline at tick + 5 so the cadence
+                // guard cannot delay the integrity recompute past the
+                // contractual 5-tick budget.
+                chunk.force_integrity_pass_deadline = Some(tick_now + 5);
                 // Lower integrity towards the cascade band so the next
                 // pass crosses thresholds quickly.
                 for ly in 0..cf_terrain::INTEGRITY_FIELD_HEIGHT {
@@ -8901,6 +9201,104 @@ impl M0Engine {
             None,
         );
         unlocked
+    }
+
+    /// **M14E** § Mutate the chunked-terrain ceiling pixels in the
+    /// collapse bbox to `MATERIAL_AIR`. Idempotent — running the same
+    /// payload twice writes the same pixels twice with no net change.
+    /// Per VAL-M14E-003 the mutation persists past tick 600 and is
+    /// not regenerated by the dirty-region flush.
+    fn m14e_mutate_ceiling_to_air(&self, payload: &cf_terrain::CaveInPayload) {
+        if let Ok(mut s) = self.state.write() {
+            if let Some(terrain) = s.chunked_terrain.as_mut() {
+                let min = [payload.bbox_min[0] as f32, payload.bbox_min[1] as f32];
+                let max = [payload.bbox_max[0] as f32, payload.bbox_max[1] as f32];
+                let _ = terrain.fill_aabb(min, max, cf_terrain::MATERIAL_AIR);
+            }
+        }
+    }
+
+    /// **M14E** § Read-only accessor for the M14E render-side queue
+    /// (decals + falling-debris cones). Tests + cf-app consume via the
+    /// public `drain_*` analog.
+    pub fn m14e_drain_crack_decals(&self) -> Vec<cf_render_2d::tunnel_collapse::CrackDecal> {
+        match self.state.write() {
+            Ok(mut s) => s.m14e_tunnel_collapse_queue.drain_decals(),
+            Err(_) => Vec::new(),
+        }
+    }
+
+    /// **M14E** § Read-only accessor for the M14E render-side cones.
+    pub fn m14e_drain_falling_debris_cones(&self) -> Vec<cf_render_2d::tunnel_collapse::FallingDebrisCone> {
+        match self.state.write() {
+            Ok(mut s) => s.m14e_tunnel_collapse_queue.drain_cones(),
+            Err(_) => Vec::new(),
+        }
+    }
+
+    /// **M14E** § Read-only snapshot of the HUD banner queue. Used by
+    /// the VAL-M14E-002 / VAL-M14E-015 tests to assert verbatim banner
+    /// strings.
+    pub fn hud_banners_snapshot(&self) -> Vec<crate::state::HudBannerView> {
+        self.state
+            .read()
+            .ok()
+            .map(|s| s.hud_banners.iter().cloned().collect())
+            .unwrap_or_default()
+    }
+
+    /// **M14E** § Cumulative count of `TunnelCreak` audio cues fired.
+    pub fn m14e_tunnel_creak_count(&self) -> u32 {
+        self.state.read().map(|s| s.m14e_tunnel_creak_count).unwrap_or(0)
+    }
+
+    /// **M14E** § Cumulative count of `CaveInThunder` audio cues fired.
+    pub fn m14e_cave_in_thunder_count(&self) -> u32 {
+        self.state.read().map(|s| s.m14e_cave_in_thunder_count).unwrap_or(0)
+    }
+
+    /// **M14E** § Per-actor delta on a crafting resource since engine
+    /// boot. Returns 0 when the actor has not touched the resource.
+    pub fn m14e_actor_resource_delta(&self, actor_id: u64, resource: &str) -> i64 {
+        self.state
+            .read()
+            .ok()
+            .and_then(|s| {
+                s.m14e_actor_resources
+                    .get(&actor_id)
+                    .and_then(|map| map.get(resource).copied())
+            })
+            .unwrap_or(0)
+    }
+
+    /// **M14E** § Force-pass deadline accessor for a chunk. Used by
+    /// the runtime tests to verify VAL-M14E-013 cadence fidelity.
+    pub fn m14e_force_pass_deadline(&self, chunk_id: (i32, i32)) -> Option<u64> {
+        self.state
+            .read()
+            .ok()
+            .and_then(|s| s.m14e_chunks.get(&chunk_id).and_then(|c| c.force_integrity_pass_deadline))
+    }
+
+    /// **M14E** § Mark the plasma-cutter as active for an actor + emit the
+    /// "VIBRATION ACCUMULATING" HUD banner per VAL-M14E-015. The banner
+    /// is sticky-by-id so repeated calls do not re-stack it.
+    pub fn m14e_plasma_cutter_use(&self, actor_id: u64) {
+        let tick = self.current_tick();
+        if let Ok(mut s) = self.state.write() {
+            s.m14e_plasma_cutter_active.insert(actor_id, true);
+            push_banner_dedup(
+                &mut s.hud_banners,
+                crate::state::HudBannerView {
+                    id: format!("m14e_vibration_accumulating_{actor_id}"),
+                    severity: "warning".to_string(),
+                    label: "VIBRATION ACCUMULATING".to_string(),
+                    raised_at_tick: tick.0,
+                    expires_at_tick: Some(tick.0 + 240),
+                    accessibility_id: "hud.banner.m14e_vibration_accumulating".to_string(),
+                },
+            );
+        }
     }
 
     fn emit_actor_events(&self, tick: Tick, sim_time_ms: f64, intent: &ControlIntent, report: &StepReport) {

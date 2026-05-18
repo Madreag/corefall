@@ -1699,6 +1699,7 @@ dependencies = [
  "cf-photo",
  "cf-physics",
  "cf-priority",
+ "cf-render-2d",
  "cf-replay",
  "cf-replay-export",
  "cf-replay-scrub",
