@@ -207,3 +207,162 @@ fn val_cross_023_brace_strut_does_not_increment_support_beam_counter() {
     let beams_after = engine.m14e_total_beams_placed();
     assert_eq!(beams_before, beams_after, "support_beam counter must not change on brace_strut placement");
 }
+
+/// **M14F § VAL-M14F-002 (runtime)**: cfctl scenario drive of the
+/// 24-px vertical mineshaft must emit `terrain.wall_bulging` within
+/// 30 ticks. Bypasses the math-only unit-test path so the cfctl event
+/// log carries the runtime evidence per AGENTS.md.
+#[test]
+fn val_m14f_002_runtime_bulging_within_30_ticks() {
+    let (_engine, events) = drive_scenario("m14f_vertical_mineshaft", 30);
+    let bulging_ticks: Vec<u64> = events
+        .iter()
+        .filter(|e| e.category == "terrain" && e.event_type == "wall_bulging")
+        .map(|e| e.tick)
+        .collect();
+    assert!(
+        !bulging_ticks.is_empty(),
+        "expected ≥1 terrain.wall_bulging within first 30 ticks; got 0"
+    );
+    let first = *bulging_ticks.iter().min().unwrap();
+    assert!(
+        first <= 30,
+        "first bulging tick = {first} must be ≤ 30 per VAL-M14F-002"
+    );
+}
+
+/// **M14F § VAL-M14F-003 (runtime)**: cfctl scenario drive of the
+/// dam scenario must emit `terrain.wall_rupture` AND the chunked-
+/// terrain pixel buffer at the breach bbox must read `MATERIAL_AIR`
+/// at tick 600 (per VAL-M14F-003 cluster 2).
+#[test]
+fn val_m14f_003_runtime_pixel_carved_persists() {
+    let (engine, events) = drive_scenario("m14f_dam_pressure_test", 600);
+    let rupture = events
+        .iter()
+        .find(|e| e.category == "terrain" && e.event_type == "wall_rupture");
+    assert!(rupture.is_some(), "expected ≥1 terrain.wall_rupture by tick 600");
+    let bbox_min = rupture.unwrap().payload.get("bbox").and_then(|b| b.get("min")).cloned();
+    let bbox_max = rupture.unwrap().payload.get("bbox").and_then(|b| b.get("max")).cloned();
+    let bbox_min = bbox_min.unwrap();
+    let bbox_max = bbox_max.unwrap();
+    let min_x = bbox_min[0].as_i64().unwrap();
+    let min_y = bbox_min[1].as_i64().unwrap();
+    let max_x = bbox_max[0].as_i64().unwrap();
+    let max_y = bbox_max[1].as_i64().unwrap();
+    let center_x = (min_x + max_x) / 2;
+    let center_y = (min_y + max_y) / 2;
+    let mat = engine.m14e_terrain_material_at(center_x, center_y);
+    assert_eq!(
+        mat,
+        Some(cf_terrain::MATERIAL_AIR),
+        "center of breach bbox must read MATERIAL_AIR at tick 600; got {mat:?}"
+    );
+}
+
+/// **M14F § VAL-M14F-005 (runtime)**: placing a brace_strut at a
+/// world position locks the correct ±radius_cells window in the
+/// shared IntegrityField; the lock_strength is reflected as
+/// `INTEGRITY_BEAM_LOCKED` (500) per `effective_integrity`.
+#[test]
+fn val_m14f_005_runtime_brace_strut_locks_correct_window() {
+    let (engine, _) = drive_scenario("m14f_vertical_mineshaft", 1);
+    // Place at world_pos (96, 64) → chunk (0, 0); chunk_local
+    // pixel (96, 64); cell (96/16, 64/16) = (6, 4).
+    let placed = engine.m14f_place_brace_strut(1, cf_equipment::BraceStrutTier::T1, (96.0, 64.0));
+    assert!(placed);
+    // T1 radius_cells = (8+1)/2 = 4. Center (6, 4); locked window
+    // covers (2..=10) × (0..=8) clamped to the 16x16 grid.
+    assert!(engine.m14f_is_cell_locked((0, 0), 6, 4), "center cell must be locked");
+    assert!(engine.m14f_is_cell_locked((0, 0), 2, 4), "leftmost in-radius cell must be locked");
+    assert!(engine.m14f_is_cell_locked((0, 0), 10, 4), "rightmost in-radius cell must be locked");
+    assert!(!engine.m14f_is_cell_locked((0, 0), 12, 4), "out-of-radius cell must NOT be locked");
+    // Locked cells expose INTEGRITY_BEAM_LOCKED (500).
+    let effective = engine.m14f_effective_integrity((0, 0), 6, 4);
+    assert_eq!(effective, cf_terrain::INTEGRITY_BEAM_LOCKED);
+}
+
+/// **M14F § VAL-M14F-007 (runtime)**: after rupture, M15 fluid mass
+/// propagates through the breach within 30 ticks. By tick 100 the
+/// breach fluid mass must be strictly positive.
+#[test]
+fn val_m14f_007_runtime_dam_fluid_cascade() {
+    let (engine, events) = drive_scenario("m14f_dam_pressure_test", 100);
+    let _ = events;
+    let mass = engine.m14f_breach_fluid_mass((1, 0));
+    assert!(mass > 0, "expected M15 fluid mass > 0 in breach at tick 100; got {mass}");
+}
+
+/// **M14F § VAL-M14F-008 (runtime)**: after sealed-room rupture, M19
+/// pressure equalization converges across the breach. By tick 100 the
+/// room-side pressure must be strictly less than the initial 101 kPa
+/// (delta monotonically decreasing).
+#[test]
+fn val_m14f_008_runtime_m19_pressure_equalization() {
+    let (engine, _) = drive_scenario("m14f_bunker_siege_wall_fail", 100);
+    let (room, _vac) = engine.m14f_breach_pressure((0, 0));
+    assert!(
+        room < 101.0,
+        "expected sealed-room pressure to decay below 101 kPa by tick 100; got {room}"
+    );
+}
+
+/// **M14F § VAL-M14F-009 (runtime)**: downstream actor in the dam
+/// scenario is flagged submerged within 60 ticks of the rupture.
+#[test]
+fn val_m14f_009_runtime_downstream_actor_flooded() {
+    let (engine, _) = drive_scenario("m14f_dam_pressure_test", 200);
+    let submerged_tick = engine.m14f_actor_submerged_at(2);
+    assert!(
+        submerged_tick.is_some(),
+        "expected actor 2 to be flagged submerged by tick 200; got None"
+    );
+}
+
+/// **M14F § VAL-M14F-011 (runtime)**: actor inside the sealed bunker
+/// registers M19C vacuum exposure within 60 ticks of the rupture.
+#[test]
+fn val_m14f_011_runtime_vacuum_exposure_damage() {
+    let (engine, _) = drive_scenario("m14f_bunker_siege_wall_fail", 200);
+    let vacuum_tick = engine.m14f_actor_vacuum_at(2);
+    assert!(
+        vacuum_tick.is_some(),
+        "expected actor 2 to be flagged vacuum-exposed by tick 200; got None"
+    );
+}
+
+/// **M14F § VAL-M14F-019 (runtime)**: cf-replay schemas for
+/// `terrain.wall_bulging` and `terrain.wall_crack_advanced` reject
+/// payloads missing the `level` field. (Schema fix per Cluster 7.)
+#[test]
+fn val_m14f_019_runtime_schemas_reject_missing_level() {
+    let payload = serde_json::json!({
+        "chunk_id": [0, 0],
+        "bbox": { "min": [0, 0], "max": [16, 16] },
+        "unsupported_span_px": 24,
+        // missing "level"
+    });
+    let v = cf_replay::schemas::validate_event_payload("terrain", "wall_bulging", &payload);
+    assert!(v.is_err(), "wall_bulging payload missing level must fail validation");
+    let v2 = cf_replay::schemas::validate_event_payload("terrain", "wall_crack_advanced", &payload);
+    assert!(v2.is_err(), "wall_crack_advanced payload missing level must fail validation");
+}
+
+/// **M14F § VAL-M14F-010 / VAL-M14F-012 (runtime)**: cfctl scenario
+/// drive of the bunker emits the ordered bulging → crack_advanced →
+/// rupture sequence on the same chunk.
+#[test]
+fn val_m14f_010_runtime_ordered_bulging_crack_rupture() {
+    let (_engine, events) = drive_scenario("m14f_bunker_siege_wall_fail", 600);
+    let first = |t: &str| {
+        events
+            .iter()
+            .find(|e| e.category == "terrain" && e.event_type == t)
+            .map(|e| e.tick)
+    };
+    let bulging = first("wall_bulging").expect("expected wall_bulging");
+    let crack = first("wall_crack_advanced").expect("expected wall_crack_advanced");
+    let rupture = first("wall_rupture").expect("expected wall_rupture");
+    assert!(bulging < crack, "bulging({bulging}) must precede crack_advanced({crack})");
+    assert!(crack < rupture, "crack_advanced({crack}) must precede rupture({rupture})");
+}

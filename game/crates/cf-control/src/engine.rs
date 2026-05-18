@@ -9648,8 +9648,9 @@ impl M0Engine {
     ///   - The submerged-flag latch on actors caught in dam floods.
     fn m14f_advance_downstream_consumers(&self, tick: u64) {
         if let Ok(mut s) = self.state.write() {
-            // Collect chunk → (topology, downstream_actor, rupture_at_tick)
-            let lateral_snapshot: Vec<((i32, i32), String, Option<u64>, Option<u64>)> = s
+            // Collect chunk → (topology, downstream_actor, rupture_at_tick).
+            type LateralSnapshotEntry = ((i32, i32), String, Option<u64>, Option<u64>);
+            let lateral_snapshot: Vec<LateralSnapshotEntry> = s
                 .m14f_lateral_chunks
                 .iter()
                 .filter_map(|(k, v)| {
