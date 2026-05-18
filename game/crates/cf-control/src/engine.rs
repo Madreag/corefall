@@ -1488,6 +1488,14 @@ pub(crate) struct M14fLateralChunkState {
     pub rupture_emitted: bool,
     pub rupture_at_tick: Option<u64>,
     pub pixel_carved: bool,
+    /// **VAL-CROSS-024**: composite-cascade opt-in from the scenario
+    /// manifest. When `true`, a `terrain.wall_rupture` on this chunk
+    /// also cascades M14E cave-in on every `cascade_neighbors` chunk
+    /// whose state is owned by an M14E tunnel span (i.e.,
+    /// `m14f_owns_rupture_emit == false`). The default `false` keeps
+    /// standalone mineshafts / dams / sealed-rooms isolated from the
+    /// M14E ceiling cave-in surface.
+    pub m14e_composite_cascade_allowed: bool,
 }
 
 /// **M14E** § Per-chunk integrity-field runtime state. Lives on
@@ -1507,6 +1515,23 @@ pub(crate) struct M14eChunkState {
     pub damage_actor_id: Option<u64>,
     pub structural_integrity_low_emitted: bool,
     pub cave_in_emitted: bool,
+    /// **VAL-CROSS-024**: explicit per-chunk flag — `true` means an
+    /// M14F lateral wall span owns the rupture emit on this chunk, so
+    /// the M14E ceiling cave-in roll is suppressed. Distinct from
+    /// `cave_in_emitted` (which is the one-shot M14E rupture latch).
+    /// Setting this flag explicitly at scenario init (rather than
+    /// pre-asserting `cave_in_emitted = true` as the prior code did)
+    /// lets the composite dam-above-tunnel topology express both an
+    /// M14F lateral rupture AND an M14E ceiling cave-in cascade on
+    /// distinct chunks without aliasing the two suppression semantics.
+    pub m14f_owns_rupture_emit: bool,
+    /// **VAL-CROSS-024**: when set by the M14F lateral-pass cascade
+    /// (wall_rupture → tunnel cave-in), the next M14E cave-in roll on
+    /// this chunk fires deterministically — skipping the
+    /// [`cf_terrain::cave_in_roll`] RNG check — because the cascade
+    /// from the M14F rupture is itself deterministic. Cleared once
+    /// the resulting cave-in fires.
+    pub cave_in_pending_cascade: bool,
     pub l1_at_tick: Option<u64>,
     pub l2_at_tick: Option<u64>,
     pub l3_at_tick: Option<u64>,
@@ -1942,6 +1967,8 @@ impl M0Engine {
                     damage_actor_id: span.damage_actor_id,
                     structural_integrity_low_emitted: false,
                     cave_in_emitted: false,
+                    m14f_owns_rupture_emit: false,
+                    cave_in_pending_cascade: false,
                     l1_at_tick: None,
                     l2_at_tick: None,
                     l3_at_tick: None,
@@ -1967,6 +1994,18 @@ impl M0Engine {
             // Make sure the chunk has an entry in the shared map so the
             // lateral pass can borrow `chunk.field`. We re-use the M14E
             // chunk-state surface (single-buffer invariant).
+            // **VAL-CROSS-024**: explicit-flag suppression. On chunks
+            // created exclusively by M14F lateral wall init (no prior
+            // M14E ceiling span) `m14f_owns_rupture_emit = true` keeps
+            // the M14E cave-in roll off — the lateral pass owns the
+            // rupture surface there. Chunks that already have an M14E
+            // tunnel span keep their M14E-init value (false) so a
+            // composite "ceiling + wall on the same chunk_id" topology
+            // emits both events.  Setting
+            // `m14e_composite_cascade_allowed=true` does NOT flip this
+            // flag — it only opts the rupture into cascading M14E
+            // cave-in on its `cascade_neighbors`, see
+            // [`Self::m14f_cascade_rupture_to_m14e_neighbors`].
             m14e_chunks.entry(span.chunk_id).or_insert_with(|| M14eChunkState {
                 field: cf_terrain::IntegrityField::pristine(),
                 span_id: span.id.clone(),
@@ -1979,7 +2018,9 @@ impl M0Engine {
                 cascade_neighbors: span.cascade_neighbors.clone(),
                 damage_actor_id: span.downstream_actor_id,
                 structural_integrity_low_emitted: false,
-                cave_in_emitted: true, // lateral pass owns rupture; suppress ceiling cave-in
+                cave_in_emitted: false,
+                m14f_owns_rupture_emit: true,
+                cave_in_pending_cascade: false,
                 l1_at_tick: None,
                 l2_at_tick: None,
                 l3_at_tick: None,
@@ -2027,6 +2068,7 @@ impl M0Engine {
                     rupture_emitted: false,
                     rupture_at_tick: None,
                     pixel_carved: false,
+                    m14e_composite_cascade_allowed: span.m14e_composite_cascade_allowed,
                 },
             );
         }
@@ -9006,7 +9048,20 @@ impl M0Engine {
         let mut cave_in_emissions: Vec<CaveInEmission> = Vec::new();
         if let Ok(mut s) = self.state.write() {
             for chunk_id in &chunk_ids {
-                let (anchored, span_px, ceiling_thickness, vibration, bbox_min, bbox_max, cave_in_emitted, neighbors, damage_actor, l3_set) = match s.m14e_chunks.get(chunk_id) {
+                let (
+                    anchored,
+                    span_px,
+                    ceiling_thickness,
+                    vibration,
+                    bbox_min,
+                    bbox_max,
+                    cave_in_emitted,
+                    m14f_owns_rupture_emit,
+                    cave_in_pending_cascade,
+                    neighbors,
+                    damage_actor,
+                    l3_set,
+                ) = match s.m14e_chunks.get(chunk_id) {
                     Some(chunk) => (
                         chunk.anchored,
                         chunk.unsupported_span_px,
@@ -9015,6 +9070,8 @@ impl M0Engine {
                         chunk.bbox_min,
                         chunk.bbox_max,
                         chunk.cave_in_emitted,
+                        chunk.m14f_owns_rupture_emit,
+                        chunk.cave_in_pending_cascade,
                         chunk.cascade_neighbors.clone(),
                         chunk.damage_actor_id,
                         chunk.l3_at_tick.is_some(),
@@ -9024,19 +9081,41 @@ impl M0Engine {
                 if anchored || cave_in_emitted {
                     continue;
                 }
+                // **VAL-CROSS-024**: M14F lateral wall owns the
+                // rupture emit on this chunk — suppress the M14E
+                // ceiling cave-in roll. The composite-cascade opt-in
+                // (cave_in_pending_cascade) overrides this so the
+                // cascade-from-rupture path still fires.
+                if m14f_owns_rupture_emit && !cave_in_pending_cascade {
+                    continue;
+                }
                 if !l3_set {
                     // VAL-M14E-007: L3 must be reached before cave-in
                     // fires. Skip the roll until the integrity field
-                    // crosses the cascade threshold.
-                    continue;
+                    // crosses the cascade threshold. The pending-
+                    // cascade path bypasses this because the cascade
+                    // from the M14F rupture has already authored the
+                    // L3 state on this chunk.
+                    if !cave_in_pending_cascade {
+                        continue;
+                    }
                 }
                 let chance = cf_terrain::cave_in_chance_per_tick(span_px, vibration);
-                if chance <= 0.0 {
+                if chance <= 0.0 && !cave_in_pending_cascade {
                     continue;
                 }
-                let draw = next_unit_draw(&mut s.m14e_rng_state);
-                let outcome = cf_terrain::cave_in_roll(draw, span_px, vibration);
-                if outcome.fired() {
+                // **VAL-CROSS-024**: the composite-cascade path emits
+                // a deterministic cave-in (no RNG draw) since the
+                // upstream M14F rupture is itself deterministic. The
+                // standard path still consumes a seeded draw so the
+                // standalone M14E scenarios remain checksum-stable.
+                let fired = if cave_in_pending_cascade {
+                    true
+                } else {
+                    let draw = next_unit_draw(&mut s.m14e_rng_state);
+                    cf_terrain::cave_in_roll(draw, span_px, vibration).fired()
+                };
+                if fired {
                     let payload = cf_terrain::CaveInPayload::primary(
                         *chunk_id,
                         bbox_min,
@@ -9047,6 +9126,10 @@ impl M0Engine {
                     );
                     if let Some(chunk) = s.m14e_chunks.get_mut(chunk_id) {
                         chunk.cave_in_emitted = true;
+                        // Clear the pending-cascade latch so the same
+                        // chunk doesn't re-fire indefinitely if a
+                        // subsequent rupture cascades into it.
+                        chunk.cave_in_pending_cascade = false;
                     }
                     s.m14e_total_cave_ins = s.m14e_total_cave_ins.saturating_add(1);
                     s.m14e_last_cave_in_tick.insert(*chunk_id, tick.0);
@@ -9575,8 +9658,25 @@ impl M0Engine {
                     // Cascade the rupture to lateral neighbors so they
                     // re-run the integrity pass on the next cadence
                     // boundary (VAL-M14F-026).
-                    if !neighbors.is_empty() {
+                    // **VAL-CROSS-024**: composite cascade — when this
+                    // wall span opts in via
+                    // `m14e_composite_cascade_allowed=true` AND any
+                    // cascade_neighbor is an M14E ceiling chunk, the
+                    // rupture also forces an M14E cave-in cascade on
+                    // that chunk inside the spec's 60-tick window.
+                    let composite_cascade_allowed = self
+                        .state
+                        .read()
+                        .ok()
+                        .and_then(|s| s.m14f_lateral_chunks.get(&chunk_id).map(|c| c.m14e_composite_cascade_allowed))
+                        .unwrap_or(false);
+                    if !neighbors.is_empty() && composite_cascade_allowed {
                         let _ = sim_time_ms;
+                        self.m14f_cascade_rupture_to_m14e_neighbors(
+                            tick.0,
+                            chunk_id,
+                            &neighbors,
+                        );
                     }
                 }
                 _ => {}
@@ -9585,6 +9685,114 @@ impl M0Engine {
         // Drive the per-tick fluid / pressure / vacuum-exposure update
         // for any chunks already past their rupture tick.
         self.m14f_advance_downstream_consumers(tick.0);
+    }
+
+    /// **VAL-CROSS-024**: cascade an M14F lateral wall rupture into
+    /// the M14E ceiling pass on each `cascade_neighbor` chunk that
+    /// already has an M14E `IntegrityField` (i.e., is owned by an
+    /// `m14e_tunnel_spans` row).
+    ///
+    /// For each such neighbor:
+    ///   * Force-decay every non-locked cell of the chunk's
+    ///     [`cf_terrain::IntegrityField`] below
+    ///     [`cf_terrain::INTEGRITY_CASCADE_THRESHOLD`] so the next
+    ///     `compute_integrity_pass` invocation observes L3.
+    ///   * Stamp `l1_at_tick / l2_at_tick / l3_at_tick` so the cave-in
+    ///     roll's `l3_set` precondition is satisfied immediately.
+    ///   * Set `cave_in_pending_cascade = true` so the next M14E pass
+    ///     emits the cave-in deterministically (skipping the RNG roll
+    ///     — the upstream rupture is itself deterministic).
+    ///   * Set `force_integrity_pass_deadline = tick + 1` so the M14E
+    ///     pass runs on the next tick regardless of the N=15 cadence
+    ///     guard (the cave-in must land inside the spec's 60-tick
+    ///     window from rupture).
+    ///   * Emit a `terrain.terrain_cascade{primary, secondary,
+    ///     cascade_kind="cave_in"}` event per neighbor so downstream
+    ///     consumers (M18 visual + audio continuity, replay viewer)
+    ///     can join the dam rupture and the underlying cave-in into
+    ///     one cascade — consistent with VAL-M14E-026's terrain-
+    ///     cascade event family.
+    fn m14f_cascade_rupture_to_m14e_neighbors(
+        &self,
+        rupture_tick: u64,
+        primary_chunk_id: (i32, i32),
+        neighbors: &[(i32, i32)],
+    ) {
+        if neighbors.is_empty() {
+            return;
+        }
+        let mut cascaded: Vec<(i32, i32)> = Vec::new();
+        if let Ok(mut s) = self.state.write() {
+            for nbr in neighbors {
+                let Some(chunk) = s.m14e_chunks.get_mut(nbr) else {
+                    continue;
+                };
+                // Skip M14F-owned chunks (their rupture surface is the
+                // lateral wall pass) + any chunk that has already
+                // caved in (one-shot per chunk). Only fire the cascade
+                // on chunks whose state was created by an M14E tunnel
+                // span (i.e., `m14f_owns_rupture_emit == false`).
+                if chunk.cave_in_emitted || chunk.m14f_owns_rupture_emit {
+                    continue;
+                }
+                // Decay every non-locked cell below the cascade
+                // threshold so compute_integrity_pass returns L3-eligible
+                // min_integrity on the next invocation.
+                let target_cell = cf_terrain::INTEGRITY_CASCADE_THRESHOLD.saturating_sub(8);
+                for ly in 0..cf_terrain::INTEGRITY_FIELD_HEIGHT {
+                    for lx in 0..cf_terrain::INTEGRITY_FIELD_WIDTH {
+                        if chunk.field.is_locked(lx, ly) {
+                            continue;
+                        }
+                        let prev = chunk.field.get(lx, ly);
+                        if prev > target_cell {
+                            chunk.field.set(lx, ly, target_cell);
+                        }
+                    }
+                }
+                if chunk.l1_at_tick.is_none() {
+                    chunk.l1_at_tick = Some(rupture_tick);
+                }
+                if chunk.l2_at_tick.is_none() {
+                    chunk.l2_at_tick = Some(rupture_tick);
+                }
+                if chunk.l3_at_tick.is_none() {
+                    chunk.l3_at_tick = Some(rupture_tick);
+                }
+                chunk.cave_in_pending_cascade = true;
+                // Force the next integrity pass to run on this chunk
+                // regardless of the N=15 cadence boundary so the cave-in
+                // lands inside the 60-tick window.
+                let deadline = rupture_tick.saturating_add(1);
+                let prev_deadline = chunk.force_integrity_pass_deadline;
+                let next_deadline = match prev_deadline {
+                    Some(prev) => Some(prev.min(deadline)),
+                    None => Some(deadline),
+                };
+                chunk.force_integrity_pass_deadline = next_deadline;
+                cascaded.push(*nbr);
+            }
+        }
+        // Emit per-neighbor cascade markers so the test + downstream
+        // consumers can observe the composite linkage.
+        let tick = self.current_tick();
+        let sim_time_ms = self.state.read().map(|s| s.clock.sim_time_ms()).unwrap_or(0.0);
+        for nbr in cascaded {
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "terrain",
+                "terrain_cascade",
+                serde_json::json!({
+                    "primary_chunk_id": [primary_chunk_id.0, primary_chunk_id.1],
+                    "secondary_chunk_id": [nbr.0, nbr.1],
+                    "cascade_kind": "cave_in",
+                    "source_event": "wall_rupture",
+                    "tick_delta": 0,
+                }),
+                None,
+            );
+        }
     }
 
     /// **M14F § VAL-M14F-003 / Cluster 2**: mutate the chunked-terrain

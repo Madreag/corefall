@@ -312,6 +312,20 @@ pub struct LateralWallSpan {
     /// pressure equalization curve through the breach.
     #[serde(default = "default_sealed_room_pressure")]
     pub sealed_room_pressure_kpa: f32,
+    /// **VAL-CROSS-024**: opts the lateral wall into the composite-
+    /// cascade topology. When `true`, a `terrain.wall_rupture` on this
+    /// chunk also drives M14E cave-in emit on every `cascade_neighbors`
+    /// chunk that has an `m14e_tunnel_spans` row. The default `false`
+    /// keeps standalone mineshafts / dams / sealed-rooms isolated from
+    /// the ceiling pass — only explicit dam-above-tunnel / lateral-
+    /// adjacent-to-tunnel scenarios opt in. Also flips the per-chunk
+    /// `m14f_owns_rupture_emit` flag on the M14E chunk state for this
+    /// chunk (when false) → the lateral pass owns the rupture surface
+    /// and the M14E cave-in roll is suppressed; setting this `true`
+    /// keeps the M14E roll surface available so the composite scenario
+    /// can express both ceilings AND walls on the same chunk_id.
+    #[serde(default)]
+    pub m14e_composite_cascade_allowed: bool,
 }
 
 fn default_wall_thickness() -> u32 {
