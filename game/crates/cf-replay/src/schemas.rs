@@ -139,8 +139,7 @@ const SCHEMA_ARMOR_APFSDS_PENETRATED: &str = include_str!("../schemas/event/armo
 const SCHEMA_ARMOR_ERA_PANEL_DETONATED: &str = include_str!("../schemas/event/armor_era_panel_detonated.json");
 // **M14C** — Per-tick HEAT + APFSDS + ERA producer schemas.
 const SCHEMA_ARMOR_HEAT_JET_TRAVERSED: &str = include_str!("../schemas/event/armor_heat_jet_traversed.json");
-const SCHEMA_ARMOR_APFSDS_LONG_ROD_THROUGH: &str =
-    include_str!("../schemas/event/armor_apfsds_long_rod_through.json");
+const SCHEMA_ARMOR_APFSDS_LONG_ROD_THROUGH: &str = include_str!("../schemas/event/armor_apfsds_long_rod_through.json");
 const SCHEMA_ARMOR_ERA_PRE_DETONATED: &str = include_str!("../schemas/event/armor_era_pre_detonated.json");
 // **M14D** — Projectile-Projectile CCD event schema (one new schema).
 const SCHEMA_COLLISION_PROJECTILE_PAIR_CONTACT: &str =
@@ -271,8 +270,7 @@ const SCHEMA_EQUIPMENT_WEAPON_SWAP_STARTED: &str = include_str!("../schemas/even
 const SCHEMA_INVENTORY_TANK_SLOT_RESERVED: &str = include_str!("../schemas/event/inventory_tank_slot_reserved.json");
 const SCHEMA_INVENTORY_WEIGHT_CHANGED: &str = include_str!("../schemas/event/inventory_weight_changed.json");
 // **M6B**: ItemSpec canonicalization — per-item mass + dimensions + bulk + per-actor encumbrance.
-const SCHEMA_EQUIPMENT_ITEM_PICKED_UP_WITH_MASS: &str =
-    include_str!("../schemas/event/item_picked_up_with_mass.json");
+const SCHEMA_EQUIPMENT_ITEM_PICKED_UP_WITH_MASS: &str = include_str!("../schemas/event/item_picked_up_with_mass.json");
 const SCHEMA_EQUIPMENT_ITEM_DROPPED_WITH_MASS: &str = include_str!("../schemas/event/item_dropped_with_mass.json");
 const SCHEMA_INVENTORY_ENCUMBRANCE_THRESHOLD_CROSSED: &str =
     include_str!("../schemas/event/encumbrance_threshold_crossed.json");
@@ -298,16 +296,13 @@ const SCHEMA_SQUAD_WAYPOINT_MARKED: &str = include_str!("../schemas/event/squad_
 // extends it). Spec § Files.
 const SCHEMA_SQUAD_COMMAND_VETOED: &str = include_str!("../schemas/event/squad_command_vetoed.json");
 const SCHEMA_SQUAD_FORMATION_SET: &str = include_str!("../schemas/event/squad_formation_set.json");
-const SCHEMA_SQUAD_FORMATION_SLOT_ASSIGNED: &str =
-    include_str!("../schemas/event/squad_formation_slot_assigned.json");
-const SCHEMA_SQUAD_FORMATION_SLOT_BROKEN: &str =
-    include_str!("../schemas/event/squad_formation_slot_broken.json");
+const SCHEMA_SQUAD_FORMATION_SLOT_ASSIGNED: &str = include_str!("../schemas/event/squad_formation_slot_assigned.json");
+const SCHEMA_SQUAD_FORMATION_SLOT_BROKEN: &str = include_str!("../schemas/event/squad_formation_slot_broken.json");
 const SCHEMA_SQUAD_FORMATION_COLLAPSED: &str = include_str!("../schemas/event/squad_formation_collapsed.json");
 const SCHEMA_SQUAD_ROLE_ASSIGNED: &str = include_str!("../schemas/event/squad_role_assigned.json");
 const SCHEMA_SQUAD_BREACH_CHAIN_STARTED: &str = include_str!("../schemas/event/squad_breach_chain_started.json");
 const SCHEMA_SQUAD_BREACH_CHAIN_STEP: &str = include_str!("../schemas/event/squad_breach_chain_step.json");
-const SCHEMA_SQUAD_BREACH_CHAIN_COMPLETE: &str =
-    include_str!("../schemas/event/squad_breach_chain_complete.json");
+const SCHEMA_SQUAD_BREACH_CHAIN_COMPLETE: &str = include_str!("../schemas/event/squad_breach_chain_complete.json");
 const SCHEMA_SQUAD_BOUNDING_STEP: &str = include_str!("../schemas/event/squad_bounding_step.json");
 const SCHEMA_SQUAD_BRAIN_HOP: &str = include_str!("../schemas/event/squad_brain_hop.json");
 
@@ -468,8 +463,7 @@ const SCHEMA_CINEMATIC_NARRATION_WORD: &str = include_str!("../schemas/event/cin
 // material, attachable detach + gib threshold, gib spawn + cascade,
 // ragdoll activation on DYING/DEAD, and per-joint impulse propagation.
 const SCHEMA_COMBAT_SWEPT_COLLISION: &str = include_str!("../schemas/event/combat_swept_collision.json");
-const SCHEMA_COMBAT_BULLET_SHARPNESS_DECAY: &str =
-    include_str!("../schemas/event/combat_bullet_sharpness_decay.json");
+const SCHEMA_COMBAT_BULLET_SHARPNESS_DECAY: &str = include_str!("../schemas/event/combat_bullet_sharpness_decay.json");
 const SCHEMA_COMBAT_EMBEDDED_IN_TERRAIN: &str = include_str!("../schemas/event/combat_embedded_in_terrain.json");
 const SCHEMA_ATTACHABLE_DETACHED: &str = include_str!("../schemas/event/attachable_detached.json");
 const SCHEMA_ATTACHABLE_GIB_THRESHOLD_CROSSED: &str =
@@ -490,8 +484,7 @@ const SCHEMA_OBJECTIVE_RESUMED: &str = include_str!("../schemas/event/mission_ob
 const SCHEMA_AI_SCOPE_SETTLE: &str = include_str!("../schemas/event/ai_scope_settle.json");
 // **M7 audit pass (GAP-M7-01, GAP-M7-02)**: spec-canonical aliases.
 const SCHEMA_ACTOR_MOOD_CHANGED: &str = include_str!("../schemas/event/actor_mood_changed.json");
-const SCHEMA_FACTION_RELATIONSHIP_CHANGED: &str =
-    include_str!("../schemas/event/faction_relationship_changed.json");
+const SCHEMA_FACTION_RELATIONSHIP_CHANGED: &str = include_str!("../schemas/event/faction_relationship_changed.json");
 // **M8 audit pass (GAP-M8-01)**: spec-canonical ux.* aliases for plan events.
 const SCHEMA_UX_PLAN_COMPOSED: &str = include_str!("../schemas/event/ux_plan_composed.json");
 const SCHEMA_UX_PLAN_EXECUTED: &str = include_str!("../schemas/event/ux_plan_executed.json");

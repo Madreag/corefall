@@ -112,7 +112,10 @@ fn val_m14d_014_runtime_cosmetic_true_on_every_emit() {
         .iter()
         .filter(|e| e.category == "collision" && e.event_type == "projectile_pair_contact")
         .collect();
-    assert!(!pair_events.is_empty(), "scenario must produce at least one pair contact");
+    assert!(
+        !pair_events.is_empty(),
+        "scenario must produce at least one pair contact"
+    );
     for ev in &pair_events {
         let cosmetic = ev
             .payload
@@ -200,7 +203,11 @@ fn val_m14d_007_runtime_determinism_byte_identical_at_tick_600() {
         .iter()
         .filter(|e| e.category == "collision" && e.event_type == "projectile_pair_contact")
         .collect();
-    assert_eq!(pair_a.len(), pair_b.len(), "same-seed runs must emit same pair-contact count");
+    assert_eq!(
+        pair_a.len(),
+        pair_b.len(),
+        "same-seed runs must emit same pair-contact count"
+    );
     for (a, b) in pair_a.iter().zip(pair_b.iter()) {
         assert_eq!(a.tick, b.tick, "tick mismatch");
         assert_eq!(a.payload, b.payload, "payload mismatch");
@@ -216,10 +223,7 @@ fn val_m14d_007_runtime_determinism_byte_identical_at_tick_600() {
         .rev()
         .find(|e| e.category == "determinism" && e.event_type == "sim_checksum")
         .and_then(|e| e.payload.get("checksum_hex").and_then(|v| v.as_str().map(String::from)));
-    assert_eq!(
-        checksum_a, checksum_b,
-        "same-seed determinism.sim_checksum mismatch"
-    );
+    assert_eq!(checksum_a, checksum_b, "same-seed determinism.sim_checksum mismatch");
 }
 
 /// **VAL-M14D-002 runtime evidence**: after the fuze_triggered intercept
@@ -283,11 +287,7 @@ fn val_m14d_014_runtime_schema_validation_passes() {
     assert!(!pair_events.is_empty());
     for ev in &pair_events {
         let payload = &ev.payload;
-        let result = cf_replay::schemas::validate_event_payload(
-            "collision",
-            "projectile_pair_contact",
-            payload,
-        );
+        let result = cf_replay::schemas::validate_event_payload("collision", "projectile_pair_contact", payload);
         assert!(
             result.is_ok(),
             "schema validation failed for payload {:?}: {:?}",

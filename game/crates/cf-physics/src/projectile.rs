@@ -291,6 +291,7 @@ impl SpatialHashBroadphase {
     /// Returns the (min, max) bucket index range (inclusive) covered by
     /// the projectile's swept AABB this tick. The swept AABB is the
     /// axis-aligned union of its start AABB and end AABB.
+    #[allow(clippy::similar_names)]
     fn bucket_range(p: &ProjectileSnapshot, tick_dt: f32) -> (i32, i32, i32, i32) {
         let dx = p.velocity[0] * tick_dt;
         let dy = p.velocity[1] * tick_dt;
@@ -310,10 +311,8 @@ impl SpatialHashBroadphase {
     /// inspect. Pairs are deduped + ordered (`a_id` < `b_id`) and the
     /// total is capped at `NARROWPHASE_CANDIDATE_BUDGET` so the perf
     /// budget holds under pathological clustering.
-    pub fn candidates(
-        projectiles: &[ProjectileSnapshot],
-        tick_dt: f32,
-    ) -> Vec<ProjectilePairCandidate> {
+    #[allow(clippy::similar_names)]
+    pub fn candidates(projectiles: &[ProjectileSnapshot], tick_dt: f32) -> Vec<ProjectilePairCandidate> {
         if projectiles.is_empty() || projectiles.len() == 1 {
             return Vec::new();
         }
@@ -395,16 +394,12 @@ pub fn pair_swept_toi(a: &ProjectileSnapshot, b: &ProjectileSnapshot, tick_dt: f
     }
     let sqrt_disc = disc.sqrt();
     let toi_root = (-dot - sqrt_disc) / vel_sq;
-    if !toi_root.is_finite() || toi_root < 0.0 || toi_root > 1.0 {
+    if !toi_root.is_finite() || !(0.0..=1.0).contains(&toi_root) {
         return None;
     }
     let point = [
-        0.5 * (a.position[0] + a.velocity[0] * tick_dt * toi_root
-            + b.position[0]
-            + b.velocity[0] * tick_dt * toi_root),
-        0.5 * (a.position[1] + a.velocity[1] * tick_dt * toi_root
-            + b.position[1]
-            + b.velocity[1] * tick_dt * toi_root),
+        0.5 * (a.position[0] + a.velocity[0] * tick_dt * toi_root + b.position[0] + b.velocity[0] * tick_dt * toi_root),
+        0.5 * (a.position[1] + a.velocity[1] * tick_dt * toi_root + b.position[1] + b.velocity[1] * tick_dt * toi_root),
     ];
     Some(PairToi {
         toi: toi_root,
@@ -445,8 +440,7 @@ pub fn narrowphase_resolve_pair(
     let canon_lo = if a.id <= b.id { a } else { b };
     let canon_hi = if a.id <= b.id { b } else { a };
     let outcome = pair_outcome(canon_lo.kind, canon_hi.kind, toi.convergence_deg)?;
-    let (a_post, b_post, a_retained, b_retained) =
-        post_contact_state(canon_lo, canon_hi, outcome, toi.convergence_deg);
+    let (a_post, b_post, a_retained, b_retained) = post_contact_state(canon_lo, canon_hi, outcome, toi.convergence_deg);
     Some(ProjectilePairContact {
         tick_dt,
         a_id: canon_lo.id,
@@ -680,13 +674,7 @@ mod tests {
         }
     }
 
-    fn snap_r(
-        id: u64,
-        kind: ProjectileKind,
-        pos: [f32; 2],
-        vel: [f32; 2],
-        radius: f32,
-    ) -> ProjectileSnapshot {
+    fn snap_r(id: u64, kind: ProjectileKind, pos: [f32; 2], vel: [f32; 2], radius: f32) -> ProjectileSnapshot {
         ProjectileSnapshot {
             id,
             kind,

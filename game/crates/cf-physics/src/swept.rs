@@ -157,9 +157,17 @@ mod tests {
     fn mixed_prioritizer_orders_actor_and_projectile_pair_by_toi() {
         let mut candidates = vec![
             SweptCandidateKind::Actor(cand(10, 0.8)),
-            SweptCandidateKind::ProjectilePair(ProjectilePairKey { a_id: 1, b_id: 2, toi: 0.25 }),
+            SweptCandidateKind::ProjectilePair(ProjectilePairKey {
+                a_id: 1,
+                b_id: 2,
+                toi: 0.25,
+            }),
             SweptCandidateKind::Actor(cand(11, 0.5)),
-            SweptCandidateKind::ProjectilePair(ProjectilePairKey { a_id: 3, b_id: 4, toi: 0.10 }),
+            SweptCandidateKind::ProjectilePair(ProjectilePairKey {
+                a_id: 3,
+                b_id: 4,
+                toi: 0.10,
+            }),
         ];
         let preserved_pair_count = candidates
             .iter()
@@ -193,8 +201,16 @@ mod tests {
         let input = || {
             vec![
                 SweptCandidateKind::Actor(cand(5, 0.5)),
-                SweptCandidateKind::ProjectilePair(ProjectilePairKey { a_id: 1, b_id: 7, toi: 0.5 }),
-                SweptCandidateKind::ProjectilePair(ProjectilePairKey { a_id: 3, b_id: 4, toi: 0.5 }),
+                SweptCandidateKind::ProjectilePair(ProjectilePairKey {
+                    a_id: 1,
+                    b_id: 7,
+                    toi: 0.5,
+                }),
+                SweptCandidateKind::ProjectilePair(ProjectilePairKey {
+                    a_id: 3,
+                    b_id: 4,
+                    toi: 0.5,
+                }),
                 SweptCandidateKind::Actor(cand(2, 0.5)),
             ]
         };
@@ -249,9 +265,7 @@ pub enum ResolvedSweptCandidate {
 /// actor candidates so the engine's per-tick schedule can interleave
 /// the two passes without losing TOI order.
 #[must_use]
-pub fn prioritize_mixed_swept_candidates(
-    mut candidates: Vec<SweptCandidateKind>,
-) -> Vec<ResolvedSweptCandidate> {
+pub fn prioritize_mixed_swept_candidates(mut candidates: Vec<SweptCandidateKind>) -> Vec<ResolvedSweptCandidate> {
     candidates.sort_by(|a, b| {
         let toi_a = match a {
             SweptCandidateKind::Actor(c) => c.entry_t,
@@ -269,15 +283,11 @@ pub fn prioritize_mixed_swept_candidates(
                 // ties (so the engine's existing M14 actor handlers run
                 // first); within a kind, sort by stable key.
                 match (a, b) {
-                    (SweptCandidateKind::Actor(_), SweptCandidateKind::ProjectilePair(_)) => {
-                        std::cmp::Ordering::Less
-                    }
+                    (SweptCandidateKind::Actor(_), SweptCandidateKind::ProjectilePair(_)) => std::cmp::Ordering::Less,
                     (SweptCandidateKind::ProjectilePair(_), SweptCandidateKind::Actor(_)) => {
                         std::cmp::Ordering::Greater
                     }
-                    (SweptCandidateKind::Actor(x), SweptCandidateKind::Actor(y)) => {
-                        x.target_id.cmp(&y.target_id)
-                    }
+                    (SweptCandidateKind::Actor(x), SweptCandidateKind::Actor(y)) => x.target_id.cmp(&y.target_id),
                     (SweptCandidateKind::ProjectilePair(x), SweptCandidateKind::ProjectilePair(y)) => {
                         (x.a_id, x.b_id).cmp(&(y.a_id, y.b_id))
                     }

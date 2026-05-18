@@ -52,22 +52,24 @@ pub mod ragdoll;
 pub mod sharpness;
 pub mod swept;
 pub mod zone_state;
+pub use atom_group::{
+    evaluate_ricochet, flail_as_limb, push_as_limb, push_travel, Atom, AtomGroup, RicochetOutcome, SweepOutcome,
+    RICOCHET_ANGLE_THRESHOLD, RICOCHET_ENERGY_LOSS, RICOCHET_HARDNESS_FACTOR,
+};
+pub use authority::{AuthorityKind, AuthorityTransition};
+pub use facing_routing::{classify_hit_direction, exposed_zones, mirror_local_x, HitDirection};
 pub use gravity_field::{
     advance_damaged_grav_wave_fronts, apply_overrides, GravityOverride, GravityVec, OverrideResult,
 };
-pub use atom_group::{
-    evaluate_ricochet, flail_as_limb, push_as_limb, push_travel, Atom, AtomGroup, RicochetOutcome,
-    SweepOutcome, RICOCHET_ANGLE_THRESHOLD, RICOCHET_ENERGY_LOSS, RICOCHET_HARDNESS_FACTOR,
+pub use joint::{
+    evaluate_joint, explosion_impulse, fall_impulse_chain, severance_probability, severance_roll, Joint, JointEval,
 };
 pub use limb_path_interop::LimbPathInterop;
-pub use authority::{AuthorityKind, AuthorityTransition};
-pub use facing_routing::{classify_hit_direction, exposed_zones, mirror_local_x, HitDirection};
-pub use joint::{evaluate_joint, explosion_impulse, fall_impulse_chain, severance_probability, severance_roll, Joint, JointEval};
 pub use penetration_m14c::{
     apfsds_impact_producer, apfsds_overpenetration_infantry_damage, autocannon_infantry_damage,
-    era_penetration_reduction, heat_impact_producer, heat_standoff_scalar, heat_within_cone,
-    ApfsdsImpactInput, ApfsdsImpactOutcome, ApfsdsPathEntry, ArmorApfsdsLongRodThroughEvent,
-    ArmorEraPreDetonatedEvent, ArmorHeatJetTraversedEvent, HeatImpactInput, HeatImpactOutcome, HeatPathEntry,
+    era_penetration_reduction, heat_impact_producer, heat_standoff_scalar, heat_within_cone, ApfsdsImpactInput,
+    ApfsdsImpactOutcome, ApfsdsPathEntry, ArmorApfsdsLongRodThroughEvent, ArmorEraPreDetonatedEvent,
+    ArmorHeatJetTraversedEvent, HeatImpactInput, HeatImpactOutcome, HeatPathEntry,
 };
 pub use penetration_ray::{
     apfsds_energy_through_module, era_pre_detonates_heat, he_damage_at_distance, heat_jet_modules_penetrated,
@@ -75,18 +77,17 @@ pub use penetration_ray::{
     PenetrationRayResult,
 };
 pub use projectile::{
-    convergence_angle_deg, interesting_pairs, is_interesting_pair, narrowphase_resolve_pair,
-    pair_outcome, pair_swept_toi, run_projectile_pair_pass, PairToi, ProjectileKind,
-    ProjectilePairCandidate, ProjectilePairContact, ProjectilePairOutcome, ProjectilePairPassTrace,
-    ProjectileSnapshot, SpatialHashBroadphase, BROADPHASE_BUCKET_PX,
+    convergence_angle_deg, interesting_pairs, is_interesting_pair, narrowphase_resolve_pair, pair_outcome,
+    pair_swept_toi, run_projectile_pair_pass, PairToi, ProjectileKind, ProjectilePairCandidate, ProjectilePairContact,
+    ProjectilePairOutcome, ProjectilePairPassTrace, ProjectileSnapshot, SpatialHashBroadphase, BROADPHASE_BUCKET_PX,
     ENERGY_CANCEL_MIN_ANGLE_DEG, KINETIC_DEFLECT_ENERGY_RETAINED, KINETIC_DEFLECT_MIN_ANGLE_DEG,
     NARROWPHASE_CANDIDATE_BUDGET,
 };
 pub use ragdoll::{step_ragdoll, Ragdoll, RagdollState};
 pub use sharpness::{decay_damage, DecayBand, SharpnessInputs, SharpnessOutcome};
 pub use swept::{
-    prioritize_mixed_swept_candidates, prioritize_swept_collisions, ProjectilePairKey,
-    ResolvedSweptCandidate, SweptCandidateKind, SweptHitCandidate, SweptHitResolved,
+    prioritize_mixed_swept_candidates, prioritize_swept_collisions, ProjectilePairKey, ResolvedSweptCandidate,
+    SweptCandidateKind, SweptHitCandidate, SweptHitResolved,
 };
 pub use zone_state::{bleed_per_tick, classify as classify_zone_state, ZoneState};
 
@@ -104,10 +105,7 @@ use serde::{Deserialize, Serialize};
 #[serde(untagged)]
 pub enum GravityField {
     Uniform(f32),
-    Layered {
-        magnitude: f32,
-        direction: [f32; 2],
-    },
+    Layered { magnitude: f32, direction: [f32; 2] },
 }
 
 impl GravityField {

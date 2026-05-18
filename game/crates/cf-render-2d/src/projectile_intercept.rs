@@ -104,12 +104,7 @@ impl IntercepRenderQueue {
     /// Enqueue the 3 primitives (1 spark cluster + 2 trail terminators)
     /// for one intercept event. Returns the number of primitives
     /// pushed — `0` when the helper dropped under backpressure.
-    pub fn enqueue(
-        &mut self,
-        event: IntercepEventInput,
-        queue_depth: usize,
-        backpressure_threshold: usize,
-    ) -> usize {
+    pub fn enqueue(&mut self, event: IntercepEventInput, queue_depth: usize, backpressure_threshold: usize) -> usize {
         if event.cosmetic && Self::under_backpressure(queue_depth, backpressure_threshold) {
             self.backpressure_drops += 1;
             return 0;

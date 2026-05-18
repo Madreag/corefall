@@ -376,9 +376,7 @@ fn build_wind_source(w: &cf_mission::ScenarioWindSource) -> cf_atmos::WindSource
 /// **M14D** § convert a [`crate::scenario::ScenarioM14dProjectile`] manifest
 /// entry into a runtime [`cf_physics::ProjectileSnapshot`] for the
 /// projectile-pair CCD pass.
-fn build_m14d_projectile_snapshot(
-    p: &crate::scenario::ScenarioM14dProjectile,
-) -> cf_physics::ProjectileSnapshot {
+fn build_m14d_projectile_snapshot(p: &crate::scenario::ScenarioM14dProjectile) -> cf_physics::ProjectileSnapshot {
     cf_physics::ProjectileSnapshot {
         id: p.id,
         kind: p.kind,
@@ -714,18 +712,10 @@ impl M0EngineConfig {
         // cf-physics + cf-atmos types from the scenario manifest's
         // `gravity_overrides[]` / `wind_sources[]` / `atmosphere_cells[]`
         // arrays. Empty arrays = pass-through (no overrides).
-        cfg.initial_gravity_overrides = scenario
-            .gravity_overrides
-            .iter()
-            .map(build_gravity_override)
-            .collect();
+        cfg.initial_gravity_overrides = scenario.gravity_overrides.iter().map(build_gravity_override).collect();
         cfg.initial_wind_sources = scenario.wind_sources.iter().map(build_wind_source).collect();
         cfg.initial_atmosphere_cells = scenario.atmosphere_cells.iter().map(build_atmos_cell).collect();
-        cfg.initial_stratification_cells = scenario
-            .atmosphere_cells
-            .iter()
-            .map(build_strat_cell)
-            .collect();
+        cfg.initial_stratification_cells = scenario.atmosphere_cells.iter().map(build_strat_cell).collect();
         // **M14C** § propagate the scenario's scripted director steps.
         cfg.initial_scripted_steps = scenario.scripted_steps.clone();
         // **M14D** § propagate the scenario's projectile-pair pool +
@@ -1932,9 +1922,12 @@ impl M0Engine {
             .state
             .read()
             .ok()
-            .and_then(|s| s.actor_state.as_ref().and_then(|sim| sim.world.actors.get(&actor)).map(|a| {
-                ([a.position.x, a.position.y], [a.velocity.x, a.velocity.y])
-            }))
+            .and_then(|s| {
+                s.actor_state
+                    .as_ref()
+                    .and_then(|sim| sim.world.actors.get(&actor))
+                    .map(|a| ([a.position.x, a.position.y], [a.velocity.x, a.velocity.y]))
+            })
             .unwrap_or(([0.0, 0.0], [0.0, 0.0]));
         let cue_name = format!("{cue_tag}.{}", actor.0);
         self.emit_m12b_spatial_resolve(
@@ -3951,8 +3944,7 @@ impl M0Engine {
                     let dmg = cf_physics::bleed_per_tick(lost_zones, tick_rate);
                     if dmg > 0.0 {
                         actor.hp = (actor.hp - dmg).max(0.0);
-                        if actor.hp <= 0.0
-                            && !matches!(actor.status, cf_actor::Status::Dying | cf_actor::Status::Dead)
+                        if actor.hp <= 0.0 && !matches!(actor.status, cf_actor::Status::Dying | cf_actor::Status::Dead)
                         {
                             actor.status = cf_actor::Status::Dying;
                         }
@@ -5730,14 +5722,9 @@ impl M0Engine {
                 .and_then(|pid| state.actor_state.as_ref().and_then(|sim| sim.world.actors.get(&pid)))
                 .map(|a| [a.position.x, a.position.y])
                 .unwrap_or([0.0, 0.0]);
-            state.m7b_squad.tick_periodic_reslot(
-                squad_id,
-                commander_pos,
-                0.0,
-                commander_actor_id,
-                tick.0,
-                tick_rate,
-            )
+            state
+                .m7b_squad
+                .tick_periodic_reslot(squad_id, commander_pos, 0.0, commander_actor_id, tick.0, tick_rate)
         };
         if let Some(out) = reslot {
             self.recorder
@@ -6315,7 +6302,10 @@ impl M0Engine {
         // is still bound (window-open phase). The existing `eject_active`
         // banner covers the ejecting state itself.
         if matches!(cur_stage, cf_chassis::ChassisStage::Eject)
-            && matches!(cur_pilot, cf_chassis::PilotState::Bound | cf_chassis::PilotState::Injured)
+            && matches!(
+                cur_pilot,
+                cf_chassis::PilotState::Bound | cf_chassis::PilotState::Injured
+            )
         {
             push_banner_dedup(
                 &mut state.hud_banners,
@@ -6402,8 +6392,8 @@ impl M0Engine {
         }
         // **M13** § "Both legs lost (crawl mode)" — "CRAWLING — both legs lost".
         let destroyed = chassis.destroyed_zones();
-        let both_legs_lost = destroyed.contains(&cf_chassis::BodyZone::LegLeft)
-            && destroyed.contains(&cf_chassis::BodyZone::LegRight);
+        let both_legs_lost =
+            destroyed.contains(&cf_chassis::BodyZone::LegLeft) && destroyed.contains(&cf_chassis::BodyZone::LegRight);
         if both_legs_lost {
             push_banner_dedup(
                 &mut state.hud_banners,
@@ -6418,8 +6408,8 @@ impl M0Engine {
             );
         }
         // **M13** § "Both arms lost (no weapons)" — "DISARMED — both arms lost".
-        let both_arms_lost = destroyed.contains(&cf_chassis::BodyZone::ArmLeft)
-            && destroyed.contains(&cf_chassis::BodyZone::ArmRight);
+        let both_arms_lost =
+            destroyed.contains(&cf_chassis::BodyZone::ArmLeft) && destroyed.contains(&cf_chassis::BodyZone::ArmRight);
         if both_arms_lost {
             push_banner_dedup(
                 &mut state.hud_banners,
@@ -7635,8 +7625,14 @@ impl M0Engine {
                 .record(tick, sim_time_ms, "actor", "mood_changed", payload, None);
         }
         for payload in faction_payloads {
-            self.recorder
-                .record(tick, sim_time_ms, "ai", "faction_allegiance_changed", payload.clone(), None);
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "ai",
+                "faction_allegiance_changed",
+                payload.clone(),
+                None,
+            );
             // **M14 audit pass 3 (GAP-M7-01)**: M7 spec lists `faction.*`
             // as the canonical category. Dual-emit so spec-literal-
             // checking consumers find the event under `faction.relationship_changed`.
@@ -8247,10 +8243,7 @@ impl M0Engine {
 
     /// **M14D § VAL-M14D-020** schedule-trace invocation counter.
     pub fn m14d_pair_pass_invocations(&self) -> u64 {
-        self.state
-            .read()
-            .map(|s| s.m14d_pair_pass_invocations)
-            .unwrap_or(0)
+        self.state.read().map(|s| s.m14d_pair_pass_invocations).unwrap_or(0)
     }
 
     /// **M14D § VAL-M14D-008/009/010** trace from the most recent
@@ -8265,10 +8258,7 @@ impl M0Engine {
     /// **M14D § VAL-M14D-019** per-player `replay_intercepts` setting
     /// surfaced to consumers (cf-killcam).
     pub fn m14d_replay_intercepts(&self) -> bool {
-        self.state
-            .read()
-            .map(|s| s.m14d_replay_intercepts)
-            .unwrap_or(false)
+        self.state.read().map(|s| s.m14d_replay_intercepts).unwrap_or(false)
     }
 
     /// **M14D** snapshot of the current projectile-pair pool length —
@@ -8451,7 +8441,11 @@ impl M0Engine {
                     .state
                     .read()
                     .ok()
-                    .and_then(|s| s.actor_state.as_ref().and_then(|sim| sim.world.actors.get(&outcome.actor).map(|a| a.is_brain)))
+                    .and_then(|s| {
+                        s.actor_state
+                            .as_ref()
+                            .and_then(|sim| sim.world.actors.get(&outcome.actor).map(|a| a.is_brain))
+                    })
                     .unwrap_or(false);
                 if brain_marker {
                     self.recorder.record(
@@ -9493,8 +9487,7 @@ impl M0Engine {
             } else {
                 0.5
             };
-            let decision =
-                cf_internal::route_internal_damage(graph_kind, hit.zone.as_str(), hit.damage, rng_roll);
+            let decision = cf_internal::route_internal_damage(graph_kind, hit.zone.as_str(), hit.damage, rng_roll);
             // M14 fallback when decision is None (below heavy threshold) —
             // keep emitting the legacy M9 organ/circuit shape so existing
             // consumers (M10 cause-chain walker) still observe per-hit
@@ -10209,14 +10202,9 @@ impl M0Engine {
                     "immobile": immobile,
                 }),
             };
-            let _ = self.recorder.record(
-                tick,
-                sim_time_ms,
-                "module",
-                cascade.as_str(),
-                payload,
-                parent.clone(),
-            );
+            let _ = self
+                .recorder
+                .record(tick, sim_time_ms, "module", cascade.as_str(), payload, parent.clone());
         }
     }
 
@@ -10296,14 +10284,16 @@ impl M0Engine {
         }
         let mut interior_modules: Vec<cf_physics::InteriorModule> = modules_snapshot
             .into_iter()
-            .map(|(id, _kind, pos, is_ammo, dist, absorbed_frac)| cf_physics::InteriorModule {
-                id,
-                damage_multiplier: 0.6,
-                armor_absorption: absorbed_frac.clamp(0.0, 0.9),
-                position: pos,
-                distance_along_ray: dist,
-                is_ammo_rack: is_ammo,
-            })
+            .map(
+                |(id, _kind, pos, is_ammo, dist, absorbed_frac)| cf_physics::InteriorModule {
+                    id,
+                    damage_multiplier: 0.6,
+                    armor_absorption: absorbed_frac.clamp(0.0, 0.9),
+                    position: pos,
+                    distance_along_ray: dist,
+                    is_ammo_rack: is_ammo,
+                },
+            )
             .collect();
         interior_modules.sort_by(|a, b| {
             a.distance_along_ray
@@ -10352,11 +10342,7 @@ impl M0Engine {
                 s.actor_state.as_mut().and_then(|sim| {
                     sim.world.actors.get_mut(&actor).and_then(|target_actor| {
                         target_actor.chassis.as_mut().and_then(|chassis| {
-                            chassis.apply_critical_module_damage(
-                                &m.module_id,
-                                m.damage,
-                                "penetration_ray",
-                            )
+                            chassis.apply_critical_module_damage(&m.module_id, m.damage, "penetration_ray")
                         })
                     })
                 })
@@ -10364,13 +10350,7 @@ impl M0Engine {
                 None
             };
             if let Some(outcome) = outcome_opt {
-                self.emit_critical_module_outcome_events(
-                    tick,
-                    sim_time_ms,
-                    actor,
-                    &outcome,
-                    Some(pen_ray_id.clone()),
-                );
+                self.emit_critical_module_outcome_events(tick, sim_time_ms, actor, &outcome, Some(pen_ray_id.clone()));
             }
         }
         // **M14** § "Spalling fragments spawn at impact point". When the
@@ -10389,7 +10369,10 @@ impl M0Engine {
         };
         let fragment_count = cf_physics::spalling_fragment_count(outer_armor_damage, spalling_threshold, rng_roll);
         if fragment_count > 0 {
-            let zone_label = outcome.zone.map(|z| z.as_str().to_string()).unwrap_or_else(|| hit.zone.clone());
+            let zone_label = outcome
+                .zone
+                .map(|z| z.as_str().to_string())
+                .unwrap_or_else(|| hit.zone.clone());
             let layer = outcome
                 .layers_breached
                 .first()
@@ -10518,7 +10501,10 @@ impl M0Engine {
         round_kind: cf_equipment::RoundKind,
         parent: Option<String>,
     ) {
-        if !matches!(round_kind, cf_equipment::RoundKind::Heat | cf_equipment::RoundKind::Apfsds) {
+        if !matches!(
+            round_kind,
+            cf_equipment::RoundKind::Heat | cf_equipment::RoundKind::Apfsds
+        ) {
             return;
         }
         // Collect chassis interior modules in distance-from-impact order +
@@ -10549,13 +10535,17 @@ impl M0Engine {
                             let dy = centre[1] - hit.hit_position.y;
                             let dist = (dx * dx + dy * dy).sqrt();
                             let is_ammo_rack = matches!(m.kind, cf_chassis::ModuleKind::AmmoRack);
-                            if matches!(m.kind, cf_chassis::ModuleKind::Era) && m.era_consumable && era_on_path.is_none() {
+                            if matches!(m.kind, cf_chassis::ModuleKind::Era)
+                                && m.era_consumable
+                                && era_on_path.is_none()
+                            {
                                 era_on_path = Some((m.id.clone(), m.era_charge_kg.max(0.0)));
                             }
                             entries.push(cf_physics::InteriorModule {
                                 id: m.id.clone(),
                                 damage_multiplier: 0.6,
-                                armor_absorption: (1.0_f32 - (m.hp / m.hp_max.max(0.001)).clamp(0.0, 1.0)).clamp(0.0, 0.9),
+                                armor_absorption: (1.0_f32 - (m.hp / m.hp_max.max(0.001)).clamp(0.0, 1.0))
+                                    .clamp(0.0, 0.9),
                                 position: centre,
                                 distance_along_ray: dist,
                                 is_ammo_rack,
@@ -11186,11 +11176,7 @@ impl M0Engine {
                         continue;
                     };
                     // **M13** drone fuel drain (only when chassis = Drone).
-                    let drone_tick_rate = actor
-                        .chassis
-                        .as_ref()
-                        .map(|c| c.tick_rate_hz)
-                        .unwrap_or(60);
+                    let drone_tick_rate = actor.chassis.as_ref().map(|c| c.tick_rate_hz).unwrap_or(60);
                     if let Some(drone) = actor.drone_ally.as_mut() {
                         if drone.tick_fuel(drone_tick_rate) {
                             drone_fuel_low.push(id);
@@ -11260,13 +11246,7 @@ impl M0Engine {
                     let pilot_id = cf_actor::ActorId(next_id);
                     // Build a foot-infantry pilot actor at the chassis position.
                     let pilot_inventory = cf_actor::Inventory::with_rifle(cf_equipment::RIFLE_M1_DEFAULT_ID);
-                    let mut pilot = cf_actor::ActorState::player(
-                        pilot_id,
-                        &team,
-                        position,
-                        100.0,
-                        pilot_inventory,
-                    );
+                    let mut pilot = cf_actor::ActorState::player(pilot_id, &team, position, 100.0, pilot_inventory);
                     pilot.controllable = was_player;
                     if was_brain {
                         pilot.mark_brain(tick.0);
@@ -11371,19 +11351,17 @@ impl M0Engine {
                     .actor_state
                     .as_ref()
                     .and_then(|sim| {
-                        sim.world.actors.get(&player_id).map(|p| {
-                            (p.is_brain, p.status != cf_actor::Status::Dead)
-                        })
+                        sim.world
+                            .actors
+                            .get(&player_id)
+                            .map(|p| (p.is_brain, p.status != cf_actor::Status::Dead))
                     })
                     .unwrap_or((false, false));
                 let target_present = state
                     .actor_state
                     .as_ref()
                     .and_then(|sim| sim.world.actors.get(&target_id))
-                    .map(|t| {
-                        t.chassis.is_some()
-                            && t.status != cf_actor::Status::Dead
-                    })
+                    .map(|t| t.chassis.is_some() && t.status != cf_actor::Status::Dead)
                     .unwrap_or(false);
                 // **M14 audit pass 4 (Finding 1)**: cancel the transfer if
                 // either side became invalid during the 1500ms transition
@@ -11394,7 +11372,11 @@ impl M0Engine {
                     boarding_aborted.push((
                         player_id.0,
                         target_id.0,
-                        if !player_alive { "player_died" } else { "target_unavailable" },
+                        if !player_alive {
+                            "player_died"
+                        } else {
+                            "target_unavailable"
+                        },
                     ));
                     continue;
                 }
@@ -11417,14 +11399,8 @@ impl M0Engine {
                 cf_chassis::TransitionCompleted::Boarded => "boarded",
                 cf_chassis::TransitionCompleted::Disembarked => "disembarked",
             };
-            self.recorder.record(
-                tick,
-                sim_time_ms,
-                "actor",
-                event_type,
-                json!({"actor": id.0}),
-                None,
-            );
+            self.recorder
+                .record(tick, sim_time_ms, "actor", event_type, json!({"actor": id.0}), None);
         }
         // **M14 audit pass 4 (Finding 1)**: canonical actor.boarded — pair
         // matches the actor.boarding event so consumers can chain via
@@ -11456,14 +11432,8 @@ impl M0Engine {
             );
         }
         for id in drone_fuel_low {
-            self.recorder.record(
-                tick,
-                sim_time_ms,
-                "drone",
-                "fuel_low",
-                json!({"actor": id.0}),
-                None,
-            );
+            self.recorder
+                .record(tick, sim_time_ms, "drone", "fuel_low", json!({"actor": id.0}), None);
         }
         for id in hit_reaction_ended {
             self.recorder.record(
@@ -11676,25 +11646,13 @@ impl M0Engine {
                 // (expired_id + 10_000) and (expired_id + 10_001).
                 let high_cell = expired_id.saturating_add(10_000);
                 let low_cell = expired_id.saturating_add(10_001);
-                state
-                    .m14b_atmos_cells
-                    .retain(|c| c.id != high_cell && c.id != low_cell);
-                state
-                    .m14b_transient_cells
-                    .retain(|c| *c != high_cell && *c != low_cell);
+                state.m14b_atmos_cells.retain(|c| c.id != high_cell && c.id != low_cell);
+                state.m14b_transient_cells.retain(|c| *c != high_cell && *c != low_cell);
             }
         }
 
         // -- Phase 2: snapshot inputs under a read lock --------------------
-        let (
-            overrides,
-            wind_sources,
-            atmos_cells,
-            base_field,
-            actor_positions,
-            projectile_positions,
-            prev_active,
-        ) = {
+        let (overrides, wind_sources, atmos_cells, base_field, actor_positions, projectile_positions, prev_active) = {
             let state = match self.state.read() {
                 Ok(s) => s,
                 Err(_) => return,
@@ -11725,7 +11683,12 @@ impl M0Engine {
             let projectiles: Vec<(u64, [f32; 2])> = state
                 .actor_state
                 .as_ref()
-                .map(|sim| sim.projectiles.iter().map(|p| (p.id, [p.position.x, p.position.y])).collect())
+                .map(|sim| {
+                    sim.projectiles
+                        .iter()
+                        .map(|p| (p.id, [p.position.x, p.position.y]))
+                        .collect()
+                })
                 .unwrap_or_default();
             (
                 state.m14b_gravity_overrides.clone(),
@@ -11748,7 +11711,11 @@ impl M0Engine {
         // pixel units (~980) or SI (~9.81); buoyancy + stratification
         // need SI so we down-scale when magnitude looks pixel-scale.
         let base_g_mag = base_field.sample([0.0, 0.0]).magnitude;
-        let local_g_m_s2 = if base_g_mag > 50.0 { base_g_mag / 100.0 } else { base_g_mag };
+        let local_g_m_s2 = if base_g_mag > 50.0 {
+            base_g_mag / 100.0
+        } else {
+            base_g_mag
+        };
 
         if !overrides.is_empty() || !wind_sources.is_empty() {
             for snap in &actor_positions {
@@ -12869,8 +12836,8 @@ impl M0Engine {
                             } else {
                                 "abdomen".to_string()
                             };
-                            let team_is_robot = team.eq_ignore_ascii_case("red_robot")
-                                || team.eq_ignore_ascii_case("robot");
+                            let team_is_robot =
+                                team.eq_ignore_ascii_case("red_robot") || team.eq_ignore_ascii_case("robot");
                             victims.push(ExplosionVictim {
                                 actor: *aid,
                                 dist,
@@ -12884,7 +12851,11 @@ impl M0Engine {
                         }
                         // Apply damage.
                         for v in &victims {
-                            if let Some(actor) = s.actor_state.as_mut().and_then(|sim| sim.world.actors.get_mut(&v.actor)) {
+                            if let Some(actor) = s
+                                .actor_state
+                                .as_mut()
+                                .and_then(|sim| sim.world.actors.get_mut(&v.actor))
+                            {
                                 let _ = actor.apply_damage(v.damage);
                             }
                         }
@@ -14176,8 +14147,14 @@ impl M0Engine {
             }
         }
         if let Some(payload) = emit {
-            self.recorder
-                .record(tick, sim_time_ms, "inventory", "encumbrance_threshold_crossed", payload, None);
+            self.recorder.record(
+                tick,
+                sim_time_ms,
+                "inventory",
+                "encumbrance_threshold_crossed",
+                payload,
+                None,
+            );
         }
     }
 
@@ -15564,12 +15541,8 @@ impl M0Engine {
                 };
                 // Mirror into the actor's inventory grid (M6B canonical
                 // surface) so M14A's mass aggregator can read one source.
-                let (grid_total_mass, grid_total_bulk, instance_id) = self.add_to_inventory_grid_mut(
-                    player_id,
-                    cf_equipment::KNIFE_M6_DEFAULT_ID,
-                    1,
-                    0.0,
-                );
+                let (grid_total_mass, grid_total_bulk, instance_id) =
+                    self.add_to_inventory_grid_mut(player_id, cf_equipment::KNIFE_M6_DEFAULT_ID, 1, 0.0);
                 self.recorder.record(
                     tick,
                     sim_time_ms,
@@ -15923,9 +15896,7 @@ impl M0Engine {
             crate::m6_actions::M6Action::ThrowGrenade => ("equipment", "grenade_thrown"),
             crate::m6_actions::M6Action::MeleeBash
             | crate::m6_actions::M6Action::MeleeKick
-            | crate::m6_actions::M6Action::MeleeShoulderCheck => {
-                ("equipment", "melee_swing")
-            }
+            | crate::m6_actions::M6Action::MeleeShoulderCheck => ("equipment", "melee_swing"),
             crate::m6_actions::M6Action::UseTool { .. } => ("equipment", "tool_used"),
             crate::m6_actions::M6Action::AttachSuppressor | crate::m6_actions::M6Action::DetachSuppressor => {
                 ("equipment", "suppressor_attached")
@@ -16401,13 +16372,10 @@ impl M0Engine {
                             _ => None,
                         })
                         .unwrap_or_else(|| "left".to_string());
-                    let started = state.m7b_squad.start_breach_chain(
-                        squad_id,
-                        door_id,
-                        &side,
-                        stack_actor_ids.clone(),
-                        tick.0,
-                    );
+                    let started =
+                        state
+                            .m7b_squad
+                            .start_breach_chain(squad_id, door_id, &side, stack_actor_ids.clone(), tick.0);
                     chain_events.push(("breach_chain_started", started));
                 }
                 "breach_door" | "frag_out" | "advance" => {
@@ -16455,7 +16423,8 @@ impl M0Engine {
             json!({"method": "act.squad.issue", "squad_id": squad_id, "verb_id": verb_id, "accepted": was_accepted}),
             None,
         );
-        self.recorder.record(tick, sim_time_ms, event_category, event_type, payload, None);
+        self.recorder
+            .record(tick, sim_time_ms, event_category, event_type, payload, None);
         for (ev, payload) in chain_events {
             self.recorder.record(tick, sim_time_ms, "squad", ev, payload, None);
         }
@@ -16497,10 +16466,9 @@ impl M0Engine {
             .and_then(|pid| state.actor_state.as_ref().and_then(|sim| sim.world.actors.get(&pid)))
             .map(|a| [a.position.x, a.position.y])
             .unwrap_or([0.0, 0.0]);
-        let outcome =
-            state
-                .m7b_squad
-                .set_formation(squad_id, kind, commander_pos, 0.0, commander_actor_id, tick.0);
+        let outcome = state
+            .m7b_squad
+            .set_formation(squad_id, kind, commander_pos, 0.0, commander_actor_id, tick.0);
         let mut collapse_payload: Option<serde_json::Value> = None;
         if outcome.previous != outcome.new_kind {
             let squad = state.m7b_squad.squad(squad_id);
@@ -16525,7 +16493,8 @@ impl M0Engine {
             None,
         );
         if let Some(p) = collapse_payload {
-            self.recorder.record(tick, sim_time_ms, "squad", "formation_collapsed", p, None);
+            self.recorder
+                .record(tick, sim_time_ms, "squad", "formation_collapsed", p, None);
         }
         self.recorder
             .record(tick, sim_time_ms, "squad", "formation_set", formation_payload, None);
@@ -18735,11 +18704,7 @@ impl M0Engine {
     /// camera REPLACES the gameplay camera at the render layer
     /// (`cf-render-2d::camera_takeover`)".
     pub fn cinematic_takeover_snapshot(&self) -> cf_cinematic::CinematicTakeoverSnapshot {
-        self.state
-            .read()
-            .ok()
-            .map(|s| s.cinematic_takeover)
-            .unwrap_or_default()
+        self.state.read().ok().map(|s| s.cinematic_takeover).unwrap_or_default()
     }
 
     /// **M12C**: read the cinematic-mixer LUFS snapshot. cf-app's audio
@@ -18759,7 +18724,10 @@ impl M0Engine {
     /// persisted via M41 save format." M41 reads this; M12C ships the
     /// in-memory mirror.
     pub fn cinematic_seen_set(&self) -> cf_cinematic::SeenSet {
-        self.state.read().map(|s| s.cinematic_seen_set.clone()).unwrap_or_default()
+        self.state
+            .read()
+            .map(|s| s.cinematic_seen_set.clone())
+            .unwrap_or_default()
     }
 
     /// **M12C**: bulk-replace the seen-set when M41 loads a save. Drops
@@ -18779,7 +18747,8 @@ impl M0Engine {
     /// `Settings.storyteller`, falling back to Cassandra Classic.
     pub fn active_storyteller(&self) -> cf_cinematic::StorytellerId {
         let settings = self.current_settings();
-        cf_cinematic::StorytellerId::from_str(&settings.storyteller).unwrap_or(cf_cinematic::StorytellerId::CassandraClassic)
+        cf_cinematic::StorytellerId::from_str(&settings.storyteller)
+            .unwrap_or(cf_cinematic::StorytellerId::CassandraClassic)
     }
 
     /// **M12C**: deterministic 40% rival-taunt roll per spec §
@@ -18918,10 +18887,7 @@ impl EngineHandle for M0Engine {
                         // open ground the value is "Exposed" per
                         // VAL-M9B-COVERMATRIX-001; standing in a placed
                         // segment reflects the (stance × variant) table.
-                        cover_state: a
-                            .cover_state(&state.trench_world)
-                            .as_str()
-                            .to_string(),
+                        cover_state: a.cover_state(&state.trench_world).as_str().to_string(),
                     }
                 })
                 .collect()
@@ -19214,10 +19180,7 @@ impl EngineHandle for M0Engine {
             obj.insert("chassis_mass_kg".to_string(), json!(mass_breakdown.chassis_kg));
             obj.insert("limb_mass_kg".to_string(), json!(mass_breakdown.limb_kg));
             obj.insert("held_devices_mass_kg".to_string(), json!(mass_breakdown.held_kg));
-            obj.insert(
-                "inventory_weight_kg".to_string(),
-                json!(mass_breakdown.inventory_kg),
-            );
+            obj.insert("inventory_weight_kg".to_string(), json!(mass_breakdown.inventory_kg));
             obj.insert(
                 "jetpack_dry_mass_kg".to_string(),
                 json!(actor.jetpack.as_ref().map_or(0.0, |j| j.dry_mass_kg)),
@@ -19228,18 +19191,9 @@ impl EngineHandle for M0Engine {
             );
             obj.insert("wound_mass_kg".to_string(), json!(mass_breakdown.wound_kg));
             // Walking sim state.
-            obj.insert(
-                "move_state".to_string(),
-                json!(actor.move_state.as_str()),
-            );
-            obj.insert(
-                "prone_state".to_string(),
-                json!(actor.prone_state.as_str()),
-            );
-            obj.insert(
-                "upper_body_state".to_string(),
-                json!(actor.upper_body_state.as_str()),
-            );
+            obj.insert("move_state".to_string(), json!(actor.move_state.as_str()));
+            obj.insert("prone_state".to_string(), json!(actor.prone_state.as_str()));
+            obj.insert("upper_body_state".to_string(), json!(actor.upper_body_state.as_str()));
             obj.insert(
                 "attitude".to_string(),
                 json!({
@@ -19267,10 +19221,7 @@ impl EngineHandle for M0Engine {
             );
             obj.insert("stride_frame".to_string(), json!(actor.stride_frame));
             obj.insert("stride_timer_ms".to_string(), json!(actor.stride_timer_ms));
-            obj.insert(
-                "last_stride_side_fg".to_string(),
-                json!(actor.last_stride_side_fg),
-            );
+            obj.insert("last_stride_side_fg".to_string(), json!(actor.last_stride_side_fg));
             // Jetpack surface.
             if let Some(jet) = actor.jetpack.as_ref() {
                 obj.insert(
@@ -19811,16 +19762,14 @@ impl EngineHandle for M0Engine {
             }
         }
         let bytes = script_bytes.ok_or_else(|| format!("script_not_found:{id}"))?;
-        let script = cf_cinematic::CinematicScript::from_ron(&bytes)
-            .map_err(|e| format!("script_parse_error:{e}"))?;
+        let script = cf_cinematic::CinematicScript::from_ron(&bytes).map_err(|e| format!("script_parse_error:{e}"))?;
         let profile = cf_cinematic::builtin_profile(
             script
                 .storyteller
                 .unwrap_or(cf_cinematic::StorytellerId::CassandraClassic),
         );
         let narration = if let Some(track_id) = &script.narration_track_id {
-            let track_path =
-                format!("game/content/audio/voice/cinematic/{track_id}.narration_track.json");
+            let track_path = format!("game/content/audio/voice/cinematic/{track_id}.narration_track.json");
             std::fs::read(&track_path)
                 .ok()
                 .and_then(|b| cf_cinematic::NarrationTrack::from_json(&b).ok())
@@ -19828,21 +19777,17 @@ impl EngineHandle for M0Engine {
         } else {
             cf_cinematic::NarrationTrack::default()
         };
-        let seed = self.config.seed ^ u64::from_le_bytes({
-            let mut buf = [0u8; 8];
-            let id_hash = blake3::hash(id.as_bytes());
-            buf.copy_from_slice(&id_hash.as_bytes()[..8]);
-            buf
-        });
+        let seed = self.config.seed
+            ^ u64::from_le_bytes({
+                let mut buf = [0u8; 8];
+                let id_hash = blake3::hash(id.as_bytes());
+                buf.copy_from_slice(&id_hash.as_bytes()[..8]);
+                buf
+            });
         let mut state = self.state.write().expect("engine state poisoned");
         let tick = state.clock.tick();
         state.cinematic_kernel = Some(cf_cinematic::CinematicKernel::new(
-            script,
-            profile,
-            narration,
-            seed,
-            seen,
-            true,
+            script, profile, narration, seed, seen, true,
         ));
         Ok(tick.0)
     }
@@ -20312,8 +20257,7 @@ impl EngineHandle for M0Engine {
                 })
             })
             .collect();
-        let salvaged_module_ids: Vec<String> =
-            chassis.salvaged_modules.iter().map(|m| m.id.clone()).collect();
+        let salvaged_module_ids: Vec<String> = chassis.salvaged_modules.iter().map(|m| m.id.clone()).collect();
         let destroyed_zones: Vec<String> = chassis
             .destroyed_zones()
             .iter()
@@ -21071,7 +21015,11 @@ impl EngineHandle for M0Engine {
                     self.reject_actor_command(tick, sim_time_ms, state, "act.player.aim")
                 }
             }
-            ControlCommand::ActPlayerFire { pressed, ammo_kind, source } => {
+            ControlCommand::ActPlayerFire {
+                pressed,
+                ammo_kind,
+                source,
+            } => {
                 if !self.config.has_actor_world {
                     return self.reject_actor_command(tick, sim_time_ms, state, "act.player.fire");
                 }
@@ -21823,7 +21771,9 @@ impl EngineHandle for M0Engine {
                         // Cycle Off → Slowdown75 → Slowdown25 → FullPause → Off.
                         let next = match state.settings.game_speed_assist {
                             crate::settings::GameSpeedAssist::Off => crate::settings::GameSpeedAssist::Slowdown75,
-                            crate::settings::GameSpeedAssist::Slowdown75 => crate::settings::GameSpeedAssist::Slowdown25,
+                            crate::settings::GameSpeedAssist::Slowdown75 => {
+                                crate::settings::GameSpeedAssist::Slowdown25
+                            }
                             crate::settings::GameSpeedAssist::Slowdown25 => crate::settings::GameSpeedAssist::FullPause,
                             crate::settings::GameSpeedAssist::FullPause => crate::settings::GameSpeedAssist::Off,
                         };
@@ -21834,8 +21784,14 @@ impl EngineHandle for M0Engine {
                             json!({"to": next.as_str(), "via": "act.input.key_press"}),
                         ));
                     }
-                    "accessibility_overlay" | "tactical_overlay" | "photo_mode" | "debug_overlay"
-                    | "mini_map_toggle" | "compass_toggle" | "damage_direction_toggle" | "captions_toggle" => {
+                    "accessibility_overlay"
+                    | "tactical_overlay"
+                    | "photo_mode"
+                    | "debug_overlay"
+                    | "mini_map_toggle"
+                    | "compass_toggle"
+                    | "damage_direction_toggle"
+                    | "captions_toggle" => {
                         // Map each toggle action to its corresponding
                         // settings field; emit the matching ux event.
                         let event_type = match action.as_str() {
@@ -21853,13 +21809,16 @@ impl EngineHandle for M0Engine {
                             "mini_map_toggle" => state.settings.mini_map_enabled = !state.settings.mini_map_enabled,
                             "compass_toggle" => state.settings.compass_enabled = !state.settings.compass_enabled,
                             "damage_direction_toggle" => {
-                                state.settings.damage_direction_enabled =
-                                    !state.settings.damage_direction_enabled
+                                state.settings.damage_direction_enabled = !state.settings.damage_direction_enabled
                             }
                             "captions_toggle" => state.settings.captions = !state.settings.captions,
                             _ => {}
                         }
-                        follow_on_event = Some(("ux".to_string(), event_type.to_string(), json!({"via": "act.input.key_press"})));
+                        follow_on_event = Some((
+                            "ux".to_string(),
+                            event_type.to_string(),
+                            json!({"via": "act.input.key_press"}),
+                        ));
                     }
                     _ => {
                         // Should never reach: server-side whitelist gates this.
@@ -22470,7 +22429,10 @@ impl EngineHandle for M0Engine {
                 CommandResult::accepted(tick.0)
             }
             // **M13** § "Brain hopping / multi-actor control".
-            ControlCommand::ActPlayerBrainHop { target_actor_id, source } => {
+            ControlCommand::ActPlayerBrainHop {
+                target_actor_id,
+                source,
+            } => {
                 if !self.config.has_actor_world {
                     return self.reject_actor_command(tick, sim_time_ms, state, "act.player.brain_hop");
                 }
@@ -22950,7 +22912,10 @@ impl EngineHandle for M0Engine {
                 CommandResult::accepted(tick.0)
             }
             // **M13** § "Boarding / disembarking transitions".
-            ControlCommand::ActPlayerBoard { chassis_actor_id, source } => {
+            ControlCommand::ActPlayerBoard {
+                chassis_actor_id,
+                source,
+            } => {
                 if !self.config.has_actor_world {
                     return self.reject_actor_command(tick, sim_time_ms, state, "act.player.board");
                 }
@@ -22965,35 +22930,19 @@ impl EngineHandle for M0Engine {
                 // performed in `tick_chassis_eject_for_all`.
                 let target_id = ActorId(chassis_actor_id);
                 let validation: Result<(), &'static str> = (|| {
-                    let sim = state
-                        .actor_state
-                        .as_ref()
-                        .ok_or("no_actor_world")?;
-                    let player = sim
-                        .world
-                        .actors
-                        .get(&player_id)
-                        .ok_or("player_actor_missing")?;
-                    if player.boarding_ticks_remaining > 0
-                        || player.pending_boarding_target.is_some()
-                    {
+                    let sim = state.actor_state.as_ref().ok_or("no_actor_world")?;
+                    let player = sim.world.actors.get(&player_id).ok_or("player_actor_missing")?;
+                    if player.boarding_ticks_remaining > 0 || player.pending_boarding_target.is_some() {
                         return Err("player_already_boarding");
                     }
                     if player.chassis.is_some() {
                         return Err("player_already_chassis_bound");
                     }
-                    let target_actor = sim
-                        .world
-                        .actors
-                        .get(&target_id)
-                        .ok_or("target_actor_not_found")?;
+                    let target_actor = sim.world.actors.get(&target_id).ok_or("target_actor_not_found")?;
                     if target_id == player_id {
                         return Err("cannot_board_self");
                     }
-                    let target_chassis = target_actor
-                        .chassis
-                        .as_ref()
-                        .ok_or("target_actor_has_no_chassis")?;
+                    let target_chassis = target_actor.chassis.as_ref().ok_or("target_actor_has_no_chassis")?;
                     if target_chassis.is_in_transition() {
                         return Err("target_chassis_busy");
                     }
@@ -23460,13 +23409,7 @@ impl EngineHandle for M0Engine {
                 source,
             } => {
                 drop(state);
-                self.dispatch_m9b_place_trench_module(
-                    module_id,
-                    segment_id,
-                    source,
-                    tick,
-                    sim_time_ms,
-                )
+                self.dispatch_m9b_place_trench_module(module_id, segment_id, source, tick, sim_time_ms)
             }
             ControlCommand::ActPlayerRepairTrenchModule {
                 module_id,
@@ -23474,13 +23417,7 @@ impl EngineHandle for M0Engine {
                 source,
             } => {
                 drop(state);
-                self.dispatch_m9b_repair_trench_module(
-                    module_id,
-                    segment_id,
-                    source,
-                    tick,
-                    sim_time_ms,
-                )
+                self.dispatch_m9b_repair_trench_module(module_id, segment_id, source, tick, sim_time_ms)
             }
             ControlCommand::ActPlayerDropTrenchTemplate { id, origin, source } => {
                 let source_label = match source {
@@ -23522,8 +23459,7 @@ impl EngineHandle for M0Engine {
                         return CommandResult::rejected("trench_template_load_failed", tick.0);
                     }
                 };
-                let resolved: std::collections::HashSet<String> =
-                    resolved_fortifications_for_build();
+                let resolved: std::collections::HashSet<String> = resolved_fortifications_for_build();
                 let inst_request = cf_content::TrenchTemplateInstantiation {
                     template: &template,
                     origin,
@@ -23556,8 +23492,7 @@ impl EngineHandle for M0Engine {
                 // into the live trench-world index so subsequent
                 // observe.trench_segment_at_pos calls find them.
                 let segment_count = inst.segments.len();
-                let first_segment_id =
-                    self.insert_trench_segments_bulk(inst.trench_segments.clone());
+                let first_segment_id = self.insert_trench_segments_bulk(inst.trench_segments.clone());
                 let dropped_id = self.recorder.record(
                     tick,
                     sim_time_ms,
@@ -23612,10 +23547,8 @@ fn load_trench_template(id: &str) -> Result<cf_content::TrenchTemplate, String> 
     for path in &candidates {
         let p: &Path = path.as_ref();
         if p.exists() {
-            let text = std::fs::read_to_string(p)
-                .map_err(|e| format!("read {}: {e}", p.display()))?;
-            return cf_content::TrenchTemplate::from_ron_str(&text)
-                .map_err(|e| format!("parse {}: {e}", p.display()));
+            let text = std::fs::read_to_string(p).map_err(|e| format!("read {}: {e}", p.display()))?;
+            return cf_content::TrenchTemplate::from_ron_str(&text).map_err(|e| format!("parse {}: {e}", p.display()));
         }
         tried.push(p.display().to_string());
     }
@@ -25226,7 +25159,7 @@ mod tests {
             let _ = engine
                 .dispatch(ControlCommand::ActPlayerFire {
                     pressed: true,
-                ammo_kind: None,
+                    ammo_kind: None,
                     source: IntentSource::Cfctl,
                 })
                 .await;
@@ -25241,7 +25174,7 @@ mod tests {
             let _ = engine
                 .dispatch(ControlCommand::ActPlayerFire {
                     pressed: false,
-                ammo_kind: None,
+                    ammo_kind: None,
                     source: IntentSource::Cfctl,
                 })
                 .await;
@@ -25294,7 +25227,7 @@ mod tests {
                 let _ = engine
                     .dispatch(ControlCommand::ActPlayerFire {
                         pressed: true,
-                ammo_kind: None,
+                        ammo_kind: None,
                         source: IntentSource::Cfctl,
                     })
                     .await;
@@ -25304,7 +25237,7 @@ mod tests {
                 let _ = engine
                     .dispatch(ControlCommand::ActPlayerFire {
                         pressed: false,
-                ammo_kind: None,
+                        ammo_kind: None,
                         source: IntentSource::Cfctl,
                     })
                     .await;
@@ -25352,7 +25285,7 @@ mod tests {
             let _ = engine
                 .dispatch(ControlCommand::ActPlayerFire {
                     pressed: true,
-                ammo_kind: None,
+                    ammo_kind: None,
                     source: IntentSource::Cfctl,
                 })
                 .await;
@@ -25362,7 +25295,7 @@ mod tests {
             let _ = engine
                 .dispatch(ControlCommand::ActPlayerFire {
                     pressed: false,
-                ammo_kind: None,
+                    ammo_kind: None,
                     source: IntentSource::Cfctl,
                 })
                 .await;
@@ -25853,7 +25786,11 @@ mod tests {
             .iter()
             .find(|e| e.category == "equipment" && e.event_type == "item_picked_up_with_mass")
             .unwrap();
-        let mass_kg = mass_event.payload.get("mass_kg").and_then(|v| v.as_f64()).unwrap_or(0.0);
+        let mass_kg = mass_event
+            .payload
+            .get("mass_kg")
+            .and_then(|v| v.as_f64())
+            .unwrap_or(0.0);
         assert!(
             (mass_kg - 3.5).abs() < 0.01,
             "mass_kg from registry must be 3.5 (got {mass_kg})"

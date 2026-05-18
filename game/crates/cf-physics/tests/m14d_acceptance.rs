@@ -13,13 +13,7 @@ use cf_physics::{
     SweptHitCandidate, BROADPHASE_BUCKET_PX, KINETIC_DEFLECT_ENERGY_RETAINED, NARROWPHASE_CANDIDATE_BUDGET,
 };
 
-fn snap_r(
-    id: u64,
-    kind: ProjectileKind,
-    pos: [f32; 2],
-    vel: [f32; 2],
-    radius: f32,
-) -> ProjectileSnapshot {
+fn snap_r(id: u64, kind: ProjectileKind, pos: [f32; 2], vel: [f32; 2], radius: f32) -> ProjectileSnapshot {
     ProjectileSnapshot {
         id,
         kind,
@@ -170,10 +164,7 @@ fn val_m14d_008_broadphase_p99_under_03_ms_at_50_projectiles() {
     timings_us.sort_unstable();
     let p99_idx = ((timings_us.len() as f64 * 0.99) as usize).min(timings_us.len() - 1);
     let p99_us = timings_us[p99_idx];
-    assert!(
-        p99_us < 300,
-        "broadphase p99 = {p99_us} µs must be < 300 µs (0.3 ms)"
-    );
+    assert!(p99_us < 300, "broadphase p99 = {p99_us} µs must be < 300 µs (0.3 ms)");
 }
 
 /// **VAL-M14D-009**: narrowphase candidate count ≤ 12 in the 50-
@@ -243,10 +234,7 @@ fn val_m14d_010_total_pair_pass_under_05_ms_at_50_projectiles() {
     timings_us.sort_unstable();
     let p99_idx = ((timings_us.len() as f64 * 0.99) as usize).min(timings_us.len() - 1);
     let p99_us = timings_us[p99_idx];
-    assert!(
-        p99_us < 500,
-        "total pair-CCD pass p99 = {p99_us} µs must be < 500 µs"
-    );
+    assert!(p99_us < 500, "total pair-CCD pass p99 = {p99_us} µs must be < 500 µs");
 }
 
 /// **VAL-M14D-011**: spatial-hash bucket size = exactly 32 px.
@@ -290,9 +278,17 @@ fn val_m14d_013_prioritize_mixed_candidates_orders_by_toi() {
     }
     let input = vec![
         SweptCandidateKind::Actor(ac(10, 0.8)),
-        SweptCandidateKind::ProjectilePair(ProjectilePairKey { a_id: 1, b_id: 2, toi: 0.25 }),
+        SweptCandidateKind::ProjectilePair(ProjectilePairKey {
+            a_id: 1,
+            b_id: 2,
+            toi: 0.25,
+        }),
         SweptCandidateKind::Actor(ac(11, 0.5)),
-        SweptCandidateKind::ProjectilePair(ProjectilePairKey { a_id: 3, b_id: 4, toi: 0.10 }),
+        SweptCandidateKind::ProjectilePair(ProjectilePairKey {
+            a_id: 3,
+            b_id: 4,
+            toi: 0.10,
+        }),
     ];
     let resolved = prioritize_mixed_swept_candidates(input);
     assert_eq!(resolved.len(), 4);
@@ -348,10 +344,7 @@ fn val_m14d_016_pair_toi_symmetric_and_matches_reference() {
     let b = snap_r(2, ProjectileKind::ExplosiveGrenade, [50.0, 0.0], [-100.0, 0.0], 4.0);
     let ab = pair_swept_toi(&a, &b, 1.0).expect("intercept");
     let ba = pair_swept_toi(&b, &a, 1.0).expect("intercept");
-    assert!(
-        (ab.toi - ba.toi).abs() < 1e-5,
-        "symmetric: ab={ab:?} ba={ba:?}"
-    );
+    assert!((ab.toi - ba.toi).abs() < 1e-5, "symmetric: ab={ab:?} ba={ba:?}");
     assert!(ab.toi >= 0.0 && ab.toi <= 1.0, "TOI in [0,1]");
     // Equivalent geometry through M14 reference primitive — segment vs
     // expanded AABB (cf_physics::segment_hits_aabb) — produces the
@@ -361,7 +354,10 @@ fn val_m14d_016_pair_toi_symmetric_and_matches_reference() {
     let combined = a.radius + b.radius;
     let t_ref = cf_physics::segment_hits_aabb(
         (a.position[0], a.position[1]),
-        (a.position[0] + a.velocity[0] - b.velocity[0], a.position[1] + a.velocity[1] - b.velocity[1]),
+        (
+            a.position[0] + a.velocity[0] - b.velocity[0],
+            a.position[1] + a.velocity[1] - b.velocity[1],
+        ),
         (b.position[0], b.position[1]),
         (combined, combined),
     );
@@ -416,7 +412,10 @@ fn val_m14d_018_cosmetic_flag_stable_across_outcomes() {
 #[test]
 fn val_m14d_019_outcome_discriminator_matches_schema_enum() {
     assert_eq!(ProjectilePairOutcome::FuzeTriggered.as_str(), "fuze_triggered");
-    assert_eq!(ProjectilePairOutcome::MutualCancellation.as_str(), "mutual_cancellation");
+    assert_eq!(
+        ProjectilePairOutcome::MutualCancellation.as_str(),
+        "mutual_cancellation"
+    );
     assert_eq!(ProjectilePairOutcome::ApsIntercept.as_str(), "aps_intercept");
     assert_eq!(ProjectilePairOutcome::KineticDeflect.as_str(), "kinetic_deflect");
 }

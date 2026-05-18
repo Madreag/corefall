@@ -130,9 +130,7 @@ pub fn dispatch_variant(
     apfsds_payload: Option<ApfsdsThroughModulePayload>,
 ) -> KillcamVariant {
     match trigger {
-        KillcamVariantTrigger::HeatJetTraversed => {
-            KillcamVariant::HeatPenetration(heat_payload.unwrap_or_default())
-        }
+        KillcamVariantTrigger::HeatJetTraversed => KillcamVariant::HeatPenetration(heat_payload.unwrap_or_default()),
         KillcamVariantTrigger::ApfsdsLongRodThrough => {
             KillcamVariant::ApfsdsThroughModule(apfsds_payload.unwrap_or_default())
         }
@@ -152,10 +150,7 @@ pub fn dispatch_variant(
 /// `replay_intercepts` setting is `true`; otherwise returns the default
 /// fallback so the killcam queue stays empty for these events.
 #[must_use]
-pub fn dispatch_pair_contact_variant(
-    payload: ProjectilePairContactPayload,
-    replay_intercepts: bool,
-) -> KillcamVariant {
+pub fn dispatch_pair_contact_variant(payload: ProjectilePairContactPayload, replay_intercepts: bool) -> KillcamVariant {
     if replay_intercepts {
         KillcamVariant::ProjectilePairContact(payload)
     } else {
@@ -228,6 +223,7 @@ mod tests {
     /// the default off, dispatching a pair contact returns the default
     /// fallback variant (queue stays empty for these events).
     #[test]
+    #[allow(clippy::assertions_on_constants)]
     fn pair_contact_dispatch_defaults_to_empty_on_default_setting() {
         assert!(!DEFAULT_REPLAY_INTERCEPTS);
         let payload = ProjectilePairContactPayload {
