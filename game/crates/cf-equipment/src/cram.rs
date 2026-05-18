@@ -33,6 +33,7 @@ pub const DEFAULT_CRAM_COOLDOWN_TICKS: u32 = 60;
 ///   3. Each subsequent tick: [`Cram::tick`] decrements
 ///      `cooldown_ticks_remaining`; on reaching zero
 ///      `cooldown_active` flips true → false.
+#[allow(clippy::struct_field_names)]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Cram {
     pub cooldown_active: bool,
