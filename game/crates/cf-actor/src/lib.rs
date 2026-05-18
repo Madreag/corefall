@@ -64,6 +64,9 @@ pub mod stamina;
 pub mod stance;
 pub mod systems;
 pub mod ttd;
+pub mod walking_sim;
+
+pub use walking_sim::{walk_sim_tick, WalkSimContext, WalkSimEvents};
 
 pub use atmosphere_contact::{
     resolve_atmosphere_contact, suit_o2_drain_mol_per_tick, wind_force_for_actor, AtmosphereContact,

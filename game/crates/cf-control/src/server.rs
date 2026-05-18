@@ -97,9 +97,11 @@ use crate::{
         ActPlayerBoardParams, ActPlayerBrainHopParams, ActPlayerClimbParams, ActPlayerCrouchParams,
         ActPlayerDetachModifierParams, ActPlayerDigParams, ActPlayerDisembarkParams, ActPlayerEjectParams,
         ActPlayerFireParams, ActPlayerJetParams, ActPlayerJumpParams, ActPlayerMoveParams,
-        ActPlayerPauseCinematicParams, ActPlayerReloadParams, ActPlayerReplayCinematicParams,
-        ActPlayerResetParams, ActPlayerSelectItemParams, ActPlayerSetDroneModeParams, ActPlayerSharpAimParams,
-        ActPlayerSkipCinematicParams, ActSquadAssignRoleParams, ActSquadIssueParams, ActSquadSetFormationParams,
+        ActPlayerPauseCinematicParams, ActPlayerQuickActionRadialParams, ActPlayerQuickActionSliceParams,
+        ActPlayerQuickActionSlotParams, ActPlayerQuickActionToggleParams, ActPlayerReloadParams,
+        ActPlayerReplayCinematicParams, ActPlayerResetParams, ActPlayerSelectItemParams, ActPlayerSetDroneModeParams,
+        ActPlayerSharpAimParams, ActPlayerSkipCinematicParams, ActPlayerWeaponCycleParams, ActSquadAssignRoleParams,
+        ActSquadIssueParams, ActSquadSetFormationParams,
         InspectActorParams, InspectAiParams, InspectChassisParams, InspectEquipmentParams, InspectMissionParams,
         ObserveActorParams, ObserveAiParams, ObserveChassisSilhouetteParams, ObserveMissionParams,
         ObserveOnceParams, ObservePerceptionParams, ObserveSubscribeParams, RunBundleWriteParams,
@@ -705,6 +707,30 @@ pub enum ControlCommand {
     },
     /// **M5**: trigger the chassis eject sequence.
     ActPlayerEject {
+        source: IntentSource,
+    },
+    /// **M14A**: instant slot invocation (keys 1-8).
+    ActPlayerQuickActionSlot {
+        slot: u8,
+        source: IntentSource,
+    },
+    /// **M14A**: tap-Q quick-toggle to last-used slot.
+    ActPlayerQuickActionToggle {
+        source: IntentSource,
+    },
+    /// **M14A**: open/close hold-Q radial picker with sim time-slow.
+    ActPlayerQuickActionRadial {
+        active: bool,
+        source: IntentSource,
+    },
+    /// **M14A**: commit a radial slice (1-8).
+    ActPlayerQuickActionSlice {
+        slice: u8,
+        source: IntentSource,
+    },
+    /// **M14A**: mouse-wheel cycle within current slot's category.
+    ActPlayerWeaponCycle {
+        direction: i8,
         source: IntentSource,
     },
     /// **M5**: repair a chassis zone (`zone` is `head | torso | arm_left | ...`).
@@ -2056,6 +2082,70 @@ async fn process_request<E: EngineHandle>(
             };
             let result = engine
                 .dispatch(ControlCommand::ActPlayerEject {
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.quick_action_slot" => {
+            let p: ActPlayerQuickActionSlotParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerQuickActionSlot {
+                    slot: p.slot,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.quick_action_toggle" => {
+            let _p: ActPlayerQuickActionToggleParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerQuickActionToggle {
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.quick_action_radial" => {
+            let p: ActPlayerQuickActionRadialParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerQuickActionRadial {
+                    active: p.active,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.quick_action_slice" => {
+            let p: ActPlayerQuickActionSliceParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerQuickActionSlice {
+                    slice: p.slice,
+                    source: IntentSource::Cfctl,
+                })
+                .await;
+            Some(ack_response(request.id, &result))
+        }
+        "act.player.weapon_cycle" => {
+            let p: ActPlayerWeaponCycleParams = match serde_json::from_value(params) {
+                Ok(v) => v,
+                Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
+            };
+            let result = engine
+                .dispatch(ControlCommand::ActPlayerWeaponCycle {
+                    direction: p.direction,
                     source: IntentSource::Cfctl,
                 })
                 .await;

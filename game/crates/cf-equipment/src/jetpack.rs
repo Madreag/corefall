@@ -378,8 +378,11 @@ pub fn jetpack_tick(
     let efficiency = jet_pressure_efficiency(local_pressure_kpa);
     let realized = thrust_n * efficiency;
 
+    // Emit angle is the direction the *exhaust* points; the actor accelerates
+    // in the *opposite* direction (Newton's third law). Negate to get the
+    // thrust vector applied to the actor.
     let angle = jet.emit_angle;
-    let thrust_vec = [angle.cos() * realized, angle.sin() * realized];
+    let thrust_vec = [-angle.cos() * realized, -angle.sin() * realized];
 
     JetpackTickOutcome {
         thrust_n: realized,

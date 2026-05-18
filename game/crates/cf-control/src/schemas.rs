@@ -279,6 +279,47 @@ pub struct ActPlayerEjectParams {
     pub schema_version: u32,
 }
 
+/// **M14A**: `act.player.quick_action_slot` — instant slot invocation (keys 1-8).
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerQuickActionSlotParams {
+    pub schema_version: u32,
+    /// 1-8 inclusive (the player-facing numbering); engine subtracts 1 internally.
+    pub slot: u8,
+}
+
+/// **M14A**: `act.player.quick_action_toggle` — invoke the last-used slot (tap-Q).
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerQuickActionToggleParams {
+    pub schema_version: u32,
+}
+
+/// **M14A**: `act.player.quick_action_radial` — open/close the radial picker.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerQuickActionRadialParams {
+    pub schema_version: u32,
+    pub active: bool,
+}
+
+/// **M14A**: `act.player.quick_action_slice` — commit a radial slice (1-8).
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerQuickActionSliceParams {
+    pub schema_version: u32,
+    pub slice: u8,
+}
+
+/// **M14A**: `act.player.weapon_cycle` — mouse-wheel slot category cycle.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ActPlayerWeaponCycleParams {
+    pub schema_version: u32,
+    /// -1 or +1.
+    pub direction: i8,
+}
+
 /// **M5**: `act.chassis.repair` — repair a chassis zone or specific module.
 #[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -756,6 +797,11 @@ pub fn dump_v1() -> BTreeMap<String, String> {
         entry::<ActPlayerClimbParams>("act_player_climb_params"),
         entry::<ActPlayerJetParams>("act_player_jet_params"),
         entry::<ActPlayerEjectParams>("act_player_eject_params"),
+        entry::<ActPlayerQuickActionSlotParams>("act_player_quick_action_slot_params"),
+        entry::<ActPlayerQuickActionToggleParams>("act_player_quick_action_toggle_params"),
+        entry::<ActPlayerQuickActionRadialParams>("act_player_quick_action_radial_params"),
+        entry::<ActPlayerQuickActionSliceParams>("act_player_quick_action_slice_params"),
+        entry::<ActPlayerWeaponCycleParams>("act_player_weapon_cycle_params"),
         entry::<ActChassisRepairParams>("act_chassis_repair_params"),
         entry::<ActChassisSalvageParams>("act_chassis_salvage_params"),
         entry::<ActChassisClearJamParams>("act_chassis_clear_jam_params"),

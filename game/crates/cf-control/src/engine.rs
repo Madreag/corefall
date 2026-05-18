@@ -19128,6 +19128,11 @@ impl EngineHandle for M0Engine {
                 ControlCommand::ActPlayerClimb { .. } => Some("act.player.climb"),
                 ControlCommand::ActPlayerJet { .. } => Some("act.player.jet"),
                 ControlCommand::ActPlayerEject { .. } => Some("act.player.eject"),
+                ControlCommand::ActPlayerQuickActionSlot { .. } => Some("act.player.quick_action_slot"),
+                ControlCommand::ActPlayerQuickActionToggle { .. } => Some("act.player.quick_action_toggle"),
+                ControlCommand::ActPlayerQuickActionRadial { .. } => Some("act.player.quick_action_radial"),
+                ControlCommand::ActPlayerQuickActionSlice { .. } => Some("act.player.quick_action_slice"),
+                ControlCommand::ActPlayerWeaponCycle { .. } => Some("act.player.weapon_cycle"),
                 ControlCommand::ActPlayerSharpAim { .. } => Some("act.player.sharp_aim"),
                 ControlCommand::ActM6 { action, .. } => Some(action.method_name()),
                 ControlCommand::ActPlayerBrainHop { .. } => Some("act.player.brain_hop"),
@@ -19179,6 +19184,11 @@ impl EngineHandle for M0Engine {
                 ControlCommand::ActPlayerClimb { .. } => Some("act.player.climb"),
                 ControlCommand::ActPlayerJet { .. } => Some("act.player.jet"),
                 ControlCommand::ActPlayerEject { .. } => Some("act.player.eject"),
+                ControlCommand::ActPlayerQuickActionSlot { .. } => Some("act.player.quick_action_slot"),
+                ControlCommand::ActPlayerQuickActionToggle { .. } => Some("act.player.quick_action_toggle"),
+                ControlCommand::ActPlayerQuickActionRadial { .. } => Some("act.player.quick_action_radial"),
+                ControlCommand::ActPlayerQuickActionSlice { .. } => Some("act.player.quick_action_slice"),
+                ControlCommand::ActPlayerWeaponCycle { .. } => Some("act.player.weapon_cycle"),
                 ControlCommand::ActPlayerSharpAim { .. } => Some("act.player.sharp_aim"),
                 ControlCommand::ActPlayerAbort { .. } => Some("act.player.abort"),
                 ControlCommand::ActM6 { action, .. } => Some(action.method_name()),
@@ -19250,6 +19260,11 @@ impl EngineHandle for M0Engine {
                 ControlCommand::ActPlayerCrouch { .. } => Some("act.player.crouch"),
                 ControlCommand::ActPlayerClimb { .. } => Some("act.player.climb"),
                 ControlCommand::ActPlayerJet { .. } => Some("act.player.jet"),
+                ControlCommand::ActPlayerQuickActionSlot { .. } => Some("act.player.quick_action_slot"),
+                ControlCommand::ActPlayerQuickActionToggle { .. } => Some("act.player.quick_action_toggle"),
+                ControlCommand::ActPlayerQuickActionRadial { .. } => Some("act.player.quick_action_radial"),
+                ControlCommand::ActPlayerQuickActionSlice { .. } => Some("act.player.quick_action_slice"),
+                ControlCommand::ActPlayerWeaponCycle { .. } => Some("act.player.weapon_cycle"),
                 ControlCommand::ActPlayerActivateAbility { .. } => Some("act.player.activate_ability"),
                 ControlCommand::ActPlayerAttachModifier { .. } => Some("act.player.attach_modifier"),
                 ControlCommand::ActPlayerDetachModifier { .. } => Some("act.player.detach_modifier"),
@@ -20661,6 +20676,180 @@ impl EngineHandle for M0Engine {
                         );
                     }
                 }
+                CommandResult::accepted(tick.0)
+            }
+            ControlCommand::ActPlayerQuickActionSlot { slot, source } => {
+                let _ = source;
+                if !self.config.has_actor_world {
+                    return self.reject_actor_command(tick, sim_time_ms, state, "act.player.quick_action_slot");
+                }
+                let player_id = state.player_actor.expect("player actor present");
+                let slot_idx = slot.saturating_sub(1);
+                let outcome = if let Some(sim) = state.actor_state.as_mut() {
+                    if let Some(actor) = sim.world.actors.get_mut(&player_id) {
+                        actor.quick_action_bar.try_invoke_slot(slot_idx)
+                    } else {
+                        cf_actor::quick_action::InvokeOutcome::Rejected("actor_missing")
+                    }
+                } else {
+                    cf_actor::quick_action::InvokeOutcome::Rejected("no_actor_world")
+                };
+                drop(state);
+                match outcome {
+                    cf_actor::quick_action::InvokeOutcome::Accepted => {
+                        self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "quick_action",
+                            "slot_invoked",
+                            json!({"actor": player_id.0, "slot": slot}),
+                            None,
+                        );
+                        CommandResult::accepted(tick.0)
+                    }
+                    cf_actor::quick_action::InvokeOutcome::Rejected(reason) => {
+                        self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "control",
+                            "command_rejected",
+                            json!({"method": "act.player.quick_action_slot", "reason": reason, "slot": slot}),
+                            None,
+                        );
+                        CommandResult::rejected(reason.to_string(), tick.0)
+                    }
+                }
+            }
+            ControlCommand::ActPlayerQuickActionToggle { source } => {
+                let _ = source;
+                if !self.config.has_actor_world {
+                    return self.reject_actor_command(tick, sim_time_ms, state, "act.player.quick_action_toggle");
+                }
+                let player_id = state.player_actor.expect("player actor present");
+                let outcome = if let Some(sim) = state.actor_state.as_mut() {
+                    if let Some(actor) = sim.world.actors.get_mut(&player_id) {
+                        actor.quick_action_bar.try_invoke_toggle()
+                    } else {
+                        cf_actor::quick_action::InvokeOutcome::Rejected("actor_missing")
+                    }
+                } else {
+                    cf_actor::quick_action::InvokeOutcome::Rejected("no_actor_world")
+                };
+                drop(state);
+                match outcome {
+                    cf_actor::quick_action::InvokeOutcome::Accepted => {
+                        self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "quick_action",
+                            "slot_invoked_via_toggle",
+                            json!({"actor": player_id.0}),
+                            None,
+                        );
+                        CommandResult::accepted(tick.0)
+                    }
+                    cf_actor::quick_action::InvokeOutcome::Rejected(reason) => {
+                        CommandResult::rejected(reason.to_string(), tick.0)
+                    }
+                }
+            }
+            ControlCommand::ActPlayerQuickActionRadial { active, source } => {
+                let _ = source;
+                if !self.config.has_actor_world {
+                    return self.reject_actor_command(tick, sim_time_ms, state, "act.player.quick_action_radial");
+                }
+                let player_id = state.player_actor.expect("player actor present");
+                if let Some(sim) = state.actor_state.as_mut() {
+                    if let Some(actor) = sim.world.actors.get_mut(&player_id) {
+                        if active {
+                            actor.quick_action_bar.open_radial(tick.0, false);
+                            self.recorder.record(
+                                tick,
+                                sim_time_ms,
+                                "quick_action",
+                                "radial_opened",
+                                json!({"actor": player_id.0, "tick": tick.0}),
+                                None,
+                            );
+                        } else {
+                            let invoked = actor.quick_action_bar.close_radial(None);
+                            self.recorder.record(
+                                tick,
+                                sim_time_ms,
+                                "quick_action",
+                                "radial_closed",
+                                json!({"actor": player_id.0, "cancelled": invoked.is_none()}),
+                                None,
+                            );
+                        }
+                    }
+                }
+                CommandResult::accepted(tick.0)
+            }
+            ControlCommand::ActPlayerQuickActionSlice { slice, source } => {
+                let _ = source;
+                if !self.config.has_actor_world {
+                    return self.reject_actor_command(tick, sim_time_ms, state, "act.player.quick_action_slice");
+                }
+                let player_id = state.player_actor.expect("player actor present");
+                let outcome = if let Some(sim) = state.actor_state.as_mut() {
+                    if let Some(actor) = sim.world.actors.get_mut(&player_id) {
+                        let slice_idx = slice.saturating_sub(1);
+                        let invoked = actor.quick_action_bar.close_radial(Some(slice_idx));
+                        if invoked.is_some() {
+                            cf_actor::quick_action::InvokeOutcome::Accepted
+                        } else {
+                            cf_actor::quick_action::InvokeOutcome::Rejected("slice_rejected")
+                        }
+                    } else {
+                        cf_actor::quick_action::InvokeOutcome::Rejected("actor_missing")
+                    }
+                } else {
+                    cf_actor::quick_action::InvokeOutcome::Rejected("no_actor_world")
+                };
+                drop(state);
+                match outcome {
+                    cf_actor::quick_action::InvokeOutcome::Accepted => {
+                        self.recorder.record(
+                            tick,
+                            sim_time_ms,
+                            "quick_action",
+                            "slice_selected",
+                            json!({"actor": player_id.0, "slice": slice}),
+                            None,
+                        );
+                        CommandResult::accepted(tick.0)
+                    }
+                    cf_actor::quick_action::InvokeOutcome::Rejected(reason) => {
+                        CommandResult::rejected(reason.to_string(), tick.0)
+                    }
+                }
+            }
+            ControlCommand::ActPlayerWeaponCycle { direction, source } => {
+                let _ = source;
+                if !self.config.has_actor_world {
+                    return self.reject_actor_command(tick, sim_time_ms, state, "act.player.weapon_cycle");
+                }
+                let player_id = state.player_actor.expect("player actor present");
+                let cycled = if let Some(sim) = state.actor_state.as_mut() {
+                    if let Some(actor) = sim.world.actors.get_mut(&player_id) {
+                        let slot = actor.last_used_quick_slot;
+                        actor.quick_action_bar.cycle_within_slot(slot, direction as i32)
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                drop(state);
+                self.recorder.record(
+                    tick,
+                    sim_time_ms,
+                    "quick_action",
+                    "weapon_cycle",
+                    json!({"actor": player_id.0, "direction": direction, "current": cycled}),
+                    None,
+                );
                 CommandResult::accepted(tick.0)
             }
             ControlCommand::ActChassisRepair {
