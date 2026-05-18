@@ -2,7 +2,7 @@
 
 use super::{WeaponClass, WeaponPreset, CARBINE_COMPACT_ID};
 use crate::fire_modes::AdvancedFireMode;
-use crate::{FireMode, RifleSpec};
+use crate::{FireMode, RifleSpec, RoundKind};
 
 #[must_use]
 pub fn carbine_compact() -> WeaponPreset {
@@ -28,6 +28,7 @@ pub fn carbine_compact() -> WeaponPreset {
         ai_life_time: 1.2,
         ai_blast_radius: 0.0,
         fire_mode: FireMode::FullAuto,
+        primary_round: RoundKind::Regular,
     };
     WeaponPreset::new(
         CARBINE_COMPACT_ID,

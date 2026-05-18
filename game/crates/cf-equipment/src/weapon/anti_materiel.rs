@@ -3,7 +3,7 @@
 
 use super::{WeaponClass, WeaponPreset, ANTI_MATERIEL_RIFLE_127_ID};
 use crate::fire_modes::AdvancedFireMode;
-use crate::{FireMode, RifleSpec};
+use crate::{FireMode, RifleSpec, RoundKind};
 
 #[must_use]
 pub fn anti_materiel_rifle_127() -> WeaponPreset {
@@ -29,6 +29,7 @@ pub fn anti_materiel_rifle_127() -> WeaponPreset {
         ai_life_time: 3.0,
         ai_blast_radius: 0.0,
         fire_mode: FireMode::Semi,
+        primary_round: RoundKind::Regular,
     };
     WeaponPreset::new(
         ANTI_MATERIEL_RIFLE_127_ID,

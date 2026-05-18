@@ -289,6 +289,16 @@ pub struct RifleSpec {
     /// FullAuto by setting this field.
     #[serde(default = "default_fire_mode")]
     pub fire_mode: FireMode,
+    /// **M14C** § primary round kind popped by this rifle's magazine when no
+    /// per-shot override (`ControlIntent::ammo_kind`) is provided. Defaults
+    /// to [`RoundKind::Regular`] so every pre-M14C preset preserves byte-
+    /// identical behavior. The M14C tank-grade presets (`rpg_launcher_v1`,
+    /// `tank_autocannon_t3`) set this to `Heat` / `Apfsds` respectively so
+    /// the cfctl drive of `m14c_heat_vs_era.ron` / `m14c_apfsds_vs_heavy.ron`
+    /// actually fires the tank-grade round per the runtime-evidence layer
+    /// required by VAL-M14C-007/008/009/010/011/012/019/020/023/026.
+    #[serde(default = "default_primary_round")]
+    pub primary_round: RoundKind,
 }
 
 fn default_recoil_decay_rate() -> f32 {
@@ -305,6 +315,10 @@ fn default_inherits_firer_velocity() -> bool {
 
 fn default_particle_count() -> u32 {
     1
+}
+
+fn default_primary_round() -> RoundKind {
+    RoundKind::Regular
 }
 
 impl RifleSpec {
@@ -562,6 +576,7 @@ impl FiringProfile {
             ai_life_time: self.projectile_lifetime_seconds,
             ai_blast_radius: 0.0,
             fire_mode: default_fire_mode(),
+            primary_round: default_primary_round(),
         }
     }
 }
@@ -740,6 +755,7 @@ fn rifle_m1_default() -> RifleSpec {
         ai_life_time: 1.5,
         ai_blast_radius: 0.0,
         fire_mode: FireMode::Semi,
+        primary_round: RoundKind::Regular,
     }
 }
 
@@ -769,6 +785,7 @@ fn shotgun_m1_default() -> RifleSpec {
         ai_life_time: 0.6,
         ai_blast_radius: 0.0,
         fire_mode: FireMode::Semi,
+        primary_round: RoundKind::Pellet,
     }
 }
 
@@ -809,6 +826,7 @@ fn carbine_m5_powered() -> RifleSpec {
         ai_life_time: 1.5,
         ai_blast_radius: 0.0,
         fire_mode: FireMode::FullAuto,
+        primary_round: RoundKind::Regular,
     }
 }
 
@@ -837,6 +855,80 @@ fn rifle_m5_mech_heavy() -> RifleSpec {
         ai_life_time: 2.0,
         ai_blast_radius: 0.0,
         fire_mode: FireMode::Semi,
+        primary_round: RoundKind::Regular,
+    }
+}
+
+/// **M14C** § Stable id for the HEAT-capable RPG launcher rifle preset.
+/// Drives `RoundKind::Heat` rounds through the M14C HEAT producer when
+/// the magazine is popped.
+pub const RPG_LAUNCHER_V1_RIFLE_ID: &str = "rpg_launcher_v1";
+
+/// **M14C** § Stable id for the APFSDS-capable chassis-mounted autocannon
+/// rifle preset. Drives `RoundKind::Apfsds` rounds through the M14C APFSDS
+/// producer when the magazine is popped.
+pub const TANK_AUTOCANNON_T3_RIFLE_ID: &str = "tank_autocannon_t3";
+
+/// **M14C** § HEAT-capable launcher RifleSpec. Backed by `rpg_launcher_v1.ron`
+/// magnitudes: 1-round magazine, 4.5 s reload, 320 m/s muzzle velocity. The
+/// `primary_round = Heat` field ensures the magazine pops a HEAT round on
+/// every fire so the cfctl drive of `m14c_heat_vs_era.ron` actually exercises
+/// the M14C HEAT producer per the runtime-evidence layer.
+fn rpg_launcher_v1_rifle() -> RifleSpec {
+    RifleSpec {
+        preset_id: RPG_LAUNCHER_V1_RIFLE_ID.to_string(),
+        fire_interval_seconds: 1.0,
+        mag_capacity: 1,
+        reload_seconds: 4.5,
+        recoil_impulse: 80.0,
+        muzzle_forward_offset: 18.0,
+        muzzle_vertical_offset: 6.0,
+        projectile_speed: 320.0,
+        damage_per_hit: 80.0,
+        projectile_lifetime_seconds: 3.0,
+        recoil_decay_rate: default_recoil_decay_rate(),
+        loudness: 1.8,
+        inherits_firer_velocity: true,
+        particle_count: 1,
+        spread_radians: 0.0,
+        tracer_round_to_total_ratio: 0,
+        ai_fire_vel: 320.0,
+        ai_penetration: 0.0,
+        ai_life_time: 3.0,
+        ai_blast_radius: 0.0,
+        fire_mode: FireMode::Semi,
+        primary_round: RoundKind::Heat,
+    }
+}
+
+/// **M14C** § APFSDS-capable chassis-mounted autocannon RifleSpec. Backed by
+/// `tank_autocannon_t3.ron` magnitudes: 15-round mag, 2.5 s reload, 1600 m/s
+/// muzzle velocity (DU long-rod). The `primary_round = Apfsds` field ensures
+/// every popped round routes to the M14C APFSDS producer.
+fn tank_autocannon_t3_rifle() -> RifleSpec {
+    RifleSpec {
+        preset_id: TANK_AUTOCANNON_T3_RIFLE_ID.to_string(),
+        fire_interval_seconds: 0.2,
+        mag_capacity: 15,
+        reload_seconds: 2.5,
+        recoil_impulse: 80.0,
+        muzzle_forward_offset: 22.0,
+        muzzle_vertical_offset: 8.0,
+        projectile_speed: 1600.0,
+        damage_per_hit: 40.0,
+        projectile_lifetime_seconds: 2.0,
+        recoil_decay_rate: default_recoil_decay_rate(),
+        loudness: 1.6,
+        inherits_firer_velocity: true,
+        particle_count: 1,
+        spread_radians: 0.0,
+        tracer_round_to_total_ratio: 0,
+        ai_fire_vel: 1600.0,
+        ai_penetration: 0.0,
+        ai_life_time: 2.0,
+        ai_blast_radius: 0.0,
+        fire_mode: FireMode::Semi,
+        primary_round: RoundKind::Apfsds,
     }
 }
 
@@ -849,6 +941,8 @@ pub fn rifle_presets() -> BTreeMap<&'static str, RifleSpec> {
     m.insert(RIFLE_M5_MECH_HEAVY_ID, rifle_m5_mech_heavy());
     m.insert(SHOTGUN_M1_DEFAULT_ID, shotgun_m1_default());
     m.insert(RIFLE_M1_TRACER_ID, rifle_m1_tracer());
+    m.insert(RPG_LAUNCHER_V1_RIFLE_ID, rpg_launcher_v1_rifle());
+    m.insert(TANK_AUTOCANNON_T3_RIFLE_ID, tank_autocannon_t3_rifle());
     m
 }
 

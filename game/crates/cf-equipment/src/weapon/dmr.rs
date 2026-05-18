@@ -2,7 +2,7 @@
 
 use super::{WeaponClass, WeaponPreset, DMR_762_ID};
 use crate::fire_modes::AdvancedFireMode;
-use crate::{FireMode, RifleSpec};
+use crate::{FireMode, RifleSpec, RoundKind};
 
 #[must_use]
 pub fn dmr_762() -> WeaponPreset {
@@ -28,6 +28,7 @@ pub fn dmr_762() -> WeaponPreset {
         ai_life_time: 2.0,
         ai_blast_radius: 0.0,
         fire_mode: FireMode::Semi,
+        primary_round: RoundKind::Regular,
     };
     WeaponPreset::new(
         DMR_762_ID,

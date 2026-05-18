@@ -2,7 +2,7 @@
 
 use super::{WeaponClass, WeaponPreset, GRENADE_LAUNCHER_M6_DEFAULT_ID};
 use crate::fire_modes::AdvancedFireMode;
-use crate::{FireMode, RifleSpec};
+use crate::{FireMode, RifleSpec, RoundKind};
 
 #[must_use]
 pub fn grenade_launcher_m6_default() -> WeaponPreset {
@@ -28,6 +28,7 @@ pub fn grenade_launcher_m6_default() -> WeaponPreset {
         ai_life_time: 4.0,
         ai_blast_radius: 60.0,
         fire_mode: FireMode::Semi,
+        primary_round: RoundKind::HighExplosive,
     };
     WeaponPreset::new(
         GRENADE_LAUNCHER_M6_DEFAULT_ID,

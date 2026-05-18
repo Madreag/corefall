@@ -2,7 +2,7 @@
 
 use super::{WeaponClass, WeaponPreset, HEAVY_MACHINE_GUN_50CAL_ID};
 use crate::fire_modes::AdvancedFireMode;
-use crate::{FireMode, RifleSpec};
+use crate::{FireMode, RifleSpec, RoundKind};
 
 #[must_use]
 pub fn heavy_machine_gun_50cal() -> WeaponPreset {
@@ -28,6 +28,7 @@ pub fn heavy_machine_gun_50cal() -> WeaponPreset {
         ai_life_time: 2.5,
         ai_blast_radius: 0.0,
         fire_mode: FireMode::FullAuto,
+        primary_round: RoundKind::Regular,
     };
     let mut p = WeaponPreset::new(
         HEAVY_MACHINE_GUN_50CAL_ID,

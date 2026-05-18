@@ -2,7 +2,7 @@
 
 use super::{WeaponClass, WeaponPreset, SQUAD_AUTOMATIC_SAW_ID};
 use crate::fire_modes::AdvancedFireMode;
-use crate::{FireMode, RifleSpec};
+use crate::{FireMode, RifleSpec, RoundKind};
 
 #[must_use]
 pub fn squad_automatic_saw() -> WeaponPreset {
@@ -28,6 +28,7 @@ pub fn squad_automatic_saw() -> WeaponPreset {
         ai_life_time: 1.5,
         ai_blast_radius: 0.0,
         fire_mode: FireMode::FullAuto,
+        primary_round: RoundKind::Regular,
     };
     let mut p = WeaponPreset::new(
         SQUAD_AUTOMATIC_SAW_ID,

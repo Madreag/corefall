@@ -2,7 +2,7 @@
 
 use super::{WeaponClass, WeaponPreset, BATTLE_RIFLE_762_ID};
 use crate::fire_modes::AdvancedFireMode;
-use crate::{FireMode, RifleSpec};
+use crate::{FireMode, RifleSpec, RoundKind};
 
 #[must_use]
 pub fn battle_rifle_762() -> WeaponPreset {
@@ -28,6 +28,7 @@ pub fn battle_rifle_762() -> WeaponPreset {
         ai_life_time: 1.8,
         ai_blast_radius: 0.0,
         fire_mode: FireMode::FullAuto,
+        primary_round: RoundKind::Regular,
     };
     WeaponPreset::new(
         BATTLE_RIFLE_762_ID,

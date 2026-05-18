@@ -2,7 +2,7 @@
 
 use super::{WeaponClass, WeaponPreset, SNIPER_M6_DEFAULT_ID};
 use crate::fire_modes::AdvancedFireMode;
-use crate::{FireMode, RifleSpec};
+use crate::{FireMode, RifleSpec, RoundKind};
 
 #[must_use]
 pub fn sniper_m6_default() -> WeaponPreset {
@@ -28,6 +28,7 @@ pub fn sniper_m6_default() -> WeaponPreset {
         ai_life_time: 2.0,
         ai_blast_radius: 0.0,
         fire_mode: FireMode::Semi,
+        primary_round: RoundKind::Regular,
     };
     WeaponPreset::new(
         SNIPER_M6_DEFAULT_ID,

@@ -2,7 +2,7 @@
 
 use super::{WeaponClass, WeaponPreset, SMG_M6_DEFAULT_ID};
 use crate::fire_modes::AdvancedFireMode;
-use crate::{FireMode, RifleSpec};
+use crate::{FireMode, RifleSpec, RoundKind};
 
 #[must_use]
 pub fn smg_m6_default() -> WeaponPreset {
@@ -28,6 +28,7 @@ pub fn smg_m6_default() -> WeaponPreset {
         ai_life_time: 1.0,
         ai_blast_radius: 0.0,
         fire_mode: FireMode::FullAuto,
+        primary_round: RoundKind::Regular,
     };
     WeaponPreset::new(
         SMG_M6_DEFAULT_ID,

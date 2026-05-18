@@ -2,7 +2,7 @@
 
 use super::{WeaponClass, WeaponPreset, ASSAULT_RIFLE_T2_ID};
 use crate::fire_modes::AdvancedFireMode;
-use crate::{FireMode, RifleSpec};
+use crate::{FireMode, RifleSpec, RoundKind};
 
 #[must_use]
 pub fn assault_rifle_t2() -> WeaponPreset {
@@ -28,6 +28,7 @@ pub fn assault_rifle_t2() -> WeaponPreset {
         ai_life_time: 1.5,
         ai_blast_radius: 0.0,
         fire_mode: FireMode::FullAuto,
+        primary_round: RoundKind::Regular,
     };
     WeaponPreset::new(
         ASSAULT_RIFLE_T2_ID,

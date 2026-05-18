@@ -2,7 +2,7 @@
 
 use super::{WeaponClass, WeaponPreset, REVOLVER_357_ID};
 use crate::fire_modes::AdvancedFireMode;
-use crate::{FireMode, RifleSpec};
+use crate::{FireMode, RifleSpec, RoundKind};
 
 #[must_use]
 pub fn revolver_357() -> WeaponPreset {
@@ -28,6 +28,7 @@ pub fn revolver_357() -> WeaponPreset {
         ai_life_time: 1.2,
         ai_blast_radius: 0.0,
         fire_mode: FireMode::Semi,
+        primary_round: RoundKind::Regular,
     };
     WeaponPreset::new(
         REVOLVER_357_ID,

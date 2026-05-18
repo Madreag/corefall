@@ -2,7 +2,7 @@
 
 use super::{WeaponClass, WeaponPreset, SUBMACHINE_GUN_9MM_ID};
 use crate::fire_modes::AdvancedFireMode;
-use crate::{FireMode, RifleSpec};
+use crate::{FireMode, RifleSpec, RoundKind};
 
 #[must_use]
 pub fn submachine_gun_9mm() -> WeaponPreset {
@@ -28,6 +28,7 @@ pub fn submachine_gun_9mm() -> WeaponPreset {
         ai_life_time: 0.9,
         ai_blast_radius: 0.0,
         fire_mode: FireMode::FullAuto,
+        primary_round: RoundKind::Regular,
     };
     WeaponPreset::new(
         SUBMACHINE_GUN_9MM_ID,

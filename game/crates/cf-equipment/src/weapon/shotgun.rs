@@ -2,7 +2,7 @@
 
 use super::{WeaponClass, WeaponPreset, SHOTGUN_M6_DEFAULT_ID};
 use crate::fire_modes::AdvancedFireMode;
-use crate::{FireMode, RifleSpec};
+use crate::{FireMode, RifleSpec, RoundKind};
 
 #[must_use]
 pub fn shotgun_m6_default() -> WeaponPreset {
@@ -28,6 +28,7 @@ pub fn shotgun_m6_default() -> WeaponPreset {
         ai_life_time: 0.6,
         ai_blast_radius: 0.0,
         fire_mode: FireMode::Semi,
+        primary_round: RoundKind::Pellet,
     };
     WeaponPreset::new(
         SHOTGUN_M6_DEFAULT_ID,
