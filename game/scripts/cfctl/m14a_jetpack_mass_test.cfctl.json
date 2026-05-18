@@ -1,0 +1,12 @@
+{
+  "scenario": "m14a_jetpack_mass_test",
+  "tick_rate_hz": 60,
+  "description": "M14A Mass + jetpack throttle-for-weight drill",
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+    { "method": "act.player.jet", "params": { "schema_version": 1, "active": true } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 120 } },
+    { "method": "act.player.jet", "params": { "schema_version": 1, "active": false } },
+    { "method": "observe.actor", "params": {} }
+  ]
+}

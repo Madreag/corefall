@@ -1,0 +1,10 @@
+{
+  "scenario": "m14a_knockdown_recovery",
+  "tick_rate_hz": 60,
+  "description": "M14A Knockdown + dying dwell + DEAD transition drill",
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 30 } },
+    { "method": "observe.actor", "params": {} }
+  ]
+}

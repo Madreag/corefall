@@ -1678,6 +1678,7 @@ dependencies = [
  "cf-actor",
  "cf-ai",
  "cf-asset-ledger",
+ "cf-atmos",
  "cf-audio",
  "cf-camera",
  "cf-chassis",

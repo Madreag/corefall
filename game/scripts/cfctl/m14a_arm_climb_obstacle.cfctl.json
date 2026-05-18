@@ -1,0 +1,11 @@
+{
+  "scenario": "m14a_arm_climb_obstacle",
+  "tick_rate_hz": 60,
+  "description": "M14A Arm-climb fallback drill",
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+    { "method": "act.player.move", "params": { "schema_version": 1, "x": 1.0, "y": 0.0 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 120 } },
+    { "method": "observe.actor", "params": {} }
+  ]
+}

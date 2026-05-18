@@ -1,0 +1,13 @@
+{
+  "scenario": "m14a_heavy_trooper_resist",
+  "tick_rate_hz": 60,
+  "description": "M14A Heavy Trooper rifle-fire resistance drill",
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+    { "method": "act.player.aim", "params": { "schema_version": 1, "x": 1.0, "y": 0.0 } },
+    { "method": "act.player.fire", "params": { "schema_version": 1, "pressed": true } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 300 } },
+    { "method": "act.player.fire", "params": { "schema_version": 1, "pressed": false } },
+    { "method": "observe.actor", "params": { "actor_id": 2 } }
+  ]
+}

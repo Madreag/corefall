@@ -1,0 +1,17 @@
+{
+  "scenario": "m14a_quick_action_drill",
+  "tick_rate_hz": 60,
+  "description": "M14A Quick Action bar + radial drill",
+  "steps": [
+    { "method": "scenario.reset", "params": {} },
+    { "method": "act.player.quick_action_slot", "params": { "schema_version": 1, "slot": 1 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 5 } },
+    { "method": "act.player.quick_action_slot", "params": { "schema_version": 1, "slot": 2 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 5 } },
+    { "method": "act.player.quick_action_radial", "params": { "schema_version": 1, "active": true } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
+    { "method": "act.player.quick_action_slice", "params": { "schema_version": 1, "slice": 5 } },
+    { "method": "sim.run_for_ticks", "params": { "ticks": 6 } },
+    { "method": "observe.quick_action", "params": {} }
+  ]
+}
