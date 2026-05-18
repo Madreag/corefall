@@ -142,6 +142,9 @@ const SCHEMA_ARMOR_HEAT_JET_TRAVERSED: &str = include_str!("../schemas/event/arm
 const SCHEMA_ARMOR_APFSDS_LONG_ROD_THROUGH: &str =
     include_str!("../schemas/event/armor_apfsds_long_rod_through.json");
 const SCHEMA_ARMOR_ERA_PRE_DETONATED: &str = include_str!("../schemas/event/armor_era_pre_detonated.json");
+// **M14D** — Projectile-Projectile CCD event schema (one new schema).
+const SCHEMA_COLLISION_PROJECTILE_PAIR_CONTACT: &str =
+    include_str!("../schemas/event/collision_projectile_pair_contact.json");
 const SCHEMA_ARMOR_SCHURZEN_PRE_DETONATED: &str = include_str!("../schemas/event/armor_schurzen_pre_detonated.json");
 const SCHEMA_ARMOR_MULTI_HIT_DEGRADATION: &str = include_str!("../schemas/event/armor_multi_hit_degradation.json");
 const SCHEMA_ARMOR_REACTIVE_ARMOR_CONSUMED: &str = include_str!("../schemas/event/armor_reactive_armor_consumed.json");
@@ -601,6 +604,8 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("armor", "heat_jet_traversed") => Some(SCHEMA_ARMOR_HEAT_JET_TRAVERSED),
         ("armor", "apfsds_long_rod_through") => Some(SCHEMA_ARMOR_APFSDS_LONG_ROD_THROUGH),
         ("armor", "era_pre_detonated") => Some(SCHEMA_ARMOR_ERA_PRE_DETONATED),
+        // **M14D** § projectile-projectile CCD pair-contact event.
+        ("collision", "projectile_pair_contact") => Some(SCHEMA_COLLISION_PROJECTILE_PAIR_CONTACT),
         ("armor", "schurzen_pre_detonated") => Some(SCHEMA_ARMOR_SCHURZEN_PRE_DETONATED),
         ("armor", "multi_hit_degradation") => Some(SCHEMA_ARMOR_MULTI_HIT_DEGRADATION),
         ("armor", "reactive_armor_consumed") => Some(SCHEMA_ARMOR_REACTIVE_ARMOR_CONSUMED),
@@ -1304,6 +1309,8 @@ mod tests {
             ("armor", "heat_jet_traversed"),
             ("armor", "apfsds_long_rod_through"),
             ("armor", "era_pre_detonated"),
+            // M14D § projectile-projectile CCD pair-contact event.
+            ("collision", "projectile_pair_contact"),
             // M5 internal.* family.
             ("internal", "organ_damaged"),
             ("internal", "organ_destroyed"),
@@ -2499,6 +2506,8 @@ mod tests {
             ("armor", "heat_jet_traversed"),
             ("armor", "apfsds_long_rod_through"),
             ("armor", "era_pre_detonated"),
+            // M14D projectile-projectile CCD pair contact.
+            ("collision", "projectile_pair_contact"),
             ("internal", "organ_damaged"),
             ("internal", "organ_destroyed"),
             ("internal", "organ_failure_cascade"),

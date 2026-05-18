@@ -1,0 +1,78 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/collision.projectile_pair_contact.v0.1",
+  "title": "collision.projectile_pair_contact",
+  "description": "M14D § Projectile-Projectile CCD — fires when the per-tick projectile-pair pass (cf-physics::projectile) resolves a swept-vs-swept intercept for an INTERESTING_PAIRS allowlisted (kind_a, kind_b) tuple. Payload carries the canonical-ordered pair ids, the per-side kinds, the outcome discriminator, the intercept point + TOI, and the cosmetic flag the renderer honors under backpressure + the killcam excludes by default (per-player `replay_intercepts` setting). Honors VAL-M14D-001..020 + the four cross-area assertions (VAL-CROSS-003/004/018/019).",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "collision" },
+    "event_type": { "const": "projectile_pair_contact" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "cosmetic": { "type": "boolean" },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "projectile_a_id": { "type": "integer", "minimum": 0 },
+        "projectile_b_id": { "type": "integer", "minimum": 0 },
+        "projectile_a_kind": {
+          "type": "string",
+          "enum": [
+            "kinetic_rifle",
+            "explosive_grenade",
+            "energy_beam",
+            "heat_round",
+            "apfsds_round",
+            "aps_laser"
+          ]
+        },
+        "projectile_b_kind": {
+          "type": "string",
+          "enum": [
+            "kinetic_rifle",
+            "explosive_grenade",
+            "energy_beam",
+            "heat_round",
+            "apfsds_round",
+            "aps_laser"
+          ]
+        },
+        "outcome": {
+          "type": "string",
+          "enum": [
+            "fuze_triggered",
+            "mutual_cancellation",
+            "aps_intercept",
+            "kinetic_deflect"
+          ]
+        },
+        "intercept_point": {
+          "type": "array",
+          "items": { "type": "number" },
+          "minItems": 2,
+          "maxItems": 2
+        },
+        "toi": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "convergence_deg": { "type": "number", "minimum": 0.0, "maximum": 180.0 },
+        "a_energy_retained": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "b_energy_retained": { "type": "number", "minimum": 0.0, "maximum": 1.0 },
+        "cosmetic": { "type": "boolean" }
+      },
+      "required": [
+        "projectile_a_id",
+        "projectile_b_id",
+        "projectile_a_kind",
+        "projectile_b_kind",
+        "outcome",
+        "intercept_point",
+        "toi",
+        "convergence_deg",
+        "cosmetic"
+      ]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}
