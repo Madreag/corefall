@@ -1741,6 +1741,23 @@ mod tests {
         t
     }
 
+    /// VAL-M14E-010: support_beam material has id=8, integrity (hardness) = 200,
+    /// anchorable=true, piling=false. The piling=false invariant is asserted
+    /// by cf-material's MaterialDef accessor; here we verify the cf-terrain
+    /// affordance row.
+    #[test]
+    fn support_beam_affordance_matches_m14e_spec_table() {
+        let aff =
+            material_affordance(MATERIAL_SUPPORT_BEAM).expect("support_beam registered");
+        assert_eq!(aff.id, MATERIAL_SUPPORT_BEAM);
+        assert_eq!(aff.id, 8);
+        assert_eq!(aff.name, "support_beam");
+        assert!((aff.hardness - 200.0).abs() < 1e-3);
+        assert!(aff.anchorable);
+        assert!(aff.solid);
+        assert!(aff.diggable, "support_beam must be diggable so demolish works");
+    }
+
     #[test]
     fn material_id_from_name_covers_launch_set() {
         for name in [
