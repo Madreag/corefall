@@ -47,6 +47,7 @@ pub mod parallel;
 pub mod penetration;
 pub mod penetration_m14c;
 pub mod penetration_ray;
+pub mod projectile;
 pub mod ragdoll;
 pub mod sharpness;
 pub mod swept;
@@ -73,9 +74,20 @@ pub use penetration_ray::{
     spalling_fragment_count, spalling_fragment_damage_fraction, traverse_ray, HeWave, InteriorModule, ModuleHit,
     PenetrationRayResult,
 };
+pub use projectile::{
+    convergence_angle_deg, interesting_pairs, is_interesting_pair, narrowphase_resolve_pair,
+    pair_outcome, pair_swept_toi, run_projectile_pair_pass, PairToi, ProjectileKind,
+    ProjectilePairCandidate, ProjectilePairContact, ProjectilePairOutcome, ProjectilePairPassTrace,
+    ProjectileSnapshot, SpatialHashBroadphase, BROADPHASE_BUCKET_PX,
+    ENERGY_CANCEL_MIN_ANGLE_DEG, KINETIC_DEFLECT_ENERGY_RETAINED, KINETIC_DEFLECT_MIN_ANGLE_DEG,
+    NARROWPHASE_CANDIDATE_BUDGET,
+};
 pub use ragdoll::{step_ragdoll, Ragdoll, RagdollState};
 pub use sharpness::{decay_damage, DecayBand, SharpnessInputs, SharpnessOutcome};
-pub use swept::{prioritize_swept_collisions, SweptHitCandidate, SweptHitResolved};
+pub use swept::{
+    prioritize_mixed_swept_candidates, prioritize_swept_collisions, ProjectilePairKey,
+    ResolvedSweptCandidate, SweptCandidateKind, SweptHitCandidate, SweptHitResolved,
+};
 pub use zone_state::{bleed_per_tick, classify as classify_zone_state, ZoneState};
 
 use serde::{Deserialize, Serialize};

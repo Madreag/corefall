@@ -11,6 +11,14 @@
 //! can report `priority_index / priority_total` on the
 //! `combat.swept_collision` event.
 //!
+//! **M14D** extends the prioritization surface to accept mixed actor /
+//! projectile-pair candidates via [`SweptCandidateKind`] +
+//! [`prioritize_mixed_swept_candidates`]. The M14D
+//! `cf-physics::projectile` pair kernel emits its candidates with the
+//! [`SweptCandidateKind::ProjectilePair`] discriminator so the engine's
+//! TOI-ordered priority queue can interleave them with actor-vs-
+//! projectile hits without losing the deterministic ordering contract.
+//!
 //! All functions are pure / deterministic. No clock; no `thread_rng`.
 
 use serde::{Deserialize, Serialize};
@@ -140,4 +148,164 @@ mod tests {
         let b = prioritize_swept_collisions(candidates);
         assert_eq!(a, b);
     }
+
+    /// **VAL-M14D-013**: the mixed prioritizer accepts a vector
+    /// containing actor + projectile-pair candidates and orders them by
+    /// TOI alongside each other. ProjectilePair entries survive the
+    /// prioritization (none dropped).
+    #[test]
+    fn mixed_prioritizer_orders_actor_and_projectile_pair_by_toi() {
+        let mut candidates = vec![
+            SweptCandidateKind::Actor(cand(10, 0.8)),
+            SweptCandidateKind::ProjectilePair(ProjectilePairKey { a_id: 1, b_id: 2, toi: 0.25 }),
+            SweptCandidateKind::Actor(cand(11, 0.5)),
+            SweptCandidateKind::ProjectilePair(ProjectilePairKey { a_id: 3, b_id: 4, toi: 0.10 }),
+        ];
+        let preserved_pair_count = candidates
+            .iter()
+            .filter(|c| matches!(c, SweptCandidateKind::ProjectilePair(_)))
+            .count();
+        let resolved = prioritize_mixed_swept_candidates(std::mem::take(&mut candidates));
+        assert_eq!(resolved.len(), 4);
+        // Pair entries must be preserved.
+        let resolved_pairs = resolved
+            .iter()
+            .filter(|c| matches!(c, ResolvedSweptCandidate::ProjectilePair { .. }))
+            .count();
+        assert_eq!(resolved_pairs, preserved_pair_count);
+        // TOI-ordered output.
+        let tois: Vec<f32> = resolved
+            .iter()
+            .map(|c| match c {
+                ResolvedSweptCandidate::Actor(a) => a.entry_t,
+                ResolvedSweptCandidate::ProjectilePair { toi, .. } => *toi,
+            })
+            .collect();
+        for w in tois.windows(2) {
+            assert!(w[0] <= w[1], "TOI order broken: {tois:?}");
+        }
+    }
+
+    /// **VAL-M14D-013**: the mixed prioritizer is deterministic across
+    /// identical input twice.
+    #[test]
+    fn mixed_prioritizer_is_deterministic() {
+        let input = || {
+            vec![
+                SweptCandidateKind::Actor(cand(5, 0.5)),
+                SweptCandidateKind::ProjectilePair(ProjectilePairKey { a_id: 1, b_id: 7, toi: 0.5 }),
+                SweptCandidateKind::ProjectilePair(ProjectilePairKey { a_id: 3, b_id: 4, toi: 0.5 }),
+                SweptCandidateKind::Actor(cand(2, 0.5)),
+            ]
+        };
+        let a = prioritize_mixed_swept_candidates(input());
+        let b = prioritize_mixed_swept_candidates(input());
+        assert_eq!(a, b);
+    }
+}
+
+/// **M14D**: stable identifier for a projectile-pair swept candidate.
+/// Carried as a payload on [`SweptCandidateKind::ProjectilePair`]. The
+/// engine matches the pair back to the M14D `cf-physics::projectile`
+/// kernel's contact list by `(a_id, b_id)`.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub struct ProjectilePairKey {
+    pub a_id: u64,
+    pub b_id: u64,
+    /// Time-of-impact in `[0, 1]` along this tick's swept window.
+    pub toi: f32,
+}
+
+/// **M14D**: mixed swept-candidate kind — actor-vs-projectile (the
+/// M14 default) or projectile-vs-projectile pair (the M14D extension).
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub enum SweptCandidateKind {
+    Actor(SweptHitCandidate),
+    ProjectilePair(ProjectilePairKey),
+}
+
+/// **M14D**: resolved entry from [`prioritize_mixed_swept_candidates`].
+/// Mirrors the [`SweptHitResolved`] shape on the actor branch and
+/// carries the pair key + the priority index/total on the pair branch.
+#[derive(Debug, Clone, Copy, PartialEq, Serialize, Deserialize)]
+pub enum ResolvedSweptCandidate {
+    Actor(SweptHitResolved),
+    ProjectilePair {
+        a_id: u64,
+        b_id: u64,
+        toi: f32,
+        priority_index: u32,
+        priority_total: u32,
+    },
+}
+
+/// **M14D § VAL-M14D-013**: deterministically resolve a mixed slate of
+/// actor + projectile-pair swept candidates into a priority-ordered
+/// slice. Closer-first (lower TOI) wins; ties break on the candidate
+/// kind's stable key (`target_id` for actor; `(a_id, b_id)` for pair).
+///
+/// ProjectilePair candidates are preserved (never dropped) — the pair
+/// kernel's output is treated as a first-class slate alongside the
+/// actor candidates so the engine's per-tick schedule can interleave
+/// the two passes without losing TOI order.
+#[must_use]
+pub fn prioritize_mixed_swept_candidates(
+    mut candidates: Vec<SweptCandidateKind>,
+) -> Vec<ResolvedSweptCandidate> {
+    candidates.sort_by(|a, b| {
+        let toi_a = match a {
+            SweptCandidateKind::Actor(c) => c.entry_t,
+            SweptCandidateKind::ProjectilePair(k) => k.toi,
+        };
+        let toi_b = match b {
+            SweptCandidateKind::Actor(c) => c.entry_t,
+            SweptCandidateKind::ProjectilePair(k) => k.toi,
+        };
+        toi_a
+            .partial_cmp(&toi_b)
+            .unwrap_or(std::cmp::Ordering::Equal)
+            .then_with(|| {
+                // Deterministic tie-break: actor kind wins over pair on
+                // ties (so the engine's existing M14 actor handlers run
+                // first); within a kind, sort by stable key.
+                match (a, b) {
+                    (SweptCandidateKind::Actor(_), SweptCandidateKind::ProjectilePair(_)) => {
+                        std::cmp::Ordering::Less
+                    }
+                    (SweptCandidateKind::ProjectilePair(_), SweptCandidateKind::Actor(_)) => {
+                        std::cmp::Ordering::Greater
+                    }
+                    (SweptCandidateKind::Actor(x), SweptCandidateKind::Actor(y)) => {
+                        x.target_id.cmp(&y.target_id)
+                    }
+                    (SweptCandidateKind::ProjectilePair(x), SweptCandidateKind::ProjectilePair(y)) => {
+                        (x.a_id, x.b_id).cmp(&(y.a_id, y.b_id))
+                    }
+                }
+            })
+    });
+    let total = candidates.len() as u32;
+    candidates
+        .into_iter()
+        .enumerate()
+        .map(|(i, c)| match c {
+            SweptCandidateKind::Actor(actor) => ResolvedSweptCandidate::Actor(SweptHitResolved {
+                target_id: actor.target_id,
+                entry_t: actor.entry_t,
+                distance_traveled: actor.distance_traveled,
+                entry_point: actor.entry_point,
+                ray_origin: actor.ray_origin,
+                ray_direction: actor.ray_direction,
+                priority_index: i as u32,
+                priority_total: total,
+            }),
+            SweptCandidateKind::ProjectilePair(k) => ResolvedSweptCandidate::ProjectilePair {
+                a_id: k.a_id,
+                b_id: k.b_id,
+                toi: k.toi,
+                priority_index: i as u32,
+                priority_total: total,
+            },
+        })
+        .collect()
 }
