@@ -512,16 +512,19 @@ impl ZoneState {
     }
 
     /// **M14A** § "Per-zone tunings" — chain-able builder for heavy-armor archetypes.
+    #[must_use]
     pub fn with_damage_multiplier(mut self, mult: f32) -> Self {
         self.damage_multiplier = mult;
         self
     }
 
+    #[must_use]
     pub fn with_gib_impulse_limit(mut self, limit: f32) -> Self {
         self.gib_impulse_limit = limit;
         self
     }
 
+    #[must_use]
     pub fn with_stagger_factor(mut self, factor: f32) -> Self {
         self.stagger_factor = factor;
         self

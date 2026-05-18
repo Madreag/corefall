@@ -2014,6 +2014,16 @@ impl ActorState {
         if matches!(self.status, Status::Dying | Status::Dead) {
             return self.status;
         }
+        // **M14A** § "PARITY-114 — Robots skip UNSTABLE; instant DEAD on
+        // lethal impulse". `is_robot_origin()` returns true for synth /
+        // robot origin_id. Robot actors at 0 HP go straight to DEAD; they
+        // never enter UNSTABLE / DOWNED / DYING.
+        if self.is_robot_origin() {
+            if self.hp <= 0.0 {
+                return Status::Dead;
+            }
+            return Status::Stable;
+        }
         if self.hp <= 0.0 {
             // CCCP Actor.cpp:1229 — HP=0 enters DYING, NOT DEAD directly.
             // Mission-critical actors cap here so the mission director (M1.5+)
@@ -2026,6 +2036,11 @@ impl ActorState {
         } else {
             Status::Stable
         }
+    }
+
+    /// **M14A** § "PARITY-114" — true when actor's origin is robot/synth.
+    pub fn is_robot_origin(&self) -> bool {
+        matches!(self.origin_id.as_str(), "robot" | "synth")
     }
 
     /// Derived stance for HUD + `cfctl observe`. M5 routes through

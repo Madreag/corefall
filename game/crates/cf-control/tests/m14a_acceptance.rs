@@ -1247,3 +1247,121 @@ fn hazard_classes_from_stride_contact() {
     let s = EnvironmentSignal::from_stride_contact(18, 101.0, 293.15, 21.0);
     assert!(s.active_hazards.contains(&HazardClass::DrowningHazard));
 }
+
+#[test]
+fn parity_114_robot_status_skips_unstable_to_dead() {
+    use cf_actor::Status;
+    let mut robot = make_walking_actor();
+    robot.origin_id = "robot".to_string();
+    assert!(robot.is_robot_origin());
+    // Lethal damage straight from full HP.
+    let new_status = robot.apply_damage(robot.hp_max);
+    // Robot may transition through DEAD directly per M14A.
+    assert_eq!(robot.status, Status::Dead);
+    assert_eq!(new_status, Some(Status::Dead));
+}
+
+#[test]
+fn mass_invariant_within_half_kg_at_observe_tick() {
+    // Spec § "Mass invariant: total_mass MUST equal sum-of-parts within
+    // 0.5 kg at every observe.actor tick."
+    let mut a = make_walking_actor();
+    a.equip_jetpack(Jetpack::standard_powered_armor());
+    a.wound_mass_kg = 0.07; // 7 lodged pixels
+    a.inventory_weight_kg = 12.0;
+    let cached = a.total_mass_kg();
+    let breakdown = cf_actor::mass_breakdown(&a);
+    let computed = breakdown.total();
+    assert!(
+        (cached - computed).abs() < 0.5,
+        "mass invariant drift: cached={} computed={}",
+        cached,
+        computed
+    );
+    // Each component slot is within 0.5kg of expected.
+    assert!(breakdown.chassis_kg >= 80.0 && breakdown.chassis_kg <= 100.0);
+    assert!(breakdown.wound_kg >= 0.06 && breakdown.wound_kg <= 0.08);
+    assert!(breakdown.jetpack_fuel_kg > 10.0);
+}
+
+#[test]
+fn save_round_trip_preserves_walking_sim_state() {
+    use cf_actor::{MoveState, ProneState};
+
+    let mut a = make_walking_actor();
+    a.equip_jetpack(Jetpack::standard_powered_armor());
+    a.move_state = MoveState::Walk;
+    a.prone_state = ProneState::Prone;
+    a.attitude.rot = 0.15;
+    a.attitude.angular_vel = 0.05;
+    a.attitude.rot_target = 0.15;
+    a.walk_angle.fg = 0.1;
+    a.walk_angle.bg = -0.05;
+    a.walk_path_offset.x = 1.0;
+    a.walk_path_offset.y = -2.0;
+    a.stride_timer_ms = 250;
+    a.last_stride_side_fg = true;
+    a.arm_sway.fg_arm_rot = 0.3;
+    a.arm_sway.bg_arm_rot = -0.2;
+    a.quick_action_bar = cf_actor::QuickActionBarState::powered_armor_default();
+    a.quick_action_bar.last_used_slot = 3;
+    a.wound_mass_kg = 0.05;
+    a.armor_scratch_level.insert("torso".to_string(), 2);
+
+    // Round-trip via serde JSON.
+    let serialized = serde_json::to_string(&a).expect("serialize");
+    let restored: cf_actor::ActorState = serde_json::from_str(&serialized).expect("deserialize");
+
+    assert_eq!(restored.move_state, MoveState::Walk);
+    assert_eq!(restored.prone_state, ProneState::Prone);
+    assert!((restored.attitude.rot - 0.15).abs() < 1e-6);
+    assert_eq!(restored.stride_timer_ms, 250);
+    assert!(restored.last_stride_side_fg);
+    assert_eq!(restored.quick_action_bar.last_used_slot, 3);
+    assert!((restored.wound_mass_kg - 0.05).abs() < 1e-6);
+    assert_eq!(restored.armor_scratch_level.get("torso"), Some(&2));
+    assert!(restored.jetpack.is_some());
+}
+
+#[test]
+fn determinism_jetpack_tick_pure_function() {
+    let mut j1 = Jetpack::standard_powered_armor();
+    let mut j2 = Jetpack::standard_powered_armor();
+    for i in 0..60 {
+        let o1 = jetpack_tick(&mut j1, true, i == 0, false, 200.0, 80.0, 0.3, false, 101.0, 16);
+        let o2 = jetpack_tick(&mut j2, true, i == 0, false, 200.0, 80.0, 0.3, false, 101.0, 16);
+        assert_eq!(o1.thrust_n, o2.thrust_n);
+        assert_eq!(o1.is_emitting_after, o2.is_emitting_after);
+    }
+    assert_eq!(j1.jet_time_left_ms, j2.jet_time_left_ms);
+}
+
+#[test]
+fn determinism_attitude_spring_pure_function() {
+    let mut s1 = AttitudeState {
+        rot: 0.3,
+        ..Default::default()
+    };
+    let mut s2 = AttitudeState {
+        rot: 0.3,
+        ..Default::default()
+    };
+    let ctx = SpringContext {
+        move_state: MoveState::Stand,
+        rot_angle_targets: RotAngleTargets::default(),
+        aim_angle: 0.0,
+        h_flipped: false,
+        health: 100.0,
+        max_health: 100.0,
+        velocity_x: 0.0,
+        walk_path_offset: WalkPathOffset::default(),
+        max_crouch_rotation: 0.45,
+        max_walkpath_crouch_shift: 6.0,
+    };
+    for _ in 0..120 {
+        cf_actor::attitude_spring_tick_stable(&mut s1, &ctx);
+        cf_actor::attitude_spring_tick_stable(&mut s2, &ctx);
+    }
+    assert!((s1.rot - s2.rot).abs() < 1e-9);
+    assert!((s1.angular_vel - s2.angular_vel).abs() < 1e-9);
+}

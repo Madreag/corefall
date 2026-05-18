@@ -88,6 +88,7 @@ pub struct SweepOutcome {
 /// with. Pure function — caller writes the foot position separately.
 ///
 /// `terrain_sampler` returns `true` for solid pixels.
+#[allow(clippy::similar_names)]
 pub fn push_travel(
     limb_pos: [f32; 2],
     target_velocity_world: [f32; 2],
@@ -122,6 +123,7 @@ pub fn push_travel(
 /// the chassis radius (off-path excursion bound), and a terrain sampler.
 ///
 /// Returns the [`SweepOutcome`] the caller applies to the chassis.
+#[allow(clippy::too_many_arguments, clippy::similar_names)]
 pub fn push_as_limb(
     joint_world_pos: [f32; 2],
     joint_velocity: [f32; 2],
@@ -206,6 +208,7 @@ pub fn push_as_limb(
 
 /// **M14A** § "FlailAsLimb — severed/ragdoll fallback" — CCCP
 /// `AtomGroup.cpp:1288-1306`.
+#[allow(clippy::similar_names, clippy::too_many_arguments)]
 pub fn flail_as_limb(
     owner_pos: [f32; 2],
     joint_offset: [f32; 2],
@@ -295,7 +298,7 @@ mod tests {
     fn push_travel_solid_pixel_pushes_back() {
         let (impulse, final_pos) = push_travel([0.0, 0.0], [10.0, 0.0], 100.0, 16, |_x, _y| true);
         assert!(impulse[0] < 0.0);
-        assert_eq!(final_pos, [0.0, 0.0]);
+        assert!(final_pos[0].abs() < 1e-6 && final_pos[1].abs() < 1e-6);
     }
 
     #[test]
@@ -303,14 +306,14 @@ mod tests {
         let (impulse, final_pos) = push_travel([0.0, 0.0], [10.0, 0.0], 100.0, 1000, |_x, _y| false);
         // 10 px/s * 1 s = 10 px.
         assert!((final_pos[0] - 10.0).abs() < 0.5);
-        assert_eq!(impulse, [0.0, 0.0]);
+        assert!(impulse[0].abs() < 1e-6 && impulse[1].abs() < 1e-6);
     }
 
     #[test]
     fn flail_as_limb_stays_within_radius() {
         let result = flail_as_limb([0.0, 0.0], [0.0, 8.0], [50.0, 8.0], 10.0, [0.0, 0.0], 0.0, 1.0, 16);
         let dist = (result[0].powi(2) + (result[1] - 8.0).powi(2)).sqrt();
-        assert!(dist <= 10.0 + 1e-3, "limb outside radius: dist={}", dist);
+        assert!(dist <= 10.0 + 1e-3, "limb outside radius: dist={dist}");
     }
 
     #[test]

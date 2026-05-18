@@ -53,6 +53,7 @@ impl JetpackType {
 
 /// **M14A** § "Jetpack physics — full algorithm" — per-archetype jetpack
 /// runtime + spec.
+#[allow(clippy::struct_field_names)]
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Jetpack {
     /// Stable id (from RON content).
@@ -298,7 +299,7 @@ pub fn jet_pressure_efficiency(local_pressure_kpa: f32) -> f32 {
 /// Returns the thrust vector to apply to the actor body this tick (N).
 ///
 /// Pure: takes context, mutates `Jetpack`, returns vector. No clock reads.
-#[allow(clippy::too_many_arguments)]
+#[allow(clippy::too_many_arguments, clippy::fn_params_excessive_bools)]
 pub fn jetpack_tick(
     jet: &mut Jetpack,
     actor_jump_intent: bool,
@@ -501,9 +502,7 @@ mod tests {
         let heavy_used = 4500_u32.saturating_sub(heavy.jet_time_left_ms);
         assert!(
             heavy_used > light_used * 2,
-            "heavy_used={}, light_used={}",
-            heavy_used,
-            light_used
+            "heavy_used={heavy_used}, light_used={light_used}"
         );
     }
 
@@ -515,7 +514,7 @@ mod tests {
             jetpack_tick(&mut jet, true, false, false, 200.0, 80.0, 0.0, false, 101.0, 16);
         }
         let after = jet.fuel_mass_kg();
-        assert!(after < initial - 1.0, "no measurable burn: {} → {}", initial, after);
+        assert!(after < initial - 1.0, "no measurable burn: {initial} → {after}");
     }
 
     #[test]

@@ -46,6 +46,7 @@ impl Default for WalkModulator {
 /// extends with `lava`/`acid`/`oil`/`ice`/`snow`/`mud`/`water` via the
 /// active material kernel; M14A reads those when the kernel ships and
 /// falls back to "default" for unknown ids.
+#[allow(clippy::match_same_arms)]
 pub fn material_walk_modulator(id: MaterialId) -> WalkModulator {
     let key = id;
     match key {
@@ -135,6 +136,7 @@ pub fn material_walk_modulator(id: MaterialId) -> WalkModulator {
 }
 
 /// **M14A** § "material_thermal_contact" — heat-transfer params per material.
+#[allow(clippy::match_same_arms)]
 pub fn material_thermal_contact(id: MaterialId) -> ThermalContact {
     let key = id;
     match key {

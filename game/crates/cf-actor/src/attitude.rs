@@ -296,6 +296,7 @@ pub fn tick_prone_state_machine(
 ///
 /// Per-leg WalkAngle lerps to sampled slope (provided by caller from
 /// cf-terrain `cast_strength_ray`) clamped to ±40°.
+#[allow(clippy::similar_names)]
 pub fn tick_walk_angle(state: &mut WalkAngleState, sampled_fg: f32, sampled_bg: f32, dt_secs: f32) {
     let clamp = (std::f32::consts::PI / 180.0) * 40.0;
     let fg_target = sampled_fg.clamp(-clamp, clamp);
