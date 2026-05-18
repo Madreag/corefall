@@ -105,6 +105,15 @@ pub mod codex_cinematics_tab;
 pub mod context_wheel;
 pub mod tactical_overlay;
 
+// **M14A** § "Crates / modules touched — cf-ui (MODIFY)" — new widgets:
+// quick_action_bar, quick_action_radial, mass_indicator, jetpack_fuel_meter,
+// walk_strip.
+pub mod jetpack_fuel_meter;
+pub mod mass_indicator;
+pub mod quick_action_bar;
+pub mod quick_action_radial;
+pub mod walk_strip;
+
 pub use mission_resolved_modal::{
     render_comic_death_recap, render_death_recap_with_mode, render_recap_text as render_death_recap_text,
     DeathRecapViewMode, RecapEvent, COMIC_DEATH_RECAP_PANELS, MAX_RECAP_LINES,

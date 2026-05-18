@@ -61,8 +61,11 @@ pub mod category;
 pub mod cli;
 pub mod entry;
 pub mod integrity;
+pub mod m14a_assets;
 pub mod regenerator;
 pub mod storage;
+
+pub use m14a_assets::{find_m14a_asset, M14aAssetEntry, M14A_ASSET_CATALOG};
 
 pub use category::{AssetCategory, License, PackageRef, ProductionTier, RegenStatus};
 pub use cli::{

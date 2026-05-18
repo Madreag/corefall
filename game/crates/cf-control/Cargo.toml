@@ -56,6 +56,10 @@ cf-sim-core = { path = "../cf-sim-core" }
 cf-tools-replay-viewer = { path = "../cf-tools-replay-viewer" }
 cf-replay-export = { path = "../cf-replay-export" }
 cf-atmos = { path = "../cf-atmos" }
+cf-audio = { path = "../cf-audio" }
+cf-asset-ledger = { path = "../cf-asset-ledger" }
+cf-environment = { path = "../cf-environment" }
+cf-ui = { path = "../cf-ui" }
 blake3 = { workspace = true }
 hex = { workspace = true }
 tempfile = "3"

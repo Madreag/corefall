@@ -39,6 +39,7 @@ pub mod cinematic_mixer;
 pub mod deterministic_replay;
 pub mod doppler;
 pub mod echo;
+pub mod footstep_lookup;
 pub mod loader;
 pub mod medium;
 pub mod mix;
@@ -47,6 +48,8 @@ pub mod positional;
 pub mod registry;
 pub mod reverb;
 pub mod spatial;
+
+pub use footstep_lookup::{fallback_footstep_cue, lookup_footstep_cue};
 
 pub use caption_bridge::{
     caption_visible, render_caption_for_sfx, resolve_template, CaptionRegistry, CaptionSeverity, CaptionTemplate,

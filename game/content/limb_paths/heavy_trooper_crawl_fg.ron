@@ -1,0 +1,15 @@
+(
+    schema_version: 1,
+    chassis_archetype: "heavy_trooper_v1",
+    move_state: "crawl",
+    side: "fg",
+    start: (-2.0, 14.0),
+    segments: [
+        (3.0, 0.0),
+        (-3.0, 0.0),
+    ],
+    travel_speed: [0.2, 0.4, 0.6],
+    travel_speed_multiplier: 1.0,
+    push_force: 285.0,
+    foot_collisions_disabled_segment: -1,
+)

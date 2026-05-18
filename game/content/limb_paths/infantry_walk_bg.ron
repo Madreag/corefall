@@ -3,7 +3,7 @@
     chassis_archetype: "infantry_v1",
     move_state: "walk",
     side: "bg",
-    start: (-2.0, 16.0),
+    start: (-4.0, 16.0),
     segments: [
         (-4.0, 2.0),
         (-4.0, 0.0),

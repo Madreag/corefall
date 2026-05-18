@@ -33,6 +33,11 @@ pub mod spotlight_cone;
 pub mod trench_layers;
 pub mod wire_visuals;
 
+// M14A: helper modules (bevy-free; pure data transforms for the renderer).
+pub mod armor_scratch_overlay;
+pub mod limb_render;
+pub mod quick_action_render;
+
 // M10B § cf-render-2d::offline_mode — software rasterizer for the
 // no-GPU export path. NO wgpu surface / winit::window references per
 // VAL-M10B-009. Only compiled with `--features offline`.

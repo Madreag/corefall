@@ -36,7 +36,9 @@ pub mod occlusion;
 pub mod sight;
 pub mod stealth_meter;
 
-pub use footstep::{footstep_loudness, FootstepEmission, SurfaceKind};
+pub use footstep::{
+    footstep_loudness, on_stride_to_hearing_emission, surface_kind_for_material, FootstepEmission, SurfaceKind,
+};
 pub use hearing::{distance_attenuation, hearing_reaction, HearingProbe};
 pub use occlusion::{apply_occlusion, OcclusionResult};
 pub use sight::{compute_sightline, SightCheck, SightResult};

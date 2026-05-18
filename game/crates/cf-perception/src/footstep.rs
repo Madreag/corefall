@@ -73,6 +73,59 @@ pub fn footstep_loudness(emission: FootstepEmission) -> f32 {
     (emission.stance_loudness.max(0.0) * emission.surface.loudness_modifier()).clamp(0.0, 1.0)
 }
 
+/// **M14A** § "actor.on_stride emits hearing signals scaled by material
+/// loudness". Convert an `actor.on_stride` event into a hearing-grade
+/// emission record. `actor_id` + `position` come from the event payload;
+/// `material_id` resolves to a SurfaceKind via [`surface_kind_for_material`].
+pub fn on_stride_to_hearing_emission(
+    actor_id: u64,
+    position: Vec2,
+    material_id: u8,
+    move_state: &str,
+) -> FootstepEmission {
+    let surface = surface_kind_for_material(material_id);
+    let stance_loudness = match move_state {
+        "stand" | "no_move" => 0.1,
+        "walk" => 0.5,
+        "crouch" | "crawl" | "arm_crawl" => 0.3,
+        "climb" => 0.35,
+        "jump" => 0.7,
+        "dislodge" => 0.6,
+        "hover" => 0.2,
+        _ => 0.4,
+    };
+    FootstepEmission {
+        actor: actor_id,
+        position,
+        surface,
+        stance_loudness,
+    }
+}
+
+/// **M14A** § "AI hearing — on_stride → AudioCue.hearing_signal_db" —
+/// map a chunked-terrain material id to the perception SurfaceKind band.
+///
+/// M14A's launch material set (DR-007: 0=air, 1=dirt, 2=concrete,
+/// 3=metal_nohook, 4=hazard, 5=loose_fill, 6=repair_fill, 7=anchor;
+/// M15 extension: 12=lava, 13=acid, 14=ice, 15=snow, 16=oil, 17=mud,
+/// 18=water).
+pub fn surface_kind_for_material(material_id: u8) -> SurfaceKind {
+    match material_id {
+        1 => SurfaceKind::Dirt,
+        2 => SurfaceKind::Concrete,
+        3 => SurfaceKind::Metal,
+        4 => SurfaceKind::Concrete,
+        5 => SurfaceKind::LooseFill,
+        6 => SurfaceKind::Concrete,
+        7 => SurfaceKind::Concrete,
+        14 | 15 => SurfaceKind::Dirt,
+        16 => SurfaceKind::Carpet,
+        17 => SurfaceKind::Dirt,
+        18 => SurfaceKind::Water,
+        _ => SurfaceKind::Concrete,
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

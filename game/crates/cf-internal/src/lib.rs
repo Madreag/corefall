@@ -31,6 +31,9 @@
 
 use serde::{Deserialize, Serialize};
 
+pub mod heat_transfer;
+pub use heat_transfer::{body_temp_delta_per_tick, ThermalContactEffect, FOOT_CONTACT_AREA_M2};
+
 /// Heavy-damage threshold per spec § "Per-organ internal damage routing"
 /// — internal damage rolls only when passthrough_damage > 5.
 pub const HEAVY_DAMAGE_THRESHOLD: f32 = 5.0;

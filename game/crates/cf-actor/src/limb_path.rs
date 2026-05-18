@@ -371,6 +371,46 @@ pub fn default_infantry_dislodge() -> LimbPath {
     p
 }
 
+/// **M14A** § "Per-actor limb-path registry — RON-loadable" — load a single
+/// limb path from a RON string.
+pub fn load_path_from_ron(ron_str: &str) -> Result<LimbPathSpec, String> {
+    ron::from_str::<LimbPathSpec>(ron_str).map_err(|e| format!("limb_path RON parse failed: {e}"))
+}
+
+/// Spec-locked shape that mirrors the on-disk RON.
+#[derive(Debug, Clone, PartialEq, serde::Deserialize, serde::Serialize)]
+pub struct LimbPathSpec {
+    pub schema_version: u32,
+    pub chassis_archetype: String,
+    pub move_state: String,
+    pub side: String,
+    pub start: (f32, f32),
+    pub segments: Vec<(f32, f32)>,
+    pub travel_speed: Vec<f32>,
+    pub travel_speed_multiplier: f32,
+    pub push_force: f32,
+    pub foot_collisions_disabled_segment: i32,
+}
+
+impl LimbPathSpec {
+    pub fn to_limb_path(&self) -> LimbPath {
+        let speeds = if self.travel_speed.len() == 3 {
+            [self.travel_speed[0], self.travel_speed[1], self.travel_speed[2]]
+        } else {
+            [0.6, 1.0, 1.5]
+        };
+        LimbPath {
+            start: [self.start.0, self.start.1],
+            segments: self.segments.iter().map(|(x, y)| [*x, *y]).collect(),
+            travel_speed: speeds,
+            travel_speed_multiplier: self.travel_speed_multiplier,
+            push_force: self.push_force,
+            foot_collisions_disabled_segment: self.foot_collisions_disabled_segment,
+            ..LimbPath::default()
+        }
+    }
+}
+
 /// Default infantry limb-path registry covering every MoveState. Used by
 /// `ActorState` when no chassis-specific RON file is loaded.
 pub fn default_infantry_registry() -> LimbPathRegistry {

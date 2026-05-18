@@ -9,6 +9,7 @@ publish.workspace = true
 [dependencies]
 serde = { workspace = true }
 tracing = { workspace = true }
+ron = { workspace = true }
 cf-physics = { path = "../cf-physics" }
 cf-equipment = { path = "../cf-equipment" }
 cf-chassis = { path = "../cf-chassis" }

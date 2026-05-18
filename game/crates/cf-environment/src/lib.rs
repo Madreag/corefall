@@ -47,6 +47,47 @@ impl EnvironmentSignal {
             ..Default::default()
         }
     }
+
+    /// **M14A** § "cf-environment (EXTEND)" — append a hazard to the active list
+    /// without duplicates.
+    pub fn add_hazard(&mut self, h: HazardClass) {
+        if !self.active_hazards.contains(&h) {
+            self.active_hazards.push(h);
+        }
+    }
+
+    /// **M14A** § "per-stride hazard.actor_contact emission from cf-terrain
+    /// + cf-atmos sample at planted foot position" — given a per-stride
+    /// material id + atmosphere sample, return the set of active hazards.
+    pub fn from_stride_contact(material_id: u8, pressure_kpa: f32, temp_k: f32, o2_kpa: f32) -> Self {
+        let mut s = Self::new();
+        // Atmosphere-driven hazards.
+        if o2_kpa < 16.0 {
+            s.add_hazard(HazardClass::Hypoxic);
+        }
+        let temp_c = temp_k - 273.15;
+        if temp_c > 49.0 {
+            s.add_hazard(HazardClass::Hyperthermic);
+        } else if temp_c < 0.0 {
+            s.add_hazard(HazardClass::Hypothermic);
+        }
+        if pressure_kpa < 11.0 {
+            s.add_hazard(HazardClass::BreachDecomp);
+        }
+        // Material-driven hazards.
+        match material_id {
+            // lava
+            12 => s.add_hazard(HazardClass::Hyperthermic),
+            // acid
+            13 => s.add_hazard(HazardClass::ToxicAtmosphere),
+            // ice
+            14 => s.add_hazard(HazardClass::Hypothermic),
+            // water
+            18 => s.add_hazard(HazardClass::DrowningHazard),
+            _ => {}
+        }
+        s
+    }
 }
 
 #[cfg(test)]
