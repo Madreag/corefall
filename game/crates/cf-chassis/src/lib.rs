@@ -621,6 +621,10 @@ pub enum ModuleKind {
     CommRelay = 14,
     /// **M13** § "Per-chassis module positions" — per-leg motor controller.
     MotorController = 15,
+    /// **M14C** § "ERA (Explosive Reactive Armor)" — one-shot consumable
+    /// panel that pre-detonates incoming HEAT jets. ERA panels are
+    /// HEAT-specific (APFSDS bypasses them per VAL-M14C-024).
+    Era = 16,
 }
 
 impl ModuleKind {
@@ -642,6 +646,7 @@ impl ModuleKind {
             ModuleKind::TargetingComputer => "targeting_computer",
             ModuleKind::CommRelay => "comm_relay",
             ModuleKind::MotorController => "motor_controller",
+            ModuleKind::Era => "era",
         }
     }
 
@@ -823,6 +828,27 @@ pub struct ChassisModule {
     /// Initialized to `Nominal` (no cascade has fired yet).
     #[serde(default = "default_module_state_kind")]
     pub last_cascade_emitted_state: ModuleStateKind,
+    /// **M14C** § ERA-only (`ModuleKind::Era`): one-shot consumable flag.
+    /// `true` = ERA panel intact, `false` = ERA has already pre-detonated
+    /// against a prior HEAT impact and can no longer disrupt a jet (per
+    /// VAL-M14C-002). Initialized true for ERA modules, false for all
+    /// other kinds (irrelevant).
+    #[serde(default = "default_era_consumable")]
+    pub era_consumable: bool,
+    /// **M14C** § ERA-only: panel charge mass (kg). Drives the
+    /// `era_charge_kg × 0.7` HEAT penetration reduction formula per
+    /// VAL-M14C-025. Defaults to 1.0 kg (~70% reduction) which matches
+    /// Gherkin-2's "~70% reduction" band.
+    #[serde(default = "default_era_charge_kg")]
+    pub era_charge_kg: f32,
+}
+
+fn default_era_consumable() -> bool {
+    true
+}
+
+fn default_era_charge_kg() -> f32 {
+    1.0
 }
 
 fn default_module_state_kind() -> ModuleStateKind {
@@ -835,6 +861,7 @@ fn default_fluid_level() -> f32 {
 
 impl ChassisModule {
     pub fn new(id: impl Into<String>, kind: ModuleKind, bound_zone: BodyZone, hp_max: f32) -> Self {
+        let is_era = matches!(kind, ModuleKind::Era);
         Self {
             id: id.into(),
             kind,
@@ -851,6 +878,8 @@ impl ChassisModule {
             coolant_level: default_fluid_level(),
             pressure_state: 0,
             last_cascade_emitted_state: ModuleStateKind::Nominal,
+            era_consumable: is_era,
+            era_charge_kg: if is_era { default_era_charge_kg() } else { 0.0 },
         }
     }
 
@@ -895,6 +924,33 @@ impl ChassisModule {
             coolant_level: 0.0,
             pressure_state: 0,
             last_cascade_emitted_state: ModuleStateKind::NotPresent,
+            era_consumable: false,
+            era_charge_kg: 0.0,
+        }
+    }
+
+    /// **M14C** § ERA-only builder: configure the one-shot consumable +
+    /// `era_charge_kg` for an ERA panel module. Other module kinds ignore
+    /// the call (the helper returns `self` unchanged).
+    #[must_use]
+    pub fn with_era(mut self, era_charge_kg: f32, consumable: bool) -> Self {
+        if matches!(self.kind, ModuleKind::Era) {
+            self.era_charge_kg = era_charge_kg.max(0.0);
+            self.era_consumable = consumable;
+        }
+        self
+    }
+
+    /// **M14C** § ERA pre-detonation handshake. If this module is an ERA
+    /// panel and is still consumable (intact), mark it spent and return
+    /// the panel's `era_charge_kg`. Returns `None` for non-ERA modules or
+    /// already-spent ERA panels (per VAL-M14C-002 one-shot rule).
+    pub fn consume_era_panel(&mut self) -> Option<f32> {
+        if matches!(self.kind, ModuleKind::Era) && self.era_consumable {
+            self.era_consumable = false;
+            Some(self.era_charge_kg.max(0.0))
+        } else {
+            None
         }
     }
 
@@ -4590,5 +4646,56 @@ mod tests {
         let ext = ModuleRepairCost::for_armor_layer(ArmorLayerKind::External);
         assert!((ext.seconds_per_hp - 0.3).abs() < 1e-6);
         assert_eq!(ext.engineer_priority, 9);
+    }
+
+    // ------------------------------------------------------------------
+    // M14C — ERA (Explosive Reactive Armor) module
+    // ------------------------------------------------------------------
+
+    /// **VAL-M14C-002**: `ModuleKind::Era` variant exists in `cf-chassis`
+    /// with one-shot consumable behavior.
+    #[test]
+    fn era_module_kind_constructs_and_serializes() {
+        let m = ChassisModule::new("era.front", ModuleKind::Era, BodyZone::Torso, 30.0);
+        assert_eq!(m.kind, ModuleKind::Era);
+        assert_eq!(ModuleKind::Era.as_str(), "era");
+        assert!(m.era_consumable);
+        assert!(m.era_charge_kg > 0.0);
+    }
+
+    /// **VAL-M14C-002**: ERA panel is consumable — first HEAT impact
+    /// returns Some(charge); a second impact returns None (already spent).
+    #[test]
+    fn era_module_one_shot_consumable() {
+        let mut m = ChassisModule::new("era.front", ModuleKind::Era, BodyZone::Torso, 30.0)
+            .with_era(1.0, true);
+        // First detonation: panel still consumable, returns Some(1.0).
+        let first = m.consume_era_panel();
+        assert_eq!(first, Some(1.0));
+        assert!(!m.era_consumable, "era_consumable must transition true -> false");
+        // Second detonation: panel spent.
+        let second = m.consume_era_panel();
+        assert_eq!(second, None);
+        assert!(!m.era_consumable, "spent panel stays spent");
+    }
+
+    /// **VAL-M14C-002 follow-on**: non-ERA modules never report a panel
+    /// charge.
+    #[test]
+    fn non_era_module_does_not_consume_panel() {
+        let mut m = ChassisModule::new("ammo.main", ModuleKind::AmmoRack, BodyZone::Torso, 60.0);
+        assert!(!m.era_consumable);
+        assert_eq!(m.consume_era_panel(), None);
+    }
+
+    /// **VAL-M14C-002 / VAL-M14C-025**: builder helper sets era_charge_kg
+    /// on ERA modules and ignores it on non-ERA kinds.
+    #[test]
+    fn era_builder_helper_only_affects_era_modules() {
+        let m = ChassisModule::new("era.heavy", ModuleKind::Era, BodyZone::Torso, 60.0).with_era(1.5, true);
+        assert!((m.era_charge_kg - 1.5).abs() < 1e-6);
+        let n = ChassisModule::new("ammo.main", ModuleKind::AmmoRack, BodyZone::Torso, 60.0).with_era(1.5, true);
+        assert!((n.era_charge_kg - 0.0).abs() < 1e-6, "non-ERA module unchanged");
+        assert!(!n.era_consumable);
     }
 }

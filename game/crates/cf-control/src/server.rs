@@ -619,6 +619,10 @@ pub enum ControlCommand {
     },
     ActPlayerFire {
         pressed: bool,
+        /// **M14C** § optional ammo-kind selector
+        /// (`heat` / `apfsds` / `regular` / `tracer` / etc.). `None` =
+        /// use the weapon's default round per existing M6 behavior.
+        ammo_kind: Option<cf_equipment::RoundKind>,
         source: IntentSource,
     },
     ActPlayerReload {
@@ -1961,9 +1965,18 @@ async fn process_request<E: EngineHandle>(
                 Ok(v) => v,
                 Err(err) => return Some(missing_param_error(request.id, &err.to_string())),
             };
+            // **M14C** § VAL-M14C-019: surface ammo_kind={heat,apfsds}.
+            let ammo_kind = match p.ammo_kind.as_deref() {
+                None => None,
+                Some(label) => match cf_equipment::RoundKind::from_str_snake(label) {
+                    Some(k) => Some(k),
+                    None => return Some(invalid_param_reason(request.id, "unknown_ammo_kind")),
+                },
+            };
             let result = engine
                 .dispatch(ControlCommand::ActPlayerFire {
                     pressed: p.pressed,
+                    ammo_kind,
                     source: IntentSource::Cfctl,
                 })
                 .await;

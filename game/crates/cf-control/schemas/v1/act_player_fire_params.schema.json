@@ -4,6 +4,13 @@
   "description": "`act.player.fire` — edge-triggered fire request.",
   "type": "object",
   "properties": {
+    "ammo_kind": {
+      "description": "**M14C** § \"Wire ammo-spec to engine.fire; surface in\n`cfctl.act.player.fire` ammo-kind\" — optional snake_case ammo\nkind selector. Accepted values: `regular`, `tracer`, `high_explosive`,\n`pellet`, `heat`, `apfsds`. `None` = use the weapon's default\nround (existing M6 behavior). Unknown values reject at the\ndispatch boundary with `unknown_ammo_kind`.",
+      "type": [
+        "string",
+        "null"
+      ]
+    },
     "pressed": {
       "description": "`true` (default) = press fire this tick; `false` = explicit release for future\nhold-to-fire weapons. M1's rifle is single-press; release is a no-op.",
       "type": "boolean",

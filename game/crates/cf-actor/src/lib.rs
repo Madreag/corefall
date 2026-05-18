@@ -2127,6 +2127,7 @@ impl ActorState {
                     cf_chassis::ModuleKind::TargetingComputer => "TARGET".to_string(),
                     cf_chassis::ModuleKind::CommRelay => "COMM".to_string(),
                     cf_chassis::ModuleKind::MotorController => "MOTOR".to_string(),
+                    cf_chassis::ModuleKind::Era => "ERA".to_string(),
                 },
                 state: m.state.as_str().to_string(),
                 kind: m.kind.as_str().to_string(),

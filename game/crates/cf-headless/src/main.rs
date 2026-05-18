@@ -608,6 +608,10 @@ fn parse_command(payload: &Value) -> Option<ControlCommand> {
         }),
         "act.player.fire" => Some(ControlCommand::ActPlayerFire {
             pressed: payload.get("pressed").and_then(Value::as_bool).unwrap_or(true),
+            ammo_kind: payload
+                .get("ammo_kind")
+                .and_then(Value::as_str)
+                .and_then(cf_equipment::RoundKind::from_str_snake),
             source: IntentSource::Cfctl,
         }),
         "act.player.reload" => Some(ControlCommand::ActPlayerReload {

@@ -1,0 +1,16 @@
+// **M14C** — Reference chassis-mounted APFSDS-capable autocannon.
+//
+// `primary_round = apfsds` so the magazine pops APFSDS rounds; `ammo_spec_id`
+// points to `content/ammo/apfsds_round_v1.ron`. Magazine capacity sized for
+// chassis-mounted use (15-round drum + 2.5 s reload).
+(
+  id: "tank_autocannon_t3",
+  display_name: "Tank Autocannon T3",
+  primary_round: apfsds,
+  ammo_spec_id: "apfsds_round_v1",
+  mag_capacity: 15,
+  reload_seconds: 2.5,
+  fire_interval_seconds: 0.2,
+  projectile_speed: 1600.0,
+  damage_per_hit: 40.0,
+)

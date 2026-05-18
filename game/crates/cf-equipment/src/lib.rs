@@ -49,6 +49,7 @@ pub use projectile::ProjectileSpawnParams;
 
 // M6 modules — see spec § Files for the canonical list.
 // M6C adds: heavy, medical, survival, sensor, ppe.
+pub mod ammo_spec;
 pub mod bipod;
 pub mod deployables;
 pub mod durability;
@@ -72,6 +73,7 @@ pub mod survival;
 pub mod tool;
 pub mod weapon;
 pub mod weapon_swap;
+pub mod weapons_m14c;
 
 pub use bipod::{Bipod, BipodState, BIPOD_BLOOM_FACTOR, BIPOD_RECOIL_FACTOR};
 pub use durability::{Durability, DURABILITY_MAX};
@@ -115,7 +117,15 @@ pub use jetpack::{
 };
 pub use jetpack_atmos::{muzzle_flash_combusts, pressure_modulated_thrust};
 pub use knife_throw::{KnifeProjectile, KnifeThrowState, KNIFE_THROW_DAMAGE_FACTOR, KNIFE_THROW_MAX_FLIGHT_SECONDS};
+pub use ammo_spec::{
+    apfsds_round_v1, heat_round_v1, parse_ammo_spec, resolve_ammo_spec, AmmoSpec, AmmoSpecLoadError,
+    ApfsdsRoundSpec, HeatRoundSpec, APFSDS_ROUND_V1_ID, APFSDS_ROUND_V1_RON, HEAT_ROUND_V1_ID, HEAT_ROUND_V1_RON,
+};
 pub use magazine::{Magazine, PoppedRound, RoundKind};
+pub use weapons_m14c::{
+    parse_m14c_weapon, resolve_m14c_weapon, M14cWeaponSpec, M14cWeaponSpecLoadError, RPG_LAUNCHER_V1_ID,
+    RPG_LAUNCHER_V1_RON, TANK_AUTOCANNON_T3_ID, TANK_AUTOCANNON_T3_RON,
+};
 pub use medical::{
     defibrillator::{
         apply_defibrillator, DefibOutcome, DefibTarget, DEFIB_REVIVE_HP_FRACTION,

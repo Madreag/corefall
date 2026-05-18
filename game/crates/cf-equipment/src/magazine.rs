@@ -17,8 +17,9 @@ pub struct PoppedRound {
     pub remaining_in_mag: u32,
 }
 
-/// Round kind. Regular vs tracer is the only distinction at M6; future
-/// extensions (HEAT, AP, frangible) get their own variants.
+/// Round kind. Regular vs tracer is the only distinction at M6; M14C adds
+/// `Heat` (shaped-charge anti-tank) and `Apfsds` (long-rod kinetic) for
+/// tank-grade ammo. Future extensions (AP, frangible) get their own variants.
 #[repr(u8)]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
@@ -27,6 +28,10 @@ pub enum RoundKind {
     Tracer = 1,
     HighExplosive = 2,
     Pellet = 3,
+    /// **M14C** § Tank-grade HEAT round.
+    Heat = 4,
+    /// **M14C** § Tank-grade APFSDS round.
+    Apfsds = 5,
 }
 
 impl RoundKind {
@@ -36,6 +41,23 @@ impl RoundKind {
             RoundKind::Tracer => "tracer",
             RoundKind::HighExplosive => "high_explosive",
             RoundKind::Pellet => "pellet",
+            RoundKind::Heat => "heat",
+            RoundKind::Apfsds => "apfsds",
+        }
+    }
+
+    /// **M14C** § parse the canonical snake_case ammo-kind id (used by
+    /// `cfctl.act.player.fire ammo_kind=...`). Returns `None` for unknown
+    /// labels.
+    pub fn from_str_snake(s: &str) -> Option<Self> {
+        match s {
+            "regular" => Some(RoundKind::Regular),
+            "tracer" => Some(RoundKind::Tracer),
+            "high_explosive" => Some(RoundKind::HighExplosive),
+            "pellet" => Some(RoundKind::Pellet),
+            "heat" => Some(RoundKind::Heat),
+            "apfsds" => Some(RoundKind::Apfsds),
+            _ => None,
         }
     }
 }
@@ -169,6 +191,51 @@ mod tests {
         let mut m = Magazine::new(8, 0, RoundKind::Pellet);
         let r = m.pop_next_round().unwrap();
         assert_eq!(r.round_kind, RoundKind::Pellet);
+    }
+
+    /// **VAL-M14C-001**: `RoundKind::Heat` + `RoundKind::Apfsds` variants
+    /// resolve and round-trip through `as_str` / `from_str_snake` without
+    /// reaching `unreachable!()`.
+    #[test]
+    fn heat_and_apfsds_round_kinds_resolve() {
+        let kinds = [RoundKind::Heat, RoundKind::Apfsds];
+        for k in kinds {
+            let s = k.as_str();
+            assert!(matches!(s, "heat" | "apfsds"));
+            let parsed = RoundKind::from_str_snake(s).expect("snake_case round-trip");
+            assert_eq!(parsed, k);
+        }
+        // pattern-match exhaustiveness check — if a future RoundKind variant
+        // is added, this `match` will force a compile-time visit here.
+        for k in [
+            RoundKind::Regular,
+            RoundKind::Tracer,
+            RoundKind::HighExplosive,
+            RoundKind::Pellet,
+            RoundKind::Heat,
+            RoundKind::Apfsds,
+        ] {
+            match k {
+                RoundKind::Regular
+                | RoundKind::Tracer
+                | RoundKind::HighExplosive
+                | RoundKind::Pellet
+                | RoundKind::Heat
+                | RoundKind::Apfsds => {}
+            }
+        }
+    }
+
+    /// **VAL-M14C-001 follow-on**: a HEAT magazine pops HEAT rounds and an
+    /// APFSDS magazine pops APFSDS rounds.
+    #[test]
+    fn heat_and_apfsds_magazines_pop_their_kind() {
+        let mut heat = Magazine::new(2, 0, RoundKind::Heat);
+        let r = heat.pop_next_round().unwrap();
+        assert_eq!(r.round_kind, RoundKind::Heat);
+        let mut apfsds = Magazine::new(2, 0, RoundKind::Apfsds);
+        let r = apfsds.pop_next_round().unwrap();
+        assert_eq!(r.round_kind, RoundKind::Apfsds);
     }
 
     #[test]

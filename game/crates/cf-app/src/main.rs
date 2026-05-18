@@ -2152,6 +2152,7 @@ fn ingest_player_input(
                 .0
                 .dispatch(ControlCommand::ActPlayerFire {
                     pressed: true,
+                ammo_kind: None,
                     source: IntentSource::Human,
                 })
                 .await;
@@ -2172,6 +2173,7 @@ fn ingest_player_input(
                 .0
                 .dispatch(ControlCommand::ActPlayerFire {
                     pressed: false,
+                ammo_kind: None,
                     source: IntentSource::Human,
                 })
                 .await;

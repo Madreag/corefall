@@ -1,0 +1,15 @@
+// **M14C** — Reference HEAT-capable launcher.
+//
+// `primary_round = heat` so the magazine pops HEAT rounds; `ammo_spec_id`
+// points to `content/ammo/heat_round_v1.ron`.
+(
+  id: "rpg_launcher_v1",
+  display_name: "RPG Launcher v1",
+  primary_round: heat,
+  ammo_spec_id: "heat_round_v1",
+  mag_capacity: 1,
+  reload_seconds: 4.5,
+  fire_interval_seconds: 1.0,
+  projectile_speed: 320.0,
+  damage_per_hit: 0.0,
+)

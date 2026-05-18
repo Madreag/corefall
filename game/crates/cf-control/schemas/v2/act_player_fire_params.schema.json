@@ -1,13 +1,18 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "ActPlayerFireParams",
-  "description": "`act.player.fire` — edge-triggered fire request.",
+  "description": "`act.player.fire` — edge-triggered fire request. M14C surfaces an optional `ammo_kind` (`heat` / `apfsds` / `regular` / `tracer` / `high_explosive` / `pellet`) so tank-grade rounds can be selected from cfctl.",
   "type": "object",
   "properties": {
     "pressed": {
       "description": "`true` (default) = press fire this tick; `false` = explicit release for future\nhold-to-fire weapons. M1's rifle is single-press; release is a no-op.",
       "type": "boolean",
       "default": true
+    },
+    "ammo_kind": {
+      "description": "**M14C** § optional snake_case ammo-kind selector. `null` = use the weapon's default round per existing M6 behavior. Unknown values reject with `unknown_ammo_kind`.",
+      "type": ["string", "null"],
+      "enum": [null, "regular", "tracer", "high_explosive", "pellet", "heat", "apfsds"]
     },
     "schema_version": {
       "type": "integer",

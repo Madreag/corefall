@@ -45,6 +45,7 @@ pub mod joint;
 pub mod limb_path_interop;
 pub mod parallel;
 pub mod penetration;
+pub mod penetration_m14c;
 pub mod penetration_ray;
 pub mod ragdoll;
 pub mod sharpness;
@@ -61,6 +62,12 @@ pub use limb_path_interop::LimbPathInterop;
 pub use authority::{AuthorityKind, AuthorityTransition};
 pub use facing_routing::{classify_hit_direction, exposed_zones, mirror_local_x, HitDirection};
 pub use joint::{evaluate_joint, explosion_impulse, fall_impulse_chain, severance_probability, severance_roll, Joint, JointEval};
+pub use penetration_m14c::{
+    apfsds_impact_producer, apfsds_overpenetration_infantry_damage, autocannon_infantry_damage,
+    era_penetration_reduction, heat_impact_producer, heat_standoff_scalar, heat_within_cone,
+    ApfsdsImpactInput, ApfsdsImpactOutcome, ApfsdsPathEntry, ArmorApfsdsLongRodThroughEvent,
+    ArmorEraPreDetonatedEvent, ArmorHeatJetTraversedEvent, HeatImpactInput, HeatImpactOutcome, HeatPathEntry,
+};
 pub use penetration_ray::{
     apfsds_energy_through_module, era_pre_detonates_heat, he_damage_at_distance, heat_jet_modules_penetrated,
     spalling_fragment_count, spalling_fragment_damage_fraction, traverse_ray, HeWave, InteriorModule, ModuleHit,

@@ -137,6 +137,11 @@ const SCHEMA_ARMOR_HEAT_JET_PRE_DETONATED_BY_ERA: &str =
     include_str!("../schemas/event/armor_heat_jet_pre_detonated_by_era.json");
 const SCHEMA_ARMOR_APFSDS_PENETRATED: &str = include_str!("../schemas/event/armor_apfsds_penetrated.json");
 const SCHEMA_ARMOR_ERA_PANEL_DETONATED: &str = include_str!("../schemas/event/armor_era_panel_detonated.json");
+// **M14C** — Per-tick HEAT + APFSDS + ERA producer schemas.
+const SCHEMA_ARMOR_HEAT_JET_TRAVERSED: &str = include_str!("../schemas/event/armor_heat_jet_traversed.json");
+const SCHEMA_ARMOR_APFSDS_LONG_ROD_THROUGH: &str =
+    include_str!("../schemas/event/armor_apfsds_long_rod_through.json");
+const SCHEMA_ARMOR_ERA_PRE_DETONATED: &str = include_str!("../schemas/event/armor_era_pre_detonated.json");
 const SCHEMA_ARMOR_SCHURZEN_PRE_DETONATED: &str = include_str!("../schemas/event/armor_schurzen_pre_detonated.json");
 const SCHEMA_ARMOR_MULTI_HIT_DEGRADATION: &str = include_str!("../schemas/event/armor_multi_hit_degradation.json");
 const SCHEMA_ARMOR_REACTIVE_ARMOR_CONSUMED: &str = include_str!("../schemas/event/armor_reactive_armor_consumed.json");
@@ -592,6 +597,10 @@ pub fn event_schema_for(category: &str, event_type: &str) -> Option<&'static str
         ("armor", "heat_jet_pre_detonated_by_era") => Some(SCHEMA_ARMOR_HEAT_JET_PRE_DETONATED_BY_ERA),
         ("armor", "apfsds_penetrated") => Some(SCHEMA_ARMOR_APFSDS_PENETRATED),
         ("armor", "era_panel_detonated") => Some(SCHEMA_ARMOR_ERA_PANEL_DETONATED),
+        // **M14C** § per-tick HEAT + APFSDS + ERA producers.
+        ("armor", "heat_jet_traversed") => Some(SCHEMA_ARMOR_HEAT_JET_TRAVERSED),
+        ("armor", "apfsds_long_rod_through") => Some(SCHEMA_ARMOR_APFSDS_LONG_ROD_THROUGH),
+        ("armor", "era_pre_detonated") => Some(SCHEMA_ARMOR_ERA_PRE_DETONATED),
         ("armor", "schurzen_pre_detonated") => Some(SCHEMA_ARMOR_SCHURZEN_PRE_DETONATED),
         ("armor", "multi_hit_degradation") => Some(SCHEMA_ARMOR_MULTI_HIT_DEGRADATION),
         ("armor", "reactive_armor_consumed") => Some(SCHEMA_ARMOR_REACTIVE_ARMOR_CONSUMED),
@@ -1291,6 +1300,10 @@ mod tests {
             ("armor", "schurzen_pre_detonated"),
             ("armor", "multi_hit_degradation"),
             ("armor", "reactive_armor_consumed"),
+            // M14C § per-tick HEAT + APFSDS + ERA producers.
+            ("armor", "heat_jet_traversed"),
+            ("armor", "apfsds_long_rod_through"),
+            ("armor", "era_pre_detonated"),
             // M5 internal.* family.
             ("internal", "organ_damaged"),
             ("internal", "organ_destroyed"),
@@ -2481,6 +2494,10 @@ mod tests {
             ("armor", "schurzen_pre_detonated"),
             ("armor", "multi_hit_degradation"),
             ("armor", "reactive_armor_consumed"),
+            // M14C per-tick producers.
+            ("armor", "heat_jet_traversed"),
+            ("armor", "apfsds_long_rod_through"),
+            ("armor", "era_pre_detonated"),
             ("internal", "organ_damaged"),
             ("internal", "organ_destroyed"),
             ("internal", "organ_failure_cascade"),

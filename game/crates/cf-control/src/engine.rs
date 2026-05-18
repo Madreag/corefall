@@ -20520,7 +20520,7 @@ impl EngineHandle for M0Engine {
                     self.reject_actor_command(tick, sim_time_ms, state, "act.player.aim")
                 }
             }
-            ControlCommand::ActPlayerFire { pressed, source } => {
+            ControlCommand::ActPlayerFire { pressed, ammo_kind, source } => {
                 if !self.config.has_actor_world {
                     return self.reject_actor_command(tick, sim_time_ms, state, "act.player.fire");
                 }
@@ -20540,12 +20540,18 @@ impl EngineHandle for M0Engine {
                         state.pending_intent.fire_held = false;
                     }
                     drop(state);
+                    let ammo_kind_str: Option<&'static str> = ammo_kind.map(cf_equipment::RoundKind::as_str);
                     self.recorder.record(
                         tick,
                         sim_time_ms,
                         "control",
                         "command_accepted",
-                        json!({"method": "act.player.fire", "actor": player_id.0, "pressed": pressed}),
+                        json!({
+                            "method": "act.player.fire",
+                            "actor": player_id.0,
+                            "pressed": pressed,
+                            "ammo_kind": ammo_kind_str,
+                        }),
                         None,
                     );
                     CommandResult::accepted(tick.0)
@@ -24079,6 +24085,7 @@ mod tests {
         let result = engine
             .dispatch(ControlCommand::ActPlayerFire {
                 pressed: true,
+                ammo_kind: None,
                 source: IntentSource::Cfctl,
             })
             .await;
@@ -24117,6 +24124,7 @@ mod tests {
         let press = engine
             .dispatch(ControlCommand::ActPlayerFire {
                 pressed: true,
+                ammo_kind: None,
                 source: IntentSource::Human,
             })
             .await;
@@ -24125,6 +24133,7 @@ mod tests {
         let release = engine
             .dispatch(ControlCommand::ActPlayerFire {
                 pressed: false,
+                ammo_kind: None,
                 source: IntentSource::Human,
             })
             .await;
@@ -24325,6 +24334,7 @@ mod tests {
         let _ = engine
             .dispatch(ControlCommand::ActPlayerFire {
                 pressed: true,
+                ammo_kind: None,
                 source: IntentSource::Cfctl,
             })
             .await;
@@ -24483,6 +24493,7 @@ mod tests {
         let _ = engine
             .dispatch(ControlCommand::ActPlayerFire {
                 pressed: true,
+                ammo_kind: None,
                 source: IntentSource::Cfctl,
             })
             .await;
@@ -24649,6 +24660,7 @@ mod tests {
             let _ = engine
                 .dispatch(ControlCommand::ActPlayerFire {
                     pressed: true,
+                ammo_kind: None,
                     source: IntentSource::Cfctl,
                 })
                 .await;
@@ -24663,6 +24675,7 @@ mod tests {
             let _ = engine
                 .dispatch(ControlCommand::ActPlayerFire {
                     pressed: false,
+                ammo_kind: None,
                     source: IntentSource::Cfctl,
                 })
                 .await;
@@ -24715,6 +24728,7 @@ mod tests {
                 let _ = engine
                     .dispatch(ControlCommand::ActPlayerFire {
                         pressed: true,
+                ammo_kind: None,
                         source: IntentSource::Cfctl,
                     })
                     .await;
@@ -24724,6 +24738,7 @@ mod tests {
                 let _ = engine
                     .dispatch(ControlCommand::ActPlayerFire {
                         pressed: false,
+                ammo_kind: None,
                         source: IntentSource::Cfctl,
                     })
                     .await;
@@ -24771,6 +24786,7 @@ mod tests {
             let _ = engine
                 .dispatch(ControlCommand::ActPlayerFire {
                     pressed: true,
+                ammo_kind: None,
                     source: IntentSource::Cfctl,
                 })
                 .await;
@@ -24780,6 +24796,7 @@ mod tests {
             let _ = engine
                 .dispatch(ControlCommand::ActPlayerFire {
                     pressed: false,
+                ammo_kind: None,
                     source: IntentSource::Cfctl,
                 })
                 .await;

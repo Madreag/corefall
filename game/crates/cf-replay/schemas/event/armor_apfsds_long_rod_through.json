@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/armor.apfsds_long_rod_through.v0.1",
+  "title": "armor.apfsds_long_rod_through",
+  "description": "M14C § Tank-Grade Rounds — per-tick APFSDS producer event. Fires when an APFSDS long-rod round traverses one or more chassis modules; carries per-module penetration depths + monotonically-decreasing remaining energy per VAL-M14C-008/012.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "armor" },
+    "event_type": { "const": "apfsds_long_rod_through" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "path": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "module_id": { "type": "string" },
+              "energy_absorbed_j": { "type": "number", "minimum": 0.0 },
+              "energy_remaining_j": { "type": "number", "minimum": 0.0 },
+              "depth_mm": { "type": "number", "minimum": 0.0 }
+            },
+            "required": ["module_id", "energy_absorbed_j", "energy_remaining_j", "depth_mm"]
+          }
+        },
+        "initial_energy_j": { "type": "number", "minimum": 0.0 },
+        "final_energy_j": { "type": "number", "minimum": 0.0 }
+      },
+      "required": ["actor_id", "path", "initial_energy_j", "final_energy_j"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

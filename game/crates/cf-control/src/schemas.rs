@@ -108,6 +108,14 @@ pub struct ActPlayerFireParams {
     /// hold-to-fire weapons. M1's rifle is single-press; release is a no-op.
     #[serde(default = "default_true")]
     pub pressed: bool,
+    /// **M14C** § "Wire ammo-spec to engine.fire; surface in
+    /// `cfctl.act.player.fire` ammo-kind" — optional snake_case ammo
+    /// kind selector. Accepted values: `regular`, `tracer`, `high_explosive`,
+    /// `pellet`, `heat`, `apfsds`. `None` = use the weapon's default
+    /// round (existing M6 behavior). Unknown values reject at the
+    /// dispatch boundary with `unknown_ammo_kind`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ammo_kind: Option<String>,
 }
 
 /// `act.player.reload` — edge-triggered reload request.

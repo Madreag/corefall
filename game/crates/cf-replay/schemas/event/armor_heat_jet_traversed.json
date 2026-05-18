@@ -1,0 +1,43 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/armor.heat_jet_traversed.v0.1",
+  "title": "armor.heat_jet_traversed",
+  "description": "M14C § Tank-Grade Rounds — per-tick HEAT producer event. Fires when a HEAT round's shaped-charge jet traverses a chassis interior; carries the ordered module path per VAL-M14C-007/010 + the standoff/cone diagnostics so consumers (kill cam M41, M14G wound cluster) can reason about the impact deterministically.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "armor" },
+    "event_type": { "const": "heat_jet_traversed" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "modules": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "path": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "module_id": { "type": "string" },
+              "depth_mm": { "type": "number", "minimum": 0.0 },
+              "damage": { "type": "number", "minimum": 0.0 }
+            },
+            "required": ["module_id", "depth_mm", "damage"]
+          }
+        },
+        "effective_damage": { "type": "number", "minimum": 0.0 },
+        "standoff_m": { "type": "number", "minimum": 0.0 },
+        "impact_angle_deg": { "type": "number" }
+      },
+      "required": ["actor_id", "modules", "path", "effective_damage", "standoff_m", "impact_angle_deg"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}

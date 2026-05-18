@@ -1,0 +1,25 @@
+// **M14C** — Tank-grade HEAT (High-Explosive Anti-Tank) reference round.
+//
+// Spec values (per `specs/active/M14C.md` § Notes for the implementer):
+//   - charge_mj            = 10.0           (10 MJ shaped charge)
+//   - jet_velocity_mps     = 3000.0         (~3 km/s)
+//   - cone_half_angle_deg  = 5.0            (narrow penetration cone)
+//   - optimum_standoff_m   = 0.6            (peak jet formation at 0.6 m)
+//
+// HEAT damage = `velocity × mass` product per the spec, NOT raw KE.
+// `charge_mass_kg = 1.0` keeps the velocity×mass product at 3000 to match
+// the M14C reference damage band; modders override either factor freely.
+//
+// `min_jet_formation_standoff_m = 0.2`: below this distance the jet is
+// "under-formed" and effective penetration drops by 50% (Gherkin-5).
+(
+  kind: heat,
+  id: "heat_round_v1",
+  display_name: "RPG HEAT v1",
+  charge_mj: 10.0,
+  charge_mass_kg: 1.0,
+  jet_velocity_mps: 3000.0,
+  cone_half_angle_deg: 5.0,
+  optimum_standoff_m: 0.6,
+  min_jet_formation_standoff_m: 0.2,
+)

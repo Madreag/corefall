@@ -1,0 +1,23 @@
+// **M14C** — Tank-grade APFSDS (Armor-Piercing Fin-Stabilized Discarding-Sabot)
+// reference round.
+//
+// Spec values (per `specs/active/M14C.md` § Notes for the implementer):
+//   - rod_mass_kg        = 7.0       (7 kg depleted-uranium long-rod)
+//   - velocity_mps       = 1600.0    (sabot package muzzle velocity)
+//   - rod_aspect_ratio   = 30.0      (length-to-diameter 30:1)
+//   - material           = "depleted_uranium"
+//   - sabot_mass_kg      = 1.5       (discards in flight, required by spec)
+//
+// Derived KE ≈ 0.5 × 7 × 1600² ≈ 8.96 MJ (~9.0 MJ per spec).
+// `rod_length_mm = 600` matches `rod_aspect_ratio` × baseline 20 mm bore.
+(
+  kind: apfsds,
+  id: "apfsds_round_v1",
+  display_name: "Tank APFSDS v1",
+  rod_mass_kg: 7.0,
+  sabot_mass_kg: 1.5,
+  velocity_mps: 1600.0,
+  rod_aspect_ratio: 30.0,
+  rod_length_mm: 600.0,
+  material: "depleted_uranium",
+)

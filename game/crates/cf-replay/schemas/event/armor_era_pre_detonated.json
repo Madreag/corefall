@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://corefall/event/armor.era_pre_detonated.v0.1",
+  "title": "armor.era_pre_detonated",
+  "description": "M14C § Tank-Grade Rounds — ERA (Explosive Reactive Armor) pre-detonation event. Fires strictly BEFORE the corresponding `armor.heat_jet_traversed` for the same impact per VAL-M14C-009. APFSDS impacts never produce this event per VAL-M14C-024.",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "schema_version": { "const": "prototype-recorder-event.v0.1" },
+    "category": { "const": "armor" },
+    "event_type": { "const": "era_pre_detonated" },
+    "actor_id": { "type": ["integer", "null"] },
+    "tick": { "type": "integer", "minimum": 0 },
+    "payload": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "actor_id": { "type": "integer" },
+        "module_id": { "type": "string" },
+        "era_charge_kg": { "type": "number", "minimum": 0.0 },
+        "penetration_reduction": { "type": "number", "minimum": 0.0, "maximum": 1.0 }
+      },
+      "required": ["actor_id", "module_id", "era_charge_kg", "penetration_reduction"]
+    }
+  },
+  "required": ["schema_version", "category", "event_type", "tick", "payload"]
+}
