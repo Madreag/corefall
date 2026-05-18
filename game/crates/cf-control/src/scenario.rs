@@ -169,6 +169,16 @@ pub struct Scenario {
     /// 0 falls back to the engine's `seed` field.
     #[serde(default)]
     pub m14e_cave_in_seed_offset: u64,
+    /// **M14F** § per-chunk lateral-wall fixtures authored by the
+    /// scenario manifest. Empty by default; M14F scenarios populate
+    /// one or more [`LateralWallSpan`] rows so the lateral integrity
+    /// pass + bulging→crack_advanced→rupture cascade fires against a
+    /// known sidewall topology. Distinct from `m14e_tunnel_spans` so
+    /// the ceiling + lateral passes don't share semantics (axes
+    /// differ; the underlying `IntegrityField` buffer is still shared
+    /// per VAL-CROSS-005).
+    #[serde(default)]
+    pub m14f_lateral_wall_spans: Vec<LateralWallSpan>,
 }
 
 /// **M14D** § one scenario projectile entry feeding the pair-CCD pool.
@@ -249,6 +259,75 @@ fn default_ceiling_thickness() -> u32 {
 
 fn default_vibration_modifier() -> f32 {
     1.0
+}
+
+/// **M14F § VAL-M14F-002 / VAL-M14F-016**: One lateral-wall fixture
+/// authored by the scenario manifest. Drives the per-tick lateral
+/// integrity pass + the bulging → crack_advanced → rupture cascade.
+/// The chunk's integrity field is shared with the M14E ceiling pass
+/// (per VAL-CROSS-005); this row only carries the lateral-axis
+/// metadata (wall span, yield strength, topology tag).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct LateralWallSpan {
+    /// Stable id for diagnostics + replay matching.
+    pub id: String,
+    /// Chunk coordinate the sidewall occupies.
+    pub chunk_id: (i32, i32),
+    /// Pixel-space AABB of the lateral wall region.
+    pub bbox_min: (i64, i64),
+    pub bbox_max: (i64, i64),
+    /// Unsupported lateral span (pixels) driving the bulging/rupture
+    /// roll.
+    pub unsupported_span_px: u32,
+    /// Wall thickness (pixels). Drives the falling-debris cone size
+    /// on rupture.
+    #[serde(default = "default_wall_thickness")]
+    pub wall_thickness_px: u32,
+    /// Per-material lateral yield strength (concrete=50, brick=30,
+    /// steel=200, wood=15, dirt=10). Drives the lateral-pass decay
+    /// rate + the pressure-blowout threshold.
+    #[serde(default = "default_lateral_yield_strength")]
+    pub lateral_yield_strength: u16,
+    /// Vibration modifier driving the bulging chance (1.0 baseline).
+    #[serde(default = "default_vibration_modifier")]
+    pub vibration_modifier: f32,
+    /// Lateral cascade neighbors that re-run the integrity pass when
+    /// this chunk's rupture fires (VAL-M14F-026).
+    #[serde(default)]
+    pub cascade_neighbors: Vec<(i32, i32)>,
+    /// Optional downstream-actor id that registers submerged / damp
+    /// after a dam rupture (VAL-M14F-009) or vacuum exposure after a
+    /// sealed-room rupture (VAL-M14F-011).
+    #[serde(default)]
+    pub downstream_actor_id: Option<u64>,
+    /// Optional topology tag — `"mineshaft"` (default integrity-decay
+    /// cascade), `"dam"` (drives M15 fluid + sets the downstream
+    /// actor's submerged flag), or `"sealed_room"` (drives M19
+    /// pressure equalization + M19C vacuum exposure on the actor
+    /// inside the sealed room).
+    #[serde(default = "default_lateral_topology")]
+    pub topology: String,
+    /// Initial sealed-room pressure (kPa). Defaults to 101 (Earth
+    /// ambient). Used by VAL-M14F-008 / VAL-M14F-011 to compute the
+    /// pressure equalization curve through the breach.
+    #[serde(default = "default_sealed_room_pressure")]
+    pub sealed_room_pressure_kpa: f32,
+}
+
+fn default_wall_thickness() -> u32 {
+    4
+}
+
+fn default_lateral_yield_strength() -> u16 {
+    50
+}
+
+fn default_lateral_topology() -> String {
+    "mineshaft".to_string()
+}
+
+fn default_sealed_room_pressure() -> f32 {
+    101.0
 }
 
 /// **M14C** § one scripted director step. The engine compares the current
@@ -1590,6 +1669,7 @@ mod tests {
             m14d_replay_intercepts: false,
             m14e_tunnel_spans: vec![],
             m14e_cave_in_seed_offset: 0,
+            m14f_lateral_wall_spans: vec![],
         };
         assert!(matches!(
             scenario.validate("t.ron"),

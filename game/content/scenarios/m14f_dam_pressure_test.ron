@@ -30,19 +30,22 @@
   scripted_steps: [],
   m14d_projectile_pool: [],
   m14d_replay_intercepts: false,
-  m14e_tunnel_spans: [
+  m14e_tunnel_spans: [],
+  m14e_cave_in_seed_offset: 24,
+  m14f_lateral_wall_spans: [
     (
       id: "dam_wall_32_tile",
       chunk_id: (1, 0),
       bbox_min: (256, 60),
       bbox_max: (288, 200),
       unsupported_span_px: 32,
-      ceiling_thickness_px: 4,
+      wall_thickness_px: 4,
+      lateral_yield_strength: 50,
       vibration_modifier: 4.0,
-      anchored: false,
       cascade_neighbors: [(0, 0), (2, 0)],
-      damage_actor_id: Some(2),
+      downstream_actor_id: Some(2),
+      topology: "dam",
+      sealed_room_pressure_kpa: 101.0,
     ),
   ],
-  m14e_cave_in_seed_offset: 24,
 )
