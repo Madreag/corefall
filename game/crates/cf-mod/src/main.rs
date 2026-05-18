@@ -1142,6 +1142,17 @@ fn validate_one(path: &Path, report: &mut ValidationReport) {
         validate_envelope_schema_file(path, report);
         return;
     }
+    // **M14G** § wound_specs/*.ron validation.
+    if path
+        .parent()
+        .and_then(|p| p.file_name())
+        .and_then(|s| s.to_str())
+        == Some("wound_specs")
+        && path.extension().and_then(|s| s.to_str()) == Some("ron")
+    {
+        validate_wound_spec_ron(path, report);
+        return;
+    }
     // **M6**: validate the four equipment registries under `content/equipment/`.
     // This must come BEFORE the scenarios fallthrough so the registry RONs
     // aren't mis-routed to `validate_scenario`.
@@ -2579,6 +2590,55 @@ fn validate_ttd_floors_interim(path: &Path, report: &mut ValidationReport) {
                 v.floors.len(),
                 v.compound_modifiers.len()
             ),
+        );
+    } else {
+        report.add_error(path.to_path_buf(), messages.join("; "));
+    }
+}
+
+/// **M14G § VAL-M14G-008 / VAL-CROSS-012 / VAL-CROSS-028**: validate one
+/// `content/wound_specs/<name>.ron` file against the
+/// [`cf_wound::WoundSpec`] schema. Rejects files that reference an unknown
+/// `WoundKind`, omit any of the 11 required fields, or carry an
+/// `heal_time_seconds_at_band` array of length ≠ 6.
+fn validate_wound_spec_ron(path: &Path, report: &mut ValidationReport) {
+    let raw = match fs::read_to_string(path) {
+        Ok(t) => t,
+        Err(err) => {
+            report.add_error(path.to_path_buf(), format!("read failed: {err}"));
+            return;
+        }
+    };
+    let spec: cf_wound::WoundSpec = match ron::from_str(&raw) {
+        Ok(s) => s,
+        Err(err) => {
+            report.add_error(path.to_path_buf(), format!("wound_spec parse: {err}"));
+            return;
+        }
+    };
+    let mut messages: Vec<String> = Vec::new();
+    if spec.heal_time_seconds_at_band.len() != 6 {
+        messages.push(format!(
+            "heal_time_seconds_at_band must have length 6, got {}",
+            spec.heal_time_seconds_at_band.len()
+        ));
+    }
+    if spec.decal_id.as_str().is_empty() {
+        messages.push("decal_id must be non-empty".to_string());
+    }
+    if !(spec.bleed_rate_ml_per_s_per_severity.is_finite() && spec.bleed_rate_ml_per_s_per_severity >= 0.0) {
+        messages.push("bleed_rate_ml_per_s_per_severity must be finite + non-negative".to_string());
+    }
+    if !(spec.pain_contribution_per_severity.is_finite() && spec.pain_contribution_per_severity >= 0.0) {
+        messages.push("pain_contribution_per_severity must be finite + non-negative".to_string());
+    }
+    if !(spec.infection_base_chance_per_tick.is_finite() && spec.infection_base_chance_per_tick >= 0.0) {
+        messages.push("infection_base_chance_per_tick must be finite + non-negative".to_string());
+    }
+    if messages.is_empty() {
+        report.add_pass(
+            path.to_path_buf(),
+            format!("wound_spec kind={:?} decal_id={}", spec.kind, spec.decal_id.as_str()),
         );
     } else {
         report.add_error(path.to_path_buf(), messages.join("; "));
