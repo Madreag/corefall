@@ -1,0 +1,19 @@
+(
+    kind: Concussion,
+    bleed_rate_ml_per_s_per_severity: 0.0,
+    pain_contribution_per_severity: 0.2,
+    infection_base_chance_per_tick: 0.0,
+    heal_time_seconds_at_band: (720.0, 1440.0, 4320.0, 14400.0, 21600.0, 28800.0),
+    treatment_difficulty: moderate,
+    allowed_zones: [
+        "head",
+        "head_back",
+        "head_front",
+    ],
+    decal_id: "decal.concussion",
+    clears_via: [
+        surgery_kit,
+    ],
+    closes_to_scar: false,
+    forbids_origin: [],
+)

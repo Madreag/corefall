@@ -1,0 +1,22 @@
+(
+    kind: DentalDamage,
+    bleed_rate_ml_per_s_per_severity: 0.5,
+    pain_contribution_per_severity: 0.2,
+    infection_base_chance_per_tick: 0.00003,
+    heal_time_seconds_at_band: (1080.0, 2160.0, 6480.0005, 21600.0, 32400.0, 43200.0),
+    treatment_difficulty: moderate,
+    allowed_zones: [
+        "head",
+        "head_back",
+        "head_front",
+    ],
+    decal_id: "decal.dental_damage",
+    clears_via: [
+        surgery_kit,
+        dental_kit,
+    ],
+    closes_to_scar: false,
+    forbids_origin: [
+        "robot",
+    ],
+)

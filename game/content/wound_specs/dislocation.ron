@@ -1,0 +1,28 @@
+(
+    kind: Dislocation,
+    bleed_rate_ml_per_s_per_severity: 0.0,
+    pain_contribution_per_severity: 0.18,
+    infection_base_chance_per_tick: 0.0,
+    heal_time_seconds_at_band: (360.0, 720.0, 2160.0, 7200.0, 10800.0, 14400.0),
+    treatment_difficulty: easy,
+    allowed_zones: [
+        "arm_left",
+        "arm_right",
+        "foot_left",
+        "foot_right",
+        "forearm_left",
+        "forearm_right",
+        "hand_left",
+        "hand_right",
+        "leg_left",
+        "leg_right",
+        "shin_left",
+        "shin_right",
+    ],
+    decal_id: "decal.dislocation",
+    clears_via: [
+        splint_bone,
+    ],
+    closes_to_scar: false,
+    forbids_origin: [],
+)

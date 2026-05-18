@@ -52,6 +52,7 @@ members = [
   "crates/cf-fortification",
   "crates/cf-replay-export",
   "crates/cf-cinematic",
+  "crates/cf-wound",
 ]
 
 [workspace.package]
