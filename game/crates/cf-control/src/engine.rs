@@ -19675,6 +19675,13 @@ fn build_checksum_bytes(state: &EngineMutable) -> Vec<u8> {
         out.extend_from_slice(&id.1.to_le_bytes());
         out.extend_from_slice(&m.to_le_bytes());
     }
+    out.extend_from_slice(&(state.m14f_breach_pressure_kpa.len() as u64).to_le_bytes());
+    for (id, (room, vac)) in &state.m14f_breach_pressure_kpa {
+        out.extend_from_slice(&id.0.to_le_bytes());
+        out.extend_from_slice(&id.1.to_le_bytes());
+        out.extend_from_slice(&room.to_le_bytes());
+        out.extend_from_slice(&vac.to_le_bytes());
+    }
     // M14G — wound aging pass invocation counter (already covered by per-actor
     // wound list inside `actor_state.checksum_bytes`, but include the counter
     // here so independent cadence drift is observable on the engine level).
