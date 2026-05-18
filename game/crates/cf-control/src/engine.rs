@@ -16031,6 +16031,74 @@ impl M0Engine {
         self.state.read().expect("engine state poisoned").clock.tick()
     }
 
+    /// **M14G test helper**: read the per-engine wound-aging pass
+    /// invocation counter (VAL-M14G-046).
+    pub fn m14g_wound_aging_invocations(&self) -> u64 {
+        self.state
+            .read()
+            .map(|s| s.m14g_wound_aging_invocations)
+            .unwrap_or(0)
+    }
+
+    /// **M14G test helper**: append a typed wound to an actor's
+    /// `m14g_wound_list`. Returns the allocated wound id.
+    pub fn m14g_inject_wound(
+        &self,
+        actor_id: u64,
+        kind: cf_wound::WoundKind,
+        zone: &str,
+        severity: f32,
+    ) -> Option<cf_wound::WoundId> {
+        let mut s = self.state.write().ok()?;
+        let sim = s.actor_state.as_mut()?;
+        let actor = sim.world.actors.get_mut(&cf_actor::ActorId(actor_id))?;
+        Some(actor.m14g_wound_list.push(
+            cf_wound::registry::ZoneId::from(zone),
+            cf_wound::Wound::new(
+                cf_wound::WoundId(0),
+                kind,
+                severity,
+                cf_wound::registry::ZoneId::from(zone),
+            ),
+        ))
+    }
+
+    /// **M14G test helper**: latest computed checksum hex over the
+    /// current engine state — exercises `build_checksum_bytes` directly
+    /// without depending on the periodic `determinism.sim_checksum`
+    /// event. Used by save/load round-trip + determinism tests.
+    pub fn m14g_compute_checksum_hex(&self) -> String {
+        let state = self.state.read().expect("engine state poisoned");
+        let tick = state.clock.tick();
+        let actor_bytes = build_checksum_bytes(&state);
+        let cs = sim_state_v1(tick, &state.rng, &actor_bytes);
+        cs.to_hex()
+    }
+
+    /// **M14G test helper**: read an actor's wound list (cloned).
+    pub fn m14g_actor_wound_list(&self, actor_id: u64) -> Option<cf_wound::ActorWoundList> {
+        let s = self.state.read().ok()?;
+        let sim = s.actor_state.as_ref()?;
+        let actor = sim.world.actors.get(&cf_actor::ActorId(actor_id))?;
+        Some(actor.m14g_wound_list.clone())
+    }
+
+    /// **M14G test helper**: overwrite an actor's wound list (used by
+    /// save/load round-trip tests).
+    pub fn m14g_set_actor_wound_list(&self, actor_id: u64, list: cf_wound::ActorWoundList) -> bool {
+        let mut s = match self.state.write() {
+            Ok(s) => s,
+            Err(_) => return false,
+        };
+        if let Some(sim) = s.actor_state.as_mut() {
+            if let Some(actor) = sim.world.actors.get_mut(&cf_actor::ActorId(actor_id)) {
+                actor.m14g_wound_list = list;
+                return true;
+            }
+        }
+        false
+    }
+
     /// **M8 helper**: record a `control.command_accepted` envelope log.
     pub(crate) fn record_command_accepted(&self, tick: Tick, sim_time_ms: f64, method: &str, extra: serde_json::Value) {
         let mut payload = json!({"method": method});
