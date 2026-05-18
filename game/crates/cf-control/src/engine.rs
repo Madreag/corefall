@@ -201,6 +201,10 @@ pub struct M0EngineConfig {
     /// **M14B** § per-column gas composition for stratification (parallel
     /// to `initial_atmosphere_cells` by `cell_id`). Empty = pure-air default.
     pub initial_stratification_cells: Vec<cf_atmos::StratCell>,
+    /// **M14C** § scripted director steps from the scenario manifest.
+    /// `drive_tick` reads this each tick and injects matching intents into
+    /// `pending_intent` before the actor sim runs. Empty by default.
+    pub initial_scripted_steps: Vec<crate::scenario::ScenarioScriptStep>,
 }
 
 /// M1.5: initial breach world snapshot.
@@ -527,6 +531,7 @@ impl M0EngineConfig {
             initial_wind_sources: Vec::new(),
             initial_atmosphere_cells: Vec::new(),
             initial_stratification_cells: Vec::new(),
+            initial_scripted_steps: Vec::new(),
         }
     }
 
@@ -689,6 +694,8 @@ impl M0EngineConfig {
             .iter()
             .map(build_strat_cell)
             .collect();
+        // **M14C** § propagate the scenario's scripted director steps.
+        cfg.initial_scripted_steps = scenario.scripted_steps.clone();
         // Promote the milestone tag when the scenario uses M14B producers.
         if !scenario.gravity_overrides.is_empty()
             || !scenario.wind_sources.is_empty()
@@ -930,6 +937,15 @@ pub(crate) struct EngineMutable {
     /// pruned when the projectile reaches `combat.projectile_hit` or
     /// `combat.projectile_expired` to keep the map bounded.
     projectile_spawn_event_ids: BTreeMap<u64, String>,
+    /// **M14C** § per-projectile round-kind discriminator. Populated at
+    /// `combat.projectile_spawned` time (from
+    /// `cf_actor::sim::SpawnedProjectile::round_kind`) and read by the
+    /// `emit_m14_penetration_ray` helper to route HEAT / APFSDS impacts
+    /// to the M14C producers (`heat_impact_producer` /
+    /// `apfsds_impact_producer`) rather than the M14 baseline traversal.
+    /// Pruned alongside `projectile_spawn_event_ids` after the projectile
+    /// is resolved.
+    projectile_round_kinds: BTreeMap<u64, cf_equipment::RoundKind>,
     /// **M1.5 forward-hook (Seam S1)**: latched by damage events so the
     /// next ReactiveGuard tick treats the damaged actor as a perception
     /// trigger. No consumer at M1; M1.5 ai layer reads it.
@@ -1246,6 +1262,12 @@ pub(crate) struct EngineMutable {
     /// **M14B** § gas-stratification cells (per-column composition). Runs
     /// every 4th tick per the spec.
     pub(crate) m14b_strat_cells: Vec<cf_atmos::StratCell>,
+    /// **M14C** § scripted director steps loaded from the scenario manifest's
+    /// `scripted_steps` array. `drive_tick` injects matching intents into
+    /// `pending_intent` before the actor sim runs so headless cfctl drives
+    /// of `m14c_heat_vs_era.ron` / `m14c_apfsds_vs_heavy.ron` actually fire
+    /// the HEAT / APFSDS round at a deterministic tick (rather than no-op).
+    pub(crate) m14c_scripted_steps: Vec<crate::scenario::ScenarioScriptStep>,
     /// **M14B** § per-(actor, override) activation latch. Used by the
     /// per-tick step to emit `gravity.override_activated` only on entry +
     /// `gravity.override_deactivated` only on exit. The inner BTreeSet
@@ -1650,6 +1672,7 @@ impl M0Engine {
         let m14b_wind_sources = config.initial_wind_sources.clone();
         let m14b_atmos_cells = config.initial_atmosphere_cells.clone();
         let m14b_strat_cells = config.initial_stratification_cells.clone();
+        let m14c_scripted_steps = config.initial_scripted_steps.clone();
         let engine = Self {
             config,
             state: RwLock::new(EngineMutable {
@@ -1684,6 +1707,7 @@ impl M0Engine {
                 pending_alarms: Vec::new(),
                 pending_alarms_staging: Vec::new(),
                 projectile_spawn_event_ids: BTreeMap::new(),
+                projectile_round_kinds: BTreeMap::new(),
                 hud_focus_index: None,
                 hud_focus_cycle: 0,
                 m9_timer_warnings_emitted: BTreeMap::new(),
@@ -1767,6 +1791,7 @@ impl M0Engine {
                 m14b_active_overrides: BTreeMap::new(),
                 m14b_transient_wind_ttl: BTreeMap::new(),
                 m14b_transient_cells: Vec::new(),
+                m14c_scripted_steps,
             }),
             recorder,
             current_tick,
@@ -3207,6 +3232,42 @@ impl M0Engine {
                                 origin: [px, py],
                             },
                         ));
+                    }
+                }
+            }
+
+            // **M14C** § inject scripted director steps into `pending_intent`
+            // BEFORE the actor sim consumes it. The scripted steps emulate
+            // what cfctl `act.player.{aim,fire,reload}` would do at the
+            // matching tick, so headless cfctl drives of
+            // `m14c_heat_vs_era.ron` / `m14c_apfsds_vs_heavy.ron` fire the
+            // HEAT / APFSDS round at a deterministic tick without an
+            // external driver. Multiple steps for the same tick stack
+            // (last write wins on overlapping fields).
+            let scripted_for_tick: Vec<crate::scenario::ScenarioScriptStep> = state
+                .m14c_scripted_steps
+                .iter()
+                .filter(|step| step.tick == tick.0)
+                .cloned()
+                .collect();
+            if !scripted_for_tick.is_empty() {
+                if let Some(player_id) = state.player_actor {
+                    state.pending_intent.actor = player_id;
+                    state.pending_intent.source = cf_actor::IntentSource::Cfctl;
+                    for step in &scripted_for_tick {
+                        if let Some((ax, ay)) = step.aim {
+                            if ax.is_finite() && ay.is_finite() {
+                                state.pending_intent.aim = cf_actor::Vec2::new(ax, ay);
+                            }
+                        }
+                        if step.fire {
+                            state.pending_intent.fire = true;
+                            state.pending_intent.fire_held = true;
+                            state.pending_intent.ammo_kind = step.resolved_ammo_kind();
+                        }
+                        if step.reload {
+                            state.pending_intent.reload = true;
+                        }
                     }
                 }
             }
@@ -8924,6 +8985,10 @@ impl M0Engine {
             spawn_velocities_this_tick.insert(spawn.id, [spawn.velocity.x, spawn.velocity.y]);
             if let Ok(mut s) = self.state.write() {
                 s.projectile_spawn_event_ids.insert(spawn.id, id);
+                // **M14C** § stash the round kind so a HEAT / APFSDS hit
+                // resolved N ticks later still routes to the M14C
+                // producer pipeline.
+                s.projectile_round_kinds.insert(spawn.id, spawn.round_kind);
             }
         }
         // **M14 audit pass 3 (Findings 3 + 4)**: build the swept-collision
@@ -9655,6 +9720,35 @@ impl M0Engine {
                         Some(projectile_hit_event_id.clone()),
                     );
                 }
+                // **M14C** § HEAT / APFSDS producer wiring — when the
+                // projectile is a tank-grade round, route the impact
+                // through `heat_impact_producer` / `apfsds_impact_producer`
+                // and emit `armor.era_pre_detonated` (strict ordering)
+                // BEFORE `armor.heat_jet_traversed` / `armor.apfsds_long_rod_through`.
+                // For HEAT/APFSDS we do NOT require armor breach (a HEAT
+                // jet bypasses spaced armor per VAL-M14C-021, and APFSDS
+                // can over-penetrate unarmored infantry per VAL-M14C-016);
+                // the producer's own gates (5° cone, ERA reduction,
+                // standoff curve) decide whether to emit per impact.
+                let round_kind_for_hit = self
+                    .state
+                    .read()
+                    .ok()
+                    .and_then(|s| s.projectile_round_kinds.get(&hit.projectile_id).copied())
+                    .unwrap_or(cf_equipment::RoundKind::Regular);
+                if matches!(
+                    round_kind_for_hit,
+                    cf_equipment::RoundKind::Heat | cf_equipment::RoundKind::Apfsds
+                ) {
+                    self.emit_m14c_armor_events(
+                        tick,
+                        sim_time_ms,
+                        hit.target,
+                        hit,
+                        round_kind_for_hit,
+                        Some(projectile_hit_event_id.clone()),
+                    );
+                }
             }
             // **M8** (Cluster E fix): auto-trigger a 100 ms hit-stop pulse on
             // an AP-round hit per spec § "Hit-stop on impact — Given melee
@@ -9705,6 +9799,11 @@ impl M0Engine {
                 if let Ok(mut s) = self.state.write() {
                     for id in &resolved_ids {
                         s.projectile_spawn_event_ids.remove(id);
+                        // **M14C** § drop the projectile's round-kind entry
+                        // alongside the spawn-id entry; the projectile is
+                        // resolved this tick so future ticks can't read
+                        // it again.
+                        s.projectile_round_kinds.remove(id);
                     }
                 }
             }
@@ -9764,6 +9863,7 @@ impl M0Engine {
             );
             if let Ok(mut s) = self.state.write() {
                 s.projectile_spawn_event_ids.remove(&expired.id);
+                s.projectile_round_kinds.remove(&expired.id);
             }
             self.recorder.record(
                 tick,
@@ -10160,6 +10260,233 @@ impl M0Engine {
                     }
                 }
             }
+        }
+    }
+
+    /// **M14C** § per-hit producer wiring for HEAT + APFSDS rounds.
+    ///
+    /// When the projectile's `RoundKind` is `Heat`, this helper invokes
+    /// [`cf_physics::heat_impact_producer`] against the target's chassis
+    /// modules + any ERA panel on the path, emitting in strict order:
+    /// `armor.era_pre_detonated` (when an ERA panel is on the path, per
+    /// VAL-M14C-009) THEN `armor.heat_jet_traversed` (the per-module
+    /// HEAT path, per VAL-M14C-007/010/021).
+    ///
+    /// When the round is `Apfsds`, this helper invokes
+    /// [`cf_physics::apfsds_impact_producer`] and emits
+    /// `armor.apfsds_long_rod_through` with per-module energy decay
+    /// entries (per VAL-M14C-008/012).
+    ///
+    /// For other round kinds this helper is a no-op (regular / tracer /
+    /// pellet / high_explosive fall back to the M14 traversal path).
+    ///
+    /// **Side effect**: an ERA pre-detonation against HEAT consumes the
+    /// matched ERA panel via [`cf_chassis::ChassisModule::consume_era_panel`]
+    /// so a second HEAT impact on the same panel does not re-trigger
+    /// pre-detonation (per VAL-M14C-002 one-shot rule).
+    #[allow(clippy::too_many_arguments)]
+    fn emit_m14c_armor_events(
+        &self,
+        tick: Tick,
+        sim_time_ms: f64,
+        actor: ActorId,
+        hit: &cf_actor::sim::HitOutcome,
+        round_kind: cf_equipment::RoundKind,
+        parent: Option<String>,
+    ) {
+        if !matches!(round_kind, cf_equipment::RoundKind::Heat | cf_equipment::RoundKind::Apfsds) {
+            return;
+        }
+        // Collect chassis interior modules in distance-from-impact order +
+        // the first ERA panel id on the path (for HEAT consume).
+        type ChassisSnapshot = (Vec<cf_physics::InteriorModule>, Option<(String, f32)>);
+        let chassis_snapshot: Option<ChassisSnapshot> = self
+            .state
+            .read()
+            .ok()
+            .and_then(|s| s.actor_state.as_ref().map(|sim| sim.world.actors.clone()))
+            .and_then(|actors| {
+                actors.get(&actor).and_then(|a| {
+                    a.chassis.as_ref().map(|chassis| {
+                        let position = a.position;
+                        let mut entries: Vec<cf_physics::InteriorModule> = Vec::new();
+                        let mut era_on_path: Option<(String, f32)> = None;
+                        for m in &chassis.modules {
+                            let centre = if m.local_aabb.is_positioned() {
+                                let aabb = &m.local_aabb;
+                                [
+                                    position.x + (aabb.min_x + aabb.max_x) * 0.5,
+                                    position.y + (aabb.min_y + aabb.max_y) * 0.5,
+                                ]
+                            } else {
+                                [position.x, position.y]
+                            };
+                            let dx = centre[0] - hit.hit_position.x;
+                            let dy = centre[1] - hit.hit_position.y;
+                            let dist = (dx * dx + dy * dy).sqrt();
+                            let is_ammo_rack = matches!(m.kind, cf_chassis::ModuleKind::AmmoRack);
+                            if matches!(m.kind, cf_chassis::ModuleKind::Era) && m.era_consumable && era_on_path.is_none() {
+                                era_on_path = Some((m.id.clone(), m.era_charge_kg.max(0.0)));
+                            }
+                            entries.push(cf_physics::InteriorModule {
+                                id: m.id.clone(),
+                                damage_multiplier: 0.6,
+                                armor_absorption: (1.0_f32 - (m.hp / m.hp_max.max(0.001)).clamp(0.0, 1.0)).clamp(0.0, 0.9),
+                                position: centre,
+                                distance_along_ray: dist,
+                                is_ammo_rack,
+                            });
+                        }
+                        entries.sort_by(|a, b| {
+                            a.distance_along_ray
+                                .partial_cmp(&b.distance_along_ray)
+                                .unwrap_or(std::cmp::Ordering::Equal)
+                        });
+                        (entries, era_on_path)
+                    })
+                })
+            });
+        let (interior_modules, era_on_path) = match chassis_snapshot {
+            Some(snap) => snap,
+            None => return,
+        };
+        if interior_modules.is_empty() {
+            return;
+        }
+
+        match round_kind {
+            cf_equipment::RoundKind::Heat => {
+                // Spec § "Notes for the implementer": 10 MJ jet @ ~3 km/s,
+                // 5° cone half-angle, 0.6 m optimum standoff, ~0.2 m min
+                // standoff for jet formation. Impact angle is 0 here —
+                // the engine routes the swept ray through the producer
+                // before the off-axis glance gate so on-target HEAT
+                // impacts always traverse (off-axis glance is handled by
+                // the M14 baseline path).
+                let input = cf_physics::HeatImpactInput {
+                    actor_id: actor.0,
+                    charge_mass_kg: 1.0,
+                    jet_velocity_mps: 3000.0,
+                    cone_half_angle_deg: 5.0,
+                    optimum_standoff_m: 0.6,
+                    min_jet_formation_standoff_m: 0.2,
+                    standoff_m: 0.6,
+                    impact_angle_deg: 0.0,
+                    modules: interior_modules,
+                    era_charge_kg: era_on_path.as_ref().map(|(_, kg)| *kg),
+                };
+                let outcome = cf_physics::heat_impact_producer(&input);
+
+                // Step 1: emit armor.era_pre_detonated FIRST (strict
+                // ordering per VAL-M14C-009).
+                let era_parent = parent.clone();
+                let mut last_parent = parent;
+                if let Some(era_event) = outcome.era_event.as_ref() {
+                    let era_recorded_id = self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "armor",
+                        "era_pre_detonated",
+                        json!({
+                            "actor_id": era_event.actor_id,
+                            "module_id": era_event.module_id,
+                            "era_charge_kg": era_event.era_charge_kg,
+                            "penetration_reduction": era_event.penetration_reduction,
+                        }),
+                        era_parent,
+                    );
+                    // Consume the ERA panel (one-shot) so a second HEAT
+                    // hit on the same panel does NOT re-pre-detonate.
+                    if let Some((era_id, _)) = era_on_path.as_ref() {
+                        if let Ok(mut s) = self.state.write() {
+                            if let Some(sim) = s.actor_state.as_mut() {
+                                if let Some(target) = sim.world.actors.get_mut(&actor) {
+                                    if let Some(chassis) = target.chassis.as_mut() {
+                                        for m in &mut chassis.modules {
+                                            if &m.id == era_id {
+                                                let _ = m.consume_era_panel();
+                                                break;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    last_parent = Some(era_recorded_id);
+                }
+
+                // Step 2: emit armor.heat_jet_traversed.
+                if let Some(traversed) = outcome.traversed.as_ref() {
+                    let path_payload: Vec<serde_json::Value> = traversed
+                        .path
+                        .iter()
+                        .map(|p| {
+                            serde_json::json!({
+                                "module_id": p.module_id,
+                                "depth_mm": p.depth_mm,
+                                "damage": p.damage,
+                            })
+                        })
+                        .collect();
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "armor",
+                        "heat_jet_traversed",
+                        json!({
+                            "actor_id": traversed.actor_id,
+                            "modules": traversed.modules,
+                            "path": path_payload,
+                            "effective_damage": traversed.effective_damage,
+                            "standoff_m": traversed.standoff_m,
+                            "impact_angle_deg": traversed.impact_angle_deg,
+                        }),
+                        last_parent,
+                    );
+                }
+            }
+            cf_equipment::RoundKind::Apfsds => {
+                // Spec § "Notes for the implementer": 7 kg DU rod @
+                // 1600 m/s = 9.0 MJ KE; per-module energy decay =
+                // KE_in × (1 - absorption_ratio). APFSDS ignores ERA
+                // (VAL-M14C-024) so `era_charge_kg` is never read.
+                let input = cf_physics::ApfsdsImpactInput {
+                    actor_id: actor.0,
+                    rod_mass_kg: 7.0,
+                    velocity_mps: 1600.0,
+                    modules: interior_modules,
+                };
+                let outcome = cf_physics::apfsds_impact_producer(&input);
+                if let Some(ev) = outcome.event.as_ref() {
+                    let path_payload: Vec<serde_json::Value> = ev
+                        .path
+                        .iter()
+                        .map(|p| {
+                            serde_json::json!({
+                                "module_id": p.module_id,
+                                "energy_absorbed_j": p.energy_absorbed_j,
+                                "energy_remaining_j": p.energy_remaining_j,
+                                "depth_mm": p.depth_mm,
+                            })
+                        })
+                        .collect();
+                    self.recorder.record(
+                        tick,
+                        sim_time_ms,
+                        "armor",
+                        "apfsds_long_rod_through",
+                        json!({
+                            "actor_id": ev.actor_id,
+                            "path": path_payload,
+                            "initial_energy_j": ev.initial_energy_j,
+                            "final_energy_j": ev.final_energy_j,
+                        }),
+                        parent,
+                    );
+                }
+            }
+            _ => {}
         }
     }
 
@@ -20538,6 +20865,21 @@ impl EngineHandle for M0Engine {
                         state.pending_intent.fire_held = true;
                     } else {
                         state.pending_intent.fire_held = false;
+                    }
+                    // **M14C** § propagate the per-shot ammo-kind override
+                    // from cfctl `act.player.fire { ammo_kind: ... }` into
+                    // the actor's pending intent so cf-actor::sim picks the
+                    // correct `RoundKind` when the magazine pops next. The
+                    // edge clears via `ControlIntent::clear_edges` so it
+                    // never bleeds into a follow-up tick. Without this
+                    // propagation the cfctl drive of
+                    // `m14c_heat_vs_era.ron` /
+                    // `m14c_apfsds_vs_heavy.ron` emits zero
+                    // `armor.heat_jet_traversed` /
+                    // `armor.apfsds_long_rod_through` events at runtime
+                    // (the M14C scrutiny gap).
+                    if pressed {
+                        state.pending_intent.ammo_kind = ammo_kind;
                     }
                     drop(state);
                     let ammo_kind_str: Option<&'static str> = ammo_kind.map(cf_equipment::RoundKind::as_str);

@@ -135,6 +135,59 @@ pub struct Scenario {
     /// alongside `wind_sources`).
     #[serde(default)]
     pub atmosphere_cells: Vec<cf_mission::ScenarioAtmosCell>,
+    /// **M14C** § scripted director steps — per-tick intent overrides the
+    /// engine injects into `pending_intent` before the actor sim runs.
+    /// Mirrors what a human (or a cfctl runner) would type via
+    /// `cfctl.act.player.{move,aim,fire,reload}` so headless cfctl drives
+    /// of `m14c_heat_vs_era.ron` / `m14c_apfsds_vs_heavy.ron` can fire a
+    /// HEAT / APFSDS round at a deterministic tick without an external
+    /// driver. Empty by default; pre-M14C scenarios behave identically
+    /// (no scripted intent injection).
+    #[serde(default)]
+    pub scripted_steps: Vec<ScenarioScriptStep>,
+}
+
+/// **M14C** § one scripted director step. The engine compares the current
+/// tick against `tick`; on the matching tick it patches `pending_intent`
+/// on the player actor with the provided overrides (aim / fire /
+/// ammo_kind) before the actor sim runs.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(default)]
+pub struct ScenarioScriptStep {
+    /// Tick on which to inject the intent. The engine drives this
+    /// exactly once; subsequent ticks see `clear_edges` clear the
+    /// edge-triggered fields.
+    pub tick: u64,
+    /// Optional aim vector `(x, y)` to assign to `pending_intent.aim`
+    /// before the fire/reload edges fire. The actor sim normalizes the
+    /// vector so any non-zero direction is accepted.
+    #[serde(default)]
+    pub aim: Option<(f32, f32)>,
+    /// True = set `pending_intent.fire = true` and `fire_held = true`.
+    /// One-shot edge — cleared by `ControlIntent::clear_edges` at end-of-tick.
+    #[serde(default)]
+    pub fire: bool,
+    /// Per-shot ammo kind override (mirrors
+    /// `cfctl.act.player.fire { ammo_kind: ... }`). Accepted snake_case
+    /// values: `regular` / `tracer` / `high_explosive` / `pellet` /
+    /// `heat` / `apfsds`. Unknown values are dropped at scenario-load
+    /// time so a typo doesn't silently fail at runtime.
+    #[serde(default)]
+    pub ammo_kind: Option<String>,
+    /// Optional `pending_intent.reload = true` edge.
+    #[serde(default)]
+    pub reload: bool,
+}
+
+impl ScenarioScriptStep {
+    /// **M14C** § resolve the `ammo_kind` string to a `cf_equipment::RoundKind`.
+    /// Returns `None` for empty / unknown values so the engine falls back
+    /// to the weapon's `RifleSpec::primary_round`.
+    pub fn resolved_ammo_kind(&self) -> Option<cf_equipment::RoundKind> {
+        self.ammo_kind
+            .as_deref()
+            .and_then(cf_equipment::RoundKind::from_str_snake)
+    }
 }
 
 /// One actor entry in `Scenario.actors`. M1 only models the player + simple dummies
@@ -193,6 +246,15 @@ pub struct ScenarioChassis {
     pub spec_id: String,
     #[serde(default)]
     pub tutorial_safety: bool,
+    /// **M14C** § optional extra modules bolted on top of the chassis
+    /// spec. Each entry maps `kind` (snake_case `ModuleKind` discriminator
+    /// — currently only `"era"` is honored) to a `BodyZone` + per-panel
+    /// HP + ERA charge. Used by `m14c_heat_vs_era.ron` to bolt an ERA
+    /// panel onto the Heavy Trooper torso so the M14C HEAT producer
+    /// emits `armor.era_pre_detonated` strictly before
+    /// `armor.heat_jet_traversed` (VAL-M14C-009/011).
+    #[serde(default)]
+    pub extra_modules: Vec<ScenarioExtraModule>,
     /// Optional initial stage override. Accepts `"nominal" | "degraded" |
     /// "critical" | "wreck" | "disabled" | "salvaged"`. When set to `"wreck"`
     /// or `"disabled"`, `act.chassis.salvage` becomes immediately valid against
@@ -205,6 +267,16 @@ impl ScenarioChassis {
     pub fn build_state(&self, tick_rate_hz: u32) -> Option<cf_chassis::ChassisState> {
         let mut state = cf_chassis::chassis_spec(&self.spec_id)
             .map(|spec| cf_chassis::ChassisState::from_spec(&spec, tick_rate_hz, self.tutorial_safety))?;
+        // **M14C** § scenario-driven extra modules. Currently only the
+        // `era` kind is honored — the panel is bolted onto the configured
+        // body zone with the requested HP + era_charge_kg + one-shot
+        // consumable flag set true so HEAT impacts trigger ERA
+        // pre-detonation.
+        for extra in &self.extra_modules {
+            if let Some(module) = extra.build_module() {
+                state.modules.push(module);
+            }
+        }
         if let Some(stage) = self.initial_stage.as_deref() {
             let target = match stage.to_ascii_lowercase().as_str() {
                 "nominal" => Some(cf_chassis::ChassisStage::Nominal),
@@ -226,6 +298,81 @@ impl ScenarioChassis {
             }
         }
         Some(state)
+    }
+}
+
+/// **M14C** § scenario-side declaration of an extra chassis module bolted
+/// on top of the base spec. M14C ships exactly one kind — `era` — for the
+/// HEAT-vs-ERA scenario.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ScenarioExtraModule {
+    /// Snake-case `ModuleKind` discriminator (`"era"`, `"ammo_rack"`, etc.).
+    pub kind: String,
+    /// Stable module id used as the event payload `module_id`.
+    pub id: String,
+    /// Body zone the module is bound to (`"torso"`, `"head"`, etc.).
+    pub zone: String,
+    /// Module HP at spawn time.
+    #[serde(default = "default_extra_module_hp")]
+    pub hp_max: f32,
+    /// **M14C** § ERA-only: charge mass in kg. Feeds the
+    /// `era_charge_kg × 0.7` HEAT penetration reduction formula.
+    #[serde(default)]
+    pub era_charge_kg: Option<f32>,
+}
+
+fn default_extra_module_hp() -> f32 {
+    30.0
+}
+
+impl ScenarioExtraModule {
+    /// Build the matching [`cf_chassis::ChassisModule`]. Returns `None` for
+    /// unknown kind / zone identifiers so the scenario loader can reject
+    /// the manifest cleanly.
+    pub fn build_module(&self) -> Option<cf_chassis::ChassisModule> {
+        let kind = parse_module_kind(&self.kind)?;
+        let zone = parse_body_zone(&self.zone)?;
+        let mut module = cf_chassis::ChassisModule::new(&self.id, kind, zone, self.hp_max);
+        if matches!(kind, cf_chassis::ModuleKind::Era) {
+            module = module.with_era(self.era_charge_kg.unwrap_or(1.0), true);
+        }
+        Some(module)
+    }
+}
+
+fn parse_module_kind(s: &str) -> Option<cf_chassis::ModuleKind> {
+    match s.to_ascii_lowercase().as_str() {
+        "era" => Some(cf_chassis::ModuleKind::Era),
+        "ammo_rack" => Some(cf_chassis::ModuleKind::AmmoRack),
+        "engine" => Some(cf_chassis::ModuleKind::Engine),
+        "fuel_tank" => Some(cf_chassis::ModuleKind::FuelTank),
+        "weapon_mount" => Some(cf_chassis::ModuleKind::WeaponMount),
+        "jet" => Some(cf_chassis::ModuleKind::Jet),
+        "shield" => Some(cf_chassis::ModuleKind::Shield),
+        "sensor" => Some(cf_chassis::ModuleKind::Sensor),
+        "repair_drone" => Some(cf_chassis::ModuleKind::RepairDrone),
+        _ => None,
+    }
+}
+
+fn parse_body_zone(s: &str) -> Option<cf_chassis::BodyZone> {
+    match s.to_ascii_lowercase().as_str() {
+        "head" => Some(cf_chassis::BodyZone::Head),
+        "torso" => Some(cf_chassis::BodyZone::Torso),
+        "arm_right" => Some(cf_chassis::BodyZone::ArmRight),
+        "arm_left" => Some(cf_chassis::BodyZone::ArmLeft),
+        "leg_right" => Some(cf_chassis::BodyZone::LegRight),
+        "leg_left" => Some(cf_chassis::BodyZone::LegLeft),
+        "backpack" => Some(cf_chassis::BodyZone::Backpack),
+        "forearm_right" => Some(cf_chassis::BodyZone::ForearmRight),
+        "forearm_left" => Some(cf_chassis::BodyZone::ForearmLeft),
+        "hand_right" => Some(cf_chassis::BodyZone::HandRight),
+        "hand_left" => Some(cf_chassis::BodyZone::HandLeft),
+        "shin_right" => Some(cf_chassis::BodyZone::ShinRight),
+        "shin_left" => Some(cf_chassis::BodyZone::ShinLeft),
+        "foot_right" => Some(cf_chassis::BodyZone::FootRight),
+        "foot_left" => Some(cf_chassis::BodyZone::FootLeft),
+        _ => None,
     }
 }
 
@@ -1334,6 +1481,7 @@ mod tests {
             gravity_overrides: vec![],
             wind_sources: vec![],
             atmosphere_cells: vec![],
+            scripted_steps: vec![],
         };
         assert!(matches!(
             scenario.validate("t.ron"),
