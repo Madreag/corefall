@@ -1498,6 +1498,7 @@ dependencies = [
 name = "cf-actor"
 version = "0.0.1"
 dependencies = [
+ "cf-atmos",
  "cf-chassis",
  "cf-equipment",
  "cf-fortification",
@@ -1759,6 +1760,7 @@ dependencies = [
 name = "cf-equipment"
 version = "0.0.1"
 dependencies = [
+ "cf-atmos",
  "serde",
  "serde_json",
  "tracing",

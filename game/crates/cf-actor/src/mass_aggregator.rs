@@ -61,23 +61,57 @@ impl MassBreakdown {
 /// inventory contribution comes from
 /// [`ActorState::inventory_grid_total_mass_kg`], with a fallback to the
 /// legacy `inventory_weight_kg` when no grid is attached.
+///
+/// **M14A** fills the held / jetpack-fuel / wound slots so `total()`
+/// matches the per-source breakdown for the HUD MASS line.
 pub fn breakdown(actor: &ActorState) -> MassBreakdown {
     let inventory_kg = actor.inventory_grid_total_mass_kg();
+
+    // **M14A** § "held_devices_mass": currently-equipped rifle / pistol.
+    // M6B's inventory grid already accounts for stored items; here we add
+    // the *equipped* weapon if it's not double-counted in the grid.
+    let held_kg = if actor.inventory_grid.is_some() {
+        0.0 // grid already includes equipped + stored
+    } else {
+        // Legacy actors: rifle ≈ 3.5 kg if a rifle slot is held.
+        if actor.inventory.rifle_slot().is_some() {
+            3.5
+        } else {
+            0.0
+        }
+    };
+
+    // **M14A** § "Jetpack fuel mass decreases as fuel burns".
+    let jetpack_fuel_kg = actor.jetpack.as_ref().map_or(0.0, |j| j.fuel_mass_kg());
+    let jetpack_dry_kg = actor.jetpack.as_ref().map_or(0.0, |j| j.dry_mass_kg);
+
+    // **M14A** § "Wound mass from lodged pixels".
+    let wound_kg = actor.wound_mass_kg.max(0.0);
+
     MassBreakdown {
-        chassis_kg: actor.mass_kg.max(0.0),
+        chassis_kg: actor.mass_kg.max(0.0) + jetpack_dry_kg,
         limb_kg: 0.0,
-        held_kg: 0.0,
+        held_kg,
         inventory_kg,
-        jetpack_fuel_kg: 0.0,
-        wound_kg: 0.0,
+        jetpack_fuel_kg,
+        wound_kg,
     }
 }
 
-/// **M6B**: aggregated total actor mass in kg. Equivalent to
-/// `breakdown(actor).total()`. M14A overrides this function (or
-/// extends [`breakdown`]) to fill the currently-reserved slots.
+/// **M14A** § "Mass aggregation system" — aggregated total actor mass in kg.
 pub fn total_mass(actor: &ActorState) -> f32 {
     breakdown(actor).total()
+}
+
+/// **M14A** § "Mass factor" — walk speed multiplier from total mass.
+///
+/// `(BASELINE_MASS_KG / total_mass).clamp(MASS_FACTOR_MIN, MASS_FACTOR_MAX)`.
+pub fn mass_factor(actor: &ActorState) -> f32 {
+    const BASELINE_MASS_KG: f32 = 80.0;
+    const MASS_FACTOR_MIN: f32 = 0.25;
+    const MASS_FACTOR_MAX: f32 = 1.2;
+    let total = total_mass(actor).max(1.0);
+    (BASELINE_MASS_KG / total).clamp(MASS_FACTOR_MIN, MASS_FACTOR_MAX)
 }
 
 #[cfg(test)]

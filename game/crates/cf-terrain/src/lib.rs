@@ -66,7 +66,9 @@ pub mod chunked;
 pub mod constants;
 pub mod dirty;
 pub mod integrity;
+pub mod m14a_overlay;
 pub mod parallel;
+pub use m14a_overlay::{material_thermal_contact, material_walk_modulator, ThermalContact, WalkModulator};
 
 pub use chunked::{
     material_affordance, material_id_from_name, material_name_from_id, Chunk, ChunkCoord, ChunkedCarveNoOp,

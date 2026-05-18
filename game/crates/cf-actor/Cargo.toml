@@ -12,6 +12,7 @@ tracing = { workspace = true }
 cf-physics = { path = "../cf-physics" }
 cf-equipment = { path = "../cf-equipment" }
 cf-chassis = { path = "../cf-chassis" }
+cf-atmos = { path = "../cf-atmos" }
 cf-trench = { path = "../cf-trench" }
 cf-fortification = { path = "../cf-fortification" }
 

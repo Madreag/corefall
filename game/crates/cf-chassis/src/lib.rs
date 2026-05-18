@@ -73,6 +73,9 @@ pub const CRAB_QUADRUPED_ID: &str = "crab_quadruped_v1";
 /// **M13** § "Chassis archetypes — M13 ships 5" — autonomous miniature
 /// chassis: 4 zones (chassis core + 2 arms + sensor pod); no pilot.
 pub const DRONE_ID: &str = "drone_v1";
+/// **M14A** § "Heavy Armor — `heavy_trooper_v1`" — tank-grade infantry
+/// chassis. 380 kg base loaded; rifles glance, only AP/HE breach.
+pub const HEAVY_TROOPER_ID: &str = "heavy_trooper_v1";
 
 /// **M13** § "Chassis archetypes — M13 ships 5". Discriminants `Infantry=0`
 /// through `LightMech=2` are pinned for cross-milestone determinism; the new
@@ -89,6 +92,9 @@ pub enum ChassisKind {
     CrabQuadruped = 3,
     /// **M13** autonomous drone chassis (no pilot binding).
     Drone = 4,
+    /// **M14A** § "Heavy Armor" — tank-grade infantry; small arms barely
+    /// scratch; 380 kg loaded; throttle-for-weight jet visibly struggles.
+    HeavyTrooper = 5,
 }
 
 impl ChassisKind {
@@ -99,11 +105,12 @@ impl ChassisKind {
             ChassisKind::LightMech => "light_mech",
             ChassisKind::CrabQuadruped => "crab_quadruped",
             ChassisKind::Drone => "drone",
+            ChassisKind::HeavyTrooper => "heavy_trooper",
         }
     }
 
     /// Reference ids (`POWERED_ARMOR_ID`, `LIGHT_MECH_ID`, `INFANTRY_ID`,
-    /// `CRAB_QUADRUPED_ID`, `DRONE_ID`).
+    /// `CRAB_QUADRUPED_ID`, `DRONE_ID`, `HEAVY_TROOPER_ID`).
     pub fn default_spec_id(self) -> &'static str {
         match self {
             ChassisKind::Infantry => INFANTRY_ID,
@@ -111,6 +118,7 @@ impl ChassisKind {
             ChassisKind::LightMech => LIGHT_MECH_ID,
             ChassisKind::CrabQuadruped => CRAB_QUADRUPED_ID,
             ChassisKind::Drone => DRONE_ID,
+            ChassisKind::HeavyTrooper => HEAVY_TROOPER_ID,
         }
     }
 
@@ -121,7 +129,7 @@ impl ChassisKind {
         match self {
             ChassisKind::Infantry | ChassisKind::Drone => 1,
             ChassisKind::PoweredArmor | ChassisKind::CrabQuadruped => 2,
-            ChassisKind::LightMech => 3,
+            ChassisKind::LightMech | ChassisKind::HeavyTrooper => 3,
         }
     }
 
@@ -132,7 +140,7 @@ impl ChassisKind {
         match self {
             ChassisKind::Infantry | ChassisKind::Drone => 1,
             ChassisKind::PoweredArmor | ChassisKind::CrabQuadruped => 2,
-            ChassisKind::LightMech => 3,
+            ChassisKind::LightMech | ChassisKind::HeavyTrooper => 3,
         }
     }
 
@@ -143,7 +151,7 @@ impl ChassisKind {
         match self {
             ChassisKind::Infantry | ChassisKind::Drone => 1.0,
             ChassisKind::PoweredArmor => 0.6,
-            ChassisKind::CrabQuadruped => 0.4,
+            ChassisKind::CrabQuadruped | ChassisKind::HeavyTrooper => 0.4,
             ChassisKind::LightMech => 0.25,
         }
     }
@@ -152,7 +160,10 @@ impl ChassisKind {
     /// support the cockpit anchor (Light has third-person only). Returns
     /// `true` when [`crate::CameraAnchor::Cockpit`] is a valid request.
     pub fn supports_cockpit_anchor(self) -> bool {
-        matches!(self, ChassisKind::LightMech | ChassisKind::CrabQuadruped)
+        matches!(
+            self,
+            ChassisKind::LightMech | ChassisKind::CrabQuadruped | ChassisKind::HeavyTrooper
+        )
     }
 }
 
@@ -455,10 +466,35 @@ pub struct ZoneState {
     pub layers: Vec<ArmorLayer>,
     pub wound_hp: f32,
     pub wound_hp_max: f32,
+    /// **M14A** § "Per-attachable `damage_multiplier`" — scales incoming
+    /// damage on this zone (< 1.0 = tougher). Default 1.0.
+    #[serde(default = "default_damage_multiplier")]
+    pub damage_multiplier: f32,
+    /// **M14A** § "Per-zone `gib_impulse_limit`" — impulse threshold (N·s)
+    /// below which the zone cannot be gibbed off. Default 800 N·s; heavy
+    /// chassis raises this to 1600..3200 N·s.
+    #[serde(default = "default_gib_impulse_limit")]
+    pub gib_impulse_limit: f32,
+    /// **M14A** § "Per-zone `stagger_factor`" — multiplier on hit-reaction
+    /// duration + knockdown probability (0.2 = heavy; 1.0 = baseline).
+    #[serde(default = "default_stagger_factor")]
+    pub stagger_factor: f32,
     /// `true` once `wound_hp <= 0`; the zone is destroyed and emits
     /// `armor_zone_destroyed`. Limb destruction has mechanical consequences listed
     /// in [`BodyGraph::movement_contributions`].
     pub destroyed: bool,
+}
+
+fn default_damage_multiplier() -> f32 {
+    1.0
+}
+
+fn default_gib_impulse_limit() -> f32 {
+    800.0
+}
+
+fn default_stagger_factor() -> f32 {
+    1.0
 }
 
 impl ZoneState {
@@ -468,8 +504,27 @@ impl ZoneState {
             layers,
             wound_hp: wound_hp.max(0.0),
             wound_hp_max: wound_hp.max(0.0),
+            damage_multiplier: default_damage_multiplier(),
+            gib_impulse_limit: default_gib_impulse_limit(),
+            stagger_factor: default_stagger_factor(),
             destroyed: false,
         }
+    }
+
+    /// **M14A** § "Per-zone tunings" — chain-able builder for heavy-armor archetypes.
+    pub fn with_damage_multiplier(mut self, mult: f32) -> Self {
+        self.damage_multiplier = mult;
+        self
+    }
+
+    pub fn with_gib_impulse_limit(mut self, limit: f32) -> Self {
+        self.gib_impulse_limit = limit;
+        self
+    }
+
+    pub fn with_stagger_factor(mut self, factor: f32) -> Self {
+        self.stagger_factor = factor;
+        self
     }
 
     pub fn reset(&mut self) {
@@ -1236,6 +1291,11 @@ impl ChassisAbilitySlots {
             ChassisKind::LightMech => &[ChassisAbility::TimeSlow, ChassisAbility::Overdrive, ChassisAbility::ShieldBurst],
             ChassisKind::CrabQuadruped => &[ChassisAbility::ShieldBurst, ChassisAbility::EmpPulse],
             ChassisKind::Drone => &[ChassisAbility::Cloak],
+            ChassisKind::HeavyTrooper => &[
+                ChassisAbility::ShieldBurst,
+                ChassisAbility::Overdrive,
+                ChassisAbility::EmpPulse,
+            ],
         };
         let slots: Vec<AbilitySlotState> = default_loadout
             .iter()
@@ -3789,8 +3849,102 @@ pub fn drone_spec() -> ChassisSpec {
     }
 }
 
-/// Stable registry of every launch chassis spec. **M13** ships 5 archetypes:
-/// Infantry, Powered Armor, Light Mech, Crab Quadruped, Drone.
+/// **M14A** § "Heavy Armor — `heavy_trooper_v1`" — tank-grade infantry chassis.
+///
+/// Per-zone External HP, hardness, and `damage_multiplier` / `gib_impulse_limit`
+/// / `stagger_factor` are spec-locked so rifles glance + heavy never knocks down
+/// on small-arms hits.
+pub fn heavy_trooper_spec() -> ChassisSpec {
+    let zones = vec![
+        // Head: 240 HP / hardness 18 / dmg×0.6 / gib 1600 / stagger 0.2
+        make_zone(BodyZone::Head, 240.0, 18.0, 80.0, 8.0, 120.0, 30.0)
+            .with_damage_multiplier(0.6)
+            .with_gib_impulse_limit(1600.0)
+            .with_stagger_factor(0.2),
+        // Torso: 400 HP / hardness 22 / dmg×0.6 / gib 3200 / stagger 0.2
+        make_zone(BodyZone::Torso, 400.0, 22.0, 200.0, 12.0, 240.0, 60.0)
+            .with_damage_multiplier(0.6)
+            .with_gib_impulse_limit(3200.0)
+            .with_stagger_factor(0.2),
+        // Arms: 180 HP / hardness 16 / dmg×0.75 / gib 2400 / stagger 0.3
+        make_zone(BodyZone::ArmRight, 180.0, 16.0, 80.0, 7.0, 100.0, 24.0)
+            .with_damage_multiplier(0.75)
+            .with_gib_impulse_limit(2400.0)
+            .with_stagger_factor(0.3),
+        make_zone(BodyZone::ArmLeft, 180.0, 16.0, 80.0, 7.0, 100.0, 24.0)
+            .with_damage_multiplier(0.75)
+            .with_gib_impulse_limit(2400.0)
+            .with_stagger_factor(0.3),
+        // Legs: 220 HP / hardness 16 / dmg×0.75 / gib 2400 / stagger 0.3
+        make_zone(BodyZone::LegRight, 220.0, 16.0, 100.0, 8.0, 140.0, 32.0)
+            .with_damage_multiplier(0.75)
+            .with_gib_impulse_limit(2400.0)
+            .with_stagger_factor(0.3),
+        make_zone(BodyZone::LegLeft, 220.0, 16.0, 100.0, 8.0, 140.0, 32.0)
+            .with_damage_multiplier(0.75)
+            .with_gib_impulse_limit(2400.0)
+            .with_stagger_factor(0.3),
+        // Backpack: 140 HP / hardness 12 / dmg×0.8 / gib 1600 / stagger 0.5
+        make_zone(BodyZone::Backpack, 140.0, 12.0, 80.0, 6.0, 60.0, 16.0)
+            .with_damage_multiplier(0.8)
+            .with_gib_impulse_limit(1600.0)
+            .with_stagger_factor(0.5),
+        make_zone(BodyZone::ForearmRight, 100.0, 14.0, 50.0, 5.0, 60.0, 12.0)
+            .with_damage_multiplier(0.8)
+            .with_gib_impulse_limit(1600.0)
+            .with_stagger_factor(0.5),
+        make_zone(BodyZone::ForearmLeft, 100.0, 14.0, 50.0, 5.0, 60.0, 12.0)
+            .with_damage_multiplier(0.8)
+            .with_gib_impulse_limit(1600.0)
+            .with_stagger_factor(0.5),
+        make_zone(BodyZone::HandRight, 80.0, 12.0, 40.0, 4.0, 50.0, 12.0)
+            .with_damage_multiplier(0.8)
+            .with_gib_impulse_limit(1600.0)
+            .with_stagger_factor(0.5),
+        make_zone(BodyZone::HandLeft, 80.0, 12.0, 40.0, 4.0, 50.0, 12.0)
+            .with_damage_multiplier(0.8)
+            .with_gib_impulse_limit(1600.0)
+            .with_stagger_factor(0.5),
+        make_zone(BodyZone::ShinRight, 120.0, 14.0, 60.0, 5.0, 80.0, 16.0)
+            .with_damage_multiplier(0.8)
+            .with_gib_impulse_limit(1600.0)
+            .with_stagger_factor(0.5),
+        make_zone(BodyZone::ShinLeft, 120.0, 14.0, 60.0, 5.0, 80.0, 16.0)
+            .with_damage_multiplier(0.8)
+            .with_gib_impulse_limit(1600.0)
+            .with_stagger_factor(0.5),
+        make_zone(BodyZone::FootRight, 100.0, 12.0, 50.0, 4.0, 60.0, 14.0)
+            .with_damage_multiplier(0.8)
+            .with_gib_impulse_limit(1600.0)
+            .with_stagger_factor(0.5),
+        make_zone(BodyZone::FootLeft, 100.0, 12.0, 50.0, 4.0, 60.0, 14.0)
+            .with_damage_multiplier(0.8)
+            .with_gib_impulse_limit(1600.0)
+            .with_stagger_factor(0.5),
+    ];
+    let modules = vec![
+        ChassisModule::new("weapon_mount.heavy", ModuleKind::WeaponMount, BodyZone::ArmRight, 200.0),
+        ChassisModule::new("jet.heavy_trooper", ModuleKind::Jet, BodyZone::Backpack, 100.0),
+        ChassisModule::new("shield.heavy_plate", ModuleKind::Shield, BodyZone::Torso, 150.0),
+        ChassisModule::not_present("sensor.none", ModuleKind::Sensor),
+        ChassisModule::not_present("repair_drone.none", ModuleKind::RepairDrone),
+    ];
+    ChassisSpec {
+        id: HEAVY_TROOPER_ID.to_string(),
+        kind: ChassisKind::HeavyTrooper,
+        display_name: "Heavy Trooper HT-1".to_string(),
+        body_graph: infantry_body_graph(),
+        zones,
+        modules,
+        eject_window_seconds: 1.2,
+        mass_kg: 380.0,
+        // Heavy Trooper armor mount angles: 40° front, 15° side, 30° back.
+        armor_angles: ArmorMountAngles::new(40.0, 15.0, 30.0),
+    }
+}
+
+/// Stable registry of every launch chassis spec. **M14A** ships 6 archetypes:
+/// Infantry, Powered Armor, Light Mech, Crab Quadruped, Drone, Heavy Trooper.
 pub fn chassis_specs() -> BTreeMap<&'static str, ChassisSpec> {
     let mut m = BTreeMap::new();
     m.insert(INFANTRY_ID, infantry_spec());
@@ -3798,6 +3952,7 @@ pub fn chassis_specs() -> BTreeMap<&'static str, ChassisSpec> {
     m.insert(LIGHT_MECH_ID, light_mech_spec());
     m.insert(CRAB_QUADRUPED_ID, crab_quadruped_spec());
     m.insert(DRONE_ID, drone_spec());
+    m.insert(HEAVY_TROOPER_ID, heavy_trooper_spec());
     m
 }
 

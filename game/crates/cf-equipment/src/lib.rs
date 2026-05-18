@@ -57,6 +57,8 @@ pub mod grenade;
 pub mod heavy;
 pub mod inventory;
 pub mod item_spec;
+pub mod jetpack;
+pub mod jetpack_atmos;
 pub mod knife_throw;
 pub mod magazine;
 pub mod medical;
@@ -108,6 +110,10 @@ pub use item_spec::{
     MaterialId, OriginId, RecipeId, HUMAN_BASELINE_MAX_CARRY_KG, HUMAN_BASELINE_MAX_CARRY_VOLUME_L,
     MAX_CONTAINER_NEST_DEPTH, MAX_DEPTH_EXCEEDED, WALK_SPEED_AT_EMPTY_CARRY, WALK_SPEED_AT_FULL_CARRY,
 };
+pub use jetpack::{
+    jet_pressure_efficiency, jetpack_tick, Jetpack, JetpackEvent, JetpackTickOutcome, JetpackType,
+};
+pub use jetpack_atmos::{muzzle_flash_combusts, pressure_modulated_thrust};
 pub use knife_throw::{KnifeProjectile, KnifeThrowState, KNIFE_THROW_DAMAGE_FACTOR, KNIFE_THROW_MAX_FLIGHT_SECONDS};
 pub use magazine::{Magazine, PoppedRound, RoundKind};
 pub use medical::{

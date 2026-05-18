@@ -35,11 +35,13 @@
 // submodules so consumers that import per the spec paths
 // (`cf_physics::authority::*`, `cf_physics::penetration::*`,
 // `cf_physics::hazard::*`) resolve cleanly.
+pub mod atom_group;
 pub mod authority;
 pub mod constants;
 pub mod facing_routing;
 pub mod hazard;
 pub mod joint;
+pub mod limb_path_interop;
 pub mod parallel;
 pub mod penetration;
 pub mod penetration_ray;
@@ -47,6 +49,11 @@ pub mod ragdoll;
 pub mod sharpness;
 pub mod swept;
 pub mod zone_state;
+pub use atom_group::{
+    evaluate_ricochet, flail_as_limb, push_as_limb, push_travel, Atom, AtomGroup, RicochetOutcome,
+    SweepOutcome, RICOCHET_ANGLE_THRESHOLD, RICOCHET_ENERGY_LOSS, RICOCHET_HARDNESS_FACTOR,
+};
+pub use limb_path_interop::LimbPathInterop;
 pub use authority::{AuthorityKind, AuthorityTransition};
 pub use facing_routing::{classify_hit_direction, exposed_zones, mirror_local_x, HitDirection};
 pub use joint::{evaluate_joint, explosion_impulse, fall_impulse_chain, severance_probability, severance_roll, Joint, JointEval};

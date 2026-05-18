@@ -41,7 +41,10 @@
     clippy::needless_pass_by_value
 )]
 
+pub mod arm_sway;
+pub mod atmosphere_contact;
 pub mod attachable;
+pub mod attitude;
 pub mod body_armor_slot;
 pub mod components;
 pub mod constants;
@@ -49,17 +52,61 @@ pub mod cover;
 pub mod gib;
 pub mod inventory;
 pub mod lean;
+pub mod limb_path;
 pub mod mass_aggregator;
+pub mod material_contact;
+pub mod move_state;
+pub mod quick_action;
+pub mod resource_drain;
 pub mod sim;
+pub mod sim_overlay;
 pub mod stamina;
 pub mod stance;
 pub mod systems;
 pub mod ttd;
 
+pub use atmosphere_contact::{
+    resolve_atmosphere_contact, suit_o2_drain_mol_per_tick, wind_force_for_actor, AtmosphereContact,
+};
+pub use material_contact::{resolve_material_contact, MaterialContact};
+pub use resource_drain::{apply_stride_drain, drain_per_stride, resource_speed_mult};
+pub use sim_overlay::{
+    compute_overlay, OverlayOutcome, WALK_SPEED_HYPERTHERMIC_MULT, WALK_SPEED_HYPOTHERMIC_MULT,
+    WALK_SPEED_HYPOXIA_MULT, WALK_SPEED_TOXIC_STAMINA_MULT,
+};
+
+pub use arm_sway::{
+    bg_arm_rotation, empty_arm_swing, fg_arm_rotation, head_rotation_target, tick_arm_sway,
+    ArmSwayContext, ArmSwayState, ARM_SWING_RATE, BG_ARM_FLAIL_SCALAR, DEVICE_ARM_SWAY_RATE,
+    FG_ARM_FLAIL_SCALAR, HEAD_SMOOTHING, LOOK_TO_AIM_RATIO,
+};
+pub use attitude::{
+    angular_impulse_from_offcenter_hit, attitude_spring_tick_dying, attitude_spring_tick_stable,
+    attitude_spring_tick_unstable, evaluate_knockdown, tick_prone_state_machine, tick_walk_angle,
+    AttitudeState, AttitudeStatus, KnockdownOutcome, RotAngleTargets, SpringContext,
+    WalkAngleState, WalkPathOffset, CROUCH_ROT_TARGET, DYING_DURATION_MS, DYING_SPRING_K_SCALAR,
+    JUMP_ROT_TARGET, MAX_CROUCH_ROTATION, MAX_WALKPATH_CROUCH_SHIFT, PRONE_DAMP_FACTOR,
+    PRONE_GOSPRING_K, PRONE_HOLD_SPRING_K, PRONE_TRANSITION_MS, SPRING_DAMPING_BASE,
+    SPRING_DAMPING_HEALTH_COEF, SPRING_STRENGTH, STABLE_RECOVER_MS, STAND_ROT_TARGET,
+    UNSTABLE_SPRING_K, WALK_ROT_TARGET,
+};
+pub use limb_path::{
+    default_infantry_arm_crawl, default_infantry_climb, default_infantry_crawl,
+    default_infantry_crouch, default_infantry_dislodge, default_infantry_jump,
+    default_infantry_registry, default_infantry_stand, default_infantry_walk_bg,
+    default_infantry_walk_fg, LimbPath, LimbPathRegistry, LimbPathSpeed, PathSide,
+};
+pub use move_state::{MoveState, ProneState, UpperBodyState};
+pub use quick_action::{
+    InvokeOutcome, QuickActionBarState, QuickActionSlot, QuickActionSlotKind, RadialPhase,
+    RadialState, QUICK_ACTION_DEADZONE_PX, QUICK_ACTION_OPEN_MS, QUICK_ACTION_SLOT_COUNT,
+    QUICK_ACTION_TAP_MAX_MS, QUICK_ACTION_TIME_SLOW, QUICK_ACTION_TIME_SLOW_REDUCE_MOTION,
+};
+
 pub use inventory::{
     Container, InventoryBreakdown, InventoryEncumbrance, InventoryGrid, PlacedItem,
 };
-pub use mass_aggregator::{breakdown as mass_breakdown, total_mass, MassBreakdown};
+pub use mass_aggregator::{breakdown as mass_breakdown, mass_factor, total_mass, MassBreakdown};
 
 pub use attachable::{apply_damage as apply_attachable_damage, Attachable};
 pub use body_armor_slot::{ArmorHitOutcome, ArmorSlotState, BodyArmorSlot, EquipReject as BodyArmorEquipReject, HitZone};
@@ -1141,6 +1188,92 @@ pub struct ActorState {
     /// snagged on a wire; `None` otherwise.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub crossing: Option<cf_fortification::WireId>,
+    /// **M14A** § "MoveState" — current locomotion state (CCCP analog).
+    #[serde(default)]
+    pub move_state: crate::move_state::MoveState,
+    /// **M14A** § "ProneState".
+    #[serde(default)]
+    pub prone_state: crate::move_state::ProneState,
+    /// **M14A** § "UpperBodyState".
+    #[serde(default)]
+    pub upper_body_state: crate::move_state::UpperBodyState,
+    /// **M14A** § "Rotational balancing spring".
+    #[serde(default)]
+    pub attitude: crate::attitude::AttitudeState,
+    /// **M14A** § "Per-leg WalkAngle slope adapter".
+    #[serde(default)]
+    pub walk_angle: crate::attitude::WalkAngleState,
+    /// **M14A** § "UpdateCrouching — crouch lean + WalkPathOffset".
+    #[serde(default)]
+    pub walk_path_offset: crate::attitude::WalkPathOffset,
+    /// **M14A** § "Arm sway state".
+    #[serde(default)]
+    pub arm_sway: crate::arm_sway::ArmSwayState,
+    /// **M14A** § "Stride alternation algorithm" — true on the tick a foot plants.
+    #[serde(default)]
+    pub stride_frame: bool,
+    /// **M14A** § "Stride alternation algorithm" — `true` at start of stride.
+    #[serde(default)]
+    pub stride_start: bool,
+    /// **M14A** § "stride_timer_ms" — wall-clock-stable per-tick counter.
+    #[serde(default)]
+    pub stride_timer_ms: u32,
+    /// **M14A** § "Stride alternation" — last side that plant'd (true = fg).
+    #[serde(default)]
+    pub last_stride_side_fg: bool,
+    /// **M14A** § "Per-actor limb-path registry" — RON-loadable, defaults to
+    /// `default_infantry_registry()`. Owned on actor for serde round-trip.
+    #[serde(default = "crate::limb_path::default_infantry_registry")]
+    pub limb_paths: crate::limb_path::LimbPathRegistry,
+    /// **M14A** § "Jetpack physics" — equipped jetpack instance.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub jetpack: Option<cf_equipment::Jetpack>,
+    /// **M14A** § "Quick Action UX" — 8-slot bar + radial state.
+    #[serde(default)]
+    pub quick_action_bar: crate::quick_action::QuickActionBarState,
+    /// **M14A** § "Mass aggregation — every kg matters" — cached total mass.
+    #[serde(default)]
+    pub total_mass_cached: f32,
+    /// **M14A** § "Mass × everything matrix" — true when the cached mass is
+    /// stale and `total_mass()` must recompute.
+    #[serde(default = "default_mass_dirty")]
+    pub total_mass_dirty: bool,
+    /// **M14A** § "Wound mass from lodged pixels" — accumulated lodged-pixel mass.
+    #[serde(default)]
+    pub wound_mass_kg: f32,
+    /// **M14A** § "actor.on_stride" — last tick a stride event fired
+    /// (consumers like cf-perception read this to emit hearing signals).
+    #[serde(default)]
+    pub last_stride_tick: u64,
+    /// **M14A** § "Hold-Q radial flow" — tick a Q-press began on; used to
+    /// disambiguate tap-Q from hold-Q.
+    #[serde(default)]
+    pub q_press_tick: u64,
+    /// **M14A** § "Hold-Q radial flow" — `true` while Q is held.
+    #[serde(default)]
+    pub q_held: bool,
+    /// **M14A** § "Quick action UX last-used slot".
+    #[serde(default)]
+    pub last_used_quick_slot: u8,
+    /// **M14A** § "armor scratch" — per-zone advance (0..3 decal level).
+    /// Level 1 = 0-30% External lost; 2 = 30-60%; 3 = 60-100%.
+    #[serde(default)]
+    pub armor_scratch_level: std::collections::BTreeMap<String, u8>,
+    /// **M14A** § "Atmospheric overlay" — last sampled atmosphere at actor pos.
+    #[serde(default)]
+    pub atmosphere_sample: AtmosphereSample,
+    /// **M14A** § "Per-stride hazard.actor_contact debouncing" — tick of last
+    /// per-zone hazard contact (zone_name → tick).
+    #[serde(default)]
+    pub last_hazard_contact_tick: std::collections::BTreeMap<String, u64>,
+}
+
+/// **M14A** § "Atmospheric overlay" — re-export of [`cf_atmos::AtmosphereSample`]
+/// so callers don't need to depend on cf-atmos directly.
+pub use cf_atmos::AtmosphereSample;
+
+fn default_mass_dirty() -> bool {
+    true
 }
 
 fn default_bipod_equipped() -> cf_equipment::Bipod {
@@ -1329,6 +1462,30 @@ impl ActorState {
             body_armor: BodyArmorSlot::default(),
             crewing_fortification_id: None,
             crossing: None,
+            move_state: crate::move_state::MoveState::default(),
+            prone_state: crate::move_state::ProneState::default(),
+            upper_body_state: crate::move_state::UpperBodyState::default(),
+            attitude: crate::attitude::AttitudeState::default(),
+            walk_angle: crate::attitude::WalkAngleState::default(),
+            walk_path_offset: crate::attitude::WalkPathOffset::default(),
+            arm_sway: crate::arm_sway::ArmSwayState::default(),
+            stride_frame: false,
+            stride_start: true,
+            stride_timer_ms: 0,
+            last_stride_side_fg: false,
+            limb_paths: crate::limb_path::default_infantry_registry(),
+            jetpack: None,
+            quick_action_bar: crate::quick_action::QuickActionBarState::infantry_default(),
+            total_mass_cached: 80.0,
+            total_mass_dirty: true,
+            wound_mass_kg: 0.0,
+            last_stride_tick: 0,
+            q_press_tick: 0,
+            q_held: false,
+            last_used_quick_slot: 0,
+            armor_scratch_level: std::collections::BTreeMap::new(),
+            atmosphere_sample: AtmosphereSample::default(),
+            last_hazard_contact_tick: std::collections::BTreeMap::new(),
         }
     }
 
@@ -1363,6 +1520,8 @@ impl ActorState {
             cf_chassis::ChassisKind::CrabQuadruped => (Vec2::new(16.0, 14.0), 350.0),
             // Drone: small target on all sides.
             cf_chassis::ChassisKind::Drone => (Vec2::new(6.0, 6.0), 30.0),
+            // **M14A** § "Heavy Trooper" — 380 kg base loaded.
+            cf_chassis::ChassisKind::HeavyTrooper => (Vec2::new(11.0, 22.0), 380.0),
         };
         self.half_extents = half_extents;
         self.mass_kg = mass;
@@ -1501,6 +1660,127 @@ impl ActorState {
             return true;
         }
         false
+    }
+
+    /// **M14A** § "Mass aggregation system" — recompute the cached
+    /// `total_mass_cached` if dirty, then return it.
+    pub fn total_mass_kg(&mut self) -> f32 {
+        if self.total_mass_dirty {
+            self.total_mass_cached = crate::mass_aggregator::total_mass(self);
+            self.total_mass_dirty = false;
+        }
+        self.total_mass_cached
+    }
+
+    /// **M14A** § "Mass × everything matrix" — current walk-speed mass factor.
+    pub fn walk_speed_mass_factor(&mut self) -> f32 {
+        let _ = self.total_mass_kg();
+        crate::mass_aggregator::mass_factor(self)
+    }
+
+    /// **M14A** § "Live recalculation hooks" — invalidate the cached total mass.
+    pub fn mark_mass_dirty(&mut self) {
+        self.total_mass_dirty = true;
+    }
+
+    /// **M14A** § "Mass aggregation system" — equip a jetpack on this actor.
+    /// Marks mass dirty so the next `total_mass_kg()` call recomputes.
+    pub fn equip_jetpack(&mut self, jetpack: cf_equipment::Jetpack) {
+        self.jetpack = Some(jetpack);
+        self.mark_mass_dirty();
+    }
+
+    /// **M14A** § "Backpack severance → jetpack failure" — drop the jetpack.
+    pub fn drop_jetpack(&mut self) -> Option<cf_equipment::Jetpack> {
+        self.mark_mass_dirty();
+        self.jetpack.take()
+    }
+
+    /// **M14A** § "Quick Action UX" — reseat the QAB to the per-chassis
+    /// default layout. Called after `attach_chassis`.
+    pub fn reseat_quick_action_bar_for_chassis(&mut self) {
+        let kind = self.chassis.as_ref().map(|c| c.kind);
+        self.quick_action_bar = match kind {
+            Some(cf_chassis::ChassisKind::PoweredArmor) => {
+                crate::quick_action::QuickActionBarState::powered_armor_default()
+            }
+            Some(cf_chassis::ChassisKind::LightMech) => {
+                crate::quick_action::QuickActionBarState::light_mech_default()
+            }
+            Some(cf_chassis::ChassisKind::HeavyTrooper) => {
+                crate::quick_action::QuickActionBarState::heavy_trooper_default()
+            }
+            _ => crate::quick_action::QuickActionBarState::infantry_default(),
+        };
+    }
+
+    /// **M14A** § "actor.on_stride" — note a stride event on this tick.
+    /// Sets `stride_frame=true` (consumed end-of-tick), advances
+    /// `last_stride_side_fg`, records `last_stride_tick`.
+    pub fn emit_stride(&mut self, tick: u64, side_fg: bool) {
+        self.stride_frame = true;
+        self.last_stride_side_fg = side_fg;
+        self.last_stride_tick = tick;
+        self.stride_start = false;
+        self.stride_timer_ms = 0;
+    }
+
+    /// **M14A** § "Apply hazard overlay disabled slots" — gate the QAB by
+    /// active hazard zones (EM disruption disables slots 6/7/8 by default).
+    pub fn apply_em_disruption(&mut self, em_disrupted: bool) {
+        if em_disrupted {
+            self.quick_action_bar.apply_hazard_disabled_slots(&[5, 6, 7]);
+        } else {
+            self.quick_action_bar.apply_hazard_disabled_slots(&[]);
+        }
+    }
+
+    /// **M14A** § "Heavy Armor — visible armor scratches" — advance the
+    /// per-zone scratch level when external HP drops past thresholds.
+    /// Returns `true` when the level changed (caller emits decal-spawn event).
+    pub fn maybe_advance_armor_scratch(&mut self, zone_name: &str, external_pct: f32) -> bool {
+        let new_level = if external_pct >= 0.7 {
+            1
+        } else if external_pct >= 0.4 {
+            2
+        } else if external_pct > 0.0 {
+            3
+        } else {
+            0
+        };
+        let prev = self.armor_scratch_level.get(zone_name).copied().unwrap_or(0);
+        if new_level > prev {
+            self.armor_scratch_level.insert(zone_name.to_string(), new_level);
+            true
+        } else {
+            false
+        }
+    }
+
+    /// **M14A** § "Knockdown threshold" — check whether incoming impulse
+    /// exceeds the stagger threshold, scaled by per-zone `stagger_factor`.
+    pub fn knockdown_check(&mut self, incoming_impulse_n_s: f32, zone: cf_chassis::BodyZone) -> crate::attitude::KnockdownOutcome {
+        let total_mass = self.total_mass_kg();
+        let stagger_factor = self
+            .chassis
+            .as_ref()
+            .and_then(|c| c.zones.iter().find(|z| z.zone == zone))
+            .map(|z| z.stagger_factor)
+            .unwrap_or(1.0);
+        let effective_impulse = incoming_impulse_n_s / stagger_factor.max(0.05);
+        crate::attitude::evaluate_knockdown(effective_impulse, total_mass)
+    }
+
+    /// **M14A** § "Per-stride material contact resolver" — apply per-stride
+    /// per-material hazard contact via a debounce window.
+    pub fn maybe_emit_hazard_contact(&mut self, zone_name: &str, current_tick: u64, debounce_ticks: u64) -> bool {
+        let last = self.last_hazard_contact_tick.get(zone_name).copied().unwrap_or(0);
+        if current_tick.saturating_sub(last) >= debounce_ticks {
+            self.last_hazard_contact_tick.insert(zone_name.to_string(), current_tick);
+            true
+        } else {
+            false
+        }
     }
 
     /// **M13** § "Brain hopping" — mark this actor as the player's brain.
