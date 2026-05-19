@@ -9627,10 +9627,20 @@ impl M0Engine {
     /// pass. For each scenario-authored thermal zone, advances the
     /// dwell-tick counter and runs
     /// [`cf_environment::classify_tile_thermal`]; emits a
-    /// `wound.created` event each time the burn / frostbite degree
-    /// changes. Zero zones → zero-cost pass.
+    /// `wound.created` event the first time the actor's zone enters a
+    /// burn / frostbite tier, and a `wound.escalated` event for every
+    /// subsequent upgrade on the same zone (Burn1st → Burn2nd → Burn3rd,
+    /// Frostbite1st → Frostbite3rd, etc) per VAL-M14G-013 / VAL-M14G-014.
+    /// Zero zones → zero-cost pass.
     fn tick_m14g_thermal_contacts(&self, tick: Tick, sim_time_ms: f64) {
-        let mut to_emit: Vec<(u64, cf_environment::ThermalWoundEmit)> = Vec::new();
+        enum ThermalDelta {
+            Created(cf_environment::ThermalWoundEmit),
+            Escalated {
+                old_kind: cf_wound::WoundKind,
+                emit: cf_environment::ThermalWoundEmit,
+            },
+        }
+        let mut to_emit: Vec<(u64, ThermalDelta)> = Vec::new();
         if let Ok(mut s) = self.state.write() {
             let zones = s.m14g_thermal_zones.clone();
             for z in &zones {
@@ -9656,19 +9666,42 @@ impl M0Engine {
                     let prev = s.m14g_thermal_emitted_kind.get(&key).copied();
                     if prev != Some(emit.kind) {
                         s.m14g_thermal_emitted_kind.insert(key.clone(), emit.kind);
-                        to_emit.push((z.actor_id, emit));
+                        match prev {
+                            None => to_emit.push((z.actor_id, ThermalDelta::Created(emit))),
+                            Some(old_kind) => to_emit.push((
+                                z.actor_id,
+                                ThermalDelta::Escalated { old_kind, emit },
+                            )),
+                        }
                     }
                 }
             }
         }
-        for (actor_id, emit) in to_emit {
-            let m14g_emit = cf_physics::M14gWoundEmit {
-                kind: emit.kind,
-                severity: emit.severity,
-                zone: emit.zone,
-                dirt_pct: 0.0,
-            };
-            let _ = self.m14g_emit_wound_created(tick, sim_time_ms, actor_id, m14g_emit, None);
+        for (actor_id, delta) in to_emit {
+            match delta {
+                ThermalDelta::Created(emit) => {
+                    let m14g_emit = cf_physics::M14gWoundEmit {
+                        kind: emit.kind,
+                        severity: emit.severity,
+                        zone: emit.zone,
+                        dirt_pct: 0.0,
+                    };
+                    let _ = self
+                        .m14g_emit_wound_created(tick, sim_time_ms, actor_id, m14g_emit, None);
+                }
+                ThermalDelta::Escalated { old_kind, emit } => {
+                    let _ = self.m14g_emit_wound_escalated(
+                        tick,
+                        sim_time_ms,
+                        actor_id,
+                        old_kind,
+                        emit.kind,
+                        emit.severity,
+                        emit.zone,
+                        None,
+                    );
+                }
+            }
         }
     }
 
@@ -9855,6 +9888,56 @@ impl M0Engine {
         Some(self
             .recorder
             .record(tick, sim_time_ms, "wound", "created", payload, parent))
+    }
+
+    /// **M14G § VAL-M14G-013 / VAL-M14G-014 / VAL-M14G-036**: upgrade an
+    /// existing wound on `(actor_id, zone)` from `old_kind` to
+    /// `new_kind` and emit a `wound.escalated` event. Used by the
+    /// per-tick thermal pass when a sustained burn / frostbite contact
+    /// crosses the next tier threshold. The existing wound in the
+    /// `ActorWoundList` is mutated in place (kind + severity updated)
+    /// so the actor's wound count stays the same — the spec mandates
+    /// escalation upgrades the wound, not a fresh emission.
+    fn m14g_emit_wound_escalated(
+        &self,
+        tick: Tick,
+        sim_time_ms: f64,
+        actor_id: u64,
+        old_kind: cf_wound::WoundKind,
+        new_kind: cf_wound::WoundKind,
+        new_severity: f32,
+        zone: cf_wound::registry::ZoneId,
+        parent: Option<String>,
+    ) -> Option<String> {
+        let actor_key = cf_actor::ActorId(actor_id);
+        let mut s = self.state.write().ok()?;
+        let sim = s.actor_state.as_mut()?;
+        let actor = sim.world.actors.get_mut(&actor_key)?;
+        let mut upgraded_wound_id: Option<cf_wound::WoundId> = None;
+        let mut old_severity: f32 = 0.0;
+        if let Some(wounds) = actor.m14g_wound_list.zone_mut(&zone) {
+            if let Some(w) = wounds.iter_mut().find(|w| w.kind == old_kind) {
+                old_severity = w.severity;
+                w.kind = new_kind;
+                w.severity = new_severity.clamp(0.0, 1.0);
+                upgraded_wound_id = Some(w.id);
+            }
+        }
+        drop(s);
+        let wound_id = upgraded_wound_id?;
+        let payload = serde_json::json!({
+            "actor_id": actor_id,
+            "tick": tick.0,
+            "wound_id": wound_id.0,
+            "zone": zone.as_str(),
+            "old_kind": old_kind.as_str(),
+            "new_kind": new_kind.as_str(),
+            "old_severity": old_severity,
+            "new_severity": new_severity.clamp(0.0, 1.0),
+        });
+        Some(self
+            .recorder
+            .record(tick, sim_time_ms, "wound", "escalated", payload, parent))
     }
 
     /// integrity pass. Runs at the same N=15 cadence as the M14E

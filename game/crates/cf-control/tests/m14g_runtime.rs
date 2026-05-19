@@ -167,34 +167,85 @@ fn val_m14g_runtime_wall_rupture_wounds() {
 
 /// VAL-M14G-013/014/030 runtime evidence: cfctl drive of the
 /// composite scenario (which carries `m14g_thermal_zones`) emits the
-/// expected burn + frostbite kind ladders via the engine.
+/// initial burn + frostbite degree as `wound.created`, then each
+/// subsequent degree-upgrade on the same zone as `wound.escalated`
+/// per the spec's Gherkin acceptance scenarios for sustained
+/// fire / cold exposure. The composite scenario's thermal zones are
+/// `foot_right` (hot, 800 K) and `hand_right` (cold, 250 K); other
+/// zones can still legitimately emit Burn3rd via the HEAT-cluster
+/// producer (VAL-M14G-022), so the zone-anchored check is scoped to
+/// those two zones only.
 #[test]
 fn val_m14g_runtime_thermal_wounds_emit_via_engine() {
     let (_engine, events) = drive_scenario("m14g_whole_mission_determinism", 600);
-    let burns = [
-        count_wounds_of_kind(&events, "Burn1st"),
-        count_wounds_of_kind(&events, "Burn2nd"),
-        count_wounds_of_kind(&events, "Burn3rd"),
-    ];
-    let frostbites = [
-        count_wounds_of_kind(&events, "Frostbite1st"),
-        count_wounds_of_kind(&events, "Frostbite2nd"),
-        count_wounds_of_kind(&events, "Frostbite3rd"),
-    ];
-    for (i, count) in burns.iter().enumerate() {
+    let zone_eq = |e: &&cf_replay::Event, zone: &str| -> bool {
+        e.payload
+            .get("zone")
+            .and_then(|v| v.as_str())
+            .map(|z| z == zone)
+            .unwrap_or(false)
+    };
+    let count_created_on_zone = |kind: &str, zone: &str| -> usize {
+        events
+            .iter()
+            .filter(|e| e.category == "wound" && e.event_type == "created")
+            .filter(|e| {
+                e.payload
+                    .get("kind")
+                    .and_then(|v| v.as_str())
+                    .map(|k| k == kind)
+                    .unwrap_or(false)
+            })
+            .filter(|e| zone_eq(e, zone))
+            .count()
+    };
+    let count_escalated_new_kind_on_zone = |new_kind: &str, zone: &str| -> usize {
+        events
+            .iter()
+            .filter(|e| e.category == "wound" && e.event_type == "escalated")
+            .filter(|e| {
+                e.payload
+                    .get("new_kind")
+                    .and_then(|v| v.as_str())
+                    .map(|k| k == new_kind)
+                    .unwrap_or(false)
+            })
+            .filter(|e| zone_eq(e, zone))
+            .count()
+    };
+    // First-tier kinds (Burn1st, Frostbite1st) MUST fire as wound.created
+    // on the thermal-zone actors.
+    assert!(
+        count_created_on_zone("Burn1st", "foot_right") >= 1,
+        "expected ≥ 1 wound.created kind=Burn1st zone=foot_right from initial fire contact"
+    );
+    assert!(
+        count_created_on_zone("Frostbite1st", "hand_right") >= 1,
+        "expected ≥ 1 wound.created kind=Frostbite1st zone=hand_right from initial cold contact"
+    );
+    // Higher tiers on the thermal zone MUST arrive as wound.escalated
+    // upgrades of the same wound — never as a fresh wound.created on
+    // the same zone.
+    for needle in ["Burn2nd", "Burn3rd"] {
         assert!(
-            *count >= 1,
-            "expected ≥ 1 Burn{}st/2nd/3rd from thermal pass; ladder={:?}",
-            i + 1,
-            burns
+            count_escalated_new_kind_on_zone(needle, "foot_right") >= 1,
+            "expected ≥ 1 wound.escalated new_kind={needle} zone=foot_right from sustained burn"
+        );
+        assert_eq!(
+            count_created_on_zone(needle, "foot_right"),
+            0,
+            "{needle} on foot_right must arrive via wound.escalated, not wound.created"
         );
     }
-    for (i, count) in frostbites.iter().enumerate() {
+    for needle in ["Frostbite2nd", "Frostbite3rd"] {
         assert!(
-            *count >= 1,
-            "expected ≥ 1 Frostbite{} from thermal pass; ladder={:?}",
-            i + 1,
-            frostbites
+            count_escalated_new_kind_on_zone(needle, "hand_right") >= 1,
+            "expected ≥ 1 wound.escalated new_kind={needle} zone=hand_right from sustained cold"
+        );
+        assert_eq!(
+            count_created_on_zone(needle, "hand_right"),
+            0,
+            "{needle} on hand_right must arrive via wound.escalated, not wound.created"
         );
     }
 }

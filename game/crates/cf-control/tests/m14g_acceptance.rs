@@ -272,7 +272,10 @@ fn end_of_mission_save_load_round_trip() {
 
 /// VAL-CROSS-010 (event-stream surface): the new composite scenario
 /// must emit a non-empty mix of wound kinds across actors during the
-/// 600-tick run.
+/// 600-tick run. Walks both `wound.created` and `wound.escalated` so
+/// the final kind reached by a sustained thermal contact (e.g.
+/// Burn1st → Burn2nd → Burn3rd) is counted regardless of which event
+/// announced it.
 #[test]
 fn composite_scenario_emits_multi_kind_wound_stream() {
     let engine = make_engine(COMPOSITE_SCENARIO, COMPOSITE_TICKS, COMPOSITE_SEED);
@@ -280,11 +283,21 @@ fn composite_scenario_emits_multi_kind_wound_stream() {
     let events = engine.recorder().snapshot_events();
     let mut kinds: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
     for e in events.iter() {
-        if e.category != "wound" || e.event_type != "created" {
+        if e.category != "wound" {
             continue;
         }
-        if let Some(k) = e.payload.get("kind").and_then(|v| v.as_str()) {
-            kinds.insert(k.to_string());
+        match e.event_type.as_str() {
+            "created" => {
+                if let Some(k) = e.payload.get("kind").and_then(|v| v.as_str()) {
+                    kinds.insert(k.to_string());
+                }
+            }
+            "escalated" => {
+                if let Some(k) = e.payload.get("new_kind").and_then(|v| v.as_str()) {
+                    kinds.insert(k.to_string());
+                }
+            }
+            _ => {}
         }
     }
     assert!(
